@@ -1,5 +1,3 @@
-// Recorded provider transcripts are committed, so no prompt, answer, path, account detail or token
-// may survive the redaction, in any field, also in a field that a later CLI version adds.
 import { describe, expect, it } from "vitest";
 import { assertRedacted, createTranscriptRedactor, REDACTED } from "./transcript-redaction";
 

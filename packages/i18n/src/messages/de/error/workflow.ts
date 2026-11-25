@@ -6,11 +6,15 @@ export const messages = {
   "error.workflow.versionMissing": "Diese Version des Workflows existiert nicht mehr.",
   "error.workflow.annotation": "Texte, Notizen und Formen können keine Verbindungen haben.",
   "error.workflow.port": "Ein Schritt kann diese Art von Eingabe nicht annehmen.",
+  "error.workflow.unknownValue":
+    "Dieses OpenBot kennt eine Einstellung eines Schritts nicht. Aktualisiere OpenBot und versuche es dann erneut.",
   "error.workflow.branch": "Nur eine Bedingung kann Ja- und Nein-Verbindungen haben.",
   "error.workflow.conditionBranch": "Jede Verbindung einer Bedingung muss Ja oder Nein sein.",
   "error.workflow.duplicateEdge": "Diese zwei Schritte haben diese Verbindung bereits.",
   "error.workflow.serverTooOld":
     "Dieser Server unterstützt keine Workflows. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
+  "error.workflow.newerSteps":
+    "Dieser Workflow hat Schritte aus einer neueren OpenBot-Version. Aktualisiere OpenBot, um ihn zu ändern.",
   "error.workflow.nodeUnsupported":
     "Diese Version von OpenBot kann Bild-, Datei- und Nachrichtenschritte noch nicht ausführen.",
   "error.workflow.interrupted": "OpenBot wurde beendet, während dieser Schritt lief. Führe ihn erneut aus.",
@@ -20,11 +24,27 @@ export const messages = {
   "error.workflow.agentStepStopped":
     "Der Agent hat angehalten, bevor er auf diesen Schritt antwortete. Führe den Schritt erneut aus.",
   "error.workflow.conditionUnclear": "Das Modell hat nicht mit Ja oder Nein geantwortet.",
+  "error.workflow.answerInvalid":
+    "Die Antwort hatte nicht die Felder, die dieser Schritt verlangt: {fields}. Führe den Schritt erneut aus.",
+  "error.workflow.answerSetup":
+    "Die Antwortfelder dieses Workflows passen hier nicht: {fields}. Korrigiere den Workflow und führe den Schritt dann erneut aus.",
+  "error.workflow.answerSourceEnded":
+    "Diese Felder haben keinen Wert, weil der Schritt, der sie liefert, nicht abgeschlossen wurde: {fields}. Führe zuerst diesen Schritt erneut aus.",
+  "error.workflow.runInputInvalid":
+    "Die Eingabe des Laufs passt nicht zu den Antwortfeldern des Auslösers: {fields}. Sende ein JSON-Objekt mit diesen Feldern.",
+  "error.workflow.sourceNotDone":
+    "Ein Schritt davor ist beim letzten Lauf fehlgeschlagen oder wurde gestoppt. Führe zuerst diesen Schritt erneut aus.",
+  "error.workflow.checkInvalid":
+    "Die Prüfung dieses Schritts ist ungültig. Korrigiere sie und führe den Schritt erneut aus.",
   "error.workflow.modelFailed": "Das Modell konnte nicht antworten. Führe den Schritt erneut aus.",
   "error.workflow.modelTimedOut":
     "Das Modell hat nicht rechtzeitig geantwortet. Wähle für diesen Schritt einen geringeren Aufwand oder ein schnelleres Modell und führe ihn erneut aus.",
   "error.workflow.modelToolUse":
     "Das Modell wollte ein Tool verwenden, aber dieser Schritt kann nur mit Text antworten. Führe den Schritt erneut aus oder wähle ein anderes Modell dafür.",
+  "error.workflow.modelImageUnsupported":
+    "Das Modell dieses Schritts kann keine Bilder lesen. Wähle ein Modell, das es kann, oder entferne die Bildverbindung.",
+  "error.workflow.modelImageType":
+    "Ein Modellschritt kann nur PNG-, JPEG-, GIF- und WebP-Bilder lesen. Verbinde ein Bild in einem dieser Formate.",
   "error.workflow.modelUnavailable":
     "Das Modell dieses Schritts ist nicht verfügbar. Wähle ein anderes Modell für diesen Schritt.",
   "error.workflow.providerBusy":
@@ -33,6 +53,7 @@ export const messages = {
     "OpenBot konnte den Anbieter nicht erreichen. Prüfe die Internetverbindung und führe den Schritt dann erneut aus.",
   "error.workflow.modelBusy": "Eine andere Modellanfrage läuft. Führe den Schritt bald erneut aus.",
   "error.workflow.mediaFailed": "Das Modell konnte das Bild oder Video nicht erstellen. Führe den Schritt erneut aus.",
+  "error.workflow.mediaNotMade": "Das Modell hat das Bild oder Video nicht erstellt. Es schrieb: {answer}",
   "error.workflow.pictureMissing": "Das Bild ist nicht mehr auf dem Server. Sende es erneut.",
   "error.workflow.pictureType": "Verwende ein PNG-, JPEG- oder WebP-Bild.",
   "error.workflow.mediaInputMissing":
@@ -41,6 +62,8 @@ export const messages = {
     "Schreibe eine Beschreibung oder führe die Schritte davor aus, damit ein Text oder ein Bild ankommt.",
   "error.workflow.mediaInputNotImage":
     "Dieser Schritt nimmt nur Bilder an, keine Videos. Entferne die Verbindung vom Video.",
+  "error.workflow.mediaInputNotClip":
+    "Dieser Eingang nimmt nur Videos und Audiodateien an. Entferne die Verbindung von der Datei.",
   "error.workflow.stepMissing": "Dieser Schritt existiert nicht mehr.",
   "error.workflow.nodeMissing": "Dieser Schritt ist nicht im Workflow.",
   "error.workflow.runMissing": "Dieser Lauf existiert nicht mehr.",

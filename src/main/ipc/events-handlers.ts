@@ -97,7 +97,6 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
       throw new Error(sourceText("error.backend.eventsUnavailable"));
     return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
   }
-  /** A host with `routine-recovery-v1` reads and saves `missedPolicy`, which the `events-v1` routes drop. */
   function recovery(serverId: string): boolean {
     return remoteServers.supportsCapability(serverId, ROUTINE_RECOVERY_CAPABILITY);
   }
@@ -109,7 +108,6 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
       input,
     );
     const agentId = runPlaceAgent(serverId, input.owner);
-    // A host with `routine-pause-reasons-v1` says which paused routine a run of its own paused (#10048).
     const pausedAgentId =
       input.owner.kind === "agent" && remoteServers.supportsCapability(serverId, ROUTINE_PAUSE_REASONS_CAPABILITY)
         ? input.owner.id
@@ -124,16 +122,11 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
     ]);
     return withRoutinePauseReasons(withRoutineRunPlaces(list, places), reasons);
   }
-  /** A host with `routine-run-place-v1` keeps where an agent routine runs, which the event routes drop. */
   function runPlaceAgent(serverId: string, owner: EventRoutineOwner): string | null {
     return owner.kind === "agent" && remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY)
       ? owner.id
       : null;
   }
-  /**
-   * A host with `routines-once-v1` lists and saves the `once` routines, which the event routes leave
-   * out and refuse. Null for a host without it.
-   */
   function onceSend(serverId: string): RoutinesOncePost | null {
     if (!remoteServers.supportsCapability(serverId, ROUTINES_ONCE_CAPABILITY)) return null;
     return (path, decode, body) =>
@@ -180,8 +173,6 @@ export function eventsIpcHandlers({ events, remoteServers }: EventsIpcDependenci
             routineId: saved.routine.id,
             runIn: input.runIn,
           });
-          // The new routine exists, so a failed place does not fail the create: it runs in the chat,
-          // and a second save does not make a second routine.
           const place =
             input.id === undefined
               ? await placed.catch(() => {

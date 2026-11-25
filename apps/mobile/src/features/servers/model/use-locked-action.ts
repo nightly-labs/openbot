@@ -1,24 +1,27 @@
+import { useMutation } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/**
- * Runs one action at a time and keeps its error. A tap while an action runs does nothing. `failure`
- * gives the error text; without it the text is the general update failure.
- */
 export function useLockedAction() {
   const { t } = useText();
   const locked = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  async function perform(operation: () => Promise<void>, failure?: (error: unknown) => string): Promise<void> {
+  async function perform(
+    operation: (cancel: () => void) => Promise<void>,
+    failure?: (error: unknown) => string,
+  ): Promise<void> {
     if (locked.current) return;
     locked.current = true;
     setBusy(true);
     setError(null);
     try {
-      await operation();
-      void haptics.notification("success");
+      let cancelled = false;
+      await operation(() => {
+        cancelled = true;
+      });
+      if (!cancelled) void haptics.notification("success");
     } catch (caught) {
       setError(failure?.(caught) ?? t("mobile.server.settings.updateFailed"));
       void haptics.notification("error");
@@ -28,4 +31,33 @@ export function useLockedAction() {
     }
   }
   return { busy, error, perform };
+}
+
+export function useLockedMutation(after: { success?: () => void; settled?: () => void } = {}) {
+  const locked = useRef(false);
+  const action = useMutation({
+    mutationFn: (operation: () => Promise<void>) => operation(),
+    onSuccess: () => {
+      void haptics.notification("success");
+      after.success?.();
+    },
+    onError: () => {
+      void haptics.notification("error");
+    },
+    onSettled: () => {
+      locked.current = false;
+      after.settled?.();
+    },
+  });
+  return {
+    action,
+    perform(operation: () => Promise<void>): Promise<boolean> {
+      if (locked.current) return Promise.resolve(false);
+      locked.current = true;
+      return action.mutateAsync(operation).then(
+        () => true,
+        () => false,
+      );
+    },
+  };
 }

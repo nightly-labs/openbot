@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/billing";
 
 export const messages = {
-  // The Billing tab in Settings and the Billing dialog in the web client.
   "billing.title": "お支払い",
   "billing.description": "サーバーごとにプランがあります。お支払いは Stripe が処理します。",
   "billing.loading": "お支払い情報を読み込んでいます…",
@@ -78,7 +77,6 @@ export const messages = {
   "billing.lifecycle.deleted": "{name} を削除しました。サブスクリプションは終了しました。",
   "billing.lifecycle.label": "デザインプレビュー · 操作は模擬のみ",
   "billing.lifecycle.reset": "プレビューをリセット",
-  // The commercial license of the account, above the server plans.
   "billing.license.title": "ライセンス",
   "billing.license.description": "企業での業務向けです。サーバーは含まれません。",
   "billing.license.loadFailed": "ライセンスを読み込めませんでした。",
@@ -147,7 +145,6 @@ export const messages = {
   "billing.license.cancel.description": "ライセンスは{date}まで有効で、その後終了します。サーバーには影響しません。",
   "billing.license.cancel.descriptionNow": "ライセンスは支払い済み期間の終了時に終了します。サーバーには影響しません。",
   "billing.license.cancel.keep": "ライセンスを維持",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "お支払いサイクル",
   "billing.order.currency": "通貨",
   "billing.order.monthly": "月払い",
@@ -194,7 +191,6 @@ export const messages = {
   "billing.order.cta.license": "ライセンスを購入",
   "billing.order.cta.download": "ダウンロード",
   "billing.order.cta.keepComputer": "このコンピューターで続ける",
-  // Shown before an invite that makes the license too small.
   "billing.license.invite.title": "ライセンスにユーザーを追加しますか？",
   "billing.license.invite.description": "この招待でライセンスにユーザーが 1 人追加され、月額が {price} 増えます。",
   "billing.license.invite.confirm": "追加して招待",
@@ -211,4 +207,28 @@ export const messages = {
   "billing.details.vatIdInvalid": "選択した国の VAT ID ではありません。",
   "billing.details.countryMissing": "請求先の国を選択してください。",
   "billing.details.saveFailed": "請求先情報を保存できませんでした",
+  "billing.credits.explainer.title": "クレジットとは？",
+  "billing.credits.explainer.page": "{page} / {total}",
+  "billing.credits.explainer.pages": "ページ",
+  "billing.credits.explainer.mediaTitle": "クレジットはメディアの支払いに使います",
+  "billing.credits.explainer.mediaText": "エージェントが画像、動画、音声を作ると、クレジットを使います。",
+  "billing.credits.explainer.chatTitle": "チャットは無料です",
+  "billing.credits.explainer.chatText":
+    "チャットはご自身の AI プロバイダーを使います。エージェントとの会話でクレジットは減りません。",
+  "billing.credits.explainer.chatFree": "0 クレジット",
+  "billing.credits.explainer.modelsTitle": "モデルごとに料金があります",
+  "billing.credits.explainer.modelsText":
+    "高性能なモデルほど高くなります。画像は {pictureMin}～{pictureMax} クレジット、{seconds} 秒の動画は {videoMin}～{videoMax} クレジットです。",
+  "billing.credits.explainer.perPicture": "/ 画像",
+  "billing.credits.explainer.perClip": "/ {seconds} 秒の動画",
+  "billing.credits.explainer.getTitle": "クレジットを入手",
+  "billing.credits.explainer.getText":
+    "足りないときはパックを購入できます。大きいパックほど 1 クレジットあたりの価格がお得です。",
+  "billing.credits.explainer.freeEnd": "毎月の無料クレジットには有効期限があります",
+  "billing.credits.explainer.welcome": "新しいアカウントには、一部のモデルを試せる無料クレジット {amount} が付きます",
+  "billing.credits.welcomeIncluded": "無料クレジット: {amount}",
+  "billing.credits.explainer.allPrices": "全{count}モデル",
+  "billing.credits.explainer.next": "次へ",
+  "billing.credits.explainer.gotIt": "OK",
+  "billing.credits.explainer.place": "OpenBot",
 } as const satisfies PartialTranslation<typeof source>;

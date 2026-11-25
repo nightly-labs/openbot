@@ -1,19 +1,3 @@
-// The ACP agent of `acp-turn-stall-e2e.ts`. Each prompt text names what the agent does:
-// - `hang` never answers and ignores `session/cancel`, as an OpenCode prompt that stays open (#2858).
-// - `tool` keeps one tool call open for `FAKE_TOOL_MS`, then answers.
-// - `stream` sends its answer in two chunks `FAKE_CHUNK_GAP_MS` apart, then answers.
-// - `hang-once` never answers until a `session/resume` of its session, as an Antigravity prompt that
-//   its harness lost (#4846). It sends only an `available_commands_update`. After the resume it
-//   answers at once.
-// - `quiet` sends one line, stays silent for `FAKE_QUIET_MS`, then answers, as a background task.
-// - `retry-once` is silent for `FAKE_RETRY_MS`, sends OpenCode's model retry notice, and answers
-//   `FAKE_RETRY_MS` later, as OpenCode after a model that did not answer its first request (#9941).
-// - `retry-forever` sends such a notice each `FAKE_RETRY_MS`, six times, after a null notice for the
-//   failed attempt from the second on, and never answers.
-// - `retry-rate-limit` sends a rate limit retry notice each `FAKE_RATE_RETRY_MS`, three times, then
-//   answers after half that time.
-// Each other prompt answers at once. `FAKE_NO_LOAD=1` offers no `session/load`, as some custom agents.
-// `FAKE_RESUME=1` offers `session/resume`, as Antigravity.
 import { type AcpParams, type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODELS = [{ modelId: "fake-alpha", name: "Fake Alpha" }];
@@ -23,11 +7,11 @@ const quietMs = Number(process.env.FAKE_QUIET_MS ?? 0);
 const retryMs = Number(process.env.FAKE_RETRY_MS ?? 0);
 const rateRetryMs = Number(process.env.FAKE_RATE_RETRY_MS ?? 0);
 const loadSession = process.env.FAKE_NO_LOAD !== "1";
+const silentNew = process.env.FAKE_SILENT_NEW === "1";
 const sessionCapabilities = process.env.FAKE_RESUME === "1" ? { sessionCapabilities: { resume: {} } } : {};
 const resumed = new Set<string>();
 let count = 0;
 
-/** OpenCode 2.2.7's notice of a model retry, or of a failed retried attempt when `attempt` is null. */
 function retryNotice(
   peer: AcpPeer,
   sessionId: string,
@@ -62,7 +46,6 @@ function restore(request: AcpRequest, peer: AcpPeer): void {
   peer.reply(request, setup(sessionId));
 }
 
-/** The user's text, without the instructions that OpenBot puts first in a new or loaded session. */
 function promptText(params: AcpParams): string {
   const text = (params.prompt ?? []).map((block) => block.text ?? "").join("");
   return text.replace(/^[\s\S]*<\/openbot-developer-instructions>/u, "");
@@ -80,6 +63,7 @@ serveFakeAcpAgent(
     "session/new": (request, peer) => {
       count += 1;
       logEntry({ event: "session/new" });
+      if (silentNew && count > 1) return;
       peer.reply(request, setup(`s-${process.pid}-${count}`));
     },
     "session/load": restore,
@@ -92,7 +76,6 @@ serveFakeAcpAgent(
       logEntry({ event: "prompt", sessionId, text });
       if (text === "hang") return;
       if (text === "hang-once" && !resumed.has(sessionId)) {
-        // An update about the session, not about the prompt: the prompt is still lost.
         peer.update(sessionId, { sessionUpdate: "available_commands_update", availableCommands: [] });
         return;
       }
@@ -138,6 +121,16 @@ serveFakeAcpAgent(
           peer.say(sessionId, ", done");
           peer.reply(request, { stopReason: "end_turn" });
         }, quietMs);
+        return;
+      }
+      if (text === "tool-hang") {
+        peer.update(sessionId, {
+          sessionUpdate: "tool_call",
+          toolCallId: "tool-hang-1",
+          title: "Read design file",
+          kind: "other",
+          status: "in_progress",
+        });
         return;
       }
       if (text === "tool") {

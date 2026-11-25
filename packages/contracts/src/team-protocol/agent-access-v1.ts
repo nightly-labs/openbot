@@ -1,16 +1,3 @@
-// Frozen optional agent-access-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or an admin reads and
-// replaces the roles of a server. A role gives its members a level for each agent: `none`, `view`,
-// `chat` or `manage`. The "everyone" levels apply to each member; an agent that they do not list is
-// `manage`. A role does not give a level for an agent that it does not list. A member gets the highest
-// level of "everyone" and of each role that the member has. Owners and admins always have `manage`.
-// A member reads only `mine`, the levels that apply to that member; the host leaves out `everyone`
-// and `roles`. The host hides a `none` agent from that member as it hides an agent from a client that
-// cannot show it, and refuses with 403 a write that the level does not permit. A replace sends the
-// revision that the client read; the host refuses a stale revision with 409. Each change sends
-// `agent-access-changed` with the new revision. Bounds and meaning do not follow IPC changes; widening
-// any of it needs a second capability string.
 import { isDynamicRecord } from "../runtime-values";
 import {
   type AdminDecoder,

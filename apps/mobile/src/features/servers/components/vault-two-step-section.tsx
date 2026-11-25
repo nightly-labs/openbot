@@ -16,16 +16,10 @@ import {
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
 
-/** The site of a login for the setup text: its host name, or "the site" while the field is empty. */
 function twoStepSite(website: string, theSite: string): string {
   return website.trim() ? vaultLoginTitle({ website }) : theSite;
 }
 
-/**
- * The two-step code of a login page (`vault-v3`). Off: Set up opens the setup steps. On: the live
- * code, which the host makes from the saved key, or the phone from a key that is not saved yet, and
- * Remove. The change goes to the host with the login when the user saves it.
- */
 export function VaultTwoStepSection({
   formId,
   serverId,
@@ -41,7 +35,6 @@ export function VaultTwoStepSection({
   host: string;
   website: string;
   saved: VaultLoginSummary | undefined;
-  /** The draft value: null keeps the saved key, "" removes it, other text is a new key. */
   twoStepKey: string | null;
   disabled: boolean;
   onChange: (twoStepKey: string | null) => void;
@@ -54,13 +47,11 @@ export function VaultTwoStepSection({
   const on = keepsSaved || newKey;
   const savedCodes = useServerVaultCodes(serverId, keepsSaved);
   const draft = useDraftTwoStepCode(newKey ? twoStepKey : "");
-  // A new key has the clock of its draft code; a saved key needs its own.
   const savedNow = useSecondClock(keepsSaved);
   const now = newKey ? draft.now : savedNow;
   const code = newKey ? draft.code : saved && keepsSaved ? savedCodes.code(saved.id) : undefined;
   const site = twoStepSite(website, t("mobile.server.vault.twoStep.theSite"));
 
-  // The setup steps give back the key when the user selects Done on the check step.
   const finished = useTwoStepSetup((state) => state.finished);
   useEffect(() => {
     if (finished?.formId !== formId) return;

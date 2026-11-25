@@ -16,8 +16,8 @@ import { messages as connector } from "./connector";
 import { messages as conversation } from "./conversation";
 import { messages as crm } from "./crm";
 import { messages as customProvider } from "./customProvider";
-import { messages as diagram } from "./diagram";
 import { messages as dialog } from "./dialog";
+import { messages as extension } from "./extension";
 import { messages as files } from "./files";
 import { messages as importAgent } from "./import";
 import { messages as island } from "./island";
@@ -53,17 +53,6 @@ import { messages as webClient } from "./webClient";
 import { messages as window } from "./window";
 import { messages as workflow } from "./workflow";
 
-/**
- * Korean. Written from the English source and not yet reviewed by a native speaker: read it as a
- * first draft that is safe to ship behind an explicit language choice, not as final copy. A key that
- * is missing here renders its English source.
- *
- * Notes for a reviewer. Sentences use 해요체 and buttons, tabs and labels use short plain nouns, as
- * docs/i18n.md says. Product names stay in Latin script: OpenBot is
- * the application name, and ZIP and JSON are the file formats a picker shows.
- *
- * This is the desktop catalog: shared keys, source text, and every desktop area.
- */
 export const ko = {
   ...shared,
   ...source,
@@ -99,12 +88,12 @@ export const ko = {
   ...mcp,
   ...messaging,
   ...webClient,
+  ...extension,
   ...account,
   ...onboarding,
   ...usage,
   ...sidebar,
   ...channel,
-  ...diagram,
   ...workflow,
   ...agent,
   ...agentTemplate,

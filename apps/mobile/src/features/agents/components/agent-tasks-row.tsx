@@ -10,17 +10,10 @@ import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** The route name of the Tasks screen in the app stack, `app/(app)/server-tasks.tsx`. */
 const TASKS_ROUTE = "server-tasks";
 
-/**
- * The agent's open tasks in its sheet. Tasks is a full screen, so the screen of this agent's tasks
- * takes the place of the sheet, and Back returns to what was under the sheet. Hidden on a host
- * without `agent-tasks-v1`.
- */
 export function AgentTasksRow({ agent }: { agent: MobileAgent }) {
   const { t, format } = useText();
-  // The stack that presents this sheet. The sheet has its own stack inside.
   const sheetStack = useNavigation().getParent();
   const supported = useMobileWorkspaceSelector((current) => current.canUseTasks(agent.serverId));
   const open = useOpenAgentTasks(agent.serverId, agent.id);

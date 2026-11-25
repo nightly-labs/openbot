@@ -8,7 +8,6 @@ export const messages = {
   "provider.custom.description": "自分のモデルエンドポイント",
   "provider.custom.addLabel": "カスタムプロバイダーを追加",
   "provider.custom.installLabel": "カスタムプロバイダーをインストール",
-  // 日本語に単数複数の区別はないので、どの個数でも同じ形です。
   "provider.endpointCount": { other: "エンドポイント {count} 件" },
   "provider.customAgentCount": { other: "カスタムエージェント {count} 件" },
   "provider.manageEndpoints": { other: "エンドポイント {count} 件を管理" },
@@ -66,6 +65,7 @@ export const messages = {
   "provider.aria.install": "{name} をインストール",
   "provider.aria.signIn": "{name} にサインイン",
   "provider.aria.codeFallback": "コードで {name} にログイン",
+  "provider.aria.addressFallback": "{name} のサインインアドレスを貼り付け",
   "provider.aria.moreActions": "{name} のその他の操作",
   "provider.aria.use": "OpenBot で {name} を使用",
   "provider.use.inUseOne":
@@ -94,11 +94,16 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "待機しています。このログインは残り {time} で停止します。",
   "provider.codeLogin.linkTitle": "別のデバイスで {name} にログイン",
   "provider.codeLogin.pageTitle": "{name} にサインイン",
+  "provider.codeLogin.addressDescription":
+    "ブラウザーでサインインを完了してください。サインインが完了すると、このウィンドウは閉じます。",
   "provider.codeLogin.pageDescription":
     "このページは {host} のブラウザーで開いています。ここでサインインしてください。",
   "provider.codeLogin.relayStarting": "{host} で {name} のサインインを開始しています…",
   "provider.codeLogin.pageOpening": "{host} で {name} のサインインページを開いています…",
   "provider.codeLogin.linkStep": "{name} にログインします。OpenBot は自動で続行します。",
+  "provider.codeLogin.thisComputerDescription":
+    "このコンピューターのブラウザーでこのリンクを開いてください。OpenBot はここで待機します。",
+  "provider.codeLogin.copyLink": "リンクをコピー",
   "provider.codeLogin.chatgptDeviceSetting":
     "パソコンの ChatGPT でセキュリティ設定を開き、Codex のデバイスコードによるサインインをオンにします。仕事用アカウントでは、ワークスペースの管理者がオンにします。",
   "provider.useApp.title": "OpenBot アプリで {name} に接続",
@@ -120,11 +125,14 @@ export const messages = {
   "provider.picker.download": "{name} のダウンロード",
   "provider.picker.search": "モデルを検索",
   "provider.picker.noMatches": "検索に一致するモデルはありません。",
+  "provider.picker.openrouterNoMatches":
+    "検索に一致するモデルはありません。openrouter.ai のプライバシー、プロバイダー、ガードレールの設定によって、このリストのモデルが非表示になることがあります。",
   "provider.picker.workspaceOnlyUnavailable":
     "これらのモデルは、Windows と Linux では「ワークスペースのみ」で動作しません。使うには、エージェントの設定で「権限」を変更してください。",
   "provider.picker.olderModels": "以前のモデル",
   "provider.picker.olderModelsList": "{name} の以前のモデル",
-  "provider.picker.noModels": "{name} で利用できるモデルはありません。",
+  "provider.picker.noModels":
+    "ここには {name} のモデルが表示されていません。オフになっている場合は、管理者が「サーバーの設定」>「プロバイダー」>「{name}」>「モデル」でオンにできます。",
   "provider.picker.endpointModelsInCustom":
     "{name} はカスタムエンドポイントを実行しています。そのモデルは「カスタム」タブにあります。",
   "provider.picker.showCustomModels": "モデルを表示",
@@ -145,6 +153,7 @@ export const messages = {
   "provider.picker.effort": "推論の強さ",
   "provider.picker.effortLabel": "エージェントの推論の強さ",
   "provider.picker.effortFixed": "{effort}（{provider} が固定）",
+  "provider.picker.effortLimited": "Claude の設定または組織により、推論の強さは {effort} までに制限されています。",
   "provider.picker.fast": "高速",
   "provider.picker.fastText": "応答が速く、使用量が増えます",
   "provider.picker.speed": "速度",
@@ -227,6 +236,7 @@ export const messages = {
   "provider.account.apiKey": "APIキー",
   "provider.account.listLabel": "{name} のアカウント",
   "provider.account.usedBy": "{agents} が使用中",
+  "provider.account.sameEmail": "{name} と同じメールアドレス",
   "provider.account.failed": "サインイン失敗",
   "provider.account.moreActions": "{name} のその他の操作",
   "provider.account.renameLabel": "{name} の名前",
@@ -267,6 +277,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot はサーバーで {provider} からサインアウトします。",
   "provider.settings.geminiKeyReplacesAccount":
     "保存された Gemini API キーが Google のサインインの代わりに使われます。Google のプランとそのモデルを使うには、キーを削除してください。",
+  "provider.settings.museKeyInUse":
+    "Muse はサインインではなく、このキーを使います。サインインを使うには、キーを削除してください。",
   "provider.settings.versionInstalledByUser": "{version} · 自分でインストール",
   "provider.settings.versionDownloaded": "{version} · OpenBot がダウンロード",
   "provider.settings.otherVersionInstalledByUser": "未使用：{version} · 自分でインストール",
@@ -278,10 +290,14 @@ export const messages = {
   "provider.settings.cache": "キャッシュ",
   "provider.settings.promptCache": "プロンプトキャッシュ",
   "provider.settings.promptCacheDescription":
-    "ターンの間に Claude がエージェントのコンテキストをキャッシュに保持する時間。",
+    "ターンの間に Claude と Pi がエージェントのコンテキストをキャッシュに保持する時間。",
   "provider.settings.promptCacheHour": "1 時間",
-  "provider.settings.promptCacheDefault": "Claude Code の既定",
+  "provider.settings.promptCacheDefault": "プロバイダーの既定",
   "provider.settings.promptCacheLoadFailed": "このサーバーのプロンプトキャッシュ時間を読み込めませんでした。",
+  "provider.settings.cacheExpiryCompaction": "キャッシュの期限切れ前に圧縮",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "20 万トークン以上のコンテキストを持つチャットが 1 時間のキャッシュでアイドル状態のとき、エージェントはキャッシュの期限切れ前にコンテキストを圧縮します。これにより、次のメッセージはキャッシュなしでコンテキスト全体を読み直しません。",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "このサーバーの圧縮設定を読み込めませんでした。",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "自分の Claude Code 設定を使う",
   "provider.settings.claudeUserSetupDescription":
@@ -336,4 +352,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "ダウンロードを削除できませんでした。",
   "provider.settings.disconnectLocalOnly":
     "OpenBot はこのコンピュータで {provider} からサインアウトします。ターミナルの {provider} CLI はサインインしたままです。",
+  "provider.settings.updateAll": "すべて更新",
 } as const satisfies PartialTranslation<typeof source>;

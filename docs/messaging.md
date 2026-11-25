@@ -136,6 +136,10 @@ this computer never has it.
    every Telegram chat. It goes in the **Integrations** section of the sidebar.
 4. In the group, mention the bot (`@<bot> …`), or reply to one of its messages.
 
+A group that adds the bot in Telegram itself, without the link from OpenBot, is not linked. When a
+person mentions the bot there, or writes to it in a direct chat, the bot answers once a day that the
+chat is not linked and how to link it.
+
 A chat answers to one OpenBot server. Another account cannot link a chat that your server answers
 until you disconnect it. **Disconnect** makes the bot leave the chat and unlinks it. When it is the
 last linked chat, it also deletes the Telegram Orchestrator with its conversations, as for Slack.

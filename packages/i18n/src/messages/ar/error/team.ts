@@ -91,6 +91,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "لا يمكن لهذا الاتصال إيقاف تشغيل مهمة دورية.",
   "error.team.sidebarFoldersUnsupported": "المجلدات داخل المجلدات غير مدعومة في هذا الاتصال.",
   "error.team.libraryFoldersUnsupported": "مجلدات المكتبة غير مدعومة في هذا الاتصال.",
+  "error.team.workflowFoldersUnsupported": "لا يدعم هذا الاتصال مجلدات مسارات العمل.",
   "error.team.agentNotificationLevelsUnsupported":
     "لا يمكن لهذا الخادم حفظ مستوى الإشعارات الخاص بك لكل وكيل. حدّث OpenBot على الحاسوب الذي يشغّله.",
   "error.team.sidebarPinsUnsupported":
@@ -121,12 +122,16 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "تغييرات هوية الخادم غير مدعومة في هذا الاتصال.",
   "error.team.hostUpdateUnsupported": "تحديثات المضيف غير مدعومة في هذا الاتصال.",
   "error.team.hostTimezoneUnsupported": "المنطقة الزمنية للخادم غير مدعومة في هذا الاتصال.",
+  "error.team.hostSignalHomeUnsupported": "اختيار خادم Signal غير مدعوم في هذا الاتصال.",
+  "error.team.hostVoiceModelUnsupported": "نموذج التعرّف على الكلام الخاص بالخادم غير مدعوم في هذا الاتصال.",
   "error.team.hostRestartUnsupported": "إعادة تشغيل الخادم غير مدعومة في هذا الاتصال.",
+  "error.team.ownerTransferUnsupported": "لا يدعم هذا الخادم نقل الملكية.",
   "error.team.hostKeyRotationUnsupported": "تغييرات مفتاح الخادم غير مدعومة في هذا الاتصال.",
   "error.team.localServersUnsupported": "الخوادم على هذا الحاسوب غير مدعومة في هذا الاتصال.",
   "error.team.routineResultsUnsupported": "وجهات المهام الدورية غير مدعومة في هذا الاتصال.",
   "error.team.agentMemoryLimitUnsupported": "حد ذاكرة الوكيل غير مدعوم في هذا الاتصال.",
   "error.team.agentFoldersUnsupported": "مجلدات الوكيل غير مدعومة في هذا الاتصال.",
+  "error.team.channelFoldersUnsupported": "مجلدات القناة غير مدعومة في هذا الاتصال.",
   "error.team.folderUnavailable": "هذا المجلد غير متاح على حاسوب المضيف.",
   "error.team.memoryReviewUnsupported": "مراجعة الذاكرة غير مدعومة في هذا الاتصال.",
   "error.team.skillLearningUnsupported": "تعلّم المهارات غير مدعوم في هذا الاتصال.",
@@ -134,6 +139,9 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "مدة ذاكرة التخزين المؤقت للموجّه غير مدعومة في هذا الاتصال.",
   "error.team.claudeUserSetupUnsupported": "هذا الاتصال لا يدعم مفتاح إعداد Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "هذا الاتصال لا يدعم حجم ضغط Claude.",
+  "error.team.cacheExpiryCompactionUnsupported": "هذا الاتصال لا يدعم الضغط قبل انتهاء ذاكرة التخزين المؤقت.",
+  "error.team.mediaApprovalCreditsUnsupported": "هذا الاتصال لا يدعم حد الموافقة على الأرصدة.",
+  "error.team.mediaApprovalCreditsInvalid": "أدخل عددًا صحيحًا من الأرصدة من 0 إلى 100,000.",
   "error.team.providerEnvironmentUnsupported": "لا يدعم هذا الاتصال متغيرات المزوّد.",
   "error.team.modelVisibilityUnsupported": "قائمة النماذج غير مدعومة في هذا الاتصال.",
   "error.team.providerDefaultUnsupported": "المزوّد الافتراضي غير مدعوم في هذا الاتصال.",
@@ -151,6 +159,8 @@ export const messages = {
   "error.team.mcpUnsupported": "خوادم MCP غير مدعومة في هذا الاتصال.",
   "error.team.mcpServerListNeedsUpdate":
     "حدّث OpenBot على هذا الجهاز لاستخدام أكثر من {limit} من خوادم MCP على هذا الخادم.",
+  "error.team.providerAccountListNeedsUpdate":
+    "حدّث OpenBot على هذا الجهاز لاستخدام أكثر من {limit} من الحسابات لمزوّد واحد على هذا الخادم.",
   "error.team.storageUnsupported": "التخزين غير مدعوم في هذا الاتصال.",
   "error.team.machineResourcesUnsupported": "استخدام الجهاز غير مدعوم في هذا الاتصال.",
   "error.team.machineAlertMemberInvalid": "يمكن فقط لمالك هذا الخادم أو مسؤوله تلقي تنبيهات الجهاز.",
@@ -192,10 +202,14 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "هذا الاتصال لا يدعم شخصية الخادم.",
   "error.team.agentWaitsUnsupported": "هذا الاتصال لا يدعم الانتظارات المفتوحة.",
   "error.team.pendingApprovalUnsupported": "هذا الاتصال لا يدعم قراءة طلب الموافقة كاملًا.",
+  "error.team.pendingPromptsUnsupported": "هذا الاتصال لا يدعم قراءة الأسئلة المفتوحة.",
   "error.team.phoneFeedbackUnsupported": "هذا الاتصال لا يدعم إرسال بلاغ من تطبيق الهاتف.",
   "error.team.messagePinsUnsupported": "هذا الاتصال لا يدعم الرسائل المثبتة.",
   "error.team.queuedMessageThreadUnsupported": "هذا الاتصال لا يدعم تشغيل رسالة في قائمة الانتظار كسلسلة جديدة.",
   "error.team.backgroundProcessesUnsupported": "هذا الاتصال لا يدعم العمليات في الخلفية.",
   "error.team.providerUseUnsupported": "هذا الاتصال لا يدعم تشغيل المزوّدين وإيقافهم.",
   "error.team.providerUseInvalid": "هذا المزوّد ليس له مفتاح تشغيل وإيقاف.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "هذا الخادم لا يدعم اختيار النموذج في موافقات الوسائط. حدّث OpenBot على الخادم.",
+  "error.team.mediaApprovalChoiceInvalid": "اختيار موافقة الوسائط غير صالح.",
 } as const satisfies PartialTranslation<typeof source>;

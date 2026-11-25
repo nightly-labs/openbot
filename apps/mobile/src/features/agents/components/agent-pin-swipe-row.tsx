@@ -100,7 +100,6 @@ export function AgentPinSwipeRow({
   pinned?: boolean;
   pinBlocked: boolean;
   onPin: (withHaptic: boolean) => void;
-  /** The hold-and-move drag of the row (`useChatDrag`). */
   drag?: ReturnType<typeof useChatDrag>;
 }>) {
   const [background] = useThemeColor(["background"]);
@@ -126,13 +125,11 @@ export function AgentPinSwipeRow({
         containerStyle={{ backgroundColor: background, overflow: "hidden" }}
         childrenContainerStyle={{ backgroundColor: background }}
         friction={1}
-        // The action is at the end of the row. Swipeable places its actions on the screen's sides.
         overshootRight={END_X === 1}
         overshootLeft={END_X === -1}
         overshootFriction={1}
         rightThreshold={PIN_REVEAL_DISTANCE / 2}
         leftThreshold={PIN_REVEAL_DISTANCE / 2}
-        enableTrackpadTwoFingerGesture
         simultaneousWith={swipe.gesture}
         requireToFail={swipe.swipeRequires}
         onSwipeableWillOpen={swipe.onWillOpen}

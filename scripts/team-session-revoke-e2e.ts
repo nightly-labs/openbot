@@ -1,12 +1,3 @@
-// Checks the reverse actions of team access on a real host: revoke and sign in again, revoke an
-// invitation, disable and enable a member, and remove a member who then joins again. The last event
-// socket of a session that closes gives back the browser control of that session. A real
-// `TeamApiServer` runs on loopback with the real team store on a temporary profile, in a child
-// process of this script. An owner client makes each change through the released `/v1/team/*`
-// routes, and a member client checks that its token, its event socket and its sign-in follow. The
-// host process then restarts on the same files, and each change must still hold.
-// Run: `bun scripts/team-session-revoke-e2e.ts`.
-// Writes .openbot-build/team-session-revoke-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -39,21 +30,13 @@ const OWNER = { username: "owner-user", password: "owner-password-123" };
 const MEMBER = { username: "member-user", password: "member-password-123" };
 const STEP_DEADLINE_MS = 30_000;
 
-/** A line that the host process writes to its standard output, after `HOST_LINE`. */
 type HostMessage =
   | { type: "ready"; port: number }
   | { type: "revoked"; sessionId: string }
   | { type: "released"; sessionId: string };
 const HOST_LINE = "team-revoke-host ";
 
-// --- Host process ---
-
-/**
- * Runs the host on a profile, as the app does at launch, until its standard input closes.
- * The first start also sets up the team, as the owner does in the app.
- */
 async function runHost(root: string, configure: boolean): Promise<void> {
-  // The main process imports Electron for its windows and IPC. No check here opens a window.
   plugin({
     name: "team-revoke-electron-boundary",
     setup(build) {
@@ -87,6 +70,7 @@ async function runHost(root: string, configure: boolean): Promise<void> {
   const unused = () => Effect.die(new Error("Not used by this check."));
   const agentBrowser: AgentBrowserHost = {
     listTabs: () => [],
+    toolCanUseTab: () => false,
     beginTakeover: unused,
     endTakeover: () => {},
     userControlTabFor: () => null,
@@ -112,6 +96,7 @@ async function runHost(root: string, configure: boolean): Promise<void> {
     navigate: unused,
     reload: unused,
     stop: unused,
+    answerPermission: unused,
     takeUserControl: unused,
     startTeach: unused,
     stopTeach: () => [],
@@ -129,7 +114,9 @@ async function runHost(root: string, configure: boolean): Promise<void> {
     startView: unused,
     dispatchViewInput: unused,
     copyViewSelection: unused,
+    answerViewDialog: unused,
     importSignIn: unused,
+    answerHttpSignIn: unused,
   };
   const send = (message: HostMessage) => process.stdout.write(`${HOST_LINE}${JSON.stringify(message)}\n`);
 
@@ -140,14 +127,12 @@ async function runHost(root: string, configure: boolean): Promise<void> {
   const sidebar = new SidebarLayoutStore(join(userData, "sidebar-layout.json"));
   const team = new TeamStore(join(userData, "openbot-team-server-v2.json"));
   await runCauseEffect(sidebar.initialize());
-  // The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
   await runCauseEffect(agentStore.initialize());
   await runCauseEffect(mailbox.initialize());
   await runCauseEffect(team.initialize());
   if (configure) await runCauseEffect(team.configure("E2E Host", OWNER.username, OWNER.password));
   const agents = new AgentService({ store: agentStore, mailbox, browser: agentBrowser, sidebarLayout: sidebar });
   let port = 0;
-  // The local-development host path of `HostService.createInvite`: a link to this host's own API.
   const createInvite: TeamApiOptions["createInvite"] = (input) =>
     Effect.gen(function* () {
       const identity = team.getIdentity();
@@ -184,12 +169,10 @@ async function runHost(root: string, configure: boolean): Promise<void> {
     sidebarLayout: sidebar,
     appVersion: HOST_VERSION,
     createInvite,
-    // The WebRTC gateway ends a revoked session through this callback.
     onSessionRevoked: (sessionId) => Effect.sync(() => send({ type: "revoked", sessionId })),
   });
   port = await Effect.runPromise(server.start());
   send({ type: "ready", port });
-  // The client closes standard input to stop the host, as the app quits.
   await Bun.stdin.text();
   await Effect.runPromise(server.stop());
   await runCauseEffect(agents.stop());
@@ -203,8 +186,6 @@ if (process.argv[2] === "--host") {
   process.exit(0);
 }
 
-// --- Clients ---
-
 interface Step {
   name: string;
   passed: boolean;
@@ -214,12 +195,10 @@ interface Step {
 
 const report: { passed: boolean; steps: Step[] } = { passed: false, steps: [] };
 
-/** Runs one check. `summarize` keeps tokens and live objects out of the report. */
 async function step<T>(name: string, run: () => Promise<T>, summarize: (value: T) => unknown = (value) => value) {
   process.stdout.write(`- ${name}\n`);
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check waits for its event, and a missing event must fail.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -236,7 +215,6 @@ async function step<T>(name: string, run: () => Promise<T>, summarize: (value: T
   }
 }
 
-/** Reads one host line; other output of the host process is its log. */
 function decodeHostLine(line: string): HostMessage | null {
   if (!line.startsWith(HOST_LINE)) return null;
   const value = record(JSON.parse(line.slice(HOST_LINE.length)), "host line");
@@ -246,7 +224,6 @@ function decodeHostLine(line: string): HostMessage | null {
   throw new Error(`Unknown host line: ${line}`);
 }
 
-/** A value that `JSON.parse` gives: the wire body of a response, a frame or a fixture. */
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 type JsonObject = { [key: string]: Json };
 
@@ -264,7 +241,6 @@ function text(value: unknown, label: string): string {
   return String(value);
 }
 
-/** A 4xx reply: the host refused the client, and did not fail. */
 function assertRefused(status: number, label: string): void {
   assert.ok(status >= 400 && status < 500, `${label} returned ${status}, not a refusal.`);
 }
@@ -273,14 +249,11 @@ const root = await mkdtemp(join(tmpdir(), "openbot-team-revoke-"));
 let host: { process: Bun.Subprocess<"pipe", "pipe", "inherit">; exited: Promise<number> } | null = null;
 let port = 0;
 const sockets: WebSocket[] = [];
-/** Sessions that the host told the WebRTC gateway to end, and the waiters for the next one. */
 const revokedForGateway: string[] = [];
 const revokedWaiters: ((sessionId: string) => void)[] = [];
-/** Sessions whose browser control the host gave back, and the waiters for the next one. */
 const releasedSessions: string[] = [];
 const releasedWaiters: ((sessionId: string) => void)[] = [];
 
-/** Starts the host process on the profile, and waits until it listens. */
 async function startHost(configure: boolean): Promise<void> {
   const child = Bun.spawn([process.execPath, import.meta.path, "--host", root, ...(configure ? ["--configure"] : [])], {
     stdin: "pipe",
@@ -315,7 +288,6 @@ async function startHost(configure: boolean): Promise<void> {
   port = await ready.promise;
 }
 
-/** Stops the host process as the app quits, and checks that it stopped cleanly. */
 async function stopHost(): Promise<void> {
   for (const socket of sockets.splice(0)) socket.close();
   if (!host) return;
@@ -325,7 +297,6 @@ async function stopHost(): Promise<void> {
   assert.equal(await exited, 0, "The host process did not stop cleanly.");
 }
 
-/** The next session that the host tells the WebRTC gateway to end. */
 function nextRevokedForGateway(): Promise<string> {
   return new Promise((resolveRevoked) => revokedWaiters.push(resolveRevoked));
 }
@@ -334,7 +305,6 @@ function nextReleasedSession(): Promise<string> {
   return new Promise((resolveReleased) => releasedWaiters.push(resolveReleased));
 }
 
-/** One request from a current desktop client. */
 async function call(
   method: string,
   path: string,
@@ -367,7 +337,6 @@ async function meStatus(token: string): Promise<number> {
   return (await call("GET", TEAM_API_ROUTES.me, { token })).status;
 }
 
-/** The session ids that the owner sees in the session list. */
 async function sessionIds(ownerToken: string): Promise<string[]> {
   const listed = await call("GET", TEAM_API_ROUTES.team.sessions, { token: ownerToken });
   assert.equal(listed.status, 200);
@@ -375,7 +344,6 @@ async function sessionIds(ownerToken: string): Promise<string[]> {
   return listed.body.map((session) => text(record(session, "session").id, "session id"));
 }
 
-/** Signs in a new device, and finds its session in the owner's list. */
 async function loginDevice(ownerToken: string): Promise<{ token: string; sessionId: string }> {
   const before = new Set(await sessionIds(ownerToken));
   const token = await login(MEMBER);
@@ -384,10 +352,6 @@ async function loginDevice(ownerToken: string): Promise<{ token: string; session
   return { token, sessionId: added[0] ?? "" };
 }
 
-/**
- * Opens the event socket of a session, and gives a promise for its close code. The promise is in
- * an object: an async function that returned it directly would wait for the close.
- */
 async function openEvents(token: string): Promise<{ closed: Promise<number>; close: () => void }> {
   const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
     TEAM_PROTOCOL_V1_WEBSOCKET,
@@ -404,7 +368,6 @@ async function openEvents(token: string): Promise<{ closed: Promise<number>; clo
   return { closed, close: () => socket.close() };
 }
 
-/** The owner creates an invitation through the Team API, and the member reads its link. */
 async function inviteMember(ownerToken: string): Promise<{ id: string; token: string }> {
   const created = await call("POST", TEAM_API_ROUTES.team.invites, { token: ownerToken, body: { role: "member" } });
   assert.equal(created.status, 201, `Invite creation returned ${created.status}.`);
@@ -560,8 +523,6 @@ try {
     return { previousPort, port, memberDisabled: true };
   });
 
-  // The sign-in limit counts every attempt for a name, also one that succeeds. The steps after the
-  // restart share this session so that they stay below it.
   const enabledToken = await step(
     "enable member: the same account signs in again and keeps its identity",
     async () => {

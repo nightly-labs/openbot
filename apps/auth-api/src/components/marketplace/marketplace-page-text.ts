@@ -2,11 +2,6 @@ import type { AppTranslate } from "@openbot/i18n";
 import type { MarketplaceAgentView, MarketplaceSkillView } from "../../lib/marketplace";
 import type { MarketplaceTab } from "../../lib/marketplace-routes";
 
-/*
- * The text of the Marketplace heads, built from `sitePage.marketplace.*` catalog keys in the route loader. The pages
- * read the rest from the catalog through `TextProvider`. This module has only a type import of the catalogs.
- */
-
 export interface MarketplaceHeadText {
   title: string;
   description: string;
@@ -30,11 +25,9 @@ export function marketplaceIndexText(t: AppTranslate): Record<MarketplaceTab, Ma
 }
 
 export interface MarketplaceListingHeadText extends MarketplaceHeadText {
-  /** The share card's text for a screen reader. */
   imageAlt: string;
 }
 
-/** A search result and a link preview show about this much of the description. */
 const DESCRIPTION_LENGTH = 200;
 
 export function marketplaceAgentText(t: AppTranslate, agent: MarketplaceAgentView): MarketplaceListingHeadText {

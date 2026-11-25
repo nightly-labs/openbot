@@ -1,5 +1,3 @@
-// What main answers when macOS was asked for Automation access to Apple apps.
-
 import { MAC_AUTOMATION_STATUSES, MAC_AUTOMATION_TARGETS, type MacAutomationResult } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 

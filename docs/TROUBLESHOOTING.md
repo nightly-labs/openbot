@@ -78,14 +78,19 @@ On Linux, OpenBot uses the GPU until the GPU fails on your computer. If the GPU 
 start stops in its first 30 seconds, OpenBot writes `gpu-crash.json` or `gpu-start.json` in
 `~/.config/OpenBot`. While one of these files is there, OpenBot renders on the CPU. A start that
 stops with no crash, for example a kill or a power loss, gets one more try with the GPU; a second
-stop in a row turns it off. An update with a new Chromium version tries the GPU again. A GPU process restart after a lost GPU context, for example
-after suspend, does not count. A server (`OPENBOT_SERVER=1` or a hosted server) always renders on the
+stop in a row turns it off. An update with a new Chromium version tries the GPU again. OpenBot
+ignores these files when OpenBot 0.75.0 or earlier wrote them: those versions could write them by
+mistake after a reboot or a GPU reset. A GPU process restart after a lost GPU context, for example
+after suspend, does not count. A GPU process that stops while OpenBot quits or the computer shuts down
+or restarts does not count either. A server (`OPENBOT_SERVER=1` or a hosted server) always renders on the
 CPU, and its browser runs WebGL on the CPU (SwiftShader) for sites such as the Figma editor. A GPU
 process crash on a server writes `gpu-crash.json` and turns off WebGL at the next start. Chromium
 also renders on the CPU when it blocks the GPU driver, for example in a remote desktop.
 
-When OpenBot renders on the CPU, dialogs and panels do not blur what is behind them, and agent
-avatars do not move. These two effects used the most CPU time.
+When OpenBot renders on the CPU, dialogs and panels do not blur what is behind them, agent
+avatars do not move, and a theme change does not show its sweep. These effects used the most CPU time.
+The agents' browser keeps WebGL on the CPU (SwiftShader), so sites such as CapCut and the Figma editor
+still open.
 
 On a Wayland session, a start that renders on the CPU opens OpenBot again on XWayland: on Wayland,
 Chromium can leave the window empty, and KDE then shows only a 1x1 taskbar entry. The log then shows
@@ -95,7 +100,7 @@ on Wayland. To stay on Wayland, start OpenBot with `--ozone-platform=wayland`.
 - To try the GPU again, for example after a driver update, remove the file. The log names it.
 - To always use the GPU, start OpenBot with `OPENBOT_DISABLE_GPU=0`. A server ignores this value.
 - If OpenBot stops at each start, start it with `OPENBOT_DISABLE_GPU=1` to always render on the CPU.
-  On a server, this value also turns off WebGL.
+  This value also turns off WebGL.
 
 ## OpenBot does not start on Linux when the monitor is off
 
@@ -297,6 +302,26 @@ host receives.
 
 If the filter puts `openbot.run` in a blocked category, the administrator can ask the vendor to
 review it. For Fortinet, use the FortiGuard web filter lookup.
+
+## A server connects slowly through a VPN or proxy app
+
+A proxy app, such as Clash, Mihomo, Shadowrocket, or Surge, can send OpenBot traffic through a
+remote proxy. Many proxies do not carry UDP. Then the connection to a joined server uses a slower
+path, it fails more frequently, and it must reconnect more often when you open the app again.
+
+Send OpenBot traffic directly, not through the proxy. Add this rule above the other rules of the
+proxy app:
+
+```text
+DOMAIN-SUFFIX,openbot.run,DIRECT
+```
+
+If the app uses fake-IP DNS, also add `+.openbot.run` to the fake-IP filter (`fake-ip-filter` in a
+Clash or Mihomo configuration). Then the connection uses the real addresses of the OpenBot hosts.
+
+This rule covers sign-in, Signal, and the TURN relays. It does not cover a direct path to the
+server, because that path uses an address, not a name. When the direct path fails, OpenBot uses a
+TURN relay.
 
 ## Reset OpenBot
 

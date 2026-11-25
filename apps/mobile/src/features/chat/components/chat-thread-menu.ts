@@ -9,16 +9,10 @@ import type { MenuAction } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** The agent's own chat in the thread menu. It is not a task: the agent chat screen shows it. */
 export const MAIN_THREAD_ID = "main";
-/** The task id of a new thread before its first message starts it, as the desktop draft tab. */
 export const DRAFT_THREAD_ID = "new";
 
 const THREAD_PREFIX = "thread:";
-/**
- * About two lines of a thread title in the menu. The iOS menu shows up to three lines and has no line
- * limit, so a longer title ends at a word with an ellipsis.
- */
 const MENU_TITLE_LENGTH = 34;
 
 function menuTitle(title: string): string {
@@ -28,22 +22,15 @@ function menuTitle(title: string): string {
   return `${(space > MENU_TITLE_LENGTH / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }
 
-/** The actions of the agent's name in the chat header, and the open threads that need the person. */
 export interface ChatThreadMenu {
   actions: MenuAction[];
   onPressAction: (id: string) => void;
-  /** The open threads, other than the one on the screen, with agent messages that the person has not read. */
   attention: number;
-  /** The agent's color, for the dot of an unread thread. */
   color: string;
+  inThread: boolean;
+  threadCount: number;
 }
 
-/**
- * The thread menu of an agent, as the desktop thread list: the agent's own chat, its open threads, a
- * new thread, all its threads with the archived ones, and the agent's info. `activeId` is the thread
- * on the screen: `MAIN_THREAD_ID` in the agent's chat, `DRAFT_THREAD_ID`, or a task id. Undefined on
- * a host without `agent-tasks-v1`; the agent's name then opens the agent's info, as before.
- */
 export function useChatThreadMenu(
   agent: {
     id: string;
@@ -64,7 +51,6 @@ export function useChatThreadMenu(
     const inThread = activeId !== MAIN_THREAD_ID;
     const unread = (taskId: string) => taskId !== activeId && (reads.get(taskId)?.unreadCount ?? 0) > 0;
     const openThread = (taskId: string) => {
-      // A thread replaces the thread on the screen, so Back still returns to the agent's chat.
       if (inThread) router.setParams<"/task/[taskId]">({ taskId });
       else router.push({ pathname: "/task/[taskId]", params: { serverId: agent.serverId, agentId: agent.id, taskId } });
     };
@@ -84,7 +70,6 @@ export function useChatThreadMenu(
             (task): MenuAction => ({
               id: `${THREAD_PREFIX}${task.id}`,
               title: menuTitle(task.title),
-              // iOS menus have one image for each item: an unread thread shows a dot in the agent's color.
               ...(unread(task.id) ? { image: "circle.fill", imageColor: agentColor } : { image: "link" }),
               state: activeId === task.id ? "on" : "off",
             }),
@@ -110,8 +95,8 @@ export function useChatThreadMenu(
     const onPressAction = (id: string) => {
       void haptics.selection();
       if (id === MAIN_THREAD_ID) {
-        // The agent's chat is under the thread, or a notification opened the thread with no chat under it.
-        if (inThread) router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId: agent.id } });
+        if (inThread)
+          router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } });
       } else if (id === DRAFT_THREAD_ID) openThread(DRAFT_THREAD_ID);
       else if (id === "all")
         router.push({ pathname: "/server-tasks", params: { serverId: agent.serverId, agentId: agent.id } });
@@ -123,6 +108,6 @@ export function useChatThreadMenu(
       }
     };
     const attention = tasks.filter((task) => task.id !== activeId && unread(task.id)).length;
-    return { actions, onPressAction, attention, color: agentColor };
+    return { actions, onPressAction, attention, color: agentColor, inThread, threadCount: tasks.length };
   }, [supported, tasks, reads, agentColor, activeId, agent.id, agent.serverId, t]);
 }

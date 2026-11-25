@@ -14,12 +14,11 @@ import {
   type ReceivedWebhookEvent,
   type RoutineRunStart,
   RoutineStore,
+  type SkippedRunRows,
   type WebhookReceiveResult,
 } from "./routine-store";
 import { ROUTINE_TABLES } from "./routine-tables";
 
-// The `command_id` of the one-time pause of the routines of hidden agents. Its receipt stops the pause
-// from running again, so the id never changes.
 const HIDDEN_AGENT_ROUTINE_PAUSE_COMMAND_ID = "routine:hidden-agent-pause:v1";
 
 export interface DueRoutineTrigger {
@@ -29,11 +28,6 @@ export interface DueRoutineTrigger {
   schedule: DueRoutine["schedule"];
 }
 
-/**
- * The agent-shaped names over the shared store: `ownerId` reads as `agentId` and the run handle
- * reads as `deliveryId`. The SQL, the constraints and the command ids all live in `RoutineStore`,
- * so this file only translates - which is why the callers did not change with the extraction.
- */
 export class AgentRoutineStore extends RoutineStore {
   constructor(database: OpenBotDatabase) {
     super(database, ROUTINE_TABLES.agent);
@@ -82,15 +76,6 @@ export class AgentRoutineStore extends RoutineStore {
     return toRoutine(this.updateRoutine(agentId, fields, now));
   }
 
-  /**
-   * Turns off, one time, each active routine of these agents, and answers the ids of the routines it
-   * turned off. Before a hidden agent could work, a hide stopped the routines of the agent. The user
-   * chose that stop, so the update must not start them: each one stays off until the user turns it on.
-   * The receipt of the command is the marker that stops a second run. A hard delete of an agent
-   * removes the receipts of the events with the id of the agent as aggregate id. The aggregate id
-   * here is the command id: its ":" makes it no agent id, so the receipt stays. A new database has no
-   * hidden agent and gets the receipt at its first start.
-   */
   pauseForAgentsHiddenBeforeWork(agentIds: readonly string[], now = new Date()): string[] {
     if (this.database.commandResult(HIDDEN_AGENT_ROUTINE_PAUSE_COMMAND_ID) !== undefined) return [];
     const routineIds = agentIds.flatMap((agentId) =>
@@ -118,7 +103,6 @@ export class AgentRoutineStore extends RoutineStore {
     return routineIds;
   }
 
-  /** Writes the finished runs that a server transfer brought for one of the agent's routines. */
   importRuns(agentId: string, routineId: string, runs: readonly ImportedRoutineRun[]): string[] {
     return this.importRunRows(routineId, agentId, runs);
   }
@@ -153,7 +137,6 @@ export class AgentRoutineStore extends RoutineStore {
     return toRun(this.createRunRow(runSource(routine), triggerId, start, scheduledFor));
   }
 
-  /** Records the due occurrences that the scheduler did not start, and why, and moves the trigger. */
   skipOccurrences(
     { agentId, ...fields }: Routine,
     due: Date,
@@ -177,8 +160,17 @@ export class AgentRoutineStore extends RoutineStore {
     return toRun(this.updateRunRow(runId, status, error));
   }
 
+  skippedBefore(run: RoutineRun): SkippedRunRows {
+    return this.skippedRowsBefore(run.agentId, run.routineId, run.id, run.createdAt);
+  }
+
   runForDelivery(deliveryId: string): RoutineRun | null {
     const run = this.runForHandleRow(deliveryId);
+    return run ? toRun(run) : null;
+  }
+
+  run(runId: string): RoutineRun | null {
+    const run = this.runRow(runId);
     return run ? toRun(run) : null;
   }
 }

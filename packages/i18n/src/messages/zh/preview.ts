@@ -23,5 +23,9 @@ export const messages = {
   "preview.tooLarge.title": "文件太大，无法预览",
   "preview.tooLarge.description": "预览上限为 100 MB。你可以用默认应用打开此文件。",
   "preview.spreadsheet.readFailed": "无法读取该表格。",
+  "preview.spreadsheet.tooLarge": "该表格太大，无法预览。请打开或下载文件以查看全部内容。",
   "preview.spreadsheet.truncated": "预览仅限前 {rows} 行、{columns} 列。",
+  "preview.document.readFailed": "无法读取此文档。",
+  "preview.document.empty": "此文档没有可显示的文本。",
+  "preview.document.truncated": "预览仅限文档的前一部分。",
 } as const satisfies PartialTranslation<typeof source>;

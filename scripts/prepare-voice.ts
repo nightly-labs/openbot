@@ -9,42 +9,38 @@ import { elfSearchPaths, ORIGIN_SEARCH_PATH } from "./elf-search-paths";
 
 const logger = createOpenBotLogger("prepare-voice");
 
-const SHERPA_ONNX_VERSION = "2.0.1";
+const SHERPA_ONNX_VERSION = "2.0.3";
 
 interface RuntimePackage {
   name: string;
-  /** The npm `dist.integrity` of the published tarball. */
   integrity: string;
-  /** The addon and the libraries it loads from its own directory. */
   files: readonly string[];
 }
 
-// Only these native files run. The JavaScript wrapper of `sherpa-onnx-node` is not used: the voice
-// host calls the N-API addon directly. The C++ API library is not loaded by the addon.
 const RUNTIME_PACKAGES: Readonly<Record<string, RuntimePackage>> = {
   "darwin-arm64": {
     name: "sherpa-onnx-darwin-arm64",
-    integrity: "sha512-agXmbbwiVPUSMViMhWhYAt59iG21ui7x6HxQFU35XzHOfQe9x6Pg9V160Pzak/66x0ePMjixsLUtMaaUrLfCwQ==",
+    integrity: "sha512-PuPsSgMvzKYYBG+/CwEZbbtl4kmztravlpN8KmsQy2jWGJ3WjEJ1NkPzUNgEbrq/9s5xnyd20FFlWJXOIcAHoA==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.dylib", "libonnxruntime.dylib"],
   },
   "darwin-x64": {
     name: "sherpa-onnx-darwin-x64",
-    integrity: "sha512-SBnHa3LDOSI/5/rpBHGxKQDFq+yIdxowYY0InLzfojTUx+yGgqu7cYBrRxjzvHOiOKi0O4rmlFVZboyhIqpDgA==",
+    integrity: "sha512-ZFSsikOf0xrnvEl8Xj5Z8IpG0hqWGFDy3HwLFagwV1apftVgh/SVXbwQ+pIf0xFRBrAr+SaR3asvoCEc6DxOSg==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.dylib", "libonnxruntime.dylib"],
   },
   "win32-x64": {
     name: "sherpa-onnx-win-x64",
-    integrity: "sha512-7vwdAw9PGEb0JLSpK7UFxAdp1vabBHK9Nhw2jFRBWSFgtslUPHIB0T6syJfRgiUGyCeNW9fJvcFAk2F2u7hBEw==",
+    integrity: "sha512-UDPUCNmuhWWC0oNMphHjgdRE0M8bVbUFXk9AyyJUuOtubmxhQBLz2sd2v6RWIAXSDh/7GwPbImLqAWI51ITTNQ==",
     files: [VOICE_RUNTIME_ADDON, "sherpa-onnx-c-api.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll"],
   },
   "linux-x64": {
     name: "sherpa-onnx-linux-x64",
-    integrity: "sha512-w5mRRrIvPvcNWac7rQ8AN/t/cwElPGoRpH+ceCRBV7XfjCIQ9Rcr3Ig/kXcJLNOxgK4bGmef+Y47lIWiesDODw==",
+    integrity: "sha512-cORrflhfgu/vD22UAfU4DvwCjKC6cSmVGM2o2fXnM6O9meN8Mpu5enqb/afIi+Nwweo9eS6YmaQcvmT+L6ia2A==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.so", "libonnxruntime.so"],
   },
   "linux-arm64": {
     name: "sherpa-onnx-linux-arm64",
-    integrity: "sha512-5CJvLjFYIg23oELCsT7l07fMLT3PdquZ3tqh7KZK3Pzi+c2YiPKRe1DDUxoNdtCaw3ZiS4aQSQPBblB9JStuDA==",
+    integrity: "sha512-F4cciAFw4rrV39CR6o1yNLG1e/Gcd4Je2wGxi4Q+jl1NJh7VSvE3n4NCz4bQzBlvZWgU8ThhV9ggD6xC5iJWFQ==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.so", "libonnxruntime.so"],
   },
 };
@@ -52,7 +48,6 @@ const RUNTIME_PACKAGES: Readonly<Record<string, RuntimePackage>> = {
 const buildRoot = resolve(".openbot-build/voice");
 const runtimeRoot = join(buildRoot, "runtime");
 const modelRoot = join(buildRoot, "model");
-// Beside the runtime, not in it: electron-builder copies the whole runtime directory.
 const runtimeMarker = join(buildRoot, "runtime-package.txt");
 const runtimeOnly = process.argv.includes("--runtime-only");
 const target = `${process.platform}-${process.arch}`;
@@ -106,10 +101,6 @@ async function prepareRuntime(runtime: RuntimePackage): Promise<void> {
   }
 }
 
-/**
- * The ONNX Runtime session settings files that the voice hosts read. They are written on every run,
- * so a runtime that an earlier run prepared gets the current settings.
- */
 async function writeSessionConfigs(): Promise<void> {
   await Promise.all(
     Object.entries(VOICE_SESSION_CONFIGS).map(([name, content]) => writeFile(join(runtimeRoot, name), content)),
@@ -135,7 +126,6 @@ async function prepareModel(): Promise<void> {
   }
 }
 
-/** Removes model files of an earlier pin, so a stale encoder cannot be packaged or loaded by mistake. */
 async function removeOtherModels(): Promise<void> {
   const expected = new Set(PARAKEET_MODEL_FILES.map((file) => file.name));
   const entries = await readdir(modelRoot);
@@ -151,11 +141,6 @@ async function isExpectedFile(path: string, bytes: number, expectedSha256: strin
   return (await sha256(path)) === expectedSha256;
 }
 
-/**
- * The published Linux addon also searches its CI build directory, and the empty and relative entries
- * of its RUNPATH search the working directory. A library planted there would load into the voice host.
- * Shortens each search path to `$ORIGIN` in place, so the addon loads libraries only from its own directory.
- */
 function pinSearchPathToOrigin(path: string): void {
   const file = readFileSync(path);
   const paths = elfSearchPaths(file).filter(({ value }) => value !== ORIGIN_SEARCH_PATH);

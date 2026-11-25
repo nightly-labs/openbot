@@ -1,10 +1,3 @@
-/**
- * The picture at the top of channel settings, and the editor it opens. It works as the agent avatar
- * editor does: an uploaded image, or an icon and a colour. A choice of icon or colour replaces the
- * image, and Remove takes away only the image. The reset button gives the channel its member faces
- * back.
- */
-
 import {
   type AvatarHue,
   type AvatarImageInput,
@@ -28,11 +21,8 @@ export interface ChannelPictureEditorProps {
   agents: AgentProfile[];
   icon: ChannelIcon | null | undefined;
   imageUrl: string | null | undefined;
-  /** Saves an image, or removes it with null. The caller reports a failure. */
   onSetImage: (image: AvatarImageInput | null) => Promise<unknown>;
-  /** Saves an icon and removes the image. */
   onSelectIcon: (icon: ChannelIcon) => Promise<unknown>;
-  /** Removes the icon and the image, so the member faces show again. */
   onReset: () => Promise<unknown>;
 }
 
@@ -43,7 +33,6 @@ export function ChannelPictureEditor(props: ChannelPictureEditorProps) {
   let fileInput: HTMLInputElement | undefined;
   const icon = () => knownChannelIcon(props.icon);
   const hasImage = () => Boolean(props.imageUrl);
-  /* The image hides the icon, so no icon or colour shows as chosen while there is one. */
   const chosenIcon = () => (hasImage() ? null : icon());
   const hue = (): AvatarHue => icon()?.hue ?? DEFAULT_CHANNEL_ICON_HUE;
 

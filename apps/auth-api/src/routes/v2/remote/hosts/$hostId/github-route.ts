@@ -17,9 +17,6 @@ import {
 } from "../../../../../server/request-auth";
 import { requestSourceIp } from "../../../../../server/source-ip";
 
-// The host proves its machine token, as it does for a Signal ticket, and sends its GitHub sign-in
-// and the repositories that its GitHub triggers watch. The ticket names only the repositories that
-// the sign-in can see through an installation of the OpenBot GitHub App. D1 keeps none of it.
 export const Route = createFileRoute("/v2/remote/hosts/$hostId/github-route")({
   server: {
     handlers: {

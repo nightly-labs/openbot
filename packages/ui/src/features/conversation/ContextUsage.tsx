@@ -1,4 +1,9 @@
-import { AGENT_CONTEXT_CATEGORIES, type AgentContextCategory, type AgentContextState } from "@openbot/contracts/ipc";
+import {
+  AGENT_CONTEXT_CATEGORIES,
+  type AgentContextCategory,
+  type AgentContextCompactionReason,
+  type AgentContextState,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
@@ -24,20 +29,14 @@ import { formatChatTimestamp } from "./chat-timestamp";
 export interface ContextUsageView {
   usedTokens: number;
   windowTokens: number;
-  /**
-   * The share of the window (0-1) at which the thread compacts without a request.
-   * Null when nothing compacts this thread on its own.
-   */
   autoCompactAt: number | null;
   nativeManaged?: boolean;
   estimated?: boolean;
   compacting: boolean;
   lastCompaction?: { beforeTokens: number; afterTokens: number } | undefined;
-  /** What fills `usedTokens`. Absent when the provider gives only a total. */
   categories?: readonly { category: AgentContextCategory; tokens: number }[] | undefined;
 }
 
-/** The meter's view of a thread's context state, or undefined when its provider reported no usage. */
 export function contextUsageView(state: AgentContextState | undefined): ContextUsageView | undefined {
   const usage = state?.usage;
   if (!usage) return undefined;
@@ -63,7 +62,6 @@ const CATEGORY_LABEL = {
   other: "composer.context.category.other",
 } as const satisfies Record<AgentContextCategory, AppTextKey>;
 
-/** The rows with tokens, in the fixed order that also gives each its colour. */
 function categoryRows(usage: ContextUsageView): { category: AgentContextCategory; tokens: number }[] {
   const rows = usage.categories ?? [];
   return AGENT_CONTEXT_CATEGORIES.flatMap((category) => {
@@ -76,11 +74,6 @@ function usedShare(usage: ContextUsageView): number {
   return usage.windowTokens > 0 ? Math.min(1, Math.max(0, usage.usedTokens / usage.windowTokens)) : 0;
 }
 
-/*
- * Below half the window the ring stays as quiet as the other toolbar icons: the reader has nothing to
- * do. It takes the warning colour 10 points before the compaction point, and the danger colour only
- * when nothing will compact the thread and it is nearly full.
- */
 function meterLevel(usage: ContextUsageView): "quiet" | "normal" | RadialProgressTone {
   const share = usedShare(usage);
   if (!usage.nativeManaged && usage.autoCompactAt === null && share >= 0.9) return "danger";
@@ -88,11 +81,6 @@ function meterLevel(usage: ContextUsageView): "quiet" | "normal" | RadialProgres
   return share < 0.5 ? "quiet" : "normal";
 }
 
-/**
- * The composer's context ring and the popover it opens. It shows how full the agent's provider
- * thread is and when it compacts. `newChat` adds the New chat action, which asks first. `compact`
- * adds the Compact action, for a thread that OpenBot compacts (`autoCompactAt` is set).
- */
 export function ContextUsageMeter(props: {
   usage: ContextUsageView;
   newChat?:
@@ -137,7 +125,6 @@ export function ContextUsageMeter(props: {
       <Popover.Root
         open={open()}
         onOpenChange={(next) => {
-          // A refusal belongs to the moment it happened: the turn it waited for can end meanwhile.
           if (next && compaction().phase === "refused") setCompaction({ phase: "idle" });
           setOpen(next);
         }}
@@ -229,7 +216,6 @@ export function ContextUsageMeter(props: {
               )}
             </Show>
             <Show when={props.newChat || compact()}>
-              {/* Menu rows under a divider: they act on the whole context, so they sit apart from the figures. */}
               <footer class="context-meter-footer">
                 <Show when={compact()}>
                   {(start) => (
@@ -281,10 +267,6 @@ export function ContextUsageMeter(props: {
   );
 }
 
-/**
- * The used share, split by category when the provider gives one, then free space, with a tick where
- * the automatic compaction runs.
- */
 function ContextUsageBar(props: { usage: ContextUsageView }) {
   const rows = () => categoryRows(props.usage);
   const rowsTotal = () => rows().reduce((sum, row) => sum + row.tokens, 0);
@@ -316,39 +298,21 @@ function ContextUsageBar(props: { usage: ContextUsageView }) {
   );
 }
 
-/** The duration to expect when this agent has not compacted before. */
 const DEFAULT_COMPACTION_MS = 30_000;
 
-/** How long the finished state stays: long enough to read the result, short enough not to sit over the reply. */
 const COMPACTION_DONE_HOLD_MS = 2_000;
 
-/*
- * Past this multiple of the expected duration, the estimate has stopped near 95% for long enough to
- * look frozen, so the notice shows the elapsed time, which still moves.
- */
 const COMPACTION_SLOW_FACTOR = 2;
 
-/*
- * Providers report no compaction progress, so the share is an estimate from the elapsed time. The
- * curve slows as it nears 95% and holds there until the provider reports the end, so a slow
- * compaction never reads as done before it is.
- */
 function estimatedCompaction(elapsedMs: number, expectedMs: number): number {
   return 0.95 * (1 - Math.exp((-2.5 * Math.max(0, elapsedMs)) / Math.max(1, expectedMs)));
 }
 
-/**
- * The composer notice while the provider compacts the thread. It takes the slab the usage limit and
- * sign-in notices use, because it is the same kind of state: the agent accepts no turn until it ends.
- *
- * `expectedMs` is the agent's last compaction duration. `completed` shows 100% for
- * `COMPACTION_DONE_HOLD_MS`; `failed` stays until the user dismisses it. Either way the notice then
- * slides down under the input and calls `onDone`, and the caller removes it.
- */
 export function ComposerCompactionNotice(props: {
   startedAt: number;
   expectedMs?: number | undefined;
   status?: ContextCompactionView["status"] | undefined;
+  reason?: AgentContextCompactionReason | undefined;
   onDone?: (() => void) | undefined;
 }) {
   const { t, format } = useText();
@@ -406,7 +370,7 @@ export function ComposerCompactionNotice(props: {
         </Match>
       </Switch>
       <p class="context-compaction-notice-copy">
-        <strong>{t(COMPACTION_LABELS[status()])}</strong>
+        <strong>{t(compactionLabel(status(), props.reason))}</strong>
         <Show when={status() === "failed"}>
           <span> · {t("chat.compaction.continues")}</span>
         </Show>
@@ -414,7 +378,6 @@ export function ComposerCompactionNotice(props: {
       <Show
         when={status() === "failed"}
         fallback={
-          /* Hidden from the live region: a value that changes four times a second must not be read out. */
           <span
             class="context-compaction-notice-percent"
             aria-hidden="true"
@@ -445,6 +408,7 @@ export interface ContextCompactionView {
   timestamp: string;
   beforeTokens?: number | undefined;
   afterTokens?: number | undefined;
+  reason?: AgentContextCompactionReason | undefined;
 }
 
 const COMPACTION_LABELS = {
@@ -453,7 +417,19 @@ const COMPACTION_LABELS = {
   failed: "chat.compaction.failed",
 } as const satisfies Record<ContextCompactionView["status"], AppTextKey>;
 
-/** The conversation row where a provider thread was compacted. It reads like the other action markers. */
+const CACHE_EXPIRY_COMPACTION_LABELS = {
+  running: "chat.compaction.cacheExpiryRunning",
+  completed: "chat.compaction.cacheExpiryCompleted",
+  failed: "chat.compaction.failed",
+} as const satisfies Record<ContextCompactionView["status"], AppTextKey>;
+
+function compactionLabel(
+  status: ContextCompactionView["status"],
+  reason: AgentContextCompactionReason | undefined,
+): AppTextKey {
+  return (reason === "cacheExpiry" ? CACHE_EXPIRY_COMPACTION_LABELS : COMPACTION_LABELS)[status];
+}
+
 export function ContextCompactionMarker(props: { compaction: ContextCompactionView }) {
   const { t, format } = useText();
   return (
@@ -477,7 +453,9 @@ export function ContextCompactionMarker(props: { compaction: ContextCompactionVi
               <LoaderCircle class="composer-spinner" />
             </Show>
           </span>
-          <span class="chat-action-marker-label">{t(COMPACTION_LABELS[props.compaction.status])}</span>
+          <span class="chat-action-marker-label">
+            {t(compactionLabel(props.compaction.status, props.compaction.reason))}
+          </span>
           <Show when={props.compaction.beforeTokens !== undefined && props.compaction.afterTokens !== undefined}>
             <span class="context-compaction-detail">
               ·{" "}

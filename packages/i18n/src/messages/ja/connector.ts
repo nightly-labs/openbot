@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/connector";
 
 export const messages = {
-  // Marketplace > Apps > GitHub: the built-in GitHub connection.
   "connector.github.title": "GitHub",
   "connector.github.description":
     "このコンピューターのすべてのエージェントが、GitHub のリポジトリ、Issue、プルリクエスト、gh と git を使えます。",
@@ -58,7 +57,6 @@ export const messages = {
   "connector.github.disconnectEffectTools": "すべてのエージェントが GitHub のツール、gh、git を使えなくなります。",
   "connector.github.disconnectEffectRevoke": "その後 GitHub が開き、OpenBot のアクセスを取り消せます。",
   "connector.github.disconnectEffectKept": "チャット、ファイル、エージェントのメモリーはこのコンピューターに残ります。",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "{host} のすべてのエージェントが、GitHub のリポジトリ、Issue、プルリクエスト、gh と git を使えます。",
   "connector.github.connectedSummaryHost": {
@@ -73,7 +71,6 @@ export const messages = {
   "connector.statusUnknown": "不明",
   "connector.readFailed": "OpenBot はこの接続の状態を読み取れませんでした。",
 
-  // Marketplace > Apps > Slack.
   "connector.slack.title": "Slack",
   "connector.slack.description":
     "Slack で @OpenBot をメンションするか、ダイレクトメッセージを送ります。Slack Orchestrator が適切なエージェントに依頼して回答します。",
@@ -153,8 +150,6 @@ export const messages = {
     other: "ワークスペース {count} 件 · Slack Orchestrator が回答します",
   },
 
-  // Marketplace > Apps > Discord. Always write "Discord server": "server" alone is an
-  // OpenBot server.
   "connector.discord.title": "Discord",
   "connector.discord.description":
     "Discord サーバーのチャンネルで @OpenBot をメンションします。Discord Orchestrator が適切なエージェントに依頼して回答します。",
@@ -248,7 +243,6 @@ export const messages = {
   "connector.discord.accessSave": "保存",
   "connector.discord.accessHostUpdate": "ロールを選択するには、{host} の OpenBot を更新してください。",
 
-  // Marketplace > Apps > Telegram.
   "connector.telegram.title": "Telegram",
   "connector.telegram.description":
     "OpenBot ボットを Telegram グループに追加するか、ボットとのダイレクトチャットを開きます。Telegram Orchestrator が適切なエージェントに依頼して回答します。",
@@ -354,7 +348,7 @@ export const messages = {
   "connector.whatsapp.linkNumber": "番号をリンク",
   "connector.whatsapp.ownNumberNote": "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。",
   "connector.whatsapp.dedicatedNote":
-    "許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
+    "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp がこのコンピューターをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
   "connector.whatsapp.helpLoggedOutHost":
@@ -380,7 +374,7 @@ export const messages = {
     "あなたの「自分にメッセージ」チャットと、許可した人だけが書き込めます。それ以外の人には返信しません。オフにすると、OpenBot は知らない人にコードを返信します。",
   "connector.whatsapp.workingMessage": "「対応しています…」メッセージ",
   "connector.whatsapp.workingMessageDescription":
-    "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。前のリクエストを待っているリクエストには、待機中のメッセージも送信します。回答だけを送信するにはオフにしてください。",
+    "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。前のリクエストを待っているリクエストには、待機中のメッセージも送信します。個人の番号では、あなたの「自分にメッセージ」チャットだけがこれらのメッセージを受け取ります。回答だけを送信するにはオフにしてください。",
   "connector.whatsapp.statusReactions": "ステータスのリアクション",
   "connector.whatsapp.statusReactionsDescription":
     "メッセージが届くと OpenBot が 👀 で、回答の準備ができると ✅ でリアクションします。リアクションを送信しないにはオフにしてください。",
@@ -459,6 +453,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "1 つの番号で許可できる連絡先とグループは最大 {count} 件です。",
   "connector.whatsapp.senderGroup": "グループ",
   "connector.whatsapp.removeSender": "削除",
+  "connector.whatsapp.senderAccess": "{name} のアクセス",
+  "connector.whatsapp.senderReplies": "仕事を頼める",
+  "connector.whatsapp.senderReadOnly": "読み取り専用",
   "connector.whatsapp.addContact": "連絡先を追加",
   "connector.whatsapp.addGroup": "グループを追加",
   "connector.whatsapp.contactTitle": "連絡先を追加",
@@ -482,7 +479,6 @@ export const messages = {
   "connector.whatsapp.requestDetail": "コード {code} · {number}",
   "connector.whatsapp.approve": "承認",
   "connector.whatsapp.deny": "拒否",
-  // Marketplace > 1Password: a vault that the user shares with OpenBot through a service account.
   "connector.onePassword.title": "1Password",
   "connector.onePassword.description":
     "専用の 1Password 保管庫をサービスアカウント経由で OpenBot と共有すると、エージェントが OpenBot のブラウザーでサイトにサインインできます。",

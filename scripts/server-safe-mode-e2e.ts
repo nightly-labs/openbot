@@ -1,25 +1,3 @@
-// Checks the server safe mode (`src/main/server-safe-mode.ts`): a server that stopped its start loop
-// keeps a minimal Team API up, and each member reads why. The real safe-mode API
-// (`src/main/team-api/server-safe-mode-api.ts`) runs on loopback with a real `TeamStore` that reads a
-// real team file without a write, and a real `TeamWebRtcHostPeer` takes WebRTC frames with no Signal.
-// The profile also has an `openbot.db`, as a server has. The checks:
-// - HTTP: a client of protocols 1-9 reads that only protocol 10 is served, and each other request of
-//   protocols 1-9 gets 426 `client_update_required`. Protocol 11 gets `host_update_required`, and
-//   malformed headers get `protocol_error`.
-// - HTTP: a protocol 10 client reads `server-safe-mode-v1` and no other capability.
-// - HTTP: the owner, an admin and a member read the reason. No token and a wrong token get 401. Each
-//   other route, sign-in and join too, gets 503 `server_safe_mode`, and so does the events socket.
-// - HTTP desktop client (`RemoteServerClient`): the connect fails with `server_safe_mode` and the
-//   translated reason, records no usable compatibility, and the status is "incompatible".
-// - WebRTC: the web and mobile compatibility read (`readTeamHostCompatibility` with
-//   `TEAM_WEB_CLIENT_PROTOCOL`) gets protocol 10 and the capability. Owner, admin and member peers read
-//   the reason. A protocol 9 peer, such as an older phone app, reads that it must update.
-// - No answer has a path, a token, an error text or a stack. No file of the profile is made, changed
-//   or removed: the safe mode does not open the database and writes no user data.
-// - The hourly `check` of scripts/hosting/openbot-hosted-update (real bash, stub `systemctl`, `stage`
-//   and `apply`) sees the empty marker, stages, stops the safe mode, installs a staged release and
-//   starts OpenBot again. With no marker, a running OpenBot is left alone.
-// Run: `bun scripts/server-safe-mode-e2e.ts`. Writes .openbot-build/server-safe-mode-e2e/report.json.
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, randomBytes, randomUUID, sign } from "node:crypto";
 import {
@@ -84,8 +62,6 @@ const OWNER = { username: "owner-user", password: "owner-password-123" };
 const ADMIN = { username: "admin-user", password: "admin-password-123" };
 const MEMBER = { username: "member-user", password: "member-password-123" };
 
-// The main process imports Electron. No check here opens a window, so each name is inert, and a call
-// to one shows as a missing feature in the failing step.
 plugin({
   name: "server-safe-mode-electron-boundary",
   setup(build) {
@@ -139,11 +115,9 @@ const report: {
   profileFiles: string[];
 } = { passed: false, reason: null, steps: [], profileFiles: [] };
 
-/** Runs one check. `summarize` keeps secrets and live objects out of the report. */
 async function step<T>(name: string, run: () => Promise<T>, summarize: (value: T) => unknown = (value) => value) {
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check waits for its answer, and a missing answer must fail.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -172,7 +146,6 @@ function record(value: unknown, label: string): JsonObject {
   return value;
 }
 
-/** Each answer body that the safe mode sent, for the secret check at the end. */
 const answers: string[] = [];
 
 interface WireResponse {
@@ -180,7 +153,6 @@ interface WireResponse {
   body: unknown;
 }
 
-/** One HTTP request. `protocol` null sends no protocol headers. `headers` adds or replaces headers. */
 async function http(
   port: number,
   input: { protocol: number | null; method?: string; path: string; body?: unknown; token?: string },
@@ -204,10 +176,8 @@ async function http(
   return { status: response.status, body: body ? JSON.parse(body) : null };
 }
 
-/** The headers of a protocol 10 request with the full client list. */
 const v10Headers = () => teamCapabilityHeaders(TEAM_PROTOCOL_V10, teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10));
 
-/** Each file under `directory`, with its size, its time and a hash of its content. */
 function snapshot(directory: string): Record<string, { size: number; mtimeMs: number; sha256: string }> {
   const files: Record<string, { size: number; mtimeMs: number; sha256: string }> = {};
   const walk = (path: string) => {
@@ -228,7 +198,6 @@ function snapshot(directory: string): Record<string, { size: number; mtimeMs: nu
   return files;
 }
 
-/** The bridge of a WebRTC client: frames go to the host peer directly, with no Signal. */
 class LoopbackBridge extends TeamWebRtcBridge {
   readonly sent: { peerId: string; channel: TeamWebRtcChannel; data: string }[] = [];
   readonly #waiters = new Set<() => void>();
@@ -245,7 +214,6 @@ class LoopbackBridge extends TeamWebRtcBridge {
       for (const wake of this.#waiters) wake();
     });
 
-  /** Waits until `pick` accepts a frame on the RPC channel from index `from`. */
   rpcFrom<T>(from: number, pick: (data: string) => T | null): Promise<T> {
     return new Promise((resolveValue) => {
       const check = () => {
@@ -283,7 +251,6 @@ function rpcResponse(requestId: string) {
   };
 }
 
-/** The first line of the answer to a WebSocket upgrade of the events route. */
 function upgradeStatus(port: number, token: string): Promise<string> {
   return new Promise((resolveLine, reject) => {
     const socket = connect(port, "127.0.0.1", () => {
@@ -319,7 +286,6 @@ interface CheckCase {
   activeState: string;
   marker: boolean;
   stageFails: boolean;
-  /** The version that `staged_version` gives, or "" when no release is staged. */
   stagedVersion: string;
   expected: { calls: string[]; exitCode: number };
 }
@@ -367,7 +333,6 @@ const CHECK_CASES: CheckCase[] = [
   },
 ];
 
-/** Runs the real `check` in bash with a stub `systemctl`, `stage` and `apply`. Sourcing runs only definitions. */
 function runCheck(entry: CheckCase): { calls: string[]; exitCode: number } {
   const directory = mkdtempSync(join(tmpdir(), "server-safe-mode-check-"));
   try {
@@ -421,7 +386,6 @@ let safeServer: Server | null = null;
 const peers: InstanceType<typeof TeamWebRtcHostPeer>[] = [];
 
 try {
-  // --- The profile of the server before the safe mode: a database and a team with three roles. ---
   mkdirSync(userData, { recursive: true });
   const database = new OpenBotDatabase(userData);
   await runCauseEffect(database.initialize());
@@ -441,7 +405,6 @@ try {
   report.profileFiles = Object.keys(before).sort();
   assert.ok(report.profileFiles.includes(databaseFile), "The profile has no database.");
 
-  // --- The safe mode, as `server-safe-mode.ts` makes it. ---
   const store = new TeamStore(join(userData, TEAM_STORE_FILE));
   await runCauseEffect(store.loadReadOnly());
   assert.equal(store.getIdentity()?.serverId, identity.serverId);
@@ -618,15 +581,12 @@ try {
     return { code: cause.code, message: cause.message, state: outcome.state };
   });
 
-  // --- WebRTC ---
-
   const clientKeys = generateKeyPairSync("ed25519", {
     publicKeyEncoding: { type: "spki", format: "pem" },
     privateKeyEncoding: { type: "pkcs8", format: "pem" },
   });
   const fingerprints = { localFingerprint: "host-fingerprint", remoteFingerprint: "client-fingerprint" };
 
-  /** A WebRTC client that Signal connected, after the signed handshake. */
   async function connectWebRtc(peerId: string, role: "owner" | "admin" | "member") {
     const bridge = new LoopbackBridge();
     const ticket = `ticket-${randomUUID()}`;
@@ -708,11 +668,6 @@ try {
       return frame?.type === "auth-confirmed" ? frame : null;
     });
 
-    /**
-     * One `GET` `http.request` with these capability keys. The body is encoded as the desktop, web
-     * and mobile WebRTC clients encode it, so a codec that refuses the request fails here too. The
-     * desktop sends no body (`undefined`); the web and mobile runtime sends `{}`.
-     */
     async function call(path: string, keys: { capabilities: string[]; absent?: string[] }, input?: TeamProtocolV2Json) {
       const requestId = randomUUID();
       const from = bridge.sent.length;
@@ -739,8 +694,6 @@ try {
 
   const web = await connectWebRtc("peer-web", "member");
   await step("WebRTC web and mobile client: protocol 10 and server-safe-mode-v1", async () => {
-    // As `createRemoteTeamPeer` does: the first read sends the bootstrap list, a later one the
-    // protocol 10 lists of the protocol that it read.
     let known: number | undefined;
     let reads = 0;
     const { support, negotiated } = await readTeamHostCompatibility(async () => {
@@ -765,13 +718,10 @@ try {
     const roles: string[] = [];
     for (const role of ["owner", "admin", "member"] as const) {
       const peer = role === "member" ? web : await connectWebRtc(`peer-${role}`, role);
-      // The member reads as the web client does, with the `{}` body of its `request`. The others read
-      // as the desktop does, with no body.
       const frame = await peer.call(SERVER_SAFE_MODE_ROUTES.reason, v10Lists(), role === "member" ? {} : undefined);
       assert.ok("result" in frame, `${role}: ${JSON.stringify(frame)}`);
       const result = record(frame.result, "result");
       assert.equal(result.status, 200);
-      // As the clients read it: the side-route codec first, then the reason decoder.
       const codec = teamSideRouteCodec(SERVER_SAFE_MODE_ROUTES.reason);
       assert.ok(codec, "The reason route has no client codec.");
       const body = codec.response(SERVER_SAFE_MODE_ROUTES.reason, 200, result.body);
@@ -813,7 +763,6 @@ try {
   });
 
   await step("No file of the profile is made, changed or removed", async () => {
-    // A refused write of the read-only team store would show here as a changed file too.
     await runCauseEffect(store.createInvite("member")).then(
       () => assert.fail("The read-only team store wrote an invite."),
       () => undefined,

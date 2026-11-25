@@ -9,40 +9,21 @@ import {
 } from "@openbot/contracts/ipc";
 import type { GraphPlace } from "./workflow-graph-edit";
 
-/**
- * A workflow of any shape as a tree that a phone draws from left to right:
- *
- * - `step`: one step.
- * - `split`: a step with more than one way on, such as a condition. Each path goes down to the step
- *   where the paths join, and the flow goes on from there.
- * - `jump`: a way to a step that the tree shows at another place: a loop back, or a second way in.
- * - `add`: a place where the editor can add a step: on each connection, and at the end of a path. A
- *   view that does not edit draws a connection as a line and leaves out the ends of paths.
- *
- * An output that a step sends its result to, and a prompt or a file that feeds a step, sit next to
- * that step in its list, as the editor shows them. The steps that no trigger reaches come last.
- */
 export type FlowItem =
   | { type: "step"; id: string }
-  /** `joined`: the paths meet again and the flow goes on after them; else each path ends by itself. */
   | { type: "split"; from: string; paths: FlowPath[]; joined: boolean }
-  /** `from`: the step that the way leaves, so two ways to one step have their own keys. */
   | { type: "jump"; from: string; to: string; loop: boolean }
   | { type: "add"; place: GraphPlace };
 
 export interface FlowPath {
-  /** Stable among the paths of one split: the branch, or the first step of the path. */
   key: string;
-  /** The branch of a condition, or null for a step that sends its result to more than one step. */
   branch: WorkflowBranch | null;
   items: FlowItem[];
-  /** The path goes on to a step after the split, its join or a join further out; else the run ends. */
   goesOn: boolean;
 }
 
 export interface FlowTree {
   items: FlowItem[];
-  /** The steps that no trigger reaches. */
   loose: string[];
 }
 
@@ -65,24 +46,15 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
     if (loops.has(edge.id)) loopEdges.set(edge.from, [...(loopEdges.get(edge.from) ?? []), edge]);
 
   const position = (id: string) => byId.get(id)?.at ?? { x: 0, y: 0 };
-  // The canvas reads from left to right, then from top to bottom.
   const byPosition = (left: string, right: string) =>
     position(left).x - position(right).x || position(left).y - position(right).y;
   const isLeaf = (id: string) => (out.get(id) ?? []).length === 0 && !loopEdges.has(id);
-  /** A step with no way in that feeds the steps after it, such as a prompt. */
-  // Only a prompt or a file feeds the step after it. Any other step with no way in does not run: it
-  // stays with the steps that no trigger reaches.
   const isFeeder = (node: WorkflowNode) =>
     (node.kind === "prompt" || node.kind === "asset") && (into.get(node.id) ?? []).length === 0;
 
   const placed = new Set<string>();
-  /** Whether the last walk stopped at a join: its path goes on after the split. */
   let endedAtStop = false;
 
-  /**
-   * The steps that a step reaches, with the fewest edges to each. It does not go past a step of `stop`,
-   * the join of an outer split: the paths of an inner split must join before the outer paths do.
-   */
   const reach = (start: string, stop: ReadonlySet<string>) => {
     const distance = new Map([[start, 0]]);
     let layer = [start];
@@ -101,7 +73,6 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
     return distance;
   };
 
-  /** The nearest step that every path reaches: the paths join there. */
   const joinOf = (targets: readonly string[], stop: ReadonlySet<string>): string | undefined => {
     const maps = targets.map((target) => reach(target, stop));
     let best: string | undefined;
@@ -118,7 +89,6 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
   };
 
   const place = (id: string, items: FlowItem[]) => {
-    // A prompt or a file that feeds this step comes first, as it does in the editor.
     for (const edge of into.get(id) ?? []) {
       const feeder = byId.get(edge.from);
       if (feeder && isFeeder(feeder) && !placed.has(feeder.id)) {
@@ -130,7 +100,6 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
     items.push({ type: "step", id });
   };
 
-  /** `via`: the connection into `start`, which is a place to add a step. */
   const walk = (start: string | undefined, stop: ReadonlySet<string>, via?: WorkflowEdge): FlowItem[] => {
     const items: FlowItem[] = [];
     if (via) items.push({ type: "add", place: { kind: "edge", edgeId: via.id } });
@@ -144,7 +113,6 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
       place(current, items);
       const from = current;
       const ways = out.get(from) ?? [];
-      // An output with no way on takes the result of this step; the flow goes on from this step.
       const ends = ways.filter(
         (edge) =>
           !edge.branch &&
@@ -171,7 +139,6 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
       const node = byId.get(from);
       const isCondition = node?.kind === "condition";
       if (rest.length === 0 && !isCondition) {
-        // A step that sends nothing, such as an output, or one that loops back, has no end to add after.
         if (back.length === 0 && node && WORKFLOW_PORTS[node.kind].out.length > 0)
           items.push({ type: "add", place: { kind: "after", nodeId: from } });
         break;
@@ -183,8 +150,6 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
         current = next.to;
         continue;
       }
-      // Paths join only when there are two or more: one connected path of a condition goes on alone,
-      // and its other answer ends the run.
       const join =
         rest.length > 1
           ? joinOf(
@@ -198,7 +163,6 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
         const items = walk(edge.to, inner, edge);
         return { key: edge.branch ?? edge.to, branch: edge.branch ?? null, items, goesOn: endedAtStop };
       });
-      // A condition shows both of its paths: one that goes nowhere ends the run, and a step can go there.
       if (isCondition)
         for (const branch of ["yes", "no"] as const)
           if (!rest.some((edge) => edge.branch === branch))
@@ -213,7 +177,6 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
       previous = from;
       current = join;
     }
-    // Read by the split that walked this path, right after this call returns.
     endedAtStop = current !== undefined && stop.has(current);
     return items;
   };
@@ -227,20 +190,13 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
   return { items, loose };
 }
 
-/**
- * A row of the list view of a workflow of any shape, in the order that a run goes, with the depth of
- * its path: a step, the label of a path, a way to a step shown at another place, or the end of a path
- * that has no step.
- */
 export type FlowRow =
   | { type: "step"; id: string; depth: number }
   | { type: "path"; key: string; branch: WorkflowBranch | null; index: number; depth: number }
   | { type: "jump"; key: string; to: string; loop: boolean; depth: number }
-  /** `goesOn`: the path goes to the steps after the split; else the run ends there. */
   | { type: "end"; key: string; goesOn: boolean; depth: number }
   | { type: "loose"; depth: number };
 
-/** The tree as rows: each path under its label, one level deeper; the steps that no trigger reaches last. */
 export function flowRows(tree: FlowTree): FlowRow[] {
   const rows: FlowRow[] = [];
   const walk = (items: readonly FlowItem[], depth: number, path: string) => {

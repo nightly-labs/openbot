@@ -6,6 +6,7 @@ import {
   type AgentDockPresentation,
   type AgentDockPrompt,
   type AgentDockTakeover,
+  type AgentDockThreadChoices,
   type AgentDockUsageLimit,
 } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
@@ -183,6 +184,62 @@ describe("agent dock decoding", () => {
     );
   });
 
+  it("accepts the thread that an agent chat shows and rejects a thread without a title", () => {
+    const [agentChat, ...others] = PRESENTATION.chats;
+    if (!agentChat) throw new Error("The presentation has no agent chat.");
+    const thread = { taskId: "task-1", title: "Launch checklist" };
+    const shown: AgentDockPresentation = { ...PRESENTATION, chats: [{ ...agentChat, thread }, ...others] };
+    expect(decodeAgentDockPresentation(shown)).toEqual(shown);
+    const untitled = [{ ...agentChat, thread: { ...thread, title: "" } }, ...others];
+    expect(() => decodeAgentDockPresentation({ ...PRESENTATION, chats: untitled })).toThrow(
+      "Invalid agent dock presentation.",
+    );
+    const long = [
+      { ...agentChat, thread: { ...thread, title: "a".repeat(INPUT_LIMITS.agentTaskTitle + 1) } },
+      ...others,
+    ];
+    expect(() => decodeAgentDockPresentation({ ...PRESENTATION, chats: long })).toThrow(
+      "Invalid agent dock presentation.",
+    );
+  });
+
+  it("accepts the chats that an agent chat can change to and rejects an unknown thread state", () => {
+    const [agentChat, ...others] = PRESENTATION.chats;
+    if (!agentChat) throw new Error("The presentation has no agent chat.");
+    const threads = {
+      activeId: "draft",
+      threads: [
+        {
+          id: "task-1",
+          title: "Launch checklist",
+          updatedAt: "2026-11-25T10:00:00.000Z",
+          status: { kind: "working" },
+          unread: 0,
+        },
+        {
+          id: "task-2",
+          title: "Pricing page copy",
+          updatedAt: "2026-11-25T09:00:00.000Z",
+          status: { kind: "waiting", reason: "question" },
+          unread: 2,
+        },
+      ],
+    } satisfies AgentDockThreadChoices;
+    const shown: AgentDockPresentation = { ...PRESENTATION, chats: [{ ...agentChat, threads }, ...others] };
+    expect(decodeAgentDockPresentation(shown)).toEqual(shown);
+    const unknown = { ...threads, threads: [{ ...threads.threads[0], status: { kind: "sleeping" } }] };
+    expect(() =>
+      decodeAgentDockPresentation({ ...PRESENTATION, chats: [{ ...agentChat, threads: unknown }, ...others] }),
+    ).toThrow("Invalid agent dock presentation.");
+    const many = {
+      ...threads,
+      threads: Array.from({ length: AGENT_DOCK_LIMITS.threads + 1 }, () => threads.threads[0]),
+    };
+    expect(() =>
+      decodeAgentDockPresentation({ ...PRESENTATION, chats: [{ ...agentChat, threads: many }, ...others] }),
+    ).toThrow("Invalid agent dock presentation.");
+  });
+
   it("accepts a temporary seat and rejects a seat that does not say whether it is temporary", () => {
     const temporary: AgentDockPresentation = {
       ...PRESENTATION,
@@ -250,6 +307,18 @@ describe("agent dock decoding", () => {
     );
   });
 
+  it("keeps a visual reply mark and rejects one that is not a boolean", () => {
+    const chat = PRESENTATION.chats[0];
+    const message = chat?.messages[0];
+    if (!chat || !message) throw new Error("The presentation fixture has no agent message.");
+    const visual = { ...chat, messages: [{ ...message, visual: true }] };
+    expect(decodeAgentDockPresentation({ ...PRESENTATION, chats: [visual] })?.chats[0]).toEqual(visual);
+    const wrong = { ...chat, messages: [{ ...message, visual: "yes" }] };
+    expect(() => decodeAgentDockPresentation({ ...PRESENTATION, chats: [wrong] })).toThrow(
+      "Invalid agent dock presentation.",
+    );
+  });
+
   it("keeps a chat question, takeover and usage limit, and rejects one that is not whole", () => {
     const chat = PRESENTATION.chats[1];
     if (!chat) throw new Error("The presentation fixture has no channel chat.");
@@ -312,7 +381,14 @@ describe("agent dock decoding", () => {
   it("accepts a dock position and rejects one outside the display", () => {
     expect(decodeAgentDockOffset({ displayId: 1, offset: 1 })).toEqual({ displayId: 1, offset: 1 });
     expect(decodeAgentDockOffset({ displayId: 1, offset: 0 })).toEqual({ displayId: 1, offset: 0 });
+    const bounds = { x: -1920, y: 0, width: 1920, height: 1080 };
+    expect(decodeAgentDockOffset({ displayId: 1, offset: 0, bounds })).toEqual({ displayId: 1, offset: 0, bounds });
     for (const value of [
+      { displayId: 1, offset: 0, bounds: { ...bounds, width: 0 } },
+      { displayId: 1, offset: 0, bounds: { ...bounds, x: 0.5 } },
+      { displayId: 1, offset: 0, bounds: { ...bounds, y: 100_001 } },
+      { displayId: 1, offset: 0, bounds: { x: 0, y: 0, width: 1920 } },
+      { displayId: 1, offset: 0, bounds: null },
       { displayId: 1, offset: -0.1 },
       { displayId: 1, offset: 1.1 },
       { displayId: 1, offset: Number.POSITIVE_INFINITY },
@@ -378,6 +454,12 @@ describe("agent dock decoding", () => {
     expect(() => decodeAgentDockAction({ type: "open-window", serverId: "local", agentId: "" })).toThrow(
       "Invalid agent dock action.",
     );
+    const openTakeover = { type: "open-browser-takeover", serverId: "local", agentId: "agent-1", tabId: "tab-1" };
+    expect(decodeAgentDockAction(openTakeover)).toEqual(openTakeover);
+    for (const tabId of [undefined, "", "t".repeat(INPUT_LIMITS.identifier + 1)]) {
+      expect(() => decodeAgentDockAction({ ...openTakeover, tabId })).toThrow("Invalid agent dock action.");
+    }
+    expect(() => decodeAgentDockAction({ ...openTakeover, agentId: "" })).toThrow("Invalid agent dock action.");
     expect(() => decodeAgentDockAction({ type: "open-link", url: "" })).toThrow("Invalid agent dock action.");
     expect(() => decodeAgentDockAction({ type: "add", serverId: "", seat: { kind: "agent", id: "agent-1" } })).toThrow(
       "Invalid agent dock action.",

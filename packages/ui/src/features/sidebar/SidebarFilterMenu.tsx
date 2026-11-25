@@ -1,9 +1,3 @@
-/**
- * The filter button beside New, and its menu: the kind of chat, its state, the folders and the chat
- * order. A dot on the button shows that a filter is set. The counts come from the data store and are
- * read only while the menu is open.
- */
-
 import { ArrowDownWideNarrow, Badge, Check, ChevronRight, DropdownMenu, Filter, Folder, Minus, X } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
@@ -15,14 +9,13 @@ import {
   type SidebarListFilter,
   sidebarFolderMark,
   sidebarFolderTreeIds,
-  sidebarListFilterParts,
   sidebarSelectedFolders,
   sidebarToggleFolder,
 } from "./sidebar-list-filter";
 import { useSidebarScope } from "./sidebar-scope";
 import { SIDEBAR_CHAT_ORDER_LABEL, SIDEBAR_CHAT_ORDERS } from "./sidebar-types";
 
-function MenuMark(props: { on: boolean; mixed?: boolean }) {
+export function MenuMark(props: { on: boolean; mixed?: boolean }) {
   return (
     <span class="ui-menu-check" data-checked={props.on || props.mixed ? "" : undefined} aria-hidden="true">
       <Show when={props.mixed} fallback={<Show when={props.on}>{<Check />}</Show>}>
@@ -32,7 +25,6 @@ function MenuMark(props: { on: boolean; mixed?: boolean }) {
   );
 }
 
-/** A checkbox for a folder and the folders in it. It stays open, so more folders can be picked. */
 function FolderCheck(props: { node: SidebarFolderNode }) {
   const { filterFolders, listFilter, listFilterCount, setListFilter } = useSidebarScope();
   const { t } = useText();
@@ -56,10 +48,6 @@ function FolderCheck(props: { node: SidebarFolderNode }) {
   );
 }
 
-/**
- * A folder with folders in it opens its own menu. The menu starts with the folder itself, which
- * selects it with all the folders in it, then lists each folder in it.
- */
 function FolderSub(props: { node: SidebarFolderNode }) {
   const { listFilter, listFilterCount } = useSidebarScope();
   const mark = () => sidebarFolderMark(props.node, listFilter().folders);
@@ -98,10 +86,11 @@ function FolderEntries(props: { nodes: readonly SidebarFolderNode[] }) {
 }
 
 export function SidebarFilterMenu() {
-  const { filterFolders, listFilter, listFilterCount, listFiltered, props, setListFilter } = useSidebarScope();
+  const { filterFolders, listFilter, listFilterCount, listFiltered, props, setListFilter, sidebarTabs } =
+    useSidebarScope();
   const { t } = useText();
   const set = (patch: Partial<SidebarListFilter>) => setListFilter({ ...listFilter(), ...patch });
-  const parts = () => sidebarListFilterParts(listFilter());
+  const parts = () => sidebarTabs.listFilterPartsBeyondTab();
   const picked = () => sidebarSelectedFolders(filterFolders(), listFilter().folders).length;
   return (
     <DropdownMenu.Root placement="bottom-end" gutter={4}>

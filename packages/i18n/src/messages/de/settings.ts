@@ -30,6 +30,8 @@ export const messages = {
   "settings.movingFaces.title": "Bewegte Agentengesichter",
   "settings.movingFaces.description":
     "Agentengesichter blinzeln und bewegen sich. Auf einem Computer ohne GPU sind sie anfangs still.",
+  "settings.startupAnimation.title": "Startanimation",
+  "settings.startupAnimation.description": "Zeigt die Agentenanimation, während OpenBot startet.",
   "settings.logoColor.title": "Logofarbe",
   "settings.logoColor.description": "Im Dock, in der Taskleiste und in Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -52,15 +54,17 @@ export const messages = {
   "settings.chatBackground.default": "Standard",
   "settings.chatBackdrop.title": "Fensterhintergrund",
   "settings.chatBackdrop.description":
-    "Eine Szene, ein Bild oder ein GIF hinter dem ganzen Fenster auf diesem Gerät. Bitte einen Agenten um eine Szene und wähle dann bei seiner Antwort „Als Fensterhintergrund verwenden“.",
+    "Eine Szene, ein Bild, ein GIF oder ein Video hinter dem ganzen Fenster auf diesem Gerät. Bitte einen Agenten um eine Szene und wähle dann bei seiner Antwort „Als Fensterhintergrund verwenden“.",
   "settings.chatBackdrop.none": "Keiner",
   "settings.chatBackdrop.pond": "Koi-Teich",
   "settings.chatBackdrop.jellyfish": "Quallen",
   "settings.chatBackdrop.sunset": "Retro-Sonnenuntergang",
   "settings.chatBackdrop.snowfall": "Schneefall",
   "settings.chatBackdrop.fireflies": "Glühwürmchen",
-  "settings.chatBackdrop.upload": "Bild hochladen…",
-  "settings.chatBackdrop.uploadRefused": "Verwende ein PNG-, JPEG-, GIF-, WebP- oder AVIF-Bild mit höchstens 20 MB.",
+  "settings.chatBackdrop.coast": "Neonküste",
+  "settings.chatBackdrop.upload": "Hochladen…",
+  "settings.chatBackdrop.uploadRefused":
+    "Verwende ein PNG-, JPEG-, GIF-, WebP- oder AVIF-Bild mit höchstens 20 MB oder ein MP4- oder WebM-Video mit höchstens 100 MB.",
   "settings.chatBackdrop.saveFailed": "Der Fensterhintergrund wurde nicht gespeichert.",
   "settings.chatBackdrop.removeFailed": "Der Fensterhintergrund wurde nicht entfernt.",
   "settings.chatColor.title": "Chatfarbe",
@@ -281,6 +285,9 @@ export const messages = {
   "settings.agentDock.xwayland.unsupported":
     "Unter Wayland ohne XWayland kann das Dock nicht über anderen Apps erscheinen. Es erscheint im OpenBot-Fenster.",
   "settings.agentDock.xwayland.restart": "Neu starten",
+  "settings.agentDock.noCompositor.title": "Im OpenBot-Fenster",
+  "settings.agentDock.noCompositor.description":
+    "Dein Desktop kann keine durchsichtigen Fenster zeigen. Darum erscheint das Dock im OpenBot-Fenster. Damit es über anderen Apps erscheint, schalte in den Systemeinstellungen Desktop-Effekte (einen Compositor) ein und starte OpenBot neu.",
   "settings.agentDock.display.title": "Display",
   "settings.agentDock.display.description":
     "Ist dieses Display nicht verbunden, wechselt das Dock auf das Display des OpenBot-Fensters.",
@@ -480,7 +487,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Das Bild konnte nicht kopiert werden.",
   "settings.profile.share.createFailed": "Das Bild konnte nicht erstellt werden.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "Meine letzten sechs Monate mit OpenBot",
   "settings.profile.activity.title": "Aktivität auf diesem Computer",
   "settings.profile.activity.activeDays": {
@@ -490,7 +496,6 @@ export const messages = {
   "settings.profile.activity.empty": "Noch keine Aktivität",
   "settings.profile.activity.loading": "Aktivität wird geladen…",
   "settings.profile.activity.loadFailed": "Deine Aktivität konnte nicht geladen werden.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} Tokens an {count} aktiven Tag im letzten Jahr",
     other: "{tokens} Tokens an {count} aktiven Tagen im letzten Jahr",
@@ -619,6 +624,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Tarif abgelaufen",
   "settings.hostedServers.state.creating": "Wird erstellt",
   "settings.hostedServers.state.starting": "Wird gestartet",
+  "settings.hostedServers.state.restoring": "Wiederherstellung",
   "settings.hostedServers.state.running": "Läuft",
   "settings.hostedServers.state.stopping": "Wird gestoppt",
   "settings.hostedServers.state.stopped": "Gestoppt",
@@ -629,6 +635,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "Die Einrichtung beginnt, sobald Stripe die Zahlung bestätigt.",
   "settings.hostedServers.planEndedDescription":
     "Der Tarif ist abgelaufen, daher wurde der Server gestoppt. Seine Daten bleiben erhalten. Verlängere den Tarif, um ihn zu starten.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Der Tarif ist abgelaufen, daher wurde der Server gestoppt. Seine Daten bleiben bis zum {date} erhalten. Verlängere den Tarif vorher, um ihn zu starten.",
   "settings.hostedServers.pay": "Zahlungsseite öffnen",
   "settings.hostedServers.payLabel": "Zahlungsseite für {name} öffnen",
   "settings.hostedServers.renew": "Tarif verlängern",
@@ -674,7 +682,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Für ein kleines Team mit täglichen Routinen.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Für viele Agenten und intensive Browserarbeit.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Diktieren",
   "settings.voice.model.parakeet.description":
     "Schnell. Erkennt die gesprochene Sprache selbst, in 25 europäischen Sprachen.",
@@ -743,7 +750,44 @@ export const messages = {
   "settings.voice.speech.sample": "Hallo. So klingen deine Antworten.",
   "settings.voice.speech.listenFailed": "Die Probe konnte nicht abgespielt werden.",
   "settings.voice.live.section": "Live-Sprache",
+  "settings.voice.talk.section": "Sprachgespräch",
+  "settings.voice.talkKey.title": "Push-to-Talk-Taste",
+  "settings.voice.talkKey.description": "Halte diese Tasten gedrückt, um in einem Sprachgespräch zu sprechen.",
+  "settings.voice.talkKey.change": "Push-to-Talk-Taste ändern",
+  "settings.voice.talkKey.recording": "Drücke die Tasten",
+  "settings.voice.talkKey.refused": "Füge noch eine Taste hinzu",
+  "settings.voice.talkKey.reset": "Zurücksetzen",
+  "settings.tab.keyboard.title": "Tastatur",
+  "settings.tab.keyboard.description": "Ändere die Tastenkürzel auf diesem Gerät.",
+  "settings.shortcuts.section": "Tastenkürzel",
+  "settings.shortcuts.fixed.section": "Feste Tastenkürzel",
+  "settings.shortcuts.command.newThread": "Neuer Thread",
+  "settings.shortcuts.command.previousThread": "Vorheriger Thread",
+  "settings.shortcuts.command.nextThread": "Nächster Thread",
+  "settings.shortcuts.command.newAgent": "Neuer Agent",
+  "settings.shortcuts.command.globalSearch": "Alles durchsuchen",
+  "settings.shortcuts.command.searchChat": "Im Chat suchen",
+  "settings.shortcuts.command.focusComposer": "Nachrichtenfeld fokussieren",
+  "settings.shortcuts.command.back": "Zurück",
+  "settings.shortcuts.command.forward": "Vorwärts",
+  "settings.shortcuts.command.toggleSidebar": "Seitenleiste ein- oder ausblenden",
+  "settings.shortcuts.command.showShortcuts": "Tastenkürzel anzeigen",
+  "settings.shortcuts.command.openSettings": "Einstellungen öffnen",
+  "settings.shortcuts.command.stopAllAgents": "Alle Agenten stoppen",
+  "settings.shortcuts.command.switchServer": "Server wechseln",
+  "settings.shortcuts.command.zoom": "Zoom",
+  "settings.shortcuts.refused.invalid": "Füge eine Sondertaste hinzu",
+  "settings.shortcuts.refused.reserved": "Das System nutzt dieses Kürzel",
+  "settings.shortcuts.refused.taken": "Belegt von {command}",
+  "settings.shortcuts.recording": "Drücke die Tasten",
+  "settings.shortcuts.change": "Tastenkürzel für {command} ändern",
+  "settings.shortcuts.reset": "Zurücksetzen",
+  "settings.shortcuts.resetAll": "Alle zurücksetzen",
   "settings.voice.live.signIn": "Melde dich mit deinem ChatGPT-Konto bei Codex an, um Live-Sprache zu nutzen.",
+  "settings.voice.live.account": "Konto",
+  "settings.voice.live.accountAutomatic": "Automatisch",
+  "settings.voice.live.accountDescription":
+    "Das ChatGPT-Konto, das Live-Sprache nutzt. Wähle ein Konto, dessen Abo Sprache enthält.",
   "settings.transfer.title": "Diesen Server auf einen anderen Computer umziehen",
   "settings.transfer.lede":
     "Deine Agenten mit ihren Fähigkeiten, Routinen, Erinnerungen und Dateien kommen in eine Datei.",

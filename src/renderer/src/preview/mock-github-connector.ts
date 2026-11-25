@@ -5,20 +5,14 @@ import {
 } from "@openbot/contracts/ipc";
 import type { GitHubConnectorPort } from "../features/connectors/github-connector-port";
 
-/** How long the mock waits for GitHub's code, and then for the user to type it on github.com. */
 const MOCK_CODE_MS = 800;
 const MOCK_SIGN_IN_MS = 4_000;
 
 const DISCONNECTED: GitHubConnectorStatus = { ...DISCONNECTED_GITHUB_CONNECTOR, available: true };
 
-/**
- * Starts disconnected. Connect waits for a code as the real one does, shows it, and after a few
- * seconds the preview is signed in.
- */
 export function createMockGitHubConnector(): GitHubConnectorDesktopApi {
   let status = DISCONNECTED;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  /** Each connect, cancel and disconnect replaces the sign-in that a connect waits for. */
   let attempt = 0;
   const listeners = new Set<(status: GitHubConnectorStatus) => void>();
   const set = (next: GitHubConnectorStatus): GitHubConnectorStatus => {
@@ -70,7 +64,6 @@ export function createMockGitHubConnector(): GitHubConnectorDesktopApi {
       return () => listeners.delete(listener);
     },
   };
-  // The preview has one connection, so a joined server shows the same one.
   return {
     ...api,
     hostStatus: api.status,

@@ -1,8 +1,3 @@
-/**
- * The DOM half of the sidebar drag: what it queries, what it measures, and the drag card it builds.
- * Kept apart from the model so the geometry can be produced in one place and read as plain values.
- */
-
 import type {
   ChatDragSlot,
   DragSlot,
@@ -11,13 +6,6 @@ import type {
   SidebarDragGeometry,
 } from "./sidebar-drag-model";
 
-/**
- * Everything `measureSidebarDragSlots` asks the list for. Each name is emitted by exactly one JSX
- * site: `sectionRegion` by the People and agent sections, `chatRow` by the agent and channel rows, `personRow`
- * by the people section, `pinnedTile` by the pinned group. Renaming one here without renaming the
- * emitter leaves an empty slot map behind: the drag starts, tracks nothing and drops nowhere, and
- * no test fails loudly on it.
- */
 export const SIDEBAR_DRAG_SELECTORS = {
   chatRow: "[data-chat-id]",
   closedBody: ".sidebar-section-collapse[data-collapsed]",
@@ -29,7 +17,6 @@ export const SIDEBAR_DRAG_SELECTORS = {
   sectionRegion: "[data-section-id]",
 } as const;
 
-/** One pass over the list: every slot cache plus the two rectangles the drop resolver guards on. */
 export interface SidebarDragMeasurement {
   chats: Map<string, ChatDragSlot>;
   geometry: SidebarDragGeometry;
@@ -38,10 +25,6 @@ export interface SidebarDragMeasurement {
   sections: Map<string, SectionDragSlot>;
 }
 
-/**
- * The empty pin area slides open inside the pinned group, which clips it. Its own box has the full
- * height from the first frame, so it would cover the rows that have not moved down yet.
- */
 function visiblePinnedBounds(group: HTMLElement, target: HTMLElement): DOMRect {
   const bounds = target.getBoundingClientRect();
   if (target === group) return bounds;
@@ -71,7 +54,6 @@ export function measureSidebarDragSlots(
     if (!sectionId || isInClosedSection(section)) continue;
     const bounds = section.getBoundingClientRect();
     const header = section.querySelector<HTMLElement>(":scope > header");
-    // A stuck header is not at the top of its section, so its line comes from its style, not its box.
     const headerStyle = header ? getComputedStyle(header) : null;
     const stickOffset = headerStyle?.position === "sticky" ? Number.parseFloat(headerStyle.top) : Number.NaN;
     sections.set(sectionId, {
@@ -130,15 +112,10 @@ export function measureSidebarDragSlots(
   return { chats, geometry, people, pinned, sections };
 }
 
-/**
- * A closed section keeps its rows and its folders in the DOM, at a height of zero. They take no drop,
- * so a drop there goes to the closed section itself.
- */
 function isInClosedSection(element: HTMLElement): boolean {
   return Boolean(element.parentElement?.closest(SIDEBAR_DRAG_SELECTORS.closedBody));
 }
 
-/** Takes the drop highlight off every section and off the pinned group. */
 export function clearSidebarDragDecorations(list: HTMLElement | undefined): void {
   list?.querySelector(SIDEBAR_DRAG_SELECTORS.pinnedGroup)?.classList.remove("sidebar-pinned-group-agent-drop-target");
   for (const section of list?.querySelectorAll<HTMLElement>(SIDEBAR_DRAG_SELECTORS.section) ?? []) {

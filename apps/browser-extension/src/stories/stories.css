@@ -1,0 +1,60 @@
+.ext-story-stage {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--openbot-text-primary) 8%, var(--openbot-bg-canvas));
+}
+
+.ext-story-panel {
+  position: relative;
+  width: 360px;
+  height: 720px;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px var(--openbot-border),
+    0 24px 48px -16px rgb(0 0 0 / 0.4);
+}
+
+.ext-story-x {
+  display: grid;
+  width: min(600px, calc(100vw - 48px));
+  gap: 16px;
+  padding: 24px;
+  border-radius: 16px;
+  background: #000000;
+  color: #e7e9ea;
+  font:
+    15px / 1.4 system-ui,
+    sans-serif;
+}
+
+.ext-story-x-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ext-story-x-box {
+  min-height: 24px;
+  color: #e7e9ea;
+}
+
+.ext-story-x-button {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #1d9bf0;
+  color: #ffffff;
+  font:
+    700 15px / 1 system-ui,
+    sans-serif;
+}
+
+.ext-story-x-label {
+  color: #71767b;
+  font-size: 13px;
+}

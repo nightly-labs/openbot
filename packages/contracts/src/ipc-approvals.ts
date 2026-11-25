@@ -60,7 +60,6 @@ export function isAgentApproval(value: unknown): value is AgentApproval {
   );
 }
 
-/** The approval to read whole: the runtime snapshot carries a cut copy of it. */
 export interface ReadPendingApprovalInput {
   agentId: string;
   requestId: string | number;
@@ -71,15 +70,7 @@ export interface RespondToApprovalInput {
   decision: "accept" | "decline";
 }
 
-/**
- * Which agents answer approvals without asking: the "Full access" permission level.
- *
- * This belongs to the computer that runs the agent, not to the approval, and is never carried over
- * the Team API: the released adapters freeze an approval response to `accept` or `decline`. A
- * remote host answers the approvals of its own Full access agents, so they never reach a client.
- */
 export interface ApprovalAutomationPreference {
-  /** Default for agents without an explicit choice. */
   defaultAutoApprove: boolean;
   autoApproveOverrides: Record<string, boolean>;
 }
@@ -103,18 +94,9 @@ export function agentAutoApprovalEnabled(preference: ApprovalAutomationPreferenc
   return preference.autoApproveOverrides[agentId] === true;
 }
 
-/** `sign-in-blocked`: the site refused the sign-in from the host's address. */
 export const BROWSER_TAKEOVER_REASONS = ["sign-in-blocked"] as const;
 export type BrowserTakeoverReason = (typeof BROWSER_TAKEOVER_REASONS)[number];
 
-/**
- * Why OpenBot did not fill a saved login, so a password or code card asks the user:
- * - `agent-script`: a script that the agent ran can still run in a page of this site.
- * - `field-kind`: the agent's target is not a password field, or not a code field.
- * - `login-choice`: several logins fit and the agent named none, or it named one that this site does not have.
- * - `no-secret`: the login has no password, or no authenticator key.
- * - `vault-unreadable`: the password manager could not be read.
- */
 export const BROWSER_VAULT_SKIP_REASONS = [
   "agent-script",
   "field-kind",
@@ -132,7 +114,6 @@ export interface BrowserTakeoverRequest {
   tabId: string;
   secret?: BrowserSecretRequest;
   reason?: BrowserTakeoverReason;
-  /** Set on a secret card when OpenBot did not fill a saved login, or could not read a password manager. */
   vaultSkip?: BrowserVaultSkipReason;
 }
 

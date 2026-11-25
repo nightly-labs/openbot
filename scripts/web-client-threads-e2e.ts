@@ -1,18 +1,3 @@
-// Uses the threads of an agent from a joined computer and from the web app, in this worktree's
-// `bun run dev:test-client` stack. The app of this worktree is the host; the test client joins it; the
-// web app at `/app` of the local Auth API reaches it through Signal and WebRTC. It changes the data of
-// the host profile and starts real provider turns, so the prompts are short. Pass an agent of the host
-// whose provider is signed in, and the Auth API address that the stack log prints:
-// `bun scripts/web-client-threads-e2e.ts --allow-mutations --agent=<agent id> --auth-api=http://localhost:<port>
-//  [--email=openbot-dev-host@example.com] [--browser-executable=<path>]`
-//
-// 1. The test client starts a thread on the host, renames it, archives and restores it. The host shows
-//    each change.
-// 2. The web app signs in as the host owner with the development code, opens the thread from the
-//    thread list, and sends a message in its tab. The host has the message.
-// 3. The web app deletes the thread from its tab menu. After the Undo time the host and the test client
-//    no longer list it.
-// Writes .openbot-build/web-client-threads-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
@@ -96,7 +81,6 @@ async function shot(page: Page, label: string): Promise<void> {
 }
 
 try {
-  // 1. The test client works on the host's threads through the Team API.
   const servers = await client.page.evaluate(() => window.openbot.servers.list());
   const server = servers.find(
     (item) => item.kind === "remote" && item.compatibility?.capabilities.includes(AGENT_THREADS_CAPABILITY) === true,
@@ -131,7 +115,6 @@ try {
   await waitFor(host.page, "the host restores the thread", hostTask, (current) => current?.state === "idle");
   report.client = { startedOnHost: true, renamedOnHost: true, archivedOnHost: true, restoredOnHost: true };
 
-  // 2. The web app signs in as the owner and uses the thread.
   await web.goto(`${authApi}/app`);
   await web.getByRole("textbox", { name: english("account.login.email") }).fill(email);
   await web.getByRole("button", { name: english("account.login.sendCode") }).click();
@@ -177,7 +160,6 @@ try {
   await shot(web, "2-web-thread");
   assert.ok(tabSelected, "The web app does not select the thread's tab.");
 
-  // 3. The web app deletes the thread.
   await tab.click({ button: "right" });
   const menu = web.getByRole("menu", { name: english("conversation.threads.actions") });
   await menu.waitFor({ timeout: UI_WAIT_MS });

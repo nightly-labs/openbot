@@ -10,7 +10,6 @@ export const messages = {
   "error.billing.planSoldOut": "该套餐已售罄，请选择其他套餐。",
   "error.billing.storageUnavailable": "此存储空间不适用于该服务器。",
   "error.billing.storagePaymentFailed": "存储空间付款失败。请更新付款方式后重试。",
-  // License errors.
   "error.billing.licenseExists": "该账号已有许可证，请改为更改其用户数。",
   "error.billing.licenseCurrency": "许可证必须使用你其他套餐的币种。",
   "error.billing.planCurrency": "新套餐必须使用你其他套餐的币种。",
@@ -25,8 +24,9 @@ export const messages = {
   "error.billing.vatIdInvalid": "欧盟增值税系统中没有此增值税号。请检查号码，或不填增值税号继续。",
   "error.billing.vatIdUnverified": "欧盟增值税系统现在无法核验增值税号。请稍后重试，或不填增值税号继续。",
   "error.billing.vatUnavailable": "现在无法付款，请稍后重试。",
-  // Billing errors that the desktop and web clients make.
   "error.billing.invalidRequest": "账单请求无效。",
   "error.billing.invalidResponse": "账单响应无效。",
   "error.billing.notStripePage": "该账单页面不是 Stripe 页面。",
+  "error.billing.customServerOfferMissing": "此服务器没有可付款的方案。",
+  "error.billing.checkoutUnavailable": "现在无法开始付款。请一分钟后重试。",
 } as const satisfies PartialTranslation<typeof source>;

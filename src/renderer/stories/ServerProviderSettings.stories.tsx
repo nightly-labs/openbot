@@ -2,6 +2,7 @@ import {
   type AgentProviderId,
   type AgentStatus,
   type AppSetupState,
+  type ClientAgentModelOption,
   type CustomProviderRestart,
   type CustomProviderSummary,
   isManagedRuntimeProvider,
@@ -61,7 +62,6 @@ const providerRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   mistral: { phase: "not-downloaded", progress: null, message: null, version: null },
 };
 
-/** Four connected runtimes, one of which has a newer version waiting. */
 const providerUpdateAgentStatus: AgentStatus = {
   ...providerAgentStatus,
   phase: "ready",
@@ -72,14 +72,12 @@ const providerUpdateAgentStatus: AgentStatus = {
     message: null,
   })),
 };
-/** The same, before Codex has a CLI. */
 const firstDownloadAgentStatus: AgentStatus = {
   ...providerUpdateAgentStatus,
   providers: (providerUpdateAgentStatus.providers ?? []).map((provider) =>
     provider.id === "codex" ? { ...provider, state: "not-installed", version: null } : provider,
   ),
 };
-/** OpenCode installed with no account of its own: enough to run an endpoint that brings its own key. */
 const openCodeInstalledAgentStatus: AgentStatus = {
   ...providerUpdateAgentStatus,
   providers: [
@@ -87,7 +85,38 @@ const openCodeInstalledAgentStatus: AgentStatus = {
     { id: "opencode", state: "sign-in-required", version: "1.18.27", message: null },
   ],
 };
-/** Codex with two connected accounts. Codex gave the own sign-in two usage resets, and the other none. */
+const devinAgentStatus: AgentStatus = {
+  ...providerUpdateAgentStatus,
+  providers: [
+    ...(providerUpdateAgentStatus.providers ?? []),
+    { id: "devin", state: "available", version: "3000.11.234", message: null },
+  ],
+};
+function devinModel(id: string, name: string): ClientAgentModelOption {
+  return {
+    provider: "devin",
+    id,
+    name,
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+  };
+}
+const DEVIN_MODELS: ClientAgentModelOption[] = [
+  devinModel("gpt-6-2-astra-medium", "GPT-6.2 Astra"),
+  devinModel("gpt-6-1-sol-medium", "GPT-6.1 Sol"),
+  devinModel("fusion-gpt-6-2-astra-high-thinking-swe-2-medium", "Fusion (GPT-6.2 Astra High Thinking + SWE-2 Medium)"),
+  devinModel("fusion-gpt-6-2-sol-high-thinking-swe-2-medium", "Fusion (GPT-6.2 Sol High Thinking + SWE-2 Medium)"),
+  devinModel(
+    "fusion-gpt-6-2-astra-high-thinking-gpt-5-6-luna-high",
+    "Fusion (GPT-6.2 Astra High Thinking + GPT-5.6 Luna High)",
+  ),
+  devinModel(
+    "fusion-gpt-6-2-sol-high-thinking-gpt-6-1-terra-high",
+    "Fusion (GPT-6.2 Sol High Thinking + GPT-6.1 Terra High)",
+  ),
+  devinModel("fusion-gpt-6-2-astra-high-thinking-glm-5-2-high", "Fusion (GPT-6.2 Astra High Thinking + GLM-5.2 High)"),
+];
 const usageResetAgentStatus: AgentStatus = {
   ...providerUpdateAgentStatus,
   providers: (providerUpdateAgentStatus.providers ?? []).map((provider) =>
@@ -102,7 +131,6 @@ const usageResetAgentStatus: AgentStatus = {
       : provider,
   ),
 };
-/** Claude with one connected account, so its page offers a second account. */
 const accountCodeAgentStatus: AgentStatus = {
   ...providerUpdateAgentStatus,
   providers: [
@@ -116,7 +144,6 @@ const accountCodeAgentStatus: AgentStatus = {
     },
   ],
 };
-/** A reset spends one credit after a short wait, so the dialog shows its pending state. */
 function createUsageResetAccounts(): ProviderAccountActions {
   let available = 2;
   return {
@@ -139,10 +166,6 @@ function createUsageResetAccounts(): ProviderAccountActions {
   };
 }
 
-/**
- * Codex accounts that the pool can share. The switch turns the pool on, and the ⋯ menu of an account
- * leaves it out or puts it back. The first account in the pool is in use.
- */
 function createPoolAccounts() {
   const [pool, setPool] = createSignal<ProviderAccountPool | undefined>(undefined);
   const accounts = usageResetAgentStatus.providers?.find((provider) => provider.id === "codex")?.accounts ?? [];
@@ -166,7 +189,6 @@ function createPoolAccounts() {
   return { actions, agentStatus };
 }
 
-/** ChatGPT installed and signed out, so its row offers both ways in. The rest are connected. */
 const codeSignInAgentStatus: AgentStatus = {
   ...providerUpdateAgentStatus,
   providers: (providerUpdateAgentStatus.providers ?? []).map((provider) =>
@@ -175,17 +197,12 @@ const codeSignInAgentStatus: AgentStatus = {
       : provider,
   ),
 };
-/**
- * Codex on a joined server with `codex-api-key-v1`, logged in with an OpenAI API key. The host status
- * does not carry the key, so only the key route says it is saved.
- */
 const hostCodexKeyAgentStatus: AgentStatus = {
   ...codeSignInAgentStatus,
   providers: (codeSignInAgentStatus.providers ?? []).map((provider) =>
     provider.id === "codex" ? { ...provider, state: "available", message: null } : provider,
   ),
 };
-/** The key routes of a joined server's host that logs Codex in with a pasted OpenAI key. */
 function hostCodexKeys(codex: "missing" | "saved"): ProviderKeyApi {
   return {
     readsCodexKey: true,
@@ -196,7 +213,6 @@ function hostCodexKeys(codex: "missing" | "saved"): ProviderKeyApi {
     openExternal: fn(async () => undefined),
   };
 }
-/** Two saved endpoints: one with a key of its own, one on this computer that asks for none. */
 const STORY_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
   {
     id: "studio-local",
@@ -213,10 +229,6 @@ const STORY_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
     models: [{ id: "gpt-oss-120b", name: "GPT OSS 120B" }],
   },
 ];
-/**
- * The endpoints of a joined server's host, as `custom-provider-edit-v1` lists them: each one names its
- * harness and its header names. The model limits stay on the host.
- */
 const STORY_HOST_CUSTOM_PROVIDERS: readonly CustomProviderSummary[] = [
   {
     id: "aperture",
@@ -247,45 +259,27 @@ const providerUpdateRuntimeStatuses: ProviderRuntimeSnapshot["providers"] = {
   mistral: { phase: "ready", progress: 100, message: null, version: "3.1.0" },
 };
 
-/** The Providers section of Server settings, with the providers of this computer. */
 function ServerProvidersStory(props: {
   providerDownloads?: boolean;
   providerUpdate?: boolean;
   providerUpdateFailure?: boolean;
-  /** Codex has no CLI yet. Needs `providerUpdate`, which gives the real runtime store. */
   providerFirstDownload?: boolean;
   openCodeInstalled?: boolean;
   customProviderList?: boolean;
   codeSignIn?: boolean;
-  /** The first result of a fake scan. Scan again runs the whole scan. */
   detection?: ProviderDetection;
-  /** Detected IDs that the user hid in an earlier run. */
   hiddenDetected?: readonly string[];
-  /** Where the scan looks. Without it the section has no detection settings. */
   detectionSettings?: ProviderDetectionSettingsValue;
-  /** A server that the window has not selected: the section offers the switch. */
   inactive?: boolean;
-  /** Providers the user turned off. With it every provider row has the switch that turns one on or off. */
   offProviders?: readonly AgentProviderId[];
   providerUsers?: Partial<Record<AgentProviderId, readonly string[]>>;
-  /** Codex accounts with usage reset credits: the account ⋯ menu offers Reset usage. */
   usageReset?: boolean;
-  /** Codex accounts that the pool can share. */
   accountPool?: boolean;
-  /** A Linux host: an account after the first of ChatGPT, Grok and Claude can sign in with a code. */
   accountCode?: boolean;
-  /**
-   * The Hermes row: `null` is a host that sends no installer status, so the row opens the install
-   * guide. A status is the Download, its progress, or an installed Hermes that offers Connect.
-   */
   hermes?: ProviderRuntimeStatus | null;
-  /** A joined server whose host logs Codex in with an OpenAI key: before the key, or with it. */
   hostCodexKey?: "missing" | "saved";
-  /**
-   * A joined server with saved endpoints: `edit` is a host with `custom-provider-edit-v1`, and
-   * `remove-only` is an older host, which offers Remove only.
-   */
   hostCustomProviders?: "edit" | "remove-only";
+  devinModels?: boolean;
 }) {
   const usageResetAccounts = props.usageReset ? createUsageResetAccounts() : undefined;
   const poolAccounts = props.accountPool ? createPoolAccounts() : undefined;
@@ -315,7 +309,6 @@ function ServerProvidersStory(props: {
               ? {
                   ...providerUpdateRuntimeStatuses,
                   codex: { phase: "not-downloaded", progress: null, message: null, version: null },
-                  // No update offer here: its notification would cover the one for the download.
                   claude: { phase: "ready", progress: 100, message: null, version: "2.1.246" },
                 }
               : providerUpdateRuntimeStatuses,
@@ -324,6 +317,7 @@ function ServerProvidersStory(props: {
         }
       : {}),
     ...(props.providerUpdateFailure ? { providerRuntimeFailure: true } : {}),
+    ...(props.devinModels ? { models: DEVIN_MODELS } : {}),
   });
   const runtimes = createProviderRuntimeStore(() => (props.providerUpdate ? mock.api.providerRuntimes : undefined));
   window.openbot = mock.api;
@@ -353,7 +347,6 @@ function ServerProvidersStory(props: {
     ? createStoryDetection(props.detection, {
         hidden: props.hiddenDetected,
         rescan: true,
-        // A saved server joins the saved endpoints, as the host's list would report it.
         onSaved: (saved) => {
           if (saved.kind !== "models") return;
           const { id, name, baseUrl, apiKey, models } = saved.value;
@@ -374,7 +367,6 @@ function ServerProvidersStory(props: {
     return "restarted";
   }
 
-  /** A key that is not sent stays saved, as in main. */
   async function updateCustomProvider(input: UpdateCustomProviderInput): Promise<CustomProviderRestart> {
     setCustomProviders((current) =>
       current.map((provider) =>
@@ -392,8 +384,6 @@ function ServerProvidersStory(props: {
     return "restarted";
   }
 
-  // Named values, not ternary props: the modal reads its props in effect callbacks, where a
-  // compiled ternary prop cannot create its memo.
   const switchToManageProviders = props.inactive ? fn() : undefined;
   function storyServer(): ServerSummary {
     if (props.hostCodexKey || props.hostCustomProviders) return { ...teamServer, active: true };
@@ -422,6 +412,7 @@ function ServerProvidersStory(props: {
         if (hermesAgentStatus) return hermesAgentStatus;
         if (poolAccounts) return poolAccounts.agentStatus();
         if (props.accountCode) return accountCodeAgentStatus;
+        if (props.devinModels) return devinAgentStatus;
         if (props.hostCodexKey) return props.hostCodexKey === "saved" ? hostCodexKeyAgentStatus : codeSignInAgentStatus;
         return props.usageReset
           ? usageResetAgentStatus
@@ -577,12 +568,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The row that adds a self-described endpoint. OpenCode is installed, so the row offers Add. */
 export const AddCustomProvider: Story = {
   render: () => <ServerProvidersStory openCodeInstalled />,
 };
 
-/** The Providers section looks for local model servers and ACP agents each time it opens. */
 export const DetectingProviders: Story = {
   render: () => (
     <ServerProvidersStory
@@ -592,7 +581,6 @@ export const DetectingProviders: Story = {
   ),
 };
 
-/** The scan is done and Ollama is already added, so its row offers Edit. Scan again runs it once more. */
 export const DetectedProviders: Story = {
   render: () => (
     <ServerProvidersStory
@@ -607,7 +595,6 @@ export const DetectedProviders: Story = {
   ),
 };
 
-/** The user hid LM Studio in an earlier run. Show hidden puts it back in the list. */
 export const HiddenDetectedProviders: Story = {
   render: () => (
     <ServerProvidersStory
@@ -618,10 +605,6 @@ export const HiddenDetectedProviders: Story = {
   ),
 };
 
-/**
- * Where the scan looks: a server on another computer and a folder that is not on the PATH. With the
- * switch off, the section shows no detected list.
- */
 export const DetectionSettings: Story = {
   render: () => (
     <ServerProvidersStory
@@ -636,47 +619,30 @@ export const DetectionSettings: Story = {
   ),
 };
 
-/** Nothing runs at the default addresses and no known agent is on the PATH. */
 export const NothingDetected: Story = {
   render: () => <ServerProvidersStory openCodeInstalled detection={{ scanning: false, found: [] }} />,
 };
 
-/**
- * Two saved endpoints. The count on the Custom provider row opens the dialog that lists them, so the
- * Providers section keeps its rows of fixed height.
- */
 export const CustomProviderList: Story = {
   render: () => <ServerProvidersStory openCodeInstalled customProviderList />,
 };
 
-/**
- * The ChatGPT row signed out. The sign-in finished on another device sits in the row's actions
- * menu, so the row still leads with one button.
- */
 export const CodeSignIn: Story = {
   render: () => <ServerProvidersStory codeSignIn />,
 };
 
-/** A joined server with `codex-api-key-v1`: the signed-out Codex row offers API key next to Connect. */
 export const HostCodexKey: Story = {
   render: () => <ServerProvidersStory hostCodexKey="missing" />,
 };
 
-/** The same server after the key: Codex on the host uses the OpenAI API key. */
 export const HostCodexKeySaved: Story = {
   render: () => <ServerProvidersStory hostCodexKey="saved" />,
 };
 
-/**
- * A joined server whose host has `custom-provider-edit-v1`. Open the endpoint list: each endpoint
- * offers Edit. The form changes the name, address, models, key and headers; the host keeps the
- * harness and the model limits.
- */
 export const HostCustomProviderEdit: Story = {
   render: () => <ServerProvidersStory openCodeInstalled hostCustomProviders="edit" />,
 };
 
-/** The same server on an older host: the endpoint list offers Remove only. */
 export const HostCustomProviderRemoveOnly: Story = {
   render: () => <ServerProvidersStory openCodeInstalled hostCustomProviders="remove-only" />,
 };
@@ -686,7 +652,6 @@ export const ProviderDownloads: Story = {
   parameters: { viewport: { defaultViewport: "serverPhone" } },
 };
 
-/** The durable surface: the update the toast offers is still here after the toast is gone. */
 export const ProviderUpdateAvailable: Story = {
   render: () => <ServerProvidersStory providerUpdate />,
 };
@@ -695,19 +660,10 @@ export const ProviderUpdateRetry: Story = {
   render: () => <ServerProvidersStory providerUpdate providerUpdateFailure />,
 };
 
-/**
- * Open ChatGPT: the page shows only the download. Press Download: the notification and the card show
- * the progress, and the other sections come when the download ends.
- */
 export const ProviderFirstDownload: Story = {
   render: () => <ServerProvidersStory providerUpdate providerFirstDownload />,
 };
 
-/**
- * Cursor, Antigravity and Cline are installed for other work, so the user turned them off. Agents use
- * Codex and Claude, so those switches stay on. Open Cursor: its Danger zone offers Delete, and after
- * it the list reads "Off · Not downloaded".
- */
 export const ProvidersOff: Story = {
   render: () => (
     <ServerProvidersStory
@@ -718,53 +674,40 @@ export const ProvidersOff: Story = {
   ),
 };
 
-/**
- * Open Codex: the ⋯ menu of the own sign-in offers Reset usage, as Codex gave it two usage resets. The
- * Work account has none, so its menu does not. The confirmation names the credits left.
- */
 export const CodexUsageReset: Story = {
   render: () => <ServerProvidersStory usageReset />,
 };
 
-/**
- * Open Codex: two accounts show the Pool accounts switch, off at first. On, agents use one account
- * until it nears a usage limit. The ⋯ menu of an account leaves it out of the pool or puts it back.
- */
 export const AccountPool: Story = {
   render: () => <ServerProvidersStory accountPool />,
 };
 
-/**
- * Open Claude on a Linux host: the ⋯ menu next to "Add account" has "Add account with code". The
- * dialog opens the Claude page and takes the code that the page shows.
- */
 export const AccountCodeSignIn: Story = {
   render: () => <ServerProvidersStory accountCode />,
 };
 
-/** A host that sends no Hermes installer status, such as a Windows host: the row opens the install guide. */
 export const HermesInstallGuide: Story = {
   render: () => <ServerProvidersStory hermes={null} />,
 };
 
-/** The host can run the Hermes installer: the row offers Download. */
 export const HermesDownload: Story = {
   render: () => (
     <ServerProvidersStory hermes={{ phase: "not-downloaded", progress: null, message: null, version: null }} />
   ),
 };
 
-/** The installer runs one stage at a time, and each stage moves the bar. Cancel stops it. */
 export const HermesInstalling: Story = {
   render: () => <ServerProvidersStory hermes={{ phase: "downloading", progress: 25, message: null, version: null }} />,
 };
 
-/** Hermes is installed: the row offers Connect, which signs in with the Nous Portal code. */
 export const HermesConnect: Story = {
   render: () => <ServerProvidersStory hermes={{ phase: "ready", progress: 100, message: null, version: "0.22.7" }} />,
 };
 
-/** A server that the window has not selected. Its providers are managed after a switch to it. */
+export const DevinModels: Story = {
+  render: () => <ServerProvidersStory devinModels />,
+};
+
 export const NotSelectedServer: Story = {
   render: () => <ServerProvidersStory inactive />,
 };

@@ -1,48 +1,21 @@
 import { contextBridge } from "electron";
 
-// The preload of the agent browser tabs. It has no IPC and exposes no world: the page gets no
-// `window.openbot` and no path to main. It only runs `matchChromePageValues` in the page world of
-// each frame, before the page's own scripts.
-
-/**
- * Makes the values that bot checks read from an Electron tab agree with Chrome:
- * - A hidden tab, or a tab of a minimized window, reports an outer size of 0x0 (Windows: 160x28),
- *   smaller than its viewport. Chrome's outer size always holds the viewport.
- * - Minimized Windows windows report a screen position of -32000.
- * - Electron's `window.chrome` is an empty object, and a `srcdoc` frame read before it loads has
- *   none. Chrome has `loadTimes`, `csi` and `app`.
- * - On macOS, Electron shows no passkey dialog, so a passkey sign-in waited with nothing on screen
- *   until the site's time limit (#6507). Such a request now fails at once, as when a person cancels
- *   Chrome's dialog, and the site offers its other sign-in methods.
- * - On a Linux server with no GPU, WebGL names SwiftShader, as only headless Chrome does. It names a
- *   laptop GPU instead.
- *
- * Electron serializes this function into the page, so it must use nothing from outside its body.
- * Each replaced function reads as native code through `Function.prototype.toString`.
- */
 function matchChromePageValues(): void {
-  // A masked `toString` called on an object with this key puts its map of replaced functions in
-  // the object, so that the frames of one page share one map. A native `toString` throws instead.
   const nativesRequest = "matchChromePageValues:natives";
   const onWindows = navigator.userAgent.includes("Windows");
   const onMac = navigator.userAgent.includes("Macintosh");
-  // Only a Linux server renders WebGL on SwiftShader, so other systems keep the native `getParameter`.
   const onLinux = navigator.userAgent.includes("Linux");
-  // The window frame and toolbar of a Chrome window with no bookmarks bar.
   const frameWidth = onWindows ? 16 : 0;
   const toolbarHeight = onWindows ? 87 : 85;
 
   const isGlobal = (value: Window | null): value is Window & typeof globalThis => {
     try {
-      // A frame of another origin throws here, and its values are not ours to change.
       return value !== null && "Function" in value && typeof value.Function === "function";
     } catch {
       return false;
     }
   };
 
-  // A page can give the `toString` of one frame a function of another frame. Each frame runs its
-  // own copy of this function, so each frame uses the map of its highest same-origin ancestor.
   const sharedNatives = (): WeakMap<object, string> => {
     let shared: WeakMap<object, string> | undefined;
     let frame: Window = window;
@@ -53,20 +26,14 @@ function matchChromePageValues(): void {
         const request: { [nativesRequest]: WeakMap<object, string> | undefined } = { [nativesRequest]: undefined };
         try {
           frame.Function.prototype.toString.call(request);
-        } catch {
-          // The native `toString` of a frame with no map throws for an object.
-        }
+        } catch {}
         shared = request[nativesRequest] ?? shared;
       }
-    } catch {
-      // The frame left the page while this ran.
-    }
+    } catch {}
     return shared ?? new WeakMap<object, string>();
   };
   const natives = sharedNatives();
 
-  // A native function that throws from a trap below has one more stack frame than in Chrome: the
-  // trap. It is removed before the error goes to the page.
   const removeTrapFrame = (error: unknown): void => {
     try {
       if (typeof error === "object" && error !== null && "stack" in error && typeof error.stack === "string") {
@@ -79,14 +46,9 @@ function matchChromePageValues(): void {
           error.stack = lines.join("\n");
         }
       }
-    } catch {
-      // An error with a fixed stack keeps it.
-    }
+    } catch {}
   };
 
-  // Replaces a native function with a Proxy that calls `apply`. A native function cannot get a
-  // prototype chain that holds itself ("Cyclic __proto__ value"), but V8 stops that check at a
-  // Proxy, and bot checks use the difference to find a replaced function. The trap does the check.
   const nativeProxy = <Method extends (...args: never[]) => unknown>(
     realm: typeof globalThis,
     method: Method,
@@ -132,16 +94,11 @@ function matchChromePageValues(): void {
     Object.defineProperty(owner, key, { ...descriptor, get: wrapped });
   };
 
-  // Chromium reaches a security key with no dialog, so a request that can use one keeps the native
-  // path: a site that asks for a security key, or a credential that a security key can hold. A
-  // credential with no transports can be an older security key.
   const securityKeyTransports = new Set(["usb", "nfc", "ble", "smart-card"]);
   const opensPasskeyDialog = (options: CredentialRequestOptions | undefined): boolean => {
     try {
       const publicKey = options?.publicKey;
-      // Autofill (conditional) requests open no dialog, and an aborted request gets its native error.
       if (!publicKey || options.mediation === "conditional" || options.signal?.aborted) return false;
-      // TypeScript's DOM types do not have the WebAuthn Level 3 `hints` yet.
       if ("hints" in publicKey && Array.isArray(publicKey.hints) && publicKey.hints.includes("security-key")) {
         return false;
       }
@@ -150,13 +107,11 @@ function matchChromePageValues(): void {
         return transports.length === 0 || transports.some((transport) => securityKeyTransports.has(transport));
       });
     } catch {
-      // Options that cannot be read get the native error.
       return false;
     }
   };
 
   const refusePasskeyDialogs = (target: typeof globalThis): void => {
-    // `navigator.credentials` exists only in a secure context.
     if (!("CredentialsContainer" in target)) return;
     const prototype = target.CredentialsContainer.prototype;
     const descriptor = Object.getOwnPropertyDescriptor(prototype, "get");
@@ -181,9 +136,14 @@ function matchChromePageValues(): void {
     Object.defineProperty(prototype, "get", { ...descriptor, value: get });
   };
 
-  // A server has no GPU, so its WebGL runs on SwiftShader (#6404). Chrome does that only when it runs
-  // headless or for automation, and bot checks (DataDome, rebrowser) block the agent for it. On such
-  // a computer, WebGL gives the GPU name of a common Linux laptop. The rendering does not change.
+  const refusePrintDialogs = (target: typeof globalThis): void => {
+    const descriptor = Object.getOwnPropertyDescriptor(target, "print");
+    if (!descriptor || typeof descriptor.value !== "function") return;
+    const print = nativeProxy(target, descriptor.value, () => undefined);
+    natives.set(print, "print");
+    Object.defineProperty(target, "print", { ...descriptor, value: print });
+  };
+
   const debugVendor = 0x9245; // WEBGL_debug_renderer_info.UNMASKED_VENDOR_WEBGL
   const debugRenderer = 0x9246; // WEBGL_debug_renderer_info.UNMASKED_RENDERER_WEBGL
   const laptopGpu = {
@@ -219,7 +179,6 @@ function matchChromePageValues(): void {
       const entry = performance.getEntriesByType("navigation")[0];
       return entry instanceof target.PerformanceNavigationTiming ? entry : undefined;
     };
-    // Seconds since the epoch, as Chrome reports them. A step that has not happened yet is 0.
     const seconds = (offset: number | undefined) => (offset ? (performance.timeOrigin + offset) / 1000 : 0);
     const methods = {
       loadTimes() {
@@ -302,6 +261,7 @@ function matchChromePageValues(): void {
     natives.set(maskedToString, "toString");
     Object.defineProperty(functionPrototype, "toString", { value: maskedToString });
     if (onMac) refusePasskeyDialogs(target);
+    refusePrintDialogs(target);
     if (onLinux) replaceSoftwareGpuName(target);
 
     const chrome = existing ?? {};
@@ -314,7 +274,6 @@ function matchChromePageValues(): void {
 
     const innerSize = (key: "innerWidth" | "innerHeight"): number => {
       try {
-        // A frame's outer size is the size of the top window, as in Chrome.
         return target.top?.[key] ?? target[key];
       } catch {
         return target[key];
@@ -329,15 +288,20 @@ function matchChromePageValues(): void {
     for (const key of ["screenX", "screenY", "screenLeft", "screenTop"] as const) {
       wrapGetter(target, target, key, (value) => (value <= -10_000 ? 0 : value));
     }
-    // A page can read a new frame's window before the frame's own document, and this preload,
-    // load. That window gets the same values here.
     wrapGetter(target, target.HTMLIFrameElement.prototype, "contentWindow", (value) => {
       if (isGlobal(value)) {
         try {
           install(value);
-        } catch {
-          // A frame that refuses a change keeps its own values.
-        }
+        } catch {}
+      }
+      return value;
+    });
+    wrapGetter(target, target.HTMLIFrameElement.prototype, "contentDocument", (value) => {
+      const view = value?.defaultView ?? null;
+      if (isGlobal(view)) {
+        try {
+          install(view);
+        } catch {}
       }
       return value;
     });

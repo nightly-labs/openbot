@@ -4,7 +4,9 @@ import { datePickerStyle, disabled as disabledModifier, fixedSize, labelsHidden 
 import { Typography } from "heroui-native";
 import { useUniwind } from "uniwind";
 import { SettingsRow } from "@/features/settings/components/settings-content";
+import { localDay } from "@/shared/lib/local-day";
 import { useText } from "@/shared/lib/text";
+import { localDate } from "./usage-date";
 
 export function RoutineTimePicker({
   time,
@@ -13,7 +15,6 @@ export function RoutineTimePicker({
   onChange,
 }: {
   time: string;
-  /** The row label. Defaults to "Time". */
   label?: string;
   disabled: boolean;
   onChange: (time: string) => void;
@@ -25,12 +26,7 @@ export function RoutineTimePicker({
   return (
     <SettingsRow
       trailing={
-        <Host
-          matchContents
-          colorScheme={theme === "dark" ? "dark" : "light"}
-          // Match the trailing inset of the native menu picker arrows.
-          style={{ marginRight: 12 }}
-        >
+        <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"} style={{ marginRight: 12 }}>
           <DatePicker
             title={title}
             selection={new Date(2000, 0, 1, hour, minute)}
@@ -39,6 +35,37 @@ export function RoutineTimePicker({
             onDateChange={(value) =>
               onChange(`${String(value.getHours()).padStart(2, "0")}:${String(value.getMinutes()).padStart(2, "0")}`)
             }
+          />
+        </Host>
+      }
+    >
+      <Typography.Paragraph>{title}</Typography.Paragraph>
+    </SettingsRow>
+  );
+}
+
+export function RoutineDatePicker({
+  date,
+  disabled,
+  onChange,
+}: {
+  date: string;
+  disabled: boolean;
+  onChange: (date: string) => void;
+}) {
+  const { t } = useText();
+  const title = t("mobile.agent.record.date");
+  const { theme } = useUniwind();
+  return (
+    <SettingsRow
+      trailing={
+        <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"} style={{ marginRight: 12 }}>
+          <DatePicker
+            title={title}
+            selection={localDate(date)}
+            displayedComponents={["date"]}
+            modifiers={[datePickerStyle("compact"), labelsHidden(), fixedSize(), disabledModifier(disabled)]}
+            onDateChange={(value) => onChange(localDay(value))}
           />
         </Host>
       }

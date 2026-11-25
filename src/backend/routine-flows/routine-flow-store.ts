@@ -1,10 +1,3 @@
-/**
- * The routine flow tables: links, node positions and steps. Rows are written directly, not through
- * `database.dispatch`, because a step holds the text one agent gave another and the event log is
- * never deleted from. It reads the routine runs table but never writes it. It owns no events: the
- * runtime says when something changed.
- */
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   ROUTINE_FLOW_STEP_STATUSES,
@@ -23,10 +16,8 @@ import { withTransaction } from "../database/sqlite-transaction";
 import type { OpenBotDatabase } from "../openbot-database";
 import { routineFlowConnectProblem, routineFlowDepths } from "./routine-flow-graph";
 
-/** A refusal the user reads: the text is already a sentence for them. */
 export class RoutineFlowError extends Error {}
 
-/** The parts of a routine run the runtime reads to continue its flow. */
 export interface RoutineFlowRun extends Pick<RoutineRun, "kind" | "source"> {
   id: string;
   routineId: string;
@@ -89,7 +80,6 @@ export class RoutineFlowStore {
     return row ? toLink(row) : null;
   }
 
-  /** Gives one link a new instruction: what the next agent is asked to do with the answer. */
   updateLinkInstruction(linkId: string, instruction: string): RoutineFlowLink {
     this.#database.connection
       .prepare("UPDATE routine_flow_links SET instruction = ? WHERE link_id = ?")
@@ -99,7 +89,6 @@ export class RoutineFlowStore {
     return link;
   }
 
-  /** The agent a routine belongs to, or null when the routine is gone. */
   routineOwner(routineId: string): string | null {
     const row = databaseRow(
       this.#database.connection
@@ -109,7 +98,6 @@ export class RoutineFlowStore {
     return row ? String(row.agent_id) : null;
   }
 
-  /** Every routine with a link that starts or ends at this agent. */
   routineIdsTouching(agentId: string): string[] {
     return databaseRows(
       this.#database.connection
@@ -120,7 +108,6 @@ export class RoutineFlowStore {
     ).map((row) => String(row.routine_id));
   }
 
-  /** Adds one handoff to a routine whose own agent is `ownerAgentId`, after the flow rules accept it. */
   createLink(
     ownerAgentId: string,
     input: { routineId: string; fromAgentId: string; toAgentId: string; instruction?: string },
@@ -152,10 +139,6 @@ export class RoutineFlowStore {
     });
   }
 
-  /**
-   * Removes a link, and every link of the same routine that only it kept on the flow: an agent the
-   * flow no longer reaches would otherwise hand work on from nowhere.
-   */
   deleteLink(linkId: string, ownerAgentId: (routineId: string) => string | null): RoutineFlowLink[] {
     return this.#transaction(() => {
       const row = databaseRow(
@@ -166,7 +149,6 @@ export class RoutineFlowStore {
       const owner = ownerAgentId(link.routineId);
       let remaining = this.linksForRoutines([link.routineId]).filter((candidate) => candidate.id !== link.id);
       const removed = [link];
-      // Each pass strands at least one link or stops, so this ends within the routine's link count.
       for (
         let stranded = strandedLinks(owner, remaining);
         stranded.length > 0;
@@ -228,10 +210,6 @@ export class RoutineFlowStore {
     ).map(toStep);
   }
 
-  /**
-   * Adds one agent's step to a run, once: a second call for the same agent and run answers null, so
-   * two events about one answer never send it on twice.
-   */
   addStep(
     input: {
       runId: string;
@@ -271,7 +249,6 @@ export class RoutineFlowStore {
       .run(deliveryId, now, stepId);
   }
 
-  /** Ends a running step. A step that already ended keeps what it has. */
   settleStep(
     stepId: string,
     status: Exclude<RoutineFlowStepStatus, "running">,
@@ -288,22 +265,16 @@ export class RoutineFlowStore {
     return Number(result.changes) > 0;
   }
 
-  /**
-   * Ids of the runs with a handoff not sent yet: a link whose sending agent's step ended since `since`
-   * and whose next agent has no step. Every run that can have a next step to send is one of these. A run
-   * whose flow is done, or whose routine has no links, is not, so a sweep does not read it again (#2283).
-   */
   runIdsWithPendingHandoff(since: string): string[] {
     return databaseRows(
       this.#database.connection
         .prepare(
-          // CROSS JOIN keeps the steps first, so the read starts at the recent steps on their `updated_at`
-          // index. Without it, SQLite reads every run ever stored in `run_id` order.
           `SELECT DISTINCT run.run_id FROM routine_flow_steps AS source
            CROSS JOIN projection_routine_runs AS run ON run.run_id = source.run_id
            JOIN routine_flow_links AS link ON link.routine_id = run.routine_id
              AND link.from_agent_id = source.agent_id AND link.created_at <= run.created_at
-           WHERE source.updated_at >= ? AND source.status <> 'running'
+           WHERE EXISTS (SELECT 1 FROM routine_flow_links)
+             AND source.updated_at >= ? AND source.status <> 'running'
              AND NOT EXISTS (
                SELECT 1 FROM routine_flow_steps AS target
                WHERE target.run_id = run.run_id AND target.agent_id = link.to_agent_id
@@ -314,7 +285,6 @@ export class RoutineFlowStore {
     ).map((row) => String(row.run_id));
   }
 
-  /** Runs that ended since `since` and whose own agent has no step yet. */
   endedRunsWithoutOwnerStep(since: string): RoutineFlowRun[] {
     return databaseRows(
       this.#database.connection
@@ -342,7 +312,6 @@ export class RoutineFlowStore {
   }
 }
 
-/** The links whose sending agent the flow no longer reaches. Without an owner, there is no flow to keep. */
 function strandedLinks(owner: string | null, links: readonly RoutineFlowLink[]): RoutineFlowLink[] {
   if (!owner) return [];
   const reached = routineFlowDepths(owner, links);
@@ -372,7 +341,6 @@ function toStep(row: DynamicRecord): RoutineFlowStep {
     deliveryId: nullableString(row.delivery_id),
     input: String(row.input),
     output: nullableString(row.output),
-    // The CHECK constraint holds the column to these values; the guard only narrows the type.
     status: isOneOf(ROUTINE_FLOW_STEP_STATUSES, row.status) ? row.status : "failed",
     error: nullableString(row.error),
     createdAt: String(row.created_at),

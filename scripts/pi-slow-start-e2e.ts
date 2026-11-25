@@ -1,15 +1,3 @@
-// Runs the real `openrouter` provider driver, which is the Pi client, and the real model catalog over a
-// fake Pi (`provider-fakes/agents/pi-slow-start.ts`) that starts slowly (#9945). Each account check and
-// each model list of a key-only Pi provider starts a new `pi` process. The account check at start had
-// the 5 s of a check of a running CLI, and the model list kept a 5 s timeout as the provider's last
-// error. On a slow Windows computer, the OpenRouter row then showed "Error" with "Pi request timed
-// out: get_state" while its key worked. The check runs:
-// - the account check with a short check timeout on a Pi that answers after that timeout;
-// - the model catalog on a Pi that answers after its 5 s pass, then the full read again;
-// - the model catalog on a Pi that never answers: the error must still show;
-// - the provider runtime, with a second 5 s pass that times out while the full read of the first runs.
-//   That read owns the result and lists the models, so the row must not show "Error" (#12166).
-// `bun run test:pi-slow-start`. Writes .openbot-build/pi-slow-start-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -71,7 +59,6 @@ async function openRouterClient(name: string, env: Record<string, string>, reque
   return client;
 }
 
-/** The 5 s pass of the catalog, then the full read again that the provider runtime starts. */
 async function readCatalog(client: AgentClient, requestTimeoutMs: number): Promise<CatalogCase> {
   const recorded: string[] = [];
   const catalog = new ModelCatalog({
@@ -96,11 +83,6 @@ async function readCatalog(client: AgentClient, requestTimeoutMs: number): Promi
   };
 }
 
-/**
- * The Pi row of the real provider runtime over a Pi that answers only while the gate file exists. With
- * the gate closed, a pass times out after 5 s and starts the full read, which waits for the gate. A
- * second pass then times out while that read runs. When the gate opens, the read lists a new model.
- */
 async function readOverlappingPasses(requestTimeoutMs: number): Promise<NonNullable<Report["overlap"]>> {
   const pi = join(root, "runtime", "pi");
   const gate = join(root, "runtime", "gate");
@@ -164,7 +146,6 @@ async function readOverlappingPasses(requestTimeoutMs: number): Promise<NonNulla
         .listModels()
         .filter((option) => option.provider === "pi")
         .map((option) => option.id);
-    /** Resolves at the first status event, or now, at which `ready` holds. Fails after `requestTimeoutMs`. */
     const waitFor = (ready: () => boolean, what: string) =>
       new Promise<void>((resolve, reject) => {
         const check = () => {
@@ -183,14 +164,11 @@ async function readOverlappingPasses(requestTimeoutMs: number): Promise<NonNulla
 
     await runCauseEffect(runtime.start());
     await waitFor(() => models().includes("openrouter/fake/before"), "model list after the start");
-    // Each error that the Pi row shows from here on.
     listeners.add(() => {
       const shown = lastError();
       if (shown && shownErrors.at(-1) !== shown) shownErrors.push(shown);
     });
     await rm(gate);
-    // The first pass times out and starts the full read, which waits for the gate. The second pass
-    // times out while that read runs.
     await runCauseEffect(runtime.refreshModels());
     await runCauseEffect(runtime.refreshModels());
     const errorAfterSecondPass = lastError();
@@ -211,7 +189,6 @@ async function readOverlappingPasses(requestTimeoutMs: number): Promise<NonNulla
 try {
   await mkdir(OUT, { recursive: true });
 
-  // The start check of the provider runtime gives 5 s. Here 500 ms, on a Pi that answers after 1.5 s.
   const accountClient = await openRouterClient("account", { FAKE_START_DELAY_MS: "1500" }, 10_000);
   const account = await runCauseEffect(
     accountClient.request("account/read", { refreshToken: false }, (value) => value, 500),
@@ -220,7 +197,6 @@ try {
   report.account = read ? { email: getString(read, "email"), type: getString(read, "type") } : null;
   assert.equal(report.account?.type, "openrouter", "The account check must wait for a slow Pi start.");
 
-  // The 5 s pass times out. Its timeout is no error: the full read lists the model.
   const slow = await openRouterClient("slow", { FAKE_START_DELAY_MS: "6500" }, 15_000);
   report.slowCatalog = await readCatalog(slow, 15_000);
   assert.equal(report.slowCatalog.timedOut, true, "The 5 s pass must time out on this Pi.");
@@ -229,7 +205,6 @@ try {
   assert.deepEqual(report.slowCatalog.recordedAfterRelist, []);
   assert.deepEqual(report.slowCatalog.models, ["fake/slow-start"], "The catalog must have the model of the slow Pi.");
 
-  // A Pi that never answers still shows its error, from the full read.
   const broken = await openRouterClient("broken", { FAKE_HANG: "1" }, 6_000);
   report.brokenCatalog = await readCatalog(broken, 6_000);
   assert.equal(report.brokenCatalog.timedOut, true);
@@ -238,7 +213,6 @@ try {
   assert.equal(report.brokenCatalog.recordedAfterRelist.length, 1, "A list that fails again must show its error.");
   assert.match(report.brokenCatalog.recordedAfterRelist[0] ?? "", /timed out/u);
 
-  // A pass that times out while the full read runs leaves the result to that read, which lists the models.
   report.overlap = await readOverlappingPasses(20_000);
   assert.equal(report.overlap.errorAfterSecondPass, null, "A pass that a running read holds shows no error.");
   assert.deepEqual(report.overlap.shownErrors, [], "The row must not show Error while the full read runs.");

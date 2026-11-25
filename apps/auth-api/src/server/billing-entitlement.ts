@@ -12,31 +12,23 @@ import {
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { OPEN_STATUSES_SQL } from "./billing-errors";
 
-/** The statuses of a subscription that gives its plan or license now. */
 const ENTITLED_STATUSES: readonly BillingSubscriptionStatus[] = ["active", "trialing", "past_due"];
 const ENTITLED_STATUSES_SQL = `(${ENTITLED_STATUSES.map((status) => `'${status}'`).join(", ")})`;
 
 export interface BillingEntitlement {
   plan: BillingPlanId;
   storageGb: number;
-  /** The active members that the plan allows. A server made before the current limits keeps its legacy limit. */
   memberLimit: number;
   status: BillingSubscriptionStatus;
-  /** Milliseconds since the epoch. */
   currentPeriodEnd: number | null;
-  /** True for a hosted server. A self-hosted host can keep a plan from before the license. */
   hosted: boolean;
 }
 
-/**
- * The plan that a server can use now. Plan limits read only this function.
- * Only a subscription of the account that owns the server counts, so metadata that names another
- * account's server gives that server nothing. The owner comes from the Remote host, or from the hosted
- * server row, which exists before the server publishes its host.
- * A `past_due` subscription keeps its plan while Stripe retries the payment, until the end of the period
- * that the unpaid invoice is for. Stripe must cancel the subscription or mark it unpaid after the last
- * retry (docs/hosted-servers.md, Production), or the plan lasts for that whole period.
- */
+export function subscriptionPaysForOwnerSql(subscription: string, owner: string): string {
+  return `(${subscription}.user_id = ${owner} OR EXISTS(SELECT 1 FROM remote_owner_transfers paid_transfer
+    WHERE paid_transfer.host_id = ${subscription}.server_id AND paid_transfer.from_user_id = ${subscription}.user_id
+      AND paid_transfer.status = 'accepted'))`;
+}
 
 export const getServerEntitlement = Effect.fn("Billing.getServerEntitlement")(function* (
   database: D1Database,
@@ -49,7 +41,7 @@ export const getServerEntitlement = Effect.fn("Billing.getServerEntitlement")(fu
         .prepare(
           `SELECT s.plan, s.status, s.current_period_end, hs.legacy_member_limits, hs.server_id IS NOT NULL AS hosted
          FROM billing_subscriptions s
-       LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND h.owner_user_id = s.user_id
+       LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND ${subscriptionPaysForOwnerSql("s", "h.owner_user_id")}
        LEFT JOIN hosted_servers hs ON hs.server_id = s.server_id AND hs.owner_user_id = s.user_id
        WHERE s.server_id = ? AND s.status IN ${ENTITLED_STATUSES_SQL}
          AND (h.host_id IS NOT NULL OR hs.server_id IS NOT NULL)
@@ -81,10 +73,6 @@ export const getServerEntitlement = Effect.fn("Billing.getServerEntitlement")(fu
   return null;
 });
 
-/**
- * True when the account pays for a hosted server of any plan, so its license gets the bundle price. The
- * status and grace rules are the same as `getServerEntitlement`.
- */
 export const accountHasServerPlan = Effect.fn("Billing.accountHasServerPlan")(function* (
   database: D1Database,
   userId: string,
@@ -105,20 +93,12 @@ export const accountHasServerPlan = Effect.fn("Billing.accountHasServerPlan")(fu
   return rows.results.some((row) => entitled(row, now));
 });
 
-/** The open license of the account that owns a host. */
 export interface OwnerLicense {
   ownerId: string;
   users: number;
-  /** True when the license gives its users now, by the same rules as a server plan. */
   entitled: boolean;
 }
 
-/**
- * The open license of the account that owns a host, or null: the newest entitled one, else the newest
- * open one. An account has one open license, but a Dashboard change or a payment that no check could stop
- * can add a second. An open license that is not entitled, such as an `unpaid` one, still limits the people
- * of the owner's servers, but gives no seats.
- */
 export const ownerLicenseForHost = Effect.fn("Billing.ownerLicenseForHost")(function* (
   database: D1Database,
   hostId: string,
@@ -141,10 +121,6 @@ export const ownerLicenseForHost = Effect.fn("Billing.ownerLicenseForHost")(func
   return { ownerId: row.owner_id, users: row.users, entitled: licenseEntitled(row, now) };
 });
 
-/**
- * The open license of an account, or null: the newest entitled one, else the newest open one, as
- * `ownerLicenseForHost` chooses. It reads the account, so a hosted server with no host yet gets it too.
- */
 export const accountLicense = Effect.fn("Billing.accountLicense")(function* (
   database: D1Database,
   userId: string,
@@ -165,18 +141,13 @@ export const accountLicense = Effect.fn("Billing.accountLicense")(function* (
   return row ? { users: row.users, entitled: licenseEntitled(row, now) } : null;
 });
 
-/**
- * The SQL condition that the server `server` of the account `owner` has a plan that it can use now, by
- * the rules of `getServerEntitlement`. Bind `now` one time.
- */
 export function serverPlanEntitledSql(server: string, owner: string): string {
   const plans = BILLING_PLANS.map((plan) => `'${plan.id}'`).join(", ");
   return `EXISTS (SELECT 1 FROM billing_subscriptions b
-    WHERE b.server_id = ${server} AND b.user_id = ${owner} AND b.plan IN (${plans})
+    WHERE b.server_id = ${server} AND ${subscriptionPaysForOwnerSql("b", owner)} AND b.plan IN (${plans})
       AND (b.status IN ('active', 'trialing') OR (b.status = 'past_due' AND b.current_period_end > ?)))`;
 }
 
-/** True when a license gives its users at `now`, by the same rules as a server plan. */
 export function licenseEntitled(license: { status: string; current_period_end: number | null }, now: number): boolean {
   const status = license.status;
   return (
@@ -184,20 +155,14 @@ export function licenseEntitled(license: { status: string; current_period_end: n
   );
 }
 
-/** A `past_due` subscription counts only until the end of its period. */
 function entitled(row: { status: BillingSubscriptionStatus; current_period_end: number | null }, now: number): boolean {
   return row.status !== "past_due" || (row.current_period_end !== null && row.current_period_end > now);
 }
 
-/** A server with no hosted row, or one made before the current plan limits, keeps its legacy limit. */
 function memberLimit(plan: BillingPlanId, legacyMemberLimits: number | null): number {
   return legacyMemberLimits === 0 ? memberLimitForPlan(plan) : LEGACY_MEMBER_LIMITS[plan];
 }
 
-/**
- * The custom member limit of a server (one `?`: the server ID). As with `getServerEntitlement`, a row
- * applies only while its account owns the remote host or the hosted server.
- */
 export const SERVER_MEMBER_LIMIT_SQL = `SELECT l.member_limit FROM server_member_limits l
   LEFT JOIN remote_hosts h ON h.host_id = l.server_id AND h.owner_user_id = l.owner_user_id
   LEFT JOIN hosted_servers hs ON hs.server_id = l.server_id AND hs.owner_user_id = l.owner_user_id

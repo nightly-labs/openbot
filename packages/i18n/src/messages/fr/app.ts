@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/app";
 
 export const messages = {
-  // The app shell, shared state, and shared controls without a feature of their own.
   "app.loading": "Chargement d’OpenBot",
   "app.leftPanel.resize": "Redimensionner la barre latérale gauche",
   "app.host.thisMac": "Ce Mac",
@@ -33,7 +32,7 @@ export const messages = {
   "app.provider.restartFailed": "Impossible de redémarrer {name}",
   "app.provider.included": "{name} est inclus avec OpenBot.",
   "app.clipboard.copyFailed": "Impossible de copier le texte.",
-  "app.voice.tooLong": "Les enregistrements vocaux sont limités à deux minutes.",
+  "app.voice.tooLong": "Les enregistrements vocaux sont limités à 10 minutes.",
   "app.avatar.type": "Choisissez une image PNG, JPEG, GIF ou WebP.",
   "app.avatar.size": "Choisissez une image de moins de 10 Mo.",
   "app.avatar.processingUnavailable": "Le traitement d’image n’est pas disponible.",
@@ -52,14 +51,20 @@ export const messages = {
   "app.rail.website": "Site web d’OpenBot",
   "app.rail.agents": "Agents",
   "app.rail.schedule": "Planning",
-  "app.rail.tasks": "Tâches",
+  "app.rail.tasks": "Fils",
   "app.rail.workflows": "Workflows",
   "app.rail.usage": "Utilisation",
+  "app.rail.creditsAsk": "Demander quand des crédits sont nécessaires",
+  "app.rail.creditsAskSaveFailed": "Impossible de modifier les questions sur les crédits.",
   "app.rail.library": "Bibliothèque",
   "app.rail.providers": "Fournisseurs",
   "app.rail.crm": "CRM",
   "app.rail.marketplace": "Marketplace",
   "app.rail.settings": "Réglages",
+  "app.rail.hideItem": "Masquer {name}",
+  "app.rail.showItem": "Afficher {name}",
+  "app.rail.itemHidden": "Élément masqué : {name}",
+  "app.rail.itemHiddenHint": "Faites un clic droit sur la barre pour l’afficher de nouveau.",
   "app.rail.settingsNotice": "Réglages. {notice}",
   "app.rail.more": "Plus",
   "app.rail.pinPage": "Épingler {name} à la barre",
@@ -96,6 +101,7 @@ export const messages = {
     "Mes agents IA travaillent maintenant sur mon propre ordinateur avec OpenBot. Mes discussions et mes fichiers restent chez moi. Essayez : {site}",
   "app.socialFollow.redditTitle": "Comment j’utilise OpenBot",
   "app.rail.usageRings": "Utilisation de {name} : {windows}. Ouvrir l’utilisation",
+  "app.rail.usageUnavailable": "Utilisation de {name} indisponible. Ouvrir l’utilisation",
   "app.rail.customAgentUsage": "Utilisation de {name}. Ouvrir l’utilisation",
   "app.rail.moreUsage": {
     one: "{count} autre compte. Ouvrir l’utilisation",

@@ -1,9 +1,5 @@
 // @vitest-environment node
 
-// A new install and an upgraded install run the same migrations: a new install starts at the version 8
-// baseline from an empty file. These tests prove that the empty file takes that path and ends at the
-// schema that the recorded history of every migration makes, with no backup to fall back on.
-
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -44,11 +40,6 @@ describe("OpenBot database build paths", () => {
   });
 });
 
-// A migration runs on every computer that upgrades past its version, and there is no backup. So a
-// shipped migration must never change: the fix is a new migration. The history file records what each
-// version added, changed or dropped, as normalized DDL, with `null` for a dropped declaration. The
-// entries only grow. A change to a recorded entry is allowed only for a version that has not shipped.
-// Data-only statements, such as an UPDATE, leave no trace in the schema, so review still covers them.
 describe("OpenBot database migration history", () => {
   it("keeps the schema change of every recorded migration", async () => {
     const actual = await schemaChangesByVersion();
@@ -67,14 +58,11 @@ describe("OpenBot database migration history", () => {
   });
 });
 
-// A rebuild, an altered column or a new index of a big table reads or writes every row of it, and one
-// user database holds 12 GB of events. The large-database E2E measures such a migration; this list
-// records the ones that were measured. Data-only rewrites and a VACUUM leave no trace in the history, so
-// review still covers them (see "Large tables" in `src/backend/AGENTS.md`).
 const LARGE_TABLES = ["orchestration_events", "provider_history_staging", "projection_thread_messages"];
 const MEASURED_LARGE_TABLE_CHANGES: Record<string, readonly string[]> = {
   "40": ["index thread_messages_shown_order", "index thread_messages_turn", "table projection_thread_messages"],
   "43": ["index orchestration_events_thread_type"],
+  "67": ["index thread_messages_ordinal"],
 };
 
 describe("OpenBot database migrations of large tables", () => {
@@ -111,9 +99,6 @@ type SchemaChanges = Record<string, string | null>;
 
 const STOP_MESSAGE = "stopped after one migration";
 
-// Runs the upgrade path one migration at a time. A temporary trigger lets exactly one more version into
-// `schema_migrations` per call, so the next migration rolls back and the database stays at the version
-// before it. The next call resumes from there, as an install on that version would.
 async function schemaChangesByVersion(): Promise<Record<string, SchemaChanges>> {
   const database = await openDatabase();
   database.exec("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)");
@@ -161,7 +146,6 @@ function diffDeclarations(before: ReadonlyMap<string, string>, after: ReadonlyMa
   return changes;
 }
 
-// An empty database has no tables: the path every new install follows.
 async function newInstallDatabase(): Promise<DatabaseSync> {
   const database = await openDatabase();
   migrateOpenBotDatabase(database, { appliedAt });
