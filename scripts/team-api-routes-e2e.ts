@@ -178,6 +178,7 @@ import {
   AGENT_THREAD_REQUESTS_CAPABILITY,
   AGENT_THREAD_REQUESTS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
+import { AGENT_UPDATE_CAPABILITY, AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
 import {
   AGENT_USAGE_LIMIT_CAPABILITY,
   AGENT_USAGE_LIMIT_ROUTES,
@@ -2797,6 +2798,15 @@ try {
     skills: chatSkills,
     admin: {
       skills: githubSkillsAdmin,
+      marketplaceAgents: {
+        install: (input) =>
+          Effect.sync(() => {
+            record("marketplaceAgentInstall", input);
+            const target = agents.find((item) => item.id === input.agentId);
+            if (!target) throw new Error("Agent not found.");
+            return { agent: target };
+          }),
+      },
       modelVisibility: new ModelVisibility({
         path: join(root, "model-visibility.json"),
         catalog: new ModelReleaseCatalog({ XDG_CACHE_HOME: join(root, "cache") }, root),
@@ -7432,6 +7442,27 @@ try {
         field(install.body, "skillId") === skillId &&
         isDeepStrictEqual(callsOf("installSkill").slice(installsBefore), [[{ agentId: "agent-ada", skillId }]]),
       { oldClient: summary(oldClient), install: summary(install) },
+    );
+  }
+
+  {
+    const updatesBefore = callsOf("marketplaceAgentInstall").length;
+    const update = await call("POST", AGENT_UPDATE_ROUTES.marketplace, {
+      capabilities: [AGENT_UPDATE_CAPABILITY],
+      token: adaToken,
+      json: { agentId: "agent-ada", listingId: "listing-ada", timezone: "UTC", replaceFields: ["description"] },
+    });
+    const received = callsOf("marketplaceAgentInstall").slice(updatesBefore);
+    const input = received[0]?.[0];
+    check(
+      "agent-update-v1 never passes a replace choice to the host, so the host keeps edited agent fields",
+      update.status === 200 &&
+        received.length === 1 &&
+        isDynamicRecord(input) &&
+        input.agentId === "agent-ada" &&
+        input.listingId === "listing-ada" &&
+        !("replaceFields" in input),
+      { update: summary(update), received },
     );
   }
 

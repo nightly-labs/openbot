@@ -1,5 +1,8 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type {
+  AgentMarketplaceProfile,
+  AgentMarketplaceProfileField,
   AgentPublicationPreview,
   AgentSubmission,
   AgentSummary,
@@ -15,6 +18,8 @@ import type {
   SubmitMarketplaceAgentInput,
 } from "@openbot/contracts/ipc";
 import {
+  agentMarketplacePictureKey,
+  agentMarketplacePictureMatches,
   decodeMarketplaceAgentDetail,
   decodeMarketplaceAgentPage,
   isAvatarHue,
@@ -221,9 +226,12 @@ export class AgentMarketplaceService {
           });
       }
       if (existing?.marketplaceSource?.versionId === detail.versionId) return { agent: existing };
+      const kept = existing
+        ? keptProfileFields(existing, detail, new Set(input.replaceFields))
+        : new Set<AgentMarketplaceProfileField>();
 
       let avatar: AvatarImageInput | null = null;
-      if (detail.avatarUrl) {
+      if (detail.avatarUrl && !kept.has("picture")) {
         const avatarUrl = detail.avatarUrl;
         const bytes = yield* this.auth.downloadAuthorized(avatarUrl).pipe(toAgentMarketplaceFailure);
         const mimeType = imageMimeType(bytes);
@@ -281,15 +289,16 @@ export class AgentMarketplaceService {
               agent = yield* this.agents
                 .updateAgent({
                   agentId: agent.id,
-                  name: detail.name,
-                  title: detail.title,
-                  description: detail.description,
-                  avatarSeed: detail.avatarSeed,
-                  avatarHue: detail.avatarHue,
+                  name: kept.has("name") ? existing.name : detail.name,
+                  title: kept.has("title") ? existing.title : detail.title,
+                  description: kept.has("description") ? existing.description : detail.description,
+                  avatarSeed: kept.has("picture") ? existing.avatarSeed : detail.avatarSeed,
+                  avatarHue: kept.has("picture") ? existing.avatarHue : detail.avatarHue,
                 })
                 .pipe(toAgentMarketplaceFailure);
             }
-            agent = yield* this.agents.setAvatar(agent.id, avatar).pipe(toAgentMarketplaceFailure);
+            if (!kept.has("picture"))
+              agent = yield* this.agents.setAvatar(agent.id, avatar).pipe(toAgentMarketplaceFailure);
             const nextSkillIds = new Set(detail.skills.map((skill) => skill.skillId));
             for (const skillId of existing?.marketplaceSource?.skillIds ?? []) {
               if (!nextSkillIds.has(skillId) && !modified.has(skillId))
@@ -302,6 +311,7 @@ export class AgentMarketplaceService {
                 version: detail.version,
                 skillIds: [...nextSkillIds],
                 routineIds: createdRoutineIds,
+                profile: listingProfile(detail, agent, kept),
               }),
             );
             for (const routineId of existing?.marketplaceSource?.routineIds ?? []) {
@@ -352,6 +362,45 @@ export class AgentMarketplaceService {
       avatarUrl: value.avatarUrl ? this.auth.resolveApiUrl(value.avatarUrl) : null,
     };
   }
+}
+
+function profileHash(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function keptProfileFields(
+  existing: AgentSummary,
+  detail: MarketplaceAgentDetail,
+  replace: ReadonlySet<AgentMarketplaceProfileField>,
+): Set<AgentMarketplaceProfileField> {
+  const baseline = existing.marketplaceSource?.profile;
+  const kept = new Set<AgentMarketplaceProfileField>();
+  for (const field of ["name", "title", "description"] as const) {
+    const current = existing[field];
+    if (replace.has(field) || current === detail[field].trim()) continue;
+    if (baseline && profileHash(current) === baseline[field]) continue;
+    kept.add(field);
+  }
+  if (
+    !replace.has("picture") &&
+    agentMarketplacePictureKey(existing) !== baseline?.picture &&
+    !agentMarketplacePictureMatches(existing, detail)
+  )
+    kept.add("picture");
+  return kept;
+}
+
+function listingProfile(
+  detail: MarketplaceAgentDetail,
+  agent: AgentSummary,
+  kept: ReadonlySet<AgentMarketplaceProfileField>,
+): AgentMarketplaceProfile {
+  return {
+    name: profileHash(detail.name.trim()),
+    title: profileHash(detail.title.trim()),
+    description: profileHash(detail.description.trim()),
+    picture: kept.has("picture") ? "" : agentMarketplacePictureKey(agent),
+  };
 }
 
 export function localSchedule(schedule: RoutineSchedule): RoutineSchedule {

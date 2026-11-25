@@ -287,7 +287,11 @@ function marketplaceSourcesEqual(
     left.versionId === right.versionId &&
     left.version === right.version &&
     stringArraysEqual(left.skillIds, right.skillIds) &&
-    stringArraysEqual(left.routineIds, right.routineIds)
+    stringArraysEqual(left.routineIds, right.routineIds) &&
+    left.profile?.name === right.profile?.name &&
+    left.profile?.title === right.profile?.title &&
+    left.profile?.description === right.profile?.description &&
+    left.profile?.picture === right.profile?.picture
   );
 }
 

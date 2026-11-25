@@ -1,5 +1,5 @@
 import { type AvatarHue, isAvatarHue, isAvatarSeed } from "./ipc-agent-identity";
-import type { ClientAgentSummary } from "./ipc-agents";
+import type { AgentMarketplaceProfileField, ClientAgentSummary } from "./ipc-agents";
 import { isReleasedRoutineSchedule, type ReleasedRoutineSchedule } from "./ipc-routines";
 import { isSkillCategory, type SkillCategory } from "./ipc-skills";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
@@ -109,6 +109,7 @@ export interface InstallMarketplaceAgentInput {
   agentId?: string;
   timezone: string;
   receiptId: string;
+  replaceFields?: AgentMarketplaceProfileField[];
 }
 
 export interface InstallMarketplaceAgentResult {

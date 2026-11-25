@@ -2,6 +2,7 @@ import { X_AGENT_LISTING_ID, X_EXTENSION_URL } from "@openbot/contracts/browser-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AddedAgent,
+  AgentMarketplaceProfileField,
   ClientAgentSummary,
   GithubSkillSource,
   InstalledSkill,
@@ -22,6 +23,8 @@ import type {
   SaveMcpSignInAppInput,
 } from "@openbot/contracts/ipc";
 import {
+  agentMarketplacePictureKey,
+  agentMarketplacePictureMatches,
   assignedSkillCount,
   DEFAULT_MCP_SERVER_ACCESS,
   githubSkillDetail,
@@ -95,7 +98,7 @@ import {
 
 export type MarketplaceAgentRow = Pick<
   ClientAgentSummary,
-  "id" | "name" | "title" | "avatarSeed" | "avatarHue" | "avatarUrl"
+  "id" | "name" | "title" | "description" | "avatarSeed" | "avatarHue" | "avatarUrl"
 > & {
   marketplaceSource?: ClientAgentSummary["marketplaceSource"];
 };
@@ -164,11 +167,38 @@ export interface PendingServerReplace {
   settle: (confirmed: boolean) => void;
 }
 
+export interface AgentUpdateChoice {
+  skillIds: string[];
+  fields: AgentMarketplaceProfileField[];
+}
+
 export interface PendingAgentUpdate {
   agentName: string;
   changed: readonly { skillId: string; name: string }[];
+  fields: readonly AgentMarketplaceProfileField[];
   othersCount: number;
-  settle: (replaceSkillIds: string[] | null) => void;
+  settle: (choice: AgentUpdateChoice | null) => void;
+}
+
+async function profileHash(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function changedProfileFields(
+  copy: MarketplaceAgentRow,
+  detail: MarketplaceAgentDetail,
+): Promise<AgentMarketplaceProfileField[]> {
+  const baseline = copy.marketplaceSource?.profile;
+  const changed: AgentMarketplaceProfileField[] = [];
+  for (const field of ["name", "title", "description"] as const) {
+    if (copy[field] === detail[field].trim()) continue;
+    if (baseline && (await profileHash(copy[field])) === baseline[field]) continue;
+    changed.push(field);
+  }
+  if (agentMarketplacePictureKey(copy) !== baseline?.picture && !agentMarketplacePictureMatches(copy, detail))
+    changed.push("picture");
+  return changed;
 }
 
 interface ChangeRemoval {
@@ -282,25 +312,33 @@ export function createMarketplaceController(
   async function askChangedSkills(
     listing: MarketplaceAgentDetail | MarketplaceAgentSummary,
     copy: MarketplaceAgentRow,
-  ): Promise<MarketplaceAgentSkill[] | null> {
+    local: boolean,
+  ): Promise<{ skills: MarketplaceAgentSkill[]; fields: AgentMarketplaceProfileField[] } | null> {
     const detail = "skills" in listing ? listing : await calls().agents.getListing(listing.id);
     const installed = new Map((await skillCalls().listInstalled(copy.id)).map((skill) => [skill.skillId, skill]));
     const updates = detail.skills.filter((skill) => installed.get(skill.skillId)?.installedVersion !== skill.version);
     const changed = updates.filter((skill) => installed.get(skill.skillId)?.state === "modified");
-    if (changed.length === 0) return [];
+    const fields = local ? await changedProfileFields(copy, detail) : [];
+    if (changed.length === 0 && fields.length === 0) return { skills: [], fields: [] };
     untrack(agentUpdate)?.settle(null);
-    const replaceIds = await new Promise<string[] | null>((resolve) =>
+    const choice = await new Promise<AgentUpdateChoice | null>((resolve) =>
       setAgentUpdate({
         agentName: copy.name,
         changed: changed.map(({ skillId, name }) => ({ skillId, name })),
+        fields,
         othersCount: updates.length - changed.length,
-        settle: (ids) => {
+        settle: (value) => {
           setAgentUpdate(null);
-          resolve(ids);
+          resolve(value);
         },
       }),
     );
-    return replaceIds && changed.filter((skill) => replaceIds.includes(skill.skillId));
+    return (
+      choice && {
+        skills: changed.filter((skill) => choice.skillIds.includes(skill.skillId)),
+        fields: fields.filter((field) => choice.fields.includes(field)),
+      }
+    );
   }
 
   async function addAgent(listing: MarketplaceAgentDetail | MarketplaceAgentSummary, update = false) {
@@ -311,7 +349,9 @@ export function createMarketplaceController(
     const serverId = copy ? (props.hostServerId ? props.agentUpdateServerId : undefined) : props.agentServerId;
     const analytics = desktopAnalytics.scope();
     mark(key, true);
-    const replace = copy ? await run(() => askChangedSkills(listing, copy)) : [];
+    const replace = copy
+      ? await run(() => askChangedSkills(listing, copy, serverId === undefined))
+      : { skills: [], fields: [] };
     if (replace === null) {
       mark(key, false);
       return false;
@@ -323,6 +363,7 @@ export function createMarketplaceController(
           {
             listingId: listing.id,
             ...(copy ? { agentId: copy.id } : {}),
+            ...(replace.fields.length > 0 ? { replaceFields: replace.fields } : {}),
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
             receiptId: crypto.randomUUID(),
           },
@@ -336,9 +377,9 @@ export function createMarketplaceController(
       result: agent ? "succeeded" : "failed",
       ...(agent ? {} : { failure_code: copy ? "update_failed" : "install_failed" }),
     });
-    if (agent && copy && replace?.length) {
+    if (agent && copy && replace?.skills.length) {
       await run(async () => {
-        for (const skill of replace)
+        for (const skill of replace.skills)
           await skillCalls().install({
             agentId: copy.id,
             skillId: skill.skillId,
