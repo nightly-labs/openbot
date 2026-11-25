@@ -37,6 +37,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
   const {
     props: view,
     openExternalMessageUrl,
+    openFileFromThread,
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
@@ -112,6 +113,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
       if (messageId && read) read(messageId);
     },
   );
+  const fromThread = (open: () => void) => openFileFromThread(props.threadId, open);
   const draftKey = () => threadComposer.sideDraftKey(props.threadId);
   const shownAt = untrack(besideFocusRequest);
   const focusRequest = () => {
@@ -174,7 +176,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
   const mcpSignInCard = useThreadMcpSignInCard((body) => thread()?.onSend(body, [], null) ?? Promise.resolve(false));
   const marketplaceCard = useThreadMarketplaceSuggestionCard();
   const settingLinkCard = useThreadSettingLinkCard();
-  const visualReplyCard = useThreadVisualReplyCard(draftKey);
+  const visualReplyCard = useThreadVisualReplyCard(draftKey, undefined, props.threadId);
   const branch = () => {
     if (!view.threads?.onBranch) return undefined;
     return (messageId: string) => void branchThread(props.threadId, messageId);
@@ -257,9 +259,11 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             onPasteFiles={(files, selection, text) => threadComposer.pasteFiles(files, selection, draftKey(), text)}
             onDraftChange={(text) => threadComposer.setText(draftKey(), text)}
             onOpenDraftAttachment={(attachment) =>
-              canPreviewAttachment(attachment)
-                ? void previewAttachment(attachment)
-                : attachmentAction(attachment, "open")
+              fromThread(() =>
+                canPreviewAttachment(attachment)
+                  ? void previewAttachment(attachment)
+                  : attachmentAction(attachment, "open"),
+              )
             }
             onAttachFiles={view.threads?.acceptsFiles ? openPicker : undefined}
             voice={threadVoice(draftKey())}
@@ -269,12 +273,14 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             onSend={(text) => sendSide(current().thread, text)}
             onStop={() => current().thread.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
-            onOpenFile={openThreadFile}
+            onOpenFile={(kind, agentId, path, asWritten) =>
+              fromThread(() => openThreadFile(kind, agentId, path, asWritten))
+            }
             onSelectAgent={view.onSelectAgent}
             onOpenWaitingAgent={openWaitingAgent}
             changeMarkerActions={changeMarkerActions}
-            onPreview={(attachment) => void previewAttachment(attachment)}
-            onAttachmentAction={attachmentAction}
+            onPreview={(attachment) => fromThread(() => void previewAttachment(attachment))}
+            onAttachmentAction={(attachment, action) => fromThread(() => attachmentAction(attachment, action))}
             backdropAction={backdropAction}
             approval={current().thread.approval}
             onRespondApproval={(decision) =>

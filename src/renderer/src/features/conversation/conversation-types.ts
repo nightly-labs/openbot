@@ -270,9 +270,16 @@ type SidebarFilePreviewSource =
   | { kind: "attachment"; attachment: AttachmentSummary };
 
 export type SidebarFilePreview =
-  | { ownerAgentId: string; source: SidebarFilePreviewSource; preview: FilePreview; directory?: undefined }
   | {
       ownerAgentId: string;
+      threadId?: string | undefined;
+      source: SidebarFilePreviewSource;
+      preview: FilePreview;
+      directory?: undefined;
+    }
+  | {
+      ownerAgentId: string;
+      threadId?: string | undefined;
       source: { kind: "workspace-folder"; agentId: string; path: string };
       preview: null;
       directory: WorkspaceDirectory;

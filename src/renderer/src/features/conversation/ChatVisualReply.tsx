@@ -32,8 +32,9 @@ export function ChatVisualReply(props: {
   onContext: (text: string) => void;
   onQuote: (quoteId: string, text: string) => void;
   onUse?: () => void;
+  threadId?: string | undefined;
 }) {
-  const { props: view, openExternalMessageUrl, previewAttachment } = useConversationViewScope();
+  const { props: view, openExternalMessageUrl, previewAttachment, openFileFromThread } = useConversationViewScope();
   const visual = () => chatVisualReply(props.message) ?? props.initial;
   const pageUrl = () => chatVisualPageUrl(visual().attachment.previewUrl);
   const pageQuoteId = () =>
@@ -68,7 +69,7 @@ export function ChatVisualReply(props: {
       onUse={props.onUse}
       onQuote={(text) => props.onQuote(pageQuoteId(), text)}
       quoteShortcut={deviceQuoteShortcut(view.platform)}
-      onOpenInSidePanel={() => void previewAttachment(visual().attachment)}
+      onOpenInSidePanel={() => openFileFromThread(props.threadId, () => void previewAttachment(visual().attachment))}
       onUseAsBackdrop={backdropAction(props.message)}
       isAppShortcut={isChatVisualAppShortcut}
       macWindowControls={view.platform === "darwin"}
@@ -76,7 +77,11 @@ export function ChatVisualReply(props: {
   );
 }
 
-export function useThreadVisualReplyCard(draftKey: () => string | undefined, focusDraft?: () => void) {
+export function useThreadVisualReplyCard(
+  draftKey: () => string | undefined,
+  focusDraft?: () => void,
+  threadId?: string,
+) {
   const { props: view, threadComposer } = useConversationViewScope();
   const setDraft = (next: (draft: string) => string | undefined) => {
     const key = draftKey();
@@ -101,6 +106,7 @@ export function useThreadVisualReplyCard(draftKey: () => string | undefined, foc
           }}
           onContext={(text) => setDraft((draft) => draftWithPageContext(draft, message.id, text))}
           onQuote={quote}
+          threadId={threadId}
         />
       </article>
     );

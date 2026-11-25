@@ -51,6 +51,7 @@ export interface SidePanelFile {
   folder: boolean;
   source: SidebarFilePreview["source"];
   unavailable: boolean;
+  threadId?: string | undefined;
 }
 
 export interface SidePanelState {
@@ -443,9 +444,21 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       void conversationRuntime(deps.props).browser.setVisible({ visible: false, target: "main" });
   }
 
+  let openingThreadId: string | undefined;
+  function openFileFromThread(threadId: string | undefined, open: () => void): void {
+    const previous = openingThreadId;
+    openingThreadId = threadId;
+    try {
+      open();
+    } finally {
+      openingThreadId = previous;
+    }
+  }
+
   async function previewAttachment(attachment: AttachmentSummary, place: FileTabPlace = "tab") {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!ownerAgentId || !canPreviewAttachment(attachment)) return;
+    const threadId = openingThreadId;
     const target = { agentId: ownerAgentId, serverId: deps.props.server?.id ?? "local" };
     const generation = deps.nextFilePreviewGeneration();
     deps.setComposerError(null, target);
@@ -453,7 +466,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       const preview = await (deps.props.runtime?.previewAttachment?.(attachment) ?? attachmentFilePreview(attachment));
       if (generation !== deps.currentFilePreviewGeneration() || conversationOwnerId(deps.props) !== ownerAgentId)
         return;
-      showSidebarFile({ ownerAgentId, source: { kind: "attachment", attachment }, preview }, place);
+      showSidebarFile({ ownerAgentId, threadId, source: { kind: "attachment", attachment }, preview }, place);
     } catch (error) {
       if (generation !== deps.currentFilePreviewGeneration()) return;
       deps.setComposerError(errorMessage(error, t("attachment.error.preview", { name: attachment.name })), target);
@@ -503,6 +516,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   function openSharedFile(path: string, place: FileTabPlace = "tab", fallback?: () => void) {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!ownerAgentId) return;
+    const threadId = openingThreadId;
     const serverId = deps.props.server?.id ?? "local";
     const target = { agentId: ownerAgentId, serverId };
     const generation = deps.nextFilePreviewGeneration();
@@ -519,14 +533,14 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
             releaseFilePreviewPage(preview.pageUrl);
             return;
           }
-          showSidebarFile({ ownerAgentId, source: { kind: "shared", path }, preview }, place);
+          showSidebarFile({ ownerAgentId, threadId, source: { kind: "shared", path }, preview }, place);
         },
         (error) => {
           if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
           const showError = () => {
             if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
             if (fallback) {
-              if (conversationOwnerId(deps.props) === ownerAgentId) fallback();
+              if (conversationOwnerId(deps.props) === ownerAgentId) openFileFromThread(threadId, fallback);
             } else {
               deps.setComposerError(filePreviewError(error, path), target);
               fileTabReadFailed(place);
@@ -551,6 +565,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   ) {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!agentId || !ownerAgentId) return;
+    const threadId = openingThreadId;
     const next = SHARED_FOLDER_PATH.test(path) ? () => openSharedFile(decodedPath(path), place, fallback) : fallback;
     const serverId = deps.props.server?.id ?? "local";
     const target = { agentId: ownerAgentId, serverId };
@@ -567,26 +582,29 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           releaseFilePreviewPage(preview.pageUrl);
           return;
         }
-        showSidebarFile({ ownerAgentId, source: { kind: "workspace", agentId, path, folder }, preview }, place);
+        showSidebarFile(
+          { ownerAgentId, threadId, source: { kind: "workspace", agentId, path, folder }, preview },
+          place,
+        );
       },
       (error) =>
         agent.listWorkspaceDirectory({ agentId, path }).then(
           (directory) => {
             if (!current()) return;
-            showWorkspaceFolder(ownerAgentId, agentId, path, directory, place);
+            showWorkspaceFolder(ownerAgentId, agentId, path, directory, place, threadId);
           },
           () => {
             if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
             if (!attachment || !canPreviewAttachment(attachment)) {
               if (next) {
-                if (current()) next();
+                if (current()) openFileFromThread(threadId, next);
               } else {
                 deps.setComposerError(filePreviewError(error, path), target);
                 fileTabReadFailed(place);
               }
               return;
             }
-            if (current()) void previewAttachment(attachment, place);
+            if (current()) openFileFromThread(threadId, () => void previewAttachment(attachment, place));
           },
         ),
     );
@@ -631,9 +649,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     path: string,
     directory: WorkspaceDirectory,
     place: FileTabPlace,
+    threadId?: string,
   ) {
     showSidebarFile(
-      { ownerAgentId, source: { kind: "workspace-folder", agentId, path }, preview: null, directory },
+      { ownerAgentId, threadId, source: { kind: "workspace-folder", agentId, path }, preview: null, directory },
       place,
     );
   }
@@ -641,16 +660,21 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   function showSidebarFile(file: SidebarFilePreview, place: FileTabPlace) {
     const { ownerAgentId, source } = file;
     const key = filePreviewKey(source);
-    if (place === "open" && !(panels.side[ownerAgentId] ?? SIDE_PANEL_EMPTY).files.some((item) => item.key === key)) {
+    const shown = panels.side[ownerAgentId] ?? SIDE_PANEL_EMPTY;
+    if (place === "open" && !shown.files.some((item) => item.key === key)) {
       releaseFilePreviewPage(file.preview?.pageUrl);
       return;
     }
+    const existing = shown.files.find((item) => item.key === key);
+    const replaced = place === "here" ? shown.files.find((item) => item.key === shown.file) : undefined;
+    const threadId = file.threadId ?? (place === "tab" ? undefined : (existing ?? replaced)?.threadId);
     const tab: SidePanelFile = {
       key,
       name: file.directory?.name ?? file.preview?.name ?? key,
       folder: source.kind === "workspace-folder",
       source,
       unavailable: false,
+      threadId,
     };
     updateSidePanel(ownerAgentId, (state) => {
       const files = [...state.files];
@@ -661,7 +685,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       else files.push(tab);
       return { ...state, files, file: key, selected: null };
     });
-    deps.setSidebarFilePreview(file);
+    deps.setSidebarFilePreview({ ...file, threadId });
     setActiveRightPanel("file-preview", ownerAgentId);
   }
 
@@ -740,7 +764,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       void agent.listWorkspaceDirectory({ agentId: source.agentId, path: source.path }).then(
         (directory) => {
           if (!current() || JSON.stringify(directory) === JSON.stringify(file.directory)) return;
-          deps.setSidebarFilePreview({ ownerAgentId, source, preview: null, directory });
+          deps.setSidebarFilePreview({ ownerAgentId, threadId: file.threadId, source, preview: null, directory });
         },
         () => undefined,
       );
@@ -761,7 +785,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           releaseFilePreviewPage(preview.pageUrl);
           return;
         }
-        deps.setSidebarFilePreview({ ownerAgentId, source, preview });
+        deps.setSidebarFilePreview({ ownerAgentId, threadId: file.threadId, source, preview });
       },
       () => undefined,
     );
@@ -882,6 +906,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     openBrowserWindow,
     reattachBrowserWindow,
     hideBrowserPanel,
+    openFileFromThread,
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
