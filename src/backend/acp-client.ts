@@ -3826,7 +3826,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       turn.receivedOutput = false;
       yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
       if (turn.task) yield* Fiber.await(turn.task).pipe(Effect.timeoutOption(Math.min(ACP_STOP_GRACE_MS, limit)));
-      if (thread.activeTurn !== turn || turn.completing) return;
+      if (thread.activeTurn !== turn || turn.completing || turn.stopped) return;
       turn.failureCause = "stalled";
       yield* this.#abandonTurn(
         thread,
