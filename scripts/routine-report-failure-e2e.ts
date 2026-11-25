@@ -667,6 +667,14 @@ try {
       !healthPrompt.includes("delete, list, or test routines"),
     healthPrompt,
   );
+  const routineLanguageLine =
+    "in the language that the routine task names, else the language that your instructions name";
+  pass(
+    "The routine prompt names the routine task as the language of the user-facing lines, before the task",
+    healthPrompt?.includes(routineLanguageLine) === true &&
+      healthPrompt.indexOf(routineLanguageLine) < healthPrompt.lastIndexOf("--- routine task ---"),
+    healthPrompt,
+  );
   const listRoutinesTool = toolResults(healthRun.delivery.turnId, "list_routines")[0]?.result;
   pass(
     "A routine run can list routines",
