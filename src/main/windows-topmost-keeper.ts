@@ -15,6 +15,7 @@ const HWND_TOPMOST = -1;
 const SWP_NOSIZE = 0x1;
 const SWP_NOMOVE = 0x2;
 const SWP_NOACTIVATE = 0x10;
+const MAX_WINDOWS_ABOVE = 1024;
 
 type WindowHandle = number | bigint;
 
@@ -35,6 +36,7 @@ interface ZOrderApi {
 }
 
 let zOrderApi: ZOrderApi | null | undefined;
+let raiseFailureLogged = false;
 
 function loadZOrderApi(): ZOrderApi | null {
   if (zOrderApi !== undefined) return zOrderApi;
@@ -73,8 +75,10 @@ function shownNormalWindow(api: ZOrderApi, window: WindowHandle): boolean {
 }
 
 function belowShownNormalWindow(api: ZOrderApi, window: WindowHandle): boolean {
-  for (let above = api.windowAbove(window, GW_HWNDPREV); above; above = api.windowAbove(above, GW_HWNDPREV)) {
+  let above = api.windowAbove(window, GW_HWNDPREV);
+  for (let step = 0; above && step < MAX_WINDOWS_ABOVE; step++) {
     if (shownNormalWindow(api, above)) return true;
+    above = api.windowAbove(above, GW_HWNDPREV);
   }
   return false;
 }
@@ -87,7 +91,8 @@ function raiseIntoTopmostBand(window: BrowserWindow): void {
     if (!belowShownNormalWindow(api, handle)) return;
     api.setPosition(handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
   } catch (error) {
-    zOrderApi = null;
+    if (raiseFailureLogged) return;
+    raiseFailureLogged = true;
     logger.warn("Unable to keep a window in the Windows topmost band:", toLogValue(error));
   }
 }
