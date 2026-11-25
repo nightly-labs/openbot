@@ -50,7 +50,7 @@ async function writeInstructions(peer: AcpPeer, sessionId: string, file: string,
     title: "write",
     kind: "edit",
     status: "in_progress",
-    locations,
+    ...(index === 2 ? { locations } : {}),
   });
   const reply = await peer.ask("session/request_permission", {
     sessionId,

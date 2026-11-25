@@ -4727,6 +4727,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     const requestedPermissions = kind === "permissions" ? { [params.toolCall.kind ?? "file-system"]: true } : null;
     const filePaths = kind === "file-change" ? permissionFilePaths(toolCall, thread?.cwd) : [];
+    if (turn && filePaths.length > 0 && !turn.toolLocations.has(toolCallId))
+      turn.toolLocations.set(
+        toolCallId,
+        filePaths.map((path) => ({ path })),
+      );
     const result = yield* this.#waitForUser(
       turn,
       this.#serverRequests.call(
