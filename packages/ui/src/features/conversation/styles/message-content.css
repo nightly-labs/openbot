@@ -1067,6 +1067,11 @@
   inset: 0;
   border-radius: var(--openbot-radius-xs);
   object-fit: contain;
+  visibility: hidden;
+}
+
+.message-link-icon img[data-loaded="true"] {
+  visibility: visible;
 }
 
 .message-link-fallback {
