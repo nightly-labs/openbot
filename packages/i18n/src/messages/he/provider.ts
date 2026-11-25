@@ -234,6 +234,7 @@ export const messages = {
   "provider.account.apiKey": "מפתח API",
   "provider.account.listLabel": "חשבונות {name}",
   "provider.account.usedBy": "בשימוש של {agents}",
+  "provider.account.sameEmail": "אותו אימייל כמו {name}",
   "provider.account.failed": "ההתחברות נכשלה",
   "provider.account.moreActions": "פעולות נוספות עבור {name}",
   "provider.account.renameLabel": "השם של {name}",

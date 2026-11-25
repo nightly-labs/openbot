@@ -232,6 +232,7 @@ export const messages = {
   "provider.account.apiKey": "API 키",
   "provider.account.listLabel": "{name} 계정",
   "provider.account.usedBy": "{agents}이(가) 사용 중",
+  "provider.account.sameEmail": "{name}과(와) 같은 이메일",
   "provider.account.failed": "로그인 실패",
   "provider.account.moreActions": "{name} 추가 작업",
   "provider.account.renameLabel": "{name}의 이름",

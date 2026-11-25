@@ -232,6 +232,7 @@ export const messages = {
   "provider.account.apiKey": "API anahtarı",
   "provider.account.listLabel": "{name} hesapları",
   "provider.account.usedBy": "Kullanan: {agents}",
+  "provider.account.sameEmail": "{name} ile aynı e-posta",
   "provider.account.failed": "Oturum açılamadı",
   "provider.account.moreActions": "{name} için diğer eylemler",
   "provider.account.renameLabel": "{name} adı",

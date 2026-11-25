@@ -42,12 +42,27 @@ export function providerAccountName(
     accounts.findIndex((account) => account.id === accountId),
   );
   const account = accounts[index];
+  const sharesEmail = account !== undefined && accounts.some((other) => other !== account && sameEmail(other, account));
   return (
     account?.label ||
-    account?.email ||
+    (sharesEmail ? null : account?.email) ||
     (account && isApiKeyAccount(account.id) ? t("provider.account.apiKey") : null) ||
     t("provider.account.numbered", { number: index + 1 })
   );
+}
+
+export function earlierAccountWithSameEmail<Account extends Pick<ProviderAccountStatus, "id" | "email">>(
+  accounts: readonly Account[],
+  accountId: string,
+): Account | undefined {
+  const index = accounts.findIndex((account) => account.id === accountId);
+  const account = accounts[index];
+  return account && accounts.slice(0, index).find((other) => sameEmail(other, account));
+}
+
+function sameEmail(first: Pick<ProviderAccountStatus, "email">, second: Pick<ProviderAccountStatus, "email">): boolean {
+  const email = first.email?.trim().toLowerCase();
+  return Boolean(email) && email === second.email?.trim().toLowerCase();
 }
 
 export function isAgentAccount(agentAccountId: string | undefined | null, accountId: string): boolean {

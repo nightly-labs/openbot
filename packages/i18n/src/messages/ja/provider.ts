@@ -233,6 +233,7 @@ export const messages = {
   "provider.account.apiKey": "APIキー",
   "provider.account.listLabel": "{name} のアカウント",
   "provider.account.usedBy": "{agents} が使用中",
+  "provider.account.sameEmail": "{name} と同じメールアドレス",
   "provider.account.failed": "サインイン失敗",
   "provider.account.moreActions": "{name} のその他の操作",
   "provider.account.renameLabel": "{name} の名前",

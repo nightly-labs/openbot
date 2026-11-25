@@ -224,6 +224,7 @@ export const messages = {
   "provider.account.apiKey": "API-sleutel",
   "provider.account.listLabel": "Accounts van {name}",
   "provider.account.usedBy": "Gebruikt door {agents}",
+  "provider.account.sameEmail": "Zelfde e-mail als {name}",
   "provider.account.failed": "Inloggen mislukt",
   "provider.account.moreActions": "Meer acties voor {name}",
   "provider.account.renameLabel": "Naam van {name}",
