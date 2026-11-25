@@ -369,6 +369,18 @@
   place-items: center;
 }
 
+.near-wallet-deposit-failure {
+  display: grid;
+  min-height: 188px;
+  align-content: center;
+  justify-items: center;
+  gap: var(--openbot-space-3);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  padding: var(--openbot-space-4);
+  text-align: center;
+}
+
 .near-wallet-qr-mark.crypto-logo {
   width: 32px;
   height: 32px;

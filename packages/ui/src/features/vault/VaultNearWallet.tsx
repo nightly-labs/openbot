@@ -24,6 +24,7 @@ import {
   Progress,
   SettingsSection,
   Spinner,
+  SwitchField,
   Text,
   Trash2,
 } from "@openbot/ui";
@@ -180,6 +181,8 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
   const account = () => props.status.account;
   const signing = () => props.status.signing;
   const busyWith = (action: string) => signing()?.action === action;
+  const paymentsOn = () => busyWith("unfreeze") || (props.status.state === "ready" && !busyWith("freeze"));
+  const paymentsText = () => (paymentsOn() ? t("vault.near.paymentsOnDetail") : t("vault.near.pausedDetail"));
   const changeAllowed = createPassed(() => account()?.policyChangeAvailableAt ?? null);
   const close = () => setDialog(null);
   const open = (next: PageDialog) => {
@@ -218,7 +221,7 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
   const grantDetail = () => {
     const current = account();
     const count = props.status.allAgents
-      ? t("vault.near.everyAgent")
+      ? t("vault.near.newAgentsToo")
       : t("vault.near.agentsOf", {
           count: String(props.status.agentIds.length),
           total: String(props.agents.length),
@@ -315,26 +318,6 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
           </Alert>
         )}
       </Show>
-      <Show when={props.status.state === "frozen"}>
-        <Alert tone="warning" report={false}>
-          <AlertContent>
-            <AlertTitle>{t("vault.near.pausedTitle")}</AlertTitle>
-          </AlertContent>
-          <AlertActions>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              loading={busyWith("unfreeze")}
-              loadingLabel={t("vault.near.waitingShort")}
-              disabled={Boolean(signing())}
-              onClick={() => void run.run(props.actions.unfreeze)}
-            >
-              {t("vault.near.resume")}
-            </Button>
-          </AlertActions>
-        </Alert>
-      </Show>
       <Show when={account() === null}>
         <Alert tone="warning" report={false}>
           <AlertContent>
@@ -355,6 +338,16 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
           </AlertActions>
         </Alert>
       </Show>
+
+      <Card label={t("vault.near.payments")}>
+        <SwitchField
+          checked={paymentsOn()}
+          disabled={Boolean(signing())}
+          onChange={(on) => void run.run(on ? props.actions.unfreeze : props.actions.freeze)}
+          label={t("vault.near.payments")}
+          description={paymentsText()}
+        />
+      </Card>
 
       <SettingsSection title={t("vault.near.balance")} actions={addFunds()}>
         <Card label={t("vault.near.balance")}>
@@ -545,40 +538,18 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
         </SettingsSection>
       </Show>
 
-      <SettingsSection title={t("vault.near.stop")}>
-        <Card label={t("vault.near.stop")}>
-          <Show when={props.status.state === "ready"}>
-            <Item class="settings-modal-row">
-              <ItemContent>
-                <ItemTitle>{t("vault.near.pause")}</ItemTitle>
-              </ItemContent>
-              <ItemActions>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  loading={busyWith("freeze")}
-                  loadingLabel={t("vault.near.waitingShort")}
-                  disabled={Boolean(signing())}
-                  onClick={() => void run.run(props.actions.freeze)}
-                >
-                  {t("vault.near.pauseButton")}
-                </Button>
-              </ItemActions>
-            </Item>
-          </Show>
-          <Item class="settings-modal-row">
-            <ItemContent>
-              <ItemTitle>{t("vault.near.disconnectRow")}</ItemTitle>
-            </ItemContent>
-            <ItemActions>
-              <Button type="button" size="sm" variant="destructive" onClick={() => open({ kind: "disconnect" })}>
-                {t("vault.near.disconnect")}
-              </Button>
-            </ItemActions>
-          </Item>
-        </Card>
-      </SettingsSection>
+      <Card label={t("vault.near.disconnectRow")}>
+        <Item class="settings-modal-row">
+          <ItemContent>
+            <ItemTitle>{t("vault.near.disconnectRow")}</ItemTitle>
+          </ItemContent>
+          <ItemActions>
+            <Button type="button" size="sm" variant="destructive" onClick={() => open({ kind: "disconnect" })}>
+              {t("vault.near.disconnect")}
+            </Button>
+          </ItemActions>
+        </Item>
+      </Card>
 
       <Show when={dialog()?.kind === "funds"}>
         <NearAddFundsDialog status={props.status} actions={props.actions} onClose={close} />

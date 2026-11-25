@@ -160,6 +160,11 @@ export function NearSetupDialog(props: NearDialogProps) {
     if (!sent) setStopped(true);
   }
 
+  function cancelSetup() {
+    setStopped(true);
+    void props.actions.cancelSigning();
+  }
+
   function resume(passkey: NearPasskeyChoice) {
     setAcceptedAt(backup()?.checkedAt ?? null);
     setIndex(SETUP_STEPS.indexOf("sign"));
@@ -189,22 +194,24 @@ export function NearSetupDialog(props: NearDialogProps) {
     if (started() && stopped()) return signed();
     return -1;
   };
-  const signingNow = () => step() === "sign" && waiting();
+  const signingNow = () => (step() === "sign" && waiting()) || checking();
   const canGoBack = () => index() > 0 && !waiting() && step() !== "funds" && step() !== "backup" && !connected();
-  const wait = () => <NearSigningWait onOpenAgain={props.actions.openSigning} onCancel={props.actions.cancelSigning} />;
+  const wait = () => <NearSigningWait onOpenAgain={props.actions.openSigning} />;
   const stepLabels = () => SETUP_STEPS.map((item) => t(STEP_KEYS[item]));
   const footer = () => (
     <Show
       when={!signingNow()}
       fallback={
         <>
-          <Text as="span" variant="caption" tone="muted" class="near-wallet-status" role="status">
-            {t("vault.near.signature.count", {
-              step: String(activeSignature() + 1),
-              count: String(SETUP_SIGNATURE_COUNT),
-            })}
-          </Text>
-          <Button type="button" variant="ghost" onClick={props.actions.cancelSigning}>
+          <Show when={step() === "sign"}>
+            <Text as="span" variant="caption" tone="muted" class="near-wallet-status" role="status">
+              {t("vault.near.signature.count", {
+                step: String(activeSignature() + 1),
+                count: String(SETUP_SIGNATURE_COUNT),
+              })}
+            </Text>
+          </Show>
+          <Button type="button" variant="ghost" onClick={cancelSetup}>
             {t("common.cancel")}
           </Button>
         </>
@@ -225,7 +232,7 @@ export function NearSetupDialog(props: NearDialogProps) {
           {t("vault.near.backup.useAnother")}
         </Button>
       </Show>
-      <Button type="submit" disabled={!canGo()} loading={checking()} loadingLabel={t("vault.near.waitingShort")}>
+      <Button type="submit" disabled={!canGo()}>
         {submitLabel()}
       </Button>
     </Show>
@@ -311,15 +318,22 @@ function OwnerChangeDialog(props: {
 }) {
   const { t } = useText();
   const waiting = () => props.run.busy() && props.sign;
-  const wait = () => <NearSigningWait onOpenAgain={props.actions.openSigning} onCancel={props.actions.cancelSigning} />;
+  const wait = () => <NearSigningWait onOpenAgain={props.actions.openSigning} />;
   const body = () => (
     <Show when={!waiting()} fallback={wait()}>
       {props.children}
     </Show>
   );
   const footer = () => (
-    <>
-      <Button type="button" variant="ghost" disabled={props.run.busy() && !props.sign} onClick={props.onClose}>
+    <Show
+      when={!waiting()}
+      fallback={
+        <Button type="button" variant="ghost" onClick={() => void props.actions.cancelSigning()}>
+          {t("common.cancel")}
+        </Button>
+      }
+    >
+      <Button type="button" variant="ghost" disabled={props.run.busy()} onClick={props.onClose}>
         {t("common.cancel")}
       </Button>
       <Button
@@ -328,11 +342,11 @@ function OwnerChangeDialog(props: {
         title={props.submitLabel}
         disabled={!props.canSave || props.run.busy()}
         loading={props.run.busy()}
-        loadingLabel={t("vault.near.waitingShort")}
+        loadingLabel={t("common.saving")}
       >
         <span>{props.submitLabel}</span>
       </Button>
-    </>
+    </Show>
   );
   return (
     <NearWalletDialog

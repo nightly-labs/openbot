@@ -386,7 +386,7 @@ import { createModelReasoningSupport, MODEL_REASONING_RETRY_WAITS_MS } from "./m
 import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
 import { createNearIntentsGateway } from "./near-intents-gateway";
 import { NearWalletService } from "./near-wallet-service";
-import { NEAR_PASSKEY_WALLET_ORIGIN, NearOwnerSigning } from "./near-wallet-signing";
+import { NEAR_PASSKEY_WALLET_ORIGIN, NearOwnerSigning, nearPasskeyPageOrigin } from "./near-wallet-signing";
 import { NearWalletStore } from "./near-wallet-store";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
@@ -1838,13 +1838,16 @@ export async function createApplicationServices({
     signing: new NearOwnerSigning({
       pageOrigin: app.isPackaged
         ? NEAR_PASSKEY_WALLET_ORIGIN
-        : process.env.OPENBOT_DEV_NEAR_SIGNING_ORIGIN || centralAuthApiUrl(),
+        : nearPasskeyPageOrigin(process.env.OPENBOT_DEV_NEAR_SIGNING_ORIGIN || centralAuthApiUrl()),
       openExternal: openLink,
       loopback: !app.isPackaged,
     }),
     baseUrl: app.isPackaged ? undefined : process.env.OPENBOT_DEV_NEAR_AGENT_API_URL || undefined,
   });
   await Effect.runPromise(nearWallet.load());
+  centralAuth.on("changed", (state) => {
+    if (state.status === "signed_in") void Effect.runPromise(nearWallet.retryReads());
+  });
   teardown.push(TEARDOWN_ORDER.nearWallet, "the NEAR wallet", () => Effect.runPromise(nearWallet.dispose()));
   const bitwardenCliTarget = runtimeTarget(process.platform, process.arch);
   const bitwardenConnector = new BitwardenConnectorService({

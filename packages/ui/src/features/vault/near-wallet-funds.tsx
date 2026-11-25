@@ -1,5 +1,5 @@
 import type { NearDepositAddress, NearDepositAsset } from "@openbot/contracts/ipc";
-import { CopyButton, Label, QrCode, SearchSelect, Spinner, Text } from "@openbot/ui";
+import { Button, CopyButton, Label, QrCode, SearchSelect, Spinner, Text } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createUniqueId, Show } from "solid-js";
 import { useText } from "../../text";
@@ -56,6 +56,7 @@ export function AddFundsFields(props: {
   const [assetId, setAssetId] = createSignal<string | null>(null);
   const [address, setAddress] = createSignal<NearDepositAddress | null>(null);
   const [failure, setFailure] = createSignal<string | null>(null);
+  const [attempt, setAttempt] = createSignal(0);
   let root: HTMLDivElement | undefined;
   const popupMount = () => root?.closest("[role=dialog],[role=alertdialog]") ?? undefined;
   const fallbackCoin = () => coins().find((coin) => coin.symbol === DEFAULT_DEPOSIT_COIN) ?? coins()[0];
@@ -66,8 +67,8 @@ export function AddFundsFields(props: {
     return current?.networks.find((item) => item.assetId === assetId()) ?? current?.networks[0];
   };
   createEffect(
-    () => asset()?.assetId,
-    (current) => {
+    () => ({ current: asset()?.assetId, attempt: attempt() }),
+    ({ current }) => {
       if (!current) return;
       let live = true;
       setAddress(null);
@@ -129,7 +130,14 @@ export function AddFundsFields(props: {
                   </SearchSelect>
                 </div>
               </div>
-              <NearFailure text={failure()} />
+              <Show when={failure()}>
+                <div class="near-wallet-deposit-failure">
+                  <NearFailure text={failure()} />
+                  <Button type="button" size="sm" variant="outline" onClick={() => setAttempt((count) => count + 1)}>
+                    {t("common.tryAgain")}
+                  </Button>
+                </div>
+              </Show>
               <Show
                 when={address()}
                 fallback={

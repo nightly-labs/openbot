@@ -7,6 +7,7 @@ import {
   parseNearRuleInput,
   parseNearWalletCreateInput,
 } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { NearWalletService } from "../near-wallet-service";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
@@ -15,6 +16,7 @@ export interface NearWalletIpcDependencies {
   nearWallet: Pick<
     NearWalletService,
     | "status"
+    | "retryReads"
     | "create"
     | "setBudget"
     | "setAgents"
@@ -43,7 +45,10 @@ function required<Payload>(parse: (value: unknown) => Payload | null, name: stri
 export function nearWalletIpcHandlers({ nearWallet }: NearWalletIpcDependencies): Pick<IpcGroupHandlers, "nearWallet"> {
   return {
     nearWallet: {
-      status: handler(() => nearWallet.status()),
+      status: handler(() => {
+        Effect.runFork(nearWallet.retryReads());
+        return nearWallet.status();
+      }),
       create: payloadHandler(required(parseNearWalletCreateInput, "setup"), (input) =>
         runCauseEffect(nearWallet.create(input)),
       ),

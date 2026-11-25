@@ -47,6 +47,7 @@ import {
   type NearIntentToSign,
   type NearOwnerSigning,
   type NearSignAction,
+  NearSigningCanceled,
   type NearSigningRequest,
   nearBackupState,
 } from "./near-wallet-signing";
@@ -113,6 +114,9 @@ export class NearWalletService implements NearWallet {
   readonly #prepared = new Map<string, PreparedPayment>();
   #signingState: NearSigning | null = null;
   #error: string | null = null;
+  #readFailed = false;
+  #retrying = false;
+  #started = false;
   #balances: { at: number; list: NearBalance[]; raw: BalanceRow[] } | null = null;
   #tokens: { at: number; list: TokenView[] } | null = null;
   #policy: PolicyView | null = null;
@@ -184,6 +188,22 @@ export class NearWalletService implements NearWallet {
     return this.status();
   }).bind(this);
 
+  readonly retryReads = Effect.fn("NearWallet.retryReads")(function* (this: NearWalletService) {
+    if (this.#disposed || this.#retrying || !this.#readFailed || !this.#gatewayOwner(this.#store.read())) return;
+    this.#retrying = true;
+    const reads = this.#started ? this.#refresh(true) : this.#startup();
+    yield* Effect.forkIn(
+      this.#background(reads).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            this.#retrying = false;
+          }),
+        ),
+      ),
+      this.#scope,
+    );
+  }).bind(this);
+
   readonly create = Effect.fn("NearWallet.create")(function* (this: NearWalletService, input: NearWalletCreateInput) {
     if (this.#disposed) return this.status();
     const record = this.#store.read();
@@ -250,7 +270,7 @@ export class NearWalletService implements NearWallet {
     return yield* this.#ownerStep(
       Effect.gen({ self: this }, function* () {
         const intent = yield* this.#generate({ type: "agent_freeze", agent_id: wallet.agentId });
-        yield* this.#signAndSubmit("freeze", intent, wallet.accountId ?? wallet.agentId, null);
+        yield* this.#signAndSubmit("freeze", intent, sourceText("status.agent.nearSummaryFreeze"), null);
       }),
     );
   }).bind(this);
@@ -261,7 +281,7 @@ export class NearWalletService implements NearWallet {
         const wallet = this.#store.read().wallet;
         if (!wallet) return yield* nearFailure(sourceText("error.connector.nearNoWallet"));
         const intent = yield* this.#generate({ type: "agent_unfreeze", agent_id: wallet.agentId });
-        yield* this.#signAndSubmit("unfreeze", intent, wallet.accountId ?? wallet.agentId, null);
+        yield* this.#signAndSubmit("unfreeze", intent, sourceText("status.agent.nearSummaryUnfreeze"), null);
         yield* this.#store.update((record) =>
           record.wallet ? { ...record, wallet: { ...record.wallet, frozen: false } } : record,
         );
@@ -282,7 +302,7 @@ export class NearWalletService implements NearWallet {
       return {
         address,
         memo: details.memo ?? null,
-        minAmount: details.min_amount ?? null,
+        minAmount: depositMinimum(details.min_amount, this.#tokens?.list ?? [], input.assetId),
         expiresAt: details.expires_at ?? null,
       } satisfies NearDepositAddress;
     },
@@ -1034,6 +1054,7 @@ export class NearWalletService implements NearWallet {
 
   readonly #startup = Effect.fn("NearWallet.startup")(function* (this: NearWalletService) {
     yield* this.#refresh(true);
+    this.#started = true;
     yield* this.#resume();
   });
 
@@ -1058,6 +1079,10 @@ export class NearWalletService implements NearWallet {
       this.#balances = { at: now, raw, list: raw.map(balanceView) };
     }
     if (policy) this.#policy = policy;
+    if (this.#readFailed) {
+      this.#readFailed = false;
+      this.#error = null;
+    }
     this.#emitStatus();
   });
 
@@ -1066,9 +1091,10 @@ export class NearWalletService implements NearWallet {
       .withPermit(
         Effect.gen({ self: this }, function* () {
           this.#error = null;
+          this.#readFailed = false;
           this.#emitStatus();
           const result = yield* operation.pipe(Effect.result);
-          if (Result.isFailure(result)) {
+          if (Result.isFailure(result) && !(result.failure.cause instanceof NearSigningCanceled)) {
             this.#error = redactText(failureText(result.failure.cause));
             if (!isOwnerFailure(result.failure.cause))
               logger.warn("A NEAR wallet action failed.", { cause: toLogValue(result.failure.cause) });
@@ -1084,7 +1110,9 @@ export class NearWalletService implements NearWallet {
     return operation.pipe(
       Effect.catch((failure) =>
         Effect.sync(() => {
+          logger.warn("A NEAR wallet read failed.", { cause: toLogValue(failure.cause) });
           this.#error = redactText(failureText(failure.cause));
+          this.#readFailed = true;
           this.#emitStatus();
         }),
       ),
@@ -1216,6 +1244,22 @@ function toAtomic(amount: string, decimals: number): string | null {
   return atomic > 0n ? atomic.toString() : null;
 }
 
+const ATOMIC = /^\d{1,78}$/;
+
+function fromAtomic(atomic: string, decimals: number): string | null {
+  if (!ATOMIC.test(atomic) || !Number.isInteger(decimals) || decimals < 0 || decimals > 36) return null;
+  const digits = atomic.replace(/^0+/, "").padStart(decimals + 1, "0");
+  const whole = digits.slice(0, digits.length - decimals);
+  const fraction = digits.slice(digits.length - decimals).replace(/0+$/, "");
+  return fraction ? `${whole}.${fraction}` : whole;
+}
+
+function depositMinimum(atomic: string | null | undefined, tokens: TokenView[], assetId: string): string | null {
+  const decimals = tokens.find((token) => token.asset_id === assetId)?.decimals;
+  if (!atomic || decimals === null || decimals === undefined) return null;
+  return fromAtomic(atomic, decimals);
+}
+
 function usdCents(amount: string, price: number): number | null {
   const cents = Math.ceil(Number(amount) * price * 100 - 1e-6);
   return Number.isSafeInteger(cents) && cents >= 0 ? cents : null;
@@ -1244,6 +1288,8 @@ function relayFailureText(cause: AgentApiError): string | null {
   if (cause.code === "wallet_service_unavailable") return sourceText("error.connector.nearServiceUnavailable");
   if (cause.code === "wallet_not_found") return sourceText("error.connector.nearWalletNotFound");
   if (cause.code === "wallet_limit") return sourceText("error.connector.nearWalletLimit");
+  if (cause.code === "provider_unavailable" || cause.status >= 500)
+    return sourceText("error.connector.nearProviderBusy");
   return null;
 }
 

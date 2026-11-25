@@ -252,7 +252,7 @@ export function SetupSignatures(props: { active: number; failed: boolean; dailyB
   );
 }
 
-export function NearSigningWait(props: { onOpenAgain: () => Promise<void>; onCancel: () => Promise<unknown> }) {
+export function NearSigningWait(props: { onOpenAgain: () => Promise<void> }) {
   const { t } = useText();
   return (
     <div class="near-wallet-waiting" role="status">
@@ -261,9 +261,6 @@ export function NearSigningWait(props: { onOpenAgain: () => Promise<void>; onCan
       <div class="near-wallet-waiting-actions">
         <Button type="button" size="sm" variant="outline" onClick={() => void props.onOpenAgain()}>
           {t("vault.near.openAgain")}
-        </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={() => void props.onCancel()}>
-          {t("common.cancel")}
         </Button>
       </div>
     </div>

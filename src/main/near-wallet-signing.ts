@@ -12,6 +12,7 @@ export const NEAR_SIGNING_PATH = "/near/sign";
 export const NEAR_PASSKEY_WALLET_ORIGIN = "https://nearintents.openbot.run";
 export const NEAR_SIGNATURE_DEV_PATH = "/near-signature";
 export const NEAR_SIGNING_TIMEOUT_MS = 10 * 60_000;
+const LOOPBACK_ADDRESSES = new Set(["127.0.0.1", "[::1]"]);
 const MAX_RESULT_CHARS = 16 * 1024;
 const BACKUP_CHECK_TIMEOUT_MS = 5 * 60_000;
 const AUTH_DATA_MIN_BYTES = 37;
@@ -175,6 +176,14 @@ export interface NearSigningOptions {
   timeoutMs?: number;
 }
 
+export function nearPasskeyPageOrigin(apiUrl: string): string {
+  const url = new URL(apiUrl);
+  if (LOOPBACK_ADDRESSES.has(url.hostname)) url.hostname = "localhost";
+  return url.origin;
+}
+
+export class NearSigningCanceled extends Error {}
+
 export class NearOwnerSigning {
   readonly #options: NearSigningOptions;
   #session: Session | null = null;
@@ -227,7 +236,7 @@ export class NearOwnerSigning {
 
   cancel(): void {
     const session = this.#session;
-    if (session) this.#end(session.nonce, new Error(sourceText("error.connector.nearSigningCanceled")));
+    if (session) this.#end(session.nonce, new NearSigningCanceled(sourceText("error.connector.nearSigningCanceled")));
   }
 
   receive(nonce: string, data: string): boolean {

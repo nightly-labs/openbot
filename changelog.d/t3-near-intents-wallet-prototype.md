@@ -7,7 +7,7 @@
   a signature, the step shows which one, and "Try again" starts it again. The daily budget starts at $25, and all
   agents, also new agents, can pay. You can change the budget and the agents on the wallet page.
   Each payment waits for your approval in the chat. Select "Always allow" to let agents pay a site up
-  to a daily limit without asking. Pause stops all payments. The payment card also shows in the Tasks
+  to a daily limit without asking. The Payments switch at the top of the wallet page stops and starts all payments. The payment card also shows in the Tasks
   view, and the agent status shows "Sending the payment…" while the payment completes.
 - After you make the passkey for a NEAR Intents wallet, OpenBot tells you if the passkey has a backup.
   When the passkey is only on this device, you confirm the risk or make a new passkey. OpenBot does
@@ -19,3 +19,8 @@
 - To add funds to the crypto wallet, you select a coin and a network. Each has its logo, and you can
   search the lists. USDC on Ethereum is the default, and the popular coins and networks are first.
   The deposit address shows with its QR code and a Copy button.
+- Add funds shows the minimum deposit in the coin, for example "0.1 USDC".
+- When the wallet service is busy, the wallet page tells you and shows "Try again".
+- While you sign a wallet change, the dialog shows one Cancel button. A Cancel shows no error.
+- The passkey page says "Pause payments" or "Resume payments" for these actions, and wallet errors
+  say "crypto wallet".
