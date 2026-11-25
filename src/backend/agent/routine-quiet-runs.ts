@@ -36,16 +36,13 @@ export function quietRoutineRun(run: Pick<RoutineRun, "kind" | "source">): boole
 
 export type FollowsUpOwnAnswer = (delivery: QueueDelivery) => boolean;
 
-function newTeammateMessage(delivery: QueueDelivery, followsUpOwnAnswer: FollowsUpOwnAnswer): boolean {
+export function quietTeammateDelivery(delivery: QueueDelivery, followsUpOwnAnswer: FollowsUpOwnAnswer): boolean {
   return (
     delivery.sender.kind === "agent" &&
     delivery.sender.agentId !== delivery.recipientAgentId &&
+    delivery.expectsReply === false &&
     (!delivery.replyToMessageId || followsUpOwnAnswer(delivery))
   );
-}
-
-export function quietTeammateDelivery(delivery: QueueDelivery, followsUpOwnAnswer: FollowsUpOwnAnswer): boolean {
-  return delivery.expectsReply === false && newTeammateMessage(delivery, followsUpOwnAnswer);
 }
 
 export function answeredRequestId(delivery: QueueDelivery): string | null {
@@ -57,8 +54,13 @@ export function answeredRequestId(delivery: QueueDelivery): string | null {
     : null;
 }
 
-export function teammateRequest(delivery: QueueDelivery, followsUpOwnAnswer: FollowsUpOwnAnswer): boolean {
-  return delivery.expectsReply !== false && newTeammateMessage(delivery, followsUpOwnAnswer);
+export function teammateRequest(delivery: QueueDelivery): boolean {
+  return (
+    delivery.sender.kind === "agent" &&
+    delivery.sender.agentId !== delivery.recipientAgentId &&
+    delivery.expectsReply !== false &&
+    !delivery.replyToMessageId
+  );
 }
 
 export function quietTeammateTurnDelivery(
@@ -66,10 +68,7 @@ export function quietTeammateTurnDelivery(
   answered: (delivery: QueueDelivery) => boolean,
   followsUpOwnAnswer: FollowsUpOwnAnswer,
 ): boolean {
-  return (
-    quietTeammateDelivery(delivery, followsUpOwnAnswer) ||
-    (teammateRequest(delivery, followsUpOwnAnswer) && answered(delivery))
-  );
+  return quietTeammateDelivery(delivery, followsUpOwnAnswer) || (teammateRequest(delivery) && answered(delivery));
 }
 
 export function isNoUpdateAnswer(text: string): boolean {

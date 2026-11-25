@@ -95,7 +95,6 @@ import {
 import type { ProviderRuntime } from "./provider-runtime";
 import {
   answeredRequestId,
-  type FollowsUpOwnAnswer,
   isNoUpdateAnswer,
   isNoUpdateToolCall,
   quietRunStepsMessage,
@@ -1982,7 +1981,7 @@ export class TurnLifecycle {
         ({ delivery }) =>
           delivery.sender.kind === "routine" ||
           quietTeammateDelivery(delivery, this.#followsUpOwnAnswer) ||
-          teammateRequest(delivery, this.#followsUpOwnAnswer) ||
+          teammateRequest(delivery) ||
           this.#continuesQuietRun(delivery),
       )
     )
@@ -2123,7 +2122,7 @@ export class TurnLifecycle {
         (publicThreadId !== null && this.#hooks.isRoutineThread(publicThreadId))) &&
       deliveries.every(
         ({ delivery }) =>
-          (teammateRequest(delivery, this.#followsUpOwnAnswer) && answered(delivery)) ||
+          (teammateRequest(delivery) && answered(delivery)) ||
           this.#quietTeammateTurnDelivery(delivery) ||
           (delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id)) ||
           (noUpdateCalled && this.#continuesQuietRun(delivery)),
@@ -2491,7 +2490,7 @@ export class TurnLifecycle {
           ? settleQuietRoutineTurn(
               snapshot,
               turnId,
-              noUpdateCalled || answeredRequestTurn(deliveries, snapshot, turnId, this.#followsUpOwnAnswer),
+              noUpdateCalled || answeredRequestTurn(deliveries, snapshot, turnId),
               running?.client.provider ?? this.#store.get(agentId)?.provider,
             )
           : quietChannelRun && settleQuietChannelTurn(snapshot, turnId));
@@ -3632,11 +3631,10 @@ function answeredRequestTurn(
   deliveries: readonly DeliveryContext[],
   snapshot: ConversationSnapshot,
   turnId: string,
-  followsUpOwnAnswer: FollowsUpOwnAnswer,
 ): boolean {
   return (
     deliveries.length > 0 &&
-    deliveries.every(({ delivery }) => teammateRequest(delivery, followsUpOwnAnswer)) &&
+    deliveries.every(({ delivery }) => teammateRequest(delivery)) &&
     writesNoAnswer(snapshot, turnId)
   );
 }

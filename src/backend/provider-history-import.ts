@@ -368,7 +368,7 @@ function routineTurnAnswers(
               )) ||
               (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)) ||
               continuesQuietRun);
-          requestsOnly &&= delivery !== undefined && teammateRequest(delivery, followsUpOwnAnswer);
+          requestsOnly &&= delivery !== undefined && teammateRequest(delivery);
           if (delivery?.status === "completed" && delivery.error !== null) failureReported = true;
         }
         if (item.type === "agentMessage" && typeof item.text === "string" && item.text && item.phase !== "commentary") {

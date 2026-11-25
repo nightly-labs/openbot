@@ -1164,7 +1164,7 @@ export class MailboxStore {
       delivery.sender.kind === "agent" &&
       delivery.sender.agentId !== agentId &&
       channelId === undefined &&
-      (delivery.replyToMessageId === null || this.followsUpOwnAnswer(delivery)) &&
+      delivery.replyToMessageId === null &&
       this.expectsReply(delivery.messageId) &&
       !this.hasReplyFrom(agentId, delivery.messageId)
         ? [delivery.messageId]
@@ -2407,7 +2407,7 @@ export class MailboxStore {
   }
 
   followsUpOwnAnswer(delivery: QueueDelivery): boolean {
-    if (delivery.sender.kind !== "agent" || !delivery.replyToMessageId) return false;
+    if (delivery.sender.kind !== "agent" || !delivery.replyToMessageId || delivery.expectsReply !== false) return false;
     const replied = this.#state.messages.find((message) => message.id === delivery.replyToMessageId);
     return replied !== undefined && isAnswer(replied) && replied.sender.agentId === delivery.recipientAgentId;
   }
