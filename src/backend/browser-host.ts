@@ -1225,6 +1225,10 @@ export class BrowserHost {
     tabId: string,
   ): Effect.fn.Return<void, BrowserOperationError> {
     yield* this.#leaveSilentPage(tabId);
+    yield* this.#reloadPage(tabId);
+  }).bind(this);
+
+  readonly #reloadPage = Effect.fn("BrowserHost.reloadPage")(function* (this: BrowserHost, tabId: string) {
     yield* this.#enqueue(
       tabId,
       (tab) =>
@@ -1239,7 +1243,7 @@ export class BrowserHost {
         }),
       true,
     );
-  }).bind(this);
+  });
 
   readonly importSignIn = Effect.fn("BrowserHost.importSignIn")(function* (
     this: BrowserHost,
@@ -2508,7 +2512,7 @@ export class BrowserHost {
     if (onCursor) tab.contents.on("cursor-changed", cursorChanged);
     reportDialog();
     return yield* Effect.gen({ self: this }, function* () {
-      stopStream = yield* openStream(generation);
+      stopStream = yield* this.#startViewStream(tabId, () => openStream(generation));
       const stopOnce = () =>
         Effect.gen({ self: this }, function* () {
           tab.viewInvalidations.delete(invalidate);
@@ -4729,16 +4733,30 @@ export class BrowserHost {
     return { title: tab.engine.scrubText(title), url: tab.engine.scrubText(url) };
   }
 
+  readonly #startViewStream = Effect.fn("BrowserHost.startViewStream")(function* <A>(
+    this: BrowserHost,
+    tabId: string,
+    open: () => Effect.Effect<A, BrowserOperationError>,
+  ) {
+    const start = yield* Effect.forkChild(open(), { startImmediately: true });
+    const started = yield* Fiber.join(start).pipe(Effect.timeoutOption(VIEW_START_CHECK_MS));
+    if (Option.isSome(started)) return started.value;
+    if (!(yield* this.#leaveSilentPage(tabId))) return yield* Fiber.join(start);
+    yield* Fiber.interrupt(start);
+    yield* this.#reloadPage(tabId).pipe(Effect.ignore);
+    return yield* open();
+  });
+
   readonly #leaveSilentPage = Effect.fn("BrowserHost.leaveSilentPage")(function* (
     this: BrowserHost,
     tabId: string,
     direction?: BrowserNavigationDirection | "reload",
   ) {
     const tab = this.#tabs.get(tabId);
-    if (!tab || tab.closing || tab.secret || tab.pendingRestore || tab.contents.isDestroyed()) return;
-    if (direction === "back" && !hasHistoryEntry(tab.contents, -1)) return;
-    if (direction === "forward" && !hasHistoryEntry(tab.contents, 1)) return;
-    if (yield* tab.engine.pageAnswers().pipe(Effect.orElseSucceed(() => true))) return;
+    if (!tab || tab.closing || tab.secret || tab.pendingRestore || tab.contents.isDestroyed()) return false;
+    if (direction === "back" && !hasHistoryEntry(tab.contents, -1)) return false;
+    if (direction === "forward" && !hasHistoryEntry(tab.contents, 1)) return false;
+    if (yield* tab.engine.pageAnswers().pipe(Effect.orElseSucceed(() => true))) return false;
     logger.warn("Ending the renderer of a browser tab whose page does not answer before it navigates");
     const contents = tab.contents;
     yield* Effect.callback<void>((resume) => {
@@ -4757,6 +4775,7 @@ export class BrowserHost {
         }),
       ),
     );
+    return true;
   });
 
   readonly #enqueue = Effect.fn("BrowserHost.enqueue")(function* <T>(
@@ -4977,6 +4996,8 @@ function showsCurrentPage(tab: BrowserHostTab, page: BrowserPreviewPage): boolea
 const CRASH_RELOAD_TIMEOUT_MS = 30_000;
 
 const SILENT_PAGE_EXIT_WAIT_MS = 5_000;
+
+const VIEW_START_CHECK_MS = 3_000;
 
 const reloadCrashedPage = Effect.fn("BrowserHost.reloadCrashedPage")(function* (tab: BrowserHostTab) {
   const url = currentTabUrl(tab);
