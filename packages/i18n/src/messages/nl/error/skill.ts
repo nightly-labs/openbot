@@ -44,7 +44,8 @@ export const messages = {
   "error.skill.publishUntracked":
     "{name} is geïnstalleerd vóór het bijhouden van exacte versies. Werk de vaardigheid bij of herstel haar voordat je publiceert.",
   "error.skill.tooManySkills": "Een agent kan maximaal {limit} vaardigheden hebben.",
-  "error.skill.unmanagedExists": "Er bestaat al een niet-beheerde vaardigheid op {path}.",
+  "error.skill.ownSkillExists":
+    "Deze agent heeft al een eigen vaardigheid met de naam {slug}. Vraag de agent om die vaardigheid te hernoemen of te verwijderen en voeg deze vaardigheid daarna opnieuw toe.",
   "error.skill.managedSlug":
     "OpenBot geeft elke agent een eigen vaardigheid {slug}. Geef deze vaardigheid een andere naam.",
   "error.skill.templateMarkdownTooLarge":
