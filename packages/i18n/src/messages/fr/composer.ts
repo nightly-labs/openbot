@@ -115,6 +115,9 @@ export const messages = {
   "composer.voice.limitSoon": "L’enregistrement s’arrête dans {seconds} secondes.",
   "composer.voice.limitReached":
     "L’enregistrement s’est arrêté à la limite de 10 minutes. Ce que vous avez dit est dans le message.",
+  "composer.voice.languageNotice":
+    "La dictée connaît 25 langues européennes, comme l’anglais. Les autres langues demandent un modèle plus grand ({size}), et le texte s’affiche après l’arrêt.",
+  "composer.voice.languageNotice.action": "Je parle une autre langue",
   "composer.send.saveQueued": "Enregistrer le message en attente",
   "composer.send.voice": "Envoyer le message vocal",
   "composer.send.message": "Envoyer le message",

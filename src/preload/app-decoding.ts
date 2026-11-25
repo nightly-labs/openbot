@@ -141,6 +141,7 @@ import {
   type VoiceServerProbe,
   type VoiceServerSettings,
   type VoiceSettings,
+  type VoiceSettingsState,
   type VoiceStream,
   type VoiceStreamTranscript,
   type VoiceTranscriptionResult,
@@ -605,6 +606,10 @@ export function decodeVoiceSettings(value: unknown): VoiceSettings {
   const { modelId, language } = decodeRecord(value, "voice settings");
   if (!isVoiceModelId(modelId) || !isVoiceLanguage(language)) throw new Error("Invalid voice settings.");
   return { modelId, language };
+}
+
+export function decodeVoiceSettingsState(value: unknown): VoiceSettingsState {
+  return { ...decodeVoiceSettings(value), saved: requiredBoolean(decodeRecord(value, "voice settings"), "saved") };
 }
 
 export function decodeVoiceTranscriptionResult(value: unknown): VoiceTranscriptionResult {

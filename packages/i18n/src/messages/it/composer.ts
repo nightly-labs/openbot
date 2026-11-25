@@ -112,6 +112,9 @@ export const messages = {
   "composer.voice.limitSoon": "La registrazione si ferma tra {seconds} secondi.",
   "composer.voice.limitReached":
     "La registrazione si è fermata al limite di 10 minuti. Quello che hai detto è nel messaggio.",
+  "composer.voice.languageNotice":
+    "La dettatura conosce 25 lingue europee, come l’inglese. Le altre lingue richiedono un modello più grande ({size}) e il testo appare dopo lo stop.",
+  "composer.voice.languageNotice.action": "Parlo un’altra lingua",
   "composer.send.saveQueued": "Salva messaggio in coda",
   "composer.send.voice": "Invia messaggio vocale",
   "composer.send.message": "Invia messaggio",
