@@ -783,6 +783,15 @@ right after the computer wakes, also the second list lacks new models (#16212). 
 OpenBot restart never moves an agent. A model that is really gone moves at the next provider start,
 for example after the idle release.
 
+The same partial list is the session's model list right after a start. Before a turn, `applyConfig`
+fails a model that the session does not list (#11964), so a queued message failed with "does not
+offer" although OpenCode offered the model a moment later (#15963). OpenCode reloads its catalog when
+it gets a model that it does not list, and refuses a model that is still missing with -32602 and
+`data.modelId` (OpenCode 1.19 and 2). The OpenCode flavor sets `modelNotOffered` to match that
+error, so OpenBot sends the model and lets OpenCode decide. Only that refusal fails the turn with
+`ProviderModelNotOfferedError`. Other ACP agents keep the check before the send, because Antigravity
+kept its own model and gave no error for a model that it did not list (#11797).
+
 The CLI reports no Go quota over ACP. `readOpenCodeGoUsage` (`src/backend/opencode-usage.ts`)
 sends `opencode.ai/zen/go/v1/usage` the key the CLI uses. A saved key is the only key: the CLI
 applies config `options.apiKey` last. With no saved key, it reads the CLI's own keys in the order

@@ -646,6 +646,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       processWideModel: options.flavor.processWideModel === true,
       setsConfigOnlyOnChange: options.flavor.setsConfigOnlyOnChange === true,
       modelSetUnsaved: options.flavor.modelSetUnsaved,
+      modelNotOffered: options.flavor.modelNotOffered,
       modelConfigId: options.flavor.modelConfigId,
       configSetUnsaved: options.flavor.configSetUnsaved,
       configConflict: options.flavor.configConflict,

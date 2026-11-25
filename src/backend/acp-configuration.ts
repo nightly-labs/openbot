@@ -64,6 +64,7 @@ export interface AcpConfigurationOptions {
   processWideModel?: boolean;
   setsConfigOnlyOnChange?: boolean;
   modelSetUnsaved?: ((error: RequestError) => boolean) | undefined;
+  modelNotOffered?: ((error: RequestError) => boolean) | undefined;
   modelConfigId?: string | undefined;
   configSetUnsaved?: ((error: RequestError) => boolean) | undefined;
   configConflict?: ((error: unknown) => boolean) | undefined;
@@ -382,25 +383,18 @@ export class AcpConfiguration {
       const values = selectValues(option);
       const wanted = category === "thought_level" ? effortWireValue(values, value) : value;
       const listed = values.some((candidate) => candidate.value === wanted);
-      const selected = listed ? wanted : unlisted && option.id === "model" ? value : undefined;
-      if (!selected) {
-        if (
-          category === "model" &&
-          requireModel &&
-          !values.some(
-            (candidate) =>
-              value.startsWith(`${candidate.value}-`) && isReasoningEffort(value.slice(candidate.value.length + 1)),
-          )
-        ) {
-          logger.warn("An agent session does not offer the model of the turn.", {
-            provider: this.options.provider,
-            model: value,
-          });
-          const name = models.find((candidate) => candidate.id === value)?.name ?? value;
-          return yield* providerFailure(new ProviderModelNotOfferedError(this.options.label(), name));
-        }
-        continue;
-      }
+      const offered = listed ? wanted : unlisted && option.id === "model" ? value : undefined;
+      const notListed =
+        !offered &&
+        category === "model" &&
+        requireModel &&
+        !values.some(
+          (candidate) =>
+            value.startsWith(`${candidate.value}-`) && isReasoningEffort(value.slice(candidate.value.length + 1)),
+        );
+      if (notListed && !this.options.modelNotOffered) return yield* this.#modelNotOffered(value, models);
+      const selected = offered ?? (notListed ? value : undefined);
+      if (!selected) continue;
       if (
         this.options.setsConfigOnlyOnChange &&
         listed &&
@@ -440,6 +434,12 @@ export class AcpConfiguration {
           configId: option.id,
           value: selected,
         }),
+      ).pipe(
+        Effect.catch((failure) =>
+          notListed && failure.cause instanceof RequestError && this.options.modelNotOffered?.(failure.cause)
+            ? this.#modelNotOffered(value, models)
+            : Effect.fail(failure),
+        ),
       );
       const response = processWide
         ? yield* request.pipe(
@@ -496,6 +496,17 @@ export class AcpConfiguration {
     thread.configOptions = response.configOptions;
     return this.sessionSettings(thread.configOptions);
   });
+
+  #modelNotOffered(model: string, models: readonly AcpModel[]): Effect.Effect<never, ProviderClientOperationError> {
+    return Effect.suspend(() => {
+      logger.warn("An agent session does not offer the model of the turn.", {
+        provider: this.options.provider,
+        model,
+      });
+      const name = models.find((candidate) => candidate.id === model)?.name ?? model;
+      return Effect.fail(providerFailure(new ProviderModelNotOfferedError(this.options.label(), name)));
+    });
+  }
 
   #setModel(thread: AcpConfigurationState, value: string): Effect.Effect<void, ProviderClientOperationError> {
     this.#processModel = null;
