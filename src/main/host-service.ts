@@ -135,6 +135,7 @@ interface MemberAuditActor {
 type ForwardedApiOptions = ConstructorParameters<typeof TeamApiServer>[0];
 
 interface HostServiceOptions {
+  onMemberUse?: ForwardedApiOptions["onMemberUse"];
   channels?: ChannelService;
   mcpServers?: ForwardedApiOptions["mcpServers"];
   mcpServerOwners?: ForwardedApiOptions["mcpServerOwners"];
@@ -476,6 +477,7 @@ export class HostService extends EventEmitter<HostEvents> {
           })
         : undefined;
     this.#api = new TeamApiServer({
+      ...(options.onMemberUse === undefined ? {} : { onMemberUse: options.onMemberUse }),
       appVersion: options.appVersion,
       store: options.store,
       agents: options.agents,

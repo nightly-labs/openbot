@@ -567,6 +567,7 @@ import { RoutineResultError } from "../src/backend/routine-results/routine-resul
 import type { OwnedRoutineRecord } from "../src/backend/routine-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
 import { resolveSharedFile as resolveSharedFileOnDisk } from "../src/backend/workspace-paths";
+import { HostAccountActivity } from "../src/main/account-activity-reporter";
 import type { AgentAccessState } from "../src/main/agent-access-store";
 import { createAgentDefaultsPreferenceStore } from "../src/main/agent-defaults-preference-store";
 import { createAgentDefaultsSettings } from "../src/main/agent-defaults-settings";
@@ -777,6 +778,7 @@ const calls: RecordedCall[] = [];
 const logged: string[] = [];
 const uploads: AttachmentDataInput[] = [];
 let clock = Date.now();
+let reportMemberUse: (memberId: string) => void = () => undefined;
 const routineResultOptions: RoutineResultConnectionOption[] = [
   {
     connectionId: "slack-acme",
@@ -2784,6 +2786,7 @@ try {
   });
   server = new TeamApiServer({
     appVersion: APP_VERSION,
+    onMemberUse: (memberId) => reportMemberUse(memberId),
     agentImport,
     libraryFolders,
     store,
@@ -3509,6 +3512,51 @@ try {
     { redeemedServerIds, serverId },
   );
   assert.ok(typeof bobToken === "string" && typeof bobId === "string", "bob did not join.");
+
+  {
+    const sends: string[][] = [];
+    const activity = new HostAccountActivity({
+      analyticsOn: true,
+      resolveOwner: () => null,
+      memberAccountId: (memberId) => store.getMemberAccountId(memberId),
+      send: (accounts) => Effect.sync(() => sends.push([...accounts])),
+    });
+    reportMemberUse = (memberId) => activity.memberUsed(memberId);
+    const bobAccount = store.getMemberAccountId(bobId);
+    await call("GET", TEAM_API_ROUTES.me, { token: bobToken });
+    await activity.idle();
+    const afterRead = sends.length;
+    await call("POST", TEAM_API_ROUTES.team.invites, { token: bobToken, json: { role: "member" } });
+    await call("POST", TEAM_API_ROUTES.team.invites, { token: bobToken, json: { role: "member" } });
+    await call("PUT", TEAM_API_ROUTES.me, { token: adaToken, json: {} });
+    await activity.idle();
+    check(
+      "a member's client use reports the member's account once a day, and a read or a member with no account reports nothing",
+      bobAccount !== null && afterRead === 0 && isDeepStrictEqual(sends, [[bobAccount]]),
+      { afterRead, sends, bobAccount },
+    );
+
+    const offSends: string[][] = [];
+    const offActivity = new HostAccountActivity({
+      analyticsOn: false,
+      resolveOwner: () => null,
+      memberAccountId: (memberId) => store.getMemberAccountId(memberId),
+      send: (accounts) => Effect.sync(() => offSends.push([...accounts])),
+    });
+    reportMemberUse = (memberId) => offActivity.memberUsed(memberId);
+    await call("POST", TEAM_API_ROUTES.team.invites, { token: bobToken, json: { role: "member" } });
+    await offActivity.idle();
+    const whileOff = offSends.length;
+    offActivity.setAnalyticsOn(true);
+    await call("POST", TEAM_API_ROUTES.team.invites, { token: bobToken, json: { role: "member" } });
+    await offActivity.idle();
+    check(
+      "a host with analytics off reports no member, and reports again when analytics is turned on",
+      whileOff === 0 && isDeepStrictEqual(offSends, [[bobAccount]]),
+      { whileOff, offSends },
+    );
+    reportMemberUse = () => undefined;
+  }
 
   const seatInvite = await runCauseEffect(store.createInvite("member"));
   const fourth = await call("POST", TEAM_API_ROUTES.join.server, {
