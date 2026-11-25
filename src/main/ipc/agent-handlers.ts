@@ -15,6 +15,7 @@ import {
   decodeChannel,
   decodeChannelPage,
   decodeChannelSummaries,
+  decodeCreditsAskMuted,
   decodeSaveAgentProfileResult,
   decodeSaveSkillSuggestionResult,
   hostAnalyticsQuery,
@@ -24,10 +25,14 @@ import {
   parseAskSideQuestion,
   parseChannelCommand,
   parseChannelRead,
+  parseCreditsAskMutedInput,
   parseGenerateAgentProfile,
   parseHostAnalyticsInput,
   parseLocalBrowserSecretResponse,
+  parseReadMediaApprovalInput,
   parseResetAgentSessionSetting,
+  parseRespondToCreditsHoldInput,
+  parseRespondToMediaApprovalInput,
   parseSaveAgentProfile,
   parseSaveSkillSuggestion,
   parseSetAgentHiddenInput,
@@ -39,6 +44,7 @@ import {
   type SidebarLayoutAction,
   type SidebarLayoutSnapshot,
   withFastServiceTiers,
+  withKeptModels,
   withModelListings,
   withSteeringModels,
   withUsageCredits,
@@ -51,6 +57,10 @@ import {
   AGENT_ACTIVE_QUEUES_ROUTES,
   decodeAgentActiveQueues,
 } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
+import {
+  AGENT_ARCHIVED_THREADS_CAPABILITY,
+  AGENT_ARCHIVED_THREADS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-archived-threads-v1";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "@openbot/contracts/team-protocol/agent-create-operation-v1";
 import {
@@ -140,6 +150,12 @@ import {
   FEEDBACK_WITHDRAW_CAPABILITY,
   FEEDBACK_WITHDRAW_ROUTES,
 } from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
+import {
+  decodeCreditsHoldResponse,
+  decodeMediaApprovalReadResponse,
+  MEDIA_APPROVAL_CHOICE_CAPABILITY,
+  MEDIA_APPROVAL_CHOICE_ROUTES,
+} from "@openbot/contracts/team-protocol/media-approval-choice-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
   decodeMessagePinsResponse,
@@ -147,6 +163,10 @@ import {
   MESSAGE_PINS_ROUTES,
 } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
+import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -192,6 +212,7 @@ import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
 import type { NotificationChat } from "../desktop-notifications";
 import type { HostService } from "../host-service";
 import type { LibraryFoldersService } from "../library-folders-service";
+import type { CreditAsksControl } from "../media-approval-credits-preference-store";
 import { runMessageDelete } from "../message-delete-refusal";
 import { type MessageLinkRelay, openMessageLink } from "../message-link-relay";
 import { runMessagePin } from "../message-pin-refusal";
@@ -213,6 +234,7 @@ import {
   decodeRemoteAgentThreadBranches,
   decodeRemoteAgentThreadQueues,
   decodeRemoteAgentThreadRequests,
+  decodeRemoteArchivedAgentTasks,
   decodeRemoteTaskConversation,
   decodeRemoteTaskPage,
   decodeRemoteTaskReadState,
@@ -243,6 +265,7 @@ import {
   parseDeleteChannelMessage,
   parseDeleteConversationMessage,
   parseInterrupt,
+  parseListArchivedAgentTasks,
   parseMarkAgentTaskRead,
   parseMarkConversationRead,
   parseMarkConversationUnread,
@@ -333,6 +356,7 @@ export interface AgentIpcDependencies {
   openExternal: (url: string) => Promise<void>;
   modelVisibility: Pick<ModelVisibility, "picker">;
   closeChatNotifications: (serverId: string, chat: NotificationChat) => void;
+  creditAsks: Pick<CreditAsksControl, "setMuted" | "mutedFor">;
 }
 
 export function agentIpcHandlers({
@@ -347,6 +371,7 @@ export function agentIpcHandlers({
   openExternal,
   modelVisibility,
   closeChatNotifications,
+  creditAsks,
 }: AgentIpcDependencies): Pick<IpcGroupHandlers, "agent"> {
   const remoteTaskRequest = <T>(serverId: string, path: string, decoder: ResponseDecoder<T>, body: RemoteTaskBody) => {
     if (!remoteServers.supportsCapability(serverId, AGENT_TASKS_CAPABILITY)) taskRemoteUnsupported();
@@ -523,11 +548,23 @@ export function agentIpcHandlers({
                     })
                     .pipe(Effect.orElseSucceed(() => []))
                 : Effect.succeed([]);
-              const [options, fastModels, listed, steered] = yield* Effect.all([models, fast, listings, steering], {
-                concurrency: "unbounded",
-              });
+              const kept = remoteServers.supportsCapability(serverId, MODEL_VISIBILITY_KEPT_CAPABILITY)
+                ? remoteServers
+                    .request(serverId, MODEL_VISIBILITY_KEPT_ROUTES.list, decodeAgentSteeringModels, {
+                      method: "POST",
+                      body: {},
+                    })
+                    .pipe(Effect.orElseSucceed(() => []))
+                : Effect.succeed([]);
+              const [options, fastModels, listed, steered, keptModels] = yield* Effect.all(
+                [models, fast, listings, steering, kept],
+                { concurrency: "unbounded" },
+              );
               return withWorkspaceOnlyLimit(
-                withSteeringModels(withModelListings(withFastServiceTiers(options, fastModels), listed), steered),
+                withSteeringModels(
+                  withKeptModels(withModelListings(withFastServiceTiers(options, fastModels), listed), keptModels),
+                  steered,
+                ),
                 remoteServers.supportsCapability(serverId, WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
               );
             }),
@@ -878,7 +915,7 @@ export function agentIpcHandlers({
           if (input.quickAcknowledgement !== undefined) {
             throw new Error(sourceText("error.agent.quickAcknowledgementLocalOnly"));
           }
-          if (input.fastMode !== undefined || input.ultrafast !== undefined) {
+          if (input.fastMode !== undefined || input.ultrafast !== undefined || input.memory !== undefined) {
             throw new Error(sourceText("error.agent.settingsLocalOnly"));
           }
           if (input.busyMessageMode !== undefined) {
@@ -1309,6 +1346,18 @@ export function agentIpcHandlers({
         remote: (parsed, serverId) =>
           remoteTaskRequest(serverId, AGENT_TASKS_ROUTES.read, decodeRemoteTaskConversation, agentTaskBody(parsed)),
       }),
+      listArchivedTasks: scopedHandler(parseListArchivedAgentTasks, {
+        local: (input) => service.listArchivedTasks(input),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_ARCHIVED_THREADS_CAPABILITY)) taskRemoteUnsupported();
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_ARCHIVED_THREADS_ROUTES.list, decodeRemoteArchivedAgentTasks, {
+              method: "POST",
+              body: { agentId: input.agentId, before: input.before },
+            }),
+          );
+        },
+      }),
       readTaskPage: scopedHandler(parseReadAgentTaskPage, {
         local: (parsed) => service.readTaskPage(parsed),
         remote: (parsed, serverId) => {
@@ -1561,7 +1610,10 @@ export function agentIpcHandlers({
           remoteCompact(serverId, CONTEXT_COMPACT_ROUTES.compactTask, { agentId, taskId }),
       }),
       respondToPrompt: scopedHandler(parsePromptResponse, {
-        local: (parsed) => runCauseEffect(service.respondToPrompt(parsed)),
+        local: (parsed) => {
+          const sender = host.conversationSender();
+          return runCauseEffect(service.respondToPrompt(parsed, { ...(sender ? { sender } : {}), privileged: true }));
+        },
         remote: (parsed, serverId) =>
           runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.respond.prompt, decodeVoid, {
@@ -1591,6 +1643,74 @@ export function agentIpcHandlers({
             remoteServers.request(serverId, PENDING_APPROVAL_ROUTES.read, decodePendingApprovalResponse, {
               method: "POST",
               body: { ...parsed },
+            }),
+          );
+        },
+      }),
+      readMediaApproval: scopedHandler(parseReadMediaApprovalInput, {
+        local: ({ agentId, requestId }) => ({
+          media: service.pendingMediaApproval(agentId, requestId) ?? null,
+          hold: service.pendingCreditsHold(agentId, requestId, true) ?? null,
+        }),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CHOICE_CAPABILITY))
+            return { media: null, hold: null };
+          return runCauseEffect(
+            remoteServers.request(serverId, MEDIA_APPROVAL_CHOICE_ROUTES.read, decodeMediaApprovalReadResponse, {
+              method: "POST",
+              body: { ...parsed },
+            }),
+          );
+        },
+      }),
+      respondToMediaApproval: scopedHandler(parseRespondToMediaApprovalInput, {
+        local: (parsed) => runCauseEffect(service.respondToMediaApproval(parsed)),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CHOICE_CAPABILITY))
+            throw new Error(sourceText("error.team.mediaApprovalChoiceUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, MEDIA_APPROVAL_CHOICE_ROUTES.respond, decodeVoid, {
+              method: "POST",
+              body: { ...parsed },
+            }),
+          );
+        },
+      }),
+      respondToCreditsHold: scopedHandler(parseRespondToCreditsHoldInput, {
+        local: (parsed) => runCauseEffect(service.respondToCreditsHold(parsed)),
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CHOICE_CAPABILITY))
+            throw new Error(sourceText("error.team.mediaApprovalChoiceUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, MEDIA_APPROVAL_CHOICE_ROUTES.hold, decodeCreditsHoldResponse, {
+              method: "POST",
+              body: { ...parsed },
+            }),
+          );
+        },
+      }),
+      setCreditsAskMuted: scopedHandler(parseCreditsAskMutedInput, {
+        local: ({ muted }) => runCauseEffect(creditAsks.setMuted(null, muted)),
+        remote: ({ muted }, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CHOICE_CAPABILITY))
+            throw new Error(sourceText("error.team.mediaApprovalChoiceUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, MEDIA_APPROVAL_CHOICE_ROUTES.muted, decodeVoid, {
+              method: "POST",
+              body: { muted },
+            }),
+          );
+        },
+      }),
+      readCreditsAskMuted: scopedQueryHandler({
+        local: () => ({ muted: creditAsks.mutedFor(null) }),
+        remote: (serverId) => {
+          if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CHOICE_CAPABILITY))
+            throw new Error(sourceText("error.team.mediaApprovalChoiceUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, MEDIA_APPROVAL_CHOICE_ROUTES.mutedRead, decodeCreditsAskMuted, {
+              method: "POST",
+              body: {},
             }),
           );
         },

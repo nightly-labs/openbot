@@ -18,7 +18,7 @@ export const messages = {
   "mobile.onboarding.server.invitationBody": "انضم إلى خادم شاركه شخص معك.",
   "mobile.onboarding.server.computerTitle": "اربط حاسوبك",
   "mobile.onboarding.server.computerSteps":
-    "سجّل الخروج على هذا الهاتف. ثم افتح OpenBot على حاسوبك، وانتقل إلى الإعدادات → Mobile Connect، واختر إنشاء رمز QR وامسحه بهذا الهاتف.",
+    "سجّل الخروج على هذا الهاتف. ثم افتح OpenBot على حاسوبك، وانتقل إلى الإعدادات → Mobile Connect، واختر «إضافة هاتف» → «نعم، تسجيل الدخول»، وامسح الرمز بهذا الهاتف.",
   "mobile.onboarding.server.signOut": "تسجيل الخروج",
   "mobile.onboarding.server.connecting": "جارٍ الاتصال بـ {name}…",
   "mobile.onboarding.agent.title": "اختر وكيلك الأول",

@@ -50,6 +50,7 @@ export const messages = {
     other: "Du kannst höchstens {count} Ordner hinzufügen",
   },
   "agentSettings.folders.browse.places": "Gehe zu",
+  "agentSettings.folders.browse.path": "Ordnerpfad",
   "agentSettings.folders.browse.home": "Benutzerordner",
   "agentSettings.folders.browse.parent": "Nach oben: {folder}",
   "agentSettings.folders.browse.failed": "Dieser Ordner kann nicht geöffnet werden.",
@@ -96,6 +97,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Nutzungslimit erreicht · übersprungen",
   "agentSettings.backupModels.unavailable": "Gerade nicht verfügbar · übersprungen",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Stoppt ein Nutzungslimit {name} nach Beginn der Arbeit, setzt {name} dieselbe Arbeit mit dem ersten verfügbaren Modell der Reihenfolge fort. Wenn das Limit endet oder 10 Minuten nach einem Anbieterfehler, kehrt {name} zu {model} zurück.",
   "agentSettings.groups.brain": "Gehirn",
@@ -180,6 +182,8 @@ export const messages = {
     "Der Agent beginnt neu und kann diesen Chat bei Bedarf noch durchsuchen. Die Nachrichten bleiben über einer Trennlinie sichtbar. Anweisungen, Modell, Werkzeuge, Erinnerungen, Arbeitsbereich und Browser bleiben unverändert.",
   "agentSettings.newChat.confirm": "Neuen Chat starten",
   "agentSettings.newChat.failed": "Ein neuer Chat konnte nicht gestartet werden.",
+  "agentSettings.newChat.busy":
+    "Der Agent arbeitet gerade. Warte, bis er fertig ist, oder stoppe ihn, um einen neuen Chat zu starten.",
   "agentSettings.deleteHistory.title": "Verlauf löschen",
   "agentSettings.deleteHistory.description":
     "Die Nachrichten dieses Chats werden gelöscht, und der Agent vergisst sie. Seine Einrichtung bleibt.",
@@ -189,6 +193,10 @@ export const messages = {
     "Alle Nachrichten und Dateien dieses Chats werden aus OpenBot gelöscht, und der Agent vergisst sie. Das lässt sich nicht rückgängig machen. Nebenthreads, Anweisungen, Modell, Tools, Erinnerungen, Arbeitsbereich und Browser ändern sich nicht.",
   "agentSettings.deleteHistory.confirm": "Verlauf löschen",
   "agentSettings.deleteHistory.failed": "Der Verlauf konnte nicht gelöscht werden.",
+  "agentSettings.deleteAgent.title": "Agenten löschen",
+  "agentSettings.deleteAgent.description":
+    "Der Agent, sein Chat, seine Erinnerungen, Routinen und sein Arbeitsbereich werden aus OpenBot entfernt.",
+  "agentSettings.deleteAgent.button": "Löschen",
   "agentSettings.fullAccess.title": "Diesem Agenten vollen Zugriff geben?",
   "agentSettings.fullAccess.askTitle": "Diesen Agenten außerhalb seines Arbeitsbereichs arbeiten lassen?",
   "agentSettings.fullAccess.description":
@@ -238,6 +246,9 @@ export const messages = {
     "Der Agent darf einen neuen Chat starten, wenn sein Chat lang wird. Er speichert vorher Notizen.",
   "agentSettings.quickAcknowledgement.title": "Plan vor langen Aufgaben zeigen",
   "agentSettings.quickAcknowledgement.description": "Vor einer langen Aufgabe zeigt der Agent seinen Plan.",
+  "agentSettings.builtinMemory.title": "OpenBot-Erinnerungen",
+  "agentSettings.builtinMemory.description":
+    "Der Agent speichert und liest eigene Erinnerungen. Schalte dies aus, um nur eine Gedächtnis-App wie Mem0 zu nutzen. Gespeicherte Erinnerungen bleiben.",
   "agentSettings.browserProfile.label": "Browser-Profil",
   "agentSettings.browserProfile.shared": "Gemeinsam",
   "agentSettings.browserProfile.agent": "Nur dieser Agent",

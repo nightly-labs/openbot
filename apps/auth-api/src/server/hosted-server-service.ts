@@ -8,6 +8,7 @@ import {
   type BillingPlanId,
   isOpenBillingStatus,
   memberLimitForPlan,
+  storageTierGb,
   storageTierOf,
 } from "@openbot/contracts/billing";
 import {
@@ -26,7 +27,6 @@ import {
   type HostedServerState,
   type HostedServerStatus,
   type HostedServerSummary,
-  hostedServerStorageGb,
   parseHostedServerName,
 } from "@openbot/contracts/hosted-servers";
 import { parseLicenseOrder } from "@openbot/contracts/license";
@@ -1291,6 +1291,12 @@ export class HostedServerService {
     );
     if (restored?.meta.changes !== 1) return yield* invalidPoolToken();
     console.info("Hosted server restored from its archive.", { serverId });
+    yield* this.#alertPool(
+      [
+        `♻️ **Restored** · ${row.plan} server · ${row.server_id.slice(0, 8)} · machine ${hostId}`,
+        ...(row.start_requested_at === null ? [] : [elapsedText(now - row.start_requested_at)]),
+      ].join(" · "),
+    );
     yield* this.#recordReady(row, now);
     return { state: "restored" };
   });
@@ -3093,6 +3099,11 @@ export class HostedServerService {
   });
 }
 
+function elapsedText(milliseconds: number): string {
+  const seconds = Math.max(0, Math.round(milliseconds / 1000));
+  return seconds < 120 ? `${seconds} s` : `${Math.round(seconds / 60)} min`;
+}
+
 function isRestoring(row: HostedServerRow): boolean {
   return (
     row.archived === 1 &&
@@ -3121,12 +3132,7 @@ function summary(row: HostedServerRow): HostedServerSummary {
     error: row.observed_error,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
-    storageGb: hostedServerStorageGb(
-      row.plan,
-      row.operator_host !== null,
-      row.provider_template === null ? null : (row.pending_size ?? row.size),
-      storageTierOf(row.storage_tier),
-    ),
+    storageGb: storageTierGb(row.plan, storageTierOf(row.storage_tier)),
     ...(restoring ? { restoring: true } : {}),
     ...(keptUntil === null ? {} : { dataKeptUntil: keptUntil }),
   };
@@ -3166,7 +3172,7 @@ function hostedPoolClaim(secret: string, serverId: string, hostId: string) {
 }
 
 function poolLocations(currency: BillingCurrency): readonly [string, ...string[]] {
-  return currency === "usd" || currency === "brl" ? ["WDC-02", "AMS-01"] : ["AMS-01"];
+  return currency === "usd" || currency === "brl" ? ["WDC-02", "AMS-01", "FRA-01"] : ["AMS-01", "FRA-01"];
 }
 
 function sandboxName(plan: BillingPlanId, email: string, serverId: string): string {

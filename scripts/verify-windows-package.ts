@@ -37,6 +37,7 @@ const voiceRuntimeFiles = [
 ];
 const voiceHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-transcription-host.js");
 const speechHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-speech-host.js");
+const processLauncherHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/process-launcher-host.js");
 
 await Promise.all([
   access(executablePath),
@@ -56,6 +57,7 @@ await Promise.all([
   ...voiceRuntimeFiles.map((name) => access(resolve(voiceRuntimePath, name))),
   access(voiceHostPath),
   access(speechHostPath),
+  access(processLauncherHostPath),
   access(resolve(resourcesPath, "remote-desktop-runtime/licenses/Sunshine-GPL-3.0.txt")),
   access(resolve(resourcesPath, "remote-desktop-runtime/licenses/moonlight-web-stream-GPL-3.0.txt")),
   access(resolve(resourcesPath, "remote-desktop-runtime/source-manifest.json")),

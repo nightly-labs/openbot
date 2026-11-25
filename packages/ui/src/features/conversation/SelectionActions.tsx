@@ -17,6 +17,7 @@ const FILE_TEXT_SELECTOR = "[data-selection-file-quote]";
 const SCOPE_SELECTOR = "[data-selection-scope]";
 const INTERACTIVE_SELECTOR =
   'a, button, input, textarea, select, [contenteditable="true"], [role="button"], .message-citation';
+const SELECTABLE_INLINE_SELECTOR = ".message-file-reference, .message-link";
 const HIGHLIGHT_NAME = "openbot-message-selection";
 const VIEWPORT_MARGIN = 12;
 const TOOLBAR_GAP = 8;
@@ -661,6 +662,7 @@ function lineBreaks(value: string): number {
 
 function rangeIntersectsInteractiveContent(range: Range, root: HTMLElement): boolean {
   return Array.from(root.querySelectorAll(INTERACTIVE_SELECTOR)).some((element) => {
+    if (element.matches(SELECTABLE_INLINE_SELECTOR)) return false;
     try {
       return range.intersectsNode(element);
     } catch {

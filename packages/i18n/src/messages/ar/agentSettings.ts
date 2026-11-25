@@ -65,6 +65,7 @@ export const messages = {
     other: "يمكنك إضافة {count} مجلد على الأكثر",
   },
   "agentSettings.folders.browse.places": "انتقال إلى",
+  "agentSettings.folders.browse.path": "مسار المجلد",
   "agentSettings.folders.browse.home": "المجلد الرئيسي",
   "agentSettings.folders.browse.parent": "صعودًا إلى {folder}",
   "agentSettings.folders.browse.failed": "تعذّر فتح هذا المجلد.",
@@ -126,6 +127,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "بلغ حد الاستخدام · تم التخطي",
   "agentSettings.backupModels.unavailable": "غير متاح الآن · تم التخطي",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "عندما يوقف حدّ الاستخدام {name} بعد أن يبدأ العمل، يتابع {name} العمل نفسه على أول نموذج متاح في الترتيب. ويعود إلى {model} عند انتهاء الحد، أو بعد 10 دقائق من خطأ المزوّد.",
   "agentSettings.groups.brain": "العقل",
@@ -212,6 +214,7 @@ export const messages = {
     "يبدأ الوكيل من جديد، ويمكنه البحث في هذه الدردشة عند الحاجة. تبقى الرسائل ظاهرة فوق فاصل. ولا تتغير التعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
   "agentSettings.newChat.confirm": "بدء دردشة جديدة",
   "agentSettings.newChat.failed": "تعذّر بدء دردشة جديدة.",
+  "agentSettings.newChat.busy": "الوكيل يعمل الآن. لبدء دردشة جديدة، انتظر حتى ينتهي أو أوقفه.",
   "agentSettings.deleteHistory.title": "حذف السجل",
   "agentSettings.deleteHistory.description": "تُحذف رسائل هذه الدردشة وينساها الوكيل. يبقى إعداده كما هو.",
   "agentSettings.deleteHistory.button": "حذف",
@@ -220,6 +223,10 @@ export const messages = {
     "تُحذف كل رسائل هذه الدردشة وملفاتها من OpenBot وينساها الوكيل. لا يمكن التراجع عن ذلك. لا تتغير المحادثات الجانبية والتعليمات والنموذج والأدوات والذكريات ومساحة العمل والمتصفح.",
   "agentSettings.deleteHistory.confirm": "حذف السجل",
   "agentSettings.deleteHistory.failed": "تعذّر حذف السجل.",
+  "agentSettings.deleteAgent.title": "حذف الوكيل",
+  "agentSettings.deleteAgent.description":
+    "يُحذف الوكيل ومحادثته وذكرياته ومهامه الدورية ومساحة العمل الخاصة به من OpenBot.",
+  "agentSettings.deleteAgent.button": "حذف",
 
   "agentSettings.fullAccess.title": "هل تريد منح هذا الوكيل وصولًا كاملًا؟",
   "agentSettings.fullAccess.askTitle": "هل تسمح لهذا الوكيل بالعمل خارج مساحة عمله؟",
@@ -285,6 +292,9 @@ export const messages = {
   "agentSettings.agentNewChat.description": "السماح للوكيل ببدء دردشة جديدة عندما تطول دردشته. يحفظ ملاحظات أولًا.",
   "agentSettings.quickAcknowledgement.title": "عرض الخطة قبل المهام الطويلة",
   "agentSettings.quickAcknowledgement.description": "قبل مهمة طويلة، يعرض الوكيل خطته.",
+  "agentSettings.builtinMemory.title": "ذاكرة OpenBot",
+  "agentSettings.builtinMemory.description":
+    "يحفظ الوكيل ذكرياته ويقرؤها. أوقفها لاستخدام تطبيق ذاكرة فقط، مثل Mem0. تبقى الذكريات المحفوظة.",
   "agentSettings.browserProfile.label": "ملف تعريف المتصفح",
   "agentSettings.browserProfile.shared": "مشترك",
   "agentSettings.browserProfile.agent": "هذا الوكيل فقط",

@@ -22,6 +22,7 @@ import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
 import { setBrowserProfileToolSchema } from "./agent/browser-profile-tool";
 import { createChannelToolSchema, listChannelsToolSchema, updateChannelToolSchema } from "./agent/channel-agent-tools";
 import { setCommitCoAuthorToolSchema } from "./agent/commit-co-author-tool";
+import { CREDIT_MEDIA_TOOL_DEFINITIONS } from "./agent/credit-media-tools";
 import { CRM_TOOL_DEFINITIONS } from "./agent/crm-tool";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
 import { deleteAgentToolSchema } from "./agent/delete-agent-tool";
@@ -82,7 +83,7 @@ import {
   webhookEventTypeZodSchema,
   webhookFiltersZodSchema,
 } from "./routine-tool-schema";
-import { WORKFLOW_TOOL_DEFINITIONS } from "./workflows/workflow-tools";
+import { WORKFLOW_ANSWER_TOOL_DEFINITION, WORKFLOW_TOOL_DEFINITIONS } from "./workflows/workflow-tools";
 
 interface OpenBotToolDefinition {
   name: string;
@@ -241,6 +242,10 @@ export const requestApiKeyToolSchema = z.strictObject({
 
 export const removeApiKeyToolSchema = z.strictObject({ name: apiKeyNameSchema });
 
+export const requestLocationToolSchema = z.strictObject({
+  reason: uiTextSchema(UI_BLOCK_LIMITS.title).describe("Why you need it, in the user's language."),
+});
+
 export const saveApiKeyToolSchema = z.strictObject({
   name: apiKeyNameSchema,
   key: z.string().trim().min(1).max(VAULT_API_KEY_LIMIT).describe("The value, as you got it."),
@@ -284,7 +289,9 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...LOCAL_SKILL_TOOL_DEFINITIONS,
   ...ROUTINE_FLOW_TOOL_DEFINITIONS,
   ...WORKFLOW_TOOL_DEFINITIONS,
+  WORKFLOW_ANSWER_TOOL_DEFINITION,
   ...CRM_TOOL_DEFINITIONS,
+  ...CREDIT_MEDIA_TOOL_DEFINITIONS,
   ...MCP_SERVER_TOOL_DEFINITIONS,
   {
     name: "list_sites",
@@ -332,7 +339,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_library_folders",
     description:
-      "List your Library folders by path, with the id, name and stored path of each file in them, and your files in no folder. Pass folder to list one folder and the folders in it. Change folders and move files with organize_library.",
+      "List your Library folders by path, with the id, name and stored path of each file in them, your files in no folder, and workflow files. Pass folder to list one folder. Change folders and move files with organize_library.",
     shape: listLibraryFoldersToolSchema.shape,
   },
   {
@@ -609,7 +616,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: ROUTINE_NO_UPDATE_TOOL,
     description:
-      "Only when nothing is for the user: a scheduled, script or webhook routine run with nothing to report, or a teammate's update that wants no answer. OpenBot collapses your text answers in the chat and sends no notification. A requested reminder or message is a report, unless the task's notification conditions say to send nothing. A manual Test run shows your answer.",
+      "Only when nothing is for the user: a scheduled, script or webhook routine run with nothing to report, or a teammate's update that wants no answer. Write no text before or with it; OpenBot sends no notification. A requested reminder or message is a report, unless the task's notification conditions say to send nothing. A manual Test run shows your answer.",
     shape: {},
   },
   {
@@ -697,6 +704,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
               )
               .max(INPUT_LIMITS.promptOptions)
               .optional(),
+            multiSelect: z.boolean().optional(),
           }),
         )
         .min(1)
@@ -737,6 +745,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
       "Call list_api_keys first: do not ask again for a saved key. A new answer replaces the saved key. Only the server owner or an admin can answer. Not in an external chat.",
     ].join(" "),
     shape: requestApiKeyToolSchema.shape,
+  },
+  {
+    name: "request_location",
+    description:
+      'Ask the user for their current location when the request needs where they are, such as places near them or local weather. This computer\'s location is not theirs. Result: "shared" with latitude, longitude, accuracyMeters and capturedAt, or with a typed place; "declined"; or "expired". Not in a channel or an external chat.',
+    shape: requestLocationToolSchema.shape,
   },
   {
     name: "list_api_keys",

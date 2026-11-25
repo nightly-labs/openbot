@@ -1,12 +1,12 @@
 import { isBoundedString } from "./ipc-bounded-values";
-import { isBoolean, isDynamicRecord, isOneOf } from "./runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 export const VOICE_AUDIO_LIMITS = {
   sampleRate: 16_000,
   channels: 1,
   bitsPerSample: 16,
-  maximumSeconds: 120,
-  maximumWavBytes: 3_840_044,
+  maximumSeconds: 600,
+  maximumWavBytes: 19_200_044,
   maximumRecordingBytes: 1_048_576,
 } as const;
 
@@ -326,6 +326,51 @@ export function isGroqVoiceModelId(value: unknown): value is GroqVoiceModelId {
   return isOneOf(GROQ_VOICE_MODEL_IDS, value);
 }
 
+export const HOST_VOICE_MODEL_ACTIONS = ["select", "download", "cancel", "remove"] as const;
+export type HostVoiceModelAction = (typeof HOST_VOICE_MODEL_ACTIONS)[number];
+
+export interface HostVoiceModelChange {
+  action: HostVoiceModelAction;
+  modelId: LocalVoiceModelId;
+}
+
+export interface HostVoiceModel {
+  modelId: VoiceModelId | null;
+  models: VoiceModelStatus[];
+}
+
+const VOICE_MODEL_PHASES = ["missing", "downloading", "ready", "error"] as const;
+
+export function parseHostVoiceModelChange(value: unknown): HostVoiceModelChange {
+  if (
+    !isDynamicRecord(value) ||
+    !isOneOf(HOST_VOICE_MODEL_ACTIONS, value.action) ||
+    !isLocalVoiceModelId(value.modelId)
+  )
+    throw new Error("Invalid server voice model change.");
+  return { action: value.action, modelId: value.modelId };
+}
+
+function hostVoiceModelStatus(value: unknown): VoiceModelStatus | null {
+  if (!isDynamicRecord(value)) throw new Error("Invalid server voice model.");
+  const { modelId, phase, progress, message } = value;
+  if (
+    !isOneOf(VOICE_MODEL_PHASES, phase) ||
+    (progress !== null && !isNumber(progress)) ||
+    (message !== null && !isString(message))
+  )
+    throw new Error("Invalid server voice model.");
+  return isVoiceModelId(modelId) ? { modelId, phase, progress, message } : null;
+}
+
+export function decodeHostVoiceModel(value: unknown): HostVoiceModel {
+  if (!isDynamicRecord(value) || !Array.isArray(value.models)) throw new Error("Invalid server voice model.");
+  return {
+    modelId: isVoiceModelId(value.modelId) ? value.modelId : null,
+    models: value.models.map(hostVoiceModelStatus).filter((status) => status !== null),
+  };
+}
+
 export function isDictationKeyProvider(value: unknown): value is DictationKeyProvider {
   return isOneOf(DICTATION_KEY_PROVIDERS, value);
 }
@@ -545,7 +590,7 @@ export const SPEECH_LIMITS = {
 
 export interface SpeechInput {
   text: string;
-  language: SpeechLanguage;
+  language: SpeechLanguage | null;
 }
 
 export interface SpeechAudio {

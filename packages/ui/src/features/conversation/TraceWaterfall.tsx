@@ -51,6 +51,7 @@ export interface TraceSpan {
   start: number;
   end: number | null;
   tokens?: number;
+  cachedInput?: number;
   costUsd?: number;
 }
 
@@ -178,7 +179,7 @@ function spanEnd(span: TraceSpan, now: number): number {
 }
 
 function unfinished(span: TraceSpan): TraceSpan {
-  const { failed: _failed, tokens: _tokens, costUsd: _costUsd, ...open } = span;
+  const { failed: _failed, tokens: _tokens, cachedInput: _cachedInput, costUsd: _costUsd, ...open } = span;
   return { ...open, end: null };
 }
 
@@ -392,18 +393,20 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
     const children = tree();
     let cost: number | null = null;
     let tokens: number | null = null;
+    let cachedInput: number | null = null;
     let modelCalls = 0;
     let toolCalls = 0;
     let errors = 0;
     for (const span of view().spans) {
       if (span.costUsd !== undefined) cost = (cost ?? 0) + span.costUsd;
       if (span.tokens !== undefined) tokens = (tokens ?? 0) + span.tokens;
+      if (span.cachedInput !== undefined) cachedInput = (cachedInput ?? 0) + span.cachedInput;
       if (span.failed) errors += 1;
       if (children.has(span.id)) continue;
       if (span.kind === "model") modelCalls += 1;
       else if (span.kind === "tool" || span.kind === "handoff") toolCalls += 1;
     }
-    return { cost, tokens, modelCalls, toolCalls, errors };
+    return { cost, tokens, cachedInput, modelCalls, toolCalls, errors };
   });
 
   const subtreeCost = createMemo(() => {
@@ -706,8 +709,11 @@ export function TraceWaterfall(props: TraceWaterfallProps) {
         <Show when={totals().cost}>
           {(cost) => <TraceTotal label={t("chat.trace.cost")} value={cost()} format={formatShownCost} />}
         </Show>
-        <Show when={totals().tokens}>
-          {(tokens) => <TraceTotal label={t("chat.trace.tokens")} value={tokens()} format={format.compact} />}
+        <Show when={totals().tokens || totals().cachedInput}>
+          <TraceTotal label={t("chat.trace.tokens")} value={totals().tokens ?? 0} format={format.compact} />
+        </Show>
+        <Show when={totals().cachedInput}>
+          {(cached) => <TraceTotal label={t("chat.trace.cachedInput")} value={cached()} format={format.compact} />}
         </Show>
         <TraceTotal label={t("chat.trace.llmCalls")} value={totals().modelCalls} format={format.number} />
         <TraceTotal label={t("chat.trace.toolCalls")} value={totals().toolCalls} format={format.number} />

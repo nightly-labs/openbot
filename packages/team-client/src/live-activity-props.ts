@@ -1,4 +1,5 @@
 import type {
+  AvatarColor,
   AvatarHue,
   DynamicIslandAction,
   DynamicIslandAgentIdentity,
@@ -71,7 +72,7 @@ export type LiveActivityMood = "working" | "responded" | "failed" | "idle" | "wa
 
 export interface LiveActivityViewInput {
   t: MobileTranslate;
-  agentColor(seed: string, hue: AvatarHue | null): string;
+  agentColor(agent: DynamicIslandAgentIdentity): string;
   avatar(serverId: string, agent: DynamicIslandAgentIdentity, mood: LiveActivityMood): string;
   unreadAgents: readonly LiveActivityUnreadAgent[];
   actionKey: Uint8Array;
@@ -184,7 +185,7 @@ function liveActivityContent(
         mode: "working",
         label: t("mobile.liveActivity.badge.working"),
         symbol: "sparkles",
-        tint: first ? agentColor(first.agent.avatarSeed, first.agent.avatarHue) : "#8E8E93",
+        tint: first ? agentColor(first.agent) : "#8E8E93",
         title: first ? limit(first.agent.name, TITLE_LIMIT) : t("mobile.liveActivity.appName"),
         detail: first ? agentText(first.task, DETAIL_LEAD, DETAIL_LIMIT) : "",
         compact:
@@ -192,11 +193,7 @@ function liveActivityContent(
             ? String(presentation.working.length)
             : t("mobile.liveActivity.badge.working"),
         compactTint:
-          presentation.working.length > 1
-            ? SEVERAL_AGENTS_TINT
-            : first
-              ? agentColor(first.agent.avatarSeed, first.agent.avatarHue)
-              : "#8E8E93",
+          presentation.working.length > 1 ? SEVERAL_AGENTS_TINT : first ? agentColor(first.agent) : "#8E8E93",
         footer: "",
         detailLines: 2,
         detailMarkdown: true,
@@ -212,7 +209,7 @@ function liveActivityContent(
         title: limit(presentation.message.agent.name, TITLE_LIMIT),
         detail: agentText(presentation.message.text, DETAIL_LEAD, DETAIL_LIMIT),
         compact: String(presentation.unreadCount),
-        compactTint: agentColor(presentation.message.agent.avatarSeed, presentation.message.agent.avatarHue),
+        compactTint: agentColor(presentation.message.agent),
         footer: t("mobile.liveActivity.unread", { count: presentation.unreadCount }),
         detailLines: 2,
         detailMarkdown: true,
@@ -232,7 +229,7 @@ function liveActivityContent(
           DETAIL_LIMIT,
         ),
         compact: limit(presentation.item.agent.name, ROW_NAME_LIMIT),
-        compactTint: agentColor(presentation.item.agent.avatarSeed, presentation.item.agent.avatarHue),
+        compactTint: agentColor(presentation.item.agent),
         footer: remaining(presentation.remainingCount, t),
         detailLines: 2,
         detailMarkdown: true,
@@ -254,7 +251,7 @@ function liveActivityContent(
               DETAIL_LIMIT,
             ),
         compact: limit(presentation.item.agent.name, ROW_NAME_LIMIT),
-        compactTint: agentColor(presentation.item.agent.avatarSeed, presentation.item.agent.avatarHue),
+        compactTint: agentColor(presentation.item.agent),
         footer: remaining(presentation.remainingCount, t),
         detailLines: command ? 4 : 2,
         detailMarkdown: !command,
@@ -274,7 +271,7 @@ function liveActivityContent(
           DETAIL_LIMIT,
         ),
         compact: limit(presentation.item.agent.name, ROW_NAME_LIMIT),
-        compactTint: agentColor(presentation.item.agent.avatarSeed, presentation.item.agent.avatarHue),
+        compactTint: agentColor(presentation.item.agent),
         footer: "",
         detailLines: 2,
         detailMarkdown: true,
@@ -425,8 +422,22 @@ export function liveActivityAgent(presentation: DynamicIslandPresentation): Dyna
   }
 }
 
-export function liveActivityBloubFile(seed: string, hue: AvatarHue | null, mood: LiveActivityMood): string {
-  return `avatar-${liveActivityFileName(["bloub", seed, String(hue ?? ""), mood])}.png`;
+export function liveActivityBloubName(
+  seed: string,
+  hue: AvatarHue | null,
+  mood: LiveActivityMood,
+  color: AvatarColor | null = null,
+): string {
+  return liveActivityFileName(["bloub", seed, String(hue ?? ""), mood, ...(color ? [color] : [])]);
+}
+
+export function liveActivityBloubFile(
+  seed: string,
+  hue: AvatarHue | null,
+  mood: LiveActivityMood,
+  color: AvatarColor | null = null,
+): string {
+  return `avatar-${liveActivityBloubName(seed, hue, mood, color)}.png`;
 }
 
 export function liveActivityFileName(parts: readonly string[]): string {

@@ -5,8 +5,12 @@ export const messages = {
   "error.attachment.notFound": "Der Anhang wurde nicht gefunden.",
   "error.attachment.fileTooLarge": "Eine Datei überschreitet die Grenze von 100 MB.",
   "error.attachment.namedFileTooLarge": "{name} ist größer als die Grenze von 100 MB.",
+  "error.attachment.emptyFile":
+    "{name} ist leer oder OpenBot kann die Datei nicht lesen. Speichere die Datei erneut und hänge sie dann erneut an.",
   "error.attachment.totalTooLarge": "Die Anhänge überschreiten die Gesamtgrenze von 250 MB.",
   "error.attachment.unavailable": "Diese Datei ist nicht mehr verfügbar.",
+  "error.attachment.noApp":
+    "Keine App auf diesem Computer hat diese Datei geöffnet. Lade sie herunter und öffne sie dann im Dateimanager.",
   "error.attachment.tooMany": "Wähle höchstens {limit} Dateien.",
   "error.attachment.mediaUnsupported":
     "Dieser Server unterstützt keine MP3- oder MOV-Anhänge. Aktualisiere OpenBot auf dem Host und versuche es erneut.",

@@ -66,6 +66,8 @@ export const messages = {
   "files.library.agents": "エージェント",
   "files.library.allAgents": { other: "全 {count} エージェント" },
   "files.library.folders": "フォルダ",
+  "files.library.workflows": "ワークフロー",
+  "files.library.workflowsOf": "{name} のワークフロー",
   "files.library.favorite": "{name} をお気に入りにする",
   "files.folder.new": "新規フォルダ",
   "files.folder.name": "フォルダ名",
@@ -192,6 +194,8 @@ export const messages = {
   "files.conversation.title": "ファイル",
   "files.conversation.summary": "{files} · チャット {size}",
   "files.conversation.close": "ファイルを閉じる",
+  "files.conversation.workspace": "ワークスペースフォルダー",
+  "files.conversation.workspaces": "ワークスペースフォルダー",
   "files.conversation.emptyTitle": "このチャットにファイルはありません",
   "files.conversation.emptyDescription": "添付したファイルとエージェントが作成したファイルがここに表示されます。",
 } as const satisfies PartialTranslation<typeof source>;

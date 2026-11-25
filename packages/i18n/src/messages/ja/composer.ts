@@ -7,6 +7,10 @@ export const messages = {
   "composer.feedbackFix.body":
     "レポート #{number} を修正しています。リクエストを送信するか、キャンセルしてレポートをそのままにします。",
   "composer.feedbackFix.cancel": "キャンセル",
+  "composer.browserTab.opened": "{name} がブラウザーで {title} を開きました。",
+  "composer.browserTab.openedMany": { other: "{name} がブラウザーで {count} ページを開きました。" },
+  "composer.browserTab.open": "ページを開く",
+  "composer.browserTab.hide": "非表示",
   "composer.providerWait.offlineTitle": "インターネットに接続されていません",
   "composer.providerWait.offline": "このコンピューターがオンラインに戻るまで、{provider} は返信できません。",
   "composer.providerWait.silent": "{provider} からの更新が {duration} ありません。",
@@ -66,6 +70,7 @@ export const messages = {
   "composer.voice.stop": "音声の録音を停止",
   "composer.voice.cancel": "音声の録音をキャンセル",
   "composer.voice.preparing": "音声モデルをダウンロードしています",
+  "composer.voice.starting": "音声録音を開始しています",
   "composer.voice.requesting": "マイクへのアクセスを要求しています",
   "composer.voice.transcribing": "音声プロンプトを文字起こししています",
   "composer.voice.start": "音声でプロンプトを作成",
@@ -103,7 +108,7 @@ export const messages = {
   "composer.voice.progress": "音声モデルをダウンロード中 {progress}%",
   "composer.voice.recording": "音声の録音",
   "composer.voice.limitSoon": "あと {seconds} 秒で録音が止まります。",
-  "composer.voice.limitReached": "2 分の上限に達したため録音を停止しました。話した内容はメッセージに入っています。",
+  "composer.voice.limitReached": "10 分の上限に達したため録音を停止しました。話した内容はメッセージに入っています。",
   "composer.voice.languageNotice":
     "音声入力が認識できるのは英語など 25 のヨーロッパ言語です。ほかの言語には大きなモデル（{size}）が必要で、テキストは停止後に表示されます。",
   "composer.voice.languageNotice.action": "別の言語を話す",

@@ -104,6 +104,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "{name} giriş sayfasını açın.",
   "mobile.marketplace.app.stepAllow": "Giriş yapın ve erişime izin verin.",
   "mobile.marketplace.app.stepReturn": "Buraya dönün. {name} sunucunuzda bağlanır.",
+  "mobile.marketplace.app.stepBlank": "Son sayfa yüklenmez. Bu doğrudur.",
+  "mobile.marketplace.app.stepCopy": "Adres çubuğuna dokunun ve adresin tamamını kopyalayın.",
+  "mobile.marketplace.app.stepPaste": "OpenBot'a dönün ve adresi aşağıya yapıştırın.",
   "mobile.marketplace.app.openSignIn": "Giriş sayfasını aç",
   "mobile.marketplace.app.keySecure": "Anahtar yalnızca sunucunuza, şifreli bir bağlantıyla gider.",
   "mobile.marketplace.app.connecting": "Bağlanıyor",
@@ -121,8 +124,6 @@ export const messages = {
     "Bu uygulama tarayıcıda oturum açmayı gerektirir. Sunucudaki OpenBot'u güncelleyin veya uygulamayı bilgisayarda bağlayın.",
   "mobile.marketplace.app.waiting": "Oturum açma sayfası bekleniyor…",
   "mobile.marketplace.app.openAgain": "Oturum açma sayfasını yeniden aç",
-  "mobile.marketplace.app.pasteHint":
-    "Sonunda sayfa, yüklenmeyen bir adres açar. Bu adresi kopyalayıp aşağıya yapıştırın.",
   "mobile.marketplace.app.pasteLabel": "Oturum açma sonrası adres",
   "mobile.marketplace.app.pasteInvalid": "Bu adres, bu oturum açma işleminin sonu değil.",
   "mobile.marketplace.app.finishSignIn": "Oturum açmayı bitir",

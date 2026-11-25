@@ -96,6 +96,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "מתחיל את ההתחברות ל-{name} ב-{host}…",
   "provider.codeLogin.pageOpening": "פותח את דף ההתחברות של {name} ב-{host}…",
   "provider.codeLogin.linkStep": "יש להתחבר ל-{name}. OpenBot ממשיך בעצמו.",
+  "provider.codeLogin.thisComputerDescription": "יש לפתוח את הקישור בדפדפן במחשב הזה. OpenBot ממתין כאן.",
+  "provider.codeLogin.copyLink": "העתקת קישור",
   "provider.codeLogin.chatgptDeviceSetting":
     "ב-ChatGPT במחשב, יש לפתוח את הגדרות האבטחה ולהפעיל התחברות עם קוד התקן עבור Codex. בחשבון עבודה, מנהל סביבת העבודה מפעיל אותה.",
   "provider.useApp.title": "חיבור {name} באפליקציית OpenBot",
@@ -122,7 +124,8 @@ export const messages = {
     "המודלים האלה לא עובדים עם „סביבת עבודה בלבד” ב-Windows וב-Linux. כדי להשתמש בהם, שנו את „הרשאות” בהגדרות הסוכן.",
   "provider.picker.olderModels": "מודלים ישנים",
   "provider.picker.olderModelsList": "מודלים ישנים של {name}",
-  "provider.picker.noModels": "אין מודלים זמינים מ-{name}.",
+  "provider.picker.noModels":
+    "לא מוצגים כאן מודלים של {name}. אם הם כבויים, מנהל יכול להפעיל אותם בהגדרות השרת ← ספקים ← {name} ← מודלים.",
   "provider.picker.endpointModelsInCustom":
     "{name} מפעיל את נקודות הקצה המותאמות שלך. המודלים שלהן נמצאים בכרטיסייה מותאם אישית.",
   "provider.picker.showCustomModels": "הצגת מודלים",
@@ -143,6 +146,7 @@ export const messages = {
   "provider.picker.effort": "מאמץ",
   "provider.picker.effortLabel": "מאמץ החשיבה של הסוכן",
   "provider.picker.effortFixed": "{effort}, נקבע על ידי {provider}",
+  "provider.picker.effortLimited": "ההגדרות של Claude או הארגון שלך מגבילים את המאמץ ל־{effort}.",
   "provider.picker.fast": "מהיר",
   "provider.picker.fastText": "תשובות מהירות יותר, שימוש מוגבר",
   "provider.picker.speed": "מהירות",
@@ -230,6 +234,7 @@ export const messages = {
   "provider.account.apiKey": "מפתח API",
   "provider.account.listLabel": "חשבונות {name}",
   "provider.account.usedBy": "בשימוש של {agents}",
+  "provider.account.sameEmail": "אותו אימייל כמו {name}",
   "provider.account.failed": "ההתחברות נכשלה",
   "provider.account.moreActions": "פעולות נוספות עבור {name}",
   "provider.account.renameLabel": "השם של {name}",
@@ -316,6 +321,7 @@ export const messages = {
   "provider.settings.codexKeyInUse":
     "ChatGPT משתמש במפתח הזה, ולא בתוכנית ChatGPT שלך. OpenAI מחייבת כל בקשה במפתח. השימוש בתוכנית לא מוצג.",
   "provider.settings.codexKeyAlternative": "או להתחבר עם מפתח OpenAI API. OpenAI מחייבת כל בקשה במפתח.",
+  "provider.settings.museKeyInUse": "Muse משתמש במפתח הזה, לא בהתחברות שלך. כדי להשתמש בהתחברות, יש להסיר את המפתח.",
   "provider.settings.addKey": "הוספת מפתח",
   "provider.settings.changeKey": "החלפת מפתח",
   "provider.settings.runtime": "סביבת ריצה",
@@ -334,10 +340,14 @@ export const messages = {
   "provider.settings.diagnostics": "אבחון",
   "provider.settings.cache": "מטמון",
   "provider.settings.promptCache": "מטמון הנחיות",
-  "provider.settings.promptCacheDescription": "כמה זמן Claude שומר במטמון את ההקשר של סוכן בין תורות.",
+  "provider.settings.promptCacheDescription": "כמה זמן Claude ו-Pi שומרים את ההקשר של סוכן במטמון בין תורות.",
   "provider.settings.promptCacheHour": "שעה",
-  "provider.settings.promptCacheDefault": "ברירת המחדל של Claude Code",
+  "provider.settings.promptCacheDefault": "ברירת המחדל של הספק",
   "provider.settings.promptCacheLoadFailed": "לא ניתן לטעון את זמן מטמון ההנחיות של השרת הזה.",
+  "provider.settings.cacheExpiryCompaction": "לכווץ לפני שהמטמון פג",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "כשצ׳אט עם הקשר של 200K טוקנים או יותר לא פעיל עם מטמון של שעה, הסוכן מכווץ את ההקשר לפני שהמטמון פג. כך ההודעה הבאה לא קוראת שוב את כל ההקשר בלי מטמון.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "לא ניתן לטעון את הגדרת הכיווץ של השרת הזה.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "שימוש בהגדרות Claude Code שלי",
   "provider.settings.claudeUserSetupDescription":

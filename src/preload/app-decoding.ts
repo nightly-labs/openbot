@@ -2,6 +2,18 @@ import { isAgentTemplateId } from "@openbot/contracts/agent-template-links";
 import { type BillingState, parseBillingState } from "@openbot/contracts/billing";
 import { type BillingDetails, parseBillingDetails } from "@openbot/contracts/billing-details";
 import {
+  type CreditActivity,
+  type CreditRedeemResult,
+  type CreditsState,
+  parseCreditActivity,
+  parseCreditRedeemResult,
+  parseCreditsState,
+} from "@openbot/contracts/credits";
+import {
+  type CustomServerCheckoutResult,
+  parseCustomServerCheckoutResult,
+} from "@openbot/contracts/custom-server-plans";
+import {
   type HostedServerCatalog,
   type HostedServerList,
   type HostedServerSummary,
@@ -186,7 +198,10 @@ export function decodeAppInfo(value: unknown): AppInfo {
   if (softwareRendering !== undefined && !isBoolean(softwareRendering))
     throw new Error("Invalid software rendering flag.");
   if (hourCycle !== undefined && !isOneOf(["h12", "h23"] as const, hourCycle)) throw new Error("Invalid hour cycle.");
-  if (aboveAppsSupport !== undefined && !isOneOf(["restart", "unsupported"] as const, aboveAppsSupport))
+  if (
+    aboveAppsSupport !== undefined &&
+    !isOneOf(["restart", "unsupported", "no-compositor"] as const, aboveAppsSupport)
+  )
     throw new Error("Invalid agent dock screen support.");
   if (dynamicIslandUnavailable !== undefined && !isBoolean(dynamicIslandUnavailable))
     throw new Error("Invalid Dynamic Island availability.");
@@ -770,6 +785,24 @@ export function decodeReferralState(value: unknown): ReferralState {
   return state;
 }
 
+export function decodeCreditsState(value: unknown): CreditsState {
+  const state = parseCreditsState(value);
+  if (!state) throw new Error("Invalid credits state response.");
+  return state;
+}
+
+export function decodeCreditRedeemResult(value: unknown): CreditRedeemResult {
+  const result = parseCreditRedeemResult(value);
+  if (!result) throw new Error("Invalid credit redeem response.");
+  return result;
+}
+
+export function decodeCreditActivity(value: unknown): CreditActivity {
+  const activity = parseCreditActivity(value);
+  if (!activity) throw new Error("Invalid credit activity response.");
+  return activity;
+}
+
 export function decodeLicenseState(value: unknown): LicenseState {
   const state = parseLicenseState(value);
   if (!state) throw new Error("Invalid license state response.");
@@ -780,6 +813,12 @@ export function decodeHostedServer(value: unknown): HostedServerSummary {
   const server = parseHostedServerSummary(value);
   if (!server) throw new Error("Invalid hosted server response.");
   return server;
+}
+
+export function decodeCustomServerCheckoutResult(value: unknown): CustomServerCheckoutResult {
+  const result = parseCustomServerCheckoutResult(value);
+  if (!result) throw new Error("Invalid custom server checkout response.");
+  return result;
 }
 
 export function decodeServerClaim(value: unknown): ServerClaim {

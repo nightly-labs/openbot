@@ -405,6 +405,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Usuń {model}",
   "mobile.agent.backupModels.unavailable": "Chwilowo niedostępny · pominięto",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Gdy limit użycia zatrzyma agenta {name} po rozpoczęciu pracy, {name} kontynuuje tę samą pracę na pierwszym dostępnym modelu z kolejności. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
   "mobile.agent.busyMessage.label": "Podczas pracy",
@@ -434,6 +435,9 @@ export const messages = {
   "mobile.agent.planCard.label": "Pokaż plan przed długimi zadaniami",
   "mobile.agent.planCard.footer":
     "Przed długim zadaniem agent pokazuje swój plan. Zaczyna po 10 s lub po naciśnięciu Start.",
+  "mobile.agent.builtinMemory.label": "Pamięć OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "Agent zapisuje i czyta własne wspomnienia. Wyłącz, aby używać tylko aplikacji pamięci, takiej jak Mem0. Zapisane wspomnienia zostają.",
   "mobile.agent.workspace.title": "Folder obszaru roboczego",
   "mobile.agent.workspace.footer": "Folder tego agenta na komputerze hosta.",
   "mobile.agent.advanced.behavior": "Zachowanie",
@@ -562,6 +566,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Zbieranie rozpoczęto {started}. Zaktualizowano {updated}.",
   "mobile.agent.usage.never": "nigdy",
   "mobile.agent.record.time": "Godzina",
+  "mobile.agent.record.date": "Data",
   "mobile.agent.section.changeFailed": "Nie udało się zmienić folderu",
   "mobile.agent.section.tryAgain": "Spróbuj ponownie.",
   "mobile.agent.section.moveUp": "Przenieś w górę",
@@ -662,7 +667,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Nie udało się wczytać serwerów",
   "mobile.agent.home.serversFailedBody": "Sprawdź, czy aplikacja na komputer działa, i spróbuj ponownie.",
   "mobile.agent.home.noServers": "Brak dostępnych serwerów",
-  "mobile.agent.home.noServersBody": "Połącz ponownie aplikację na komputer lub dołącz do zdalnego serwera.",
+  "mobile.agent.home.noServersBody":
+    "Otwórz OpenBot na komputerze na tym koncie i włącz Opublikuj ten serwer w Ustawienia serwera → Członkowie. Możesz też dołączyć do zdalnego serwera.",
   "mobile.agent.home.chooseServer": "Wybierz serwer",
   "mobile.agent.home.openServers": "Otwórz serwery",
   "mobile.agent.home.noChatOpen": "Brak otwartego czatu",
@@ -753,6 +759,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Nie wykluczaj",
   "mobile.agent.folders.browseTitle": "Wybierz folder",
   "mobile.agent.folders.places": "Przejdź do",
+  "mobile.agent.folders.path": "Ścieżka folderu",
   "mobile.agent.folders.home": "Folder domowy",
   "mobile.agent.folders.parent": "W górę: {folder}",
   "mobile.agent.folders.browseFailed": "Nie można otworzyć tego folderu.",

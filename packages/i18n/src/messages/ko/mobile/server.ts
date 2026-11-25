@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "{name}에서 나가지 못했어요",
   "mobile.server.drawer.removeFailed": "{name}을(를) 삭제하지 못했어요",
   "mobile.server.drawer.deleteFailed": "{name}을(를) 삭제할 수 없습니다",
+  "mobile.server.drawer.hide": "서버 숨기기",
+  "mobile.server.drawer.show": "서버 표시",
+  "mobile.server.drawer.hiddenServers": "숨긴 서버",
+  "mobile.server.drawer.hideFailed": "{name}을(를) 숨길 수 없습니다",
+  "mobile.server.drawer.showFailed": "{name}을(를) 표시할 수 없습니다",
   "mobile.server.drawer.actionFailed": "OpenBot에서 이 작업을 완료하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.drawer.moveUp": "위로 이동",
   "mobile.server.drawer.moveDown": "아래로 이동",
@@ -99,13 +104,16 @@ export const messages = {
   "mobile.server.hosted.intro.description":
     "컴퓨터가 꺼져 있어도 클라우드 서버가 에이전트와 루틴을 실행해요. OpenBot이 설정하고 계속 실행 상태를 유지해요.",
   "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
-  "mobile.server.hosted.computer.title": "컴퓨터에서",
+  "mobile.server.hosted.steps.title": "컴퓨터에서 추가하세요",
+  "mobile.server.hosted.steps.open": "컴퓨터에서 OpenBot을 여세요.",
+  "mobile.server.hosted.steps.settings": "설정 → 호스팅 서버로 이동하세요.",
+  "mobile.server.hosted.steps.add": "서버 추가를 선택하고 요금제를 고르세요.",
+  "mobile.server.hosted.plansToggle": "요금제별 포함 항목",
   "mobile.server.hosted.computer.add": "클라우드 서버 추가",
   "mobile.server.hosted.computer.addHint": "OpenBot에서 설정 → 호스팅 서버를 열고 서버 추가를 선택하세요.",
   "mobile.server.hosted.computer.change": "요금제 변경",
   "mobile.server.hosted.computer.changeHint": "OpenBot에서 설정 → 결제를 여세요.",
   "mobile.server.hosted.yourServers": "내 서버",
-  "mobile.server.hosted.plans": "요금제",
   "mobile.server.hosted.currentPlan": "내 요금제",
   "mobile.server.hosted.soldOut": "품절",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
@@ -262,6 +270,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "모든 멤버의 계정 서비스에서 이 서버가 삭제돼요. 해당 컴퓨터의 파일과 채팅은 그대로 유지돼요. 다시 사용하려면 그 컴퓨터에서 서버를 등록하세요.",
   "mobile.server.settings.remove": "서버 삭제",
+  "mobile.server.settings.hide": "서버 숨기기",
+  "mobile.server.settings.show": "서버 표시",
   "mobile.server.settings.deleteTitle": "{name}을(를) 삭제할까요?",
   "mobile.server.settings.deleteBody":
     "OpenBot이 해당 컴퓨터에서 서버를 중지하고 에이전트, 채팅, 파일을 그 컴퓨터의 휴지통으로 옮깁니다. 서버는 모든 기기의 서버 목록에서 사라집니다.",
@@ -324,8 +334,10 @@ export const messages = {
   "mobile.server.route.invite": "사람 초대",
   "mobile.server.route.member": "멤버",
   "mobile.server.route.timezone": "시간대",
+  "mobile.server.route.signalHome": "Signal 서버",
   "mobile.server.route.personality": "에이전트 성격",
   "mobile.server.route.agents": "에이전트",
+  "mobile.server.route.voiceModel": "음성 인식",
   "mobile.server.settings.storage": "저장 공간",
   "mobile.server.route.storage": "저장 공간",
   "mobile.server.route.storageFiles": "모든 파일",
@@ -447,6 +459,39 @@ export const messages = {
   "mobile.server.settings.timezoneSaveFailed": "시간대를 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.timezoneUnavailable": "시간대를 변경하려면 소유자나 관리자로 이 서버에 연결하세요.",
   "mobile.server.settings.timezoneUnsupported": "여기에서 시간대를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.signalHomeAutomatic": "자동",
+  "mobile.server.settings.signalHomeNearest": "가장 가까운 Signal 서버",
+  "mobile.server.settings.signalHomeInUse": "사용 중: {name}",
+  "mobile.server.settings.signalHomeLoading": "Signal 서버를 측정하는 중…",
+  "mobile.server.settings.signalHomeSaveFailed": "Signal 서버를 변경하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.signalHomeUnavailable": "Signal 서버를 변경하려면 소유자나 관리자로 이 서버에 연결하세요.",
+  "mobile.server.settings.signalHomeUnsupported": "여기서 Signal 서버를 변경하려면 이 서버의 OpenBot을 업데이트하세요.",
+  "mobile.server.settings.signalHomeDescription":
+    "멤버는 이 Signal 서버를 통해 이 서버에 연결해요. 지연 시간이 짧은 Signal 서버일수록 연결이 빨라요.",
+  "mobile.server.settings.signalHomeFallback":
+    "{chosen}이(가) 응답하지 않아요. {chosen}이(가) 다시 응답할 때까지 서버는 {name}을(를) 사용해요.",
+  "mobile.server.settings.signalHomeMoving": "서버가 {name}(으)로 이동해요. 멤버는 몇 초 뒤에 다시 연결돼요.",
+  "mobile.server.settings.signalHomeLoadFailed": "Signal 서버를 불러오지 못했어요.",
+  "mobile.server.settings.signalHomeLatency": "{latency}ms",
+  "mobile.server.settings.signalHomeNoAnswer": "응답 없음",
+  "mobile.server.settings.signalHomePlaceHelsinki1": "헬싱키 1",
+  "mobile.server.settings.signalHomePlaceHelsinki2": "헬싱키 2",
+  "mobile.server.settings.signalHomePlaceSanJose": "산호세",
+  "mobile.server.settings.signalHomePlaceSydney": "시드니",
+  "mobile.server.settings.signalHomePlaceSingapore": "싱가포르",
+  "mobile.server.settings.voiceModelDescription":
+    "이 서버의 에이전트는 자막이 없는 동영상의 소리를 이 모델로 받아 적어요.",
+  "mobile.server.settings.voiceModelLoading": "음성 인식을 불러오는 중…",
+  "mobile.server.settings.voiceModelLoadFailed": "서버의 음성 인식 모델을 불러오지 못했어요.",
+  "mobile.server.settings.voiceModelSaveFailed": "음성 인식 모델을 변경하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "여기에서 음성 인식을 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.voiceModelReady": "준비됨",
+  "mobile.server.settings.voiceModelDownloading": "다운로드 중: {percent}",
+  "mobile.server.settings.voiceModelSize": "{size} 다운로드",
+  "mobile.server.settings.voiceModelDownload": "다운로드",
+  "mobile.server.settings.voiceModelCancel": "다운로드 중지",
+  "mobile.server.settings.voiceModelRemove": "제거",
   "mobile.server.settings.keySection": "서버 키",
   "mobile.server.settings.keyChanged": "마지막 변경",
   "mobile.server.settings.keyChange": "키 변경",
@@ -463,12 +508,37 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "서버 키를 변경하지 못했어요. 다시 시도하세요.",
   "mobile.server.settings.keyOwnerOnly": "서버 키는 소유자만 변경할 수 있어요.",
   "mobile.server.settings.keyUnsupported": "여기에서 키를 변경하려면 이 서버의 OpenBot을 업데이트하세요.",
+  "mobile.server.settings.turnLimit": "동시 실행 스레드",
+  "mobile.server.settings.turnLimitDescription":
+    "이 서버에서 동시에 실행할 수 있는 에이전트 스레드 수입니다. 스레드가 많을수록 메모리를 더 사용합니다.",
+  "mobile.server.settings.turnLimitAutomatic": "자동({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "자동(제한 없음)",
+  "mobile.server.settings.turnLimitUnlimited": "제한 없음",
+  "mobile.server.settings.turnLimitsLoadFailed": "이 서버의 스레드 제한을 불러올 수 없습니다.",
+  "mobile.server.settings.turnLimitsSaveFailed": "스레드 제한을 저장하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "여기에서 스레드 제한을 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.agentTaskLimit": "에이전트별 병렬 스레드",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "자체 제한이 없는 각 에이전트가 동시에 실행할 수 있는 스레드 수입니다.",
+  "mobile.server.settings.agentTaskLimitDefault": "기본값({count})",
   "mobile.server.settings.memoryLimit": "에이전트당 메모리 수",
   "mobile.server.settings.memoryLimitDescription": "이 서버의 각 에이전트가 보관할 수 있는 메모리 수예요.",
   "mobile.server.settings.memoryLimitLoadFailed": "이 서버의 메모리 한도를 불러오지 못했어요.",
   "mobile.server.settings.memoryLimitSaveFailed": "메모리 한도를 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.memoryLimitUnsupported":
     "여기에서 메모리 한도를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.mediaApprovalCredits": "다음 값을 넘으면 확인",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "크레딧",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed": "이 서버의 크레딧 승인 한도를 불러오지 못했어요.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed": "크레딧 승인 한도를 저장하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "여기에서 크레딧 승인 한도를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.mediaApprovalAgents": "에이전트의 크레딧 사용 허용",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed":
+    "에이전트의 크레딧 사용을 변경하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.mediaApprovalAsk": "크레딧이 필요할 때 묻기",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "크레딧 요청 설정을 변경하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.memoryReview": "메모리 검토",
   "mobile.server.settings.memoryReviewDescription":
     "이 서버의 에이전트가 채팅에서 오래 쓸 사실을 백그라운드에서 저장하는 빈도예요.",
@@ -858,7 +928,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "“나에게 메시지 보내기” 채팅과 허용한 사람들이 OpenBot에 연락할 수 있어요.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "허용한 사람들이 OpenBot에 연락할 수 있어요. 다른 사람은 나에게 알려 줄 코드를 받아요.",
+    "“나에게 메시지 보내기” 채팅과 허용한 사람들이 OpenBot에 연락할 수 있어요. 다른 사람은 나에게 알려 줄 코드를 받아요.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp이 연결된 기기에서 이 서버를 삭제했어요. 번호를 다시 연결해 주세요.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -872,7 +942,7 @@ export const messages = {
     "“나에게 메시지 보내기” 채팅과 허용한 사람들만 메시지를 보낼 수 있어요. 다른 사람에게는 답장하지 않아요. 끄면 OpenBot이 모르는 사람에게 코드를 답장해요.",
   "mobile.server.connectors.whatsapp.workingMessage": "“작업 중이에요…” 메시지",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "에이전트가 작업하는 동안 OpenBot이 보내고, 이후 답변으로 바꿔요. 이전 요청을 기다리는 요청에는 대기 메시지도 보내요. 답변만 보내려면 끄세요.",
+    "에이전트가 작업하는 동안 OpenBot이 보내고, 이후 답변으로 바꿔요. 이전 요청을 기다리는 요청에는 대기 메시지도 보내요. 개인 번호에서는 “나에게 메시지 보내기” 채팅에만 이 메시지를 보내요. 답변만 보내려면 끄세요.",
   "mobile.server.connectors.whatsapp.statusReactions": "상태 반응",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "메시지가 도착하면 OpenBot이 👀로, 답변이 준비되면 ✅로 반응해요. 반응을 보내지 않으려면 끄세요.",
@@ -933,6 +1003,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "번호 하나에 연락처와 그룹을 최대 {count}개까지 허용할 수 있어요.",
   "mobile.server.connectors.whatsapp.senderGroup": "그룹",
   "mobile.server.connectors.whatsapp.removeSender": "제거",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · 읽기 전용",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "읽기 전용으로 설정",
+  "mobile.server.connectors.whatsapp.allowWork": "작업 요청 허용",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "읽기 전용: 에이전트는 이 채팅을 읽을 수 있지만 OpenBot은 여기에 절대 쓰지 않습니다.",
   "mobile.server.connectors.whatsapp.addContact": "연락처 추가",
   "mobile.server.connectors.whatsapp.addGroup": "그룹 추가",
   "mobile.server.connectors.whatsapp.contactTitle": "연락처 추가",
@@ -1092,10 +1167,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "모델을 변경할 수 없습니다. 다시 시도하세요.",
   "mobile.server.providers.promptCache": "프롬프트 캐시",
   "mobile.server.providers.promptCacheHint":
-    "턴 사이에 Claude가 에이전트의 컨텍스트를 캐시에 보관하는 시간입니다. 변경 사항은 Claude가 다시 시작할 때 적용됩니다.",
-  "mobile.server.providers.promptCacheDefault": "Claude Code 기본값",
+    "턴 사이에 Claude와 Pi가 에이전트의 컨텍스트를 캐시에 보관하는 시간이에요. 변경 사항은 공급자가 다시 시작할 때 적용돼요.",
+  "mobile.server.providers.promptCacheDefault": "공급자 기본값",
   "mobile.server.providers.promptCacheHour": "1시간",
   "mobile.server.providers.promptCacheLoadFailed": "이 서버의 프롬프트 캐시 시간을 불러올 수 없습니다.",
+  "mobile.server.providers.cacheExpiryCompaction": "캐시가 만료되기 전에 압축",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "컨텍스트가 20만 토큰 이상인 채팅이 1시간 캐시로 유휴 상태이면, 에이전트가 캐시가 만료되기 전에 컨텍스트를 압축해요. 그러면 다음 메시지가 캐시 없이 전체 컨텍스트를 다시 읽지 않아요.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "이 서버의 압축 설정을 불러올 수 없어요.",
   "mobile.server.providers.compactWindow": "채팅 압축 크기",
   "mobile.server.providers.compactWindowHint":
     "채팅이 이 크기에 도달하면 Claude Code가 이전 턴을 요약해요. 낮으면 턴이 빠르고 저렴해요. 높으면 더 많은 세부 정보가 남아요. 창이 더 작은 모델은 자체 한도에서 압축해요.",
@@ -1150,6 +1229,7 @@ export const messages = {
     "ChatGPT는 ChatGPT 요금제가 아니라 이 키를 사용해요. OpenAI는 요청마다 키에 요금을 청구해요. 요금제 사용량은 표시되지 않아요.",
   "mobile.server.providers.codexKeyAlternative":
     "또는 OpenAI API 키로 로그인하세요. OpenAI는 요청마다 키에 요금을 청구해요.",
+  "mobile.server.providers.museKeyInUse": "Muse는 로그인이 아닌 이 키를 사용해요. 로그인을 사용하려면 키를 제거하세요.",
   "mobile.server.providers.sectionUse": "사용",
   "mobile.server.providers.unused": "사용하는 에이전트 없음",
   "mobile.server.providers.usedByCount": { other: "에이전트 {count}개가 사용 중" },
@@ -1314,7 +1394,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "{reasons}을(를) 기다리는 중이에요.",
   "mobile.server.update.disabledTitle": "원격 업데이트가 꺼져 있어요",
   "mobile.server.update.disabledDescription":
-    "{name} 사용자가 서버 멤버의 업데이트를 껐어요. OpenBot을 업데이트하거나 설정을 켜 달라고 요청하세요.",
+    "{name} 사용자가 서버 멤버의 업데이트를 껐어요. OpenBot을 업데이트하거나, 그 컴퓨터에서 설정 > 업데이트를 열고 ‘서버 멤버의 업데이트 허용’을 켜 달라고 요청하세요.",
   "mobile.server.update.managedTitle": "Host Manager가 업데이트를 관리해요",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager가 {name}을(를) 업데이트해요. 호스트 관리자에게 문의하세요.",

@@ -2,6 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentEvent,
   type AskSideQuestionInput,
+  type AttachmentDownloadProgress,
   type AttachmentImportEvent,
   type AttachmentSummary,
   decodeSaveSkillSuggestionResult,
@@ -47,6 +48,7 @@ import {
   resetAgentSessionSetting,
   setAgentSessionSetting,
   setAgentSkillEnabled,
+  testMcpServer,
   uninstallAgentSkill,
   unpublishAgentTemplate,
 } from "@openbot/team-client/team-admin-requests";
@@ -179,6 +181,7 @@ export function createWebConversationRuntime(
   const routinePauseReasonsEnabled = () => hasCapability?.(ROUTINE_PAUSE_REASONS_CAPABILITY) === true;
   const webLiveVoice = useWebLiveVoice();
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
+  const downloadListeners = new Set<(progress: AttachmentDownloadProgress) => void>();
   const attachmentMedia = createWebAttachmentMedia(remote, hostId);
   const files = createWebAttachmentFiles(remote, hostId, attachmentMedia);
   let importing: { cancelled: boolean; serverId: string } | undefined;
@@ -351,6 +354,14 @@ export function createWebConversationRuntime(
           ? runTeamEffect(listMcpServers(adminRequest()).pipe(Effect.mapError((error) => error.cause)))
           : [];
       },
+      ...(adminRequest
+        ? {
+            testMcpServer: async (input, serverId) => {
+              if (serverId !== hostId()) throw new Error(currentText().t("webClient.error.hostChanged"));
+              return runTeamEffect(testMcpServer(adminRequest(), input).pipe(Effect.mapError((error) => error.cause)));
+            },
+          }
+        : {}),
       listWorkspaceDirectory: ({ agentId, path }) => remote.workspaceDirectory(agentId, path),
       onAttachmentImport(listener) {
         listeners.add(listener);
@@ -367,11 +378,31 @@ export function createWebConversationRuntime(
       discardAttachmentImport(requestId) {
         failedImports.delete(requestId);
       },
-      openAttachment: ({ attachmentId }) => files.download(attachmentId),
+      openAttachment: ({ attachmentId, size }) => {
+        const serverId = hostId();
+        return files.download(
+          attachmentId,
+          size === undefined
+            ? undefined
+            : {
+                size,
+                onProgress: (received, total) => {
+                  for (const listener of downloadListeners) listener({ serverId, attachmentId, received, total });
+                },
+              },
+        );
+      },
+      onAttachmentDownload(listener) {
+        downloadListeners.add(listener);
+        return () => {
+          downloadListeners.delete(listener);
+        };
+      },
       openSharedFile: ({ path }) => files.saveShared(path),
       openWorkspaceFile: ({ agentId, path }) => files.saveWorkspace(agentId, path),
       previewSharedFile: ({ path }) => files.previewShared(path),
-      previewWorkspaceFile: ({ agentId, path }) => files.previewWorkspace(agentId, path),
+      previewWorkspaceFile: ({ agentId, path, exactPath }) =>
+        files.previewWorkspace(agentId, path, exactPath ? { exactPath } : {}),
       respondToBrowserSecret: remote.respondToBrowserSecret
         ? (input) => remote.respondToBrowserSecret?.(input) ?? Promise.resolve()
         : unavailable,
@@ -380,10 +411,15 @@ export function createWebConversationRuntime(
     browser: {
       capturePreview: remote.browserPreview ?? unavailable,
       closePictureInPicture: async () => {},
+      closeWindow: async () => {},
+      focusWindow: async () => {},
       navigate: (input) => remote.navigateBrowserTab(input),
       onPictureInPictureEvent: () => () => {},
+      onWindowEvent: () => () => {},
       open: (input) => remote.openBrowserTab(input),
       openPictureInPicture: unavailable,
+      openWindow: unavailable,
+      publishWindowModel: async () => {},
       reload: (tabId) => remote.reloadBrowserTab(tabId),
       stop: (tabId) => remote.stopBrowserTab(tabId),
       takeControl: (tabId) => remote.takeBrowserControl(tabId),

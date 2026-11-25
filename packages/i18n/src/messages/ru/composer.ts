@@ -8,6 +8,15 @@ export const messages = {
   "composer.feedbackFix.body":
     "Исправление отчёта #{number}. Отправьте запрос или отмените, чтобы оставить отчёт как есть.",
   "composer.feedbackFix.cancel": "Отмена",
+  "composer.browserTab.opened": "{name}: страница {title} открыта в браузере.",
+  "composer.browserTab.openedMany": {
+    one: "{name}: в браузере открыта {count} страница.",
+    few: "{name}: в браузере открыты {count} страницы.",
+    many: "{name}: в браузере открыто {count} страниц.",
+    other: "{name}: в браузере открыто {count} страницы.",
+  },
+  "composer.browserTab.open": "Открыть страницу",
+  "composer.browserTab.hide": "Скрыть",
   "composer.providerWait.offlineTitle": "Нет подключения к интернету",
   "composer.providerWait.offline": "{provider} не сможет ответить, пока этот компьютер не подключится к сети.",
   "composer.providerWait.silent": "Время без обновлений от {provider}: {duration}.",
@@ -65,6 +74,7 @@ export const messages = {
   "composer.voice.stop": "Остановить запись голоса",
   "composer.voice.cancel": "Отменить запись голоса",
   "composer.voice.preparing": "Загрузка голосовой модели",
+  "composer.voice.starting": "Запуск голосовой записи",
   "composer.voice.requesting": "Запрос доступа к микрофону",
   "composer.voice.transcribing": "Расшифровка голосового запроса",
   "composer.voice.start": "Создать запрос голосом",
@@ -102,7 +112,7 @@ export const messages = {
   "composer.voice.progress": "Загрузка голосовой модели: {progress}%",
   "composer.voice.recording": "Запись голоса",
   "composer.voice.limitSoon": "Запись остановится через {seconds} секунд.",
-  "composer.voice.limitReached": "Запись остановлена: достигнут лимит в 2 минуты. Сказанное уже в сообщении.",
+  "composer.voice.limitReached": "Запись остановлена: достигнут лимит в 10 минут. Сказанное уже в сообщении.",
   "composer.voice.languageNotice":
     "Диктовка знает 25 европейских языков, например английский. Для других языков нужна модель побольше ({size}), и текст появится после остановки.",
   "composer.voice.languageNotice.action": "Я говорю на другом языке",

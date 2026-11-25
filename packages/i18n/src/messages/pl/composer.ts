@@ -7,6 +7,15 @@ export const messages = {
   "composer.feedbackFix.body":
     "Poprawiasz zgłoszenie #{number}. Wyślij prośbę albo anuluj, aby zostawić zgłoszenie bez zmian.",
   "composer.feedbackFix.cancel": "Anuluj",
+  "composer.browserTab.opened": "{name} otworzył(a) {title} w przeglądarce.",
+  "composer.browserTab.openedMany": {
+    one: "{name} otworzył(a) {count} stronę w przeglądarce.",
+    few: "{name} otworzył(a) {count} strony w przeglądarce.",
+    many: "{name} otworzył(a) {count} stron w przeglądarce.",
+    other: "{name} otworzył(a) {count} strony w przeglądarce.",
+  },
+  "composer.browserTab.open": "Otwórz stronę",
+  "composer.browserTab.hide": "Ukryj",
   "composer.providerWait.offlineTitle": "Brak połączenia z internetem",
   "composer.providerWait.offline": "{provider} nie może odpowiedzieć, dopóki ten komputer nie wróci do sieci.",
   "composer.providerWait.silent": "Czas bez aktualizacji od {provider}: {duration}.",
@@ -64,6 +73,7 @@ export const messages = {
   "composer.voice.stop": "Zatrzymaj nagrywanie głosu",
   "composer.voice.cancel": "Anuluj nagrywanie głosu",
   "composer.voice.preparing": "Pobieranie modelu głosowego",
+  "composer.voice.starting": "Uruchamianie nagrywania głosu",
   "composer.voice.requesting": "Prośba o dostęp do mikrofonu",
   "composer.voice.transcribing": "Transkrypcja promptu głosowego",
   "composer.voice.start": "Utwórz prompt głosem",
@@ -102,7 +112,7 @@ export const messages = {
   "composer.voice.recording": "Nagrywanie głosu",
   "composer.voice.limitSoon": "Nagrywanie zatrzyma się za {seconds} sekund.",
   "composer.voice.limitReached":
-    "Nagrywanie zatrzymało się po osiągnięciu limitu 2 minut. Nagrana treść jest w wiadomości.",
+    "Nagrywanie zatrzymało się po osiągnięciu limitu 10 minut. Nagrana treść jest w wiadomości.",
   "composer.voice.languageNotice":
     "Dyktowanie zna 25 języków europejskich, na przykład angielski. Inne języki wymagają większego modelu ({size}), a tekst pojawia się po zatrzymaniu.",
   "composer.voice.languageNotice.action": "Mówię w innym języku",

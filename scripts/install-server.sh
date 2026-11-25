@@ -1,27 +1,4 @@
 #!/bin/bash
-# Installs OpenBot as a self-hosted server on a Linux computer with no screen:
-#
-#   curl -fsSL https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh | sudo bash
-#
-# Options (after `sudo bash -s --`):
-#   --user <name>             The user that runs OpenBot and its agents. Default: the user of the
-#                             installed server, else openbot, which the install makes when it does
-#                             not exist.
-#   --auth-api-url <origin>   Another account server, for development. Default: the one of the
-#                             installed server, else the one in the build.
-#   --display-size <W>x<H>    The size of the virtual display that computer use reads, from 640x480
-#                             to 2576x2576. Default: the one of the installed server, else 1280x800.
-#   --name <name>             The server name, with a claim. Default: OpenBot.
-#
-# The command from the app (Add server, Other options, New server on another computer) puts a line
-# OPENBOT_CLAIM=<claim> before this script on standard input. The install then signs in with that
-# one-time claim, asks no questions, waits until the server is online, and ends with exit code 0
-# only when the server is connected. The claim is not an argument, because sudo logs its arguments.
-#
-# This file only downloads the latest release and checks it against the release manifest, the
-# manifest that the Linux desktop updater reads. The install steps come from that release
-# (resources/hosting/openbot-server-setup), so they always match the build that they install.
-# See docs/self-hosted-server.md.
 set -euo pipefail
 export LC_ALL=C DEBIAN_FRONTEND=noninteractive
 
@@ -40,6 +17,34 @@ fail() {
 
 fetch() {
   curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 --silent --show-error --retry 3 "$@"
+}
+
+usage() {
+  cat <<'EOF'
+Installs OpenBot as a self-hosted server on a Linux computer with no screen:
+
+  curl -fsSL https://raw.githubusercontent.com/nightly-labs/openbot/main/scripts/install-server.sh | sudo bash
+
+Options (after `sudo bash -s --`):
+  --user <name>             The user that runs OpenBot and its agents. Default: the user of the
+                            installed server, else openbot, which the install makes when it does
+                            not exist.
+  --auth-api-url <origin>   Another account server, for development. Default: the one of the
+                            installed server, else the one in the build.
+  --display-size <W>x<H>    The size of the virtual display that computer use reads, from 640x480
+                            to 2576x2576. Default: the one of the installed server, else 1280x800.
+  --name <name>             The server name, with a claim. Default: OpenBot.
+
+The command from the app (Add server, Other options, New server on another computer) puts a line
+OPENBOT_CLAIM=<claim> before this script on standard input. The install then signs in with that
+one-time claim, asks no questions, waits until the server is online, and ends with exit code 0
+only when the server is connected. The claim is not an argument, because sudo logs its arguments.
+
+This file only downloads the latest release and checks it against the release manifest, the
+manifest that the Linux desktop updater reads. The install steps come from that release
+(resources/hosting/openbot-server-setup), so they always match the build that they install.
+See docs/self-hosted-server.md.
+EOF
 }
 
 while [ "$#" -gt 0 ]; do
@@ -65,7 +70,7 @@ while [ "$#" -gt 0 ]; do
       shift 2
       ;;
     -h | --help)
-      sed -n '2,24p' "$0" 2>/dev/null | sed 's/^# \{0,1\}//'
+      usage
       exit 0
       ;;
     *) fail "Unknown option: $1" ;;

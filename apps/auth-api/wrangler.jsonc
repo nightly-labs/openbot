@@ -43,6 +43,7 @@
   },
   "vars": {
     "AUTH_EXPOSE_DEVELOPMENT_CODE": "false",
+    "BROWSER_EXTENSION_IDS": "eggdpikcggoicfcfdpdihfkinajchpfj",
     "EMAIL_SMTP_HOST": "mail.privateemail.com",
     "EMAIL_SMTP_PORT": "465",
     "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
@@ -71,6 +72,10 @@
     {
       "binding": "EMAIL_RELAY",
       "service": "openbot-email-relay"
+    },
+    {
+      "binding": "MEDIA_GATEWAY",
+      "service": "openbot-media-gateway"
     }
   ],
   "send_email": [

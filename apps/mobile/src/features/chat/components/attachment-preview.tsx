@@ -4,13 +4,14 @@ import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
+import { randomUUID } from "expo-crypto";
 import { Directory, File, FileMode, Paths } from "expo-file-system";
 import { Image } from "expo-image";
 import * as Sharing from "expo-sharing";
 import { useThemeColor } from "heroui-native/hooks";
 import FileText from "lucide-react-native/icons/file-text";
-import { useMemo, useState } from "react";
-import { View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Platform, View } from "react-native";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
@@ -27,7 +28,7 @@ import {
 } from "../model/large-files";
 import { shareTypeOptions } from "../model/share-file-type";
 import { shareFilesNative } from "../model/share-files-native";
-import { mediaFile, writeMediaFile } from "./use-media-file";
+import { fileWantedOrDropped, mediaFile, requestFile, writeMediaFile } from "./use-media-file";
 
 const dimensionCache = createImageDimensionCache({
   read: () => {
@@ -104,6 +105,16 @@ async function keepFile(
   }
 }
 
+function mediaTarget(serverId: string, attachment: AttachmentSummary): string | undefined {
+  try {
+    const file = mediaFile(serverId, attachment);
+    file.parentDirectory.create({ intermediates: true, idempotent: true });
+    return file.uri;
+  } catch {
+    return undefined;
+  }
+}
+
 function keptFile(serverId: string, attachment: AttachmentSummary): (RemoteFileUpload & { fileUri: string }) | null {
   const large = attachment.size > MOBILE_ATTACHMENT_BYTES;
   if (!large && (!attachment.mimeType.startsWith("image/") || !dimensionCache.get(attachment.id))) return null;
@@ -130,6 +141,17 @@ export function copiesToClipboard(attachment: Pick<AttachmentSummary, "kind" | "
 
 function safeFileName(name: string) {
   return name.replace(/[/\\\p{Cc}]/gu, "_");
+}
+
+function newShareFolder() {
+  const folder = new Directory(Paths.cache, `share-${randomUUID()}`);
+  folder.create({ intermediates: true });
+  return folder;
+}
+
+function shareCopy(folder: Directory, name: string) {
+  const safe = safeFileName(name);
+  return new File(folder, /^\.{0,2}$/u.test(safe) ? "file" : safe);
 }
 
 async function fileText(data: RemoteFileUpload & { fileUri?: string }) {
@@ -214,15 +236,24 @@ function attachmentFileQuery(
   attachment: AttachmentSummary,
   downloadAttachment: DownloadAttachment,
   tooLarge: string,
+  tapped: boolean,
 ) {
   return queryOptions({
     queryKey: queryKeys.chatAttachment(serverId, attachment.id),
-    queryFn: async (): Promise<RemoteFileUpload & { localUri?: string; fileUri?: string }> => {
+    queryFn: async ({ client, queryKey }): Promise<RemoteFileUpload & { localUri?: string; fileUri?: string }> => {
       if (attachment.size > MOBILE_LARGE_FILE_BYTES) throw new Error(tooLarge);
       const kept = keptFile(serverId, attachment);
       if (kept) return kept;
-      const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment));
       const large = attachment.size > MOBILE_ATTACHMENT_BYTES;
+      const data = await downloadAttachment(
+        serverId,
+        attachment.id,
+        largeDownloadOf(attachment, large ? mediaTarget(serverId, attachment) : undefined),
+        undefined,
+        tapped,
+        fileWantedOrDropped(client, queryKey),
+      );
+      if (data.file) return { ...data, base64: "", fileUri: data.file.ref };
       const fileUri =
         large || data.mimeType.startsWith("image/") ? await keepFile(serverId, attachment, data) : undefined;
       return fileUri && large ? { ...data, base64: "", fileUri } : { ...data, fileUri };
@@ -243,8 +274,14 @@ function imageExtension(attachment: AttachmentSummary, mimeType: string) {
   return attachmentFileExtension(attachment.name) ?? mimeType.split("/")[1] ?? "png";
 }
 
-export function useAttachmentFile(serverId: string, attachment: AttachmentSummary, preview: boolean) {
-  const { downloadAttachment } = useMobileWorkspaceActions();
+export function useAttachmentFile(
+  serverId: string,
+  attachment: AttachmentSummary,
+  preview: boolean,
+  tapped = !preview,
+) {
+  const { downloadAttachment, prioritizeAttachmentDownload } = useMobileWorkspaceActions();
+  const queryClient = useQueryClient();
   const text = useText();
   const { t } = text;
   const { download } = useAttachmentDownload(serverId, attachment);
@@ -254,15 +291,22 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
     attachment.previewUrl?.startsWith("data:image/") || (pending && attachment.previewUrl?.startsWith("file://"))
       ? attachment.previewUrl
       : null;
-  const query = useQuery({
-    ...attachmentFileQuery(
+  const fileQuery = (tappedDownload: boolean) =>
+    attachmentFileQuery(
       serverId,
       attachment,
       downloadAttachment,
       t("mobile.chat.attachment.tooLargeForMobile", { limit: fileLimitText(text, MOBILE_LARGE_FILE_BYTES) }),
-    ),
+      tappedDownload,
+    );
+  const query = useQuery({
+    ...fileQuery(tapped),
     enabled: preview && download === "download" && !local && !pending,
   });
+  const waitingForTap = preview && tapped && query.fetchStatus === "fetching";
+  useEffect(() => {
+    if (waitingForTap) prioritizeAttachmentDownload(serverId, attachment.id);
+  }, [waitingForTap, prioritizeAttachmentDownload, serverId, attachment.id]);
   const data = query.data;
   const dimensions = useMemo(() => {
     const known = dimensionCache.get(attachment.id);
@@ -274,26 +318,31 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
   const localUri = local ?? query.data?.localUri;
   const uri =
     localUri ?? query.data?.fileUri ?? (query.data ? `data:${query.data.mimeType};base64,${query.data.base64}` : null);
+  const loadTapped = async () => {
+    if (query.data) return query.data;
+    prioritizeAttachmentDownload(serverId, attachment.id);
+    return requestFile(queryKeys.chatAttachment(serverId, attachment.id), () =>
+      queryClient.fetchQuery(fileQuery(true)),
+    );
+  };
   async function share() {
     requestLargeFile(serverId, attachment.id);
     setSharing(true);
-    let file: File | null = null;
+    let folder: Directory | null = null;
     try {
       if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
-      const result = query.data ? { data: query.data, error: null } : await query.refetch();
-      if (result.error) throw result.error;
-      if (!result.data) throw new Error(t("mobile.chat.attachment.unavailable"));
-      const name = safeFileName(attachment.name);
-      file = new File(Paths.cache, `${Date.now()}-${name}`);
-      await writeFileData(file, result.data);
+      const data = await loadTapped();
+      folder = newShareFolder();
+      const file = shareCopy(folder, attachment.name);
+      await writeFileData(file, data);
       await Sharing.shareAsync(file.uri, {
-        ...shareTypeOptions(file.uri, result.data.mimeType),
+        ...shareTypeOptions(file.uri, data.mimeType),
         dialogTitle: attachment.name,
       });
     } catch (error) {
       showFileFailure(error, t("mobile.chat.attachment.openFailed"), text);
     } finally {
-      if (file?.exists) file.delete();
+      if (folder?.exists) folder.delete();
       setSharing(false);
     }
   }
@@ -306,12 +355,10 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
       if (!MediaLibrary) throw new Error(t("mobile.chat.attachment.photosNeedUpdate"));
       if (!(await MediaLibrary.requestPermissionsAsync(true, ["photo"])).granted)
         throw new Error(t("mobile.chat.attachment.photosPermission"));
-      const result = query.data ? { data: query.data, error: null } : await query.refetch();
-      if (result.error) throw result.error;
-      if (!result.data) throw new Error(t("mobile.chat.attachment.imageUnavailable"));
-      const extension = imageExtension(attachment, result.data.mimeType);
+      const data = await loadTapped();
+      const extension = imageExtension(attachment, data.mimeType);
       file = new File(Paths.cache, `${Date.now()}-download.${extension}`);
-      await writeFileData(file, result.data);
+      await writeFileData(file, data);
       await MediaLibrary.Asset.create(file.uri);
       return true;
     } catch (error) {
@@ -326,10 +373,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
     requestLargeFile(serverId, attachment.id);
     setSharing(true);
     try {
-      const result = query.data ? { data: query.data, error: null } : await query.refetch();
-      if (result.error) throw result.error;
-      if (!result.data) throw new Error(t("mobile.chat.attachment.imageUnavailable"));
-      await copyImageData(result.data);
+      await copyImageData(await loadTapped());
       return true;
     } catch (error) {
       showFileFailure(error, t("mobile.chat.attachment.copyImageFailed"), text);
@@ -359,12 +403,15 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
   const { t } = text;
   const [busy, setBusy] = useState(false);
   const load = (attachment: AttachmentSummary) =>
-    queryClient.fetchQuery(
-      attachmentFileQuery(
-        serverId,
-        attachment,
-        downloadAttachment,
-        t("mobile.chat.attachment.tooLargeForMobile", { limit: fileLimitText(text, MOBILE_LARGE_FILE_BYTES) }),
+    requestFile(queryKeys.chatAttachment(serverId, attachment.id), () =>
+      queryClient.fetchQuery(
+        attachmentFileQuery(
+          serverId,
+          attachment,
+          downloadAttachment,
+          t("mobile.chat.attachment.tooLargeForMobile", { limit: fileLimitText(text, MOBILE_LARGE_FILE_BYTES) }),
+          true,
+        ),
       ),
     );
   const fail = (error: unknown, title: string) => showFileFailure(error, title, text);
@@ -410,6 +457,10 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
   }
 
   async function saveToFiles(only: readonly AttachmentSummary[] = attachments): Promise<boolean> {
+    if (Platform.OS === "ios" && (only.length === 1 || shareFilesNative)) {
+      await shareAll(only, t("mobile.chat.attachment.saveFilesFailed"));
+      return false;
+    }
     let folder: Directory;
     try {
       folder = await Directory.pickDirectoryAsync();
@@ -429,31 +480,32 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
     }
   }
 
-  async function shareFile(attachment: AttachmentSummary) {
+  async function shareFile(attachment: AttachmentSummary, failTitle = t("mobile.chat.attachment.openFailed")) {
     setBusy(true);
-    let file: File | null = null;
+    let folder: Directory | null = null;
     try {
       if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
       const data = await load(attachment);
-      file = new File(Paths.cache, `${Date.now()}-${safeFileName(attachment.name)}`);
+      folder = newShareFolder();
+      const file = shareCopy(folder, attachment.name);
       await writeFileData(file, data);
       await Sharing.shareAsync(file.uri, {
         ...shareTypeOptions(file.uri, data.mimeType),
         dialogTitle: attachment.name,
       });
     } catch (error) {
-      fail(error, t("mobile.chat.attachment.openFailed"));
+      fail(error, failTitle);
     } finally {
-      if (file?.exists) file.delete();
+      if (folder?.exists) folder.delete();
       setBusy(false);
     }
   }
 
-  async function shareAll() {
-    const only = attachments.length === 1 ? attachments[0] : undefined;
-    if (only) return shareFile(only);
+  async function shareAll(only: readonly AttachmentSummary[] = attachments, failTitle?: string) {
+    const single = only.length === 1 ? only[0] : undefined;
+    if (single) return shareFile(single, failTitle);
     setBusy(true);
-    const images = attachments.every(showsAsImage);
+    const images = only.every(showsAsImage);
     try {
       if (!shareFilesNative)
         throw new Error(
@@ -461,7 +513,7 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
         );
       const uris: string[] = [];
       const types = new Set<string>();
-      for (const attachment of attachments) {
+      for (const attachment of only) {
         const data = await load(attachment);
         const uri = data.fileUri ?? (await keepFile(serverId, attachment, data));
         if (!uri)
@@ -477,7 +529,11 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
         types.size === 1 ? ([...types][0] ?? "*/*") : imageTypes ? "image/*" : "*/*",
       );
     } catch (error) {
-      fail(error, images ? t("mobile.chat.imageGallery.shareFailed") : t("mobile.chat.attachment.shareFilesFailed"));
+      fail(
+        error,
+        failTitle ??
+          (images ? t("mobile.chat.imageGallery.shareFailed") : t("mobile.chat.attachment.shareFilesFailed")),
+      );
     } finally {
       setBusy(false);
     }
@@ -506,13 +562,14 @@ export function showFileFailure(error: unknown, title: string, text: Pick<Mobile
 export async function shareLocalAttachment(file: { name: string; mimeType: string; base64?: string; uri?: string }) {
   const text = currentText();
   const { t } = text;
-  let temporary: File | null = null;
+  let folder: Directory | null = null;
   try {
     if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
     let uri = file.uri;
     if (!uri) {
       if (!file.base64) throw new Error(t("mobile.chat.attachment.unavailable"));
-      temporary = new File(Paths.cache, `${Date.now()}-${safeFileName(file.name)}`);
+      folder = newShareFolder();
+      const temporary = shareCopy(folder, file.name);
       temporary.writeSync(file.base64, { encoding: "base64" });
       uri = temporary.uri;
     }
@@ -520,6 +577,6 @@ export async function shareLocalAttachment(file: { name: string; mimeType: strin
   } catch (error) {
     showFileFailure(error, t("mobile.chat.attachment.openFailed"), text);
   } finally {
-    if (temporary?.exists) temporary.delete();
+    if (folder?.exists) folder.delete();
   }
 }

@@ -1,6 +1,7 @@
 import { adminRoute, empty, fields, type OptionalRouteCodec, oneOf } from "./admin-wire";
 
 export const PROMPT_CACHE_TTL_CAPABILITY = "prompt-cache-ttl-v1";
+export const PROMPT_CACHE_TTL_PI_CAPABILITY = "prompt-cache-ttl-pi-v1";
 
 export const PROMPT_CACHE_TTL_ROUTES = {
   settings: "/v1/admin/host/prompt-cache-ttl",

@@ -90,6 +90,18 @@ export const Link: Story = {
   },
 };
 
+export const LinkOnThisComputer: Story = {
+  args: {
+    providerName: "Claude",
+    state: {
+      phase: "link",
+      verificationUrl: "https://claude.ai/oauth/authorize?code=true&client_id=example&state=example",
+      expiresAt: Date.now() + 10 * 60_000,
+      onThisComputer: true,
+    },
+  },
+};
+
 export const Verifying: Story = {
   args: { state: { phase: "verifying" } },
 };

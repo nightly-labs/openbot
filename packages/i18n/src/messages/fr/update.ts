@@ -44,6 +44,12 @@ export const messages = {
   "update.idleRestart.description": "Les nouvelles exécutions de routines attendent le redémarrage.",
   "update.idleRestart.waitingFor": "En attente de {reasons}.",
   "update.idleRestart.cancel": "Annuler le redémarrage",
+  "update.idleRestart.openSettings": "Réglages de mise à jour",
+  "update.idleRestart.restartNow": "Redémarrer maintenant",
+  "update.idleRestart.restartNowTitle": "Redémarrer OpenBot maintenant ?",
+  "update.idleRestart.restartNowDescription":
+    "Les tours d’agent et les exécutions de routines non terminés s’arrêtent maintenant.",
+  "update.idleRestart.keepWaiting": "Continuer d’attendre",
   "update.idleRestart.cancelFailed": "Le redémarrage n’a pas pu être annulé.",
   "update.idleRestart.requestFailed": "Le redémarrage n’a pas pu être planifié.",
   "update.idleRestart.failedTitle": "OpenBot n’a pas redémarré",

@@ -344,7 +344,8 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.numbersTitle": "Numbers",
   "connector.whatsapp.linkNumber": "Link a number",
   "connector.whatsapp.ownNumberNote": "Your “Message yourself” chat and the people you allow reach OpenBot.",
-  "connector.whatsapp.dedicatedNote": "The people you allow reach OpenBot. Other people get a code to give you.",
+  "connector.whatsapp.dedicatedNote":
+    "Your “Message yourself” chat and the people you allow reach OpenBot. Other people get a code to give you.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp removed this computer from the linked devices. Link the number again.",
   "connector.whatsapp.helpLoggedOutHost":
     "WhatsApp removed this server from the linked devices. Link the number again.",
@@ -367,7 +368,7 @@ export const messages = defineMessages("connector", {
     "Only your “Message yourself” chat and the people you allow can write. Other people get no reply. When it is off, OpenBot replies to unknown people with a code.",
   "connector.whatsapp.workingMessage": "“Working on it…” message",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot posts it while the agent works, then replaces it with the answer. A request that waits for an earlier request gets a waiting message too. Turn off to post only the answer.",
+    "OpenBot posts it while the agent works, then replaces it with the answer. A request that waits for an earlier request gets a waiting message too. On a personal number, only your “Message yourself” chat gets these messages. Turn off to post only the answer.",
   "connector.whatsapp.statusReactions": "Status reactions",
   "connector.whatsapp.statusReactionsDescription":
     "OpenBot reacts with 👀 when a message arrives and with ✅ when the answer is ready. Turn off to send no reactions.",
@@ -442,6 +443,9 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.sendersLimit": "A number can allow up to {count} contacts and groups.",
   "connector.whatsapp.senderGroup": "Group",
   "connector.whatsapp.removeSender": "Remove",
+  "connector.whatsapp.senderAccess": "Access for {name}",
+  "connector.whatsapp.senderReplies": "Can give work",
+  "connector.whatsapp.senderReadOnly": "Read only",
   "connector.whatsapp.addContact": "Add contact",
   "connector.whatsapp.addGroup": "Add group",
   "connector.whatsapp.contactTitle": "Add a contact",

@@ -5,8 +5,12 @@ export const messages = {
   "error.attachment.notFound": "No se encontró el archivo adjunto.",
   "error.attachment.fileTooLarge": "Un archivo supera el límite de 100 MB.",
   "error.attachment.namedFileTooLarge": "{name} supera el límite de 100 MB.",
+  "error.attachment.emptyFile":
+    "{name} está vacío o OpenBot no puede leerlo. Guarda el archivo de nuevo y vuelve a adjuntarlo.",
   "error.attachment.totalTooLarge": "Los archivos adjuntos superan el límite total de 250 MB.",
   "error.attachment.unavailable": "Este archivo ya no está disponible.",
+  "error.attachment.noApp":
+    "Ninguna app de este ordenador abrió este archivo. Descárgalo y ábrelo desde tu gestor de archivos.",
   "error.attachment.tooMany": "Elige un máximo de {limit} archivos.",
   "error.attachment.mediaUnsupported":
     "Este servidor no admite archivos adjuntos MP3 o MOV. Actualiza OpenBot en el host e inténtalo de nuevo.",

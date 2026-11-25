@@ -24,12 +24,16 @@ export const messages = {
     "El host no ha permitido que OpenBot grabe su pantalla. Concede permiso de grabación de pantalla en el host e inténtalo de nuevo.",
   "error.remote.windowsSessionDisconnected":
     "La sesión de Windows del host está desconectada, así que no hay pantalla para compartir. Inicia sesión en Windows en la pantalla del host e inténtalo de nuevo.",
+  "error.remote.windowsCaptureDenied":
+    "Windows en el host no permite que OpenBot grabe su pantalla. Desbloquea Windows en la pantalla del host, cierra cualquier aviso de administrador e inténtalo de nuevo. Si sigue pasando, reinicia el host.",
   "error.remote.macScreenLocked":
     "El Mac está bloqueado, así que no puede compartir su pantalla. Desbloquea el Mac en su pantalla e inténtalo de nuevo.",
   "error.remote.streamTooSlowLowerQuality":
     "La conexión con el host es demasiado lenta para la imagen. Inténtalo de nuevo: la próxima conexión usará una calidad más baja.",
   "error.remote.streamTooSlow":
     "La conexión con el host es demasiado lenta para la imagen. Usa una red más rápida e inténtalo de nuevo.",
+  "error.remote.noPictureSwitchEncoder":
+    "El host no envió ninguna imagen. Inténtalo de nuevo: la próxima conexión usa un ajuste de vídeo que funciona en más ordenadores.",
   "error.remote.teamSessionExpired": "La sesión del equipo caducó.",
   "error.remote.finishTestBeforeSwitch": "Termina la prueba de escritorio remoto antes de cambiar de pantalla.",
   "error.remote.displayNotFound": "No se encontró la pantalla remota.",
@@ -93,7 +97,12 @@ export const messages = {
     "OpenBot no puede verificar este servidor porque falta su clave de seguridad o ha cambiado. Pide al propietario del servidor que lo revise.",
   "error.remote.connectionNotStarted":
     "OpenBot no pudo iniciar la conexión con este servidor. Si continúa, cierra OpenBot y vuelve a abrirlo.",
-  "error.remote.hostDidNotConnect": "El host WebRTC no se conectó.",
+  "error.remote.connectionServiceUnreachable":
+    "Este ordenador no puede acceder al servicio de conexión de OpenBot. Comprueba su conexión a internet. OpenBot se vuelve a conectar automáticamente.",
+  "error.remote.serverAnswerTimeout":
+    "El servidor no respondió a tiempo. OpenBot se vuelve a conectar automáticamente.",
+  "error.remote.signInConnectionClosed":
+    "La conexión con el servidor se cerró al iniciar sesión. Si vuelve a pasar, comprueba que la fecha y la hora sean correctas en el servidor y en este dispositivo.",
   "error.remote.connectionCancelled": "Se canceló la conexión remota.",
   "error.remote.hostDisconnected":
     "Se perdió la conexión con el servidor. Comprueba si la acción se completó y vuelve a intentarlo.",

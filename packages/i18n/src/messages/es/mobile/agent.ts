@@ -378,6 +378,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Quitar {model}",
   "mobile.agent.backupModels.unavailable": "No disponible ahora · omitido",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Si un límite de uso detiene a {name} después de empezar a trabajar, {name} continúa el mismo trabajo con el primer modelo disponible del orden. Vuelve a {model} cuando termina el límite, o 10 minutos después de un error del proveedor.",
   "mobile.agent.busyMessage.label": "Mientras trabaja",
@@ -408,6 +409,9 @@ export const messages = {
   "mobile.agent.planCard.label": "Mostrar el plan antes de tareas largas",
   "mobile.agent.planCard.footer":
     "Antes de una tarea larga, el agente muestra su plan. Empieza tras 10 s o cuando pulsas Iniciar.",
+  "mobile.agent.builtinMemory.label": "Memoria de OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "El agente guarda y lee sus propios recuerdos. Desactívala para usar solo una app de memoria, como Mem0. Los recuerdos guardados se mantienen.",
   "mobile.agent.workspace.title": "Carpeta del espacio de trabajo",
   "mobile.agent.workspace.footer": "La carpeta de este agente en el equipo host.",
   "mobile.agent.advanced.behavior": "Comportamiento",
@@ -525,6 +529,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Recopilación iniciada {started}. Actualizado {updated}.",
   "mobile.agent.usage.never": "nunca",
   "mobile.agent.record.time": "Hora",
+  "mobile.agent.record.date": "Fecha",
   "mobile.agent.section.changeFailed": "No se pudo cambiar la carpeta",
   "mobile.agent.section.tryAgain": "Inténtalo de nuevo.",
   "mobile.agent.section.moveUp": "Subir",
@@ -608,7 +613,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "No se pudieron cargar tus servidores",
   "mobile.agent.home.serversFailedBody": "Comprueba que la app de escritorio está abierta e inténtalo de nuevo.",
   "mobile.agent.home.noServers": "No hay servidores disponibles",
-  "mobile.agent.home.noServersBody": "Vuelve a conectar la app de escritorio o únete a un servidor remoto.",
+  "mobile.agent.home.noServersBody":
+    "Abre OpenBot en tu equipo con esta cuenta y activa Publicar este servidor en Ajustes del servidor → Miembros. O únete a un servidor remoto.",
   "mobile.agent.home.chooseServer": "Elige un servidor",
   "mobile.agent.home.openServers": "Abrir servidores",
   "mobile.agent.home.noChatOpen": "Ningún chat abierto",
@@ -685,6 +691,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Dejar de excluir",
   "mobile.agent.folders.browseTitle": "Elegir carpeta",
   "mobile.agent.folders.places": "Ir a",
+  "mobile.agent.folders.path": "Ruta de la carpeta",
   "mobile.agent.folders.home": "Carpeta de inicio",
   "mobile.agent.folders.parent": "Subir a {folder}",
   "mobile.agent.folders.browseFailed": "No se puede abrir esta carpeta.",

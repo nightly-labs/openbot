@@ -11,12 +11,12 @@ RUN chmod 0700 OpenBot.AppImage \
 
 FROM ${BASE}
 ARG DEBIAN_FRONTEND=noninteractive
-COPY --from=release /tmp/squashfs-root/resources/hosting/packages.txt /tmp/packages.txt
+COPY --from=release /tmp/squashfs-root/resources/hosting/packages.txt /tmp/squashfs-root/resources/hosting/optional-packages.txt /tmp/
 RUN apt-get update \
-  && sed -e '/^#/d' -e '/^$/d' -e '/^apparmor$/d' /tmp/packages.txt \
+  && sed -e '/^#/d' -e '/^$/d' -e '/^apparmor$/d' /tmp/packages.txt /tmp/optional-packages.txt \
     | xargs apt-get install --yes --no-install-recommends \
       fonts-noto-cjk git less openssh-client procps ripgrep tini unzip xz-utils \
-  && rm -rf /var/lib/apt/lists/* /tmp/packages.txt
+  && rm -rf /var/lib/apt/lists/* /tmp/packages.txt /tmp/optional-packages.txt
 RUN userdel --remove ubuntu \
   && useradd --uid 1000 --user-group --home-dir /data --create-home --shell /bin/bash openbot \
   && install -d -o openbot -g openbot -m 0700 /run/openbot

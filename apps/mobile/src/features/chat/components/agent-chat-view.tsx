@@ -8,6 +8,8 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import { ChatChannelWorkRow } from "@/features/channels/components/chat-channel-work-row";
 import { useChannelList } from "@/features/channels/components/use-channels";
+import { appendComposerDraft } from "@/features/chat/model/composer-drafts";
+import { promptAskedByThisPerson } from "@/features/chat/model/location-request";
 import { useAgentViewOnly } from "@/features/servers/model/use-server-roles";
 import { useChatPullPreference, useChatSwipePreference } from "@/features/settings/model/chat-swipe";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
@@ -174,7 +176,39 @@ export function MobileChatView({
     steers,
     conversation?.messages,
   );
-  const messages = useMemo(() => withFailureReasons(projected, queue.deliveries), [projected, queue.deliveries]);
+  const withLiveQuestions = useMemo(() => {
+    if (!online || !threadId) return projected;
+    const key = (turnId: string | undefined, requestId: string | number) => `${turnId ?? ""}\n${String(requestId)}`;
+    const saved = new Set(
+      projected.flatMap((message) =>
+        message.kind === "question" ? [key(message.turnId, message.prompt.requestId)] : [],
+      ),
+    );
+    const live = threadWaits.flatMap(
+      ({ reason, questions, agentId, requestId, threadId: waitThreadId, turnId, task }) => {
+        return reason === "question" &&
+          questions &&
+          !task &&
+          agentId === agent.id &&
+          waitThreadId === threadId &&
+          !saved.has(key(turnId, requestId))
+          ? [
+              {
+                id: `question-prompt:${turnId}:${String(requestId)}`,
+                kind: "question" as const,
+                turnId,
+                prompt: { requestId, questions, resolution: null },
+              },
+            ]
+          : [];
+      },
+    );
+    return live.length > 0 ? [...projected, ...live] : projected;
+  }, [online, threadId, projected, threadWaits, agent.id]);
+  const messages = useMemo(
+    () => withFailureReasons(withLiveQuestions, queue.deliveries),
+    [withLiveQuestions, queue.deliveries],
+  );
   const [historyLoadFailed, setHistoryLoadFailed] = useState(false);
   const [catchingUp, setCatchingUp] = useState(false);
   const [focus, setFocus] = useState<{ messageId: string; loaded: boolean; unread: boolean } | null>(() =>
@@ -395,11 +429,14 @@ export function MobileChatView({
   });
   const mentionSkills = useAgentMentionSkills(agent.id, agent.serverId, showsOnline(server));
   const mentionReferences = useAgentMentionReferences(agent.serverId, agent.id);
+  const returnUnsentPreview = useCallback((text: string) => appendComposerDraft(target, text), [target]);
   const questionForm = useQuestionPrompt(
     agent.id,
     activePrompt?.kind === "question" ? activePrompt : undefined,
     showsOnline(server) && !viewOnly,
     respondToPrompt,
+    returnUnsentPreview,
+    promptAskedByThisPerson(messages, activePrompt?.id),
   );
   const swipeAction = useChatSwipePreference((state) => state.action);
   const browserAllowed = useBrowserFeature();
@@ -428,12 +465,17 @@ export function MobileChatView({
       workChannel && workActivity ? (
         <>
           {signInProvider ? <ChatProviderSignInRow serverId={agent.serverId} provider={signInProvider} /> : null}
-          <ChatChannelWorkRow channel={workChannel} activity={workActivity} serverId={agent.serverId} />
+          <ChatChannelWorkRow
+            channel={workChannel}
+            activity={workActivity}
+            agentId={agent.id}
+            serverId={agent.serverId}
+          />
         </>
       ) : signInProvider ? (
         <ChatProviderSignInRow serverId={agent.serverId} provider={signInProvider} />
       ) : null,
-    [workChannel, workActivity, agent.serverId, signInProvider],
+    [workChannel, workActivity, agent.id, agent.serverId, signInProvider],
   );
   return (
     <ChatView

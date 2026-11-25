@@ -44,10 +44,12 @@
 @import "./styles/context-usage.css";
 @import "./styles/composer-stack.css";
 @import "./styles/interaction-cards.css";
+@import "./styles/media-approval.css";
 @import "./styles/browser-takeover.css";
 @import "./styles/feedback-card.css";
 @import "./styles/question-prompt.css";
 @import "./styles/ui-blocks.css";
+@import "./styles/credits-hold.css";
 @import "./styles/surface-overrides.css";
 @import "./styles/browser-previews.css";
 @import "./styles/browser-dock.css";

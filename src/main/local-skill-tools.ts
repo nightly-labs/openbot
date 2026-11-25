@@ -1,10 +1,10 @@
 import { join, posix } from "node:path";
+import { MANAGED_SKILL_FOLDERS } from "@openbot/contracts/agent-providers";
 import type { InstalledSkill } from "@openbot/contracts/ipc";
 import { registerPublicValues } from "@openbot/logging";
 import { Effect } from "effect";
 import type { LocalSkillTools } from "../backend/agent/skill-tools";
 import { ToolOperationFailed, toToolOperationFailed } from "../backend/agent/tool-operation";
-import { MANAGED_SKILL_FOLDERS } from "./managed-skill-service";
 import type { SkillMarketplaceService } from "./skill-marketplace-service";
 
 export const keepSkillIdsReadable = (installed: readonly InstalledSkill[]) =>

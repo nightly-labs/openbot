@@ -329,6 +329,10 @@ export const Voice: Story = {
   render: () => <SettingsModalStory initialOpen initialTab="voice" />,
 };
 
+export const Keyboard: Story = {
+  render: () => <SettingsModalStory initialOpen initialTab="keyboard" />,
+};
+
 export const VoiceWhisperHungarian: Story = {
   render: () => (
     <SettingsModalStory

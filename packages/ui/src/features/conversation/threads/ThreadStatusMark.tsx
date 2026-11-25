@@ -4,6 +4,7 @@ import { TypingDots } from "@openbot/ui/components/TypingDots";
 import { SidebarWaitIcon } from "@openbot/ui/features/sidebar/SidebarAgentIndicator";
 import type { SidebarWaitReason } from "@openbot/ui/features/sidebar/sidebar-types";
 import { type TextValue, useText } from "@openbot/ui/text";
+import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
 import type { ThreadStatus } from "./thread-types";
 
@@ -96,10 +97,14 @@ function StatusIcon(props: { status: ThreadMark }) {
   );
 }
 
-export function ThreadTabIcon(props: { status: ThreadStatus; unread?: number | undefined }) {
+export function ThreadTabIcon(props: {
+  status: ThreadStatus;
+  unread?: number | undefined;
+  idle?: (() => JSX.Element) | undefined;
+}) {
   const mark = () => threadMark(props.status, props.unread);
   return (
-    <Show when={mark().kind !== "idle"} fallback={<Split aria-hidden="true" />}>
+    <Show when={mark().kind !== "idle"} fallback={props.idle?.() ?? <Split aria-hidden="true" />}>
       <StatusBadge status={mark()} />
     </Show>
   );

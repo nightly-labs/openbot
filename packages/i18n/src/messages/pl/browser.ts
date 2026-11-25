@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "Zamknij kartę przeglądarki",
   "browser.newTab": "Nowa karta przeglądarki",
   "browser.backToChat": "Wróć do czatu",
+  "browser.fullView.open": "Otwórz w pełnym widoku",
   "browser.goBack": "Wstecz",
   "browser.goForward": "Dalej",
   "browser.reload": "Odśwież stronę",
@@ -60,6 +61,8 @@ export const messages = {
   "browser.pip.close": "Zamknij okno przeglądarki",
   "browser.pip.reattachFailed": "Nie udało się przypiąć przeglądarki z powrotem.",
   "browser.pip.closeFailed": "Nie udało się zamknąć okna przeglądarki.",
+  "browser.window.open": "Otwórz przeglądarkę w nowym oknie",
+  "browser.window.openFailed": "Nie udało się otworzyć okna przeglądarki.",
   "browser.popupBlocked.title": "Zablokowano wyskakujące okno",
   "browser.popupBlocked.dismiss": "Zamknij komunikat o wyskakującym oknie",
   "browser.liveView.label": "Podgląd na żywo strony na serwerze",
@@ -94,6 +97,7 @@ export const messages = {
   "browser.secret.submitting": "Wysyłanie…",
   "browser.secret.takeOver": "Przejmij",
   "browser.secret.failed": "Nie udało się wykonać żądania. Sprawdź połączenie i spróbuj ponownie.",
+  "browser.secret.ended": "To żądanie logowania zostało zakończone. Poproś agenta o ponowną próbę.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ agent uruchomił skrypt na tej stronie. Aby ich użyć, poproś agenta o ponowne załadowanie strony i ponowną próbę.",
   "browser.secret.vaultSkip.fieldKind":

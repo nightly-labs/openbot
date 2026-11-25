@@ -79,10 +79,11 @@ const REGISTRATION_FORBIDDEN = {
   error_description:
     "Dynamic client registration is not supported. Only pre-registered MCP trusted partners are allowed.",
 };
-type RegistrationForbidden = "dropbox" | "forbidden";
+type RegistrationForbidden = "dropbox" | "forbidden" | "namecheap";
 type AccountRefusal = "forbidden" | "insufficientScope";
 
 const DROPBOX_REDIRECTS = ["http://localhost/callback", "http://127.0.0.1/callback", "http://127.0.0.1"];
+const NAMECHEAP_REDIRECTS = ["https://claude.ai/api/mcp/auth_callback", "https://vscode.dev/redirect"];
 
 interface ScopeMetadata {
   resource?: string[] | null;
@@ -139,6 +140,12 @@ async function fakeServer(
         state.redirects.push(`register ${asked.redirect_uris.join(" ")}`);
         if (registrationForbidden) {
           const path = URL.parse(asked.redirect_uris[0] ?? "")?.pathname;
+          if (registrationForbidden === "namecheap")
+            return json(response, 201, {
+              client_id: id,
+              token_endpoint_auth_method: "none",
+              redirect_uris: path === "/callback" ? asked.redirect_uris : NAMECHEAP_REDIRECTS,
+            });
           if (registrationForbidden === "forbidden" || path !== "/callback")
             return json(response, 403, REGISTRATION_FORBIDDEN);
           return json(response, 201, {
@@ -558,6 +565,24 @@ async function main(): Promise<void> {
     );
     check(dropboxStored, dropboxStored.signedIn, "no token is stored after the sign-in");
     report.cases.push(dropboxStored);
+
+    const namecheap = await runCase("registration-replaces-address-except-callback", ["none"], 1, {
+      registrationForbidden: "namecheap",
+    });
+    check(namecheap, namecheap.attempts[0]?.error === null, `the sign-in failed: ${namecheap.attempts[0]?.error}`);
+    check(
+      namecheap,
+      namecheap.redirects.join() ===
+        [
+          "register http://127.0.0.1:28417/mcp-auth",
+          `register ${callback}`,
+          `page ${callback}`,
+          `token ${callback}`,
+        ].join(),
+      `the addresses were ${namecheap.redirects.join()}`,
+    );
+    check(namecheap, namecheap.signedIn, "no token is stored after the sign-in");
+    report.cases.push(namecheap);
 
     const forbidden = await runCase("registration-forbidden", ["none"], 1, { registrationForbidden: "forbidden" });
     check(

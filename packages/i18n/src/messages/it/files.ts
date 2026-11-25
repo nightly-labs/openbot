@@ -69,6 +69,8 @@ export const messages = {
   "files.library.agents": "Agenti",
   "files.library.allAgents": { one: "{count} agente", other: "Tutti i {count} agenti" },
   "files.library.folders": "Cartelle",
+  "files.library.workflows": "Flussi",
+  "files.library.workflowsOf": "Flussi in {name}",
   "files.library.favorite": "{name} nei preferiti",
   "files.folder.new": "Nuova cartella",
   "files.folder.name": "Nome della cartella",
@@ -201,6 +203,8 @@ export const messages = {
   "files.conversation.title": "File",
   "files.conversation.summary": "{files} · chat {size}",
   "files.conversation.close": "Chiudi i file",
+  "files.conversation.workspace": "Cartella del workspace",
+  "files.conversation.workspaces": "Cartelle dei workspace",
   "files.conversation.emptyTitle": "Nessun file in questa chat",
   "files.conversation.emptyDescription": "I file che alleghi e quelli creati dall'agente compaiono qui.",
 } as const satisfies PartialTranslation<typeof source>;

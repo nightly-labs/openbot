@@ -1,5 +1,6 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { RemoteCompatibilityScreen } from "@openbot/ui/features/remote-desktop/RemoteCompatibilityScreen";
+import { type ServerPaywall, ServerPaywallScreen } from "@openbot/ui/features/servers/ServerPaywall";
 import { ServerPlanEndedScreen, serverPlanScreenShown } from "@openbot/ui/features/servers/ServerPlanEnd";
 import type { JSX } from "@solidjs/web";
 import { omit, type ParentProps, Show } from "solid-js";
@@ -14,6 +15,7 @@ type WorkspaceFrameProps = ParentProps<
     compact: boolean;
     hidden?: boolean;
     blockedServer: ServerSummary | null;
+    paywall?: ServerPaywall;
     onRetryServer: (serverId: string) => Promise<void>;
     planDeletesAt: (serverId: string) => number | null;
     onRenewPlan?: ((serverId: string) => Promise<void>) | undefined;
@@ -35,6 +37,7 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
     "compact",
     "hidden",
     "blockedServer",
+    "paywall",
     "onRetryServer",
     "planDeletesAt",
     "onRenewPlan",
@@ -50,10 +53,34 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
 
   const compactWidth = () => props.compact && (!pageOpen() || layout.leftPanelNarrow());
   const planScreenShown = () => serverPlanScreenShown(props.blockedServer, props.planDeletesAt);
+  const paywallView = () => {
+    const paywall = props.paywall;
+    const server = paywall?.server();
+    return paywall && server ? { paywall, server } : null;
+  };
+  const fullScreen = () => planScreenShown() || paywallView() !== null;
   const leftPanelWidth = () => {
-    if (planScreenShown()) return 0;
+    if (fullScreen()) return 0;
     return compactWidth() ? LEFT_PANEL_COMPACT : layout.leftPanelWidth();
   };
+
+  const blockedContent = () => (
+    <Show when={props.blockedServer} keyed fallback={props.children}>
+      {(server) => (
+        <Show
+          when={planScreenShown()}
+          fallback={<RemoteCompatibilityScreen server={server} onRetry={() => props.onRetryServer(server.id)} />}
+        >
+          <ServerPlanEndedScreen
+            server={server}
+            deleteAt={props.planDeletesAt(server.id)}
+            onRenew={props.onRenewPlan}
+            onRetry={() => void props.onRetryServer(server.id)}
+          />
+        </Show>
+      )}
+    </Show>
+  );
 
   return (
     <div
@@ -77,7 +104,7 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
       style={`--left-panel-width: ${leftPanelWidth()}px`}
     >
       {props.left}
-      <Show when={!planScreenShown()}>
+      <Show when={!fullScreen()}>
         <WorkspaceLeftPanelResizer />
       </Show>
       <div
@@ -87,20 +114,8 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
       >
         {props.connection}
         <div class="server-connection-content" hidden={props.initialLoading && !props.blockedServer}>
-          <Show when={props.blockedServer} keyed fallback={props.children}>
-            {(server) => (
-              <Show
-                when={planScreenShown()}
-                fallback={<RemoteCompatibilityScreen server={server} onRetry={() => props.onRetryServer(server.id)} />}
-              >
-                <ServerPlanEndedScreen
-                  server={server}
-                  deleteAt={props.planDeletesAt(server.id)}
-                  onRenew={props.onRenewPlan}
-                  onRetry={() => void props.onRetryServer(server.id)}
-                />
-              </Show>
-            )}
+          <Show when={paywallView()} fallback={blockedContent()}>
+            {(view) => <ServerPaywallScreen server={view().server} paywall={view().paywall} />}
           </Show>
         </div>
       </div>

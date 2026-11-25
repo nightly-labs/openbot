@@ -18,6 +18,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import {
   decodeVoiceServerWav,
   OPENAI_VOICES,
+  shortVoiceServerModel,
   VOICE_SERVER_VOICE_PATHS,
   voiceServerHost,
   voiceServerModelLists,
@@ -35,6 +36,8 @@ const logger = createOpenBotLogger("voice-server-service");
 
 const PROBE_TIMEOUT_MS = 8_000;
 const TRANSCRIPTION_TIMEOUT_MS = 120_000;
+const TRANSCRIPTION_TIMEOUT_PER_AUDIO_SECOND_MS = 1_000;
+const WAV_BYTES_PER_SECOND = 32_000;
 const SPEECH_TIMEOUT_MS = 120_000;
 const LIST_BODY_LIMIT = 1024 * 1024;
 const SPEECH_BODY_LIMIT = 32 * 1024 * 1024;
@@ -148,7 +151,16 @@ export class VoiceServerService extends EventEmitter<VoiceServerEvents> {
       model,
       wav,
       language,
-      { label: "Voice server" },
+      {
+        label: "Voice server",
+        refused: (status) =>
+          status === 404
+            ? sourceText("error.voice.server.modelUnsupported", {
+                host: voiceServerHost(server.address),
+                model: shortVoiceServerModel(model),
+              })
+            : null,
+      },
     );
   }).bind(this);
 
@@ -219,7 +231,10 @@ export function transcribeRecording(
     target,
     "audio/transcriptions",
     { method: "POST", body: form },
-    TRANSCRIPTION_TIMEOUT_MS,
+    Math.max(
+      TRANSCRIPTION_TIMEOUT_MS,
+      (wav.byteLength / WAV_BYTES_PER_SECOND) * TRANSCRIPTION_TIMEOUT_PER_AUDIO_SECOND_MS,
+    ),
     (response, host) => readJson(response, host, LIST_BODY_LIMIT),
     caller.refused,
   ).pipe(

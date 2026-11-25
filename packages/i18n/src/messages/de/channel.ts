@@ -22,6 +22,11 @@ export const messages = {
   "channel.panel.close": "Kanalbereich schließen",
   "channel.settings.title": "Kanaleinstellungen",
   "channel.settings.memories": "Erinnerungen",
+  "channel.settings.folders.title": "Ordner",
+  "channel.settings.folders.description":
+    "Alle Mitglieder von {channel} können in diesen Ordnern Dateien ändern und Befehle ausführen.",
+  "channel.settings.folders.toastAdded": "Mitglieder von {channel} können jetzt Dateien in {folder} ändern",
+  "channel.settings.folders.toastRemoved": "Mitglieder von {channel} können Dateien in {folder} nicht mehr ändern",
   "channel.settings.isolated": "Erinnerungen in diesem Kanal behalten",
   "channel.settings.isolatedDescription":
     "Agenten speichern, was sie hier lernen, als Kanalerinnerungen. Ihre anderen Chats sehen sie nicht.",

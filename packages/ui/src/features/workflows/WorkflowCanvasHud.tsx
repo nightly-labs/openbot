@@ -4,11 +4,10 @@ import {
   Button,
   buttonVariants,
   Check,
-  ChevronDown,
   CircleAlert,
+  CirclePause,
   DropdownMenu,
   History,
-  Input,
   LabelTooltipTrigger,
   LoaderCircle,
   Play,
@@ -99,18 +98,14 @@ export interface HudRun {
 export interface HudStep {
   id: string;
   status: "running" | "approval" | "failed";
+  waiting: boolean;
   name: string;
   more: number;
 }
 
 export function WorkflowCanvasHeader(props: {
   frame: "window" | undefined;
-  name: string;
-  renaming: boolean;
-  menuRef: (element: HTMLButtonElement) => void;
-  switcher: JSX.Element;
-  onName: (name: string) => void;
-  onEndRename: (keep: boolean) => void;
+  title: JSX.Element;
   previewing: boolean;
   viewing: number | null;
   onView: (run: number | null) => void;
@@ -126,6 +121,8 @@ export function WorkflowCanvasHeader(props: {
   progress: { done: number; total: number };
   onRun: () => void;
   onStop: () => void;
+  paused: boolean;
+  onResume?: (() => void) | undefined;
   people?: JSX.Element;
 }) {
   const { t, format } = useText();
@@ -141,59 +138,28 @@ export function WorkflowCanvasHeader(props: {
     props.openRuns.find((run) => run.number === props.viewing) ??
     props.pastRuns.find((run) => run.number === props.viewing);
   const manyOpen = () => props.openRuns.length > 1 || props.waiting > 0;
-  const statusVerb = (status: HudStep["status"]) =>
-    status === "approval"
+  const statusVerb = (step: HudStep) =>
+    step.status === "approval"
       ? t("workflow.canvas.status.approval")
-      : status === "failed"
+      : step.status === "failed"
         ? t("workflow.canvas.status.failed")
-        : t("workflow.canvas.status.running");
+        : step.waiting
+          ? t("workflow.canvas.status.waiting")
+          : t("workflow.canvas.status.running");
   const spoken = createMemo(() => {
     const step = props.previewing ? undefined : props.step;
-    return step ? `${step.id}\u0000${step.status}` : "";
+    return step ? `${step.id}\u0000${step.status}\u0000${step.waiting}` : "";
   });
   const announcement = createMemo(() => {
     if (!spoken()) return undefined;
     return untrack(() => {
       const step = props.step;
-      return step && { verb: statusVerb(step.status), name: step.name };
+      return step && { verb: statusVerb(step), name: step.name };
     });
   });
   return (
     <header class={props.frame === "window" ? "wfn-hud-top window-drag" : "wfn-hud-top"}>
-      <div class="wfn-hud wfn-hud-title">
-        <DropdownMenu.Root placement="bottom-start" gutter={8} getAnchorRect={hudBarRect} modal={false}>
-          <DropdownMenu.Trigger
-            ref={props.menuRef}
-            class={`${buttonVariants({ variant: "ghost", size: "sm" })} wfn-hud-button wfn-hud-switcher`}
-            hidden={props.renaming}
-          >
-            <span class="wfn-hud-switcher-name">{props.name}</span>
-            <ChevronDown class="wfn-hud-chevron" aria-hidden="true" />
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Portal>{props.switcher}</DropdownMenu.Portal>
-        </DropdownMenu.Root>
-        <Show when={props.renaming}>
-          <Input
-            ref={(element: HTMLInputElement) => {
-              queueMicrotask(() => {
-                element.focus();
-                element.select();
-              });
-            }}
-            class="wfn-hud-name"
-            aria-label={t("workflow.canvas.switcher.name")}
-            spellcheck={false}
-            value={props.name}
-            onValueChange={props.onName}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter" && event.key !== "Escape") return;
-              event.preventDefault();
-              props.onEndRename(event.key === "Enter");
-            }}
-            onBlur={() => props.onEndRename(true)}
-          />
-        </Show>
-      </div>
+      {props.title}
       <div class="wfn-hud-group">
         <Show when={!props.previewing && viewedRun()}>
           {(entry) => (
@@ -214,6 +180,27 @@ export function WorkflowCanvasHeader(props: {
               </Hint>
             </div>
           )}
+        </Show>
+        <Show when={props.paused}>
+          <div class="wfn-hud wfn-hud-paused">
+            <CirclePause aria-hidden="true" />
+            <span class="wfn-hud-label">{t("workflow.canvas.paused")}</span>
+            <Show when={props.onResume}>
+              {(resume) => (
+                <Hint label={t("workflow.canvas.resume")} placement="bottom">
+                  <LabelTooltipTrigger
+                    as={Button}
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t("workflow.canvas.resume")}
+                    onClick={() => resume()()}
+                  >
+                    <Play />
+                  </LabelTooltipTrigger>
+                </Hint>
+              )}
+            </Show>
+          </div>
         </Show>
         <div class="sr-only" role="status">
           <Show when={announcement()}>
@@ -243,7 +230,7 @@ export function WorkflowCanvasHeader(props: {
                   >
                     <LoaderCircle class="wfn-hud-spin" aria-hidden="true" />
                   </Show>
-                  <span class="wfn-hud-meta">{statusVerb(step().status)}</span>
+                  <span class="wfn-hud-meta">{statusVerb(step())}</span>
                   <span class="wfn-hud-step-name">{step().name}</span>
                   <Show when={step().more > 0}>
                     <span class="wfn-hud-count">{t("workflow.canvas.status.more", { count: step().more })}</span>
