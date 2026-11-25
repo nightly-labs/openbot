@@ -5235,7 +5235,8 @@ function isSessionNotFound(error: unknown, sessionId: string, flavor: AcpFlavor)
   return data?.sessionId === sessionId || data?.uri === sessionId || error.message.includes(sessionId);
 }
 
-const DAMAGED_SESSION_STORE = /\b(?:malformed|corrupt(?:ed|ion)?)\b|\bnot a database\b/iu;
+const DAMAGED_SESSION_STORE =
+  /\bdatabase disk image is malformed\b|\bfile is not a database\b|\bdatabase (?:is )?corrupt/iu;
 
 function isUnloadableSession(error: unknown): boolean {
   return error instanceof RequestError && error.code === -32603 && DAMAGED_SESSION_STORE.test(failureText(error));
