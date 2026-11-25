@@ -410,6 +410,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "إزالة {model}",
   "mobile.agent.backupModels.unavailable": "غير متاح الآن · مُتخطى",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "عندما يوقف حدّ الاستخدام {name} بعد أن يبدأ العمل، يتابع {name} العمل نفسه على أول نموذج متاح في الترتيب. يعود إلى {model} عند انتهاء الحد، أو بعد 10 دقائق من خطأ المزوّد.",
   "mobile.agent.busyMessage.label": "أثناء العمل",
@@ -569,6 +570,7 @@ export const messages = {
   "mobile.agent.usage.collection": "بدأ الجمع {started}. آخر تحديث {updated}.",
   "mobile.agent.usage.never": "أبدًا",
   "mobile.agent.record.time": "الوقت",
+  "mobile.agent.record.date": "التاريخ",
   "mobile.agent.section.changeFailed": "تعذّر تغيير المجلد",
   "mobile.agent.section.tryAgain": "حاول مرة أخرى.",
   "mobile.agent.section.moveUp": "نقل لأعلى",
@@ -774,6 +776,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "إيقاف الاستبعاد",
   "mobile.agent.folders.browseTitle": "اختر مجلدًا",
   "mobile.agent.folders.places": "انتقال إلى",
+  "mobile.agent.folders.path": "مسار المجلد",
   "mobile.agent.folders.home": "المجلد الرئيسي",
   "mobile.agent.folders.parent": "صعودًا إلى {folder}",
   "mobile.agent.folders.browseFailed": "تعذّر فتح هذا المجلد.",

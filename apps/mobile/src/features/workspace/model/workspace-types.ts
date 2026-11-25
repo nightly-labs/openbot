@@ -87,6 +87,8 @@ import type {
   HostSignalHomeSettings,
   HostSkillLearning,
   HostTimezoneSettings,
+  HostTurnLimits,
+  HostTurnLimitsInput,
   HostUpdateSettingsChange,
   HostUpdateStatus,
   HostVoiceModel,
@@ -105,6 +107,8 @@ import type {
   McpServerConfig,
   McpSignInState,
   McpTestResult,
+  MediaApprovalCreditsSetting,
+  MediaApprovalCreditsUpdate,
   MessagingOverview,
   MessagingWorkspaceInput,
   OnePasswordConnectorStatus,
@@ -272,6 +276,7 @@ export interface MobileServer {
   role: "owner" | "admin" | "member";
   memberLimit?: number;
   hosted?: boolean;
+  hidden?: true;
   storageGb?: number;
   restartAvailable?: boolean;
   keyChangedAt?: number;
@@ -387,8 +392,10 @@ export interface MobileWorkspaceContextValue {
   selectServer: (serverId: string) => void;
   leaveServer: (serverId: string) => Promise<void>;
   removeServer: (serverId: string) => Promise<void>;
+  setServerHidden: (serverId: string, hidden: boolean) => Promise<void>;
   refreshServers: () => Promise<void>;
   refreshServer: (serverId: string) => Promise<void>;
+  reconnectServer: (serverId: string) => Promise<void>;
   hostedServerStarting: (serverId: string) => void;
   knownServerChecks: (serverId: string) => ServerChecks | null;
   canEditServerIdentity: (serverId: string) => boolean;
@@ -423,6 +430,9 @@ export interface MobileWorkspaceContextValue {
   canManageServerTimezone: (serverId: string) => boolean;
   loadServerTimezone: (serverId: string) => Promise<HostTimezoneSettings>;
   setServerTimezone: (timezone: string | null, serverId: string) => Promise<HostTimezoneSettings>;
+  canManageServerTurnLimits: (serverId: string) => boolean;
+  loadServerTurnLimits: (serverId: string) => Promise<HostTurnLimits>;
+  setServerTurnLimits: (input: HostTurnLimitsInput, serverId: string) => Promise<HostTurnLimits>;
   canManageServerVoiceModel: (serverId: string) => boolean;
   canManageServerSignalHome: (serverId: string) => boolean;
   servesServerSignalHome: (serverId: string) => boolean;
@@ -433,6 +443,12 @@ export interface MobileWorkspaceContextValue {
   canManageAgentMemoryLimit: (serverId: string) => boolean;
   loadAgentMemoryLimit: (serverId: string) => Promise<HostAgentMemoryLimit>;
   setAgentMemoryLimit: (limit: number, serverId: string) => Promise<HostAgentMemoryLimit>;
+  canManageMediaApprovalCredits: (serverId: string) => boolean;
+  loadMediaApprovalCredits: (serverId: string) => Promise<MediaApprovalCreditsSetting>;
+  setMediaApprovalCredits: (
+    update: MediaApprovalCreditsUpdate,
+    serverId: string,
+  ) => Promise<MediaApprovalCreditsSetting>;
   canManageMemoryReview: (serverId: string) => boolean;
   loadMemoryReview: (serverId: string) => Promise<HostMemoryReview>;
   setMemoryReview: (interval: number, serverId: string) => Promise<HostMemoryReview>;
@@ -589,6 +605,7 @@ export interface MobileWorkspaceContextValue {
   testAgentRoutine: (agentId: string, routineId: string, serverId: string) => Promise<void>;
   canManageEvents: (serverId: string) => boolean;
   canManageMissedRuns: (serverId: string) => boolean;
+  canUseOnceRoutines: (serverId: string) => boolean;
   canManageRoutineResults: (serverId: string) => boolean;
   canGiveWebhookSecretToAgent: (serverId: string) => boolean;
   loadRoutineResultOptions: (serverId: string) => Promise<RoutineResultConnectionOption[]>;
@@ -615,6 +632,7 @@ export interface MobileWorkspaceContextValue {
   ) => Promise<AgentMemorySelectionState>;
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
+  loadOnceAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
   loadRoutineCalendar: (
     input: RoutineCalendarInput,
     serverId: string,
@@ -809,6 +827,7 @@ export interface MobileWorkspaceContextValue {
     largeDownload?: RemoteLargeDownload,
     progress?: RemoteDownloadWatch,
     tapped?: boolean,
+    wanted?: () => boolean,
   ) => Promise<RemoteFileUpload>;
   prioritizeAttachmentDownload: (serverId: string, attachmentId: string) => void;
   downloadMessageFile: (serverId: string, file: MessageFileTarget) => Promise<RemoteFileUpload>;
@@ -876,11 +895,13 @@ type ServerCheckKey =
   | "canCreateLocalServers"
   | "canRestartServerItself"
   | "canManageServerTimezone"
+  | "canManageServerTurnLimits"
   | "canManageServerVoiceModel"
   | "canManageServerSignalHome"
   | "servesServerSignalHome"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
+  | "canManageMediaApprovalCredits"
   | "canManageMemoryReview"
   | "canManageSkillLearning"
   | "canManageBrowsingMemory"
@@ -917,6 +938,7 @@ type ServerCheckKey =
   | "canUpdateMarketplaceAgents"
   | "canManageEvents"
   | "canManageMissedRuns"
+  | "canUseOnceRoutines"
   | "canManageRoutineResults"
   | "canGiveWebhookSecretToAgent"
   | "canManageAgentSkills"

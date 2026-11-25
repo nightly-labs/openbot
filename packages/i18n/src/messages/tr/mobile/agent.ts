@@ -389,6 +389,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "{model} modelini kaldır",
   "mobile.agent.backupModels.unavailable": "Şu an uygun değil · atlandı",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Bir kullanım sınırı {name} işe başladıktan sonra onu durdurursa, {name} aynı işe sıradaki ilk kullanılabilir modelle devam eder. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
   "mobile.agent.busyMessage.label": "Çalışırken",
@@ -540,6 +541,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Toplama başlangıcı: {started}. Güncellendi: {updated}.",
   "mobile.agent.usage.never": "hiçbir zaman",
   "mobile.agent.record.time": "Zaman",
+  "mobile.agent.record.date": "Tarih",
   "mobile.agent.section.changeFailed": "Klasör değiştirilemedi",
   "mobile.agent.section.tryAgain": "Lütfen tekrar deneyin.",
   "mobile.agent.section.moveUp": "Yukarı taşı",
@@ -704,6 +706,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Hariç tutma",
   "mobile.agent.folders.browseTitle": "Klasör seç",
   "mobile.agent.folders.places": "Git",
+  "mobile.agent.folders.path": "Klasör yolu",
   "mobile.agent.folders.home": "Ana klasör",
   "mobile.agent.folders.parent": "Yukarı: {folder}",
   "mobile.agent.folders.browseFailed": "Bu klasör açılamadı.",

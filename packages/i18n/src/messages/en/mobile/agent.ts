@@ -370,6 +370,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.backupModels.remove": "Remove {model}",
   "mobile.agent.backupModels.unavailable": "Not available now · skipped",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "When a usage limit stops {name} after it starts to work, {name} continues the same work on the first available model in the order. It goes back to {model} when the limit ends, or 10 minutes after a provider error.",
   "mobile.agent.busyMessage.label": "While working",
@@ -518,6 +519,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.usage.collection": "Collection started {started}. Updated {updated}.",
   "mobile.agent.usage.never": "never",
   "mobile.agent.record.time": "Time",
+  "mobile.agent.record.date": "Date",
   "mobile.agent.section.changeFailed": "Could not change folder",
   "mobile.agent.section.tryAgain": "Please try again.",
   "mobile.agent.section.moveUp": "Move up",
@@ -674,6 +676,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.folders.includeConfirm": "Stop excluding",
   "mobile.agent.folders.browseTitle": "Choose folder",
   "mobile.agent.folders.places": "Go to",
+  "mobile.agent.folders.path": "Folder path",
   "mobile.agent.folders.home": "Home folder",
   "mobile.agent.folders.parent": "Up to {folder}",
   "mobile.agent.folders.browseFailed": "Could not open this folder.",

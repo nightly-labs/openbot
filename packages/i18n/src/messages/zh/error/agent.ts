@@ -19,6 +19,8 @@ export const messages = {
     "工具未运行。tool_call 找不到此名称的工具。请使用 tool_search 给出的准确完整名称，例如 openbot_browser.snapshot。",
   "error.agent.toolCallUnknownToolSuggest":
     "工具未运行。tool_call 找不到此名称的工具。完整名称可能是 {name}。如果是，请使用该名称再次发送调用。",
+  "error.agent.toolCallNullValue":
+    "工具未运行。{name} 在 {paths} 需要对象或列表，但这些列表项都以 null 到达。请再次发送调用，并将每一项作为包含其 JSON 的字符串传入。",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe 未找到名为 {names} 的 OpenBot 工具。它只描述 openbot.tool_search 列出的 OpenBot 和浏览器工具，不描述 MCP 工具。",
   "error.agent.toolDescribeDiscoveryNames": "请直接调用 {names}。tool_describe 不描述发现工具。",
@@ -161,6 +163,8 @@ export const messages = {
   "error.agent.screenCaptureUnavailable": "这台电脑不支持截屏。",
   "error.agent.screenCaptureShared": "在 Slack、Discord、Telegram 对话中无法使用截屏，因为其他人也会收到这些文件。",
   "error.agent.screenCaptureDeclined": "用户未允许本次截屏，没有截取任何内容。",
+  "error.agent.creditMediaDeclined": "用户未允许此次生成。未花费任何积分。",
+  "error.agent.creditMediaNotSaved": "文件已生成，但 OpenBot 无法将其保存到聊天中。",
   "error.agent.mcpServerDeclined": "用户未允许这次 MCP 服务器更改，未做任何更改。",
   "error.agent.mcpToolDeclined": "用户未允许这次 MCP 工具调用，工具没有运行。",
   "error.agent.mcpServerNotSaved": "该 MCP 服务器没有响应，因此未保存。{error}",

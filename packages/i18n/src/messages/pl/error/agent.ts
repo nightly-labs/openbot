@@ -20,6 +20,8 @@ export const messages = {
     "Narzędzie nie zostało uruchomione. tool_call nie znalazł narzędzia o tej nazwie. Użyj dokładnej pełnej nazwy z tool_search, na przykład openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "Narzędzie nie zostało uruchomione. tool_call nie znalazł narzędzia o tej nazwie. Pełna nazwa to prawdopodobnie {name}. Jeśli tak, wyślij wywołanie ponownie z tą nazwą.",
+  "error.agent.toolCallNullValue":
+    "Narzędzie nie zostało uruchomione. {name} wymaga obiektu lub listy w {paths}, ale każdy z tych elementów listy dotarł jako null. Wyślij wywołanie ponownie i podaj każdy z tych elementów jako ciąg znaków z jego JSON.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe nie znalazł narzędzia OpenBot o nazwie {names}. Opisuje tylko narzędzia OpenBot i przeglądarki, które podaje openbot.tool_search, a nie narzędzia MCP.",
   "error.agent.toolDescribeDiscoveryNames":
@@ -191,6 +193,8 @@ export const messages = {
     "Przechwytywanie ekranu nie działa w rozmowie w Slacku, Discordzie lub Telegramie, ponieważ jego pliki trafiają do innych osób.",
   "error.agent.screenCaptureDeclined":
     "Użytkownik nie zezwolił na to przechwycenie ekranu. Nic nie zostało przechwycone.",
+  "error.agent.creditMediaDeclined": "Użytkownik nie zezwolił na to generowanie. Nie wydano żadnych kredytów.",
+  "error.agent.creditMediaNotSaved": "Plik został utworzony, ale OpenBot nie mógł zapisać go w czacie.",
   "error.agent.mcpToolDeclined":
     "Użytkownik nie zezwolił na to wywołanie narzędzia MCP. Narzędzie nie zostało uruchomione.",
   "error.agent.screenCaptureWindowMissing":

@@ -139,12 +139,33 @@ async function main(): Promise<void> {
       throw new Error(`Expected ${expectedUnread} unread messages, got ${firstSummary?.unreadCount}.`);
     if (firstSummary.openTasks !== 9 || firstSummary.activeTasks !== 3)
       throw new Error(`Unexpected task counts ${firstSummary.openTasks}/${firstSummary.activeTasks}.`);
+    channels.commit("bench-task-change", {
+      channel: channels.get("channel-0"),
+      messages: [],
+      tasks: [
+        { ...task("channel-0", 0), state: "completed" as const },
+        { ...task("channel-0", 2), state: "completed" as const },
+      ],
+      assignments: [],
+    });
+    const changedSummaries = channels.list(MEMBER_ID);
+    const changedSummary = changedSummaries.find((summary) => summary.id === "channel-0");
+    const otherSummary = changedSummaries.find((summary) => summary.id === "channel-1");
+    if (changedSummary?.openTasks !== 7 || changedSummary.activeTasks !== 2)
+      throw new Error(
+        `Unexpected task counts after a change ${changedSummary?.openTasks}/${changedSummary?.activeTasks}.`,
+      );
+    if (otherSummary?.openTasks !== 9 || otherSummary.activeTasks !== 3)
+      throw new Error(
+        `Unexpected task counts in an unchanged channel ${otherSummary?.openTasks}/${otherSummary?.activeTasks}.`,
+      );
     const counts = {
       channels: CHANNEL_COUNT,
       messages: CHANNEL_COUNT * MESSAGE_COUNT,
       tasks: CHANNEL_COUNT * TASK_COUNT,
       summaries: summaries.length,
       unreadInFirstChannel: firstSummary.unreadCount,
+      tasksInFirstChannelAfterChange: { open: changedSummary.openTasks, active: changedSummary.activeTasks },
     };
     const medianMs = { cold: median(cold), warm: median(warm), oneChanged: median(oneChanged) };
     await mkdir(resolve(".openbot-build"), { recursive: true });

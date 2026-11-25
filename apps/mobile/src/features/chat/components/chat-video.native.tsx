@@ -191,7 +191,8 @@ export function ChatVideoAttachment({
   else if (live === null && failed && lastReceived !== null) setLastReceived(null);
   const received = live ?? (uri || failed ? null : lastReceived);
   const downloads = lastReceived !== null;
-  const loading = !uri && !failed && received !== null;
+  const waiting = !uri && !failed;
+  const loading = waiting && received !== null;
   const progress = uri ? 1 : received !== null && attachment.size > 0 ? Math.min(1, received / attachment.size) : 0;
   const percent = Math.floor(progress * 100);
   const finishing = loading && received !== null && received >= attachment.size;
@@ -238,7 +239,7 @@ export function ChatVideoAttachment({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
-            loading
+            waiting
               ? t("mobile.chat.video.loading", { name: attachment.name })
               : t("mobile.chat.video.play", { name: attachment.name })
           }
@@ -288,19 +289,19 @@ export function ChatVideoAttachment({
               <View pointerEvents="none" className="items-center justify-center" style={FILL}>
                 <Animated.View
                   className="absolute size-14 items-center justify-center rounded-full bg-black/50"
-                  style={{ opacity: loading ? 1 : 0, transform: [{ scale: swapScale(loading) }], ...SWAP_OUT }}
+                  style={{ opacity: waiting ? 1 : 0, transform: [{ scale: swapScale(waiting) }], ...SWAP_OUT }}
                 >
-                  {finishing ? (
-                    <ActivityIndicator color="white" />
-                  ) : (
+                  {loading && !finishing ? (
                     <Typography.Paragraph type="body-sm" className="font-semibold text-white" style={TABULAR}>
                       {format.percent(percent / 100)}
                     </Typography.Paragraph>
+                  ) : (
+                    <ActivityIndicator color="white" />
                   )}
                 </Animated.View>
                 <Animated.View
                   className="size-14 items-center justify-center rounded-full bg-black/50"
-                  style={{ opacity: loading ? 0 : 1, transform: [{ scale: swapScale(!loading) }], ...SWAP_IN }}
+                  style={{ opacity: waiting ? 0 : 1, transform: [{ scale: swapScale(!waiting) }], ...SWAP_IN }}
                 >
                   <Play size={26} color="white" fill="white" style={PLAY_OFFSET} />
                 </Animated.View>

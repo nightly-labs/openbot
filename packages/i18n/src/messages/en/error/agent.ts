@@ -19,6 +19,8 @@ export const messages = defineMessages("error.agent", {
     "The tool did not run. tool_call found no tool with this name. Use the exact qualified name that tool_search gives, such as openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "The tool did not run. tool_call found no tool with this name. The qualified name is possibly {name}. If it is, send the call again with that name.",
+  "error.agent.toolCallNullValue":
+    "The tool did not run. {name} needs an object or a list at {paths}, but each of these list items arrived as null. Send the call again and give each of these items as a string that holds its JSON.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe found no OpenBot tool named {names}. It describes only the OpenBot and browser tools that openbot.tool_search lists, not MCP tools.",
   "error.agent.toolDescribeDiscoveryNames":
@@ -185,6 +187,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.screenCaptureShared":
     "Screen capture does not work in a Slack, Discord or Telegram conversation, because other people get its files.",
   "error.agent.screenCaptureDeclined": "The user did not allow this screen capture. Nothing was captured.",
+  "error.agent.creditMediaDeclined": "The user did not allow this generation. No credits were spent.",
+  "error.agent.creditMediaNotSaved": "The file was made, but OpenBot could not save it in the chat.",
   "error.agent.mcpServerDeclined": "The user did not allow this MCP server change. Nothing changed.",
   "error.agent.mcpToolDeclined": "The user did not allow this MCP tool call. The tool did not run.",
   "error.agent.mcpServerNotSaved": "The MCP server did not answer, so it was not saved. {error}",

@@ -99,6 +99,7 @@ import {
   decodeHostSignalHomeSettings,
   decodeHostSkillLearning,
   decodeHostTimezoneSettings,
+  decodeHostTurnLimits,
   decodeHostUpdateStatus,
   decodeHostVaultCodes,
   decodeHostVaultImport,
@@ -152,6 +153,8 @@ import {
   type HostSignalHomeSettings,
   type HostSkillLearning,
   type HostTimezoneSettings,
+  type HostTurnLimits,
+  type HostTurnLimitsInput,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
   type HostVoiceModel,
@@ -183,6 +186,8 @@ import {
   type McpSignInState,
   type McpSignInStatus,
   type McpTestResult,
+  type MediaApprovalCreditsSetting,
+  type MediaApprovalCreditsUpdate,
   type MessagingOverview,
   type MessagingWorkspaceInput,
   type OnePasswordConnectorStatus,
@@ -347,6 +352,7 @@ import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-relea
 import { HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_SIGNAL_HOME_ROUTES } from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
+import { HOST_TURN_LIMITS_ROUTES } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOST_VOICE_MODEL_ROUTES } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
@@ -359,6 +365,10 @@ import { MCP_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/mcp-access-v
 import { MCP_SIGN_IN_APP_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
+import {
+  decodeMediaApprovalCreditsResponse,
+  MEDIA_APPROVAL_CREDITS_ROUTES,
+} from "@openbot/contracts/team-protocol/media-approval-credits-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
@@ -827,6 +837,19 @@ export function setHostTimezone(
   return adminCall(() => request("POST", HOST_TIMEZONE_ROUTES.update, decodeHostTimezoneSettings, { timezone }));
 }
 
+export function getHostTurnLimits(request: TeamApiRequest): Effect.Effect<HostTurnLimits, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_TURN_LIMITS_ROUTES.settings, decodeHostTurnLimits, {}));
+}
+
+export function setHostTurnLimits(
+  request: TeamApiRequest,
+  { turnLimit, agentTaskLimit }: HostTurnLimitsInput,
+): Effect.Effect<HostTurnLimits, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", HOST_TURN_LIMITS_ROUTES.update, decodeHostTurnLimits, { turnLimit, agentTaskLimit }),
+  );
+}
+
 export function getHostVoiceModel(request: TeamApiRequest): Effect.Effect<HostVoiceModel, TeamAdminRequestError> {
   return adminCall(() => request("POST", HOST_VOICE_MODEL_ROUTES.settings, decodeHostVoiceModel, {}));
 }
@@ -1054,6 +1077,23 @@ export function setHostCacheExpiryCompaction(
 ): Effect.Effect<CacheExpiryCompactionSetting, TeamAdminRequestError> {
   return adminCall(() =>
     request("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, decodeCacheExpiryCompactionResponse, { enabled }),
+  );
+}
+
+export function getHostMediaApprovalCredits(
+  request: TeamApiRequest,
+): Effect.Effect<MediaApprovalCreditsSetting, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", MEDIA_APPROVAL_CREDITS_ROUTES.settings, decodeMediaApprovalCreditsResponse, {}),
+  );
+}
+
+export function setHostMediaApprovalCredits(
+  request: TeamApiRequest,
+  update: MediaApprovalCreditsUpdate,
+): Effect.Effect<MediaApprovalCreditsSetting, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", MEDIA_APPROVAL_CREDITS_ROUTES.update, decodeMediaApprovalCreditsResponse, update),
   );
 }
 

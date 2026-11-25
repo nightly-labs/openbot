@@ -17,10 +17,12 @@ export function ChatCameraContent({
   onBusyChange,
   onCancel,
   onCaptured,
+  onFailedChange,
 }: {
   onBusyChange: (busy: boolean) => void;
   onCancel: () => void;
   onCaptured: (uri: string) => void;
+  onFailedChange: (failed: boolean) => void;
 }) {
   const camera = useRef<CameraView>(null);
   const busyRef = useRef(false);
@@ -31,6 +33,9 @@ export function ChatCameraContent({
   const [error, setError] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
   const { t, sourceText } = useText();
+  useEffect(() => {
+    onFailedChange(error !== null);
+  }, [error, onFailedChange]);
   useEffect(() => {
     mounted.current = true;
     return () => {

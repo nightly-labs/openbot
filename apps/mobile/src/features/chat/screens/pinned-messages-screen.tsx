@@ -119,7 +119,7 @@ export function PinnedMessagesScreen() {
     if (pin.taskId === null) {
       router.dismissTo({
         pathname: "/chat/[agentId]",
-        params: { agentId, messageId: pin.messageId, focusAt: focusAt() },
+        params: { agentId, serverId, messageId: pin.messageId, focusAt: focusAt() },
       });
     } else if (pin.taskId === viewTaskId) {
       router.dismissTo({

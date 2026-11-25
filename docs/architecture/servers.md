@@ -853,6 +853,21 @@ closed. The WebRTC host peer encodes the local response and the events again wit
 The iPhone app advertises it through the shared team client, but it still shows the question as a
 single choice.
 
+### Prompt detail
+
+`prompt-detail-v1` (protocol 10) carries the `detail` text under an agent question, such as the
+commands that `ask_user` asks the user to run (see `team-protocol/prompt-detail-v1.ts`). It goes in
+the same places as `prompt-multi-select-v1`. The frozen codecs leave `detail` out. The host adds it
+after the frozen projection, only for a connection that advertises the capability: `team-api-server.ts`
+for HTTP responses and events, and the WebRTC host peer for its responses and event frames. A question
+gets the detail of the source question with the same message id, or, for a `prompt` event and a
+`pendingPrompts` item, the same agent, thread, turn and `requestId`, and the same question `id`. A
+client copies `detail` back from the wire value after it decodes: the shared team client (web client
+and phone) and, on desktop, `remote-server-http.ts`, `remote-server-event-stream.ts` and
+`team-webrtc-client-transport.ts`. Both sides keep only a nonempty string of at most
+`INPUT_LIMITS.promptQuestion` characters. A client or a host without the capability sends and shows the
+question as before. The iPhone app shows the detail under the question in the question card.
+
 ### Reasoning efforts
 
 `reasoning-efforts-v1` lets an agent `reasoningEffort`, a model `defaultReasoningEffort` and each of
@@ -1028,6 +1043,17 @@ computer's windows get it too. A client reads the list again through `browser-pr
 desktop Browser profiles section and agent setting, the web client and the phone show a change made on
 another device while the page is open.
 
+### Client use
+
+The host counts each authenticated request that is not `GET`, `HEAD` or `OPTIONS` as use of its
+session (`isClientUse` in `src/main/team-api/client-use.ts`), unless its path is in `PASSIVE_ROUTES`
+or `PASSIVE_PATTERNS`. Use from another session of the member stops the phone push for 30 seconds,
+and use keeps a hosted server running. A client sends some `POST` reads by itself: on a timer, on a
+host event such as `runtime-snapshot`, or when a page loads. Put each such read route in
+`PASSIVE_ROUTES` in the change that adds it, so that an open client that nobody uses does not stop the
+phone push. Keep a route that changes data out of the list. `scripts/computer-activity-e2e.ts` checks
+both cases through the Team API.
+
 ### Focus use
 
 `focus-use-v1` adds `POST /v1/client/focus` with an empty body. Only a hosted server advertises it
@@ -1131,7 +1157,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-turn-limits-v1` | Read and set the turns at the same time on the host (1 to 128, unlimited, or automatic) and the default task limit of an agent (1 to 64). Owner or admin. Protocol 9 only | `hostAdmin` |
 | `host-personality-v1` | Read (any member) and set (owner or admin) the response style of the agents | `hostAdmin` |
 | `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
-| `host-restart-v1` | Restart a self-hosted server now. Owner or admin. Only a host in server mode advertises it. Protocol 9 only | `hostAdmin` |
+| `host-restart-v1` | Restart a self-hosted or hosted server now. Owner or admin. Only a host in server mode or a hosted server advertises it. Protocol 9 only | `hostAdmin` |
 | `owner-transfer-v1` | No routes. The host can take a new owner: the owner gives the server to another account through the account service, and the host applies the change. Only a host in server mode that OpenBot does not host advertises it | none: the client calls the account service |
 | `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
@@ -1146,6 +1172,9 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `machine-resources-v1` | Read the disk, memory and CPU use of the host machine; read and set the alert levels and the owner or admin who gets the `machine-alert` event | `storage`, `hostAdmin` |
 | `prompt-cache-ttl-v1` | Read and set how long Claude keeps the prompt cache of the host's agents | `hostAdmin` |
 | `claude-compact-window-v1` | Read and set the size at which Claude Code compacts the chats of the host's agents. Protocol 9 only | `hostAdmin` |
+| `media-approval-credits-v1` | Read and set the OpenBot credits that one `generate_image` or `generate_video` call of the host's agents can spend before the user must approve it, and the default image and video model. Protocol 10 only | `hostAdmin` |
+| `media-approval-choice-v1` | Read the model offer of a pending media approval and allow it with another model, aspect, resolution, duration or sound. Protocol 10 only | `agent` |
+| `openbot-credits-events-v1` | The event `openbot-credits-changed`, with no data. The host sends it when a credits image or video job of an agent or a workflow ends, so the desktop and the web client read the Credits rail balance again. No route and no balance travel. Protocol 10 only | none: an event only |
 | `provider-environment-v1` | Read and set the environment variables that each process of the host's Claude, Codex and Gemini starts with. Protocol 9 only | `hostAdmin` |
 | `provider-account-models-v1` | Read the models that each account after the first of the host's providers serves and the provider's own sign-in does not, for the model picker of that account. Protocol 9 only | `hostAdmin` |
 | `model-visibility-v1` | Read every model of one provider of the host, and set which of them the model picker shows. Every member reads which models the picker folds under Older models or labels New. Protocol 9 only | `hostAdmin` |
@@ -1259,12 +1288,15 @@ agents' threads, so the next turn uses the new prompt. A host without the capabi
 
 `host-restart-v1` lets an owner or admin restart a self-hosted server from Restart server in the
 server menu (desktop and web client) or in Server settings (mobile). Only a host in server mode
-(`OPENBOT_SERVER=1`, not a hosted server) advertises it, because only there does a service manager
-start the app again: systemd (`Restart=always` in `openbot.service`) or the Docker restart policy.
-The host answers, then quits; it does not use `app.relaunch`, which would start the app outside
-`xvfb-run`. Running agent turns stop, as on any restart. A hosted server still restarts through the
-account service, and a server on this computer through `localServers`. A host that does not answer
-cannot get the request; then the owner runs `sudo openbot restart`.
+(`OPENBOT_SERVER=1`) or a hosted server (`OPENBOT_HOSTED_SERVER=1`) advertises it, because only
+there does a service manager start the app again: systemd (`Restart=always` in `openbot.service`)
+or the Docker restart policy. The host answers, then quits; it does not use `app.relaunch`, which
+would start the app outside `xvfb-run`. Running agent turns stop, as on any restart. A hosted server
+on boat still restarts through the account service, which can also wake a machine that does not
+answer. A hosted server on a Leaseweb machine (`restartAvailable: false` in the account host list)
+uses `host-restart-v1`, and a server on this computer uses `localServers`. A host that does not
+answer cannot get the request; then the owner runs `sudo openbot restart`, or asks support for a
+hosted server.
 
 `owner-transfer-v1` lets the owner give the server to another OpenBot account from Server Settings ›
 Members (desktop, web client and mobile). The owner enters an email; the account service stores a
@@ -1404,6 +1436,45 @@ and the environment of the host still apply. An environment value of the agent s
 compaction stays on. A change applies to the next Claude process, not to a running one. The Context
 section of the Claude page in Server settings → Providers sets it for this computer, for a joined
 server, on the web client and in the mobile app.
+
+`media-approval-credits-v1` reads and sets the credit approval limit of the host's agents
+(`openbot-media-approval-credits-v1.json`; `credits` is a whole number from 0 to 100,000, default 50).
+When one `generate_image` or `generate_video` call of an agent costs more OpenBot credits than this
+limit, the user must approve it. With 0 the user approves each paid call. A change applies
+to the next call. The same file keeps `imageModel` and `videoModel`: the model that a call uses when
+the agent names none (without them, `gpt-image-2.6` and `seedance-2.5`), `agents` and `askWhenBlocked` (both default true; a file without them reads as
+true). When `agents` is false, or the balance is less than the price, the call holds and the chat shows
+a credits hold card: the agent waits until the user buys credits, turns `agents` on, skips, or selects
+"Don't ask again". The card continues by itself when the balance becomes enough. All held calls of one
+turn share one card. When `askWhenBlocked` is false, or the member who started the turn muted the
+asks (`openbot-credit-asks-muted-v1.json`), the call does not hold and the agent says that it skipped
+the step. "Don't ask again" from an owner or an admin sets `askWhenBlocked` to false; the "Ask when
+credits are needed" switch in Server settings → Agents, on desktop, the web client and mobile, sets
+it again. From a member it mutes only that member. The button tooltip and the toast after the click
+name the scope; the owner or admin toast names the switch, and both toasts have Undo. The hover card of
+the Credits rail item also has the "Ask when credits are needed" switch on desktop and the web client:
+for an owner or an admin it sets `askWhenBlocked`, for a member it sets that member's mute
+(`media/muted/read` and `media/muted`). It shows only when the host has `media-approval-choice-v1`. The "Agents can use credits" switch in
+Server settings → Agents and in the hover card of the Credits rail item sets it; the rail item turns
+grey while it is off. The Credits card of Server settings → Agents sets the limit for this computer,
+for a joined server and on the web client; Server settings → Agents of the mobile app sets it too. An
+owner or an admin sets a default model with "Set as default" in the approval card. An instance
+transfer moves the file with the other server preferences; it does not move the muted members file.
+The desktop and web chat, channels, agent thread views and tasks view, the in-window dock chat and the
+browser island in the chat show the hold card; after Turn on, the Credits rail item reads the new
+`agents` value without a reload. The Credits rail item shows the wallet that the agents of the
+active server pay from (`creditsRailWallet`): the wallet of the joined server, the server wallet of
+this computer when this computer is a shared server, and else the personal wallet. The hold card shows
+the same balance. Buy opens the credits page for that wallet. When the user owns the server of
+that wallet (the joined server, or the server wallet of this computer), the hover card has "Move
+credits", which opens the move dialog between the personal wallet and the server wallet. The screen dock and the browser island overlay run in the helper
+window, which has no credits balance, so they show the generic approval card. The mobile app shows a credits hold as a plain approval card: Allow continues when the balance is
+enough, and Decline skips.
+
+`media-approval-choice-v1` lets the approval card of the desktop and the web client show the request
+of a media approval: the model picker with prices, and chips for aspect, resolution, duration and
+sound. Each member who can chat with the agent can change them before Allow. The mobile app shows the
+plain Allow card.
 
 `provider-environment-v1` reads and sets the variables of one provider of the host (see
 [Provider variables](providers.md#provider-variables)): names and plain values in
@@ -1926,6 +1997,17 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
   child's `OPENBOT_LOCAL_SERVER_WORKING` line, reason `agent-turn`). After an unexpected exit, the desktop starts the child again
   after 5 seconds, at most 3 times in 10 minutes. The owner password is registered for redaction
   and is never logged.
+- **Provider sign-ins.** A server made since #15846 has the folder `provider-homes` in its user
+  data. At each start, `LocalServers` gives the child its own `CLAUDE_CONFIG_DIR`, `CODEX_HOME` and
+  `GROK_HOME` there, so its default provider account is its own: a sign-in or a sign-out on one
+  server does not change the others. Gemini stays shared: Antigravity before 1.5.3 ignores
+  `GEMINI_HOME`, and the desktop does not know the CLI version of the child. Other providers also
+  stay shared. Claude Code reads its user setup from `CLAUDE_CONFIG_DIR` too, so on such a server
+  "Use my Claude Code setup" loads the `CLAUDE.md`, skills, agents, hooks and plugins of
+  `provider-homes/claude`, not of `~/.claude`. Claude Code also uses a separate macOS Keychain
+  item when `CLAUDE_CONFIG_DIR` is set. A server without the folder, made by an earlier build, keeps
+  the shared homes (`~/.claude`, `~/.codex` and `~/.grok`): a new home would remove its sign-in and the
+  Claude session files that its agents resume from. An earlier build ignores the folder.
 - **Delete.** The desktop stops the child, removes the entry, and moves both folders to the trash
   with `shell.trashItem`. It never deletes them.
 - **Rename.** The `host-admin` identity route, as on any joined server that the user owns. The child has

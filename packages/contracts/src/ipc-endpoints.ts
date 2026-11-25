@@ -5,7 +5,14 @@ import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
 import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
 import type { BillingDetails, BillingDetailsRequest } from "./billing-details";
-import type { CreditActivity, CreditCheckoutRequest, CreditsState, CreditTransferRequest } from "./credits";
+import type {
+  CreditActivity,
+  CreditCheckoutRequest,
+  CreditRedeemRequest,
+  CreditRedeemResult,
+  CreditsState,
+  CreditTransferRequest,
+} from "./credits";
 import type { CustomServerCheckoutRequest, CustomServerCheckoutResult } from "./custom-server-plans";
 import type {
   CreateHostedServerInput,
@@ -434,6 +441,14 @@ import type {
   SignOutMcpServerInput,
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
+import type {
+  CreditsHold,
+  MediaApprovalRead,
+  ReadMediaApprovalInput,
+  RespondToCreditsHoldInput,
+  RespondToMediaApprovalInput,
+} from "./ipc-media-approval";
+import type { MediaApprovalCreditsSetting, MediaApprovalCreditsUpdate } from "./ipc-media-approval-credits";
 import type { PinnedMessagesSnapshot, SetMessagePinnedInput } from "./ipc-message-pins";
 import type {
   AddMessagingOrchestratorInput,
@@ -602,6 +617,7 @@ import type {
   ScopedTeamPresenceSnapshot,
   SendDirectMessageInput,
   ServerSummary,
+  SetServerHiddenInput,
   SetServerMutedInput,
   SetServerNotificationLevelInput,
   SetTeamTypingInput,
@@ -1263,6 +1279,12 @@ export const IPC_ENDPOINTS = {
     setCacheExpiryCompaction: scopedRequest<boolean, CacheExpiryCompactionSetting, "required">()(
       "host-admin:set-cache-expiry-compaction",
     ),
+    getMediaApprovalCredits: scopedQuery<MediaApprovalCreditsSetting, "required">()(
+      "host-admin:get-media-approval-credits",
+    ),
+    setMediaApprovalCredits: scopedRequest<MediaApprovalCreditsUpdate, MediaApprovalCreditsSetting, "required">()(
+      "host-admin:set-media-approval-credits",
+    ),
     getClaudeUserSetup: scopedQuery<ClaudeUserSetupSetting, "required">()("host-admin:get-claude-user-setup"),
     setClaudeUserSetup: scopedRequest<boolean, ClaudeUserSetupSetting, "required">()(
       "host-admin:set-claude-user-setup",
@@ -1403,6 +1425,7 @@ export const IPC_ENDPOINTS = {
     getActivity: request<undefined, CreditActivity>()("credits:get-activity"),
     openCheckout: request<CreditCheckoutRequest, void>()("credits:open-checkout"),
     transfer: request<CreditTransferRequest, CreditsState>()("credits:transfer"),
+    redeem: request<CreditRedeemRequest, CreditRedeemResult>()("credits:redeem"),
   },
   license: {
     getState: request<undefined, LicenseState>()("license:get-state"),
@@ -1612,6 +1635,13 @@ export const IPC_ENDPOINTS = {
     respondToPrompt: scopedRequest<RespondToPromptInput, void>()("agent:respond-to-prompt"),
     respondToApproval: scopedRequest<RespondToApprovalInput, void>()("agent:respond-to-approval"),
     readPendingApproval: scopedRequest<ReadPendingApprovalInput, AgentApproval | null>()("agent:read-pending-approval"),
+    readMediaApproval: scopedRequest<ReadMediaApprovalInput, MediaApprovalRead>()("agent:read-media-approval"),
+    respondToMediaApproval: scopedRequest<RespondToMediaApprovalInput, void>()("agent:respond-to-media-approval"),
+    respondToCreditsHold: scopedRequest<RespondToCreditsHoldInput, CreditsHold | null>()(
+      "agent:respond-to-credits-hold",
+    ),
+    setCreditsAskMuted: scopedRequest<{ muted: boolean }, void>()("agent:set-credits-ask-muted"),
+    readCreditsAskMuted: scopedQuery<{ muted: boolean }>()("agent:read-credits-ask-muted"),
     listPendingPrompts: scopedQuery<AgentRuntimePrompt[]>()("agent:list-pending-prompts"),
     respondToBrowserSecret: scopedRequest<LocalBrowserSecretResponse, void>()("agent:respond-to-browser-secret"),
     respondToBrowserTakeover: scopedRequest<RespondToBrowserTakeoverInput, void>()("agent:respond-to-browser-takeover"),
@@ -1815,6 +1845,7 @@ export const IPC_ENDPOINTS = {
     select: request<string, ServerSummary[]>()("servers:select"),
     reorder: request<ReorderServersInput, ServerSummary[]>()("servers:reorder"),
     setMuted: request<SetServerMutedInput, ServerSummary[]>()("servers:set-muted"),
+    setHidden: request<SetServerHiddenInput, ServerSummary[]>()("servers:set-hidden"),
     setNotificationLevel: request<SetServerNotificationLevelInput, ServerSummary[]>()("servers:set-notification-level"),
     join: request<JoinServerInput, ServerSummary>()("servers:join"),
     previewInvite: request<JoinServerInput, InvitePreview>()("servers:preview-invite"),

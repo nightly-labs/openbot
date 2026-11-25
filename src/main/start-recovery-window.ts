@@ -29,6 +29,7 @@ interface StartRecoveryOptions {
   locale: TranslatedLocale;
   translate: AppTranslate;
   iconPath: string;
+  showWithoutFocus: boolean;
 }
 
 export interface StartRecovery {
@@ -66,7 +67,7 @@ export function openStartRecoveryWindow(options: StartRecoveryOptions): StartRec
     },
   });
   window.setMenuBarVisibility(false);
-  window.once("ready-to-show", () => window.show());
+  window.once("ready-to-show", () => (options.showWithoutFocus ? window.showInactive() : window.show()));
 
   let settled = false;
   let busy = false;

@@ -62,6 +62,11 @@ export interface SetServerMutedInput {
   durationMs?: number;
 }
 
+export interface SetServerHiddenInput {
+  serverId: string;
+  hidden: boolean;
+}
+
 export interface SetServerNotificationLevelInput {
   serverId: string;
   level: ServerNotificationLevel;
@@ -82,6 +87,7 @@ export interface ServerSummary {
   role: TeamRole | null;
   active: boolean;
   memberLimit?: number;
+  licenseRaisesMemberLimit?: boolean;
   hosted?: boolean;
   restartAvailable?: boolean;
   storageGb?: number;
@@ -89,6 +95,7 @@ export interface ServerSummary {
   customPlan?: CustomServerPlan;
   keyChangedAt?: number;
   thisComputer?: true;
+  hidden?: boolean;
   compatibility?: ServerCompatibility | null;
   issue?: ServerConnectionIssue | null;
   connectionSequence?: number;

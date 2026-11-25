@@ -72,6 +72,30 @@ document.querySelector('[data-testid="replyComposerSubmit"]').addEventListener("
   box.textContent = "";
 });
 </script></body></html>`;
+const X_REDESIGN_STATUS = "2124944836277260700";
+const X_REDESIGN_PATH = `/x-fixture/redesign/dana/status/${X_REDESIGN_STATUS}`;
+const X_REDESIGN_FIXTURE = `<!doctype html><html><head><meta charset="utf-8"><title>X</title></head><body>
+<main>
+<div tabindex="-1" data-navigation-stop=""><article>
+<div><span><a href="/dana"><div dir="auto">Dana</div></a></span><span><a href="/dana"><span>@dana</span></a></span></div>
+<div dir="auto" lang="en">Coffee doubles your focus for ten hours.</div>
+<a data-engagement-action="media" href="${X_REDESIGN_PATH}/photo/1"><img src="https://pbs.twimg.com/media/coffee.jpg" alt=""></a>
+<a data-base-ui-tooltip-trigger="" href="${X_REDESIGN_PATH}">Nov 23</a>
+<div><div aria-hidden="true"></div><textarea aria-label="Post your reply" aria-multiline="true" rows="1"></textarea>
+<button data-slot="xds-button" type="button" class="x-button bg-btn-primary" style="border-radius:999px;padding:8px 16px">Reply</button></div>
+</article></div>
+<article>
+<div><span><a href="/erin"><div dir="auto">Erin</div></a></span><span><a href="/erin"><span>@erin</span></a></span></div>
+<div dir="auto" lang="en">Erin thinks this is nonsense.</div>
+</article>
+</main>
+<script>
+document.querySelector("button.bg-btn-primary").addEventListener("click", () => {
+  const box = document.querySelector("textarea");
+  document.body.dataset.posted = box.value;
+  box.value = "";
+});
+</script></body></html>`;
 const servedRules: XPageRules = {
   mention: X_PAGE_RULES_DEFAULT.mention,
   selectors: {
@@ -92,12 +116,60 @@ const xServer = Bun.serve({
       });
     if (url.pathname.startsWith("/share-fixture/"))
       return new Response(SHARE_FIXTURE, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+    if (url.pathname.startsWith("/x-fixture/redesign/"))
+      return new Response(X_REDESIGN_FIXTURE, { headers: { "Content-Type": "text/html; charset=utf-8" } });
     if (url.pathname.startsWith("/x-fixture/"))
       return new Response(X_FIXTURE, { headers: { "Content-Type": "text/html; charset=utf-8" } });
     return new Response("Not found", { status: 404 });
   },
 });
 const xBase = `http://127.0.0.1:${xServer.port}`;
+
+interface CapturedEvent {
+  type: string;
+  clientId: string | null;
+  name: string;
+  profileId: string;
+  surface: unknown;
+  generation: unknown;
+  platform: unknown;
+  raw: string;
+}
+const captured: CapturedEvent[] = [];
+const captureServer = Bun.serve({
+  hostname: "127.0.0.1",
+  port: 0,
+  async fetch(request) {
+    const cors = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "content-type, openpanel-client-id",
+    };
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+    const raw = await request.text();
+    const body = JSON.parse(raw);
+    captured.push({
+      type: String(body.type),
+      clientId: request.headers.get("openpanel-client-id"),
+      name: String(body.payload?.name ?? ""),
+      profileId: String(body.payload?.profileId ?? ""),
+      surface: body.payload?.properties?.surface,
+      generation: body.payload?.properties?.event_schema_version,
+      platform: body.payload?.properties?.platform,
+      raw,
+    });
+    return new Response(null, { status: 202, headers: cors });
+  },
+});
+const ANALYTICS_CHOICE_KEY = "openbot.analytics.v1";
+async function capturedEvent(test: (event: CapturedEvent) => boolean, label: string): Promise<CapturedEvent> {
+  const deadline = Date.now() + UI_WAIT_MS;
+  for (;;) {
+    const found = captured.find(test);
+    if (found) return found;
+    if (Date.now() > deadline) throw new Error(`No analytics event: ${label}`);
+    await Bun.sleep(100);
+  }
+}
 
 interface Report {
   agentId: string;
@@ -122,6 +194,7 @@ interface Report {
     otherReplyLeftOut: boolean;
     postedAtOnce: boolean;
     queueEmptyAfterSend: boolean;
+    redesign?: { posted: boolean; messageComplete: boolean };
     panelStayed?: boolean;
   };
   create?: {
@@ -137,20 +210,24 @@ interface Report {
   sharedTabs?: {
     onWithoutSwitch: boolean;
     ungroupedBeforeUse: boolean;
-    sharedAgain: boolean;
     inOpenBotGroup: boolean;
     presenceAccepted: boolean;
     askShown: boolean;
     buttonClicked: boolean;
     siteStored: boolean;
     siteRevoked: boolean;
-    groupEnded: boolean;
-    presenceEnded: boolean;
   };
   xQueue?: { waitingShown: boolean; sentByRetry: boolean; queueEmpty: boolean };
   silentSignIn?: { signedIn: boolean; noWindow: boolean };
   xRestart?: { sentAfterRestart: boolean; deliveredBy: "start" | "panel"; twoDayOldKept: boolean; queueEmpty: boolean };
   signOut?: { signInShown: boolean };
+  analytics?: {
+    events: string[];
+    allExtensionSurface: boolean;
+    optOutLinked: boolean;
+    afterOptOutAnonymous: boolean;
+    leaks: string[];
+  };
   pageErrors: string[];
   screenshots: string[];
   passed: boolean;
@@ -161,7 +238,12 @@ const host = await connectChannelE2e(NAME);
 
 const build = spawnSync("bun", ["run", "build", "--", "--mode", "development"], {
   cwd: EXTENSION,
-  env: { ...process.env, VITE_OPENBOT_API_URL: authApi, VITE_OPENBOT_X_RULES_URL: `${xBase}/x-rules` },
+  env: {
+    ...process.env,
+    VITE_OPENBOT_API_URL: authApi,
+    VITE_OPENBOT_X_RULES_URL: `${xBase}/x-rules`,
+    OPENBOT_ANALYTICS_CAPTURE_URL: `http://127.0.0.1:${captureServer.port}`,
+  },
   stdio: "inherit",
 });
 assert.equal(build.status, 0, "The extension build failed.");
@@ -222,11 +304,14 @@ async function shot(page: Page, label: string): Promise<void> {
 let panel: Page | null = null;
 async function toHome(target: Page): Promise<void> {
   const server = target.getByRole("button", { name: english("extension.home.serverMenu") });
-  const atHome = await server.click({ trial: true, timeout: 2_000 }).then(
-    () => true,
-    () => false,
-  );
-  if (!atHome) await target.getByRole("button", { name: english("common.back"), exact: true }).click();
+  for (let step = 0; step < 3; step += 1) {
+    const atHome = await server.click({ trial: true, timeout: 2_000 }).then(
+      () => true,
+      () => false,
+    );
+    if (atHome) return;
+    await target.getByRole("button", { name: english("common.back"), exact: true }).click();
+  }
 }
 const made: { folderId: string | null; channelId: string | null; agentId: string | null } = {
   folderId: null,
@@ -265,6 +350,7 @@ try {
   const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker", { timeout: UI_WAIT_MS }));
   const extensionId = new URL(worker.url()).host;
   report.extensionId = extensionId;
+  await capturedEvent((event) => event.name === "extension_installed", "extension_installed");
   const agentName = await host.page.evaluate(async (id) => {
     const found = (await window.openbot.agent.listAgents()).find((candidate) => candidate.id === id);
     if (!found) throw new Error(`Unknown agent: ${id}`);
@@ -335,6 +421,19 @@ try {
   const agentButton = page.getByRole("button", { name: new RegExp(`^${literal(agentName)}\\b`) }).first();
   await agentButton.waitFor({ timeout: UI_WAIT_MS });
   report.signIn = { invalidExtensionRefused: true, cancelShown: true, homeShowsServer: true, homeShowsAgent: true };
+  await worker.evaluate(`(async () => {
+    const session = (await chrome.storage.local.get("openbot.session.v1"))["openbot.session.v1"];
+    const response = await fetch(${JSON.stringify(`${authApi}/v1/me/analytics`)}, {
+      method: "PUT",
+      headers: { authorization: "Bearer " + session.token, "content-type": "application/json" },
+      body: JSON.stringify({ enabled: true, ageMs: 0 }),
+    });
+    if (!response.ok) throw new Error("The account did not save the analytics answer: " + response.status);
+    await chrome.storage.local.set({
+      "openbot.session.v1": { ...session, user: { ...session.user, analyticsEnabled: true } },
+      "${ANALYTICS_CHOICE_KEY}": { enabled: true, at: Date.now(), accountId: session.user.id },
+    });
+  })()`);
   await shot(page, "1-home");
 
   await agentButton.click();
@@ -582,48 +681,30 @@ try {
   );
   await page.getByRole("button", { name: english("common.back"), exact: true }).click();
   await serverTitle.click();
-  await page.getByRole("menuitem", { name: english("extension.browser.title") }).click();
+  await page.getByRole("menuitem", { name: english("extension.home.settings") }).click();
+  const sharedTabs = page.getByRole("button", { name: new RegExp(`^${english("extension.browser.title")}`) });
+  await sharedTabs.click();
+  assert.equal(await sharedTabs.getAttribute("aria-expanded"), "true", "Shared tabs did not open in Settings.");
   await shot(page, "6b-shared-tabs-settings");
   await page
     .getByRole("button", { name: english("extension.browser.revokeSite", { site: new URL(xBase).host }) })
     .click();
   await page.getByText(english("extension.browser.noSites")).waitFor({ timeout: UI_WAIT_MS });
   const siteRevoked = JSON.parse(await readStored(sitesKey))?.[site] === undefined;
-  await page.getByRole("button", { name: english("extension.browser.stop") }).click();
-  const groupEnded =
-    (await waitFor(host.page, "the group ended", fixtureGroup, (value) => value === "null")) === "null";
-  await waitFor(
-    host.page,
-    "the server accepted the end of the presence",
-    () => readStored(presenceKey),
-    (value) => value.includes('"sharing":false'),
-  );
-  await serverTitle.click();
-  await page.getByRole("menuitem", { name: english("extension.browser.share") }).click();
-  const sharedAgain = (
-    await waitFor(
-      host.page,
-      "the server accepted the presence again",
-      () => readStored(presenceKey),
-      (value) => value.includes('"sharing":true'),
-    )
-  ).includes('"sharing":true');
+  await toHome(page);
   report.sharedTabs = {
     onWithoutSwitch,
     ungroupedBeforeUse,
-    sharedAgain,
     inOpenBotGroup,
     presenceAccepted: true,
     askShown: true,
     buttonClicked: true,
     siteStored,
     siteRevoked,
-    groupEnded,
-    presenceEnded: true,
   };
+  assert.ok(onWithoutSwitch, "Sharing is not on by default.");
   assert.ok(ungroupedBeforeUse, "The page joined the OpenBot group before an agent used it.");
   assert.ok(inOpenBotGroup, "The page that the agent used is not in the OpenBot group.");
-  assert.ok(sharedAgain, "Share tabs with agents did not turn sharing on again.");
   assert.ok(siteStored, "Always for this site did not store the site.");
   assert.ok(siteRevoked, "Remove did not forget the site.");
   await shareFixture.close();
@@ -750,6 +831,58 @@ try {
   assert.ok(messageHasPostThreadAndWords, `The X agent message is not complete: ${sent.text}`);
   assert.ok(otherReplyLeftOut, "The X agent message has the reply of another person.");
   assert.ok(postedAtOnce, "The page did not post the reply at once.");
+
+  const redesignQuestion = `Is the redesign claim true? ${run}`;
+  const redesignTasksBefore = new Set(
+    (await host.page.evaluate((id) => window.openbot.agent.listTasks(id), xAgentId)).tasks.map((entry) => entry.id),
+  );
+  await xPage.goto(`${xBase}${X_REDESIGN_PATH}`);
+  await xPage.locator("textarea").click();
+  await xPage.keyboard.type(`@OpenBot_ ${redesignQuestion}`);
+  const redesignReply = xPage.locator('button.bg-btn-primary[data-openbot-x="armed"]');
+  await redesignReply.waitFor({ timeout: 60_000 });
+  await shot(xPage, "8a-x-redesign-armed");
+  await redesignReply.click();
+  await xPage.waitForFunction(() => document.body.dataset.posted !== undefined, null, { timeout: 5_000 });
+  const redesignPosted = (await xPage.evaluate(() => document.body.dataset.posted ?? "")).includes(redesignQuestion);
+  const redesignTasks = await waitFor(
+    host.page,
+    "The X agent has a thread for the redesigned page",
+    (): Promise<AgentTasksSnapshot> => host.page.evaluate((id) => window.openbot.agent.listTasks(id), xAgentId),
+    (snapshot) => snapshot.tasks.some((entry) => !redesignTasksBefore.has(entry.id)),
+  );
+  const redesignTask = redesignTasks.tasks.find((entry) => !redesignTasksBefore.has(entry.id));
+  assert.ok(redesignTask, "The X agent has no thread for the post on the redesigned page.");
+  const redesignThread = await waitFor(
+    host.page,
+    "the redesigned page thread has the post",
+    (): Promise<ConversationSnapshot> =>
+      host.page.evaluate((value) => window.openbot.agent.readTask(value), {
+        agentId: xAgentId,
+        taskId: redesignTask.id,
+      }),
+    (snapshot) => snapshot.messages.some((entry) => entry.author === "user" && entry.text.includes(redesignQuestion)),
+  );
+  const redesignSent = redesignThread.messages.find(
+    (entry) => entry.author === "user" && entry.text.includes(redesignQuestion),
+  );
+  assert.ok(redesignSent);
+  const redesignMessageComplete =
+    redesignSent.text.includes("Coffee doubles your focus") &&
+    redesignSent.text.includes("Dana (@dana)") &&
+    redesignSent.text.includes("2026") &&
+    redesignSent.text.includes(`${xBase}${X_REDESIGN_PATH}`) &&
+    !redesignSent.text.includes(`${X_REDESIGN_PATH}/photo`) &&
+    redesignSent.text.includes("https://pbs.twimg.com/media/coffee.jpg") &&
+    !redesignSent.text.includes("Erin thinks") &&
+    !redesignSent.text.includes("@OpenBot_");
+  report.x = { ...report.x, redesign: { posted: redesignPosted, messageComplete: redesignMessageComplete } };
+  assert.ok(redesignPosted, "The redesigned page did not post the reply.");
+  assert.ok(
+    redesignMessageComplete,
+    `The X agent message from the redesigned page is not complete: ${redesignSent.text}`,
+  );
+  await waitFor(host.page, "the queue of posts is empty", outbox, (count) => count === 0);
   await xPage.close();
 
   const panelStayed = await page.getByRole("button", { name: english("extension.home.serverMenu") }).isVisible();
@@ -820,9 +953,30 @@ try {
   await toHome(page);
 
   await toHome(page);
+  const accountId = await page.evaluate<string>(
+    `chrome.storage.local.get("openbot.session.v1").then((items) => items["openbot.session.v1"].user.id)`,
+  );
+  await serverTitle.click();
+  await page.getByRole("menuitem", { name: english("extension.home.settings") }).click();
+  const analyticsSwitch = page.getByRole("switch", { name: english("settings.analytics.title") });
+  await analyticsSwitch.waitFor({ timeout: UI_WAIT_MS });
+  assert.ok(await analyticsSwitch.isChecked(), "Analytics is not linked at the start.");
+  await shot(page, "9a-settings-analytics-on");
+  await page.getByText(english("settings.analytics.title"), { exact: true }).click();
+  const optOut = await capturedEvent(
+    (event) => event.name === "analytics_preference_changed",
+    "analytics_preference_changed",
+  );
+  assert.ok(!(await analyticsSwitch.isChecked()), "The switch did not turn off.");
+  await shot(page, "9a-settings-analytics-off");
+  await toHome(page);
   await serverTitle.click();
   await page.getByRole("menuitem", { name: english("extension.home.signOut") }).click();
   await signInButton.waitFor({ timeout: UI_WAIT_MS });
+  const signedOut = await capturedEvent(
+    (event) => event.name === "account_sign_out" && captured.indexOf(event) > captured.indexOf(optOut),
+    "account_sign_out after the opt-out",
+  );
   const windows: string[] = [];
   const seeWindow = (opened: Page) => windows.push(opened.url());
   context.on("page", seeWindow);
@@ -909,6 +1063,47 @@ try {
   await reopened.getByRole("menuitem", { name: english("extension.home.signOut") }).click();
   await reopened.getByRole("button", { name: english("extension.signIn.withWeb") }).waitFor({ timeout: UI_WAIT_MS });
   report.signOut = { signInShown: true };
+
+  const tracks = captured.filter((event) => event.type === "track");
+  const names = [...new Set(tracks.map((event) => event.name))].sort();
+  const leaks = captured.flatMap((event) =>
+    [run, new URL(xBase).host, ...(event.type === "track" ? [email] : [])]
+      .filter((secret) => event.raw.includes(secret))
+      .map((secret) => `${event.type} ${event.name}: ${secret}`),
+  );
+  report.analytics = {
+    events: names,
+    allExtensionSurface: tracks.every(
+      (event) =>
+        event.clientId !== null &&
+        event.surface === "extension" &&
+        event.generation === 1 &&
+        event.platform === "chrome",
+    ),
+    optOutLinked: optOut.profileId === accountId,
+    afterOptOutAnonymous: signedOut.profileId.startsWith("install-"),
+    leaks,
+  };
+  for (const expected of [
+    "extension_installed",
+    "extension_opened",
+    "account_sign_in_completed",
+    "message_send",
+    "voice_transcription",
+    "folder_action",
+    "channel_action",
+    "agent_action",
+    "x_reply_action",
+    "browser_sharing_action",
+    "browser_sharing_ask",
+    "analytics_preference_changed",
+    "account_sign_out",
+  ])
+    assert.ok(names.includes(expected), `No ${expected} event: ${names.join(", ")}`);
+  assert.ok(report.analytics.allExtensionSurface, "An event has no extension surface.");
+  assert.ok(report.analytics.optOutLinked, "The opt-out event is not linked to the account.");
+  assert.ok(report.analytics.afterOptOutAnonymous, "An event after the opt-out has the account.");
+  assert.deepEqual(leaks, [], "An analytics event has user content.");
   assert.deepEqual(report.pageErrors, [], "The panel threw errors.");
   report.passed = true;
 } catch (error) {
@@ -921,5 +1116,6 @@ try {
   await context.close().catch(() => undefined);
   rmSync(profile, { recursive: true, force: true });
   await xServer.stop(true);
+  await captureServer.stop(true);
   await host.close().catch(() => undefined);
 }

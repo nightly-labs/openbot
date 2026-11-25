@@ -241,4 +241,29 @@ export const messages = {
   "billing.details.vatIdInvalid": "To nie jest numer VAT wybranego kraju.",
   "billing.details.countryMissing": "Wybierz kraj rozliczenia.",
   "billing.details.saveFailed": "Nie udało się zapisać danych rozliczeniowych",
+  "billing.credits.explainer.title": "Czym są kredyty?",
+  "billing.credits.explainer.page": "{page} z {total}",
+  "billing.credits.explainer.pages": "Strony",
+  "billing.credits.explainer.mediaTitle": "Kredyty płacą za multimedia",
+  "billing.credits.explainer.mediaText": "Gdy agent tworzy obraz, wideo lub głos, zużywa kredyty.",
+  "billing.credits.explainer.chatTitle": "Czaty pozostają bezpłatne",
+  "billing.credits.explainer.chatText":
+    "Czaty korzystają z Twojego dostawcy AI. Rozmowa z agentami nie zużywa kredytów.",
+  "billing.credits.explainer.chatFree": "0 kredytów",
+  "billing.credits.explainer.modelsTitle": "Każdy model ma cenę",
+  "billing.credits.explainer.modelsText":
+    "Lepsze modele kosztują więcej. Obraz zużywa {pictureMin}–{pictureMax} kredytów, a wideo {seconds} s {videoMin}–{videoMax}.",
+  "billing.credits.explainer.perPicture": "/ obraz",
+  "billing.credits.explainer.perClip": "/ wideo {seconds} s",
+  "billing.credits.explainer.getTitle": "Zdobądź kredyty",
+  "billing.credits.explainer.getText":
+    "Kup pakiet, gdy potrzebujesz więcej. Większe pakiety dają lepszą cenę za kredyt.",
+  "billing.credits.explainer.freeEnd": "Miesięczne bezpłatne kredyty mają datę ważności",
+  "billing.credits.explainer.welcome":
+    "Nowe konta dostają bezpłatne kredyty ({amount}) na wypróbowanie niektórych modeli",
+  "billing.credits.welcomeIncluded": "Bezpłatne kredyty: {amount}",
+  "billing.credits.explainer.allPrices": "Wszystkie modele ({count})",
+  "billing.credits.explainer.next": "Dalej",
+  "billing.credits.explainer.gotIt": "Rozumiem",
+  "billing.credits.explainer.place": "OpenBot",
 } as const satisfies PartialTranslation<typeof source>;

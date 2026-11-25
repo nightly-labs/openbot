@@ -157,6 +157,10 @@ function openbotGuidance(namespace: string, tool: string): string {
         "OpenBot renders GitHub-flavored Markdown tables: a header row, a separator row with three or more dashes per column, and one or more data rows. A fenced ```mermaid block shows a diagram. A fenced ```html block shows a static page next to its code: inline CSS, inline SVG, and data: URLs only, with no scripts or network loads.",
         "When a chart, a table, a diagram, an image collage, or a mockup needs scripts or a CDN library, publish a self-contained page with openbot.html_render before your final answer. OpenBot shows it above the answer, so do not announce or repeat it; add only what it does not say.",
       ].join("\n");
+    case "list_media_models":
+    case "generate_image":
+    case "generate_video":
+      return "openbot.list_media_models (with tool_call) gives the model ids, options and prices; use them when the user names a model, an option or a price. Each call makes one file and spends credits: make no variants that the user did not ask for. To edit a picture, give its local path in images. When the user declines or skips, or the balance is too low, tell the user and do not try another model.";
     case "set_backdrop":
       return "Check the page with openbot.html_preview first when you can. Give matching bubbles colors unless the user wants the page only.";
     case "react_to_user_message":

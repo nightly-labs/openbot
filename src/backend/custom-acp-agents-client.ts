@@ -4,9 +4,9 @@ import { CUSTOM_AGENT_DEFAULT_MODEL, customAgentIdOfModel } from "@openbot/contr
 import { type AgentSessionSettingsSnapshot, type AgentSessionSettingValue, isAgentModel } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Deferred, Effect, Exit } from "effect";
+import { Deferred, Effect, Exit, Option, Result } from "effect";
 import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
-import { type AcpHistoryPersistence, withStartModels } from "./acp-client";
+import { ACP_SESSION_PROCESS_START_TIMEOUT_MS, type AcpHistoryPersistence, withStartModels } from "./acp-client";
 import { type AcpFlavor, customAgentFlavor } from "./acp-flavor";
 import { type AgentClient, AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
 import { agentLaunchPath } from "./cli";
@@ -53,6 +53,10 @@ export type CustomAgentChildFactory = (
 const MODEL_LIST_TIMEOUT_MS = 5_000;
 
 const WRITE_DENIED = /\bEPERM\b|operation not permitted|attempt to write a readonly database/iu;
+export function isDeniedWriteLine(message: string): boolean {
+  return WRITE_DENIED.test(message);
+}
+
 const WORKSPACE_ONLY_HINT = sourceText("error.provider.customAgentWorkspaceOnly", { reason: "" });
 
 function withWorkspaceOnlyHint(message: string): string {
@@ -67,6 +71,13 @@ interface ClientEvents {
 }
 
 type ModelEntry = ModelListResponse["data"][number];
+
+interface StartModelsRead {
+  readonly models: Deferred.Deferred<ModelEntry[], ProviderClientOperationError>;
+  outwaited: boolean;
+}
+
+export const CUSTOM_AGENT_MODELS_LISTED = "openbot/customAgentModels/listed";
 
 function sessionAgent(value: string): string | null {
   const colon = value.indexOf(":");
@@ -125,6 +136,8 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   readonly #requests = new Map<RequestId, { child: AgentClient; id: RequestId }>();
   #nextRequestId = 0;
   readonly #lastModels = new Map<string, ModelEntry[]>();
+  readonly #startReads = new Map<string, StartModelsRead>();
+  readonly #lateModels = new Set<string>();
   #running = false;
 
   constructor(
@@ -246,6 +259,8 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
 
   readonly stop = Effect.fn("CustomAcp.stop")(function* (this: CustomAcpAgentsClient) {
     this.#running = false;
+    this.#lateModels.clear();
+    this.#startReads.clear();
     const children = [...this.#children.values()];
     this.#children.clear();
     this.#sessionKeys.clear();
@@ -612,7 +627,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       created.once("exit", (error) => this.#childExited(key, folder, created, this.#publicError(error)));
       yield* customStep(() => created.start());
       yield* created
-        .request("initialize", {}, decodeRecordResponse)
+        .request("initialize", {}, decodeRecordResponse, ACP_SESSION_PROCESS_START_TIMEOUT_MS)
         .pipe(toProviderClientOperationError)
         .pipe(Effect.onError(() => created.stop().pipe(Effect.catch(() => Effect.void))));
       return created;
@@ -693,48 +708,106 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     params: unknown,
     timeoutMs: number,
   ) {
-    const configs = this.#source();
-    const lists = yield* Effect.forEach(
-      configs,
-      (config) =>
-        this.#discoveryChild(config.id)
-          .pipe(toProviderClientOperationError)
-          .pipe(
-            Effect.flatMap(({ child, started }) =>
-              child
-                .request("model/list", started ? withStartModels(params) : params, decodeModelListResponse, timeoutMs)
-                .pipe(toProviderClientOperationError),
-            ),
-            Effect.timeoutOrElse({
-              duration: timeoutMs,
-              orElse: () =>
-                Effect.fail(
-                  new ProviderClientOperationError({
-                    cause: new Error(`${config.name} request timed out: model/list`),
-                  }),
-                ),
-            }),
-            Effect.flatMap((response) =>
-              customStep(() => {
-                const models = routedModels(config, response.data, response.steersTurns === true);
-                this.#lastModels.set(config.id, models);
-                return models;
-              }),
-            ),
-            Effect.catch((error) =>
-              Effect.sync(() => {
-                this.emit(
-                  "diagnostic",
-                  this.#redact(`Custom agent ${config.id} did not list its models: ${String(error.cause)}`),
-                );
-                return this.#lastModels.get(config.id) ?? [];
-              }),
-            ),
-          ),
-      { concurrency: "unbounded" },
-    );
+    const lists = yield* Effect.forEach(this.#source(), (config) => this.#agentModels(config, params, timeoutMs), {
+      concurrency: "unbounded",
+    });
     return lists.flat();
   });
+
+  readonly #agentModels = Effect.fn("CustomAcp.agentModels")(function* (
+    this: CustomAcpAgentsClient,
+    config: CustomAgentConfig,
+    params: unknown,
+    timeoutMs: number,
+  ) {
+    if (this.#lateModels.delete(config.id)) return this.#lastModels.get(config.id) ?? [];
+    let startRead = this.#startReads.get(config.id);
+    if (!startRead && !this.#children.has(childKey(config.id, null))) {
+      startRead = { models: Deferred.makeUnsafe(), outwaited: false };
+      this.#startReads.set(config.id, startRead);
+      yield* Effect.forkDetach(this.#readAtStart(config, params, startRead), { startImmediately: true });
+    }
+    if (!startRead) {
+      return yield* this.#readModels(config, params, timeoutMs).pipe(
+        Effect.catch((error) => Effect.sync(() => this.#modelsNotListed(config, error))),
+      );
+    }
+    const waiting = startRead;
+    const listed = yield* Deferred.await(waiting.models).pipe(
+      Effect.timeoutOption(timeoutMs),
+      Effect.catch(() => Effect.succeed(Option.none<ModelEntry[]>())),
+      Effect.onInterrupt(() =>
+        Effect.sync(() => {
+          waiting.outwaited = true;
+        }),
+      ),
+    );
+    if (Option.isSome(listed)) return listed.value;
+    startRead.outwaited = true;
+    return this.#lastModels.get(config.id) ?? [];
+  });
+
+  readonly #readAtStart = Effect.fn("CustomAcp.readAtStart")(function* (
+    this: CustomAcpAgentsClient,
+    config: CustomAgentConfig,
+    params: unknown,
+    startRead: StartModelsRead,
+  ) {
+    const result = yield* Effect.result(this.#readModels(config, params, ACP_SESSION_PROCESS_START_TIMEOUT_MS));
+    const current = this.#running && this.#startReads.get(config.id) === startRead;
+    if (current) this.#startReads.delete(config.id);
+    if (Result.isFailure(result)) {
+      yield* Deferred.fail(startRead.models, result.failure);
+      if (current) this.#modelsNotListed(config, result.failure);
+      return;
+    }
+    yield* Deferred.succeed(startRead.models, result.success);
+    if (!startRead.outwaited || !current) return;
+    this.#lateModels.add(config.id);
+    this.emit("notification", { method: CUSTOM_AGENT_MODELS_LISTED, params: {} });
+  });
+
+  #readModels(
+    config: CustomAgentConfig,
+    params: unknown,
+    timeoutMs: number,
+  ): Effect.Effect<ModelEntry[], ProviderClientOperationError> {
+    return this.#discoveryChild(config.id)
+      .pipe(toProviderClientOperationError)
+      .pipe(
+        Effect.flatMap(({ child, started }) =>
+          child
+            .request("model/list", started ? withStartModels(params) : params, decodeModelListResponse, timeoutMs)
+            .pipe(toProviderClientOperationError),
+        ),
+        Effect.timeoutOrElse({
+          duration: timeoutMs,
+          orElse: () =>
+            Effect.fail(
+              new ProviderClientOperationError({
+                cause: new Error(
+                  sourceText("error.provider.acpModelsTimedOut", {
+                    provider: config.name,
+                    seconds: String(Math.round(timeoutMs / 1_000)),
+                  }),
+                ),
+              }),
+            ),
+        }),
+        Effect.flatMap((response) =>
+          customStep(() => {
+            const models = routedModels(config, response.data, response.steersTurns === true);
+            this.#lastModels.set(config.id, models);
+            return models;
+          }),
+        ),
+      );
+  }
+
+  #modelsNotListed(config: CustomAgentConfig, error: ProviderClientOperationError): ModelEntry[] {
+    this.emit("diagnostic", this.#redact(`Custom agent ${config.id} did not list its models: ${String(error.cause)}`));
+    return this.#lastModels.get(config.id) ?? [];
+  }
 }
 
 function routedModels(config: CustomAgentConfig, data: readonly ModelEntry[], steersTurns: boolean): ModelEntry[] {

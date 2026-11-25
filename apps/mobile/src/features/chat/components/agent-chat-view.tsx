@@ -465,12 +465,17 @@ export function MobileChatView({
       workChannel && workActivity ? (
         <>
           {signInProvider ? <ChatProviderSignInRow serverId={agent.serverId} provider={signInProvider} /> : null}
-          <ChatChannelWorkRow channel={workChannel} activity={workActivity} serverId={agent.serverId} />
+          <ChatChannelWorkRow
+            channel={workChannel}
+            activity={workActivity}
+            agentId={agent.id}
+            serverId={agent.serverId}
+          />
         </>
       ) : signInProvider ? (
         <ChatProviderSignInRow serverId={agent.serverId} provider={signInProvider} />
       ) : null,
-    [workChannel, workActivity, agent.serverId, signInProvider],
+    [workChannel, workActivity, agent.id, agent.serverId, signInProvider],
   );
   return (
     <ChatView

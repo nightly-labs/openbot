@@ -84,12 +84,17 @@ const OPENCODE_TITLE_OFF = { title: { disable: true } } as const;
 export const OPENCODE_PROFILE_CONFIG: OpenCodeConfigBase = { permission: { "*": "deny", bash: "ask", read: "ask" } };
 
 export const OPENCODE_AGENT_CONFIG: OpenCodeConfigBase = {
-  permission: { "opencode_session_*": "deny", "opencode_worktree_*": "deny" },
+  permission: {
+    "opencode_session_*": "deny",
+    "opencode_worktree_*": "deny",
+    automation_create: "deny",
+    automation_resume: "deny",
+  },
 };
 
 const OPENCODE_CONFIG_ENV = "OPENCODE_CONFIG_CONTENT";
 
-const OPENCODE_GO_PROVIDER = "opencode-go";
+export const OPENCODE_GO_PROVIDER = "opencode-go";
 
 const OPENCODE_GO_ADVICE = "OpenCode listed no model. Add an OpenCode Go key to continue.";
 
@@ -238,6 +243,10 @@ function mergeOpenCodeConfig(
     ...(Object.keys(entries).length > 0 ? { provider: entries } : {}),
     ...(native ? { providers: native } : {}),
   };
+}
+
+export function clearedInheritedOpenCodeKeyEnv(apiKey: string | null): Record<string, string> {
+  return apiKey && process.env.OPENCODE_API_KEY?.trim() ? { OPENCODE_API_KEY: "" } : {};
 }
 
 export function openCodeConfigEnv(

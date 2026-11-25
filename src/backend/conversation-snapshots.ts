@@ -430,8 +430,10 @@ function isClaudeReasoning(message: ConversationMessage): boolean {
   return message.author === "assistant" && message.itemType === "commentary" && message.id.endsWith(":reasoning");
 }
 
+export const LOST_BACKGROUND_WORK_TAG = "openbot_lost_background_work";
+
 export function isClaudeTaskNotification(text: string): boolean {
-  return text.startsWith("<task-notification>");
+  return text.startsWith("<task-notification>") || text.startsWith(`<${LOST_BACKGROUND_WORK_TAG}>`);
 }
 
 export function isClaudeCompactionSummary(text: string): boolean {

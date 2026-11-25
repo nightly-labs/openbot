@@ -22,6 +22,7 @@ import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { AgentTaskWait } from "@openbot/ui/features/conversation/AgentTasks";
 import type { AttachmentDownloads, AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import type { ComposerPasteResult, ComposerSelection } from "@openbot/ui/features/conversation/ComposerEditor";
+import type { MediaApprovalControls } from "@openbot/ui/features/conversation/MediaApprovalCard";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { AgentThreadView, type AgentThreadVoice } from "@openbot/ui/features/conversation/threads/AgentThreadView";
 import { TaskAnswerCard, TaskPanel } from "@openbot/ui/features/tasks/TaskPanel";
@@ -100,6 +101,7 @@ interface TasksViewProps {
   downloads?: AttachmentDownloads | undefined;
   approvals: readonly AgentApproval[];
   onRespondApproval: (approval: AgentApproval, decision: "accept" | "decline") => Promise<boolean>;
+  mediaApproval?: MediaApprovalControls | undefined;
   onRead?: ((input: AgentTaskInput, messageId: string) => void) | undefined;
   waitsForAnswer?: ((task: AgentTask) => boolean) | undefined;
   onOpenInChat?: ((task: AgentTask) => void) | undefined;
@@ -826,6 +828,7 @@ export function TasksView(props: TasksViewProps) {
               mediaSource={props.mediaSource}
               downloads={props.downloads}
               approval={approval()}
+              media={props.mediaApproval}
               onRespondApproval={async (decision) => {
                 const current = approval();
                 return current ? props.onRespondApproval(current, decision) : false;

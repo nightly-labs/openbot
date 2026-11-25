@@ -407,6 +407,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Убрать {model}",
   "mobile.agent.backupModels.unavailable": "Сейчас недоступна · пропущена",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Если лимит использования остановит {name} после начала работы, {name} продолжит ту же работу на первой доступной модели из списка. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
   "mobile.agent.busyMessage.label": "Во время работы",
@@ -566,6 +567,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Сбор данных начат: {started}. Обновлено: {updated}.",
   "mobile.agent.usage.never": "никогда",
   "mobile.agent.record.time": "Время",
+  "mobile.agent.record.date": "Дата",
   "mobile.agent.section.changeFailed": "Не удалось изменить папку",
   "mobile.agent.section.tryAgain": "Повторите попытку.",
   "mobile.agent.section.moveUp": "Выше",
@@ -760,6 +762,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Не исключать",
   "mobile.agent.folders.browseTitle": "Выбор папки",
   "mobile.agent.folders.places": "Перейти",
+  "mobile.agent.folders.path": "Путь к папке",
   "mobile.agent.folders.home": "Домашняя папка",
   "mobile.agent.folders.parent": "Вверх: {folder}",
   "mobile.agent.folders.browseFailed": "Не удалось открыть эту папку.",

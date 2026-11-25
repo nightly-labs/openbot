@@ -1,11 +1,11 @@
-import { AppWindow, ArrowLeft, Button, CreditCard, Download, Globe2, KeyRound, LogIn, Trash2 } from "@openbot/ui";
+import { Button, CreditCard, Download, Globe2, KeyRound, LogIn } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
+import { track } from "./analytics";
 import {
   ASKS_KEY,
   type AskChoice,
   BROWSER_ANSWER_MESSAGE,
-  BROWSER_SHARE_MESSAGE,
   type BrowserAsk,
   decodeAsks,
   decodeSites,
@@ -30,75 +30,17 @@ function storedValue<T>(key: string, decode: (value: unknown) => T, initial: T):
   return () => value().current;
 }
 
-const siteName = (origin: string) => (URL.canParse(origin) ? new URL(origin).host : origin);
+export const siteName = (origin: string) => (URL.canParse(origin) ? new URL(origin).host : origin);
 
-export async function startSharing(): Promise<void> {
-  await chrome.runtime.sendMessage({ kind: BROWSER_SHARE_MESSAGE, on: true }).catch(() => undefined);
+export function useAllowedSites(): () => string[] {
+  return storedValue(SITES_KEY, decodeSites, []);
 }
 
-export function BrowserSharingScreen(props: { onBack: () => void }) {
-  const { t } = useText();
-  const sites = storedValue(SITES_KEY, decodeSites, []);
-  async function revoke(site: string) {
-    const stored = (await chrome.storage.local.get(SITES_KEY))[SITES_KEY];
-    const kept = Object.fromEntries(
-      decodeSites(stored).flatMap((entry) => (entry === site ? [] : [[entry, "always"]])),
-    );
-    await chrome.storage.local.set({ [SITES_KEY]: kept });
-  }
-  async function stop() {
-    await chrome.runtime.sendMessage({ kind: BROWSER_SHARE_MESSAGE, on: false }).catch(() => undefined);
-    props.onBack();
-  }
-  return (
-    <div class="ext-form-screen">
-      <header class="ch-topbar">
-        <button type="button" class="ch-back" aria-label={t("common.back")} onClick={() => props.onBack()}>
-          <ArrowLeft size={16} aria-hidden="true" />
-        </button>
-        <h1 class="ext-form-title">{t("extension.browser.title")}</h1>
-      </header>
-      <div class="ext-form-body">
-        <p class="ext-browser-note">
-          <AppWindow size={16} aria-hidden="true" />
-          <span>{t("extension.browser.about")}</span>
-        </p>
-        <p class="ext-browser-note">
-          <KeyRound size={16} aria-hidden="true" />
-          <span>{t("extension.browser.alwaysAsk")}</span>
-        </p>
-        <section class="ext-browser-sites" aria-labelledby="ext-browser-sites-title">
-          <h2 id="ext-browser-sites-title" class="ph-section">
-            {t("extension.browser.sites")}
-          </h2>
-          <For each={sites()} fallback={<p class="ph-none">{t("extension.browser.noSites")}</p>}>
-            {(site) => (
-              <div class="ext-browser-site">
-                <Globe2 size={16} aria-hidden="true" />
-                <span class="ext-browser-site-name" dir="ltr">
-                  {siteName(site)}
-                </span>
-                <button
-                  type="button"
-                  class="ext-browser-revoke"
-                  aria-label={t("extension.browser.revokeSite", { site: siteName(site) })}
-                  onClick={() => void revoke(site)}
-                >
-                  <Trash2 size={14} aria-hidden="true" />
-                  <span>{t("extension.browser.revoke")}</span>
-                </button>
-              </div>
-            )}
-          </For>
-        </section>
-      </div>
-      <div class="ext-form-footer">
-        <Button variant="destructive" onClick={() => void stop()}>
-          {t("extension.browser.stop")}
-        </Button>
-      </div>
-    </div>
-  );
+export async function removeAllowedSite(site: string): Promise<void> {
+  const stored = (await chrome.storage.local.get(SITES_KEY))[SITES_KEY];
+  const kept = Object.fromEntries(decodeSites(stored).flatMap((entry) => (entry === site ? [] : [[entry, "always"]])));
+  await chrome.storage.local.set({ [SITES_KEY]: kept });
+  void track("browser_sharing_action", { action: "site_removed" });
 }
 
 function actionWords(ask: BrowserAsk, t: ReturnType<typeof useText>["t"]): string {

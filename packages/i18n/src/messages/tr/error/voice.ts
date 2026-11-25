@@ -44,4 +44,6 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI canlı sesi başlatmayı reddetti. Daha sonra yeniden deneyin veya sesle konuşmak için Ayarlar'dan canlı sesi kapatın.",
   "error.voice.live.off": "Codex canlı ses kapalı. Ayarlar → Ses bölümünden açın.",
+  "error.voice.server.modelUnsupported":
+    "{host}, {model} ile yazıya dökemiyor. Ayarlar → Ses bölümünde ses sunucusu için başka bir dikte modeli seçin.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -11,7 +11,7 @@ import { firstParam } from "@/features/chat/components/use-conversation-message"
 import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
 import { noteChatOpened } from "@/features/quick-actions/model/recent-agents";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
-import { sameAgentApartFromMessage } from "@/features/workspace/model/directory-agents";
+import { findChatAgent, sameAgentApartFromMessage } from "@/features/workspace/model/directory-agents";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -21,17 +21,19 @@ export function AgentChatScreen() {
   const { t } = useText();
   const leaveChat = useLeaveChat();
 
-  const { agentId, messageId, focusAt } = useLocalSearchParams<{
+  const { agentId, serverId, messageId, focusAt } = useLocalSearchParams<{
     agentId: string;
+    serverId?: string;
     messageId?: string;
     focusAt?: string;
   }>();
   const foreground = useThemeColor("foreground");
   const insets = useSafeAreaInsets();
   const resolvedAgentId = firstParam(agentId);
+  const resolvedServerId = firstParam(serverId);
   const resolvedMessageId = firstParam(messageId);
   const agent = useMobileWorkspaceSelector(
-    (current) => current.agents.find((candidate) => candidate.id === resolvedAgentId),
+    (current) => findChatAgent(current.agents, resolvedAgentId, resolvedServerId, current.activeServer.id),
     sameChatAgent,
   );
   const openedAgentId = agent?.id;

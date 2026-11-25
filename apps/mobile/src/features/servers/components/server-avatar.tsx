@@ -81,7 +81,7 @@ export function ServerAvatar({
         : offline;
   const muted = showStatus && !online;
   const showsLogo = Boolean(logo && !logoFailed);
-  const showsPlush = !showsLogo && (server.kind !== "local" || Boolean(server.appearance));
+  const showsPlush = !showsLogo;
   const plush = useServerPlush(
     server.id,
     server.appearance,

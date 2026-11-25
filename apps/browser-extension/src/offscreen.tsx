@@ -4,7 +4,7 @@ import { formatLocale, loadLocale, resolveLocale } from "@openbot/i18n";
 import { currentText, TextProvider } from "@openbot/ui/text";
 import { render } from "@solidjs/web";
 import { type ClientBrowserLink, createClientBrowserLink } from "./client-browser-link";
-import { BROWSER_HOLD_MESSAGE, BROWSER_PRESENCE_MESSAGE } from "./client-browser-messages";
+import { BROWSER_HOLD_MESSAGE } from "./client-browser-messages";
 import { readServerId, readSession, useStorageArea } from "./extension-storage";
 import { createHostConnection, type HostConnection } from "./host-connection";
 import { xSend, xStatus } from "./x-agent";
@@ -12,13 +12,10 @@ import {
   decodeXRequest,
   isStoredItems,
   STORAGE_MESSAGE,
-  X_IDLE_MESSAGE,
   X_OFFSCREEN_MESSAGE,
   type XSendResult,
   type XStatusAnswer,
 } from "./x-messages";
-
-const IDLE_MS = 10 * 60 * 1_000;
 
 useStorageArea({
   get: async (keys) => {
@@ -54,7 +51,6 @@ interface Target {
 
 let target: Target | null = null;
 let queue: Promise<unknown> = Promise.resolve();
-let idle: number | undefined;
 
 function drop() {
   target?.link.dispose();
@@ -127,27 +123,11 @@ async function send(payload: XReplyPayload, clientMessageId: string): Promise<XS
   }
 }
 
-async function sharing(): Promise<boolean> {
-  const answer = await chrome.runtime.sendMessage({ kind: BROWSER_PRESENCE_MESSAGE }).catch(() => null);
-  return isDynamicRecord(answer) && answer.sharing === true;
-}
-
-function armIdle() {
-  window.clearTimeout(idle);
-  idle = window.setTimeout(() => {
-    void sharing().then((shares) => {
-      if (shares) return armIdle();
-      drop();
-      void chrome.runtime.sendMessage({ kind: X_IDLE_MESSAGE });
-    });
-  }, IDLE_MS);
-}
-
 function holdShared() {
   const work = queue
     .then(() => started)
     .then(async () => {
-      if (!target && (await sharing())) await currentTarget();
+      if (!target) await currentTarget();
     });
   queue = work.catch(() => undefined);
 }
@@ -155,13 +135,11 @@ window.setInterval(holdShared, 30_000);
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (isDynamicRecord(message) && message.kind === BROWSER_HOLD_MESSAGE && !sender.tab) {
-    armIdle();
     holdShared();
     return undefined;
   }
   const request = decodeXRequest(message, X_OFFSCREEN_MESSAGE);
   if (!request || sender.tab || request.action === "rules") return undefined;
-  armIdle();
   const next = (): Promise<XStatusAnswer | XSendResult> =>
     request.action === "status" ? status() : send(request.payload, request.clientMessageId ?? crypto.randomUUID());
   const work = queue.then(() => started).then(next);
