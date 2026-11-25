@@ -119,7 +119,6 @@ export function ScrollEdges(props: {
     observer.observe(element);
     if (element.firstElementChild) observer.observe(element.firstElementChild);
     element.addEventListener("scroll", measure, { passive: true });
-    measureEdges(element);
     return () => {
       observer.disconnect();
       element.removeEventListener("scroll", measure);

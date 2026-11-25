@@ -4,6 +4,7 @@ import {
   imageAspectRatioOf,
   imagePixelSize,
 } from "@openbot/contracts/ipc";
+import { ATTACHMENT_PREVIEW_EDGE } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { Button, Download, Maximize2 } from "@openbot/ui";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
@@ -18,6 +19,8 @@ import {
 import { rememberedMediaSize, rememberMediaSize } from "./media-size-memory";
 import { createSteadyImageUrl } from "./steady-image-url";
 
+const TILE_WIDTH = 420;
+
 export type ImageGenerationStatus = MediaGenerationStatus;
 export interface ImageGenerationProps {
   status: ImageGenerationStatus;
@@ -26,6 +29,7 @@ export interface ImageGenerationProps {
   resolution?: string;
   aspectRatio: ImageGenerationAspectRatio;
   attachment?: AttachmentSummary | undefined;
+  copyUrl?: string | undefined;
   error?: string | undefined;
   loading?: boolean | undefined;
   onPreview?: (attachment: AttachmentSummary, origin: HTMLElement) => void;
@@ -35,8 +39,21 @@ export interface ImageGenerationProps {
 export function ImageGeneration(props: ImageGenerationProps) {
   const { t, errorMessage } = useText();
   const [previewError, setPreviewError] = createSignal(false);
-  const [imageSize, setImageSize] = createSignal(untrack(() => rememberedMediaSize(props.attachment?.id)));
-  const imageUrl = createSteadyImageUrl(() => props.attachment?.previewUrl);
+  const [copyFailed, setCopyFailed] = createSignal(false);
+  const [imageSize, setImageSize] = createSignal(
+    untrack(() => {
+      const id = props.attachment?.id;
+      return id ? (rememberedMediaSize(id) ?? rememberedMediaSize(copySizeKey(id))) : null;
+    }),
+  );
+  const copyIsSharp = () => {
+    const size = imageSize();
+    const tallness = size ? Math.max(1, size.height / size.width) : 1;
+    return TILE_WIDTH * tallness * (globalThis.devicePixelRatio || 1) <= ATTACHMENT_PREVIEW_EDGE;
+  };
+  const copy = () =>
+    props.presentation === "attachment" && !copyFailed() && copyIsSharp() ? props.copyUrl : undefined;
+  const imageUrl = createSteadyImageUrl(() => copy() ?? props.attachment?.previewUrl);
   let image: HTMLImageElement | undefined;
   const readRatio = (element: HTMLImageElement) => {
     const { naturalHeight, naturalWidth } = element;
@@ -44,7 +61,7 @@ export function ImageGeneration(props: ImageGenerationProps) {
     const size = { width: naturalWidth, height: naturalHeight };
     setImageSize(size);
     const id = props.attachment?.id;
-    if (id) rememberMediaSize(id, size);
+    if (id) rememberMediaSize(element.src === untrack(copy) ? copySizeKey(id) : id, size);
   };
   createEffect(
     () => imageUrl(),
@@ -153,7 +170,10 @@ export function ImageGeneration(props: ImageGenerationProps) {
                 image = element;
               }}
               onLoad={(event) => readRatio(event.currentTarget)}
-              onError={() => setPreviewError(true)}
+              onError={(event) => {
+                if (event.currentTarget.src === untrack(copy)) setCopyFailed(true);
+                else setPreviewError(true);
+              }}
             />
           </Button>
         </Show>
@@ -207,4 +227,8 @@ export function ImageGeneration(props: ImageGenerationProps) {
       </Show>
     </section>
   );
+}
+
+function copySizeKey(attachmentId: string): string {
+  return `${attachmentId}#copy`;
 }
