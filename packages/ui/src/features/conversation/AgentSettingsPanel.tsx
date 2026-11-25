@@ -1606,23 +1606,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   </Button>
                 </div>
               </Show>
-              <Show when={props.onDeleteAgent}>
-                <div class="agent-settings-notifications">
-                  <div>
-                    <strong>{t("agentSettings.deleteAgent.title")}</strong>
-                    <span>{t("agentSettings.deleteAgent.description")}</span>
-                  </div>
-                  <Button
-                    variant="destructive"
-                    type="button"
-                    aria-label={t("agentSettings.deleteAgent.title")}
-                    aria-haspopup="dialog"
-                    onClick={() => setAgentToDelete({ ...props.agent })}
-                  >
-                    {t("agentSettings.deleteAgent.button")}
-                  </Button>
-                </div>
-              </Show>
               <Show when={props.newChatEditable}>
                 <div class="agent-settings-notifications">
                   <div>
@@ -1681,6 +1664,23 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     </Button>
                   </div>
                 )}
+              </Show>
+              <Show when={props.onDeleteAgent}>
+                <div class="agent-settings-notifications">
+                  <div>
+                    <strong>{t("agentSettings.deleteAgent.title")}</strong>
+                    <span>{t("agentSettings.deleteAgent.description")}</span>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    type="button"
+                    aria-label={t("agentSettings.deleteAgent.title")}
+                    aria-haspopup="dialog"
+                    onClick={() => setAgentToDelete({ ...props.agent })}
+                  >
+                    {t("agentSettings.deleteAgent.button")}
+                  </Button>
+                </div>
               </Show>
             </Show>
             <Show when={draft.saveError}>
