@@ -222,10 +222,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
       return pooled ? [rail, ...keys] : keys;
     }),
   );
-  const poolAccount = (provider: AgentProviderId): string | null => {
+  const poolAccount = (provider: AgentProviderId): string | null | undefined => {
     const pool = railPool(provider);
     const account = pool?.members.find((member) => member.id === pool.inUse) ?? pool?.members[0];
-    return account && account.id !== DEFAULT_PROVIDER_ACCOUNT_ID ? account.id : null;
+    if (!account) return undefined;
+    return account.id !== DEFAULT_PROVIDER_ACCOUNT_ID ? account.id : null;
   };
   const chosenAccount = (provider: AgentProviderId, accountId: string | null): string | null | undefined => {
     if (!railAccounts(provider).length) return undefined;

@@ -192,7 +192,7 @@ const report: {
   deletedAgent?: { ownProcessStopped: boolean; workspaceRemoved: boolean };
   pool?: { second: string | null; default: string | null; null: string | null };
   leftOut?: {
-    account: { afterTurn: string | null; afterModelChange: string | null };
+    account: { afterTurn: string | null; afterModelChange: string | null; pinAfterModelOnly: string | null };
     own: { afterTurn: string | null };
     backInPool: { account: string | null; pinned: string | null };
   };
@@ -672,9 +672,11 @@ try {
   await runCauseEffect(agents.updateAgent({ agentId: pooled.id, providerAccountId: second.id }));
   await talk(pooled.id, "Hello on the account out of the pool.");
   const afterAccountTurn = accountOf(pooled.id);
-  await runCauseEffect(agents.updateAgent({ agentId: pooled.id, model: OTHER_MODEL }));
+  await runCauseEffect(agents.updateAgent({ agentId: pooled.id, model: OTHER_MODEL, providerAccountId: second.id }));
   await talk(pooled.id, "Hello on another model.");
   const afterModelChange = accountOf(pooled.id);
+  await runCauseEffect(agents.updateAgent({ agentId: pooled.id, model: MODEL }));
+  const pinAfterModelOnly = storedAgent(pooled.id).pinnedAccountId ?? null;
   await runCauseEffect(accounts.setPool("codex", { leftOut: ["default"] }));
   await runCauseEffect(agents.updateAgent({ agentId: pooled.id, providerAccountId: null }));
   await talk(pooled.id, "Hello on the own sign-in out of the pool.");
@@ -682,7 +684,7 @@ try {
   await runCauseEffect(agents.updateAgent({ agentId: pooled.id, providerAccountId: second.id }));
   const backInPool = storedAgent(pooled.id);
   report.leftOut = {
-    account: { afterTurn: afterAccountTurn, afterModelChange },
+    account: { afterTurn: afterAccountTurn, afterModelChange, pinAfterModelOnly },
     own: { afterTurn: afterOwnTurn },
     backInPool: { account: backInPool.providerAccountId ?? null, pinned: backInPool.pinnedAccountId ?? null },
   };
@@ -694,6 +696,11 @@ try {
   pass(
     "A model change keeps the agent on the account out of the pool",
     afterModelChange === second.id,
+    JSON.stringify(report.leftOut.account),
+  );
+  pass(
+    "A model change without the account, as an older client sends it, gives the agent back to the pool",
+    pinAfterModelOnly === null,
     JSON.stringify(report.leftOut.account),
   );
   pass(
