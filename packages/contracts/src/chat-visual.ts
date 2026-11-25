@@ -417,7 +417,7 @@ if(!event.defaultPrevented&&src)send({method:"${CHAT_VISUAL_OPEN_IMAGE}",params:
 const jump=(fragment)=>{
 const target=document.getElementById(decodeURIComponent(fragment.slice(1)));
 if(target)target.scrollIntoView();
-else if(fragment.length>1)location.hash=fragment;
+else if(fragment.length>1)location.replace(location.href.split("#")[0]+fragment);
 };
 document.addEventListener("click",(event)=>{
 if(event.button!==0||!(event.target instanceof Element))return;
