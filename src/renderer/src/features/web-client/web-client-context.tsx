@@ -2106,7 +2106,7 @@ export function createWebWorkspace(
       runtime.hosts?.refresh();
       void props
         .onSessionCheck()
-        .then(() => refreshHosts())
+        .then(retryHosts)
         .then(() => {
           if (state.status === "online") return Date.now() - syncedAt < FOCUS_RESYNC_MS ? undefined : resync();
           if (state.recovery?.phase !== "suspended") recoverNow();
