@@ -34,9 +34,7 @@ import {
   type BrowserViewContextMenu,
   type BrowserViewCursor,
   type BrowserViewViewport,
-  browserViewFrameBytes,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
-import { REMOTE_DESKTOP_MAX_SIGNAL_BYTES } from "@openbot/contracts/team-protocol/remote-stream-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Option, Result, Scope, Semaphore } from "effect";
@@ -224,18 +222,16 @@ const VIEW_FRAME_QUALITY = 60;
 const VIEW_FRAME_MAX_WIDTH = 1_280;
 const VIEW_FRAME_MAX_HEIGHT = 800;
 const VIEW_FRAME_LIMIT = 2_048;
+const VIEW_FRAME_MAX_PIXELS = 2_048 * 1_080;
 
-function viewFrameSide(asked: number | undefined, fallback: number): number {
-  return asked === undefined ? fallback : Math.min(VIEW_FRAME_LIMIT, Math.max(fallback, Math.round(asked)));
-}
-
-function fitViewFrameImage(image: Uint8Array): Uint8Array {
-  if (browserViewFrameBytes({ image }) <= REMOTE_DESKTOP_MAX_SIGNAL_BYTES) return image;
-  const picture = nativeImage.createFromBuffer(Buffer.from(image.buffer, image.byteOffset, image.byteLength));
-  if (picture.isEmpty()) return image;
-  const scale = Math.sqrt(REMOTE_DESKTOP_MAX_SIGNAL_BYTES / image.byteLength) * 0.9;
-  const width = Math.max(1, Math.floor(picture.getSize().width * scale));
-  return picture.resize({ width, quality: "good" }).toJPEG(VIEW_FRAME_QUALITY);
+function viewFrameBox(asked: BrowserViewViewport | undefined): { maxWidth: number; maxHeight: number } {
+  if (!asked) return { maxWidth: VIEW_FRAME_MAX_WIDTH, maxHeight: VIEW_FRAME_MAX_HEIGHT };
+  const maxWidth = Math.min(VIEW_FRAME_LIMIT, Math.max(VIEW_FRAME_MAX_WIDTH, Math.round(asked.width)));
+  const tallest = Math.max(VIEW_FRAME_MAX_HEIGHT, Math.floor(VIEW_FRAME_MAX_PIXELS / maxWidth));
+  return {
+    maxWidth,
+    maxHeight: Math.min(VIEW_FRAME_LIMIT, tallest, Math.max(VIEW_FRAME_MAX_HEIGHT, Math.round(asked.height))),
+  };
 }
 const TAB_SET_TOOLS: ReadonlySet<string> = new Set(["open", "list_tabs", "status"]);
 const VIEW_CONTEXT_MENU_MS = 1_500;
@@ -2288,8 +2284,7 @@ export class BrowserHost {
       tab.engine.startScreencast(
         {
           quality: VIEW_FRAME_QUALITY,
-          maxWidth: viewFrameSide(frameSize?.width, VIEW_FRAME_MAX_WIDTH),
-          maxHeight: viewFrameSide(frameSize?.height, VIEW_FRAME_MAX_HEIGHT),
+          ...viewFrameBox(frameSize),
           ...(viewport ? { viewport } : {}),
           ...(onPageCopy
             ? {
@@ -2302,7 +2297,7 @@ export class BrowserHost {
         (frame) => {
           if (!showsPage(streamGeneration)) return;
           sequence += 1;
-          onFrame({ ...frame, image: fitViewFrameImage(frame.image), sequence });
+          onFrame({ ...frame, sequence });
         },
         (error) => {
           if (streamGeneration !== generation) return;
