@@ -378,7 +378,7 @@ export const messages = {
   "error.provider.cursorSignInUnusable":
     "Cursor kon met je aanmelding geen verbinding maken met zijn server. Controleer je internetverbinding en log daarna opnieuw in bij Cursor.",
   "error.provider.cursorNoModels":
-    "Cursor heeft zijn lijst met modellen niet gestuurd. Start Cursor opnieuw. Blijft dit bericht staan, meld je dan opnieuw aan bij Cursor en controleer of je Cursor-abonnement modellen bevat.",
+    "Cursor heeft zijn lijst met modellen niet gestuurd. Kies 'Verbinden' om opnieuw aan te melden bij Cursor. Blijft dit bericht staan, controleer dan of je Cursor-abonnement modellen bevat.",
   "error.provider.clineArchivePath": "Het Cline-archief heeft een onverwacht pad.",
   "error.provider.clinePackageMismatch": "Het Cline-pakket komt niet overeen met de runtimecatalogus.",
   "error.provider.clineChecksum": "Checksum van de Cline-runtime komt niet overeen.",

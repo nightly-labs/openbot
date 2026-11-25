@@ -389,7 +389,7 @@ export const messages = {
   "error.provider.cursorSignInUnusable":
     "Cursor がサインイン情報でサーバーに接続できませんでした。インターネット接続を確認してから、もう一度 Cursor にサインインしてください。",
   "error.provider.cursorNoModels":
-    "Cursor からモデルの一覧が届きませんでした。Cursor を再起動してください。このメッセージが消えない場合は、もう一度 Cursor にサインインし、Cursor のプランでモデルを使えるか確認してください。",
+    "Cursor からモデルの一覧が届きませんでした。「接続」を選んで、もう一度 Cursor にサインインしてください。このメッセージが消えない場合は、Cursor のプランでモデルを使えるか確認してください。",
   "error.provider.clineArchivePath": "Cline のアーカイブに予期しないパスがあります。",
   "error.provider.clinePackageMismatch": "Cline のパッケージがランタイムカタログと一致しません。",
   "error.provider.clineChecksum": "Cline ランタイムのチェックサムが一致しません。",

@@ -392,7 +392,7 @@ export const messages = {
   "error.provider.cursorSignInUnusable":
     "Cursor konnte sich mit deiner Anmeldung nicht mit seinem Server verbinden. Prüfe deine Internetverbindung und melde dich dann erneut bei Cursor an.",
   "error.provider.cursorNoModels":
-    "Cursor hat seine Modellliste nicht gesendet. Starte Cursor neu. Wenn diese Meldung bleibt, melde dich erneut bei Cursor an und prüfe, ob dein Cursor-Tarif Modelle enthält.",
+    "Cursor hat seine Modellliste nicht gesendet. Wähle „Verbinden“, um dich erneut bei Cursor anzumelden. Wenn diese Meldung bleibt, prüfe, ob dein Cursor-Tarif Modelle enthält.",
   "error.provider.clineArchivePath": "Das Cline-Archiv hat einen unerwarteten Pfad.",
   "error.provider.clinePackageMismatch": "Das Cline-Paket stimmt nicht mit dem Laufzeitkatalog überein.",
   "error.provider.clineChecksum": "Die Prüfsumme der Cline-Laufzeit stimmt nicht überein.",

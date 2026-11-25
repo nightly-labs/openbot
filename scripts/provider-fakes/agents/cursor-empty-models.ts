@@ -8,7 +8,12 @@ const sessionLog = process.env.FAKE_CURSOR_SESSION_LOG ?? "";
 let count = 0;
 serveFakeAcpAgent({
   initialize: (request, peer) =>
-    peer.reply(request, { protocolVersion: 1, agentCapabilities: { loadSession: true }, authMethods: [] }),
+    peer.reply(request, {
+      protocolVersion: 1,
+      agentCapabilities: { loadSession: true },
+      authMethods: [{ id: "cursor_login", name: "Cursor Login" }],
+    }),
+  authenticate: (request, peer) => peer.reply(request, {}),
   "session/new": (request, peer) => {
     count += 1;
     if (sessionLog) appendFileSync(sessionLog, "session/new\n");
