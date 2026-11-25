@@ -2355,17 +2355,25 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     decoder: (value: unknown, response: Response) => T,
     timeoutMs = 10_000,
   ): Effect.fn.Return<T, CentralAuthOperationError, CentralAuthTransport> {
+    const deadline = AbortSignal.timeout(timeoutMs);
     const response = yield* CentralAuthTransport.use((transport) =>
       transport.fetch(new URL(path, this.#options.apiUrl), {
         ...init,
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: deadline,
       }),
     );
     if (!response.ok)
       return yield* new CentralAuthOperationError({
         cause: yield* AuthApiError.fromResponseEffect(response),
       });
-    const value = response.status === 204 ? undefined : yield* authCall(() => response.json());
+    const value =
+      response.status === 204
+        ? undefined
+        : yield* authCall(() => response.json()).pipe(
+            Effect.mapError((failure) =>
+              deadline.aborted ? new CentralAuthOperationError({ cause: deadline.reason }) : failure,
+            ),
+          );
     return yield* authDecode(() => decoder(value, response));
   });
 
