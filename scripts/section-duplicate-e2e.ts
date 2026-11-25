@@ -1,11 +1,3 @@
-// Checks that the sidebar "Duplicate section" chain copies a section and its agents. The chain that the
-// desktop and web clients run (`duplicateSection` in `@openbot/ui/features/sidebar/duplicate-section`) runs
-// here against the real agent service and the real sidebar layout store on a temporary profile. Each call
-// goes through the same backend path as the `agent:duplicate` and `agent:mutate-sidebar-layout` handlers.
-// The agent service is not initialized, so no provider CLI starts.
-// Run: `bun scripts/section-duplicate-e2e.ts`.
-// Writes .openbot-build/section-duplicate-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -56,6 +48,7 @@ async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -96,7 +89,6 @@ function sectionAgentNames(layout: SidebarLayoutSnapshot, sectionId: string): st
     .map((agentId) => names.get(agentId) ?? agentId);
 }
 
-/** The dependencies that a client builds from its host calls. */
 function deps(layout: SidebarLayoutSnapshot, options: { failOnCopy?: number } = {}) {
   let copies = 0;
   return {

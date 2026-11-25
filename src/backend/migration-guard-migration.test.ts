@@ -3,9 +3,6 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: a migration commits a database with a broken foreign key that it made; a broken foreign key from
-// before the upgrade stops a migration that does not touch it, or the upgrade deletes or changes its row; a failed
-// migration leaves foreign-key enforcement off; a history with a gap at any version runs the migrations after the gap.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -29,8 +26,6 @@ function latestDatabase(): DatabaseSync {
   return db;
 }
 
-// A message and a turn whose thread and session do not exist. Only a database written with foreign keys off can
-// hold them.
 function seedOrphans(db: DatabaseSync): void {
   db.exec("PRAGMA foreign_keys = OFF");
   db.exec(`
@@ -66,7 +61,6 @@ function range(from: number, to: number): number[] {
 }
 
 describe("migration guards", () => {
-  // Migrations 13, 17, 19, 22 to 24, 26 and 28 turn foreign keys off for their rebuilds, and the others do not.
   it.each([9, 13, 17, 19, 22, 23, 24, 26, 28, 39, 40, 43, 44, 45, 46, 47, 49, 50, 51, 52])(
     "runs migration %i past broken foreign keys from before the upgrade",
     (version) => {
@@ -78,10 +72,8 @@ describe("migration guards", () => {
 
       migrateOpenBotDatabase(db);
 
-      expect(versions(db)).toEqual(range(8, 65));
-      // Migration 40 adds order columns to the message; every column the row had keeps its value.
+      expect(versions(db)).toEqual(range(8, 69));
       expect(contents(db)).toMatchObject(before);
-      // A rebuild moves its table in the schema, which changes only the order of the rows.
       const violationsAfter = db.prepare("PRAGMA foreign_key_check").all();
       expect(violationsAfter).toHaveLength(violationsBefore.length);
       expect(violationsAfter).toEqual(expect.arrayContaining(violationsBefore));
@@ -93,8 +85,6 @@ describe("migration guards", () => {
   it("rolls back a migration that breaks a foreign key, next to one from before the upgrade", () => {
     const db = databaseAt(27);
     seedOrphans(db);
-    // Migration 28 runs with foreign keys off. Its transaction deletes the thread of the turn, so the turn gets a
-    // second broken reference that the migration made.
     db.exec(`CREATE TEMP TRIGGER break_reference AFTER INSERT ON schema_migrations WHEN new.version = 28
       BEGIN DELETE FROM projection_threads WHERE thread_id = 'openbot-thread-chief'; END;`);
     const before = contents(db);
@@ -116,13 +106,12 @@ describe("migration guards", () => {
     expect(contents(db)).toEqual(before);
     expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
 
-    // The next start meets the same rows and stops again. It deletes nothing to get past them.
     expect(() => migrateOpenBotDatabase(db)).toThrow("migration to version 28 failed");
     expect(contents(db)).toEqual(before);
 
     db.exec("DROP TRIGGER break_reference");
     migrateOpenBotDatabase(db);
-    expect(versions(db)).toEqual(range(8, 65));
+    expect(versions(db)).toEqual(range(8, 69));
     expect(contents(db)).toMatchObject(before);
   });
 
@@ -134,7 +123,7 @@ describe("migration guards", () => {
     expect(() => migrateOpenBotDatabase(db)).toThrow(
       `OpenBot database migration history is missing version ${missing}.`,
     );
-    expect(versions(db)).toEqual(range(8, 65).filter((version) => version !== missing));
+    expect(versions(db)).toEqual(range(8, 69).filter((version) => version !== missing));
     expect(db.prepare("SELECT type, name, sql FROM sqlite_master ORDER BY type, name").all()).toEqual(schemaBefore);
   });
 });

@@ -1,8 +1,3 @@
-// What main answers for Computer Use: its state, its permissions, and where to draw the highlight.
-//
-// Each decoder checks every field the contract type requires and keeps each optional field it
-// carries, so a value the renderer reads always has the shape its type says.
-
 import {
   COMPUTER_USE_STATUSES,
   type ComputerUseCoveredArea,

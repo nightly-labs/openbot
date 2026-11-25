@@ -1,26 +1,3 @@
-// Runs the update server of the mobile app (the real Worker code on a local R2 bucket, workerd
-// through Wrangler) and the real publish commands, then asks for updates as a phone does. It checks:
-//
-// - a binary with no update gets the empty answer, and bad requests are refused;
-// - a published update comes back signed, the certificate accepts the signature, and each file that
-//   the manifest names downloads with the hash that the manifest gives;
-// - a part rollout reaches a stable part of the installs and the others keep the earlier update;
-// - an update that failed on a phone is not sent to it again;
-// - a rollback publishes the earlier bundle again as a newer update, and a second rollback sends a
-//   signed directive that returns phones to the bundle in their binary;
-// - a publish with a key that the certificate does not accept changes nothing;
-// - a manifest that someone changes in the bucket no longer has a valid signature;
-// - other runtime versions and channels are not affected, and the answers come from the cache;
-// - a rollout change and a rollback find the binary that has an update from the store builds, also
-//   when only one platform has an update, and stop when two store versions have one;
-// - no `.gitignore` file ignores the update signing certificate by itself, so the project copy of
-//   the EAS build has it;
-// - the publish guard of `scripts/mobile-ota.ts` passes a commit whose runtime version a store build
-//   has, and refuses one that no store build has.
-//
-// Run: bun run test:mobile-ota
-// It writes .openbot-build/mobile-ota-e2e/report.json and exits non-zero on a failure. The bucket
-// and the keys are in a temporary directory. It uses no network.
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -77,7 +54,6 @@ try {
         bucketReads += 1;
         const object = await bucket.get(key);
         if (!object) return null;
-        // Under Bun, the local bucket cannot stream a body, so the script reads the whole object.
         const bytes = await object.arrayBuffer();
         return {
           body: new Blob([bytes]).stream(),
@@ -97,7 +73,6 @@ try {
     },
   };
 
-  // The Cache API of one Worker location: the Worker keeps bucket answers in it.
   const cached = new Map<string, Response>();
   const pending: Promise<void>[] = [];
   const runtime: MobileUpdatesRuntime = {
@@ -111,7 +86,6 @@ try {
       pending.push(Effect.runPromise(work));
     },
   };
-  /** One request to the Worker. `fresh` asks as a location that has nothing in its cache. */
   async function request(path: string, init: RequestInit = {}, fresh = true): Promise<Response> {
     if (fresh) cached.clear();
     const response = await Effect.runPromise(routeRequest(new Request(`${SERVER}${path}`, init), env, runtime));
@@ -119,7 +93,6 @@ try {
     return response;
   }
 
-  // The same command that makes the production keys.
   await run(
     join(BIN, "expo-updates"),
     [
@@ -140,7 +113,6 @@ try {
     certificatePem: await readFile(join(temp, "certs", "certificate.pem"), "utf8"),
   };
 
-  /** A folder as `expo export` writes it, with one bundle and two assets for each platform. */
   async function writeExport(name: string, bundleText: string): Promise<string> {
     const directory = join(temp, name);
     const image = Buffer.from(`image of ${name}`);
@@ -185,7 +157,6 @@ try {
       },
     };
   }
-  /** The signed part of an answer, with the result of the check that a phone makes. */
   async function signedPart(response: Response, name: "manifest" | "directive") {
     const part = multipartParts(response.headers.get("content-type") ?? "", await response.text()).find(
       (candidate) => candidate.name === name,
@@ -218,7 +189,6 @@ try {
       now: new Date(Date.UTC(2026, 10, 10, 12, minute)),
     });
 
-  // 1. No update, and requests that are not valid.
   const empty = await request("/manifest", phone());
   check("a binary with no update gets an empty 204 answer of protocol 1", empty.status === 204, {
     status: empty.status,
@@ -233,7 +203,6 @@ try {
   check("a write request is refused", (await request("/manifest", { ...phone(), method: "POST" })).status === 405);
   check("an asset name that is not a hash is not found", (await request("/assets/..%2Fpointers")).status === 404);
 
-  // 2. A full publish.
   const first = await publish(await writeExport("export-1", "bundle one"), 100, "first", 1);
   const answer = await request("/manifest", phone());
   const manifest = await signedPart(answer, "manifest");
@@ -268,13 +237,11 @@ try {
     unsigned.status === 200 && !(await unsigned.text()).includes("expo-signature"),
   );
 
-  // 3. The cache: a second request of the same location reads nothing from the bucket.
   await request("/manifest", phone());
   bucketReads = 0;
   const again = await request("/manifest", phone(), false);
   check("a second request is answered from the cache", again.status === 200 && bucketReads === 0, { bucketReads });
 
-  // 4. Other binaries are not affected.
   check(
     "another runtime version gets no update",
     (await request("/manifest", phone({}, { ...scope, runtimeVersion: "runtime-b" }))).status === 204,
@@ -288,7 +255,6 @@ try {
     (await request("/manifest", phone({}, { ...scope, platform: "android" }))).status === 204,
   );
 
-  // 5. A part rollout.
   const second = await publish(await writeExport("export-2", "bundle two"), 20, "second", 2);
   const installs = Array.from({ length: 300 }, (_, index) => `install-${index}`);
   const served: (string | null)[] = [];
@@ -316,7 +282,6 @@ try {
     (await request("/manifest", phone({ "expo-recent-failed-update-ids": `"${second.update.id}"` }))).status === 204,
   );
 
-  // 6. A key that the certificate does not accept.
   await run(
     join(BIN, "expo-updates"),
     [
@@ -346,7 +311,6 @@ try {
     refused,
   );
 
-  // 7. A rollback to the earlier update, then to the bundle in the binary.
   const back = await rollBack(store, { scope, toEmbedded: false, keys, now: new Date(Date.UTC(2026, 10, 10, 12, 5)) });
   const backAnswer = await signedPart(
     await request("/manifest", phone({ "expo-current-update-id": second.update.id })),
@@ -380,7 +344,6 @@ try {
   check("a publish after a rollback reaches the phones", (await servedId(phone())) === third.update.id);
   check("the pointer keeps the history of the changes", ((await readPointer(store, scope))?.history.length ?? 0) === 6);
 
-  // 8. A change in the bucket without the key.
   const stored = JSON.parse((await store.read(updateKey(third.update.id))) ?? "{}");
   stored.manifest = stored.manifest
     .replace(third.update.id, third.update.id)
@@ -394,7 +357,6 @@ try {
     (await request("/manifest", phone({}, { ...scope, runtimeVersion: "runtime-c" }))).status === 204,
   );
 
-  // 9. A rollout change and a rollback find the binary from the store builds, not from the checkout.
   const androidBuild: UpdateScope = { channel: "production", platform: "android", runtimeVersion: "store-android-1" };
   const build = (of: UpdateScope, number: string): StoreBuild => ({
     platform: of.platform,
@@ -478,9 +440,6 @@ try {
     twoPlatforms,
   );
 
-  // 10. The EAS build copies the project with its own ignore logic: it leaves a file out when one
-  // `.gitignore` file ignores it by itself, also when a deeper file includes it again, as git allows.
-  // A build with no certificate stops at `expo prebuild`.
   const appJson = JSON.parse(await readFile(join(MOBILE, "app.json"), "utf8"));
   const certificatePath = posix.join("apps/mobile", String(appJson.expo.updates.codeSigningCertificate));
   const ignoreFiles = (await run("git", ["ls-files", "--", ".gitignore", "**/.gitignore"], { cwd: ROOT })).stdout
@@ -504,7 +463,6 @@ try {
   }
   check("the EAS project copy keeps the update signing certificate", leftOutBy.length === 0, leftOutBy);
 
-  // 11. The publish guard, with the real runtime version of this checkout and a local tag remote.
   const android = await fingerprint("android", MOBILE);
   const remote = join(temp, "remote");
   await mkdir(remote);

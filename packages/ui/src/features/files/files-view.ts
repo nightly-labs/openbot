@@ -1,8 +1,3 @@
-/*
- * Display helpers for the Files and storage views (issue #496). The row and usage shapes are the IPC
- * contract in `@openbot/contracts/ipc`; labels, grouping and filters stay here, beside the views.
- */
-
 import type { StorageBreakdown, StorageCategory, StoredFileRow } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import type { FileSort, FileTypeFilter } from "@openbot/team-client/stored-files";
@@ -32,11 +27,6 @@ export const STORAGE_CATEGORY_LABELS = {
   logs: "files.category.logs",
 } as const satisfies Record<StorageCategory, AppTextKey>;
 
-/**
- * The bar shows six groups, not eight categories: past five hues a stacked bar stops being
- * readable, so caches and logs fold into one neutral "App data" segment. Provider runtimes keep a
- * hue of their own: they are usually the largest share, and "App data" told the user nothing.
- */
 export type StorageGroup = "workspaces" | "files" | "chats" | "downloads" | "runtimes" | "app";
 
 export const STORAGE_GROUPS: readonly StorageGroup[] = ["workspaces", "files", "chats", "downloads", "runtimes", "app"];
@@ -68,7 +58,6 @@ export interface StorageGroupTotal {
   percent: number;
 }
 
-/** Groups in fixed order, so a group keeps its colour when another one is empty. Empty groups are left out. */
 export function storageGroupTotals(breakdown: readonly StorageBreakdown[], t: AppTranslate): StorageGroupTotal[] {
   const total = storageTotal(breakdown);
   return STORAGE_GROUPS.map((group) => {
@@ -87,7 +76,6 @@ export function storageBytes(breakdown: readonly StorageBreakdown[], category: S
   return breakdown.find((entry) => entry.category === category)?.bytes ?? 0;
 }
 
-/** Share of the total as a percent. A non-zero share never rounds to 0, so a small segment stays visible in the legend. */
 export function sharePercent(bytes: number, total: number): number {
   if (total <= 0 || bytes <= 0) return 0;
   const percent = (bytes / total) * 100;
@@ -124,7 +112,6 @@ function startOfDay(value: Date): number {
   return new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
 }
 
-/** "Today", "Yesterday", or a short date. `now` is a parameter so a story does not depend on the day it runs. */
 export function fileDayLabel(iso: string, now: Date, t: AppTranslate, format: AppFormat): string {
   const date = new Date(iso);
   const days = Math.round((startOfDay(now) - startOfDay(date)) / 86_400_000);
@@ -143,7 +130,6 @@ export interface FileGroup {
   files: StoredFileRow[];
 }
 
-/** Consecutive files that share a day, in the order the caller sorted them. */
 export function groupFilesByDay(
   files: readonly StoredFileRow[],
   now: Date,
@@ -168,7 +154,6 @@ export function chatCountLabel(count: number, t: AppTranslate): string {
   return t("files.chatCount", { count });
 }
 
-/** A share from `sharePercent`, such as "12%" or "0.1%". */
 export function sharePercentLabel(percent: number, format: AppFormat): string {
   return format.percent(percent / 100, { maximumFractionDigits: 1 });
 }

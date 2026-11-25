@@ -2,18 +2,6 @@ import { Effect } from "effect";
 import { recordValue, type SendCommand, stringValue } from "./browser-cdp-values";
 import type { BrowserOperationError } from "./browser-effects";
 
-/**
- * Installs the guard on the target node in an automation world. A capture listener on the window of
- * the node's document checks the first trusted press event: the event must go to the node, to an
- * element inside it, or to a label of it. Otherwise that event and the rest of the click stop before
- * the page's listeners get them. A capture listener that the page put on its window before the click
- * runs first and still gets the event. `stop` removes the listener and returns the name of the element
- * that got the press, or null.
- *
- * Inside a closed shadow root, the window sees only the outermost closed host in the event path, so
- * the check accepts a press on that host. When the page replaced the target before the press, as a
- * re-render on hover can do, nothing is left to check against, so the press goes through.
- */
 const INSTALL_PRESS_GUARD = `function() {
   const target = this;
   let anchor = target;
@@ -49,16 +37,6 @@ const INSTALL_PRESS_GUARD = `function() {
   };
 }`;
 
-/**
- * Runs `press` with a check on the first press event that the page gets. A page can move its layout
- * when the pointer comes near, for example an editor that shows a block toolbar over a paragraph.
- * Then a point that was correct before the pointer moved is on another element at the press. The
- * guard stops such a press before the page's listeners get it.
- *
- * Returns the name of the element that got the press instead of the target. Returns undefined when
- * the target got it, when no press event came (a press into a child frame, or a page handler that
- * stopped it first), when the page navigated, or when the guard could not be installed.
- */
 export const guardedPress = Effect.fn("Browser.guardedPress")(function* (
   send: SendCommand,
   backendNodeId: number,
@@ -88,7 +66,6 @@ export const guardedPress = Effect.fn("Browser.guardedPress")(function* (
     return undefined;
   }
   let stopped = false;
-  // A press that navigates or removes the frame takes the guard with it; the press reached the page.
   const stop = Effect.suspend(() => {
     stopped = true;
     return send(

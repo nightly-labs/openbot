@@ -1,5 +1,3 @@
-// The payloads of the routine result endpoints. Only a malformed payload fails here, so the text stays English.
-
 import {
   isResendRoutineResultInput,
   isRoutineResultRoutineInput,

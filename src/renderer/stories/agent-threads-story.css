@@ -1,13 +1,19 @@
-/* The app fills the story frame, as it fills the window. */
 .agent-threads-story {
   height: 100vh;
 }
 
-/* The chat header alone, at the width of a wide window or a narrow one. */
 .thread-header-story {
   height: 100vh;
 }
 
 .thread-header-story[data-narrow] {
   width: 560px;
+}
+
+.threads-pane-story {
+  position: relative;
+  width: 360px;
+  height: 100vh;
+  border-inline-start: 1px solid var(--openbot-border);
+  margin-inline-start: auto;
 }

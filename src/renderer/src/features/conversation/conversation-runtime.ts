@@ -44,22 +44,27 @@ export interface ConversationRuntime {
     | "respondToBrowserSecret"
     | "setMessageReaction"
   > &
-    // A joined server's sign-in link that the host relays. Absent, a link opens with `openUrl`.
     Partial<Pick<OpenBotDesktopApi["agent"], "openMessageLink" | "pasteMessageLink" | "cancelMessageLink">> &
-    // The progress and stop of an attachment download from a joined server. Absent, a card shows no progress.
     Partial<Pick<OpenBotDesktopApi["agent"], "stopAttachmentDownload" | "onAttachmentDownload">> &
-    // Retry and remove of a failed file import. Absent, a failed upload chip has only its remove button.
-    Partial<Pick<OpenBotDesktopApi["agent"], "retryAttachmentImport" | "discardAttachmentImport">>;
+    Partial<Pick<OpenBotDesktopApi["agent"], "retryAttachmentImport" | "discardAttachmentImport">> &
+    Partial<Pick<OpenBotDesktopApi["agent"], "testMcpServer">>;
   browser: Pick<
     OpenBotDesktopApi["browser"],
     | "capturePreview"
     | "closePictureInPicture"
+    | "closeWindow"
+    | "focusWindow"
     | "navigate"
     | "onPictureInPictureEvent"
+    | "onWindowEvent"
     | "open"
     | "openPictureInPicture"
+    | "openWindow"
+    | "publishWindowModel"
     | "reload"
     | "stop"
+    | "answerPermission"
+    | "answerHttpSignIn"
     | "releaseControl"
     | "setVisible"
     | "startTeach"
@@ -69,9 +74,11 @@ export interface ConversationRuntime {
   voice: Pick<
     OpenBotDesktopApi["voice"],
     | "getSettings"
+    | "setSettings"
     | "getServer"
     | "onModelStatus"
     | "prepareModel"
+    | "downloadModel"
     | "transcribe"
     | "startStream"
     | "appendStream"
@@ -80,56 +87,27 @@ export interface ConversationRuntime {
     | "onStreamTranscript"
   >;
   openUrl: OpenBotDesktopApi["openUrl"];
-  /** Asks the connected host a side question. Absent, the host does not serve `side-question-v1`. */
   askSideQuestion?: ((input: AskSideQuestionInput) => Promise<string>) | undefined;
-  /**
-   * Codex live voice of the connected host. Absent, the host does not serve `live-voice-v1` or the
-   * user did not turn live voice on in this browser.
-   */
+  sideQuestionThreads?: boolean | undefined;
   liveVoice?: CodexLivePort | undefined;
-  /** The marketplace skills catalog that gives the agent's skills their descriptions and icons. */
   skillCatalog?: SkillCatalogCalls | undefined;
-  /** Remove on a feedback thank-you card. Absent, the host does not serve `feedback-withdraw-v1`. */
   withdrawFeedback?: ((input: { agentId: string; messageId: string }) => Promise<WithdrawFeedbackResult>) | undefined;
-  /** Save on a skill question. Absent, the host does not serve `skill-learning-v1`. */
   saveSkillSuggestion?: ((input: SaveSkillSuggestionInput) => Promise<SaveSkillSuggestionResult>) | undefined;
   previewAttachment?: (attachment: AttachmentSummary) => Promise<FilePreview>;
-  /** Loads attachment images and media for a client that gets no `previewUrl`. */
   attachmentMedia?: AttachmentMediaSource;
-  /**
-   * The HTML of a visual reply page, for a client that has no page URL. Only the browser client
-   * has it: the frame shows the page as `srcdoc`, which the desktop renderer policy would block.
-   */
   visualPage?: (attachment: AttachmentSummary) => Promise<string>;
   importFiles?: (files: File[]) => Promise<void>;
   cancelImportFiles?: () => Promise<void>;
-  /**
-   * The browser profile calls of a host that serves `browser-profiles-v1`, for a client without the
-   * desktop port. Any member reads tab labels; only an owner or admin gets the other calls.
-   */
   browserProfiles?: BrowserProfileCalls | undefined;
-  /** The agent routine calls of a client without the desktop port. */
   routines?: AgentRoutinesApi | undefined;
-  /** An agent's memories, for a client without the desktop port. Any member who can open the agent reads them. */
   agentMemories?: AgentMemoriesApi | undefined;
-  /** An agent's folders on a host that serves `agent-folders-v1` to this owner or admin. */
   agentFolders?: AgentFoldersApi | undefined;
-  /** An agent's instruction file on a host that serves `agent-instructions-v1` to this owner or admin. */
   agentInstructions?: AgentInstructionsApi | undefined;
-  /** Routine destinations on a host that serves `routine-results-v1` to this owner or admin. */
   routineResultCalls?: RoutineResultsCalls | undefined;
-  /** The run command of a routine, from a host that serves `routine-run-command-v1` to this owner or admin. */
   routineRunCommand?: ((input: TestRoutineInput) => Promise<string>) | undefined;
-  /** The memory cap of a host that serves `agent-memory-limit-v1` to this owner or admin. */
   agentMemoryLimit?: (() => Promise<number>) | undefined;
-  /** The stored files of a host that serves `storage-v1`, for the Files pane and Agent settings > Files. */
   storageCalls?: FilesPort | undefined;
-  /**
-   * The user's own notification level of each agent, for a client without the desktop port. Any member
-   * can call it. The caller asks only a server that serves `agent-notification-levels-v1`.
-   */
   agentNotificationLevels?: AgentNotificationLevelCalls | undefined;
-  /** The host admin calls of a client without the desktop port. Absent, skills, tables and publishing are hidden. */
   admin?:
     | {
         skills: AgentSkillCalls;
@@ -148,10 +126,8 @@ export interface ConversationRuntime {
     | undefined;
 }
 
-/** Reads the user's own level of each agent. The notification settings are the one place that changes them. */
 export interface AgentNotificationLevelCalls {
   list(): Promise<AgentNotificationLevelsSnapshot>;
-  /** Calls `listener` with all levels after a change on any device of the user. Returns the unsubscribe. */
   subscribe?(listener: (levels: AgentNotificationLevelsSnapshot) => void): () => void;
 }
 

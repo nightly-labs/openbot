@@ -1,7 +1,5 @@
-/** Linear 0-1 channels, as the aurora shader takes them. */
 type VoiceRgb = readonly [number, number, number];
 
-/** Four lobe colours for the aurora: the shader needs a fixed count. */
 export type VoicePalette = readonly [VoiceRgb, VoiceRgb, VoiceRgb, VoiceRgb];
 
 const FALLBACK: VoiceRgb = [0.545, 0.361, 0.965];
@@ -41,15 +39,8 @@ function fromHsl(hue: number, saturation: number, lightness: number): VoiceRgb {
   return [channel(1 / 3), channel(0), channel(-1 / 3)];
 }
 
-/**
- * The aurora stays inside the agent's own colour: its hue, two neighbours a
- * little to each side, and a lighter core. A channel takes one colour from each
- * of its first members, so the glow mixes the agents the user speaks to.
- */
 export function voicePalette(colors: readonly string[], dark: boolean): VoicePalette {
   const parsed = colors.map(parseHex).filter((color): color is VoiceRgb => color !== null);
-  // A dark canvas takes the colours a little lighter. On a light canvas a light
-  // colour fades into the background, so they go deeper and more saturated.
   const lift = dark ? 0.06 : -0.05;
   const minSaturation = dark ? 0.62 : 0.72;
   if (parsed.length >= 2) {
@@ -75,15 +66,8 @@ function luminance(color: VoiceRgb): number {
   return 0.2126 * (r ?? 0) + 0.7152 * (g ?? 0) + 0.0722 * (b ?? 0);
 }
 
-// An opaque tint makes Liquid Glass read as a flat fill.
 const GLASS_TINT_ALPHA = 0.55;
 
-/**
- * The palette's main colour for the filled voice controls, the glyph colour
- * with the higher contrast on it (a yellow agent gets a dark glyph), and the
- * same colour as a see-through tint for Liquid Glass. `lightGlyph` says that a
- * white glyph still reads on the fill, with the 3:1 contrast of a control.
- */
 export function voiceAccent(palette: VoicePalette): { fill: string; glyph: string; tint: string; lightGlyph: boolean } {
   const color = palette[1];
   const [r, g, b] = color.map((channel) => Math.round(channel * 255));

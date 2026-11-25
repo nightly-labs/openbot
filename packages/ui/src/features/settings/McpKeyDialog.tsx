@@ -1,8 +1,3 @@
-/**
- * The way in that stays here: a credential from the server's own settings page, pasted and proved
- * before it is saved anywhere.
- */
-
 import {
   applyMcpFlow,
   type McpAuthValues,
@@ -16,23 +11,16 @@ import { createConnectRun, type McpConnectBaseProps, McpConnectShell } from "./M
 import { mcpFlowError } from "./mcp-connect-auth";
 
 export interface McpKeyDialogProps extends McpConnectBaseProps {
-  /** The credentials this server asks for, as its listing declares them. */
   flow: McpKeyFlow;
-  /** Opens the page the key is created on. Without it the dialog shows no link. */
   onOpenUrl?: ((url: string) => void) | undefined;
-  /** The joined server whose host keeps the credential. Absent when this computer keeps it. */
   hostName?: string | undefined;
 }
 
 export function McpKeyDialog(props: McpKeyDialogProps) {
   const { t } = useText();
   const { state, busy, forget, attempt } = createConnectRun(props);
-  /* The form, which only this way in has: what is typed, and whether the user has tried to connect
-     with it yet. The second gates the "fill this in" copy, so an untouched dialog asks rather than
-     complains. */
   const [form, setForm] = createStore<{ values: McpAuthValues; touched: boolean }>({ values: {}, touched: false });
   const complete = createMemo(() => mcpFlowComplete(props.flow, form.values));
-  /* The page the key is made on, when the flow names one and the caller can open it. */
   const docs = createMemo(() => {
     const url = props.flow.docsUrl;
     return url && props.onOpenUrl ? { url, label: props.flow.docsLabel ?? t("mcp.connect.getKey") } : null;
@@ -83,8 +71,6 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
         </Button>
       }
     >
-      {/* The card is what this way in asks for, and nothing else. The address the server answers
-          on is the listing's business, unless the listing asks the user for their own link. */}
       <Show when={props.flow.fields.length > 0}>
         <div class="mcp-connect-card">
           <For each={props.flow.fields}>
@@ -100,7 +86,6 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
                       : undefined
                   }
                 >
-                  {/* A link is shown so the user can check what they pasted; a credential is not. */}
                   <Input
                     type={field.url ? "url" : "password"}
                     autocomplete="off"
@@ -111,8 +96,6 @@ export function McpKeyDialog(props: McpKeyDialogProps) {
                     onValueChange={(value) => edit(field.id, value)}
                   />
                 </Field>
-                {/* The page the key is made on: once, on the first row's label line, and after the
-                    field in the order, so the dialog opens with the field focused and not the way out. */}
                 <Show when={index() === 0 && docs()}>
                   {(page) => (
                     <Button

@@ -1,9 +1,15 @@
-import type { WorkflowNodeKind, WorkflowTriggerType } from "@openbot/contracts/ipc";
+import {
+  type WorkflowFields,
+  type WorkflowNodeKind,
+  type WorkflowTriggerType,
+  workflowMediaKind,
+} from "@openbot/contracts/ipc";
 import type { LucideIcon } from "lucide-react-native";
 import AtSign from "lucide-react-native/icons/at-sign";
 import Bot from "lucide-react-native/icons/bot";
 import Clock from "lucide-react-native/icons/clock";
 import File from "lucide-react-native/icons/file";
+import Film from "lucide-react-native/icons/film";
 import GitBranch from "lucide-react-native/icons/git-branch";
 import GitPullRequest from "lucide-react-native/icons/git-pull-request";
 import Image from "lucide-react-native/icons/image";
@@ -18,7 +24,6 @@ import Zap from "lucide-react-native/icons/zap";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
 
-/** The colour family of each kind, from the file reference tokens: the same hues in both themes. */
 const KIND_TINT: Record<WorkflowNodeKind, string> = {
   trigger: "default",
   agent: "blue",
@@ -60,20 +65,25 @@ const TRIGGER_ICON: Record<WorkflowTriggerType, LucideIcon> = {
   slack: AtSign,
 };
 
-/** The icon of a step on its colour, as the desktop canvas marks each kind. */
 export function WorkflowKindTile({
   kind,
   trigger,
+  fields,
   size = 32,
 }: {
   kind: WorkflowNodeKind;
-  /** The type of a trigger, which picks its icon. */
   trigger?: WorkflowTriggerType;
+  fields?: WorkflowFields;
   size?: number;
 }) {
   const tint = KIND_TINT[kind];
   const [color, background] = useCSSVariable([`--openbot-file-${tint}`, `--openbot-file-${tint}-soft`]);
-  const Icon = kind === "trigger" && trigger ? TRIGGER_ICON[trigger] : KIND_ICON[kind];
+  const Icon =
+    kind === "trigger" && trigger
+      ? TRIGGER_ICON[trigger]
+      : kind === "image" && fields && workflowMediaKind(fields) === "video"
+        ? Film
+        : KIND_ICON[kind];
   return (
     <View
       accessibilityElementsHidden

@@ -5,6 +5,7 @@ import {
   accessibilityValue,
   disabled as disabledModifier,
   foregroundStyle,
+  frame,
   lineLimit,
   pickerStyle,
   tag,
@@ -14,6 +15,8 @@ import { useCSSVariable } from "uniwind";
 import { AppSwitch } from "@/shared/components/app-switch";
 import { useNativeLabelFont } from "@/shared/lib/native-label-font";
 import type { SettingsPickerProps, SettingsSwitchProps } from "./settings-controls.types";
+
+const PICKER_LABEL_MAX_WIDTH = 200;
 
 export function SettingsPicker<T extends string | number>({
   value,
@@ -25,7 +28,6 @@ export function SettingsPicker<T extends string | number>({
 }: SettingsPickerProps<T>) {
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
   const selected = options.find((option) => option.value === value);
-  // A menu picker draws its value in the primary colour, so the menu has its own gray label.
   return (
     <Host matchContents colorScheme={dark ? "dark" : "light"}>
       <Menu
@@ -37,7 +39,15 @@ export function SettingsPicker<T extends string | number>({
         ]}
         label={
           <HStack spacing={4}>
-            <Text modifiers={[foregroundStyle(muted), lineLimit(1)]}>{selected?.label ?? ""}</Text>
+            <Text
+              modifiers={[
+                foregroundStyle(muted),
+                lineLimit(1),
+                frame({ maxWidth: PICKER_LABEL_MAX_WIDTH, alignment: "trailing" }),
+              ]}
+            >
+              {selected?.label ?? ""}
+            </Text>
             <Image systemName="chevron.up.chevron.down" size={13} color={muted} />
           </HStack>
         }

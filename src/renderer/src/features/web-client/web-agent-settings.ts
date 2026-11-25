@@ -1,6 +1,3 @@
-// The agent settings calls of the web client: memories, folders, the instruction file, routine
-// destinations and the memory cap. Desktop sends the same calls through preload and main.
-
 import {
   type AgentEvent,
   type AgentMemory,
@@ -14,14 +11,18 @@ import { AGENT_MEMORIES_CAPABILITY } from "@openbot/contracts/team-protocol/agen
 import { runTeamEffect } from "@openbot/team-client";
 import {
   addAgentFolder,
+  addChannelFolder,
   browseAgentFolders,
+  browseChannelFolders,
   excludeAgentFolder,
   getHostAgentMemoryLimit,
   getRoutineResultDestination,
   includeAgentFolder,
   listRoutineResultOptions,
   readAgentFolders,
+  readChannelFolders,
   removeAgentFolder,
+  removeChannelFolder,
   setRoutineResultDestination,
 } from "@openbot/team-client/team-admin-requests";
 import {
@@ -32,13 +33,13 @@ import {
   type TeamApiRequest,
 } from "@openbot/team-client/team-api-requests";
 import { Effect } from "effect";
+import type { ChannelFoldersApi } from "../channels/channel-folders-port";
 import type { AgentFoldersApi, AgentInstructionsApi } from "../conversation/agent-folders-port";
 import type { AgentMemoriesApi } from "../conversation/memories-port";
 import type { RoutineResultsCalls } from "../conversation/routines-port";
 
 type HostEvents = (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void;
 
-/** Each team-client helper fails with a wrapper; the page shows the host's own error. */
 function run<T, E extends { cause: unknown }>(effect: Effect.Effect<T, E>): Promise<T> {
   return runTeamEffect(effect.pipe(Effect.mapError((error) => error.cause)));
 }
@@ -48,10 +49,6 @@ function decodeMemory(value: unknown): AgentMemory {
   return value;
 }
 
-/**
- * An agent's memories on the connected host. Any member who can open the agent reads them; the host
- * checks the level of each change. `request()` names the connected host at call time.
- */
 export function webAgentMemoriesApi(
   request: () => TeamApiRequest,
   onHostEvent: HostEvents | undefined,
@@ -81,7 +78,6 @@ export function webAgentMemoriesApi(
   };
 }
 
-/** The folders of an agent on the connected host, through `agent-folders-v1`. Owners and admins only. */
 export function webAgentFoldersApi(request: () => TeamApiRequest): AgentFoldersApi {
   return {
     listAgentFolders: (agentId) => run(readAgentFolders(request(), agentId)),
@@ -93,7 +89,15 @@ export function webAgentFoldersApi(request: () => TeamApiRequest): AgentFoldersA
   };
 }
 
-/** The instruction file of an agent on the connected host, through `agent-instructions-v1`. Owners and admins only. */
+export function webChannelFoldersApi(request: () => TeamApiRequest): ChannelFoldersApi {
+  return {
+    listChannelFolders: (channelId) => run(readChannelFolders(request(), channelId)),
+    addChannelFolder: (input) => run(addChannelFolder(request(), input)),
+    removeChannelFolder: (input) => run(removeChannelFolder(request(), input)),
+    browseChannelFolders: (input) => run(browseChannelFolders(request(), input)),
+  };
+}
+
 export function webAgentInstructionsApi(request: () => TeamApiRequest): AgentInstructionsApi {
   return {
     readAgentInstructions: (agentId) =>
@@ -107,7 +111,6 @@ export function webAgentInstructionsApi(request: () => TeamApiRequest): AgentIns
   };
 }
 
-/** Where an agent routine sends its answers, through `routine-results-v1`. Owners and admins only. */
 export function webRoutineResultsCalls(request: () => TeamApiRequest): RoutineResultsCalls {
   return {
     options: () => run(listRoutineResultOptions(request())),
@@ -116,7 +119,6 @@ export function webRoutineResultsCalls(request: () => TeamApiRequest): RoutineRe
   };
 }
 
-/** The memory cap of the connected host, through `agent-memory-limit-v1`. Owners and admins only. */
 export function webAgentMemoryLimit(request: () => TeamApiRequest): () => Promise<number> {
   return async () => (await run(getHostAgentMemoryLimit(request()))).limit;
 }

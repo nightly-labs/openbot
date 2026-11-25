@@ -73,10 +73,8 @@ const ROLE_LABELS = {
   member: "server.role.member",
 } as const satisfies Record<TeamRole, AppTextKey>;
 const EMAIL_PLACEHOLDER = "person@company.com";
-/** How long the account service keeps a single-use invite. Every server but a local development host uses it. */
 const INVITE_LIFETIME_MS = 7 * 24 * 60 * 60 * 1_000;
 
-/** The invite composer. `mode` picks which of `email` and `link` the panel is filling in. */
 interface InvitePanel {
   email: string;
   emailError: string | null;
@@ -89,33 +87,23 @@ interface InvitePanel {
 
 interface MembersPanel {
   removeId: string | null;
-  /** A role change waits for confirmation: it can end the member's sessions on the server. */
   roleChange: { memberId: string; role: InviteRole } | null;
   revokeInviteId: string | null;
   search: string;
 }
 
-/**
- * The Members section's state. Each group's fields are written together - switching invite mode
- * clears three of the composer's fields - so they are one store rather than a signal each, and
- * replacing one field re-renders only what read that field.
- */
 interface MembersPanels {
   invite: InvitePanel;
   members: MembersPanel;
-  /** Set after this Mac publishes, to offer the remote desktop setup once. */
   offerRemoteDesktopSetup: boolean;
 }
 
 interface ServerMembersSection {
   Panel: () => JSX.Element;
-  /** The remove, role and revoke confirmations. They stay outside the panel so they keep their place in the dialog. */
   ConfirmDialogs: () => JSX.Element;
-  /** Forgets the invite and search of the previous server when the dialog shows another one. */
   resetForServer(): void;
 }
 
-/** The Members section: publication, the invite composer, the member list, and the pending invites. */
 export function createServerMembersSection(
   host: ServerSettingsSectionHost,
   options: { onSetUpDesktop: () => void; saveIdentityDraft: () => Promise<boolean> },
@@ -136,9 +124,7 @@ export function createServerMembersSection(
     members: { removeId: null, roleChange: null, revokeInviteId: null, search: "" },
     offerRemoteDesktopSetup: false,
   });
-  /** A clock, not panel state: it retires an invite row as its `expiresAt` passes. */
   const [now, setNow] = createSignal(Date.now());
-  /** The full license that the next invite would add a user to, while the owner confirms it. */
   const [licenseStep, setLicenseStep] = createSignal<{ license: License; used: number; error: string | null } | null>(
     null,
   );
@@ -147,12 +133,6 @@ export function createServerMembersSection(
   let expiryTimer: ReturnType<typeof setTimeout> | undefined;
   let inviteLinkSwapTimer: ReturnType<typeof setTimeout> | undefined;
 
-  /**
-   * Permanent links need a transport that carries the flag: local IPC or the account
-   * plane. The frozen Team API projections strip it on legacy HTTP, where even two
-   * updated peers would silently mint single-use, so the tab stays hidden there. A server
-   * on this computer has a loopback address, but its invitations go to the account plane.
-   */
   const permanentSupported = () => local() || props.server.apiUrl === null || props.server.thisComputer === true;
   const canManage = () => configured() && serverRoleCanAdminister(props.server);
   const activeInvites = createMemo(() =>
@@ -160,7 +140,6 @@ export function createServerMembersSection(
       (item) => (item.permanent || item.usedAt === null) && (item.permanent || Date.parse(item.expiresAt) > now()),
     ),
   );
-  /** The invites the empty pending list shows as a faint example: the kinds this server can make. */
   const sampleInvites = createMemo((): TeamInviteSummary[] => {
     const expiresAt = new Date(now() + INVITE_LIFETIME_MS).toISOString();
     const sample = { expiresAt, usedAt: null, email: null, permanent: false, useCount: 0 } as const;
@@ -184,17 +163,15 @@ export function createServerMembersSection(
       panels.invite.result && !panels.invite.result.permanent && Date.parse(panels.invite.result.expiresAt) <= now(),
     );
   const activeMembers = createMemo(() => props.members.filter((member) => !member.disabled));
-  /**
-   * This host or the account plane applies the limit, from the host's plan. A legacy HTTP peer can be
-   * a version without it.
-   */
   const memberLimit = () => (permanentSupported() ? (props.server.memberLimit ?? DEFAULT_TEAM_MEMBER_LIMIT) : null);
   const membersFull = () => {
     const limit = memberLimit();
     return limit !== null && activeMembers().length >= limit;
   };
+  const inviteBlocked = () =>
+    membersFull() && !(props.server.licenseRaisesMemberLimit === true && props.license !== undefined);
   createEffect(
-    () => membersFull() && canManage(),
+    () => inviteBlocked() && canManage(),
     (full) => {
       if (full) desktopAnalytics.track("limit_reached", { kind: "members", action: "shown" });
     },
@@ -236,7 +213,7 @@ export function createServerMembersSection(
     () =>
       canManage() &&
       published() &&
-      !membersFull() &&
+      !inviteBlocked() &&
       busy() === null &&
       (panels.invite.mode !== "email" || normalizeEmailAddress(panels.invite.email) !== null),
   );
@@ -297,15 +274,9 @@ export function createServerMembersSection(
     }, duration);
   }
 
-  /**
-   * The owner's open license and the people that it counts, when it is full and the invite can add a
-   * person that it does not count yet. The account service refuses a join above the license, so the
-   * owner adds a user first. Admins get null: the license is the owner's, and the join tells the person
-   * that it is full. A failed read gets null, so it never blocks an invite.
-   */
   async function fullLicense(email: string | null): Promise<{ license: License; used: number } | null> {
     const calls = props.license;
-    if (!calls || props.server.role !== "owner") return null;
+    if (!calls || (props.server.role !== "owner" && props.server.licenseRaisesMemberLimit !== true)) return null;
     const state = await calls.getState().catch(() => null);
     const license = state?.license;
     if (!state || !license || !isOpenBillingStatus(license.status) || state.used < license.users) return null;
@@ -348,7 +319,6 @@ export function createServerMembersSection(
     if (!created.email) swapInviteLink(created.inviteUrl);
   }
 
-  /** An unnamed server gets a generated name as it publishes, so the switch needs no setup first. */
   async function setPublished(value: boolean): Promise<void> {
     const serverId = props.server.id;
     if (value && local() && !configured() && !(await options.saveIdentityDraft())) return;
@@ -369,8 +339,6 @@ export function createServerMembersSection(
   function accessDescription() {
     if (!local()) return published() ? t("server.settings.remoteOnline") : t("server.settings.remoteOffline");
     if (published()) return t("server.settings.reachable");
-    // The owner removed this server on another device, and the account service refused its automatic
-    // publish. Main sends the status as its English source text (#5273).
     if (props.hostStatus?.message === sourceText("status.host.removed")) return t("status.host.removed");
     return configured() ? t("server.settings.notReachable") : t("server.settings.notPublished");
   }
@@ -387,10 +355,8 @@ export function createServerMembersSection(
     resetInviteLink();
   }
 
-  /** The empty pending list's action: the composer above, on its email field. */
   function startEmailInvite(): void {
     if (panels.invite.mode !== "email") inviteTabsProps.onChange("email");
-    // A hidden tab panel is inert, so the email field takes focus only after the tab change renders.
     requestAnimationFrame(() => {
       inviteEmailInput?.scrollIntoView({ block: "center", behavior: prefersReducedMotion() ? "auto" : "smooth" });
       inviteEmailInput?.focus({ preventScroll: true });
@@ -418,7 +384,6 @@ export function createServerMembersSection(
       <>
         {accessSection()}
         <Show when={canManage()}>{inviteComposer()}</Show>
-        {/* An unnamed local server has no members yet: publishing it adds the owner. */}
         <Show when={configured()}>
           <SettingsSection
             class="server-settings-members-section"
@@ -680,12 +645,12 @@ export function createServerMembersSection(
                 )}
               </Show>
             </div>
-            <Show when={panels.invite.mode === "perma" && !membersFull()}>
+            <Show when={panels.invite.mode === "perma" && !inviteBlocked()}>
               <Text variant="caption" tone="muted" class="server-settings-invite-hint">
                 {t("server.invite.permaHint")}
               </Text>
             </Show>
-            <Show when={membersFull()}>
+            <Show when={inviteBlocked()}>
               <Text variant="caption" tone="muted" class="server-settings-invite-hint">
                 {t("server.invite.full", { count: memberLimit() ?? DEFAULT_TEAM_MEMBER_LIMIT })}
               </Text>
@@ -769,7 +734,6 @@ export function createServerMembersSection(
                   disabled={Boolean(busy())}
                   mount={host.menuMount()}
                   onServerRole={(role, trigger) => {
-                    // The confirmation returns focus to the element focused when it opens.
                     trigger.focus({ preventScroll: true });
                     setPanels((state) => {
                       state.members.roleChange = { memberId: member.id, role };
@@ -784,7 +748,6 @@ export function createServerMembersSection(
                 member={member}
                 mount={host.menuMount()}
                 onRemove={(trigger) => {
-                  // The confirmation returns focus to the element focused when it opens.
                   trigger.focus({ preventScroll: true });
                   setPanels((state) => {
                     state.members.removeId = member.id;
@@ -848,7 +811,7 @@ export function createServerMembersSection(
                     </span>,
                   )
                 }
-                disabled={!published() || membersFull()}
+                disabled={!published() || inviteBlocked()}
                 onInvite={startEmailInvite}
               />
             }
@@ -956,7 +919,6 @@ export function createServerMembersSection(
   }
 
   function RemoveDialog() {
-    // The dialog unmounts with its target, so its title never shows an empty name while it closes.
     return (
       <Show when={removeMember()}>
         {(member) => (
@@ -987,11 +949,6 @@ export function createServerMembersSection(
     );
   }
 
-  /**
-   * Asks the owner to add a user to the full license, then sends the invite. A Starter license is for
-   * 1 user, so the dialog changes it to Team with the same billing period. A license at the maximum cannot grow, so the
-   * dialog offers the contact page and sends no invite.
-   */
   function LicenseUserDialog() {
     const { errorMessage } = useText();
     return (
@@ -999,7 +956,6 @@ export function createServerMembersSection(
         {(step) => {
           const plan = () => licensePlanOf(step().license);
           const toTeam = () => plan().tier !== "team";
-          // A license can count more people than it pays for, when they joined before a lower limit.
           const next = () => Math.max(step().license.users, step().used) + 1;
           const users = () => (toTeam() ? Math.max(LICENSE_INCLUDED_USERS, next()) : next());
           const price = () =>
@@ -1096,7 +1052,6 @@ function MemberActionsMenu(props: {
       >
         <Ellipsis aria-hidden="true" />
       </DropdownMenu.Trigger>
-      {/* A portal without a mount uses the document body. The server role is in the role menu. */}
       <DropdownMenu.Portal mount={props.mount ?? document.body}>
         <DropdownMenu.Content class="server-settings-member-menu">
           <DropdownMenu.Item

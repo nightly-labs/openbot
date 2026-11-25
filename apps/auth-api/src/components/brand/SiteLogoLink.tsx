@@ -8,16 +8,6 @@ import { useSiteChrome } from "../landing/SiteText";
 
 type BrandFiles = typeof import("./brand-files");
 
-/**
- * The home link in the site header. A right-click, a long press, or the menu key on it opens a menu
- * with the logo files, as on linear.app.
- *
- * The trigger wraps the link and takes no space of its own. The menu is a sibling of the link, so a
- * click on an item never reaches the link and opens the home page. It stays in the header, not in a
- * portal, so it is inside the page's banner landmark.
- *
- * The header is on every page, so the logo files load only when the menu opens.
- */
 export function SiteLogoLink() {
   const router = useRouter();
   const chrome = useSiteChrome();
@@ -30,25 +20,20 @@ export function SiteLogoLink() {
     files ??= import("./brand-files");
     return files;
   };
-  // A copy must start in the same task as the click in Safari, so it needs the module already loaded.
   let loaded: BrandFiles | undefined;
   const handleOpenChange = (open: boolean) => {
     if (open) {
       void loadFiles().then((module) => (loaded = module));
       return;
     }
-    // A menu that is not modal does not return focus. Kobalte moves focus after this callback, so
-    // focus the link a frame later.
     if (fromKeyboard) requestAnimationFrame(() => link?.focus());
     fromKeyboard = false;
   };
-  // A copy fails when the clipboard is not allowed. The menu has closed, so there is nothing to show.
   const run = (action: (module: BrandFiles) => Promise<void>) => {
     const done = loaded ? action(loaded) : loadFiles().then(action);
     void done.catch(() => undefined);
   };
 
-  // The menu key and Shift+F10 open the menu under the logo. When it closes, focus goes back to the link.
   const handleKeyDown = (event: KeyboardEvent) => {
     if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
     event.preventDefault();

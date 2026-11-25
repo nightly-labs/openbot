@@ -5,17 +5,6 @@ import { set } from "@dotenvx/dotenvx";
 import { createOpenBotLogger } from "@openbot/logging";
 import { setDevelopmentOverrides } from "./development-secrets";
 
-// Puts an Apple Push Notification service key into this checkout's ignored development state, so
-// the local Auth API can send iPhone Live Activity updates. The key text never goes to the output.
-//
-//   bun run dev:apns-key -- ~/Downloads/AuthKey_ABC1234567.p8 [KEY_ID]
-//   bun run dev:apns-key -- ~/Downloads/AuthKey_ABC1234567.p8 --production
-//
-// The key ID comes from the file name that Apple gives the download, or from the second argument.
-// `--production` encrypts both values into `apps/auth-api/.env.production` with the dotenvx key in
-// `.env.keys`, which `bun run api:deploy` reads. The key is one line there, with `\n` for each line
-// break, and the Worker turns them back into line breaks.
-
 const logger = createOpenBotLogger("dev-apns-key");
 
 if (import.meta.main) {

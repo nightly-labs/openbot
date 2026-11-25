@@ -1,9 +1,5 @@
 import type { ProviderPage } from "./provider-page";
 
-// Every statement about Muse Code here is taken from dev.meta.ai. Each page used is in
-// `sources`. Muse Code is Meta's coding agent; the Muse app, Meta's personal agent, is on
-// /compare/muse. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 const DOCS = "https://dev.meta.ai/docs";
 
 export const MUSE_CODE_PROVIDER: ProviderPage = {

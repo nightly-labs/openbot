@@ -7,7 +7,7 @@ export const messages = {
   "error.vault.tooLarge": "הכספת מלאה. יש למחוק כמה פריטים ולנסות שוב.",
   "error.vault.itemMissing": "הפריט הזה כבר אינו בכספת.",
   "error.vault.valueTooLong": "אחד הערכים ארוך מדי.",
-  "error.vault.websiteInvalid": "יש להזין כתובת אתר HTTPS.",
+  "error.vault.websiteInvalid": "יש להזין כתובת אתר HTTP/HTTPS.",
   "error.vault.passwordRequired": "יש להזין סיסמה.",
   "error.vault.twoStepKeyInvalid": "זה לא מפתח אימות דו־שלבי. יש להזין את מפתח ההגדרה או את קישור otpauth:// של האתר.",
   "error.vault.cardNumberInvalid": "יש להזין מספר כרטיס תקין.",

@@ -1,9 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Hugging Face here is taken from huggingface.co and Hugging Face's
-// hf-mcp-server repository. Each page used is in `sources`. Check the sources again, and move
-// `checkedAt`, whenever this file changes.
-
 export const HUGGINGFACE_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

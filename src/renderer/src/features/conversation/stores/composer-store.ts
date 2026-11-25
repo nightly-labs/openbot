@@ -1,6 +1,6 @@
 import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
+import { appendVoiceTranscript } from "@openbot/ui/voice-recording";
 import { createMemo } from "solid-js";
-import { appendVoiceTranscript } from "../../../voice-recording";
 import { EMPTY_DRAFT, rowAttachments, type StoredQueueEdit } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
@@ -22,8 +22,12 @@ export interface ComposerStoreDeps {
   seenMessageIds: Set<string>;
 }
 
-/** The agent, or for a channel the channel, that owns the drafts, errors and panels of the view. */
-export function conversationOwnerId(props: ConversationProps): string | undefined {
+type ConversationOwner = {
+  agent?: Pick<NonNullable<ConversationProps["agent"]>, "id"> | undefined;
+  channel?: Pick<NonNullable<ConversationProps["channel"]>, "id"> | undefined;
+};
+
+export function conversationOwnerId(props: ConversationOwner): string | undefined {
   return props.channel?.id ?? props.agent?.id;
 }
 
@@ -57,7 +61,6 @@ export function createComposerStore(deps: ComposerStoreDeps) {
     const referencedIds = attachmentReferenceIds(currentDraft().text);
     return currentDraft().attachments.filter((attachment) => !referencedIds.has(attachment.id));
   });
-  /** The thumbnail row: each image, also one that the text names, and each other file that the text does not name. */
   const rowDraftAttachments = createMemo(() => rowAttachments(currentDraft().text, currentDraft().attachments));
   const currentPastePreviews = createMemo(() => {
     const target = currentTarget();
@@ -110,7 +113,6 @@ export function createComposerStore(deps: ComposerStoreDeps) {
   const updateCurrentDraft = (patch: Partial<ComposerDraft>) => {
     const target = currentTarget();
     if (!target) return;
-    // A pending Save owns the outcome: keep the exact request for retry.
     if (
       deps.editingPendingSave() &&
       deps.editingAgentId() === target.agentId &&

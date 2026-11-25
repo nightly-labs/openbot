@@ -1,11 +1,8 @@
 export interface ImageGalleryLayoutOptions {
   width: number;
-  /** A row closes as soon as it fills the width at this height or lower. */
   rowHeight: number;
-  /** The last row does not fill the width, so it grows to this height at most. */
   maxRowHeight: number;
   gap: number;
-  /** The last row takes images from the row above until it holds this many. */
   minPerRow: number;
 }
 
@@ -21,7 +18,6 @@ export interface ImageGalleryLayout {
   height: number;
 }
 
-/** Justified rows: each row but the last fills the width, and images keep their aspect ratio. */
 export function justifiedGalleryLayout(
   ratios: readonly number[],
   options: ImageGalleryLayoutOptions,

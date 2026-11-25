@@ -322,6 +322,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Nessun modello disponibile per questo provider.",
   "mobile.agent.runtime.searchModels": "Cerca modelli",
   "mobile.agent.runtime.noMatches": "Nessun modello corrisponde alla ricerca.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Nessun modello corrisponde alla ricerca. Le tue impostazioni di privacy, provider e guardrail su openrouter.ai possono nascondere modelli da questo elenco.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Questo provider non funziona con «Solo workspace» su Windows e Linux. Per usarlo, cambia prima i «Permessi».",
   "mobile.agent.runtime.usageLimit": "Limite di utilizzo raggiunto",
@@ -375,6 +377,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Rimuovi {model}",
   "mobile.agent.backupModels.unavailable": "Non disponibile ora · saltato",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Se un limite di utilizzo ferma {name} dopo l'inizio del lavoro, {name} continua lo stesso lavoro con il primo modello disponibile nell'ordine. Torna a {model} quando il limite termina, o 10 minuti dopo un errore del provider.",
   "mobile.agent.busyMessage.label": "Durante il lavoro",
@@ -399,10 +402,15 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Gestisci profili",
   "mobile.agent.browserProfile.footer":
     "Ogni profilo ha i propri accessi e cookie. Una modifica chiude le schede aperte dell'agente.",
+  "mobile.agent.browserProfile.movedNote":
+    "Gli accessi ai siti restano nel profilo precedente. L'agente deve accedere di nuovo a questi siti.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot non è riuscito a modificare il profilo del browser dell'agente.",
   "mobile.agent.planCard.label": "Mostra il piano prima delle attività lunghe",
   "mobile.agent.planCard.footer":
     "Prima di un'attività lunga, l'agente mostra il suo piano. Inizia dopo 10 s o quando premi Avvia.",
+  "mobile.agent.builtinMemory.label": "Memoria di OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "L'agente salva e legge le proprie memorie. Disattiva per usare solo un'app di memoria, come Mem0. Le memorie salvate restano.",
   "mobile.agent.workspace.title": "Cartella del workspace",
   "mobile.agent.workspace.footer": "La cartella di questo agente sul computer host.",
   "mobile.agent.advanced.behavior": "Comportamento",
@@ -418,10 +426,11 @@ export const messages = {
     "Questo server non può salvare il tuo livello di notifiche per un agente. Aggiorna OpenBot sul computer che lo esegue.",
   "mobile.agent.newChat.title": "Nuova chat",
   "mobile.agent.newChat.starting": "Avvio della nuova chat…",
-  "mobile.agent.newChat.footer": "L'agente dimentica questa chat. La sua configurazione resta.",
+  "mobile.agent.newChat.footer":
+    "L'agente riparte da zero e può ancora consultare questa chat quando serve. La sua configurazione resta.",
   "mobile.agent.newChat.confirmTitle": "Iniziare una nuova chat con {name}?",
   "mobile.agent.newChat.confirmBody":
-    "L'agente dimentica questa chat. I messaggi restano visibili sopra un divisore. Istruzioni, modello, tool, memorie, workspace e browser non cambiano.",
+    "L'agente riparte da zero e può ancora consultare questa chat quando serve. I messaggi restano visibili sopra un divisore. Istruzioni, modello, tool, memorie, workspace e browser non cambiano.",
   "mobile.agent.newChat.confirm": "Inizia nuova chat",
   "mobile.agent.newChat.failed": "Impossibile iniziare una nuova chat",
   "mobile.agent.newChat.failedBody": "L'host non ha potuto iniziare una nuova chat.",
@@ -485,6 +494,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Questo host non può pubblicare agenti da un dispositivo remoto.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Token senza letture dalla cache",
   "mobile.agent.usage.estimatedCost": "Costo stimato",
+  "mobile.agent.usage.noCostEstimate": "Nessuna stima del costo",
   "mobile.agent.usage.daily": "Utilizzo giornaliero",
   "mobile.agent.usage.tokens": "Token",
   "mobile.agent.usage.cost": "Costo",
@@ -519,6 +529,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Raccolta iniziata {started}. Aggiornata {updated}.",
   "mobile.agent.usage.never": "mai",
   "mobile.agent.record.time": "Ora",
+  "mobile.agent.record.date": "Data",
   "mobile.agent.section.changeFailed": "Impossibile modificare la cartella",
   "mobile.agent.section.tryAgain": "Riprova.",
   "mobile.agent.section.moveUp": "Sposta su",
@@ -606,13 +617,13 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Impossibile caricare i tuoi server",
   "mobile.agent.home.serversFailedBody": "Controlla che l'app desktop sia in esecuzione e riprova.",
   "mobile.agent.home.noServers": "Nessun server disponibile",
-  "mobile.agent.home.noServersBody": "Collega di nuovo l'app desktop o unisciti a un server remoto.",
+  "mobile.agent.home.noServersBody":
+    "Apri OpenBot sul tuo computer con questo account e attiva Pubblica questo server in Impostazioni server → Membri. Oppure unisciti a un server remoto.",
   "mobile.agent.home.chooseServer": "Scegli un server",
   "mobile.agent.home.openServers": "Apri i server",
   "mobile.agent.home.noChatOpen": "Nessuna chat aperta",
   "mobile.agent.home.noChatOpenBody": "Scegli una chat nell'elenco.",
   "mobile.agent.home.chatListWidth": "Larghezza elenco chat",
-  "mobile.agent.home.serverTitle": "{name}, apri i server",
   "mobile.agent.home.waiting": "In attesa della connessione",
   "mobile.agent.home.waitingBody": "L'elenco degli agenti si caricherà quando questo server sarà connesso.",
   "mobile.agent.home.noAgents": "Nessun agente su questo server",
@@ -684,6 +695,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Non escludere",
   "mobile.agent.folders.browseTitle": "Scegli cartella",
   "mobile.agent.folders.places": "Vai a",
+  "mobile.agent.folders.path": "Percorso della cartella",
   "mobile.agent.folders.home": "Cartella Inizio",
   "mobile.agent.folders.parent": "Su a {folder}",
   "mobile.agent.folders.browseFailed": "Impossibile aprire questa cartella.",

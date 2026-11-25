@@ -1,4 +1,3 @@
-/* The agent's offer to send feedback to the OpenBot team, and the thank-you after Send. */
 .feedback-offer {
   align-items: center;
   gap: var(--openbot-space-3);
@@ -105,7 +104,6 @@
   font-size: var(--openbot-text-sm);
 }
 
-/* Fix or remove: two choices, then Remove asks in the card, because it cannot be undone. */
 .feedback-sent-panel {
   display: grid;
   min-width: 0;

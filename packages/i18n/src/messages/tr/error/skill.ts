@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/skill";
 
 export const messages = {
-  // Skill package, library, and marketplace errors.
   "error.skill.symlinks": "Beceri paketleri sembolik bağlantılar içeremez.",
   "error.skill.expandedTooLarge": "Açılmış beceri 10 MB altında olmalıdır.",
   "error.skill.irregularEntry": "Beceri paketleri yalnızca normal dosyalar ve klasörler içerebilir.",
@@ -45,7 +44,8 @@ export const messages = {
   "error.skill.publishUntracked":
     "{name} kesin sürüm takibinden önce kurulmuş. Yayımlamadan önce güncelleyin veya onarın.",
   "error.skill.tooManySkills": "Bir ajan en fazla {limit} beceriye sahip olabilir.",
-  "error.skill.unmanagedExists": "{path} konumunda zaten yönetilmeyen bir beceri mevcut.",
+  "error.skill.ownSkillExists":
+    "Bu ajanın zaten {slug} adlı kendi becerisi var. Ajandan o beceriyi yeniden adlandırmasını veya silmesini isteyin, ardından bu beceriyi yeniden ekleyin.",
   "error.skill.managedSlug": "OpenBot her ajana kendi {slug} becerisini verir. Bu beceriye başka bir ad verin.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md 64 KB'tan daha büyük. Yayımlamadan önce kısaltın.",
   "error.skill.localNoRevisions": "Yerel becerinin yayımlanmış revizyonu yok.",

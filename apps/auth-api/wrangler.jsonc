@@ -10,19 +10,11 @@
     "enabled": true,
     "cross_version_cache": false
   },
-  // Workers Logs stay off: they kept one event for each request, and their cost was larger than the cost of
-  // the requests. `wrangler tail` still shows live events. `false` turns off a setting made earlier.
   "observability": {
     "enabled": false
   },
-  // The Cloudflare Vite plugin emits and uploads Worker source maps unless this is false. The Worker
-  // bundles the web app, and its maps pass the 60 MiB upload limit, so every deploy fails.
   "upload_source_maps": false,
-  // The outbox, the hosted-site cleanup and the hosted server checks are retry paths: the request path
-  // and the webhooks do the first attempt. A run each minute only repeated empty reads. An idle server
-  // stops 15 to 20 minutes after its last use.
   "triggers": {
-    // The second cron runs only the Signal entry check (`signal-entry-failover.ts`), each minute.
     "crons": ["*/5 * * * *", "*/1 * * * *"]
   },
   "routes": [
@@ -30,7 +22,6 @@
       "pattern": "openbot.run/*",
       "zone_id": "bac5e044ba951c390229f0e93673ebd3"
     },
-    // `www` has no origin. The Worker answers it only with a redirect to openbot.run.
     {
       "pattern": "www.openbot.run/*",
       "zone_id": "bac5e044ba951c390229f0e93673ebd3"
@@ -52,67 +43,41 @@
   },
   "vars": {
     "AUTH_EXPOSE_DEVELOPMENT_CODE": "false",
+    "BROWSER_EXTENSION_IDS": "eggdpikcggoicfcfdpdihfkinajchpfj",
     "EMAIL_SMTP_HOST": "mail.privateemail.com",
     "EMAIL_SMTP_PORT": "465",
     "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
     "EMAIL_FROM": "no_reply@openbot.run",
     "EMAIL_REPLY_TO": "hello@openbot.run",
     "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
-    // Empty on purpose: deploys use --keep-vars, so a removed var stays live. An empty value sends
-    // license emails from EMAIL_FROM.
     "EMAIL_LICENSE_FROM": "",
     "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
     "REMOTE_SIGNAL_URL": "wss://signal.openbot.run/v1/signal",
-    // Active Signal machines (docs/remote-session-deployment.md): a is sui-alexandria and b is signal2,
-    // both in Helsinki; us is in San Jose (Leaseweb SFO-12), au in Sydney (Leaseweb SYD-12) and sg in
-    // Singapore. Keep a and b first: the entry failover tries the homes in this order. Set the three
-    // lists together, so that a revoke reaches each home and each home has a place. An empty
-    // REMOTE_SIGNAL_HOMES rolls back.
     "REMOTE_SIGNAL_HOMES": "a=wss://signal1.openbot.run/v1/signal,b=wss://signal2.openbot.run/v1/signal,us=wss://signal-us.openbot.run/v1/signal,au=wss://signal-au.openbot.run/v1/signal,sg=wss://signal-sg.openbot.run/v1/signal",
     "REMOTE_SIGNAL_HOME_LOCATIONS": "a=60.17:24.94,b=60.17:24.94,us=37.34:-121.89,au=-33.87:151.21,sg=1.35:103.82",
-    // From mainland China, the routes to Helsinki are slow and lose packets; us is faster (Globalping
-    // test from 12 Chinese networks, 2026-11-18). Not au: its 5 TB monthly traffic pack is too small for
-    // the China relay traffic. A removed home must leave this list too. "" reverts the rule.
     "REMOTE_SIGNAL_HOME_COUNTRIES": "CN=us",
     "REMOTE_AUTH_WEBHOOK_URL": "https://signal.openbot.run/internal/auth-events",
     "REMOTE_AUTH_WEBHOOK_URLS": "https://signal1.openbot.run/internal/auth-events,https://signal2.openbot.run/internal/auth-events,https://signal-us.openbot.run/internal/auth-events,https://signal-au.openbot.run/internal/auth-events,https://signal-sg.openbot.run/internal/auth-events",
-    // The zone of signal.openbot.run. The entry check stays off until the secret SIGNAL_ENTRY_DNS_TOKEN
-    // is set and REMOTE_SIGNAL_HOMES names two machines.
     "SIGNAL_ENTRY_ZONE_ID": "bac5e044ba951c390229f0e93673ebd3",
-    // Creates stay off until the boat and Stripe secrets and the template are set. "false" stops new
-    // servers only.
     "HOSTED_SERVERS_ENABLED": "true",
-    // Each account can buy a server in production. Put account IDs here to limit creates to them.
     "HOSTED_SERVERS_ALLOWED_USER_IDS": "*",
-    // A license bought before this time is free until then: Stripe charges its first payment at this time.
-    // Local development reads it too; set LICENSE_TRIAL_END= in the shell to sell licenses with no trial.
     "LICENSE_TRIAL_END": "2026-12-01T00:00:00Z",
-    // An account with no billing country cannot open Checkout (409 billing_country_required), so no
-    // payment uses Stripe Tax. Desktop 0.72.0 and the web client ask for the country. Deploys keep
-    // removed vars: set "false" to let older clients buy with Stripe Tax again.
-    // Local development reads it too; set BILLING_COUNTRY_REQUIRED=false in the shell to turn it off.
     "BILLING_COUNTRY_REQUIRED": "true",
-    // The public Client ID of the OpenBotGit GitHub App. Its private key is the optional secret
-    // GITHUB_APP_PRIVATE_KEY (PKCS #8). Without the key, agents act on GitHub as the signed-in user.
     "GITHUB_APP_CLIENT_ID": "Iv23lik5pzHz70cb0RUL",
-    // The private repository where a withdrawn feedback issue moves, as `owner/name`. The GitHub App
-    // needs Issues write access to it. Empty, the app can withdraw a comment, but not an issue.
     "FEEDBACK_WITHDRAWN_REPOSITORY": "",
     "APNS_TEAM_ID": "8A47NKRZSJ",
     "APNS_TOPIC": "run.openbot.mobile"
   },
-  // Email leaves through the relay Worker (`wrangler.email-relay.jsonc`), which runs near the mail
-  // host. Only production has it: the preview and test Workers and `vite dev` send from their own
-  // socket. Deploy the relay before this Worker.
   "services": [
     {
       "binding": "EMAIL_RELAY",
       "service": "openbot-email-relay"
+    },
+    {
+      "binding": "MEDIA_GATEWAY",
+      "service": "openbot-media-gateway"
     }
   ],
-  // Cloudflare Email Service sends when the SMTP mailbox surely did not, such as when its hourly limit
-  // (500 messages) is spent. The senders must be on an onboarded Email Sending domain (openbot.run).
-  // Only production has it: the preview and test Workers keep SMTP only.
   "send_email": [
     {
       "name": "EMAIL_FALLBACK",
@@ -201,8 +166,6 @@
         "EMAIL_FROM": "no_reply@openbot.run",
         "EMAIL_REPLY_TO": "hello@openbot.run",
         "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
-        // Empty on purpose: deploys use --keep-vars, so a removed var stays live. An empty value sends
-        // license emails from EMAIL_FROM.
         "EMAIL_LICENSE_FROM": "",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
@@ -278,15 +241,9 @@
       "workers_dev": true,
       "preview_urls": false,
       "routes": [],
-      // Each minute: the cron starts hosted servers that stopped again, and checks servers that a webhook missed.
       "triggers": {
         "crons": ["* * * * *"]
       },
-      // Hosted servers stay off until these are set. `api:deploy:test` sets the Stripe pair, BOAT_API_KEY,
-      // BOAT_WEBHOOK_SECRET and HOSTED_SERVERS_DEVELOPER_KEY from the `.env.dev`, and
-      // HOSTED_SERVERS_ALLOWED_USER_IDS from its HOSTED_SERVERS_TEST_ALLOW_LIST.
-      // Set HOSTED_SERVER_TEMPLATE with `wrangler secret put <name> --env test`.
-      // They are not required, so the test Worker deploys without them. See docs/hosted-servers.md.
       "secrets": {
         "required": [
           "EMAIL_SMTP_PASSWORD",
@@ -305,8 +262,6 @@
         "EMAIL_FROM": "no_reply@openbot.run",
         "EMAIL_REPLY_TO": "hello@openbot.run",
         "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
-        // Empty on purpose: deploys use --keep-vars, so a removed var stays live. An empty value sends
-        // license emails from EMAIL_FROM.
         "EMAIL_LICENSE_FROM": "",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
@@ -315,7 +270,6 @@
         "REMOTE_SIGNAL_HOMES": "",
         "REMOTE_AUTH_WEBHOOK_URL": "https://signal.openbot.run/internal/auth-events",
         "REMOTE_AUTH_WEBHOOK_URLS": "",
-        // The test Worker never moves the production entry name.
         "SIGNAL_ENTRY_ZONE_ID": "",
         "HOSTED_SERVERS_ENABLED": "true",
         "GITHUB_APP_CLIENT_ID": "Iv23lik5pzHz70cb0RUL",

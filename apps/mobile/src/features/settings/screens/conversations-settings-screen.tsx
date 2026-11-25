@@ -10,6 +10,7 @@ import { SettingsSwitch } from "@/features/settings/components/settings-controls
 import { SettingsPictureChoice } from "@/features/settings/components/settings-picture-choice";
 import { ComposerPicture, SwipePicture } from "@/features/settings/components/settings-pictures";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
+import { saveFullScreenCameraPreference, useFullScreenCameraPreference } from "@/features/settings/model/camera-mode";
 import {
   type ChatSwipeAction,
   saveChatPullPreference,
@@ -26,7 +27,7 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { END_X } from "@/shared/lib/text-direction";
 
-type ConversationSetting = "compactComposer" | "swipe" | "pull" | "largeFiles" | "photoQuality";
+type ConversationSetting = "compactComposer" | "swipe" | "pull" | "largeFiles" | "photoQuality" | "camera";
 
 function withoutSetting(
   settings: ReadonlySet<ConversationSetting>,
@@ -43,7 +44,6 @@ export function ConversationsSettingsScreen() {
   const { t } = text;
   const { theme } = useUniwind();
   const dark = theme === "dark";
-  // Each setting keeps its own save error, so a save of one setting does not hide the error of another.
   const [failed, setFailed] = useState<ReadonlySet<ConversationSetting>>(() => new Set());
   function save(setting: ConversationSetting, write: Promise<void>) {
     setFailed((current) => withoutSetting(current, setting));
@@ -57,13 +57,12 @@ export function ConversationsSettingsScreen() {
   }
 
   const motion = useMotionPreferences();
-  // Reduced motion, from the device or from Settings > Animations, keeps the message field full size.
   const reduced = useReducedMotion();
   const chatSwipe = useChatSwipePreference();
   const chatPull = useChatPullPreference();
   const largeFiles = useLargeFilePreference();
   const photoQuality = usePhotoQualityPreference();
-  // The swipe goes away from Back: to the left, or to the right in a right-to-left layout.
+  const camera = useFullScreenCameraPreference();
   const chatSwipeLabel =
     END_X === 1 ? t("mobile.settings.conversations.swipeLeft") : t("mobile.settings.conversations.swipeRight");
 
@@ -108,6 +107,11 @@ export function ConversationsSettingsScreen() {
           value={chatSwipe.action}
           disabled={!chatSwipe.ready}
           options={[
+            {
+              value: "question",
+              label: t("mobile.settings.conversations.swipeQuestion"),
+              picture: (play) => <SwipePicture target="question" play={play} />,
+            },
             {
               value: "threads",
               label: t("mobile.settings.conversations.swipeThreads"),
@@ -166,6 +170,17 @@ export function ConversationsSettingsScreen() {
             label={t("mobile.settings.conversations.fullQualityPhotos")}
             dark={dark}
             onValueChange={(fullQuality) => save("photoQuality", savePhotoQualityPreference(fullQuality))}
+          />
+        </SettingsRow>
+      </SettingsSection>
+      <SettingsSection footer={footer("camera", t("mobile.settings.conversations.fullScreenCameraFooter"))}>
+        <SettingsRow>
+          <SettingsSwitch
+            value={camera.fullScreen}
+            disabled={!camera.ready || camera.saving}
+            label={t("mobile.settings.conversations.fullScreenCamera")}
+            dark={dark}
+            onValueChange={(fullScreen) => save("camera", saveFullScreenCameraPreference(fullScreen))}
           />
         </SettingsRow>
       </SettingsSection>

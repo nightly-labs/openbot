@@ -17,19 +17,12 @@ import { type MobileAgent, useMobileWorkspaceActions } from "@/features/workspac
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
-/**
- * The user's own notification level of the agent, on a host that serves `agent-notification-levels-v1`.
- * The host keeps it for this member only and applies it on each of their devices. Settings >
- * Notifications is the one place that changes it, so the row opens that screen in the agent sheet,
- * with the agent's server and the agent selected.
- */
 export function AgentNotificationLevelRow({ agent }: { agent: MobileAgent }) {
   const { t } = useText();
   const preference = usePushNotificationPreference();
   const synced = useSyncedNotificationLevels((state) => state.servers[agent.serverId]);
   const own = synced ? agentNotificationLevelMap(synced).get(agent.id) : undefined;
   const serverLevel = effectiveServerLevel(synced, serverNotificationSetting(preference, agent.serverId));
-  // Until the host answers, the row shows no level: the agent can have a level of its own.
   const value =
     synced === undefined
       ? undefined
@@ -43,7 +36,6 @@ export function AgentNotificationLevelRow({ agent }: { agent: MobileAgent }) {
       leading={<RowIcon icon={Bell} />}
       supportingText={value}
       onPress={() =>
-        // The agent sheet shows Settings > Notifications in its own stack, not as a second sheet.
         router.push({
           pathname: "/agent-info/[agentId]/notifications",
           params: { agentId: agent.id, serverId: agent.serverId },
@@ -55,10 +47,6 @@ export function AgentNotificationLevelRow({ agent }: { agent: MobileAgent }) {
   );
 }
 
-/**
- * Puts an action row in its own section with `footer` under it, or, in a group of the Advanced page,
- * in a `SettingsGroupRow` with the text inside the row.
- */
 function ActionRowFrame({
   grouped,
   footer,
@@ -75,11 +63,6 @@ function ActionRowFrame({
   );
 }
 
-/**
- * Starts a new chat with the agent after the user confirms, as on desktop. The agent forgets the
- * messages before it and keeps its setup. The host refuses while the agent works, and its reason
- * shows in the alert. `grouped`: a row of a group on the Advanced page.
- */
 export function AgentNewChatSection({
   agent,
   available,
@@ -140,12 +123,6 @@ export function AgentNewChatSection({
   );
 }
 
-/**
- * Asks the host to compact the context of the agent's chat now, as "Compact now" on desktop. The
- * messages stay. The context ring of the composer shows the progress, on a host that reports it. The
- * host refuses while the agent works or when its provider cannot compact, and its reason shows in
- * the alert.
- */
 export function AgentCompactSection({
   agent,
   available,
@@ -154,15 +131,12 @@ export function AgentCompactSection({
 }: {
   agent: MobileAgent;
   available: boolean;
-  /** A side thread of the agent, from the context sheet of its composer. Absent for the agent's own chat. */
   taskId?: string;
-  /** The host reports a compaction that runs now: the row waits for it. */
   compacting?: boolean;
 }) {
   const { t } = useText();
   const { compactContext } = useMobileWorkspaceActions();
   const [requesting, setRequesting] = useState(false);
-  // The host starts the compaction and answers; the provider finishes it later.
   const [started, setStarted] = useState(false);
 
   function compact(): void {
@@ -208,13 +182,6 @@ export function AgentCompactSection({
   );
 }
 
-/**
- * "Delete history" of the agent's own chat after the user confirms, as on desktop
- * (`chat-history-v1`). The messages and their files go, and the agent forgets them; side threads,
- * profile, memories and workspace stay. Only for a person with `manage` on the agent. The host
- * refuses while the agent works, and its reason shows in the alert. A row of a group on the
- * Advanced page.
- */
 export function AgentDeleteHistoryRow({ agent, available }: { agent: MobileAgent; available: boolean }) {
   const { t } = useText();
   const { deleteAgentHistory, loadLatestMessages, conversationStore } = useMobileWorkspaceActions();
@@ -225,8 +192,6 @@ export function AgentDeleteHistoryRow({ agent, available }: { agent: MobileAgent
     deleteAgentHistory(agent.id, agent.serverId)
       .then(() => {
         void haptics.notification("success");
-        // A window around a search result keeps the messages that the empty latest page does not
-        // name, so the chat reads its latest page again.
         if (conversationStore.get(agent.id)) void loadLatestMessages(agent.id, agent.serverId).catch(() => undefined);
       })
       .catch((cause: unknown) => {

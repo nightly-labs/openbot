@@ -1,15 +1,4 @@
 #!/bin/bash
-# Installs OpenBot as a self-hosted server. install-server.sh downloads the release, checks it
-# against the release manifest, unpacks it, and runs this file from that release as root:
-#
-#   openbot-server-setup <service-user> <unpacked release> [<account server URL> [<display size>]]
-#
-# An empty user or no URL keeps the ones of the installed server: the keyring and the sign-in are in
-# the home folder of that user, for that account server. No display size keeps the installed one.
-#
-# It uses the install steps of a hosted server (openbot-hosted-update), with `mode` set to `self`:
-# openbot-hosted-server then starts OpenBot for a terminal sign-in, not for a claim. Run it again to
-# reinstall or upgrade; the data in the home folder of the service user stays.
 set -euo pipefail
 
 SOURCE=$(cd "$(dirname "$0")" && pwd)
@@ -37,8 +26,6 @@ fi
 if [ -n "$AUTH_API_URL" ]; then
   [[ $AUTH_API_URL =~ ^https://[^/?#[:space:]]+/?$ ]] || fail "The account server URL must be an HTTPS origin."
 fi
-# The rules of display_size in openbot-hosted-server. There a value that is not valid only writes a
-# warning, so the install refuses it.
 if [ -n "$DISPLAY_SIZE" ]; then
   [[ $DISPLAY_SIZE =~ ^([1-9][0-9]{2,3})x([1-9][0-9]{2,3})$ ]] &&
     [ "${BASH_REMATCH[1]}" -ge 640 ] && [ "${BASH_REMATCH[1]}" -le 2576 ] &&
@@ -48,7 +35,6 @@ fi
 if [ -f "$INSTALL/hosted/service-user" ] && ! { [ -r "$INSTALL/hosted/mode" ] && [ "$(<"$INSTALL/hosted/mode")" = self ]; }; then
   fail "This computer is an OpenBot hosted server. A self-hosted install would replace it."
 fi
-# Agents run shell commands as this user, so it gets a login shell, and no password.
 if ! id "$SERVICE_USER" >/dev/null 2>&1; then
   useradd --system --create-home --home-dir "/var/lib/$SERVICE_USER" --shell /bin/bash "$SERVICE_USER"
   echo "Created the user $SERVICE_USER."
@@ -57,17 +43,16 @@ fi
 exec 9>"$LOCK"
 flock 9
 install_packages "$SOURCE/packages.txt"
+install_optional_packages "$SOURCE/optional-packages.txt"
 install -d -m 0755 "$INSTALL" "$INSTALL/hosted"
 recover
 prepare_release "$RELEASE"
 version=$(version_of "$RELEASE")
 [ -n "$version" ] || fail "The release has no version."
-# An older OpenBot cannot open a database that a newer one migrated.
 installed=$(version_of "$INSTALL/app")
 if [ -n "$installed" ] && newer "$installed" "$version"; then
   fail "OpenBot $installed is installed, and this release has an older version."
 fi
-# The copy below replaces the files that a running OpenBot uses.
 systemctl stop openbot.service 2>/dev/null || true
 stage_release "$RELEASE"
 swap_in
@@ -77,9 +62,7 @@ chmod 0644 "$INSTALL/hosted/service-user" "$INSTALL/hosted/mode"
 install_hosting "$SOURCE"
 finish_swap
 
-# The keyring that keeps the account session. openbot-hosted-server explains the place.
 install -d -o "$SERVICE_USER" -g "$(id -gn "$SERVICE_USER")" -m 0700 /srv/openbot-hosted
-# Sets $1 to $2 in openbot.env, which openbot-hosted-server reads. The other keys stay.
 set_server_env() {
   local file="$INSTALL/hosted/openbot.env" temporary
   temporary=$(mktemp "$INSTALL/hosted/.openbot.env.XXXXXX")
@@ -90,9 +73,7 @@ set_server_env() {
 }
 if [ -n "$AUTH_API_URL" ]; then set_server_env OPENBOT_AUTH_API_URL "${AUTH_API_URL%/}"; fi
 if [ -n "$DISPLAY_SIZE" ]; then set_server_env OPENBOT_DISPLAY_SIZE "$DISPLAY_SIZE"; fi
-# The start runs `boot` through openbot-update-apply.service, and `boot` waits for this lock.
 flock -u 9
 systemctl start openbot.service
-# install_hosting only enables the timer, and the first boot is maybe a long time away.
 systemctl start openbot-update.timer
 echo "Installed OpenBot $version. It runs as the user $SERVICE_USER."

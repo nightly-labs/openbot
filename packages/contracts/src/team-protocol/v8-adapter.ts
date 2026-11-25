@@ -46,6 +46,7 @@ import { decodeProfileV8Request, decodeProfileV8Response } from "./profile-v8";
 import { withConversationPromptMultiSelect } from "./prompt-multi-select-v1";
 import { OPEN_PROVIDER_ID } from "./provider-aware-codec";
 import { decodeQueueEditRequest, isQueueEditRoute } from "./queue-edit-v1";
+import { withQueueHold } from "./queue-hold-v1";
 import { TEAM_REASONING_EFFORTS } from "./reasoning-efforts-v1";
 import {
   decodeRemoteDesktopSetupRequest,
@@ -54,6 +55,8 @@ import {
 } from "./remote-desktop-setup-v1";
 import { withConversationSubagents } from "./subagents-v1";
 import { withConversationUiBlocks } from "./ui-blocks-v1";
+import { withUsageGroups } from "./usage-groups-v1";
+import { withUsageReadFailed } from "./usage-read-failed-v1";
 import { isUsageRoute, withUsageTertiary } from "./usage-tertiary-v1";
 import { decodeTeamProtocolV8HttpRequest, decodeTeamProtocolV8HttpResponse } from "./v8";
 import type { TeamProtocolV8BaseJsonObject, TeamProtocolV8BaseJsonValue } from "./v8-base";
@@ -65,18 +68,6 @@ import {
 } from "./v8-base-adapter";
 import { withConversationVideoGeneration } from "./video-generation-v1";
 
-/**
- * `editing` and `expectsReply` ride beside the frozen queue projection: the shipped key lists drop
- * them, so a client on protocol 1-3 reads the queue exactly as it did before, and only the current
- * protocol carries the mark that another editor holds a message, or that a teammate's message
- * needs no answer. A client uses the second mark to keep a teammate's answer out of the actions it
- * offers on queued messages.
- *
- * A present mark must be a boolean. The projection removes the key, so an unchecked `editing` would
- * reach the client as a message nobody holds, and enable the edit actions the hold disables; an
- * unchecked `expectsReply` would reach it as a question. Fail closed instead; an absent mark still
- * means an older host that never sends one: no hold, and an answer expected.
- */
 const QUEUE_MARKS = { editing: "Invalid queue edit mark.", expectsReply: "Invalid queue reply mark." } as const;
 
 function withQueueMarks(projected: TeamProtocolV8BaseJsonValue, source: unknown): TeamProtocolV8BaseJsonValue {
@@ -105,14 +96,6 @@ function withQueueMarks(projected: TeamProtocolV8BaseJsonValue, source: unknown)
   };
 }
 
-/**
- * The sender's `timezone` rides beside the frozen message projection: the shipped key list drops it,
- * so an older host never reads it and keeps its own zone for a routine the agent creates.
- *
- * A present value that is not a bounded string is malformed and fails closed. A string this runtime
- * cannot resolve is dropped instead: the client's time zone data can be newer than the host's, and
- * an unknown zone must not stop the message, only the schedule default it would give.
- */
 function messageTimezone(source: unknown): TeamProtocolV8BaseJsonObject {
   if (!isDynamicRecord(source) || source.timezone === undefined) return {};
   const timezone = source.timezone;
@@ -154,8 +137,6 @@ export function encodeTeamProtocolV8CurrentHttpRequest(
     return JSON.stringify(decodeScopedUsageRequest(value));
   }
   if (!duplicateRoute(method, path)) {
-    // The frozen base projection names no provider or model, so a chosen pair rides beside it:
-    // only a host behind the capability reads them, and anything older drops unknown keys.
     if (isAgentCreateRoute(method, path) && options.agentCreateModel) {
       const projected = JSON.parse(encodeTeamProtocolV8BaseCurrentHttpRequest(method, path, value, options));
       return JSON.stringify({ ...projected, ...decodeAgentCreateModel(value) });
@@ -166,7 +147,6 @@ export function encodeTeamProtocolV8CurrentHttpRequest(
     }
     return encodeTeamProtocolV8BaseCurrentHttpRequest(method, path, value, options);
   }
-  // The duplicate route reaches the frozen v3 codec directly, so the vocabulary swap happens here.
   const currentValue: TeamProtocolV8BaseJsonValue = JSON.parse(JSON.stringify(value ?? null));
   return JSON.stringify(decodeTeamProtocolV8HttpRequest(method, path, toWireAgentKeys(currentValue)));
 }
@@ -194,14 +174,8 @@ export function decodeTeamProtocolV8CurrentHttpRequest(
       : decodeTeamProtocolV8BaseCurrentHttpRequest(
           method,
           path,
-          // The encode call is only here to expand semantic tags, and it leaves the object in wire
-          // vocabulary. Decoding its output is what brings the keys back to the current spelling the
-          // handlers read.
           JSON.parse(encodeTeamProtocolV8BaseCurrentHttpRequest(method, path, value)),
         );
-    // Read off the raw request, not the projection: the frozen base codec drops unknown keys, so
-    // the pair is gone by the time `decoded` exists. A request without the capability takes the
-    // host default exactly as before.
     if (isAgentCreateRoute(method, path) && options.agentCreateModel) {
       return { ...decoded, ...decodeAgentCreateModel(value) };
     }
@@ -212,19 +186,6 @@ export function decodeTeamProtocolV8CurrentHttpRequest(
   return toCurrentAgentKeysObjectForPath(path, structuredClone(decodeTeamProtocolV8HttpRequest(method, path, value)));
 }
 
-/**
- * `historyExtent` is the negotiated history-extent-v1 capability: only then does a page carry its
- * unloaded length beside the frozen keys. `uiBlocks` is the negotiated ui-blocks-v1 capability: only
- * then does a conversation message carry its `uiBlock`. `subagents` is the negotiated subagents-v1
- * capability: only then does a conversation message carry its `subagents`. `promptMultiSelect` is the
- * negotiated prompt-multi-select-v1 capability: only then does a prompt question carry `multiSelect`.
- * `videoGeneration` is the negotiated video-generation-v1 capability: only then does a conversation
- * message carry its `videoGeneration`. `usageTertiary` is the negotiated usage-tertiary-v1 capability:
- * only then does a usage limit carry its `tertiary` window. `agentPendingRuntime` is the negotiated
- * agent-pending-runtime-v1 capability: only then does an agent of the agent list carry its
- * `pendingRuntime`. `memoryChanges` is the negotiated memory-changes-v1 capability: only then does a
- * conversation message carry its `memoryChanges`. Without them the output is the released projection.
- */
 export function encodeTeamProtocolV8CurrentHttpResponse(
   method: string,
   path: string,
@@ -238,8 +199,12 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
     usageTertiary?: boolean;
+    usageGroups?: boolean;
+    usageReadFailed?: boolean;
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
+    queueHold?: boolean;
+    queueHoldSignIn?: boolean;
   } = {},
 ): string {
   const {
@@ -249,13 +214,21 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     promptMultiSelect,
     videoGeneration,
     usageTertiary,
+    usageGroups,
+    usageReadFailed,
     agentPendingRuntime,
     memoryChanges,
+    queueHold,
+    queueHoldSignIn,
     ...frozen
   } = options;
   const encoded = encodeFrozenResponse(method, path, status, value, frozen);
   if (status >= 400) return encoded;
+  if (queueHold && (isQueueSnapshotRoute(method, path) || isQueueEditRoute(method, path)))
+    return JSON.stringify(withQueueHold(JSON.parse(encoded), value, true, queueHoldSignIn === true));
   const withUsage = usageTertiary && isUsageRoute(method, path);
+  const withGroups = usageGroups && isUsageRoute(method, path);
+  const withReadFailed = usageReadFailed && isUsageRoute(method, path);
   const withExtent = historyExtent && isHistoryExtentRoute(method, path);
   const withBlocks = uiBlocks && isConversationRoute(method, path);
   const withSubagents = subagents && isConversationRoute(method, path);
@@ -265,6 +238,8 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
   const withMemory = memoryChanges && isConversationRoute(method, path);
   if (
     !withUsage &&
+    !withGroups &&
+    !withReadFailed &&
     !withExtent &&
     !withBlocks &&
     !withSubagents &&
@@ -276,6 +251,8 @@ export function encodeTeamProtocolV8CurrentHttpResponse(
     return encoded;
   let output: TeamProtocolV8BaseJsonValue = JSON.parse(encoded);
   if (withUsage) output = withUsageTertiary(output, value, true);
+  if (withGroups) output = withUsageGroups(output, value, true);
+  if (withReadFailed) output = withUsageReadFailed(output, value, true);
   if (withExtent) output = withPageHistoryExtent(output, value);
   if (withBlocks) output = withConversationUiBlocks(output, value);
   if (withSubagents) output = withConversationSubagents(output, value);
@@ -305,8 +282,6 @@ function encodeFrozenResponse(
   if (isBrowserViewSessionRoute(method, path) && status < 400) return "{}";
   if (isBrowserViewSessionsRoute(method, path) && status < 400)
     return JSON.stringify(decodeBrowserViewSessionResponse(value));
-  // The tabs keep the released projection, and that projection names `ownerBotId`, so the swap the
-  // base adapter does by path has to happen here too.
   if (isBrowserDisplayRoute(method, path) && status < 400)
     return JSON.stringify(decodeBrowserDisplayResponse(toWireAgentKeys(JSON.parse(JSON.stringify(value ?? null)))));
   if (isQueueEditRoute(method, path) && status === 204) return "{}";
@@ -341,17 +316,10 @@ function encodeFrozenResponse(
   if (!duplicateRoute(method, path)) {
     return encodeTeamProtocolV8BaseCurrentHttpResponse(method, path, status, value, options);
   }
-  // The duplicate route reaches the frozen v3 codec directly, so the vocabulary swap happens here.
   const currentValue: TeamProtocolV8BaseJsonValue = JSON.parse(JSON.stringify(value ?? null));
   return JSON.stringify(decodeTeamProtocolV8HttpResponse(method, path, status, toWireAgentKeys(currentValue)));
 }
 
-/**
- * A host sends the history extent only under history-extent-v1, a UI block only under ui-blocks-v1,
- * the subagents only under subagents-v1, a multi-select flag only under prompt-multi-select-v1, a
- * video request only under video-generation-v1, memory changes only under memory-changes-v1, and a
- * third usage window only under usage-tertiary-v1, so a present one is always kept.
- */
 export function decodeTeamProtocolV8CurrentHttpResponse(
   method: string,
   path: string,
@@ -361,8 +329,9 @@ export function decodeTeamProtocolV8CurrentHttpResponse(
   const decoded = decodeFrozenResponse(method, path, status, value);
   if (status >= 400) return decoded;
   if (isAgentListRoute(method, path)) return withAgentPendingRuntimes(decoded, value);
-  const withUsage = isUsageRoute(method, path) ? withUsageTertiary(decoded, value) : decoded;
-  // The conversation page route carries all three.
+  const withUsage = isUsageRoute(method, path)
+    ? withUsageReadFailed(withUsageGroups(withUsageTertiary(decoded, value), value), value)
+    : decoded;
   const withExtent = isHistoryExtentRoute(method, path) ? withPageHistoryExtent(withUsage, value) : withUsage;
   if (!isConversationRoute(method, path)) return withExtent;
   return withConversationMemoryChanges(
@@ -397,12 +366,18 @@ function decodeFrozenResponse(
     return toCurrentAgentKeys(structuredClone(decodeBrowserDisplayResponse(value)));
   if (isQueueEditRoute(method, path) && status === 204) return {};
   if (isQueueEditRoute(method, path))
-    return withQueueMarks(
-      decodeTeamProtocolV8BaseCurrentHttpResponse("GET", "/v1/agents/queue/queue", status, value),
+    return withQueueHold(
+      withQueueMarks(
+        decodeTeamProtocolV8BaseCurrentHttpResponse("GET", "/v1/agents/queue/queue", status, value),
+        value,
+      ),
       value,
     );
   if (isQueueSnapshotRoute(method, path) && status < 400)
-    return withQueueMarks(decodeTeamProtocolV8BaseCurrentHttpResponse(method, path, status, value), value);
+    return withQueueHold(
+      withQueueMarks(decodeTeamProtocolV8BaseCurrentHttpResponse(method, path, status, value), value),
+      value,
+    );
   if (isConversationRoute(method, path) && status < 400)
     return withConversationSenders(
       withConversationPlans(
@@ -420,20 +395,9 @@ function decodeFrozenResponse(
   return toCurrentAgentKeys(structuredClone(decodeTeamProtocolV8HttpResponse(method, path, status, value)));
 }
 
-/**
- * The model ids and reasoning efforts of the `v8-base.ts` agent validator. A provider is open: any id
- * that `OPEN_PROVIDER_ID` matches. The host still refuses an id it cannot run, so a client may name a
- * provider that only a newer host knows. A client names a reasoning-efforts-v1 level only when the
- * host lists it for the model.
- */
 const V8_AGENT_MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/[\],=-]{0,159}$/u;
 const V8_REASONING_EFFORTS = TEAM_REASONING_EFFORTS;
 
-/**
- * The provider, model and reasoning effort of an agent creation request, validated and fail-closed:
- * a present field with the wrong shape rejects the request rather than silently starting the agent
- * on the host default. Absent fields stay absent, so the host default still applies.
- */
 function decodeAgentCreateModel(value: unknown): TeamProtocolV8BaseJsonObject {
   if (!isDynamicRecord(value)) throw new Error("Invalid agent creation request.");
   const result: TeamProtocolV8BaseJsonObject = {};

@@ -1,6 +1,3 @@
-// The payloads of the workflow endpoints. Only a malformed payload fails here, so the text stays
-// English; a graph that is too large is the one exception that a person can cause.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type CreateWorkflowInput,
@@ -11,6 +8,7 @@ import {
   isRetryWorkflowStepInput,
   isRunWorkflowStepInput,
   isSaveWorkflowGraphInput,
+  isSetWorkflowPausedInput,
   isStartWorkflowRunInput,
   isWorkflowGitHubLastEventInput,
   isWorkflowGitHubRepositoryInput,
@@ -22,6 +20,7 @@ import {
   type RetryWorkflowStepInput,
   type RunWorkflowStepInput,
   type SaveWorkflowGraphInput,
+  type SetWorkflowPausedInput,
   type StartWorkflowRunInput,
   type WorkflowEdge,
   type WorkflowGitHubLastEventInput,
@@ -70,10 +69,6 @@ function knownEdge(edge: WorkflowEdge): WorkflowEdge {
   };
 }
 
-/**
- * The graph with only the keys that the contract names, so the strokes and the run versions that the
- * host keeps as JSON hold no other data. A graph larger than one frame can carry is refused.
- */
 function knownGraph(graph: WorkflowGraph): WorkflowGraph {
   const known: WorkflowGraph = {
     nodes: graph.nodes.map(knownNode),
@@ -109,12 +104,21 @@ export function parseWorkflowRunId(value: unknown): string {
 
 export function parseCreateWorkflow(value: unknown): CreateWorkflowInput {
   if (!isCreateWorkflowInput(value)) throw new Error("Invalid workflow.");
-  return { title: value.title, ...(value.graph === undefined ? {} : { graph: knownGraph(value.graph) }) };
+  return {
+    title: value.title,
+    ...(value.graph === undefined ? {} : { graph: knownGraph(value.graph) }),
+    ...(value.paused ? { paused: true } : {}),
+  };
 }
 
 export function parseRenameWorkflow(value: unknown): RenameWorkflowInput {
   if (!isRenameWorkflowInput(value)) throw new Error("Invalid workflow title.");
   return { workflowId: value.workflowId, title: value.title };
+}
+
+export function parseSetWorkflowPaused(value: unknown): SetWorkflowPausedInput {
+  if (!isSetWorkflowPausedInput(value)) throw new Error("Invalid workflow.");
+  return { workflowId: value.workflowId, paused: value.paused };
 }
 
 export function parseSaveWorkflowGraph(value: unknown): SaveWorkflowGraphInput {
@@ -184,5 +188,6 @@ export function parseWorkflowMediaPrice(value: unknown): WorkflowMediaPriceReque
     duration: value.duration,
     resolution: value.resolution,
     transparent: value.transparent,
+    ...(value.options ? { options: value.options.map(({ name, value }) => ({ name, value })) } : {}),
   };
 }

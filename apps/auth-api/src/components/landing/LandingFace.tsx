@@ -2,14 +2,9 @@ import type { JSX } from "@solidjs/web";
 import { For, Show } from "solid-js";
 import type { LandingHair, LandingPerson } from "../../lib/landing-content";
 
-/** A circle of radius `r` at (`x`, `y`), as one subpath. */
 const curl = (x: number, y: number, r: number) =>
   `M${x - r} ${y}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`;
 
-/**
- * Hair in front of the head. Each path is filled on its own, so curls that overlap the cap do not
- * make holes in it.
- */
 const HAIR_FRONT: Record<LandingHair, readonly string[]> = {
   long: [
     "M12.2 18C11.9 10.9 15.5 7.9 20 7.9S28.1 10.9 27.8 18C27.1 14.6 25.3 12.5 22.2 11.9C20.4 14.4 16.4 16.3 12.2 18Z",
@@ -31,14 +26,12 @@ const HAIR_FRONT: Record<LandingHair, readonly string[]> = {
   ],
 };
 
-/** Hair behind the head, for long hair only. */
 const HAIR_BACK: Record<LandingHair, string | null> = {
   long: "M10.6 19.5C10.3 9.8 14.7 6.6 20 6.6S29.7 9.8 29.4 19.5V32C27.4 33.6 12.6 33.6 10.6 32Z",
   short: null,
   curly: null,
 };
 
-/** Three freckles on each cheek. */
 const FRECKLES = [
   [15, 20.7],
   [16.1, 21.3],
@@ -53,10 +46,6 @@ interface LandingFaceProps {
   class: string;
 }
 
-/**
- * A drawn face for a person in a picture. People get faces and agents get avatars, so the two are
- * easy to tell apart. The colours of each person are in the stylesheet, under `data-person`.
- */
 export function LandingFace(props: LandingFaceProps): JSX.Element {
   return (
     <span class={`${props.class} landing-face`} data-person={props.person.id}>

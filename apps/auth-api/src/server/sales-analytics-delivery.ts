@@ -17,6 +17,16 @@ const MAX_BATCH_SIZE = 50;
 const MAX_RATE_LIMIT_RETRIES = 3;
 const RATE_LIMIT_RETRY_DELAY_MS = 60_000;
 
+export const RECOVER_EXPIRED_CLAIMS_SQL = `UPDATE billing_analytics_events
+    SET status = 'uncertain', claimed_at = NULL, claim_token = NULL, last_error = 'claim_expired', updated_at = ?
+  WHERE status = 'sending' AND claimed_at IS NOT NULL AND claimed_at <= ?`;
+export const READY_EVENTS_SQL = `SELECT source_key, profile_id, event_name, properties_json, event_timestamp, attempts,
+    '' AS claim_token
+  FROM billing_analytics_events
+  WHERE status IN ('pending', 'rejected')
+    AND (status = 'pending' OR (next_attempt_at > 0 AND next_attempt_at <= ? AND attempts < ?))
+  ORDER BY created_at ASC LIMIT ?`;
+
 const PROFILE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const SOURCE_KEY_PATTERN = /^[A-Za-z0-9_.:-]{1,512}$/u;
 const SAFE_VALUE_PATTERN = /^[A-Za-z0-9_.:/+-]{1,128}$/u;
@@ -62,7 +72,6 @@ const BILLING_SUBSCRIPTION_STATUSES = [
 const SALES_ANALYTICS_EVENT_NAMES = ["billing_action", "revenue", "billing_snapshot"] as const;
 type SalesAnalyticsEventName = (typeof SALES_ANALYTICS_EVENT_NAMES)[number];
 
-/** The only event properties that the account Worker may send to OpenPanel. */
 const SALES_ANALYTICS_EVENT_PROPERTIES = {
   billing_action: [
     "action",
@@ -167,12 +176,6 @@ interface DeliveryOutcome {
   error: string | null;
 }
 
-/**
- * Durable, server-side delivery for account sales events.
- *
- * The ledger is deliberately separate from the existing account analytics sender. It keeps the
- * source key forever and never retries an outcome for which the HTTP result is unknown.
- */
 export class SalesAnalyticsDelivery {
   readonly #database: D1Database;
   readonly #clientId: string | undefined;
@@ -249,10 +252,6 @@ export class SalesAnalyticsDelivery {
     });
   }
 
-  /**
-   * Sets the account email on the OpenPanel profile, as the apps do at sign-in. It is not part of the
-   * ledger: a failure logs one line with no address, and the event is still sent.
-   */
   async #identify(profileId: string): Promise<void> {
     const clientId = this.#clientId;
     const clientSecret = this.#clientSecret;
@@ -378,24 +377,14 @@ export class SalesAnalyticsDelivery {
 
   async #recoverExpiredClaims(now: number): Promise<void> {
     await this.#database
-      .prepare(
-        `UPDATE billing_analytics_events
-            SET status = 'uncertain', claimed_at = NULL, claim_token = NULL,
-                last_error = 'claim_expired', updated_at = ?
-          WHERE status = 'sending' AND claimed_at IS NOT NULL AND claimed_at <= ?`,
-      )
+      .prepare(RECOVER_EXPIRED_CLAIMS_SQL)
       .bind(now, now - CLAIM_TIMEOUT_MS)
       .run();
   }
 
   async #readyEvents(now: number): Promise<LedgerEvent[]> {
     const result = await this.#database
-      .prepare(
-        `SELECT source_key, profile_id, event_name, properties_json, event_timestamp, attempts, '' AS claim_token
-           FROM billing_analytics_events
-          WHERE status = 'pending' OR (status = 'rejected' AND next_attempt_at > 0 AND next_attempt_at <= ? AND attempts < ?)
-          ORDER BY created_at ASC LIMIT ?`,
-      )
+      .prepare(READY_EVENTS_SQL)
       .bind(now, MAX_RATE_LIMIT_RETRIES, MAX_BATCH_SIZE)
       .all<unknown>();
     return result.results.filter(isLedgerEvent);
@@ -530,11 +519,6 @@ function isEventProperties(value: unknown): value is SalesAnalyticsProperties {
   return true;
 }
 
-/**
- * A payment: `revenue`, or the `payment_succeeded` action that comes with it. It also sets the account
- * email on the OpenPanel profile, so that a paying account is not anonymous when its apps have product
- * analytics off.
- */
 function isPaidEvent(row: LedgerEvent): boolean {
   if (row.event_name === "revenue") return true;
   if (row.event_name !== "billing_action") return false;

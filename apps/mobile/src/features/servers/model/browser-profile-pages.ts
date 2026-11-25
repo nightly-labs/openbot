@@ -1,12 +1,7 @@
 import { router } from "expo-router";
 
-/**
- * The stack that shows the browser profile pages: Server settings, or the settings of one agent,
- * which open them from the agent's profile choice without a second sheet.
- */
 export type BrowserProfileStack = { kind: "server" } | { kind: "agent"; agentId: string };
 
-/** Opens one profile, or a new profile when `profileId` is absent. `assignTo` gives a new profile to that agent. */
 export function openBrowserProfilePage(
   stack: BrowserProfileStack,
   serverId: string,
@@ -21,7 +16,6 @@ export function openBrowserProfilePage(
     });
 }
 
-/** Opens the agents of the server, to give them the profile or take it from them. */
 export function openBrowserProfileAgentsPage(stack: BrowserProfileStack, serverId: string, profileId: string): void {
   if (stack.kind === "server")
     router.push({ pathname: "/server-settings/browser-profile-agents", params: { serverId, profileId } });
@@ -32,7 +26,6 @@ export function openBrowserProfileAgentsPage(stack: BrowserProfileStack, serverI
     });
 }
 
-/** Opens the list of the profiles. */
 export function openBrowserProfilesPage(stack: BrowserProfileStack, serverId: string): void {
   if (stack.kind === "server") router.push({ pathname: "/server-settings/browser-profiles", params: { serverId } });
   else
@@ -42,10 +35,6 @@ export function openBrowserProfilesPage(stack: BrowserProfileStack, serverId: st
     });
 }
 
-/**
- * Opens one saved proxy or member computer, or a new proxy when `proxyId` is absent. `assignTo` gives
- * a new proxy to that named profile.
- */
 export function openBrowserProxyPage(
   stack: BrowserProfileStack,
   serverId: string,
@@ -60,7 +49,6 @@ export function openBrowserProxyPage(
     });
 }
 
-/** Opens the proxy choice of one named profile. */
 export function openBrowserProfileProxyPage(stack: BrowserProfileStack, serverId: string, profileId: string): void {
   if (stack.kind === "server")
     router.push({ pathname: "/server-settings/browser-profile-proxy", params: { serverId, profileId } });

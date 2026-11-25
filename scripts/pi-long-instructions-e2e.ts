@@ -1,11 +1,3 @@
-// Runs the real `pi` provider driver over a fake Pi (`provider-fakes/agents/pi-instructions.ts`) to
-// check that a turn with long developer instructions reaches the CLI (#3738). The instructions go
-// to `--append-system-prompt` as a file, so the launch line stays short. Before the fix they went
-// on the command line: on Windows the `.cmd` wrapper starts through `cmd.exe`, which stops at 8191
-// characters, and the turn failed with `Pi process closed (1).` The fake logs its own command line
-// and the instructions that arrive. Cases: a turn with instructions that fill the old limit, and a
-// turn with none.
-// `bun run test:pi-long-instructions`. Writes .openbot-build/pi-long-instructions-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -15,7 +7,6 @@ import { requireProviderDriver } from "../src/backend/provider-drivers";
 import { readJsonl, runTurn, startThread, stopClients } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/pi-long-instructions-e2e");
-/** Longer than the 8191-character command line of `cmd.exe`, with the rest of the launch line. */
 const INSTRUCTIONS = `You are a careful assistant.\n${"Rule for the assistant: prefer the smallest change that solves the problem. ".repeat(200)}`;
 
 interface LogEntry {
@@ -44,11 +35,6 @@ const root = await mkdtemp(join(tmpdir(), "openbot-pi-long-instructions-e2e-"));
 const report: Report = { passed: false };
 const clients: AgentClient[] = [];
 
-/**
- * Writes the fake Pi and its launcher, and returns the launcher path. On Windows the launcher is a
- * `.cmd`, like the Pi CLI that npm installs, so the spawn goes through `cmd.exe` exactly as in the
- * bug. Elsewhere it is a shell script.
- */
 async function installFakePi(bin: string): Promise<string> {
   const fake = resolve(import.meta.dirname, "provider-fakes/agents/pi-instructions.ts");
   const env = { FAKE_LOG: join(root, "agent.jsonl"), FAKE_DIR: root };
@@ -88,7 +74,6 @@ const argvEntry = async (): Promise<LogEntry | undefined> =>
 try {
   const client = await open();
 
-  // The instructions that fill the old limit arrive as one file, and the turn runs.
   const thread = await startThread(client, {
     cwd: root,
     developerInstructions: INSTRUCTIONS,
@@ -113,7 +98,6 @@ try {
     instructionsArrived: true,
   };
 
-  // A turn without instructions still runs, and no prompt argument reaches the CLI.
   const plain = await startThread(client, { cwd: root });
   const plainTurn = await runTurn(client, plain, { text: "say ok", timeoutMs: 30_000 });
   const entries = await readJsonl<LogEntry>(join(root, "agent.jsonl"));

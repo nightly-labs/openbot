@@ -127,6 +127,7 @@ export const messages = {
   "billing.license.cancel.descriptionNow":
     "De licentie eindigt aan het einde van de betaalde periode. Je servers merken hier niets van.",
   "billing.license.cancel.keep": "Licentie behouden",
+  "billing.order.cta.download": "Downloaden",
   "billing.license.invite.title": "Gebruiker aan de licentie toevoegen?",
   "billing.license.invite.description":
     "Deze uitnodiging voegt 1 gebruiker toe aan je licentie: {price} meer per maand.",
@@ -142,4 +143,27 @@ export const messages = {
   "billing.details.vatIdInvalid": "Dit is geen btw-nummer van het gekozen land.",
   "billing.details.countryMissing": "Kies je factuurland.",
   "billing.details.saveFailed": "Kan de factuurgegevens niet opslaan",
+  "billing.credits.explainer.title": "Wat zijn credits?",
+  "billing.credits.explainer.page": "{page} van {total}",
+  "billing.credits.explainer.pages": "Pagina’s",
+  "billing.credits.explainer.mediaTitle": "Credits betalen voor media",
+  "billing.credits.explainer.mediaText": "Wanneer een agent een afbeelding, video of stem maakt, gebruikt die credits.",
+  "billing.credits.explainer.chatTitle": "Chats blijven gratis",
+  "billing.credits.explainer.chatText": "Chats gebruiken je eigen AI-provider. Praten met je agents kost geen credits.",
+  "billing.credits.explainer.chatFree": "0 credits",
+  "billing.credits.explainer.modelsTitle": "Elk model heeft een prijs",
+  "billing.credits.explainer.modelsText":
+    "Betere modellen kosten meer. Een afbeelding kost {pictureMin}–{pictureMax} credits, een video van {seconds} s {videoMin}–{videoMax}.",
+  "billing.credits.explainer.perPicture": "/ afbeelding",
+  "billing.credits.explainer.perClip": "/ video van {seconds} s",
+  "billing.credits.explainer.getTitle": "Credits krijgen",
+  "billing.credits.explainer.getText":
+    "Koop een pakket als je meer nodig hebt. Grotere pakketten geven een betere prijs per credit.",
+  "billing.credits.explainer.freeEnd": "Maandelijkse gratis credits hebben een einddatum",
+  "billing.credits.explainer.welcome": "Nieuwe accounts krijgen {amount} gratis credits om enkele modellen te proberen",
+  "billing.credits.welcomeIncluded": "Gratis credits: {amount}",
+  "billing.credits.explainer.allPrices": "Alle {count} modellen",
+  "billing.credits.explainer.next": "Volgende",
+  "billing.credits.explainer.gotIt": "Begrepen",
+  "billing.credits.explainer.place": "OpenBot",
 } as const satisfies PartialTranslation<typeof source>;

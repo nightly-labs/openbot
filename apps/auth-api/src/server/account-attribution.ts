@@ -3,7 +3,6 @@ import { Effect, Schema } from "effect";
 import { safeScreenPath } from "../lib/analytics";
 import type { AccountAnalytics, AttributionSource } from "./account-analytics";
 
-/** A checkout older than this cannot name the first touch of its account. */
 const CHECKOUT_ATTRIBUTION_WINDOW_MS = 24 * 60 * 60_000;
 const CHECKOUT_SESSION_PATTERN = /^cs_[A-Za-z0-9_]{1,250}$/u;
 
@@ -32,19 +31,11 @@ export class AccountAttributionError extends Schema.TaggedError<AccountAttributi
   {},
 ) {}
 
-/**
- * A first touch from a browser request, or null. The landing page must be a screen the website
- * reports, so a client cannot store a path that the website itself would never send.
- */
 export function requestFirstTouch(value: unknown): FirstTouch | null {
   const touch = parseFirstTouch(value);
   return touch && safeScreenPath(touch.landingPage) === touch.landingPage ? touch : null;
 }
 
-/**
- * The first website visit of each account. The first one that the service learns is kept; a later
- * one is ignored, so the source of an account never changes after it is recorded.
- */
 export class AccountAttribution {
   readonly #database: D1Database;
   readonly #analytics: AccountAnalytics;
@@ -56,7 +47,6 @@ export class AccountAttribution {
     this.#now = options.now ?? Date.now;
   }
 
-  /** Saves the first touch unless the account has one. True when this call saved it. */
   readonly record = Effect.fn("AccountAttribution.record")(function* (
     this: AccountAttribution,
     userId: string,
@@ -93,10 +83,6 @@ export class AccountAttribution {
     return saved;
   }).bind(this);
 
-  /**
-   * Saves the first touch for the account of a recent Checkout Session. Only the browser that Stripe
-   * sent back knows the session ID, and only an account without a first touch changes.
-   */
   readonly recordCheckout = Effect.fn("AccountAttribution.recordCheckout")(function* (
     this: AccountAttribution,
     sessionId: string,

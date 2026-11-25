@@ -8,6 +8,7 @@ export const messages = {
   "menu.actualSize": "Gerçek Boyut",
   "menu.zoomIn": "Yakınlaştır",
   "menu.zoomOut": "Uzaklaştır",
+  "menu.closeDeveloperTools": "Geliştirici araçlarını kapat",
   "menu.copyLink": "Bağlantıyı Kopyala",
   "menu.copyImage": "Görüntüyü Kopyala",
   "menu.quit": "OpenBot'tan çık",

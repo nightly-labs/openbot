@@ -15,37 +15,25 @@ import {
   sourceVerified,
 } from "./marketplace-view";
 
-/** A group on the Agents tab shows this many agents. "See all" opens the category on its own page. */
 const GROUP_LIMIT = 6;
-/** The featured cards of the Agents tab and of a category page. */
 const FEATURED_LIMIT = 3;
 
 const categoryOf = (listing: MarketplaceAgentSummary): SkillCategory => listing.category ?? "other";
 
-/**
- * Whether an agent is of the chosen source. The catalog query sends the source too, but a Worker that
- * does not read it sends each agent.
- */
 export function agentFromSource(listing: MarketplaceAgentSummary, source: SkillSource | null): boolean {
   return source === null || (listing.verified === true) === (source === "verified");
 }
 
-/** The user has the agent. A member, who can add no agent, has none. */
 function owned(model: MarketplaceModel, listing: MarketplaceAgentSummary) {
   return (model.agentState(listing) ?? "add") !== "add";
 }
 
-/** The catalog's own picks first, then the agents with the most installs. */
 function byFeatured(from: readonly MarketplaceAgentSummary[]) {
   return [...from].sort(
     (left, right) => Number(right.featured) - Number(left.featured) || right.installs - left.installs,
   );
 }
 
-/**
- * An add moves the agent into "Your agents", so the focus goes to its row there after the render. A
- * category page has no such row; the focus then goes to the page heading.
- */
 function focusRow(label: string) {
   requestAnimationFrame(() => {
     const view = document.querySelector(".skills-marketplace .marketplace-view");
@@ -54,7 +42,6 @@ function focusRow(label: string) {
   });
 }
 
-/** "2 skills · 1 routine": what the agent brings with it. */
 function useContents() {
   const { t } = useText();
   return (listing: MarketplaceAgentSummary) =>
@@ -64,12 +51,10 @@ function useContents() {
     ].join(" · ");
 }
 
-/** "Add", "Added", or "Update available" in a catalog row; "Open chat" or "Update" in a row of the user's. */
 function AgentAction(props: {
   scope: MarketplaceScope;
   listing: MarketplaceAgentSummary;
   yours?: boolean | undefined;
-  /** The button is gone after an add, so the focus needs a new place. */
   onAdded: () => void;
 }) {
   const { t } = useText();
@@ -123,14 +108,9 @@ function AgentAction(props: {
   );
 }
 
-/**
- * One agent as an app row: avatar, name, creator, one line, and its action. The row opens the agent
- * page. The creator shows, as on the public page, so a copy of an agent's name does not pass for it.
- */
 function AgentRow(props: { scope: MarketplaceScope; listing: MarketplaceAgentSummary; yours?: boolean | undefined }) {
   const { t } = useText();
   const open = () => t("marketplace.open", { name: props.listing.name });
-  /** A row of the user's says that a newer version waits. */
   const attention = () => props.yours === true && props.scope.model.agentState(props.listing) === "update";
   const line = () => (attention() ? t("marketplace.agent.updateAvailable") : props.listing.title);
   return (
@@ -173,10 +153,6 @@ function AgentRows(props: { scope: MarketplaceScope; agents: readonly Marketplac
   );
 }
 
-/**
- * A featured agent: its avatar and Add on one line, its name and creator, what it does, and what it
- * brings, as a featured card on the public page.
- */
 function FeatureCard(props: { scope: MarketplaceScope; listing: MarketplaceAgentSummary }) {
   const { t } = useText();
   const contents = useContents();
@@ -221,7 +197,6 @@ function FeatureCard(props: { scope: MarketplaceScope; listing: MarketplaceAgent
   );
 }
 
-/** Three cards under one title. On the Agents tab the shelf is one more group, with the same line above it. */
 function FeatureShelf(props: { scope: MarketplaceScope; agents: readonly MarketplaceAgentSummary[]; group?: boolean }) {
   const { t } = useText();
   return (
@@ -241,11 +216,6 @@ function FeatureShelf(props: { scope: MarketplaceScope; agents: readonly Marketp
   );
 }
 
-/**
- * The featured agents of the Agents tab or of one category: the catalog's own picks with the most
- * installs. With no pick, or after a failed read, the loaded agents: the featured ones first, then the
- * most installed. The user has none of them. A search hides them.
- */
 function createFeaturedAgents(
   scope: MarketplaceScope,
   category: SkillCategory | undefined,
@@ -293,7 +263,6 @@ function createFeaturedAgents(
   });
 }
 
-/** The title of the Agents tab or of a category page, and the source switch at its end. */
 function AgentsHead(props: { nav: MarketplaceNavigation; title: string; description?: string | undefined }) {
   return (
     <div class="marketplace-skill-head-row">
@@ -321,16 +290,10 @@ function AgentsHead(props: { nav: MarketplaceNavigation; title: string; descript
   );
 }
 
-/**
- * The Agents tab: "Your agents" first, with Open chat or Update in each row; the featured agents; then
- * the agents that the user does not have, by category. Each category shows its first 6 agents, also
- * during a search; "See all" opens the category page.
- */
 export function AgentLibrary(props: { scope: MarketplaceScope; noMatch: JSX.Element }) {
   const { t } = useText();
   const nav = () => props.scope.nav;
   const model = () => props.scope.model;
-  /* The listing holds the search. The source goes to the server too, and is checked here. */
   const found = createMemo(() =>
     props.scope.agents.items().filter((listing) => agentFromSource(listing, nav().state.agentSource)),
   );
@@ -343,7 +306,6 @@ export function AgentLibrary(props: { scope: MarketplaceScope; noMatch: JSX.Elem
     }),
   );
   const featured = createFeaturedAgents(props.scope, undefined, available);
-  /* The server can hold more agents of a category than the first page brought. */
   const more = (agents: readonly MarketplaceAgentSummary[]) =>
     agents.length > GROUP_LIMIT || props.scope.agents.hasMore();
   return (
@@ -399,11 +361,6 @@ export function AgentLibrary(props: { scope: MarketplaceScope; noMatch: JSX.Elem
   );
 }
 
-/**
- * One category on its own page, from the server in pages: three featured cards, so the page does not
- * start as a flat list, then the rest in two columns. A search hides the cards. The search stays at
- * the top while the list scrolls.
- */
 export function AgentGroupPage(props: { scope: MarketplaceScope; category: SkillCategory }) {
   const { t } = useText();
   const category = untrack(() => props.category);

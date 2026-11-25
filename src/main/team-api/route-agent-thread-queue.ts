@@ -17,12 +17,6 @@ import {
   WEBRTC_FRAME_BODY_BUDGET,
 } from "./request-helpers";
 
-/**
- * The waiting messages of each side thread of an agent, and their order in one thread, from a joined
- * server. A member who can send the agent a message can use them, as the panel of a thread on this
- * computer does. An agent that this peer cannot see answers as a missing agent does. Frozen by
- * `agent-thread-queue-v1`.
- */
 export async function routeAgentThreadQueue(
   context: TeamApiRequestContext,
   tasks: TeamApiAgentTasks | undefined,
@@ -37,7 +31,6 @@ export async function routeAgentThreadQueue(
     return "unmatched";
   if (!tasks || !capabilities.has(AGENT_THREAD_QUEUE_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.threadQueueUnsupported"));
-  // `readJson` has already run the body through the agent-thread-queue wire codec.
   const body = await readJson(request);
   const agentId = stringField(body, "agentId");
   if (hiddenAgentIds.has(agentId)) throw new HttpError(404, sourceText("error.team.agentNotFound"));
@@ -50,7 +43,6 @@ export async function routeAgentThreadQueue(
       .slice(0, AGENT_THREAD_QUEUE_LIMIT)
       .map((thread) => ({
         taskId: thread.taskId,
-        // A preview URL is an address on this computer: a client reads the file through its own route.
         deliveries: thread.deliveries.slice(0, AGENT_THREAD_QUEUE_LIMIT).map((delivery) => ({
           ...delivery,
           attachments: delivery.attachments.map((attachment) => ({ ...attachment, previewUrl: null })),
@@ -67,24 +59,17 @@ export async function routeAgentThreadQueue(
       }),
     );
   } catch (error) {
-    // A stale order, or an order with channel work, is a sentence for the member. Any other error is a
-    // host fault.
     if (error instanceof Error && REFUSALS().includes(error.message)) throw new HttpError(409, error.message);
     throw error;
   }
   return json(200, {});
 }
 
-/** The texts with which the queue refuses an order. */
 const REFUSALS = () => [
   sourceText("error.backend.queueOrderStale"),
   sourceText("error.backend.useChannelTaskControlsWork"),
 ];
 
-/**
- * The threads and deliveries that fit in one WebRTC frame, in queue order, as the queue window of
- * `route-agent-queue.ts` keeps them. A long queue then shows its first messages and does not fail.
- */
 function inFrame<Delivery>(
   agentId: string,
   threads: readonly { taskId: string; deliveries: Delivery[] }[],

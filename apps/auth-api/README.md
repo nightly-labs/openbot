@@ -42,6 +42,47 @@ has no plan change (`subscription_update` is off); it cancels plans and updates 
 `POST /v1/me/billing/storage` (and `/api/browser/v1/me/billing/storage`) with
 `{subscriptionId, tier}` buys a storage tier for a server on a VPS of the operator. See
 [Hosted servers](../../docs/hosted-servers.md#storage-tiers).
+The bootstrap also creates the `openbot_credits` Product and one Price for each credit amount
+(`openbot_credits_<n>`). `GET /v1/me/credits` returns the balance of the account and of its servers,
+`POST /v1/me/credits/checkout` with `{credits, currency, serverId?}` opens a Checkout, and
+`POST /v1/me/credits/transfer` with `{serverId, direction, credits}` moves credits between the account
+and a server that it owns. `POST /v1/me/credits/redeem` with `{code, serverId?}` redeems a credit code
+for the account or for a server that the account is a member of. The web client uses the same routes
+under `/api/browser`. `bun run test:credits` checks them.
+
+Make credit codes with `bun apps/auth-api/scripts/credit-codes.ts`:
+
+```sh
+bun apps/auth-api/scripts/credit-codes.ts create --credits 500 --count 200 --expires 2027-03-31 --campaign launch-week --note "Launch" --out ~/launch-codes.csv --production --confirm-production --apply
+bun apps/auth-api/scripts/credit-codes.ts list --campaign launch-week --production
+bun apps/auth-api/scripts/credit-codes.ts disable <code id> --production --confirm-production --apply
+```
+
+A code has 16 random characters from a 32-character alphabet (80 bits), for example
+`7KQ2-M9XD-4TPA-HW3C`. The script shows each code one time. D1 keeps only the SHA-256 hash of the
+code, so nobody can read a code back from the database. `--max-redemptions <m>` lets up to `<m>`
+accounts redeem the same code, one time each (default 1). The credits are free credits that end
+`--grant-days` days after the redemption (default 365). An account can redeem each code one time and
+any number of different codes. `--count` makes up to 1000 codes in one run. `--campaign` (lower-case
+letters, digits and dashes) groups codes in `list` and in the OpenPanel Credits dashboard. `--out`
+writes the codes to a new CSV file with mode 0600 instead of the terminal. `disable` stops a code;
+credits that accounts already redeemed stay.
+
+Redemptions have hourly limits (`CREDIT_CODE_LIMITS` in `src/server/credit-codes.ts`): 30 tries and 10
+wrong codes for each account, 120 tries and 30 wrong codes for each network address (IPv6 to its /64),
+and 20 redemptions of one code from one network. Only a code that does not exist or is disabled is a
+wrong code; a used, expired or already redeemed code counts only as a try. A try over a limit gets
+`429 credit_code_attempts`.
+D1 keeps only SHA-256 hashes of the counted keys in `credit_code_limits`, and the retention job deletes
+old hours.
+Without `--apply` the script makes no change. `--local` (the default) and `--test` work the same way.
+
+Each account gets 10 welcome credits once, with no end date. They pay only for the models that the
+media gateway gives a welcome route. The Worker reaches the media generation processor only through
+the private Worker `openbot-media-gateway` (service binding `MEDIA_GATEWAY`, production only). D1 keeps
+the models, prices, holds and ledger; the gateway keeps the adapters, routes and keys. Without the
+binding, as in local development, every credits model is unavailable. `bun run test:credit-media`
+checks the service against a fake gateway.
 
 The optional Worker variable `VIES_REQUESTER_VAT_ID` is the seller's EU VAT ID (for example
 `PL1234567890`). With it, the EU VIES check of a buyer's VAT ID returns a consultation number, which the
@@ -71,7 +112,9 @@ failed renewal, cancel at the period end, plan change, renew, delete, another ac
 deleted customer, a refund, a dispute, the welcome email of a first plan, and the storage tiers
 (`storage-tier`, which needs the storage Prices of the bootstrap). The `license-*`
 scenarios check the license: buy, Checkout, one open Checkout page, change users, the user count,
-renewal, failed renewal, currency, isolation from the server plans, and the user limit at a join. Each scenario uses a Stripe
+renewal, failed renewal, currency, isolation from the server plans, and the user limit at a join. The `credits`
+scenario buys the smallest credit pack and checks the invoice: Polish VAT for PL and DE, the OSS amount for DE, and no VAT
+for US. Each scenario uses a Stripe
 test clock and deletes it at the end. Start the Worker
 with `HOSTED_SERVERS_ENABLED=true`, `HOSTED_SERVERS_ALLOWED_USER_IDS` set to the output of
 `bun scripts/stripe-flows-e2e.ts --print-user-ids`, `HOSTED_SERVER_TEMPLATE=e2e-template`, and
@@ -89,6 +132,12 @@ Checkout pages of a discount link (`?promo=CODE`): an active code is applied, an
 fit the order or does not exist gives the code field. A copy of the Brazil partner code (BRL server plans only)
 gives a discount on a BRL server page and the code field on a EUR server page and a license page. It deletes the
 coupons and turns off the codes at the end.
+
+The `invite` scenario checks the invite rewards: a referred friend gets the first-payment coupon only on the
+first purchase, the coupon goes after the first paid invoice, a yearly payment gives 12 credit parts 30 days
+apart, the cron (`/cdn-cgi/handler/scheduled`) sends the due parts, and a refund takes the newest unsent parts
+first and then the sent credit. The scenario moves `ready_at` in D1, because the parts use the Worker clock,
+not the Stripe test clock.
 
 The `portal` scenario prints a Customer Portal cancel page and waits until you use it. Then it checks
 that the plan change flow of an old app opens the Portal home, and that the Portal has no plan change. The report goes to `.openbot-build/stripe-flows-e2e.json`.
@@ -246,11 +295,44 @@ value, each company must enter its client secret again. Without it, company sign
 everyone signs in with an email code. GitHub Actions reads it from the `cloudflare-production`
 Environment; a local deployment reads it from the encrypted `.env.production`.
 
+`HOSTED_ARCHIVE_KEY_SECRET` (32 random bytes in base64), `B2_WORKER_KEY_ID_EU` and
+`B2_WORKER_APPLICATION_KEY_EU` are set together or not at all. They are for the archives of ended
+pool servers ([plan 012](../../plans/012-pool-server-archive.md)). The first encrypts the `age` key
+of each archive in `hosted_server_archives`; with another value, no archive can be restored. The B2
+key reads the `openbot-pool-archive-eu` bucket and nothing else. The encrypted `.env.production` has
+all three, and GitHub Actions reads them from the `cloudflare-production` Environment. When you
+change one, change it in both places and deploy the Worker.
+`BROWSER_EXTENSION_IDS` lists the ids of the published OpenBot browser extensions, separated by
+commas (a Chrome id is 32 letters from `a` to `p`). Only they get a sign-in from the web app: the
+extension opens `/app?extension=<id>&challenge=<c>&state=<s>` in its sign-in window, the person
+allows it, `/api/browser/extension/code` gives a one-time code, and the extension spends it with its
+verifier at `/v1/mobile-auth/company/exchange` (`platform: "unknown"`), as the phone does after a company sign-in. The extension first asks with no window (`&silent=1`,
+`launchWebAuthFlow` not interactive): the web app gives the code at once when this account allowed this
+extension in this browser before (`openbot.web.extension-allowed.v1` in local storage), and else answers
+`login_required` or `consent_required`, and the extension opens the window. Without the variable, production gives no extension a
+code; a development API (`AUTH_EXPOSE_DEVELOPMENT_CODE`) accepts any extension id, because an
+unpacked extension gets its id from its folder. It is not a secret: set it in `wrangler.jsonc` `vars`
+when the store gives the extension its id.
+
+`GET /v1/browser-extension/x-rules?hash=<hex>` answers the CSS selectors that the extension uses on
+X (`server/browser-extension-x-rules.ts`) as `{ hash, rules }`, with `rules: null` when the extension
+already has that hash. When X changes its page, put new selectors in that file and deploy: extensions
+take them within an hour, with no store review. It holds selectors only, never code.
+
 `SERVER_CLAIMS_ADMIN_TOKEN` lets an operator sign a new server in for a user without an email code: see
 [server claims](../../docs/self-hosted-server.md#sign-in-with-a-server-claim). Without it, the endpoint answers 401.
 The encrypted `.env.production` has it, so `scripts/hosting/leaseweb-pool.ts custom` can sign a custom
 server in for its owner. GitHub Actions reads it from the `cloudflare-production` Environment. When you
 change it, change it in both places and deploy the Worker.
+
+`STORE_REVIEW_EMAIL` and `STORE_REVIEW_CODE` give app store reviewers a sign-in that does not need an
+inbox. A sign-in that starts with this one email sends no email, and its code is `STORE_REVIEW_CODE`
+(8 characters from the sign-in code alphabet). The expiry, the 5 tries and the rate limits stay the
+same, and every other email works as before. Set both or neither: a value that is not a valid email or
+code turns the sign-in off. The account must be a member of the review server only, because each person
+who has the code can sign in to it. Change the code after a review. The encrypted `.env.production`
+has both values, and `scripts/deploy-auth-api.ts` puts them. The CI deploy keeps the values that the
+Worker has.
 
 Use `bun run api:deploy:test` for the isolated `openbot-auth-api-test` Worker
 and the `openbot-auth-test` D1 database.
@@ -365,7 +447,11 @@ ticket names `REMOTE_SIGNAL_URL`, as before.
   `remote_hosts.signal_home` keeps, and a ticket with the `signal` claim. The host keeps its home
   until it sends that home's URL as `failedSignalUrl`. Session tickets of the host name the same
   home. Other host tickets (ingress, the webhook relay, released hosts) and hosts with no home use
-  `REMOTE_SIGNAL_URL`, which stays the entry Signal.
+  `REMOTE_SIGNAL_URL`, which stays the entry Signal. A host ticket request with `signalHome: true` can
+  also send `preferredSignalHome`, the ID of the home that an owner or admin chose. The host gets that
+  home when it is not the `failedSignalUrl` and its `/health/ready` answers in 2 seconds; otherwise the
+  rules below choose. An ID that is not a home is ignored. `POST /v2/remote/hosts/:hostId/signal-homes`
+  with the machine token lists the homes (`{ homes: [{ id, url }] }`).
 - `REMOTE_SIGNAL_HOME_LOCATIONS`: the place of each home, as `id=latitude:longitude,...`, for example
   `a=60.17:24.94,us=37.34:-121.89`. Empty means no places. Otherwise it must name each home of
   `REMOTE_SIGNAL_HOMES` one time, or each ticket request fails with `503 remote_not_configured`. With

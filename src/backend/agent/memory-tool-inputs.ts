@@ -8,10 +8,6 @@ const searchMemoriesInput = z.strictObject({
   limit: z.number().int().min(1).max(10).optional(),
 });
 
-/**
- * The model reads the limit range in `searchMemoriesInput`, but some models send a larger limit, such
- * as 15 (#6933). The search then uses the nearest limit in the range, and does not fail.
- */
 export const searchMemoriesArguments = searchMemoriesInput.extend({
   limit: z
     .number()

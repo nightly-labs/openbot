@@ -27,22 +27,12 @@ import type { ServerTransferCalls } from "../servers/server-transfer-store";
 import { readBase64 } from "./web-agent-import";
 import { chooseFiles } from "./web-channels-runtime";
 
-/**
- * Server settings > Transfer in the browser client, with `instance-transfer-v1` of the connected host.
- * The export downloads to the browser's download folder, so there is no folder to show. The import
- * sends a file that the user chooses in the browser. A host with `instance-transfer-full-copy-v1`
- * sends the export in parts, with each part of the file chosen, so it can be larger than one request.
- */
 export function createWebInstanceTransferCalls(options: {
-  /** The admin requests of the connected host. */
   request: (serverId: string) => TeamApiRequest;
-  /** The same requests, with a response of up to one transfer file. */
   download: (serverId: string) => TeamApiRequest;
   listAgents: () => Promise<ClientAgentSummary[]>;
   saveFile: (file: { name: string; base64: string } | { name: string; blob: Blob }) => void;
-  /** The host serves `instance-transfer-full-copy-v1` and `instance-transfer-chunks-v1`. */
   fullCopy: (serverId: string) => boolean;
-  /** The host serves `instance-transfer-chunks-v1`: a file goes to it in parts. */
   sendsParts: (serverId: string) => boolean;
 }): ServerTransferCalls {
   const progressListeners = new Set<(progress: InstanceTransferUploadProgress) => void>();
@@ -60,18 +50,15 @@ export function createWebInstanceTransferCalls(options: {
       const file = await runTeamEffect(
         downloadInstanceTransfer(options.download(serverId), input).pipe(Effect.mapError((error) => error.cause)),
       );
-      // The desktop save dialog proposes the same name.
       const fileName = `openbot-transfer-${new Date().toISOString().slice(0, 10)}.zip`;
       options.saveFile({ name: fileName, base64: file.base64 });
       return { saved: true, fileName, warnings: [] };
     },
     async choose(serverId) {
-      // The host is checked before the chooser opens, and nothing is awaited before it.
       const request = options.request(serverId);
       const [file] = await chooseFiles({ multiple: false, accept: ".zip,application/zip" });
       if (!file) return null;
       if (file.size === 0) throw new Error(currentText().t("error.import.chooseZip"));
-      // In parts, as the Grok Bot import sends them: up to the limit of a transfer file on the host.
       if (options.sendsParts(serverId)) {
         if (file.size > INSTANCE_TRANSFER_LIMITS.archiveBytes)
           throw new Error(currentText().t("error.import.transferTooLarge"));
@@ -128,7 +115,6 @@ async function exportInParts(
     beginInstanceTransferFullCopy(request, input).pipe(Effect.mapError((error) => error.cause)),
   );
   try {
-    // Each part becomes a Blob at once, so the browser can keep it out of the page's memory.
     const parts: Blob[] = [];
     for (const [index, expected] of file.chunks.entries()) {
       const part = await runTeamEffect(
@@ -138,7 +124,6 @@ async function exportInParts(
       );
       const bytes = base64ToBytes(part.base64);
       const length = Math.min(file.chunkBytes, file.size - index * file.chunkBytes);
-      // Each part is checked against the SHA-256 that the host named for it.
       if (bytes.length !== length || sha256Hex(bytes) !== expected)
         throw new Error(currentText().t("error.import.transferPartInvalid"));
       parts.push(new Blob([bytes]));

@@ -13,6 +13,7 @@ export const messages = {
   "status.messaging.stopped": "Interrotto.",
   "status.messaging.stop": "Interrompi",
   "status.messaging.approvalTitle": "OpenBot chiede l'approvazione per continuare.",
+  "status.messaging.approvalTitleTeammate": "Il collega {agent} chiede l'approvazione per continuare.",
   "status.messaging.approvalCommand": "Eseguire un comando",
   "status.messaging.approvalFileChange": "Modificare dei file",
   "status.messaging.approvalPermissions": "Ottenere altri permessi",
@@ -35,9 +36,11 @@ export const messages = {
   "status.messaging.signInReceived": "OpenBot ha ricevuto l'installazione di Slack. Puoi chiudere questa scheda.",
   "status.messaging.signInUnknown": "OpenBot non ha avviato questa installazione di Slack. Riavviala in OpenBot.",
   "status.messaging.telegramNoAgent":
-    "Nessun agente può ancora rispondere qui. Aggiungi il Telegram Orchestrator in OpenBot.",
+    "Nessun agente può ancora rispondere qui. In OpenBot, apri Marketplace > App > Telegram e fai clic su Aggiungi agente.",
   "status.messaging.telegramLinked":
     "OpenBot è collegato a questa chat. Menziona {bot} o rispondi a un messaggio di OpenBot per interpellare gli agenti.",
+  "status.messaging.telegramNotLinked":
+    "OpenBot non è collegato a questa chat. Per collegarlo, apri l’app OpenBot, vai su Marketplace → App → Telegram e seleziona «Aggiungi a un gruppo» o «Apri una chat diretta».",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Risponde su Telegram e consulta il team",
   "status.messaging.whatsappNoAgent":
@@ -56,6 +59,10 @@ export const messages = {
     "Un altro OpenBot è collegato a questo numero WhatsApp, quindi puoi ricevere due risposte. Per risolvere, apri Dispositivi collegati in WhatsApp sul telefono ed esci dall’OpenBot che non usi.",
   "status.messaging.whatsappPaused":
     "OpenBot non risponde qui per 10 minuti: sono arrivati troppi messaggi in poco tempo. Se un altro OpenBot è collegato a questo numero, apri Dispositivi collegati in WhatsApp sul telefono ed esci dall’OpenBot che non usi.",
+  "status.messaging.whatsappNotDelivered":
+    "WhatsApp non ha accettato questa risposta, quindi la persona non l’ha ricevuta.",
+  "status.messaging.whatsappPartlyDelivered":
+    "WhatsApp non ha accettato tutta questa risposta, quindi la persona ne ha ricevuto solo una parte.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Risponde su WhatsApp e consulta il team",
 } as const satisfies PartialTranslation<typeof source>;

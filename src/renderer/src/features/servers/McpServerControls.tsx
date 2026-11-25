@@ -14,9 +14,11 @@ import {
   Switch,
   Text,
 } from "@openbot/ui";
+import { McpSignInLinkCopy } from "@openbot/ui/features/settings/McpSignInDialog";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, Show } from "solid-js";
 import { McpRelaySignIn } from "./McpRelaySignIn";
+import { McpSignInAppSection } from "./McpSignInAppSection";
 import { asksForSignIn, type McpServerTools, type SettledTest, useMcpRuns } from "./mcp-server-tools";
 import {
   type McpServerConfig,
@@ -25,44 +27,44 @@ import {
   mcpProviderLimitNote,
   mcpStatusLabel,
   mcpStatusVariant,
+  mcpUrlAtAddress,
   normalizeMcpConfig,
 } from "./mcp-servers";
 
 interface ControlsState {
-  /** The key of the one action in flight. A test or a sign-in does not hold it. */
   busy: string | null;
   error: string;
-  /** The last test or sign-in, with the config it measured: an edit makes it stale. */
   test: { test: McpTestState; config: McpServerConfig } | null;
+  signInAppShown: boolean;
 }
 
-/**
- * The connection card of a custom MCP server's Marketplace page: turn it on or off, test it, and
- * sign in to it. The form edits the settings; this card only acts on what is stored.
- */
 export function McpServerControls(props: { tools: McpServerTools; id: string }) {
   const { t, errorMessage } = useText();
   const runs = useMcpRuns(() => props.tools);
-  const [state, setState] = createStore<ControlsState>({ busy: null, error: "", test: null });
-  // Counts the tests and sign-ins: a Test during a sign-in replaces it, and only the newest answers.
+  const [state, setState] = createStore<ControlsState>({ busy: null, error: "", test: null, signInAppShown: false });
   let run = 0;
   let testButton: HTMLButtonElement | undefined;
 
   const config = createMemo(() => props.tools.servers().find((candidate) => candidate.id === props.id));
   const signedIn = () => Boolean(props.tools.signIns()[props.id]?.signedIn);
+  const transport = createMemo(() => config()?.transport);
+  const signInApp = createMemo(() => (transport() === "http" ? props.tools.signIn()?.app : undefined));
 
-  /** The test while it still describes the stored row; the switch is not compared. */
   const test = createMemo((): McpTestState | undefined => {
     const current = config();
     if (!current) return undefined;
     const entry = state.test;
     if (entry && !mcpConfigChanged({ ...current, enabled: entry.config.enabled }, entry.config)) return entry.test;
-    // The server refused the saved sign-in: the page asks for a new one as a failed test would.
     if (runs.canSignIn(current) && props.tools.signIns()[props.id]?.needsSignIn)
       return { status: "failed", error: t("error.backend.mcpSignInRequired"), kind: "sign-in" };
     return undefined;
   });
   const waiting = () => (test()?.status === "signing-in" ? state.test?.config : undefined);
+  const otherAddress = () => {
+    const current = test();
+    const row = config();
+    return current?.status === "failed" && row ? mcpUrlAtAddress(row.url, current.address) : undefined;
+  };
 
   async function latch(key: string, action: () => Promise<void>): Promise<void> {
     if (state.busy !== null) return;
@@ -98,13 +100,13 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
     if (mine !== run) return;
     setState((draft) => {
       draft.test = result ? { test: result, config: tested } : null;
+      if (result?.status === "failed" && result.kind === "sign-in-app") draft.signInAppShown = true;
     });
   }
 
   const testServer = () => measure("testing", runs.runTest);
   const signIn = () => measure("signing-in", runs.runSignIn);
 
-  /** Not behind the latch: nothing may leave the user unable to stop a browser wait. */
   function cancelSignIn(url: string): void {
     props.tools
       .signIn()
@@ -114,6 +116,17 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
           current.error = errorMessage(error, t("mcp.panel.saveFailed"));
         });
       });
+  }
+
+  async function switchAddress(url: string): Promise<void> {
+    const current = config();
+    if (!current) return;
+    let saved = false;
+    await latch("address", async () => {
+      await props.tools.save({ ...current, url });
+      saved = true;
+    });
+    if (saved) void signIn();
   }
 
   function signOut(): void {
@@ -128,7 +141,22 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
     });
   }
 
-  // A sign-in the user asked for on an agent's card starts once, when the page shows the row.
+  createEffect(
+    () => ({ api: signInApp(), mcpServerId: props.id }),
+    ({ api, mcpServerId }) => {
+      if (!api) return;
+      api
+        .load(mcpServerId)
+        .then((stored) => {
+          if (stored.app)
+            setState((current) => {
+              current.signInAppShown = true;
+            });
+        })
+        .catch(() => undefined);
+    },
+  );
+
   createEffect(
     () => {
       const current = config();
@@ -141,7 +169,7 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
     },
   );
 
-  return (
+  const connection = (
     <Show when={config()}>
       {(server) => (
         <SettingsSection
@@ -159,7 +187,6 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                     <Badge variant="outline">{t("mcp.status.signedIn")}</Badge>
                   </Show>
                 </div>
-                {/* Testing shows on the button, and a passed test on the badge. */}
                 <Show when={test()?.status === "failed" || test()?.status === "signing-in" ? test() : undefined}>
                   {(answer) => (
                     <ItemDescription class="server-mcp-row-text" role="status">
@@ -167,7 +194,6 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                     </ItemDescription>
                   )}
                 </Show>
-                {/* Only when no failure or wait is shown: the answer the user asked for comes first. */}
                 <Show
                   when={
                     test()?.status !== "failed" && test()?.status !== "signing-in"
@@ -176,6 +202,22 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                   }
                 >
                   {(note) => <ItemDescription class="server-mcp-row-text">{note()}</ItemDescription>}
+                </Show>
+                <Show when={otherAddress()}>
+                  {(address) => (
+                    <div class="server-mcp-row-next">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={state.busy !== null}
+                        loading={state.busy === "address"}
+                        onClick={() => void switchAddress(address())}
+                      >
+                        {t("mcp.panel.useAddress")}
+                      </Button>
+                    </div>
+                  )}
                 </Show>
                 <Show when={waiting()}>
                   {(pending) => (
@@ -225,7 +267,6 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                   type="button"
                   size="sm"
                   variant="outline"
-                  // A Test would replace the sign-in that waits, and with it Cancel.
                   disabled={Boolean(waiting())}
                   loading={test()?.status === "testing"}
                   loadingLabel={t("common.connecting")}
@@ -242,6 +283,19 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                 />
               </ItemActions>
             </Item>
+            <Show when={waiting() ? props.tools.signIn()?.copyLink : undefined}>
+              {(copy) => (
+                <Item class="settings-modal-row">
+                  <ItemContent class="server-mcp-sign-in-link">
+                    <McpSignInLinkCopy
+                      onCopy={copy()}
+                      onPaste={props.tools.signIn()?.pasteAddress}
+                      waitingNote={false}
+                    />
+                  </ItemContent>
+                </Item>
+              )}
+            </Show>
           </ItemGroup>
           <Show when={state.error}>
             <Text class="server-mcp-runtime-note" variant="caption" tone="danger" role="alert">
@@ -265,5 +319,22 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
         </SettingsSection>
       )}
     </Show>
+  );
+  return (
+    <>
+      {connection}
+      <Show when={state.signInAppShown ? signInApp() : undefined}>
+        {(api) => (
+          <McpSignInAppSection
+            api={api()}
+            mcpServerId={props.id}
+            urlChanged={false}
+            hostName={props.tools.signIn()?.relay?.hostName}
+            relayed={props.tools.signIn()?.relay !== undefined}
+            disabled={state.busy !== null}
+          />
+        )}
+      </Show>
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useRef, useSyncExternalStore } from "react";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { useAgentThreadUnread } from "@/features/chat/components/use-agent-thread-reads";
 import {
@@ -14,7 +14,7 @@ import type {
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import { agentThreadWaitReason } from "@/features/workspace/model/thread-waits";
-import type { TurnStepLines } from "@/features/workspace/model/turn-step-lines";
+import type { TurnStepLine, TurnStepLines } from "@/features/workspace/model/turn-step-lines";
 import { selectLiveState, useAgentUnread, useAgentUnreadCount } from "./use-live-workspace";
 
 export function useAgentActivity(agentId: string) {
@@ -28,7 +28,6 @@ export function useAgentActivity(agentId: string) {
   return useSyncExternalStore(liveState.subscribe, select);
 }
 
-/** What the side threads of this agent wait on from the user, or undefined. */
 function useAgentThreadWaitReason(agentId: string) {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
   const online = useMobileWorkspaceSelector((workspace) => showsOnline(workspace.activeServer));
@@ -40,18 +39,11 @@ function useAgentThreadWaitReason(agentId: string) {
   return useSyncExternalStore(liveState.subscribe, select);
 }
 
-/**
- * True while a side thread of this agent runs a turn, as the task list that the phone holds says.
- * It reads the cached list only: the task events keep it current, and the home list reads the lists
- * of running threads again after the server was away.
- */
 function useAgentThreadRunning(agentId: string) {
   const queryScope = useQueryScope();
   const workspace = useMobileWorkspaceReader();
   const online = useMobileWorkspaceSelector((current) => showsOnline(current.activeServer));
   const serverId = useMobileWorkspaceSelector((current) => current.activeServer.id);
-  // Disabled with the real query function, not `skipToken`: each observer writes its options into
-  // the shared query, and the thread list's later invalidation of the key fetches with them.
   const running = useQuery({
     queryKey: queryKeys.agentTasks(queryScope, serverId, agentId),
     enabled: false,
@@ -62,10 +54,6 @@ function useAgentThreadRunning(agentId: string) {
   return online && running === true;
 }
 
-/**
- * The activity that the home list shows on an agent: the activity of its own chat, with the work of
- * its side threads. A wait wins over work, so an agent that needs the user says so.
- */
 export function useAgentListActivity(agentId: string): MobileAgentActivity | undefined {
   const own = useAgentActivity(agentId);
   const threadWait = useAgentThreadWaitReason(agentId);
@@ -78,38 +66,21 @@ export function useAgentListActivity(agentId: string): MobileAgentActivity | und
   }, [own, threadWait, threadRunning]);
 }
 
-/**
- * What this agent or one of its side threads waits on from the user, or undefined. `activity` comes
- * from `useAgentListActivity`, which the caller reads once for the badge and the avatar.
- */
 export function agentListWaitReason(activity: MobileAgentActivity | undefined) {
   return activity?.phase === "waiting" ? activity.reason : undefined;
 }
 
-/**
- * The unread messages that the home list shows on this agent, as the desktop counts them: those of its
- * own chat. 0 when the person read them all. An unread chat with no count from the host counts as one.
- */
 export function useAgentListUnreadCount(agentId: string): number {
   const own = useAgentUnread(agentId);
   const ownCount = useAgentUnreadCount(agentId);
   return own ? Math.max(1, ownCount) : 0;
 }
 
-/**
- * Whether a side thread of this agent, such as a routine's thread, has unread messages. As on the
- * desktop, they add a badge with no number: a routine that runs each hour would raise a count that
- * opening the chat cannot clear.
- */
 export function useAgentListUnreadThreads(agentId: string): boolean {
   const serverId = useMobileWorkspaceSelector((workspace) => workspace.activeServer.id);
   return useAgentThreadUnread(serverId, agentId) > 0;
 }
 
-/**
- * The agents of the active server that wait for the user, in their own chat or in a side thread. The
- * selector returns a sorted key, so activity that keeps the same agents waiting does not re-render the list.
- */
 export function useWaitingAgentIds(): ReadonlySet<string> {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
   const online = useMobileWorkspaceSelector((workspace) => showsOnline(workspace.activeServer));
@@ -126,10 +97,6 @@ export function useWaitingAgentIds(): ReadonlySet<string> {
   return useMemo(() => new Set(key ? key.split("\n") : []), [key]);
 }
 
-/**
- * The wait of each agent of a server that waits for the user. The selector returns a key, so
- * activity that does not change a wait does not re-render the consumer.
- */
 export function useAgentWaits(serverId: string, online: boolean): Readonly<Record<string, MobileAgentWait>> {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
   const waits = useCallback(
@@ -138,7 +105,6 @@ export function useAgentWaits(serverId: string, online: boolean): Readonly<Recor
   );
   const select = useCallback(() => JSON.stringify(waits()), [waits]);
   const key = useSyncExternalStore(liveState.subscribe, select);
-  // The key changes with every wait, so the waits are read again then.
   return useMemo(() => (key === "{}" ? {} : waits()), [key, waits]);
 }
 
@@ -154,9 +120,31 @@ function agentWaits(activities: MobileAgentActivities): Record<string, MobileAge
 
 const NO_TURN_LINES: TurnStepLines = {};
 
-/** The progress lines that this phone got for the newest turns on the server. */
 export function useTurnStepLines(serverId: string): TurnStepLines {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
   const select = useCallback(() => liveState.get().turnLinesByServer[serverId] ?? NO_TURN_LINES, [liveState, serverId]);
+  return useSyncExternalStore(liveState.subscribe, select);
+}
+
+export function useTurnStepLinesOf(serverId: string, turnIds: readonly string[]): TurnStepLines {
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  const kept = useRef<TurnStepLines>(NO_TURN_LINES);
+  const select = useCallback(() => {
+    const lines = liveState.get().turnLinesByServer[serverId] ?? NO_TURN_LINES;
+    const previous = kept.current;
+    const next: Record<string, readonly TurnStepLine[]> = {};
+    let count = 0;
+    let same = true;
+    for (const turnId of turnIds) {
+      const turn = lines[turnId];
+      if (!turn) continue;
+      next[turnId] = turn;
+      count += 1;
+      if (previous[turnId] !== turn) same = false;
+    }
+    if (same && count === Object.keys(previous).length) return previous;
+    kept.current = count === 0 ? NO_TURN_LINES : next;
+    return kept.current;
+  }, [liveState, serverId, turnIds]);
   return useSyncExternalStore(liveState.subscribe, select);
 }

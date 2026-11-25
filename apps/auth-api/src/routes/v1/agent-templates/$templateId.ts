@@ -16,7 +16,6 @@ export const Route = createFileRoute("/v1/agent-templates/$templateId")({
       GET: ({ params }) =>
         runApiResponse(
           Effect.gen(function* () {
-            // Not cached: after an unpublish no copy may still show the instructions.
             return json(yield* requestAgentTemplates().get(params.templateId));
           }),
           marketplaceErrorResponse,

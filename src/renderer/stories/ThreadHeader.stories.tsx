@@ -19,7 +19,6 @@ function item(id: string, title: string, minutesAgo: number, status: ThreadStatu
   return { id, kind: "side", title, updatedAt, status };
 }
 
-/** When the agent's own chat changed last. The new thread tab shows this time. */
 const MAIN_UPDATED_AT = "2026-08-19T10:00:00.000Z";
 
 const STATES: ThreadItem[] = [
@@ -50,12 +49,10 @@ interface HeaderFixture {
   active?: string;
   archived?: ThreadItem[];
   canStartNew?: boolean;
-  /** A host with `agent-tasks-v1` only cannot rename or delete a thread. */
   editable?: boolean;
   narrow?: boolean;
 }
 
-/** The chat header with a thread row whose actions change a local copy of the threads. */
 function ThreadHeaderStory(props: HeaderFixture) {
   const [state, setState] = createStore({
     threads: props.threads,
@@ -72,7 +69,6 @@ function ThreadHeaderStory(props: HeaderFixture) {
       : [];
     return [...open, ...draft];
   };
-  /** The tab order with the agent's own chat first, which has no tab: closing the first tab opens it. */
   const order = () => [MAIN_THREAD_ID, ...tabs().map((tab) => tab.id)];
   const setOrder = (next: string[], active: string) =>
     setState((draft) => {
@@ -120,7 +116,6 @@ function ThreadHeaderStory(props: HeaderFixture) {
           onChange: fn(),
           onReasoningEffortChange: fn(),
         }}
-        sidePanel={{ open: false, onToggle: fn() }}
         threads={
           <ThreadHeader
             threads={state.threads}
@@ -142,7 +137,6 @@ function ThreadHeaderStory(props: HeaderFixture) {
               setOrder(next, next.includes(state.active) ? state.active : id);
             }}
             onMove={(id, index) => {
-              // The index is among the shown tabs, without the agent's own chat.
               const next = tabs()
                 .map((tab) => tab.id)
                 .filter((entry) => entry !== id);
@@ -184,35 +178,28 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The agent has only its own chat: the header shows "New thread" and nothing more. */
 export const OwnChatOnly: Story = { render: () => <ThreadHeaderStory threads={[]} open={[]} /> };
 
-/** One tab for each state: done, working, waiting for an approval, queued and failed. */
 export const States: Story = {
   render: () => <ThreadHeaderStory threads={STATES} open={STATES.map((thread) => thread.id)} active="pricing" />,
 };
 
-/** More tabs than the header has space for: the tabs scroll, and the open tab stays in view. */
 export const ManyTabs: Story = {
   render: () => <ThreadHeaderStory threads={MANY} open={MANY.map((thread) => thread.id)} active="roadmap" />,
 };
 
-/** Archived threads show under "Archived" in the thread list. Opening one restores it. */
 export const Archived: Story = {
   render: () => <ThreadHeaderStory threads={STATES.slice(0, 2)} open={["pricing"]} archived={ARCHIVED} />,
 };
 
-/** A host with `agent-tasks-v1` only: the tab menu has no rename and no delete. */
 export const NoRenameOrDelete: Story = {
   render: () => <ThreadHeaderStory threads={STATES} open={["pricing", "competitors"]} editable={false} />,
 };
 
-/** At the limit of threads: "New thread" is off. */
 export const AtLimit: Story = {
   render: () => <ThreadHeaderStory threads={STATES} open={["pricing"]} canStartNew={false} />,
 };
 
-/** A narrow window: the tabs become one button with the open thread. */
 export const Narrow: Story = {
   render: () => <ThreadHeaderStory threads={STATES} open={["pricing", "competitors"]} active="pricing" narrow />,
 };

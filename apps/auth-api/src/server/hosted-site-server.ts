@@ -13,31 +13,14 @@ import { sha256 } from "./crypto";
 import { HOSTED_SITE_LIMITS, HostedSiteInputError } from "./hosted-site-contract";
 import { siteCall, siteFailure } from "./hosted-site-effects";
 
-/**
- * The sites that one request can see and change.
- *
- * - `server`: the request proved a registered server with its machine token. It sees and changes only
- *   that server's sites, and new sites count against the server's plan.
- * - `unlinked`: a desktop that is not a registered server asked for its own list (`?scope=unlinked`).
- * - `account`: a request with no server and no scope, as every released desktop sends. It keeps the
- *   meaning that `/v1/sites` had before sites belonged to servers: it lists and deletes every site of
- *   the account. It creates and replaces only unlinked sites.
- */
 export type HostedSiteScope =
   | { kind: "server"; userId: string; serverId: string }
   | { kind: "unlinked"; userId: string }
   | { kind: "account"; userId: string };
 
-/** The server of a scope, or null for the unlinked bucket, which `account` also creates into. */
 export function scopeServerId(scope: HostedSiteScope): string | null {
   return scope.kind === "server" ? scope.serverId : null;
 }
-
-/**
- * Reads the server headers of a site request. A request that names a server must prove it: a wrong
- * token is refused, and never falls back to the unlinked bucket, so a forged host id cannot use
- * another server's slots.
- */
 
 export const resolveHostedSiteScope = Effect.fn("HostedSites.resolveScope")(function* (
   database: D1Database,
@@ -63,17 +46,10 @@ export const resolveHostedSiteScope = Effect.fn("HostedSites.resolveScope")(func
   for (let index = 0; index < provided.length; index += 1) {
     difference |= expected.charCodeAt(index) ^ provided.charCodeAt(index);
   }
-  // The server's sites belong to its owner. A member's account cannot publish into another owner's server.
   if (!host || !expected || difference !== 0 || host.owner_user_id !== userId) return yield* hostUnauthorized();
   return { kind: "server", userId, serverId: hostId };
 });
 
-/**
- * The SQL condition that the `hosted_sites` row `alias` holds a slot of its bucket. Bind `now` two times. A new
- * site holds a slot only while its upload is live: the list does not show an abandoned upload, so no count may
- * include one before the cleanup removes it. Every slot count uses this condition, so that the list, a new
- * site, an activation and an adoption agree.
- */
 function holdsSiteSlotSql(alias: string): string {
   return `${alias}.status IN ('uploading', 'active', 'blocked')
     AND (${alias}.expires_at IS NULL OR ${alias}.expires_at > ?)
@@ -83,41 +59,24 @@ function holdsSiteSlotSql(alias: string): string {
     ))`;
 }
 
-/**
- * The custom site limit of a server (one `?`: the server ID). As with `getServerEntitlement`, a row
- * applies only while its account owns the remote host or the hosted server.
- */
 export const SERVER_SITE_LIMIT_SQL = `SELECT l.site_limit FROM server_site_limits l
   LEFT JOIN remote_hosts h ON h.host_id = l.server_id AND h.owner_user_id = l.owner_user_id
   LEFT JOIN hosted_servers hs ON hs.server_id = l.server_id AND hs.owner_user_id = l.owner_user_id
  WHERE l.server_id = ? AND (h.host_id IS NOT NULL OR hs.server_id IS NOT NULL)`;
 
-/** The SQL condition that the server `server` of the account `owner` has a custom site limit row. */
 function customSiteLimitSql(server: string, owner: string): string {
   return `EXISTS (SELECT 1 FROM server_site_limits l WHERE l.server_id = ${server} AND l.owner_user_id = ${owner})`;
 }
 
-/**
- * The slots that a new or activating site counts against.
- *
- * - `unlinked`: the account's sites with no server.
- * - `server`: one server with its own limit: a custom row, else a plan that it can use now.
- * - `shared`: every other server of the account. They share one pool: the license sites, else
- *   `HOSTED_SITE_SHARED_FREE_LIMIT`. So more servers with no plan do not give more sites.
- *
- * Every bucket except a custom limit also counts against `HOSTED_SITE_LIMITS.accountSites`.
- */
 export type HostedSiteBucket =
   | { kind: "unlinked"; limit: number }
   | { kind: "server"; serverId: string; limit: number; custom: boolean }
   | { kind: "shared"; serverId: string; limit: number };
 
-/** The server of a bucket, or null for the unlinked bucket. */
 export function bucketServerId(bucket: HostedSiteBucket): string | null {
   return bucket.kind === "unlinked" ? null : bucket.serverId;
 }
 
-/** Reads the bucket of a server, or of the unlinked bucket when `serverId` is null. */
 export const resolveHostedSiteBucket = Effect.fn("HostedSites.resolveBucket")(function* (
   database: D1Database,
   userId: string,
@@ -136,16 +95,11 @@ export const resolveHostedSiteBucket = Effect.fn("HostedSites.resolveBucket")(fu
   return { kind: "shared", serverId, limit };
 });
 
-/** A SQL fragment and its binds, in order. */
 export interface SqlPart {
   sql: string;
   binds: (string | number | null)[];
 }
 
-/**
- * The SQL condition that the `hosted_sites` row `alias` is in the bucket. The shared pool holds the sites of
- * the account's servers with no own limit, by the same rules as `resolveHostedSiteBucket`.
- */
 function bucketMemberSql(bucket: HostedSiteBucket, alias: string, now: number): SqlPart {
   if (bucket.kind === "unlinked") return { sql: `${alias}.server_id IS NULL`, binds: [] };
   if (bucket.kind === "server") return { sql: `${alias}.server_id = ?`, binds: [bucket.serverId] };
@@ -158,7 +112,6 @@ function bucketMemberSql(bucket: HostedSiteBucket, alias: string, now: number): 
   };
 }
 
-/** The SQL count of the account's sites that hold a slot of the bucket, except `excludeSiteId`. */
 function bucketSlotCountSql(
   bucket: HostedSiteBucket,
   userId: string,
@@ -173,7 +126,6 @@ function bucketSlotCountSql(
   };
 }
 
-/** The SQL count of the account's sites that count against `HOSTED_SITE_LIMITS.accountSites`. */
 function accountSlotCountSql(userId: string, excludeSiteId: string | null, now: number): SqlPart {
   return {
     sql: `(SELECT COUNT(*) FROM hosted_sites y
@@ -183,11 +135,6 @@ function accountSlotCountSql(userId: string, excludeSiteId: string | null, now: 
   };
 }
 
-/**
- * The SQL that selects the first uploads of new sites in the bucket that are idle: no file upload runs now, and the
- * last file upload, or the start, is not after `idleBefore`. Such an upload holds a slot, but the list does not show
- * it, so the user cannot delete it. Returns `id` and `site_id`, the oldest first, at most `count` rows.
- */
 export function idleNewSiteUploadsSql(
   bucket: HostedSiteBucket,
   userId: string,
@@ -207,10 +154,6 @@ export function idleNewSiteUploadsSql(
   };
 }
 
-/**
- * The SQL condition that the bucket has a free slot for one more site of the account. Put it in the statement
- * that adds or activates the site, so that two requests at the same time cannot both take the last slot.
- */
 export function bucketHasRoomSql(
   bucket: HostedSiteBucket,
   userId: string,
@@ -228,12 +171,6 @@ export function bucketHasRoomSql(
   };
 }
 
-/**
- * The slots of a bucket. `limit` is what the server can hold now: its own sites and the free slots of
- * the bucket and the account, but not more than the bucket's limit. `used` is the server's own sites.
- * So `limit` and `used` keep the meaning of the frozen `hosted-sites-v1` list ("the host's site
- * limit and the slots in use") when the server shares a pool.
- */
 export const hostedSiteSlots = Effect.fn("HostedSites.slots")(function* (
   database: D1Database,
   userId: string,
@@ -268,7 +205,6 @@ export const hostedSiteSlots = Effect.fn("HostedSites.slots")(function* (
   };
 });
 
-/** The account cap comes first: when it is full, a site on any server of the account frees a slot. */
 function limitReason(bucket: HostedSiteBucket, accountFull: boolean): HostedSiteLimitReason | null {
   if (accountFull) return "account";
   return bucket.kind === "shared" ? "shared" : null;
@@ -277,20 +213,10 @@ function limitReason(bucket: HostedSiteBucket, accountFull: boolean): HostedSite
 export interface HostedSiteSlots {
   limit: number;
   used: number;
-  /** True when the account cap, not the bucket, has no free slot. */
   accountFull: boolean;
-  /** The list's `limitReason`: why other sites can take the slots of this list. */
   reason: HostedSiteLimitReason | null;
 }
 
-/**
- * Moves the owner's unlinked sites into a self-hosted server that has just registered, up to the free slots of
- * its bucket (its plan, or the account's shared pool). A computer that publishes before it is a registered server puts its sites in the unlinked bucket,
- * and the server's own list never showed them. Only sites created before the server first registered move, so
- * a later site of another unregistered computer of the account stays unlinked. A hosted server never moves
- * sites: it registers at its first start, so an unlinked site is from another computer. Active sites only: an
- * upload in progress keeps the bucket it started in.
- */
 export const adoptUnlinkedHostedSites = Effect.fn("HostedSites.adoptUnlinked")(function* (
   database: D1Database,
   userId: string,

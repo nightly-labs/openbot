@@ -5,7 +5,6 @@ import { useText } from "../../text";
 import { CloseIcon } from "./ConversationIcons";
 import { ReplyQuote } from "./ReplyQuote";
 
-/** The message that the draft replies to, above the message box, with a button that removes the reply. */
 export function ComposerReplyPreview(props: {
   message: AgentMessage;
   agents: AgentProfile[];

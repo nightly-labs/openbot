@@ -1,4 +1,3 @@
-/* UserAvatar has no style of its own: the initials, or GitHub's picture when the account has one. */
 .github-connector-avatar {
   display: inline-grid;
   flex: none;
@@ -39,8 +38,6 @@
   padding-inline-start: calc(var(--openbot-space-3) * 2 + var(--openbot-icon-sm));
 }
 
-/* A long list scrolls inside the card, so Disconnect stays near the top of the tab. The rows' hover fill goes past
-   the text, so the names line up with the search field. */
 .github-connector-repository-list {
   display: grid;
   max-height: 260px;
@@ -55,7 +52,6 @@
   gap: var(--openbot-space-2);
   align-items: center;
   justify-content: space-between;
-  /* The same height with and without the Private badge. */
   min-height: 36px;
   padding: 0 var(--openbot-space-2);
   border-radius: var(--openbot-radius-md);
@@ -79,15 +75,12 @@
   gap: var(--openbot-space-1);
 }
 
-/* ------------------------------------------------ connect dialog */
-
 .github-connector-center {
   display: grid;
   min-height: 96px;
   place-items: center;
 }
 
-/* The code is about to be typed on another screen, so each character has its own tile. */
 .github-connector-code {
   display: flex;
   gap: var(--openbot-space-1-5);

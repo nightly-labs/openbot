@@ -6,7 +6,6 @@ export class TelemetryFailure extends Schema.TaggedError<TelemetryFailure>()("Te
 export const telemetryIO = <A>(run: () => Promise<A>) =>
   Effect.tryPromise({ try: run, catch: () => new TelemetryFailure() });
 export interface ReportStorage {
-  /** Cross-tab lock. The release function must always run. */
   acquire?(): Effect.Effect<() => void, TelemetryFailure>;
   read(): Effect.Effect<unknown, TelemetryFailure>;
   clear?(): Effect.Effect<void, TelemetryFailure>;
@@ -17,7 +16,6 @@ export const REPORT_LIMIT = 1_000;
 export const REPORT_BYTES = 1_048_576;
 export const REPORT_TTL = 7 * 24 * 60 * 60 * 1_000;
 
-/** Owns only safe reports. Application work never waits for this queue. */
 export class ReportQueue {
   readonly #lock = Semaphore.makeUnsafe(1);
   #reports: Report[] = [];
@@ -44,7 +42,6 @@ export class ReportQueue {
     readonly makeId: () => string = () => crypto.randomUUID(),
   ) {}
 
-  /** Invalidate scopes and abort immediately, before waiting for a storage write. */
   configure(enabled: boolean, profileId: string | null): Effect.Effect<void> {
     if (!isReportProfileId(profileId)) return this.configure(false, null);
     if (this.#closed || (this.#configured && this.#enabled === enabled && this.#profileId === profileId))
@@ -195,7 +192,6 @@ export class ReportQueue {
     );
   }
 
-  /** Startup, online, foreground and retry callbacks all use this one sender. */
   readonly flush = Effect.fn("ReportQueue.flush")(function* (this: ReportQueue) {
     if (this.#active || !this.#enabled || this.#closed || this.#closing) return;
     this.#active = true;
@@ -220,7 +216,6 @@ export class ReportQueue {
             );
             if (generation !== this.#generation || this.#closed || !this.#enabled) return false;
             this.#reports = this.#reports.filter((entry) => entry.id !== report.id);
-            // Keep refused reports until expiry, but let later reports send on the next attempt.
             if (!accepted) this.#reports.push(report);
             yield* this.#persist();
             if (!accepted) return yield* new TelemetryFailure();

@@ -7,6 +7,13 @@ export const messages = {
   "composer.feedbackFix.body":
     "Correzione della segnalazione #{number}. Invia la richiesta, oppure annulla per lasciare la segnalazione com'è.",
   "composer.feedbackFix.cancel": "Annulla",
+  "composer.browserTab.opened": "{name} ha aperto {title} nel browser.",
+  "composer.browserTab.openedMany": {
+    one: "{name} ha aperto {count} pagina nel browser.",
+    other: "{name} ha aperto {count} pagine nel browser.",
+  },
+  "composer.browserTab.open": "Apri pagina",
+  "composer.browserTab.hide": "Nascondi",
   "composer.providerWait.offlineTitle": "Nessuna connessione a Internet",
   "composer.providerWait.offline": "{provider} non può rispondere finché questo computer non torna online.",
   "composer.providerWait.silent": "{provider} non invia nulla da {duration}.",
@@ -53,6 +60,7 @@ export const messages = {
   "composer.picker.noSkills": "Questo agente non ha skill.",
   "composer.picker.noSkillMatch": "Nessuna skill corrisponde a «{query}».",
   "composer.picker.skillsLoadFailed": "Impossibile caricare le skill.",
+  "composer.picker.skillProblem": "{name} non è disponibile. {problem} Chiedi all’agente di correggerla.",
   "composer.token.attachment": "Apri il file allegato {name}",
   "composer.token.agent": "Agente {name}",
   "composer.token.skill": "Skill {name}",
@@ -64,6 +72,7 @@ export const messages = {
   "composer.voice.stop": "Interrompi la registrazione vocale",
   "composer.voice.cancel": "Annulla la registrazione vocale",
   "composer.voice.preparing": "Download del modello vocale",
+  "composer.voice.starting": "Avvio della registrazione vocale",
   "composer.voice.requesting": "Richiesta di accesso al microfono",
   "composer.voice.transcribing": "Trascrizione del prompt vocale",
   "composer.voice.start": "Crea un prompt con la voce",
@@ -102,7 +111,10 @@ export const messages = {
   "composer.voice.recording": "Registrazione vocale",
   "composer.voice.limitSoon": "La registrazione si ferma tra {seconds} secondi.",
   "composer.voice.limitReached":
-    "La registrazione si è fermata al limite di 2 minuti. Quello che hai detto è nel messaggio.",
+    "La registrazione si è fermata al limite di 10 minuti. Quello che hai detto è nel messaggio.",
+  "composer.voice.languageNotice":
+    "La dettatura conosce 25 lingue europee, come l’inglese. Le altre lingue richiedono un modello più grande ({size}) e il testo appare dopo lo stop.",
+  "composer.voice.languageNotice.action": "Parlo un’altra lingua",
   "composer.send.saveQueued": "Salva messaggio in coda",
   "composer.send.voice": "Invia messaggio vocale",
   "composer.send.message": "Invia messaggio",

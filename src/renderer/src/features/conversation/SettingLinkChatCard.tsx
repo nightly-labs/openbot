@@ -7,26 +7,55 @@ import {
   isAgentSettingLinkId,
 } from "@openbot/ui/features/conversation/agent-setting-links";
 import { SettingLinkCard } from "@openbot/ui/features/conversation/SettingLinkCard";
+import { CreditIcon } from "@openbot/ui/features/credits/CreditIcon";
+import { CreditsExplainerDialog } from "@openbot/ui/features/credits/CreditsExplainerDialog";
 import { useText } from "@openbot/ui/text";
+import { createSignal, Show } from "solid-js";
 import { usePlatform } from "../../platform";
+import { openCreditPrices } from "../servers/credit-prices";
 import { appSettingLinkTarget } from "../settings/setting-link-targets";
 import { navItem } from "../settings/settings-tabs";
+import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
 
 export interface SettingLinkChatCardProps {
   settingId: SettingLinkId;
-  /** The agent whose chat shows the card. Null in a channel, where no agent settings panel is open. */
   agent: { id: string; name: string } | null;
   onOpenAgentSetting: (agentId: string, settingId: AgentSettingLinkId) => void;
   appSettingOpener?: ConversationProps["appSettingOpener"];
 }
 
-/**
- * A setting that an agent showed with `show_setting`. An app setting opens Settings of this computer at
- * the row; an agent setting opens the agent settings in the side panel at the row.
- */
+function CreditsExplainerChatCard() {
+  const { t } = useText();
+  const { props } = useConversationViewScope();
+  const [open, setOpen] = createSignal(false);
+  return (
+    <>
+      <SettingLinkCard
+        title={t("billing.credits.explainer.title")}
+        path={[t("billing.credits.explainer.place"), t("app.rail.credits")]}
+        icon={<CreditIcon />}
+        onOpen={() => setOpen(true)}
+      />
+      <CreditsExplainerDialog
+        open={open()}
+        onOpenChange={setOpen}
+        onOpenPrices={() => openCreditPrices(conversationRuntime(props).openUrl)}
+      />
+    </>
+  );
+}
+
 export function SettingLinkChatCard(props: SettingLinkChatCardProps) {
+  return (
+    <Show when={props.settingId !== "credits.explainer"} fallback={<CreditsExplainerChatCard />}>
+      <SettingRowChatCard {...props} />
+    </Show>
+  );
+}
+
+function SettingRowChatCard(props: SettingLinkChatCardProps) {
   const { t } = useText();
   const platform = usePlatform();
   const card = () => {
@@ -43,6 +72,7 @@ export function SettingLinkChatCard(props: SettingLinkChatCardProps) {
         note: agent ? undefined : t("chat.settingLink.agentChatOnly"),
       };
     }
+    if (settingId === "credits.explainer") return { title: "", path: [], open: undefined, note: undefined };
     const target = appSettingLinkTarget(settingId, platform.appInfo()?.platform);
     const open = props.appSettingOpener?.(settingId);
     return {
@@ -55,7 +85,6 @@ export function SettingLinkChatCard(props: SettingLinkChatCardProps) {
   return <SettingLinkCard title={card().title} path={card().path} onOpen={card().open} note={card().note} />;
 }
 
-/** The setting card of a side thread message, as the agent's own chat draws it. Another message keeps its row. */
 export function useThreadSettingLinkCard() {
   const { props, channel, openAgentSettingRow } = useConversationViewScope();
   return (message: AgentMessage) => {

@@ -16,7 +16,6 @@ import {
 } from "./onboarding-fixture";
 import { createFakeConnection } from "./provider-connection-fixture";
 
-/** OpenCode installed with no account of its own: enough to run an endpoint that brings its own key. */
 const openCodeInstalledAgentStatus: AgentStatus = {
   ...STORY_AGENT_STATUS,
   providers: [
@@ -45,7 +44,6 @@ const bothConnectingAgentStatus: AgentStatus = {
   })),
 };
 
-/** Gemini is downloaded and signed in. The others are not downloaded yet. */
 const geminiSignedInAgentStatus: AgentStatus = {
   ...lazyProviderAgentStatus,
   providers: lazyProviders.map((provider) =>
@@ -55,7 +53,6 @@ const geminiSignedInAgentStatus: AgentStatus = {
   ),
 };
 
-/** Every plan provider's CLI is on the computer, and the user signed in to each one. */
 const everyProviderSignedInAgentStatus: AgentStatus = {
   ...noProvidersConnectedAgentStatus,
   providers: (
@@ -78,10 +75,6 @@ const everyProviderSignedInAgentStatus: AgentStatus = {
   ).map((id) => ({ id, state: "available" as const, version: "1.0.0", email: "ada@example.com", message: null })),
 };
 
-/**
- * The plan step as first run shows it after "Use your … plan". The flow itself opens on the first
- * question, so these stories show the step alone.
- */
 function PlanStep(props: SetupProviderProps) {
   const providers = createSetupProviders(props, undefined, { includeFree: () => false });
   const [screen, setScreen] = createSignal<HTMLElement | undefined>();
@@ -142,7 +135,6 @@ function LazyProviderDownloadsPlanStep(props: {
   );
 }
 
-/** The provider step with a fake scan. `scan` starts one when the story opens, as first run would. */
 function DetectingPlanStep(props: { args: SetupProviderProps; initial: ProviderDetection; scan?: boolean }) {
   const story = createStoryDetection(props.initial);
   onSettled(() => {
@@ -161,8 +153,6 @@ function DetectingPlanStep(props: { args: SetupProviderProps; initial: ProviderD
 
 const args: SetupProviderProps = {
   agentStatus: STORY_AGENT_STATUS,
-  // Every onboarding story offers it: naming your own endpoint is part of choosing a provider,
-  // not a variant of the step.
   onAddCustomProvider: fn(async () => "restarted" as const),
   customProviders: [
     {
@@ -198,12 +188,10 @@ type Story = StoryObj<typeof meta>;
 
 export const Initial: Story = {};
 
-/** The row that adds a self-described endpoint. OpenCode is installed, so the row offers Add. */
 export const AddCustomProvider: Story = {
   args: { agentStatus: openCodeInstalledAgentStatus },
 };
 
-/** The endpoint is refused, so the form stays with the values, including the key the user typed. */
 export const CustomProviderSaveFails: Story = {
   args: {
     agentStatus: openCodeInstalledAgentStatus,
@@ -213,19 +201,11 @@ export const CustomProviderSaveFails: Story = {
   },
 };
 
-/**
- * First run looks for local model servers and ACP agents while the user reads the list. Rows appear
- * one by one; the provider rows above them do not move.
- */
 export const DetectingLocalProviders: Story = {
   args: { agentStatus: openCodeInstalledAgentStatus },
   render: (storyArgs) => <DetectingPlanStep args={storyArgs} initial={{ scanning: true, found: [] }} scan />,
 };
 
-/**
- * The scan is done. Add opens the form of its kind, filled from the scan: the endpoint form for a
- * server, the ACP agent form for an agent. X hides a row that the user does not want.
- */
 export const DetectedLocalProviders: Story = {
   args: { agentStatus: openCodeInstalledAgentStatus },
   render: (storyArgs) => (
@@ -233,7 +213,6 @@ export const DetectedLocalProviders: Story = {
   ),
 };
 
-/** The same result on a narrow window. */
 export const DetectedLocalProvidersNarrow: Story = {
   ...DetectedLocalProviders,
   globals: { viewport: "onboardingNarrow" },
@@ -258,11 +237,6 @@ export const NoProvidersConnected: Story = {
   },
 };
 
-/**
- * The second way in, on the step where it matters most: first run on a computer whose browser
- * cannot finish the hand-off. The ChatGPT row keeps it in its actions menu, beside the Connect the
- * step leads with, and the code opens over the step rather than replacing it.
- */
 export const SignInWithCode: Story = {
   args: {
     agentStatus: noProvidersConnectedAgentStatus,
@@ -356,10 +330,6 @@ export const LazyProviderDownloads: Story = {
   render: (storyArgs) => <LazyProviderDownloadsPlanStep args={storyArgs} />,
 };
 
-/**
- * A new computer with no saved endpoint. The list shows ChatGPT, Claude and Gemini. Grok, OpenCode
- * and the custom provider are in "More providers".
- */
 export const NewComputer: Story = {
   args: {
     agentStatus: lazyProviderAgentStatus,
@@ -368,7 +338,6 @@ export const NewComputer: Story = {
   render: (storyArgs) => <LazyProviderDownloadsPlanStep args={storyArgs} />,
 };
 
-/** The user is signed in to Gemini, so Gemini is the first row and Grok is in "More providers". */
 export const SignedInToGemini: Story = {
   args: {
     agentStatus: geminiSignedInAgentStatus,
@@ -386,10 +355,6 @@ export const LazyProviderDownloadsWithFailure: Story = {
   render: (storyArgs) => <LazyProviderDownloadsPlanStep args={storyArgs} failGrokOnce />,
 };
 
-/**
- * The user signed in to every provider. The list still has three plan rows, ChatGPT, Claude and Gemini,
- * and the free row. The other providers are in "More providers".
- */
 export const EveryProviderSignedIn: Story = {
   render: () => (
     <MockedPlanStep

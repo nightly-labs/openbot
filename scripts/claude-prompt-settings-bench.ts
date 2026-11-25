@@ -1,16 +1,3 @@
-// Measures what the Claude Code features that OpenBot agents do not use cost in each request. Runs
-// the real Claude CLI with the user's Claude login, on Claude Haiku, through `ClaudeAgentClient`, in
-// a temporary git workspace. `current` is the flag settings that `claude-client.ts` sends; each other
-// variant adds settings to them, or takes them away, and runs these turns, each in a new session:
-//   1. a one-word reply: the request prompt is the fixed prefix of every request (system prompt,
-//      tools, skills) plus a short message,
-//   2. a small task with tools, which makes several requests.
-// Each variant runs with the user's Claude Code setup off (the default) and on.
-// The report holds, for each run: the tools, skills, slash commands, MCP servers and plugins that the
-// CLI reports in its `init` message, and the input, cache read and cache write tokens of each
-// request. A variant that drops a feature shows it as a missing tool or skill.
-// Costs a few dozen Haiku turns. `bun run bench:claude-prompt-settings`; `--variant=<name>` runs one
-// variant; `--setup=off|on` runs one setup; `--model=<id>` replaces Claude Haiku. Writes .openbot-build/claude-prompt-settings-bench/report.json.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -29,13 +16,9 @@ const TASK_PROMPT =
 
 interface Variant {
   name: string;
-  /** Settings added to the query's flag settings. */
   settings: Settings;
-  /** Settings taken away from them. */
   remove?: ReadonlyArray<keyof Settings>;
-  /** Tools added to the query's disallowed tools. */
   disallowedTools?: string[];
-  /** Environment values added to the query's environment. */
   env?: Record<string, string>;
 }
 
@@ -47,17 +30,9 @@ const SINGLE_SETTINGS = [
   "disableClaudeAiConnectors",
 ] as const;
 
-/**
- * Features that OpenBot agents keep, measured as references on top of `current`. On 2026-11-07:
- * `includeGitInstructions: false` saved 561 tokens, but takes away the commit and pull request rules.
- * The built-in agents saved 1,542, but take away `general-purpose`, `Explore`, `Plan` and `web-fetch`.
- * `ENABLE_TOOL_SEARCH=true` changed nothing on `claude-sonnet-5-5[1m]`: the CLI already defers the
- * OpenBot MCP tools there.
- */
 const REFERENCES: Variant[] = [
   { name: "no-git-instructions", settings: { includeGitInstructions: false } },
   { name: "no-builtin-agents", settings: {}, env: { CLAUDE_AGENT_SDK_DISABLE_BUILTIN_AGENTS: "1" } },
-  // Tool search on for each request, whatever the model's context window.
   { name: "tool-search-on", settings: {}, env: { ENABLE_TOOL_SEARCH: "true" } },
 ];
 
@@ -97,9 +72,7 @@ interface InitReport {
 interface TurnReport {
   step: string;
   requests: RequestUsage[];
-  /** input + cache read + cache write of the first request: the prompt that each request repeats. */
   firstRequestPrompt: number;
-  /** The same sum over all requests of the turn. */
   totalPrompt: number;
   output: number;
   init: InitReport | null;
@@ -136,15 +109,10 @@ const report: {
   runs: [],
 };
 
-/**
- * The query's flag settings with the variant's changes. The client has no state folder here, so it
- * writes no sign-in settings file and the flag settings are an object.
- */
 function withVariantSettings(options: Options, variant: Variant): Options {
   const current = options.settings;
   if (typeof current === "string") throw new Error("The query has a settings file; the bench expects an object.");
   const settings = { ...current, ...variant.settings };
-  // A variant's skill overrides add to the current ones, unless it removes them.
   if (current?.skillOverrides && variant.settings.skillOverrides && !variant.remove?.includes("skillOverrides"))
     settings.skillOverrides = { ...current.skillOverrides, ...variant.settings.skillOverrides };
   for (const key of variant.remove ?? [])
@@ -177,7 +145,6 @@ for (const userSetup of setups) {
             agents: messageNames(message.agents).sort(),
           };
         }
-        // A message repeats its request once per content block; the last copy has the final count.
         if (message.type === "assistant" && message.parent_tool_use_id === null) {
           const usage = message.message.usage;
           requests.set(message.message.id, {

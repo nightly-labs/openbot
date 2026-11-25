@@ -1,10 +1,3 @@
-// The Link sign-in (link.com, by Stripe): the OAuth device flow, the token refresh and the revoke.
-//
-// OpenBot uses Link's public client, the one that Stripe's `link-cli` uses, with OpenBot as the
-// client hint. A public client needs no secret, so the whole sign-in stays on this computer. Link
-// shows `connection_label` in the user's list of connected apps. Link's own page carries the code,
-// so the user does not type it: OpenBot opens `verification_uri_complete`.
-
 import { hostname } from "node:os";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
@@ -13,26 +6,19 @@ import { LinkOperationError, linkCall, linkDecode } from "./link-effects";
 
 const LINK_AUTH_URL = "https://login.link.com";
 export const LINK_API_URL = "https://api.link.com";
-/** Link's public client. It needs no secret. */
 const LINK_CLIENT_ID = "lwlpk_U7Qy7ThG69STZk";
-/** The name that Link shows on its approval page. A product name: it is not translated. */
 const LINK_CLIENT_HINT = "OpenBot";
-/** Read the user's email, and ask for one-time cards that the user approves one at a time. */
 const LINK_SCOPE = "userinfo:read payment_methods.agentic";
 const DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code";
-/** RFC 8628: the wait grows by this much after each `slow_down`. */
 const SLOW_DOWN_MS = 5_000;
-/** A request that Link has not answered in this time fails as unreachable, so a sign-in never hangs. */
 export const LINK_REQUEST_TIMEOUT_MS = 30_000;
 
-/** A field that is missing or of the wrong type reads as absent, so each caller names what it needs. */
 const text = z.string().min(1).optional().catch(undefined);
 const count = z
   .union([z.number().finite(), z.string().regex(/^\d+$/u).transform(Number)])
   .optional()
   .catch(undefined);
 
-/** Every field of a device code, token or OAuth error answer that this module reads. */
 const oauthAnswerSchema = z.object({
   error: text,
   error_description: text,
@@ -50,24 +36,17 @@ export type LinkFetch = (url: string, init: RequestInit) => Promise<Response>;
 
 export interface LinkDeviceCode {
   deviceCode: string;
-  /** Link's approval page, with the code in it. */
   verificationUrl: string;
-  /** Epoch milliseconds. */
   expiresAt: number;
   intervalMs: number;
 }
 
 export interface LinkTokenSet {
   accessToken: string;
-  /** Epoch milliseconds, or null when Link did not say. */
   accessTokenExpiresAt: number | null;
   refreshToken: string | null;
 }
 
-/**
- * Why the flow stopped. `denied`, `expired` and `refresh_rejected` are the user's or Link's final
- * answer; the others are a fault that a retry can fix.
- */
 export type LinkAuthFailure = "denied" | "expired" | "refresh_rejected" | "unreachable" | "unexpected";
 
 export class LinkAuthError extends Schema.TaggedError<LinkAuthError>()("LinkAuthError", {
@@ -84,7 +63,6 @@ export interface LinkAuthOptions {
   now?: () => number;
 }
 
-/** Asks Link for a device code. The user approves it on `verificationUrl`. */
 export const requestLinkDeviceCode = Effect.fn("Link.requestDeviceCode")(function* (
   options: LinkAuthOptions & { signal: AbortSignal },
 ): Effect.fn.Return<LinkDeviceCode, LinkOperationError> {
@@ -113,7 +91,6 @@ export const requestLinkDeviceCode = Effect.fn("Link.requestDeviceCode")(functio
   };
 });
 
-/** Keeps Link's polling interval and retries only unreachable requests. */
 export const pollLinkDeviceToken = Effect.fn("Link.pollDeviceToken")(function* (
   options: LinkAuthOptions & { device: LinkDeviceCode; signal: AbortSignal },
 ): Effect.fn.Return<LinkTokenSet, LinkOperationError> {
@@ -145,7 +122,6 @@ export const pollLinkDeviceToken = Effect.fn("Link.pollDeviceToken")(function* (
   }
 });
 
-/** Link rotates the refresh token: the caller must keep the new one before it uses the access token. */
 export const refreshLinkToken = Effect.fn("Link.refreshToken")(function* (
   options: LinkAuthOptions & { refreshToken: string },
 ): Effect.fn.Return<LinkTokenSet, LinkOperationError> {
@@ -162,7 +138,6 @@ export const refreshLinkToken = Effect.fn("Link.refreshToken")(function* (
   return yield* linkDecode(() => tokenSet(body, now()));
 });
 
-/** Tells Link to forget a token. Link then removes OpenBot from the user's connected apps. */
 export const revokeLinkToken = Effect.fn("Link.revokeToken")(function* (
   options: LinkAuthOptions & { token: string },
 ): Effect.fn.Return<void, LinkOperationError> {
@@ -173,7 +148,6 @@ export const revokeLinkToken = Effect.fn("Link.revokeToken")(function* (
   if (body.error) return yield* new LinkOperationError({ cause: flowError(body.error, body) });
 });
 
-/** An https page on link.com, the only kind that OpenBot opens for Link. */
 export function isLinkPage(address: string): boolean {
   try {
     const url = new URL(address);
@@ -239,7 +213,6 @@ function flowError(code: string, body: OAuthAnswer | null): LinkAuthError {
     case "refresh_rejected":
       return new LinkAuthError("refresh_rejected", sourceText("error.connector.linkExpired"));
     default:
-      // The error code and Link's own description only. Never the body: it can hold a token.
       return unexpected([code, body?.error_description].filter(Boolean).join(": "));
   }
 }

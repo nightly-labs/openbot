@@ -2,7 +2,7 @@ import type { BrowserTabProfile } from "@openbot/contracts/ipc";
 import { Button, buttonVariants, ChevronDown, ContextMenu, DropdownMenu, Tabs, X } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { clamp, motionDuration, prefersReducedMotion } from "@openbot/ui/utils";
-import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, For, flush, onSettled, Show } from "solid-js";
 import { createTabRow } from "../../components/createTabRow";
 import { browserProfileColor } from "./BrowserProfileColor";
 import { BrowserTabIcon, useBrowserTabTitle } from "./BrowserTabIcon";
@@ -10,17 +10,14 @@ import { BrowserTabMenu } from "./BrowserTabMenu";
 import { type BrowserFullViewProps, browserTabProfileLabel } from "./browser-full-view-types";
 import { useBrowserPageCover } from "./browser-page-cover";
 
-/** A press that travels this far becomes a drag; a shorter one stays a click on the tab or its X. */
 const DRAG_START_PX = 6;
 interface TabDrag {
   id: string;
   pointerId: number;
   startX: number;
   startScroll: number;
-  /** The pointer now. */
   x: number;
   active: boolean;
-  /** Where each chip was when the drag started, in row coordinates. */
   slots: { el: HTMLElement; left: number; width: number }[];
   gap: number;
   from: number;
@@ -28,67 +25,65 @@ interface TabDrag {
   frame: number;
 }
 
-/**
- * Slides the chips from their last places to their new places (FLIP). The tabs change after an answer
- * from the host, so the row keeps the places of its last layout rather than measuring before a change.
- * A new chip fades in.
- */
-/** A tab of a named profile has a line in the profile's color, as its toolbar label has a dot. */
 function tabProfileColor(profile: BrowserTabProfile | undefined): string | undefined {
   return profile?.hue == null ? undefined : browserProfileColor(profile.hue);
+}
+
+function motionTiming(): KeyframeAnimationOptions {
+  return {
+    duration: motionDuration("--openbot-duration-normal", 160),
+    easing: getComputedStyle(document.documentElement).getPropertyValue("--openbot-ease-out").trim() || "ease-out",
+  };
+}
+
+function siblingsAfter(element: HTMLElement): HTMLElement[] {
+  const siblings: HTMLElement[] = [];
+  for (let next = element.nextElementSibling; next instanceof HTMLElement; next = next.nextElementSibling)
+    siblings.push(next);
+  return siblings;
 }
 
 function createChipMotion(chips: () => HTMLElement[]) {
   let places = new Map<string, number>();
   const read = () => new Map(chips().map((el) => [el.dataset.tabId ?? "", el.offsetLeft]));
   return {
-    /** Keeps the places of the layout now, without a slide. */
     keep: (override?: Map<string, number>) => {
       places = override ?? read();
     },
-    play: () => {
+    play: (): Animation[] => {
       const before = places;
       const elements = chips();
       places = read();
-      if (before.size === 0 || prefersReducedMotion() || elements.some((el) => !el.isConnected)) return;
-      const timing = {
-        duration: motionDuration("--openbot-duration-normal", 160),
-        easing: getComputedStyle(document.documentElement).getPropertyValue("--openbot-ease-out").trim() || "ease-out",
-      };
+      if (before.size === 0 || prefersReducedMotion() || elements.some((el) => !el.isConnected)) return [];
+      const started: Animation[] = [];
+      const timing = motionTiming();
       for (const el of elements) {
         const id = el.dataset.tabId ?? "";
         const left = before.get(id);
         const now = places.get(id) ?? 0;
         if (left === undefined) {
           for (const animation of el.getAnimations()) animation.cancel();
-          el.animate(
-            [
-              { opacity: 0, transform: "scale(0.94)" },
-              { opacity: 1, transform: "none" },
-            ],
-            timing,
+          started.push(
+            el.animate(
+              [
+                { opacity: 0, transform: "scale(0.94)" },
+                { opacity: 1, transform: "none" },
+              ],
+              timing,
+            ),
           );
           continue;
         }
         const dx = left - now;
         if (Math.abs(dx) < 0.5) continue;
         for (const animation of el.getAnimations()) animation.cancel();
-        el.animate([{ transform: `translateX(${dx}px)` }, { transform: "none" }], timing);
+        started.push(el.animate([{ transform: `translateX(${dx}px)` }, { transform: "none" }], timing));
       }
+      return started;
     },
   };
 }
 
-/**
- * Every tab, as the chips of the top row.
- * - Drag a chip to move it: the other chips slide out of its way, and near an edge the row scrolls.
- *   Escape puts it back.
- * - A middle click, Delete or the X closes a tab. After a close with the pointer, the chips keep their
- *   width until the pointer leaves the row, so the next X is under the pointer.
- * - A right click (or Control-click) opens the tab menu.
- * - When the chips do not fit, the row scrolls (also with a vertical wheel), its edges fade, and a
- *   menu lists the tabs out of view.
- */
 export function BrowserTabStrip(props: {
   view: BrowserFullViewProps;
   onNewTab: (afterId?: string) => void;
@@ -108,15 +103,16 @@ export function BrowserTabStrip(props: {
     list: () => strip,
     tabs: () => chips(),
     key: (el) => el.dataset.tabId ?? "",
-    // Offsets ignore the slides, so a moving chip counts at its new place.
     measured: () => {
       if (!drag?.active) motion.keep();
     },
   });
   const row = tabRow.row;
+  const frozenStyle = () =>
+    row.frozen
+      ? { "--browser-full-chip-frozen": `${row.frozen}px`, "--browser-full-chips-frozen": `${row.frozenRow}px` }
+      : undefined;
   const [hiddenMenuOpen, setHiddenMenuOpen] = createSignal(false);
-  // The menu goes away with its button when every tab fits again, without a close, and a new button
-  // starts closed.
   createEffect(
     () => row.hidden.length > 0,
     (shown) => {
@@ -135,13 +131,31 @@ export function BrowserTabStrip(props: {
   createEffect(
     () => props.view.tabs.map((tab) => tab.id).join(),
     () => {
-      motion.play();
+      const animations = motion.play();
       tabRow.measure();
+      if (animations.length > 0)
+        void Promise.allSettled(animations.map((animation) => animation.finished)).then(tabRow.measure);
     },
   );
 
   const close = (ids: readonly string[]) => {
     if (canClose()) props.onClose(ids);
+  };
+  const unfreeze = () => {
+    const list = strip;
+    if (!row.frozen || !list || prefersReducedMotion()) {
+      tabRow.unfreeze();
+      return;
+    }
+    const following = siblingsAfter(list);
+    const before = following.map((element) => element.getBoundingClientRect().left);
+    tabRow.unfreeze();
+    flush();
+    const timing = motionTiming();
+    following.forEach((element, index) => {
+      const dx = (before[index] ?? 0) - element.getBoundingClientRect().left;
+      if (Math.abs(dx) >= 0.5) element.animate([{ transform: `translateX(${dx}px)` }, { transform: "none" }], timing);
+    });
   };
   const closeWithPointer = (id: string) => {
     if (!canClose()) return;
@@ -149,7 +163,6 @@ export function BrowserTabStrip(props: {
     close([id]);
   };
 
-  /** Puts the held chip under the pointer and moves the chips between its old and new place by one slot. */
   const layout = (current: TabDrag) => {
     const held = current.slots[current.from];
     const first = current.slots[0];
@@ -194,12 +207,10 @@ export function BrowserTabStrip(props: {
     window.removeEventListener("keydown", onDragKey, true);
     if (!current?.active || !strip) return;
     cancelAnimationFrame(current.frame);
-    // The release also clicks the chip or its X; that click is part of the drag.
     swallowClick = true;
     setTimeout(() => {
       swallowClick = false;
     });
-    // The chips settle from where they are drawn now.
     const origin = strip.getBoundingClientRect().left - strip.scrollLeft + strip.clientLeft;
     motion.keep(
       new Map(
@@ -212,7 +223,6 @@ export function BrowserTabStrip(props: {
     }
     strip.removeAttribute("data-dragging");
     if (drop && current.to !== current.from) props.view.onMoveTab(current.id, current.to);
-    // A drop in place changes no tab, so the held chip slides back here.
     else motion.play();
   };
 
@@ -252,10 +262,7 @@ export function BrowserTabStrip(props: {
   }
 
   const onChipPointerDown = (event: PointerEvent, id: string) => {
-    // The middle button closes on release (auxclick); here it only stops the scroll cursor.
     if (event.button === 1) event.preventDefault();
-    // Control-click is the right click of macOS: its menu takes the release, so no drag starts.
-    // A touch scrolls the row; a long press opens the menu.
     if (event.button !== 0 || event.pointerType === "touch" || event.ctrlKey || drag) return;
     drag = {
       id,
@@ -296,7 +303,6 @@ export function BrowserTabStrip(props: {
 
   return (
     <>
-      {/* The tab list moves the focus with the arrow keys, Home and End; the focus selects the tab. */}
       <Tabs.List
         ref={(element: HTMLDivElement) => {
           strip = element;
@@ -306,8 +312,8 @@ export function BrowserTabStrip(props: {
         data-frozen={row.frozen ? "" : undefined}
         data-fade-start={row.fadeStart ? "" : undefined}
         data-fade-end={row.fadeEnd ? "" : undefined}
-        style={row.frozen ? { "--browser-full-chip-frozen": `${row.frozen}px` } : undefined}
-        onPointerLeave={tabRow.unfreeze}
+        style={frozenStyle()}
+        onPointerLeave={unfreeze}
       >
         <For each={props.view.tabs} keyed={(tab) => tab.id}>
           {(tab) => {
@@ -362,8 +368,6 @@ export function BrowserTabStrip(props: {
                     value={tab().id}
                     class={buttonVariants({ variant: "ghost", class: "side-panel-tab-select" })}
                     onClick={() => props.view.onActivateTab(tab().id)}
-                    // Focus that comes back from the page or another window has no related target.
-                    // It lands on the tab the user chose before, not on a new choice.
                     onFocus={(event: FocusEvent) => {
                       if (event.relatedTarget !== null && !selected()) props.view.onActivateTab(tab().id);
                     }}
