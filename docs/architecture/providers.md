@@ -762,8 +762,10 @@ applies config `options.apiKey` last. With no saved key, it reads the CLI's own 
 T3 Code uses: the active OpenCode Console row (`integration_id = 'opencode'`, `type: "key"`, no
 self-hosted `metadata.server`) in the `credential` table of `$XDG_DATA_HOME/opencode/opencode.db`
 (or `OPENCODE_DB`), then the Go key: the `opencode-go` key of `auth.json` (or `OPENCODE_AUTH_CONTENT`,
-which also skips the database), or `OPENCODE_API_KEY` when that has none (#3548). A 401 or 403 on the
-Console key tries the Go key. The
+which also skips the database), or `OPENCODE_API_KEY` when that has none (#3548), then the `opencode`
+key of `auth.json` with no self-hosted `metadata.server` (#16230). OpenCode 1 keeps the Console key only
+there; OpenCode 2 copies it into the `credential` table once. A 401 or 403 tries the next key, and Go
+answers 403 for a key with no Go subscription. The
 database is opened read-only with a 100 ms busy timeout, because Effect cannot interrupt a blocked
 SQLite call. `scripts/opencode-go-usage-e2e.ts` covers it.
 
