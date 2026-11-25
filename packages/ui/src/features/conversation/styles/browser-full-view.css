@@ -364,6 +364,23 @@ body[data-browser-full-view] .app-frame {
   transform: rotate(45deg);
 }
 
+.browser-pane-view .browser-full-address-row {
+  position: relative;
+}
+
+.browser-pane-view .browser-full-capsule-anchor {
+  position: static;
+}
+
+.browser-pane-view .browser-http-sign-in {
+  left: var(--openbot-space-2);
+  width: min(320px, calc(100% - 2 * var(--openbot-space-2)));
+}
+
+.browser-pane-view .browser-http-sign-in::before {
+  display: none;
+}
+
 .browser-http-sign-in-head {
   display: flex;
   align-items: flex-start;
