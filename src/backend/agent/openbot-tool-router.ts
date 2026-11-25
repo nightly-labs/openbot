@@ -68,6 +68,7 @@ import {
   isMessageReaction,
   isPasswordManagerId,
   isSettingLinkId,
+  type MacPermissionId,
   marketplaceSuggestionItemType,
   mcpSignInItemType,
   SETTING_LINK_SCOPES,
@@ -110,6 +111,7 @@ import {
   MARKETPLACE_APP_IDS,
   removeApiKeyToolSchema,
   requestApiKeyToolSchema,
+  requestLocationToolSchema,
   routineReportFailureToolSchema,
   saveApiKeyToolSchema,
   sendToChannelToolSchema,
@@ -127,7 +129,7 @@ import {
 } from "../protocol";
 import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
 import type { StoredStateFailure } from "../stored-state-effects";
-import type { VaultItems } from "../vault-items";
+import { type VaultItems, vaultClosedText } from "../vault-items";
 import { WORKFLOW_ANSWER_TOOL } from "../workflows/workflow-answers";
 import {
   handleWorkflowAnswerTool,
@@ -158,6 +160,7 @@ import {
   listChannelsToolSchema,
 } from "./channel-agent-tools";
 import type { ChatVisualPreviewHost } from "./chat-visual-preview";
+import { type ClientBrowser, isClientBrowserCall, runClientBrowserTool, withClientTabs } from "./client-browser-tools";
 import { handleSetCommitCoAuthorTool, type SetCommitCoAuthor } from "./commit-co-author-tool";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { CRM_TOOL_NAMES, handleCrmTool } from "./crm-tool";
@@ -222,8 +225,8 @@ import {
   updateProfileToolSchema,
   widensAgentSettings,
 } from "./profile-tools";
-import { apiKeyFormSpec, browserUserControlResult } from "./prompts";
-import { ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
+import { apiKeyFormSpec, browserUserControlResult, locationFormSpec } from "./prompts";
+import { ROUTINE_NO_UPDATE_MARKER, ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 import {
@@ -252,6 +255,7 @@ import {
   DEFERRED_MCP_NOTE,
   deferredCall,
   deferredCallArgumentsError,
+  deferredNullValueError,
   discoverTools,
   givesBrowserSchemas,
   mayNameMcpTool,
@@ -276,6 +280,16 @@ const API_KEY_TOOLS: ReadonlySet<string> = new Set([
   "list_api_keys",
   "remove_api_key",
   "save_api_key",
+]);
+
+const VAULT_ITEM_TOOLS: ReadonlySet<string> = new Set([
+  "list_logins",
+  "submit_secret",
+  "request_takeover",
+  "list_vault_items",
+  "request_vault_item",
+  "save_vault_item",
+  "delete_vault_item",
 ]);
 
 function lowerCaseColor(color: string): AvatarColor {
@@ -417,6 +431,11 @@ function captureFailure(failure: ScreenCaptureFailed) {
   return openBotToolFailure(failure.reason);
 }
 
+const MAC_PERMISSION_NAMES: Record<MacPermissionId, string> = {
+  "screen-recording": "Screen Recording",
+  accessibility: "Accessibility",
+};
+
 export interface OpenBotToolRouterHooks {
   listAgents(): AgentSummary[];
   listModels(): AgentModelOption[];
@@ -435,6 +454,7 @@ export interface OpenBotToolRouterHooks {
   deleteAgent(agentId: string): Effect.Effect<void, ToolOperationFailed>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Effect.Effect<AgentSummary, ToolOperationFailed>;
   enabledMcpServers(agentId?: string): McpServerConfig[];
+  computerUseMissingPermissions?(): readonly MacPermissionId[];
   emitError(code: string, error: unknown, agentId?: string): void;
   redactMcp(text: string): string;
   redactMcpForAgent(text: string): string;
@@ -504,6 +524,8 @@ export interface OpenBotToolRouterOptions {
   apiKeys?: AgentApiKeys | null | undefined;
   vaultItems?: VaultItems | null | undefined;
   codexSubagentParent?: ((childThreadId: string) => CodexSubagentParent | undefined) | undefined;
+  clientBrowser?: ClientBrowser | null | undefined;
+  fromChrome?: ((deliveryId: string) => boolean) | undefined;
   hooks: OpenBotToolRouterHooks;
 }
 
@@ -517,6 +539,8 @@ export class OpenBotToolRouter {
   readonly #codexSubagentParent: (childThreadId: string) => CodexSubagentParent | undefined;
   readonly #browser: AgentBrowserHost;
   readonly #browserUploads: BrowserUploads;
+  readonly #clientBrowser: ClientBrowser | null;
+  readonly #fromChrome: (deliveryId: string) => boolean;
   readonly #attachments: AttachmentGateway;
   readonly #channels: ChannelService;
   readonly #messaging: MessagingThreads;
@@ -585,6 +609,8 @@ export class OpenBotToolRouter {
     this.#codexSubagentParent = options.codexSubagentParent ?? (() => undefined);
     this.#browser = options.browser;
     this.#browserUploads = options.browserUploads;
+    this.#clientBrowser = options.clientBrowser ?? null;
+    this.#fromChrome = options.fromChrome ?? (() => false);
     this.#attachments = options.attachments;
     this.#channels = options.channels;
     this.#messaging = options.messaging;
@@ -742,6 +768,11 @@ export class OpenBotToolRouter {
                 );
                 return;
               }
+              const nullValue = deferredNullValueError(resolved, client.provider);
+              if (nullValue) {
+                client.respond(request.id, openBotToolFailure(nullValue));
+                return;
+              }
               params = resolved;
             }
           }
@@ -847,6 +878,30 @@ export class OpenBotToolRouter {
               client.respond(toolRequest.id, channelRefusal);
               return;
             }
+            const callArgs = repairBrowserToolInput(toolRequest.params.tool, toolRequest.params.arguments).value;
+            if (isClientBrowserCall(toolRequest.params.tool, callArgs)) {
+              const signal = toolRequest.signal;
+              if (signal?.aborted) return;
+              const agent = this.#conversation.requireKnownAgent(agentId);
+              const result = yield* runClientBrowserTool(
+                this.#clientBrowser,
+                this.#chromeRequesters(agentId, toolRequest.params.turnId),
+                { id: agentId, name: agent.name },
+                toolRequest.params.tool,
+                callArgs,
+              ).pipe(
+                Effect.flatMap((chromeResult) =>
+                  toolRequest.params.tool === "screenshot"
+                    ? saveBrowserScreenshot(() => agent.workspacePath, callArgs, chromeResult)
+                    : Effect.succeed(chromeResult),
+                ),
+                Effect.raceFirst(requestAborted(signal)),
+              );
+              if (signal?.aborted || !client.running) return;
+              client.respond(toolRequest.id, this.#withBrowserPrimer(toolRequest.params.threadId, result));
+              return;
+            }
+            if (this.#vaultItems && VAULT_ITEM_TOOLS.has(toolRequest.params.tool)) yield* this.#vaultItems.reload();
             if (toolRequest.params.tool === "request_takeover" || toolRequest.params.tool === "submit_secret") {
               const result = yield* this.#attention.surfaceBrowserTakeover(client, toolRequest);
               if (client.running) client.respond(toolRequest.id, result);
@@ -866,7 +921,6 @@ export class OpenBotToolRouter {
               threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
               ownerAgentId: agentId,
             };
-            const callArgs = repairBrowserToolInput(params.tool, params.arguments).value;
             const callTabId = isRecord(callArgs) && isString(callArgs.tabId) ? callArgs.tabId : undefined;
             if (this.#attention.browserTakeoverBlocks(agentId, params.threadId, callTabId)) {
               client.respond(toolRequest.id, {
@@ -902,6 +956,8 @@ export class OpenBotToolRouter {
                     onUserControl: userControl,
                     cardVault: linkVault ?? this.#attention.cardVault(client, toolRequest, params),
                   });
+                  if (params.tool === "list_tabs")
+                    return withClientTabs(result, this.#clientBrowser, this.#chromeRequesters(agentId, params.turnId));
                   if (params.tool !== "screenshot") return result;
                   const workspacePath = () => this.#conversation.requireKnownAgent(agentId).workspacePath;
                   return yield* saveBrowserScreenshot(workspacePath, params.arguments, result);
@@ -915,18 +971,7 @@ export class OpenBotToolRouter {
               Effect.onInterrupt(() => Effect.sync(() => this.#browser.endControl(params.threadId, params.turnId))),
             );
             if (signal?.aborted || !client.running) return;
-            const threadId = toolRequest.params.threadId;
-            if (this.#browserSchemasGiven.has(threadId)) client.respond(toolRequest.id, result);
-            else {
-              this.#browserSchemasGiven.add(threadId);
-              client.respond(toolRequest.id, {
-                ...result,
-                contentItems: [
-                  ...result.contentItems,
-                  { type: "inputText", text: JSON.stringify({ browserTools: browserToolsPrimer() }) },
-                ],
-              });
-            }
+            client.respond(toolRequest.id, this.#withBrowserPrimer(toolRequest.params.threadId, result));
             return;
           }
           if (toolRequest.params.namespace === "openbot") {
@@ -954,6 +999,11 @@ export class OpenBotToolRouter {
             if (toolRequest.params.tool === "capture_screen" || toolRequest.params.tool === "list_capture_sources") {
               const result = yield* this.#screenCaptureTool(client, toolRequest, toolRequest.params);
               if (!toolRequest.signal?.aborted && client.running) client.respond(toolRequest.id, result);
+              return;
+            }
+            if (toolRequest.params.tool === "request_location") {
+              const result = this.#locationTool(client, toolRequest, toolRequest.params);
+              if (result && !toolRequest.signal?.aborted && client.running) client.respond(toolRequest.id, result);
               return;
             }
             if (API_KEY_TOOLS.has(toolRequest.params.tool)) {
@@ -1115,6 +1165,27 @@ export class OpenBotToolRouter {
     this.#attention.surfaceUiBlock(client, request, { blockId, spec });
   }
 
+  #locationTool(client: AgentClient, request: AppServerRequest, params: DynamicToolCallParams) {
+    const agentId = this.#conversation.agentForThread(params.threadId);
+    if (!agentId) throw new Error("The calling OpenBot agent is unknown.");
+    const parsed = requestLocationToolSchema.safeParse(params.arguments);
+    if (!parsed.success)
+      return openBotToolFailure(`${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`);
+    const threadId = this.#conversation.publicThreadId(agentId, params.threadId);
+    if (this.#messaging.store.linkForThread(threadId))
+      return openBotToolFailure(
+        "request_location does not work in an external chat. Ask the person for a place in your answer.",
+      );
+    if (this.#channels.store.channelForThread(threadId))
+      return openBotToolFailure(
+        "request_location does not work in a channel, because all members read it. Ask the person for a place in your answer.",
+      );
+    const spec = locationFormSpec(parsed.data.reason);
+    if (!spec) return openBotToolFailure("OpenBot could not show this card. Use a shorter reason and retry.");
+    this.#attention.surfaceUiBlock(client, request, { blockId: randomUUID(), spec, location: true });
+    return null;
+  }
+
   readonly #apiKeyTool = Effect.fn("OpenBotToolRouter.apiKeyTool")(function* (
     this: OpenBotToolRouter,
     client: AgentClient,
@@ -1125,6 +1196,7 @@ export class OpenBotToolRouter {
     if (!agentId) throw new Error("The calling OpenBot agent is unknown.");
     const apiKeys = this.#apiKeys;
     if (!apiKeys) return openBotToolFailure("This OpenBot server cannot save API keys.");
+    if (this.#vaultItems) yield* this.#vaultItems.reload();
     const failed = (failure: { cause: unknown }) =>
       Effect.succeed(
         openBotToolFailure(
@@ -1218,7 +1290,7 @@ export class OpenBotToolRouter {
         "Only a person's message, in your OpenBot chat or a thread they opened, can save a key to the Vault. Ask the user to add it in Server settings > Vault.",
       );
     const vault = this.#vaultItems;
-    if (!vault?.ready()) return openBotToolFailure("No Vault is available on this computer. Ask the user.");
+    if (!vault?.ready()) return openBotToolFailure(vaultClosedText(vault?.status()));
     const agentName = this.#store.list().find((candidate) => candidate.id === agentId)?.name;
     const saved = yield* Effect.result(vault.saveApiKey({ name, key, notes }, { id: agentId, name: agentName }, false));
     if (Result.isFailure(saved)) {
@@ -1739,6 +1811,11 @@ export class OpenBotToolRouter {
     const agent = yield* toolStep(() => this.#requireAgent(agentId));
     const computerUse = agentComputerUseEnabled(agent);
     const mcpServers = agentMcpServers(this.#hooks.enabledMcpServers(agentId), computerUse);
+    const computerUseReady = mcpServers.some((server) => server.id === COMPUTER_USE_MCP_SERVER_ID);
+    const computerUseMissing =
+      computerUse && !computerUseReady
+        ? (this.#hooks.computerUseMissingPermissions?.() ?? []).map((id) => MAC_PERMISSION_NAMES[id])
+        : [];
     let skills: unknown[] | undefined;
     let skillsError: string | undefined;
     const loaded = yield* Effect.result(
@@ -1783,9 +1860,8 @@ export class OpenBotToolRouter {
       permissions,
       permissionLevels: agentPermissionLevels(agent.provider, permissions),
       computerUse,
-      ...(computerUse
-        ? { computerUseReady: mcpServers.some((server) => server.id === COMPUTER_USE_MCP_SERVER_ID) }
-        : {}),
+      ...(computerUse ? { computerUseReady } : {}),
+      ...(computerUseMissing.length > 0 ? { computerUseMissingPermissions: computerUseMissing } : {}),
       notifications: agent.notifications,
       ...this.#agentBrowserProfile(agent),
       ...(skills ? { skills } : { skillsError }),
@@ -1870,7 +1946,12 @@ export class OpenBotToolRouter {
     }
 
     const executionThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
-    if (isMessagingOutboundCall(params.tool, params.arguments))
+    if (
+      isMessagingOutboundCall(params.tool, params.arguments) ||
+      (params.tool === "messaging_history" &&
+        !this.#messaging.store.linkForThread(executionThreadId) &&
+        !this.#mailbox.turnServesExternalChat(senderAgentId, params.turnId))
+    )
       return yield* this.#messaging.outboundTool(
         senderAgentId,
         { threadId: executionThreadId, turnId: params.turnId },
@@ -1959,10 +2040,12 @@ export class OpenBotToolRouter {
           "This request came from an external chat, and a channel result cannot go back to it. Ask the channel members with send_message instead, then answer the one who asked.",
         );
       const args = sendToChannelToolSchema.parse(params.arguments, { reportInput: true });
+      const senderTaskId = this.#tasks.taskForThread(executionThreadId);
       const channel = yield* this.#channels.handoff({
         operationId: toolCallIdempotencyKey(params),
         channelId: args.channelId,
         senderAgentId,
+        ...(senderTaskId ? { senderTaskId } : {}),
         text: args.text,
         recipientAgentIds: args.recipientAgentIds ?? [],
         sourcePaths: args.paths ?? [],
@@ -2188,7 +2271,10 @@ export class OpenBotToolRouter {
         this.#endRoutineRunTurn(params, "quiet");
       return openBotToolResult(
         outcome === "quiet"
-          ? { status: "quiet", note: "This turn ends without a message or a notification. End your turn now." }
+          ? {
+              status: "quiet",
+              note: client.provider === "antigravity" && channelRun === null ? QUIET_MARKER_NOTE : QUIET_NOTE,
+            }
           : { status: "shown", note: "Someone waits for this answer. Report the result as usual." },
       );
     }
@@ -2474,6 +2560,12 @@ export class OpenBotToolRouter {
         return yield* marketplaceAppStatus(this.#mcpServers, installed, (config) =>
           toolStep(() => this.#postMcpSignInCard(senderAgentId, executionThreadId, params.turnId, config)),
         );
+      if (this.#servesTeammateRequest(senderAgentId, params.turnId, executionThreadId))
+        return openBotToolResult({
+          status: "ask_requester",
+          app: args.app,
+          next: `In this turn you answer a teammate, not the user, so the user does not read your chat and no card shows. Do not say that a card is in the chat. When you can do the task now another way, do it. Otherwise end your answer: tell the teammate that the user must connect the app, and that the teammate calls openbot.suggest_marketplace_app with app ${args.app} in its own chat, where the user sees the card.`,
+        });
       suggestCard();
       return openBotToolResult({
         status: "suggested",
@@ -3034,6 +3126,15 @@ export class OpenBotToolRouter {
     if (oldest !== undefined) this.#routineRunTurns.delete(oldest);
   }
 
+  #servesTeammateRequest(agentId: string, turnId: string, executionThreadId: string): boolean {
+    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId).length;
+    return (
+      deliveries > 0 &&
+      !this.#channels.store.channelForThread(executionThreadId) &&
+      this.#mailbox.openTeammateRequestIds(agentId, turnId).length === deliveries
+    );
+  }
+
   #requestedByPerson(agentId: string, turnId: string, threadId: string): boolean {
     const executionThreadId = this.#conversation.publicThreadId(agentId, threadId);
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
@@ -3045,6 +3146,18 @@ export class OpenBotToolRouter {
           !this.#messaging.store.linkForThread(executionThreadId) &&
           !this.#channels.store.channelForThread(executionThreadId)))
     );
+  }
+
+  #withBrowserPrimer(threadId: string, result: DynamicToolResult): DynamicToolResult {
+    if (this.#browserSchemasGiven.has(threadId)) return result;
+    this.#browserSchemasGiven.add(threadId);
+    return {
+      ...result,
+      contentItems: [
+        ...result.contentItems,
+        { type: "inputText", text: JSON.stringify({ browserTools: browserToolsPrimer() }) },
+      ],
+    };
   }
 
   #channelBrowserRefusal(threadId: string, agentId: string): DynamicToolResult | null {
@@ -3072,6 +3185,13 @@ export class OpenBotToolRouter {
       ids.add(this.#mailbox.senderMember(delivery.messageId)?.id ?? SIGNED_OUT_CHANNEL_MEMBER_ID);
     }
     return [...ids];
+  }
+
+  #chromeRequesters(agentId: string, turnId: string): string[] {
+    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    return deliveries.some(({ delivery }) => this.#fromChrome(delivery.id))
+      ? this.#turnRequesters(agentId, turnId)
+      : [];
   }
 
   #memberRequesters(agentId: string, turnId: string): string[] {
@@ -3666,6 +3786,10 @@ type SentDelivery = QueuedMessageReceipt["deliveries"][number] & {
   queuedBecause?: Exclude<AgentMessageSteer, "steered" | null>;
   note?: string;
 };
+
+const QUIET_NOTE = "This turn ends without a message or a notification. End your turn now.";
+
+const QUIET_MARKER_NOTE = `This turn ends without a message or a notification. End your turn now with only ${ROUTINE_NO_UPDATE_MARKER} as your answer: no other text.`;
 
 const RECIPIENT_QUEUES_NOTE =
   "The recipient's While working setting is Queue, so the message waits for its next turn. The user can set it to Steer.";

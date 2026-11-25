@@ -54,6 +54,8 @@ export const messages = {
     "Bu uzak ana makine bir tarayıcı sekmesinin denetimini almayı desteklemiyor.",
   "error.backend.browserSignInUnsupported": "Bu uzak ana makine bu bilgisayardan oturum açma alamaz.",
   "error.backend.browserSignInOpenFailed": "OpenBot oturum açma penceresini açamadı.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot oturum açma penceresinde sayfayı yükleyemedi. İnternet bağlantısını kontrol edin, ardından oturum açma penceresini yeniden açın.",
   "error.backend.browserSignInReadFailed": "OpenBot pencereden oturumu okuyamadı.",
   "error.backend.browserStopUnsupported": "Bu uzak ana makine sayfa yüklemesini durduramaz.",
   "error.backend.sharedDataLocalOnly": "Paylaşılan veriler bu ajanları çalıştıran bilgisayarda yönetilir.",
@@ -65,6 +67,12 @@ export const messages = {
     "Sıkıştırma bu sohbeti küçültmüyor: iki sıkıştırmadan sonra hâlâ modelin bağlam penceresinin %{percent} kadarını kullanıyor, bu yüzden OpenBot sıkıştırmayı durduruyor. Pencerenin çoğunu araçlar ve talimatlar kullanıyor. Bu ajanın ihtiyaç duymadığı MCP sunucularını veya bilgisayar kullanımını kapatın ya da daha büyük pencereli bir model seçin. Ardından yeni bir sohbet başlatın.",
   "error.backend.contextCompactionStopped":
     'Bu sohbetin art arda iki sıkıştırması başarısız oldu, bu yüzden OpenBot onu otomatik olarak sıkıştırmayı bırakıyor. Her deneme tüm sohbeti modele gönderir ve plan sınırınızı kullanır. Yeniden denemek için "Şimdi sıkıştır"ı seçin veya yeni bir sohbet başlatın.',
+  "error.backend.contextCompactionRetrying":
+    "Sağlayıcı bu sohbeti sıkıştıramadı ve yeniden deniyor. Bu sohbetteki yeni mesajlar sıkıştırma bitene kadar bekler. Yakında bitmezse OpenBot onu durdurur ve mesajlarını gönderir.",
+  "error.backend.contextCompactionFailed":
+    "Bu sohbetin sıkıştırılması başarısız oldu. Sohbet değişmedi. Bekleyen mesajlar şimdi ajana gidiyor.",
+  "error.backend.contextCompactionTimedOut":
+    "Bu sohbetin sıkıştırılması çok uzun sürdü, bu yüzden OpenBot onu durdurdu. Sohbet değişmedi. Bekleyen mesajlar şimdi ajana gidiyor.",
   "error.backend.providerModelAtCapacity":
     "Model kapasitesinin sınırında. Sağlayıcı birkaç dakika içinde yeniden deneyecek. Hemen devam etmek için turu durdurun ve başka bir model seçin.",
   "error.backend.providerRetrying":
@@ -106,6 +114,15 @@ export const messages = {
   "error.backend.channelRoutingFailed": "Yönlendirme başarısız oldu. Bir üye seçin veya tekrar deneyin.",
   "error.backend.channelLeadTimedOut": "Kanal lideri zamanında yanıt vermedi. Bir üye seçin veya tekrar deneyin.",
   "error.backend.channelLeadFailed": "Kanal lideri bu mesajı yönlendiremedi. Bir üye seçin veya tekrar deneyin.",
+  "error.backend.channelLeadBusy":
+    "Kanal liderinin modeli şu anda meşgul. Birkaç dakika sonra tekrar deneyin veya bir üye seçin.",
+  "error.backend.channelLeadOffline": "Kanal liderinin modelinin bağlantısı koptu. Tekrar deneyin veya bir üye seçin.",
+  "error.backend.channelLeadSignIn":
+    "Kanal liderinin sağlayıcı oturumunun süresi doldu. Tekrar oturum açın veya bir üye seçin.",
+  "error.backend.channelLeadModelGone":
+    "Kanal liderinin modeli kullanılamıyor. Lider için başka bir model seçin veya bir üye seçin.",
+  "error.backend.channelLeadRefused":
+    "Kanal liderinin modeli bu isteği reddetti. Bir üye veya lider için başka bir model seçin.",
   "error.backend.channelRequestMemberRequired": "Bu istek için bir üye seçin.",
   "error.backend.channelDeliveryNotCreated": "Kanal teslimatı oluşturulamadı.",
   "error.backend.channelAssignmentStopped": "Bu kanal ataması durduruldu veya değiştirildi.",
@@ -287,6 +304,8 @@ export const messages = {
     "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
   "error.backend.mcpServerExitedWithOutput": "Sunucu yanıt vermeden durdu. Yazdığı: {detail}",
   "error.backend.mcpServerFailedToStart": "Sunucu başlamadı: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot, {name} MCP sunucusunu başlatamadı, çünkü programı OpenBot'un çalıştığı bilgisayarda yüklü değil. {name} sağlayan uygulamayı o bilgisayara yükleyin veya Pazaryeri, Uygulamalar bölümünde {name} öğesini kapatın.",
   "error.backend.mcpServerStartAbandoned":
     "{provider}, sunucu başlamadan beklemeyi bıraktı. Bu yüzden ajanları bu sunucunun araçlarını almıyor.",
   "error.backend.mcpServerStoppedDuringCall": "MCP sunucusu bu çağrıya yanıt vermeden durdu.",
@@ -410,6 +429,8 @@ export const messages = {
     "Bu sitenin güvenlik sertifikasına güvenilmiyor, bu yüzden sayfa açılmadı.",
   "error.backend.browserLowMemory":
     "Bu sunucunun belleği azaldı, bu nedenle tarayıcı başka bir sekme açamıyor. Bir sekmeyi kapatın veya diğer ajanların bitmesini bekleyin.",
+  "error.backend.browserNoMemory":
+    "Bu sunucunun belleği neredeyse doldu, bu nedenle tarayıcı şu anda sekme açamıyor. Diğer ajanların bitmesini bekleyin, sonra tekrar deneyin.",
   "error.backend.browserOpenFailed": "{url} açılamadı: {reason}",
   "error.backend.popupSecureInput":
     "Güvenli giriş sırasında açılır pencereler engellenir. Güvenli girişi tamamlayın veya iptal edin, ardından sayfadan tekrar deneyin.",

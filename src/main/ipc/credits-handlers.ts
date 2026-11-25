@@ -1,4 +1,8 @@
-import { parseCreditCheckoutRequest, parseCreditTransferRequest } from "@openbot/contracts/credits";
+import {
+  parseCreditCheckoutRequest,
+  parseCreditRedeemRequest,
+  parseCreditTransferRequest,
+} from "@openbot/contracts/credits";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { CreditsDesktopService } from "../credits-service";
@@ -14,6 +18,9 @@ export function creditsIpcHandlers({ credits }: { credits: CreditsDesktopService
       ),
       transfer: payloadHandler(validRequest(parseCreditTransferRequest), (request) =>
         runCauseEffect(credits.transfer(request)),
+      ),
+      redeem: payloadHandler(validRequest(parseCreditRedeemRequest), (request) =>
+        runCauseEffect(credits.redeem(request)),
       ),
     },
   };

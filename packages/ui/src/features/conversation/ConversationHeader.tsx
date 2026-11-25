@@ -5,7 +5,6 @@ import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { agentAccessLockLabel } from "@openbot/ui/features/agents/agent-access";
 import { RemoteDesktopIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { PinnedMessages, type PinnedMessagesProps } from "@openbot/ui/features/conversation/PinnedMessages";
-import { SidePanelToggle, type SidePanelToggleProps } from "@openbot/ui/features/conversation/SidePanel";
 import { TabShape } from "@openbot/ui/features/conversation/TabShape";
 import { useText } from "@openbot/ui/text";
 import type { ComponentProps, JSX } from "@solidjs/web";
@@ -22,7 +21,6 @@ export interface ConversationHeaderProps {
   onOpenChat?: (() => void) | undefined;
   remoteControl?: ConversationHeaderRemoteControl | undefined;
   pinnedMessages?: PinnedMessagesProps | undefined;
-  sidePanel?: SidePanelToggleProps | undefined;
   threads?: JSX.Element | undefined;
   titleSelected?: boolean | undefined;
 }
@@ -193,7 +191,6 @@ export function ConversationHeader(props: ConversationHeaderProps) {
           )}
         </Show>
         <Show when={props.pinnedMessages}>{(pins) => <PinnedMessages {...pins()} />}</Show>
-        <Show when={props.sidePanel}>{(sidePanel) => <SidePanelToggle {...sidePanel()} />}</Show>
       </div>
       <Show when={props.agent && titleTab() !== undefined}>
         <TabShape

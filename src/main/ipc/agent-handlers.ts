@@ -39,6 +39,7 @@ import {
   type SidebarLayoutAction,
   type SidebarLayoutSnapshot,
   withFastServiceTiers,
+  withKeptModels,
   withModelListings,
   withSteeringModels,
   withUsageCredits,
@@ -151,6 +152,10 @@ import {
   MESSAGE_PINS_ROUTES,
 } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
+import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -529,11 +534,23 @@ export function agentIpcHandlers({
                     })
                     .pipe(Effect.orElseSucceed(() => []))
                 : Effect.succeed([]);
-              const [options, fastModels, listed, steered] = yield* Effect.all([models, fast, listings, steering], {
-                concurrency: "unbounded",
-              });
+              const kept = remoteServers.supportsCapability(serverId, MODEL_VISIBILITY_KEPT_CAPABILITY)
+                ? remoteServers
+                    .request(serverId, MODEL_VISIBILITY_KEPT_ROUTES.list, decodeAgentSteeringModels, {
+                      method: "POST",
+                      body: {},
+                    })
+                    .pipe(Effect.orElseSucceed(() => []))
+                : Effect.succeed([]);
+              const [options, fastModels, listed, steered, keptModels] = yield* Effect.all(
+                [models, fast, listings, steering, kept],
+                { concurrency: "unbounded" },
+              );
               return withWorkspaceOnlyLimit(
-                withSteeringModels(withModelListings(withFastServiceTiers(options, fastModels), listed), steered),
+                withSteeringModels(
+                  withKeptModels(withModelListings(withFastServiceTiers(options, fastModels), listed), keptModels),
+                  steered,
+                ),
                 remoteServers.supportsCapability(serverId, WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
               );
             }),

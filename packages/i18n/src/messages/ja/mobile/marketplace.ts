@@ -108,6 +108,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "{name} のサインインページを開きます。",
   "mobile.marketplace.app.stepAllow": "サインインしてアクセスを許可します。",
   "mobile.marketplace.app.stepReturn": "ここに戻ります。{name} がサーバーに接続されます。",
+  "mobile.marketplace.app.stepBlank": "最後のページは読み込まれません。これは正常です。",
+  "mobile.marketplace.app.stepCopy": "アドレスバーをタップし、アドレス全体をコピーします。",
+  "mobile.marketplace.app.stepPaste": "OpenBot に戻り、下にアドレスを貼り付けます。",
   "mobile.marketplace.app.openSignIn": "サインインページを開く",
   "mobile.marketplace.app.keySecure": "キーは暗号化された接続で、あなたのサーバーにのみ送られます。",
   "mobile.marketplace.app.connecting": "接続中",
@@ -124,8 +127,6 @@ export const messages = {
     "このアプリにはブラウザーでのサインインが必要です。サーバーの OpenBot をアップデートするか、コンピューターでアプリを接続してください。",
   "mobile.marketplace.app.waiting": "サインインページを待っています…",
   "mobile.marketplace.app.openAgain": "サインインページをもう一度開く",
-  "mobile.marketplace.app.pasteHint":
-    "最後に、ページは読み込まれないアドレスを開きます。そのアドレスをコピーして、下に貼り付けてください。",
   "mobile.marketplace.app.pasteLabel": "サインイン後のアドレス",
   "mobile.marketplace.app.pasteInvalid": "このアドレスはこのサインインの最後のアドレスではありません。",
   "mobile.marketplace.app.finishSignIn": "サインインを完了",

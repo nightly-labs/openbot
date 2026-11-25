@@ -40,6 +40,8 @@ export const messages = {
     "تعذّر على OpenBot الاتصال بـ 1Password. تحقق من الاتصال بالإنترنت، ثم حاول مرة أخرى.",
   "error.connector.onePasswordRateLimited": "تلقّى 1Password طلبات كثيرة جدًا. انتظر بضع دقائق، ثم حاول مرة أخرى.",
   "error.connector.onePasswordNoVault": "لا يمكن لحساب الخدمة قراءة أي خزنة. امنحه الوصول إلى خزنة، ثم حاول مرة أخرى.",
+  "error.connector.onePasswordReadFailed":
+    "لا يستطيع OpenBot قراءة بيانات تسجيل الدخول في 1Password. اقطع اتصال 1Password، ثم اتصل به مرة أخرى.",
   "error.connector.onePasswordFileUnreadable": "ملف اتصال 1Password غير قابل للقراءة.",
   "error.connector.onePasswordFileTooLarge": "ملف اتصال 1Password كبير جدًا.",
   "error.connector.bitwardenFailed":
@@ -52,6 +54,10 @@ export const messages = {
     "أدخل عنوان خادم HTTPS، وclient_id وclient_secret لمفتاح API، وكلمة المرور الرئيسية.",
   "error.connector.bitwardenHostFailed":
     "تعذّر فتح Bitwarden على هذا الخادم. تحقق من عنوان الخادم ومفتاح API وكلمة المرور الرئيسية، وتأكد من وجود مجلد واحد باسم Shared with OpenBot. ثم اتصل مرة أخرى.",
+  "error.connector.bitwardenHostSignInFailed":
+    "تعذّر تسجيل الدخول إلى Bitwarden على هذا الخادم. تحقق من عنوان الخادم ومفتاح API، ثم اتصل مرة أخرى.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "تعذّر فتح قفل Bitwarden على هذا الخادم. تحقق من كلمة المرور الرئيسية، ثم اتصل مرة أخرى.",
   "error.connector.bitwardenCliInstallFailed":
     "تعذّر تثبيت Bitwarden CLI على هذا الخادم. تحقق من اتصاله بالشبكة، ثم اتصل مرة أخرى.",
   "error.connector.bitwardenFileUnreadable": "ملف اتصال Bitwarden غير قابل للقراءة.",

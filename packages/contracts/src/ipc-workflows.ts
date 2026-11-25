@@ -66,6 +66,7 @@ export type WorkflowFields = Record<string, WorkflowFieldValue>;
 
 export const WORKFLOW_GROUP_FIELDS = { id: "group", name: "groupName", folded: "groupFolded" } as const;
 export const WORKFLOW_STEP_NAME_FIELD = "stepName";
+export const WORKFLOW_UNLINKED_CONNECTION = "unlinked";
 
 export const WORKFLOW_MEDIA_KINDS = ["image", "video"] as const;
 export type WorkflowMediaKind = (typeof WORKFLOW_MEDIA_KINDS)[number];
@@ -1240,8 +1241,15 @@ export interface WorkflowMediaCatalogModel {
 
 export const WORKFLOW_MEDIA_FRAME_COUNT_MAX = 2;
 
+export interface WorkflowMediaUnavailableModel {
+  id: string;
+  name: string;
+  kinds: readonly WorkflowMediaKind[];
+}
+
 export interface WorkflowMediaCatalog {
   models: readonly WorkflowMediaCatalogModel[];
+  unavailable?: readonly WorkflowMediaUnavailableModel[];
 }
 
 const isListOf = <T>(value: unknown, max: number, item: (entry: unknown) => entry is T): value is readonly T[] =>
@@ -1300,8 +1308,22 @@ function isWorkflowMediaOptionValue(value: unknown): value is WorkflowMediaOptio
   return isDynamicRecord(value) && isIdentifier(value.name) && isOptionText(value.value);
 }
 
+export function isWorkflowMediaUnavailableModel(value: unknown): value is WorkflowMediaUnavailableModel {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.id) &&
+    isBoundedString(value.name, WORKFLOW_MEDIA_NAME_MAX) &&
+    isListOf(value.kinds, 2, (entry): entry is WorkflowMediaKind => isOneOf(WORKFLOW_MEDIA_KINDS, entry))
+  );
+}
+
 export function isWorkflowMediaCatalog(value: unknown): value is WorkflowMediaCatalog {
-  return isDynamicRecord(value) && isListOf(value.models, WORKFLOW_MEDIA_CATALOG_MAX, isWorkflowMediaCatalogModel);
+  return (
+    isDynamicRecord(value) &&
+    isListOf(value.models, WORKFLOW_MEDIA_CATALOG_MAX, isWorkflowMediaCatalogModel) &&
+    (value.unavailable === undefined ||
+      isListOf(value.unavailable, WORKFLOW_MEDIA_CATALOG_MAX, isWorkflowMediaUnavailableModel))
+  );
 }
 
 const WORKFLOW_CATALOG_SOURCE_NAMES: Readonly<Record<WorkflowCatalogSource, string>> = {

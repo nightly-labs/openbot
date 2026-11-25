@@ -213,6 +213,18 @@
   z-index: 1;
 }
 
+.agent-dock-seat[data-temporary-start]:not([data-dragging])::before {
+  position: absolute;
+  top: -6px;
+  left: 10px;
+  width: 24px;
+  height: 2px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-dim);
+  content: "";
+  pointer-events: none;
+}
+
 .agent-dock-seat[data-dragging] .agent-dock-seat-button {
   color: var(--openbot-text-primary);
   cursor: grabbing;

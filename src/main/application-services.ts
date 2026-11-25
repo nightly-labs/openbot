@@ -1,4 +1,6 @@
+import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import { readdir, readFile, rm } from "node:fs/promises";
 import { homedir, hostname, tmpdir } from "node:os";
@@ -11,6 +13,7 @@ import {
   type ManagedProviderId,
 } from "@openbot/contracts/agent-providers";
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
   AgentProviderStatus,
@@ -69,6 +72,7 @@ import {
   powerMonitor,
   powerSaveBlocker,
   screen,
+  session,
   shell,
   systemPreferences,
   webContents,
@@ -212,6 +216,7 @@ import {
   claudeUserSetupControl,
   createClaudeUserSetupPreferenceStore,
 } from "./claude-user-setup-preference-store";
+import { ClientBrowserHub } from "./client-browser-hub";
 import { createComputerIdle } from "./computer-idle";
 import { ComputerUseDisplayAwake } from "./computer-use-display-awake";
 import { ComputerUseHighlightController } from "./computer-use-highlight-window";
@@ -277,6 +282,7 @@ import {
 } from "./host-events-service";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import { HostService } from "./host-service";
+import { HostSignalHomeService, SIGNAL_HOME_PREFERENCE_FILE } from "./host-signal-home";
 import { HostTurnLimitsPreferenceStore } from "./host-turn-limits-preference-store";
 import { HostUpdateCoordinator } from "./host-update-coordinator";
 import { HostVoiceModelService } from "./host-voice-model";
@@ -354,7 +360,13 @@ import {
   showMainWindow,
 } from "./main-window";
 import { DATA_SKILL_SLUG, ManagedSkillService, SKILL_CREATOR_SKILL_SLUG } from "./managed-skill-service";
-import { MCP_ACCESS_FILE, type McpAccessControl, McpAccessStore, sameMcpAgents } from "./mcp-access-store";
+import {
+  MCP_ACCESS_FILE,
+  type McpAccessControl,
+  McpAccessStore,
+  mcpAgentsOnlyAdded,
+  sameMcpAgents,
+} from "./mcp-access-store";
 import { McpHostSignIns } from "./mcp-host-sign-ins";
 import { McpOAuthProxySettingsFile } from "./mcp-oauth-proxy-store";
 import {
@@ -601,6 +613,7 @@ const TEARDOWN_ORDER = {
   hostEvents: 85.5,
   signalIngress: 86,
   host: 90,
+  clientBrowser: 98,
   browserEgress: 99,
   teamWebRtcBridge: 100,
   routineFlows: 103,
@@ -721,6 +734,7 @@ export interface ApplicationServices {
   mcpAccess: McpAccessControl;
   serverAudit: ServerAuditStore;
   serverTimezone: ServerTimezonePreferenceStore;
+  hostSignalHome: HostSignalHomeService;
   hostTurnLimits: HostTurnLimitsPreferenceStore;
   serverPersonality: ServerPersonalityPreferenceStore;
   promptCacheTtl: PromptCacheTtlPreferenceStore;
@@ -843,6 +857,13 @@ async function createMessagingServices({
     issueTelegramRoute: (hostId) => centralAuth.issueTelegramRoute(hostId).pipe(toRemoteWorkflowError),
     issueGitHubRoute,
     queueKey: () => loadIngressQueueKey(join(app.getPath("userData"), INGRESS_QUEUE_KEY_FILE), secretCipher),
+    resolveProxy: (url) =>
+      Effect.tryPromise(() => session.defaultSession.resolveProxy(url)).pipe(
+        Effect.tapError(() =>
+          Effect.sync(() => logger.warn("OpenBot could not read the proxy settings. Signal connects directly.")),
+        ),
+        Effect.orElseSucceed(() => "DIRECT"),
+      ),
   });
   teardown.push(TEARDOWN_ORDER.signalIngress, "the Signal ingress socket", () =>
     Effect.runPromise(signalIngress.dispose()),
@@ -1293,6 +1314,8 @@ export async function createApplicationServices({
   );
   const browserEgress = new BrowserEgressHost(teamWebRtcBridge);
   teardown.push(TEARDOWN_ORDER.browserEgress, "the computer proxies of members", () => browserEgress.dispose());
+  const clientBrowser = new ClientBrowserHub();
+  teardown.push(TEARDOWN_ORDER.clientBrowser, "the shared Chrome tabs of members", () => clientBrowser.dispose());
   const hostMemory =
     hostedServer || serverModeEnvironment
       ? new ServerMemory({
@@ -1348,6 +1371,7 @@ export async function createApplicationServices({
   };
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
+    memoryCritical: () => hostMemory?.level() === "critical",
     ...(hostMemory ? { tabLimit: () => hostMemory.browserTabLimit() } : {}),
     browserProfile: (agentId) => {
       const agent = store.get(agentId);
@@ -1462,6 +1486,16 @@ export async function createApplicationServices({
     join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE),
     systemTimezone,
   );
+  const hostSignalHome = new HostSignalHomeService({
+    path: join(app.getPath("userData"), SIGNAL_HOME_PREFERENCE_FILE),
+    fetch: (url, init) => net.fetch(url, { ...init, credentials: "omit", cache: "no-store" }),
+    listHomes: () => {
+      const hostId = teamStore.configured ? teamStore.getIdentity()?.serverId : undefined;
+      return hostId && host.getStatus().apiOnline ? centralAuth.listRemoteSignalHomes(hostId) : Effect.succeed([]);
+    },
+    currentHome: () => host.signalHome(),
+    followHome: () => host.followSignalHome(),
+  });
   const hostTurnLimits = new HostTurnLimitsPreferenceStore(
     join(app.getPath("userData"), HOST_TURN_LIMITS_PREFERENCE_FILE),
     () => hostMemory?.turnLimit() ?? null,
@@ -1518,6 +1552,7 @@ export async function createApplicationServices({
       serverAudit.load(),
       mcpServerOwners.load(),
       serverTimezone.load(),
+      hostSignalHome.load(),
       hostTurnLimits.load(),
       serverPersonality.load(),
       promptCacheTtl.load(),
@@ -1982,6 +2017,7 @@ export async function createApplicationServices({
   const workflowRuns = new WorkflowRunStore({ database: store.database });
   const userData = app.getPath("userData");
   const storageSources = {
+    libraryFiles: () => new Set(Object.keys(libraryFolders.getSnapshot().placement)),
     roots: {
       database: store.database.path,
       downloads: store.downloadsRoot,
@@ -2118,6 +2154,7 @@ export async function createApplicationServices({
     agentCursorDrawn: drawsComputerUseHighlight,
     computerUseOnWayland: agentsShareDisplay && cuaDriverDrivesWayland(process.platform),
     computerUseInputRefused: () => agentsShareDisplay && cuaDriver.waylandInputRefused(),
+    computerUseMissingPermissions: () => cuaDriver.missingPermissions(),
     requestTimeoutMs: 30_000,
     offProviders: providerUse.off(),
     providerAccounts,
@@ -2197,6 +2234,7 @@ export async function createApplicationServices({
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
     browserProfiles: () => agentBrowserProfiles,
+    clientBrowser,
     crm: () => crmHandle,
     crmAgentVisibleToMembers: (agentId) => host.agentVisibleToMembers(agentId),
     personCanAdminister: (personId) => host.personCanAdminister(personId),
@@ -2209,6 +2247,8 @@ export async function createApplicationServices({
         mcpServerOwners.remove(mcpServerId).pipe(Effect.andThen(mcpAccessStore.remove(mcpServerId))),
     },
     reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
+    reviewSkillsFull: (agentId) =>
+      skills.lockedSkillIds(agentId).pipe(Effect.map((ids) => ids.length >= INPUT_LIMITS.agentSkills)),
     routineFlowTools: () => routineFlowRuntime,
     workflowTools: () => workflowRuntime,
     webhookRoutines: () => agentWebhookRoutineWriter(events),
@@ -2274,6 +2314,7 @@ export async function createApplicationServices({
     listAgents: () => service.listAgents(),
     agentDefaults: () => agentDefaults.get(),
     listModels: () => service.listModels(),
+    providerStatuses: () => service.getStatus().providers ?? [],
     listRoutines: (agentId) => service.listRoutines(agentId),
     runRoutine: (input) => service.runRoutineFromAutomation(input),
     sendMessage: (input) => service.sendMessage(input),
@@ -2284,6 +2325,7 @@ export async function createApplicationServices({
     updateAgent: (input) => service.updateAgent(input),
     clearAgentContext: (agentId) => service.clearAgentContext(agentId),
   });
+  await Effect.runPromise(automation.removeStaleFiles());
   service.on("event", (event) => {
     if (event.type === "agents-changed") Effect.runFork(automation.requestSync());
   });
@@ -2327,6 +2369,7 @@ export async function createApplicationServices({
     download: (url, maxBytes) => downloadDiscordAttachment(url, maxBytes),
   });
   const workflowGitHub = workflowGitHubDirectory(() => githubConnector.workflowCatalog(), githubRest);
+  const workflowNotices = new EventEmitter<{ notice: [WorkflowNotice] }>();
   const workflowRuntime = await Effect.runPromise(
     createWorkflows({
       store: workflowStore,
@@ -2390,7 +2433,10 @@ export async function createApplicationServices({
           Effect.map((kept) => (typeof kept === "string" ? kept : kept.id)),
           Effect.ensuring(Effect.sync(() => storageUsage.invalidate())),
         ),
-      notify: forwardWorkflowNotice,
+      notify: (notice) => {
+        workflowNotices.emit("notice", notice);
+        forwardWorkflowNotice(notice);
+      },
       connectionOn: (connectionId) => service.messaging.store.connection(connectionId)?.enabled === true,
       post: (connectionId, placeId, markdown) => service.messaging.deliver(connectionId, placeId, markdown),
       channelPost: (input) => service.channels.postNote(input),
@@ -2654,7 +2700,7 @@ export async function createApplicationServices({
     providerRuntimes.startUpdateChecks();
   }
   providerRuntimes.on("ready", (runtime) => {
-    if (isManagedToolRuntime(runtime)) Effect.runFork(service.refreshAllAgentRuntimes());
+    if (isManagedToolRuntime(runtime)) Effect.runFork(service.refreshAllAgentRuntimes("after-background-work"));
   });
   service.on("event", (event) => {
     if (event.type === "agents-changed") storageUsage.invalidate();
@@ -2672,12 +2718,17 @@ export async function createApplicationServices({
     githubSkillSource((url, init) => fetch(url, init)),
   );
   const marketplaceAgents = new AgentMarketplaceService(marketplaceAuth, service, skills);
-  const agentTemplates = new AgentTemplateService(centralAuth, service, {
-    listTemplateSkills: (agentId) => skills.listTemplateSkills(agentId),
-    installVersion: (input) => skills.installVersion(input),
-    library: () => skills.requireLocalLibrary(),
-    installLocal: (input) => skills.installLocal(input),
-  });
+  const agentTemplates = new AgentTemplateService(
+    centralAuth,
+    service,
+    {
+      listTemplateSkills: (agentId) => skills.listTemplateSkills(agentId),
+      installVersion: (input) => skills.installVersion(input),
+      library: () => skills.requireLocalLibrary(),
+      installLocal: (input) => skills.installLocal(input),
+    },
+    marketplaceAuth,
+  );
   const teamStore = new TeamStore(
     join(app.getPath("userData"), TEAM_STORE_FILE),
     join(app.getPath("userData"), LEGACY_TEAM_STORE_FILE),
@@ -3087,9 +3138,15 @@ export async function createApplicationServices({
       saveRoutineFlowPosition: (input) => routineFlowRuntime.savePosition(input),
       workflows: {
         workflows: () =>
-          workflowRuntime
-            .listWithGraphs()
-            .pipe(Effect.map((list) => list.map(({ summary, graph }) => ({ title: summary.title, graph })))),
+          workflowRuntime.listWithGraphs().pipe(
+            Effect.map((list) =>
+              list.map(({ summary, graph, needsNewerApp }) => ({
+                title: summary.title,
+                graph,
+                ...(needsNewerApp ? { needsNewerApp } : {}),
+              })),
+            ),
+          ),
         createWorkflow: (input) => workflowRuntime.createCopy(input),
       },
       signedInProviders: () =>
@@ -3153,7 +3210,11 @@ export async function createApplicationServices({
           .set(change, existing)
           .pipe(
             Effect.andThen(
-              sameMcpAgents(before, change.access.agents) ? Effect.void : service.refreshAllAgentRuntimes(),
+              sameMcpAgents(before, change.access.agents)
+                ? Effect.void
+                : service.refreshAllAgentRuntimes(
+                    mcpAgentsOnlyAdded(before, change.access.agents) ? "after-background-work" : "now",
+                  ),
             ),
           );
       }),
@@ -3166,6 +3227,7 @@ export async function createApplicationServices({
     store: teamStore,
     agents: service,
     signInWaits: service.signInWaits,
+    workflowNotices,
     agentsReady: () => agentInitialization.awaitRoster(),
     events,
     skills,
@@ -3203,6 +3265,28 @@ export async function createApplicationServices({
       subscribe: (listener) => {
         service.on("liveVoice", listener);
         return () => service.off("liveVoice", listener);
+      },
+    },
+    clientBrowser,
+    voiceTranscription: {
+      transcribe: (audio) => {
+        if (voiceServer.dictates()) return voiceServer.transcribe(audio, voice.getSettings().language);
+        return voice.getModelStatus().pipe(
+          Effect.flatMap((status) => {
+            if (status.phase === "ready" && (isLocalVoiceModelId(status.modelId) || isGroqVoiceModelId(status.modelId)))
+              return voice.transcribe(audio);
+            const preparing =
+              isLocalVoiceModelId(status.modelId) && (status.phase === "missing" || status.phase === "downloading");
+            const refusal = Effect.fail(
+              new VoiceOperationError({
+                cause: new Error(sourceText(preparing ? "error.voice.host.preparing" : "error.voice.host.notSetUp")),
+              }),
+            );
+            return preparing && status.phase === "missing"
+              ? Effect.forkDetach(Effect.ignore(voice.prepareModel())).pipe(Effect.andThen(refusal))
+              : refusal;
+          }),
+        );
       },
     },
     hostedSites,
@@ -3261,6 +3345,7 @@ export async function createApplicationServices({
         changeSettings: (change) => scheduledUpdate().changeSettings(change),
       },
       timezone: serverTimezone,
+      signalHome: hostSignalHome,
       ...(hostedServer || serverModeEnvironment || localServerChild
         ? {
             voiceModel: {
@@ -3364,7 +3449,11 @@ export async function createApplicationServices({
       centralAuth.handOverRemoteHostKey(hostId, handover).pipe(toRemoteWorkflowError),
     onKeyRotated: () => remoteServers.requestDirectoryRefresh(),
     issueRemoteHostTicket: (hostId, home) =>
-      centralAuth.issueRemoteHostTicket(hostId, home).pipe(toRemoteWorkflowError),
+      centralAuth
+        .issueRemoteHostTicket(hostId, home && { ...home, preferredSignalHome: hostSignalHome.preferred() })
+        .pipe(toRemoteWorkflowError),
+    preferredSignalHome: () => hostSignalHome.preferred(),
+    signalHomeAnswers: (home) => hostSignalHome.answers(home),
     ...(serverModeEnvironment && !hostedServer
       ? {
           requestTransferredOwnerSession: (hostId: string) =>
@@ -3451,6 +3540,9 @@ export async function createApplicationServices({
     remoteDesktopStateDirectory: join(app.getPath("userData"), "remote-desktop-runtime"),
     getRemoteDesktopRuntimeCredentials: () => Effect.succeed(remoteDesktopRuntimeCredentials),
     remoteDesktopScreenLocked: () => powerMonitor.getSystemIdleState(1) === "locked",
+    wakeRemoteDesktopScreen: () => {
+      execFile("/usr/bin/caffeinate", ["-u", "-t", "5"], () => undefined).unref();
+    },
     getRemoteDesktopDisplays: () => {
       const primaryId = screen.getPrimaryDisplay().id;
       return screen.getAllDisplays().map((display, index) => ({
@@ -3661,6 +3753,7 @@ export async function createApplicationServices({
           }),
       },
       accountReady: centralAuthInitialization,
+      headlessHost: Boolean(hostedServer || serverModeEnvironment),
       ...(hostedServer || serverModeEnvironment || localServerChild
         ? {}
         : {
@@ -3702,6 +3795,7 @@ export async function createApplicationServices({
           centralAuth.updateRemoteMember(hostId, membershipId, role, reactivate),
         removeMember: (hostId, membershipId) => centralAuth.removeRemoteMember(hostId, membershipId),
         removeOwnedHost: (hostId) => centralAuth.removeOwnedRemoteHost(hostId),
+        setHostHidden: (hostId, hidden) => centralAuth.setRemoteHostHidden(hostId, hidden),
         getPrincipalId: () => centralAuth.getSignedInUser().id,
         controlPlaneUrl: centralAuth.resolveApiUrl("/"),
         downloadHostLogo: (hostId, version) => centralAuth.downloadRemoteHostLogo(hostId, version),
@@ -4062,7 +4156,7 @@ export async function createApplicationServices({
   const describeRestartReadiness = (): RestartReadiness =>
     checkRestartReadiness({
       agentWork: [
-        ...service.hasActiveWork(),
+        ...service.workBeforeRestart(),
         ...(workflowRuntime.working() ? ["routine-run"] : []),
         ...(localServers && localServers.workingAgents().length > 0 ? ["agent-turn"] : []),
       ],
@@ -4329,6 +4423,7 @@ export async function createApplicationServices({
     mcpAccess,
     serverAudit,
     serverTimezone,
+    hostSignalHome,
     hostTurnLimits,
     serverPersonality,
     promptCacheTtl,

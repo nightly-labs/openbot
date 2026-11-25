@@ -103,6 +103,7 @@ function WorkflowStepLine({
         <WorkflowKindTile
           kind={node.kind}
           trigger={node.kind === "trigger" ? triggerType(node) : undefined}
+          fields={node.fields}
           size={26}
         />
         <View className="min-w-0 flex-1">

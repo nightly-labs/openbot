@@ -32,6 +32,8 @@ function serverText(error: unknown): string | null {
   return typeof text === "string" ? text : null;
 }
 
+const AGY_NO_BROWSER = "No browser is available here";
+
 const NETWORK_FAILURE_TEXT =
   /\blookup [\w-]+(?:\.[\w-]+)+\.? on \S+: |\bdial (?:tcp|udp)[46]?\b|\bconnect: (?:connection refused|connection timed out|network is unreachable|no route to host)\b|\bi\/o timeout\b|\bno such host\b|\bserver misbehaving\b|\berror sending request for url\b|\bdns error\b|\btcp connect error\b|\bgetaddrinfo\b|\bfetch failed\b|\b(?:ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH)\b/iu;
 
@@ -143,7 +145,12 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
       };
       const poll = opener ? setInterval(readSignInPage, OPENER_POLL_MS) : undefined;
       poll?.unref?.();
-      const timer = setTimeout(() => signInFailed(sourceText("error.provider.acpSignInTimedOut")), options.timeoutMs);
+      let started = false;
+      const timer = setTimeout(
+        () =>
+          signInFailed(sourceText(started ? "error.provider.acpSignInTimedOut" : "error.provider.acpSignInNoStart")),
+        options.timeoutMs,
+      );
       timer.unref?.();
       const send = (message: AcpMessage) => child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
       const authenticate = () =>
@@ -176,6 +183,8 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
             return fail(
               new ProviderSignInError({ message: sourceText("error.provider.acpSignOutFailedReason", { reason }) }),
             );
+          if (!options.logoutOnly && text?.includes(AGY_NO_BROWSER))
+            return signInFailed(sourceText("error.provider.geminiNoBrowserUseCode"));
           if (!options.logoutOnly && text && NETWORK_FAILURE_TEXT.test(text)) {
             logger.warn("An ACP sign-in could not reach the provider's service.", { reason });
             return signInFailed(sourceText("error.provider.acpSignInNetwork"));
@@ -186,6 +195,7 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
               : sourceText("error.provider.acpSignInFailed"),
           );
         } else if (message.id === 1) {
+          started = true;
           const result = isDynamicRecord(message.result) ? message.result : undefined;
           const methods = result?.authMethods;
           if (

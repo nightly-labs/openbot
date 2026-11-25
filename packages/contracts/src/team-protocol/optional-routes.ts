@@ -56,6 +56,7 @@ import { CHAT_COLORS_CODECS } from "./chat-colors-v1";
 import { CHAT_HISTORY_CODECS } from "./chat-history-v1";
 import { CLAUDE_COMPACT_WINDOW_CODECS } from "./claude-compact-window-v1";
 import { CLAUDE_USER_SETUP_CODECS } from "./claude-user-setup-v1";
+import { CLIENT_BROWSER_CODECS } from "./client-browser-v1";
 import { COMPUTER_ACTIVITY_CODECS } from "./computer-activity-v1";
 import { CONNECTORS_CODECS } from "./connectors-v1";
 import { CONTEXT_COMPACT_CODECS } from "./context-compact-v1";
@@ -80,6 +81,7 @@ import { HOST_MEMBER_UPDATE_CODECS } from "./host-member-update-v1";
 import { HOST_PERSONALITY_CODECS } from "./host-personality-v1";
 import { HOST_RELEASE_CODECS } from "./host-release-v1";
 import { HOST_RESTART_CODECS } from "./host-restart-v1";
+import { HOST_SIGNAL_HOME_CODECS } from "./host-signal-home-v1";
 import { HOST_TIMEZONE_CODECS } from "./host-timezone-v1";
 import { HOST_TURN_LIMITS_CODECS } from "./host-turn-limits-v1";
 import { HOST_UPDATE_CODECS } from "./host-update-v1";
@@ -101,6 +103,7 @@ import { MEMORY_REVIEW_CODECS } from "./memory-review-v1";
 import { MESSAGE_DELETE_CODECS } from "./message-delete-v1";
 import { MESSAGE_PINS_CODECS } from "./message-pins-v1";
 import { MODEL_STEERING_CODECS } from "./model-steering-v1";
+import { MODEL_VISIBILITY_KEPT_CODECS } from "./model-visibility-kept-v1";
 import { MODEL_VISIBILITY_CODECS } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CODECS } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CODECS } from "./password-managers-v1";
@@ -161,13 +164,16 @@ import { VAULT_CODECS } from "./vault-v1";
 import { VAULT_V2_CODECS } from "./vault-v2";
 import { VAULT_V3_CODECS } from "./vault-v3";
 import { VAULT_V4_CODECS } from "./vault-v4";
+import { VOICE_TRANSCRIPTION_CODECS } from "./voice-transcription-v1";
 import { WEBHOOK_AGENT_SECRET_CODECS } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CODECS } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CODECS } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CODECS } from "./whatsapp-connector-v1";
+import { WHATSAPP_READ_ONLY_CODECS } from "./whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_CODECS } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CODECS } from "./whatsapp-working-message-v1";
 import { WORKFLOW_FOLDERS_CODECS } from "./workflow-folders-v1";
+import { WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CODECS } from "./workflows-credit-media-unavailable-v1";
 import { WORKFLOWS_CREDIT_MEDIA_CODECS } from "./workflows-credit-media-v1";
 import { WORKFLOWS_GITHUB_CODECS } from "./workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_CODECS } from "./workflows-higgsfield-v1";
@@ -208,6 +214,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...HOST_UPDATE_CODECS,
   ...HOST_TIMEZONE_CODECS,
   ...HOST_VOICE_MODEL_CODECS,
+  ...HOST_SIGNAL_HOME_CODECS,
   ...HOST_TURN_LIMITS_CODECS,
   ...HOST_PERSONALITY_CODECS,
   ...HOST_KEY_ROTATION_CODECS,
@@ -220,6 +227,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...MODEL_STEERING_CODECS,
   ...PROVIDER_MODEL_SOURCE_CODECS,
   ...MODEL_VISIBILITY_CODECS,
+  ...MODEL_VISIBILITY_KEPT_CODECS,
   ...SERVER_AUDIT_CODECS,
   ...PROVIDER_DEFAULT_CODECS,
   ...DISCORD_ACCESS_CODECS,
@@ -317,6 +325,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WHATSAPP_CONNECTOR_CODECS,
   ...WHATSAPP_WORKING_MESSAGE_CODECS,
   ...WHATSAPP_STATUS_REACTIONS_CODECS,
+  ...WHATSAPP_READ_ONLY_CODECS,
   ...MESSAGE_DELETE_CODECS,
   ...CHAT_HISTORY_CODECS,
   ...CONVERSATION_UNREAD_FROM_CODECS,
@@ -342,6 +351,8 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...SIDE_QUESTION_CODECS,
   ...LIVE_VOICE_CODECS,
   ...LIVE_VOICE_ACCOUNT_CODECS,
+  ...VOICE_TRANSCRIPTION_CODECS,
+  ...CLIENT_BROWSER_CODECS,
   ...BROWSER_PROFILES_CODECS,
   ...WORKFLOWS_CODECS,
   ...CRM_CODECS,
@@ -353,6 +364,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WORKFLOWS_MEDIA_CATALOG_CODECS,
   ...WORKFLOWS_MEDIA_CATALOG_V2_CODECS,
   ...WORKFLOWS_CREDIT_MEDIA_CODECS,
+  ...WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CODECS,
   ...WORKFLOWS_STEP_SETTINGS_CODECS,
   ...WORKFLOWS_PAUSE_CODECS,
   ...WORKFLOWS_PORTABLE_CODECS,

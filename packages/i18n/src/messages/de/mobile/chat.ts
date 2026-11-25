@@ -98,6 +98,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Nächster Teil",
   "mobile.chat.preview.pdfFailed": "Dieses PDF konnte nicht angezeigt werden.",
   "mobile.chat.preview.spreadsheetFailed": "Diese Tabelle konnte nicht gelesen werden.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Diese Tabelle ist zu groß für die Vorschau. Teile sie, um sie in einer anderen App zu öffnen.",
   "mobile.chat.preview.spreadsheetTruncated": "Vorschau auf die ersten {rows} Zeilen und {columns} Spalten begrenzt.",
   "mobile.chat.copyFailedMessage": "Versuche es erneut.",
   "mobile.chat.message.copyFailed": "Nachricht konnte nicht kopiert werden",
@@ -145,6 +147,8 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "Schließen",
   "mobile.chat.attachment.sharingUnavailable": "Dateifreigabe ist auf diesem Gerät nicht verfügbar.",
   "mobile.chat.attachment.unavailable": "Der Anhang ist nicht verfügbar. Versuche es erneut.",
+  "mobile.chat.attachment.downloadStopped":
+    "Der Download wurde unterbrochen. Er startet erneut, wenn der Server verbunden ist.",
   "mobile.chat.attachment.openFailed": "Anhang konnte nicht geöffnet werden",
   "mobile.chat.attachment.photosNeedUpdate": "Zum Speichern von Fotos wird die neueste Version der App benötigt.",
   "mobile.chat.attachment.photosPermission":
@@ -157,6 +161,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesFailed": "Dateien konnten nicht geteilt werden",
   "mobile.chat.attachment.shareFilesNeedsUpdate": "Zum Teilen vieler Dateien ist die neueste App-Version nötig.",
   "mobile.chat.attachment.preview": "Vorschau von {name}",
+  "mobile.chat.attachment.seeAll": "Tippe, um alles zu sehen",
   "mobile.chat.attachment.displayFailed": "Dieses Bild konnte nicht angezeigt werden.",
   "mobile.chat.attachment.loadingImage": "Bild wird geladen",
   "mobile.chat.attachment.uploading": "{name} wird hochgeladen",
@@ -187,6 +192,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "Der Anhang ist beschädigt. Wähle ihn erneut aus.",
   "mobile.chat.attachment.tooLarge": "{name} ist größer als {limit}.",
   "mobile.chat.attachment.cameraPermission": "Erlaube den Kamerazugriff in den Einstellungen, um ein Foto aufzunehmen.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "Das Foto wurde nicht geladen. Öffne es in der Fotos-App, bis es ganz angezeigt wird, und versuche es dann erneut.",
   "mobile.chat.composer.send": "Nachricht senden",
   "mobile.chat.composer.stop": "{name} stoppen",
   "mobile.chat.composer.dictate": "Nachricht diktieren",
@@ -223,7 +230,8 @@ export const messages = {
     "Der Server ist nicht verbunden. Das Gespräch geht weiter, sobald er wieder verbunden ist.",
   "mobile.chat.liveVoice.speakFailed": "Die Antwort konnte nicht vorgelesen werden.",
   "mobile.chat.liveVoice.voiceNotReady": "Wähle eine Antwortstimme unter Einstellungen > Stimme.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 kann diese Sprache nicht lesen.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 kann diese Sprache nicht lesen. Wähle eine andere Antwortstimme unter Einstellungen > Stimme.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs hat den API-Schlüssel nicht akzeptiert.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "Dem ElevenLabs-Schlüssel fehlt eine Berechtigung. Prüfe sie unter Einstellungen > Stimme.",
@@ -235,6 +243,8 @@ export const messages = {
   "mobile.chat.liveVoice.gptFailed":
     "GPT Live Voice konnte nicht starten. Hebe die Stummschaltung auf, um es erneut zu versuchen.",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice wurde beendet. Hebe die Stummschaltung auf, um es neu zu starten.",
+  "mobile.chat.liveVoice.gptFailedTitle": "GPT Live Voice konnte nicht starten",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice wurde beendet",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "Erlaube OpenBot in den Einstellungen, das Mikrofon zu verwenden. Hebe dann die Stummschaltung auf.",
   "mobile.chat.composer.addAttachment": "Anhang hinzufügen",
@@ -243,6 +253,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "Das Foto konnte nicht aufgenommen werden. Versuche es erneut.",
   "mobile.chat.camera.startFailed": "Die Kamera konnte nicht gestartet werden. Schließe sie und versuche es erneut.",
   "mobile.chat.camera.close": "Kamera schließen",
+  "mobile.chat.camera.fullScreenTipTitle": "Größere Ansicht?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "Verwende die Vollbildkamera mit Zoom und allen Objektiven. Du kannst das unter Einstellungen > Unterhaltungen ändern.",
+  "mobile.chat.camera.fullScreenTipUse": "Vollbild verwenden",
+  "mobile.chat.camera.fullScreenTipDismiss": "Tipp ausblenden",
   "mobile.chat.camera.takePhoto": "Foto aufnehmen",
   "mobile.chat.camera.switch": "Kamera wechseln",
   "mobile.chat.header.info": "Infos zu {name}",
@@ -313,6 +328,8 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "Wiedergabegeschwindigkeit: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Nachricht konnte nicht vorgelesen werden",
+  "mobile.chat.message.readAloudModelMissing":
+    "Lade das Sprachmodell unter Einstellungen > Stimme herunter, um Nachrichten zu hören.",
   "mobile.chat.message.selectText": "Text auswählen",
   "mobile.chat.message.copyImage": "Bild kopieren",
   "mobile.chat.message.copyText": "Text kopieren",
@@ -517,6 +534,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Verbindung zum Server wird hergestellt",
   "mobile.chat.history.loading": "Chatverlauf wird geladen",
   "mobile.chat.history.waiting": "Warten auf Verbindung",
+  "mobile.chat.history.syncing": "Suche nach neuen Nachrichten",
   "mobile.chat.history.loadFailed": "Chatverlauf konnte nicht geladen werden",
   "mobile.chat.scrollToLatest": "Zur neuesten Nachricht scrollen",
   "mobile.chat.agentUnavailable.title": "Agent nicht verfügbar",
@@ -560,6 +578,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Keine Nachrichten in der Warteschlange",
   "mobile.chat.queue.emptyBody": "Neue Nachrichten kommen in die Warteschlange, während der Agent arbeitet.",
   "mobile.chat.queue.noLongerQueued": "Diese Nachricht ist nicht mehr in der Warteschlange.",
+  "mobile.chat.queue.routine": "Routine: {name}",
   "mobile.chat.queue.position": "Position {position} · {date}",
   "mobile.chat.queue.attachments": "Anhänge",
   "mobile.chat.queue.steer": "Steuern",
@@ -674,4 +693,20 @@ export const messages = {
   "mobile.chat.context.noAuto": "Dieser Agent komprimiert seinen Kontext nicht.",
   "mobile.chat.context.lastCompaction": "Letzte Komprimierung: {before} → {after} Tokens",
   "mobile.chat.context.unavailable": "Dieser Chat meldet seinen Kontext gerade nicht.",
+  "mobile.chat.locationRequest.share": "Einmal teilen",
+  "mobile.chat.locationRequest.decline": "Nicht teilen",
+  "mobile.chat.locationRequest.alwaysAllow": "Immer erlauben",
+  "mobile.chat.locationRequest.alwaysAllowed":
+    "Dieser Agent bekommt deinen Standort ohne Nachfrage, während du die App nutzt.",
+  "mobile.chat.locationRequest.askEveryTime": "Jedes Mal fragen",
+  "mobile.chat.locationRequest.locating": "Standort wird ermittelt …",
+  "mobile.chat.locationRequest.private": "Der aktuelle Standort deines Telefons geht einmal an diesen Agenten.",
+  "mobile.chat.locationRequest.shared": "Standort geteilt",
+  "mobile.chat.locationRequest.declined": "Nicht geteilt",
+  "mobile.chat.locationRequest.unavailable":
+    "Dein Telefon konnte deinen Standort nicht finden. Versuche es noch einmal.",
+  "mobile.chat.locationRequest.deniedTitle": "Standortzugriff ist aus",
+  "mobile.chat.locationRequest.denied":
+    "Erlaube OpenBot in den Einstellungen den Standortzugriff, um deinen Standort zu teilen.",
+  "mobile.chat.locationRequest.openSettings": "Einstellungen öffnen",
 } as const satisfies PartialTranslation<typeof source>;

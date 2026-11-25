@@ -48,6 +48,7 @@ export const messages = {
     other: "Puoi aggiungere al massimo {count} cartelle",
   },
   "agentSettings.folders.browse.places": "Vai a",
+  "agentSettings.folders.browse.path": "Percorso della cartella",
   "agentSettings.folders.browse.home": "Cartella Inizio",
   "agentSettings.folders.browse.parent": "Su a {folder}",
   "agentSettings.folders.browse.failed": "Impossibile aprire questa cartella.",
@@ -94,6 +95,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Limite di utilizzo raggiunto · saltato",
   "agentSettings.backupModels.unavailable": "Non disponibile ora · saltato",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Se un limite di utilizzo ferma {name} dopo l'inizio del lavoro, {name} continua lo stesso lavoro con il primo modello disponibile nell'ordine. Torna a {model} quando il limite termina, o 10 minuti dopo un errore del provider.",
   "agentSettings.groups.brain": "Cervello",
@@ -184,6 +186,7 @@ export const messages = {
     "L'agente riparte da zero e può ancora consultare questa chat quando serve. I messaggi restano visibili sopra un divisore. Istruzioni, modello, tool, memorie, workspace e browser non cambiano.",
   "agentSettings.newChat.confirm": "Inizia una nuova chat",
   "agentSettings.newChat.failed": "Impossibile iniziare una nuova chat.",
+  "agentSettings.newChat.busy": "L'agente sta lavorando. Per iniziare una nuova chat, attendi che finisca o fermalo.",
   "agentSettings.deleteHistory.title": "Elimina cronologia",
   "agentSettings.deleteHistory.description":
     "I messaggi di questa chat vengono eliminati e l'agente li dimentica. La sua configurazione resta.",

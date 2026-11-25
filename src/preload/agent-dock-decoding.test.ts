@@ -397,6 +397,12 @@ describe("agent dock decoding", () => {
     expect(() => decodeAgentDockAction({ type: "open-window", serverId: "local", agentId: "" })).toThrow(
       "Invalid agent dock action.",
     );
+    const openTakeover = { type: "open-browser-takeover", serverId: "local", agentId: "agent-1", tabId: "tab-1" };
+    expect(decodeAgentDockAction(openTakeover)).toEqual(openTakeover);
+    for (const tabId of [undefined, "", "t".repeat(INPUT_LIMITS.identifier + 1)]) {
+      expect(() => decodeAgentDockAction({ ...openTakeover, tabId })).toThrow("Invalid agent dock action.");
+    }
+    expect(() => decodeAgentDockAction({ ...openTakeover, agentId: "" })).toThrow("Invalid agent dock action.");
     expect(() => decodeAgentDockAction({ type: "open-link", url: "" })).toThrow("Invalid agent dock action.");
     expect(() => decodeAgentDockAction({ type: "add", serverId: "", seat: { kind: "agent", id: "agent-1" } })).toThrow(
       "Invalid agent dock action.",

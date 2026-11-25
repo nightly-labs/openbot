@@ -117,8 +117,10 @@ export interface DeliveryPromptSources {
   tags?: TagReferenceSource | undefined;
   answeredRoutine?: AnsweredRoutine | null;
   liveVoice?: LiveVoiceRelayed | null;
+  fromChrome?: boolean;
   steerFramedAsUser?: boolean;
   steersQuietTurn?: boolean;
+  followsUpOwnAnswer?: boolean;
   externalChat?: boolean;
   taskReport?: TaskReportState | null;
   taskReportWaiting?: readonly string[];
@@ -301,6 +303,7 @@ function currentTeammatePrompts(prompt: string): TeammatePrompt[] | null {
 
 function userFramedTeammateText(
   delivery: QueueDelivery,
+  answersRequest: boolean,
   senderAgentId: string,
   agentNames: ReadonlyMap<string, string>,
   displayText: string,
@@ -308,7 +311,7 @@ function userFramedTeammateText(
 ): string {
   const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
   const teammate = `Your teammate ${senderName} (${senderAgentId})`;
-  if (delivery.replyToMessageId)
+  if (answersRequest)
     return [
       `${teammate} answered your message through OpenBot:`,
       displayText,
@@ -393,10 +396,14 @@ function taskReportFraming(taskId: string, report: TaskReportState | null, waiti
 
 export const TASK_REPORT_CUT_MARK = "[…]";
 
+const FROM_CHROME_NOTE =
+  'The person sent this message from their own Chrome, through the OpenBot extension. For web work in this turn, use that Chrome, not the OpenBot browser: openbot_browser list_tabs lists its open tabs (ids start with "chrome:", the first is the tab that the person looks at), and open with browser "chrome" opens a page there.';
+
 export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryPromptSources): DeliveryInputItem[] {
   const { delivery, managedAttachments } = context;
   const { agentNames, snapshot } = sources;
   const fromTeammate = delivery.sender.kind === "agent" && delivery.sender.agentId !== delivery.recipientAgentId;
+  const answersRequest = Boolean(delivery.replyToMessageId) && sources.followsUpOwnAnswer !== true;
   const displayText = displayMessageReferences(delivery.text, delivery.attachments, agentNames, {
     fileHeadings: true,
     tags: fromTeammate ? undefined : sources.tags,
@@ -443,10 +450,11 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   } else if (
     delivery.sender.kind === "agent" &&
     sources.steerFramedAsUser &&
-    !(delivery.replyToMessageId && sources.answeredRoutine)
+    !(answersRequest && sources.answeredRoutine)
   ) {
     text = userFramedTeammateText(
       delivery,
+      answersRequest,
       delivery.sender.agentId,
       agentNames,
       displayText,
@@ -455,8 +463,8 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   } else if (delivery.sender.kind === "agent") {
     const senderAgentId = delivery.sender.agentId;
     const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
-    const routine = delivery.replyToMessageId ? sources.answeredRoutine : null;
-    const replyProtocol = delivery.replyToMessageId
+    const routine = answersRequest ? sources.answeredRoutine : null;
+    const replyProtocol = answersRequest
       ? [
           routine
             ? `This replies to a message you sent in a run of your routine "${routine.routineName}". That run has ended, so its task is below. Continue that task from this result now: do its next steps, such as a request to the next teammate, before you end this turn. Then give the result to the user naturally, starting with the teammate's name.`
@@ -501,10 +509,10 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   const wokenWaits = sources.wokenWaits ?? [];
   if (delivery.sender.kind === "routine" && sources.continuesWait) {
     text = [
-      "An event of an existing OpenBot routine continues a wait that you opened in this thread.",
+      "An event of an existing OpenBot routine continues a wait that you opened in this chat.",
       `Routine name: ${delivery.sender.routineName}`,
       "The routine run does the routine task in its own chat. Do not do the routine task here, and do not create, update, delete, or test routines.",
-      "Continue the work of this thread with the event, then give your answer as usual.",
+      "Continue the work of this chat with the event, then give your answer as usual.",
       ROUTINE_TASK_START,
       displayText,
       ROUTINE_TASK_END,
@@ -599,6 +607,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     ].join("\n\n");
     text = `${continuation}${CURRENT_MESSAGE_SEPARATOR}${text}`;
   }
+  if (delivery.sender.kind === "user" && sources.fromChrome) text = `${FROM_CHROME_NOTE}\n\n${text}`;
   return [
     { type: "text", text },
     ...managedAttachments.map(

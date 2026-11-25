@@ -104,7 +104,7 @@ function ConversationImageViewer({
 }) {
   const [index, setIndex] = useState(initialIndex);
   const page = pages[index] ?? pages[initialIndex];
-  const file = useAttachmentFile(serverId, page?.attachment ?? PLACEHOLDER, Boolean(page));
+  const file = useAttachmentFile(serverId, page?.attachment ?? PLACEHOLDER, Boolean(page), true);
   return (
     <ImageViewer
       serverId={serverId}

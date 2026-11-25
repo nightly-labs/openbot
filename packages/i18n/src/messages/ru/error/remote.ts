@@ -98,6 +98,8 @@ export const messages = {
   "error.remote.connectionServiceUnreachable":
     "Этот компьютер не может подключиться к сервису соединений OpenBot. Проверьте его подключение к интернету. OpenBot подключится снова автоматически.",
   "error.remote.serverAnswerTimeout": "Сервер не ответил вовремя. OpenBot подключится снова автоматически.",
+  "error.remote.signInConnectionClosed":
+    "Соединение с сервером закрылось при входе. Если это повторяется, проверьте дату и время на сервере и на этом устройстве.",
   "error.remote.connectionCancelled": "Удалённое подключение отменено.",
   "error.remote.hostDisconnected":
     "Соединение с сервером прервано. Проверьте, выполнено ли действие, и повторите попытку.",

@@ -67,7 +67,13 @@ import {
   stripeRequest,
 } from "./billing-errors";
 import type { BillingOss } from "./billing-oss";
-import { type BillingPurchase, purchaseEvent, reportPurchase, subscriptionEnd } from "./billing-purchase";
+import {
+  type BillingPurchase,
+  type CreditPurchase,
+  purchaseEvent,
+  reportPurchase,
+  subscriptionEnd,
+} from "./billing-purchase";
 import { BillingReferral } from "./billing-referral";
 import {
   type BillingSales,
@@ -176,6 +182,7 @@ export interface BillingServiceOptions {
   onFirstPlanStarted?: (start: FirstPlanStart) => void;
   onLicenseEmail?: LicenseServiceOptions["onLicenseEmail"];
   onPurchase?: (purchase: BillingPurchase) => void;
+  onCreditPurchase?: (purchase: CreditPurchase) => void;
   vies?: ViesClient;
   onVatMismatch?: (text: string) => void;
   oss?: BillingOss;
@@ -315,6 +322,7 @@ export class BillingService {
       now,
       ensureCustomer: (user) => this.ensureCustomer(user),
       analytics: this.#analytics,
+      ...(options.onCreditPurchase ? { onPurchase: options.onCreditPurchase } : {}),
     });
     this.license = new LicenseService({
       database,

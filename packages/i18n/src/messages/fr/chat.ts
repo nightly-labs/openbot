@@ -68,6 +68,7 @@ export const messages = {
   "chat.trace.duration": "Durée",
   "chat.trace.cost": "Coût",
   "chat.trace.tokens": "Jetons",
+  "chat.trace.cachedInput": "Entrée en cache",
   "chat.trace.llmCalls": "Appels LLM",
   "chat.trace.toolCalls": "Appels d’outils",
   "chat.trace.errors": "Erreurs",
@@ -479,6 +480,8 @@ export const messages = {
   "chat.suggestion.updating": "Mise à jour…",
   "chat.suggestion.saveReply": "Oui, enregistre-le comme compétence.",
   "chat.suggestion.updateReply": "Oui, ajoute-le à la compétence.",
+  "chat.suggestion.saveFailed":
+    "La compétence n’a pas pu être enregistrée. Réessayez quand l’agent a fini son travail.",
   "chat.suggestion.detailsNamed": "Ouvrir {name} dans la Marketplace",
   "chat.suggestion.dismissed": "Suggestion {name} ignorée.",
   "chat.suggestion.undo": "Annuler",

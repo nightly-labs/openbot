@@ -18,6 +18,7 @@ import {
   type WorkflowMediaCatalogModel,
   type WorkflowMediaOptionValue,
   type WorkflowMediaPriceRequest,
+  type WorkflowMediaUnavailableModel,
   type WorkflowNode,
   workflowFileAssetBytes,
   workflowVideoLengthChoices,
@@ -47,6 +48,11 @@ import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protoc
 import { WORKFLOWS_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-answers-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
+import {
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CODECS,
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-credit-media-unavailable-v1";
 import {
   WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
   WORKFLOWS_CREDIT_MEDIA_CODECS,
@@ -110,6 +116,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import {
   decodeRemoteWorkflowDetail,
+  decodeRemoteWorkflowMediaUnavailable,
   decodeRemoteWorkflowRunDetail,
   decodeRemoteWorkflowVersions,
 } from "@openbot/team-client/workflow-decoding";
@@ -210,6 +217,12 @@ const CREDIT_MODEL: WorkflowMediaCatalogModel = {
   inputs: ["frames"],
 };
 let creditModels: readonly WorkflowMediaCatalogModel[] = [];
+const CREDIT_UNAVAILABLE: WorkflowMediaUnavailableModel = {
+  id: "openbot-kling_e2e",
+  name: "Kling e2e · Omni",
+  kinds: ["video"],
+};
+let creditUnavailable: readonly WorkflowMediaUnavailableModel[] = [];
 let creditBalance: { available: number; quota: number | null } | null = null;
 const sizeRequests: { attachmentId: string; width: number; height: number }[] = [];
 let sizeFails = false;
@@ -467,7 +480,7 @@ async function startHost(): Promise<Host> {
   await runCauseEffect(libraryFolderStore.initialize());
   const libraryFolders = new LibraryFoldersService({
     store: libraryFolderStore,
-    storage: { usage: scan, invalidate: () => undefined },
+    storage: { hostFiles: scan, invalidate: () => undefined },
     agents: () => agents.listAgents(),
   });
   const workflows = await Effect.runPromise(
@@ -527,6 +540,7 @@ async function startHost(): Promise<Host> {
             only === "openbot"
               ? creditModels
               : [...(higgsfieldSignedIn ? liveModels : []), ...(only === undefined ? creditModels : [])],
+          ...(only === undefined || only === "openbot" ? { unavailable: creditUnavailable } : {}),
         }),
       mediaPrice: (request) =>
         Effect.sync(() => {
@@ -734,6 +748,7 @@ type RefusalKey =
   | "error.workflow.missing"
   | "error.workflow.unknownValue"
   | "error.workflow.versionMissing"
+  | "error.workflow.newerSteps"
   | "error.workflow.tooLargeToSend"
   | "error.team.agentViewOnly"
   | "error.team.agentManageDenied"
@@ -1046,6 +1061,144 @@ try {
     );
     assert.equal((await runCauseEffect(current().workflows.get(ids.open))).revision, revision);
     return { status, revision };
+  });
+
+  await step("placeholders: a save that turns a step into a locked note is refused", async () => {
+    const before = Number((await ok(WORKFLOWS_ROUTES.get, ownerToken, { workflowId: ids.open })).revision);
+    const graph = agentGraph(open);
+    const placeholder: WorkflowGraph = {
+      ...graph,
+      nodes: graph.nodes.map((node) =>
+        node.id === "prompt" ? { ...node, kind: "note", locked: true, fields: { text: "Start." } } : node,
+      ),
+      edges: [],
+    };
+    const status = await refused(
+      WORKFLOWS_ROUTES.saveGraph,
+      ownerToken,
+      { workflowId: ids.open, baseRevision: before, graph: placeholder },
+      400,
+      "error.workflow.newerSteps",
+    );
+    const stored = await runCauseEffect(current().workflows.get(ids.open));
+    assert.equal(stored.revision, before, "A refused placeholder save changed the revision.");
+    assert.equal(stored.graph.nodes.find((node) => node.id === "prompt")?.kind, "prompt");
+    const lockedNote: WorkflowNode = { id: "pinned", kind: "note", at: at(1200), locked: true, fields: { text: "Hi" } };
+    const pinned = await ok(WORKFLOWS_ROUTES.saveGraph, ownerToken, {
+      workflowId: ids.open,
+      baseRevision: before,
+      graph: { ...graph, nodes: [...graph.nodes, lockedNote] },
+    });
+    assert.equal(pinned.ok, true, "A new locked note was refused.");
+    const kept = await ok(WORKFLOWS_ROUTES.saveGraph, ownerToken, {
+      workflowId: ids.open,
+      baseRevision: Number(pinned.revision),
+      graph: { ...graph, nodes: [...graph.nodes, { ...lockedNote, at: at(1300) }] },
+    });
+    assert.equal(kept.ok, true, "A saved locked note could not be moved.");
+    const restored = await ok(WORKFLOWS_ROUTES.saveGraph, ownerToken, {
+      workflowId: ids.open,
+      baseRevision: Number(kept.revision),
+      graph,
+    });
+    assert.equal(restored.ok, true);
+    return { placeholder: status, lockedNote: 200 };
+  });
+
+  await step("bad row: a workflow with a step that does not decode stays apart and read-only", async () => {
+    const { workflows, database } = current();
+    const broken = await hostWorkflow("Broken", agentGraph(open));
+    const listed = async (token: string) =>
+      list((await ok(WORKFLOWS_ROUTES.list, token, {})).workflows, "list")
+        .map((row) => text(record(row, "summary").title, "title"))
+        .sort();
+    const ownerBefore = await listed(ownerToken);
+    const mineBefore = await listed(member);
+    assert.ok(ownerBefore.includes("Broken") && mineBefore.includes("Broken"), "The new workflow is not listed.");
+    const db = database.connection;
+    const fieldsOf = () =>
+      db.prepare("SELECT fields_json FROM workflow_nodes WHERE workflow_id = ? AND node_id = 'prompt'").get(broken.id);
+    db.prepare("UPDATE workflow_nodes SET fields_json = ? WHERE workflow_id = ? AND node_id = 'prompt'").run(
+      '{"text":{"rich":true}}',
+      broken.id,
+    );
+    const corrupt = fieldsOf();
+    const owner = await listed(ownerToken);
+    const mine = await listed(member);
+    assert.deepEqual(
+      owner,
+      ownerBefore.filter((title) => title !== "Broken"),
+      "The owner list changed with a bad row.",
+    );
+    assert.deepEqual(
+      mine,
+      mineBefore.filter((title) => title !== "Broken"),
+      "The member list changed with a bad row.",
+    );
+    const remoteGet = await refused(
+      WORKFLOWS_ROUTES.get,
+      ownerToken,
+      { workflowId: broken.id },
+      404,
+      "error.workflow.missing",
+    );
+    const local = await runCauseEffect(workflows.get(broken.id));
+    assert.equal(local.needsNewerApp, true, "The local detail is not marked for a newer app.");
+    const stand = local.graph.nodes.find((node) => node.id === "prompt");
+    assert.equal(stand?.kind, "note");
+    assert.equal(stand?.locked, true);
+    assert.equal(local.graph.edges.length, 0, "An edge to the unreadable step was kept.");
+    const agentStep = local.graph.nodes.find((node) => node.kind === "agent");
+    assert.ok(agentStep, "The readable agent step is missing.");
+    const newer = (error: unknown) =>
+      error instanceof Error && error.message === sourceText("error.workflow.newerSteps");
+    await assert.rejects(
+      runCauseEffect(
+        workflows.saveGraph({ workflowId: broken.id, baseRevision: local.revision, graph: agentGraph(open) }),
+      ),
+      newer,
+    );
+    await assert.rejects(
+      runCauseEffect(workflows.saveGraph({ workflowId: broken.id, baseRevision: local.revision, graph: local.graph })),
+      newer,
+    );
+    await assert.rejects(runCauseEffect(workflows.startRun({ workflowId: broken.id, requestId: requestId() })), newer);
+    await assert.rejects(
+      runCauseEffect(workflows.runStep({ workflowId: broken.id, nodeId: agentStep.id, requestId: requestId() })),
+      newer,
+    );
+    const version = (await runCauseEffect(workflows.versions(broken.id)))[0];
+    assert.ok(version, "The broken workflow has no version.");
+    await assert.rejects(
+      runCauseEffect(workflows.restoreVersion({ workflowId: broken.id, versionId: version.id })),
+      newer,
+    );
+    assert.deepEqual(fieldsOf(), corrupt, "A refused write changed the unreadable row.");
+    assert.equal((await runCauseEffect(workflows.get(broken.id))).revision, local.revision);
+    const page = await runCauseEffect(workflows.runs({ workflowId: ids.closed, limit: 10 }));
+    const earlier = page.runs[0]?.run.id;
+    assert.ok(earlier, "The closed workflow has no run.");
+    const graphOf = db.prepare("SELECT graph_json FROM workflow_runs WHERE run_id = ?");
+    const saved = text(record(graphOf.get(earlier), "run row").graph_json, "graph json");
+    const setGraph = db.prepare("UPDATE workflow_runs SET graph_json = ? WHERE run_id = ?");
+    setGraph.run('{"nodes":"newer"}', earlier);
+    try {
+      const listed = await runCauseEffect(workflows.runs({ workflowId: ids.closed, limit: 10 }));
+      assert.ok(
+        listed.runs.some(({ run }) => run.id === earlier),
+        "A run with an unreadable graph left the run list.",
+      );
+      await Effect.runPromise(workflows.sweep());
+    } finally {
+      setGraph.run(saved, earlier);
+    }
+    await runCauseEffect(workflows.remove(broken.id));
+    assert.equal(
+      (await runCauseEffect(workflows.list())).some((summary) => summary.id === broken.id),
+      false,
+      "The broken workflow could not be deleted.",
+    );
+    return { owner, mine, remoteGet, refused: ["save", "placeholderSave", "run", "step", "restore"] };
   });
 
   await step("place output: only an owner or admin adds one or moves it; a member keeps it", async () => {
@@ -2423,6 +2576,53 @@ try {
         higgsfieldSignedIn = false;
         creditModels = [];
         creditBalance = null;
+      }
+    },
+  );
+
+  await step(
+    "credit media unavailable: the host advertises workflows-credit-media-unavailable-v1 to protocol 10; its route lists a saved credit model with no route by name only, the credit catalog does not list it, and a peer without the capability gets server too old",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        decodeTeamProtocolSupportExpanded((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body)
+          .capabilities;
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY));
+      const route = WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES.list;
+      const codec = WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CODECS.get(route);
+      assert.ok(codec, `No codec for ${route}.`);
+      const raw = async (path: string, capabilities: readonly string[] = TEAM_CURRENT_CAPABILITIES) =>
+        call("POST", path, { token: member, body: {}, protocol: TEAM_PROTOCOL_V10, capabilities });
+      creditModels = [CREDIT_MODEL];
+      creditUnavailable = [CREDIT_UNAVAILABLE];
+      try {
+        codec.request({});
+        const response = await raw(route);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        const listed = codec.response(response.status, response.body);
+        assert.deepEqual(listed, { models: [CREDIT_UNAVAILABLE] });
+        assert.deepEqual(decodeRemoteWorkflowMediaUnavailable(response.body), [CREDIT_UNAVAILABLE]);
+        const catalog = await raw(WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog);
+        assert.equal(catalog.status, 200, JSON.stringify(catalog.body));
+        assert.deepEqual(catalog.body, { models: [CREDIT_MODEL] });
+        creditUnavailable = [];
+        const empty = await raw(route);
+        assert.deepEqual(codec.response(empty.status, empty.body), { models: [] });
+        const old = await raw(
+          route,
+          TEAM_CURRENT_CAPABILITIES.filter(
+            (capability) => capability !== WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY,
+          ),
+        );
+        assert.equal(old.status, 400, JSON.stringify(old.body));
+        assert.ok(
+          JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")),
+          JSON.stringify(old.body),
+        );
+        return { listed, catalog: catalog.body, empty: empty.body, old: old.status };
+      } finally {
+        creditModels = [];
+        creditUnavailable = [];
       }
     },
   );

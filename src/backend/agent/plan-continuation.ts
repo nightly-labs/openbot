@@ -210,6 +210,7 @@ export class PlanContinuation {
     earlierPlan: ConversationPlan | null;
     answer: string | undefined;
     finishCheck?: FinishCheckMode;
+    nextStep?: boolean;
   }): ({ kind: ContinuationKind } & ContinuationCount) | typeof STOPPED | FinishCheckPending | null {
     const key = laneKey(input.agentId, input.taskId);
     const previous = this.#chains.get(key);
@@ -241,7 +242,13 @@ export class PlanContinuation {
       )
         return STOPPED;
       kind = "plan";
-    } else if (mode !== "only" && nextSteps < NEXT_STEP_LIMIT && stoppedBeforeNextStep(input.answer)) kind = "nextStep";
+    } else if (
+      mode !== "only" &&
+      input.nextStep !== false &&
+      nextSteps < NEXT_STEP_LIMIT &&
+      stoppedBeforeNextStep(input.answer)
+    )
+      kind = "nextStep";
     else if (mode !== "no" && checks < FINISH_CHECK_LIMIT) {
       this.#chains.set(key, {
         deliveryIds: new Set(input.deliveryIds),

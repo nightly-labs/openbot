@@ -50,6 +50,7 @@ export const messages = {
     other: "Je kunt maximaal {count} mappen toevoegen",
   },
   "agentSettings.folders.browse.places": "Ga naar",
+  "agentSettings.folders.browse.path": "Mappad",
   "agentSettings.folders.browse.home": "Thuismap",
   "agentSettings.folders.browse.parent": "Omhoog naar {folder}",
   "agentSettings.folders.browse.failed": "Kan deze map niet openen.",
@@ -96,6 +97,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Gebruikslimiet bereikt · overgeslagen",
   "agentSettings.backupModels.unavailable": "Nu niet beschikbaar · overgeslagen",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Als een gebruikslimiet {name} stopt nadat het werk is begonnen, gaat {name} met hetzelfde werk verder op het eerste beschikbare model in de volgorde. Het gaat terug naar {model} als de limiet afloopt, of 10 minuten na een fout van de aanbieder.",
   "agentSettings.groups.brain": "Brein",
@@ -180,6 +182,7 @@ export const messages = {
     "De agent begint opnieuw en kan deze chat nog doorzoeken als dat nodig is. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, het geheugen, de werkruimte en de browser veranderen niet.",
   "agentSettings.newChat.confirm": "Nieuwe chat starten",
   "agentSettings.newChat.failed": "Kan geen nieuwe chat starten.",
+  "agentSettings.newChat.busy": "De agent is bezig. Wacht tot hij klaar is of stop hem om een nieuwe chat te starten.",
   "agentSettings.deleteHistory.title": "Geschiedenis wissen",
   "agentSettings.deleteHistory.description":
     "De berichten van deze chat worden gewist en de agent vergeet ze. De instellingen blijven.",

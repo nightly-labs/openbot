@@ -14,6 +14,7 @@ export const CREDIT_HOLD_START_GRACE_MS = 10 * 60 * 1_000;
 export const CREDIT_HOLD_FIRST_CHECK_MS = 15 * 60 * 1_000;
 const CREDIT_HOLD_MAX_CHECK_GAP_MS = 60 * 60 * 1_000;
 export const CREDIT_HOLD_LIMIT_MS = 24 * 60 * 60 * 1_000;
+const CREDIT_HOLD_SUBMIT_LEASE_MS = 3 * 60 * 1_000;
 const SWEEP_BATCH = 50;
 
 export type CreditWallet = { userId: string } | { serverId: string };
@@ -26,7 +27,11 @@ export type CreditJobCheck =
   | { status: "running" }
   | { status: "completed"; charged?: number }
   | { status: "failed" | "canceled" };
-export type CreditJobChecker = (providerJobId: string, jobId: string) => Effect.Effect<CreditJobCheck, Failure>;
+export type CreditJobChecker = (
+  providerJobId: string,
+  jobId: string,
+  upstream: string | null,
+) => Effect.Effect<CreditJobCheck, Failure>;
 
 export interface CreditHoldInput {
   jobId: string;
@@ -47,6 +52,21 @@ export interface CreditHold {
   outcome: CreditHoldOutcome | null;
   charged: number | null;
   providerJobId: string | null;
+  upstream: string | null;
+}
+
+export interface CreditSubmitTarget {
+  upstream: string;
+  model: string;
+  params: string;
+  fields: string;
+}
+
+interface SubmitTargetRow {
+  upstream: string;
+  upstream_model: string;
+  upstream_params: string;
+  upstream_fields: string | null;
 }
 
 export interface CreditSweepResult {
@@ -90,11 +110,13 @@ interface HoldRow {
   outcome: string | null;
   charged_tenths: number | null;
   provider_job_id: string | null;
+  upstream: string | null;
 }
 
 interface DueRow {
   job_id: string;
   provider_job_id: string;
+  upstream: string | null;
   created_at: number;
   expires_at: number;
 }
@@ -142,6 +164,7 @@ function toHold(row: HoldRow): CreditHold {
     outcome: isOneOf(HOLD_OUTCOMES, row.outcome) ? row.outcome : null,
     charged: row.charged_tenths === null ? null : creditsFromTenths(row.charged_tenths),
     providerJobId: row.provider_job_id,
+    upstream: row.upstream,
   };
 }
 
@@ -256,14 +279,16 @@ export class CreditSpending {
     jobId: string,
     providerJobId: string,
     details: CreditMediaDetails = {},
+    upstream: string | null = null,
   ): Effect.fn.Return<CreditHold | null, Failure> {
     const started = yield* billingCall(() =>
       this.#database
         .prepare(
-          `UPDATE credit_holds SET provider_job_id = ?2 WHERE job_id = ?1 AND provider_job_id IS NULL
+          `UPDATE credit_holds SET provider_job_id = ?2, upstream = ?3, submit_lease_until = NULL
+            WHERE job_id = ?1 AND provider_job_id IS NULL
            ${TRACKED_HOLD_SQL}`,
         )
-        .bind(jobId, providerJobId)
+        .bind(jobId, providerJobId, upstream)
         .all<TrackedHoldRow>(),
     );
     for (const row of started.results) {
@@ -272,16 +297,53 @@ export class CreditSpending {
     return yield* this.find(jobId);
   }).bind(this);
 
-  readonly submitting = Effect.fn("CreditSpending.submitting")(function* (
+  readonly claimSubmit = Effect.fn("CreditSpending.claimSubmit")(function* (
+    this: CreditSpending,
+    jobId: string,
+    target: CreditSubmitTarget | null,
+  ): Effect.fn.Return<CreditSubmitTarget | null, Failure> {
+    const now = this.#now();
+    const claimed = yield* billingCall(() =>
+      this.#database
+        .prepare(
+          `UPDATE credit_holds
+              SET submitted_at = COALESCE(submitted_at, ?2), submit_lease_until = ?3,
+                  upstream = COALESCE(upstream, ?4), upstream_model = COALESCE(upstream_model, ?5),
+                  upstream_params = COALESCE(upstream_params, ?6),
+                  upstream_fields = CASE WHEN upstream IS NULL THEN ?7 ELSE upstream_fields END
+            WHERE job_id = ?1 AND status = 'held' AND provider_job_id IS NULL
+              AND (submit_lease_until IS NULL OR submit_lease_until <= ?2)
+              AND (?4 IS NOT NULL OR upstream IS NOT NULL)
+           RETURNING upstream, upstream_model, upstream_params, upstream_fields`,
+        )
+        .bind(
+          jobId,
+          now,
+          now + CREDIT_HOLD_SUBMIT_LEASE_MS,
+          target?.upstream ?? null,
+          target?.model ?? null,
+          target?.params ?? null,
+          target?.fields ?? null,
+        )
+        .first<SubmitTargetRow>(),
+    );
+    if (!claimed) return null;
+    return {
+      upstream: claimed.upstream,
+      model: claimed.upstream_model,
+      params: claimed.upstream_params,
+      fields: claimed.upstream_fields ?? "{}",
+    };
+  }).bind(this);
+
+  readonly endSubmit = Effect.fn("CreditSpending.endSubmit")(function* (
     this: CreditSpending,
     jobId: string,
   ): Effect.fn.Return<void, Failure> {
     yield* billingCall(() =>
       this.#database
-        .prepare(
-          "UPDATE credit_holds SET submitted_at = COALESCE(submitted_at, ?2) WHERE job_id = ?1 AND status = 'held'",
-        )
-        .bind(jobId, this.#now())
+        .prepare("UPDATE credit_holds SET submit_lease_until = NULL WHERE job_id = ?1 AND status = 'held'")
+        .bind(jobId)
         .run(),
     );
   }).bind(this);
@@ -343,7 +405,7 @@ export class CreditSpending {
       this.#database
         .prepare(
           `SELECT job_id, user_id, server_id, actor_user_id, model_id, credits_tenths, status, outcome, charged_tenths,
-                  provider_job_id
+                  provider_job_id, upstream
              FROM credit_holds WHERE job_id = ?`,
         )
         .bind(jobId)
@@ -375,7 +437,7 @@ export class CreditSpending {
       const due = yield* billingCall(() =>
         this.#database
           .prepare(
-            `SELECT job_id, provider_job_id, created_at, expires_at FROM credit_holds
+            `SELECT job_id, provider_job_id, upstream, created_at, expires_at FROM credit_holds
               WHERE status = 'held' AND provider_job_id IS NOT NULL AND (check_at <= ?1 OR expires_at <= ?1)
               ORDER BY MIN(check_at, expires_at) LIMIT ?2`,
           )
@@ -383,7 +445,7 @@ export class CreditSpending {
           .all<DueRow>(),
       );
       for (const row of due.results) {
-        const check = yield* Effect.exit(checkJob(row.provider_job_id, row.job_id));
+        const check = yield* Effect.exit(checkJob(row.provider_job_id, row.job_id, row.upstream));
         const result = Exit.isSuccess(check) ? checkResult(check.value) : null;
         if (result) {
           yield* this.settle(row.job_id, result);

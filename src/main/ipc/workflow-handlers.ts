@@ -15,6 +15,10 @@ import {
   WORKFLOW_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/workflow-folders-v1";
 import {
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-credit-media-unavailable-v1";
+import {
   WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
   WORKFLOWS_CREDIT_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
@@ -77,6 +81,7 @@ import {
   decodeRemoteWorkflowMediaCredits,
   decodeRemoteWorkflowMediaPrice,
   decodeRemoteWorkflowMediaProviders,
+  decodeRemoteWorkflowMediaUnavailable,
   decodeRemoteWorkflowPicture,
   decodeRemoteWorkflowRunDetail,
   decodeRemoteWorkflowRunPage,
@@ -136,6 +141,7 @@ interface WorkflowRemoteServers {
       | typeof WORKFLOWS_MEDIA_CATALOG_CAPABILITY
       | typeof WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY
       | typeof WORKFLOWS_CREDIT_MEDIA_CAPABILITY
+      | typeof WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY
       | typeof WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY
       | typeof WORKFLOWS_STEP_SETTINGS_CAPABILITY
       | typeof WORKFLOWS_PAUSE_CAPABILITY
@@ -380,13 +386,24 @@ export function workflowIpcHandlers({
       mediaCatalog: scopedQueryHandler({
         local: () => runCauseEffect(workflows.mediaCatalog()),
         remote: async (serverId) => {
-          const [credit, services] = await Promise.all([
+          const [credit, services, unavailable] = await Promise.all([
             creditMedia(serverId)
               ? remote(serverId, WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
               : { models: [] },
             serviceCatalog(serverId),
+            remoteServers.supportsCapability(serverId, WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY)
+              ? remote(
+                  serverId,
+                  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES.list,
+                  decodeRemoteWorkflowMediaUnavailable,
+                  {},
+                ).catch(() => [])
+              : [],
           ]);
-          return { models: [...credit.models, ...services.models].slice(0, WORKFLOW_MEDIA_CATALOG_MAX) };
+          return {
+            models: [...credit.models, ...services.models].slice(0, WORKFLOW_MEDIA_CATALOG_MAX),
+            ...(unavailable.length > 0 ? { unavailable } : {}),
+          };
         },
       }),
       mediaPrice: scopedHandler(parseWorkflowMediaPrice, {

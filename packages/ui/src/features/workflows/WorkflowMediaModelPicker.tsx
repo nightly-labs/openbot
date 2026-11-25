@@ -67,6 +67,7 @@ export function MediaModelPicker(props: {
   kind: WorkflowMediaKind;
   models: readonly WorkflowImageModel[];
   model: WorkflowImageModel | undefined;
+  savedName?: string | undefined;
   account: string;
   title: string;
   disabled?: boolean;
@@ -109,7 +110,7 @@ export function MediaModelPicker(props: {
   };
   const currentEntry = () => entries().find((entry) => entry.key === current());
   const tabLabel = () => entries().find((entry) => entry.key === tab())?.label ?? props.title;
-  const name = () => props.model?.name ?? t("workflow.image.chooseModel");
+  const name = () => props.model?.name ?? props.savedName ?? t("workflow.image.chooseModel");
   const accountName = () => currentEntry()?.account?.name;
   const label = () => (accountName() ? `${name()} · ${accountName()}` : name());
 

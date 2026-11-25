@@ -64,6 +64,7 @@ const models = [
   model("claude", "claude-sonnet-5-5", "high", ["low", "medium", "high"]),
   model("claude", "claude-opus-5-5", "high", ["low", "medium", "high", "max"]),
   model("codex", "gpt-5.5", "medium", ["low", "medium"]),
+  model("opencode", "opencode/big-pickle", "medium", ["low", "medium"]),
 ];
 const deliveries = new Map<string, FakeDelivery>();
 const updates: UpdateAgentInput[] = [];
@@ -91,6 +92,7 @@ const options: ConstructorParameters<typeof AutomationServer>[0] = {
   listAgents: () => agents,
   agentDefaults: () => ({ ...DEFAULT_AGENT_DEFAULTS, automationRunsPerHour }),
   listModels: () => models,
+  providerStatuses: () => [{ id: "opencode", state: "not-installed", message: null }],
   listRoutines: () => [],
   runRoutine: () => Effect.die(new Error("No routine runs in this test.")),
   sendMessage: (input) => {
@@ -304,6 +306,12 @@ try {
     ["agent", "set-model", "Ada", "claude-sonnet-5-5", "--effort", "max"],
     1,
     (run) => run.stderr.includes("max") && updates.length === updateCount,
+  );
+  await check(
+    "a model of a provider that is not installed exits 1 with the reason",
+    ["agent", "set-model", "Ada", "opencode/big-pickle"],
+    1,
+    (run) => run.stderr.includes("OpenCode is not installed.") && updates.length === updateCount,
   );
   await check(
     "an unexpected update failure exits 1 without its detail",

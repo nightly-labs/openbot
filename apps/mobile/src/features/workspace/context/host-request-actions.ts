@@ -41,7 +41,9 @@ import {
   STORAGE_CAPABILITY,
   type TeamRole,
   withFastServiceTiers,
+  withKeptModels,
   withSteeringModels,
+  withWhatsAppReadOnly,
   withWhatsAppStatusReactions,
   withWhatsAppWorkingMessages,
   withWorkspaceOnlyLimit,
@@ -148,7 +150,9 @@ import { HOST_MEMBER_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
+import { HOST_SIGNAL_HOME_CAPABILITY } from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
+import { HOST_TURN_LIMITS_CAPABILITY } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOST_VOICE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
@@ -168,6 +172,10 @@ import { MEMORY_REVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/memor
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
+import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -204,10 +212,13 @@ import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { VAULT_V4_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v4";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_READ_ONLY_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-v1";
+import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
+import { WORKFLOWS_MEDIA_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-v1";
 import { WORKFLOWS_PAUSE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-pause-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
 import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
@@ -218,9 +229,13 @@ import { readPlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteDownloadWatch, RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import {
+  createOnceAgentRoutine,
+  isOnceSchedule,
   listOnceAgentRoutines,
   listOnceChannelRoutines,
   type RoutinesOncePost,
+  requireReleasedScheduleOn,
+  updateAgentRoutineOnce,
 } from "@openbot/team-client/routines-once";
 import {
   addAgentFolder,
@@ -253,8 +268,10 @@ import {
   getHostMemoryReview,
   getHostPersonality,
   getHostReleaseStatus,
+  getHostSignalHome,
   getHostSkillLearning,
   getHostTimezone,
+  getHostTurnLimits,
   getHostUpdateStatus,
   getHostVoiceModel,
   getRoutineResultDestination,
@@ -318,8 +335,10 @@ import {
   setHostMcpAccess,
   setHostMemoryReview,
   setHostPersonality,
+  setHostSignalHome,
   setHostSkillLearning,
   setHostTimezone,
+  setHostTurnLimits,
   setHostUpdateSettings,
   setMcpServerEnabled,
   setOwnServerNotificationLevel,
@@ -342,10 +361,12 @@ import {
   whatsappConnectorGroups,
   whatsappConnectorLinkState,
   whatsappConnectorOverview,
+  whatsappConnectorReadOnly,
   whatsappConnectorReconnect,
   whatsappConnectorRemoveSender,
   whatsappConnectorSetEnabled,
   whatsappConnectorSetOwnNumber,
+  whatsappConnectorSetSenderReadOnly,
   whatsappConnectorSetStatusReactions,
   whatsappConnectorSetWorkingMessage,
   whatsappConnectorStartLink,
@@ -393,6 +414,7 @@ import { createProviderAdmin } from "@/features/servers/model/provider-admin";
 import { saveAgentAvatar, savedAgentAvatar } from "@/features/workspace/model/agent-avatar-cache";
 import { decodeConversationSearchPage } from "@/features/workspace/model/conversation";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
+import { attachmentDownloadKey, type DownloadQueue } from "@/features/workspace/model/request-lanes";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
 import {
   hasCapability,
@@ -440,6 +462,7 @@ type HostRequestActions = Pick<
   | "loadAgentMemorySelection"
   | "setAgentMemoryInclusion"
   | "loadAgentRoutines"
+  | "loadOnceAgentRoutines"
   | "loadRoutineCalendar"
   | "listEventRoutines"
   | "saveEventRoutine"
@@ -525,8 +548,12 @@ type HostRequestActions = Pick<
   | "restartServerItself"
   | "loadServerTimezone"
   | "setServerTimezone"
+  | "loadServerTurnLimits"
+  | "setServerTurnLimits"
   | "loadServerVoiceModel"
   | "changeServerVoiceModel"
+  | "loadServerSignalHome"
+  | "setServerSignalHome"
   | "loadAgentMemoryLimit"
   | "setAgentMemoryLimit"
   | "loadMemoryReview"
@@ -602,6 +629,7 @@ type HostRequestActions = Pick<
   | "setWhatsAppOwnNumber"
   | "setWhatsAppWorkingMessage"
   | "setWhatsAppStatusReactions"
+  | "setWhatsAppSenderReadOnly"
   | "loadServerUpdate"
   | "checkServerUpdate"
   | "startServerUpdate"
@@ -640,6 +668,7 @@ type HostRequestActions = Pick<
   | "setMessageReaction"
   | "deleteMessage"
   | "downloadAttachment"
+  | "prioritizeAttachmentDownload"
   | "downloadMessageFile"
 >;
 
@@ -717,6 +746,15 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
       has(serverId, WORKFLOWS_CAPABILITY) &&
       has(serverId, WORKFLOWS_CHATS_CAPABILITY) &&
       has(serverId, ROUTINE_RESULTS_CAPABILITY),
+    canUseWorkflowMedia: (serverId) => has(serverId, WORKFLOWS_CAPABILITY) && has(serverId, WORKFLOWS_MEDIA_CAPABILITY),
+    canUseWorkflowMediaSize: (serverId) =>
+      has(serverId, WORKFLOWS_CAPABILITY) &&
+      has(serverId, WORKFLOWS_MEDIA_CAPABILITY) &&
+      has(serverId, WORKFLOWS_MEDIA_SIZE_CAPABILITY),
+    canUseWorkflowAssets: (serverId) =>
+      has(serverId, WORKFLOWS_CAPABILITY) &&
+      has(serverId, WORKFLOWS_MEDIA_CAPABILITY) &&
+      has(serverId, STORAGE_CAPABILITY),
     canPauseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY) && has(serverId, WORKFLOWS_PAUSE_CAPABILITY),
     canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
     canOrganizeLibrary: (serverId) => has(serverId, STORAGE_CAPABILITY) && has(serverId, LIBRARY_FOLDERS_CAPABILITY),
@@ -761,8 +799,8 @@ export function createHostRequestActions({
   queryClient: QueryClient;
   queryScope: QueryScope;
   capabilities: ServerCapabilities;
-  attachmentDownloads: { current: Promise<void> };
-  largeAttachmentDownloads: { current: Promise<void> };
+  attachmentDownloads: DownloadQueue;
+  largeAttachmentDownloads: DownloadQueue;
 }): { checks: HostRequestChecks; actions: HostRequestActions } {
   const has = (serverId: string, capability: string) => hasCapability(capabilities, serverId, capability);
   function capabilityApi(
@@ -783,6 +821,11 @@ export function createHostRequestActions({
   const eventsAdmin = (serverId: string) =>
     capabilityApi(serverId, EVENTS_CAPABILITY, "mobile.agent.record.eventsUnsupported");
   const recovery = (serverId: string) => has(serverId, ROUTINE_RECOVERY_CAPABILITY);
+  const onceRoutines = (serverId: string) => has(serverId, ROUTINES_ONCE_CAPABILITY);
+  const oncePost =
+    (serverId: string): RoutinesOncePost =>
+    (path, decode, body) =>
+      teamApi(serverId)("POST", path, decode, body);
   const routineResultsAdmin = (serverId: string) =>
     capabilityApi(serverId, ROUTINE_RESULTS_CAPABILITY, "mobile.agent.record.resultDestinationUnsupported");
   const sessionSettingsAdmin = (serverId: string) =>
@@ -811,6 +854,10 @@ export function createHostRequestActions({
     capabilityApi(serverId, HOST_RESTART_CAPABILITY, "mobile.server.settings.restartUnsupported");
   const timezoneAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_TIMEZONE_CAPABILITY, "mobile.server.settings.timezoneUnsupported");
+  const turnLimitsAdmin = (serverId: string) =>
+    capabilityApi(serverId, HOST_TURN_LIMITS_CAPABILITY, "mobile.server.settings.turnLimitsUnsupported");
+  const signalHomeAdmin = (serverId: string) =>
+    capabilityApi(serverId, HOST_SIGNAL_HOME_CAPABILITY, "mobile.server.settings.signalHomeUnsupported");
   const voiceModelAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_VOICE_MODEL_CAPABILITY, "mobile.server.settings.voiceModelUnsupported");
   const memoryLimitAdmin = (serverId: string) =>
@@ -886,7 +933,11 @@ export function createHostRequestActions({
     restartServerItself: async (serverId) => runTeamRequest(requestHostRestart(restartAdmin(serverId))),
     loadServerTimezone: async (serverId) => runTeamRequest(getHostTimezone(timezoneAdmin(serverId))),
     setServerTimezone: async (timezone, serverId) => runTeamRequest(setHostTimezone(timezoneAdmin(serverId), timezone)),
+    loadServerTurnLimits: async (serverId) => runTeamRequest(getHostTurnLimits(turnLimitsAdmin(serverId))),
+    setServerTurnLimits: async (input, serverId) => runTeamRequest(setHostTurnLimits(turnLimitsAdmin(serverId), input)),
     loadServerVoiceModel: async (serverId) => runTeamRequest(getHostVoiceModel(voiceModelAdmin(serverId))),
+    loadServerSignalHome: async (serverId) => runTeamRequest(getHostSignalHome(signalHomeAdmin(serverId))),
+    setServerSignalHome: async (home, serverId) => runTeamRequest(setHostSignalHome(signalHomeAdmin(serverId), home)),
     changeServerVoiceModel: async (change, serverId) =>
       runTeamRequest(changeHostVoiceModel(voiceModelAdmin(serverId), change)),
     loadAgentMemoryLimit: async (serverId) => runTeamRequest(getHostAgentMemoryLimit(memoryLimitAdmin(serverId))),
@@ -1024,11 +1075,15 @@ export function createHostRequestActions({
             has(serverId, WHATSAPP_STATUS_REACTIONS_CAPABILITY)
               ? whatsappConnectorStatusReactions(api)
               : Effect.succeed(null),
+            has(serverId, WHATSAPP_READ_ONLY_CAPABILITY) ? whatsappConnectorReadOnly(api) : Effect.succeed(null),
           ],
           { concurrency: "unbounded" },
         ).pipe(
-          Effect.map(([overview, workingMessages, statusReactions]) =>
-            withWhatsAppStatusReactions(withWhatsAppWorkingMessages(overview, workingMessages), statusReactions),
+          Effect.map(([overview, workingMessages, statusReactions, readOnly]) =>
+            withWhatsAppReadOnly(
+              withWhatsAppStatusReactions(withWhatsAppWorkingMessages(overview, workingMessages), statusReactions),
+              readOnly,
+            ),
           ),
         ),
       );
@@ -1066,6 +1121,13 @@ export function createHostRequestActions({
       runTeamRequest(
         whatsappConnectorSetStatusReactions(
           capabilityApi(serverId, WHATSAPP_STATUS_REACTIONS_CAPABILITY, "mobile.server.connectors.unsupported"),
+          input,
+        ),
+      ),
+    setWhatsAppSenderReadOnly: async (input, serverId) =>
+      runTeamRequest(
+        whatsappConnectorSetSenderReadOnly(
+          capabilityApi(serverId, WHATSAPP_READ_ONLY_CAPABILITY, "mobile.server.connectors.unsupported"),
           input,
         ),
       ),
@@ -1129,7 +1191,7 @@ export function createHostRequestActions({
     listEventRoutines: (owner, serverId) =>
       runTeamRequest(listEventRoutines(eventsAdmin(serverId), { owner }, recovery(serverId))),
     saveEventRoutine: (input, serverId) =>
-      runTeamRequest(saveEventRoutine(eventsAdmin(serverId), input, recovery(serverId))),
+      runTeamRequest(saveEventRoutine(eventsAdmin(serverId), input, recovery(serverId), false, onceRoutines(serverId))),
     loadRoutineResultOptions: (serverId) => runTeamRequest(listRoutineResultOptions(routineResultsAdmin(serverId))),
     loadRoutineResultDestination: (input, serverId) =>
       runTeamRequest(getRoutineResultDestination(routineResultsAdmin(serverId), input)),
@@ -1161,6 +1223,20 @@ export function createHostRequestActions({
       await request("DELETE", TEAM_API_ROUTES.agent.memory(agentId, memoryId), ignoreResponse, undefined, serverId);
     },
     createAgentRoutine: async (input, serverId) => {
+      const fields = {
+        name: input.name,
+        instruction: input.instruction,
+        active: input.active,
+        timezone: input.timezone,
+        schedule: input.schedule,
+      };
+      if (isOnceSchedule(input.schedule)) {
+        requireReleasedScheduleOn(input.schedule, onceRoutines(serverId));
+        await saveAgentRecord(queryClient, queryKeys.agentOnceRoutines(queryScope, serverId, input.agentId), () =>
+          createOnceAgentRoutine(oncePost(serverId), { agentId: input.agentId, ...fields }),
+        );
+        return;
+      }
       await saveAgentRecord(queryClient, queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines"), () =>
         request(
           "POST",
@@ -1170,37 +1246,53 @@ export function createHostRequestActions({
               throw new Error("The host returned an invalid saved record.");
             return value;
           },
-          {
-            name: input.name,
-            instruction: input.instruction,
-            active: input.active,
-            timezone: input.timezone,
-            schedule: input.schedule,
-          },
+          fields,
           serverId,
         ),
       );
     },
     updateAgentRoutine: async (input, serverId) => {
-      await saveAgentRecord(queryClient, queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines"), () =>
-        request(
-          "PATCH",
-          TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
-          (value) => {
-            if (!isRoutine(value) || value.agentId !== input.agentId || value.id !== input.routineId)
-              throw new Error("The host returned an invalid saved record.");
-            return value;
-          },
-          {
-            ...(input.name === undefined ? {} : { name: input.name }),
-            ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
-            ...(input.active === undefined ? {} : { active: input.active }),
-            ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
-          },
-          serverId,
-        ),
+      const changes = {
+        ...(input.name === undefined ? {} : { name: input.name }),
+        ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
+        ...(input.active === undefined ? {} : { active: input.active }),
+        ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+      };
+      const savedRoutine = (value: unknown) => {
+        if (!isRoutine(value) || value.agentId !== input.agentId || value.id !== input.routineId)
+          throw new Error("The host returned an invalid saved record.");
+        return value;
+      };
+      const releasedKey = queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines");
+      if (!onceRoutines(serverId)) {
+        await saveAgentRecord(queryClient, releasedKey, () =>
+          request(
+            "PATCH",
+            TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
+            savedRoutine,
+            changes,
+            serverId,
+          ),
+        );
+        return;
+      }
+      const saved = savedRoutine(
+        await updateAgentRoutineOnce(oncePost(serverId), {
+          agentId: input.agentId,
+          routineId: input.routineId,
+          ...changes,
+        }),
+      );
+      await saveAgentRecord(
+        queryClient,
+        isOnceSchedule(saved.trigger.schedule)
+          ? queryKeys.agentOnceRoutines(queryScope, serverId, input.agentId)
+          : releasedKey,
+        async () => saved,
       );
     },
+    loadOnceAgentRoutines: async (agentId, serverId) =>
+      onceRoutines(serverId) ? listOnceAgentRoutines(oncePost(serverId), agentId) : [],
     deleteAgentRoutine: async (agentId, routineId, serverId) => {
       await request("DELETE", TEAM_API_ROUTES.agent.routine(agentId, routineId), ignoreResponse, undefined, serverId);
     },
@@ -1227,15 +1319,18 @@ export function createHostRequestActions({
         : has(serverId, AGENT_FAST_MODE_CAPABILITY)
           ? AGENT_FAST_MODE_ROUTES.models
           : null;
-      const [options, fast, steering] = await Promise.all([
+      const [options, fast, steering, kept] = await Promise.all([
         models,
         fastRoute ? request("POST", fastRoute, decodeAgentFastModels, {}, serverId).catch(() => []) : [],
         has(serverId, MODEL_STEERING_CAPABILITY)
           ? request("POST", MODEL_STEERING_ROUTES.list, decodeAgentSteeringModels, {}, serverId).catch(() => [])
           : [],
+        has(serverId, MODEL_VISIBILITY_KEPT_CAPABILITY)
+          ? request("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, decodeAgentSteeringModels, {}, serverId).catch(() => [])
+          : [],
       ]);
       return withWorkspaceOnlyLimit(
-        withSteeringModels(withFastServiceTiers(options, fast), steering),
+        withSteeringModels(withKeptModels(withFastServiceTiers(options, fast), kept), steering),
         has(serverId, WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
       );
     },
@@ -1714,26 +1809,28 @@ export function createHostRequestActions({
         await request("POST", MESSAGE_DELETE_ROUTES.agent, ignoreResponse, body, serverId);
       }
     },
-    downloadAttachment: (serverId, attachmentId, largeDownload, progress) => {
+    downloadAttachment: (serverId, attachmentId, largeDownload, progress, tapped, wanted) => {
       const download = () =>
-        request(
-          "GET",
-          TEAM_API_ROUTES.attachment(attachmentId),
-          (value) => decodeHostFile(value, largeDownload?.file),
-          undefined,
-          serverId,
-          undefined,
-          undefined,
-          largeDownload,
-          progress,
-        );
-      const lane = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
-      const result = lane.current.then(download);
-      lane.current = result.then(
-        () => {},
-        () => {},
-      );
-      return result;
+        wanted?.() === false
+          ? Promise.reject(new Error(sourceText("error.remote.downloadStopped")))
+          : request(
+              "GET",
+              TEAM_API_ROUTES.attachment(attachmentId),
+              (value) => decodeHostFile(value, largeDownload?.file),
+              undefined,
+              serverId,
+              undefined,
+              undefined,
+              largeDownload,
+              progress,
+            );
+      const queue = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
+      return queue.run(attachmentDownloadKey(serverId, attachmentId), download, tapped);
+    },
+    prioritizeAttachmentDownload: (serverId, attachmentId) => {
+      const key = attachmentDownloadKey(serverId, attachmentId);
+      attachmentDownloads.prioritize(key);
+      largeAttachmentDownloads.prioritize(key);
     },
     downloadMessageFile: (serverId, file) =>
       request(

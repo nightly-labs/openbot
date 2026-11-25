@@ -136,7 +136,8 @@ export function BrowserDock(props: BrowserDockProps) {
   );
   const [phase, setPhase] = createSignal<DockPhase>("open");
   const tucked = () => phase() === "hidden";
-  let tab: HTMLButtonElement | undefined;
+  let tab: HTMLDivElement | undefined;
+  let tabButton: HTMLButtonElement | undefined;
   let reopen = false;
   let showing = false;
 
@@ -172,7 +173,10 @@ export function BrowserDock(props: BrowserDockProps) {
     ...(dock?.querySelectorAll(".browser-dock-stack > .agent-queue-slot") ?? []),
     ...(form?.children ?? []),
   ];
-  const tabParts = (): Element[] => (tab ? [...tab.children] : []);
+  const tabParts = (): Element[] => [
+    ...(tabButton?.children ?? []),
+    ...(tab?.querySelectorAll(".browser-dock-tab-done") ?? []),
+  ];
 
   async function glide(from: DOMRect, to: DOMRect, spring: Spring): Promise<() => void> {
     const root = dock;
@@ -221,7 +225,7 @@ export function BrowserDock(props: BrowserDockProps) {
     if (!from || !tab || prefersReducedMotion()) {
       setPhase("hidden");
       flush();
-      tab?.focus({ preventScroll: true });
+      tabButton?.focus({ preventScroll: true });
       return;
     }
     setPhase("hiding");
@@ -242,7 +246,7 @@ export function BrowserDock(props: BrowserDockProps) {
     done();
     for (const fade of fades) fade.cancel();
     fadeIn(tabParts(), REVEAL_STAGGER_MS);
-    tab.focus({ preventScroll: true });
+    tabButton?.focus({ preventScroll: true });
     if (reopen) {
       reopen = false;
       void show();
@@ -313,6 +317,8 @@ export function BrowserDock(props: BrowserDockProps) {
     }
   };
   const agentActs = () => props.island?.kind === "activity" && props.island.control === "agent";
+  const stepDone = () =>
+    props.island?.kind === "activity" && props.island.control === "request" ? props.onHandoff : undefined;
   const unread = () => props.island?.kind === "reply" || needsAnswer(props.island);
 
   let tabWidth = 0;
@@ -479,26 +485,49 @@ export function BrowserDock(props: BrowserDockProps) {
         dock = element;
       }}
     >
-      <Button
-        type="button"
-        variant="ghost"
+      <div
         class="browser-dock-glass browser-dock-tab"
-        title={t("browser.dock.show")}
-        ref={(element: HTMLButtonElement) => {
+        ref={(element) => {
           tab = element;
         }}
-        onClick={() => void show()}
       >
-        <span
-          class="browser-dock-tab-avatar"
-          data-working={agentActs() ? "" : undefined}
-          data-unread={unread() ? "" : undefined}
+        <Button
+          type="button"
+          variant="ghost"
+          class="browser-dock-tab-open"
+          title={t("browser.dock.show")}
+          ref={(element: HTMLButtonElement) => {
+            tabButton = element;
+          }}
+          onClick={() => void show()}
         >
-          <AgentAvatar agent={props.agent} class="browser-dock-avatar" />
-        </span>
-        <span class="browser-dock-tab-label">{tabLabel()}</span>
-        <ChevronUp class="browser-dock-tab-chevron" aria-hidden="true" />
-      </Button>
+          <span
+            class="browser-dock-tab-avatar"
+            data-working={agentActs() ? "" : undefined}
+            data-unread={unread() ? "" : undefined}
+          >
+            <AgentAvatar agent={props.agent} class="browser-dock-avatar" />
+          </span>
+          <span class="browser-dock-tab-label">{tabLabel()}</span>
+          <ChevronUp class="browser-dock-tab-chevron" aria-hidden="true" />
+        </Button>
+        <Show when={stepDone()}>
+          {(done) => (
+            <Button
+              type="button"
+              size="xs"
+              class="browser-dock-tab-done"
+              loading={props.handoffPending === true}
+              onClick={() => {
+                tabButton?.focus({ preventScroll: true });
+                done()();
+              }}
+            >
+              {t("prompt.browser.done")}
+            </Button>
+          )}
+        </Show>
+      </div>
       <Show when={shown()}>
         {(content) => (
           <div

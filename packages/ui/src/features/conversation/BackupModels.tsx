@@ -84,6 +84,7 @@ export function backupModelOptions(
   const option = (choice: AgentModelChoice) =>
     exclude.some((other) => sameAgentModelChoice(other, choice)) ? [] : [backupModelOption(choice, source)];
   const shared = source.modelOptions.flatMap((model) => {
+    if (model.listing === "kept") return [];
     const modelProvider = model.provider;
     if (!isKnownAgentProvider(modelProvider)) return [];
     const provider = source.providers?.find((status) => status.id === modelProvider);
@@ -115,10 +116,13 @@ export function backupModelOptions(
 
 function useOptionLabel() {
   const { t } = useText();
-  return (option: BackupModelOption) =>
-    option.account
-      ? t("agentSettings.backupModels.withAccount", { model: option.model, account: option.account })
-      : option.model;
+  return (option: BackupModelOption) => {
+    const model = t("agentSettings.backupModels.withProvider", {
+      model: option.model,
+      provider: agentProviderName(option.choice.provider),
+    });
+    return option.account ? t("agentSettings.backupModels.withAccount", { model, account: option.account }) : model;
+  };
 }
 
 function OptionLogo(props: { provider: AgentProviderId }) {
@@ -275,9 +279,7 @@ export function BackupModelsPage(props: BackupModelsPageProps) {
             value={null}
             optionValue={(option) => option.key}
             label={label}
-            optionTextValue={(option) =>
-              `${label(option)} ${agentProviderName(option.choice.provider)} ${option.choice.model}`
-            }
+            optionTextValue={(option) => `${label(option)} ${option.choice.model}`}
             itemContent={(option) => <OptionContent option={option} />}
             onChange={(option) => save({ automatic: automatic(), order: [...order(), option.choice] })}
           >

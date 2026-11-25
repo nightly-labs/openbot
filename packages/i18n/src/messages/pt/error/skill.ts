@@ -44,7 +44,8 @@ export const messages = {
   "error.skill.publishUntracked":
     "{name} foi instalada antes do controle exato de versões. Atualize ou repare a habilidade antes de publicar.",
   "error.skill.tooManySkills": "Um agente pode ter até {limit} habilidades.",
-  "error.skill.unmanagedExists": "Uma habilidade não gerenciada já existe em {path}.",
+  "error.skill.ownSkillExists":
+    "Este agente já tem uma habilidade própria chamada {slug}. Peça ao agente para renomear ou excluir essa habilidade e depois adicione esta habilidade de novo.",
   "error.skill.managedSlug":
     "O OpenBot dá a cada agente sua própria habilidade {slug}. Dê outro nome a esta habilidade.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md tem mais de 64 KB. Encurte o texto antes de publicar.",

@@ -144,6 +144,7 @@ export const messages = defineMessages("provider", {
   "provider.picker.effort": "Effort",
   "provider.picker.effortLabel": "Agent reasoning effort",
   "provider.picker.effortFixed": "{effort}, set by {provider}",
+  "provider.picker.effortLimited": "Your Claude settings or organization limit the effort to {effort}.",
   "provider.picker.fast": "Fast",
   "provider.picker.fastText": "Faster responses, increased usage",
   "provider.picker.speed": "Speed",

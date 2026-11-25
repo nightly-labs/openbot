@@ -38,6 +38,7 @@ export interface RemoteHostSummary {
   storageGb?: number;
   paymentRequired?: true;
   customPlan?: CustomServerPlan;
+  hidden?: true;
 }
 
 export interface RemoteInviteRecord {
@@ -192,6 +193,7 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       ...(isBoolean(host.restartAvailable) ? { restartAvailable: host.restartAvailable } : {}),
       ...(validStorage ? { storageGb } : {}),
       ...optionalCustomServerPayment(host),
+      ...(host.hidden === true ? { hidden: true as const } : {}),
     };
   });
 }

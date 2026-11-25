@@ -48,6 +48,7 @@ export const messages = {
     other: "אפשר להוסיף {count} תיקיות לכל היותר",
   },
   "agentSettings.folders.browse.places": "מעבר אל",
+  "agentSettings.folders.browse.path": "נתיב התיקייה",
   "agentSettings.folders.browse.home": "תיקיית הבית",
   "agentSettings.folders.browse.parent": "למעלה אל {folder}",
   "agentSettings.folders.browse.failed": "לא ניתן לפתוח את התיקייה הזו.",
@@ -100,6 +101,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "מגבלת השימוש הושגה · מדולג",
   "agentSettings.backupModels.unavailable": "אינו זמין כעת · מדולג",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "כשמגבלת שימוש עוצרת את {name} אחרי שהתחיל לעבוד, {name} ממשיך באותה עבודה במודל הזמין הראשון לפי הסדר. הוא חוזר ל-{model} כשהמגבלה מסתיימת, או 10 דקות אחרי שגיאת ספק.",
   "agentSettings.groups.brain": "מוח",
@@ -188,6 +190,7 @@ export const messages = {
     "הסוכן מתחיל מחדש ויכול לחפש בצ'אט הזה כשצריך. ההודעות נשארות גלויות מעל קו מפריד. ההנחיות, המודל, הכלים, הזיכרונות, סביבת העבודה והדפדפן לא משתנים.",
   "agentSettings.newChat.confirm": "התחלת צ'אט חדש",
   "agentSettings.newChat.failed": "לא ניתן להתחיל צ'אט חדש.",
+  "agentSettings.newChat.busy": "הסוכן עובד עכשיו. כדי להתחיל צ'אט חדש, צריך לחכות שיסיים או לעצור אותו.",
   "agentSettings.deleteHistory.title": "מחיקת היסטוריה",
   "agentSettings.deleteHistory.description": "ההודעות בצ'אט הזה נמחקות והסוכן שוכח אותן. ההגדרות שלו נשארות.",
   "agentSettings.deleteHistory.button": "מחיקה",

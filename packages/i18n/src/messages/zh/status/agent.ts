@@ -145,4 +145,8 @@ export const messages = {
   "status.agent.compactionContinues": "助手压缩上下文时连接中断。助手将继续工作。",
   "status.agent.providerExitContinues": "助手在完成回答前停止了。助手将继续工作。",
   "status.agent.branchTitle": "分支聊天",
+  "status.agent.location.field": "你的位置",
+  "status.agent.location.placeholder": "城市、地址或地点",
+  "status.agent.location.submit": "共享",
+  "status.agent.location.shared": "已共享位置",
 } as const satisfies PartialTranslation<typeof source>;

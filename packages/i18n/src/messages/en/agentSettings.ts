@@ -46,6 +46,7 @@ export const messages = defineMessages("agentSettings", {
     other: "You can add at most {count} folders",
   },
   "agentSettings.folders.browse.places": "Go to",
+  "agentSettings.folders.browse.path": "Folder path",
   "agentSettings.folders.browse.home": "Home folder",
   "agentSettings.folders.browse.parent": "Up to {folder}",
   "agentSettings.folders.browse.failed": "Could not open this folder.",
@@ -92,6 +93,7 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.backupModels.limited": "Usage limit reached · skipped",
   "agentSettings.backupModels.unavailable": "Not available now · skipped",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "When a usage limit stops {name} after it starts to work, {name} continues the same work on the first available model in the order. It goes back to {model} when the limit ends, or 10 minutes after a provider error.",
   "agentSettings.groups.brain": "Brain",
@@ -182,6 +184,7 @@ export const messages = defineMessages("agentSettings", {
     "The agent starts fresh and can still look up this chat when it needs to. The messages stay visible above a divider. The instructions, model, tools, memories, workspace, and browser do not change.",
   "agentSettings.newChat.confirm": "Start new chat",
   "agentSettings.newChat.failed": "Could not start a new chat.",
+  "agentSettings.newChat.busy": "The agent is working. To start a new chat, wait until it finishes or stop it.",
   "agentSettings.deleteHistory.title": "Delete history",
   "agentSettings.deleteHistory.description":
     "The messages of this chat go, and the agent forgets them. Its setup stays.",

@@ -49,7 +49,7 @@ import { type OpenWaitItem, OpenWaits } from "@openbot/ui/features/conversation/
 import { SpeakingBar } from "@openbot/ui/features/conversation/SpeakingBar";
 import { ComposerVoiceControls } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show, snapshot } from "solid-js";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
 import { readableAgentError } from "../agents/agent-error-text";
@@ -61,7 +61,7 @@ import { createComposerResize } from "./composer-resize";
 import { useConversationController } from "./conversation-controller-context";
 import { composerDraftKey } from "./conversation-keys";
 import { useConversationViewScope } from "./conversation-scope";
-import { currentConversationTarget } from "./stores/composer-store";
+import { conversationOwnerId, currentConversationTarget } from "./stores/composer-store";
 
 const [dismissedCompactions, setDismissedCompactions] = createSignal<Record<string, string>>({});
 const [dismissedUsageLimits, setDismissedUsageLimits] = createStore<Record<string, Record<string, string>>>({});
@@ -176,7 +176,7 @@ export function ConversationComposer() {
   const openVoiceConversation = () =>
     voiceConversationAvailable() && !voiceConversationOpen() ? toggleVoiceConversation : undefined;
   const sendVoice = (): ComposerSendVoice | undefined => {
-    if (!props.agent || !voiceConversationAvailable()) return undefined;
+    if (!(props.agent || channel) || !voiceConversationAvailable()) return undefined;
     if (composerHasContent() || editingDeliveryId() || sharedVoicePhase() !== "idle") return undefined;
     if (attachmentBusy() || uploadFailed() || submitting() || !agentReady() || providerUpdateRequired())
       return undefined;
@@ -225,12 +225,13 @@ export function ConversationComposer() {
   const speaking = () => {
     const reading = speechReading();
     return reading &&
-      reading.agentId === props.agent?.id &&
+      reading.agentId === conversationOwnerId(props) &&
       reading.serverId === (props.server?.id ?? "local") &&
       !voiceConversationOpen()
       ? reading
       : null;
   };
+  const speakingAgent = () => (channel ? channel.voiceAgent() : props.agent);
   const context = () =>
     props.contextState?.agentId === props.agent?.id && props.contextState?.threadId === props.agent?.threadId
       ? props.contextState
@@ -262,8 +263,17 @@ export function ConversationComposer() {
     return keyError ? props.onManageProviders : undefined;
   };
   const errorInChat = (error: string) => {
-    const marker = props.messages.at(-1)?.actionMarker;
-    return marker?.kind === "sign-in-failure" && readableAgentError(marker.text) === error;
+    for (let index = props.messages.length - 1; index >= 0; index -= 1) {
+      const message = props.messages[index];
+      if (message?.author === "you") return false;
+      const marker = message?.actionMarker;
+      if (
+        (marker?.kind === "sign-in-failure" || marker?.kind === "no-answer") &&
+        readableAgentError(marker.text) === error
+      )
+        return true;
+    }
+    return false;
   };
   const errorBannerAction = () => {
     const updateKey = updateOpenCodeKey();
@@ -338,7 +348,7 @@ export function ConversationComposer() {
         id: endpoint.id,
         name: endpoint.name,
         baseUrl: endpoint.baseUrl,
-        models: endpoint.models.map((item) =>
+        models: snapshot(endpoint.models).map((item) =>
           item.id === model.id
             ? {
                 ...item,
@@ -514,7 +524,7 @@ export function ConversationComposer() {
     return (
       <div class={["composer-wrap", { "conversation-covered": sideThreadOpen() }]} inert={sideThreadOpen()}>
         {channel ? <channel.AboveComposer /> : null}
-        <Show when={speaking() && props.agent}>
+        <Show when={speaking() && speakingAgent()}>
           {(agent) => (
             <SpeakingBar
               agent={agent()}

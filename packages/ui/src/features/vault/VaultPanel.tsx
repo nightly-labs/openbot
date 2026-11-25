@@ -149,7 +149,8 @@ const SECRET_TEXT = {
 const digitsOf = (value: string) => value.replace(/\D/gu, "");
 
 function parseExpiry(text: string): { month: number; year: number } | null {
-  const match = /^\s*(\d{1,2})\s*\/\s*(\d{2}|\d{4})\s*$/u.exec(text);
+  const plain = text.normalize("NFKC").trim();
+  const match = /^(\d{1,2})\s*[-./\s]\s*(\d{2}|\d{4})$/u.exec(plain) ?? /^(\d{2})(\d{2}|\d{4})$/u.exec(plain);
   if (!match?.[1] || !match[2]) return null;
   const month = Number(match[1]);
   const year = match[2].length === 2 ? 2000 + Number(match[2]) : Number(match[2]);
@@ -1095,6 +1096,9 @@ function ItemDialog(props: {
       .replace(/^https?:\/\//u, "")
       .split("/")[0] || t("vault.twoStep.theSite");
   const keyInvalid = (login: LoginDraft) => login.twoStepKey.trim() !== "" && !typedKey.valid();
+  const [expiryLeft, setExpiryLeft] = createSignal(false);
+  const expiryInvalid = (card: CardDraft) =>
+    expiryLeft() && card.expiry.trim() !== "" && parseExpiry(card.expiry) === null;
   const startSetup = () => {
     const login = loginDraft();
     if (login) set(login, { twoStepKey: "" });
@@ -1258,13 +1262,14 @@ function ItemDialog(props: {
                 onChange={(number) => set(card(), { number })}
               />
             </Field>
-            <Field label={t("vault.field.expiry")}>
+            <Field label={t("vault.field.expiry")} error={expiryInvalid(card()) ? t("vault.expiryInvalid") : undefined}>
               <Input
                 inputmode="numeric"
                 maxlength={7}
                 placeholder={t("vault.placeholder.expiry")}
                 value={card().expiry}
                 onValueChange={(expiry) => set(card(), { expiry })}
+                onBlur={() => setExpiryLeft(true)}
               />
             </Field>
             <Field label={t("vault.field.securityCode")}>

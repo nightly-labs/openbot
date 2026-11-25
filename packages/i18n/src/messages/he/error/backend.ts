@@ -51,6 +51,8 @@ export const messages = {
   "error.backend.browserUserControlUnsupported": "המארח המרוחק הזה אינו תומך בשליטה בלשונית דפדפן.",
   "error.backend.browserSignInUnsupported": "המארח המרוחק הזה אינו יכול לקבל התחברות מהמחשב הזה.",
   "error.backend.browserSignInOpenFailed": "OpenBot לא הצליח לפתוח את חלון ההתחברות.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot לא הצליח לטעון את הדף בחלון ההתחברות. בדקו את החיבור לאינטרנט, ואז פתחו שוב את חלון ההתחברות.",
   "error.backend.browserSignInReadFailed": "OpenBot לא הצליח לקרוא את ההתחברות מהחלון.",
   "error.backend.browserStopUnsupported": "המארח המרוחק הזה אינו יכול לעצור טעינת דף.",
   "error.backend.sharedDataLocalOnly": "נתונים משותפים מנוהלים במחשב שמריץ את הסוכנים האלה.",
@@ -62,6 +64,11 @@ export const messages = {
     "הדחיסה אינה מקטינה את הצ'אט הזה: אחרי שתי דחיסות הוא עדיין תופס {percent}% מחלון ההקשר של המודל, ולכן OpenBot מפסיק לדחוס אותו. כלים והנחיות תופסים את רוב החלון. יש לכבות את שרתי ה-MCP או את השליטה במחשב שהסוכן הזה לא צריך, או לבחור מודל עם חלון גדול יותר. אחר כך יש להתחיל צ'אט חדש.",
   "error.backend.contextCompactionStopped":
     "שתי דחיסות של הצ'אט הזה נכשלו ברצף, ולכן OpenBot מפסיק לדחוס אותו אוטומטית. כל ניסיון שולח את כל הצ'אט למודל וצורך ממגבלת התוכנית שלך. יש לבחור Compact now כדי לנסות שוב, או להתחיל צ'אט חדש.",
+  "error.backend.contextCompactionRetrying":
+    "הספק לא הצליח לדחוס את הצ'אט הזה ומנסה שוב. הודעות חדשות בצ'אט הזה ממתינות עד שהדחיסה תסתיים. אם היא לא תסתיים בקרוב, OpenBot יעצור אותה וישלח את ההודעות שלך.",
+  "error.backend.contextCompactionFailed": "דחיסת הצ'אט הזה נכשלה. הצ'אט לא השתנה. הודעות ממתינות נשלחות עכשיו לסוכן.",
+  "error.backend.contextCompactionTimedOut":
+    "דחיסת הצ'אט הזה נמשכה יותר מדי זמן, ולכן OpenBot עצר אותה. הצ'אט לא השתנה. הודעות ממתינות נשלחות עכשיו לסוכן.",
   "error.backend.providerModelAtCapacity":
     "המודל בעומס מלא. הספק ינסה שוב בעוד כמה דקות. כדי להמשיך עכשיו, עצור את התור ובחר מודל אחר.",
   "error.backend.providerRetrying":
@@ -99,6 +106,11 @@ export const messages = {
   "error.backend.channelRoutingFailed": "הניתוב נכשל. יש לבחור חבר או לנסות שוב.",
   "error.backend.channelLeadTimedOut": "מוביל הערוץ לא ענה בזמן. יש לבחור חבר או לנסות שוב.",
   "error.backend.channelLeadFailed": "מוביל הערוץ לא הצליח לנתב את ההודעה הזו. יש לבחור חבר או לנסות שוב.",
+  "error.backend.channelLeadBusy": "המודל של מוביל הערוץ עמוס כרגע. יש לנסות שוב בעוד כמה דקות, או לבחור חבר.",
+  "error.backend.channelLeadOffline": "המודל של מוביל הערוץ איבד את החיבור. יש לנסות שוב, או לבחור חבר.",
+  "error.backend.channelLeadSignIn": "פג תוקף ההתחברות לספק של מוביל הערוץ. יש להתחבר שוב, או לבחור חבר.",
+  "error.backend.channelLeadModelGone": "המודל של מוביל הערוץ לא זמין. יש לבחור מודל אחר למוביל, או לבחור חבר.",
+  "error.backend.channelLeadRefused": "המודל של מוביל הערוץ דחה את הבקשה. יש לבחור חבר, או מודל אחר למוביל.",
   "error.backend.channelRequestMemberRequired": "יש לבחור חבר לבקשה הזו.",
   "error.backend.channelDeliveryNotCreated": "מסירת הערוץ לא נוצרה.",
   "error.backend.channelAssignmentStopped": "הקצאת הערוץ הזו נעצרה או הוחלפה.",
@@ -274,6 +286,8 @@ export const messages = {
   "error.backend.mcpServerExited": "השרת נעצר לפני שענה. יש להריץ את הפקודה במסוף כדי לראות את השגיאה שלו.",
   "error.backend.mcpServerExitedWithOutput": "השרת נעצר לפני שענה. הוא כתב: {detail}",
   "error.backend.mcpServerFailedToStart": "השרת לא התחיל: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot לא הצליח להפעיל את שרת ה-MCP {name}, כי התוכנה שלו לא מותקנת במחשב שמריץ את OpenBot. יש להתקין את האפליקציה שמספקת את {name} במחשב הזה, או לכבות את {name} בחנות, אפליקציות.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} הפסיק לחכות לפני שהשרת התחיל, ולכן הסוכנים שלו לא מקבלים את הכלים של השרת הזה.",
   "error.backend.mcpServerStoppedDuringCall": "שרת ה-MCP נעצר לפני שענה לקריאה הזו.",
@@ -396,6 +410,8 @@ export const messages = {
   "error.backend.browserCertificateUntrusted": "תעודת האבטחה של האתר הזה אינה מהימנה, ולכן הדף לא נפתח.",
   "error.backend.browserLowMemory":
     "בשרת הזה נותר מעט זיכרון, ולכן הדפדפן אינו יכול לפתוח לשונית נוספת. יש לסגור לשונית או להמתין לסיום העבודה של סוכנים אחרים.",
+  "error.backend.browserNoMemory":
+    "הזיכרון בשרת הזה כמעט נגמר, ולכן הדפדפן אינו יכול לפתוח לשונית כרגע. יש להמתין לסיום העבודה של סוכנים אחרים ולנסות שוב.",
   "error.backend.browserOpenFailed": "לא ניתן לפתוח את {url}: {reason}",
   "error.backend.popupSecureInput":
     "חלונות קופצים חסומים בזמן קלט מאובטח. יש לסיים או לבטל את הקלט המאובטח ולנסות שוב מהדף.",

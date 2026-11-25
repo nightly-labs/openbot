@@ -22,7 +22,7 @@ const account = {
   ownNumber: false,
   allowedSenders: [
     { id: "48600100300", kind: "contact", name: "Ben" },
-    { id: "120363000000000000@g.us", kind: "group", name: "Team" },
+    { id: "120363000000000000@g.us", kind: "group", name: "Team", readOnly: true },
   ],
   pendingRequests: [{ code: "ABC234", senderId: "48600100400", name: "Cara", expiresAt: "2026-10-30T12:00:00.000Z" }],
 };
@@ -47,6 +47,12 @@ describe("WhatsApp replies from main", () => {
     { ...overview, accounts: [{ ...account, allowedSenders: [{ id: "+48 600", kind: "contact", name: "Ben" }] }] },
     { ...overview, accounts: [{ ...account, allowedSenders: [{ id: "48600100300", kind: "group", name: "Ben" }] }] },
     { ...overview, accounts: [{ ...account, allowedSenders: [{ id: "48600100300", kind: "channel", name: "Ben" }] }] },
+    {
+      ...overview,
+      accounts: [
+        { ...account, allowedSenders: [{ id: "48600100300", kind: "contact", name: "Ben", readOnly: "yes" }] },
+      ],
+    },
     { ...overview, accounts: [{ ...account, pendingRequests: [{ ...account.pendingRequests[0], code: "abc" }] }] },
     {
       ...overview,

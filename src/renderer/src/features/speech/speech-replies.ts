@@ -1,6 +1,9 @@
 import {
   type AgentEvent,
+  type ChannelMessage,
+  type ChannelTask,
   type ConversationMessage,
+  isAgentAnswer,
   latestTurnAnswer,
   type SpeechLanguage,
 } from "@openbot/contracts/ipc";
@@ -30,10 +33,17 @@ import {
 } from "./speech-playback";
 import { speechPort } from "./speech-port";
 import { loadSpeechSpeed } from "./speech-speed";
-import { voiceServer } from "./voice-server";
+import { voiceServer, voiceServerLoaded } from "./voice-server";
 
 const DICTATION_LIFETIME_MS = 10 * 60_000;
 const ANSWER_LOOKUP_LIMIT = 50;
+
+export interface ChannelReplyView {
+  messages: readonly ChannelMessage[];
+  tasks: readonly ChannelTask[];
+}
+
+const WORKING_TASK_STATES: ReadonlySet<ChannelTask["state"]> = new Set(["queued", "running", "waiting"]);
 
 interface DictatedMessage {
   dictatedAt: number;
@@ -45,6 +55,7 @@ interface DictatedMessage {
   continuedTurnId: string | undefined;
   always: boolean;
   progressUpdate: ((message: ConversationMessage) => boolean) | undefined;
+  channel: boolean;
 }
 
 type SpeechTrigger = "voice_conversation" | "progress_update" | "dictation" | "read_aloud";
@@ -104,7 +115,11 @@ function isSpoken(agent: SpeechAgent): boolean {
 export function noteDictatedMessage(
   agent: SpeechAgent,
   transcript: string,
-  options?: { always: boolean; progressUpdate?: (message: ConversationMessage) => boolean },
+  options?: {
+    always?: boolean;
+    progressUpdate?: (message: ConversationMessage) => boolean;
+    channel?: boolean;
+  },
 ): void {
   const key = agentKey(agent);
   dictated.set(key, {
@@ -117,6 +132,7 @@ export function noteDictatedMessage(
     continuedTurnId: undefined,
     always: options?.always ?? false,
     progressUpdate: options?.progressUpdate,
+    channel: options?.channel ?? false,
   });
   followSpeechModel();
   void warmSpeech(options?.always ?? false);
@@ -134,10 +150,49 @@ export function claimDictatedSend(agent: SpeechAgent): ((messageId: string) => v
   const message = dictated.get(agentKey(agent));
   if (!message || message.sending) return undefined;
   message.sending = true;
+  if (message.channel) endChannelReplyAfterLifetime(agent, message);
   return (messageId) => {
     message.messageId = messageId;
     takeDeliveryTurn(message);
   };
+}
+
+function endChannelReplyAfterLifetime(channel: SpeechAgent, message: DictatedMessage): void {
+  const key = agentKey(channel);
+  setTimeout(
+    () => {
+      if (dictated.get(key) !== message) return;
+      dictated.delete(key);
+      endAfterReadings(channel);
+    },
+    Math.max(0, message.dictatedAt + DICTATION_LIFETIME_MS - Date.now()),
+  );
+}
+
+function endAfterReadings(agent: SpeechAgent): void {
+  void afterReadings(async () => {}).finally(replyEndedUnlessDropped(agent));
+}
+
+export function followDictatedChannelReply(channel: SpeechAgent, view: ChannelReplyView): void {
+  const key = agentKey(channel);
+  const message = dictated.get(key);
+  if (!message?.channel || !message.messageId) return;
+  const sent = view.messages.find((entry) => entry.id === message.messageId);
+  const taskId = sent?.taskId;
+  if (!sent || !taskId) return;
+  const task = view.tasks.find((entry) => entry.id === taskId);
+  if (!task || WORKING_TASK_STATES.has(task.state)) return;
+  const answer = view.messages.findLast(
+    (entry) =>
+      entry.sequence > sent.sequence &&
+      entry.taskId === taskId &&
+      !entry.superseded &&
+      entry.author.kind === "agent" &&
+      isAgentAnswer(entry.message),
+  );
+  dictated.delete(key);
+  if (answer?.message.status === "completed") void readChannelReply(channel, answer, message);
+  else endAfterReadings(channel);
 }
 
 function takeDeliveryTurn(message: DictatedMessage): void {
@@ -188,7 +243,11 @@ function replyEndedUnlessDropped(agent: SpeechAgent): () => void {
   };
 }
 
-export function readDictatedReplies(event: AgentEvent, serverId: string): void {
+export function readDictatedReplies(
+  event: AgentEvent,
+  serverId: string,
+  isMainThread: (agentId: string, threadId: string) => boolean,
+): void {
   if (event.type === "conversation") {
     readProgressUpdates(event.snapshot.messages, { serverId, agentId: event.snapshot.agentId });
     return;
@@ -215,9 +274,8 @@ export function readDictatedReplies(event: AgentEvent, serverId: string): void {
   const agent = { serverId, agentId: event.agentId };
   const key = agentKey(agent);
   if (event.type === "turn-started") {
-    if (event.origin === "routine" || event.origin === "agent") return;
-    if (isSpoken(agent)) stopSpokenReply();
-    if (event.origin === "unknown") return;
+    if (event.origin === "routine" || event.origin === "agent" || event.origin === "unknown") return;
+    if (isSpoken(agent) && isMainThread(event.agentId, event.threadId)) stopSpokenReply();
     const message = dictated.get(key);
     if (!message || message.turnId) return;
     if (Date.now() - message.dictatedAt > DICTATION_LIFETIME_MS) {
@@ -236,7 +294,7 @@ export function readDictatedReplies(event: AgentEvent, serverId: string): void {
   }
   dictated.delete(key);
   if (event.status === "completed" && !event.quiet) void readReply(agent, event.turnId, message);
-  else void afterReadings(async () => {}).finally(replyEndedUnlessDropped(agent));
+  else endAfterReadings(agent);
 }
 
 function readProgressUpdates(messages: readonly ConversationMessage[], agent: SpeechAgent): void {
@@ -295,6 +353,26 @@ async function readReply(agent: SpeechAgent, turnId: string, message: DictatedMe
       result: "failed",
       failure_code: "load_failed",
     });
+    reportReadFailure(error);
+  } finally {
+    loading.delete(own);
+    ended();
+  }
+}
+
+async function readChannelReply(channel: SpeechAgent, entry: ChannelMessage, message: DictatedMessage): Promise<void> {
+  const own = { ...channel };
+  const ended = replyEndedUnlessDropped(channel);
+  const trigger = message.always ? "voice_conversation" : "dictation";
+  loading.add(own);
+  try {
+    if (!message.always && !(await speechPort().voice.getSpeechSettings()).readReplies) return;
+    if (!loading.has(own)) return;
+    loading.delete(own);
+    await readAfterReadings(entry.message.text, { ...channel, messageId: entry.id }, message.language, trigger);
+  } catch (error) {
+    if (!loading.has(own)) return;
+    desktopAnalytics.track("speech_reply", { trigger, result: "failed", failure_code: "load_failed" });
     reportReadFailure(error);
   } finally {
     loading.delete(own);
@@ -381,6 +459,12 @@ async function speak(
   const own = { serverId: source.serverId, agentId: source.agentId };
   const analytics = desktopAnalytics.scope();
   try {
+    if (voiceServer() === undefined) {
+      spoken = own;
+      const generation = readingsGeneration;
+      await voiceServerLoaded();
+      if (generation !== readingsGeneration) return;
+    }
     const input = speechInput(markdown, fallback);
     if (!input) {
       if (markdown && speechTextFromMarkdown(markdown)) reportUnreadableLanguage();

@@ -28,6 +28,8 @@ export const messages = {
   "error.connector.onePasswordUnreachable": "OpenBot 无法连接到 1Password，请检查网络连接后重试。",
   "error.connector.onePasswordRateLimited": "1Password 收到的请求过多，请等待几分钟后重试。",
   "error.connector.onePasswordNoVault": "该服务账号无法读取任何保险库。请授予其保险库访问权限后重试。",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot 无法读取你在 1Password 中的登录信息。请断开 1Password，然后重新连接。",
   "error.connector.onePasswordFileUnreadable": "1Password 连接文件无法读取。",
   "error.connector.onePasswordFileTooLarge": "1Password 连接文件过大。",
   "error.connector.bitwardenFailed":
@@ -39,6 +41,9 @@ export const messages = {
   "error.connector.bitwardenHostInput": "请填写 HTTPS 服务器地址、API 密钥的 client_id 和 client_secret，以及主密码。",
   "error.connector.bitwardenHostFailed":
     "无法在该服务器上打开 Bitwarden。请检查服务器地址、API 密钥和主密码，并确认有一个文件夹名为 Shared with OpenBot，然后重新连接。",
+  "error.connector.bitwardenHostSignInFailed":
+    "无法在该服务器上登录 Bitwarden。请检查服务器地址和 API 密钥，然后重新连接。",
+  "error.connector.bitwardenHostUnlockFailed": "无法在该服务器上解锁 Bitwarden。请检查主密码，然后重新连接。",
   "error.connector.bitwardenCliInstallFailed": "无法在该服务器上安装 Bitwarden CLI。请检查它的网络连接，然后重新连接。",
   "error.connector.bitwardenFileUnreadable": "Bitwarden 连接文件无法读取。",
   "error.connector.passwordManagerUnknown": "OpenBot 不支持此密码管理器。",

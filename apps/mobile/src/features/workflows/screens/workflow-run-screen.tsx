@@ -160,6 +160,7 @@ export function WorkflowRunScreen() {
                     {t("mobile.workflow.detail.stepsTitle")}
                   </Typography>
                   <WorkflowFlowView
+                    serverId={serverId}
                     graph={graph}
                     agents={serverAgents}
                     run={{

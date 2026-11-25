@@ -738,8 +738,8 @@ try {
   );
   const keys = new Map([[AGENT_A, "agent-writer"]]);
   const channelKeys = new Map([["channel-news", "channel-news"]]);
-  const transferred = JSON.parse(JSON.stringify(exportWorkflows(graphsA, keys, channelKeys)));
   const warnings: string[] = [];
+  const transferred = JSON.parse(JSON.stringify(exportWorkflows(graphsA, keys, channelKeys, warnings)));
   const before = new Set((await runCauseEffect(b.list())).map((row) => row.id));
   await Effect.runPromise(
     importWorkflows(
@@ -759,7 +759,12 @@ try {
   );
   const again = JSON.parse(
     JSON.stringify(
-      exportWorkflows(graphsB, new Map([[AGENT_B, "agent-writer"]]), new Map([["channel-news-b", "channel-news"]])),
+      exportWorkflows(
+        graphsB,
+        new Map([[AGENT_B, "agent-writer"]]),
+        new Map([["channel-news-b", "channel-news"]]),
+        warnings,
+      ),
     ),
   );
   const byTitle = (entries: { title: string; relink?: boolean }[]) =>

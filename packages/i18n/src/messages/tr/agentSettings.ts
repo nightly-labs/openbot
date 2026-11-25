@@ -50,6 +50,7 @@ export const messages = {
     other: "En fazla {count} klasör ekleyebilirsiniz",
   },
   "agentSettings.folders.browse.places": "Git",
+  "agentSettings.folders.browse.path": "Klasör yolu",
   "agentSettings.folders.browse.home": "Ana klasör",
   "agentSettings.folders.browse.parent": "Yukarı: {folder}",
   "agentSettings.folders.browse.failed": "Bu klasör açılamadı.",
@@ -96,6 +97,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Kullanım sınırına ulaşıldı · atlandı",
   "agentSettings.backupModels.unavailable": "Şu an uygun değil · atlandı",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Bir kullanım sınırı {name} işe başladıktan sonra onu durdurursa, {name} aynı işe sıradaki ilk kullanılabilir modelle devam eder. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
   "agentSettings.groups.brain": "Beyin",
@@ -180,6 +182,8 @@ export const messages = {
     "Ajan sıfırdan başlar ve gerektiğinde bu sohbette arama yapabilir. Mesajlar bir ayırıcının üzerinde görünür kalır. Talimatlar, model, araçlar, bellekler, çalışma alanı ve tarayıcı değişmez.",
   "agentSettings.newChat.confirm": "Yeni sohbet başlat",
   "agentSettings.newChat.failed": "Yeni bir sohbet başlatılamadı.",
+  "agentSettings.newChat.busy":
+    "Ajan çalışıyor. Yeni bir sohbet başlatmak için bitmesini bekleyin veya ajanı durdurun.",
   "agentSettings.deleteHistory.title": "Geçmişi sil",
   "agentSettings.deleteHistory.description": "Bu sohbetin mesajları silinir ve ajan onları unutur. Kurulumu kalır.",
   "agentSettings.deleteHistory.button": "Sil",

@@ -49,6 +49,7 @@ export const messages = {
     other: "Puedes añadir {count} carpetas como máximo",
   },
   "agentSettings.folders.browse.places": "Ir a",
+  "agentSettings.folders.browse.path": "Ruta de la carpeta",
   "agentSettings.folders.browse.home": "Carpeta de inicio",
   "agentSettings.folders.browse.parent": "Subir a {folder}",
   "agentSettings.folders.browse.failed": "No se puede abrir esta carpeta.",
@@ -95,6 +96,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Límite de uso alcanzado · omitido",
   "agentSettings.backupModels.unavailable": "No disponible ahora · omitido",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Si un límite de uso detiene a {name} después de empezar a trabajar, {name} continúa el mismo trabajo con el primer modelo disponible del orden. Vuelve a {model} cuando termina el límite, o 10 minutos después de un error del proveedor.",
   "agentSettings.groups.brain": "Cerebro",
@@ -179,6 +181,8 @@ export const messages = {
     "El agente empieza de cero y puede consultar este chat cuando lo necesite. Los mensajes permanecen visibles sobre un separador. Las instrucciones, el modelo, las herramientas, los recuerdos, el espacio de trabajo y el navegador no cambian.",
   "agentSettings.newChat.confirm": "Iniciar nuevo chat",
   "agentSettings.newChat.failed": "No se pudo iniciar un nuevo chat.",
+  "agentSettings.newChat.busy":
+    "El agente está trabajando. Para iniciar un nuevo chat, espera a que termine o detenlo.",
   "agentSettings.deleteHistory.title": "Eliminar historial",
   "agentSettings.deleteHistory.description":
     "Los mensajes de este chat se eliminan y el agente los olvida. Su configuración se mantiene.",

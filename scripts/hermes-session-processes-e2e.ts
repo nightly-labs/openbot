@@ -158,7 +158,8 @@ async function turn(client: AgentClient, threadId: string, model: string): Promi
 
 const cases = [
   { agent: "hermes-old", version: "0.21.3", sharing: "process" as const, ownProcessPerSession: true },
-  { agent: "hermes-new", version: "0.22.1", sharing: "session" as const, ownProcessPerSession: false },
+  { agent: "hermes-rebuilt", version: "0.22.2", sharing: "process" as const, ownProcessPerSession: true },
+  { agent: "hermes-new", version: "0.22.3", sharing: "session" as const, ownProcessPerSession: false },
 ];
 const logs = Object.fromEntries(cases.map((item) => [item.agent, join(root, `${item.agent}.jsonl`)]));
 const toolCallThreads: string[] = [];

@@ -57,6 +57,8 @@ export const messages = {
   "error.backend.browserSignInUnsupported":
     "Cet hôte distant ne peut pas recevoir une connexion depuis cet ordinateur.",
   "error.backend.browserSignInOpenFailed": "OpenBot n’a pas pu ouvrir la fenêtre de connexion.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot n’a pas pu charger la page dans la fenêtre de connexion. Vérifiez la connexion internet, puis rouvrez la fenêtre de connexion.",
   "error.backend.browserSignInReadFailed": "OpenBot n’a pas pu lire la connexion dans la fenêtre.",
   "error.backend.browserStopUnsupported": "Cet hôte distant ne peut pas arrêter le chargement d’une page.",
   "error.backend.sharedDataLocalOnly": "Les données partagées sont gérées sur l’ordinateur qui exécute ces agents.",
@@ -68,6 +70,12 @@ export const messages = {
     "La compaction ne réduit pas ce chat : après deux compactions, il utilise encore {percent} % de la fenêtre de contexte du modèle, donc OpenBot arrête de le compacter. Les outils et les instructions occupent la plus grande partie de la fenêtre. Désactive les serveurs MCP ou le contrôle de l'ordinateur dont cet agent n'a pas besoin, ou choisis un modèle avec une fenêtre plus grande. Puis démarre un nouveau chat.",
   "error.backend.contextCompactionStopped":
     "Deux compactages de suite de cette discussion ont échoué, donc OpenBot ne la compacte plus automatiquement. Chaque essai envoie toute la discussion au modèle et consomme la limite de votre forfait. Sélectionnez « Compacter » pour réessayer, ou démarrez une nouvelle discussion.",
+  "error.backend.contextCompactionRetrying":
+    "Le fournisseur n’a pas pu compacter cette discussion et réessaie. Les nouveaux messages de cette discussion attendent la fin du compactage. S’il ne se termine pas bientôt, OpenBot l’arrête et envoie vos messages.",
+  "error.backend.contextCompactionFailed":
+    "Le compactage de cette discussion a échoué. La discussion n’a pas changé. Les messages en attente partent maintenant vers l’agent.",
+  "error.backend.contextCompactionTimedOut":
+    "Le compactage de cette discussion a pris trop de temps, donc OpenBot l’a arrêté. La discussion n’a pas changé. Les messages en attente partent maintenant vers l’agent.",
   "error.backend.providerModelAtCapacity":
     "Le modèle est saturé. Le fournisseur réessaiera dans quelques minutes. Pour continuer maintenant, arrête le tour et choisis un autre modèle.",
   "error.backend.providerRetrying":
@@ -115,6 +123,16 @@ export const messages = {
     "Le responsable du canal n'a pas répondu à temps. Choisissez un membre ou réessayez.",
   "error.backend.channelLeadFailed":
     "Le responsable du canal n'a pas pu router ce message. Choisissez un membre ou réessayez.",
+  "error.backend.channelLeadBusy":
+    "Le modèle du responsable est occupé. Réessayez dans quelques minutes ou choisissez un membre.",
+  "error.backend.channelLeadOffline":
+    "Le modèle du responsable a perdu la connexion. Réessayez ou choisissez un membre.",
+  "error.backend.channelLeadSignIn":
+    "La connexion au fournisseur du responsable a expiré. Reconnectez-vous ou choisissez un membre.",
+  "error.backend.channelLeadModelGone":
+    "Le modèle du responsable n'est pas disponible. Choisissez un autre modèle pour le responsable ou un membre.",
+  "error.backend.channelLeadRefused":
+    "Le modèle du responsable a refusé cette demande. Choisissez un membre ou un autre modèle pour le responsable.",
   "error.backend.channelRequestMemberRequired": "Choisissez un membre pour cette demande.",
   "error.backend.channelDeliveryNotCreated": "La distribution dans le canal n’a pas été créée.",
   "error.backend.channelAssignmentStopped": "Cette tâche de canal a été arrêtée ou remplacée.",
@@ -308,6 +326,8 @@ export const messages = {
     "Le serveur s’est arrêté avant de répondre. Exécutez la commande dans un terminal pour voir son erreur.",
   "error.backend.mcpServerExitedWithOutput": "Le serveur s’est arrêté avant de répondre. Il a écrit : {detail}",
   "error.backend.mcpServerFailedToStart": "Le serveur n’a pas démarré : {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot n’a pas pu démarrer le serveur MCP {name}, car son programme n’est pas installé sur l’ordinateur qui exécute OpenBot. Installez l’application qui fournit {name} sur cet ordinateur, ou désactivez {name} dans Marketplace, Apps.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} a cessé d’attendre avant le démarrage du serveur : ses agents n’ont donc pas les outils de ce serveur.",
   "error.backend.mcpServerStoppedDuringCall": "Le serveur MCP s’est arrêté avant de répondre à cet appel.",
@@ -439,6 +459,8 @@ export const messages = {
     "Le certificat de sécurité de ce site n’est pas fiable, la page ne s’est donc pas ouverte.",
   "error.backend.browserLowMemory":
     "Ce serveur manque de mémoire : le navigateur ne peut pas ouvrir un autre onglet. Fermez un onglet, ou attendez la fin du travail des autres agents.",
+  "error.backend.browserNoMemory":
+    "Ce serveur n'a presque plus de mémoire : le navigateur ne peut pas ouvrir d'onglet pour le moment. Attendez la fin du travail des autres agents, puis réessayez.",
   "error.backend.browserOpenFailed": "Impossible d’ouvrir {url} : {reason}",
   "error.backend.popupSecureInput":
     "Les fenêtres contextuelles sont bloquées pendant une saisie sécurisée. Terminez ou annulez la saisie sécurisée, puis réessayez depuis la page.",

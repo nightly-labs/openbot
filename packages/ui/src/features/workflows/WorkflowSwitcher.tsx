@@ -109,6 +109,7 @@ export function WorkflowSwitcher(props: {
   readOnly: boolean;
   paused: boolean | undefined;
   portable: boolean;
+  copyable: boolean;
   folders: SwitcherFolders | undefined;
   onAction: (action: SwitcherAction) => void;
   onFolder: (action: FolderMenuAction) => void;
@@ -273,11 +274,13 @@ export function WorkflowSwitcher(props: {
             <span>{props.paused ? t("workflow.canvas.resume") : t("workflow.canvas.pause")}</span>
           </DropdownMenu.Item>
         </Show>
-        <DropdownMenu.Item onSelect={() => props.onAction("duplicate")}>
-          <CopyPlus class="agent-context-icon" aria-hidden="true" />
-          <span>{t("workflow.canvas.switcher.duplicate")}</span>
-        </DropdownMenu.Item>
-        <Show when={props.portable}>
+        <Show when={props.copyable}>
+          <DropdownMenu.Item onSelect={() => props.onAction("duplicate")}>
+            <CopyPlus class="agent-context-icon" aria-hidden="true" />
+            <span>{t("workflow.canvas.switcher.duplicate")}</span>
+          </DropdownMenu.Item>
+        </Show>
+        <Show when={props.portable && props.copyable}>
           <DropdownMenu.Item onSelectAfterClose={() => props.onAction("export")}>
             <Download class="agent-context-icon" aria-hidden="true" />
             <span>{t("workflow.canvas.switcher.export")}</span>

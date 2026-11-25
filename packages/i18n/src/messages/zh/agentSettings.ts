@@ -45,6 +45,7 @@ export const messages = {
   "agentSettings.folders.missing": "{folder} 不是此电脑上的文件夹",
   "agentSettings.folders.limit": { one: "最多可添加 {count} 个文件夹", other: "最多可添加 {count} 个文件夹" },
   "agentSettings.folders.browse.places": "前往",
+  "agentSettings.folders.browse.path": "文件夹路径",
   "agentSettings.folders.browse.home": "主文件夹",
   "agentSettings.folders.browse.parent": "向上：{folder}",
   "agentSettings.folders.browse.failed": "无法打开此文件夹。",
@@ -87,6 +88,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "额度已用完 · 已跳过",
   "agentSettings.backupModels.unavailable": "当前不可用 · 已跳过",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "{name} 开始工作后若因用量上限停止，会用顺序中第一个可用的模型继续同一项工作。额度重置后会回到 {model}；出现服务商错误时，则在 10 分钟后回到 {model}。",
   "agentSettings.groups.brain": "核心",
@@ -172,6 +174,7 @@ export const messages = {
     "助手会重新开始，需要时仍可查找当前对话。消息仍显示在分隔线之上。指令、模型、工具、记忆、工作区和浏览器都不会改变。",
   "agentSettings.newChat.confirm": "开始新对话",
   "agentSettings.newChat.failed": "无法开始新对话。",
+  "agentSettings.newChat.busy": "助手正在工作。要开始新对话，请等待它完成或停止它。",
   "agentSettings.deleteHistory.title": "删除历史记录",
   "agentSettings.deleteHistory.description": "此对话的消息会被删除，智能体也会忘记它们。设置保持不变。",
   "agentSettings.deleteHistory.button": "删除",

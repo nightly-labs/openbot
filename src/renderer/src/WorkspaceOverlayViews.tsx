@@ -129,6 +129,7 @@ export function MarketplaceOverlay(props: {
           hostServerId={remoteAdminServer(props.server, "skills-admin-v1")?.id}
           agentServerId={remoteAdminServer(props.server, "agent-install-v1")?.id}
           agentUpdateServerId={remoteAdminServer(props.server, "agent-update-v1")?.id}
+          xApp={manage() && serverCanAdminister(props.server, "agent-install-v1")}
           githubSkills={manage() && serverCanAdminister(props.server, "github-skills-v1")}
           onOpenChange={(open) => {
             if (!open) {

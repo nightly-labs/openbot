@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "{name} konnte nicht verlassen werden",
   "mobile.server.drawer.removeFailed": "{name} konnte nicht entfernt werden",
   "mobile.server.drawer.deleteFailed": "{name} konnte nicht gelöscht werden",
+  "mobile.server.drawer.hide": "Server ausblenden",
+  "mobile.server.drawer.show": "Server einblenden",
+  "mobile.server.drawer.hiddenServers": "Ausgeblendete Server",
+  "mobile.server.drawer.hideFailed": "{name} konnte nicht ausgeblendet werden",
+  "mobile.server.drawer.showFailed": "{name} konnte nicht eingeblendet werden",
   "mobile.server.drawer.actionFailed": "OpenBot konnte diese Aktion nicht ausführen. Versuche es erneut.",
   "mobile.server.drawer.moveUp": "Nach oben verschieben",
   "mobile.server.drawer.moveDown": "Nach unten verschieben",
@@ -101,14 +106,17 @@ export const messages = {
   "mobile.server.hosted.intro.description":
     "Ein Cloud-Server führt deine Agenten und Routinen aus, wenn dein Computer aus ist. OpenBot richtet ihn ein und hält ihn am Laufen.",
   "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
-  "mobile.server.hosted.computer.title": "Auf deinem Computer",
+  "mobile.server.hosted.steps.title": "Auf deinem Computer hinzufügen",
+  "mobile.server.hosted.steps.open": "Öffne OpenBot auf deinem Computer.",
+  "mobile.server.hosted.steps.settings": "Öffne Einstellungen → Gehostete Server.",
+  "mobile.server.hosted.steps.add": "Wähle „Server hinzufügen“ und einen Tarif.",
+  "mobile.server.hosted.plansToggle": "Was jeder Tarif enthält",
   "mobile.server.hosted.computer.add": "Cloud-Server hinzufügen",
   "mobile.server.hosted.computer.addHint":
     "Öffne in OpenBot Einstellungen → Gehostete Server und wähle „Server hinzufügen“.",
   "mobile.server.hosted.computer.change": "Tarif ändern",
   "mobile.server.hosted.computer.changeHint": "Öffne in OpenBot Einstellungen → Abrechnung.",
   "mobile.server.hosted.yourServers": "Deine Server",
-  "mobile.server.hosted.plans": "Tarife",
   "mobile.server.hosted.currentPlan": "Dein Tarif",
   "mobile.server.hosted.soldOut": "Ausverkauft",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
@@ -273,6 +281,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Dadurch wird der Server für alle Mitglieder aus dem Kontodienst entfernt. Dateien und Chats auf seinem Computer bleiben erhalten. Um ihn wieder zu nutzen, registriere ihn auf diesem Computer.",
   "mobile.server.settings.remove": "Server entfernen",
+  "mobile.server.settings.hide": "Server ausblenden",
+  "mobile.server.settings.show": "Server einblenden",
   "mobile.server.settings.deleteTitle": "{name} löschen?",
   "mobile.server.settings.deleteBody":
     "OpenBot stoppt den Server auf seinem Computer und verschiebt seine Agenten, Chats und Dateien in den Papierkorb dieses Computers. Der Server verschwindet aus der Serverliste auf allen deinen Geräten.",
@@ -343,6 +353,7 @@ export const messages = {
   "mobile.server.route.invite": "Personen einladen",
   "mobile.server.route.member": "Mitglied",
   "mobile.server.route.timezone": "Zeitzone",
+  "mobile.server.route.signalHome": "Signal-Server",
   "mobile.server.route.personality": "Agent-Persönlichkeit",
   "mobile.server.route.agents": "Agenten",
   "mobile.server.route.voiceModel": "Spracherkennung",
@@ -475,6 +486,29 @@ export const messages = {
     "Verbinde dich als Eigentümer oder Admin mit diesem Server, um seine Zeitzone zu ändern.",
   "mobile.server.settings.timezoneUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um seine Zeitzone hier zu ändern.",
+  "mobile.server.settings.signalHomeAutomatic": "Automatisch",
+  "mobile.server.settings.signalHomeNearest": "Der nächste Signal-Server",
+  "mobile.server.settings.signalHomeInUse": "In Verwendung: {name}",
+  "mobile.server.settings.signalHomeLoading": "Signal-Server werden gemessen…",
+  "mobile.server.settings.signalHomeSaveFailed": "Der Signal-Server konnte nicht geändert werden. Versuche es erneut.",
+  "mobile.server.settings.signalHomeUnavailable":
+    "Verbinde dich als Eigentümer oder Admin mit diesem Server, um seinen Signal-Server zu ändern.",
+  "mobile.server.settings.signalHomeUnsupported":
+    "Aktualisiere OpenBot auf diesem Server, um seinen Signal-Server hier zu ändern.",
+  "mobile.server.settings.signalHomeDescription":
+    "Mitglieder verbinden sich über diesen Signal-Server mit diesem Server. Ein Signal-Server mit geringerer Latenz ergibt schnellere Verbindungen.",
+  "mobile.server.settings.signalHomeFallback":
+    "{chosen} antwortet nicht. Der Server nutzt {name}, bis {chosen} wieder antwortet.",
+  "mobile.server.settings.signalHomeMoving":
+    "Der Server wechselt zu {name}. Mitglieder verbinden sich in wenigen Sekunden neu.",
+  "mobile.server.settings.signalHomeLoadFailed": "Die Signal-Server konnten nicht geladen werden.",
+  "mobile.server.settings.signalHomeLatency": "{latency} ms",
+  "mobile.server.settings.signalHomeNoAnswer": "Keine Antwort",
+  "mobile.server.settings.signalHomePlaceHelsinki1": "Helsinki 1",
+  "mobile.server.settings.signalHomePlaceHelsinki2": "Helsinki 2",
+  "mobile.server.settings.signalHomePlaceSanJose": "San José",
+  "mobile.server.settings.signalHomePlaceSydney": "Sydney",
+  "mobile.server.settings.signalHomePlaceSingapore": "Singapur",
   "mobile.server.settings.voiceModelDescription":
     "Agenten auf diesem Server verwenden dieses Modell, um den Ton von Videos ohne Untertitel zu transkribieren.",
   "mobile.server.settings.voiceModelLoading": "Spracherkennung wird geladen …",
@@ -509,6 +543,21 @@ export const messages = {
   "mobile.server.settings.keyOwnerOnly": "Nur der Eigentümer kann den Serverschlüssel ändern.",
   "mobile.server.settings.keyUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um seinen Schlüssel hier zu ändern.",
+  "mobile.server.settings.turnLimit": "Threads gleichzeitig",
+  "mobile.server.settings.turnLimitDescription":
+    "Wie viele Agent-Threads auf diesem Server gleichzeitig laufen können. Mehr Threads brauchen mehr Arbeitsspeicher.",
+  "mobile.server.settings.turnLimitAutomatic": "Automatisch ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Automatisch (kein Limit)",
+  "mobile.server.settings.turnLimitUnlimited": "Kein Limit",
+  "mobile.server.settings.turnLimitsLoadFailed": "Die Thread-Limits dieses Servers konnten nicht geladen werden.",
+  "mobile.server.settings.turnLimitsSaveFailed":
+    "Das Thread-Limit konnte nicht gespeichert werden. Versuche es erneut.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Aktualisiere OpenBot auf diesem Server, um sein Thread-Limit hier zu ändern.",
+  "mobile.server.settings.agentTaskLimit": "Parallele Threads pro Agent",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Wie viele Threads jeder Agent gleichzeitig ausführen kann, wenn er kein eigenes Limit hat.",
+  "mobile.server.settings.agentTaskLimitDefault": "Standard ({count})",
   "mobile.server.settings.memoryLimit": "Erinnerungen pro Agent",
   "mobile.server.settings.memoryLimitDescription":
     "Wie viele Erinnerungen jeder Agent auf diesem Server behalten kann.",
@@ -958,7 +1007,7 @@ export const messages = {
     "Nur dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, können schreiben. Andere bekommen keine Antwort. Wenn es aus ist, antwortet OpenBot unbekannten Personen mit einem Code.",
   "mobile.server.connectors.whatsapp.workingMessage": "Nachricht „Wird bearbeitet…“",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot sendet sie, während der Agent arbeitet, und ersetzt sie dann durch die Antwort. Eine Anfrage, die auf eine frühere wartet, bekommt auch eine Wartemeldung. Schalte sie aus, um nur die Antwort zu senden.",
+    "OpenBot sendet sie, während der Agent arbeitet, und ersetzt sie dann durch die Antwort. Eine Anfrage, die auf eine frühere wartet, bekommt auch eine Wartemeldung. Bei einer privaten Nummer bekommt nur dein Chat „Nachricht an dich selbst“ diese Meldungen. Schalte sie aus, um nur die Antwort zu senden.",
   "mobile.server.connectors.whatsapp.statusReactions": "Status-Reaktionen",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot reagiert mit 👀, wenn eine Nachricht ankommt, und mit ✅, wenn die Antwort fertig ist. Schalte sie aus, um keine Reaktionen zu senden.",
@@ -1025,6 +1074,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "Eine Nummer kann bis zu {count} Kontakte und Gruppen zulassen.",
   "mobile.server.connectors.whatsapp.senderGroup": "Gruppe",
   "mobile.server.connectors.whatsapp.removeSender": "Entfernen",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · Nur lesen",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "Auf Nur lesen setzen",
+  "mobile.server.connectors.whatsapp.allowWork": "Aufgaben erlauben",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "Nur lesen: Agenten können diesen Chat lesen, und OpenBot schreibt nie darin.",
   "mobile.server.connectors.whatsapp.addContact": "Kontakt hinzufügen",
   "mobile.server.connectors.whatsapp.addGroup": "Gruppe hinzufügen",
   "mobile.server.connectors.whatsapp.contactTitle": "Kontakt hinzufügen",

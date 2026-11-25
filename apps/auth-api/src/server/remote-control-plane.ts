@@ -7,6 +7,7 @@ import {
 } from "@openbot/contracts/host-key-handover";
 import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import { isAvatarColor } from "@openbot/contracts/ipc";
+import { isSignalHomeId } from "@openbot/contracts/ipc-host-signal-home";
 import type { MobileConnectHostBinding } from "@openbot/contracts/mobile-connect";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import type { RemoteAuthEvent } from "@openbot/contracts/signal-protocol/auth-events";
@@ -325,6 +326,7 @@ export interface RemoteSignalPlan {
 interface SignalHostPlace {
   location: SignalLocation | null;
   country: string | null;
+  preferred: string | null;
 }
 
 export interface SignalLocation {
@@ -337,7 +339,6 @@ interface RemoteSignalHome {
   url: string;
 }
 
-const SIGNAL_HOME_ID_PATTERN = /^[a-z0-9-]{1,32}$/u;
 const SIGNAL_COUNTRY_PATTERN = /^[A-Z][A-Z0-9]$/u;
 const NEAR_SIGNAL_HOME_MARGIN_KM = 1_000;
 const EARTH_RADIUS_KM = 6_371;
@@ -888,7 +889,7 @@ export class RemoteControlPlane {
         dependencies.database
           .prepare(
             `SELECT h.host_id, h.name, h.logo_key, h.appearance_shape, h.appearance_color, h.device_public_key,
-           h.auth_epoch, m.membership_id, m.role,
+           h.auth_epoch, m.membership_id, m.role, m.hidden_at,
            (SELECT s.plan FROM hosted_servers s WHERE s.server_id = h.host_id
              AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_plan,
            (SELECT s.operator_host FROM hosted_servers s WHERE s.server_id = h.host_id
@@ -914,6 +915,7 @@ export class RemoteControlPlane {
               auth_epoch: number;
               membership_id: string;
               role: RemoteMemberRole;
+              hidden_at: number | null;
               hosted_plan: string | null;
               operator_host: string | null;
               hosted_storage_tier: number | null;
@@ -942,6 +944,7 @@ export class RemoteControlPlane {
               role: row.role,
               memberLimit: license ? Math.min(limit, license.users) : limit,
               hosted: row.hosted_plan !== null,
+              ...(row.hidden_at === null ? {} : { hidden: true as const }),
               ...(row.operator_host === null ? {} : { restartAvailable: false }),
               ...hostedStorage(row.hosted_plan, row.hosted_storage_tier),
               ...customServerPayment(row, row.role),
@@ -1370,7 +1373,7 @@ export class RemoteControlPlane {
                 WHERE invite_id = ? AND revoked_at IS NULL AND expires_at > ? AND ${memberSeat.sql}
                   AND ${INVITE_STILL_GRANTED_SQL}
                ON CONFLICT(host_id, user_id) DO UPDATE SET
-                 role = excluded.role, status = 'active', updated_at = excluded.updated_at, removed_at = NULL
+                 role = excluded.role, status = 'active', updated_at = excluded.updated_at, removed_at = NULL, hidden_at = NULL
                 WHERE remote_memberships.status = 'revoked' AND remote_memberships.role <> 'owner'`
                 : `INSERT INTO remote_memberships(
                  membership_id, host_id, user_id, role, status, created_at, updated_at
@@ -1379,7 +1382,7 @@ export class RemoteControlPlane {
                 WHERE invite_id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?
                   AND ${memberSeat.sql} AND ${INVITE_STILL_GRANTED_SQL}
                ON CONFLICT(host_id, user_id) DO UPDATE SET
-                 role = excluded.role, status = 'active', updated_at = excluded.updated_at, removed_at = NULL
+                 role = excluded.role, status = 'active', updated_at = excluded.updated_at, removed_at = NULL, hidden_at = NULL
                 WHERE remote_memberships.status = 'revoked' AND remote_memberships.role <> 'owner'`,
             )
             .bind(
@@ -1483,7 +1486,7 @@ export class RemoteControlPlane {
               `INSERT INTO remote_memberships(membership_id, host_id, user_id, role, status, created_at, updated_at)
                SELECT ?, ?, ?, 'member', 'active', ?, ? WHERE ${memberSeat.sql}
                ON CONFLICT(host_id, user_id) DO UPDATE SET
-                 role = 'member', status = 'active', updated_at = excluded.updated_at, removed_at = NULL
+                 role = 'member', status = 'active', updated_at = excluded.updated_at, removed_at = NULL, hidden_at = NULL
                 WHERE remote_memberships.status = 'revoked' AND remote_memberships.role <> 'owner'`,
             )
             .bind(membershipId, hostId, userId, now, now, ...memberSeat.binds),
@@ -1579,7 +1582,8 @@ export class RemoteControlPlane {
       if (input.revoke && input.reactivate) return yield* invalid("member status");
       const activating = !input.revoke && (input.reactivate === true || membership.status === "active");
       const memberSeat = yield* this.#memberSeat(input.hostId, membership.user_id);
-      if (activating && membership.status !== "active") yield* this.#requireMemberSeat(memberSeat);
+      const reactivating = activating && membership.status !== "active";
+      if (reactivating) yield* this.#requireMemberSeat(memberSeat);
       const removedAt = removedAtAfterChange({
         revoke: input.revoke === true,
         leave: leavingOwnMembership,
@@ -1603,7 +1607,7 @@ export class RemoteControlPlane {
         dependencies.database.batch([
           dependencies.database
             .prepare(
-              `UPDATE remote_memberships SET ${guardsRole ? "role = ?, " : ""}status = ?, updated_at = ?, removed_at = ${removedAt}
+              `UPDATE remote_memberships SET ${guardsRole ? "role = ?, " : ""}status = ?, updated_at = ?, removed_at = ${removedAt}${reactivating ? ", hidden_at = NULL" : ""}
             WHERE membership_id = ? AND status = ?${guardsRole ? " AND role = ?" : " AND role != 'owner'"}${activating ? ` AND ${memberSeat.sql}` : ""}`,
             )
             .bind(
@@ -1878,7 +1882,7 @@ export class RemoteControlPlane {
               `INSERT INTO remote_memberships(membership_id, host_id, user_id, role, status, created_at, updated_at)
              SELECT ?, ?, ?, 'owner', 'active', ?, ? WHERE ${applied.sql}
              ON CONFLICT(host_id, user_id) DO UPDATE SET
-               role = 'owner', status = 'active', removed_at = NULL, updated_at = excluded.updated_at`,
+               role = 'owner', status = 'active', removed_at = NULL, hidden_at = NULL, updated_at = excluded.updated_at`,
             )
             .bind(membershipId, hostId, user.id, now, now, ...applied.binds),
           dependencies.database
@@ -2416,6 +2420,25 @@ export class RemoteControlPlane {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
+  readonly setHostHidden = Effect.fn("RemoteControlPlane.setHostHidden")(
+    function* (this: RemoteControlPlane, userId: string, hostId: string, hidden: boolean) {
+      const membership = yield* this.#requireRole(hostId, userId, ["owner", "admin", "member"]);
+      const dependencies = yield* RemoteDependencies;
+      const now = dependencies.now();
+      yield* remoteCall(() =>
+        dependencies.database
+          .prepare(
+            `UPDATE remote_memberships SET hidden_at = ?, updated_at = ?
+              WHERE membership_id = ? AND status = 'active' AND (hidden_at IS NULL) = ?`,
+          )
+          .bind(hidden ? now : null, now, membership.membership_id, hidden ? 1 : 0)
+          .run(),
+      );
+      yield* this.#serversChanged("SELECT ? AS user_id", userId);
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
   readonly deleteHost = Effect.fn("RemoteControlPlane.deleteHost")(
     function* (
       this: RemoteControlPlane,
@@ -2531,6 +2554,7 @@ export class RemoteControlPlane {
         failedSignalUrl: string | null;
         location?: SignalLocation | null;
         country?: string | null;
+        preferredSignalHome?: string | null;
       } = {
         signalHome: null,
         failedSignalUrl: null,
@@ -2551,6 +2575,7 @@ export class RemoteControlPlane {
         ? yield* this.#placeHost(host, signal, placement.failedSignalUrl, {
             location: placement.location ?? null,
             country: placement.country ?? null,
+            preferred: placement.preferredSignalHome ?? null,
           })
         : null;
       const issued = yield* dependencies.signer.issue({
@@ -2704,6 +2729,21 @@ export class RemoteControlPlane {
         "webhook_route_limit",
         "This host has reached its webhook route limit.",
       );
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly listSignalHomes = Effect.fn("RemoteControlPlane.listSignalHomes")(
+    function* (
+      this: RemoteControlPlane,
+      hostId: string,
+      machineToken: string,
+    ): Effect.fn.Return<{ homes: RemoteSignalHome[] }, RemoteFailure, RemoteDependencies> {
+      const dependencies = yield* RemoteDependencies;
+      yield* this.authenticateHost(hostId, machineToken);
+      const signal = dependencies.signal;
+      if (!signal) return yield* remoteSignalNotConfigured();
+      return { homes: [...signal.homes].map(([id, url]) => ({ id, url })) };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -3459,8 +3499,14 @@ export class RemoteControlPlane {
     place: SignalHostPlace,
   ): Effect.fn.Return<RemoteSignalHome | null, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
-    const candidates = nearSignalHomes(signal, failedSignalUrl, place);
     const current = configuredSignalHome(signal, host.signal_home);
+    const preferred = configuredSignalHome(signal, place.preferred);
+    if (preferred && preferred.url !== failedSignalUrl) {
+      if (preferred.id === host.signal_home) return preferred;
+      if (yield* signalAnswers(dependencies.fetch, preferred.url, SIGNAL_HOME_MOVE_TIMEOUT_MS))
+        return yield* this.#storeSignalHome(host, signal, preferred);
+    }
+    const candidates = nearSignalHomes(signal, failedSignalUrl, place);
     if (current && candidates.includes(current.id)) return current;
     const chosen = configuredSignalHome(signal, yield* rendezvousSignalHome(host.host_id, candidates));
     if (!chosen || chosen.id === host.signal_home) return chosen;
@@ -3470,6 +3516,16 @@ export class RemoteControlPlane {
       !(yield* signalAnswers(dependencies.fetch, chosen.url, SIGNAL_HOME_MOVE_TIMEOUT_MS))
     )
       return current;
+    return yield* this.#storeSignalHome(host, signal, chosen);
+  });
+
+  readonly #storeSignalHome = Effect.fn("RemoteControlPlane.storeSignalHome")(function* (
+    this: RemoteControlPlane,
+    host: RemoteHostRow,
+    signal: RemoteSignalPlan,
+    chosen: RemoteSignalHome,
+  ): Effect.fn.Return<RemoteSignalHome, RemoteFailure, RemoteDependencies> {
+    const dependencies = yield* RemoteDependencies;
     const stored = yield* remoteCall(() =>
       dependencies.database
         .prepare("UPDATE remote_hosts SET signal_home = ? WHERE host_id = ? AND signal_home IS ?")
@@ -3666,7 +3722,7 @@ export function remoteSignalPlan(
     const id = entry.slice(0, separator).trim();
     const url = entry.slice(separator + 1).trim();
     const protocol = urlProtocol(url);
-    if (!SIGNAL_HOME_ID_PATTERN.test(id) || homes.has(id)) return null;
+    if (!isSignalHomeId(id) || homes.has(id)) return null;
     if (protocol !== "wss:" && !(permitsWs && protocol === "ws:")) return null;
     homes.set(id, url);
   }

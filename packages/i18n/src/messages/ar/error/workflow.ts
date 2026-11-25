@@ -11,6 +11,7 @@ export const messages = {
   "error.workflow.conditionBranch": "يجب أن يكون كل اتصال من شرط «نعم» أو «لا».",
   "error.workflow.duplicateEdge": "لهاتين الخطوتين هذا الاتصال بالفعل.",
   "error.workflow.serverTooOld": "لا يدعم هذا الخادم مسارات العمل. حدّث OpenBot على الحاسوب الذي يشغّله.",
+  "error.workflow.newerSteps": "يحتوي سير العمل هذا على خطوات من إصدار أحدث من OpenBot. حدّث OpenBot لتغييره.",
   "error.workflow.nodeUnsupported": "لا يستطيع هذا الإصدار من OpenBot تشغيل خطوات الصور والملفات والرسائل بعد.",
   "error.workflow.interrupted": "توقف OpenBot أثناء تشغيل هذه الخطوة. شغّلها مرة أخرى.",
   "error.workflow.agentMissing": "اختر وكيلًا لهذه الخطوة.",

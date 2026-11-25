@@ -50,6 +50,7 @@ export const messages = {
     other: "Du kannst höchstens {count} Ordner hinzufügen",
   },
   "agentSettings.folders.browse.places": "Gehe zu",
+  "agentSettings.folders.browse.path": "Ordnerpfad",
   "agentSettings.folders.browse.home": "Benutzerordner",
   "agentSettings.folders.browse.parent": "Nach oben: {folder}",
   "agentSettings.folders.browse.failed": "Dieser Ordner kann nicht geöffnet werden.",
@@ -96,6 +97,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Nutzungslimit erreicht · übersprungen",
   "agentSettings.backupModels.unavailable": "Gerade nicht verfügbar · übersprungen",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Stoppt ein Nutzungslimit {name} nach Beginn der Arbeit, setzt {name} dieselbe Arbeit mit dem ersten verfügbaren Modell der Reihenfolge fort. Wenn das Limit endet oder 10 Minuten nach einem Anbieterfehler, kehrt {name} zu {model} zurück.",
   "agentSettings.groups.brain": "Gehirn",
@@ -180,6 +182,8 @@ export const messages = {
     "Der Agent beginnt neu und kann diesen Chat bei Bedarf noch durchsuchen. Die Nachrichten bleiben über einer Trennlinie sichtbar. Anweisungen, Modell, Werkzeuge, Erinnerungen, Arbeitsbereich und Browser bleiben unverändert.",
   "agentSettings.newChat.confirm": "Neuen Chat starten",
   "agentSettings.newChat.failed": "Ein neuer Chat konnte nicht gestartet werden.",
+  "agentSettings.newChat.busy":
+    "Der Agent arbeitet gerade. Warte, bis er fertig ist, oder stoppe ihn, um einen neuen Chat zu starten.",
   "agentSettings.deleteHistory.title": "Verlauf löschen",
   "agentSettings.deleteHistory.description":
     "Die Nachrichten dieses Chats werden gelöscht, und der Agent vergisst sie. Seine Einrichtung bleibt.",

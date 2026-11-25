@@ -107,6 +107,11 @@ export const messages = defineMessages("error.team", {
   "error.team.sideQuestionUnsupported": "Side questions are not supported by this connection.",
   "error.team.liveVoiceUnsupported":
     "This server does not support Codex live voice. Update OpenBot on the computer that runs it.",
+  "error.team.voiceTranscriptionUnsupported":
+    "This server does not support dictation. Update OpenBot on the computer that runs it.",
+  "error.team.clientBrowserUnsupported":
+    "This server does not support shared Chrome tabs. Update OpenBot on the computer that runs it.",
+  "error.team.clientBrowserCommandUnknown": "The agent no longer waits for this Chrome action.",
   "error.team.routineFlowsUnsupported":
     "This server does not support routine flows. Update OpenBot on the computer that runs it.",
   "error.team.routineCanvasTooLarge":
@@ -123,6 +128,7 @@ export const messages = defineMessages("error.team", {
   "error.team.hostIdentityUnsupported": "Server identity changes are not supported by this connection.",
   "error.team.hostUpdateUnsupported": "Host updates are not supported by this connection.",
   "error.team.hostTimezoneUnsupported": "The server timezone is not supported by this connection.",
+  "error.team.hostSignalHomeUnsupported": "The Signal server choice is not supported by this connection.",
   "error.team.hostVoiceModelUnsupported":
     "The speech recognition model of the server is not supported by this connection.",
   "error.team.hostRestartUnsupported": "Restarting the server is not supported by this connection.",

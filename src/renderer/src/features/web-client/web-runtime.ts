@@ -85,6 +85,7 @@ import {
   isSidebarLayoutSnapshot,
   isTeamPresenceSnapshot,
   withFastServiceTiers,
+  withKeptModels,
   withModelListings,
   withModelSources,
   withSteeringModels,
@@ -172,6 +173,10 @@ import {
   MESSAGE_PINS_ROUTES,
 } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
+import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -355,6 +360,7 @@ export interface WebWorkspaceRuntime {
   listHosts(): Promise<RemoteTeamHost[]>;
   leaveHost(hostId: string, membershipId: string): Promise<void>;
   removeOwnedHost?: (hostId: string) => Promise<void>;
+  setHostHidden?: (hostId: string, hidden: boolean) => Promise<void>;
   ownerTransfers?: WebOwnerTransfers;
   previewInvite(url: string): Promise<InvitePreview>;
   acceptInvite(url: string): Promise<RemoteTeamHost>;
@@ -1282,6 +1288,7 @@ export function createWebWorkspaceRuntime(
       Effect.runPromise(respondToBrowserTakeover(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     listHosts: () => runTeamEffect(directory.listHosts()),
     leaveHost: (hostId, membershipId) => runTeamEffect(directory.leaveHost(hostId, membershipId)),
+    setHostHidden: (hostId, hidden) => runTeamEffect(directory.setHostHidden(hostId, hidden)),
     ownerTransfers: {
       pending: (hostId) => runTeamEffect(directory.pendingOwnerTransfer(hostId)),
       start: (hostId, email) => runTeamEffect(directory.startOwnerTransfer(hostId, email)),
@@ -1651,7 +1658,7 @@ export function createWebWorkspaceRuntime(
         isClientAgentModelOption,
         "models",
       )(await request("GET", TEAM_API_ROUTES.agents.models));
-      const [fast, listings, steering] = await Promise.all([
+      const [fast, listings, steering, kept] = await Promise.all([
         capabilities.includes(AGENT_SPEED_CAPABILITY)
           ? request("POST", AGENT_SPEED_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
           : capabilities.includes(AGENT_FAST_MODE_CAPABILITY)
@@ -1663,9 +1670,15 @@ export function createWebWorkspaceRuntime(
         capabilities.includes(MODEL_STEERING_CAPABILITY)
           ? request("POST", MODEL_STEERING_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
           : [],
+        capabilities.includes(MODEL_VISIBILITY_KEPT_CAPABILITY)
+          ? request("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
+          : [],
       ]);
       return withWorkspaceOnlyLimit(
-        withSteeringModels(withModelListings(withFastServiceTiers(models, fast), listings), steering),
+        withSteeringModels(
+          withKeptModels(withModelListings(withFastServiceTiers(models, fast), listings), kept),
+          steering,
+        ),
         capabilities.includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
       );
     },
