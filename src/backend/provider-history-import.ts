@@ -73,7 +73,7 @@ export interface ProviderHistoryImportInput {
   quietTeammateThread?: boolean;
   continuesQuietRun?(delivery: DeliveryContext["delivery"]): boolean;
   requestAnswered?(deliveryId: string): boolean;
-  followsUpOwnMessage?(delivery: DeliveryContext["delivery"]): boolean;
+  followsUpOwnAnswer?(delivery: DeliveryContext["delivery"]): boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -335,7 +335,7 @@ function routineTurnAnswers(
   input: ProviderHistoryImportInput,
   turnId: string,
 ): Effect.Effect<RoutineTurnAnswers, ProviderClientOperationError> {
-  const followsUpOwnMessage = (delivery: DeliveryContext["delivery"]) => input.followsUpOwnMessage?.(delivery) === true;
+  const followsUpOwnAnswer = (delivery: DeliveryContext["delivery"]) => input.followsUpOwnAnswer?.(delivery) === true;
   return Effect.gen(function* () {
     let routine: boolean | undefined;
     let requestsOnly = true;
@@ -364,11 +364,11 @@ function routineTurnAnswers(
               quietTeammateTurnDelivery(
                 delivery,
                 (request) => input.requestAnswered?.(request.id) === true,
-                followsUpOwnMessage,
+                followsUpOwnAnswer,
               )) ||
               (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)) ||
               continuesQuietRun);
-          requestsOnly &&= delivery !== undefined && teammateRequest(delivery, followsUpOwnMessage);
+          requestsOnly &&= delivery !== undefined && teammateRequest(delivery, followsUpOwnAnswer);
           if (delivery?.status === "completed" && delivery.error !== null) failureReported = true;
         }
         if (item.type === "agentMessage" && typeof item.text === "string" && item.text && item.phase !== "commentary") {

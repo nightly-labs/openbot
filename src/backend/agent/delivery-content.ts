@@ -120,7 +120,7 @@ export interface DeliveryPromptSources {
   fromChrome?: boolean;
   steerFramedAsUser?: boolean;
   steersQuietTurn?: boolean;
-  followsUpOwnMessage?: boolean;
+  followsUpOwnAnswer?: boolean;
   externalChat?: boolean;
   taskReport?: TaskReportState | null;
   taskReportWaiting?: readonly string[];
@@ -403,7 +403,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   const { delivery, managedAttachments } = context;
   const { agentNames, snapshot } = sources;
   const fromTeammate = delivery.sender.kind === "agent" && delivery.sender.agentId !== delivery.recipientAgentId;
-  const answersRequest = Boolean(delivery.replyToMessageId) && sources.followsUpOwnMessage !== true;
+  const answersRequest = Boolean(delivery.replyToMessageId) && sources.followsUpOwnAnswer !== true;
   const displayText = displayMessageReferences(delivery.text, delivery.attachments, agentNames, {
     fileHeadings: true,
     tags: fromTeammate ? undefined : sources.tags,

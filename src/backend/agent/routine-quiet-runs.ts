@@ -34,18 +34,18 @@ export function quietRoutineRun(run: Pick<RoutineRun, "kind" | "source">): boole
   return run.kind === "scheduled" || run.source === "script" || run.source === "webhook";
 }
 
-export type FollowsUpOwnMessage = (delivery: QueueDelivery) => boolean;
+export type FollowsUpOwnAnswer = (delivery: QueueDelivery) => boolean;
 
-function newTeammateMessage(delivery: QueueDelivery, followsUpOwnMessage: FollowsUpOwnMessage): boolean {
+function newTeammateMessage(delivery: QueueDelivery, followsUpOwnAnswer: FollowsUpOwnAnswer): boolean {
   return (
     delivery.sender.kind === "agent" &&
     delivery.sender.agentId !== delivery.recipientAgentId &&
-    (!delivery.replyToMessageId || followsUpOwnMessage(delivery))
+    (!delivery.replyToMessageId || followsUpOwnAnswer(delivery))
   );
 }
 
-export function quietTeammateDelivery(delivery: QueueDelivery, followsUpOwnMessage: FollowsUpOwnMessage): boolean {
-  return delivery.expectsReply === false && newTeammateMessage(delivery, followsUpOwnMessage);
+export function quietTeammateDelivery(delivery: QueueDelivery, followsUpOwnAnswer: FollowsUpOwnAnswer): boolean {
+  return delivery.expectsReply === false && newTeammateMessage(delivery, followsUpOwnAnswer);
 }
 
 export function answeredRequestId(delivery: QueueDelivery): string | null {
@@ -57,18 +57,18 @@ export function answeredRequestId(delivery: QueueDelivery): string | null {
     : null;
 }
 
-export function teammateRequest(delivery: QueueDelivery, followsUpOwnMessage: FollowsUpOwnMessage): boolean {
-  return delivery.expectsReply !== false && newTeammateMessage(delivery, followsUpOwnMessage);
+export function teammateRequest(delivery: QueueDelivery, followsUpOwnAnswer: FollowsUpOwnAnswer): boolean {
+  return delivery.expectsReply !== false && newTeammateMessage(delivery, followsUpOwnAnswer);
 }
 
 export function quietTeammateTurnDelivery(
   delivery: QueueDelivery,
   answered: (delivery: QueueDelivery) => boolean,
-  followsUpOwnMessage: FollowsUpOwnMessage,
+  followsUpOwnAnswer: FollowsUpOwnAnswer,
 ): boolean {
   return (
-    quietTeammateDelivery(delivery, followsUpOwnMessage) ||
-    (teammateRequest(delivery, followsUpOwnMessage) && answered(delivery))
+    quietTeammateDelivery(delivery, followsUpOwnAnswer) ||
+    (teammateRequest(delivery, followsUpOwnAnswer) && answered(delivery))
   );
 }
 

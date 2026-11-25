@@ -301,7 +301,7 @@ export class QueueControls {
         quietTeammateTurnDelivery(
           delivery,
           (request) => this.#mailbox.hasOwnReplyFrom(request.id),
-          (follow) => this.#mailbox.followsUpOwnMessage(follow),
+          (follow) => this.#mailbox.followsUpOwnAnswer(follow),
         ),
       );
     yield* client
@@ -331,7 +331,7 @@ export class QueueControls {
                   ? this.#routines.timezoneForDelivery(input.deliveryId)
                   : undefined,
               answeredRoutine: this.#drain.answeredRoutine(context.delivery),
-              followsUpOwnMessage: this.#mailbox.followsUpOwnMessage(context.delivery),
+              followsUpOwnAnswer: this.#mailbox.followsUpOwnAnswer(context.delivery),
               taskReport: this.#drain.taskReport(context),
               taskReportWaiting: this.#drain.taskReportWaiting(context),
               tags: this.#hooks.tagReferences(agent.id, publicThreadId),
