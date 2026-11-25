@@ -1461,15 +1461,17 @@ Hermes 0.21.5 advertises `session/resume`, but a resume of a missing session mak
 and the reply does not carry its id: each later prompt to the saved id would end as "refusal".
 `HERMES_ACP_FLAVOR.loadInsteadOfResume` restores with `session/load`, whose reply for a missing
 session is null, which the SDK gives as `{}`; a reply with no `modes` is a missing session.
-Hermes before 0.22.1 keeps one MCP server of each name for its whole process, so in one shared
-process each session's `openbot` call went out with the bearer token of the first session. OpenBot
-then ran it as that session's agent, and a message to that agent was refused as a message to
-itself (#13120). Hermes 0.22.1 gives each session its own servers (`GatewayACPAgent`). Both Hermes
-flavors set `sessionProcessesBefore: "0.22.1"`: when `initialize` reports an older `agentInfo.version`,
+Hermes before 0.22.1, and Hermes 0.22.2, keep one MCP server of each name for the whole process,
+so in one shared process each session's `openbot` call went out with the bearer token of the first
+session. OpenBot then ran it as that session's agent, and a message to that agent was refused as a message to
+itself (#13120). Hermes 0.22.3 gives each session its own servers (`GatewayACPAgent`,
+`gateway/session_local_mcp.py`). Hermes 0.22.1 had them too, but Hermes 0.22.2 is a rebuild of the
+older line without them, and shares the servers again (#15923). Both Hermes flavors set
+`sessionProcessesBefore: "0.22.3"`: when `initialize` reports an older `agentInfo.version`,
 each session runs in a Hermes process of its own, as for Mistral. Hermes keeps its sessions in
 `state.db`, so an idle session closes with its process and loads again in a new one. A version that
 `isVersion` does not read keeps the shared process. `bun run test:hermes-session-processes` checks
-both versions with a fake `hermes` agent.
+0.21.3, 0.22.2 and 0.22.3 with a fake `hermes` agent.
 Hermes reads only one project context file: `.hermes.md` or `HERMES.md` before `AGENTS.md`. It
 reads project skills only in a git root that `skills.trusted_project_dirs` names. A turn that fails
 with an exception in Hermes ends as answer text `Error: …`, not as a failed turn. Team API
