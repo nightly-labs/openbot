@@ -170,7 +170,9 @@ function spenderSql(wallet: CreditWallet, { user, server, actor, via }: SpenderP
   if ("userId" in wallet)
     return `EXISTS (SELECT 1 FROM users WHERE id = ${user}) AND CASE
       WHEN ${via} IS NULL THEN ${actor} IS NOT NULL AND ${actor} = ${user}
-      ELSE (${actor} IS NULL OR ${actor} = ${user}) AND EXISTS (SELECT 1 FROM remote_hosts WHERE host_id = ${via} AND owner_user_id = ${user})
+      ELSE EXISTS (SELECT 1 FROM remote_hosts WHERE host_id = ${via} AND owner_user_id = ${user}) AND (${actor} IS NULL OR ${actor} = ${user} OR EXISTS (
+        SELECT 1 FROM remote_memberships m WHERE m.host_id = ${via} AND m.user_id = ${actor} AND m.status = 'active'
+      ))
     END`;
   return `${via} IS NULL AND EXISTS (SELECT 1 FROM remote_hosts WHERE host_id = ${server}) AND (${actor} IS NULL OR EXISTS (
     SELECT 1 FROM remote_memberships m WHERE m.host_id = ${server} AND m.user_id = ${actor} AND m.status = 'active'

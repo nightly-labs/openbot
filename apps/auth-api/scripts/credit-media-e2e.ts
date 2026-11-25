@@ -1242,20 +1242,39 @@ async function welcomeRouteFlow() {
   const paidOnServer = await failure(service.submit(studio, null, submission("video-one", { duration: 5 })));
   database.prepare("UPDATE credit_grants SET remaining_tenths = 30 WHERE grant_id = ?").run(`welcome:${OWNER}`);
   const tooBig = await failure(service.submit(studio, null, submission("image-one", { count: 4 })));
+  check(
+    "the owner's free credits never pay for a model with no free use or a job they cannot cover",
+    paidOnServer.code === "credits_spend_not_enough" &&
+      tooBig.code === "credits_spend_not_enough" &&
+      (await run(service.balance(owner))).welcome === 3,
+    { paidOnServer, tooBig },
+  );
+
   database.exec(`
     INSERT INTO users(id, identity_key, email, created_at, updated_at)
     VALUES ('member', 'email:member@example.test', 'member@example.test', 1, 1);
     INSERT INTO remote_memberships(membership_id, host_id, user_id, role, status, created_at, updated_at)
     VALUES ('m-member', '${SERVER_ID}', 'member', 'member', 'active', 1, 1);
   `);
-  const memberJob = await failure(service.submit(studio, "member", submission("image-one")));
+  const outsiderJob = await failure(service.submit(studio, OUTSIDER, submission("image-one")));
+  const memberSubmission = submission("image-one");
+  await run(service.submit(studio, "member", memberSubmission));
+  const memberHold = database
+    .prepare("SELECT user_id, server_id, actor_user_id, via_server_id, funding FROM credit_holds WHERE job_id = ?")
+    .get(memberSubmission.request.jobId);
   check(
-    "the owner's free credits never pay for a model with no free use, a job they cannot cover, or a job of another member",
-    paidOnServer.code === "credits_spend_not_enough" &&
-      tooBig.code === "credits_spend_not_enough" &&
-      memberJob.code === "credits_spend_not_enough" &&
-      (await run(service.balance(owner))).welcome === 3,
-    { paidOnServer, tooBig, memberJob },
+    "a job of a server member also uses the owner's free credits; a job of a user who is not a member does not",
+    outsiderJob.code === "credits_spend_member" &&
+      JSON.stringify(memberHold) ===
+        JSON.stringify({
+          user_id: OWNER,
+          server_id: null,
+          actor_user_id: "member",
+          via_server_id: SERVER_ID,
+          funding: "welcome",
+        }) &&
+      (await run(service.balance(owner))).welcome === 1.5,
+    { outsiderJob, memberHold },
   );
 }
 

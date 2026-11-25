@@ -578,7 +578,7 @@ export class CreditMediaService {
     serverShort: BillingError,
   ): Effect.fn.Return<CreditHold, Failure> {
     const owner = yield* this.#serverOwner(serverId);
-    if (!owner || (request.actorUserId !== null && request.actorUserId !== owner)) return yield* serverShort;
+    if (!owner) return yield* serverShort;
     yield* this.#issueWelcome({ wallet: "personal", userId: owner });
     return yield* this.#spending.hold({ ...request, wallet: { userId: owner }, welcome: true, viaServerId: serverId });
   }).bind(this);
