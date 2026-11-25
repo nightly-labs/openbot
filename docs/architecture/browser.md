@@ -672,7 +672,8 @@ the web client does not show it. A tab that no agent or thread owns gets Block a
 chat can show its request. The answer holds for the tab while it stays on the same origin. A load of another origin, a
 close or a sleep of the tab blocks the pending request and forgets the answer. A secret tab, a
 private session tab, a closing tab and a page that is not `http` or `https` get Block at once. A tab
-with a pending request does not sleep.
+with a pending request does not sleep. A request with no answer after 10 minutes gets Block, so a
+client that does not show the question (the web client or an older client) does not keep the tab awake.
 
 Allow always from the computer that runs the browser grants the origin in every tab that an agent or
 thread owns, and answers the pending requests of that origin in those tabs. An answer for a tab clears

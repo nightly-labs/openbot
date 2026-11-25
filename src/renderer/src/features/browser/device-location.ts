@@ -8,7 +8,7 @@ function accuracyOf(accuracy: number): number | null {
   return Number.isFinite(accuracy) && accuracy >= 0 ? Math.min(accuracy, BROWSER_LOCATION_ACCURACY_LIMIT) : null;
 }
 
-export function readDeviceLocation(): Promise<BrowserLocation> {
+function readDeviceLocation(): Promise<BrowserLocation> {
   return new Promise((resolve, reject) => {
     if (!("geolocation" in navigator)) {
       reject(new Error("Location is not available on this device."));

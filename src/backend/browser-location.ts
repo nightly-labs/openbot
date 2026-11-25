@@ -7,7 +7,10 @@ interface PendingLocation {
   id: string;
   origin: string;
   answers: Answer[];
+  deadline: ReturnType<typeof setTimeout>;
 }
+
+const LOCATION_ANSWER_TIMEOUT_MS = 10 * 60_000;
 
 interface TabLocation {
   owner: string;
@@ -36,6 +39,7 @@ export function locationOrigin(url: string): string | null {
 }
 
 function settle(pending: PendingLocation | undefined, granted: boolean): void {
+  if (pending) clearTimeout(pending.deadline);
   for (const answer of pending?.answers ?? []) answer(granted);
 }
 
@@ -76,7 +80,10 @@ export class BrowserLocationRequests {
       answer(true);
       return;
     }
-    state.pending = { id: randomUUID(), origin, answers: [answer] };
+    const id = randomUUID();
+    const deadline = setTimeout(() => this.decide(tabId, id, false), LOCATION_ANSWER_TIMEOUT_MS);
+    deadline.unref?.();
+    state.pending = { id, origin, answers: [answer], deadline };
     this.#changed(tabId);
   }
 
