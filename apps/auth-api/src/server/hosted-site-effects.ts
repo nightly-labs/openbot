@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema } from "effect";
 import { HostedSiteInputError } from "./hosted-site-contract";
 
-class HostedSiteStorageError extends Schema.TaggedError<HostedSiteStorageError>()("HostedSiteStorageError", {
+export class HostedSiteStorageError extends Schema.TaggedError<HostedSiteStorageError>()("HostedSiteStorageError", {
   message: Schema.String,
 }) {}
 export type HostedSiteFailure = HostedSiteInputError | HostedSiteStorageError;
