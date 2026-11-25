@@ -165,6 +165,8 @@ export const messages = defineMessages("status.agent", {
   "status.agent.nextStepContinues": "The agent stopped before its next step. It continues ({current} of {limit}).",
   "status.agent.planContinues": "The plan has open steps. The agent continues ({current} of {limit}).",
   "status.agent.planStopped": "The agent stopped with open steps in its plan. Send a message to continue.",
+  "status.agent.continuationLimitReached":
+    "The agent stopped before the request was done. It cannot continue by itself again. Send a message to continue.",
   "status.agent.compactionContinues":
     "The connection stopped while the agent compacted its context. The agent continues.",
   "status.agent.providerExitContinues": "The agent stopped before it finished its answer. The agent continues.",

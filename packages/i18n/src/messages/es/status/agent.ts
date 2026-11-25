@@ -116,6 +116,8 @@ export const messages = {
   "status.agent.nextStepContinues": "El agente se detuvo antes del siguiente paso. Continúa ({current} de {limit}).",
   "status.agent.planContinues": "El plan tiene pasos pendientes. El agente continúa ({current} de {limit}).",
   "status.agent.planStopped": "El agente se detuvo con pasos pendientes en su plan. Envía un mensaje para continuar.",
+  "status.agent.continuationLimitReached":
+    "El agente se detuvo antes de terminar la solicitud. No puede continuar solo otra vez. Envía un mensaje para continuar.",
   "status.agent.compactionContinues":
     "La conexión se detuvo mientras el agente compactaba su contexto. El agente continúa.",
   "status.agent.providerExitContinues": "El agente se detuvo antes de terminar su respuesta. El agente continúa.",

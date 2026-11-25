@@ -154,6 +154,8 @@ export const messages = {
   "status.agent.nextStepContinues": "De agent stopte vóór de volgende stap en gaat verder ({current} van {limit}).",
   "status.agent.planContinues": "Het plan heeft open stappen. De agent gaat verder ({current} van {limit}).",
   "status.agent.planStopped": "De agent is gestopt met open stappen in het plan. Stuur een bericht om verder te gaan.",
+  "status.agent.continuationLimitReached":
+    "De agent is gestopt voordat de aanvraag klaar was. Hij kan niet nog een keer zelf verdergaan. Stuur een bericht om verder te gaan.",
   "status.agent.compactionContinues":
     "De verbinding viel weg terwijl de agent zijn context comprimeerde. De agent gaat verder.",
   "status.agent.providerExitContinues": "De agent stopte voordat zijn antwoord klaar was. De agent gaat verder.",

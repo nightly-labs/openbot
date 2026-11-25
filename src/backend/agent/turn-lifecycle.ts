@@ -2557,25 +2557,33 @@ export class TurnLifecycle {
               finishCheck,
               nextStep: !awaitsEarlierRequest,
             });
-      let considered = proposed?.kind === "check" ? null : proposed;
-      if (proposed?.kind === "check" && latestAssistant) {
-        const gap = yield* this.#checkFinish(
-          agentId,
-          laneTaskId,
-          turnId,
-          snapshot,
-          deliveries,
-          toolSteps,
-          toolOutcomes,
-          turnPlan,
-          latestAssistant.text,
-          proposed.continuations,
-          awaitsEarlierRequest,
-        );
-        considered = gap === null ? null : this.#planContinuation.afterFinishCheck(agentId, laneTaskId, gap);
-      }
-      const continuation = compactionContinuation ?? (considered && considered.kind !== "stopped" ? considered : null);
+      const gap =
+        proposed?.kind === "check" && latestAssistant
+          ? yield* this.#checkFinish(
+              agentId,
+              laneTaskId,
+              turnId,
+              snapshot,
+              deliveries,
+              toolSteps,
+              toolOutcomes,
+              turnPlan,
+              latestAssistant.text,
+              proposed.continuations,
+              awaitsEarlierRequest,
+            )
+          : null;
+      const considered =
+        proposed?.kind !== "check"
+          ? proposed
+          : gap === null
+            ? null
+            : this.#planContinuation.afterFinishCheck(agentId, laneTaskId, gap);
+      const continuation =
+        compactionContinuation ??
+        (considered && considered.kind !== "stopped" && considered.kind !== "limitReached" ? considered : null);
       const planStopped = considered?.kind === "stopped" && latestAssistant === undefined;
+      const limitReached = considered?.kind === "limitReached";
       if (!continuation)
         this.#planContinuation.cancel(
           agentId,
@@ -2706,7 +2714,7 @@ export class TurnLifecycle {
                       },
                     ),
           });
-      } else if (planStopped) {
+      } else if (planStopped || limitReached) {
         snapshot.messages.push({
           id: `${turnId}:plan-stopped`,
           author: "system",
@@ -2714,7 +2722,7 @@ export class TurnLifecycle {
           status: "completed",
           createdAt: new Date().toISOString(),
           itemType: PLAN_CONTINUATION_ITEM_TYPE,
-          text: sourceText("status.agent.planStopped"),
+          text: sourceText(planStopped ? "status.agent.planStopped" : "status.agent.continuationLimitReached"),
         });
       }
       const provider = running?.client.provider;
