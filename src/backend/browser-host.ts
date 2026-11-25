@@ -289,6 +289,7 @@ const PROXY_ERROR_LIST: readonly (readonly [name: string, code: number, failure:
   ["net::ERR_MANDATORY_PROXY_CONFIGURATION_FAILED", -131, "unreachable"],
 ];
 const EMPTY_RESPONSE_ERROR_CODE = -324;
+const PROXY_ROUTE = /^(?:PROXY|HTTPS|SOCKS[45]?|QUIC)\s/u;
 const PROXY_ERRORS = new Map(PROXY_ERROR_LIST.map(([name, , failure]) => [name, failure]));
 const PROXY_ERROR_CODES = new Map(PROXY_ERROR_LIST.map(([, code, failure]) => [code, failure]));
 
@@ -3438,7 +3439,7 @@ export class BrowserHost {
     const route = yield* Effect.tryPromise(() => this.#tabSession(tab).resolveProxy(url)).pipe(
       Effect.orElseSucceed(() => "DIRECT"),
     );
-    if (route.trim().startsWith("DIRECT")) return failure;
+    if (!PROXY_ROUTE.test(route.trim())) return failure;
     return browserFailure(
       new Error(
         sourceText(

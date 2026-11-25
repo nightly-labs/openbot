@@ -584,7 +584,11 @@ sign-in that the relay records, or an HTTP proxy sign-in that the `login` handle
 marks it `signIn`; Chromium reports that last one as a failed tunnel. The next page that loads
 clears the mark. The page error takes the mark that the network error recorded, and it reads the
 Chromium code when a failed load gives no error name. A page error names the proxy (`browserProxyUnreachable`, `browserProxySignInRefused`,
-`browserProxyComputerUnreachable`); each change sends `browser-profiles-changed`. A change of a profile's proxy, or of a
+`browserProxyComputerUnreachable`); each change sends `browser-profiles-changed`. `ERR_EMPTY_RESPONSE` (-324) is not a proxy
+error: a site that sends nothing gives it too, with or without a proxy. When `resolveProxy` gives a proxy for the page, the
+page error says that the site or the proxy closed the connection (`browserSystemProxyOrSiteClosed`,
+`browserProfileProxyOrSiteClosed`) and does not mark the proxy. A page with no proxy keeps the Chromium error. The check
+uses the address that the load asked for, not the address of a redirect. A change of a profile's proxy, or of a
 proxy that profiles use, closes their tabs; the settings ask first when tabs are open. A delete moves the profiles to Automatic (foreign key
 `ON DELETE CASCADE`). Changes run one at a time. Two admins can still change one proxy: a save sends
 the address that the dialog opened with, and a delete sends the profiles that the question showed.
