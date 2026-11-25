@@ -661,9 +661,9 @@ function mcpRemoteBridgeUrl(config: McpServerConfig): string | null {
   return null;
 }
 
-const BUN_DOWNLOAD_FAILURE = /^error: \w+ downloading (?:package manifest|tarball)\b/mu;
+const BUN_DOWNLOAD_FAILURE = /error: \w+ downloading (?:package manifest|tarball) /u;
 const NPM_DOWNLOAD_FAILURE =
-  /^npm (?:ERR!|error) (?:code|errno) (?:ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH)\b/mu;
+  /npm (?:ERR!|error) (?:code|errno) (?:ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH)\b/u;
 
 function isPackageDownloadFailure(output: string): boolean {
   return BUN_DOWNLOAD_FAILURE.test(output) || NPM_DOWNLOAD_FAILURE.test(output);
