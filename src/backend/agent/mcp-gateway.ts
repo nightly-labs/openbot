@@ -207,6 +207,10 @@ export class McpGateway {
     );
   }
 
+  #awaitsSignIn(config: McpServerConfig): boolean {
+    return this.#proxied(config) && this.#oauth?.needsSignIn(config.url) === true;
+  }
+
   #proxyTarget(route: string): Effect.Effect<McpOAuthProxyTarget | null, McpOperationError> {
     const oauth = this.#oauth;
     const config = this.#servers
@@ -317,7 +321,13 @@ export class McpGateway {
     const outcome = yield* this.#probeStoredSignIn(config, silent, options.signInPlace ?? null);
     yield* this.#refreshForTestedTools(config, outcome);
     const refused = outcome.error === null && (yield* this.signInOffer(config)) === "refused";
-    const error = refused ? sourceText("error.backend.mcpRegistrationUnavailable") : outcome.error;
+    const error = refused
+      ? sourceText("error.backend.mcpRegistrationUnavailable")
+      : outcome.error === null && this.#awaitsSignIn(config)
+        ? sourceText(
+            options.signInPlace === "host" ? "error.backend.mcpSignInOnHost" : "error.backend.mcpSignInRequired",
+          )
+        : outcome.error;
     return { toolCount: outcome.toolCount, error };
   });
 
@@ -474,10 +484,11 @@ export class McpGateway {
       return yield* new McpGatewayFailed({
         cause: new McpServerError(sourceText("error.backend.mcpSignInAppClientId")),
       });
+    const proxied = this.#proxied(config);
     const dropped = yield* oauth
       .saveSignInApp(config.url, { clientId: input.clientId, clientSecret: input.clientSecret, scope: input.scope })
       .pipe(toMcpGatewayFailed);
-    if (dropped) yield* this.#hooks.refreshAllAgentRuntimes("now");
+    if (dropped || this.#proxied(config) !== proxied) yield* this.#hooks.refreshAllAgentRuntimes("now");
     return this.signInApp(input);
   }, Effect.uninterruptible);
 
@@ -514,7 +525,7 @@ export class McpGateway {
       .map((config) => ({
         mcpServerId: config.id,
         signedIn: oauth?.signedIn(config.url) ?? false,
-        needsSignIn: oauth?.needsSignIn(config.url) ?? false,
+        needsSignIn: this.#awaitsSignIn(config),
       }));
   }
 
