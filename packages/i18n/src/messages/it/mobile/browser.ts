@@ -37,6 +37,8 @@ export const messages = {
   "mobile.browser.keyboard.field": "Scrittura nella pagina",
   "mobile.browser.reconnect": "Riconnetti",
   "mobile.browser.status.connecting": "Connessione al browser…",
+  "mobile.browser.dialog.title": "La pagina mostra un messaggio",
+  "mobile.browser.dialog.ok": "OK",
   "mobile.browser.status.ended": "La vista in diretta è terminata.",
   "mobile.browser.status.offline": "Il server non è connesso.",
   "mobile.browser.status.noTab": "{name} non ha nessuna scheda del browser aperta.",

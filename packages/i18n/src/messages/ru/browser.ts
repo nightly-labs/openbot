@@ -74,6 +74,10 @@ export const messages = {
   "browser.liveView.copyFailed": "Не удалось скопировать текст. Нажмите на страницу и повторите попытку.",
   "browser.liveView.pageCopied":
     "Страница скопировала текст. Выберите «Копировать», чтобы поместить его в буфер обмена.",
+  "browser.liveView.dialog.site": "Сообщение от {site}",
+  "browser.liveView.dialog.page": "Сообщение от страницы",
+  "browser.liveView.dialog.waiting": "Страница ждёт вашего ответа.",
+  "browser.liveView.dialog.ok": "ОК",
   "browser.previews.label": "Превью браузера",
   "browser.previews.resize": "Изменить размер правой панели",
   "browser.previews.empty": "Нет вкладок браузера",

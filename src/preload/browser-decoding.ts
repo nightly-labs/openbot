@@ -37,6 +37,7 @@ import {
 import { type DynamicRecord, isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 
 const CONTROL_PHASES = ["acting", "waiting"] as const;
+const DIALOG_TYPES = ["alert", "confirm"] as const;
 const VIEWPORT_MODES = ["fill", "custom"] as const;
 const VIEWPORT_PRESETS = ["desktop", "tablet", "mobile"] as const;
 const COLOR_SCHEMES = ["light", "dark", "system"] as const;
@@ -100,6 +101,16 @@ export function decodeBrowserLiveViewEvent(value: unknown): BrowserLiveViewEvent
       return { type: "copied", tabId, text: requiredString(event, "text") };
     case "copyTooLarge":
       return { type: "copyTooLarge", tabId };
+    case "dialog": {
+      if (event.dialog === null) return { type: "dialog", tabId, dialog: null };
+      const dialog = decodeRecord(event.dialog, "browser live view dialog");
+      if (!isOneOf(DIALOG_TYPES, dialog.type)) throw new Error("Invalid browser live view dialog type.");
+      return {
+        type: "dialog",
+        tabId,
+        dialog: { id: requiredString(dialog, "id"), type: dialog.type, message: requiredString(dialog, "message") },
+      };
+    }
     default:
       throw new Error("Invalid browser live view event type.");
   }

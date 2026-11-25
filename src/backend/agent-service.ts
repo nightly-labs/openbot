@@ -1758,6 +1758,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId).pipe(toMessagingThreadFailed),
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toMessagingThreadFailed),
       ownChat: (threadId) => this.#store.ownsThread(threadId),
+      appendSystemMessage: (agentId, sideThreadId, message) =>
+        sideThreadId
+          ? this.#appendSideThreadSystemMessage(agentId, sideThreadId, message, "messaging.undelivered")
+          : this.#appendSystemMessage(agentId, message, "messaging.undelivered"),
       contextSession: (agentId, threadId) => {
         const agent = this.#store.get(agentId);
         if (!agent || !this.#reportsCompactions(agentId)) return null;

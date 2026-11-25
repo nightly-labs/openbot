@@ -135,6 +135,20 @@ describe("browser decoders", () => {
       { type: "stopped", tabId: "tab-1", reason: "The live view of this page ended." } satisfies BrowserLiveViewEvent,
     ],
     [
+      "live view dialog",
+      decodeBrowserLiveViewEvent,
+      {
+        type: "dialog",
+        tabId: "tab-1",
+        dialog: { id: "dialog-1", type: "confirm", message: "Pay now?" },
+      } satisfies BrowserLiveViewEvent,
+    ],
+    [
+      "closed live view dialog",
+      decodeBrowserLiveViewEvent,
+      { type: "dialog", tabId: "tab-1", dialog: null } satisfies BrowserLiveViewEvent,
+    ],
+    [
       "picture-in-picture move",
       decodeBrowserPictureInPictureEvent,
       { type: "bounds-changed", bounds } satisfies BrowserPictureInPictureEvent,
@@ -212,6 +226,17 @@ describe("browser decoders", () => {
     ["browser bounds without a height", decodeBrowserBounds, { x: 0, y: 0, width: 1 }],
     ["live view frame with a text image", decodeBrowserLiveViewEvent, { ...frame, image: "jpeg" }],
     ["live view event of an unknown type", decodeBrowserLiveViewEvent, { type: "paused", tabId: "tab-1" }],
+    [
+      "live view dialog of an unknown type",
+      decodeBrowserLiveViewEvent,
+      { type: "dialog", tabId: "tab-1", dialog: { id: "dialog-1", type: "prompt", message: "Name?" } },
+    ],
+    [
+      "live view dialog without a message",
+      decodeBrowserLiveViewEvent,
+      { type: "dialog", tabId: "tab-1", dialog: { id: "dialog-1", type: "alert" } },
+    ],
+    ["live view dialog event without a dialog", decodeBrowserLiveViewEvent, { type: "dialog", tabId: "tab-1" }],
     ["picture-in-picture move without bounds", decodeBrowserPictureInPictureEvent, { type: "bounds-changed" }],
     ["picture-in-picture event of an unknown type", decodeBrowserPictureInPictureEvent, { type: "grow" }],
     [

@@ -113,6 +113,9 @@ export const messages = {
   "composer.voice.recording": "Spraakopname",
   "composer.voice.limitSoon": "De opname stopt over {seconds} seconden.",
   "composer.voice.limitReached": "De opname is gestopt bij de limiet van 10 minuten. Wat je zei staat in het bericht.",
+  "composer.voice.languageNotice":
+    "Dicteren kent 25 Europese talen, zoals Engels. Andere talen hebben een groter model nodig ({size}), en de tekst verschijnt pas na het stoppen.",
+  "composer.voice.languageNotice.action": "Ik spreek een andere taal",
   "composer.send.saveQueued": "Bericht in wachtrij opslaan",
   "composer.send.voice": "Spraakbericht sturen",
   "composer.send.message": "Bericht sturen",

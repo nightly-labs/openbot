@@ -1,6 +1,7 @@
 import type {
   BrowserControlSession,
   BrowserDockIsland,
+  BrowserLiveViewDialog,
   BrowserLiveViewEvent,
   BrowserTab,
 } from "@openbot/contracts/ipc";
@@ -258,10 +259,17 @@ export const TeachTaskRecording: Story = { args: { teach: { ...teach, startedAt:
 
 export const Empty: Story = { args: { tabs: [], activeTab: undefined, canReopen: false } };
 
-function remoteLiveViewRuntime(): BrowserViewRuntime {
+function remoteLiveViewRuntime(
+  question?: { dialog: BrowserLiveViewDialog; showsPage: boolean } | undefined,
+): BrowserViewRuntime {
   const listeners = new Set<(event: BrowserLiveViewEvent) => void>();
+  const emit = (event: BrowserLiveViewEvent) => {
+    for (const listener of listeners) listener(event);
+  };
   return {
     async startLiveView(tabId) {
+      if (question) emit({ type: "dialog", tabId, dialog: question.dialog });
+      if (question && !question.showsPage) return;
       const width = 1024;
       const height = 768;
       const canvas = new OffscreenCanvas(width, height);
@@ -275,10 +283,12 @@ function remoteLiveViewRuntime(): BrowserViewRuntime {
         context.fillText("Page on the host", 64, 128);
       }
       const image = new Uint8Array(await (await canvas.convertToBlob({ type: "image/jpeg" })).arrayBuffer());
-      for (const listener of listeners) listener({ type: "frame", tabId, sequence: 1, width, height, image });
+      emit({ type: "frame", tabId, sequence: 1, width, height, image });
     },
     stopLiveView: async () => undefined,
-    sendLiveViewInput: async () => undefined,
+    async sendLiveViewInput(input) {
+      if (input.type === "dialog") emit({ type: "dialog", tabId: tab.id, dialog: null });
+    },
     onLiveViewEvent(listener) {
       listeners.add(listener);
       return () => {
@@ -292,6 +302,30 @@ export const RemoteLiveView: Story = {
   args: {
     liveViewTabId: tab.id,
     liveViewRuntime: remoteLiveViewRuntime(),
+    canEnterPip: false,
+    shortcuts: undefined,
+  },
+};
+
+export const RemoteLiveViewPageDialog: Story = {
+  args: {
+    liveViewTabId: tab.id,
+    liveViewRuntime: remoteLiveViewRuntime({
+      dialog: { id: "dialog-1", type: "confirm", message: "Leave this page? The changes that you made are not saved." },
+      showsPage: true,
+    }),
+    canEnterPip: false,
+    shortcuts: undefined,
+  },
+};
+
+export const RemoteLiveViewPageAlertBeforeFirstFrame: Story = {
+  args: {
+    liveViewTabId: tab.id,
+    liveViewRuntime: remoteLiveViewRuntime({
+      dialog: { id: "dialog-2", type: "alert", message: "Your session ends in 2 minutes." },
+      showsPage: false,
+    }),
     canEnterPip: false,
     shortcuts: undefined,
   },

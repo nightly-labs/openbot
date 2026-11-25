@@ -113,6 +113,9 @@ export const messages = {
   "composer.voice.limitSoon": "Nagrywanie zatrzyma się za {seconds} sekund.",
   "composer.voice.limitReached":
     "Nagrywanie zatrzymało się po osiągnięciu limitu 10 minut. Nagrana treść jest w wiadomości.",
+  "composer.voice.languageNotice":
+    "Dyktowanie zna 25 języków europejskich, na przykład angielski. Inne języki wymagają większego modelu ({size}), a tekst pojawia się po zatrzymaniu.",
+  "composer.voice.languageNotice.action": "Mówię w innym języku",
   "composer.send.saveQueued": "Zapisz wiadomość z kolejki",
   "composer.send.voice": "Wyślij wiadomość głosową",
   "composer.send.message": "Wyślij wiadomość",

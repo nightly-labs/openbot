@@ -36,6 +36,8 @@ export const messages = defineMessages("mobile.browser", {
   "mobile.browser.keyboard.field": "Typing on the page",
   "mobile.browser.reconnect": "Reconnect",
   "mobile.browser.status.connecting": "Connecting to the browser…",
+  "mobile.browser.dialog.title": "The page shows a message",
+  "mobile.browser.dialog.ok": "OK",
   "mobile.browser.status.ended": "The live view ended.",
   "mobile.browser.status.offline": "The server is not connected.",
   "mobile.browser.status.noTab": "{name} has no browser tab open.",

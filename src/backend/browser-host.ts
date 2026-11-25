@@ -36,6 +36,7 @@ import {
   BROWSER_VIEW_CONTEXT_MENU_URL_MAX_LENGTH,
   type BrowserViewContextMenu,
   type BrowserViewCursor,
+  type BrowserViewDialog,
   type BrowserViewViewport,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -267,6 +268,7 @@ export interface BrowserViewOptions {
   viewport?: BrowserViewViewport;
   frameSize?: BrowserViewViewport;
   onPageCopy?: (text: string) => void;
+  onDialog?: (dialog: BrowserViewDialog | null) => void;
 }
 
 function menuAddress(value: string): string | undefined {
@@ -2377,7 +2379,7 @@ export class BrowserHost {
     onEnded?: (reason: string) => void,
     options: BrowserViewOptions = {},
   ): Effect.fn.Return<() => Effect.Effect<void>, BrowserOperationError> {
-    const { onCursor, viewport, frameSize, onPageCopy } = options;
+    const { onCursor, viewport, frameSize, onPageCopy, onDialog } = options;
     const tab = yield* this.#requireTab(tabId);
     const protection = tab.secret;
     if (protection?.submitted && !protection.running && this.#takeoverTabIds.has(tabId))
@@ -2408,13 +2410,24 @@ export class BrowserHost {
       lastCursor = cursor;
       onCursor?.(cursor);
     };
-    const stopCursor = () => {
+    const dialogEngine = tab.engine;
+    let shownDialogId: string | null | undefined;
+    const reportDialog = () => {
+      const open = dialogEngine.dialog;
+      const dialog = open && !tab.secret?.submitted && !tab.filledCard && !tab.secretShown ? open : undefined;
+      if ((dialog?.id ?? null) === shownDialogId) return;
+      shownDialogId = dialog?.id ?? null;
+      onDialog?.(dialog ? { id: dialog.id, type: dialog.type, message: dialog.message } : null);
+    };
+    const stopDialog = onDialog ? dialogEngine.onDialogChange(reportDialog) : () => undefined;
+    const stopEvents = () => {
+      stopDialog();
       if (onCursor && !tab.contents.isDestroyed()) tab.contents.off("cursor-changed", cursorChanged);
     };
     const end = (reason: string) => {
       invalidated = true;
       tab.viewInvalidations.delete(invalidate);
-      stopCursor();
+      stopEvents();
       onEnded?.(reason);
     };
     const endForAuthentication = () => end("Authentication changed the browser view. Open a new view to continue.");
@@ -2425,6 +2438,7 @@ export class BrowserHost {
           quality: VIEW_FRAME_QUALITY,
           ...viewFrameBox(frameSize),
           ...(viewport ? { viewport } : {}),
+          ...(onDialog ? { watchDialogs: true } : {}),
           ...(onPageCopy
             ? {
                 onPageCopy: (text: string) => {
@@ -2441,7 +2455,7 @@ export class BrowserHost {
         (error) => {
           if (streamGeneration !== generation) return;
           tab.viewInvalidations.delete(invalidate);
-          stopCursor();
+          stopEvents();
           logger.warn("The live browser view stopped.", { error: toLogValue(error) });
           onEnded?.("The live browser view stopped. Open a new view to continue.");
         },
@@ -2484,12 +2498,13 @@ export class BrowserHost {
     };
     tab.viewInvalidations.add(invalidate);
     if (onCursor) tab.contents.on("cursor-changed", cursorChanged);
+    reportDialog();
     return yield* Effect.gen({ self: this }, function* () {
       stopStream = yield* openStream(generation);
       const stopOnce = () =>
         Effect.gen({ self: this }, function* () {
           tab.viewInvalidations.delete(invalidate);
-          stopCursor();
+          stopEvents();
           if (stopped) return;
           stopped = true;
           if (resume) Deferred.doneUnsafe(resume, Effect.void);
@@ -2504,11 +2519,21 @@ export class BrowserHost {
         Effect.gen({ self: this }, function* () {
           const error = operationFailure.cause;
           tab.viewInvalidations.delete(invalidate);
-          stopCursor();
+          stopEvents();
           return yield* browserFailure(error);
         }),
       ),
     );
+  }).bind(this);
+
+  readonly answerViewDialog = Effect.fn("BrowserHost.answerViewDialog")(function* (
+    this: BrowserHost,
+    tabId: string,
+    id: string,
+    accept: boolean,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    const tab = yield* this.#requireTab(tabId);
+    yield* tab.engine.answerPersonDialog(id, accept);
   }).bind(this);
 
   readonly dispatchViewInput = Effect.fn("BrowserHost.dispatchViewInput")(function* (
@@ -2516,11 +2541,14 @@ export class BrowserHost {
     tabId: string,
     input: BrowserViewportInput,
     onContextMenu?: (menu: BrowserViewContextMenu) => void,
+    personSeesDialogs = false,
   ): Effect.fn.Return<void, BrowserOperationError> {
     const tab = yield* this.#requireTab(tabId);
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error(sourceText("error.backend.browserInputProtected")));
     if (input.type !== "pointer" || input.action !== "move") tab.engine.invalidateReferences();
+    if (personSeesDialogs && (input.type === "pointer" || input.type === "key") && input.action === "down")
+      tab.engine.notePersonViewInput();
     if (input.type === "pointer" && input.action === "down") {
       tab.viewContextMenu =
         input.button === "right" && onContextMenu

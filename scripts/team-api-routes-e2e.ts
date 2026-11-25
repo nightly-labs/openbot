@@ -2282,6 +2282,7 @@ const browser: TeamApiBrowser = {
   startView: unused("startView"),
   dispatchViewInput: unused("dispatchViewInput"),
   copyViewSelection: unused("copyViewSelection"),
+  answerViewDialog: unused("answerViewDialog"),
   importSignIn: (tabId, cookies, storage = null) => {
     record("importSignIn", tabId, cookies.length, storage?.origin ?? null, storage?.entries.length ?? 0);
     return Effect.succeed({ cookies: cookies.length, storage: storage?.entries.length ?? 0 });

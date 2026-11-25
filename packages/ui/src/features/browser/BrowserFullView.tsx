@@ -5,7 +5,7 @@ import { clamp, holdFlag } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, flush, onCleanup, onSettled, Show } from "solid-js";
 import { BrowserAddressRow } from "./BrowserAddressRow";
 import { BrowserHttpSignInPopover } from "./BrowserHttpSignInPopover";
-import BrowserLiveView from "./BrowserLiveView";
+import BrowserLiveView, { browserPageSite } from "./BrowserLiveView";
 import { BrowserTabStrip } from "./BrowserTabStrip";
 import { BrowserTabSwitcher } from "./BrowserTabSwitcher";
 import { BrowserTeachBar } from "./BrowserTeachBar";
@@ -341,6 +341,7 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
                   tabId={tabId()}
                   active={props.open}
                   clipboard={props.liveViewClipboard}
+                  site={browserPageSite(props.tabs.find((entry) => entry.id === tabId())?.url)}
                   onFrameSize={setFrameSize}
                 />
               )}

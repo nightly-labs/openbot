@@ -37,6 +37,8 @@ export const messages = {
   "mobile.browser.keyboard.field": "Sayfaya yazma",
   "mobile.browser.reconnect": "Yeniden bağlan",
   "mobile.browser.status.connecting": "Tarayıcıya bağlanılıyor…",
+  "mobile.browser.dialog.title": "Sayfa bir mesaj gösteriyor",
+  "mobile.browser.dialog.ok": "Tamam",
   "mobile.browser.status.ended": "Canlı görünüm sona erdi.",
   "mobile.browser.status.offline": "Sunucu bağlı değil.",
   "mobile.browser.status.noTab": "{name} için açık tarayıcı sekmesi yok.",
