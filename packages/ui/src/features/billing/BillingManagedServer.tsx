@@ -23,10 +23,14 @@ export function BillingManagedServer(props: {
   }>({ action: null, name: "", pending: false, error: null });
   const [addingStorage, setAddingStorage] = createSignal(false);
   createEffect(
-    () => props.hosting.state.pendingDelete?.serverId === props.server.serverId,
-    (requested) => {
+    () => ({
+      requested: props.hosting.state.pendingDelete?.serverId === props.server.serverId,
+      scheduled: props.server.deletionScheduledAt != null,
+    }),
+    ({ requested, scheduled }) => {
       if (!requested) return;
       props.hosting.cancelDelete();
+      if (scheduled) return;
       setDialog((draft) => {
         draft.action = "delete";
         draft.name = "";
