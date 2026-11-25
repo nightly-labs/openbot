@@ -1562,8 +1562,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     },
   );
   function accountRestarts(serverId: string): boolean {
-    if (!hostedServers.isHosted(serverId)) return false;
-    return servers().find((item) => item.id === serverId)?.restartAvailable !== false;
+    const item = servers().find((candidate) => candidate.id === serverId);
+    if (item?.restartAvailable === false) return false;
+    return item?.hosted === true || hostedServers.isHosted(serverId);
   }
   function restartsItself(serverId: string): boolean {
     return (
