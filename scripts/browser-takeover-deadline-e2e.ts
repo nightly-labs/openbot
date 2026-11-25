@@ -1008,6 +1008,7 @@ try {
       const vaultEvents: AgentEvent[] = [];
       const attention: string[] = [];
       let routineFillFails = false;
+      let routineScripted = false;
       const vaultRegistry = new AttentionRegistry({
         conversation: {
           agentForThread: (threadId) => (threadId === THREAD ? AGENT : undefined),
@@ -1029,6 +1030,7 @@ try {
           prepareSecret: () =>
             Effect.sync(() => ({
               ...preparedSecret(),
+              agentScriptedOrigin: routineScripted,
               vaultFillable: true,
               submit: () =>
                 routineFillFails
@@ -1097,6 +1099,17 @@ try {
       assert.equal(unknown.success, false, "the skipped saved login was reported as a success");
       assert.match(unknown.next ?? "", /list_logins/u, "the agent did not get the reason for the skip");
       assert.match(unknown.next ?? "", /routine run/u, "the agent was not told that nobody answers in a routine");
+      routineScripted = true;
+      const { call: scriptedCall } = await settled("routine-scripted-login", "openbot:a");
+      assert.equal(cards(), 0, "a password card opened in a routine for a login that an agent script blocks");
+      const scripted = answerOf(await scriptedCall);
+      assert.match(scripted.next ?? "", /navigate direction=reload/u, "the agent did not get the reload step");
+      assert.doesNotMatch(
+        scripted.next ?? "",
+        /so that the user types the password/u,
+        "a routine was told to open a card that nobody answers",
+      );
+      routineScripted = false;
       routineFillFails = true;
       const { call: failedCall } = await settled("routine-failed-fill", "openbot:a");
       assert.equal(cards(), 0, "a takeover card opened in a routine after a saved login fill failed");
@@ -1106,7 +1119,7 @@ try {
       assert.equal(vaultRegistry.runtimeAttention().pendingBrowserTakeovers.length, 0, "the takeover stayed open");
       assert.equal(
         browserLog.filter((entry) => entry === "secret-cancelled").length,
-        cancelledBefore + 2,
+        cancelledBefore + 3,
         "the secure input lock of the tab was not released",
       );
       assert(!attention.some((entry) => entry.startsWith("needs:")), "the routine was marked as waiting for the user");
@@ -1123,7 +1136,7 @@ try {
         }),
       );
       assert.equal(answerOf(await chatCall).status, "completed");
-      return { unknown, failed, cards: cards() };
+      return { unknown, scripted, failed, cards: cards() };
     },
   );
 
