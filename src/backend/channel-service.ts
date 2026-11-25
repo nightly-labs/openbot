@@ -994,7 +994,10 @@ export class ChannelService {
     if (command.type === "cancel") {
       if (selected.state !== "paused" && selected.state !== "failed")
         return yield* channelFailure(new Error(sourceText("error.backend.channelTaskNotStopped")));
-      return yield* this.#cancelTasks(channel, descendants(tasks, selected.rootTaskId), operationId);
+      const cancelled = descendants(tasks, selected.rootTaskId);
+      const result = yield* this.#cancelTasks(channel, cancelled, operationId);
+      yield* this.#settleUnconfirmedStarts(channel.id, cancelled);
+      return result;
     }
     if (command.type === "reassign") {
       if (!command.recipientAgentId)
