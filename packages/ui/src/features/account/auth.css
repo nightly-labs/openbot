@@ -1521,7 +1521,7 @@ textarea:not(.ui-textarea):focus-visible {
 }
 
 .scroll-edge-blur-band.scroll-edge-blur-visible {
-  visibility: visible;
+  visibility: inherit;
   opacity: 1;
   transition:
     opacity var(--openbot-duration-normal) var(--openbot-ease-out),
