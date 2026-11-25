@@ -17,7 +17,7 @@ export const MCP_OAUTH_REDIRECT_URL = "openbot://mcp-auth";
 
 const MCP_OAUTH_HOST = "mcp-auth";
 const SLACK_WORKSPACE_HOST = "slack-workspace";
-export const NEAR_SIGNATURE_HOST = "near-signature";
+const NEAR_SIGNATURE_HOST = "near-signature";
 const DISCORD_GUILD_HOST = "discord-guild";
 
 export function parseDeepLink(value: string, options: InviteLinkOptions = {}): DeepLink | null {

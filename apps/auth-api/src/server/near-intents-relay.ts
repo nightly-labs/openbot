@@ -1,7 +1,7 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect, Schema } from "effect";
 
-export const NEAR_INTENTS_RELAY_PREFIX = "/v1/near";
+const NEAR_INTENTS_RELAY_PREFIX = "/v1/near";
 const DEFAULT_UPSTREAM = "https://api.agentsonintents.com";
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_WALLETS_PER_DAY = 10;

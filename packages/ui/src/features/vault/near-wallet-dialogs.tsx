@@ -461,7 +461,7 @@ export function NearAgentsDialog(props: NearDialogProps & { agents: readonly Nea
   );
 }
 
-export const limitFor = (amountUsd: number) =>
+const limitFor = (amountUsd: number) =>
   NEAR_RULE_DAILY_USD.find((limit) => limit >= amountUsd) ?? NEAR_RULE_DAILY_USD.at(-1) ?? 0;
 
 export function NearDomainDialog(

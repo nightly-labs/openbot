@@ -10,8 +10,8 @@ import type { NearOwner } from "./near-wallet-store";
 
 export const NEAR_SIGNING_PATH = "/near/sign";
 export const NEAR_PASSKEY_WALLET_ORIGIN = "https://nearintents.openbot.run";
-export const NEAR_SIGNATURE_DEV_PATH = "/near-signature";
-export const NEAR_SIGNING_TIMEOUT_MS = 10 * 60_000;
+const NEAR_SIGNATURE_DEV_PATH = "/near-signature";
+const NEAR_SIGNING_TIMEOUT_MS = 10 * 60_000;
 const LOOPBACK_ADDRESSES = new Set(["127.0.0.1", "[::1]"]);
 const MAX_RESULT_CHARS = 16 * 1024;
 const BACKUP_CHECK_TIMEOUT_MS = 5 * 60_000;
@@ -41,7 +41,7 @@ export type NearSigningResult =
   | { kind: "backup"; backup: NearPasskeyBackup | null }
   | { kind: "webauthn"; credential: NearWebAuthnCredential };
 
-export type NearWebAuthnCredential = Extract<SignedData, { standard: "webauthn" }>["credential"];
+type NearWebAuthnCredential = Extract<SignedData, { standard: "webauthn" }>["credential"];
 
 interface SigningFragment {
   v: 1;

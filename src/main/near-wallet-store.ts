@@ -22,8 +22,6 @@ const ownerBackupSchema = z.object({
   checkedAt: z.number(),
 });
 
-export type NearOwnerBackupRecord = z.infer<typeof ownerBackupSchema>;
-
 const grantSchema = z.object({
   token: z.string().min(1),
   expiresAt: z.string(),
@@ -78,10 +76,8 @@ const recordSchema = z.object({
 });
 
 export type NearWalletRecord = z.infer<typeof recordSchema>;
-export type NearWalletAccountRecord = z.infer<typeof walletSchema>;
-export type NearGrantRecord = z.infer<typeof grantSchema>;
 
-export const EMPTY_NEAR_WALLET_RECORD: NearWalletRecord = {
+const EMPTY_NEAR_WALLET_RECORD: NearWalletRecord = {
   owner: null,
   ownerBackup: null,
   wallet: null,
@@ -96,7 +92,7 @@ const envelopeSchema = z.object({ version: z.literal(1), record: z.string() });
 
 const MAX_ENVELOPE_BYTES = 512 * 1024;
 
-export function registerNearSecrets(record: NearWalletRecord): void {
+function registerNearSecrets(record: NearWalletRecord): void {
   if (record.wallet?.grant) registerSecretValue(record.wallet.grant.token);
 }
 
