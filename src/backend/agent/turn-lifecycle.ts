@@ -797,6 +797,7 @@ export class TurnLifecycle {
     plan: ConversationPlan | null,
     answer: string,
     continuations: number,
+    earlierGaps: readonly string[],
     awaitsTeammate: boolean,
   ): Effect.Effect<string | null> {
     const check = this.#hooks.checkFinish;
@@ -816,6 +817,13 @@ export class TurnLifecycle {
       )
       .slice(-FINISH_CHECK_CONTEXT_MESSAGES)
       .map((message) => ({ author: message.author, text: redact(message.text) }));
+    const earlierTurnIds = new Set(
+      deliveries.flatMap(({ planContinuation }) => planContinuation?.turnIds ?? []).filter((id) => id !== turnId),
+    );
+    const earlierAnswers = [...earlierTurnIds].flatMap((id) => {
+      const text = latestTurnAnswer(snapshot.messages, id)?.text;
+      return text === undefined || text.trim().length === 0 ? [] : [redact(text)];
+    });
     const input: FinishCheckInput = {
       request,
       context,
@@ -832,6 +840,8 @@ export class TurnLifecycle {
       }),
       plan: plan && { ...plan, steps: plan.steps.map((step) => ({ ...step, text: redact(step.text) })) },
       answer: redact(answer),
+      ...(earlierAnswers.length > 0 ? { earlierAnswers } : {}),
+      ...(earlierGaps.length > 0 ? { earlierGaps } : {}),
       continuations,
       ...(awaitsTeammate ? { awaitsTeammate } : {}),
     };
@@ -2634,6 +2644,7 @@ export class TurnLifecycle {
               turnPlan,
               latestAssistant.text,
               proposed.continuations,
+              proposed.earlierGaps,
               awaitsEarlierRequest,
             )
           : null;
