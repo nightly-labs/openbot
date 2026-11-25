@@ -3470,6 +3470,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       }
                       chatOrder={layout.sidebarChatOrder()}
                       onChatOrderChange={layout.setSidebarChatOrder}
+                      tabIds={workspace.preferences.sidebarTabIds()}
+                      onTabIdsChange={workspace.preferences.setSidebarTabIds}
                       collapsedSectionIds={workspace.preferences.collapsedSidebarSectionIds()}
                       onMutateLayout={workspace.mutateSidebarLayout}
                       sectionDuplicateSupported={
