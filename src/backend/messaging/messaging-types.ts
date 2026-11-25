@@ -141,7 +141,7 @@ export interface MessagingAdapter {
   readonly searchesHistory?: boolean;
   identify(): Effect.Effect<ConnectionIdentity, MessagingAdapterError>;
   post(target: MessageTarget, body: MessageBody): Effect.Effect<string, MessagingAdapterError>;
-  edit(target: MessageTarget, messageId: string, body: MessageBody): Effect.Effect<void, MessagingAdapterError>;
+  edit(target: MessageTarget, messageId: string, body: MessageBody): Effect.Effect<string, MessagingAdapterError>;
   remove?(target: MessageTarget, messageId: string): Effect.Effect<void, MessagingAdapterError>;
   postPrivate(
     target: MessageTarget,

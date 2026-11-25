@@ -456,6 +456,8 @@ export const messages = {
     "Muse nie mógł uruchomić serwera MCP i zablokował MCP w tej sesji. OpenBot rozpoczął nową sesję Muse z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wyłącz Sterowanie komputerem lub serwer MCP, który zawiódł, dla tego agenta.",
   "error.provider.claudeSessionMissing":
     "Claude Code nie znalazł zapisanej sesji tego czatu. OpenBot rozpoczął nową sesję Claude Code z historią czatu. Spróbuj ponownie.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode nie znalazł zapisanej sesji tego czatu. OpenBot rozpoczął nową sesję OpenCode z historią czatu. Spróbuj ponownie.",
   "error.provider.grokSignIn": "Uruchom `grok login` lub ustaw XAI_API_KEY, aby używać Grok.",
   "error.provider.acpSignInNoStart":
     "Dostawca się nie uruchomił, więc logowanie nie mogło się zacząć. Spróbuj ponownie lub uruchom ponownie OpenBot.",

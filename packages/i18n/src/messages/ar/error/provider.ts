@@ -434,6 +434,8 @@ export const messages = {
     "تعذّر على Muse تشغيل خادم MCP فحظر MCP في هذه الجلسة. بدأ OpenBot جلسة Muse جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، أوقف التحكم في الحاسوب أو خادم MCP الفاشل لهذا الوكيل.",
   "error.provider.claudeSessionMissing":
     "لم يعثر Claude Code على الجلسة المحفوظة لهذه الدردشة. بدأ OpenBot جلسة Claude Code جديدة بسجل الدردشة. أعد المحاولة.",
+  "error.provider.opencodeSessionMissing":
+    "لم يعثر OpenCode على الجلسة المحفوظة لهذه الدردشة. بدأ OpenBot جلسة OpenCode جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.grokSignIn": "شغّل `grok login` أو عيّن XAI_API_KEY لاستخدام Grok.",
   "error.provider.acpSignInNoStart": "لم يبدأ المزوّد، لذلك لم يبدأ تسجيل الدخول. حاول مرة أخرى، أو أعد تشغيل OpenBot.",
   "error.provider.acpSignInTimedOut": "انتهت مهلة تسجيل الدخول.",

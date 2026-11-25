@@ -463,6 +463,8 @@ export const messages = {
     "Muse kon een MCP-server niet starten en heeft MCP in deze sessie geblokkeerd. OpenBot heeft een nieuwe Muse-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, zet dan Computerbesturing of de mislukte MCP-server uit voor deze agent.",
   "error.provider.claudeSessionMissing":
     "Claude Code heeft de opgeslagen sessie van deze chat niet gevonden. OpenBot heeft een nieuwe Claude Code-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode heeft de opgeslagen sessie van deze chat niet gevonden. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.grokSignIn": "Voer `grok login` uit of stel XAI_API_KEY in om Grok te gebruiken.",
   "error.provider.acpSignInNoStart":
     "De aanbieder is niet gestart, dus het inloggen kon niet beginnen. Probeer het opnieuw of start OpenBot opnieuw.",

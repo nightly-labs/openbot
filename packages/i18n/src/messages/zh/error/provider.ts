@@ -412,6 +412,8 @@ export const messages = {
     "Muse 无法启动某个 MCP 服务器，并在本次会话中停用了 MCP。OpenBot 已带着聊天记录开启新的 Muse 会话，请重试。如果仍然报错，请关闭 Computer Use，或对该助手关闭启动失败的 MCP 服务器。",
   "error.provider.claudeSessionMissing":
     "Claude Code 找不到此聊天已保存的会话。OpenBot 已带着聊天记录开启新的 Claude Code 会话，请重试。",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode 找不到此聊天已保存的会话。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。",
   "error.provider.grokSignIn": "请运行 `grok login`，或设置 XAI_API_KEY 以使用 Grok。",
   "error.provider.acpSignInNoStart": "服务商没有启动，所以无法开始登录。请重试，或重新启动 OpenBot。",
   "error.provider.acpSignInTimedOut": "登录超时。",

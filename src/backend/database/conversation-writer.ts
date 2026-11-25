@@ -1018,8 +1018,8 @@ function supersedeStreamedMessageEvents(
   deleteReceiptsOf(core.connection, [requiredStringColumn(previous, "command_id")]);
 }
 
-const CONVERSATION_UPDATED = "conversation.snapshot-updated";
-const GENERATED_UPDATE_COMMAND =
+export const CONVERSATION_UPDATED = "conversation.snapshot-updated";
+export const GENERATED_UPDATE_COMMAND =
   /^conversation:conversation\.snapshot-updated:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 function updateActivityId(sequence: number): string {
