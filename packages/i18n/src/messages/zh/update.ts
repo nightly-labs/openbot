@@ -45,6 +45,7 @@ export const messages = {
   "update.idleRestart.description": "新的自动化任务运行会等到重启之后。",
   "update.idleRestart.waitingFor": "正在等待{reasons}。",
   "update.idleRestart.cancel": "取消重启",
+  "update.idleRestart.openSettings": "打开更新设置",
   "update.idleRestart.restartNow": "立即重启",
   "update.idleRestart.restartNowTitle": "立即重启 OpenBot？",
   "update.idleRestart.restartNowDescription": "未完成的助手轮次和自动化任务运行会立即停止。",

@@ -45,6 +45,7 @@ export const messages = {
   "update.idleRestart.description": "Yeni rutin çalıştırmaları yeniden başlatmaya kadar bekler.",
   "update.idleRestart.waitingFor": "{reasons} bekleniyor.",
   "update.idleRestart.cancel": "Yeniden başlatmayı iptal et",
+  "update.idleRestart.openSettings": "Güncelleme ayarları",
   "update.idleRestart.restartNow": "Şimdi yeniden başlat",
   "update.idleRestart.restartNowTitle": "OpenBot şimdi yeniden başlatılsın mı?",
   "update.idleRestart.restartNowDescription": "Bitmemiş ajan turları ve rutin çalıştırmaları şimdi durur.",
