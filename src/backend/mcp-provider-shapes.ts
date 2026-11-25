@@ -12,7 +12,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Deferred, Effect, Schema } from "effect";
+import { Deferred, Effect, Option, Schema } from "effect";
 import { agentLaunchPath, isExecutable, isWindowsRunnable, windowsPathExtensions } from "./cli";
 import { causeHelpers } from "./effect-boundary";
 import { isMissingFileError } from "./file-errors";
@@ -252,16 +252,15 @@ const lookUpMcpCommand = Effect.fn("McpShape.lookUpCommand")(
     const windows = process.platform === "win32";
     if (trimmed.includes("/") || (windows && trimmed.includes("\\"))) return null;
     const names = windows ? windowsCommandNames(trimmed, process.env.PATHEXT) : [trimmed];
+    const value = path ?? process.env.PATH ?? "";
     let notRunnable: string | null = null;
-    for (const entry of (path ?? process.env.PATH ?? "").split(delimiter)) {
-      const folder = windows ? entry.trim().replace(/^"(.*)"$/u, "$1") : entry;
+    for (const folder of windows ? windowsPathEntries(value) : value.split(delimiter)) {
       if (!isAbsolute(folder)) continue;
       for (const name of names) {
         const candidate = join(folder, name);
-        const found = yield* isExecutable(candidate).pipe(
-          Effect.timeoutOrElse({ duration: COMMAND_FILE_CHECK_MS, orElse: () => Effect.succeed(false) }),
-        );
-        if (!found) continue;
+        const found = yield* isExecutable(candidate).pipe(Effect.timeoutOption(COMMAND_FILE_CHECK_MS));
+        if (Option.isNone(found)) break;
+        if (!found.value) continue;
         if (!windows || isWindowsRunnable(candidate, process.env.PATHEXT)) return candidate;
         notRunnable ??= candidate;
       }
@@ -270,6 +269,10 @@ const lookUpMcpCommand = Effect.fn("McpShape.lookUpCommand")(
   },
   Effect.catch(() => Effect.succeed(null)),
 );
+
+function windowsPathEntries(value: string): string[] {
+  return (value.match(/(?:"[^"]*"|[^;"])+/gu) ?? []).map((entry) => entry.replaceAll('"', "").trim());
+}
 
 function windowsCommandNames(command: string, pathext: string | undefined): string[] {
   if (isWindowsRunnable(command, pathext)) return [command];
