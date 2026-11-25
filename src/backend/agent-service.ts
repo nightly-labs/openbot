@@ -6318,13 +6318,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this: AgentService,
     agent: AgentSummary,
   ) {
-    const signIn = () => ({ cause: new Error(sourceText("error.voice.live.signIn")) });
-    yield* this.#providers.ensureProvider("codex").pipe(Effect.mapError(signIn));
+    const codexFailure = (cause: unknown) => ({
+      cause: this.#providers.signInRequired("codex") ? new Error(sourceText("error.voice.live.signIn")) : cause,
+    });
+    yield* this.#providers.ensureProvider("codex").pipe(Effect.mapError((failure) => codexFailure(failure.cause)));
     const model = this.#sideCodexModel();
     if (!model) return yield* Effect.fail({ cause: new Error(sourceText("error.provider.noModel")) });
     const client = yield* Effect.try({
       try: () => this.#providers.createProfileClient("codex", this.#liveVoiceAccountId(agent)),
-      catch: signIn,
+      catch: codexFailure,
     });
     return { client, model: model.id, effort: model.defaultReasoningEffort };
   }).bind(this);
