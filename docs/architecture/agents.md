@@ -1011,8 +1011,9 @@ header with a secret name before it parses the call, so logs mask it, and a fail
 value. A key value needs the same source as `save_api_key`: never an external chat, in a channel only a
 key that the local user wrote in the request of the task, and elsewhere only a person's message. The
 approval names the headers that change. The tools never take an environment value and
-never return a header or environment value, and show an address without its query. The user can also
-enter a key with Edit on the server's page in Marketplace, Apps. An edit keeps the row's other headers
+never return a header or environment value, and show an address without its query. An agent saves an
+address as the user gave it, query included, because some servers take the key only there (#16362).
+The user can also enter a key with Edit on the server's page in Marketplace, Apps. An edit keeps the row's other headers
 and environment, and an edit that would send them to another transport, origin, command, arguments or
 folder is refused; headers that the same edit replaces do not count. The approval masks known secrets in the command line and names
 the folder a stdio server starts in. A sign-in shows an `mcp-sign-in:<id>` card in

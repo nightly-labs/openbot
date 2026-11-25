@@ -270,6 +270,8 @@ export const messages = {
     "OpenCode 模型给出推理过程后结束本轮对话，但没有回答。请重试或改用其他模型。",
   "error.provider.opencodeToolCallsAsText": "OpenCode 模型把操作写成了文字，没有实际执行。请重试或改用其他模型。",
   "error.provider.acpNoAnswer": "{provider} 结束本轮对话时没有给出回答。请重新发送消息，或开始新对话。",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} 收到了团队成员的结果，然后结束本轮对话时没有给出回答。请让助手继续。",
   "error.provider.noAnswerAfterSteps":
     "{provider} 执行了一些步骤后结束了本轮对话，但没有给出回答。再次发送相同请求之前，请先问问助手做了什么。",
   "error.provider.acpRefusedNoReason": "{provider} 已停止，没有给出回答。请重新发送消息。",

@@ -3,6 +3,7 @@ import { Button, Dialog, Maximize2, SlidingTabs } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, Match, onSettled, Show, Switch } from "solid-js";
+import { ScrollEdges } from "../../components/ScrollEdges";
 import { documentColorScheme } from "../../document-color-scheme";
 import { useText } from "../../text";
 import { CodeBlock } from "./CodeBlock";
@@ -94,9 +95,23 @@ export function CodePreview(props: {
     <div class="message-preview-resize" ref={(element) => (resize = element)}>
       <SlidingTabs.ContentSlot class="message-preview-views" ref={(element) => (views = element)}>
         <SlidingTabs.Content value="preview" class="message-preview-view">
-          <div class="message-preview-body" data-preview-kind={props.kind}>
-            {content(false)}
-          </div>
+          <Show
+            when={props.kind === "mermaid"}
+            fallback={
+              <div class="message-preview-body" data-preview-kind={props.kind}>
+                {content(false)}
+              </div>
+            }
+          >
+            <ScrollEdges
+              axis="y"
+              label={title()}
+              class="message-preview-diagram-scroll"
+              viewClass="message-preview-body message-preview-diagram-view"
+            >
+              {content(false)}
+            </ScrollEdges>
+          </Show>
         </SlidingTabs.Content>
         <SlidingTabs.Content value="code" class="message-preview-view">
           {code}

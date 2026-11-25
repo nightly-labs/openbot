@@ -137,8 +137,15 @@ async function answerTool(args: unknown, deliveryIds: readonly string[]) {
 async function tool(name: string, args: unknown) {
   assert.ok(service);
   const response = await runCauseEffect(
-    handleWorkflowTool(name, args, service, "agent-builder", `call-${crypto.randomUUID()}`, new Set([AGENT]), () =>
-      Effect.succeed(false),
+    handleWorkflowTool(
+      name,
+      args,
+      service,
+      "agent-builder",
+      `call-${crypto.randomUUID()}`,
+      new Set([AGENT]),
+      undefined,
+      () => Effect.succeed(false),
     ),
   );
   assert.ok(response);

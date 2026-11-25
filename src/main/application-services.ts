@@ -2296,6 +2296,7 @@ export async function createApplicationServices({
     skillLearner: () => localSkillLearner(skills),
     responseStyle: () => serverPersonality.responseStyle(),
     timezone: () => serverTimezone.effective(),
+    chosenTimezone: () => serverTimezone.get().timezone,
     extraRoutineSources: () => (workflowTriggers ? [workflowTriggers] : []),
     channelPersonAgentLevel: (personId, agentId) => host.channelPersonAgentLevel(personId, agentId),
     channelRemotePerson: (personId) => host.channelPersonIsRemote(personId),
@@ -3415,7 +3416,7 @@ export async function createApplicationServices({
           }
         : {}),
       turnLimits: hostTurnLimits,
-      ...(serverModeEnvironment
+      ...(serverModeEnvironment || hostedServer
         ? {
             restart: {
               request: (memberId) => {

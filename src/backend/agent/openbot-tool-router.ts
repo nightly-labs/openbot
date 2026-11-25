@@ -511,6 +511,7 @@ export interface OpenBotToolRouterOptions {
   localSkillTools?: (() => LocalSkillTools) | undefined;
   routineFlowTools?: (() => RoutineFlowTools) | undefined;
   workflowTools?: (() => WorkflowTools) | undefined;
+  chosenTimezone?: (() => string | null) | undefined;
   approvalAutomation?: ApprovalAutomationPolicy | undefined;
   visualPreview?: ChatVisualPreviewHost | null | undefined;
   setCommitCoAuthor?: SetCommitCoAuthor | undefined;
@@ -568,6 +569,7 @@ export class OpenBotToolRouter {
   readonly #localSkillTools: (() => LocalSkillTools) | undefined;
   readonly #routineFlowTools: (() => RoutineFlowTools) | undefined;
   readonly #workflowTools: (() => WorkflowTools) | undefined;
+  readonly #chosenTimezone: (() => string | null) | undefined;
   readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #visualPreview: ChatVisualPreviewHost | null;
   readonly #setCommitCoAuthor: SetCommitCoAuthor | null;
@@ -639,6 +641,7 @@ export class OpenBotToolRouter {
     this.#localSkillTools = options.localSkillTools;
     this.#routineFlowTools = options.routineFlowTools;
     this.#workflowTools = options.workflowTools;
+    this.#chosenTimezone = options.chosenTimezone;
     this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
     this.#visualPreview = options.visualPreview ?? null;
     this.#setCommitCoAuthor = options.setCommitCoAuthor ?? null;
@@ -2424,6 +2427,7 @@ export class OpenBotToolRouter {
         senderAgentId,
         `${params.threadId}:${params.turnId}:${params.callId}`,
         new Set(this.#hooks.listAgents().map((agent) => agent.id)),
+        this.#chosenTimezone?.() ?? this.#routines.turnSenderTimezone(senderAgentId, params.turnId),
         (title) =>
           this.#attention
             .awaitToolApproval(

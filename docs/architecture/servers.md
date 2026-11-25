@@ -1157,7 +1157,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `host-turn-limits-v1` | Read and set the turns at the same time on the host (1 to 128, unlimited, or automatic) and the default task limit of an agent (1 to 64). Owner or admin. Protocol 9 only | `hostAdmin` |
 | `host-personality-v1` | Read (any member) and set (owner or admin) the response style of the agents | `hostAdmin` |
 | `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
-| `host-restart-v1` | Restart a self-hosted server now. Owner or admin. Only a host in server mode advertises it. Protocol 9 only | `hostAdmin` |
+| `host-restart-v1` | Restart a self-hosted or hosted server now. Owner or admin. Only a host in server mode or a hosted server advertises it. Protocol 9 only | `hostAdmin` |
 | `owner-transfer-v1` | No routes. The host can take a new owner: the owner gives the server to another account through the account service, and the host applies the change. Only a host in server mode that OpenBot does not host advertises it | none: the client calls the account service |
 | `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
@@ -1288,12 +1288,15 @@ agents' threads, so the next turn uses the new prompt. A host without the capabi
 
 `host-restart-v1` lets an owner or admin restart a self-hosted server from Restart server in the
 server menu (desktop and web client) or in Server settings (mobile). Only a host in server mode
-(`OPENBOT_SERVER=1`, not a hosted server) advertises it, because only there does a service manager
-start the app again: systemd (`Restart=always` in `openbot.service`) or the Docker restart policy.
-The host answers, then quits; it does not use `app.relaunch`, which would start the app outside
-`xvfb-run`. Running agent turns stop, as on any restart. A hosted server still restarts through the
-account service, and a server on this computer through `localServers`. A host that does not answer
-cannot get the request; then the owner runs `sudo openbot restart`.
+(`OPENBOT_SERVER=1`) or a hosted server (`OPENBOT_HOSTED_SERVER=1`) advertises it, because only
+there does a service manager start the app again: systemd (`Restart=always` in `openbot.service`)
+or the Docker restart policy. The host answers, then quits; it does not use `app.relaunch`, which
+would start the app outside `xvfb-run`. Running agent turns stop, as on any restart. A hosted server
+on boat still restarts through the account service, which can also wake a machine that does not
+answer. A hosted server on a Leaseweb machine (`restartAvailable: false` in the account host list)
+uses `host-restart-v1`, and a server on this computer uses `localServers`. A host that does not
+answer cannot get the request; then the owner runs `sudo openbot restart`, or asks support for a
+hosted server.
 
 `owner-transfer-v1` lets the owner give the server to another OpenBot account from Server Settings ›
 Members (desktop, web client and mobile). The owner enters an email; the account service stores a

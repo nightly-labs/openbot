@@ -1591,9 +1591,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (gone) setRestartRequest(null);
     },
   );
+  function accountRestarts(serverId: string): boolean {
+    const item = servers().find((candidate) => candidate.id === serverId);
+    if (item?.restartAvailable === false) return false;
+    return item?.hosted === true || hostedServers.isHosted(serverId);
+  }
   function restartsItself(serverId: string): boolean {
     return (
-      !hostedServers.isHosted(serverId) &&
+      !accountRestarts(serverId) &&
       server()?.id === serverId &&
       workspace.state.restartReady &&
       workspace.runtime.admin !== undefined
@@ -1602,7 +1607,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   async function restartHost(): Promise<void> {
     const hostId = restartRequest()?.hostId;
     if (!hostId) return;
-    if (hostedServers.isHosted(hostId)) await hostedServers.calls.restart(hostId);
+    if (accountRestarts(hostId)) await hostedServers.calls.restart(hostId);
     else {
       await runTeamEffect(requestHostRestart(hostRequest(hostId)).pipe(Effect.mapError((error) => error.cause)));
       workspace.restartRequested();
@@ -2005,7 +2010,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     onDelete: deleteHostedServer,
     canDelete: hostedServers.isHosted,
     onRestart: (hostId, trigger) => setRestartRequest({ hostId, trigger }),
-    canRestart: (serverId) => hostedServers.isHosted(serverId) || restartsItself(serverId),
+    canRestart: (serverId) => accountRestarts(serverId) || restartsItself(serverId),
     planDeletesAt: hostedServers.planDeletesAt,
     onRenewPlan: hostedServers.renewPlan,
     onHide: (serverId) => void hideServer(serverId),
@@ -2175,12 +2180,19 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         errorBanners.noteError(key, event.message, message);
         controller.setConversationErrors((current) => ({ ...current, [key]: message }));
         const details = agentErrorDetails(event.message, message);
+        const link = event.link;
         const notice = isRetryNotice(event.message);
         controller.setConversationErrorRuns((current) => {
-          if (details || notice)
+          if (link || details || notice)
             return {
               ...current,
-              [key]: { message, run: null, ...(details ? { details } : {}), ...(notice ? { notice } : {}) },
+              [key]: {
+                message,
+                run: null,
+                ...(link ? { link } : {}),
+                ...(details ? { details } : {}),
+                ...(notice ? { notice } : {}),
+              },
             };
           if (!(key in current)) return current;
           const { [key]: _replaced, ...next } = current;
