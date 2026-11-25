@@ -1,3 +1,4 @@
+import { AGENT_PROVIDERS } from "@openbot/contracts/agent-providers";
 import {
   AGENT_PERMISSION_LEVELS,
   type AgentPermissionLevel,
@@ -437,7 +438,17 @@ export type ServerPlace = Omit<SettingLinkEntry, "words">;
 
 interface ServerPlaceEntry extends SettingLinkEntry {
   foundWithoutServerWord?: readonly string[];
+  answersProviderAccountQuestion?: true;
 }
+
+const PROVIDER_WORDS: readonly string[] = [
+  ...AGENT_PROVIDERS.filter((provider) => provider !== "acp"),
+  "anthropic",
+  "openai",
+  "chatgpt",
+  "gemini",
+];
+const ACCOUNT_WORDS = ["account", "subscription"];
 
 const SERVER_PLACES: readonly ServerPlaceEntry[] = [
   {
@@ -493,6 +504,14 @@ const SERVER_PLACES: readonly ServerPlaceEntry[] = [
     words: "claude code claude.md home user own personal setup config hooks plugins skills load",
     foundWithoutServerWord: ["claude"],
   },
+  {
+    title: "Provider accounts",
+    place: `On a computer: ${SERVER_SETTINGS} > Providers > the provider, such as Claude or ChatGPT > Accounts > Add account. On the phone app: Server settings > Providers > the provider > Add account; for some providers, the phone says to add the account on a computer.`,
+    about:
+      "Only the owner or an admin of the server. Signs in one more account of a provider, for example a second Claude or ChatGPT subscription, or adds an API key. Each agent uses one account: choose it in the agent's settings. Pool accounts lets the agents of a provider share its accounts.",
+    words: ["account accounts subscription pool", ...PROVIDER_WORDS].join(" "),
+    answersProviderAccountQuestion: true,
+  },
 ];
 
 const CHAT_PLACES: readonly SettingLinkEntry[] = [
@@ -526,11 +545,14 @@ const SERVER_TERMS = ["server", "computer", "machine", "device", "laptop", "macb
 
 export function searchServerPlaces(query: string, limit = 2): ServerPlace[] {
   const queryTerms = terms(query);
+  const asksAboutProviderAccount =
+    queryTerms.some((term) => hits(term, ACCOUNT_WORDS)) && queryTerms.some((term) => PROVIDER_WORDS.includes(term));
   const places = queryTerms.some((term) => hits(term, SERVER_TERMS))
     ? SERVER_PLACES
     : SERVER_PLACES.filter(
-        ({ foundWithoutServerWord }) =>
-          foundWithoutServerWord && queryTerms.some((term) => hits(term, foundWithoutServerWord)),
+        ({ foundWithoutServerWord, answersProviderAccountQuestion }) =>
+          (foundWithoutServerWord && queryTerms.some((term) => hits(term, foundWithoutServerWord))) ||
+          (answersProviderAccountQuestion && asksAboutProviderAccount),
       );
   if (places.length === 0) return [];
   const scored = queryTerms.filter((term) => !hits(term, SERVER_TERMS));
