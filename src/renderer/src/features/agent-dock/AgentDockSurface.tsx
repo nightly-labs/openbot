@@ -111,8 +111,10 @@ export function AgentDockSurface() {
   let tuckTimer: ReturnType<typeof setTimeout> | undefined;
   let sent: { interactive: boolean; keyboard: boolean } | null = null;
   let dockShape: readonly AgentDockShapeRect[] | null = null;
+  let shapeSize = "";
   let sentShape = "";
   let sentExtent: AgentDockExtent | null | undefined;
+  let shelfExtent: AgentDockExtent | null = null;
   let shrinkTimer: ReturnType<typeof setTimeout> | undefined;
   let failed: { seatKey: string; taskId: string | undefined; text: string; clientMessageId: string } | null = null;
 
@@ -156,6 +158,13 @@ export function AgentDockSurface() {
       syncShape();
     },
   );
+  const results = createMemo(() => [...(presentation()?.results ?? [])]);
+  createEffect(
+    () => results().length === 0,
+    (empty) => {
+      if (empty) syncShape();
+    },
+  );
   const stripOn = () => (presentation()?.autoHide ?? false) && (presentation()?.edgeStrip ?? false);
   const asks = createMemo(() => (presentation()?.seats ?? []).some((seat) => seat.state?.kind === "waiting"));
 
@@ -178,6 +187,7 @@ export function AgentDockSurface() {
     };
   }
 
+  const windowSize = () => `${window.innerWidth}x${window.innerHeight}`;
   const fitted = () => sentExtent !== undefined && sentExtent !== null;
   const stopShrink = () => {
     clearTimeout(shrinkTimer);
@@ -185,15 +195,22 @@ export function AgentDockSurface() {
   };
 
   function syncExtent(settled = false) {
+    if (dockShape !== null && shapeSize !== windowSize()) return;
     const body = isTucked && edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
     if (menuOpen()) menuWanted = false;
-    const extent =
-      dockShape === null || chatOpen || menuWanted || menuOpen() || (pointerIn && !fitted())
+    const measured =
+      dockShape === null
         ? null
         : windowExtent(
             isTucked ? [...dockShape, tuckedStrip(body, AGENT_DOCK_STRIP_FEEL)] : dockShape,
             presentation()?.edge ?? "right",
           );
+    if (results().length === 0) shelfExtent = null;
+    else if (shelfShown && measured) shelfExtent = grownExtent(shelfExtent, measured);
+    const extent =
+      measured === null || chatOpen || menuWanted || menuOpen() || (pointerIn && !fitted())
+        ? null
+        : grownExtent(shelfExtent, measured);
     const change = extentChange(sentExtent, extent);
     if (change === "keep") return stopShrink();
     if (change === "shrink" && !settled) {
@@ -395,7 +412,6 @@ export function AgentDockSurface() {
     return bySeat;
   });
   const agents = createMemo(() => [...(presentation()?.agents ?? [])]);
-  const results = createMemo(() => [...(presentation()?.results ?? [])]);
   const chat = (seat: AgentDockSeatRef): AgentDockChatModel =>
     chats().get(agentDockSeatKey(seat)) ?? {
       messages: [],
@@ -489,6 +505,7 @@ export function AgentDockSurface() {
               SHAPED_WINDOW || FITTED_WINDOW
                 ? (parts) => {
                     dockShape = parts;
+                    shapeSize = windowSize();
                     syncShape();
                   }
                 : undefined
