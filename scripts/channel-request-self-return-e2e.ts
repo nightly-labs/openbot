@@ -33,6 +33,7 @@ interface Report {
   promptFraming?: { channelResult: boolean; startTask: boolean };
   otherMemberReturned?: number;
   requeuedAfterRestart?: boolean;
+  sideThread?: { queuedInSideThread: number; movedToMainChat: number; leftInSideThread: number };
   passed: boolean;
   failure?: string;
 }
@@ -217,6 +218,38 @@ try {
   await Effect.runPromise(mailbox.markStarting(selfDelivery.id));
   report.requeuedAfterRestart = await Effect.runPromise(mailbox.requeueAfterRestart(selfDelivery.id, false));
   assert.ok(report.requeuedAfterRestart, "A restart dropped the self-sent result instead of queuing it again.");
+
+  const sideThreadId = "side-thread-e2e";
+  const sideText = "E2E request from a side thread";
+  openTasks.add(sideThreadId);
+  await runCauseEffect(
+    service.handoff({
+      operationId: randomUUID(),
+      channelId,
+      senderAgentId: lead.id,
+      text: sideText,
+      recipientAgentIds: [lead.id],
+      sourcePaths: [],
+      senderTaskId: sideThreadId,
+    }),
+  );
+  const sideTask = await until(
+    () => service.store.tasks(channelId).find((item) => item.parentTaskId === null && item.instruction === sideText),
+    "the task of the side thread request",
+  );
+  service.store.update(service.store.get(channelId), {
+    tasks: [{ ...sideTask, state: "completed", revision: sideTask.revision + 1, error: null }],
+  });
+  await Effect.runPromise(returns.reconcile(channelId));
+  const inSideThread = () =>
+    mailbox.queuedTaskMessages(lead.id, sideThreadId).filter((message) => message.text.includes(RETURN_MARK)).length;
+  const queuedInSideThread = inSideThread();
+  openTasks.delete(sideThreadId);
+  const moved = await Effect.runPromise(mailbox.returnTaskAnswers(lead.id, sideThreadId));
+  report.sideThread = { queuedInSideThread, movedToMainChat: moved, leftInSideThread: inSideThread() };
+  assert.equal(queuedInSideThread, 1, "The self-sent result of a side thread request did not go to that side thread.");
+  assert.equal(moved, 1, "Closing the side thread did not move its self-sent result to the main chat.");
+  assert.equal(report.sideThread.leftInSideThread, 0, "The self-sent result stayed in the closed side thread.");
   report.passed = true;
 } catch (error) {
   report.failure = error instanceof Error ? error.message : String(error);

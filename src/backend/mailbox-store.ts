@@ -1592,7 +1592,9 @@ export class MailboxStore {
       const ids = new Set(
         this.#queuedFor(agentId).flatMap((delivery) => {
           const message = this.#requireMessage(delivery.messageId);
-          return message.taskId === taskId && message.sender.kind === "agent" && message.sender.agentId !== agentId
+          return message.taskId === taskId &&
+            message.sender.kind === "agent" &&
+            (message.sender.agentId !== agentId || message.replyToMessageId !== null)
             ? [message.id]
             : [];
         }),
