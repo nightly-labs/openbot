@@ -1,8 +1,14 @@
-import type { OpenBotDesktopApi, OpenSharedFileInput, OpenWorkspaceFileInput } from "@openbot/contracts/ipc";
+import { isOpenableAttachmentName } from "@openbot/contracts/attachment-files";
+import type {
+  FileAction,
+  OpenBotDesktopApi,
+  OpenSharedFileInput,
+  OpenWorkspaceFileInput,
+} from "@openbot/contracts/ipc";
 import { matchingSourceKeys } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
 import { normalizeMessage } from "@openbot/user-errors/reference";
-import { decodedPath } from "./message-image-files";
+import { decodedPath, SHARED_FOLDER_PATH } from "./message-image-files";
 
 export type ChatFileKind = "shared" | "workspace";
 
@@ -40,10 +46,24 @@ export function chatFileError(error: unknown, path: string, fallback: string): s
     : message;
 }
 
+const LOCATION_SUFFIX = /(?::\d+(?::\d+)?|#L\d+(?:C\d+)?)$/u;
+
+function fileAction(path: string): FileAction {
+  return isOpenableAttachmentName(decodedPath(path).replace(LOCATION_SUFFIX, "")) ? "open" : "reveal";
+}
+
 function openFile(opener: ChatFileOpener, kind: ChatFileKind, agentId: string | undefined, path: string) {
-  if (kind === "shared") return opener.openSharedFile({ path, action: "open" });
+  const action = fileAction(path);
+  if (kind === "shared") return opener.openSharedFile({ path, action });
   if (!agentId) return Promise.resolve();
-  return opener.openWorkspaceFile({ agentId, path, action: "open" });
+  return opener.openWorkspaceFile({ agentId, path, action });
+}
+
+function fallbacks(kind: ChatFileKind, agentId: string | undefined, path: string, asWritten?: string) {
+  const files: { kind: ChatFileKind; path: string }[] = [];
+  if (asWritten && agentId) files.push({ kind: "workspace", path: asWritten });
+  if (kind === "workspace" && SHARED_FOLDER_PATH.test(path)) files.push({ kind: "shared", path: decodedPath(path) });
+  return files;
 }
 
 export async function openChatFile(
@@ -57,8 +77,8 @@ export async function openChatFile(
     await openFile(opener, kind, agentId, path);
     return null;
   } catch (error) {
-    if (asWritten && agentId) {
-      const opened = await openFile(opener, "workspace", agentId, asWritten).then(
+    for (const file of fallbacks(kind, agentId, path, asWritten)) {
+      const opened = await openFile(opener, file.kind, agentId, file.path).then(
         () => true,
         () => false,
       );

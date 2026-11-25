@@ -1059,17 +1059,19 @@ export function AgentDock(props: AgentDockProps) {
       }),
   );
 
+  const fileErrors = new Map<string, string>();
+
   async function openFile(id: string, ...file: Parameters<AgentDockFileOpener>) {
     const open = props.onOpenFile;
     if (!open) return;
-    setState((draft) => {
-      draft.errors[id] = null;
-    });
     const error = await open(...file);
-    if (error)
-      setState((draft) => {
-        draft.errors[id] = error;
-      });
+    const shownFileError = fileErrors.get(id);
+    if (error) fileErrors.set(id, error);
+    else fileErrors.delete(id);
+    setState((draft) => {
+      if (error) draft.errors[id] = error;
+      else if (shownFileError !== undefined && draft.errors[id] === shownFileError) draft.errors[id] = null;
+    });
   }
 
   async function send(id = state.open, draft?: string) {
