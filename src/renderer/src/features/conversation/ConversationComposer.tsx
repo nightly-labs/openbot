@@ -88,6 +88,7 @@ export function ConversationComposer() {
     currentChatErrorRun,
     currentChatErrorLink,
     currentChatErrorDetails,
+    currentChatErrorNotice,
     currentDraft,
     dismissCurrentChatErrors,
     installedSkills,
@@ -377,6 +378,10 @@ export function ConversationComposer() {
   const unreadableContent = () =>
     props.agent?.provider === "opencode" &&
     currentChatError() === localizeSourceText(sourceText("error.provider.opencodeUnreadableContent"));
+  const chatErrorTone = createMemo<"warning" | "danger">((previous) => {
+    if (!currentChatError()) return previous ?? "danger";
+    return unreadableContent() || currentChatErrorNotice() ? "warning" : "danger";
+  });
   const [now, setNow] = createSignal(Date.now());
   const agentAccountId = () => props.agent?.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
   const agentUsageLimit = (limit: AccountUsageLimit) =>
@@ -751,7 +756,7 @@ export function ConversationComposer() {
               <ComposerErrorBanner
                 message={message()}
                 title={currentChatErrorRun() ?? undefined}
-                tone={unreadableContent() ? "warning" : "danger"}
+                tone={chatErrorTone()}
                 reference={currentChatErrorReference()}
                 onShown={() => reportErrorBanner(message(), "turn")}
                 conversationKey={currentChatConversationKey()}
