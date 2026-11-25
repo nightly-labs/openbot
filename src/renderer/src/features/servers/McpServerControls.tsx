@@ -142,7 +142,7 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
   createEffect(
     () => ({ api: signInApp(), mcpServerId: props.id }),
     ({ api, mcpServerId }) => {
-      if (!api || state.signInAppShown) return;
+      if (!api) return;
       api
         .load(mcpServerId)
         .then((stored) => {
