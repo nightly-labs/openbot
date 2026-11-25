@@ -23,6 +23,9 @@ the [root changelog](../../CHANGELOG.md).
   the chat opens the system camera, with zoom and all lenses, instead of the small camera in the chat.
 - The small camera in the chat shows a tip one time. It tells you about the full-screen camera, and
   one tap turns it on.
+- Owners and admins can turn "Agents can use credits" on or off in Server Settings > Agents. While it is off, the agents of the server cannot spend OpenBot credits. **The server must also be on the new version to show the switch.**
+- Owners and admins can turn "Ask when credits are needed" on or off in Server Settings > Agents. While it is on, an agent that needs credits waits and asks in the chat; Allow continues when the balance is enough, and Decline skips the step. **The server must also be on the new version to show the switch.**
+- When a page in an agent's browser asks for your location, the app now asks you with Block, Allow always and Allow, on the browser screen and in the agent's chat. Allow sends the location of your phone to that tab only. Allow always gives it to that site in all tabs of the same agent until the server restarts. The server must be on the latest desktop version.
 
 ### Changed
 
@@ -155,6 +158,53 @@ the [root changelog](../../CHANGELOG.md).
 - The Send Message shortcut and the Action button now send the message while OpenBot is open. Before,
   the app showed "Reconnecting" and the message did not go. This fix needs the new app version from the
   App Store.
+- Refresh connection in Server Settings now starts a new connection at once when the server is not
+  connected. Before, it waited for the current try to end, and sometimes only a force-quit of the app
+  connected it again.
+- A Pi agent that uses a ChatGPT sign-in model now continues when its chat becomes too long for the model. The server starts a new Pi session with the chat history and sends the message again. Before, the agent stopped responding. The server must be on the new OpenBot version.
+- When you open a chat from a notification after the app was in the background, the chat now shows "Checking for new messages" while the app connects to the server again and gets the newest messages. Before, the chat showed the older messages with no sign that the reply was still on its way.
+- When the reply voice cannot read the language of a reply, for example Chinese with Supertonic 3, the
+  message now tells you to choose another reply voice. Read aloud also shows a Voice settings button
+  that opens Settings > Voice. Before, the message only said that the voice cannot read the language.
+- A message that you send to an agent now stays in the chat while the agent starts its answer. Before,
+  it could disappear and come back, or stay missing until you opened the chat again.
+- A spreadsheet that is too large for the preview now says so, and tells you to share it to open it
+  in another app. Before, the preview said "Could not read this spreadsheet.", so a good file looked
+  broken.
+- Show the provider name next to each model in the Backup models order. Before, two providers with
+  a model of the same name, such as Grok 4.6, showed the same text.
+- When you choose a folder for an agent or a channel, you can now type or paste a folder path. Before, the folder picker showed no hidden folders, such as `.config`, and you could not give an agent access to them.
+- When an agent does some steps and then ends its turn with no answer, the chat now shows a note:
+  "<provider> did some steps, then ended the turn with no answer. Ask the agent what it did before
+  you send the same request again." Before, the phone showed an empty reply with no reason. The
+  server must also be on the new version.
+- When a server closes the connection while the phone signs in, the app now says so and tells you to
+  check the date and time on the server and on the phone. Before, it showed a general connection
+  error.
+- On iPhone, the download of a speech model or a voice model shows its progress again and finishes.
+  Before, the speech model stayed at 0%, and the voice model stopped with "The download stopped".
+- Bold and struck-through text in a chat now shows correctly after Chinese, Japanese or Korean
+  punctuation, as in `**待办：**说明`. Before, the `**` marks stayed in the text.
+- Provider accounts of a server that have the same email no longer look the same. Each one shows its number ("Account 1", "Account 2").
+- Live Activities now show the avatar color that you chose for an agent. Before, they showed the old
+  color. While the phone is locked, an agent with a chosen color shows one face that does not change
+  with its state. The lock-screen status color is correct when the server is on the new version.
+- When you open the app again, a message that waits to send no longer shows "Not sent" while the app
+  repairs its connection to the server. The message shows "Waiting to send" and sends by itself when
+  the connection is back. Before, you had to touch and hold the message and select Retry.
+- When WhatsApp did not accept an agent's answer to a WhatsApp chat, the chat in the app gave no sign of it. Now the chat shows a line under the answer: WhatsApp did not accept it, so the person did not get it. The server must also be on the new version.
+- Show a page's message box (an alert or a confirm) in the live browser view, and let you answer it
+  there. Before, the view stayed on "Connecting to the browser…" while the page waited for an answer
+  on the server's screen. The server must also be on the new version.
+- A site that asks for its username and password in its own browser prompt (HTTP Basic sign-in) no longer shows only an empty page in the browser. A **Sign in to** card now shows above the page. Type the username and password, then tap **Sign in**. If the site does not accept them, the card tells you, and you can try again. This works only for sites that use HTTPS, and the server must also be on the new version.
+- Channel settings no longer show "Compact context" when no member of the channel can compact on
+  request, for example when all members use Claude Code. These members compact their context by
+  themselves when it is almost full. The server must also be on the new version.
+- The Android app does not stop when it starts. Before, two threads of React Native could make the
+  main thread handler at the same time.
+- The Android app does not stop when a screen changes after you go back from it. Before, the views
+  that the closing screen removed kept their parent, and React Native could not add them again.
+- The Android app does not stop when Android closes it while it removes a screen.
 
 ## [1.4.13] - 2026-11-24
 
