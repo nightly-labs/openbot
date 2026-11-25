@@ -272,7 +272,8 @@ async function purchaseStartsOnThePoolOrOnBoat() {
   check(
     "a start on boat alerts the operator once, with the plan, the currency, the server and the reason",
     alertsAbout("eur-2").length === 1 &&
-      alertsAbout("eur-2")[0] === "⛵ **Boat start** · standard server · eur · eur-2 · no ready VPS02 in AMS-01",
+      alertsAbout("eur-2")[0] ===
+        "⛵ **Boat start** · standard server · eur · eur-2 · no ready VPS02 in AMS-01, FRA-01",
     alerts,
   );
   check(
@@ -314,6 +315,14 @@ async function purchaseStartsOnThePoolOrOnBoat() {
       sandboxOf("usd-pro-2").length === 1 &&
       serversOn(sydPro).length === 0,
     { eur: row("eur-pro"), usd: row("usd-pro"), usd2: row("usd-pro-2") },
+  );
+
+  const fraPro = await machine(1014, "VPS03", "FRA-01");
+  await purchase("eur-pro-fra", "pro", "eur");
+  check(
+    "a euro purchase uses a ready machine in FRA-01 when AMS-01 has none",
+    row("eur-pro-fra")?.operator_host === fraPro && sandboxOf("eur-pro-fra").length === 0,
+    row("eur-pro-fra"),
   );
 
   const starter = await machine(1009, "VPS01", "AMS-01");
@@ -461,7 +470,7 @@ async function purchaseStartsOnThePoolOrOnBoat() {
     alerts,
   );
 
-  const unsigned = ["eur-1", "usd-2", "usd-pro", serversOn(starter)[0]?.server_id].map(String);
+  const unsigned = ["eur-1", "usd-2", "usd-pro", "eur-pro-fra", serversOn(starter)[0]?.server_id].map(String);
   const boatBefore = events("provisioned", "boat").length;
   const alertsBefore = alerts.length;
   const before = await tick(t0 + 3 * MINUTE);

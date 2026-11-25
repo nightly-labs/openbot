@@ -206,9 +206,12 @@ export interface ConversationUiBlock {
   state: UiBlockState;
   vault?: UiBlockVaultRequest;
   apiKey?: true;
+  location?: true;
 }
 
 export const UI_API_KEY_SCOPE_FIELD_ID = "scope";
+
+export const UI_LOCATION_FIELD_ID = "location";
 
 export function isUiBlockType(value: unknown): value is UiBlockType {
   return isOneOf(UI_BLOCK_TYPES, value);
@@ -665,6 +668,7 @@ function readConversationUiBlock(value: unknown): ConversationUiBlock {
   };
   if (record.vault !== undefined) block.vault = readVaultRequest(spec, record.vault);
   if (record.apiKey === true && spec.type === "form") block.apiKey = true;
+  if (record.location === true && spec.type === "form") block.location = true;
   return block;
 }
 

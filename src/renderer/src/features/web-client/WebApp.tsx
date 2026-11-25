@@ -35,11 +35,13 @@ import {
 } from "../../error-reports";
 import { StaticI18nProvider } from "../../i18n-context";
 import { startupLoadingScene } from "../../startup-animation-preference";
+import { clearStorageUsageCache } from "../files/storage-usage";
 import { AnalyticsConsentRow, ConsentNotice } from "../onboarding/AnalyticsConsent";
 import { createOnboardingTeam, onboardingSessionSeed } from "../onboarding/onboarding-avatars";
 import { deleteRemoteWorkspaceFrames } from "../servers/remote-workspace-frame";
 import { WindowBackdropBubbles } from "../window/backdrop-bubbles";
 import { keepCachedWorkflows } from "../workflows/workflow-cache";
+import { WebExtensionConnect } from "./WebExtensionConnect";
 import { WebLanguageStep } from "./WebLanguageStep";
 import { phoneAppScreenWanted, WebPhoneAppScreen } from "./WebPhoneAppScreen";
 import { WebSlowLoadNotice } from "./WebSlowLoadNotice";
@@ -50,6 +52,8 @@ import { createWebAppearancePreference } from "./web-appearance-preference";
 import { takeWebAppStart, WEB_APP_BILLING_PARAM, type WebAppStart } from "./web-billing";
 import { syncWebChatBackground } from "./web-chat-background";
 import type { WebRuntimeFactory } from "./web-client-context";
+import { extensionReturnUrl, forgetExtensionConnect, takeExtensionConnect } from "./web-extension-connect";
+import { deleteCachedWebHosts } from "./web-host-cache";
 import { takeHostingReturn } from "./web-hosted-servers";
 import { createWebLanguagePreference } from "./web-language-preference";
 
@@ -208,6 +212,15 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
   const [pluginSlug, setPluginSlug] = createSignal(takePluginLink());
   const [marketplaceListing, setMarketplaceListing] = createSignal(takeMarketplaceLink());
   const [startLink, setStartLink] = createSignal(takeStartLink());
+  const extensionConnect = takeExtensionConnect();
+  createEffect(
+    () => state.loaded && !state.account,
+    (signedOut) => {
+      if (!signedOut || !extensionConnect?.silent) return;
+      forgetExtensionConnect();
+      window.location.assign(extensionReturnUrl(extensionConnect, { error: "login_required" }));
+    },
+  );
   const initialBillingReturn = takeBillingReturn();
   const initialHostingReturn = takeHostingReturn();
   const [billingReturn, setBillingReturn] = createSignal(initialBillingReturn !== null);
@@ -222,6 +235,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
     pluginSlug() !== null ||
     marketplaceListing() !== null ||
     startLink() !== null ||
+    extensionConnect !== null ||
     initialBillingReturn !== null ||
     initialHostingReturn !== null ||
     companySignInReturnError !== null;
@@ -242,6 +256,8 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
       deleteRemoteWorkspaceFrames(null);
       void deleteSavedAgentPictures(null);
       keepCachedWorkflows(null);
+      deleteCachedWebHosts(null);
+      clearStorageUsageCache();
     }
     sessionGeneration += 1;
     setState((draft) => {
@@ -633,37 +649,52 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
               }
             >
               {(accountId) => (
-                <Dynamic
-                  component={workspace()}
-                  accountId={accountId}
-                  accountEmail={state.account?.email ?? ""}
-                  accountName={state.account?.name ?? null}
-                  accountAvatarUrl={state.account?.avatarUrl ?? null}
-                  accountChatColor={state.account?.chatColor ?? null}
-                  accountFetch={accountFetch}
-                  onSessionCheck={checkSession}
-                  accountSessionEnded={() => sessionEnded}
-                  onLogout={logout}
-                  createRuntime={props.createRuntime}
-                  agentTemplateId={agentTemplateId()}
-                  onAgentTemplateClose={() => setAgentTemplateId(null)}
-                  inviteUrl={inviteUrl()}
-                  onInviteClose={() => setInviteUrl(null)}
-                  pluginSlug={pluginSlug()}
-                  onPluginSlugConsumed={() => setPluginSlug(null)}
-                  marketplaceListing={marketplaceListing()}
-                  onMarketplaceListingConsumed={() => setMarketplaceListing(null)}
-                  start={startLink()}
-                  onStartConsumed={() => setStartLink(null)}
-                  billingReturn={billingReturn()}
-                  onBillingReturnConsumed={() => setBillingReturn(false)}
-                  hostingReturn={hostingReturn()}
-                  onHostingReturnConsumed={() => setHostingReturn(null)}
-                  language={languagePreference.language()}
-                  onChangeLanguage={languagePreference.setLanguage}
-                  appearance={appearancePreference.appearance()}
-                  onChangeAppearance={appearancePreference.setAppearance}
-                />
+                <Show
+                  when={extensionConnect}
+                  fallback={
+                    <Dynamic
+                      component={workspace()}
+                      accountId={accountId}
+                      accountEmail={state.account?.email ?? ""}
+                      accountName={state.account?.name ?? null}
+                      accountAvatarUrl={state.account?.avatarUrl ?? null}
+                      accountChatColor={state.account?.chatColor ?? null}
+                      accountFetch={accountFetch}
+                      onSessionCheck={checkSession}
+                      accountSessionEnded={() => sessionEnded}
+                      onLogout={logout}
+                      createRuntime={props.createRuntime}
+                      agentTemplateId={agentTemplateId()}
+                      onAgentTemplateClose={() => setAgentTemplateId(null)}
+                      inviteUrl={inviteUrl()}
+                      onInviteClose={() => setInviteUrl(null)}
+                      pluginSlug={pluginSlug()}
+                      onPluginSlugConsumed={() => setPluginSlug(null)}
+                      marketplaceListing={marketplaceListing()}
+                      onMarketplaceListingConsumed={() => setMarketplaceListing(null)}
+                      start={startLink()}
+                      onStartConsumed={() => setStartLink(null)}
+                      billingReturn={billingReturn()}
+                      onBillingReturnConsumed={() => setBillingReturn(false)}
+                      hostingReturn={hostingReturn()}
+                      onHostingReturnConsumed={() => setHostingReturn(null)}
+                      language={languagePreference.language()}
+                      onChangeLanguage={languagePreference.setLanguage}
+                      appearance={appearancePreference.appearance()}
+                      onChangeAppearance={appearancePreference.setAppearance}
+                    />
+                  }
+                >
+                  {(request) => (
+                    <WebExtensionConnect
+                      variant={variant}
+                      request={request()}
+                      accountId={accountId}
+                      email={state.account?.email ?? ""}
+                      accountFetch={accountFetch}
+                    />
+                  )}
+                </Show>
               )}
             </Show>
           </Show>

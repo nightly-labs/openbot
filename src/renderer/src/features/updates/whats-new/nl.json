@@ -1,5 +1,77 @@
 [
   {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Veel van de onderstaande oplossingen werken op een server alleen als de server deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Gebruik spraak in kanalen. Wanneer je een bericht voor een kanaal dicteert, leest de app het antwoord van een agent hardop voor. Je kunt ook een spraakgesprek starten vanuit het berichtvak van het kanaal.",
+          "Verberg een server op de serverbalk. De server is ook verborgen op je andere computers. Selecteer hem in de map “Verborgen servers” om hem weer te tonen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "De pagina Taken heet nu Threads, zoals in de telefoon-app en in het zijpaneel van de chat.",
+          "Gestreamde antwoorden en workflows die tegelijk lopen, gebruiken minder CPU, en de webclient opent een server sneller."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Op een Mac openen Koppelen en Account toevoegen voor Claude nu de aanmeldpagina van Claude vanuit OpenBot.",
+          "Wanneer de verbinding met een server waarbij je bent aangesloten stopt met het verzenden van gegevens, maakt de app zelf weer verbinding.",
+          "Lange kanalen op een server waarbij je bent aangesloten, openen en updaten sneller.",
+          "Een workflowuitvoer “Melding” of een stap die op goedkeuring wacht, stuurt nu een melding naar je telefoon.",
+          "Een Gemini-chat gaat door nadat Google een toolresultaat weigert. Eerder mislukte elk volgend bericht."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.77.0",
+    "date": "2026-11-23",
+    "notices": [
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Op een server werken OpenBot-creditmodellen, gepauzeerde en geëxporteerde workflows, alleen-lezen WhatsApp-chats, locatieverzoeken en de keuze van de Signal-server alleen als de server deze versie heeft.",
+      "Na deze update kan een oudere versie van OpenBot je gegevens niet openen."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Koop OpenBot-credits voor jezelf of voor een server via de knop “Credits” in de paginabalk of onder Instellingen → Facturering. Een betaalde licentie geeft ook elke maand gratis credits.",
+          "Beeld- en videostappen in een workflow kunnen OpenBot-modellen gebruiken die je credits betalen, zonder extra aanmelding. Stel bij een stap “Aantal” in om tot 4 resultaten tegelijk te maken.",
+          "Pauzeer een workflow via het workflowmenu. Je kunt een workflow ook naar een bestand exporteren en op een andere computer of server importeren.",
+          "Typ {{ in een workflowstap om een veld uit een eerdere stap toe te voegen. Triggers voor Planning, GitHub, Discord, Telegram en Slack geven nu ook velden.",
+          "Een agent kan om je locatie vragen wanneer een verzoek die nodig heeft, zoals “restaurants bij mij in de buurt”. Er wordt niets verstuurd tot je antwoordt.",
+          "Maak een toegestaan WhatsApp-contact of een toegestane groep alleen-lezen. Je agents kunnen de chat lezen, en OpenBot schrijft er nooit in."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Een inactieve Claude- of Pi-chat met 200K of meer tokens context comprimeert zichzelf voordat de prompt-cache van 1 uur verloopt. Dat kost minder dan de volledige context opnieuw lezen. Zet het uit in Serverinstellingen → Aanbieders.",
+          "Kies de Signal-server van een server in Serverinstellingen → Algemeen. “Automatisch” houdt de dichtstbijzijnde.",
+          "Gemini-agents met Volledige toegang gebruiken OpenBot-tools, zoals geheugen, de browser en kanalen, zonder goedkeuringskaart."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een bericht dat je naar een Claude-agent stuurt terwijl die werkt, komt nu meteen bij de agent aan, ook terwijl hij een subagent of een lange tool uitvoert.",
+          "Een ChatGPT (Codex)-agent die op “Eerst vragen” staat, vraagt je nu voordat hij een opdracht uitvoert of een bestand wijzigt.",
+          "Een gehoste of zelf gehoste server die niet meer reageert, start na 10 minuten vanzelf weer.",
+          "Op macOS maakt het agentdock OpenBot en de hele computer niet meer traag.",
+          "Lange chats scrollen soepel. Eerder haperde een chat met meer dan 100 berichten tijdens het scrollen."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.76.0",
     "date": "2026-11-21",
     "notices": [

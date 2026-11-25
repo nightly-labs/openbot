@@ -31,9 +31,7 @@ import { useText } from "@openbot/ui/text";
 export function ConversationHeader() {
   const { t } = useText();
   const {
-    actingBrowserControl,
     agentActivity,
-    browserControlAgent,
     channel,
     fastMode,
     ultrafast,
@@ -46,11 +44,9 @@ export function ConversationHeader() {
     settingsModel,
     settingsProvider,
     settingsReasoning,
-    sidePanelOpen,
     sideThreadOpen,
     messagePins,
     replyJump,
-    toggleSidePanel,
     moveThreadToPanel,
     startNewThread,
   } = useConversationViewScope();
@@ -182,17 +178,6 @@ export function ConversationHeader() {
         </Show>
       }
       pinnedMessages={pinnedMessages()}
-      sidePanel={
-        channel?.readOnly()
-          ? undefined
-          : {
-              open: sidePanelOpen(),
-              actingAgentName: actingBrowserControl()
-                ? (browserControlAgent()?.name ?? t("conversation.header.agentFallback"))
-                : undefined,
-              onToggle: toggleSidePanel,
-            }
-      }
     />
   );
 }

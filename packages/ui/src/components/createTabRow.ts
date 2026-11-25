@@ -9,6 +9,7 @@ export interface TabRowState {
   fadeStart: boolean;
   fadeEnd: boolean;
   frozen: number;
+  frozenRow: number;
 }
 
 export function createTabRow(options: {
@@ -17,7 +18,13 @@ export function createTabRow(options: {
   key: (tab: HTMLElement) => string;
   measured?: () => void;
 }) {
-  const [row, setRow] = createStore<TabRowState>({ hidden: [], fadeStart: false, fadeEnd: false, frozen: 0 });
+  const [row, setRow] = createStore<TabRowState>({
+    hidden: [],
+    fadeStart: false,
+    fadeEnd: false,
+    frozen: 0,
+    frozenRow: 0,
+  });
   let frame = 0;
   const tab = (key: string) => {
     const list = options.list();
@@ -76,15 +83,18 @@ export function createTabRow(options: {
 
   const freeze = (key: string) => {
     const width = tab(key)?.offsetWidth;
+    const rowWidth = options.list()?.offsetWidth ?? 0;
     if (width)
       setRow((state) => {
         state.frozen = width;
+        state.frozenRow = rowWidth;
       });
   };
   const unfreeze = () => {
     if (row.frozen)
       setRow((state) => {
         state.frozen = 0;
+        state.frozenRow = 0;
       });
   };
 

@@ -759,7 +759,7 @@
     var(--openbot-text-primary) 55%,
     transparent 70%
   );
-  animation: agent-activity-shine-window 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+  animation: agent-activity-shine-window 2.25s steps(5, end) infinite;
 }
 
 .agent-activity-shine-text {
@@ -770,13 +770,22 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: inherit;
   -webkit-text-fill-color: var(--openbot-text-muted);
-  animation: agent-activity-shine-text 2.25s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+  animation: agent-activity-shine-text 2.25s steps(5, end) infinite;
 }
 
 @keyframes agent-activity-shine-window {
   0%,
   18% {
     transform: translateX(0);
+  }
+  34% {
+    transform: translateX(calc(200% / 3 * 0.409));
+  }
+  50% {
+    transform: translateX(calc(200% / 3 * 0.802));
+  }
+  66% {
+    transform: translateX(calc(200% / 3 * 0.96));
   }
   82%,
   100% {
@@ -788,6 +797,15 @@
   0%,
   18% {
     transform: translateX(0);
+  }
+  34% {
+    transform: translateX(calc(-200% * 0.409));
+  }
+  50% {
+    transform: translateX(calc(-200% * 0.802));
+  }
+  66% {
+    transform: translateX(calc(-200% * 0.96));
   }
   82%,
   100% {
@@ -817,14 +835,14 @@
   width: 200%;
   -webkit-mask-image: linear-gradient(90deg, transparent 25%, var(--openbot-text-primary) 60%, transparent 75%);
   mask-image: linear-gradient(90deg, transparent 25%, var(--openbot-text-primary) 60%, transparent 75%);
-  animation: agent-activity-plain-shine-window 1.1s steps(30, end) -0.8125s infinite;
+  animation: agent-activity-plain-shine-window 1.1s steps(15, end) -0.8125s infinite;
 }
 
 .agent-activity-entry[data-plain="true"] .agent-activity-shine-text {
   width: 50%;
   margin-left: calc(75% - 100% / 60);
   -webkit-text-fill-color: var(--openbot-text-primary);
-  animation: agent-activity-plain-shine-text 1.1s steps(30, end) -0.8125s infinite;
+  animation: agent-activity-plain-shine-text 1.1s steps(15, end) -0.8125s infinite;
 }
 
 @keyframes agent-activity-plain-shine-window {
@@ -1090,6 +1108,13 @@
 .chat-action-marker-time {
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
+}
+
+.chat-action-marker-no-answer .chat-action-marker-label {
+  min-width: 0;
+  flex: 0 1 auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .chat-action-target {
@@ -1983,7 +2008,7 @@ button.chat-action-target:active,
   border-start-end-radius: var(--openbot-radius-sm);
 }
 
-.virtual-chat-row:has(+ .virtual-chat-row[data-grouped="sender"] > .message-entry-agent:first-child)
+.virtual-chat-row[data-next-grouped="agent"]
   > .message-entry-agent:last-child
   .message-shell
   > .ui-bubble
@@ -1991,7 +2016,7 @@ button.chat-action-target:active,
   border-end-start-radius: var(--openbot-radius-sm);
 }
 
-.virtual-chat-row:has(+ .virtual-chat-row[data-grouped="sender"] > .message-entry-user:first-child)
+.virtual-chat-row[data-next-grouped="user"]
   > .message-entry-user:last-child
   .message-stack
   > .ui-bubble:last-child

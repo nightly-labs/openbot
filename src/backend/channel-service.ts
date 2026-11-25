@@ -2,10 +2,12 @@ import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, normalize, sep } from "node:path";
 import { chatTagReferences, leadingAddress } from "@openbot/contracts/chat-tag-references";
+import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentAccessLevel,
   type AgentEvent,
+  type AgentProviderRef,
   type AgentSummary,
   type AvatarImageInput,
   CHANNEL_ASSIGNMENT_LIMIT,
@@ -22,6 +24,7 @@ import {
   type ChannelTask,
   type ChannelTaskWait,
   CONTEXT_RESET_ITEM_TYPE,
+  type ConversationMessage,
   type ConversationSnapshot,
   type CreateChannelMemoryInput,
   channelRoutingConversationEventItemType,
@@ -31,11 +34,13 @@ import {
   mcpSignInEvent,
   type QueueHold,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
+  settingLinkEvent,
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
+import { isFixedSourceText, matchingSourceKeys, type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import type { CauseCode } from "@openbot/telemetry";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { isTextAnswer } from "./agent/routine-quiet-runs";
 import { setChannelFolderSource } from "./agent/workspace-sandbox";
@@ -82,6 +87,7 @@ export interface ChannelHooks {
   schedule(agentId: string): void;
   awaitDrain?(agentId: string): Effect.Effect<void, ChannelOperationError> | undefined;
   interrupt(agentId: string, turnId: string, threadId: string): Effect.Effect<void, ChannelOperationError>;
+  settleUnconfirmedStart?(deliveryId: string): Effect.Effect<void>;
   busy(agentId: string, channelId: string): boolean;
   channelTurnLimit?(agentId: string): number;
   usageLimited?(agentId: string): boolean;
@@ -95,6 +101,7 @@ export interface ChannelHooks {
   reportsCompactions?(agentId: string): boolean;
   provisionalAnswers?(agentId: string): boolean;
   quietTurn?(turnId: string): boolean;
+  channelNote?(turnId: string, messageId: string): "result" | "pending" | "running" | null;
   loadedSnapshot?(threadId: string): ConversationSnapshot | undefined;
   forgetThread?(threadId: string): Effect.Effect<void, ChannelOperationError>;
   steersWhenBusy?(agentId: string): boolean;
@@ -155,6 +162,7 @@ interface ChannelHandoffCommand {
   recipientAgentIds: string[];
   sourcePaths: string[];
   senderAgentId: string;
+  senderTaskId?: string;
 }
 
 type ChannelServiceCommand = ChannelCommand | ChannelHandoffCommand;
@@ -172,6 +180,12 @@ function channelHandoffAuthorId(agentId: string): string {
 export function channelHandoffSenderAgentId(request: ChannelMessage): string | null {
   return request.author.kind === "member" && request.author.id.startsWith(CHANNEL_HANDOFF_AUTHOR_PREFIX)
     ? request.author.id.slice(CHANNEL_HANDOFF_AUTHOR_PREFIX.length) || null
+    : null;
+}
+
+export function channelHandoffSenderTaskId(request: ChannelMessage): string | null {
+  return "senderTaskId" in request && isString(request.senderTaskId) && request.senderTaskId
+    ? request.senderTaskId
     : null;
 }
 
@@ -269,6 +283,7 @@ export class ChannelService {
       text: string;
       recipientAgentIds: string[];
       sourcePaths: string[];
+      senderTaskId?: string;
     },
   ) {
     const command: ChannelHandoffCommand = {
@@ -279,6 +294,7 @@ export class ChannelService {
       recipientAgentIds: [...new Set(input.recipientAgentIds)],
       sourcePaths: input.sourcePaths,
       senderAgentId: input.senderAgentId,
+      ...(input.senderTaskId ? { senderTaskId: input.senderTaskId } : {}),
     };
     const actor = this.agentActor(input.senderAgentId);
     return yield* this.#serialize(
@@ -979,7 +995,10 @@ export class ChannelService {
     if (command.type === "cancel") {
       if (selected.state !== "paused" && selected.state !== "failed")
         return yield* channelFailure(new Error(sourceText("error.backend.channelTaskNotStopped")));
-      return yield* this.#cancelTasks(channel, descendants(tasks, selected.rootTaskId), operationId);
+      const cancelled = descendants(tasks, selected.rootTaskId);
+      const result = yield* this.#cancelTasks(channel, cancelled, operationId);
+      yield* this.#settleUnconfirmedStarts(channel.id, cancelled);
+      return result;
     }
     if (command.type === "reassign") {
       if (!command.recipientAgentId)
@@ -1006,9 +1025,34 @@ export class ChannelService {
     const result = yield* channelSync(() => this.store.update(channel, { tasks: updated }, operationId));
     this.publish(channel.id);
     yield* this.interruptTasks(channel.id, affected);
+    if (command.type !== "stop") yield* this.#settleUnconfirmedStarts(channel.id, affected);
     yield* this.wake(channel.id);
     return result;
   }).bind(this);
+
+  #settleUnconfirmedStarts(
+    channelId: string,
+    tasks: readonly ChannelTask[],
+  ): Effect.Effect<void, ChannelOperationError> {
+    const settle = this.hooks.settleUnconfirmedStart;
+    if (!settle) return Effect.void;
+    return channelSync(() => this.store.assignments(channelId)).pipe(
+      Effect.flatMap((assignments) =>
+        Effect.forEach(
+          assignments.flatMap((assignment) =>
+            assignment.deliveryId &&
+            !assignment.turnId &&
+            activeAssignment(assignment) &&
+            tasks.some((task) => task.id === assignment.taskId)
+              ? [assignment.deliveryId]
+              : [],
+          ),
+          (deliveryId) => settle(deliveryId),
+          { discard: true },
+        ),
+      ),
+    );
+  }
 
   readonly #applyHandoff = Effect.fn("ChannelService.applyHandoff")(function* (
     this: ChannelService,
@@ -1052,8 +1096,9 @@ export class ChannelService {
       const others = rest.map((agentId) => this.newTask(current.id, id, text, agentId));
       const message = this.message(current.id, task.id, { kind: "member", ...actor }, text, id);
       if (committed) message.message.attachments = committed.attachments;
+      const request = command.senderTaskId ? { ...message, senderTaskId: command.senderTaskId } : message;
       return yield* channelSync(() =>
-        this.store.update(current, { messages: [message], tasks: [task, ...others] }, operationId),
+        this.store.update(current, { messages: [request], tasks: [task, ...others] }, operationId),
       );
     }).pipe(
       Effect.onExit((exit) =>
@@ -2165,8 +2210,14 @@ export class ChannelService {
   ): Effect.fn.Return<void, ChannelOperationError> {
     if (this.#scope.state._tag === "Closed") this.#scope = Scope.makeUnsafe();
     this.#stopped = false;
-    for (const context of yield* channelSync(() => this.store.executionThreads()))
-      this.capture(yield* channelSync(() => this.store.database.readConversation(context.id, context.threadId)));
+    const channelAssignments = new Map<string, ChannelAssignment[]>();
+    for (const context of yield* channelSync(() => this.store.executionThreads())) {
+      const assignments =
+        channelAssignments.get(context.channelId) ??
+        (yield* channelSync(() => this.store.assignments(context.channelId)));
+      channelAssignments.set(context.channelId, assignments);
+      yield* channelSync(() => this.#captureAfterRestart(context, assignments));
+    }
     const archived = yield* channelSync(() => this.store.archivedIds());
     for (const channelId of yield* channelSync(() => this.store.ids())) {
       for (let assignment of (yield* channelSync(() => this.store.assignments(channelId))).filter(activeAssignment)) {
@@ -2459,6 +2510,12 @@ export class ChannelService {
 
   event(event: AgentEvent): boolean {
     if (event.type === "conversation") return this.capture(event.snapshot);
+    if (event.type === "turn-progress" && event.running === true) {
+      if (!this.store.channelForThread(event.threadId)) return false;
+      const loaded = this.hooks.loadedSnapshot?.(event.threadId);
+      if (loaded?.agentId === event.agentId) this.capture(loaded, event.turnId);
+      return true;
+    }
     if (event.type === "conversation-delta") {
       const channelId = this.store.channelForThread(event.threadId);
       if (!channelId) return false;
@@ -2579,6 +2636,18 @@ export class ChannelService {
     return task?.state === "completed" && task.revision === assignment.taskRevision ? assignment : undefined;
   }
 
+  #captureAfterRestart(context: { id: string; threadId: string }, assignments: ChannelAssignment[]): void {
+    const own = assignments.filter((assignment) => assignment.agentId === context.id);
+    if (own.some(activeAssignment)) {
+      this.capture(this.store.database.readConversation(context.id, context.threadId));
+      return;
+    }
+    const turnId = this.store.database.readLatestTurnId(
+      own.flatMap((assignment) => (assignment.turnId === null ? [] : [assignment.turnId])),
+    );
+    if (turnId) this.capture(this.store.database.readTurnConversation(context.id, context.threadId, turnId), turnId);
+  }
+
   private capture(snapshot: ConversationSnapshot, turnId?: string): boolean {
     const channelId = snapshot.threadId ? this.store.channelForThread(snapshot.threadId) : null;
     if (!channelId) return false;
@@ -2586,7 +2655,8 @@ export class ChannelService {
       turnId === undefined
         ? this.store.assignments(channelId)
         : this.store.agentAssignments(channelId, snapshot.agentId);
-    const name = this.hooks.agents().find((agent) => agent.id === snapshot.agentId)?.name ?? "Former member";
+    const author = this.hooks.agents().find((agent) => agent.id === snapshot.agentId);
+    const name = author?.name ?? "Former member";
     const taskReads = new Map<string, ChannelTask | null>();
     const taskOf = (id: string): ChannelTask | undefined => {
       if (!taskReads.has(id)) taskReads.set(id, this.store.task(channelId, id));
@@ -2614,7 +2684,8 @@ export class ChannelService {
         message.author !== "assistant" &&
         !message.questionPrompt &&
         !(message.attachments?.length && message.author !== "user") &&
-        !mcpSignInEvent(message)
+        !mcpSignInEvent(message) &&
+        !settingLinkEvent(message)
       )
         continue;
       const lateId = message.turnId === undefined ? undefined : this.#lateTurns.get(message.turnId);
@@ -2625,7 +2696,14 @@ export class ChannelService {
             (turnId === undefined ? undefined : (this.store.assignment(channelId, lateId) ?? undefined)));
       const owner = assignments.find((item) => item.turnId === message.turnId) ?? late;
       if (!owner && message.turnId !== undefined && this.#providerTurns.has(message.turnId)) continue;
-      const original = existing(message.id);
+      const note = channelNote(message, author?.provider, this.hooks.channelNote);
+      const resultNoteId = `${message.id}${CHANNEL_RESULT_NOTE_SUFFIX}`;
+      const entryId =
+        note !== undefined && !existing(message.id) && (note === "result" || existing(resultNoteId))
+          ? resultNoteId
+          : message.id;
+      const original = existing(entryId);
+      if (!original && (note === "pending" || (note === "running" && message.status === "streaming"))) continue;
       const assignment =
         owner ??
         (turnId !== undefined ||
@@ -2700,11 +2778,12 @@ export class ChannelService {
         message.itemType !== "commentary"
       )
         message = { ...message, replyToMessageId: task.requestMessageId };
+      if (entryId !== message.id) message = { ...message, id: entryId };
       const messageId =
         original?.superseded && task?.revision === assignment.taskRevision
-          ? `${message.id}-revision-${task.revision}`
-          : message.id;
-      if (messageId !== message.id && JSON.stringify(original?.message) === JSON.stringify(message)) continue;
+          ? `${entryId}-revision-${task.revision}`
+          : entryId;
+      if (messageId !== entryId && JSON.stringify(original?.message) === JSON.stringify(message)) continue;
       const value: ChannelMessage = {
         id: messageId,
         channelId,
@@ -2712,7 +2791,7 @@ export class ChannelService {
         author: { kind: "agent", id: snapshot.agentId, name },
         taskId: assignment.taskId,
         superseded:
-          task?.revision !== assignment.taskRevision || (messageId === message.id && original?.superseded === true),
+          task?.revision !== assignment.taskRevision || (messageId === entryId && original?.superseded === true),
         message,
       };
       const previous = existing(value.id);
@@ -3455,7 +3534,17 @@ export class ChannelService {
       `${this.hooks.agents().find((item) => item.id === args.recipientAgentId)?.name ?? args.recipientAgentId}: ${args.task}`,
     );
     const [firstSourceMessageId] = sourceMessageIds;
-    if (firstSourceMessageId !== undefined) handoff.message.replyToMessageId = firstSourceMessageId;
+    const rootTaskIds = new Set(tasks.filter((item) => item.rootTaskId === root.id).map((item) => item.id));
+    const rootRepliedToSource =
+      firstSourceMessageId !== undefined &&
+      (yield* channelSync(() => this.store.messages(channelId))).some(
+        (message) =>
+          message.message.replyToMessageId === firstSourceMessageId &&
+          message.taskId !== null &&
+          rootTaskIds.has(message.taskId),
+      );
+    if (firstSourceMessageId !== undefined && !rootRepliedToSource)
+      handoff.message.replyToMessageId = firstSourceMessageId;
     yield* channelSync(() => this.store.update(channel, { tasks: changes, messages: [handoff] }, operationId));
     this.publish(channelId);
     yield* this.wake(channelId);
@@ -3861,6 +3950,23 @@ function routingTimedOut(error: unknown): boolean {
   return error instanceof Error && error.message === sourceText("error.agent.profileTimedOut");
 }
 
+const CHANNEL_LEAD_FAILURE_KEYS = [
+  ["provider_unavailable", "error.backend.channelLeadBusy"],
+  ["rate_limit", "error.backend.channelLeadBusy"],
+  ["network", "error.backend.channelLeadOffline"],
+  ["authentication", "error.backend.channelLeadSignIn"],
+  ["model_not_found", "error.backend.channelLeadModelGone"],
+  ["invalid_request", "error.backend.channelLeadRefused"],
+] as const satisfies readonly (readonly [CauseCode, keyof SourceMessages])[];
+const CHANNEL_LEAD_FAILURES = new Map<CauseCode, (typeof CHANNEL_LEAD_FAILURE_KEYS)[number][1]>(
+  CHANNEL_LEAD_FAILURE_KEYS,
+);
+
+export function channelLeadFailureText(causeCode: CauseCode): string | null {
+  const key = CHANNEL_LEAD_FAILURES.get(causeCode);
+  return key ? sourceText(key) : null;
+}
+
 function routingFailureText(error: unknown): string | null {
   if (!(error instanceof Error) || !isFixedSourceText(error.message)) return null;
   const keys = matchingSourceKeys(error.message);
@@ -3880,6 +3986,23 @@ const OWN_LABEL_WORDS = new Set([
   "summary",
   "update",
 ]);
+
+const CHANNEL_RESULT_NOTE_SUFFIX = ":result";
+
+function channelNote(
+  message: ConversationMessage,
+  provider: AgentProviderRef | undefined,
+  read: ChannelHooks["channelNote"],
+): "result" | "pending" | "running" | null | undefined {
+  if (
+    message.turnId === undefined ||
+    message.author !== "assistant" ||
+    message.itemType !== "commentary" ||
+    !isNarrationItemId(message.id, provider)
+  )
+    return undefined;
+  return read?.(message.turnId, message.id) ?? null;
+}
 
 function withoutOwnNameLabel(text: string, name: string, streaming = false): string {
   const own = name.trim().toLocaleLowerCase();

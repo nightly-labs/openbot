@@ -2,14 +2,14 @@ import { Alert, AlertContent, AlertDescription, AlertTitle, ArrowLeft, Button, T
 import { CloseIcon, PlusIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { useText } from "@openbot/ui/text";
 import { clamp, holdFlag } from "@openbot/ui/utils";
-import { createEffect, createSignal, flush, onCleanup, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, flush, onCleanup, onSettled, Show } from "solid-js";
 import { BrowserAddressRow } from "./BrowserAddressRow";
 import BrowserLiveView, { browserPageSite } from "./BrowserLiveView";
 import { BrowserTabStrip } from "./BrowserTabStrip";
 import { BrowserTabSwitcher } from "./BrowserTabSwitcher";
 import { BrowserTeachBar } from "./BrowserTeachBar";
 import type { BrowserFullViewProps } from "./browser-full-view-types";
-import { BrowserPageCover } from "./browser-page-cover";
+import { BrowserPageCover, menuCoversPage } from "./browser-page-cover";
 import { type BrowserViewCommand, browserAriaShortcut, browserViewCommand } from "./browser-view-shortcuts";
 
 export type { BrowserFullViewProps } from "./browser-full-view-types";
@@ -29,7 +29,7 @@ function createNarrow() {
 
 export default function BrowserFullView(props: BrowserFullViewProps) {
   const { t, sourceText } = useText();
-  onCleanup(holdFlag(document.body, "browser-full-view"));
+  if (!props.pane) onCleanup(holdFlag(document.body, "browser-full-view"));
   const narrow = createNarrow();
   const [dismissedPopupFailures, setDismissedPopupFailures] = createSignal<ReadonlySet<string>>(new Set());
   const popupFailure = () => props.activeTab?.popupFailure;
@@ -57,29 +57,46 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
       });
   };
 
-  createEffect(
-    () => props.open,
-    (open) => {
-      setSettled(false);
-      if (!open) return;
-      let disposed = false;
-      onSettled(() => {
-        hideButton?.focus();
-        const animations = view?.getAnimations() ?? [];
-        const settle = () => {
-          if (!disposed) setSettled(true);
-        };
-        if (animations.length === 0) settle();
-        else void Promise.all(animations.map((animation) => animation.finished)).then(settle, () => undefined);
-      });
-      return () => {
-        disposed = true;
+  const viewOpen = createMemo(() => props.open);
+  createEffect(viewOpen, (open) => {
+    setSettled(false);
+    if (!open) return;
+    let disposed = false;
+    onSettled(() => {
+      hideButton?.focus();
+      const animations = view?.getAnimations() ?? [];
+      const settle = () => {
+        if (!disposed) setSettled(true);
       };
+      if (animations.length === 0) settle();
+      else void Promise.all(animations.map((animation) => animation.finished)).then(settle, () => undefined);
+    });
+    return () => {
+      disposed = true;
+    };
+  });
+
+  const [overlapped, setOverlapped] = createSignal(false);
+  createEffect(
+    () => props.coveringMenus ?? [],
+    (menus) => {
+      if (menus.length === 0) {
+        setOverlapped(false);
+        return;
+      }
+      let frame = 0;
+      const measure = () => {
+        const surface = surfaceElement;
+        setOverlapped(surface !== undefined && menus.some((menu) => menuCoversPage(surface, menu)));
+        frame = requestAnimationFrame(measure);
+      };
+      measure();
+      return () => cancelAnimationFrame(frame);
     },
   );
 
   createEffect(
-    () => props.open && settled() && covers().size === 0,
+    () => viewOpen() && settled() && covers().size === 0 && !overlapped(),
     (shown) => props.onSurface(shown ? surfaceElement : undefined),
   );
 
@@ -171,6 +188,8 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
     </Button>
   );
 
+  const fullViewIdentity = () => (props.pane ? {} : { id: "browser-expanded-panel" });
+
   return (
     <Tabs.Root
       as="section"
@@ -178,11 +197,12 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
       hidden={!props.open}
       aria-hidden={props.open ? undefined : "true"}
       inert={!props.open}
-      id="browser-expanded-panel"
+      {...fullViewIdentity()}
       class={[
         "browser-full-view",
         {
           "browser-full-view-mac-controls": props.macWindowControls === true,
+          "browser-pane-view": props.pane === true,
         },
       ]}
       style={
@@ -194,33 +214,35 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
       value={props.activeTab?.id ?? "__empty"}
       activationMode="automatic"
     >
-      <div class="browser-full-top window-drag">
-        <BrowserPageCover value={cover}>
-          <Show
-            when={narrow()}
-            fallback={
-              <>
-                <BrowserTabStrip view={props} onNewTab={newTab} onClose={closeTabs} />
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  class="no-drag"
-                  aria-label={t("browser.newTab")}
-                  aria-keyshortcuts={browserAriaShortcut("newTab", props.shortcuts)}
-                  title={t("browser.newTab")}
-                  onClick={() => newTab()}
-                >
-                  <PlusIcon />
-                </Button>
-              </>
-            }
-          >
-            <BrowserTabSwitcher view={props} onNewTab={() => newTab()} onClose={closeTabs} />
-          </Show>
-        </BrowserPageCover>
-        <div class="browser-full-top-spacer" />
-        {hideBrowserButton()}
-      </div>
+      <Show when={!props.pane}>
+        <div class="browser-full-top window-drag">
+          <BrowserPageCover value={cover}>
+            <Show
+              when={narrow()}
+              fallback={
+                <>
+                  <BrowserTabStrip view={props} onNewTab={newTab} onClose={closeTabs} />
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    class="no-drag"
+                    aria-label={t("browser.newTab")}
+                    aria-keyshortcuts={browserAriaShortcut("newTab", props.shortcuts)}
+                    title={t("browser.newTab")}
+                    onClick={() => newTab()}
+                  >
+                    <PlusIcon />
+                  </Button>
+                </>
+              }
+            >
+              <BrowserTabSwitcher view={props} onNewTab={() => newTab()} onClose={closeTabs} />
+            </Show>
+          </BrowserPageCover>
+          <div class="browser-full-top-spacer" />
+          {hideBrowserButton()}
+        </div>
+      </Show>
       <div class="browser-full-card">
         <Tabs.Content
           forceMount

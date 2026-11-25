@@ -118,6 +118,7 @@ export interface MessagingAgents {
       description: string;
       avatarSeed: string;
       avatarHue: AgentSummary["avatarHue"];
+      startOnRunnableProvider: boolean;
     },
   ): Effect.Effect<AgentSummary, AgentLifecycleFailed>;
   createMemory(input: { agentId: string; text: string }): unknown;
@@ -398,6 +399,16 @@ export class MessagingService {
     yield* whatsapp.removeSender(workspaceId, senderId).pipe(toMessagingOperationFailed);
   }).bind(this);
 
+  readonly setWhatsAppSenderReadOnly = Effect.fn("MessagingService.setWhatsAppSenderReadOnly")(function* (
+    this: MessagingService,
+    workspaceId: string,
+    senderId: string,
+    readOnly: boolean,
+  ) {
+    const whatsapp = yield* messagingStep(() => this.#requireWhatsApp());
+    yield* whatsapp.setSenderReadOnly(workspaceId, senderId, readOnly).pipe(toMessagingOperationFailed);
+  }).bind(this);
+
   readonly answerWhatsAppRequest = Effect.fn("MessagingService.answerWhatsAppRequest")(function* (
     this: MessagingService,
     workspaceId: string,
@@ -577,6 +588,7 @@ export class MessagingService {
         ...(input.provider ? { provider: input.provider } : {}),
         ...(input.model ? { model: input.model } : {}),
         ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
+        startOnRunnableProvider: true,
       })
       .pipe(toMessagingOperationFailed);
     const memories = discord ? discordOrchestratorMemories() : slackOrchestratorMemories();
@@ -867,6 +879,7 @@ export class MessagingService {
         ...(input.provider ? { provider: input.provider } : {}),
         ...(input.model ? { model: input.model } : {}),
         ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
+        startOnRunnableProvider: true,
       })
       .pipe(toMessagingOperationFailed);
     const memories = telegram ? telegramOrchestratorMemories() : whatsAppOrchestratorMemories();
@@ -1461,9 +1474,13 @@ export class MessagingService {
           if (result.status === "duplicate") return;
           const key = `${result.link.linkId}:${message.platformMessageId}`;
           if (result.status === "busy") {
-            yield* adapter
-              .post(message.target, { text: sourceText("status.messaging.busy") })
-              .pipe(toMessagingOperationFailed);
+            if (
+              !this.#quietEnd(live.record.connectionId, message.target) &&
+              !this.#withoutStatusPost(live.record.connectionId)
+            )
+              yield* adapter
+                .post(message.target, { text: sourceText("status.messaging.busy") })
+                .pipe(toMessagingOperationFailed);
             yield* this.#react(live, message.target, message.platformMessageId, "failed", true);
             return;
           }
@@ -1476,7 +1493,8 @@ export class MessagingService {
                 if (
                   this.#posts.has(key) ||
                   !this.#targets.has(key) ||
-                  this.#withoutStatusPost(live.record.connectionId)
+                  this.#withoutStatusPost(live.record.connectionId) ||
+                  this.#quietEnd(live.record.connectionId, message.target)
                 )
                   return;
                 const messageId = yield* adapter
@@ -1862,7 +1880,12 @@ export class MessagingService {
     }
     if (activity.type === "started") {
       if (!live) return;
-      if (!post?.messageId && (activity.teammateRequest || this.#withoutStatusPost(live.record.connectionId))) {
+      if (
+        !post?.messageId &&
+        (activity.teammateRequest ||
+          this.#withoutStatusPost(live.record.connectionId) ||
+          this.#quietEnd(live.record.connectionId, target))
+      ) {
         this.#posts.set(key, { connectionId: live.record.connectionId, target, messageId: null, stopToken: null });
         this.#status.restored.delete(key);
         yield* this.#status.save();
@@ -2364,7 +2387,7 @@ function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
 }
 
 const WHATSAPP_ALLOWED_PLACES =
-  "This list has only the WhatsApp chats that the user allowed, not all chats of this number. For a chat that is not in it, tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this number.";
+  "This list has only the WhatsApp chats that the user allowed, not all chats of this number. For a chat that is not in it, tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this number. A place with readOnly is read only: read its history, but OpenBot cannot post in it.";
 
 const WHATSAPP_NOT_CONNECTED =
   "WhatsApp is not connected on this number now. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Reconnect or Link again for this number.";
@@ -2373,6 +2396,10 @@ const WHATSAPP_LOCAL_REFUSALS = new Map([
   [
     "place_not_allowed",
     "OpenBot sent nothing: the user did not allow this WhatsApp chat. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this chat. Then the post can go to it.",
+  ],
+  [
+    "place_read_only",
+    "OpenBot sent nothing: the user made this WhatsApp chat read only. OpenBot reads it but never posts in it. Do not post it again: give the result in the conversation that you answer.",
   ],
   ["not_connected", WHATSAPP_NOT_CONNECTED],
   ["not_linked", WHATSAPP_NOT_CONNECTED],

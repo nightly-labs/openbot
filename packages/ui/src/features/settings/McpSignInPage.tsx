@@ -108,8 +108,6 @@ export function relayDescriptionKey(page: McpSignInRelaySource) {
 
 export function McpSignInRelayControls(props: McpSignInRelayActions & { page: McpSignInRelaySource }) {
   const { t, errorMessage } = useText();
-  const [address, setAddress] = createSignal("");
-  const [sending, setSending] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const openPage = async () => {
     setError(null);
@@ -117,19 +115,6 @@ export function McpSignInRelayControls(props: McpSignInRelayActions & { page: Mc
       await props.onOpen();
     } catch (cause) {
       setError(errorMessage(cause, t("error.mcp.relayEnded")));
-    }
-  };
-  const send = async (event: SubmitEvent) => {
-    event.preventDefault();
-    if (sending() || !address().trim()) return;
-    setSending(true);
-    setError(null);
-    try {
-      await props.onPaste(address());
-    } catch (cause) {
-      setError(errorMessage(cause, t("error.mcp.relayAddressInvalid")));
-    } finally {
-      setSending(false);
     }
   };
   return (
@@ -154,22 +139,50 @@ export function McpSignInRelayControls(props: McpSignInRelayActions & { page: Mc
           </Show>
         }
       >
-        <form class="mcp-sign-in-relay-form" onSubmit={send}>
-          <Field
-            label={t("mcp.signIn.relayAddress")}
-            description={t(props.page.listening ? "mcp.signIn.relayPasteHint" : "mcp.signIn.relayPasteRequired")}
-            error={error()}
-          >
-            <div class="mcp-sign-in-relay-row">
-              <Input type="url" autocomplete="off" spellcheck={false} value={address()} onValueChange={setAddress} />
-              <Button type="submit" variant="outline" loading={sending()} disabled={!address().trim()}>
-                {t("mcp.signIn.relaySend")}
-              </Button>
-            </div>
-          </Field>
-        </form>
+        <McpSignInAddressForm
+          description={t(props.page.listening ? "mcp.signIn.relayPasteHint" : "mcp.signIn.relayPasteRequired")}
+          error={error()}
+          onError={setError}
+          onPaste={props.onPaste}
+        />
       </Show>
     </>
+  );
+}
+
+export function McpSignInAddressForm(props: {
+  description: string;
+  error: string | null;
+  onError: (message: string | null) => void;
+  onPaste: (address: string) => Promise<void>;
+}) {
+  const { t, errorMessage } = useText();
+  const [address, setAddress] = createSignal("");
+  const [sending, setSending] = createSignal(false);
+  const send = async (event: SubmitEvent) => {
+    event.preventDefault();
+    if (sending() || !address().trim()) return;
+    setSending(true);
+    props.onError(null);
+    try {
+      await props.onPaste(address());
+    } catch (cause) {
+      props.onError(errorMessage(cause, t("error.mcp.relayAddressInvalid")));
+    } finally {
+      setSending(false);
+    }
+  };
+  return (
+    <form class="mcp-sign-in-relay-form" onSubmit={send}>
+      <Field label={t("mcp.signIn.relayAddress")} description={props.description} error={props.error}>
+        <div class="mcp-sign-in-relay-row">
+          <Input type="url" autocomplete="off" spellcheck={false} value={address()} onValueChange={setAddress} />
+          <Button type="submit" variant="outline" loading={sending()} disabled={!address().trim()}>
+            {t("mcp.signIn.relaySend")}
+          </Button>
+        </div>
+      </Field>
+    </form>
   );
 }
 

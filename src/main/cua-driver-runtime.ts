@@ -44,6 +44,8 @@ const PARENT_LIVENESS_ENV = "CUA_DRIVER_PARENT_LIVENESS_STDIN";
 const HOST_BUNDLE_ID_ENV = "CUA_DRIVER_HOST_BUNDLE_ID";
 const WAYLAND_ENV = "CUA_DRIVER_RS_ENABLE_WAYLAND";
 const KEEP_DISPLAY_AWAKE_ENV = "CUA_DRIVER_KEEP_DISPLAY_AWAKE";
+const CLICK_HOLD_ENV = "CUA_DRIVER_CLICK_GAP_MS";
+const MAC_CLICK_HOLD_MS = "60";
 
 const REQUIRED_PERMISSIONS: Readonly<Partial<Record<NodeJS.Platform, readonly MacPermissionId[]>>> = {
   darwin: ["screen-recording", "accessibility"],
@@ -163,6 +165,7 @@ export class CuaDriverRuntime {
   #recheckTimer: ReturnType<typeof setTimeout> | null = null;
   #recheckAttempt = 0;
   #readySince: number | null = null;
+  #permissionsRead = false;
 
   constructor(options: CuaDriverRuntimeOptions) {
     this.#options = options;
@@ -179,6 +182,11 @@ export class CuaDriverRuntime {
 
   waylandInputRefused(): boolean {
     return this.#waylandInputRefused;
+  }
+
+  missingPermissions(): MacPermissionId[] {
+    if (!this.#permissionsRead || this.#state.status !== "permissions-required") return [];
+    return this.#state.permissions.filter((permission) => !permission.granted).map((permission) => permission.id);
   }
 
   running(): boolean {
@@ -300,6 +308,7 @@ export class CuaDriverRuntime {
         message: sourceText("status.computerUse.driverNoAnswer", { reason: describe(result.failure.cause) }),
       });
     const { permissions, waylandInputRefused } = result.success;
+    this.#permissionsRead = true;
     this.#waylandInputRefused = waylandInputRefused;
     const granted = requiredPermissions(this.#options.platform).every((id) =>
       permissions.some((p) => p.id === id && p.granted),
@@ -309,7 +318,11 @@ export class CuaDriverRuntime {
         ? { status: "permissions-required", permissions, message: null }
         : this.#restartRequired
           ? restartRequiredState(permissions)
-          : { status: "ready", permissions, message: null },
+          : {
+              status: "ready",
+              permissions,
+              message: waylandInputRefused ? sourceText("status.computerUse.inputRefused") : null,
+            },
     );
     if (!granted) yield* this.stop().pipe(Effect.catch(() => Effect.void));
     return state;
@@ -372,6 +385,7 @@ export class CuaDriverRuntime {
           ...CUA_DRIVER_VENDOR_CALLS_OFF,
           [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
           ...waylandEnvironment(this.#options.platform),
+          ...clickHoldEnvironment(this.#options.platform),
           ...(tapListening ? displayAwakeEnvironment(this.#options.platform) : {}),
         },
         stdio: ["pipe", "pipe", "pipe"],
@@ -579,6 +593,10 @@ function ungranted(platform: NodeJS.Platform): ComputerUsePermission[] {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function clickHoldEnvironment(platform: NodeJS.Platform): Record<string, string> {
+  return platform === "darwin" ? { [CLICK_HOLD_ENV]: MAC_CLICK_HOLD_MS } : {};
 }
 
 function displayAwakeEnvironment(platform: NodeJS.Platform): Record<string, string> {

@@ -1,14 +1,18 @@
 import {
   isWorkflowStepKind,
+  WORKFLOW_PORTS,
   type WorkflowBranch,
   type WorkflowEdge,
   type WorkflowGraph,
   type WorkflowNode,
   type WorkflowNodeKind,
+  type WorkflowPortType,
   workflowGraphProblem,
   workflowLoopEdges,
 } from "@openbot/contracts/ipc";
 import { isOneOf } from "@openbot/contracts/runtime-values";
+import { ADD_KEYS, type AddKey, addFields, addKind, isFeederKind } from "./workflow-add";
+import { edgeTypeFor, linkType } from "./workflow-ports";
 
 const OUTLINE_KINDS = [
   "trigger",
@@ -18,18 +22,10 @@ const OUTLINE_KINDS = [
   "approval",
   "output",
   "prompt",
+  "image",
+  "asset",
 ] as const satisfies readonly WorkflowNodeKind[];
-export type OutlineKind = (typeof OUTLINE_KINDS)[number];
-
-export const ADDABLE_KINDS = [
-  "agent",
-  "llm",
-  "condition",
-  "approval",
-  "prompt",
-  "output",
-] as const satisfies readonly OutlineKind[];
-export type AddableKind = (typeof ADDABLE_KINDS)[number];
+type OutlineKind = (typeof OUTLINE_KINDS)[number];
 
 export interface WorkflowOutline {
   trigger: string;
@@ -144,7 +140,7 @@ export function workflowOutline(graph: WorkflowGraph): WorkflowOutline | null {
   const nodes = new Map(steps.map((node) => [node.id, node]));
   const kinds = new Map(steps.map((node) => [node.id, node.kind]));
   const edges = graph.edges;
-  if (edges.some((edge) => edge.type !== "text" || !kinds.has(edge.from) || !kinds.has(edge.to))) return null;
+  if (edges.some((edge) => !kinds.has(edge.from) || !kinds.has(edge.to))) return null;
   if (workflowGraphProblem(graph) || workflowLoopEdges(steps, edges).size > 0) return null;
 
   const reached = new Set([trigger.id]);
@@ -156,7 +152,7 @@ export function workflowOutline(graph: WorkflowGraph): WorkflowOutline | null {
       }
   const prompts = new Map<string, string>();
   for (const node of steps) {
-    if (node.kind !== "prompt") continue;
+    if (!isFeederKind(node.kind)) continue;
     const targets = edges.filter((edge) => edge.from === node.id).map((edge) => edge.to);
     if (targets.length === 0 || !targets.some((id) => reached.has(id))) continue;
     if (targets.length > 1 || !targets.every((id) => reached.has(id))) return null;
@@ -225,22 +221,29 @@ export function workflowOutline(graph: WorkflowGraph): WorkflowOutline | null {
   return outline;
 }
 
-function workflowEdgeId(from: string, to: string, branch?: WorkflowBranch): string {
-  return `${from}${branch ? `.${branch}` : ""}>${to}:text`;
+function workflowEdgeId(from: string, to: string, type: WorkflowPortType, branch?: WorkflowBranch): string {
+  return `${from}${branch ? `.${branch}` : ""}>${to}:${type}`;
 }
 
 function outlineEdges(outline: WorkflowOutline, graph: WorkflowGraph): WorkflowEdge[] {
+  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
   const kinds = new Map(graph.nodes.map((node) => [node.id, node.kind]));
   const edges: WorkflowEdge[] = [];
-  const link = (from: string, to: string, branch?: WorkflowBranch) =>
-    edges.push({ id: workflowEdgeId(from, to, branch), from, to, type: "text", ...(branch ? { branch } : {}) });
+  const keptType = (from: string, to: string, branch?: WorkflowBranch) =>
+    graph.edges.find((edge) => edge.from === from && edge.to === to && edge.branch === branch)?.type;
+  const link = (from: string, to: string, branch?: WorkflowBranch) => {
+    const source = nodes.get(from);
+    const target = nodes.get(to);
+    const type = (source && target && edgeTypeFor(source, target, keptType(from, to, branch))) || "text";
+    edges.push({ id: workflowEdgeId(from, to, type, branch), from, to, type, ...(branch ? { branch } : {}) });
+  };
   type Source = { from: string; branch?: WorkflowBranch };
   const walk = (items: readonly string[], start: Source[]) => {
     let sources = start;
     let prompts: string[] = [];
     for (const id of items) {
       const kind = kinds.get(id);
-      if (kind === "prompt") {
+      if (kind && isFeederKind(kind)) {
         prompts.push(id);
         continue;
       }
@@ -259,6 +262,24 @@ function outlineEdges(outline: WorkflowOutline, graph: WorkflowGraph): WorkflowE
   const no = walk(outline.no, [{ from: outline.condition, branch: "no" }]);
   if (outline.after.length > 0) walk(outline.after, [...yes.sources, ...no.sources]);
   return edges;
+}
+
+export function outlineFits(graph: WorkflowGraph, outline: WorkflowOutline): boolean {
+  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  return outlineEdges(outline, graph).every((edge) => {
+    const from = nodes.get(edge.from);
+    const to = nodes.get(edge.to);
+    return (
+      from !== undefined &&
+      to !== undefined &&
+      WORKFLOW_PORTS[from.kind].out.includes(edge.type) &&
+      WORKFLOW_PORTS[to.kind].in.includes(edge.type)
+    );
+  });
+}
+
+function fitting(next: { graph: WorkflowGraph; outline: WorkflowOutline }) {
+  return outlineFits(next.graph, next.outline) ? next : null;
 }
 
 export function graphWithOutline(graph: WorkflowGraph, outline: WorkflowOutline): WorkflowGraph {
@@ -280,7 +301,8 @@ export function outlineProblems(outline: WorkflowOutline, graph: WorkflowGraph):
     const items = outline[name];
     for (let index = items.length - 1; index >= 0; index--) {
       const id = items[index];
-      if (!id || kinds.get(id) !== "prompt") break;
+      const kind = id ? kinds.get(id) : undefined;
+      if (!id || !kind || !isFeederKind(kind)) break;
       problems.set(id, "prompt-target");
     }
   }
@@ -394,12 +416,14 @@ export function connectStep(
     nodes: graph.nodes.filter((item) => item.id !== id),
     edges: graph.edges.filter((edge) => edge.from !== id && edge.to !== id),
   };
-  return insertStep(
-    without,
-    { ...outline, loose: outline.loose.filter((item) => item !== id) },
-    list,
-    outline[list].length,
-    node,
+  return fitting(
+    insertStep(
+      without,
+      { ...outline, loose: outline.loose.filter((item) => item !== id) },
+      list,
+      outline[list].length,
+      node,
+    ),
   );
 }
 
@@ -445,12 +469,68 @@ export function moveStep(
   const nodes = graph.nodes.map((node) =>
     node.id === id ? { ...node, at: second.at } : node.id === other ? { ...node, at: first.at } : node,
   );
-  return { graph: { ...graph, nodes }, outline: { ...outline, [list]: items } };
+  return fitting({ graph: { ...graph, nodes }, outline: { ...outline, [list]: items } });
 }
 
-export function canMove(outline: WorkflowOutline, id: string, direction: -1 | 1): boolean {
-  const list = outlineListOf(outline, id);
-  if (!list || list === "loose") return false;
-  const index = outline[list].indexOf(id);
-  return index + direction >= 0 && index + direction < outline[list].length;
+export function canMove(graph: WorkflowGraph, outline: WorkflowOutline, id: string, direction: -1 | 1): boolean {
+  return moveStep(graph, outline, id, direction) !== null;
+}
+
+function chainSources(
+  outline: WorkflowOutline,
+  kinds: ReadonlyMap<string, WorkflowNodeKind>,
+  list: FlowList,
+  index: number,
+) {
+  const isChain = (id: string) => {
+    const kind = kinds.get(id);
+    return kind !== undefined && kind !== "output" && !isFeederKind(kind);
+  };
+  const last = (items: readonly string[]) => items.findLast(isChain);
+  const found = last(outline[list].slice(0, index));
+  if (found) return [found];
+  if (list === "main") return [outline.trigger];
+  const start = outline.condition ?? outline.trigger;
+  if (list === "yes" || list === "no") return [start];
+  return [...new Set([last(outline.yes) ?? start, last(outline.no) ?? start])];
+}
+
+function readersAt(
+  outline: WorkflowOutline,
+  kinds: ReadonlyMap<string, WorkflowNodeKind>,
+  list: FlowList,
+  index: number,
+) {
+  const readers: string[] = [];
+  let target: string | null = null;
+  const lists: FlowList[] = list === "main" ? ["main"] : list === "after" ? ["after"] : [list, "after"];
+  const ahead = lists.flatMap((name, at) => (at === 0 ? outline[name].slice(index) : outline[name]));
+  for (const id of ahead) {
+    const kind = kinds.get(id);
+    if (!kind || isFeederKind(kind)) continue;
+    target ??= id;
+    readers.push(id);
+    if (kind !== "output") return { readers, target };
+  }
+  if (list === "main" && outline.condition) {
+    target ??= outline.condition;
+    readers.push(outline.condition);
+  }
+  return { readers, target };
+}
+
+export function outlineKeys(graph: WorkflowGraph, outline: WorkflowOutline, list: FlowList, index: number): AddKey[] {
+  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  const kinds = new Map(graph.nodes.map((node) => [node.id, node.kind]));
+  const sources = chainSources(outline, kinds, list, index).flatMap((id) => nodes.get(id) ?? []);
+  const { readers, target } = readersAt(outline, kinds, list, index);
+  const readerNodes = readers.flatMap((id) => nodes.get(id) ?? []);
+  const targetNode = target ? nodes.get(target) : undefined;
+  return ADD_KEYS.filter((key) => {
+    const probe = { kind: addKind(key), fields: addFields(key) };
+    if (isFeederKind(probe.kind)) return !targetNode || linkType(probe, targetNode) !== null;
+    if (probe.kind === "condition" && (list !== "main" || hasCondition(graph))) return false;
+    if (!sources.every((source) => linkType(source, probe) !== null)) return false;
+    return probe.kind === "output" || readerNodes.every((reader) => linkType(probe, reader) !== null);
+  });
 }

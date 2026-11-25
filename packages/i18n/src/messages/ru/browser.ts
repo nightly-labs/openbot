@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "Закрыть вкладку браузера",
   "browser.newTab": "Новая вкладка браузера",
   "browser.backToChat": "Вернуться в чат",
+  "browser.fullView.open": "Открыть в полном виде",
   "browser.goBack": "Назад",
   "browser.goForward": "Вперёд",
   "browser.reload": "Перезагрузить страницу",
@@ -101,6 +102,7 @@ export const messages = {
   "browser.secret.submitting": "Отправка…",
   "browser.secret.takeOver": "Взять управление",
   "browser.secret.failed": "Не удалось выполнить запрос. Проверьте соединение и повторите попытку.",
+  "browser.secret.ended": "Этот запрос на вход завершён. Попросите агента повторить попытку.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot не использовал ваши сохранённые учётные данные, потому что агент запустил скрипт на этой странице. Чтобы их использовать, попросите агента перезагрузить страницу и попробовать снова.",
   "browser.secret.vaultSkip.fieldKind":

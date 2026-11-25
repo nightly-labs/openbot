@@ -11,6 +11,7 @@ import {
   Text,
   Trash2,
 } from "@openbot/ui";
+import { McpSignInLinkCopy } from "@openbot/ui/features/settings/McpSignInDialog";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createStore, For, onCleanup, Show, untrack } from "solid-js";
@@ -19,6 +20,7 @@ import { McpSignInAppSection } from "./McpSignInAppSection";
 import { type McpServerTools, mcpTestTone, type SettledTest, useMcpRuns } from "./mcp-server-tools";
 import {
   emptyMcpConfig,
+  isMcpHeaderName,
   isMcpHttpAddress,
   type McpServerConfig,
   type McpTestState,
@@ -72,7 +74,7 @@ export function McpServerForm(props: McpServerFormProps) {
   let testRun = 0;
 
   const errors = createMemo(() => mcpConfigErrors(state.draft));
-  const visible = (key: "name" | "command" | "url") => (state.touched ? errors()[key] : undefined);
+  const visible = (key: "name" | "command" | "url" | "headers") => (state.touched ? errors()[key] : undefined);
   const changed = () => mcpConfigChanged(state.draft, state.baseline);
   const test = createMemo(() =>
     state.testConfig && !mcpConfigChanged(state.draft, state.testConfig) ? state.test : null,
@@ -477,6 +479,7 @@ export function McpServerForm(props: McpServerFormProps) {
             <McpRowList
               label={t("mcp.panel.headers")}
               addLabel={t("mcp.panel.addHeader")}
+              error={visible("headers") ? t("error.backend.mcpHeaderNameInvalid") : undefined}
               disabled={disabled()}
               onAdd={() =>
                 setState((current) => {
@@ -494,6 +497,7 @@ export function McpServerForm(props: McpServerFormProps) {
                       size="md"
                       placeholder={t("mcp.panel.key")}
                       aria-label={t("mcp.panel.headerKey", { position: index + 1 })}
+                      invalid={state.touched && !isMcpHeaderName(pair().key)}
                       value={pair().key}
                       disabled={disabled()}
                       onValueChange={(next) =>
@@ -626,6 +630,17 @@ export function McpServerForm(props: McpServerFormProps) {
                   </div>
                 )}
               </Show>
+              <Show when={signingIn() ? props.tools.signIn()?.copyLink : undefined}>
+                {(copy) => (
+                  <div class="server-mcp-sign-in-link">
+                    <McpSignInLinkCopy
+                      onCopy={copy()}
+                      onPaste={props.tools.signIn()?.pasteAddress}
+                      waitingNote={false}
+                    />
+                  </div>
+                )}
+              </Show>
             </>
           )}
         </Show>
@@ -670,6 +685,7 @@ export function McpServerForm(props: McpServerFormProps) {
 function McpRowList(props: {
   label: string;
   addLabel: string;
+  error?: string | undefined;
   disabled: boolean;
   onAdd: () => void;
   children: JSX.Element;
@@ -682,6 +698,11 @@ function McpRowList(props: {
         </Text>
       </legend>
       {props.children}
+      <Show when={props.error}>
+        <Text variant="caption" tone="danger" role="alert">
+          {props.error}
+        </Text>
+      </Show>
       <Button
         type="button"
         class="server-mcp-repeat-add"

@@ -30,7 +30,7 @@ export const messages = defineMessages("mobile.auth", {
   "mobile.auth.signIn.helpTitle": "Where is the QR code?",
   "mobile.auth.signIn.helpStep1": "1. Open OpenBot on your computer.",
   "mobile.auth.signIn.helpStep2": "2. Go to Settings → Mobile Connect.",
-  "mobile.auth.signIn.helpStep3": "3. Choose Generate QR code, then scan it here.",
+  "mobile.auth.signIn.helpStep3": "3. Choose Add phone → Yes, sign in, then scan the code here.",
   "mobile.auth.signIn.emailButton": "Continue with email",
   "mobile.auth.done.title": "Connected",
   "mobile.auth.done.body": "You are signed in.",

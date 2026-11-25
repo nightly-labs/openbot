@@ -32,6 +32,8 @@ export const messages = {
     "De verbinding met de host is te traag voor het beeld. Probeer het opnieuw: de volgende verbinding gebruikt een lagere kwaliteit.",
   "error.remote.streamTooSlow":
     "De verbinding met de host is te traag voor het beeld. Gebruik een sneller netwerk en probeer het opnieuw.",
+  "error.remote.noPictureSwitchEncoder":
+    "De host heeft geen beeld gestuurd. Probeer het opnieuw: de volgende verbinding gebruikt een video-instelling die op meer computers werkt.",
   "error.remote.teamSessionExpired": "De teamsessie is verlopen.",
   "error.remote.finishTestBeforeSwitch": "Rond de test van extern bureaublad af voordat je van beeldscherm wisselt.",
   "error.remote.displayNotFound": "Extern beeldscherm niet gevonden.",
@@ -96,7 +98,11 @@ export const messages = {
     "OpenBot kan deze server niet controleren, omdat de beveiligingssleutel ontbreekt of is gewijzigd. Vraag de eigenaar van de server om de server te controleren.",
   "error.remote.connectionNotStarted":
     "OpenBot kon de verbinding met deze server niet starten. Als dit blijft gebeuren, sluit OpenBot af en open het opnieuw.",
-  "error.remote.hostDidNotConnect": "De WebRTC-host heeft geen verbinding gemaakt.",
+  "error.remote.connectionServiceUnreachable":
+    "Deze computer kan de verbindingsdienst van OpenBot niet bereiken. Controleer de internetverbinding. OpenBot verbindt automatisch opnieuw.",
+  "error.remote.serverAnswerTimeout": "De server heeft niet op tijd geantwoord. OpenBot verbindt automatisch opnieuw.",
+  "error.remote.signInConnectionClosed":
+    "De verbinding met de server is tijdens het inloggen verbroken. Gebeurt dit vaker, controleer dan de datum en tijd op de server en op dit apparaat.",
   "error.remote.connectionCancelled": "De externe verbinding is geannuleerd.",
   "error.remote.hostDisconnected":
     "De verbinding met de server is verbroken. Controleer of de actie is voltooid en probeer het dan opnieuw.",

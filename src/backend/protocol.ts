@@ -200,6 +200,7 @@ export interface ModelListResponse {
     supportedReasoningEfforts?: Array<{ reasoningEffort?: string }>;
     reasoningEffortConfigurable?: boolean;
     hidden?: boolean;
+    upgrade?: string;
     serviceTiers?: Array<{ id: string; name?: string }>;
     additionalSpeedTiers?: string[];
     steersTurns?: boolean;
@@ -218,6 +219,7 @@ export function decodeModelListResponse(value: unknown): ModelListResponse {
       ...(isString(item.displayName) ? { displayName: item.displayName } : {}),
       ...(isString(item.defaultReasoningEffort) ? { defaultReasoningEffort: item.defaultReasoningEffort } : {}),
       ...(isBoolean(item.hidden) ? { hidden: item.hidden } : {}),
+      ...(isString(item.upgrade) ? { upgrade: item.upgrade } : {}),
       ...(item.steersTurns === true ? { steersTurns: true } : {}),
       ...(isBoolean(item.reasoningEffortConfigurable)
         ? { reasoningEffortConfigurable: item.reasoningEffortConfigurable }

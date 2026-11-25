@@ -554,8 +554,8 @@ try {
       );
       const firstSpawn = await waitFor("the first Claude start", () => entries<{ sessionId: string }>(claudeSpawns)[0]);
       const firstSession = firstSpawn.sessionId;
-      await runCauseEffect(agents.refreshAllAgentRuntimes());
-      await runCauseEffect(agents.refreshAllAgentRuntimes());
+      await runCauseEffect(agents.refreshAllAgentRuntimes("now"));
+      await runCauseEffect(agents.refreshAllAgentRuntimes("now"));
       const messagesBefore = entries(claudeMessages).length;
       await sendTurn(profile, agent.id, "second-turn");
       const spawns = entries<{ resume: string | null; sessionId: string }>(claudeSpawns);
@@ -704,7 +704,7 @@ try {
   await runGroupCase(
     "claude-release-ends-process-group",
     "claude",
-    (profile) => runCauseEffect(profile.agents.refreshAllAgentRuntimes()),
+    (profile) => runCauseEffect(profile.agents.refreshAllAgentRuntimes("now")),
     { model: CLAUDE_MODEL, clientFactory: (_provider, cli) => new ClaudeStandIn(cli) },
   );
   const stopService = (profile: Profile) => runCauseEffect(profile.agents.stop());

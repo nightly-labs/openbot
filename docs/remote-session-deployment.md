@@ -266,6 +266,11 @@ until it fails, or until it is no longer near (see "Regional Signal machines"). 
 check that `dig signal.openbot.run` gives `65.109.88.58` within 3 minutes and that
 `openbot_remote_signal_entry` is 1 on `signal2`. To move the entry back, set the A record by hand.
 
+A host whose owner or admin chose a home in Server settings sends it as `preferredSignalHome`. It gets
+that home while the home answers, also when the home is far. When the chosen home stops, the host moves
+as above, and it asks for the chosen home again every 15 minutes. Deploy the Worker before a desktop
+release that lists the homes: an older Worker has no `signal-homes` route, so the row shows an error.
+
 Known limits: the host status shows the home URL from its first ticket and does not change after a
 move. A host that goes back to a released desktop sends no `signalHome`; its ticket request removes the
 stored home, so its clients go to the entry with it.

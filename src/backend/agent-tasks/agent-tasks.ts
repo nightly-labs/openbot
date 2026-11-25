@@ -13,6 +13,8 @@ import {
   type AgentTaskHold,
   type AgentTasksSnapshot,
   type AgentTurnCompletedEvent,
+  type ArchivedAgentTasksCursor,
+  type ArchivedAgentTasksPage,
   type AttachmentSummary,
   agentTaskLimit,
   type BranchAgentTaskInput,
@@ -179,6 +181,15 @@ export class AgentTasks implements TaskLanes {
       agentId,
       tasks: tasks.map((task) => this.#publicTask(task, work, awaited)),
       limit: this.limit(agentId),
+    };
+  }
+
+  archivedPage(agentId: string, before: ArchivedAgentTasksCursor | null): ArchivedAgentTasksPage {
+    const rows = this.#store.archivedPage(agentId, before, INPUT_LIMITS.agentTasks + 1);
+    const awaited = this.#mailbox.awaitedThreadRequests();
+    return {
+      tasks: rows.slice(0, INPUT_LIMITS.agentTasks).map((task) => this.#publicTask(task, new Map(), awaited)),
+      hasMore: rows.length > INPUT_LIMITS.agentTasks,
     };
   }
 
@@ -1116,6 +1127,7 @@ function publicHold(reason: string | null): AgentTaskHold | null {
       return "task-limit";
     case "agent-client-changing":
     case "provider-cli-replaced":
+    case "endpoint-reload":
       return "agent-restarting";
     case "usage-limit":
       return "usage-limit";

@@ -6,10 +6,14 @@ export const messages = {
   "error.workflow.versionMissing": "Questa versione del workflow non esiste più.",
   "error.workflow.annotation": "Testi, note e forme non possono avere connessioni.",
   "error.workflow.port": "Un passaggio non può ricevere questo tipo di input.",
+  "error.workflow.unknownValue":
+    "Questo OpenBot non conosce un’impostazione di un passaggio. Aggiorna OpenBot, poi riprova.",
   "error.workflow.branch": "Solo una condizione può avere connessioni sì e no.",
   "error.workflow.conditionBranch": "Ogni connessione da una condizione deve essere sì o no.",
   "error.workflow.duplicateEdge": "Questi due passaggi hanno già questa connessione.",
   "error.workflow.serverTooOld": "Questo server non supporta i workflow. Aggiorna OpenBot sul computer che lo esegue.",
+  "error.workflow.newerSteps":
+    "Questo flusso di lavoro ha passaggi di una versione più recente di OpenBot. Aggiorna OpenBot per modificarlo.",
   "error.workflow.nodeUnsupported":
     "Questa versione di OpenBot non può ancora eseguire passaggi di immagine, file e messaggio.",
   "error.workflow.interrupted": "OpenBot si è fermato durante questo passaggio. Eseguilo di nuovo.",
@@ -21,6 +25,14 @@ export const messages = {
   "error.workflow.conditionUnclear": "Il modello non ha risposto sì o no.",
   "error.workflow.answerInvalid":
     "La risposta non conteneva i campi richiesti da questo passaggio: {fields}. Esegui di nuovo il passaggio.",
+  "error.workflow.answerSetup":
+    "I campi di risposta di questo workflow hanno un problema qui: {fields}. Correggi il workflow, poi esegui di nuovo il passaggio.",
+  "error.workflow.answerSourceEnded":
+    "Questi campi non hanno un valore perché il passaggio che li fornisce non è terminato: {fields}. Esegui prima di nuovo quel passaggio.",
+  "error.workflow.runInputInvalid":
+    "L’input dell’esecuzione non corrisponde ai campi di risposta dell’attivatore: {fields}. Invia un oggetto JSON con questi campi.",
+  "error.workflow.sourceNotDone":
+    "Un passaggio precedente non è riuscito o è stato fermato l’ultima volta che è stato eseguito. Esegui prima di nuovo quel passaggio.",
   "error.workflow.checkInvalid":
     "Il controllo di questo passaggio non è valido. Correggilo, poi esegui di nuovo il passaggio.",
   "error.workflow.modelFailed": "Il modello non ha potuto rispondere. Esegui di nuovo il passaggio.",

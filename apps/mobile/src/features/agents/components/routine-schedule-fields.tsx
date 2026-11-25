@@ -24,7 +24,7 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { useNativeLabelFont } from "@/shared/lib/native-label-font";
 import { useText } from "@/shared/lib/text";
-import { RoutineTimePicker } from "./routine-schedule-time";
+import { RoutineDatePicker, RoutineTimePicker } from "./routine-schedule-time";
 
 const PROBLEM_TEXT = {
   invalidDate: "mobile.agent.record.problem.invalidDate",
@@ -230,6 +230,12 @@ export function RoutineScheduleFields({
       hint = t("mobile.agent.record.cronHint");
       break;
     case "once":
+      fields = (
+        <>
+          <RoutineDatePicker date={draft.date} disabled={disabled} onChange={(date) => onChange({ ...draft, date })} />
+          {timeRow(draft.time, (time) => onChange({ ...draft, time }))}
+        </>
+      );
       break;
   }
 

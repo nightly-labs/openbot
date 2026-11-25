@@ -34,6 +34,7 @@ export interface QueueControlsHooks {
   taskThreadId(deliveryId: string): string | null;
   tagReferences(agentId: string, threadId: string | null): TagReferenceSource;
   liveVoiceRelayed(deliveryId: string): LiveVoiceRelayed | null;
+  fromChrome(deliveryId: string): boolean;
 }
 
 export interface QueueControlsOptions {
@@ -241,7 +242,11 @@ export class QueueControls {
     this.#mailboxSync.emitQueue(input.agentId);
   }, Effect.uninterruptible);
 
-  readonly steer = Effect.fn("QueueControls.steer")(function* (this: QueueControls, input: SteerQueuedMessageInput) {
+  readonly steer = Effect.fn("QueueControls.steer")(function* (
+    this: QueueControls,
+    input: SteerQueuedMessageInput,
+    busyModeSteer = false,
+  ) {
     const agent = yield* this.#store.existing(input.agentId).pipe(toQueueOperationFailed);
     const { client, session, snapshot, context, turnId, routineSession, publicThreadId, turnModel } = yield* queueStep(
       () => {
@@ -293,7 +298,11 @@ export class QueueControls {
     const steersQuietTurn =
       turnDeliveries.length > 0 &&
       turnDeliveries.every(({ delivery }) =>
-        quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id)),
+        quietTeammateTurnDelivery(
+          delivery,
+          (request) => this.#mailbox.hasOwnReplyFrom(request.id),
+          (follow) => this.#mailbox.followsUpOwnAnswer(follow),
+        ),
       );
     yield* client
       .request(
@@ -302,6 +311,9 @@ export class QueueControls {
           threadId: session,
           expectedTurnId: turnId,
           clientUserMessageId: input.deliveryId,
+          ...(busyModeSteer && providerForAgent(agent) === "claude" && context.delivery.sender.kind !== "user"
+            ? { waitsForRunningTools: true }
+            : {}),
           input: [
             ...(note ? [{ type: "text" as const, text: note }] : []),
             ...deliveryPromptInput(context, {
@@ -319,10 +331,12 @@ export class QueueControls {
                   ? this.#routines.timezoneForDelivery(input.deliveryId)
                   : undefined,
               answeredRoutine: this.#drain.answeredRoutine(context.delivery),
+              followsUpOwnAnswer: this.#mailbox.followsUpOwnAnswer(context.delivery),
               taskReport: this.#drain.taskReport(context),
               taskReportWaiting: this.#drain.taskReportWaiting(context),
               tags: this.#hooks.tagReferences(agent.id, publicThreadId),
               liveVoice: this.#hooks.liveVoiceRelayed(input.deliveryId),
+              fromChrome: this.#hooks.fromChrome(input.deliveryId),
               steerFramedAsUser: providerForAgent(agent) === "claude",
               steersQuietTurn,
             }),
@@ -345,10 +359,13 @@ export class QueueControls {
           ),
         ),
       );
-    yield* this.#mailbox.markRunning(input.deliveryId, turnId).pipe(toQueueOperationFailed);
+    const steering = this.#mailbox.getDelivery(input.deliveryId)?.delivery;
+    const joinedTurn = steering?.status === "starting" && steering.turnId === turnId;
+    if (joinedTurn) yield* this.#mailbox.markRunning(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     yield* queueStep(() => {
       const current = liveSnapshot();
       if (
+        joinedTurn &&
         this.#conversation.isExecutionThread(current.threadId) &&
         !current.messages.some((message) => message.id === input.deliveryId)
       ) {
@@ -357,7 +374,9 @@ export class QueueControls {
       }
       this.#mailboxSync.syncMailboxMessages(current);
       this.#mailboxSync.emitQueue(agent.id);
-      this.#conversation.emitConversation(current, "queue.message-steered", { deliveryId: input.deliveryId });
+      if (joinedTurn)
+        this.#conversation.emitConversation(current, "queue.message-steered", { deliveryId: input.deliveryId });
+      else this.#conversation.emitConversation(current);
     });
   }, Effect.uninterruptible);
 }

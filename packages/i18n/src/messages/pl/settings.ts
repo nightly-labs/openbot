@@ -282,6 +282,9 @@ export const messages = {
   "settings.agentDock.xwayland.unsupported":
     "W Wayland bez XWayland dok nie może być nad innymi aplikacjami. Jest w oknie OpenBot.",
   "settings.agentDock.xwayland.restart": "Uruchom ponownie",
+  "settings.agentDock.noCompositor.title": "W oknie OpenBot",
+  "settings.agentDock.noCompositor.description":
+    "Twój pulpit nie może pokazywać przezroczystych okien, więc dok jest w oknie OpenBot. Aby pokazać go nad innymi aplikacjami, włącz efekty pulpitu (kompozytor) w ustawieniach systemu i uruchom ponownie OpenBot.",
   "settings.agentDock.display.title": "Ekran",
   "settings.agentDock.display.description":
     "Jeśli ten ekran nie jest podłączony, dok przechodzi na ekran okna OpenBot.",

@@ -12,11 +12,13 @@ import {
   type BrowserViewSessionResponse,
   type BrowserViewViewport,
   browserViewClientAcksFrames,
+  browserViewClientFrameSize,
   browserViewClientViewport,
   browserViewClientWantsContextMenu,
   browserViewClientWantsCursor,
   browserViewClientWantsDialog,
   browserViewClientWantsPageCopy,
+  browserViewFrameBytes,
   browserViewStreamPath,
   browserViewStreamSessionId,
   decodeBrowserViewInput,
@@ -25,6 +27,7 @@ import {
   encodeBrowserViewHostMessage,
   isBrowserViewUserAction,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { REMOTE_DESKTOP_MAX_SIGNAL_BYTES } from "@openbot/contracts/team-protocol/remote-stream-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { Context, Deferred, Effect, Layer, Result, Semaphore } from "effect";
@@ -119,6 +122,7 @@ interface ManagedViewSession {
   reportCursor: boolean;
   reportContextMenu: boolean;
   viewport: BrowserViewViewport | null;
+  frameSize: BrowserViewViewport | null;
   reportPageCopy: boolean;
   reportDialog: boolean;
   dialog: BrowserViewDialog | null;
@@ -164,6 +168,7 @@ export class BrowserViewGateway {
       reportCursor: false,
       reportContextMenu: false,
       viewport: null,
+      frameSize: null,
       reportPageCopy: false,
       reportDialog: false,
       dialog: null,
@@ -258,6 +263,7 @@ export class BrowserViewGateway {
     session.reportPageCopy = browserViewClientWantsPageCopy(url);
     session.reportDialog = browserViewClientWantsDialog(url);
     session.viewport = browserViewClientViewport(url);
+    session.frameSize = browserViewClientFrameSize(url);
     this.#webSockets.handleUpgrade(request, socket, head, (client) => this.#dispatch(this.#connect(session, client)));
   }
 
@@ -311,6 +317,7 @@ export class BrowserViewGateway {
         session.tabId,
         (frame) => {
           if (session.socket !== client) return;
+          if (browserViewFrameBytes(frame) > REMOTE_DESKTOP_MAX_SIGNAL_BYTES) return;
           if (session.rememberFrames && framesInFlight(session) >= MAX_FRAMES_IN_FLIGHT) {
             this.#holdFrame(session, client, frame);
             return;
@@ -332,6 +339,7 @@ export class BrowserViewGateway {
             session.dialog = dialog;
             if (session.reportDialog) this.#send(session, client, { type: "dialog", dialog });
           },
+          ...(session.frameSize ? { frameSize: session.frameSize } : {}),
           ...(session.reportPageCopy
             ? {
                 onPageCopy: (text: string) => {

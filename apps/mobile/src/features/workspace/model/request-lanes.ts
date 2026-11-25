@@ -14,6 +14,44 @@ export function isBackgroundRead(method: string, path: string): boolean {
   return BACKGROUND_READS.some((read) => read.method === method && read.route.test(route));
 }
 
+export const attachmentDownloadKey = (serverId: string, attachmentId: string) => `${serverId}\n${attachmentId}`;
+
+export interface DownloadQueue {
+  run<T>(key: string, task: () => Promise<T>, tapped?: boolean): Promise<T>;
+  prioritize(key: string): void;
+}
+
+interface WaitingDownload {
+  key: string;
+  start: () => void;
+}
+
+export function createDownloadQueue(): DownloadQueue {
+  let running = false;
+  const tappedTasks: WaitingDownload[] = [];
+  const otherTasks: WaitingDownload[] = [];
+  function startNext() {
+    const next = tappedTasks.shift() ?? otherTasks.shift();
+    running = next !== undefined;
+    next?.start();
+  }
+  return {
+    async run(key, task, tapped = false) {
+      if (running) await new Promise<void>((start) => (tapped ? tappedTasks : otherTasks).push({ key, start }));
+      else running = true;
+      try {
+        return await task();
+      } finally {
+        startNext();
+      }
+    },
+    prioritize(key) {
+      const index = otherTasks.findIndex((waiting) => waiting.key === key);
+      if (index >= 0) tappedTasks.push(...otherTasks.splice(index, 1));
+    },
+  };
+}
+
 export function createRequestLimiter(limit: number) {
   let running = 0;
   const waiting: (() => void)[] = [];

@@ -168,6 +168,7 @@ function questionFixture(variant: QuestionVariant): DynamicIslandPromptItem {
           id: "send-version",
           header: "Send this version?",
           question: "The draft is ready. Which version should I use?",
+          detail: "1. Short version: 120 words\n2. Full version: 340 words",
           isSecret: false,
           options,
         },

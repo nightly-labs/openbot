@@ -2,12 +2,15 @@ import type { AppTranslate } from "@openbot/i18n";
 import { Bell, Button, CircleCheck, FileText, Hash, Play, Send, Skeleton } from "@openbot/ui";
 import { Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { AnswerProblems } from "./workflow-answer-parts";
 import { resultValue, useBoard, type WfnPortType } from "./workflow-board";
 import { DISCORD_OUTPUT_DEFAULTS, DiscordIcon, DiscordOutputRows } from "./workflow-discord-parts";
 import { GITHUB_OUTPUT_DEFAULTS, GitHubIcon, GitHubOutputRows, useGitHubOutputReady } from "./workflow-github-parts";
+import { NameField } from "./workflow-name-field";
 import {
   type Choice,
   FailureAlert,
+  Field,
   NodeShell,
   NodeToolbar,
   oneOf,
@@ -51,6 +54,12 @@ const TARGET_DEFAULTS: Partial<Record<OutputTarget, Record<string, string>>> = {
   telegram: TELEGRAM_OUTPUT_DEFAULTS,
   slack: SLACK_OUTPUT_DEFAULTS,
 };
+
+const TEXT_ACTIONS: ReadonlySet<string> = new Set(["comment", "review.changes", "issue.create", "reply", "post"]);
+
+const MESSAGE_FORMAT = 2;
+
+const textAction = (action: unknown) => typeof action === "string" && TEXT_ACTIONS.has(action);
 
 const OUTPUT_INPUTS: readonly WfnPortType[] = ["text", "image", "file"];
 
@@ -101,6 +110,10 @@ export function OutputNode(props: {
     "title",
     untrack(() => props.title ?? ""),
   );
+  const [message, setMessage] = useTextField(() => props.id, "message", "");
+  const sendsText = () =>
+    target() !== "file" && (!HOST_TARGETS.includes(target()) || textAction(board.field(props.id, "action")));
+  const messageShown = () => message() !== "" || (sendsText() && (board.features()?.format ?? 1) >= MESSAGE_FORMAT);
   const [locked, setLocked] = useLocked(() => props.id);
   const run = useStepRun(untrack(() => props.id));
   const githubReady = useGitHubOutputReady(() => props.id);
@@ -184,6 +197,20 @@ export function OutputNode(props: {
           <SlackOutputRows id={props.id} locked={locked()} />
         </Show>
       </SettingRows>
+      <Show when={messageShown()}>
+        <Field class="wfn-block-field">
+          <NameField
+            node={props.id}
+            class="wfn-input"
+            aria-label={t("workflow.output.message")}
+            placeholder={t("workflow.output.messagePlaceholder")}
+            readonly={locked()}
+            value={message()}
+            onValueChange={setMessage}
+          />
+        </Field>
+      </Show>
+      <AnswerProblems id={props.id} />
       <Show
         when={shown()}
         fallback={

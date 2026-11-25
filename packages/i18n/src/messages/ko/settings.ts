@@ -275,6 +275,9 @@ export const messages = {
   "settings.agentDock.xwayland.unsupported":
     "XWayland가 없는 Wayland에서는 독을 다른 앱 위에 표시할 수 없습니다. OpenBot 창 안에 표시됩니다.",
   "settings.agentDock.xwayland.restart": "다시 시작",
+  "settings.agentDock.noCompositor.title": "OpenBot 창 안에 표시",
+  "settings.agentDock.noCompositor.description":
+    "데스크톱에서 투명한 창을 표시할 수 없어 독이 OpenBot 창 안에 표시됩니다. 다른 앱 위에 표시하려면 시스템 설정에서 데스크톱 효과(컴포지터)를 켜고 OpenBot을 다시 시작하세요.",
   "settings.agentDock.display.title": "디스플레이",
   "settings.agentDock.display.description":
     "해당 디스플레이가 연결되어 있지 않으면 독이 OpenBot 창의 디스플레이로 이동합니다.",

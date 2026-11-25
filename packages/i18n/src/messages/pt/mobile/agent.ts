@@ -383,6 +383,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Remover {model}",
   "mobile.agent.backupModels.unavailable": "Indisponível agora · ignorado",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Quando um limite de uso para {name} depois de começar a trabalhar, {name} continua o mesmo trabalho no primeiro modelo disponível da ordem. Volta para {model} quando o limite termina, ou 10 minutos após um erro do provedor.",
   "mobile.agent.busyMessage.label": "Durante o trabalho",
@@ -537,6 +538,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Coleta iniciada em {started}. Atualizado em {updated}.",
   "mobile.agent.usage.never": "nunca",
   "mobile.agent.record.time": "Horário",
+  "mobile.agent.record.date": "Data",
   "mobile.agent.section.changeFailed": "Não foi possível alterar a pasta",
   "mobile.agent.section.tryAgain": "Tente novamente.",
   "mobile.agent.section.moveUp": "Mover para cima",
@@ -622,7 +624,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Não foi possível carregar seus servidores",
   "mobile.agent.home.serversFailedBody": "Verifique se o app para computador está em execução e tente novamente.",
   "mobile.agent.home.noServers": "Nenhum servidor disponível",
-  "mobile.agent.home.noServersBody": "Conecte o app para computador novamente ou entre em um servidor remoto.",
+  "mobile.agent.home.noServersBody":
+    "Abra o OpenBot no seu computador com esta conta e ative Publicar este servidor em Configurações do servidor → Membros. Ou entre em um servidor remoto.",
   "mobile.agent.home.chooseServer": "Escolha um servidor",
   "mobile.agent.home.openServers": "Abrir servidores",
   "mobile.agent.home.noChatOpen": "Nenhum chat aberto",
@@ -700,6 +703,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Parar de excluir",
   "mobile.agent.folders.browseTitle": "Escolher pasta",
   "mobile.agent.folders.places": "Ir para",
+  "mobile.agent.folders.path": "Caminho da pasta",
   "mobile.agent.folders.home": "Pasta pessoal",
   "mobile.agent.folders.parent": "Subir para {folder}",
   "mobile.agent.folders.browseFailed": "Não foi possível abrir esta pasta.",

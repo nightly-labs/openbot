@@ -85,7 +85,7 @@ export const MCP_SERVER_TOOL_DEFINITIONS = [
   },
   {
     name: "save_mcp_server",
-    description: `Add an MCP server, or change one by its name, only when the user asks for it. ${MCP_SCOPE} ${MCP_APPROVAL} Then OpenBot connects to the server and saves it when it answers or needs only a sign-in or a key. The result is ready with its tools, needs_sign_in (a Sign in card is in the conversation: wait for the user), needs_key (save again with the key in headers when the user gave it; else the user enters it in Marketplace, Apps; never ask for a key in the chat), or the error. Put a key that the user gave in headers, never in the address. Environment values are not set here: a stdio server that cannot start without a key in its environment is added by the user in Marketplace, Apps. A server keeps the keys it holds only on its transport, address origin, command, arguments and folder. New tools reach the agents from their next turn.`,
+    description: `Add an MCP server, or change one by its name, only when the user asks for it. ${MCP_SCOPE} ${MCP_APPROVAL} Then OpenBot connects to the server and saves it when it answers or needs only a sign-in or a key. The result is ready with its tools, needs_sign_in (a Sign in card is in the conversation: wait for the user), needs_key (save again with the key in headers when the user gave it; else the user enters it in Marketplace, Apps; never ask for a key in the chat), or the error. Keep a given address with its query; other keys go in headers. Environment values are not set here: a stdio server that cannot start without a key in its environment is added by the user in Marketplace, Apps. A server keeps the keys it holds only on its transport, address origin, command, arguments and folder. New tools reach the agents from their next turn.`,
     shape: saveMcpServerToolSchema.shape,
   },
   {
@@ -332,7 +332,7 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       const existing = servers.list().find((config) => config.name === input.name);
       const config = normalizeMcpConfig(mergeServer(existing, input));
       const errors = mcpConfigErrors(config);
-      const invalid = errors.name ?? errors.command ?? errors.url;
+      const invalid = errors.name ?? errors.command ?? errors.url ?? errors.headers;
       if (invalid) return openBotToolFailure(invalid);
       const headers = input.headers ?? [];
       if (headers.length > 0 && config.transport !== "http")
@@ -482,7 +482,7 @@ const report = Effect.fnUntraced(function* (
       status: "needs_key",
       server,
       error,
-      next: "When the user gave the key, call openbot.save_mcp_server again with it in headers, such as Authorization: Bearer <token>. Otherwise ask the user to enter the key with Edit on the server's page in Marketplace, Apps. Do not ask for the key in the chat or show it.",
+      next: "When the user gave the key, call openbot.save_mcp_server again with it in headers, such as Authorization: Bearer <token>, or with the full address when the key is in the address that the user gave. Otherwise ask the user to enter the key with Edit on the server's page in Marketplace, Apps. Do not ask for the key in the chat or show it.",
     });
   return openBotToolResult({ status: "error", server, error });
 });

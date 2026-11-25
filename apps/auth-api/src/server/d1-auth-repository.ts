@@ -458,6 +458,11 @@ export class D1AuthRepository implements AuthRepository {
           .first<UserRow>(),
       );
       if (!row) return yield* new AuthStoreError({ message: "User not found." });
+      if (row.analytics_enabled === 0) {
+        yield* storeCall(() =>
+          database.prepare("DELETE FROM account_active_days WHERE account_id = ?").bind(userId).run(),
+        );
+      }
       return mapUser(row);
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),

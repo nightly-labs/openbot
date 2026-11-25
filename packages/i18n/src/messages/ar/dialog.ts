@@ -22,6 +22,8 @@ export const messages = {
   "dialog.saveTransfer": "حفظ ملف النقل",
   "dialog.chooseTransfer": "اختر ملف نقل",
   "dialog.filter.transfer": "ملفات نقل OpenBot",
+  "dialog.saveWorkflow": "حفظ ملف سير العمل",
+  "dialog.filter.workflow": "ملفات سير عمل OpenBot",
   "dialog.chooseExternalLinkApp": "اختر متصفحًا",
   "dialog.filter.applications": "التطبيقات",
 } as const satisfies PartialTranslation<typeof source>;

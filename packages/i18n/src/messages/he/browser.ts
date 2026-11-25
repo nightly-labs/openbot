@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "סגירת לשונית דפדפן",
   "browser.newTab": "לשונית דפדפן חדשה",
   "browser.backToChat": "חזרה לצ'אט",
+  "browser.fullView.open": "פתיחה בתצוגה מלאה",
   "browser.goBack": "חזרה",
   "browser.goForward": "קדימה",
   "browser.reload": "טעינת הדף מחדש",
@@ -105,6 +106,7 @@ export const messages = {
   "browser.secret.submitting": "שולח…",
   "browser.secret.takeOver": "השתלטות",
   "browser.secret.failed": "לא ניתן להשלים את הבקשה. יש לבדוק את החיבור ולנסות שוב.",
+  "browser.secret.ended": "בקשת ההתחברות הזו הסתיימה. צריך לבקש מהסוכן לנסות שוב.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot לא השתמש בפרטי ההתחברות השמורים כי הסוכן הריץ סקריפט בדף הזה. כדי להשתמש בהם, צריך לבקש מהסוכן לטעון מחדש את הדף ולנסות שוב.",
   "browser.secret.vaultSkip.fieldKind": "OpenBot לא השתמש בפרטי ההתחברות השמורים כי הסוכן בחר שדה שגוי בדף.",

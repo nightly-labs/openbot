@@ -16,6 +16,7 @@ const SPEECH_BELOW_PEAK_DB = 40;
 const SPEECH_MARGIN_SAMPLES = (450 * SAMPLE_RATE) / 1_000;
 const SPEECH_END_SILENCE_SAMPLES = SAMPLE_RATE;
 const DIGITAL_SILENCE_DB = -90;
+const WHISPER_TOKENS_PER_SECOND = "15";
 const MAXIMUM_LEADING_SILENCE_SAMPLES = SAMPLE_RATE;
 const MAXIMUM_THREADS = 64;
 const SESSION_CONFIG_PATTERN = /^(?:[a-z0-9-]+\.cfg)?$/u;
@@ -265,6 +266,7 @@ async function decode(
   try {
     const stream = addon.createOfflineStream(recognizer);
     if (engine === "cohere-transcribe") addon.offlineStreamSetOption(stream, "language", language || "en");
+    if (engine === "whisper") addon.offlineStreamSetOption(stream, "max_tokens_per_second", WHISPER_TOKENS_PER_SECOND);
     addon.acceptWaveformOffline(stream, { samples, sampleRate: SAMPLE_RATE });
     await addon.decodeOfflineStreamAsync(recognizer, stream);
     return resultText(JSON.parse(addon.getOfflineStreamResultAsJson(stream))).trim();

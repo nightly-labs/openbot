@@ -7,7 +7,7 @@ import {
   vatIdPrefix,
 } from "@openbot/contracts/billing-details";
 import { Field, Input, Label, SearchSelect } from "@openbot/ui";
-import { createMemo, createSignal, createUniqueId, Show } from "solid-js";
+import { createMemo, createSignal, createUniqueId, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 
 export interface BillingDetailsCalls {
@@ -111,4 +111,62 @@ export function BillingDetailsFields(props: {
       </Show>
     </div>
   );
+}
+
+export function createBillingDetailsForm(calls: () => BillingDetailsCalls | undefined) {
+  const { t, errorMessage } = useText();
+  const [saved, setSaved] = createSignal<BillingDetails | null>(null);
+  const [draft, setDraft] = createSignal<BillingDetailsDraft>(billingDetailsDraft(null));
+  const [edited, setEdited] = createSignal(false);
+  const [saving, setSaving] = createSignal(false);
+  const [error, setError] = createSignal<string | null>(null);
+  const [known, setKnown] = createSignal(false);
+  const api = untrack(calls);
+  const loaded: Promise<string | null> = api
+    ? api.getDetails().then(
+        (details) => {
+          setSaved(details);
+          if (!untrack(edited)) setDraft(billingDetailsDraft(details));
+          setKnown(true);
+          return details.country;
+        },
+        () => {
+          setKnown(true);
+          return null;
+        },
+      )
+    : Promise.resolve(null);
+  async function save(): Promise<boolean> {
+    const current = calls();
+    if (!current) return true;
+    if (!billingDetailsRequest(draft())) {
+      setError(t("billing.details.countryMissing"));
+      return false;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      setSaved(await saveBillingDetails(current, saved(), draft()));
+      return true;
+    } catch (failure) {
+      setError(errorMessage(failure, t("billing.details.saveFailed")));
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+  return {
+    saved,
+    known,
+    draft,
+    saving,
+    error,
+    loaded,
+    save,
+    edit: (next: BillingDetailsDraft) => {
+      setEdited(true);
+      setError(null);
+      setDraft(next);
+    },
+  };
 }

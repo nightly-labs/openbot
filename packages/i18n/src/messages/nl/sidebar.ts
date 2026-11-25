@@ -167,6 +167,10 @@ export const messages = {
   "sidebar.storage.body": "{used} van {total} gebruikt op {server}.",
   "sidebar.storage.fullBody": "{used} van {total} gebruikt op {server}. Agents kunnen mogelijk geen bestanden opslaan.",
   "sidebar.storage.meterLabel": "Gebruikte opslag op {server}",
+  "sidebar.storage.bodyThisComputer": "{used} van {total} gebruikt op deze computer.",
+  "sidebar.storage.fullBodyThisComputer":
+    "{used} van {total} gebruikt op deze computer. Agents kunnen mogelijk geen bestanden opslaan.",
+  "sidebar.storage.meterLabelThisComputer": "Gebruikte opslag op deze computer",
   "sidebar.storage.used": "{percent} gebruikt",
   "sidebar.storage.freeUpSpace": "Ruimte vrijmaken",
   "sidebar.storage.dismiss": "Verbergen tot opslag vol is",

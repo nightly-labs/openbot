@@ -1,5 +1,6 @@
 import {
   isWorkflowMediaSide,
+  WORKFLOW_CATALOG_SOURCES,
   WORKFLOW_MEDIA_ASPECTS,
   WORKFLOW_MEDIA_CUSTOM_ASPECT,
   WORKFLOW_MEDIA_KINDS,
@@ -9,6 +10,7 @@ import {
   WORKFLOW_MEDIA_SIZE_MIN,
   WORKFLOW_VIDEO_DURATIONS,
   WORKFLOW_VIDEO_VOICES,
+  type WorkflowFields,
   type WorkflowMediaAspect,
   type WorkflowMediaInput,
   type WorkflowMediaKind,
@@ -22,10 +24,12 @@ import {
   workflowMediaSpecs,
   workflowVideoDurations,
 } from "@openbot/contracts/ipc";
+import { isOneOf } from "@openbot/contracts/runtime-values";
 import type { AppTextKey } from "@openbot/i18n";
-import { Play, Zap } from "@openbot/ui";
+import { Play } from "@openbot/ui";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { CreditIcon } from "../credits/CreditIcon";
 import { resultValue, useBoard, type WfnBoard } from "./workflow-board";
 import { type InputRole, orStoredPicture, pictureUrl as storedPictureUrl } from "./workflow-input-pictures";
 import { asString, oneOf, useField, useLocked, useStepRun, useTextField } from "./workflow-node-parts";
@@ -245,7 +249,11 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
   const customAllowed = () => kind() === "image" && sizeHost();
   const hostAspect = (frame: Frame) =>
     sizeHost() || WORKFLOW_MEDIA_LEGACY_ASPECTS.some((legacy) => legacy === frame) ? frame : "";
-  const [duration, setDuration] = useField<number>(key, "duration", WORKFLOW_VIDEO_DURATIONS[0], asSeconds);
+  const [, setDuration] = useField<number>(key, "duration", WORKFLOW_VIDEO_DURATIONS[0], asSeconds);
+  const storedDuration = (): WorkflowFields => {
+    const seconds = asSeconds(board.field(id, "duration"));
+    return seconds === undefined ? {} : { duration: seconds };
+  };
   const [resolution, setResolution] = useField<string>(key, "resolution", "720p", asText);
   const [background, setBackground] = useField<Background>(key, "background", "solid", oneOf(BACKGROUNDS));
   const [optionsField] = useField(key, "options", "", asString);
@@ -257,6 +265,12 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
     asString,
   );
   const model = () => models().find((candidate) => candidate.id === modelId());
+  const modelMissing = () => board.catalogs().imageModelsReady === true && modelId() !== "" && model() === undefined;
+  const savedModelName = () =>
+    model() === undefined
+      ? board.catalogs().unavailableModels?.find((entry) => entry.id === modelId() && entry.kinds.includes(kind()))
+          ?.name
+      : undefined;
   const aspects = () => workflowMediaAspects(model(), kind()).filter((value) => hostAspect(value) !== "");
   const [account] = useField(key, "account", "", asString);
   const specs = () =>
@@ -265,7 +279,7 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
         aspect: hostAspect(aspect()),
         width: board.field(id, "width") ?? 0,
         height: board.field(id, "height") ?? 0,
-        duration: duration(),
+        ...storedDuration(),
         resolution: resolution(),
         background: background(),
         options: optionsField(),
@@ -287,11 +301,12 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
   const mode = () => specs().options.find((entry) => entry.name === WORKFLOW_MEDIA_MODE_OPTION)?.value ?? "";
   const setMode = (value: string) => setOption(WORKFLOW_MEDIA_MODE_OPTION, value);
   const mediaInputs = () => shownMediaInputs(model(), mode());
+  const frameCount = () => (kind() === "video" ? model()?.frameCount : undefined);
   const resolutions = () => resolutionsBySize(workflowMediaResolutions(model(), kind()));
   const durations = () => workflowVideoDurations(model());
   const price = useMediaPrice(() => {
     const chosen = model();
-    if (!chosen?.credits || (chosen.provider !== "sunra" && chosen.provider !== "higgsfield")) return null;
+    if (!chosen?.credits || !isOneOf(WORKFLOW_CATALOG_SOURCES, chosen.provider)) return null;
     const { aspect, duration, resolution, transparent, options } = specs();
     return {
       model: chosen.id,
@@ -308,13 +323,26 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
     const credits = price();
     return credits === null ? null : credits * batch();
   };
+  const balance = () => (model()?.provider === "openbot" ? board.catalogs().creditBalance : undefined);
+  const exceeds = (credits: number | null) => {
+    const available = balance();
+    return typeof available === "number" && credits !== null && credits > available;
+  };
+  const short = () => exceeds(total());
+  const retryShort = () => exceeds(price());
+  const priced = (label: string, isShort: boolean) =>
+    isShort ? [t("billing.credits.notEnough"), label].join(", ") : label;
   const runLabel = () => {
     const credits = total();
-    return credits === null ? undefined : t("workflow.node.runPriceLabel", { credits: format.number(credits) });
+    return credits === null || modelMissing()
+      ? undefined
+      : priced(t("workflow.node.runPriceLabel", { credits: format.number(credits) }), short());
   };
   const retryLabel = () => {
     const credits = price();
-    return credits === null ? undefined : t("workflow.node.retryPriceLabel", { credits: format.number(credits) });
+    return credits === null
+      ? undefined
+      : priced(t("workflow.node.retryPriceLabel", { credits: format.number(credits) }), retryShort());
   };
   const chooseFrame = (frame: Frame) => {
     if (frame !== WORKFLOW_MEDIA_CUSTOM_ASPECT) {
@@ -367,6 +395,8 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
     setBackground,
     models,
     model,
+    modelMissing,
+    savedModelName,
     account,
     specs,
     resolutions,
@@ -377,10 +407,13 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
     mode,
     setMode,
     mediaInputs,
+    frameCount,
     price,
     total,
     batch,
     setBatch,
+    short,
+    retryShort,
     runLabel,
     retryLabel,
     chooseFrame,
@@ -405,10 +438,10 @@ export type MediaStep = ReturnType<typeof useMediaStep>;
 
 export const resolutionName = (value: string) => value.replace(/k$/u, "K");
 
-export function RunContent(props: { credits: number | null; takes?: number }) {
+export function RunContent(props: { credits: number | null; takes?: number; modelMissing?: boolean }) {
   const { t, format } = useText();
   return (
-    <>
+    <Show when={!props.modelMissing} fallback={t("workflow.image.modelUnavailable")}>
       <Show
         when={props.credits !== null}
         fallback={
@@ -418,12 +451,12 @@ export function RunContent(props: { credits: number | null; takes?: number }) {
           </>
         }
       >
-        <Zap class="wfn-run-credits-icon" aria-hidden="true" />
+        <CreditIcon class="wfn-run-credits-icon" />
         {format.number(props.credits ?? 0)}
       </Show>
       <Show when={(props.takes ?? 1) > 1}>
         <span class="wfn-run-takes">{t("workflow.media.batchCount", { value: String(props.takes) })}</span>
       </Show>
-    </>
+    </Show>
   );
 }

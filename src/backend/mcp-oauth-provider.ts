@@ -29,7 +29,7 @@ import {
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { checkResourceAllowed, resourceUrlFromServerUrl } from "@modelcontextprotocol/sdk/shared/auth-utils.js";
 import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { MCP_SIGN_IN_TIMEOUT_MS } from "@openbot/contracts/ipc";
+import { MCP_SIGN_IN_TIMEOUT_MS, relayCallbackQuery } from "@openbot/contracts/ipc";
 import { mcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { sourceText } from "@openbot/i18n/source";
 import type { Logger } from "@openbot/logging";
@@ -176,6 +176,8 @@ export interface McpSignIn {
 
 export type McpSignInOpener = (url: string) => Promise<void>;
 
+export type McpSignInAddressOutcome = "received" | "ended" | "invalid";
+
 export interface McpOAuthAuthority {
   accessToken: (url: string) => Effect.Effect<string | null, McpOperationError>;
   refreshAccessToken: (url: string, rejected: string) => Effect.Effect<string | null, McpOperationError>;
@@ -183,6 +185,7 @@ export interface McpOAuthAuthority {
   signIn: (url: string, open?: McpSignInOpener, deepLinkRedirectUrl?: string) => McpSignIn | null;
   cancelSignIn: (url: string) => boolean;
   signInLink: (url: string) => string | null;
+  receiveSignInAddress: (url: string, address: string) => McpSignInAddressOutcome;
   signedIn: (url: string) => boolean;
   needsSignIn: (url: string) => boolean;
   hasSignIn: (url: string) => boolean;
@@ -201,8 +204,7 @@ export class McpOAuth implements McpOAuthAuthority {
   readonly #waiting = new Map<string, (code: string | null) => void>();
   readonly #openedElsewhere = new Set<string>();
   readonly #exchanges = new Map<string, Deferred.Deferred<boolean>>();
-  readonly #attempts = new Map<string, () => void>();
-  readonly #pages = new Map<string, McpOAuthClientProvider>();
+  readonly #attempts = new Map<string, Set<SignInAttempt>>();
   readonly #unanswered = new Map<string, string>();
   readonly #scope = Scope.makeUnsafe();
   readonly #refreshing = new Map<string, Fiber.Fiber<McpRefreshOutcome>>();
@@ -302,8 +304,7 @@ export class McpOAuth implements McpOAuthAuthority {
     Scope.close(this.#scope, Exit.void).pipe(
       Effect.ensuring(
         Effect.sync(() => {
-          for (const cancel of [...this.#attempts.values()]) cancel();
-          this.#pages.clear();
+          for (const key of [...this.#attempts.keys()]) this.#cancelAttempts(key);
           this.#waiting.clear();
           this.#openedElsewhere.clear();
         }),
@@ -314,11 +315,13 @@ export class McpOAuth implements McpOAuthAuthority {
   signIn(url: string, open?: McpSignInOpener, deepLinkRedirectUrl?: string): McpSignIn | null {
     const key = mcpOAuthAccountKey(url);
     if (!key) return null;
-    this.#attempts.get(key)?.();
-    const unanswered = this.#unanswered.get(key);
+    const attempts = this.#attempts.get(key) ?? new Set<SignInAttempt>();
+    this.#attempts.set(key, attempts);
+    const unanswered = [...attempts].at(-1)?.unanswered() ?? this.#unanswered.get(key);
     this.#unanswered.delete(key);
     const state = randomUUID();
     const grant = Deferred.makeUnsafe<string, Error>();
+    const signedInElsewhere = Deferred.makeUnsafe<void>();
     let refused = false;
     this.#waiting.set(state, (code) => {
       refused = code === null;
@@ -332,19 +335,28 @@ export class McpOAuth implements McpOAuthAuthority {
     this.#exchanges.set(state, exchanged);
     let abandoned = false;
     let cancelled = false;
+    let settled = false;
     let exchangeFailed = false;
     const resource = mcpOAuthServerUrl(key);
-    const provider = this.#provider(key, state, () => abandoned, open, unanswered, deepLinkRedirectUrl);
+    const provider = this.#provider(
+      key,
+      state,
+      () => abandoned,
+      open,
+      unanswered,
+      deepLinkRedirectUrl,
+      () => settled,
+    );
     const abandon = () => {
       const unansweredNow = provider.openedRedirectUrl ?? unanswered;
-      if (!abandoned && this.#waiting.has(state) && unansweredNow) this.#unanswered.set(key, unansweredNow);
+      if (!abandoned && !settled && this.#waiting.has(state) && unansweredNow) this.#unanswered.set(key, unansweredNow);
       abandoned = true;
       this.#waiting.delete(state);
       this.#openedElsewhere.delete(state);
       Deferred.doneUnsafe(exchanged, Effect.succeed(false));
       this.#exchanges.delete(state);
-      if (this.#attempts.get(key) === cancel) this.#attempts.delete(key);
-      if (this.#pages.get(key) === provider) this.#pages.delete(key);
+      attempts.delete(attempt);
+      if (attempts.size === 0 && this.#attempts.get(key) === attempts) this.#attempts.delete(key);
     };
     const cancel = () => {
       if (refused) return;
@@ -352,8 +364,17 @@ export class McpOAuth implements McpOAuthAuthority {
       Deferred.doneUnsafe(grant, Effect.fail(new Error(sourceText("error.backend.mcpSignInCancelled"))));
       abandon();
     };
-    this.#attempts.set(key, cancel);
-    this.#pages.set(key, provider);
+    const attempt: SignInAttempt = {
+      state,
+      cancel,
+      settle: () => {
+        settled = true;
+        Deferred.doneUnsafe(signedInElsewhere, Effect.void);
+      },
+      unanswered: () => provider.openedRedirectUrl ?? unanswered,
+      openedUrl: () => provider.openedUrl,
+    };
+    attempts.add(attempt);
     return {
       provider,
       begin: () =>
@@ -377,10 +398,11 @@ export class McpOAuth implements McpOAuthAuthority {
           const controller = new AbortController();
           yield* Effect.gen({ self: this }, function* () {
             const code = yield* withTimeout(
-              Deferred.await(grant),
+              Effect.raceFirst(Deferred.await(grant), Deferred.await(signedInElsewhere).pipe(Effect.as(null))),
               this.#options.signInTimeoutMs ?? MCP_SIGN_IN_TIMEOUT_MS,
               sourceText("error.backend.mcpSignInTimedOut"),
             ).pipe(Effect.mapError(mcpFailure));
+            if (code === null) return;
             provider.recordSecret(code);
             provider.beginCodeExchange();
             yield* withTimeout(
@@ -401,6 +423,7 @@ export class McpOAuth implements McpOAuthAuthority {
               sourceText("error.backend.mcpSignInResponseTimedOut"),
             ).pipe(Effect.mapError(mcpFailure));
             Deferred.doneUnsafe(exchanged, Effect.succeed(true));
+            for (const other of [...attempts]) if (other !== attempt) other.settle();
           }).pipe(
             Effect.ensuring(
               Effect.sync(() => {
@@ -451,14 +474,41 @@ export class McpOAuth implements McpOAuthAuthority {
 
   cancelSignIn(url: string): boolean {
     const key = mcpOAuthAccountKey(url);
-    const cancel = key ? this.#attempts.get(key) : undefined;
-    cancel?.();
-    return cancel !== undefined;
+    return key !== null && this.#cancelAttempts(key);
+  }
+
+  #cancelAttempts(key: string): boolean {
+    const attempts = [...(this.#attempts.get(key) ?? [])];
+    for (const attempt of attempts) attempt.cancel();
+    return attempts.length > 0;
+  }
+
+  cancelSignInPage(state: string): boolean {
+    for (const attempts of this.#attempts.values())
+      for (const attempt of attempts) {
+        if (attempt.state !== state) continue;
+        attempt.cancel();
+        return true;
+      }
+    return false;
   }
 
   signInLink(url: string): string | null {
     const key = mcpOAuthAccountKey(url);
-    return (key && this.#pages.get(key)?.openedUrl) ?? null;
+    const attempts = key === null ? [] : [...(this.#attempts.get(key) ?? [])];
+    return attempts.map((attempt) => attempt.openedUrl()).findLast((page) => page !== null) ?? null;
+  }
+
+  receiveSignInAddress(url: string, address: string): McpSignInAddressOutcome {
+    const page = this.signInLink(url);
+    const state = page ? URL.parse(page)?.searchParams.get("state") : null;
+    if (!state || !this.#exchanges.has(state)) return "ended";
+    const query = relayCallbackQuery(address, state);
+    if (query === null) return "invalid";
+    if (!this.#waiting.has(state)) return "received";
+    const code = new URLSearchParams(query).get("code");
+    const received = code ? this.receiveAuthorizationCode(state, code) : this.refuseAuthorization(state);
+    return received ? "received" : "ended";
   }
 
   signedIn(url: string): boolean {
@@ -470,13 +520,13 @@ export class McpOAuth implements McpOAuthAuthority {
   needsSignIn(url: string): boolean {
     const key = mcpOAuthAccountKey(url);
     const record = key === null ? undefined : this.#options.storage.read(key);
-    return record?.lostAt !== undefined && !record.tokens;
+    return (record?.lostAt !== undefined || record?.app !== undefined) && !record.tokens;
   }
 
   hasSignIn(url: string): boolean {
     const key = mcpOAuthAccountKey(url);
     const record = key === null ? undefined : this.#options.storage.read(key);
-    return record?.tokens !== undefined || record?.lostAt !== undefined;
+    return record?.tokens !== undefined || record?.lostAt !== undefined || record?.app !== undefined;
   }
 
   readonly signInOffer = Effect.fn("McpOAuth.signInOffer")(function* (this: McpOAuth, url: string) {
@@ -619,7 +669,7 @@ export class McpOAuth implements McpOAuthAuthority {
 
   #invalidate(key: string): void {
     this.#generations.set(key, (this.#generations.get(key) ?? 0) + 1);
-    this.#attempts.get(key)?.();
+    this.#cancelAttempts(key);
     this.#unanswered.delete(key);
   }
 
@@ -630,6 +680,7 @@ export class McpOAuth implements McpOAuthAuthority {
     open?: McpSignInOpener,
     unansweredRedirectUrl?: string,
     openedDeepLinkRedirectUrl?: string,
+    isSettled: () => boolean = () => false,
   ): McpOAuthClientProvider {
     const generation = this.#generations.get(key) ?? 0;
     const storage = this.#options.storage;
@@ -661,11 +712,20 @@ export class McpOAuth implements McpOAuthAuthority {
       deepLinkRedirectUrl: open ? () => openedDeepLinkRedirectUrl : this.#options.deepLinkRedirectUrl,
       openExternal: open ?? this.#options.openExternal,
       isAbandoned,
+      isSettled,
       legacyIssuer: legacyIssuer(stored),
       hasUnboundCredentials: hasUnboundCredentials(stored),
       unansweredRedirectUrl,
     });
   }
+}
+
+interface SignInAttempt {
+  state: string;
+  cancel: () => void;
+  settle: () => void;
+  unanswered: () => string | undefined;
+  openedUrl: () => string | null;
 }
 
 interface ClientProviderOptions {
@@ -677,6 +737,7 @@ interface ClientProviderOptions {
   deepLinkRedirectUrl?: (() => string | undefined) | undefined;
   openExternal: (url: string) => Promise<void>;
   isAbandoned: () => boolean;
+  isSettled: () => boolean;
   legacyIssuer: string | undefined;
   hasUnboundCredentials: boolean;
   unansweredRedirectUrl?: string | undefined;
@@ -710,6 +771,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   readonly #retryRedirectUrl: string | null;
   #openedRedirectUrl: string | null = null;
   #openedUrl: string | null = null;
+  #authorizedClient: OAuthClientInformationFull | undefined;
 
   #otherRedirectName(redirectUrl: string | null | undefined): string | null {
     const localhost = this.#localhostRedirectUrl;
@@ -719,6 +781,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   }
 
   get redirectUrl(): string {
+    if (this.#exchangingCode && this.#openedRedirectUrl) return this.#openedRedirectUrl;
     const record = this.#record();
     const own = this.#options.redirectUrl;
     if (record.app) return signInAppRedirectUrl(this.#options.resource, own);
@@ -790,7 +853,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         token_endpoint_auth_method: "none",
         issuer: builtIn.issuer,
       };
-    const client = this.#registeredClient ?? this.#credential(record.client);
+    const authorized = this.#exchangingCode ? this.#authorizedClient : undefined;
+    const client = this.#registeredClient ?? authorized ?? this.#credential(record.client);
     this.recordSecret(record.client?.client_secret);
     if (!client) {
       if (this.#exchangingCode) throw new Error(sourceText("error.backend.mcpSignInClientRefused"));
@@ -999,7 +1063,9 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     return runCauseEffect(
       Effect.gen({ self: this }, function* () {
         this.#recordTokens(tokens);
-        const client = this.#registeredClient;
+        const authorized = this.#authorizedClient;
+        const replaced = authorized && this.#record().client?.client_id !== authorized.client_id;
+        const client = this.#registeredClient ?? (replaced ? authorized : undefined);
         yield* this.#save({ ...(client ? { client } : {}), tokens, obtainedAt: Date.now(), lostAt: undefined });
         this.#registeredClient = undefined;
       }),
@@ -1080,7 +1146,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   redirectToAuthorization(authorizationUrl: URL): Promise<void> {
     return runCauseEffect(
       Effect.gen({ self: this }, function* () {
-        if (this.#options.isAbandoned()) return;
+        if (this.#options.isAbandoned() || this.#options.isSettled()) return;
         if (!this.#options.state) return yield* mcpFailure(new Error(sourceText("error.backend.mcpSignInNoBrowser")));
         if (!isAuthorizationUrlSafe(authorizationUrl))
           return yield* mcpFailure(new Error(sourceText("error.backend.mcpSignInNotWebPage")));
@@ -1090,9 +1156,20 @@ class McpOAuthClientProvider implements OAuthClientProvider {
             ? withAppScope(authorizationUrl, app)
             : withOfflineAccess(authorizationUrl, this.#discoveryState?.authorizationServerMetadata),
         );
+        const clientId = url.searchParams.get("client_id");
+        this.#authorizedClient = app
+          ? undefined
+          : [this.#registeredClient, this.#record().client].find((client) => client?.client_id === clientId);
         this.#openedUrl = url.toString();
-        yield* mcpCall(() => this.#options.openExternal(url.toString()));
+        const previous = this.#openedRedirectUrl;
         this.#openedRedirectUrl = url.searchParams.get("redirect_uri");
+        yield* mcpCall(() => this.#options.openExternal(url.toString())).pipe(
+          Effect.tapError(() =>
+            Effect.sync(() => {
+              this.#openedRedirectUrl = previous;
+            }),
+          ),
+        );
       }),
     );
   }
@@ -1157,7 +1234,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
           return;
         }
         const record = yield* mcpSync(() => this.#record());
-        if (scope !== "tokens") this.#registeredClient = undefined;
+        if (scope !== "tokens") {
+          this.#registeredClient = undefined;
+          this.#authorizedClient = undefined;
+        }
         if (scope !== "tokens" && this.#exchangingCode && record.app) this.#appRefused = true;
         if (scope === "all") {
           this.#codeVerifier = null;

@@ -106,6 +106,8 @@ const NO_CODEX_OWN_SERVERS: CodexOwnServers = { disabled: {}, transports: {}, re
 
 const RUNTIME_RELOADED_ON_RESUME: ReadonlySet<AgentProvider> = new Set(["claude"]);
 
+export type RuntimeRefreshTiming = "now" | "after-background-work";
+
 type CodexToolApprovals = Array<[string, DynamicRecord]>;
 const SESSION_NAME_PREFIX = "OpenBot · ";
 
@@ -116,13 +118,27 @@ interface InstructionsFileInPrompt {
   hiddenFromCli: AgentInstructionFileName[];
 }
 
-const CODEX_TOOLS_CONFIG = { update_plan: { enabled: true } } as const;
+const CODEX_TOOLS_CONFIG = {
+  update_plan: { enabled: true },
+  experimental_request_user_input: { enabled: false },
+} as const;
 
-export const CODEX_FEATURES_CONFIG = { "features.goals": false, "features.request_permissions_tool": false } as const;
+export const CODEX_FEATURES_CONFIG = {
+  "features.goals": false,
+  "features.request_permissions_tool": false,
+  "features.multi_agent_v2_dynamic_tools": true,
+} as const;
 
 const CODEX_COMPUTER_USE_PLUGINS_OFF = {
   "plugins.computer-use@openai-bundled.enabled": false,
   "plugins.unified-computer-use@openai-bundled.enabled": false,
+} as const;
+
+const CODEX_BROWSER_PLUGINS_OFF = {
+  "plugins.browser@openai-bundled.enabled": false,
+  "plugins.chrome@openai-bundled.enabled": false,
+  "plugins.chrome-dev@openai-bundled.enabled": false,
+  "plugins.chrome-internal@openai-bundled.enabled": false,
 } as const;
 
 const CODEX_MCP_STARTUP_GRACE_MS = 10_000;
@@ -270,10 +286,11 @@ export class ThreadLifecycle {
 
   readonly refreshAllAgentRuntimes = Effect.fn("ThreadLifecycle.refreshAllAgentRuntimes")(function* (
     this: ThreadLifecycle,
+    timing: RuntimeRefreshTiming,
   ) {
     for (const agent of this.#store.list()) {
       this.#pendingRuntimeRefreshes.add(agent.id);
-      this.#mcpRuntimeRefreshes.add(agent.id);
+      if (timing === "now") this.#mcpRuntimeRefreshes.add(agent.id);
       yield* this.applyPendingRuntimeRefresh(agent);
     }
   }, Effect.uninterruptible).bind(this);
@@ -817,13 +834,14 @@ export class ThreadLifecycle {
       config?: {
         mcp_servers?: Record<string, CodexMcpServer | CodexDisabledMcpServer>;
         tools: typeof CODEX_TOOLS_CONFIG;
+        model_reasoning_effort: AgentSummary["reasoningEffort"];
         project_doc_max_bytes: number;
         mcp_optional_startup_grace_ms: number;
-        "features.goals": false;
-        "features.request_permissions_tool": false;
         "features.code_mode.direct_only_tool_namespaces": string[];
         [variable: `shell_environment_policy.set.${string}`]: string;
-      } & CodexPromptSettings &
+      } & typeof CODEX_FEATURES_CONFIG &
+        CodexPromptSettings &
+        typeof CODEX_BROWSER_PLUGINS_OFF &
         Partial<typeof CODEX_COMPUTER_USE_PLUGINS_OFF> &
         ReturnType<typeof codexSandboxConfig>;
     },
@@ -840,8 +858,10 @@ export class ThreadLifecycle {
       config: {
         ...(Object.keys(mcpServers).length > 0 ? { mcp_servers: mcpServers } : {}),
         tools: CODEX_TOOLS_CONFIG,
+        model_reasoning_effort: agent.reasoningEffort,
         ...CODEX_FEATURES_CONFIG,
         ...codexPromptSettings(own.read),
+        ...CODEX_BROWSER_PLUGINS_OFF,
         ...(agentComputerUseEnabled(agent) ? {} : CODEX_COMPUTER_USE_PLUGINS_OFF),
         project_doc_max_bytes: AGENT_INSTRUCTIONS_FILE_BYTES,
         mcp_optional_startup_grace_ms: CODEX_MCP_STARTUP_GRACE_MS,
@@ -1182,7 +1202,10 @@ export class ThreadLifecycle {
               client.provider === "antigravity"
               ? mcpServers
                   .filter((config) => mcpFallbackRunsServer(config, agent))
-                  .map((config) => providerMcpServerName(config.name))
+                  .map(
+                    (config) =>
+                      client.sessionMcpServerName?.(config, agent.workspacePath) ?? providerMcpServerName(config.name),
+                  )
               : [],
       catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,
       ...(client.provider === "antigravity" ? { toolCatalog: toolCatalogNames(client.provider) } : {}),

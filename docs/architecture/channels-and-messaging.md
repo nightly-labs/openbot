@@ -307,8 +307,10 @@ task sends nothing. When a person continues the task, its request message change
 finds the request in the newest `agent:<agentId>` message of the task sources and replies to it. The idempotency key holds the task id, revision and state, so a task that is resumed and
 finishes again sends a new result. At start, the tasks that are already finished are marked as
 handled, so an upgrade or a restart sends no old results. A send that fails is reported
-(`channel_request_return_failed`) and is not tried again. The reply goes to the main chat of the
-agent, also when it sent the request from a side task. No result is sent when the owner is the
+(`channel_request_return_failed`) and is not tried again. A request sent from a side thread keeps that
+thread's id (`senderTaskId` on the request message), and the reply goes to that side thread while it
+is open. The reply goes to the main chat of the agent when the request came from the main chat, when
+the side thread is archived or deleted, and for a request sent before this id was kept (#15476). No result is sent when the owner is the
 sender, or when one of the two agents was deleted. When the lead moves a request into an open
 task, the request message gets the `taskId` of that task, and the cancelled routing task (it has
 no owner) sends nothing; the open task sends the result. Each member task of a request with more
@@ -794,7 +796,10 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   the exception: the router passes them to `MessagingThreads.outboundTool` from any thread, their
   arguments name an enabled connection and a place, and `MessagingService` answers them through
   `MessagingThreads.setOutbound` with the adapter's `places` and `postAnswer`, after `redactPostText`
-  (the secret rules of `redactText`; an email address that the agent wrote stays).
+  (key formats: private keys, Bearer and Authorization values, link passwords, webhook links, known
+  key prefixes and JWTs; a registered secret only as a whole token, so a saved value inside a word,
+  an email address or a domain stays, because a match inside a word hides normal text; labeled
+  passwords that are not registered and email addresses stay).
   A `messaging_history` call that names a connection and a place goes the same way
   (`isMessagingOutboundCall`): `MessagingService` reads the adapter's `recent` only for a place that
   `places` lists. `outboundTool` refuses this read in a thread that has a messaging link, and in a
@@ -815,13 +820,15 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   nothing, and the adapter's `remove` deletes the status post. An adapter without `remove` edits it
   to the no-answer text.
 - **Quiet end.** On a personal WhatsApp number, a post in another person's chat shows as the
-  owner's own message (`WhatsAppConnect.postsAsOwner`). There a request that fails or stops keeps
-  its reaction and posts no "could not finish" or "Stopped." text, also when a restart ends the
-  request. The status post is deleted, and the failure shows in OpenBot. When the answer cannot be
-  sent there, the status post is deleted too. But when a later part fails, the WhatsApp adapter
-  reports `WhatsAppAnswerPartlySent`: the status post holds the first part, so OpenBot leaves it.
-  The owner's "Message yourself" chat, a number only for OpenBot, Slack, Telegram and Discord still
-  get the text.
+  owner's own message (`WhatsAppConnect.postsAsOwner`). There OpenBot posts no waiting or
+  "Working on it…" post: WhatsApp shows "This message was deleted" for each deleted post, and a
+  quiet answer would delete it. The reactions show the progress, and the answer comes as a new
+  message. A request that fails or stops keeps its reaction and posts no "could not finish" or
+  "Stopped." text, also when a restart ends the request. The failure shows in OpenBot. A status
+  post that an earlier version made is still deleted at the end. When a later part of an answer
+  that replaced such a post fails, the WhatsApp adapter reports `WhatsAppAnswerPartlySent`: the
+  post holds the first part, so OpenBot leaves it. The owner's "Message yourself" chat, a number
+  only for OpenBot, Slack, Telegram and Discord still get the status post and the text.
 - **Order.** The external conversations of an agent run one turn at a time in `MESSAGING_LANE`, beside
   its own chat. On a provider that runs one turn at a time (`concurrentTurns: false`) they keep the own
   chat's lane, so Slack requests wait behind the agent's own work, in queue order, and behind its

@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "ブラウザーのタブを閉じる",
   "browser.newTab": "新しいブラウザーのタブ",
   "browser.backToChat": "チャットに戻る",
+  "browser.fullView.open": "全体表示で開く",
   "browser.goBack": "戻る",
   "browser.goForward": "進む",
   "browser.reload": "ページを再読み込み",
@@ -97,6 +98,7 @@ export const messages = {
   "browser.secret.submitting": "送信しています…",
   "browser.secret.takeOver": "操作を引き継ぐ",
   "browser.secret.failed": "リクエストを完了できませんでした。接続を確認して、もう一度お試しください。",
+  "browser.secret.ended": "このサインインのリクエストは終了しました。エージェントにもう一度試すよう依頼してください。",
   "browser.secret.vaultSkip.agentScript":
     "エージェントがこのページでスクリプトを実行したため、OpenBot は保存したログイン情報を使いませんでした。使うには、ページを再読み込みしてもう一度試すようにエージェントに頼んでください。",
   "browser.secret.vaultSkip.fieldKind":

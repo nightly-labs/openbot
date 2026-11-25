@@ -1,5 +1,10 @@
 import { playableMediaKind } from "@openbot/contracts/attachment-files";
-import { CHAT_VISUAL_PAGE_LIMIT, chatVisualFrameHeight, isChatVisualMimeType } from "@openbot/contracts/chat-visual";
+import {
+  CHAT_VISUAL_DEFAULT_HEIGHT,
+  CHAT_VISUAL_PAGE_LIMIT,
+  chatVisualFrameHeight,
+  isChatVisualMimeType,
+} from "@openbot/contracts/chat-visual";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { requireOptionalNativeModule } from "expo";
 import { File } from "expo-file-system";
@@ -95,7 +100,8 @@ function ChatVisualAttachment(props: ChatAttachmentProps) {
   };
   const pageHeight = full
     ? chatVisualFrameHeight(reported ?? props.visual?.height)
-    : chatVisualFrameHeight(undefined, props.visual?.height);
+    : chatVisualFrameHeight(reported, props.visual?.height ?? CHAT_VISUAL_DEFAULT_HEIGHT);
+  const cut = reported !== undefined && Math.ceil(reported) > pageHeight;
   const file = useMediaFile(serverId, attachment, true);
   const [page, setPage] = useState<{ uri: string; source: string } | null>(null);
   const [failed, setFailed] = useState(false);
@@ -130,6 +136,7 @@ function ChatVisualAttachment(props: ChatAttachmentProps) {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t("mobile.chat.attachment.preview", { name: attachment.name })}
+        accessibilityHint={cut ? t("mobile.chat.attachment.seeAll") : undefined}
         style={{
           width: width - 80,
           maxWidth: "100%",
@@ -147,9 +154,18 @@ function ChatVisualAttachment(props: ChatAttachmentProps) {
       >
         <View pointerEvents="none" style={FILL}>
           {settled && historyShown ? (
-            <HtmlPage source={page.source} title={attachment.name} mode="chat" onHeight={full ? report : undefined} />
+            <HtmlPage source={page.source} title={attachment.name} mode="chat" onHeight={report} />
           ) : null}
         </View>
+        {cut ? (
+          <View pointerEvents="none" className="absolute inset-x-0 bottom-2.5 items-center">
+            <View className="rounded-full bg-background/70 px-2.5 py-1">
+              <Typography.Paragraph type="body-xs" className="font-semibold text-foreground">
+                {t("mobile.chat.attachment.seeAll")}
+              </Typography.Paragraph>
+            </View>
+          </View>
+        ) : null}
       </Pressable>
     );
   return (

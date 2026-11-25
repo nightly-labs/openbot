@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "Fechar aba do navegador",
   "browser.newTab": "Nova aba do navegador",
   "browser.backToChat": "Voltar ao chat",
+  "browser.fullView.open": "Abrir em vista completa",
   "browser.goBack": "Voltar",
   "browser.goForward": "Avançar",
   "browser.reload": "Recarregar página",
@@ -98,6 +99,7 @@ export const messages = {
   "browser.secret.submitting": "Enviando…",
   "browser.secret.takeOver": "Assumir",
   "browser.secret.failed": "Não foi possível concluir a solicitação. Verifique a conexão e tente novamente.",
+  "browser.secret.ended": "Esta solicitação de login terminou. Peça ao agente que tente de novo.",
   "browser.secret.vaultSkip.agentScript":
     "O OpenBot não usou seu login salvo porque o agente executou um script nesta página. Para usá-lo, peça ao agente que recarregue a página e tente de novo.",
   "browser.secret.vaultSkip.fieldKind":

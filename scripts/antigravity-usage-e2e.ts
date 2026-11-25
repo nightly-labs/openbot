@@ -182,6 +182,7 @@ interface Report {
   googleSignIn?: UsageCase & { acpMethodsDuringLaterReads: string[] };
   perModel?: UsageCase[];
   noGeminiGroup?: UsageCase[];
+  untouchedReset?: UsageCase;
   groups?: AccountUsage;
   apiKeySignIn?: UsageCase;
   expiringToken?: UsageCase;
@@ -432,6 +433,31 @@ try {
     noGeminiUsage.limits[0]?.groups?.map((group) => group.name),
     ["Claude and GPT models"],
     "the popover names the one group",
+  );
+
+  const rollingReset = new Date(Date.now() + 5 * 60 * 60_000).toISOString();
+  const weekReset = new Date(Date.now() + 7 * 24 * 60 * 60_000).toISOString();
+  service.quota = {
+    groups: [
+      {
+        displayName: "Gemini Models",
+        description: "Models within this group: Gemini Flash, Gemini Pro",
+        buckets: [
+          { displayName: "5h Limit Remaining", window: "5h", resetTime: rollingReset, remainingFraction: 1 },
+          { displayName: "Weekly Limit Remaining", window: "weekly", resetTime: weekReset, remainingFraction: 0.5 },
+        ],
+      },
+    ],
+  };
+  report.untouchedReset = await readUsage(cli, "untouched rolling reset", 1, "gemini-3.8-flash-high");
+  assert.deepEqual(
+    report.untouchedReset.readings[0]?.rateLimits,
+    {
+      limitId: "antigravity",
+      primary: { usedPercent: 0, windowDurationMins: 300, resetsAt: null },
+      secondary: { usedPercent: 50, windowDurationMins: 10_080, resetsAt: Date.parse(weekReset) / 1_000 },
+    },
+    "an unused quota shows no rolling reset, and a used quota keeps its reset",
   );
 
   service.quota = GOOGLE_QUOTA;

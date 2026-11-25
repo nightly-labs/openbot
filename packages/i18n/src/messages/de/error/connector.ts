@@ -9,6 +9,8 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub kennt die Client ID dieser GitHub App nicht.",
   "error.connector.githubUnexpected": "GitHub hat eine unerwartete Antwort gesendet: {detail}",
   "error.connector.githubUnreachable": "OpenBot kann GitHub nicht erreichen: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot kann GitHub nicht erreichen. Prüfe die Internetverbindung und die DNS-Einstellungen des Computers oder Servers, auf dem OpenBot läuft, und versuche es dann erneut.",
   "error.connector.githubExpired": "Die GitHub-Verbindung ist abgelaufen. Verbinde GitHub erneut.",
   "error.connector.githubFileUnreadable": "Die GitHub-Verbindungsdatei ist nicht lesbar.",
   "error.connector.githubFileTooLarge": "Die GitHub-Verbindungsdatei ist zu groß.",
@@ -31,6 +33,8 @@ export const messages = {
     "1Password hat zu viele Anfragen erhalten. Warte ein paar Minuten und versuche es erneut.",
   "error.connector.onePasswordNoVault":
     "Das Dienstkonto kann keinen Tresor lesen. Gib ihm Zugriff auf einen Tresor und versuche es erneut.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot kann deine Logins in 1Password nicht lesen. Trenne 1Password und verbinde es dann erneut.",
   "error.connector.onePasswordFileUnreadable": "Die 1Password-Verbindungsdatei ist nicht lesbar.",
   "error.connector.onePasswordFileTooLarge": "Die 1Password-Verbindungsdatei ist zu groß.",
   "error.connector.bitwardenFailed":
@@ -43,6 +47,10 @@ export const messages = {
     "Gib eine HTTPS-Serveradresse, client_id und client_secret des API-Schlüssels und das Master-Passwort ein.",
   "error.connector.bitwardenHostFailed":
     "Bitwarden konnte auf diesem Server nicht geöffnet werden. Prüfe die Serveradresse, den API-Schlüssel und das Master-Passwort und stelle sicher, dass ein Ordner Shared with OpenBot heißt. Verbinde dann erneut.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Die Anmeldung bei Bitwarden auf diesem Server ist fehlgeschlagen. Prüfe die Serveradresse und den API-Schlüssel und verbinde dann erneut.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Bitwarden konnte auf diesem Server nicht entsperrt werden. Prüfe das Master-Passwort und verbinde dann erneut.",
   "error.connector.bitwardenCliInstallFailed":
     "Die Bitwarden CLI konnte auf diesem Server nicht installiert werden. Prüfe seine Netzwerkverbindung und verbinde dann erneut.",
   "error.connector.bitwardenFileUnreadable": "Die Bitwarden-Verbindungsdatei ist nicht lesbar.",

@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "Zdarzenia nie są dostępne na tym hoście.",
   "error.backend.databaseIntegrity": "Baza danych OpenBot nie przeszła kontroli integralności.",
+  "error.backend.creditsHoldAdminOnly":
+    "Tylko właściciel lub administrator tego serwera może zezwolić agentom na używanie kredytów.",
+  "error.backend.creditsHoldShort": "Nie ma jeszcze wystarczającej liczby kredytów.",
   "error.backend.webhookRouteLimit": "Host może mieć maksymalnie {limit} rutyn typu webhook.",
   "error.backend.webhookSettingsInvalid": "Sprawdź ustawienia webhooka i spróbuj ponownie.",
   "error.backend.webhookSenderSecretInvalid":
@@ -55,6 +58,8 @@ export const messages = {
     "Ten zdalny host nie obsługuje przejmowania kontroli nad kartą przeglądarki.",
   "error.backend.browserSignInUnsupported": "Ten zdalny host nie może przyjąć logowania z tego komputera.",
   "error.backend.browserSignInOpenFailed": "OpenBot nie mógł otworzyć okna logowania.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot nie mógł wczytać strony w oknie logowania. Sprawdź połączenie z internetem, a potem otwórz okno logowania ponownie.",
   "error.backend.browserSignInReadFailed": "OpenBot nie mógł odczytać logowania z okna.",
   "error.backend.browserStopUnsupported": "Ten zdalny host nie może zatrzymać wczytywania strony.",
   "error.backend.sharedDataLocalOnly": "Dane współdzielone są zarządzane na komputerze, na którym działają ci agenci.",
@@ -66,6 +71,12 @@ export const messages = {
     "Kompaktowanie nie zmniejsza tego czatu: po dwóch kompaktowaniach nadal zajmuje {percent}% okna kontekstu modelu, więc OpenBot przestaje go kompaktować. Narzędzia i instrukcje zajmują większość okna. Wyłącz serwery MCP lub sterowanie komputerem, których ten agent nie potrzebuje, albo wybierz model z większym oknem. Potem zacznij nowy czat.",
   "error.backend.contextCompactionStopped":
     "Dwa kompaktowania tego czatu z rzędu się nie udały, więc OpenBot przestaje go kompaktować automatycznie. Każda próba wysyła cały czat do modelu i zużywa limit planu. Wybierz „Kompaktuj”, aby spróbować ponownie, albo zacznij nowy czat.",
+  "error.backend.contextCompactionRetrying":
+    "Dostawca nie mógł skompaktować tego czatu i próbuje ponownie. Nowe wiadomości w tym czacie czekają, aż kompaktowanie się skończy. Jeśli nie skończy się wkrótce, OpenBot je zatrzyma i wyśle Twoje wiadomości.",
+  "error.backend.contextCompactionFailed":
+    "Kompaktowanie tego czatu nie powiodło się. Czat się nie zmienił. Oczekujące wiadomości trafiają teraz do agenta.",
+  "error.backend.contextCompactionTimedOut":
+    "Kompaktowanie tego czatu trwało zbyt długo, więc OpenBot je zatrzymał. Czat się nie zmienił. Oczekujące wiadomości trafiają teraz do agenta.",
   "error.backend.providerModelAtCapacity":
     "Model jest przeciążony. Dostawca spróbuje ponownie za kilka minut. Aby kontynuować od razu, zatrzymaj turę i wybierz inny model.",
   "error.backend.providerRetrying":
@@ -110,6 +121,15 @@ export const messages = {
   "error.backend.channelLeadTimedOut": "Lider kanału nie odpowiedział na czas. Wybierz członka lub spróbuj ponownie.",
   "error.backend.channelLeadFailed":
     "Lider kanału nie mógł skierować tej wiadomości. Wybierz członka lub spróbuj ponownie.",
+  "error.backend.channelLeadBusy":
+    "Model lidera kanału jest teraz zajęty. Spróbuj ponownie za kilka minut lub wybierz członka.",
+  "error.backend.channelLeadOffline": "Model lidera kanału stracił połączenie. Spróbuj ponownie lub wybierz członka.",
+  "error.backend.channelLeadSignIn":
+    "Logowanie u dostawcy lidera kanału wygasło. Zaloguj się ponownie lub wybierz członka.",
+  "error.backend.channelLeadModelGone":
+    "Model lidera kanału jest niedostępny. Wybierz inny model dla lidera lub wybierz członka.",
+  "error.backend.channelLeadRefused":
+    "Model lidera kanału odrzucił tę prośbę. Wybierz członka lub inny model dla lidera.",
   "error.backend.channelRequestMemberRequired": "Wybierz członka do tego żądania.",
   "error.backend.channelDeliveryNotCreated": "Nie utworzono dostarczenia kanału.",
   "error.backend.channelAssignmentStopped": "Ten przydział kanału został zatrzymany lub zastąpiony.",
@@ -131,6 +151,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "Uruchomienie zatrzymało się z błędem, ale bez podanego powodu. Otwórz uruchomienie, aby zobaczyć, co zrobił agent.",
   "error.backend.turnNotStarted": "Dostawca nie rozpoczął tej tury.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} nie potwierdził na czas, że rozpoczął tę wiadomość. OpenBot nie wysyła jej ponownie, aby praca nie wykonała się dwa razy. OpenBot czeka do 5 minut, aż agent zacznie.",
+  "error.backend.turnStartAbandoned": "Agent nie rozpoczął tej wiadomości w ciągu 5 minut. Wyślij wiadomość ponownie.",
   "error.backend.routineResultConnectionOff":
     "To połączenie z komunikatorem jest wyłączone lub usunięte. Wybierz inne miejsce.",
   "error.backend.routineResultNoDelivery": "To uruchomienie nie ma odpowiedzi do ponownego wysłania.",
@@ -248,8 +271,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot przechowuje maksymalnie {limit} serwerów MCP.",
   "error.backend.mcpServerNameTaken": "Serwer MCP o nazwie {name} już istnieje.",
   "error.backend.mcpServerInvalid": "OpenBot nie może zapisać tej konfiguracji serwera MCP.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Nazwy nagłówków nie mogą zawierać spacji ani symboli, takich jak : ( ) /. Użyj nazwy takiej jak Authorization, a klucz lub token wpisz w polu Wartość.",
   "error.backend.mcpServerNoAnswer": "Serwer nie odpowiedział w ciągu {seconds} s.",
   "error.backend.mcpSignInNotAccepted": "Serwer nie zaakceptował tego logowania.",
+  "error.backend.mcpSignInGrantRefused":
+    "Serwer nie zaakceptował logowania. Zaloguj się ponownie. Jeśli problem nie ustąpi, sprawdź, czy Twoje konto jest w tej samej witrynie lub regionie co ta aplikacja.",
   "error.backend.mcpSignInAccountRefused":
     "Serwer odrzucił konto, na które się zalogowano. Sprawdź, czy to konto może korzystać z usługi. Aby użyć innego konta, wyloguj się, a potem zaloguj ponownie.",
   "error.backend.mcpSignInClientRefused":
@@ -286,7 +313,11 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Serwer zatrzymał się przed odpowiedzią. Uruchom polecenie w terminalu, aby zobaczyć błąd.",
   "error.backend.mcpServerExitedWithOutput": "Serwer zatrzymał się przed odpowiedzią. Napisał: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "Serwer się nie uruchomił, bo jego pobieranie się nie powiodło. Sprawdź połączenie z internetem, a potem spróbuj ponownie.",
   "error.backend.mcpServerFailedToStart": "Serwer się nie uruchomił: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot nie może uruchomić serwera MCP {name}, ponieważ jego program nie jest zainstalowany na komputerze, na którym działa OpenBot. Zainstaluj na tym komputerze aplikację, która dostarcza {name}, albo wyłącz {name} w Marketplace, Aplikacje.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} przestał czekać, zanim serwer się uruchomił, więc jego agenci nie dostają narzędzi tego serwera.",
   "error.backend.mcpServerStoppedDuringCall": "Serwer MCP zatrzymał się, zanim odpowiedział na to wywołanie.",
@@ -294,6 +325,8 @@ export const messages = {
     "Jego narzędzie {tool} ma format danych wejściowych, którego ten dostawca nie umie odczytać. Agenci u innych dostawców nadal dostają serwer.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} nie może użyć serwera MCP {name}, ponieważ serwer wymaga zalogowania. Otwórz {name} w Marketplace, Aplikacje i wybierz Zaloguj się.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} nie może użyć serwera MCP {name}, ponieważ serwer wymaga klucza. Otwórz {name} w Marketplace, Aplikacje, wybierz Edytuj i wpisz poprawny klucz w sekcji Nagłówki.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} nie może uruchomić serwera MCP {name}. Otwórz {name} w Marketplace, Aplikacje i wybierz Testuj połączenie, aby zobaczyć przyczynę.",
   "error.backend.mcpServerFailedInProvider":
@@ -412,6 +445,8 @@ export const messages = {
     "Certyfikat bezpieczeństwa tej witryny nie jest zaufany, więc strona się nie otworzyła.",
   "error.backend.browserLowMemory":
     "Na tym serwerze brakuje pamięci, więc przeglądarka nie może otworzyć kolejnej karty. Zamknij kartę lub poczekaj, aż inni agenci skończą.",
+  "error.backend.browserNoMemory":
+    "Na tym serwerze prawie skończyła się pamięć, więc przeglądarka nie może teraz otworzyć karty. Poczekaj, aż inni agenci skończą, i spróbuj ponownie.",
   "error.backend.browserOpenFailed": "Nie można otworzyć {url}: {reason}",
   "error.backend.popupSecureInput":
     "Wyskakujące okna są blokowane podczas bezpiecznego wprowadzania. Zakończ lub anuluj bezpieczne wprowadzanie, a potem ponów próbę na stronie.",
