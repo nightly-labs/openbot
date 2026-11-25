@@ -2346,9 +2346,7 @@ export class ProviderRuntime implements ProviderPort {
     );
     this.#countActivation(provider);
     this.#forgetUsage(provider);
-    return yield* this.#reprobeProvider(provider).pipe(
-      Effect.tapError(() => this.#releaseClientWithOldCredential(provider)),
-    );
+    return yield* this.#reprobeProvider(provider, { releaseOldClientOnFailure: true });
   }, Effect.uninterruptible);
 
   readonly #releaseClientWithOldCredential = Effect.fn("ProviderRuntime.releaseClientWithOldCredential")(function* (
@@ -3544,6 +3542,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #reprobeProvider = Effect.fn("ProviderRuntime.reprobeProvider")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
+    options: { releaseOldClientOnFailure?: boolean } = {},
   ) {
     if (this.#hooks.isProviderBusy(provider)) {
       return yield* new ProviderOperationFailed({
@@ -3588,8 +3587,19 @@ export class ProviderRuntime implements ProviderPort {
               return this.status();
             });
           }),
+          Effect.tapError(() =>
+            options.releaseOldClientOnFailure ? this.#releaseClientWithOldCredential(provider) : Effect.void,
+          ),
           Effect.tapError((failure) =>
-            Effect.sync(() => this.#setProviderConnectionFailure(provider, failure.cause, cli?.version)),
+            Effect.sync(() =>
+              this.#setProviderConnectionFailure(
+                provider,
+                failure.cause,
+                cli?.version,
+                undefined,
+                options.releaseOldClientOnFailure,
+              ),
+            ),
           ),
         ),
       () =>
