@@ -6,6 +6,8 @@ import CalendarClock from "lucide-react-native/icons/calendar-clock";
 import ChartArea from "lucide-react-native/icons/chart-area";
 import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import Folder from "lucide-react-native/icons/folder";
 import GalleryVerticalEnd from "lucide-react-native/icons/gallery-vertical-end";
 import ListChecks from "lucide-react-native/icons/list-checks";
 import Monitor from "lucide-react-native/icons/monitor";
@@ -13,7 +15,6 @@ import Pin from "lucide-react-native/icons/pin";
 import PinOff from "lucide-react-native/icons/pin-off";
 import Plus from "lucide-react-native/icons/plus";
 import Settings from "lucide-react-native/icons/settings";
-import Settings2 from "lucide-react-native/icons/settings-2";
 import Sparkles from "lucide-react-native/icons/sparkles";
 import Store from "lucide-react-native/icons/store";
 import UsersRound from "lucide-react-native/icons/users-round";
@@ -39,7 +40,6 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { scheduleOnRN } from "react-native-worklets";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { MobileSession } from "@/features/auth/api/mobile-auth";
@@ -69,9 +69,11 @@ import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-fea
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
+import { DrawerCredits } from "./drawer-credits";
 import { DrawerHeaderBlur } from "./drawer-header-blur";
-import { ServerAvatar } from "./server-avatar";
+import { SERVER_AVATAR_CORNER_RATIO, ServerAvatar } from "./server-avatar";
 import { ServerDrawerIconButton } from "./server-drawer-icon-button";
 import { SERVER_ROW_HEIGHT, SortableServerList } from "./sortable-server-list";
 import { useDrawerMemberCount, useDrawerServerValues } from "./use-drawer-server-values";
@@ -84,9 +86,9 @@ const HEADER_FADE_START = 16;
 const HEADER_EDGE = 16;
 const LIST_TOP_GAP = 8;
 const DRAWER_ROW_HEIGHT = 46;
-const CLOSED_LIST = { height: 0, overflow: "hidden" } as const;
 const UNPINNED_OPACITY = 0.5;
 const UNAVAILABLE_OPACITY = 0.45;
+const PROFILE_ROW_OVERHANG = 12;
 
 interface ServerDrawerContentProps {
   activeServerId: string;
@@ -100,6 +102,7 @@ interface ServerDrawerContentProps {
   onLeave: (serverId: string) => Promise<void>;
   onRemove: (serverId: string) => Promise<void>;
   onDelete: (serverId: string) => Promise<void>;
+  onSetHidden: (serverId: string, hidden: boolean) => Promise<void>;
   localServerKind: (serverId: string) => "computer" | "onComputer" | null;
   onReorder: (serverIds: string[]) => boolean;
   onSelectServer: (serverId: string) => void;
@@ -138,6 +141,17 @@ function isServerExit(value: string): value is ServerExit {
   return value === "leave" || value === "remove" || value === "delete";
 }
 
+const VISIBILITY_TEXT = {
+  hide: { action: "mobile.server.drawer.hide", failed: "mobile.server.drawer.hideFailed" },
+  show: { action: "mobile.server.drawer.show", failed: "mobile.server.drawer.showFailed" },
+} as const;
+
+type ServerVisibility = keyof typeof VISIBILITY_TEXT;
+
+function isServerVisibility(value: string): value is ServerVisibility {
+  return value === "hide" || value === "show";
+}
+
 function serverKindLabel(server: MobileServer, t: MobileTranslate): string {
   return server.kind === "local" ? t("mobile.server.drawer.local") : t("mobile.server.drawer.remote");
 }
@@ -154,6 +168,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
   onLeave,
   onRemove,
   onDelete,
+  onSetHidden,
   localServerKind,
   onReorder,
   onSelectServer,
@@ -165,16 +180,26 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
   const displayName = mobileUserName(session.user);
   const avatarUrl = session.user.avatarUrl ? new URL(session.user.avatarUrl, session.apiUrl).toString() : null;
   const mutedColor = String(muted);
+  const controlColor = useCSSVariable("--openbot-bg-control");
   const [editing, setEditing] = useState(false);
   const [editingTools, setEditingTools] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [listOpen, setListOpen] = useState(false);
+  const [hiddenOpen, setHiddenOpen] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [rowWidth, setRowWidth] = useState<number>();
-  const activeServer = servers.find((server) => server.id === activeServerId);
-  const serverIds = servers.map((server) => server.id);
+  const visibleServers = servers.filter((server) => !server.hidden);
+  const hiddenServers = servers.filter((server) => server.hidden);
+  const activeServer = visibleServers.find((server) => server.id === activeServerId);
+  const serverIds = visibleServers.map((server) => server.id);
   const canReorder = serverIds.length > 1;
   const showsList = listOpen || editing || !activeServer;
+  const showsHidden = hiddenOpen || serverIds.length === 0;
+  const reorderVisible = (ids: string[]) => {
+    const visible = new Set(serverIds);
+    let index = 0;
+    return onReorder(servers.map((server) => (visible.has(server.id) ? (ids[index++] ?? server.id) : server.id)));
+  };
   const memberCount = useDrawerMemberCount(activeServer?.id ?? "");
   const hostedServerIds = useHostedServerAvailability((state) =>
     state.userId === session.user.id ? state.serverIds : null,
@@ -182,15 +207,25 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
   const exiting = useRef(false);
   function serverExit(server: MobileServer): ServerExit | null {
     if (server.role !== "owner") return "leave";
-    const kind = localServerKind(server.id);
-    if (kind === "computer") return null;
-    if (kind === "onComputer") return "delete";
+    if (localServerKind(server.id) === "onComputer") return "delete";
     return hostedServerIds && !hostedServerIds.has(server.id) ? "remove" : null;
   }
+  function serverVisibility(server: MobileServer): ServerVisibility | null {
+    if (server.hidden) return "show";
+    return serverIds.length > 1 ? "hide" : null;
+  }
   function menuActions(server: MobileServer): MenuAction[] {
-    const actions: MenuAction[] = canReorder
-      ? [{ id: "reorder", title: t("mobile.server.drawer.editOrder"), image: "arrow.up.arrow.down" }]
-      : [];
+    const actions: MenuAction[] =
+      canReorder && !server.hidden
+        ? [{ id: "reorder", title: t("mobile.server.drawer.editOrder"), image: "arrow.up.arrow.down" }]
+        : [];
+    const visibility = serverVisibility(server);
+    if (visibility)
+      actions.push({
+        id: visibility,
+        title: t(VISIBILITY_TEXT[visibility].action),
+        image: visibility === "hide" ? "eye.slash" : "eye",
+      });
     const exit = serverExit(server);
     if (exit)
       actions.push({
@@ -241,6 +276,26 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
     }
   }
 
+  async function changeVisibility(server: MobileServer, visibility: ServerVisibility) {
+    if (exiting.current) return;
+    exiting.current = true;
+    try {
+      await onSetHidden(server.id, visibility === "hide");
+      void haptics.notification("success");
+    } catch (error) {
+      void haptics.notification("error");
+      const text = currentText();
+      showFailureAlert(
+        error,
+        "team",
+        text.t(VISIBILITY_TEXT[visibility].failed, { name: server.name }),
+        text.errorMessage(error, text.t("mobile.server.drawer.actionFailed")),
+      );
+    } finally {
+      exiting.current = false;
+    }
+  }
+
   const stopEditing = () => {
     void haptics.selection();
     setEditing(false);
@@ -261,6 +316,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
     setEditingTools(false);
     setDragging(false);
     setListOpen(false);
+    setHiddenOpen(false);
   }, [open]);
 
   const accountHasPlans = useHostedServerAvailability((state) => state.userId === session.user.id && state.available);
@@ -277,7 +333,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
 
   function move(serverId: string, targetIndex: number) {
     const next = moveServerId(serverIds, serverId, targetIndex);
-    if (next.join("\n") !== serverIds.join("\n")) onReorder(next);
+    if (next.join("\n") !== serverIds.join("\n")) reorderVisible(next);
   }
 
   function renderRow(serverItem: MobileServer, width?: number) {
@@ -285,8 +341,14 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
     const listIndex = serverIds.indexOf(serverItem.id);
     const serverLabel = serverKindLabel(serverItem, t);
     const exit = serverExit(serverItem);
+    const visibility = serverVisibility(serverItem);
     const accessibilityActions = [
-      ...(editing ? [] : [...(exit ? [{ name: exit, label: t(EXIT_TEXT[exit].action) }] : [])]),
+      ...(editing
+        ? []
+        : [
+            ...(visibility ? [{ name: visibility, label: t(VISIBILITY_TEXT[visibility].action) }] : []),
+            ...(exit ? [{ name: exit, label: t(EXIT_TEXT[exit].action) }] : []),
+          ]),
       ...(listIndex > 0 ? [{ name: "moveUp", label: t("mobile.server.drawer.moveUp") }] : []),
       ...(listIndex >= 0 && listIndex < serverIds.length - 1
         ? [{ name: "moveDown", label: t("mobile.server.drawer.moveDown") }]
@@ -302,11 +364,12 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
         onAccessibilityAction={(event) => {
           const action = event.nativeEvent.actionName;
           if (isServerExit(action)) confirmExit(serverItem, action);
+          if (isServerVisibility(action)) void changeVisibility(serverItem, action);
           if (action === "moveUp") move(serverItem.id, listIndex - 1);
           if (action === "moveDown") move(serverItem.id, listIndex + 1);
         }}
-        className={`flex-row items-center gap-3 rounded-2xl px-2.5 ${selected ? "bg-control" : ""}`}
-        onPress={editing ? undefined : () => onSelectServer(serverItem.id)}
+        className={`flex-row items-center gap-3 rounded-2xl px-3 ${selected ? "bg-control" : ""}`}
+        onPress={editing || serverItem.hidden ? undefined : () => onSelectServer(serverItem.id)}
         delayLongPress={longPressDelay}
         onLongPress={
           editing
@@ -375,6 +438,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
             setEditing(true);
           }
           if (isServerExit(event.nativeEvent.event)) confirmExit(serverItem, event.nativeEvent.event);
+          if (isServerVisibility(event.nativeEvent.event)) void changeVisibility(serverItem, event.nativeEvent.event);
         }}
       >
         {renderRow(serverItem, rowWidth)}
@@ -395,7 +459,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
     <>
       <View className="flex-1">
         <View
-          className="absolute top-0 right-0 left-0 z-20 pr-3 pb-1"
+          className="absolute top-0 right-0 left-0 z-20 pr-6 pb-1"
           style={{ paddingTop: Math.max(topInset, 16) }}
           onLayout={(event) => {
             const measured = event.nativeEvent.layout.height;
@@ -458,20 +522,16 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
               >
                 <Check color={mutedColor} size={18} strokeWidth={2} />
               </ServerDrawerIconButton>
-            ) : (
+            ) : activeServer ? (
               <ServerDrawerIconButton
-                accessibilityLabel={showsPlans ? t("mobile.server.drawer.add") : t("mobile.server.drawer.join")}
+                accessibilityLabel={t("mobile.server.drawer.serverSettings")}
                 color={mutedColor}
-                systemName="plus"
-                onPress={() =>
-                  onNavigate(
-                    showsPlans ? { pathname: "/hosted-server", params: { entryPoint: "drawer" } } : "/add-server",
-                  )
-                }
+                systemName="gearshape"
+                onPress={() => onNavigate({ pathname: "/server-settings", params: { serverId: activeServer.id } })}
               >
-                <Plus color={mutedColor} size={18} strokeWidth={2} />
+                <Settings color={mutedColor} size={18} strokeWidth={1.8} />
               </ServerDrawerIconButton>
-            )}
+            ) : null}
           </View>
         </View>
 
@@ -498,15 +558,89 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
                   return serverItem ? renderRow(serverItem) : null;
                 }}
                 onDragActive={setDragging}
-                onReorder={onReorder}
+                onReorder={reorderVisible}
               />
             ) : (
-              servers.map(withMenu)
+              visibleServers.map(withMenu)
             )}
             {editing ? (
               <Typography.Paragraph className="px-3 pt-3 text-text-secondary" style={typeScale.caption}>
                 {t("mobile.server.drawer.orderHint")}
               </Typography.Paragraph>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                className="flex-row items-center gap-3 rounded-2xl px-3"
+                style={({ pressed }) => ({ height: SERVER_ROW_HEIGHT - 4, opacity: pressed ? 0.58 : 1 })}
+                onPress={() =>
+                  onNavigate(
+                    showsPlans ? { pathname: "/hosted-server", params: { entryPoint: "drawer" } } : "/add-server",
+                  )
+                }
+              >
+                <View
+                  className="items-center justify-center bg-control"
+                  style={{
+                    width: SERVER_AVATAR_SIZE,
+                    height: SERVER_AVATAR_SIZE,
+                    borderRadius: SERVER_AVATAR_SIZE * SERVER_AVATAR_CORNER_RATIO,
+                  }}
+                >
+                  <Plus color={mutedColor} size={20} strokeWidth={2} />
+                </View>
+                <Typography.Paragraph className="font-medium" numberOfLines={1} style={typeScale.rowTitle}>
+                  {showsPlans ? t("mobile.server.drawer.add") : t("mobile.server.drawer.join")}
+                </Typography.Paragraph>
+              </Pressable>
+            )}
+            {!editing && hiddenServers.length > 0 ? (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showsHidden }}
+                  className="flex-row items-center gap-3 rounded-2xl px-3"
+                  disabled={serverIds.length === 0}
+                  style={({ pressed }) => ({ height: SERVER_ROW_HEIGHT - 4, opacity: pressed ? 0.58 : 1 })}
+                  onPress={() => {
+                    void haptics.selection();
+                    setHiddenOpen((current) => !current);
+                  }}
+                >
+                  <View
+                    className="items-center justify-center bg-control"
+                    style={{
+                      width: SERVER_AVATAR_SIZE,
+                      height: SERVER_AVATAR_SIZE,
+                      borderRadius: SERVER_AVATAR_SIZE * SERVER_AVATAR_CORNER_RATIO,
+                    }}
+                  >
+                    <Folder color={mutedColor} size={20} strokeWidth={2} />
+                  </View>
+                  <Typography.Paragraph
+                    className="min-w-0 shrink font-medium"
+                    numberOfLines={1}
+                    style={typeScale.rowTitle}
+                  >
+                    {t("mobile.server.drawer.hiddenServers")}
+                  </Typography.Paragraph>
+                  <Typography.Paragraph className="text-muted" style={typeScale.rowTitle}>
+                    {hiddenServers.length}
+                  </Typography.Paragraph>
+                  <Animated.View
+                    style={{
+                      transform: [{ rotate: showsHidden ? "180deg" : "0deg" }],
+                      transitionProperty: "transform",
+                      transitionDuration: reducedMotion ? 0 : 240,
+                      transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1),
+                    }}
+                  >
+                    <ChevronDown color={mutedColor} size={18} strokeWidth={2.4} />
+                  </Animated.View>
+                </Pressable>
+                <ServerListCollapse open={showsHidden} reducedMotion={reducedMotion}>
+                  {hiddenServers.map(withMenu)}
+                </ServerListCollapse>
+              </>
             ) : null}
             {activeServer ? <DrawerDivider /> : null}
           </ServerListCollapse>
@@ -525,32 +659,38 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
         </ScrollView>
       </View>
 
-      <View className="mr-3 flex-row items-center gap-2 pt-2">
-        <View className="min-h-14 min-w-0 flex-1 flex-row items-center gap-2.5 rounded-2xl px-2 py-2">
+      <View className="mr-6 pt-2">
+        <DrawerCredits serverId={activeServer?.id ?? null} open={open} onNavigate={onNavigate} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${displayName}, ${session.user.email}`}
+          accessibilityHint={t("mobile.server.drawer.settings")}
+          className="min-h-14 flex-row items-center gap-2.5 rounded-2xl py-2 pl-3"
+          style={({ pressed }) => ({
+            marginRight: -PROFILE_ROW_OVERHANG,
+            paddingRight: PROFILE_ROW_OVERHANG,
+            backgroundColor: pressed ? String(controlColor) : undefined,
+          })}
+          onPress={() => {
+            void haptics.impact("soft");
+            onNavigate("/settings");
+          }}
+        >
           <ProfileAvatar neutral name={displayName} imageUrl={avatarUrl} size={36} />
           <View className="min-w-0 flex-1">
             <Typography.Paragraph className="font-semibold" numberOfLines={1} style={typeScale.preview}>
               {displayName}
             </Typography.Paragraph>
-            <Typography.Paragraph className="text-text-secondary" numberOfLines={1} selectable style={typeScale.small}>
+            <Typography.Paragraph className="text-text-secondary" numberOfLines={1} style={typeScale.small}>
               {session.user.email}
             </Typography.Paragraph>
           </View>
-        </View>
-        <ServerDrawerIconButton
-          accessibilityLabel={t("mobile.server.drawer.settings")}
-          color={mutedColor}
-          systemName="gearshape"
-          onPress={() => onNavigate("/settings")}
-        >
-          <Settings color={mutedColor} size={18} strokeWidth={1.8} />
-        </ServerDrawerIconButton>
+          <ChevronRight color={mutedColor} size={18} strokeWidth={2} style={MIRROR_IN_RTL} />
+        </Pressable>
       </View>
     </>
   );
 });
-
-type DrawerRoute = DrawerToolId | "settings";
 
 interface DrawerTool {
   icon: LucideIcon;
@@ -599,7 +739,7 @@ function DrawerServerTools({
     serverRowState(current, serverId, (checks) => checks.canUseWorkflows(serverId)),
   );
   const routes = useMemo(
-    (): Record<DrawerRoute, Href> => ({
+    (): Record<DrawerToolId, Href> => ({
       tasks: { pathname: "/server-tasks", params: { serverId } },
       routines: { pathname: "/server-routines", params: { serverId } },
       workflows: { pathname: "/server-workflows", params: { serverId } },
@@ -609,7 +749,6 @@ function DrawerServerTools({
       providers: { pathname: "/server-settings/providers", params: { serverId } },
       remoteDesktop: { pathname: "/remote-desktop/[serverId]", params: { serverId } },
       members: { pathname: "/server-settings/members", params: { serverId } },
-      settings: { pathname: "/server-settings", params: { serverId } },
     }),
     [serverId],
   );
@@ -654,9 +793,9 @@ function DrawerServerTools({
   const available = layout.order.filter((id) => tools[id] !== null);
   const shown = available.filter((id) => !layout.hidden.includes(id));
   const onToolAction = useCallback(
-    (action: string, toolId: DrawerToolId | null) => {
+    (action: string, toolId: DrawerToolId) => {
       if (action === "editSidebar") onEdit();
-      if (action === "unpin" && toolId) {
+      if (action === "unpin") {
         void haptics.selection();
         setDrawerToolPinned(toolId, false);
       }
@@ -726,17 +865,6 @@ function DrawerServerTools({
           );
         })
       )}
-      <DrawerDivider />
-      <DrawerToolRow
-        toolId={null}
-        icon={Settings2}
-        label={t("mobile.server.drawer.serverSettings")}
-        href={routes.settings}
-        width={rowWidth}
-        disabled={editing}
-        onAction={editing ? undefined : onToolAction}
-        onNavigate={onNavigate}
-      />
     </View>
   );
 }
@@ -747,22 +875,21 @@ const DrawerToolRow = memo(function DrawerToolRow({
   onAction,
   ...row
 }: DrawerRowProps & {
-  toolId: DrawerToolId | null;
+  toolId: DrawerToolId;
   width?: number;
-  onAction?: (action: string, toolId: DrawerToolId | null) => void;
+  onAction: (action: string, toolId: DrawerToolId) => void;
 }) {
   const { t } = useText();
   const { theme } = useUniwind();
   const menu = useRef<MenuComponentRef | null>(null);
-  if (!onAction) return <DrawerRow {...row} />;
   const items = [
     { name: "editSidebar", label: t("mobile.server.drawer.editSidebar") },
-    ...(toolId ? [{ name: "unpin", label: t("mobile.server.drawer.unpinTool") }] : []),
+    { name: "unpin", label: t("mobile.server.drawer.unpinTool") },
   ];
   const actions: MenuAction[] = [
     { id: "editSidebar", title: t("mobile.server.drawer.editSidebar"), image: "arrow.up.arrow.down" },
+    { id: "unpin", title: t("mobile.server.drawer.unpinTool"), image: "pin.slash" },
   ];
-  if (toolId) actions.push({ id: "unpin", title: t("mobile.server.drawer.unpinTool"), image: "pin.slash" });
   return (
     <View style={{ height: DRAWER_ROW_HEIGHT }}>
       <MenuView
@@ -865,51 +992,42 @@ function ServerListCollapse({
   reducedMotion,
   children,
 }: PropsWithChildren<{ open: boolean; reducedMotion: boolean }>) {
-  const [height, setHeight] = useState(0);
-  const [moving, setMoving] = useState(false);
+  const height = useSharedValue(0);
   const progress = useSharedValue(open ? 1 : 0);
   const shown = useRef(open);
   useEffect(() => {
-    if (shown.current === open) {
-      progress.set(open ? 1 : 0);
-      setMoving(false);
-      return;
-    }
+    if (shown.current === open) return;
     shown.current = open;
-    if (reducedMotion) {
-      progress.set(open ? 1 : 0);
-      return;
-    }
-    let active = true;
-    const stop = () => {
-      if (active) setMoving(false);
-    };
-    setMoving(true);
-    progress.set(
-      withTiming(open ? 1 : 0, SERVER_LIST_MOTION, (finished) => {
-        if (finished) scheduleOnRN(stop);
-      }),
-    );
-    return () => {
-      active = false;
-    };
+    const target = open ? 1 : 0;
+    progress.set(reducedMotion ? target : withTiming(target, SERVER_LIST_MOTION));
   }, [open, progress, reducedMotion]);
-  const frameStyle = useAnimatedStyle(() => ({ height: height * progress.get(), overflow: "hidden" }));
-  const contentStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.get(), [0, 0.8], [0, 1], Extrapolation.CLAMP),
-    transform: [{ translateY: reducedMotion ? 0 : (1 - progress.get()) * -6 }],
-  }));
+  const frameStyle = useAnimatedStyle(() => {
+    const value = progress.get();
+    const settledOpen = value >= 1;
+    return {
+      height: settledOpen ? "auto" : height.get() * value,
+      overflow: settledOpen ? "visible" : "hidden",
+    };
+  });
+  const contentStyle = useAnimatedStyle(() => {
+    const value = progress.get();
+    return {
+      position: value > 0 && value < 1 ? "absolute" : "relative",
+      top: 0,
+      left: 0,
+      right: 0,
+      opacity: interpolate(value, [0, 0.8], [0, 1], Extrapolation.CLAMP),
+      transform: [{ translateY: reducedMotion ? 0 : (1 - value) * -6 }],
+    };
+  });
   return (
     <Animated.View
-      style={moving ? frameStyle : open ? undefined : CLOSED_LIST}
+      style={frameStyle}
       pointerEvents={open ? "auto" : "none"}
       accessibilityElementsHidden={!open}
       importantForAccessibility={open ? "auto" : "no-hide-descendants"}
     >
-      <Animated.View
-        style={moving ? [{ position: "absolute", top: 0, left: 0, right: 0 }, contentStyle] : undefined}
-        onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
-      >
+      <Animated.View style={contentStyle} onLayout={(event) => height.set(event.nativeEvent.layout.height)}>
         {children}
       </Animated.View>
     </Animated.View>
@@ -917,7 +1035,7 @@ function ServerListCollapse({
 }
 
 function DrawerDivider() {
-  return <View accessibilityElementsHidden className="mx-2.5 mt-2.5 mb-1 h-px bg-grouped-border" />;
+  return <View accessibilityElementsHidden className="mx-3 mt-2.5 mb-1 h-px bg-grouped-border" />;
 }
 
 interface DrawerRowProps {
@@ -926,7 +1044,6 @@ interface DrawerRowProps {
   value?: string | null;
   accentValue?: boolean;
   href: Href;
-  disabled?: boolean;
   unavailable?: boolean;
   onNavigate: (href: Href) => void;
 }
@@ -937,7 +1054,6 @@ const DrawerRow = memo(function DrawerRow({
   value,
   accentValue = false,
   href,
-  disabled = false,
   unavailable = false,
   onNavigate,
   width,
@@ -957,9 +1073,9 @@ const DrawerRow = memo(function DrawerRow({
       accessibilityLabel={value ? `${label}, ${value}` : label}
       accessibilityActions={accessibilityActions}
       onAccessibilityAction={(event) => onAccessibilityAction?.(event.nativeEvent.actionName)}
-      accessibilityState={{ disabled: disabled || unavailable }}
+      accessibilityState={{ disabled: unavailable }}
       className="flex-row items-center gap-3 rounded-2xl px-3"
-      disabled={disabled || unavailable}
+      disabled={unavailable}
       style={({ pressed }) => ({
         height: DRAWER_ROW_HEIGHT,
         width,

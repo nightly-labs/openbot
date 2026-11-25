@@ -8,6 +8,8 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import { ChatChannelWorkRow } from "@/features/channels/components/chat-channel-work-row";
 import { useChannelList } from "@/features/channels/components/use-channels";
+import { appendComposerDraft } from "@/features/chat/model/composer-drafts";
+import { promptAskedByThisPerson } from "@/features/chat/model/location-request";
 import { useAgentViewOnly } from "@/features/servers/model/use-server-roles";
 import { useChatPullPreference, useChatSwipePreference } from "@/features/settings/model/chat-swipe";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
@@ -39,6 +41,7 @@ import { messageActionsOpen } from "../model/message-actions-sheet";
 import { useAgentMentionReferences } from "../model/use-agent-mention-references";
 import { useAgentMentionSkills } from "../model/use-agent-mention-skills";
 import { useProgressUpdates } from "../model/use-progress-updates";
+import { ChatProviderSignInRow, useProviderSignInNeeded } from "./chat-provider-sign-in-row";
 import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
 import { useAgentBackdrops } from "./use-agent-backdrops";
@@ -173,7 +176,39 @@ export function MobileChatView({
     steers,
     conversation?.messages,
   );
-  const messages = useMemo(() => withFailureReasons(projected, queue.deliveries), [projected, queue.deliveries]);
+  const withLiveQuestions = useMemo(() => {
+    if (!online || !threadId) return projected;
+    const key = (turnId: string | undefined, requestId: string | number) => `${turnId ?? ""}\n${String(requestId)}`;
+    const saved = new Set(
+      projected.flatMap((message) =>
+        message.kind === "question" ? [key(message.turnId, message.prompt.requestId)] : [],
+      ),
+    );
+    const live = threadWaits.flatMap(
+      ({ reason, questions, agentId, requestId, threadId: waitThreadId, turnId, task }) => {
+        return reason === "question" &&
+          questions &&
+          !task &&
+          agentId === agent.id &&
+          waitThreadId === threadId &&
+          !saved.has(key(turnId, requestId))
+          ? [
+              {
+                id: `question-prompt:${turnId}:${String(requestId)}`,
+                kind: "question" as const,
+                turnId,
+                prompt: { requestId, questions, resolution: null },
+              },
+            ]
+          : [];
+      },
+    );
+    return live.length > 0 ? [...projected, ...live] : projected;
+  }, [online, threadId, projected, threadWaits, agent.id]);
+  const messages = useMemo(
+    () => withFailureReasons(withLiveQuestions, queue.deliveries),
+    [withLiveQuestions, queue.deliveries],
+  );
   const [historyLoadFailed, setHistoryLoadFailed] = useState(false);
   const [catchingUp, setCatchingUp] = useState(false);
   const [focus, setFocus] = useState<{ messageId: string; loaded: boolean; unread: boolean } | null>(() =>
@@ -210,6 +245,18 @@ export function MobileChatView({
       }
     };
     const load = async () => {
+      if (pending?.unread && stored()) {
+        setFocus((current) => (current?.messageId === pending.messageId ? { ...current, loaded: true } : current));
+        await readLatest();
+        if (
+          request.current === id &&
+          !stored() &&
+          !(await loadConversationAround(agent.id, pending.messageId, agent.serverId)) &&
+          request.current === id
+        )
+          setFocus(null);
+        return;
+      }
       if (pending?.unread) {
         await readLatest();
         if (!stored() && !(await loadConversationAround(agent.id, pending.messageId, agent.serverId))) {
@@ -382,11 +429,14 @@ export function MobileChatView({
   });
   const mentionSkills = useAgentMentionSkills(agent.id, agent.serverId, showsOnline(server));
   const mentionReferences = useAgentMentionReferences(agent.serverId, agent.id);
+  const returnUnsentPreview = useCallback((text: string) => appendComposerDraft(target, text), [target]);
   const questionForm = useQuestionPrompt(
     agent.id,
     activePrompt?.kind === "question" ? activePrompt : undefined,
     showsOnline(server) && !viewOnly,
     respondToPrompt,
+    returnUnsentPreview,
+    promptAskedByThisPerson(messages, activePrompt?.id),
   );
   const swipeAction = useChatSwipePreference((state) => state.action);
   const browserAllowed = useBrowserFeature();
@@ -409,12 +459,23 @@ export function MobileChatView({
     [agent.id, agent.serverId],
   );
   const workActivity = workChannel ? liveActivity : undefined;
+  const signInProvider = useProviderSignInNeeded(agent.serverId, agent.provider) ? agent.provider : undefined;
   const activityAccessory = useMemo(
     () =>
       workChannel && workActivity ? (
-        <ChatChannelWorkRow channel={workChannel} activity={workActivity} serverId={agent.serverId} />
+        <>
+          {signInProvider ? <ChatProviderSignInRow serverId={agent.serverId} provider={signInProvider} /> : null}
+          <ChatChannelWorkRow
+            channel={workChannel}
+            activity={workActivity}
+            agentId={agent.id}
+            serverId={agent.serverId}
+          />
+        </>
+      ) : signInProvider ? (
+        <ChatProviderSignInRow serverId={agent.serverId} provider={signInProvider} />
       ) : null,
-    [workChannel, workActivity, agent.serverId],
+    [workChannel, workActivity, agent.id, agent.serverId, signInProvider],
   );
   return (
     <ChatView

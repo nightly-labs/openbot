@@ -181,7 +181,7 @@ export class ScreenCapturer implements ScreenCaptureHost {
     const source =
       sources.find(({ display_id }) => display_id === String(display.id)) ??
       (displays.length === 1 && sources.length === 1 ? sources[0] : undefined);
-    if (!source) return yield* failure(sourceText("error.agent.screenCaptureDisplayMissing"));
+    if (!source) return yield* this.#noScreenSource(display, sources);
     const image = yield* this.#nonEmpty(source.thumbnail);
     const name = display.label || source.name;
     if (request.target !== "region") return yield* this.#encode(Effect.succeed(image), name);
@@ -220,6 +220,22 @@ export class ScreenCapturer implements ScreenCaptureHost {
       try: () => this.#options.getSources({ types, thumbnailSize }),
       catch: captureFailed("sources"),
     });
+  }
+
+  #noScreenSource(display: CaptureDisplay, sources: CaptureSource[]): Effect.Effect<never, ScreenCaptureFailed> {
+    logger.warn("No screen source matched a connected display.", {
+      displayId: String(display.id),
+      sourceDisplayIds: sources.map(({ display_id }) => display_id),
+    });
+    return Effect.fail(
+      failure(
+        sourceText(
+          this.#options.platform === "darwin"
+            ? "error.agent.screenCapturePermissionMissing"
+            : "error.agent.screenCaptureFailed",
+        ),
+      ),
+    );
   }
 
   #nonEmpty(image: CaptureImage): Effect.Effect<CaptureImage, ScreenCaptureFailed> {

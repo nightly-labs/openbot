@@ -25,6 +25,7 @@ try {
   renderWithSafeArea(iconPath, 1024, join(workPath, "icon-1024.png"));
   await writeIcns(join(workPath, "icon-1024.png"));
   renderWithSafeArea(iconPath, DOCK_IMAGE_SIZE, dockImagePath);
+  execFileSync(process.execPath, [resolve("scripts/generate-logo-color-icons.ts")], { stdio: "inherit" });
   logger.info(`Wrote ${catalogPath}, ${icnsPath} and ${dockImagePath}`);
 } finally {
   await rm(workPath, { recursive: true, force: true });

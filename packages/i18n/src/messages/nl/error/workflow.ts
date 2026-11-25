@@ -6,11 +6,15 @@ export const messages = {
   "error.workflow.versionMissing": "Deze versie van de workflow bestaat niet meer.",
   "error.workflow.annotation": "Tekst, notities en vormen kunnen geen verbindingen hebben.",
   "error.workflow.port": "Een stap kan dit type invoer niet aannemen.",
+  "error.workflow.unknownValue":
+    "Deze OpenBot kent een instelling van een stap niet. Werk OpenBot bij en probeer het opnieuw.",
   "error.workflow.branch": "Alleen een voorwaarde kan ja- en nee-verbindingen hebben.",
   "error.workflow.conditionBranch": "Elke verbinding vanuit een voorwaarde moet ja of nee zijn.",
   "error.workflow.duplicateEdge": "Deze twee stappen hebben deze verbinding al.",
   "error.workflow.serverTooOld":
     "Deze server ondersteunt geen workflows. Werk OpenBot bij op de computer waarop de server draait.",
+  "error.workflow.newerSteps":
+    "Deze workflow heeft stappen uit een nieuwere OpenBot. Werk OpenBot bij om hem te wijzigen.",
   "error.workflow.nodeUnsupported":
     "Deze versie van OpenBot kan nog geen stappen voor afbeeldingen, bestanden en berichten uitvoeren.",
   "error.workflow.interrupted": "OpenBot is gestopt terwijl deze stap liep. Voer hem opnieuw uit.",
@@ -20,6 +24,17 @@ export const messages = {
   "error.workflow.agentStepStopped":
     "De agent is gestopt voordat hij deze stap beantwoordde. Voer de stap opnieuw uit.",
   "error.workflow.conditionUnclear": "Het model antwoordde niet met ja of nee.",
+  "error.workflow.answerInvalid":
+    "Het antwoord had niet de velden die deze stap vraagt: {fields}. Voer de stap opnieuw uit.",
+  "error.workflow.answerSetup":
+    "De antwoordvelden van deze workflow hebben hier een probleem: {fields}. Corrigeer de workflow en voer de stap daarna opnieuw uit.",
+  "error.workflow.answerSourceEnded":
+    "Deze velden hebben geen waarde, omdat de stap die ze levert niet is voltooid: {fields}. Voer eerst die stap opnieuw uit.",
+  "error.workflow.runInputInvalid":
+    "De invoer van de run past niet bij de antwoordvelden van de trigger: {fields}. Stuur één JSON-object met deze velden.",
+  "error.workflow.sourceNotDone":
+    "Een eerdere stap is de laatste keer mislukt of gestopt. Voer eerst die stap opnieuw uit.",
+  "error.workflow.checkInvalid": "De controle van deze stap is ongeldig. Corrigeer hem en voer de stap opnieuw uit.",
   "error.workflow.modelFailed": "Het model kon niet antwoorden. Voer de stap opnieuw uit.",
   "error.workflow.modelTimedOut":
     "Het model antwoordde niet op tijd. Kies een lager denkniveau of een sneller model voor deze stap en voer hem opnieuw uit.",
@@ -36,6 +51,7 @@ export const messages = {
     "OpenBot kon de provider niet bereiken. Controleer de internetverbinding en voer de stap dan opnieuw uit.",
   "error.workflow.modelBusy": "Er loopt een ander verzoek aan het model. Voer de stap zo opnieuw uit.",
   "error.workflow.mediaFailed": "Het model kon de afbeelding of video niet maken. Voer de stap opnieuw uit.",
+  "error.workflow.mediaNotMade": "Het model heeft de afbeelding of video niet gemaakt. Het antwoordde: {answer}",
   "error.workflow.pictureMissing": "De afbeelding staat niet meer op de server. Stuur hem opnieuw.",
   "error.workflow.pictureType": "Gebruik een PNG-, JPEG- of WebP-afbeelding.",
   "error.workflow.mediaInputMissing":

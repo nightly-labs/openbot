@@ -9,6 +9,8 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub kent de Client ID van deze GitHub-app niet.",
   "error.connector.githubUnexpected": "GitHub gaf een onverwacht antwoord: {detail}",
   "error.connector.githubUnreachable": "OpenBot kan GitHub niet bereiken: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot kan GitHub niet bereiken. Controleer de internetverbinding en de DNS-instellingen van de computer of server waarop OpenBot draait en probeer het opnieuw.",
   "error.connector.githubExpired": "De verbinding met GitHub is verlopen. Verbind GitHub opnieuw.",
   "error.connector.githubFileUnreadable": "Het verbindingsbestand van GitHub is onleesbaar.",
   "error.connector.githubFileTooLarge": "Het verbindingsbestand van GitHub is te groot.",
@@ -31,6 +33,8 @@ export const messages = {
     "1Password heeft te veel verzoeken ontvangen. Wacht een paar minuten en probeer het opnieuw.",
   "error.connector.onePasswordNoVault":
     "Het serviceaccount kan geen kluis lezen. Geef het toegang tot een kluis en probeer het opnieuw.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot kan je logins in 1Password niet lezen. Verbreek de verbinding met 1Password en maak daarna opnieuw verbinding.",
   "error.connector.onePasswordFileUnreadable": "Het verbindingsbestand van 1Password is onleesbaar.",
   "error.connector.onePasswordFileTooLarge": "Het verbindingsbestand van 1Password is te groot.",
   "error.connector.bitwardenFailed":
@@ -43,6 +47,10 @@ export const messages = {
     "Voer een HTTPS-serveradres, de client_id en client_secret van de API-sleutel en het hoofdwachtwoord in.",
   "error.connector.bitwardenHostFailed":
     "Kan Bitwarden niet openen op deze server. Controleer het serveradres, de API-sleutel en het hoofdwachtwoord, en zorg dat één map de naam Shared with OpenBot heeft. Verbind daarna opnieuw.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Kan niet inloggen bij Bitwarden op deze server. Controleer het serveradres en de API-sleutel en verbind opnieuw.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Kan Bitwarden niet ontgrendelen op deze server. Controleer het hoofdwachtwoord en verbind opnieuw.",
   "error.connector.bitwardenCliInstallFailed":
     "Kan de Bitwarden-CLI niet installeren op deze server. Controleer de netwerkverbinding en verbind opnieuw.",
   "error.connector.bitwardenFileUnreadable": "Het verbindingsbestand van Bitwarden is onleesbaar.",

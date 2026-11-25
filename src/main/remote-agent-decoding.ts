@@ -23,6 +23,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   type AgentSessionSettings,
+  type ChannelFolderChange,
   decodeAgentAnalytics,
   decodeGithubSkillSource,
   decodeHostAnalytics,
@@ -53,7 +54,10 @@ import {
   isAgentTaskReadState,
   isAgentTasksSnapshot,
   isAgentTaskWindow,
+  isArchivedAgentTasksPage,
   isAttachmentSummary,
+  isChannelFolderChange,
+  isChannelFolderList,
   isChatColors,
   isClientAgentModelOption,
   isClientAgentSummary,
@@ -62,8 +66,6 @@ import {
   isQueuedMessageReceipt,
   isQueueSnapshot,
   isRoutine,
-  isRoutineFlowCanvas,
-  isRoutineFlowLink,
   isRoutineRun,
   isSidebarLayoutSnapshot,
   isSidebarPinsSnapshot,
@@ -86,6 +88,7 @@ export const decodeAgentNotificationLevelsFromHost = guardedDecoder(
   "agent notification levels response",
 );
 export const decodeRemoteAgentTasks = guardedDecoder(isAgentTasksSnapshot, "remote agent tasks");
+export const decodeRemoteArchivedAgentTasks = guardedDecoder(isArchivedAgentTasksPage, "remote archived threads");
 export const decodeRemoteAgentTask = guardedDecoder(isAgentTask, "remote agent task");
 export const decodeRemoteAgentThreadBranches = guardedDecoder(isAgentThreadBranchLinks, "remote thread branches");
 export const decodeRemoteAgentThreadQueues = guardedDecoder(isAgentThreadQueues, "remote thread queues");
@@ -168,6 +171,14 @@ function decodeMarketplaceSource(value: unknown): AgentSummary["marketplaceSourc
 export const decodeRemoteAgentFolderList = guardedDecoder(isAgentFolderList, "remote agent folders");
 export const decodeRemoteAgentFolderBrowse = guardedDecoder(isAgentFolderBrowse, "remote agent folder browse");
 export const decodeRemoteAgentInstructionsFile = guardedDecoder(isAgentInstructionsFile, "remote agent instructions");
+
+export const decodeRemoteChannelFolderList = guardedDecoder(isChannelFolderList, "remote channel folders");
+
+export function decodeRemoteChannelFolderChange(value: unknown): ChannelFolderChange {
+  if (!isDynamicRecord(value) || !isChannelFolderChange(value))
+    throw new Error("Invalid remote channel folder change.");
+  return value;
+}
 
 export function decodeRemoteAgentFolderChange(value: unknown): AgentFolderChange {
   if (!isDynamicRecord(value) || !isAgentFolderChange(value)) throw new Error("Invalid remote agent folder change.");
@@ -264,8 +275,6 @@ export const decodeRoutine = guardedDecoder(isRoutine, "remote routine");
 export const decodeRoutines = guardedListDecoder(isRoutine, "remote routine list");
 export const decodeRoutineRun = guardedDecoder(isRoutineRun, "remote routine run");
 export const decodeRoutineRuns = guardedListDecoder(isRoutineRun, "remote routine history");
-export const decodeRemoteRoutineFlowCanvas = guardedDecoder(isRoutineFlowCanvas, "remote routine flow canvas");
-export const decodeRemoteRoutineFlowLink = guardedDecoder(isRoutineFlowLink, "remote routine flow link");
 export function decodeSidebarLayoutSnapshot(value: unknown): SidebarLayoutSnapshot {
   if (!isSidebarLayoutSnapshot(value)) throw new Error("Invalid sidebar layout response.");
   return value;

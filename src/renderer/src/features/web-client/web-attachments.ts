@@ -2,12 +2,18 @@ import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import { CHAT_VISUAL_PAGE_LIMIT, isChatVisualMimeType } from "@openbot/contracts/chat-visual";
 import { type AttachmentSummary, type FilePreview, filePreviewKindForFile } from "@openbot/contracts/ipc";
 import { base64ToBytes } from "@openbot/team-client/base64";
+import type { RemoteDownloadWatch } from "@openbot/team-client/remote-peer";
 import { currentText } from "@openbot/ui/text";
 import type { WebAttachmentMedia } from "./web-attachment-media";
+import { createDownloadLimit, type DownloadLimit } from "./web-download-limit";
 import { createWebFileSaver } from "./web-file-download";
 import type { WebFile, WebWorkspaceRuntime } from "./web-runtime";
 
 const VISUAL_PAGE_CACHE = 8;
+const VISUAL_PAGE_READS = 4;
+const visualPageReads = new WeakMap<VisualPageRemote, DownloadLimit>();
+
+type VisualPageRemote = Pick<WebWorkspaceRuntime, "download">;
 
 export function createWebAttachmentFiles(
   remote: Pick<WebWorkspaceRuntime, "download" | "sharedFile" | "workspaceFile">,
@@ -16,13 +22,14 @@ export function createWebAttachmentFiles(
 ) {
   const save = createWebFileSaver();
   const pages = new Map<string, Promise<string>>();
+  const readPage = visualPageQueue(remote);
   return {
-    async download(id: string): Promise<void> {
+    async download(id: string, progress?: RemoteDownloadWatch): Promise<void> {
       const held = await media.file(id);
       save(
         held
           ? { name: held.name, blob: new Blob([held.blob], { type: "application/octet-stream" }) }
-          : await remote.download(id),
+          : await remote.download(id, progress),
       );
     },
     async preview(attachment: AttachmentSummary): Promise<FilePreview> {
@@ -44,7 +51,7 @@ export function createWebAttachmentFiles(
         pages.set(key, cached);
         return cached;
       }
-      const page = readVisualPage(remote, attachment);
+      const page = readPage(() => readVisualPage(remote, attachment));
       pages.set(key, page);
       page.catch(() => pages.delete(key));
       for (const old of pages.keys()) {
@@ -63,11 +70,19 @@ export function createWebAttachmentFiles(
       const file = await remote.sharedFile(path);
       return filePreview({ ...file, mimeType: attachmentMimeTypeForName(file.name) });
     },
-    async previewWorkspace(agentId: string, path: string): Promise<FilePreview> {
-      const file = await remote.workspaceFile(agentId, path);
+    async previewWorkspace(agentId: string, path: string, options?: { exactPath?: boolean }): Promise<FilePreview> {
+      const file = await remote.workspaceFile(agentId, path, options);
       return filePreview({ ...file, mimeType: attachmentMimeTypeForName(file.name) });
     },
   };
+}
+
+function visualPageQueue(remote: VisualPageRemote) {
+  const shared = visualPageReads.get(remote);
+  if (shared) return shared;
+  const queue = createDownloadLimit(VISUAL_PAGE_READS);
+  visualPageReads.set(remote, queue);
+  return queue;
 }
 
 async function readVisualPage(

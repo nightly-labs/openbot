@@ -1,7 +1,13 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { AGENT_TASK_LIMIT_MAX, type AgentTasksSnapshot, type TeamMemberSummary } from "@openbot/contracts/ipc";
+import {
+  AGENT_TASK_LIMIT_MAX,
+  type AgentTask,
+  type AgentTasksSnapshot,
+  type TeamMemberSummary,
+} from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { AGENT_TASKS_CAPABILITY, AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import { QUEUE_HOLD_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamApiAgentTasks } from "./dependencies";
@@ -16,8 +22,21 @@ import {
   stringField,
 } from "./request-helpers";
 
-export function agentTasksWireSnapshot(snapshot: AgentTasksSnapshot): AgentTasksSnapshot {
-  return snapshot.limit <= AGENT_TASK_LIMIT_MAX ? snapshot : { ...snapshot, limit: AGENT_TASK_LIMIT_MAX };
+export function agentTaskWire(task: AgentTask, capabilities: ReadonlySet<string>): AgentTask {
+  return task.hold === "sign-in" && !capabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY)
+    ? { ...task, hold: "agent-busy" }
+    : task;
+}
+
+export function agentTasksWireSnapshot(
+  snapshot: AgentTasksSnapshot,
+  capabilities: ReadonlySet<string>,
+): AgentTasksSnapshot {
+  return {
+    ...snapshot,
+    tasks: snapshot.tasks.map((task) => agentTaskWire(task, capabilities)),
+    limit: Math.min(snapshot.limit, AGENT_TASK_LIMIT_MAX),
+  };
 }
 
 export async function routeAgentTasks(
@@ -33,9 +52,11 @@ export async function routeAgentTasks(
   const agentId = stringField(body, "agentId");
   if (hiddenAgentIds.has(agentId)) throw new HttpError(404, sourceText("error.team.agentNotFound"));
   requireListedAgent(tasks, agentId);
-  if (url.pathname === AGENT_TASKS_ROUTES.list) return json(200, agentTasksWireSnapshot(tasks.listTasks(agentId)));
+  if (url.pathname === AGENT_TASKS_ROUTES.list)
+    return json(200, agentTasksWireSnapshot(tasks.listTasks(agentId), capabilities));
   if (url.pathname !== AGENT_TASKS_ROUTES.read) requireAgentLevel(context, agentId, "chat");
-  if (url.pathname === AGENT_TASKS_ROUTES.start) return json(200, await startTask(tasks, agentId, body, member));
+  if (url.pathname === AGENT_TASKS_ROUTES.start)
+    return json(200, agentTaskWire(await startTask(tasks, agentId, body, member, context.fromChrome), capabilities));
   const taskId = stringField(body, "taskId");
   switch (url.pathname) {
     case AGENT_TASKS_ROUTES.read:
@@ -52,6 +73,8 @@ export async function routeAgentTasks(
               ...clientMessageId(body),
             },
             memberSender(member),
+            undefined,
+            context.fromChrome,
           ),
         ),
       );
@@ -68,11 +91,19 @@ export async function routeAgentTasks(
   return "unmatched";
 }
 
-function startTask(tasks: TeamApiAgentTasks, agentId: string, body: DynamicRecord, member: TeamMemberSummary) {
+function startTask(
+  tasks: TeamApiAgentTasks,
+  agentId: string,
+  body: DynamicRecord,
+  member: TeamMemberSummary,
+  fromChrome: boolean,
+) {
   return runCauseEffect(
     tasks.startTask(
       { agentId, text: stringField(body, "text", false, INPUT_LIMITS.messageText), ...clientMessageId(body) },
       memberSender(member),
+      undefined,
+      fromChrome,
     ),
   );
 }

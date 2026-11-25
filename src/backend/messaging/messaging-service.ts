@@ -109,6 +109,7 @@ export interface MessagingCredentials {
 export interface MessagingAgents {
   listAgents(): AgentSummary[];
   respondToApproval(input: RespondToApprovalInput): Effect.Effect<void, AgentLifecycleFailed>;
+  approvalExecutionThreadId(requestId: string | number): string | undefined;
   onEvent(listener: (event: AgentEvent) => void): () => void;
   createAgentProfile(
     input: Pick<AddMessagingOrchestratorInput, "provider" | "model" | "reasoningEffort"> & {
@@ -117,6 +118,7 @@ export interface MessagingAgents {
       description: string;
       avatarSeed: string;
       avatarHue: AgentSummary["avatarHue"];
+      startOnRunnableProvider: boolean;
     },
   ): Effect.Effect<AgentSummary, AgentLifecycleFailed>;
   createMemory(input: { agentId: string; text: string }): unknown;
@@ -179,6 +181,7 @@ const FINAL_POST_ATTEMPTS = 5;
 const RECEIVE_NAME_DEADLINE_MS = 5_000;
 const RECEIVE_CONTEXT_DEADLINE_MS = 5_000;
 const MENTION_MARKERS = /[\uE000-\uE001]/g;
+const RESULT_REPORT = /^\s*[*_]*Status:?[*_]*:?\s*(?:done|partial|blocked)\b/i;
 
 export class MessagingService {
   readonly #threads: MessagingThreads;
@@ -274,6 +277,10 @@ export class MessagingService {
     );
     this.#threads.setHistorySource((link, scope, limit, filter) => this.#recentMessages(link, scope, limit, filter));
     this.#threads.setOutbound({
+      keysUnreadable: (connectionId) => {
+        const record = this.#threads.store.connection(connectionId);
+        return record ? this.#summary(record).state === "secret_storage_unavailable" : false;
+      },
       places: (connectionId) => this.#outboundPlaces(connectionId),
       history: (connectionId, placeId, limit, filter) => this.#outboundHistory(connectionId, placeId, limit, filter),
       post: (connectionId, target, markdown, files, embeds) =>
@@ -390,6 +397,16 @@ export class MessagingService {
   ) {
     const whatsapp = yield* messagingStep(() => this.#requireWhatsApp());
     yield* whatsapp.removeSender(workspaceId, senderId).pipe(toMessagingOperationFailed);
+  }).bind(this);
+
+  readonly setWhatsAppSenderReadOnly = Effect.fn("MessagingService.setWhatsAppSenderReadOnly")(function* (
+    this: MessagingService,
+    workspaceId: string,
+    senderId: string,
+    readOnly: boolean,
+  ) {
+    const whatsapp = yield* messagingStep(() => this.#requireWhatsApp());
+    yield* whatsapp.setSenderReadOnly(workspaceId, senderId, readOnly).pipe(toMessagingOperationFailed);
   }).bind(this);
 
   readonly answerWhatsAppRequest = Effect.fn("MessagingService.answerWhatsAppRequest")(function* (
@@ -571,6 +588,7 @@ export class MessagingService {
         ...(input.provider ? { provider: input.provider } : {}),
         ...(input.model ? { model: input.model } : {}),
         ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
+        startOnRunnableProvider: true,
       })
       .pipe(toMessagingOperationFailed);
     const memories = discord ? discordOrchestratorMemories() : slackOrchestratorMemories();
@@ -861,6 +879,7 @@ export class MessagingService {
         ...(input.provider ? { provider: input.provider } : {}),
         ...(input.model ? { model: input.model } : {}),
         ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
+        startOnRunnableProvider: true,
       })
       .pipe(toMessagingOperationFailed);
     const memories = telegram ? telegramOrchestratorMemories() : whatsAppOrchestratorMemories();
@@ -1399,17 +1418,18 @@ export class MessagingService {
       Effect.succeed(staging),
       () =>
         Effect.gen({ self: this }, function* () {
-          const gave = (messageId: string) =>
-            Boolean(existing) &&
+          const delivered = (messageId: string) =>
             this.#threads.received(`messaging:${live.record.connectionId}:${message.platformChannelId}:${messageId}`);
+          const gave = (messageId: string) => Boolean(existing) && delivered(messageId);
           const quoted =
             quote?.messageId && !gave(quote.messageId)
               ? (quote.files ?? []).map((file) => ({ file, label: `${quote.authorName}: ${file.name}` }))
               : [];
+          const hasOwnFiles = message.files.length > 0 || quoted.length > 0;
           const earlierFiles = [
             ...quoted,
-            ...earlier
-              .filter((entry) => !gave(entry.id))
+            ...(hasOwnFiles ? [] : earlier)
+              .filter((entry) => !delivered(entry.id))
               .toReversed()
               .flatMap((entry) =>
                 (entry.files ?? []).map((file) => ({ file, label: `${entry.authorName}: ${file.name}` })),
@@ -1454,9 +1474,13 @@ export class MessagingService {
           if (result.status === "duplicate") return;
           const key = `${result.link.linkId}:${message.platformMessageId}`;
           if (result.status === "busy") {
-            yield* adapter
-              .post(message.target, { text: sourceText("status.messaging.busy") })
-              .pipe(toMessagingOperationFailed);
+            if (
+              !this.#quietEnd(live.record.connectionId, message.target) &&
+              !this.#withoutStatusPost(live.record.connectionId)
+            )
+              yield* adapter
+                .post(message.target, { text: sourceText("status.messaging.busy") })
+                .pipe(toMessagingOperationFailed);
             yield* this.#react(live, message.target, message.platformMessageId, "failed", true);
             return;
           }
@@ -1469,7 +1493,8 @@ export class MessagingService {
                 if (
                   this.#posts.has(key) ||
                   !this.#targets.has(key) ||
-                  this.#withoutStatusPost(live.record.connectionId)
+                  this.#withoutStatusPost(live.record.connectionId) ||
+                  this.#quietEnd(live.record.connectionId, message.target)
                 )
                   return;
                 const messageId = yield* adapter
@@ -1701,6 +1726,9 @@ export class MessagingService {
         return {
           posted: true as const,
           messageId: captioned.success,
+          ...(guildId
+            ? { url: `https://discord.com/channels/${guildId}/${target.platformChannelId}/${captioned.success}` }
+            : {}),
           ...directPing(`${text}\nFiles: ${single.name}`),
         };
       }
@@ -1852,7 +1880,12 @@ export class MessagingService {
     }
     if (activity.type === "started") {
       if (!live) return;
-      if (!post?.messageId && this.#withoutStatusPost(live.record.connectionId)) {
+      if (
+        !post?.messageId &&
+        (activity.teammateRequest ||
+          this.#withoutStatusPost(live.record.connectionId) ||
+          this.#quietEnd(live.record.connectionId, target))
+      ) {
         this.#posts.set(key, { connectionId: live.record.connectionId, target, messageId: null, stopToken: null });
         this.#status.restored.delete(key);
         yield* this.#status.save();
@@ -2051,7 +2084,13 @@ export class MessagingService {
   }
 
   #agentEvent(event: AgentEvent): void {
-    if (event.type === "approval") this.#dispatch(this.#approval(event.approval));
+    if (event.type === "approval")
+      this.#dispatch(
+        this.#approval(
+          event.approval,
+          this.#agents.approvalExecutionThreadId(event.approval.requestId) ?? event.approval.threadId,
+        ),
+      );
     else if (event.type === "agent-input-resolved" && event.kind === "approval")
       this.#dispatch(this.#approvalResolved(event.requestId));
   }
@@ -2059,8 +2098,9 @@ export class MessagingService {
   readonly #approval = Effect.fn("MessagingService.approval")(function* (
     this: MessagingService,
     approval: AgentApproval,
+    executionThreadId: string,
   ) {
-    const own = this.#threads.store.linkForThread(approval.threadId);
+    const own = this.#threads.store.linkForThread(executionThreadId);
     const request = own ? null : this.#threads.teammateRequest(approval.agentId, approval.turnId);
     const link = own ?? request?.link;
     if (!link) return;
@@ -2347,7 +2387,7 @@ function redactEmbed(embed: DiscordEmbed): DiscordEmbed {
 }
 
 const WHATSAPP_ALLOWED_PLACES =
-  "This list has only the WhatsApp chats that the user allowed, not all chats of this number. For a chat that is not in it, tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this number.";
+  "This list has only the WhatsApp chats that the user allowed, not all chats of this number. For a chat that is not in it, tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this number. A place with readOnly is read only: read its history, but OpenBot cannot post in it.";
 
 const WHATSAPP_NOT_CONNECTED =
   "WhatsApp is not connected on this number now. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Reconnect or Link again for this number.";
@@ -2356,6 +2396,10 @@ const WHATSAPP_LOCAL_REFUSALS = new Map([
   [
     "place_not_allowed",
     "OpenBot sent nothing: the user did not allow this WhatsApp chat. Tell the user to open Marketplace, then Apps, then WhatsApp, and to use Add contact or Add group for this chat. Then the post can go to it.",
+  ],
+  [
+    "place_read_only",
+    "OpenBot sent nothing: the user made this WhatsApp chat read only. OpenBot reads it but never posts in it. Do not post it again: give the result in the conversation that you answer.",
   ],
   ["not_connected", WHATSAPP_NOT_CONNECTED],
   ["not_linked", WHATSAPP_NOT_CONNECTED],
@@ -2367,6 +2411,17 @@ const WHATSAPP_LOCAL_REFUSALS = new Map([
 
 const DISCORD_NOT_LINKED =
   "This Discord server is not linked to this OpenBot server now. Another OpenBot server of the user may answer there. Tell the user to open Marketplace, then Apps, then Discord, and to select Reconnect for this Discord server if this server must answer there.";
+
+const TELEGRAM_RELAY_REFUSALS = new Map([
+  [
+    "telegram_503 relay_unavailable",
+    "OpenBot on this computer is not connected to the OpenBot service now. Telegram calls go through that service, so Telegram did not refuse this call, and the connection and place ids are not the cause. OpenBot connects again by itself. When a Telegram call fails again in a few minutes, tell the user that OpenBot on this computer cannot connect to its service, and that the computer must be online and signed in to OpenBot.",
+  ],
+  [
+    "telegram_504 timeout",
+    "The OpenBot service did not answer this Telegram call in time. Telegram did not refuse it, and the connection and place ids are not the cause.",
+  ],
+]);
 
 function telegramNotReady(state: IngressState): MessagingOperationFailed {
   const text =
@@ -2385,6 +2440,9 @@ function refusal(failure: MessagingAdapterError): string {
   const local = cause instanceof Error ? WHATSAPP_LOCAL_REFUSALS.get(cause.message) : undefined;
   if (local) return local;
   if (cause instanceof DiscordApiError && cause.code === "unknown_guild") return DISCORD_NOT_LINKED;
+  const relay =
+    cause instanceof TelegramCallError ? TELEGRAM_RELAY_REFUSALS.get(`${cause.code} ${cause.message}`) : undefined;
+  if (relay) return relay;
   const code =
     cause instanceof SlackApiError || cause instanceof DiscordApiError || cause instanceof TelegramCallError
       ? cause.code
@@ -2427,9 +2485,13 @@ function finalPost(
       reaction: reacts ? "failed" : null,
     };
   const reaction = reacts ? "done" : null;
-  if (activity.answer && isQuietAnswer(activity.answer)) return { answer: false, text: "", reaction };
+  if (
+    activity.answer &&
+    (isQuietAnswer(activity.answer) || (activity.teammateRequest && RESULT_REPORT.test(activity.answer)))
+  )
+    return { answer: false, text: "", reaction };
   if (activity.answer) return { answer: true, text: redactPostText(activity.answer), reaction };
-  if (answerOnly) return { answer: false, text: "", reaction };
+  if (answerOnly || activity.teammateRequest) return { answer: false, text: "", reaction };
   if (!activity.followUp && awaitsTeammate)
     return { answer: false, text: sourceText("status.messaging.delegated"), reaction };
   if (sendsFiles && activity.files.length) return { answer: false, text: "", reaction };

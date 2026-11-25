@@ -2,7 +2,7 @@ import type { BrowserTabProfile } from "@openbot/contracts/ipc";
 import { Button, buttonVariants, ChevronDown, ContextMenu, DropdownMenu, Tabs, X } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { clamp, motionDuration, prefersReducedMotion } from "@openbot/ui/utils";
-import { createEffect, createSignal, For, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, For, flush, onSettled, Show } from "solid-js";
 import { createTabRow } from "../../components/createTabRow";
 import { browserProfileColor } from "./BrowserProfileColor";
 import { BrowserTabIcon, useBrowserTabTitle } from "./BrowserTabIcon";
@@ -29,6 +29,20 @@ function tabProfileColor(profile: BrowserTabProfile | undefined): string | undef
   return profile?.hue == null ? undefined : browserProfileColor(profile.hue);
 }
 
+function motionTiming(): KeyframeAnimationOptions {
+  return {
+    duration: motionDuration("--openbot-duration-normal", 160),
+    easing: getComputedStyle(document.documentElement).getPropertyValue("--openbot-ease-out").trim() || "ease-out",
+  };
+}
+
+function siblingsAfter(element: HTMLElement): HTMLElement[] {
+  const siblings: HTMLElement[] = [];
+  for (let next = element.nextElementSibling; next instanceof HTMLElement; next = next.nextElementSibling)
+    siblings.push(next);
+  return siblings;
+}
+
 function createChipMotion(chips: () => HTMLElement[]) {
   let places = new Map<string, number>();
   const read = () => new Map(chips().map((el) => [el.dataset.tabId ?? "", el.offsetLeft]));
@@ -36,35 +50,36 @@ function createChipMotion(chips: () => HTMLElement[]) {
     keep: (override?: Map<string, number>) => {
       places = override ?? read();
     },
-    play: () => {
+    play: (): Animation[] => {
       const before = places;
       const elements = chips();
       places = read();
-      if (before.size === 0 || prefersReducedMotion() || elements.some((el) => !el.isConnected)) return;
-      const timing = {
-        duration: motionDuration("--openbot-duration-normal", 160),
-        easing: getComputedStyle(document.documentElement).getPropertyValue("--openbot-ease-out").trim() || "ease-out",
-      };
+      if (before.size === 0 || prefersReducedMotion() || elements.some((el) => !el.isConnected)) return [];
+      const started: Animation[] = [];
+      const timing = motionTiming();
       for (const el of elements) {
         const id = el.dataset.tabId ?? "";
         const left = before.get(id);
         const now = places.get(id) ?? 0;
         if (left === undefined) {
           for (const animation of el.getAnimations()) animation.cancel();
-          el.animate(
-            [
-              { opacity: 0, transform: "scale(0.94)" },
-              { opacity: 1, transform: "none" },
-            ],
-            timing,
+          started.push(
+            el.animate(
+              [
+                { opacity: 0, transform: "scale(0.94)" },
+                { opacity: 1, transform: "none" },
+              ],
+              timing,
+            ),
           );
           continue;
         }
         const dx = left - now;
         if (Math.abs(dx) < 0.5) continue;
         for (const animation of el.getAnimations()) animation.cancel();
-        el.animate([{ transform: `translateX(${dx}px)` }, { transform: "none" }], timing);
+        started.push(el.animate([{ transform: `translateX(${dx}px)` }, { transform: "none" }], timing));
       }
+      return started;
     },
   };
 }
@@ -93,6 +108,10 @@ export function BrowserTabStrip(props: {
     },
   });
   const row = tabRow.row;
+  const frozenStyle = () =>
+    row.frozen
+      ? { "--browser-full-chip-frozen": `${row.frozen}px`, "--browser-full-chips-frozen": `${row.frozenRow}px` }
+      : undefined;
   const [hiddenMenuOpen, setHiddenMenuOpen] = createSignal(false);
   createEffect(
     () => row.hidden.length > 0,
@@ -112,13 +131,31 @@ export function BrowserTabStrip(props: {
   createEffect(
     () => props.view.tabs.map((tab) => tab.id).join(),
     () => {
-      motion.play();
+      const animations = motion.play();
       tabRow.measure();
+      if (animations.length > 0)
+        void Promise.allSettled(animations.map((animation) => animation.finished)).then(tabRow.measure);
     },
   );
 
   const close = (ids: readonly string[]) => {
     if (canClose()) props.onClose(ids);
+  };
+  const unfreeze = () => {
+    const list = strip;
+    if (!row.frozen || !list || prefersReducedMotion()) {
+      tabRow.unfreeze();
+      return;
+    }
+    const following = siblingsAfter(list);
+    const before = following.map((element) => element.getBoundingClientRect().left);
+    tabRow.unfreeze();
+    flush();
+    const timing = motionTiming();
+    following.forEach((element, index) => {
+      const dx = (before[index] ?? 0) - element.getBoundingClientRect().left;
+      if (Math.abs(dx) >= 0.5) element.animate([{ transform: `translateX(${dx}px)` }, { transform: "none" }], timing);
+    });
   };
   const closeWithPointer = (id: string) => {
     if (!canClose()) return;
@@ -275,8 +312,8 @@ export function BrowserTabStrip(props: {
         data-frozen={row.frozen ? "" : undefined}
         data-fade-start={row.fadeStart ? "" : undefined}
         data-fade-end={row.fadeEnd ? "" : undefined}
-        style={row.frozen ? { "--browser-full-chip-frozen": `${row.frozen}px` } : undefined}
-        onPointerLeave={tabRow.unfreeze}
+        style={frozenStyle()}
+        onPointerLeave={unfreeze}
       >
         <For each={props.view.tabs} keyed={(tab) => tab.id}>
           {(tab) => {

@@ -17,6 +17,7 @@ import { type ReactNode, useState } from "react";
 import { Pressable, TextInput, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
+import { InactiveRequestError } from "@/features/workspace/model/pending-approvals";
 import { haptics } from "@/shared/lib/haptics";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
@@ -117,6 +118,7 @@ export function BrowserTakeoverCard({
   };
   const reload = request.secret?.requiresReload ? ` ${t("mobile.chat.browserSecret.takeoverReload")}` : "";
   const signInBlocked = request.reason === "sign-in-blocked";
+  const openServerPage = signInBlocked ? undefined : openBrowser;
   return (
     <BrowserRequestCard
       icon={<Globe color={String(muted)} size={14} strokeWidth={2.2} />}
@@ -132,14 +134,14 @@ export function BrowserTakeoverCard({
       onCancel={() => void finish("cancel")}
     >
       <View className="flex-row gap-2">
-        {openBrowser ? (
+        {openServerPage ? (
           <Button
             size="sm"
             className="flex-1 bg-action"
             isDisabled={pending}
             onPress={() => {
               void haptics.impact("soft");
-              openBrowser();
+              openServerPage();
             }}
           >
             <Button.Label className="text-action-foreground">{t("mobile.browser.open")}</Button.Label>
@@ -147,12 +149,12 @@ export function BrowserTakeoverCard({
         ) : null}
         <Button
           size="sm"
-          variant={openBrowser ? "ghost" : "primary"}
-          className={openBrowser ? "flex-1" : "flex-1 bg-action"}
+          variant={openServerPage ? "ghost" : "primary"}
+          className={openServerPage ? "flex-1" : "flex-1 bg-action"}
           isDisabled={pending}
           onPress={() => void finish("complete")}
         >
-          <Button.Label className={openBrowser ? undefined : "text-action-foreground"}>
+          <Button.Label className={openServerPage ? undefined : "text-action-foreground"}>
             {t("mobile.chat.browserSecret.done")}
           </Button.Label>
         </Button>
@@ -190,7 +192,7 @@ export function BrowserSecretComposer({
   const { t } = useText();
   const [value, setValue] = useState("");
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<MobileTextKey | null>(null);
   const password = request.secret?.method === "password";
   const digits = request.secret?.digits ?? 6;
   const title = password
@@ -207,7 +209,7 @@ export function BrowserSecretComposer({
   const send = async (decision: "submit" | "cancel" | "takeover") => {
     if (pending) return;
     setPending(true);
-    setError(false);
+    setError(null);
     const identity = { agentId: request.agentId, requestId: request.requestId };
     const input: RespondToBrowserSecretInput =
       decision === "submit" ? { ...identity, decision, secret: value } : { ...identity, decision };
@@ -215,9 +217,13 @@ export function BrowserSecretComposer({
     try {
       await respond(input);
       void haptics.notification("success");
-    } catch {
+    } catch (cause) {
       void haptics.notification("error");
-      setError(true);
+      setError(
+        cause instanceof InactiveRequestError
+          ? "mobile.chat.browserSecret.ended"
+          : "mobile.chat.browserSecret.submitFailed",
+      );
     } finally {
       if (input.decision === "submit") input.secret = "";
       setPending(false);
@@ -248,7 +254,7 @@ export function BrowserSecretComposer({
         </Button>
         {error ? (
           <Typography.Paragraph type="body-xs" className="text-danger-text" accessibilityRole="alert">
-            {t("mobile.chat.browserSecret.submitFailed")}
+            {t(error)}
           </Typography.Paragraph>
         ) : null}
       </BrowserRequestCard>

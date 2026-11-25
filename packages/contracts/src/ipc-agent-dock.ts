@@ -95,6 +95,7 @@ export interface AgentDockMessage {
   kind: "text" | "error";
   body: string;
   attachments: AttachmentSummary[];
+  visual?: boolean;
 }
 
 export interface AgentDockApproval {
@@ -183,9 +184,26 @@ export interface AgentDockDisplayInfo {
 
 export type AgentDockEdge = "left" | "right";
 
+export interface AgentDockDisplayBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface AgentDockOffset {
   displayId: number;
   offset: number;
+  bounds?: AgentDockDisplayBounds | undefined;
+}
+
+export function sameAgentDockDisplayBounds(
+  a: AgentDockDisplayBounds | undefined,
+  b: AgentDockDisplayBounds | undefined,
+): boolean {
+  return (
+    a !== undefined && b !== undefined && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height
+  );
 }
 
 export const AGENT_DOCK_SIZE_LIMITS = { min: 70, max: 140, step: 1, default: 100 } as const;
@@ -215,6 +233,7 @@ export type AgentDockAction =
   | { type: "move"; serverId: string; seat: AgentDockSeatRef; before: AgentDockSeatRef | null }
   | { type: "send"; serverId: string; seat: AgentDockSeatRef; text: string; clientMessageId: string }
   | { type: "open-agent"; serverId: string; agentId: string }
+  | { type: "open-browser-takeover"; serverId: string; agentId: string; tabId: string }
   | { type: "open-channel"; serverId: string; channelId: string }
   | { type: "open-window"; serverId: string; agentId: string }
   | {
@@ -246,7 +265,7 @@ export type AgentDockAction =
   | { type: "open-settings" }
   | { type: "hide" };
 
-export type AboveAppsSupport = "restart" | "unsupported";
+export type AboveAppsSupport = "restart" | "unsupported" | "no-compositor";
 
 export interface SetAgentDockXWaylandInput {
   enabled: boolean;
@@ -262,6 +281,12 @@ export interface AgentDockInputRect {
   y: number;
   width: number;
   height: number;
+}
+
+export interface AgentDockExtent {
+  inward: number;
+  above: number;
+  below: number;
 }
 
 export function isAgentDockPresentation(value: unknown): value is AgentDockPresentation {
@@ -299,6 +324,8 @@ export function isAgentDockAction(value: unknown): value is AgentDockAction {
     case "open-agent":
     case "open-window":
       return isIdentifier(value.agentId);
+    case "open-browser-takeover":
+      return isIdentifier(value.agentId) && isIdentifier(value.tabId);
     case "open-channel":
       return isIdentifier(value.channelId);
     case "respond-approval":
@@ -354,6 +381,16 @@ export function isAgentDockXWayland(value: unknown): value is SetAgentDockXWayla
   return isDynamicRecord(value) && isBoolean(value.enabled);
 }
 
+export function isAgentDockExtent(value: unknown): value is AgentDockExtent | null {
+  return (
+    value === null ||
+    (isDynamicRecord(value) &&
+      integerInRange(value.inward, 0, AGENT_DOCK_LIMITS.inputExtent) &&
+      integerInRange(value.above, 0, AGENT_DOCK_LIMITS.inputExtent) &&
+      integerInRange(value.below, 0, AGENT_DOCK_LIMITS.inputExtent))
+  );
+}
+
 export function isAgentDockInputRegion(value: unknown): value is AgentDockInputRect[] {
   return isList(
     value,
@@ -373,7 +410,19 @@ export function isAgentDockOffset(value: unknown): value is AgentDockOffset {
     isDisplayId(value.displayId) &&
     isFiniteNumber(value.offset) &&
     value.offset >= 0 &&
-    value.offset <= 1
+    value.offset <= 1 &&
+    (value.bounds === undefined || isAgentDockDisplayBounds(value.bounds))
+  );
+}
+
+function isAgentDockDisplayBounds(value: unknown): value is AgentDockDisplayBounds {
+  const extent = AGENT_DOCK_LIMITS.inputExtent;
+  return (
+    isDynamicRecord(value) &&
+    integerInRange(value.x, -extent, extent) &&
+    integerInRange(value.y, -extent, extent) &&
+    integerInRange(value.width, 1, extent) &&
+    integerInRange(value.height, 1, extent)
   );
 }
 
@@ -560,7 +609,8 @@ function isMessage(value: unknown): value is AgentDockMessage {
     (value.senderMember === null || isConversationMessageSender(value.senderMember)) &&
     isOneOf(["text", "error"] as const, value.kind) &&
     isBoundedString(value.body, INPUT_LIMITS.messageText) &&
-    isList(value.attachments, INPUT_LIMITS.attachments, isAttachmentSummary)
+    isList(value.attachments, INPUT_LIMITS.attachments, isAttachmentSummary) &&
+    (value.visual === undefined || isBoolean(value.visual))
   );
 }
 

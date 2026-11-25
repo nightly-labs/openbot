@@ -85,6 +85,20 @@ export function requireOwnMcpSignIn(
   if (row?.transport === "http") requireOwnMcpAddress(access, servers, row.url);
 }
 
+export function mcpSignInSharedWithOthers(
+  servers: readonly McpServerConfig[],
+  mcpServerId: string,
+  owns: (mcpServerId: string) => boolean,
+): boolean {
+  const row = servers.find((server) => server.id === mcpServerId);
+  if (row?.transport !== "http") return false;
+  const key = signInKey(row.url);
+  return servers.some(
+    (server) =>
+      server.id !== mcpServerId && server.transport === "http" && signInKey(server.url) === key && !owns(server.id),
+  );
+}
+
 function signInKey(url: string): string {
   return mcpOAuthAccountKey(url) ?? url;
 }

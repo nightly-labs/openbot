@@ -5,7 +5,7 @@ export const messages = {
   "error.mcp.redirectByName": "无法通过名称访问该地址。",
   "error.mcp.redirectNotSignIn": "该地址不属于任何登录流程。",
   "error.mcp.redirectRefused": "登录被拒绝，请返回 OpenBot 重试。",
-  "error.mcp.redirectNoSignIn": "没有等待处理的登录，它可能已结束。",
+  "error.mcp.redirectNoSignIn": "此登录已失效。请返回 OpenBot，重新开始登录。",
   "error.mcp.redirectSignedIn": "OpenBot 已登录，你可以关闭该窗口。",
   "error.mcp.redirectNotSaved": "登录未完成。请返回 OpenBot 查看原因。",
   "error.mcp.signInFileUnreadable": "MCP 登录文件无法读取。",

@@ -74,14 +74,18 @@ function plainTextOf(cell: { tokens: Token[] }): string {
 function inlineText(tokens: Token[], lineBreak = " "): string {
   let text = "";
   for (const [index, token] of tokens.entries()) {
-    const next = tokens[index + 1];
-    const intraword =
-      token.type === "em" &&
-      token.raw.startsWith("*") &&
-      (WORD_CHARACTER.test(text.at(-1) ?? "") || WORD_CHARACTER.test(next?.raw.at(0) ?? ""));
+    const intraword = isWordStarEmphasis(token, text, tokens[index + 1]?.raw ?? "");
     text += intraword ? token.raw : plainText(token, lineBreak);
   }
   return text;
+}
+
+export function isWordStarEmphasis(token: Token, before: string, after: string): boolean {
+  return (
+    token.type === "em" &&
+    token.raw.startsWith("*") &&
+    (WORD_CHARACTER.test(before.at(-1) ?? "") || WORD_CHARACTER.test(after.at(0) ?? ""))
+  );
 }
 
 export function markdownPreviewText(body: string): string {
@@ -91,6 +95,32 @@ export function markdownPreviewText(body: string): string {
     .join(" ")
     .replace(/\s+/gu, " ")
     .trim();
+}
+
+export function markdownImageName(alt: string, url: string): string {
+  if (alt.trim()) return alt.trim();
+  try {
+    const path = new URL(url).pathname;
+    const name = decodeURIComponent(path.split(/[\\/]/u).pop() ?? "");
+    if (name) return name;
+  } catch {}
+  return url;
+}
+
+function childTokens(token: Token): Token[] {
+  if (token.type === "list") return token.items;
+  if (token.type === "table") return [token.header, ...token.rows].flat().flatMap((cell) => cell.tokens);
+  return "tokens" in token && Array.isArray(token.tokens) ? token.tokens : [];
+}
+
+function imageNames(tokens: readonly Token[]): string[] {
+  return tokens.flatMap((token) =>
+    token.type === "image" ? [markdownImageName(token.text, token.href)] : imageNames(childTokens(token)),
+  );
+}
+
+export function markdownImageNames(body: string): string[] {
+  return imageNames(markdown.lexer(body));
 }
 
 export function markdownInlinePlainText(body: string): string {

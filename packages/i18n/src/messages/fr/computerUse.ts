@@ -19,6 +19,7 @@ export const messages = {
   "computerUse.ready.title": "Computer Use est prêt",
   "computerUse.ready.description":
     "OpenBot peut voir les apps de cet ordinateur et interagir avec elles. Ce système ne demande aucune autorisation supplémentaire.",
+  "computerUse.limited.title": "Computer Use est limité sur ce bureau",
   "computerUse.openSettingsFailed.title": "Impossible d’ouvrir Réglages Système",
   "computerUse.restartRequired.title": "Redémarrage nécessaire",
   "computerUse.restartRequired.description":

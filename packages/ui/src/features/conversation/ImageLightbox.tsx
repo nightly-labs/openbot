@@ -280,6 +280,7 @@ export function ImageLightbox(props: {
   canDownload?: ((attachment: AttachmentSummary) => boolean) | undefined;
   macWindowControls?: boolean | undefined;
   stripLabel?: string | undefined;
+  stripUrl?: ((attachment: AttachmentSummary) => string | null) | undefined;
   onClose: () => void;
 }) {
   const { t } = useText();
@@ -823,8 +824,9 @@ export function ImageLightbox(props: {
                     onClick={() => go(position(), Math.sign(position() - index()))}
                   >
                     <img
-                      src={entry.previewUrl ?? ""}
+                      src={(props.stripUrl ? props.stripUrl(entry) : entry.previewUrl) ?? ""}
                       alt=""
+                      loading="lazy"
                       decoding="async"
                       referrerpolicy="no-referrer"
                       draggable={false}

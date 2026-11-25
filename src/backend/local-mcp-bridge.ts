@@ -16,7 +16,7 @@ import { isString } from "@openbot/contracts/runtime-values";
 import { Deferred, Effect, Exit } from "effect";
 import { runCauseEffect } from "./effect-boundary";
 import { type McpOperationError, mcpCall, mcpFailure, mcpResult, mcpSync } from "./mcp-effects";
-import type { DynamicToolResult } from "./protocol";
+import { type DynamicToolResult, PROVIDER_STOPPED_WAITING } from "./protocol";
 import type { ProviderClientOperationError } from "./provider-client-effects";
 
 interface DynamicToolDefinition {
@@ -43,6 +43,7 @@ export interface LocalMcpSession {
   setThreadId(threadId: string): void;
   reached(): boolean;
   dropped(sentAt: number, limitMs: number): boolean;
+  listedWithin(from: number, limitMs: number): boolean;
   renew(): LocalMcpSession["servers"];
   close(): void;
 }
@@ -54,6 +55,8 @@ const LOCAL_MCP_UNEXTENDED_DETACH_MS = 45_000;
 const OPENCODE_SESSION_META = "ai.opencode/sessionID";
 
 const DROP_JUDGE_MARGIN_MS = 2_000;
+
+const LISTED_TIMES_KEPT = 16;
 
 const LOCAL_MCP_KEEP_ALIVE_MS = 95_000;
 
@@ -100,6 +103,7 @@ interface BridgeRoute {
   tokens: string[];
   sentBy: BridgeMember;
   listedAt: number | null;
+  listedTimes: number[];
   dropped: boolean;
 }
 
@@ -150,6 +154,7 @@ export class LocalMcpBridge {
         tokens: [token],
         sentBy: member,
         listedAt: null,
+        listedTimes: [],
         dropped: false,
       };
       this.#routes.set(token, route);
@@ -183,6 +188,8 @@ export class LocalMcpBridge {
         }
         return dropped;
       },
+      listedWithin: (from, limitMs) =>
+        routes.some((route) => route.listedTimes.some((at) => at >= from && at - from <= limitMs)),
       renew: () => {
         for (const route of routes) if (route.dropped) this.#renewToken(route, member);
         current.splice(0, current.length, ...servers());
@@ -205,6 +212,7 @@ export class LocalMcpBridge {
     route.tokens.push(token);
     route.sentBy = member;
     route.listedAt = null;
+    route.listedTimes = [];
     route.dropped = false;
     this.#routes.set(token, route);
     if (route.shareKey !== null) this.#shared.set(route.shareKey, token);
@@ -313,7 +321,11 @@ export class LocalMcpBridge {
       },
     );
     mcp.setRequestHandler(ListToolsRequestSchema, async () => {
-      if (token === route.tokens.at(-1)) route.listedAt ??= Date.now();
+      if (token === route.tokens.at(-1)) {
+        const now = Date.now();
+        route.listedAt ??= now;
+        route.listedTimes = [...route.listedTimes, now].slice(-LISTED_TIMES_KEPT);
+      }
       return {
         tools: listedTools(route).map((tool) => ({
           name: tool.name,
@@ -338,7 +350,8 @@ export class LocalMcpBridge {
           if (!tool) return yield* mcpFailure(new Error(`Unknown ${route.namespace.name} tool: ${params.name}`));
           const abandoned = new AbortController();
           const abandon = () => abandoned.abort();
-          extra.signal.addEventListener("abort", abandon, { once: true });
+          const stopWaiting = () => abandoned.abort(PROVIDER_STOPPED_WAITING);
+          extra.signal.addEventListener("abort", stopWaiting, { once: true });
           route.running.set(extra.requestId, abandoned);
           const progressToken = extra._meta?.progressToken;
           let progress = 0;
@@ -372,7 +385,7 @@ export class LocalMcpBridge {
             Effect.ensuring(
               Effect.sync(() => {
                 clearInterval(keepAlive);
-                extra.signal.removeEventListener("abort", abandon);
+                extra.signal.removeEventListener("abort", stopWaiting);
                 if (route.running.get(extra.requestId) === abandoned) route.running.delete(extra.requestId);
               }),
             ),
@@ -402,7 +415,7 @@ export class LocalMcpBridge {
         for (const message of Array.isArray(body) ? body : body ? [body] : []) {
           const cancelled = CancelledNotificationSchema.safeParse(message);
           const requestId = cancelled.success ? cancelled.data.params.requestId : undefined;
-          if (requestId !== undefined) route.running.get(requestId)?.abort();
+          if (requestId !== undefined) route.running.get(requestId)?.abort(PROVIDER_STOPPED_WAITING);
         }
         mcpResult(yield* Effect.result(mcpCall(() => transport.handleRequest(request, response, body))));
       } catch {

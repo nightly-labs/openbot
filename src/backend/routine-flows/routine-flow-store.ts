@@ -273,7 +273,8 @@ export class RoutineFlowStore {
            CROSS JOIN projection_routine_runs AS run ON run.run_id = source.run_id
            JOIN routine_flow_links AS link ON link.routine_id = run.routine_id
              AND link.from_agent_id = source.agent_id AND link.created_at <= run.created_at
-           WHERE source.updated_at >= ? AND source.status <> 'running'
+           WHERE EXISTS (SELECT 1 FROM routine_flow_links)
+             AND source.updated_at >= ? AND source.status <> 'running'
              AND NOT EXISTS (
                SELECT 1 FROM routine_flow_steps AS target
                WHERE target.run_id = run.run_id AND target.agent_id = link.to_agent_id

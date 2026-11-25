@@ -48,7 +48,7 @@ export function AgentDockEdgeStrip(props: {
 
   onSettled(() => {
     let frame = 0;
-    let pointer: { x: number; y: number } | null = null;
+    let pointer: { fromEdge: number; fromCenter: number } | null = null;
     let near = false;
     let box: DOMRect | undefined;
     const written = new Map<string, string>();
@@ -72,9 +72,9 @@ export function AgentDockEdgeStrip(props: {
         write("--agent-dock-strip-near", "0");
         return;
       }
-      const dx = props.side === "left" ? pointer.x : window.innerWidth - pointer.x;
-      const dy = Math.max(0, box.top - pointer.y, pointer.y - box.bottom);
-      const distance = Math.hypot(dx, dy);
+      const y = window.innerHeight / 2 + pointer.fromCenter;
+      const dy = Math.max(0, box.top - y, y - box.bottom);
+      const distance = Math.hypot(pointer.fromEdge, dy);
       setNear(distance <= STRIP_REVEAL);
       const grown = Math.min(
         1,
@@ -86,7 +86,10 @@ export function AgentDockEdgeStrip(props: {
       if (frame === 0) frame = requestAnimationFrame(update);
     };
     const onMove = (event: MouseEvent) => {
-      pointer = { x: event.clientX, y: event.clientY };
+      pointer = {
+        fromEdge: props.side === "left" ? event.clientX : window.innerWidth - event.clientX,
+        fromCenter: event.clientY - window.innerHeight / 2,
+      };
       schedule();
     };
     const onLeave = () => {

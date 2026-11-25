@@ -325,6 +325,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "このプロバイダーで利用できるモデルはありません。",
   "mobile.agent.runtime.searchModels": "モデルを検索",
   "mobile.agent.runtime.noMatches": "検索に一致するモデルはありません。",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "検索に一致するモデルはありません。openrouter.ai のプライバシー、プロバイダー、ガードレールの設定によって、このリストのモデルが非表示になることがあります。",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "このプロバイダーは、Windows と Linux では「ワークスペースのみ」で動作しません。使うには、先に「権限」を変更してください。",
   "mobile.agent.runtime.usageLimit": "使用量の上限に達しました",
@@ -378,6 +380,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "{model} を削除",
   "mobile.agent.backupModels.unavailable": "現在使用できません · スキップ",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "作業の開始後に利用上限で {name} が止まると、{name} は順序の中で最初に使えるモデルで同じ作業を続けます。上限が解除されると、またはプロバイダーのエラーから 10 分後に {model} に戻ります。",
   "mobile.agent.busyMessage.label": "作業中",
@@ -402,10 +405,15 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "プロファイルを管理",
   "mobile.agent.browserProfile.footer":
     "各プロファイルは独自のサインインと Cookie を保持します。変更するとエージェントの開いているタブは閉じます。",
+  "mobile.agent.browserProfile.movedNote":
+    "サイトへのサインインは古いプロファイルに残ります。エージェントはこれらのサイトに再度サインインする必要があります。",
   "mobile.agent.browserProfile.saveFailed": "OpenBot はエージェントのブラウザープロファイルを変更できませんでした。",
   "mobile.agent.planCard.label": "長いタスクの前に計画を表示",
   "mobile.agent.planCard.footer":
     "長いタスクの前に、エージェントが計画を表示します。10 秒後、または開始を押すと始まります。",
+  "mobile.agent.builtinMemory.label": "OpenBot のメモリー",
+  "mobile.agent.builtinMemory.footer":
+    "エージェントが自分のメモリーを保存して読み込みます。Mem0 などのメモリーアプリだけを使うにはオフにします。保存済みのメモリーは残ります。",
   "mobile.agent.workspace.title": "ワークスペースのフォルダー",
   "mobile.agent.workspace.footer": "ホストのコンピューター上にある、このエージェントのフォルダーです。",
   "mobile.agent.advanced.behavior": "動作",
@@ -489,6 +497,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "このホストでは、リモートデバイスからエージェントを公開できません。",
   "mobile.agent.usage.tokensWithoutCacheReads": "キャッシュ読み取りを除くトークン",
   "mobile.agent.usage.estimatedCost": "推定コスト",
+  "mobile.agent.usage.noCostEstimate": "コストの推定なし",
   "mobile.agent.usage.daily": "日別の使用量",
   "mobile.agent.usage.tokens": "トークン",
   "mobile.agent.usage.cost": "コスト",
@@ -523,6 +532,7 @@ export const messages = {
   "mobile.agent.usage.collection": "収集開始: {started}。更新: {updated}。",
   "mobile.agent.usage.never": "なし",
   "mobile.agent.record.time": "時刻",
+  "mobile.agent.record.date": "日付",
   "mobile.agent.section.changeFailed": "フォルダーを変更できませんでした",
   "mobile.agent.section.tryAgain": "もう一度お試しください。",
   "mobile.agent.section.moveUp": "上へ移動",
@@ -603,13 +613,13 @@ export const messages = {
   "mobile.agent.home.serversFailed": "サーバーを読み込めませんでした",
   "mobile.agent.home.serversFailedBody": "デスクトップアプリが実行中か確認して、もう一度お試しください。",
   "mobile.agent.home.noServers": "利用できるサーバーはありません",
-  "mobile.agent.home.noServersBody": "デスクトップアプリに再接続するか、リモートサーバーに参加してください。",
+  "mobile.agent.home.noServersBody":
+    "このアカウントでコンピューターの OpenBot を開き、「サーバーの設定」→「メンバー」で「このサーバーを公開」をオンにしてください。または、リモートサーバーに参加してください。",
   "mobile.agent.home.chooseServer": "サーバーを選択",
   "mobile.agent.home.openServers": "サーバーを開く",
   "mobile.agent.home.noChatOpen": "チャットが開いていません",
   "mobile.agent.home.noChatOpenBody": "リストからチャットを選んでください。",
   "mobile.agent.home.chatListWidth": "チャットリストの幅",
-  "mobile.agent.home.serverTitle": "{name}、サーバーを開く",
   "mobile.agent.home.waiting": "接続を待っています",
   "mobile.agent.home.waitingBody": "このサーバーが接続されると、エージェントの一覧が読み込まれます。",
   "mobile.agent.home.noAgents": "このサーバーにエージェントはいません",
@@ -679,6 +689,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "除外を解除",
   "mobile.agent.folders.browseTitle": "フォルダを選択",
   "mobile.agent.folders.places": "移動",
+  "mobile.agent.folders.path": "フォルダのパス",
   "mobile.agent.folders.home": "ホームフォルダ",
   "mobile.agent.folders.parent": "上へ: {folder}",
   "mobile.agent.folders.browseFailed": "このフォルダを開けませんでした。",

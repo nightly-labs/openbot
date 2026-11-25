@@ -15,11 +15,12 @@ export function htmlAttachmentPageUrl(
   return attachment && isChatVisualMimeType(attachment.mimeType) ? chatVisualPageUrl(attachment.previewUrl) : undefined;
 }
 
-export function htmlAttachmentPageHtml(
+export function htmlFilePageHtml(
   attachment: { mimeType: string } | null | undefined,
   preview: { mimeType: string; bytes: Uint8Array | null } | null | undefined,
 ): string | undefined {
-  if (!attachment || !preview?.bytes || preview.bytes.byteLength > CHAT_VISUAL_PAGE_LIMIT) return undefined;
-  if (!isChatVisualMimeType(attachment.mimeType) || !isChatVisualMimeType(preview.mimeType)) return undefined;
+  if (!preview?.bytes || preview.bytes.byteLength > CHAT_VISUAL_PAGE_LIMIT) return undefined;
+  if (attachment && !isChatVisualMimeType(attachment.mimeType)) return undefined;
+  if (!isChatVisualMimeType(preview.mimeType)) return undefined;
   return new TextDecoder().decode(preview.bytes);
 }

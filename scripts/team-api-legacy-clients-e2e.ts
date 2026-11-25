@@ -47,7 +47,10 @@ import { AGENT_BACKGROUND_WORK_CAPABILITY } from "@openbot/contracts/team-protoc
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { teamProtocolCapabilityLimit } from "@openbot/contracts/team-protocol/capability-limits";
 import {
+  AGENT_ERROR_LINK_CAPABILITY,
   BROWSER_VAULT_SKIP_CAPABILITY,
+  TEAM_USAGE_GROUPS_CAPABILITY,
+  TEAM_USAGE_READ_FAILED_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_WEB_CLIENT_PROTOCOL,
   TEAM_WEBRTC_CLIENT_PROTOCOL,
@@ -60,7 +63,10 @@ import {
 import { TEAM_PI_MUSE_CAPABILITY } from "@openbot/contracts/team-protocol/v7";
 import { decodeTeamProtocolV8CurrentHttpResponse } from "@openbot/contracts/team-protocol/v8-adapter";
 import { decodeTeamProtocolSupportV8Base } from "@openbot/contracts/team-protocol/v8-base";
-import { decodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
+import {
+  decodeTeamProtocolV8BaseCurrentEvent,
+  encodeTeamProtocolV8BaseCurrentEvent,
+} from "@openbot/contracts/team-protocol/v8-base-adapter";
 import {
   decodeTeamProtocolSupportV9,
   TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
@@ -180,6 +186,7 @@ function text(value: unknown, label: string): string {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -1000,7 +1007,11 @@ try {
   const withoutTertiary = (protocol: number) =>
     teamCapabilitiesForProtocol(protocol).filter((capability) => capability !== TEAM_USAGE_TERTIARY_CAPABILITY);
 
-  async function currentUsageEvent(capabilities: readonly string[]): Promise<JsonObject> {
+  async function currentUsageEvent(
+    capabilities: readonly string[],
+    sent: AccountUsage = reading,
+    before?: AccountUsage,
+  ): Promise<JsonObject> {
     const opened = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
       TEAM_PROTOCOL_V1_WEBSOCKET,
       `openbot-token.${member.token}`,
@@ -1022,7 +1033,8 @@ try {
     try {
       await scoped;
       const usage = nextMessage(opened, (value) => (isRecord(value) && value.type === "usage-changed" ? value : null));
-      hostAgents.emit("event", { type: "usage-changed", usage: reading });
+      if (before) hostAgents.emit("event", { type: "usage-changed", usage: before });
+      hostAgents.emit("event", { type: "usage-changed", usage: sent });
       return await usage;
     } finally {
       opened.close();
@@ -1096,6 +1108,113 @@ try {
       const malformed = { ...wire, usage: { ...usage, limits: [bad] } };
       assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
       assert.throws(() => decodeTeamProtocolV8CurrentHttpResponse("GET", "/v1/agents/usage", 200, malformed.usage));
+      return { relayed: relayed.status, malformed: "invalid" };
+    });
+
+    const pools = [
+      { name: "Gemini Models", models: ["gemini-3-pro"], primary: reading.limits[0]?.primary ?? null, secondary: null },
+      { name: "Claude and GPT models", models: ["claude-sonnet-4-6"], primary: monthly, secondary: null },
+    ];
+    const grouped: AccountUsage = { limits: [{ id: "antigravity", primary: monthly, secondary: null, groups: pools }] };
+    const withoutGroups = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).filter(
+      (capability) => capability !== TEAM_USAGE_GROUPS_CAPABILITY,
+    );
+
+    await step(
+      "usage-groups-v1: the host sends the model pools in usage-changed only to a client that asks",
+      async () => {
+        const wire = await currentUsageEvent(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10), grouped);
+        const decoded = decodeTeamProtocolV8BaseCurrentEvent(wire);
+        assert.ok(decoded.kind === "known" && decoded.event.type === "usage-changed", JSON.stringify(wire));
+        assert.deepEqual(decoded.event.usage.limits[0]?.groups, pools);
+        const without = await currentUsageEvent(withoutGroups, grouped);
+        assert.ok(!JSON.stringify(without).includes("groups"), "A client without usage-groups-v1 got the pools.");
+        const usage = record(without.usage, "usage");
+        assert.ok(Array.isArray(usage.limits) && usage.limits.length === 1, "The host dropped the limit itself.");
+        return { withCapability: "groups", without: "released" };
+      },
+    );
+
+    await step("usage-groups-v1: a WebRTC event follows the capability; a bad pool fails closed", async () => {
+      const wire = await currentUsageEvent(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10), grouped);
+      const relayed = decodeTeamProtocolV8CurrentEvent(createTeamProtocolV8Event(1, wire, { usageGroups: true }));
+      assert.ok(relayed.status === "known" && relayed.event.type === "usage-changed");
+      assert.deepEqual(relayed.event.usage.limits[0]?.groups, pools);
+      const without = createTeamProtocolV8Event(2, wire, {});
+      assert.ok(without.type === "event" && !JSON.stringify(without.payload).includes("groups"));
+      const usage = record(wire.usage, "usage");
+      assert.ok(Array.isArray(usage.limits));
+      const bad = { ...record(usage.limits[0], "antigravity"), groups: [{ name: "Gemini Models", models: [1] }] };
+      const malformed = { ...wire, usage: { ...usage, limits: [bad] } };
+      assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
+      assert.throws(() => decodeTeamProtocolV8CurrentHttpResponse("GET", "/v1/agents/usage", 200, malformed.usage));
+      return { relayed: relayed.status, malformed: "invalid" };
+    });
+
+    const failedRead = { id: "grok", primary: null, secondary: null, readFailed: true } as const;
+    const withFailedRead: AccountUsage = { limits: [...reading.limits, failedRead] };
+    const failedReadOnly: AccountUsage = { limits: [failedRead] };
+    const withoutReadFailed = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).filter(
+      (capability) => capability !== TEAM_USAGE_READ_FAILED_CAPABILITY,
+    );
+
+    await step("usage-read-failed-v1: an older client reads the usage route without the failed read", async () => {
+      Object.defineProperty(hostAgents, "getUsage", {
+        value: () => Effect.succeed(withFailedRead),
+        configurable: true,
+      });
+      try {
+        const results: { protocol: number; limits: number }[] = [];
+        for (const protocol of [TEAM_PROTOCOL_V9, 8, TEAM_PROTOCOL_V7]) {
+          const without = await current(protocol, teamCapabilitiesForProtocol(protocol), "/v1/agents/usage");
+          assert.equal(without.status, 200, `Protocol ${protocol}: ${JSON.stringify(without.body)}.`);
+          const limits = record(without.body, "usage").limits;
+          assert.ok(Array.isArray(limits) && limits.length === 2, `Protocol ${protocol} got the failed read.`);
+          assert.ok(!JSON.stringify(without.body).includes("readFailed"), `Protocol ${protocol} got readFailed.`);
+          results.push({ protocol, limits: limits.length });
+        }
+        return results;
+      } finally {
+        Object.defineProperty(hostAgents, "getUsage", { value: () => Effect.succeed(reading), configurable: true });
+      }
+    });
+
+    await step(
+      "usage-read-failed-v1: the usage-changed event follows the capability; an older client gets no empty event",
+      async () => {
+        const wire = await currentUsageEvent(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10), withFailedRead);
+        const decoded = decodeTeamProtocolV8BaseCurrentEvent(wire);
+        assert.ok(decoded.kind === "known" && decoded.event.type === "usage-changed", JSON.stringify(wire));
+        assert.deepEqual(decoded.event.usage.limits[2], failedRead);
+        const without = await currentUsageEvent(withoutReadFailed, withFailedRead);
+        assert.ok(!JSON.stringify(without).includes("readFailed"), "A client without the capability got readFailed.");
+        const usage = record(without.usage, "usage");
+        assert.ok(Array.isArray(usage.limits) && usage.limits.length === 2, JSON.stringify(usage));
+        const next = await currentUsageEvent(withoutReadFailed, reading, failedReadOnly);
+        const nextUsage = record(next.usage, "usage");
+        assert.ok(Array.isArray(nextUsage.limits) && nextUsage.limits.length === 2, JSON.stringify(nextUsage));
+        return { withCapability: "readFailed", without: "released", failedReadOnly: "not sent" };
+      },
+    );
+
+    await step("usage-read-failed-v1: a WebRTC event follows the capability; a bad value fails closed", async () => {
+      const wire = await currentUsageEvent(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10), withFailedRead);
+      const relayed = decodeTeamProtocolV8CurrentEvent(createTeamProtocolV8Event(1, wire, { usageReadFailed: true }));
+      assert.ok(relayed.status === "known" && relayed.event.type === "usage-changed");
+      assert.deepEqual(relayed.event.usage.limits[2], failedRead);
+      const without = createTeamProtocolV8Event(2, wire, {});
+      assert.ok(without.type === "event" && !JSON.stringify(without.payload).includes("readFailed"));
+      const usage = record(wire.usage, "usage");
+      assert.ok(Array.isArray(usage.limits));
+      const opencode = record(usage.limits[0], "opencode");
+      for (const bad of [
+        { ...failedRead, readFailed: "yes" },
+        { ...opencode, readFailed: true },
+      ]) {
+        const malformed = { ...wire, usage: { ...usage, limits: [bad] } };
+        assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid", JSON.stringify(bad));
+        assert.throws(() => decodeTeamProtocolV8CurrentHttpResponse("GET", "/v1/agents/usage", 200, malformed.usage));
+      }
       return { relayed: relayed.status, malformed: "invalid" };
     });
   } finally {
@@ -1182,6 +1301,92 @@ try {
     assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
     return { relayed: relayed.status, malformed: "invalid" };
   });
+
+  const verificationLink = "https://accounts.google.com/v3/signin/continue?sarp=1&scc=1&plt=team-api-e2e";
+  const accountError = {
+    type: "error",
+    agentId: source.id,
+    code: "agent_error",
+    message: "Google must verify your account before Gemini can answer.",
+    provider: "antigravity",
+    link: verificationLink,
+  } as const;
+  const withoutErrorLink = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).filter(
+    (capability) => capability !== AGENT_ERROR_LINK_CAPABILITY,
+  );
+
+  async function currentErrorEvent(capabilities: readonly string[]): Promise<JsonObject> {
+    const opened = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${member.token}`,
+    ]);
+    await new Promise<void>((resolveOpen, reject) => {
+      opened.addEventListener("open", () => resolveOpen(), { once: true });
+      opened.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    const scoped = nextMessage(opened, (value) =>
+      isRecord(value) && value.type === "runtime-snapshot" ? value : null,
+    );
+    opened.send(
+      encodeTeamProtocolV1CurrentClientEvent({
+        type: "agent-event-scope",
+        includeConversations: false,
+        capabilities: [...capabilities],
+      }),
+    );
+    try {
+      await scoped;
+      const failed = nextMessage(opened, (value) => (isRecord(value) && value.type === "error" ? value : null));
+      hostAgents.emit("event", accountError);
+      return await failed;
+    } finally {
+      opened.close();
+    }
+  }
+
+  await step("agent-error-link-v1: a client that asks for it gets the verification link of an error", async () => {
+    const capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10);
+    assert.ok(capabilities.includes(AGENT_ERROR_LINK_CAPABILITY), "A protocol 10 client does not ask for it.");
+    const wire = await currentErrorEvent(capabilities);
+    assert.equal(wire.link, verificationLink, JSON.stringify(wire));
+    const decoded = decodeTeamProtocolV8BaseCurrentEvent(wire);
+    assert.ok(decoded.kind === "known" && decoded.event.type === "error", JSON.stringify(wire));
+    assert.equal(decoded.event.link, verificationLink);
+    assert.equal(decoded.event.message, accountError.message);
+    return { error: Object.keys(wire).sort() };
+  });
+
+  await step("agent-error-link-v1: a client without it, and a protocol 9 client, get the released error", async () => {
+    const results: { capabilities: string; error: string[] }[] = [];
+    for (const [name, capabilities] of [
+      ["protocol 10 without the capability", withoutErrorLink],
+      ["protocol 9", teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)],
+    ] as const) {
+      const wire = await currentErrorEvent(capabilities);
+      assert.ok(!Object.hasOwn(wire, "link"), `${name} got the link: ${JSON.stringify(wire)}.`);
+      assert.equal(wire.message, accountError.message);
+      results.push({ capabilities: name, error: Object.keys(wire).sort() });
+    }
+    return results;
+  });
+
+  await step(
+    "agent-error-link-v1: a WebRTC event follows the capability; a link that is not https fails closed",
+    async () => {
+      const wire = await currentErrorEvent(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10));
+      const relayed = decodeTeamProtocolV8CurrentEvent(createTeamProtocolV8Event(1, wire, { errorLink: true }));
+      assert.ok(relayed.status === "known" && relayed.event.type === "error");
+      assert.equal(relayed.event.link, verificationLink);
+      const without = createTeamProtocolV8Event(2, wire, {});
+      assert.ok(without.type === "event" && !JSON.stringify(without.payload).includes("link"));
+      for (const link of ["javascript:alert(1)", "http://accounts.google.com/signin/continue", 7]) {
+        assert.equal(decodeTeamProtocolV8BaseCurrentEvent({ ...wire, link }).kind, "invalid", String(link));
+        const sent = encodeTeamProtocolV8BaseCurrentEvent({ ...accountError, link: String(link) }, { errorLink: true });
+        assert.ok(sent !== null && !sent.includes('"link"'), `The host sent ${String(link)}.`);
+      }
+      return { relayed: relayed.status, malformed: "invalid" };
+    },
+  );
 
   const clientKeys = generateKeyPairSync("ed25519", {
     publicKeyEncoding: { type: "spki", format: "pem" },
@@ -1619,6 +1824,7 @@ try {
       sourceText("error.backend.authRequestInactive"),
       `The answer did not reach the agent service: ${JSON.stringify(frame)}.`,
     );
+    assert.equal(error?.status, 409, `A closed secure authentication request was not a 409: ${JSON.stringify(frame)}.`);
     return { status: error?.status };
   });
 

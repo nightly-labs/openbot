@@ -2,12 +2,20 @@
 set -euo pipefail
 umask 077
 
+service_openbot() {
+  local comm
+  [[ $1 =~ ^[1-9][0-9]*$ ]] || return 1
+  if [ -d /proc/self ]; then
+    comm=$(cat "/proc/$1/comm" 2>/dev/null) || return 1
+  else
+    comm=$(ps -o comm= -p "$1" 2>/dev/null) || return 1
+  fi
+  [ "${comm##*/}" = openbot ] && [ "$(cat "/proc/$1/cgroup" 2>/dev/null)" = "$(cat /proc/$$/cgroup 2>/dev/null)" ]
+}
+
 if [ "${1:-}" = --stop ]; then
   pid=$(cat "$XDG_RUNTIME_DIR/openbot.pid" 2>/dev/null) || pid=""
-  if [[ $pid =~ ^[1-9][0-9]*$ ]] &&
-    [ "$(cat "/proc/$pid/comm" 2>/dev/null)" = openbot ] &&
-    [ "$(cat "/proc/$pid/cgroup" 2>/dev/null)" = "$(cat /proc/$$/cgroup)" ] &&
-    kill -TERM "$pid" 2>/dev/null; then
+  if service_openbot "$pid" && kill -TERM "$pid" 2>/dev/null; then
     while [ -e "/proc/$pid" ]; do sleep 0.2; done
   fi
   main=${MAINPID:-}
@@ -17,6 +25,41 @@ if [ "${1:-}" = --stop ]; then
       sleep 0.2
     done
   fi
+  exit 0
+fi
+if [ "${1:-}" = --watchdog ]; then
+  pid_file=$2 user_data=$3 interval=$4 limit=$5
+  heartbeat="$user_data/openbot-run-marker-v1.json"
+  start_attempts="$user_data/openbot-start-attempts-v1.json"
+  started_and_running() {
+    grep -qs '"state":"running"' "$heartbeat" && grep -qs '"attempt":null' "$start_attempts"
+  }
+  seen=$(cat "$heartbeat" 2>/dev/null) || seen=""
+  armed=0 misses=0
+  while sleep "$interval"; do
+    current=$(cat "$heartbeat" 2>/dev/null) || current=""
+    if [ "$current" != "$seen" ]; then
+      seen=$current armed=1 misses=0
+      continue
+    fi
+    [ "$armed" -eq 1 ] || continue
+    if ! started_and_running; then
+      misses=0
+      continue
+    fi
+    misses=$((misses + 1))
+    [ "$misses" -ge "$limit" ] || continue
+    free_kb=$(df -Pk "$user_data" 2>/dev/null | awk 'NR == 2 { print $4 }') || free_kb=""
+    if [[ ! $free_kb =~ ^[0-9]+$ ]] || [ "$free_kb" -lt 1024 ]; then continue; fi
+    pid=$(cat "$pid_file" 2>/dev/null) || pid=""
+    if ! service_openbot "$pid"; then
+      armed=0 misses=0
+      continue
+    fi
+    echo "OpenBot did not update its heartbeat for $((interval * limit)) seconds. The watchdog stops it, and systemd starts it again." >&2
+    kill -KILL "$pid" 2>/dev/null || true
+    exit 0
+  done
   exit 0
 fi
 state="$HOME/.config/openbot-hosted"
@@ -98,6 +141,8 @@ export GNOME_KEYRING_CONTROL
     find "$keyrings" -maxdepth 1 -name "${keyring##*/}.temp-*" ! -samefile "$keyring" -delete
   done
 ) &
+
+"$0" --watchdog "$XDG_RUNTIME_DIR/openbot.pid" "${XDG_CONFIG_HOME:-$HOME/.config}/OpenBot" 30 20 &
 
 openbot=(bash -c 'echo "$$" >"$XDG_RUNTIME_DIR/openbot.pid" && exec "$@"' openbot-hosted-server
   /opt/OpenBot/app/openbot --password-store=gnome-libsecret)

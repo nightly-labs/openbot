@@ -83,7 +83,12 @@ import {
   toPublicTab,
 } from "./browser-host-tab";
 import { BrowserHintRequests, sessionBrowserUserAgent } from "./browser-identity";
-import { describeBrowserTarget, navigateAndWait, waitForLoading } from "./browser-navigation";
+import {
+  describeBrowserTarget,
+  isCommittedNavigationTimeout,
+  navigateAndWait,
+  waitForLoading,
+} from "./browser-navigation";
 import {
   browserLoadOptions,
   browserRequestHeaders,
@@ -216,10 +221,23 @@ const PREVIEW_STALE_AFTER_MS = 1_000;
 const VIEW_FRAME_QUALITY = 60;
 const VIEW_FRAME_MAX_WIDTH = 1_280;
 const VIEW_FRAME_MAX_HEIGHT = 800;
+const VIEW_FRAME_LIMIT = 2_048;
+const VIEW_FRAME_MAX_PIXELS = 2_048 * 1_080;
+
+function viewFrameBox(asked: BrowserViewViewport | undefined): { maxWidth: number; maxHeight: number } {
+  if (!asked) return { maxWidth: VIEW_FRAME_MAX_WIDTH, maxHeight: VIEW_FRAME_MAX_HEIGHT };
+  const maxWidth = Math.min(VIEW_FRAME_LIMIT, Math.max(VIEW_FRAME_MAX_WIDTH, Math.round(asked.width)));
+  const tallest = Math.max(VIEW_FRAME_MAX_HEIGHT, Math.floor(VIEW_FRAME_MAX_PIXELS / maxWidth));
+  return {
+    maxWidth,
+    maxHeight: Math.min(VIEW_FRAME_LIMIT, tallest, Math.max(VIEW_FRAME_MAX_HEIGHT, Math.round(asked.height))),
+  };
+}
 const TAB_SET_TOOLS: ReadonlySet<string> = new Set(["open", "list_tabs", "status"]);
 const VIEW_CONTEXT_MENU_MS = 1_500;
 const DIALOG_ACTION_WAIT_MS = 10_000;
 const OPEN_REDIRECT_WAIT_MS = 5_000;
+const AGENT_OPEN_LOAD_TIMEOUT_MS = 30_000;
 const SIGN_IN_STORAGE_WRITE_TIMEOUT_MS = 5_000;
 const SERVICE_WORKER_CLEAR_WAIT_MS = 10_000;
 const OPEN_REDIRECT_READS = 2;
@@ -235,6 +253,7 @@ const DOWNLOAD_TOO_LARGE =
 export interface BrowserViewOptions {
   onCursor?: (cursor: BrowserViewCursor) => void;
   viewport?: BrowserViewViewport;
+  frameSize?: BrowserViewViewport;
   onPageCopy?: (text: string) => void;
 }
 
@@ -266,6 +285,7 @@ const LOW_MEMORY_TAB_SLEEP_MS = 5 * 60_000;
 const IDLE_TAB_SWEEP_MS = 60_000;
 const MAX_IDLE_AWAKE_TABS = 3;
 const AWAKE_TAB_GRACE_MS = 2 * 60_000;
+const IDLE_TAB_FREEZE_MS = 2 * 60_000;
 const IDLE_UNLOAD_NOTE =
   "Note: this tab was not used for some time, so its page was unloaded to free memory and loaded again from its address. Scripts that you injected, page variables, form input and the tab history from before are gone. Set them up again if you need them. An idle tab unloads sooner when several other tabs are open: close the tabs that you no longer need.";
 const PAGE_CLOSED_TAB_ERROR = (tabId: string) =>
@@ -281,6 +301,8 @@ const PROXY_ERROR_LIST: readonly (readonly [name: string, code: number, failure:
   ["net::ERR_PROXY_CERTIFICATE_INVALID", -136, "unreachable"],
   ["net::ERR_MANDATORY_PROXY_CONFIGURATION_FAILED", -131, "unreachable"],
 ];
+const EMPTY_RESPONSE_ERROR_CODE = -324;
+const PROXY_ROUTE = /^(?:PROXY|HTTPS|SOCKS[45]?|QUIC)\s/u;
 const PROXY_ERRORS = new Map(PROXY_ERROR_LIST.map(([name, , failure]) => [name, failure]));
 const PROXY_ERROR_CODES = new Map(PROXY_ERROR_LIST.map(([, code, failure]) => [code, failure]));
 
@@ -339,6 +361,7 @@ const USES_BACKGROUND_WINDOW =
   process.platform === "darwin" || process.platform === "win32" || process.platform === "linux";
 
 const SHOWS_VIEWS_IN_BACKGROUND = process.platform === "linux";
+const PAGE_ALERT_ACCEPTED = "The page showed an alert. OpenBot pressed OK so the app stays usable. Alert text: ";
 
 function createBackgroundWindow(): BaseWindow {
   const window = new BaseWindow({
@@ -480,6 +503,19 @@ function drivenByAgent(state: BrowserControlState, tab: BrowserHostTab): boolean
   );
 }
 
+const THIS_CHAT = "this chat";
+const NO_CHAT = "none";
+const OTHER_CHAT_TABS_NOTE =
+  'A tab whose chat is not "this chat" belongs to another chat of this agent, and this chat can use it. When otherChatWorking is true, another chat used the tab in the last 2 minutes and can still work in it: do not navigate, type in, or close it. Open a new tab instead, or wait.';
+const OTHER_CHAT_WORKING_MS = 120_000;
+
+type ToolTab = BrowserTab & { chat: string; otherChatWorking?: true };
+
+export interface BrowserAgentChat {
+  agentId: string;
+  sideThread: { taskId: string; title: string } | null;
+}
+
 export class BrowserHost {
   static readonly CONTROL_IDLE_GRACE_MS = BrowserControlSessions.IDLE_GRACE_MS;
   readonly #window: BrowserWindow;
@@ -487,7 +523,7 @@ export class BrowserHost {
   readonly #tabSessions = new Map<string, Session>();
   readonly #browserProfile: (agentId: string) => AgentBrowserProfile;
   readonly #profileExists: (profileId: string) => boolean;
-  readonly #agentChat: (threadId: string) => boolean;
+  readonly #agentChat: (threadId: string) => BrowserAgentChat | null;
   readonly #profileProxy: (profileId: string) => BrowserProxyConnection | null;
   readonly #onProxyStatusChanged: () => void;
   readonly #computerExit: (memberId: string) => RelayExit;
@@ -516,6 +552,7 @@ export class BrowserHost {
   #bounds: BrowserBounds | null = null;
   #attachedView: WebContentsView | null = null;
   #pictureInPictureWindow: BrowserWindow | null = null;
+  #pictureInPictureShortcuts = false;
   #pictureInPictureOverlayView: WebContentsView | null = null;
   #mainPageListener: ((page: BrowserMainPage | null) => void) | null = null;
   #target: BrowserViewTarget = "main";
@@ -538,9 +575,11 @@ export class BrowserHost {
     { ownerThreadId: string | null; ownerAgentId: string | null; sharedThreadIds: ReadonlySet<string> }
   >();
   readonly #memoryLow: () => boolean;
+  readonly #memoryCritical: () => boolean;
   readonly #tabLimit: () => number;
   readonly #idleTabSweep: NodeJS.Timeout;
   readonly #awakeTabGraceMs: number;
+  readonly #idleTabFreezeMs: number;
   readonly #webPreferences: ReturnType<typeof browserWebPreferences>;
 
   constructor(
@@ -552,16 +591,17 @@ export class BrowserHost {
       recordingMaxConcurrent?: number;
       recordingMaxAggregateBytes?: number;
       memoryLow?: () => boolean;
+      memoryCritical?: () => boolean;
       tabLimit?: () => number;
       browserProfile?: (agentId: string) => AgentBrowserProfile;
       profileExists?: (profileId: string) => boolean;
-      agentChat?: (threadId: string) => boolean;
+      agentChat?: (threadId: string) => BrowserAgentChat | null;
       profileProxy?: (profileId: string) => BrowserProxyConnection | null;
       onProxyStatusChanged?: () => void;
       computerExit?: (memberId: string) => RelayExit;
       quitShortcut?: (input: Input) => boolean;
       pagePreload?: string;
-      tabSleep?: { sweepMs: number; awakeGraceMs: number };
+      tabSleep?: { sweepMs: number; awakeGraceMs: number; freezeMs?: number };
       siteMemories?: (agentId: string, hostname: string) => BrowserSiteMemory[];
       userBrowsing?: BrowserUserBrowsing;
       hideFromWindowSwitchers?: (window: BaseWindow) => void;
@@ -579,11 +619,13 @@ export class BrowserHost {
       window.once("closed", () => this.#closeBackgroundWindow());
     }
     this.#memoryLow = options.memoryLow ?? (() => false);
+    this.#memoryCritical = options.memoryCritical ?? (() => false);
     this.#tabLimit = options.tabLimit ?? (() => INPUT_LIMITS.browserTabs);
     this.#awakeTabGraceMs = options.tabSleep?.awakeGraceMs ?? AWAKE_TAB_GRACE_MS;
+    this.#idleTabFreezeMs = options.tabSleep?.freezeMs ?? IDLE_TAB_FREEZE_MS;
     this.#browserProfile = options.browserProfile ?? (() => ({ kind: "shared" }));
     this.#profileExists = options.profileExists ?? (() => false);
-    this.#agentChat = options.agentChat ?? (() => false);
+    this.#agentChat = options.agentChat ?? (() => null);
     this.#profileProxy = options.profileProxy ?? (() => null);
     this.#onProxyStatusChanged = options.onProxyStatusChanged ?? (() => {});
     this.#computerExit = options.computerExit ?? (() => () => Promise.reject(new Error("No computer exit")));
@@ -663,7 +705,7 @@ export class BrowserHost {
 
     for (const tab of tabs) tab.pendingRestore = () => loadSavedPage(tab);
     const activeTab = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : undefined;
-    if (activeTab) yield* this.#wake(activeTab);
+    if (activeTab && this.#visible) yield* this.#wake(activeTab);
   }).bind(this);
 
   readonly #wake = Effect.fn("BrowserHost.wake")(function* (this: BrowserHost, tab: BrowserHostTab) {
@@ -683,8 +725,8 @@ export class BrowserHost {
   });
 
   readonly #sleepIdleTabs = Effect.fn("BrowserHost.sleepIdleTabs")(function* (this: BrowserHost) {
-    this.#throttleHiddenTabs();
     const now = Date.now();
+    this.#throttleHiddenTabs(now);
     const idleMs = this.#memoryLow() ? LOW_MEMORY_TAB_SLEEP_MS : IDLE_TAB_SLEEP_MS;
     const awake: BrowserHostTab[] = [];
     for (const tab of this.#tabs.values()) {
@@ -699,20 +741,68 @@ export class BrowserHost {
     }
   });
 
-  #throttleHiddenTabs(): void {
+  readonly releaseIdleTabs = Effect.fn("BrowserHost.releaseIdleTabs")(function* (
+    this: BrowserHost,
+    runningThreadIds: ReadonlySet<string>,
+  ) {
+    for (const tab of [...this.#tabs.values()]) {
+      if (tab.pendingRestore || tab.ownerThreadId === null || !this.#maySleep(tab) || this.#tabInUse(tab)) continue;
+      if ([tab.ownerThreadId, ...(tab.sharedThreadIds ?? [])].some((threadId) => runningThreadIds.has(threadId))) {
+        continue;
+      }
+      yield* this.#sleep(tab).pipe(
+        Effect.tapError((error) =>
+          Effect.sync(() => logger.warn("Unable to sleep a browser tab to free memory", { error: toLogValue(error) })),
+        ),
+        Effect.ignore,
+      );
+    }
+  }).bind(this);
+
+  #throttleHiddenTabs(now: number): void {
     for (const tab of this.#tabs.values()) {
-      if (tab.closing || tab.contents.isDestroyed() || tab.contents.getBackgroundThrottling()) continue;
-      if (this.#viewShown(tab.view)) continue;
-      if (this.#tabBusy(tab)) continue;
-      tab.contents.setBackgroundThrottling(true);
-      this.#setIdleFocus(tab, false);
+      if (tab.closing || tab.contents.isDestroyed() || this.#viewShown(tab.view) || this.#tabBusy(tab)) continue;
+      if (!tab.contents.getBackgroundThrottling()) {
+        tab.contents.setBackgroundThrottling(true);
+        this.#setIdleFocus(tab, false);
+      }
+      if (this.#mayFreeze(tab) && now - tab.lastUsedAt >= this.#idleTabFreezeMs) this.#setFrozen(tab, true);
     }
   }
 
   #unthrottle(tab: BrowserHostTab): void {
-    if (tab.contents.isDestroyed() || !tab.contents.getBackgroundThrottling()) return;
+    if (tab.contents.isDestroyed()) return;
+    this.#thaw(tab);
+    if (!tab.contents.getBackgroundThrottling()) return;
     tab.contents.setBackgroundThrottling(false);
     this.#setIdleFocus(tab, true);
+  }
+
+  #mayFreeze(tab: BrowserHostTab): boolean {
+    return !tab.pendingRestore && !tab.engine.dialog && this.#maySleep(tab);
+  }
+
+  #thaw(tab: BrowserHostTab): void {
+    if (!tab.engine.frozen) return;
+    this.#setFrozen(tab, false);
+    if (!tab.view.getVisible()) return;
+    tab.view.setVisible(false);
+    tab.view.setVisible(true);
+  }
+
+  #setFrozen(tab: BrowserHostTab, frozen: boolean): void {
+    if (tab.closing) return;
+    Effect.runFork(
+      tab.engine.setFrozen(frozen).pipe(
+        Effect.tapError((error) =>
+          Effect.sync(() =>
+            logger.warn("Unable to change the lifecycle state of a browser tab", { error: toLogValue(error) }),
+          ),
+        ),
+        Effect.ignore,
+        Effect.forkIn(tab.scope, { startImmediately: true }),
+      ),
+    );
   }
 
   #setIdleFocus(tab: BrowserHostTab, enabled: boolean): void {
@@ -735,7 +825,7 @@ export class BrowserHost {
   }
 
   #tabInUse(tab: BrowserHostTab): boolean {
-    return this.#activeTabId === tab.id || this.#tabBusy(tab);
+    return (this.#activeTabId === tab.id && this.#viewShown(tab.view)) || this.#tabBusy(tab);
   }
 
   #tabBusy(tab: BrowserHostTab): boolean {
@@ -873,8 +963,9 @@ export class BrowserHost {
     return { tabs: this.listTabs(), activeTabId: this.#activeTabId };
   }
 
-  setPictureInPictureWindow(window: BrowserWindow | null): void {
+  setPictureInPictureWindow(window: BrowserWindow | null, options: { shortcuts?: boolean } = {}): void {
     this.#pictureInPictureWindow = window;
+    this.#pictureInPictureShortcuts = window !== null && options.shortcuts === true;
     if (!window && this.#target === "picture-in-picture") {
       this.#visible = false;
       this.#target = "main";
@@ -914,7 +1005,7 @@ export class BrowserHost {
     ownerAgentId: string | null = null,
     focus = false,
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
-    return yield* this.#open(url, ownerThreadId, ownerAgentId, focus, false);
+    return yield* this.#open(url, ownerThreadId, ownerAgentId, focus, false, null);
   }).bind(this);
 
   readonly openPrivate = Effect.fn("BrowserHost.openPrivate")(function* (
@@ -923,7 +1014,7 @@ export class BrowserHost {
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
     const privateSession = session.fromPartition(`openbot-private-${randomUUID()}`, { cache: false });
     this.#configureSession(privateSession);
-    return yield* this.#open(url, null, null, false, true, privateSession);
+    return yield* this.#open(url, null, null, false, true, null, privateSession);
   }).bind(this);
 
   readonly #open = Effect.fn("BrowserHost.openTab")(function* (
@@ -933,12 +1024,18 @@ export class BrowserHost {
     ownerAgentId: string | null,
     focus: boolean,
     closeOnFailure: boolean,
+    firstLoadTimeoutMs: number | null,
     privateSession?: Session,
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
     if (!this.#hasTabCapacity(ownerThreadId, ownerAgentId)) {
       return yield* browserFailure(new Error(sourceText("error.backend.browserTabLimit", { limit: this.#tabLimit() })));
     }
-    if (this.#memoryLow()) return yield* browserFailure(new Error(sourceText("error.backend.browserLowMemory")));
+    if (this.#memoryLow()) {
+      if (this.#ownedTabs(ownerThreadId, ownerAgentId).some((tab) => !tab.pendingRestore)) {
+        return yield* browserFailure(new Error(sourceText("error.backend.browserLowMemory")));
+      }
+      if (this.#memoryCritical()) return yield* browserFailure(new Error(sourceText("error.backend.browserNoMemory")));
+    }
     const normalizedUrl = yield* browserSync(() => normalizeBrowserUrl(url));
     const previouslyFocused = focus ? null : this.#focusedContentsOutsideTabs();
     const tabSession = privateSession || !ownerAgentId ? undefined : yield* this.#agentTabSession(ownerAgentId);
@@ -971,8 +1068,11 @@ export class BrowserHost {
         yield* navigateAndWait(
           tab.contents,
           () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
-          null,
-        ).pipe(Effect.ensuring(Effect.sync(() => (tab.opening = false))));
+          firstLoadTimeoutMs,
+        ).pipe(
+          Effect.catchIf(isCommittedNavigationTimeout, () => Effect.void),
+          Effect.ensuring(Effect.sync(() => (tab.opening = false))),
+        );
         if (focus) {
           this.#focusTab(tab);
           setImmediate(() => this.#focusTab(tab));
@@ -997,7 +1097,7 @@ export class BrowserHost {
             }
             this.#emitChanged();
             yield* this.#persistState();
-            const proxyFailure = this.#proxyLoadFailure(tab, operationFailure);
+            const proxyFailure = yield* this.#loadFailure(tab, operationFailure, normalizedUrl);
             if (proxyFailure !== operationFailure) return yield* proxyFailure;
             const certificateFailure = closeOnFailure ? operationFailure : certificateLoadFailure(operationFailure);
             if (certificateFailure !== operationFailure) return yield* certificateFailure;
@@ -1013,14 +1113,17 @@ export class BrowserHost {
   }).bind(this);
 
   #hasTabCapacity(ownerThreadId: string | null, ownerAgentId: string | null): boolean {
-    const tabs = [...this.#tabs.values()].filter(
+    return this.#ownedTabs(ownerThreadId, ownerAgentId).length < this.#tabLimit();
+  }
+
+  #ownedTabs(ownerThreadId: string | null, ownerAgentId: string | null): BrowserHostTab[] {
+    return [...this.#tabs.values()].filter(
       (tab) =>
         !tab.closing &&
         !tab.contents.isDestroyed() &&
         tab.ownerThreadId === ownerThreadId &&
         (tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId),
     );
-    return tabs.length < this.#tabLimit();
   }
 
   readonly activate = Effect.fn("BrowserHost.activate")(function* (
@@ -1039,6 +1142,7 @@ export class BrowserHost {
     tabId: string,
     direction: BrowserNavigationDirection,
   ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaveSilentPage(tabId, direction);
     yield* this.#enqueue(tabId, (tab) =>
       Effect.gen({ self: this }, function* () {
         yield* untilStopped(
@@ -1055,6 +1159,7 @@ export class BrowserHost {
     url: string,
   ): Effect.fn.Return<void, BrowserOperationError> {
     const normalizedUrl = yield* browserSync(() => normalizeBrowserUrl(url));
+    yield* this.#leaveSilentPage(tabId);
     yield* this.#enqueue(
       tabId,
       (tab) =>
@@ -1065,7 +1170,11 @@ export class BrowserHost {
             tab,
             navigateAndWait(tab.contents, () => tab.contents.loadURL(normalizedUrl, browserLoadOptions())),
           ).pipe(
-            Effect.mapError((failure) => certificateLoadFailure(this.#proxyLoadFailure(tab, failure))),
+            Effect.catch((failure) =>
+              this.#loadFailure(tab, failure, normalizedUrl).pipe(
+                Effect.flatMap((loadFailure) => Effect.fail(certificateLoadFailure(loadFailure))),
+              ),
+            ),
             Effect.ensuring(
               Effect.sync(() => {
                 tab.focusOnCommit = false;
@@ -1082,6 +1191,7 @@ export class BrowserHost {
     this: BrowserHost,
     tabId: string,
   ): Effect.fn.Return<void, BrowserOperationError> {
+    yield* this.#leaveSilentPage(tabId);
     yield* this.#enqueue(
       tabId,
       (tab) =>
@@ -1444,7 +1554,6 @@ export class BrowserHost {
     const protection = { origin: url.origin, submitted: false, replaced: false, running: false };
     tab.secret = protection;
     stopCookieBanners(tab.contents);
-    this.#invalidateViews(tab);
     this.#syncAttachedView();
     return yield* Effect.gen({ self: this }, function* () {
       const entry = yield* this.#enqueue(
@@ -1541,6 +1650,7 @@ export class BrowserHost {
             let shown = false;
             let leaked = false;
             let stopWaiting = () => {};
+            let submitSent = false;
             const contents = tab.contents;
             const blockLeak = (event: ElectronEvent<WebContentsWillFrameNavigateEventParams>) => {
               if (!secrets.some((value) => urlCarriesSecret(event.url, value))) return;
@@ -1556,10 +1666,18 @@ export class BrowserHost {
                   Effect.gen({ self: this }, function* () {
                     yield* boundEngineOperation(
                       tab,
-                      entry.enter(values, vault),
+                      entry.enter(values, vault, () => {
+                        submitSent = true;
+                      }),
                       10_000,
                       "Authentication submission timed out.",
                       keepQueueBlocked,
+                    ).pipe(
+                      Effect.catch((error) =>
+                        submitSent && protection.replaced && isTimeoutError(error.cause)
+                          ? Effect.void
+                          : Effect.fail(error),
+                      ),
                     );
                     if (!protection.replaced && !leaked) {
                       yield* Effect.callback<void>((resume) => {
@@ -1893,8 +2011,9 @@ export class BrowserHost {
     input: BrowserVisibilityInput,
   ) {
     const active = this.#activeTabId ? this.#tabs.get(this.#activeTabId) : undefined;
-    if (active) yield* this.#wake(active);
+    if (active && input.visible) yield* this.#wake(active);
     yield* browserSync(() => {
+      if (!input.visible && input.target !== undefined && input.target !== this.#target) return;
       const restoreRendererFocus = !input.visible && this.#attachedView?.webContents.isFocused();
       this.#visible = input.visible;
       if (input.bounds) this.#bounds = validateBounds(input.bounds);
@@ -2061,6 +2180,7 @@ export class BrowserHost {
     tab: BrowserHostTab,
   ) {
     if (tab.previewCapture && showsCurrentPage(tab, tab.previewCapture)) return tab.previewCapture;
+    this.#thaw(tab);
     const page = currentPreviewPage(tab);
     const frame = Deferred.makeUnsafe<BrowserPreview, BrowserOperationError>();
     const capture = { ...page, frame };
@@ -2124,7 +2244,7 @@ export class BrowserHost {
     onEnded?: (reason: string) => void,
     options: BrowserViewOptions = {},
   ): Effect.fn.Return<() => Effect.Effect<void>, BrowserOperationError> {
-    const { onCursor, viewport, onPageCopy } = options;
+    const { onCursor, viewport, frameSize, onPageCopy } = options;
     const tab = yield* this.#requireTab(tabId);
     const protection = tab.secret;
     if (protection?.submitted && !protection.running && this.#takeoverTabIds.has(tabId))
@@ -2134,9 +2254,20 @@ export class BrowserHost {
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error(sourceText("error.backend.browserViewProtected")));
     yield* browserSync(() => this.#requireNoFilledCard(tab, "Browser view"));
-    const generation = tab.captureGeneration;
+    let generation = tab.captureGeneration;
     let invalidated = false;
+    let stopped = false;
+    let stopStream: (() => Effect.Effect<void>) | undefined;
+    let resume: Deferred.Deferred<void> | undefined;
+    let paused: Fiber.Fiber<void> | undefined;
+    let sequence = 0;
     let lastCursor: BrowserViewCursor | null = null;
+    const showsPage = (streamGeneration: number) =>
+      streamGeneration === generation &&
+      !tab.secret?.submitted &&
+      !tab.filledCard &&
+      !tab.secretShown &&
+      tab.captureGeneration === streamGeneration;
     const cursorChanged = (_event: unknown, type: string) => {
       if (tab.secret?.submitted || tab.captureGeneration !== generation) return;
       const cursor = browserViewCursor(type);
@@ -2147,55 +2278,91 @@ export class BrowserHost {
     const stopCursor = () => {
       if (onCursor && !tab.contents.isDestroyed()) tab.contents.off("cursor-changed", cursorChanged);
     };
-    const invalidate = () => {
+    const end = (reason: string) => {
       invalidated = true;
       tab.viewInvalidations.delete(invalidate);
       stopCursor();
-      onEnded?.("Authentication changed the browser view. Open a new view to continue.");
+      onEnded?.(reason);
     };
-    tab.viewInvalidations.add(invalidate);
-    if (onCursor) tab.contents.on("cursor-changed", cursorChanged);
-    return yield* Effect.gen({ self: this }, function* () {
-      const stop = yield* tab.engine.startScreencast(
+    const endForAuthentication = () => end("Authentication changed the browser view. Open a new view to continue.");
+    const tabGone = () => tab.closing || tab.contents.isDestroyed() || this.#tabs.get(tab.id) !== tab;
+    const openStream = (streamGeneration: number) =>
+      tab.engine.startScreencast(
         {
           quality: VIEW_FRAME_QUALITY,
-          maxWidth: VIEW_FRAME_MAX_WIDTH,
-          maxHeight: VIEW_FRAME_MAX_HEIGHT,
+          ...viewFrameBox(frameSize),
           ...(viewport ? { viewport } : {}),
           ...(onPageCopy
             ? {
                 onPageCopy: (text: string) => {
-                  if (
-                    !tab.secret?.submitted &&
-                    !tab.filledCard &&
-                    !tab.secretShown &&
-                    tab.captureGeneration === generation
-                  )
-                    onPageCopy(text);
+                  if (showsPage(streamGeneration)) onPageCopy(text);
                 },
               }
             : {}),
         },
         (frame) => {
-          if (!tab.secret?.submitted && !tab.filledCard && !tab.secretShown && tab.captureGeneration === generation)
-            onFrame(frame);
+          if (!showsPage(streamGeneration)) return;
+          sequence += 1;
+          onFrame({ ...frame, sequence });
         },
         (error) => {
+          if (streamGeneration !== generation) return;
           tab.viewInvalidations.delete(invalidate);
           stopCursor();
           logger.warn("The live browser view stopped.", { error: toLogValue(error) });
           onEnded?.("The live browser view stopped. Open a new view to continue.");
         },
       );
-      let stopped = false;
+    const pauseUntilProtectionEnds = (previous: () => Effect.Effect<void>) => {
+      const protectionEnded = Deferred.makeUnsafe<void>();
+      const stopListening = this.onChanged(() => {
+        if (tabGone() || !tab.secret?.running) Deferred.doneUnsafe(protectionEnded, Effect.void);
+      });
+      const release = () => {
+        stopListening();
+        if (resume !== protectionEnded) return;
+        resume = undefined;
+        paused = undefined;
+      };
+      resume = protectionEnded;
+      paused = Effect.runFork(
+        Effect.gen(function* () {
+          yield* previous();
+          yield* Deferred.await(protectionEnded);
+          stopListening();
+          if (stopped) return;
+          if (tabGone() || tab.secret?.submitted || tab.filledCard || tab.secretShown) return endForAuthentication();
+          const streamGeneration = tab.captureGeneration;
+          generation = streamGeneration;
+          stopStream = yield* openStream(streamGeneration);
+          if (stopped) return;
+          release();
+          if (!showsPage(streamGeneration) || tabGone()) invalidate();
+        }).pipe(
+          Effect.catchCause(() => Effect.sync(endForAuthentication)),
+          Effect.ensuring(Effect.sync(release)),
+        ),
+      );
+    };
+    const invalidate = () => {
+      if (paused) return;
+      if (!stopStream || stopped || !tab.secret?.submitted || tab.filledCard) return endForAuthentication();
+      pauseUntilProtectionEnds(stopStream);
+    };
+    tab.viewInvalidations.add(invalidate);
+    if (onCursor) tab.contents.on("cursor-changed", cursorChanged);
+    return yield* Effect.gen({ self: this }, function* () {
+      stopStream = yield* openStream(generation);
       const stopOnce = () =>
         Effect.gen({ self: this }, function* () {
           tab.viewInvalidations.delete(invalidate);
           stopCursor();
           if (stopped) return;
           stopped = true;
+          if (resume) Deferred.doneUnsafe(resume, Effect.void);
+          if (paused) yield* Fiber.await(paused);
           tab.engine.releaseViewButton();
-          yield* stop();
+          if (stopStream) yield* stopStream();
         });
       if (invalidated) yield* stopOnce();
       return stopOnce;
@@ -2244,7 +2411,14 @@ export class BrowserHost {
   readonly #toolHandlers: BrowserToolHandlers = {
     open: ({ args }, params) =>
       Effect.gen({ self: this }, function* () {
-        const tab = yield* this.#open(args.url, params.threadId, params.ownerAgentId ?? null, false, true);
+        const tab = yield* this.#open(
+          args.url,
+          params.threadId,
+          params.ownerAgentId ?? null,
+          false,
+          true,
+          AGENT_OPEN_LOAD_TIMEOUT_MS,
+        );
         this.#controls.updateTab(params, tab.id);
         let read = yield* Effect.result(this.#finalStepsSnapshot(params, tab.id));
         for (
@@ -2580,7 +2754,9 @@ export class BrowserHost {
       const call = yield* browserSync(() => parseBrowserToolCall(params.tool, params.arguments));
       if ("tabId" in call.args) calledTabId = call.args.tabId;
       yield* browserSync(() => this.#controls.begin(params, call));
-      return { result: yield* runBrowserTool(this.#toolHandlers, call.tool, call, params, hooks) };
+      const run = runBrowserTool(this.#toolHandlers, call.tool, call, params, hooks);
+      if (calledTabId === undefined || call.tool === "run_script") return { result: yield* run };
+      return { result: yield* Effect.raceFirst(run, this.#pageCrashFailure(calledTabId)) };
     })
       .pipe(
         Effect.provideService(BrowserToolHold, (tabId: string) => this.#heldByUser(tabId)),
@@ -2630,16 +2806,36 @@ export class BrowserHost {
   }
 
   #toolTabs(params: DynamicToolCallParams): {
-    tabs: BrowserTab[];
+    tabs: ToolTab[];
     activeTabId: string | null;
     otherChatTabs?: number;
     note?: string;
   } {
-    const tabs = this.listTabs()
-      .filter((tab) => this.#canUseToolTab(params, tab))
-      .map((tab) => {
-        const engine = this.#tabs.get(tab.id)?.engine;
-        return engine ? { ...tab, title: engine.scrubText(tab.title), url: engine.scrubText(tab.url) } : tab;
+    const chatOf = this.#cachedAgentChat();
+    const otherChatTabIds = new Set(
+      this.getControlState()
+        .sessions.filter((session) => session.threadId !== params.threadId)
+        .map((session) => session.tabId),
+    );
+    const now = Date.now();
+    const allTabs = this.listTabs();
+    const tabs = allTabs
+      .filter((tab) => this.#canUseToolTab(params, tab, chatOf))
+      .map((tab): ToolTab => {
+        const hostTab = this.#tabs.get(tab.id);
+        const engine = hostTab?.engine;
+        const scrubbed = engine ? { ...tab, title: engine.scrubText(tab.title), url: engine.scrubText(tab.url) } : tab;
+        const lastChat = hostTab?.lastToolChat;
+        const working =
+          otherChatTabIds.has(tab.id) ||
+          (lastChat !== undefined &&
+            lastChat.threadId !== params.threadId &&
+            now - lastChat.at < OTHER_CHAT_WORKING_MS);
+        return {
+          ...scrubbed,
+          chat: this.#tabChat(params, tab, chatOf),
+          ...(working ? { otherChatWorking: true as const } : {}),
+        };
       });
     const activeTabId = tabs.some((tab) => tab.id === this.#activeTabId)
       ? this.#activeTabId
@@ -2648,15 +2844,46 @@ export class BrowserHost {
     const otherChatTabs =
       ownerAgentId === null
         ? 0
-        : this.listTabs().filter((tab) => tab.ownerAgentId === ownerAgentId && !this.#canUseToolTab(params, tab))
+        : allTabs.filter((tab) => tab.ownerAgentId === ownerAgentId && !this.#canUseToolTab(params, tab, chatOf))
             .length;
-    if (otherChatTabs === 0) return { tabs, activeTabId };
+    const notes = [
+      ...(tabs.some((tab) => tab.chat !== THIS_CHAT && tab.chat !== NO_CHAT) ? [OTHER_CHAT_TABS_NOTE] : []),
+      ...(otherChatTabs === 0
+        ? []
+        : [
+            `${otherChatTabs} more ${otherChatTabs === 1 ? "tab of this agent is" : "tabs of this agent are"} open in its other chats, and this chat cannot use ${otherChatTabs === 1 ? "it" : "them"}. To give a tab to this chat, ask the user to type @ in the message box of this chat, select the tab under "Browser tabs", and send the message.`,
+          ]),
+    ];
     return {
       tabs,
       activeTabId,
-      otherChatTabs,
-      note: `${otherChatTabs} more ${otherChatTabs === 1 ? "tab of this agent is" : "tabs of this agent are"} open in its other chats, and this chat cannot use ${otherChatTabs === 1 ? "it" : "them"}. To give a tab to this chat, ask the user to type @ in the message box of this chat, select the tab under "Browser tabs", and send the message.`,
+      ...(otherChatTabs === 0 ? {} : { otherChatTabs }),
+      ...(notes.length === 0 ? {} : { note: notes.join(" ") }),
     };
+  }
+
+  #cachedAgentChat(): (threadId: string) => BrowserAgentChat | null {
+    const known = new Map<string, BrowserAgentChat | null>();
+    return (threadId) => {
+      const cached = known.get(threadId);
+      if (cached !== undefined) return cached;
+      const chat = this.#agentChat(threadId);
+      known.set(threadId, chat);
+      return chat;
+    };
+  }
+
+  #tabChat(
+    params: DynamicToolCallParams,
+    tab: BrowserTab,
+    chatOf: (threadId: string) => BrowserAgentChat | null,
+  ): string {
+    if (tab.ownerThreadId === params.threadId) return THIS_CHAT;
+    if (tab.ownerThreadId === null) return NO_CHAT;
+    const owner = chatOf(tab.ownerThreadId);
+    if (owner === null || owner.agentId !== tab.ownerAgentId) return "another conversation";
+    if (owner.sideThread === null) return "main chat";
+    return `side thread ${JSON.stringify(owner.sideThread.title)} (taskId ${owner.sideThread.taskId})`;
   }
 
   readonly #fillCard = Effect.fn("BrowserHost.fillCard")(function* (
@@ -2758,6 +2985,9 @@ export class BrowserHost {
   ) {
     const { url, direction } = args;
     if (!url && !direction) return yield* browserFailure(new Error("navigate requires url or direction."));
+    if (url) yield* browserSync(() => normalizeBrowserUrl(url));
+    if (!this.#takeoverTabIds.has(tabId) && !this.#userControlTabIds.has(tabId))
+      yield* this.#leaveSilentPage(tabId, url ? undefined : direction);
     return yield* this.#runAction(
       tabId,
       "navigate",
@@ -2772,7 +3002,11 @@ export class BrowserHost {
               tab.contents,
               () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
               operationTimeout,
-            ).pipe(Effect.mapError((failure) => this.#proxyLoadFailure(tab, failure)));
+            ).pipe(
+              Effect.catch((failure) =>
+                this.#loadFailure(tab, failure, normalizedUrl).pipe(Effect.flatMap(Effect.fail)),
+              ),
+            );
           } else if (direction === "reload") {
             yield* navigateAndWait(
               tab.contents,
@@ -3205,6 +3439,30 @@ export class BrowserHost {
     this.#onProxyStatusChanged();
   }
 
+  readonly #loadFailure = Effect.fn("BrowserHost.loadFailure")(function* (
+    this: BrowserHost,
+    tab: BrowserHostTab,
+    failure: BrowserOperationError,
+    url: string,
+  ) {
+    const proxyFailure = this.#proxyLoadFailure(tab, failure);
+    if (proxyFailure !== failure || chromiumErrorCode(String(failure.cause)) !== EMPTY_RESPONSE_ERROR_CODE)
+      return proxyFailure;
+    const route = yield* Effect.tryPromise(() => this.#tabSession(tab).resolveProxy(url)).pipe(
+      Effect.orElseSucceed(() => "DIRECT"),
+    );
+    if (!PROXY_ROUTE.test(route.trim())) return failure;
+    return browserFailure(
+      new Error(
+        sourceText(
+          this.#tabProxy(tab) === null
+            ? "error.backend.browserSystemProxyOrSiteClosed"
+            : "error.backend.browserProfileProxyOrSiteClosed",
+        ),
+      ),
+    );
+  }).bind(this);
+
   #proxyLoadFailure(tab: BrowserHostTab, failure: BrowserOperationError): BrowserOperationError {
     const proxy = this.#tabProxy(tab);
     const proxyError = proxyErrorInText(String(failure.cause));
@@ -3448,9 +3706,23 @@ export class BrowserHost {
     });
   }
 
+  #agentRunsTab(tab: BrowserHostTab): boolean {
+    return (
+      (tab.ownerThreadId !== null || tab.ownerAgentId !== null) &&
+      !tab.secret &&
+      !this.#takeoverTabIds.has(tab.id) &&
+      !this.#userControlTabIds.has(tab.id)
+    );
+  }
+
   #bindTabEvents(tab: BrowserHostTab): void {
     const contents = tab.contents;
     const changed = () => this.#emitChanged();
+    tab.engine.acceptPageAlerts((message) => {
+      if (tab.closing || !this.#agentRunsTab(tab)) return false;
+      tab.diagnostics.add({ kind: "console", level: "warning", message: `${PAGE_ALERT_ACCEPTED}${message}` });
+      return true;
+    });
     if (this.#tabProxy(tab)) contents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
     let proxySignIns = 0;
     contents.on("login", (event, _details, authInfo, callback) => {
@@ -3540,12 +3812,10 @@ export class BrowserHost {
         this.#collapseOnEscape(tab);
         return;
       }
-      if (
-        isBrowserViewShortcut(input, process.platform === "darwin") &&
-        this.#mountedViews.get(tab.view) === this.#window
-      ) {
+      const shortcutWindow = this.#shortcutWindow(tab.view);
+      if (isBrowserViewShortcut(input, process.platform === "darwin") && shortcutWindow) {
         event.preventDefault();
-        this.#forwardKeyToWindow(input);
+        this.#forwardKeyToWindow(input, shortcutWindow);
         return;
       }
       if (!isCloseBrowserTabShortcut(input)) return;
@@ -3591,13 +3861,7 @@ export class BrowserHost {
     contents.on("did-start-loading", changed);
     contents.on("dom-ready", () => {
       void contents.insertCSS(":where(html) { scrollbar-gutter: stable; }").catch(() => undefined);
-      if (
-        (tab.ownerThreadId !== null || tab.ownerAgentId !== null) &&
-        !tab.secret &&
-        !this.#takeoverTabIds.has(tab.id) &&
-        !this.#userControlTabIds.has(tab.id)
-      )
-        refuseCookieBanners(contents);
+      if (this.#agentRunsTab(tab)) refuseCookieBanners(contents);
     });
     contents.on("did-stop-loading", () => {
       if (tab.closing || tab.contents !== contents || contents.isDestroyed()) return;
@@ -3631,6 +3895,7 @@ export class BrowserHost {
     contents.on("page-title-updated", changed);
     contents.on("render-process-gone", (_event, details) => {
       if (tab.closing || tab.contents !== contents || contents.isDestroyed() || details.reason === "clean-exit") return;
+      if (tab.endingSilentPage) return;
       tab.crashes = (tab.crashes ?? 0) + 1;
       if (tab.secret) return;
       const reload =
@@ -3789,17 +4054,23 @@ export class BrowserHost {
     });
   }
 
-  #forwardKeyToWindow(input: Input): void {
-    if (this.#window.isDestroyed()) return;
+  #shortcutWindow(view: WebContentsView): BrowserWindow | null {
+    const mounted = this.#mountedViews.get(view);
+    if (mounted === this.#window) return mounted;
+    return this.#pictureInPictureShortcuts && mounted === this.#pictureInPictureWindow ? mounted : null;
+  }
+
+  #forwardKeyToWindow(input: Input, window: BrowserWindow = this.#window): void {
+    if (window.isDestroyed()) return;
     const keyCode = FORWARDED_KEY_CODES[input.key] ?? (input.key.length === 1 ? input.key.toUpperCase() : input.key);
     const modifiers: Array<"shift" | "control" | "alt" | "meta"> = [];
     if (input.shift) modifiers.push("shift");
     if (input.control) modifiers.push("control");
     if (input.alt) modifiers.push("alt");
     if (input.meta) modifiers.push("meta");
-    this.#window.webContents.focus();
-    this.#window.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
-    this.#window.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
+    window.webContents.focus();
+    window.webContents.sendInputEvent({ type: "keyDown", keyCode, modifiers });
+    window.webContents.sendInputEvent({ type: "keyUp", keyCode, modifiers });
   }
 
   #collapseOnEscape(tab: BrowserHostTab): void {
@@ -4095,11 +4366,29 @@ export class BrowserHost {
       const contents = this.#tabs.get(tabId)?.contents;
       if (!contents || contents.isDestroyed()) return;
       const gone = (_event: Electron.Event, details: Electron.RenderProcessGoneDetails) => {
-        if (details.reason !== "clean-exit") resume(Effect.succeed({ status: "page_crashed" }));
+        const tab = this.#tabs.get(tabId);
+        if (details.reason !== "clean-exit" && tab && !tab.closing && !tab.endingSilentPage)
+          resume(Effect.succeed({ status: "page_crashed" }));
       };
       contents.on("render-process-gone", gone);
       return Effect.sync(() => contents.off("render-process-gone", gone));
     });
+  }
+
+  #pageCrashFailure(tabId: string): Effect.Effect<never, BrowserOperationError> {
+    return this.#rendererGone(tabId).pipe(
+      Effect.flatMap(() =>
+        Effect.fail(
+          browserFailure(
+            new Error(
+              this.#tabs.get(tabId)?.pendingRestore === undefined
+                ? BROWSER_PAGE_CRASH_KEPT
+                : BROWSER_PAGE_CRASH_RELOADED,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   readonly #requireTab = Effect.fn("BrowserHost.requireTab")(function* (this: BrowserHost, tabId: string) {
@@ -4124,7 +4413,9 @@ export class BrowserHost {
       throw new Error("Browser inspection is protected during authentication. Use takeover.");
     if (this.#takeoverTabIds.has(tabId)) throw new Error(`Browser tab is under user takeover: ${tabId}`);
     if (this.#heldByUser(tabId)) throw new BrowserUserControlHeld(tabId);
-    const engine = this.#tabs.get(tabId)?.engine;
+    const hostTab = this.#tabs.get(tabId);
+    if (hostTab) hostTab.lastToolChat = { threadId: params.threadId, at: Date.now() };
+    const engine = hostTab?.engine;
     const dialog = engine?.dialog;
     if (!dialog || dialogTool) return;
     if (engine?.dialogOwnedBy({ threadId: params.threadId, turnId: params.turnId }))
@@ -4139,12 +4430,14 @@ export class BrowserHost {
   #canUseToolTab(
     params: DynamicToolCallParams,
     tab: Pick<BrowserTab, "id" | "ownerThreadId" | "ownerAgentId"> & { sharedThreadIds?: ReadonlySet<string> },
+    chatOf: (threadId: string) => BrowserAgentChat | null = this.#agentChat,
   ): boolean {
     const ownerAgentId = params.ownerAgentId ?? null;
     if (tab.ownerThreadId === params.threadId) return tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId;
     if (tab.ownerAgentId === null || tab.ownerAgentId !== ownerAgentId) return false;
-    if (tab.ownerThreadId === null && this.#agentChat(params.threadId)) return true;
-    return (tab.sharedThreadIds ?? this.#tabs.get(tab.id)?.sharedThreadIds)?.has(params.threadId) ?? false;
+    if ((tab.sharedThreadIds ?? this.#tabs.get(tab.id)?.sharedThreadIds)?.has(params.threadId)) return true;
+    if (chatOf(params.threadId)?.agentId !== ownerAgentId) return false;
+    return tab.ownerThreadId === null || chatOf(tab.ownerThreadId)?.agentId === ownerAgentId;
   }
 
   #notePageClosedTab(tab: BrowserHostTab): void {
@@ -4157,6 +4450,11 @@ export class BrowserHost {
     });
     const oldest = this.#pageClosedTabs.keys().next().value;
     if (this.#pageClosedTabs.size > PAGE_CLOSED_TAB_LIMIT && oldest !== undefined) this.#pageClosedTabs.delete(oldest);
+  }
+
+  toolCanUseTab(params: DynamicToolCallParams, tabId: string): boolean {
+    const tab = this.listTabs().find((candidate) => candidate.id === tabId);
+    return tab !== undefined && this.#canUseToolTab(params, tab);
   }
 
   shareTab(tabId: string, target: { agentId: string; threadId: string }): void {
@@ -4180,6 +4478,36 @@ export class BrowserHost {
     const { title, url } = toPublicTab(tab);
     return { title: tab.engine.scrubText(title), url: tab.engine.scrubText(url) };
   }
+
+  readonly #leaveSilentPage = Effect.fn("BrowserHost.leaveSilentPage")(function* (
+    this: BrowserHost,
+    tabId: string,
+    direction?: BrowserNavigationDirection | "reload",
+  ) {
+    const tab = this.#tabs.get(tabId);
+    if (!tab || tab.closing || tab.secret || tab.pendingRestore || tab.contents.isDestroyed()) return;
+    if (direction === "back" && !hasHistoryEntry(tab.contents, -1)) return;
+    if (direction === "forward" && !hasHistoryEntry(tab.contents, 1)) return;
+    if (yield* tab.engine.pageAnswers().pipe(Effect.orElseSucceed(() => true))) return;
+    logger.warn("Ending the renderer of a browser tab whose page does not answer before it navigates");
+    const contents = tab.contents;
+    yield* Effect.callback<void>((resume) => {
+      const gone = () => resume(Effect.void);
+      contents.once("render-process-gone", gone);
+      tab.endingSilentPage = true;
+      contents.forcefullyCrashRenderer();
+      return Effect.sync(() => {
+        if (!contents.isDestroyed()) contents.off("render-process-gone", gone);
+      });
+    }).pipe(
+      Effect.timeoutOption(SILENT_PAGE_EXIT_WAIT_MS),
+      Effect.ensuring(
+        Effect.sync(() => {
+          tab.endingSilentPage = false;
+        }),
+      ),
+    );
+  });
 
   readonly #enqueue = Effect.fn("BrowserHost.enqueue")(function* <T>(
     this: BrowserHost,
@@ -4397,6 +4725,8 @@ function showsCurrentPage(tab: BrowserHostTab, page: BrowserPreviewPage): boolea
   return page.url === current.url && page.document === current.document && page.generation === current.generation;
 }
 const CRASH_RELOAD_TIMEOUT_MS = 30_000;
+
+const SILENT_PAGE_EXIT_WAIT_MS = 5_000;
 
 const reloadCrashedPage = Effect.fn("BrowserHost.reloadCrashedPage")(function* (tab: BrowserHostTab) {
   const url = currentTabUrl(tab);

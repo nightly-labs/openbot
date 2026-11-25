@@ -19,7 +19,17 @@ import Search from "lucide-react-native/icons/search";
 import Settings from "lucide-react-native/icons/settings";
 import SlidersHorizontal from "lucide-react-native/icons/sliders-horizontal";
 import UsersRound from "lucide-react-native/icons/users-round";
-import { type PropsWithChildren, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  type PropsWithChildren,
+  type RefObject,
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   AccessibilityInfo,
   BackHandler,
@@ -72,9 +82,10 @@ import { fieldDirectionStyle } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
-function openSearchedChat(pane: ReturnType<typeof useChatListPane>, agentId: string): void {
-  const open = () => router.push({ pathname: "/chat/[agentId]", params: { agentId } });
-  if (pane) openChatFromPane(pane, agentId, open);
+function openSearchedChat(pane: ReturnType<typeof useChatListPane>, agent: MobileAgent): void {
+  const open = () =>
+    router.push({ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } });
+  if (pane) openChatFromPane(pane, agent.id, open);
   else open();
 }
 
@@ -147,7 +158,7 @@ export interface HomeSearch {
   closing: SharedValue<number>;
   canUseTasks: boolean;
   target: MobileAgent | null;
-  chooseTarget: (agent: MobileAgent, text?: string) => void;
+  chooseTarget: (agent: MobileAgent, text?: SetStateAction<string>) => void;
   clearTarget: () => void;
   fillTask: (text: string) => void;
   targetMatches: MobileAgent[] | null;
@@ -230,7 +241,7 @@ export function useHomeSearch(): HomeSearch {
       }),
     );
   }, [progress, closing, setOpeningBlocked, finishClose]);
-  const chooseTarget = useCallback((agent: MobileAgent, text?: string) => {
+  const chooseTarget = useCallback((agent: MobileAgent, text?: SetStateAction<string>) => {
     void haptics.selection();
     setTarget(agent);
     setQuery(text ?? draft.current);
@@ -427,11 +438,16 @@ export function HomeSearchResults({ search, barHeight }: { search: HomeSearch; b
   );
 }
 
+function trimmedQuery(query: string) {
+  return query.trim();
+}
+
 function HomeSearchBody({ search }: { search: HomeSearch }) {
   const { t } = useText();
   const motion = useTransitionMode("searchTransitions");
   const text = search.query.trim();
-  const { target, targetMatches } = search;
+  const { target, targetMatches, chooseTarget } = search;
+  const chooseWithText = useCallback((agent: MobileAgent) => chooseTarget(agent, trimmedQuery), [chooseTarget]);
   const agents = useMobileWorkspaceSelector((current) => current.activeAgents);
   const idle = <HomeSearchIdle onLeave={search.leave} canUseTasks={search.canUseTasks} />;
   return (
@@ -460,7 +476,7 @@ function HomeSearchBody({ search }: { search: HomeSearch }) {
                 contentContainerClassName="gap-3.5 px-5 pt-1 pb-1.5"
               >
                 {agents.map((agent) => (
-                  <AgentChip key={agent.id} agent={agent} onPress={() => search.chooseTarget(agent, text)} />
+                  <AgentChip key={agent.id} agent={agent} onPress={chooseWithText} />
                 ))}
               </ScrollView>
             </>
@@ -930,10 +946,13 @@ function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseT
     ],
     [t, hasServer, hasHiddenChats, serverId, canUseTasks],
   );
-  const openChat = (agent: MobileAgent) => {
-    onLeave();
-    openSearchedChat(pane, agent.id);
-  };
+  const openChat = useCallback(
+    (agent: MobileAgent) => {
+      onLeave();
+      openSearchedChat(pane, agent);
+    },
+    [onLeave, pane],
+  );
   return (
     <View className="pb-2">
       {canUseTasks ? <SearchTasks onLeave={onLeave} /> : null}
@@ -960,7 +979,7 @@ function HomeSearchIdle({ onLeave, canUseTasks }: { onLeave: () => void; canUseT
             contentContainerClassName="gap-3.5 px-5 pt-1 pb-1.5"
           >
             {agents.map((agent) => (
-              <AgentChip key={agent.id} agent={agent} onPress={() => openChat(agent)} />
+              <AgentChip key={agent.id} agent={agent} onPress={openChat} />
             ))}
           </ScrollView>
         </>
@@ -978,7 +997,7 @@ function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSea
   const muted = String(useThemeColor("muted"));
   const color = avatarHeadColor(agent.avatarSeed, agent.avatarHue, agent.avatarColor);
   const { tasks } = useServerTasks(agent.serverId, { agentId: agent.id });
-  const sorted = [...tasks].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  const sorted = newestFirst(tasks);
   const ideas = [...new Set(sorted.filter((task) => !isAgentTaskOpen(task)).map((task) => task.title.trim()))]
     .filter(Boolean)
     .slice(0, IDEA_LIMIT);
@@ -986,7 +1005,7 @@ function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSea
   const [before = "", after = ""] = t("mobile.search.thread.newFor", { name: NAME_MARK }).split(NAME_MARK);
   const message = () => {
     search.leave();
-    openSearchedChat(pane, agent.id);
+    openSearchedChat(pane, agent);
   };
   return (
     <View className="pb-2">
@@ -1078,17 +1097,23 @@ function TaskEditorPage({ agent, search }: { agent: MobileAgent; search: HomeSea
 
 const SEARCH_TASK_LIMIT = 5;
 
+function newestFirst<Task extends { updatedAt: string }>(tasks: readonly Task[]): Task[] {
+  return tasks
+    .map((task) => ({ task, updated: Date.parse(task.updatedAt) }))
+    .sort((a, b) => b.updated - a.updated)
+    .map(({ task }) => task);
+}
+
 function SearchTasks({ query, onLeave }: { query?: string; onLeave: () => void }) {
   const { t } = useText();
   const serverId = useMobileWorkspaceSelector((current) => current.activeServer.id);
   const { agents, tasks } = useServerTasks(serverId);
   const needle = query?.toLocaleLowerCase();
-  const shown = tasks
-    .filter((task) =>
+  const shown = newestFirst(
+    tasks.filter((task) =>
       needle ? task.title.toLocaleLowerCase().includes(needle) : isAgentTaskOpen(task) && taskNeedsYou(task),
-    )
-    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-    .slice(0, SEARCH_TASK_LIMIT);
+    ),
+  ).slice(0, SEARCH_TASK_LIMIT);
   if (shown.length === 0) return null;
   return (
     <View>
@@ -1138,14 +1163,20 @@ function ShortcutChip({ shortcut, onPress }: { shortcut: Shortcut; onPress: () =
   );
 }
 
-function AgentChip({ agent, onPress }: { agent: MobileAgent; onPress: () => void }) {
+const AgentChip = memo(function AgentChip({
+  agent,
+  onPress,
+}: {
+  agent: MobileAgent;
+  onPress: (agent: MobileAgent) => void;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={agent.name}
       onPress={() => {
         void haptics.impact("soft");
-        onPress();
+        onPress(agent);
       }}
     >
       {({ pressed }) => (
@@ -1174,4 +1205,4 @@ function AgentChip({ agent, onPress }: { agent: MobileAgent; onPress: () => void
       )}
     </Pressable>
   );
-}
+});

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { withoutTurnContext } from "./agent/developer-instructions";
@@ -12,6 +13,13 @@ export function piText(content: unknown): string {
   return content
     .flatMap((block) => (isRecord(block) && block.type === "text" && isString(block.text) ? [block.text] : []))
     .join("\n");
+}
+
+const PI_SHELL_TOOLS = new Set(["bash", "powershell"]);
+
+export function piShellCommand(tool: string | null, args: unknown): { command?: string } {
+  const command = tool !== null && PI_SHELL_TOOLS.has(tool) ? getString(args, "command") : null;
+  return command ? { command: command.slice(0, INPUT_LIMITS.messageText) } : {};
 }
 
 export function piMessageItems(message: unknown, id: string): ThreadItem[] {
@@ -56,14 +64,17 @@ export function piMessageItems(message: unknown, id: string): ThreadItem[] {
         text: block.thinking,
         summary: [block.thinking],
       });
-    if (block.type === "toolCall")
+    if (block.type === "toolCall") {
+      const tool = getString(block, "name");
       items.push({
         id: getString(block, "id") ?? `${id}:tool:${index}`,
         type: "dynamicToolCall",
-        tool: getString(block, "name"),
+        tool,
         arguments: block.arguments,
+        ...piShellCommand(tool, block.arguments),
         status: "inProgress",
       });
+    }
   }
   return items;
 }

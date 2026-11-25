@@ -24,7 +24,10 @@ import type {
   MemberChatColorEntry,
   ProviderModelSourceEntry,
   QueueSnapshot,
+  ReadMediaApprovalInput,
   RespondToApprovalInput,
+  RespondToCreditsHoldInput,
+  RespondToMediaApprovalInput,
   RespondToPromptInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
@@ -44,6 +47,7 @@ import {
 } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { HOST_APPEARANCE_CAPABILITY, type ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
+import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
@@ -97,6 +101,7 @@ import {
   readSavedAgentPicture,
   saveAgentPicture,
 } from "./web-agent-pictures";
+import { readCachedWebHosts, writeCachedWebHosts } from "./web-host-cache";
 import type { WebHostNotice } from "./web-host-connections";
 import { createWebHostLifecycle } from "./web-host-lifecycle";
 import { WebHostOtherTabError, type WebHostState } from "./web-host-lock";
@@ -124,6 +129,7 @@ interface WebConversation {
 
 const LATEST_PAGE_SIZE = 50;
 const PRELOADED_AGENTS = 3;
+const PRELOAD_CONCURRENCY = 2;
 const EVENT_READS_INTERVAL_MS = 1_000;
 
 function trimToLatestPage(conversation: WebConversation): void {
@@ -163,6 +169,7 @@ interface WebWorkspaceState {
   threadContextStates: Record<string, AgentContextState>;
   backgroundWork: Record<string, number>;
   browserTabs: BrowserTab[];
+  noticedBrowserTabIds: string[] | null;
   activeBrowserTabId: string | null;
   browserControlState: BrowserControlState;
   presence: TeamPresenceSnapshot | null;
@@ -182,6 +189,7 @@ interface WebWorkspaceState {
   agentStatus: AgentStatus | null;
   models: ClientAgentModelOption[];
   hostRestart: { state: "waiting" | "restarting"; version: string | null } | null;
+  restartReady: boolean;
   hostStates: Record<string, WebHostState>;
   incompatibility: {
     hostId: string;
@@ -227,8 +235,9 @@ export function createWebWorkspace(
     onStatus?: (status: AgentStatus) => void;
   } = {},
 ) {
+  const cachedHosts = readCachedWebHosts(props.accountId);
   const [state, setState] = createStore<WebWorkspaceState>({
-    hosts: [],
+    hosts: cachedHosts,
     host: null,
     agents: [],
     agentsLoaded: false,
@@ -245,6 +254,7 @@ export function createWebWorkspace(
     threadContextStates: {},
     backgroundWork: {},
     browserTabs: [],
+    noticedBrowserTabIds: null,
     activeBrowserTabId: null,
     browserControlState: { sessions: [] },
     presence: null,
@@ -264,9 +274,10 @@ export function createWebWorkspace(
     agentStatus: null,
     models: [],
     hostRestart: null,
+    restartReady: false,
     hostStates: {},
     incompatibility: null,
-    hostsLoaded: false,
+    hostsLoaded: cachedHosts.length > 0,
     hostsLoading: false,
     hostsError: null,
     revocationRevision: 0,
@@ -284,6 +295,7 @@ export function createWebWorkspace(
   });
   const [stepLines, setStepLines] = createSignal<TurnStepLines>({});
   let generation = 0;
+  let restartCapable = false;
   let selectedId: string | null = null;
   let hostId: string | null = null;
   let disposed = false;
@@ -374,6 +386,52 @@ export function createWebWorkspace(
   });
   const hostNoticeListeners = new Set<(hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]) => void>();
   const wholeApprovalReads = new Set<string>();
+  let promptListRead: "idle" | "reading" | "again" = "idle";
+  const resolvedDuringPromptListRead = new Set<string>();
+  let listedPrompts: { generation: number; prompts: Array<Extract<AgentEvent, { type: "prompt" }>> } = {
+    generation,
+    prompts: [],
+  };
+  function withListedPrompts(prompts: Array<Extract<AgentEvent, { type: "prompt" }>>) {
+    if (listedPrompts.generation !== generation) return prompts;
+    const known = new Set(prompts.map((item) => String(item.requestId)));
+    const missing = listedPrompts.prompts.filter((prompt) => !known.has(String(prompt.requestId)));
+    return missing.length > 0 ? [...prompts, ...missing] : prompts;
+  }
+  function forgetListedPrompt(requestId: string | number): void {
+    if (promptListRead !== "idle") resolvedDuringPromptListRead.add(String(requestId));
+    listedPrompts.prompts = listedPrompts.prompts.filter((prompt) => String(prompt.requestId) !== String(requestId));
+  }
+  function readListedPrompts(): void {
+    const list = runtime.listPendingPrompts;
+    if (!list) return;
+    if (promptListRead !== "idle") {
+      promptListRead = "again";
+      return;
+    }
+    promptListRead = "reading";
+    resolvedDuringPromptListRead.clear();
+    const current = generation;
+    void list()
+      .then((prompts) => {
+        if (disposed || current !== generation) return;
+        listedPrompts = {
+          generation: current,
+          prompts: prompts
+            .filter((prompt) => !resolvedDuringPromptListRead.has(String(prompt.requestId)))
+            .map((prompt) => ({ ...prompt, type: "prompt" as const })),
+        };
+        setState((draft) => {
+          draft.prompts = withListedPrompts(draft.prompts);
+        });
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        const again = promptListRead === "again";
+        promptListRead = "idle";
+        if (again && !disposed) readListedPrompts();
+      });
+  }
   function readWholeApprovals(): void {
     const read = runtime.readPendingApproval;
     if (!read) return;
@@ -421,6 +479,7 @@ export function createWebWorkspace(
     props.accountId,
     {
       accountChanged: props.onSessionCheck,
+      serversChanged: retryHosts,
       accessDenied(id, error) {
         if (!disposed && id === hostId) blockAccess(error);
       },
@@ -438,12 +497,14 @@ export function createWebWorkspace(
       hostTaken(id) {
         if (disposed || id !== hostId) return;
         generation += 1;
+        restartCapable = false;
         hostLifecycle.endSleep();
         recoveryBlocked = true;
         recovery.suspend();
         setState((draft) => {
           draft.otherTab = true;
           draft.status = "offline";
+          draft.restartReady = false;
           draft.connectionError = null;
         });
       },
@@ -454,6 +515,7 @@ export function createWebWorkspace(
           (update.state === "offline" || update.hostOffline === true) && !update.code && !state.hostRestart;
         setState((draft) => {
           if (update.state !== "online") draft.status = update.state;
+          draft.restartReady = update.state === "online" && restartCapable;
           if (update.state !== "online") syncedAt = 0;
           if (update.hostOffline) draft.hostOffline = true;
           else if (update.state !== "connecting") draft.hostOffline = false;
@@ -550,6 +612,8 @@ export function createWebWorkspace(
               event.snapshot.pendingPrompts.map((prompt) => ({ ...prompt, type: "prompt" as const })),
               attentionComplete,
             );
+            if (attentionComplete) listedPrompts = { generation, prompts: [] };
+            else draft.prompts = withListedPrompts(draft.prompts);
             draft.takeovers = reconcilePendingRequests(
               draft.takeovers,
               event.snapshot.pendingBrowserTakeovers,
@@ -569,6 +633,7 @@ export function createWebWorkspace(
             );
           });
           readWholeApprovals();
+          if (!attentionComplete) readListedPrompts();
         } else if (event.type === "prompt") {
           setState((draft) => {
             draft.prompts = [...draft.prompts.filter((item) => item.requestId !== event.requestId), event];
@@ -581,6 +646,7 @@ export function createWebWorkspace(
             ];
           });
         } else if (event.type === "agent-input-resolved") {
+          forgetListedPrompt(event.requestId);
           setState((draft) => {
             draft.approvals = draft.approvals.filter((item) => String(item.requestId) !== String(event.requestId));
             draft.prompts = draft.prompts.filter((item) => String(item.requestId) !== String(event.requestId));
@@ -956,8 +1022,6 @@ export function createWebWorkspace(
   }
   function refreshHosts(): Promise<void> {
     if (hostsRefreshPromise) return hostsRefreshPromise;
-    const refreshGeneration = generation;
-    const refreshHostId = hostId;
     const promise = (async () => {
       if (disposed) return;
       setState((draft) => {
@@ -966,9 +1030,21 @@ export function createWebWorkspace(
       });
       try {
         markRemoteSync("hosts-start");
-        const hosts = await runtime.listHosts();
+        const cachedHostId = readWebServerSelection(props.accountId);
+        const cachedHost =
+          hostId === null
+            ? (state.hosts.find((host) => host.hostId === cachedHostId) ??
+              orderWebHosts(state.hosts, serverOrder())[0] ??
+              null)
+            : null;
+        const listedHosts = runtime.listHosts();
+        if (cachedHost) void connect(cachedHost);
+        const refreshGeneration = generation;
+        const refreshHostId = hostId;
+        const hosts = await listedHosts;
         markRemoteSync("hosts");
         if (disposed) return;
+        writeCachedWebHosts(props.accountId, hosts);
         deleteRemoteWorkspaceFrames(
           props.accountId,
           hosts.map((host) => host.hostId),
@@ -981,8 +1057,16 @@ export function createWebWorkspace(
           props.accountId,
           hosts.map((host) => host.hostId),
         );
-        const activeGeneration = refreshGeneration === generation && refreshHostId === hostId;
-        if (!activeGeneration) return;
+        const earlyHostId = cachedHost?.hostId ?? null;
+        const activeGeneration =
+          refreshHostId === hostId && (refreshGeneration === generation || refreshHostId === earlyHostId);
+        if (!activeGeneration) {
+          setState((draft) => {
+            draft.hosts = hosts;
+            draft.hostsLoaded = true;
+          });
+          return;
+        }
         if (refreshHostId && !hosts.some((host) => host.hostId === refreshHostId)) {
           generation += 1;
           hostId = null;
@@ -1009,6 +1093,7 @@ export function createWebWorkspace(
             setStepLines({});
             draft.takeovers = [];
             draft.browserTabs = [];
+            draft.noticedBrowserTabIds = null;
             draft.activeBrowserTabId = null;
             draft.browserControlState = { sessions: [] };
             draft.sidebarLayout = defaultSidebarLayout();
@@ -1019,16 +1104,24 @@ export function createWebWorkspace(
             draft.duplicatingAgentIds = [];
             draft.capabilities = [];
             draft.status = "offline";
-            draft.error = leftHostIds.has(refreshHostId)
-              ? null
-              : { message: currentText().t("webClient.error.accessEnded"), reference: null };
+            draft.error =
+              leftHostIds.has(refreshHostId) || refreshHostId === earlyHostId
+                ? null
+                : { message: currentText().t("webClient.error.accessEnded"), reference: null };
           });
           runtime.hosts?.setHosts(hosts);
           await runtime.disconnect().catch(() => undefined);
         }
         const connected = hosts.find((host) => host.hostId === hostId);
+        const listedEarlyHost = connected && connected.hostId === earlyHostId ? connected : null;
         setState((draft) => {
-          if (connected && draft.host?.hostId === connected.hostId) {
+          if (listedEarlyHost && draft.host?.hostId === listedEarlyHost.hostId) {
+            const appearance = draft.capabilities.includes(HOST_APPEARANCE_CAPABILITY)
+              ? draft.host.appearance
+              : listedEarlyHost.appearance;
+            draft.host = { ...listedEarlyHost };
+            if (appearance !== undefined) draft.host.appearance = appearance;
+          } else if (connected && draft.host?.hostId === connected.hostId) {
             draft.host.name = connected.name;
             draft.host.logoKey = connected.logoKey;
             if (connected.appearance !== undefined && !draft.capabilities.includes(HOST_APPEARANCE_CAPABILITY))
@@ -1039,10 +1132,17 @@ export function createWebWorkspace(
           draft.hostsError = null;
         });
         for (const left of leftHostIds) if (!hosts.some((host) => host.hostId === left)) leftHostIds.delete(left);
+        if (listedEarlyHost && cachedHost && listedEarlyHost.devicePublicKey !== cachedHost.devicePublicKey) {
+          await connectionPromise?.promise.catch(() => undefined);
+          if (!disposed && hostId === listedEarlyHost.hostId) await connect(listedEarlyHost);
+        }
         if (!hostId) {
           const savedHostId = readWebServerSelection(props.accountId);
+          const ordered = orderWebHosts(hosts, serverOrder());
           const initialHost =
-            hosts.find((host) => host.hostId === savedHostId) ?? orderWebHosts(hosts, serverOrder())[0];
+            hosts.find((host) => host.hostId === savedHostId && host.hidden !== true) ??
+            ordered.find((host) => host.hidden !== true) ??
+            ordered[0];
           if (initialHost) await connect(initialHost);
         }
         if (!disposed) runtime.hosts?.setHosts(hosts);
@@ -1080,6 +1180,18 @@ export function createWebWorkspace(
     if (!remove) throw new Error(currentText().t("server.settings.actionFailed"));
     await departHost(host, () => remove(host.hostId));
   }
+  async function setHostHidden(host: RemoteTeamHost, hidden: boolean): Promise<void> {
+    const change = runtime.setHostHidden;
+    if (!change) throw new Error(currentText().t("server.settings.actionFailed"));
+    await change(host.hostId, hidden);
+    setState((draft) => {
+      const listed = draft.hosts.find((candidate) => candidate.hostId === host.hostId);
+      if (!listed) return;
+      if (hidden) listed.hidden = true;
+      else delete listed.hidden;
+    });
+    void (hostsRefreshPromise ?? Promise.resolve()).catch(() => undefined).then(retryHosts);
+  }
   async function departHost(host: RemoteTeamHost, operation: () => Promise<void>): Promise<void> {
     leftHostIds.add(host.hostId);
     try {
@@ -1106,9 +1218,11 @@ export function createWebWorkspace(
       deleteCachedWorkflows(hostId);
     }
     generation += 1;
+    restartCapable = false;
     selectedId = null;
     setState((draft) => {
       draft.revocationRevision += 1;
+      draft.restartReady = false;
       draft.workspaceLoaded = false;
       draft.synced = false;
       draft.agents = [];
@@ -1125,6 +1239,7 @@ export function createWebWorkspace(
       setStepLines({});
       draft.takeovers = [];
       draft.browserTabs = [];
+      draft.noticedBrowserTabIds = null;
       draft.activeBrowserTabId = null;
       draft.browserControlState = { sessions: [] };
       draft.sidebarLayout = defaultSidebarLayout();
@@ -1189,6 +1304,9 @@ export function createWebWorkspace(
       if (!disposed && hostId === host.hostId && state.recovery?.phase !== "suspended") recover();
     }
   }
+  function restartRequested(): void {
+    if (state.status !== "online") generation += 1;
+  }
   async function useHere(): Promise<void> {
     const host = state.host;
     if (host && state.otherTab) await connect(host, true);
@@ -1214,6 +1332,7 @@ export function createWebWorkspace(
     writeWebServerSelection(props.accountId, host.hostId);
     if (!keepWorkspace) selectedId = null;
     if (!sameHost) hostLifecycle.endSleep();
+    if (!sameHost) restartCapable = false;
     setState((draft) => {
       draft.host = host;
       draft.recovery = null;
@@ -1228,6 +1347,7 @@ export function createWebWorkspace(
       }
       draft.status = "connecting";
       draft.hostRestart = null;
+      if (!sameHost) draft.restartReady = false;
       draft.memberId = sameHost ? draft.memberId : null;
       if (!keepWorkspace) {
         draft.agents = [];
@@ -1251,6 +1371,7 @@ export function createWebWorkspace(
       if (!keepWorkspace) {
         draft.progress = {};
         draft.browserTabs = [];
+        draft.noticedBrowserTabIds = null;
         draft.activeBrowserTabId = null;
         draft.sidebarLayout = defaultSidebarLayout();
         draft.userHiddenAgents = [];
@@ -1311,6 +1432,12 @@ export function createWebWorkspace(
       }
       const capabilities = await connecting;
       markRemoteSync("connected");
+      if (!disposed && current === generation) {
+        restartCapable = capabilities.includes(HOST_RESTART_CAPABILITY);
+        setState((draft) => {
+          draft.restartReady = restartCapable;
+        });
+      }
       const [agents, agentStatus, models] = await (early.gate ?? readGate());
       if (disposed || current !== generation) return;
       revokedReconnect = false;
@@ -1451,6 +1578,7 @@ export function createWebWorkspace(
           if (!isCurrent()) return;
           setState((draft) => {
             draft.browserTabs = browserTabs;
+            draft.noticedBrowserTabIds ??= browserTabs.map((tab) => tab.id);
             draft.activeBrowserTabId = browserTabs.some((tab) => tab.id === draft.activeBrowserTabId)
               ? draft.activeBrowserTabId
               : (browserTabs[0]?.id ?? null);
@@ -1727,16 +1855,22 @@ export function createWebWorkspace(
     }
   }
   async function preloadRecent(ids: readonly string[], current: number) {
-    for (const id of ids.slice(0, PRELOADED_AGENTS)) {
-      if (disposed || current !== generation) return;
-      if (state.conversations[id]) continue;
-      setState((draft) => {
-        draft.conversations[id] ??= { page: null, draft: "", attachments: [], loading: false, trimmed: true };
-      });
-      try {
-        await load(id);
-      } catch {}
-    }
+    const pending = ids.slice(0, PRELOADED_AGENTS);
+    let next = 0;
+    const worker = async () => {
+      while (next < pending.length) {
+        if (disposed || current !== generation) return;
+        const id = pending[next++];
+        if (!id || state.conversations[id]) continue;
+        setState((draft) => {
+          draft.conversations[id] ??= { page: null, draft: "", attachments: [], loading: false, trimmed: true };
+        });
+        try {
+          await load(id);
+        } catch {}
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(PRELOAD_CONCURRENCY, pending.length) }, worker));
   }
   let readsLoad: { generation: number; promise: Promise<void> } | null = null;
   let pendingReads = false;
@@ -1981,7 +2115,7 @@ export function createWebWorkspace(
       runtime.hosts?.refresh();
       void props
         .onSessionCheck()
-        .then(() => refreshHosts())
+        .then(retryHosts)
         .then(() => {
           if (state.status === "online") return Date.now() - syncedAt < FOCUS_RESYNC_MS ? undefined : resync();
           if (state.recovery?.phase !== "suspended") recoverNow();
@@ -2056,15 +2190,19 @@ export function createWebWorkspace(
     setHostAppearance,
     leaveHost,
     removeOwnedHost,
+    setHostHidden,
+    canHideHosts: runtime.setHostHidden !== undefined,
     retryHosts,
     reconnect,
+    restartRequested,
     useHere,
     joinInvite,
     connect,
     select,
     refresh,
     send,
-    cancelQueued: (deliveryId: string) => changeQueue((agentId) => runtime.cancelQueued({ agentId, deliveryId })),
+    cancelQueued: (deliveryId: string, recipientAgentId?: string) =>
+      changeQueue((agentId) => runtime.cancelQueued({ agentId: recipientAgentId ?? agentId, deliveryId })),
     steerQueued(deliveryId: string) {
       const expectedTurnId = conversation()?.page?.activeTurnId;
       if (!expectedTurnId) return;
@@ -2280,6 +2418,7 @@ export function createWebWorkspace(
       const current = generation;
       await runtime.answer(input);
       if (disposed || current !== generation) return;
+      forgetListedPrompt(input.requestId);
       setState((draft) => {
         draft.prompts = draft.prompts.filter((item) => String(item.requestId) !== String(input.requestId));
       });
@@ -2312,6 +2451,14 @@ export function createWebWorkspace(
       if (state.browserTabs.some((tab) => tab.id === tabId))
         setState((draft) => {
           draft.activeBrowserTabId = tabId;
+        });
+    },
+    noticeBrowserTabs(tabIds: readonly string[]) {
+      const noticed = state.noticedBrowserTabIds;
+      const added = noticed ? tabIds.filter((tabId) => !noticed.includes(tabId)) : [];
+      if (added.length > 0)
+        setState((draft) => {
+          draft.noticedBrowserTabIds?.push(...added);
         });
     },
     async openSearchMessage(messageId: string): Promise<boolean> {
@@ -2371,6 +2518,42 @@ export function createWebWorkspace(
     async approve(input: RespondToApprovalInput) {
       const current = generation;
       await runtime.approve(input);
+      if (disposed || current !== generation) return;
+      setState((draft) => {
+        draft.approvals = draft.approvals.filter((item) => item.requestId !== input.requestId);
+      });
+      await refresh();
+    },
+    readMediaApproval(input: ReadMediaApprovalInput) {
+      return runtime.readMediaApproval?.(input) ?? Promise.resolve({ media: null, hold: null });
+    },
+    async respondToCreditsHold(input: RespondToCreditsHoldInput) {
+      const respond = runtime.respondToCreditsHold;
+      if (!respond) throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      const current = generation;
+      const hold = await respond(input);
+      if (hold || disposed || current !== generation) return hold;
+      setState((draft) => {
+        draft.approvals = draft.approvals.filter((item) => item.requestId !== input.requestId);
+      });
+      await refresh();
+      return hold;
+    },
+    async setCreditsAskMuted(muted: boolean) {
+      const setMuted = runtime.setCreditsAskMuted;
+      if (!setMuted) throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      await setMuted({ muted });
+    },
+    async readCreditsAskMuted() {
+      const read = runtime.readCreditsAskMuted;
+      if (!read) throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      return read();
+    },
+    async respondToMediaApproval(input: RespondToMediaApprovalInput) {
+      const respond = runtime.respondToMediaApproval;
+      if (!respond) throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      const current = generation;
+      await respond(input);
       if (disposed || current !== generation) return;
       setState((draft) => {
         draft.approvals = draft.approvals.filter((item) => item.requestId !== input.requestId);

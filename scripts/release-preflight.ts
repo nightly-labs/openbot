@@ -4,6 +4,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
 import { roleIdProblems } from "./discord-announcement";
 import { ANNOUNCEMENT_FILE, announcementProblems, ROLE_VARIABLE } from "./discord-release-announcement";
+import { unpublishedCatalogEntries } from "./publish-production-catalog";
 import { releaseNotesProblems } from "./release-notes";
 import { whatsNewTranslationProblems } from "./whats-new-translations";
 
@@ -90,6 +91,19 @@ try {
   }
 } catch {
   failures.push("The hosted release environment settings could not be verified.");
+}
+
+try {
+  const unpublished = await unpublishedCatalogEntries();
+  if (unpublished.length > 0) {
+    failures.push(
+      `the live Marketplace does not have the catalog on main (${unpublished.length} entries, such as ${unpublished.slice(0, 5).join(", ")}); run \`bun run marketplace:publish:production -- --apply --confirm-production\``,
+    );
+  }
+} catch (error) {
+  failures.push(
+    `The live Marketplace catalog could not be checked: ${error instanceof Error ? error.message : String(error)}`,
+  );
 }
 
 if (failures.length > 0) {

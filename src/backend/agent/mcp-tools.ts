@@ -2,6 +2,10 @@ import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentAccess,
+  agentComputerUseEnabled,
+  COMPUTER_USE_MCP_SERVER_ID,
+  GITHUB_CONNECTOR_MCP_SERVER_ID,
+  isReservedMcpServerName,
   MCP_TRANSPORTS,
   type McpKeyValue,
   type McpServerConfig,
@@ -81,7 +85,7 @@ export const MCP_SERVER_TOOL_DEFINITIONS = [
   },
   {
     name: "save_mcp_server",
-    description: `Add an MCP server, or change one by its name, only when the user asks for it. ${MCP_SCOPE} ${MCP_APPROVAL} Then OpenBot connects to the server and saves it when it answers or needs only a sign-in or a key. The result is ready with its tools, needs_sign_in (a Sign in card is in the conversation: wait for the user), needs_key (save again with the key in headers when the user gave it; else the user enters it in Marketplace, Apps; never ask for a key in the chat), or the error. Put a key that the user gave in headers, never in the address. Environment values are not set here: a stdio server that cannot start without a key in its environment is added by the user in Marketplace, Apps. A server keeps the keys it holds only on its transport, address origin, command, arguments and folder. New tools reach the agents from their next turn.`,
+    description: `Add an MCP server, or change one by its name, only when the user asks for it. ${MCP_SCOPE} ${MCP_APPROVAL} Then OpenBot connects to the server and saves it when it answers or needs only a sign-in or a key. The result is ready with its tools, needs_sign_in (a Sign in card is in the conversation: wait for the user), needs_key (save again with the key in headers when the user gave it; else the user enters it in Marketplace, Apps; never ask for a key in the chat), or the error. Keep a given address with its query; other keys go in headers. Environment values are not set here: a stdio server that cannot start without a key in its environment is added by the user in Marketplace, Apps. A server keeps the keys it holds only on its transport, address origin, command, arguments and folder. New tools reach the agents from their next turn.`,
     shape: saveMcpServerToolSchema.shape,
   },
   {
@@ -132,6 +136,20 @@ export interface AgentMcpServers {
 
 export function mcpFallbackRunsServer(config: McpServerConfig, agent: { access?: AgentAccess | undefined }): boolean {
   return config.transport === "http" || !workspaceAccessEnforced(agent);
+}
+
+export function agentFallbackMcpServers(
+  enabled: readonly McpServerConfig[],
+  savedIds: ReadonlySet<string>,
+  agent: { access?: AgentAccess | undefined; computerUse?: boolean | undefined },
+): McpServerConfig[] {
+  return enabled.filter(
+    (config) =>
+      (config.id === GITHUB_CONNECTOR_MCP_SERVER_ID ||
+        (config.id === COMPUTER_USE_MCP_SERVER_ID && agentComputerUseEnabled(agent)) ||
+        (savedIds.has(config.id) && !isReservedMcpServerName(config.name))) &&
+      mcpFallbackRunsServer(config, agent),
+  );
 }
 
 export function findAgentMcpTool(
@@ -204,6 +222,8 @@ export interface McpServerToolCall {
   approve(reason: string, cwd?: string | null): Effect.Effect<boolean, ToolOperationFailed>;
   keysFromPerson(values: readonly string[]): Effect.Effect<boolean>;
   requestSignIn(config: McpServerConfig): Effect.Effect<void, ToolOperationFailed>;
+  added(config: McpServerConfig): Effect.Effect<void>;
+  removed(mcpServerId: string): Effect.Effect<void>;
 }
 
 export const handleMcpServerTool = (servers: AgentMcpServers, call: McpServerToolCall) =>
@@ -312,7 +332,7 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       const existing = servers.list().find((config) => config.name === input.name);
       const config = normalizeMcpConfig(mergeServer(existing, input));
       const errors = mcpConfigErrors(config);
-      const invalid = errors.name ?? errors.command ?? errors.url;
+      const invalid = errors.name ?? errors.command ?? errors.url ?? errors.headers;
       if (invalid) return openBotToolFailure(invalid);
       const headers = input.headers ?? [];
       if (headers.length > 0 && config.transport !== "http")
@@ -335,8 +355,14 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       );
       if (!(yield* call.approve(reason, config.transport === "stdio" ? config.workingDirectory || null : null)))
         return openBotToolFailure(sourceText("error.agent.mcpServerDeclined"));
-      if (!config.enabled) {
+      const save = Effect.fnUntraced(function* () {
+        const before = new Set(servers.list().map((candidate) => candidate.id));
         yield* servers.save(config);
+        const added = servers.list().find((candidate) => !before.has(candidate.id) && candidate.name === config.name);
+        if (added) yield* call.added(added);
+      });
+      if (!config.enabled) {
+        yield* save();
         const saved = servers.list().find((candidate) => candidate.name === config.name) ?? config;
         return openBotToolResult({
           status: "disabled",
@@ -352,7 +378,7 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
             config,
           ),
         );
-      yield* servers.save(config);
+      yield* save();
       return yield* report(servers, call, config, outcome, true);
     }
     case "set_mcp_server_enabled": {
@@ -370,6 +396,7 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       if (!(yield* call.approve(sourceText("status.agent.mcpServerRemove", { name: config.name }))))
         return openBotToolFailure(sourceText("error.agent.mcpServerDeclined"));
       yield* servers.remove(config.id);
+      yield* call.removed(config.id);
       return openBotToolResult({ name: config.name, removed: true, appliesFrom: "the next turn of each agent" });
     }
   }
@@ -455,7 +482,7 @@ const report = Effect.fnUntraced(function* (
       status: "needs_key",
       server,
       error,
-      next: "When the user gave the key, call openbot.save_mcp_server again with it in headers, such as Authorization: Bearer <token>. Otherwise ask the user to enter the key with Edit on the server's page in Marketplace, Apps. Do not ask for the key in the chat or show it.",
+      next: "When the user gave the key, call openbot.save_mcp_server again with it in headers, such as Authorization: Bearer <token>, or with the full address when the key is in the address that the user gave. Otherwise ask the user to enter the key with Edit on the server's page in Marketplace, Apps. Do not ask for the key in the chat or show it.",
     });
   return openBotToolResult({ status: "error", server, error });
 });

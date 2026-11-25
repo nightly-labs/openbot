@@ -90,7 +90,7 @@ function columns(db: DatabaseSync, table: string): string[] {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 65 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 69 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -148,9 +148,9 @@ describe("agent routine run place migration", () => {
     seed(db);
     const before = contents(db);
     const columnsBefore = columns(db, "projection_agent_routines");
-    db.exec("INSERT INTO schema_migrations VALUES(66,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(70,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=66; DELETE FROM schema_migrations WHERE version=54");
+    db.exec("DELETE FROM schema_migrations WHERE version=70; DELETE FROM schema_migrations WHERE version=54");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 54");
     expect(contents(db)).toEqual(before);
     expect(columns(db, "projection_agent_routines")).toEqual(columnsBefore);
@@ -161,7 +161,7 @@ describe("agent routine run place migration", () => {
     seed(db);
     migrateOpenBotDatabase(db);
     const after = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(66,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(70,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
     expect(contents(db)).toEqual(after);
   });

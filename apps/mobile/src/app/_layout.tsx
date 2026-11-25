@@ -20,6 +20,7 @@ import { installAppLock } from "@/features/app-lock/model/app-lock";
 import { UpdateRequiredOverlay } from "@/features/app-update/components/update-required-overlay";
 import { DevelopmentConnectLinkHandler } from "@/features/auth/components/development-connect-link-handler";
 import { MobileSessionProvider, useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { backgroundRefreshNative } from "@/features/background-refresh/background-refresh-native";
 import { loadOnboardingProgress } from "@/features/onboarding/model/onboarding-progress";
 import { resetNotificationAvatars } from "@/features/push-notifications/notification-avatars";
 import { installNotificationHandler } from "@/features/push-notifications/use-notification-taps";
@@ -27,6 +28,7 @@ import { installQuickActions, resetQuickActions } from "@/features/quick-actions
 import { ThemeSweep } from "@/features/settings/components/theme-sweep";
 import { loadAppLanguage } from "@/features/settings/model/app-language";
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
+import { loadFullScreenCameraPreference } from "@/features/settings/model/camera-mode";
 import { loadChatBackdrop } from "@/features/settings/model/chat-backdrop";
 import { loadChatBackground } from "@/features/settings/model/chat-background";
 import { loadChatDetailPreferences } from "@/features/settings/model/chat-details";
@@ -77,6 +79,7 @@ installQuickActions();
 installShortcuts();
 installAppLock();
 installNotificationHandler();
+backgroundRefreshNative?.install();
 
 const UniwindGestureHandlerRootView = withUniwind(GestureHandlerRootView);
 const lightTheme = { ...DefaultTheme, fonts: navigationFonts };
@@ -220,6 +223,7 @@ export default function RootLayout() {
       void loadHapticsPreference().catch(() => undefined);
       void loadLargeFilePreference().catch(() => undefined);
       void loadPhotoQualityPreference().catch(() => undefined);
+      void loadFullScreenCameraPreference().catch(() => undefined);
       void loadMessageColor().catch(() => undefined);
       void loadChatBackground().catch(() => undefined);
       void loadChatBackdrop().catch(() => undefined);

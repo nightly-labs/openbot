@@ -1,3 +1,6 @@
+import type { AvatarColor, AvatarHue } from "./ipc-agent-identity";
+import type { BrowserTabProfile } from "./ipc-browser-profiles";
+
 export interface BrowserTab {
   id: string;
   title: string;
@@ -145,34 +148,40 @@ export interface BrowserPreview {
 
 export type BrowserControlPhase = "acting" | "waiting";
 
-export type BrowserControlAction =
-  | "open"
-  | "list-tabs"
-  | "snapshot"
-  | "click"
-  | "type"
-  | "key"
-  | "scroll"
-  | "back"
-  | "forward"
-  | "reload"
-  | "screenshot"
-  | "close-tab";
+export const BROWSER_CONTROL_ACTIONS = [
+  "open",
+  "list-tabs",
+  "snapshot",
+  "click",
+  "type",
+  "key",
+  "scroll",
+  "back",
+  "forward",
+  "reload",
+  "screenshot",
+  "close-tab",
+] as const;
 
-export type BrowserControlDetailAction =
-  | "status"
-  | "navigate"
-  | "press"
-  | "hover"
-  | "select-option"
-  | "set-checked"
-  | "drag"
-  | "upload-files"
-  | "wait-for"
-  | "evaluate"
-  | "set-environment"
-  | "recording-start"
-  | "recording-stop";
+export type BrowserControlAction = (typeof BROWSER_CONTROL_ACTIONS)[number];
+
+export const BROWSER_CONTROL_DETAIL_ACTIONS = [
+  "status",
+  "navigate",
+  "press",
+  "hover",
+  "select-option",
+  "set-checked",
+  "drag",
+  "upload-files",
+  "wait-for",
+  "evaluate",
+  "set-environment",
+  "recording-start",
+  "recording-stop",
+] as const;
+
+export type BrowserControlDetailAction = (typeof BROWSER_CONTROL_DETAIL_ACTIONS)[number];
 
 export interface BrowserControlSession {
   id: string;
@@ -208,6 +217,61 @@ export type BrowserPictureInPictureEvent =
   | { type: "bounds-changed"; bounds: BrowserBounds }
   | { type: "dock" }
   | { type: "hide" };
+
+export interface BrowserTabAgent {
+  id: string;
+  name: string;
+  avatarSeed: string;
+  avatarHue: AvatarHue | null;
+  avatarColor?: AvatarColor | null;
+  avatarUrl: string | null;
+}
+
+export type BrowserTabLabel = BrowserTabProfile & { proxy?: string | undefined };
+
+export interface BrowserWindowTabDetails {
+  tabId: string;
+  control?: BrowserControlSession | undefined;
+  controller?: BrowserTabAgent | undefined;
+  owner?: BrowserTabAgent | undefined;
+  profile?: BrowserTabLabel | undefined;
+}
+
+export interface BrowserWindowHistoryEntry {
+  url: string;
+  title: string;
+  visits: number;
+}
+
+export interface BrowserWindowModel {
+  tabs: BrowserTab[];
+  activeTabId: string | null;
+  details: BrowserWindowTabDetails[];
+  history: BrowserWindowHistoryEntry[];
+  canReopen: boolean;
+  canCloseTabs: boolean;
+  liveViewTabId: string | null;
+  liveViewClipboard: boolean;
+  shortcuts: "mac" | "pc" | null;
+}
+
+export type BrowserWindowAction =
+  | { type: "activate"; tabId: string }
+  | { type: "close"; tabIds: string[] }
+  | { type: "new-tab"; afterId?: string | undefined }
+  | { type: "duplicate"; tabId: string }
+  | { type: "move"; tabId: string; index: number }
+  | { type: "reopen" }
+  | { type: "reload"; tabId: string }
+  | { type: "stop"; tabId: string }
+  | { type: "navigate"; tabId: string; direction: BrowserNavigationDirection }
+  | { type: "open-address"; url: string; tabId?: string | undefined };
+
+export type BrowserWindowEvent =
+  | { type: "bounds-changed"; bounds: BrowserBounds }
+  | { type: "dock" }
+  | { type: "hide" }
+  | { type: "action"; action: BrowserWindowAction };
 
 export interface BrowserOpenInput {
   url: string;

@@ -3,6 +3,7 @@ import type { WhatsAppAuthStore } from "@openbot/whatsapp/auth-store";
 import {
   type AnyMessageContent,
   type BaileysEventMap,
+  type BinaryNode,
   Browsers,
   type ConnectionState,
   DEFAULT_CONNECTION_CONFIG,
@@ -33,6 +34,7 @@ export interface WhatsAppSocket {
   ws: {
     on(event: "frame", listener: () => void): unknown;
     on(event: typeof MESSAGE_ACK, listener: (node: WhatsAppAck) => void): unknown;
+    on(event: typeof NODE_HANDLING, listener: (node: BinaryNode, started: boolean) => void): unknown;
   };
   user?: { id: string } | undefined;
   sendMessage(
@@ -61,6 +63,8 @@ export interface WhatsAppAck {
 
 export const MESSAGE_ACK = "CB:ack,class:message";
 
+export const NODE_HANDLING = "openbot:node";
+
 export type WhatsAppSocketFactory = (config: UserFacingSocketConfig) => WhatsAppSocket;
 
 export type WhatsAppSessionState =
@@ -87,6 +91,9 @@ const FAILING_AFTER_ATTEMPTS = 12;
 const STABLE_MS = 60_000;
 const WATCHDOG_SILENCE_MS = 90_000;
 const WATCHDOG_INTERVAL_MS = 15_000;
+const STALL_MS = 5 * 60_000;
+const STALL_LIMIT = 3;
+const STALL_WINDOW_MS = 60 * 60_000;
 const SEND_DEADLINE_MS = 5 * 60_000;
 const ACK_WAIT_MS = 10_000;
 const LID_WAIT_MS = 5_000;
@@ -136,6 +143,7 @@ export interface WhatsAppSessionOptions {
   pairing?: boolean;
   fetchVersion?: () => Promise<WAVersion | null>;
   now?: () => number;
+  readOnly?: (jid: string) => boolean;
 }
 
 type UpsertListener = (event: { messages: WAMessage[]; type: string }) => void;
@@ -149,6 +157,7 @@ export class WhatsAppSession {
   #pairing: boolean;
   readonly #fetchVersion: () => Promise<WAVersion | null>;
   readonly #now: () => number;
+  readonly #readOnly: (jid: string) => boolean;
   readonly #stateListeners = new Set<(state: WhatsAppSessionState) => void>();
   readonly #upsertListeners = new Set<UpsertListener>();
   readonly #unread: Array<{ messages: WAMessage[]; type: string }> = [];
@@ -161,6 +170,8 @@ export class WhatsAppSession {
   readonly #postChats = new Map<string, string>();
   readonly #noLid = new Map<string, number>();
   readonly #groups = new Map<string, { metadata: GroupMetadata; at: number }>();
+  readonly #handling = new Map<BinaryNode, number>();
+  #stalls: number[] = [];
   #socket: WhatsAppSocket | null = null;
   #state: WhatsAppSessionState = "stopped";
   #started = false;
@@ -183,6 +194,7 @@ export class WhatsAppSession {
     this.#pairing = options.pairing ?? false;
     this.#fetchVersion = options.fetchVersion ?? webVersion;
     this.#now = options.now ?? Date.now;
+    this.#readOnly = options.readOnly ?? (() => false);
   }
 
   get state(): WhatsAppSessionState {
@@ -231,12 +243,14 @@ export class WhatsAppSession {
     this.#historySent = this.#store.linked;
     this.#browserName = options.codeLink ? "Chrome" : "OpenBot";
     this.#attempt = 0;
+    this.#stalls = [];
     this.#setState("connecting");
     void this.#connect();
   }
 
   reconnect(): void {
     if (!this.#started || this.#state === "logged_out" || this.#state === "replaced") return;
+    if (this.#state === "failing") this.#stalls = [];
     this.#attempt = 0;
     this.#dropSocket();
     this.#setState("reconnecting");
@@ -378,6 +392,11 @@ export class WhatsAppSession {
     socket.ws.on(MESSAGE_ACK, (node) => {
       if (this.#socket === socket && node.attrs.id) this.#acks.get(node.attrs.id)?.({ error: node.attrs.error });
     });
+    socket.ws.on(NODE_HANDLING, (node, started) => {
+      if (this.#socket !== socket) return;
+      if (started === true) this.#handling.set(node, this.#now());
+      else this.#handling.delete(node);
+    });
   }
 
   #update(socket: WhatsAppSocket, update: Partial<ConnectionState>): void {
@@ -442,11 +461,32 @@ export class WhatsAppSession {
   #startWatchdog(): void {
     if (this.#watchdog) return;
     this.#watchdog = setInterval(() => {
-      if (this.#state !== "open" || this.#now() - this.#lastFrameAt < WATCHDOG_SILENCE_MS) return;
-      logger.warn("A WhatsApp socket went silent; reconnecting.");
-      this.reconnect();
+      if (this.#state !== "open") return;
+      if (this.#now() - this.#lastFrameAt >= WATCHDOG_SILENCE_MS) {
+        logger.warn("A WhatsApp socket went silent; reconnecting.");
+        this.reconnect();
+        return;
+      }
+      const oldest = this.#handling.values().next();
+      if (this.#historySentAtOpen && !oldest.done && this.#now() - oldest.value >= STALL_MS) this.#stalled();
     }, WATCHDOG_INTERVAL_MS);
     this.#watchdog.unref?.();
+  }
+
+  #stalled(): void {
+    const now = this.#now();
+    this.#stalls = [...this.#stalls.filter((at) => now - at < STALL_WINDOW_MS), now];
+    const stop = this.#stalls.length >= STALL_LIMIT;
+    logger.warn("A WhatsApp socket stopped delivering messages.", {
+      reason: "message_stalled",
+      action: stop ? "stop" : "reconnect",
+    });
+    if (!stop) {
+      this.reconnect();
+      return;
+    }
+    this.#dropSocket();
+    this.#setState("failing");
   }
 
   #dropSocket(): void {
@@ -454,6 +494,7 @@ export class WhatsAppSession {
     this.#retryTimer = null;
     if (this.#watchdog) clearInterval(this.#watchdog);
     this.#watchdog = null;
+    this.#handling.clear();
     const socket = this.#socket;
     this.#socket = null;
     if (!socket) return;
@@ -498,6 +539,7 @@ export class WhatsAppSession {
       const address = this.#postChat(content) ?? (await this.#address(socket, jid));
       const gap = CHAT_PACING_MS * (1 + Math.random() / 2) - (this.#now() - (this.#lastSend.get(jid) ?? 0));
       if (gap > 0) await new Promise((resume) => setTimeout(resume, gap));
+      if (this.#readOnly(jid)) throw new Error("place_read_only");
       messageId ??= generateMessageIDV2(socket.user?.id);
       this.#remember(messageId);
       const ack = this.#ackOf(messageId);
@@ -509,7 +551,14 @@ export class WhatsAppSession {
         });
         this.#lastSend.set(jid, this.#now());
         if (!sent?.key.id) throw new Error("no_message_id");
-        const result = await ack.promise;
+        const result = await ack.wait();
+        if (result === "timeout" && this.#socket === socket && this.#acks.size === 1) {
+          logger.warn("A WhatsApp socket stopped delivering messages.", {
+            reason: "post_unconfirmed",
+            action: "reconnect",
+          });
+          this.reconnect();
+        }
         if (result === "closed" && this.#started) {
           if (attempt >= SEND_ATTEMPTS) throw new Error("not_confirmed");
           continue;
@@ -552,16 +601,19 @@ export class WhatsAppSession {
     return key?.id ? this.#postChats.get(key.id) : undefined;
   }
 
-  #ackOf(messageId: string): { promise: Promise<AckResult>; cancel: () => void } {
+  #ackOf(messageId: string): { wait: () => Promise<AckResult>; cancel: () => void } {
     let finish: (result: AckResult) => void = () => undefined;
     const promise = new Promise<AckResult>((resolve) => {
       finish = resolve;
     });
-    const timer = setTimeout(() => finish("timeout"), ACK_WAIT_MS);
-    timer.unref?.();
+    let timer: ReturnType<typeof setTimeout> | undefined;
     this.#acks.set(messageId, finish);
     return {
-      promise,
+      wait: () => {
+        timer = setTimeout(() => finish("timeout"), ACK_WAIT_MS);
+        timer.unref?.();
+        return promise;
+      },
       cancel: () => {
         clearTimeout(timer);
         if (this.#acks.get(messageId) === finish) this.#acks.delete(messageId);

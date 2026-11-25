@@ -1,6 +1,11 @@
 import type { ProviderLogoVariant } from "@openbot/brand";
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
-import { isAgentProviderRef } from "@openbot/contracts/ipc";
+import {
+  isAgentProviderRef,
+  parseWorkflowAnswerSpec,
+  WORKFLOW_ANSWER_FIELD,
+  WORKFLOW_STEP_NAME_FIELD,
+} from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Button,
@@ -15,6 +20,7 @@ import {
   DropdownMenu,
   File,
   Image,
+  Input,
   LabelTooltipTrigger,
   LoaderCircle,
   Lock,
@@ -35,19 +41,24 @@ import { children, createEffect, createSignal, createStore, For, onSettled, Show
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
+import { AgentAvatar } from "../agents/AgentAvatar";
 import { PickerMenu } from "./WorkflowPicker";
 import {
+  customStepName,
   Hint,
+  makingTake,
   PORT_NAME,
   resizeCursor,
   resizeHandles,
   resultValue,
+  showsStrip,
   useBoard,
   type WfnBoard,
   type WfnFieldValue,
   type WfnPortSide,
   type WfnPortType,
   type WfnResult,
+  type WorkflowAgentProgress,
 } from "./workflow-board";
 import type { WorkflowPlace } from "./workflow-model";
 
@@ -61,6 +72,33 @@ export type NoteTone = "yellow" | "orange" | "red" | "pink" | "blue" | "teal" | 
 export type CanvasColor = "ink" | NoteTone;
 export type ShapeKind = "rectangle" | "circle" | "diamond" | "triangle" | "inverted" | "oval" | "star";
 type BlockKind = "trigger" | "condition" | "output" | "approval" | "note" | "shape";
+
+const readClock = () => ({ wall: Date.now(), mono: performance.now() });
+
+function createSharedClock(intervalMs: number) {
+  const [now, setNow] = createSignal(readClock());
+  let users = 0;
+  let timer: ReturnType<typeof setInterval> | undefined;
+  const subscribe = () => {
+    users += 1;
+    setNow(readClock());
+    if (users === 1) timer = setInterval(() => setNow(readClock()), intervalMs);
+    return () => {
+      users -= 1;
+      if (users !== 0 || timer === undefined) return;
+      clearInterval(timer);
+      timer = undefined;
+    };
+  };
+  const read = () => {
+    const value = now();
+    return users === 0 ? readClock() : value;
+  };
+  return { now: read, subscribe };
+}
+
+const runTimeClock = createSharedClock(100);
+const workflowClock = createSharedClock(250);
 
 export function PortIcon(props: { type: WfnPortType }) {
   return (
@@ -135,7 +173,13 @@ export function Toolbar(props: { id: string; children: JSX.Element }) {
   onSettled(() => {
     const target = element;
     if (!target) return;
-    const observer = new ResizeObserver(() => setBar({ width: target.offsetWidth, height: target.offsetHeight }));
+    const observer = new ResizeObserver(() => {
+      const width = target.offsetWidth;
+      const height = target.offsetHeight;
+      const previous = bar();
+      if (previous?.width === width && previous.height === height) return;
+      setBar({ width, height });
+    });
     observer.observe(target);
     return () => observer.disconnect();
   });
@@ -166,7 +210,9 @@ export function ToolAction(props: {
   keys?: readonly string[];
   tone?: "danger";
   pressed?: boolean;
+  expanded?: boolean;
   icon: JSX.Element;
+  ref?: (element: HTMLButtonElement) => void;
   onClick: () => void;
   onAim?: (aimed: boolean) => void;
 }) {
@@ -179,6 +225,9 @@ export function ToolAction(props: {
         class="wfn-tool-action"
         aria-label={props.label ?? props.text}
         aria-pressed={props.pressed === undefined ? undefined : props.pressed ? "true" : "false"}
+        aria-haspopup={props.expanded === undefined ? undefined : "dialog"}
+        aria-expanded={props.expanded === undefined ? undefined : props.expanded ? "true" : "false"}
+        ref={(element: HTMLButtonElement) => props.ref?.(element)}
         data-tone={props.tone}
         onPointerEnter={() => props.onAim?.(true)}
         onPointerLeave={() => props.onAim?.(false)}
@@ -197,6 +246,12 @@ export function download(url: string, name: string) {
   link.href = url;
   link.download = name;
   link.click();
+}
+
+export function downloadMedia(board: WfnBoard, attachmentId: string, url: string, name: string) {
+  const save = board.catalogs().download;
+  if (save) void save(attachmentId).catch(() => undefined);
+  else download(url, name);
 }
 
 export function NodeToolbar(props: {
@@ -382,7 +437,7 @@ export function NodeShell(props: ShellProps) {
         tabindex={board.resizable ? 0 : undefined}
         data-status={board.status(props.id)}
         data-height={board.size(props.id)?.height === undefined ? undefined : ""}
-        aria-label={props.label}
+        aria-label={customStepName(board.field(props.id, WORKFLOW_STEP_NAME_FIELD)) ?? props.label}
         style={style()}
       >
         <Show when={selected()}>
@@ -391,7 +446,7 @@ export function NodeShell(props: ShellProps) {
         <span class="wfn-label" data-bare={props.bare ? "" : undefined}>
           <Show when={!props.bare}>
             {props.icon}
-            {props.label}
+            <StepName id={props.id} kind={props.label} />
           </Show>
           <Show when={board.isLocked(props.id)}>
             <span class="wfn-lock-badge" role="img" aria-label={t("workflow.node.locked")}>
@@ -469,34 +524,50 @@ export function NodeShell(props: ShellProps) {
   );
 }
 
+function StepName(props: { id: string; kind: string }) {
+  const board = useBoard();
+  const { t } = useText();
+  const [value, setValue] = useTextField(() => props.id, WORKFLOW_STEP_NAME_FIELD, "");
+  return (
+    <Input
+      class="wfn-frame-name wfn-step-name"
+      value={value()}
+      placeholder={props.kind}
+      aria-label={t("workflow.node.name")}
+      spellcheck={false}
+      autocomplete="off"
+      readonly={board.isLocked(props.id)}
+      onValueChange={setValue}
+      onBlur={() => {
+        const trimmed = value().trim();
+        if (trimmed !== value()) setValue(trimmed);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === "Escape") event.currentTarget.blur();
+      }}
+    />
+  );
+}
+
 function RunTime(props: { id: string }) {
   const board = useBoard();
   const { t, format } = useText();
-  const [clock, setClock] = createStore({ ms: 0, done: false });
+  const [clock, setClock] = createStore<{ startMs: number | undefined; finishedMs: number; done: boolean }>({
+    startMs: undefined,
+    finishedMs: 0,
+    done: false,
+  });
   let start = 0;
   createEffect(
     () => board.status(props.id),
     (status, before) => {
       if (status === "running") {
         start = performance.now();
-        setClock((draft) => {
-          draft.ms = 0;
-          draft.done = false;
-        });
-        const timer = setInterval(
-          () =>
-            setClock((draft) => {
-              draft.ms = performance.now() - start;
-            }),
-          100,
-        );
-        return () => clearInterval(timer);
+        setClock(() => ({ startMs: start, finishedMs: 0, done: false }));
+        return runTimeClock.subscribe();
       }
       if (status === "done" && before === "running") {
-        setClock((draft) => {
-          draft.ms = performance.now() - start;
-          draft.done = true;
-        });
+        setClock(() => ({ startMs: start, finishedMs: performance.now() - start, done: true }));
         const timer = setTimeout(
           () =>
             setClock((draft) => {
@@ -512,6 +583,11 @@ function RunTime(props: { id: string }) {
       return undefined;
     },
   );
+  const elapsedMs = () => {
+    if (clock.done) return clock.finishedMs;
+    const startMs = clock.startMs;
+    return startMs === undefined ? 0 : Math.max(0, runTimeClock.now().mono - startMs);
+  };
   return (
     <Show
       when={board.status(props.id) === "running" || clock.done}
@@ -529,7 +605,10 @@ function RunTime(props: { id: string }) {
           <CircleCheck aria-hidden="true" />
         </Show>
         {t("workflow.node.runTime", {
-          seconds: format.number(clock.ms / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+          seconds: format.number(elapsedMs() / 1000, {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1,
+          }),
         })}
       </span>
     </Show>
@@ -541,11 +620,21 @@ export function ResultField(props: { id: string; running: boolean }) {
   const { t } = useText();
   const value = () => resultValue(board.shown(props.id)) ?? "";
   const failure = () => resultFailure(board, props.id);
+  const live = () => (props.running ? board.progress(props.id) : undefined);
+  const answer = () => {
+    const text = value();
+    const spec = board.field(props.id, WORKFLOW_ANSWER_FIELD);
+    const givesAnswer = typeof spec === "string" && parseWorkflowAnswerSpec(spec).fields.length > 0;
+    return text && givesAnswer ? answerEntries(t, text) : undefined;
+  };
   return (
     <Show when={value() || failure() || props.running}>
       <Field class="wfn-field-result">
         <div class="wfn-field-head">
           <span>{t("workflow.node.result.title")}</span>
+          <Show when={live()?.done}>
+            {(done) => <span class="wfn-result-count">{t("workflow.node.stepsDone", { count: done() })}</span>}
+          </Show>
           <CopyButton
             value={value()}
             iconOnly
@@ -553,17 +642,56 @@ export function ResultField(props: { id: string; running: boolean }) {
             disabled={props.running || !value()}
           />
         </div>
-        <div class="wfn-result-body" data-running={props.running ? "" : undefined}>
+        <div class="wfn-result-body" data-running={props.running ? "" : undefined} data-live={live() ? "" : undefined}>
           <Show when={value() || failure()}>
-            <p data-failed={value() ? undefined : ""}>{value() || failure()}</p>
+            <p data-failed={value() ? undefined : ""}>
+              <Show when={answer()} fallback={value() || failure()}>
+                {(entries) => (
+                  <For each={entries()}>
+                    {(entry) => (
+                      <span class="wfn-result-answer">
+                        <span class="wfn-result-answer-name">{entry.name}</span>
+                        <span class="wfn-result-answer-value">{entry.text}</span>
+                      </span>
+                    )}
+                  </For>
+                )}
+              </Show>
+            </p>
           </Show>
           <Show when={props.running}>
             <ResultPending />
           </Show>
+          <Show when={live()}>{(progress) => <LiveProgress id={props.id} progress={progress()} />}</Show>
         </div>
       </Field>
     </Show>
   );
+}
+
+type AnswerEntry = { name: string; text: string };
+
+function answerEntries(t: AppTranslate, value: string): AnswerEntry[] | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+  const entries = Object.entries(parsed).flatMap(([name, item]) => {
+    const text = answerText(t, item);
+    return text ? [{ name, text }] : [];
+  });
+  return entries.length > 0 ? entries : undefined;
+}
+
+function answerText(t: AppTranslate, value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (typeof value === "boolean") return value ? t("workflow.node.result.yes") : t("workflow.node.result.no");
+  if (Array.isArray(value)) return value.map((item) => answerText(t, item)).join("\n");
+  return value === null || value === undefined ? "" : JSON.stringify(value);
 }
 
 function resultFailure(board: WfnBoard, id: string): string | undefined {
@@ -586,6 +714,22 @@ export function FailureAlert(props: { id: string; running: boolean }) {
   );
 }
 
+function LiveProgress(props: { id: string; progress: WorkflowAgentProgress }) {
+  const board = useBoard();
+  const agent = () => board.catalogs().agents.find((entry) => entry.id === props.progress.agentId);
+  return (
+    <div class="wfn-result-live" role="status" aria-live="polite">
+      <AgentAvatar agent={agent()} mood="working" activity={props.progress.activity} class="wfn-result-live-avatar" />
+      <div class="wfn-result-live-lines">
+        <span class="wfn-result-live-text">{props.progress.detail}</span>
+        <Show when={props.progress.previous}>
+          {(previous) => <span class="wfn-result-live-previous">{previous()}</span>}
+        </Show>
+      </div>
+    </div>
+  );
+}
+
 function ResultPending() {
   return (
     <div class="wfn-result-pending" aria-hidden="true">
@@ -600,7 +744,7 @@ export function Field(props: { class?: string; children: JSX.Element }) {
   return <div class={`wfn-field ${props.class ?? ""}`}>{props.children}</div>;
 }
 
-function resultName(t: AppTranslate, result: WfnResult): string {
+export function resultName(t: AppTranslate, result: WfnResult): string {
   if (result.run === undefined)
     return result.failed ? t("workflow.node.result.stepFailed") : t("workflow.node.result.step");
   return result.failed
@@ -633,7 +777,7 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
   };
   let items: HTMLSpanElement | undefined;
   createEffect(
-    () => (list().length > 1 ? board.shown(props.id)?.id : undefined),
+    () => (showsStrip(board, props.id) ? (makingTake(board, props.id)?.id ?? board.shown(props.id)?.id) : undefined),
     (id, before) => {
       const item = id ? items?.querySelector<HTMLElement>('[aria-pressed="true"]') : null;
       if (!items || !item) return;
@@ -662,7 +806,7 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
     items.scrollLeft += step;
   };
   return (
-    <Show when={list().length > 1}>
+    <Show when={showsStrip(board, props.id)}>
       <fieldset class="wfn-strip" aria-label={t("workflow.node.result.list")}>
         <Button
           variant="ghost"
@@ -690,17 +834,36 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
                     name: resultName(t, result),
                     time: resultTime(format, result.at),
                   })}
-                  aria-pressed={result.id === board.shown(props.id)?.id ? "true" : "false"}
+                  aria-pressed={
+                    makingTake(board, props.id) === undefined && result.id === board.shown(props.id)?.id
+                      ? "true"
+                      : "false"
+                  }
                   data-failed={result.failed ? "" : undefined}
                   onClick={() => board.pick(props.id, result.id)}
                 >
                   <Show when={!result.failed} fallback={<CircleX class="wfn-strip-failed" aria-hidden="true" />}>
                     <Show when={props.thumb?.(result)} fallback={<span class="wfn-strip-number">{at() + 1}</span>}>
-                      {(src) => <img src={src()} alt="" />}
+                      {(src) => (
+                        <>
+                          <img class="wfn-strip-tint" src={src()} alt="" aria-hidden="true" />
+                          <img class="wfn-strip-picture" src={src()} alt="" />
+                        </>
+                      )}
                     </Show>
                   </Show>
                 </LabelTooltipTrigger>
               </Hint>
+            )}
+          </For>
+          <For each={board.pending(props.id)} keyed={(take) => take.id}>
+            {(take, at) => (
+              <PendingTake
+                number={list().length + at() + 1}
+                since={take().at}
+                current={makingTake(board, props.id)?.id === take().id}
+                onPick={() => board.pick(props.id, take().id)}
+              />
             )}
           </For>
         </span>
@@ -716,6 +879,63 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
       </fieldset>
     </Show>
   );
+}
+
+function PendingTake(props: { number: number; since: string; current: boolean; onPick: () => void }) {
+  const { t } = useText();
+  const since = useSince(() => props.since);
+  const seconds = () => since() ?? 0;
+  const label = () => t("workflow.media.takeMaking", { number: props.number, time: clock(seconds()) });
+  return (
+    <Hint label={label()}>
+      <LabelTooltipTrigger
+        type="button"
+        class="wfn-strip-item wfn-strip-take"
+        aria-label={label()}
+        aria-pressed={props.current ? "true" : "false"}
+        onClick={props.onPick}
+      >
+        <svg class="wfn-take-ring" viewBox="0 0 36 36" aria-hidden="true">
+          <circle class="wfn-take-track" cx="18" cy="18" r="16" pathLength="100" />
+          <circle class="wfn-take-fill" cx="18" cy="18" r="16" pathLength="100" />
+        </svg>
+        <span class="wfn-take-label" aria-hidden="true">
+          {clock(seconds())}
+        </span>
+      </LabelTooltipTrigger>
+    </Hint>
+  );
+}
+
+export const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+
+export function useElapsed(running: () => boolean) {
+  const [span, setSpan] = createSignal<{ start: number; end: number | undefined }>();
+  createEffect(running, (on) => {
+    if (!on) {
+      setSpan((current) => current && { start: current.start, end: untrack(() => workflowClock.now().mono) });
+      return;
+    }
+    setSpan({ start: performance.now(), end: undefined });
+    return workflowClock.subscribe();
+  });
+  return () => {
+    const current = span();
+    if (!current) return 0;
+    const end = current.end ?? workflowClock.now().mono;
+    return Math.max(0, Math.floor((end - current.start) / 1000));
+  };
+}
+
+export function useSince(since: () => string | undefined) {
+  createEffect(since, (at) => {
+    if (at === undefined) return;
+    return workflowClock.subscribe();
+  });
+  return () => {
+    const at = since();
+    return at === undefined ? undefined : Math.max(0, Math.floor((workflowClock.now().wall - Date.parse(at)) / 1000));
+  };
 }
 
 export function useStepRun(id: string) {

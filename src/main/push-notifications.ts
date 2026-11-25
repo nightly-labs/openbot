@@ -5,6 +5,7 @@ import {
   type ConversationMessage,
   latestTurnAnswer,
   type ServerNotificationLevel,
+  type WorkflowGraph,
 } from "@openbot/contracts/ipc";
 import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
 import {
@@ -15,6 +16,7 @@ import {
 } from "@openbot/contracts/notification-relay";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
+import { PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-workflows-v1";
 import { resolveLocale, translateFor } from "@openbot/i18n";
 import { redactText, toLogValue } from "@openbot/logging";
 import {
@@ -23,6 +25,9 @@ import {
   agentEventRequestThread,
   agentNotificationLevel,
   notificationForAgentEvent,
+  notificationForSignInWait,
+  type ProviderSignInWaitNotice,
+  plainPreview,
   teammateTurnCompleted,
 } from "@openbot/team-client/agent-notifications";
 import {
@@ -38,8 +43,10 @@ import {
   sealPushNotification,
 } from "@openbot/team-client/push-notification-seal";
 import { Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
+import type { ProviderSignInWait, ProviderSignInWaits } from "../backend/agent/provider-sign-in-waits";
 import { isNoUpdateAnswer } from "../backend/agent/routine-quiet-runs";
 import type { AgentService } from "../backend/agent-service";
+import type { WorkflowNotice } from "../backend/workflows/workflows";
 import type { PushNotificationStore, PushTarget, StoredPushRegistration } from "./push-notification-store";
 import type { TeamApiAgents } from "./team-api/dependencies";
 import { markerExclusionsForCapabilities } from "./team-api/request-helpers";
@@ -61,8 +68,31 @@ type PushNotificationAgents = Pick<
 > &
   Pick<AgentService, "readTask">;
 
+interface WorkflowPushNotice {
+  type: "workflow-notice";
+  notice: WorkflowNotice;
+}
+
+type PushNotice = AgentEvent | ProviderSignInWaitNotice | WorkflowPushNotice;
+
+export type WorkflowPushNeed = "view" | "chat";
+
+export interface WorkflowPushDetail {
+  graph: WorkflowGraph;
+  title: string;
+}
+
+export interface WorkflowNoticeSource {
+  on(event: "notice", listener: (notice: WorkflowNotice) => void): unknown;
+  off(event: "notice", listener: (notice: WorkflowNotice) => void): unknown;
+}
+
 interface PushNotificationOptions {
   agents: PushNotificationAgents;
+  signInWaits?: Pick<ProviderSignInWaits, "on" | "off">;
+  workflowNotices?: WorkflowNoticeSource;
+  workflowDetail?(workflowId: string): Effect.Effect<WorkflowPushDetail | null>;
+  workflowAllows?(viewer: PushNotificationViewer, graph: WorkflowGraph, need: WorkflowPushNeed): boolean;
   store: Pick<PushNotificationStore, "list" | "replace">;
   send(request: NotificationRelayRequest): Effect.Effect<"sent" | "gone", PushNotificationSendFailure>;
   hiddenAgentIds(protocol: number, capabilities: ReadonlySet<string>, memberId: string): ReadonlySet<string>;
@@ -73,7 +103,7 @@ interface PushNotificationOptions {
     server: ServerNotificationLevel | null;
     agents: ReadonlyMap<string, ServerNotificationLevel>;
   };
-  atHostComputer(memberId: string, event: AgentEvent): boolean;
+  atHostComputer(memberId: string, event: AgentEvent | null): boolean;
   liveActivityShows(
     sessionId: string,
     subject: PushNotificationSubject,
@@ -86,7 +116,7 @@ interface PushNotificationOptions {
   logger?: { warn(message: string, ...values: unknown[]): void };
 }
 
-interface PushNotificationViewer {
+export interface PushNotificationViewer {
   memberId: string;
   protocol: number;
   capabilities: ReadonlySet<string>;
@@ -99,7 +129,7 @@ export interface PushNotificationSubject {
 }
 
 interface HeldEvent {
-  event: AgentEvent;
+  event: PushNotice;
   at: number;
 }
 
@@ -121,6 +151,14 @@ export class PushNotificationService {
   readonly #listener = (event: AgentEvent) => {
     this.#releaseAnswered(event);
     Effect.runFork(this.#deliver(event).pipe(Effect.forkIn(this.#scope, { startImmediately: true })));
+  };
+  readonly #signInListener = (wait: ProviderSignInWait) => {
+    const notice: ProviderSignInWaitNotice = { type: "provider-sign-in-wait", ...wait };
+    Effect.runFork(this.#deliver(notice).pipe(Effect.forkIn(this.#scope, { startImmediately: true })));
+  };
+  readonly #workflowListener = (notice: WorkflowNotice) => {
+    const received: WorkflowPushNotice = { type: "workflow-notice", notice };
+    Effect.runFork(this.#deliver(received).pipe(Effect.forkIn(this.#scope, { startImmediately: true })));
   };
   #scope = Scope.makeUnsafe();
   #listening = false;
@@ -214,7 +252,11 @@ export class PushNotificationService {
 
   readonly dispose = Effect.fn("PushNotifications.dispose")(function* (this: PushNotificationService) {
     this.#running = false;
-    if (this.#listening) this.#options.agents.off("event", this.#listener);
+    if (this.#listening) {
+      this.#options.agents.off("event", this.#listener);
+      this.#options.signInWaits?.off("signInWait", this.#signInListener);
+      this.#options.workflowNotices?.off("notice", this.#workflowListener);
+    }
     this.#listening = false;
     for (const registration of this.#registrations.values()) this.#dropHeld(registration);
     this.#registrations.clear();
@@ -241,9 +283,11 @@ export class PushNotificationService {
 
   #deliver = Effect.fn("PushNotifications.deliver")(function* (
     this: PushNotificationService,
-    received: AgentEvent,
+    received: PushNotice,
     only?: Registration,
   ) {
+    if (received.type === "provider-sign-in-wait") return yield* this.#deliverSignInWait(received, only);
+    if (received.type === "workflow-notice") return yield* this.#deliverWorkflowNotice(received, only);
     if (teammateTurnCompleted(received)) return;
     const thread = received.type === "thread-turn-completed" ? received : null;
     const event = thread ? thread.turn : received;
@@ -252,7 +296,6 @@ export class PushNotificationService {
     const now = this.#now();
     const desktopNotifies = !thread || thread.routine;
     const targets = (only ? [only] : [...this.#registrations.values()]).filter((registration) => {
-      const { value, memberId, protocol, sessionId } = registration.stored;
       if (
         thread &&
         !thread.routine &&
@@ -260,24 +303,12 @@ export class PushNotificationService {
           registration.stored.threadReplies === false)
       )
         return false;
-      if (!value.away && registration.connected) {
-        if (!only) this.#hold(registration, received, now);
-        return false;
-      }
-      if (value.mutedUntil !== null && value.mutedUntil * 1_000 > now) return false;
-      if (!this.#options.memberActive(memberId)) {
-        this.remove(sessionId);
-        return false;
-      }
-      if (this.#options.hiddenAgentIds(protocol, registration.capabilities, memberId).has(subject.agentId))
-        return false;
-      const used = desktopNotifies
-        ? this.#lastUseElsewhere(memberId, sessionId)
-        : this.#options.lastUseElsewhere(memberId, sessionId);
-      return !(
-        (used !== null && now - used < this.#awayAfterMs) ||
-        this.#options.atHostComputer(memberId, desktopNotifies ? event : received)
-      );
+      return this.#reaches(registration, received, subject.agentId, {
+        desktopNotifies,
+        hostEvent: desktopNotifies ? event : received,
+        now,
+        only,
+      });
     });
     if (!targets.length) return;
     const agents = this.#options.agents.listAgents();
@@ -335,6 +366,129 @@ export class PushNotificationService {
     }
   });
 
+  #deliverSignInWait = Effect.fn("PushNotifications.deliverSignInWait")(function* (
+    this: PushNotificationService,
+    notice: ProviderSignInWaitNotice,
+    only?: Registration,
+  ) {
+    const now = this.#now();
+    const targets = (only ? [only] : [...this.#registrations.values()]).filter((registration) =>
+      this.#reaches(registration, notice, notice.agentId, { desktopNotifies: false, hostEvent: null, now, only }),
+    );
+    if (!targets.length) return;
+    const agents = this.#options.agents.listAgents();
+    const userHidden = agents.some((agent) => agent.id === notice.agentId && agent.hiddenAt !== undefined);
+    for (const registration of targets) {
+      const { stored } = registration;
+      const { value, memberId } = stored;
+      if (stored.platform !== "android" && stored.value.token === null) continue;
+      const chosen = this.#options.memberLevels?.(memberId);
+      const level = agentNotificationLevel(
+        chosen?.server ?? value.level,
+        chosen?.agents ?? null,
+        notice.agentId,
+        userHidden,
+      );
+      const translate = translateFor(resolveLocale("system", value.locale));
+      const content = notificationForSignInWait(notice, agents, translate, level);
+      if (!content) continue;
+      const sealedContent: PushNotificationContent = {
+        serverId: value.serverId,
+        agentId: content.agentId,
+        threadId: content.threadId,
+        kind: "sign-in",
+        title: content.title,
+        body: content.body,
+      };
+      yield* this.#send(registration, sealedContent, content.body).pipe(
+        Effect.forkIn(this.#scope, { startImmediately: true }),
+      );
+    }
+  });
+
+  #deliverWorkflowNotice = Effect.fn("PushNotifications.deliverWorkflowNotice")(function* (
+    this: PushNotificationService,
+    received: WorkflowPushNotice,
+    only?: Registration,
+  ) {
+    const { notice } = received;
+    const detail = yield* this.#options.workflowDetail?.(notice.workflowId) ?? Effect.succeed(null);
+    const allows = this.#options.workflowAllows;
+    if (!detail || !allows) return;
+    const approval = notice.kind === "approval";
+    const now = this.#now();
+    const targets = (only ? [only] : [...this.#registrations.values()]).filter((registration) => {
+      const { memberId, protocol } = registration.stored;
+      return (
+        registration.capabilities.has(PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY) &&
+        this.#reaches(registration, received, null, {
+          desktopNotifies: true,
+          hostEvent: null,
+          now,
+          only,
+          sendWhileOpen: true,
+        }) &&
+        allows(
+          { memberId, protocol, capabilities: registration.capabilities },
+          detail.graph,
+          approval ? "chat" : "view",
+        )
+      );
+    });
+    for (const registration of targets) {
+      const { stored } = registration;
+      const { value, memberId } = stored;
+      if (stored.platform !== "android" && value.token === null) continue;
+      const level = this.#options.memberLevels?.(memberId).server ?? value.level;
+      if (approval ? level === "nothing" : level !== "all") continue;
+      const translate = translateFor(resolveLocale("system", value.locale));
+      const fallback = approval ? translate("notification.workflowApproval") : translate("notification.workflowOutput");
+      const content: PushNotificationContent = {
+        serverId: value.serverId,
+        agentId: notice.workflowId,
+        threadId: null,
+        kind: "workflow",
+        title: redactText(value.preview ? notice.workflowTitle : detail.title).trim(),
+        body: (value.preview && plainPreview(redactText(notice.text))) || fallback,
+      };
+      yield* this.#send(registration, content, fallback).pipe(Effect.forkIn(this.#scope, { startImmediately: true }));
+    }
+  });
+
+  #reaches(
+    registration: Registration,
+    received: PushNotice,
+    agentId: string | null,
+    delivery: {
+      desktopNotifies: boolean;
+      hostEvent: AgentEvent | null;
+      now: number;
+      only: Registration | undefined;
+      sendWhileOpen?: boolean;
+    },
+  ): boolean {
+    const { value, memberId, protocol, sessionId } = registration.stored;
+    const { now } = delivery;
+    if (!value.away && registration.connected && !delivery.sendWhileOpen) {
+      if (!delivery.only) this.#hold(registration, received, now);
+      return false;
+    }
+    if (value.mutedUntil !== null && value.mutedUntil * 1_000 > now) return false;
+    if (!this.#options.memberActive(memberId)) {
+      this.remove(sessionId);
+      return false;
+    }
+    if (agentId !== null && this.#options.hiddenAgentIds(protocol, registration.capabilities, memberId).has(agentId))
+      return false;
+    const used = delivery.desktopNotifies
+      ? this.#lastUseElsewhere(memberId, sessionId)
+      : this.#options.lastUseElsewhere(memberId, sessionId);
+    return !(
+      (used !== null && now - used < this.#awayAfterMs) ||
+      this.#options.atHostComputer(memberId, delivery.hostEvent)
+    );
+  }
+
   #answer = Effect.fn("PushNotifications.answer")(function* (
     this: PushNotificationService,
     event: AgentTurnCompletedEvent,
@@ -389,7 +543,7 @@ export class PushNotificationService {
     }
   });
 
-  #hold(registration: Registration, event: AgentEvent, now: number): void {
+  #hold(registration: Registration, event: PushNotice, now: number): void {
     const held = registration.held.filter((item) => now - item.at < HELD_EVENT_MS);
     held.push({ event, at: now });
     registration.held = held.slice(-HELD_EVENT_LIMIT);
@@ -469,6 +623,8 @@ export class PushNotificationService {
   #listen(): void {
     if (this.#listening) return;
     this.#options.agents.on("event", this.#listener);
+    this.#options.signInWaits?.on("signInWait", this.#signInListener);
+    this.#options.workflowNotices?.on("notice", this.#workflowListener);
     this.#listening = true;
   }
 }
@@ -492,12 +648,13 @@ function relayRequest(
 }
 
 function heldEventUnseen(
-  event: AgentEvent,
+  event: PushNotice,
   snapshot: ReturnType<PushNotificationAgents["getRuntimeSnapshot"]>,
   reads: ReturnType<PushNotificationAgents["listConversationReads"]>,
   agents: readonly AgentSummary[],
 ): boolean | null {
   if (event.type === "error" || event.type === "thread-turn-completed") return null;
+  if (event.type === "provider-sign-in-wait") return true;
   if (event.type !== "turn-completed") return true;
   if (event.status !== "completed") {
     return snapshot.failedTurns.some((failed) => failed.agentId === event.agentId && failed.turnId === event.turnId);
@@ -506,7 +663,7 @@ function heldEventUnseen(
   return (reads[event.agentId]?.unreadCount ?? 0) > 0;
 }
 
-function heldRequest(event: AgentEvent): { agentId: string; requestId: string | number } | null {
+function heldRequest(event: PushNotice): { agentId: string; requestId: string | number } | null {
   switch (event.type) {
     case "prompt":
       return { agentId: event.agentId, requestId: event.requestId };

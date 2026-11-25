@@ -1,4 +1,9 @@
-import { decodeHostReleaseStatus, type HostReleaseStatus } from "@openbot/contracts/ipc";
+import {
+  decodeHostReleaseStatus,
+  decodeWorkflowFoldersSnapshot,
+  type HostReleaseStatus,
+  type WorkflowFoldersSnapshot,
+} from "@openbot/contracts/ipc";
 
 import { emptyDecoder } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -13,4 +18,8 @@ export const decodeComputerActivityReply = (value: unknown): boolean => isDynami
 
 export function decodeHostReleaseStatusFromHost(value: unknown): HostReleaseStatus {
   return decodeHostReleaseStatus(value);
+}
+
+export function decodeWorkflowFoldersSnapshotFromHost(value: unknown): WorkflowFoldersSnapshot {
+  return decodeWorkflowFoldersSnapshot(value);
 }

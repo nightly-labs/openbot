@@ -37,6 +37,12 @@ const PRICES: Readonly<Record<string, Price>> = {
     short: { input: 10, cached: 1, cacheWrite: 12.5, output: 50 },
     long: { from: OPENAI_LONG, input: 20, cached: 2, cacheWrite: 25, output: 75 },
   },
+  "codex:gpt-6.2-astra": {
+    source: OPENAI,
+    verified: "2026-11-17",
+    short: { input: 8, cached: 0.4, cacheWrite: 10, output: 40 },
+    long: { from: OPENAI_LONG, input: 16, cached: 0.8, cacheWrite: 20, output: 60 },
+  },
   "codex:gpt-6.2-sol": {
     source: OPENAI,
     verified: "2026-11-17",
@@ -119,6 +125,11 @@ const PRICES: Readonly<Record<string, Price>> = {
     source: GEMINI,
     verified: "2026-11-18",
     short: { input: 1.5, cached: 0.075, output: 7.5 },
+  },
+  "antigravity:gemini-4-neon": {
+    source: GEMINI,
+    verified: "2026-11-22",
+    short: { input: 3, cached: 0.15, output: 15 },
   },
   "antigravity:gemini-3.8-flash": {
     source: GEMINI,

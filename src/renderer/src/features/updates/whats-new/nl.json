@@ -1,5 +1,154 @@
 [
   {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Veel van de onderstaande oplossingen werken op een server alleen als de server deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Gebruik spraak in kanalen. Wanneer je een bericht voor een kanaal dicteert, leest de app het antwoord van een agent hardop voor. Je kunt ook een spraakgesprek starten vanuit het berichtvak van het kanaal.",
+          "Verberg een server op de serverbalk. De server is ook verborgen op je andere computers. Selecteer hem in de map “Verborgen servers” om hem weer te tonen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "De pagina Taken heet nu Threads, zoals in de telefoon-app en in het zijpaneel van de chat.",
+          "Gestreamde antwoorden en workflows die tegelijk lopen, gebruiken minder CPU, en de webclient opent een server sneller."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Op een Mac openen Koppelen en Account toevoegen voor Claude nu de aanmeldpagina van Claude vanuit OpenBot.",
+          "Wanneer de verbinding met een server waarbij je bent aangesloten stopt met het verzenden van gegevens, maakt de app zelf weer verbinding.",
+          "Lange kanalen op een server waarbij je bent aangesloten, openen en updaten sneller.",
+          "Een workflowuitvoer “Melding” of een stap die op goedkeuring wacht, stuurt nu een melding naar je telefoon.",
+          "Een Gemini-chat gaat door nadat Google een toolresultaat weigert. Eerder mislukte elk volgend bericht."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.77.0",
+    "date": "2026-11-23",
+    "notices": [
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Op een server werken OpenBot-creditmodellen, gepauzeerde en geëxporteerde workflows, alleen-lezen WhatsApp-chats, locatieverzoeken en de keuze van de Signal-server alleen als de server deze versie heeft.",
+      "Na deze update kan een oudere versie van OpenBot je gegevens niet openen."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Koop OpenBot-credits voor jezelf of voor een server via de knop “Credits” in de paginabalk of onder Instellingen → Facturering. Een betaalde licentie geeft ook elke maand gratis credits.",
+          "Beeld- en videostappen in een workflow kunnen OpenBot-modellen gebruiken die je credits betalen, zonder extra aanmelding. Stel bij een stap “Aantal” in om tot 4 resultaten tegelijk te maken.",
+          "Pauzeer een workflow via het workflowmenu. Je kunt een workflow ook naar een bestand exporteren en op een andere computer of server importeren.",
+          "Typ {{ in een workflowstap om een veld uit een eerdere stap toe te voegen. Triggers voor Planning, GitHub, Discord, Telegram en Slack geven nu ook velden.",
+          "Een agent kan om je locatie vragen wanneer een verzoek die nodig heeft, zoals “restaurants bij mij in de buurt”. Er wordt niets verstuurd tot je antwoordt.",
+          "Maak een toegestaan WhatsApp-contact of een toegestane groep alleen-lezen. Je agents kunnen de chat lezen, en OpenBot schrijft er nooit in."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Een inactieve Claude- of Pi-chat met 200K of meer tokens context comprimeert zichzelf voordat de prompt-cache van 1 uur verloopt. Dat kost minder dan de volledige context opnieuw lezen. Zet het uit in Serverinstellingen → Aanbieders.",
+          "Kies de Signal-server van een server in Serverinstellingen → Algemeen. “Automatisch” houdt de dichtstbijzijnde.",
+          "Gemini-agents met Volledige toegang gebruiken OpenBot-tools, zoals geheugen, de browser en kanalen, zonder goedkeuringskaart."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een bericht dat je naar een Claude-agent stuurt terwijl die werkt, komt nu meteen bij de agent aan, ook terwijl hij een subagent of een lange tool uitvoert.",
+          "Een ChatGPT (Codex)-agent die op “Eerst vragen” staat, vraagt je nu voordat hij een opdracht uitvoert of een bestand wijzigt.",
+          "Een gehoste of zelf gehoste server die niet meer reageert, start na 10 minuten vanzelf weer.",
+          "Op macOS maakt het agentdock OpenBot en de hele computer niet meer traag.",
+          "Lange chats scrollen soepel. Eerder haperde een chat met meer dan 100 berichten tijdens het scrollen."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Op een server werken taken die tegelijk lopen, het account voor live spraak, de OpenBot-geheugenschakelaar, workflowmappen, getypeerde workflowantwoorden en meer dan 10 accounts van één aanbieder alleen als de server deze versie heeft.",
+      "Na deze update kan een oudere versie van OpenBot je gegevens niet openen."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Een agent kan losstaand werk splitsen in taken die tegelijk lopen. Elk resultaat komt terug in de hoofdchat, en de agent voegt de resultaten voor je samen.",
+          "Bekijk alle open threads van een agent in het nieuwe tabblad Threads van het zijpaneel. Het tabblad toont het aantal threads dat op je wacht.",
+          "Wijzig je sneltoetsen in het nieuwe tabblad Toetsenbord van Instellingen. Nieuwe sneltoetsen starten een thread en gaan naar de volgende en de vorige thread.",
+          "Workflows openen in tabbladen, en workflowstappen kunnen getypeerde antwoorden geven. Schrijf {{name}} om een antwoord in een latere stap te gebruiken.",
+          "Upload een MP4- of WebM-video als vensterachtergrond in Instellingen > Weergave.",
+          "Kies het ChatGPT-account dat GPT live spraak gebruikt in Instellingen > Spraak."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Een aanbieder houdt tot 20 accounts. Eerder was de limiet 10.",
+          "Dicteren neemt op tot 10 minuten op. Eerder stopte het na 2 minuten.",
+          "Een thread laadt oudere berichten wanneer je bij de bovenkant scrolt. Je hoeft niet op een knop te klikken."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een geplande routine schakelt zichzelf niet meer stilletjes uit wanneer een uitvoering niets te melden heeft.",
+          "Een lange chat behoudt al zijn berichten, in de juiste volgorde, terwijl een antwoord binnenkomt.",
+          "Een gekoppeld WhatsApp-nummer stopt niet meer met het ontvangen van berichten terwijl het nog «Verbonden» toont.",
+          "Op Windows voeren OpenCode-agents weer opdrachten uit. Eerder mislukten ze vaak met «opencode-pty request timed out».",
+          "Een agent die je hebt gedempt stuurt je geen melding meer wanneer hij in een kanaal antwoordt."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Werk ook elke server waarbij je bent aangesloten bij naar deze versie. Op een server werken de instellingen van workflowstappen, Uitvoeren vanaf deze stap, eigendomsoverdracht, de knop Alles updaten en veel fixes voor agents alleen als de server deze versie heeft.",
+      "Na deze update kan een oudere versie van OpenBot je gegevens niet openen."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Praat met een agent met Indrukken om te praten. Houd de spreekknop of de spreektoets ingedrukt terwijl je spreekt. OpenBot stuurt wat je zei zodra je loslaat. Wijzig de toets in Instellingen > Spraak.",
+          "Start een workflow opnieuw vanaf één stap. Selecteer in het stapmenu Uitvoeren vanaf deze stap. De stappen ervoor behouden hun antwoorden en worden niet opnieuw uitgevoerd.",
+          "Bekijk de instellingen en invoer die het resultaat van een workflowstap hebben gemaakt. Selecteer Instellingen op de stap, en daarna Deze instellingen gebruiken om hem op dezelfde manier opnieuw uit te voeren.",
+          "Geef je server over aan een ander OpenBot-account. Vul in Serverinstellingen > Leden het e-mailadres van de nieuwe eigenaar in. De server wisselt van eigenaar zodra die het accepteert.",
+          "Update alle aanbieders tegelijk. Instellingen > Aanbieders toont Alles updaten wanneer een of meer aanbieders een update hebben."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot werkt de provider-CLI's die het heeft gedownload elk uur bij, als er een nieuwe versie beschikbaar is. De update wacht tot de agents inactief zijn.",
+          "Elke thread van een agent kan de browsertabbladen gebruiken die de hoofdchat of een andere thread van die agent heeft geopend.",
+          "Het tabblad Routines is uit de zijbalk verdwenen. Routines blijven draaien. Beheer ze in de instellingen van de agent, op de pagina Planning en bij Serverinstellingen > Routines."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Herstart voor een gedownloade update wacht nu tot de agents inactief zijn, met Herstart annuleren. Eerder sloot OpenBot meteen af en stopte het de taak van de agent.",
+          "Een agent blijft na een herstart of een gebruikslimiet niet meer op «Bezig» staan met wachtende berichten. De onderbroken beurt wordt als onderbroken getoond, en de wachtende berichten starten.",
+          "Een drukke server met veel agents en verbonden apparaten raakt niet meer door zijn geheugen heen, en bevriest niet meer wanneer hij de volgende beurt selecteert.",
+          "Een bericht dat je na een pauze verstuurt, blijft niet meer op «Niet verstuurd» staan met «Verbind Claude om door te gaan.» wanneer Claude is aangemeld.",
+          "Agent-browsertabbladen die niemand gebruikt, stoppen na 2 minuten met het gebruik van de processor."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.74.0",
     "date": "2026-11-19",
     "notices": [

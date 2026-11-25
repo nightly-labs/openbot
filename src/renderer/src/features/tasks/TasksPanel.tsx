@@ -1,22 +1,26 @@
+import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
+import { appendVoiceTranscript } from "@openbot/ui/voice-recording";
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { appPort } from "../../app-port";
-import { useLayout } from "../../layout";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { deviceSendShortcut } from "../../send-shortcut-preference";
 import { useTurns } from "../../turns";
-import { appendVoiceTranscript } from "../../voice-recording";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
+import { remoteAgentError } from "../agents/agent-error-text";
 import { attentionKey } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";
 import { createAttachmentDownloads } from "../conversation/attachment-downloads";
 import { EMPTY_DRAFT } from "../conversation/composer-draft";
 import { composerDraftKey } from "../conversation/conversation-keys";
 import type { ComposerDraft } from "../conversation/conversation-types";
+import { useDesktopMediaApproval } from "../conversation/desktop-media-approval";
 import { createVoiceStore, VOICE_LEVEL_COUNT, type VoiceStoreDeps } from "../conversation/stores/voice-store";
+import { createServerResponseStyle } from "../servers/server-personality";
+import { useServers } from "../servers/servers-context";
 import { TasksView, type TasksVoiceAdapter, type TasksVoiceControls } from "./TasksView";
 import { desktopTasksSource } from "./tasks-port";
 
@@ -32,10 +36,15 @@ export function TasksPanel(props: TasksPanelProps) {
   const { agentList } = useAgents();
   const { approvals, pendingPrompts, respondToApprovalRequest } = useTurns();
   const threads = useAgentTasks();
+  const mediaApproval = useDesktopMediaApproval();
   const tabs = useAgentThreads();
   const { selectAgent } = useNavigation();
   const platform = usePlatform();
-  const layout = useLayout();
+  const { servers } = useServers();
+  const responseStyle = createServerResponseStyle(
+    () => servers().find((server) => server.id === props.serverId),
+    window.openbot.hostAdmin,
+  );
 
   const attachmentFiles = createAttachmentDownloads({
     serverId: () => props.serverId,
@@ -55,7 +64,9 @@ export function TasksPanel(props: TasksPanelProps) {
     <TasksView
       {...props}
       source={desktopTasksSource()}
+      failureText={props.serverId === LOCAL_SERVER_ID ? undefined : remoteAgentError}
       agents={agentList()}
+      mediaApproval={mediaApproval}
       voice={createTasksVoice}
       onOpenLink={(url) => void appPort().openUrl(url)}
       onAttachmentAction={attachmentFiles.open}
@@ -69,10 +80,10 @@ export function TasksPanel(props: TasksPanelProps) {
       waitsForAnswer={(task) => pendingPrompts()[attentionKey(task.agentId, task.threadId)] !== undefined}
       onOpenInChat={(task) => {
         tabs.open(task.agentId, task.id);
-        layout.setSidebarView("agents");
         selectAgent(task.agentId);
       }}
       sendShortcut={deviceSendShortcut(platform.appInfo()?.platform)}
+      responseStyle={responseStyle()}
       onRead={(input, messageId) => threads.markTaskRead(input.agentId, input.taskId, messageId)}
       onRespondApproval={(approval, decision) =>
         respondToApprovalRequest(approval.agentId, approval.requestId, decision, {

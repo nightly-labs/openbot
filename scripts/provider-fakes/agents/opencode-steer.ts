@@ -6,6 +6,7 @@ const MODELS = {
 };
 const steers = process.env.FAKE_NO_STEERING !== "1";
 const neverRunning = process.env.FAKE_NEVER_RUNNING === "1";
+const idleSteer = process.env.FAKE_IDLE_STEER;
 const open = new Map<string, AcpRequest>();
 let count = 0;
 
@@ -44,7 +45,7 @@ serveFakeAcpAgent(
       const sessionId = request.params.sessionId ?? "";
       const prompt = text(request.params.prompt);
       logEntry({ event: "prompt", sessionId, text: prompt });
-      if (prompt !== "work") {
+      if (!/(^|>)work$/u.test(prompt)) {
         peer.say(sessionId, "ok");
         peer.reply(request, { stopReason: "end_turn" });
         return;
@@ -74,6 +75,20 @@ serveFakeAcpAgent(
       if (neverRunning || !open.has(sessionId)) {
         peer.reply(request, { outcome: "promptRequired", reason: "noRunningTurn" });
         finish(peer, sessionId, "done without steering");
+        return;
+      }
+      if (idleSteer === "before") {
+        finish(peer, sessionId, "done before the steer");
+        peer.reply(request, { outcome: "injected" });
+        return;
+      }
+      if (idleSteer === "after") {
+        peer.update(sessionId, { sessionUpdate: "tool_call_update", toolCallId: "tool-1", status: "completed" });
+        peer.say(sessionId, "done before the steer");
+        peer.reply(request, { outcome: "injected" });
+        const prompt = open.get(sessionId);
+        open.delete(sessionId);
+        if (prompt) setTimeout(() => peer.reply(prompt, { stopReason: "end_turn" }), 200);
         return;
       }
       peer.reply(request, { outcome: "injected" });

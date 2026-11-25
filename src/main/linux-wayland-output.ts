@@ -9,6 +9,7 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Option, Schema } from "effect";
 import { app } from "electron";
 import { relaunchApp } from "./linux-appimage-relaunch";
+import { x11CompositorRunning } from "./linux-x11-activation";
 
 const logger = createOpenBotLogger("main");
 
@@ -157,7 +158,8 @@ export function aboveAppsWindowKind(server: boolean): "panel" | "tool" | "x11" |
 }
 
 export function aboveAppsScreenSupport(): AboveAppsSupport | undefined {
-  if (process.platform !== "linux" || usesX11Windows()) return undefined;
+  if (process.platform !== "linux") return undefined;
+  if (usesX11Windows()) return onXWayland() || x11CompositorRunning() ? undefined : "no-compositor";
   return app.isPackaged && process.env.DISPLAY && chromiumChoosesWayland() ? "restart" : "unsupported";
 }
 

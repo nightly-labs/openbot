@@ -87,10 +87,10 @@ export type Report = typeof Report.Type;
 export type ReportContext = Pick<Report, "surface" | "app_version" | "platform" | "event_schema_version">;
 
 export const ANALYTICS_GENERATIONS = {
-  desktop_host: 21,
-  desktop: 13,
+  desktop_host: 22,
+  desktop: 14,
   web: 2,
-  mobile: 4,
+  mobile: 5,
 } as const satisfies Record<Report["surface"], number>;
 
 const FAILURE_CODES = new Set([
@@ -262,7 +262,7 @@ export function classifyFailure(error: unknown): CauseCode {
   )
     return "provider_unavailable";
   if (
-    /\b(?:context[ _-]?(?:length|window)[ _-]?exceeded|context[ _-]overflow|maximum context length|prompt is too long|too many (?:input )?tokens(?![^.]{0,40}\b(?:wait|per (?:minute|second|day)))|input token count\b.{0,80}\bexceeds)\b/iu.test(
+    /\b(?:context[ _-]?(?:length|window)[ _-]?exceeded|context[ _-]overflow|exceeds the context window|maximum context length|prompt is too long|too many (?:input )?tokens(?![^.]{0,40}\b(?:wait|per (?:minute|second|day)))|input token count\b.{0,80}\bexceeds)\b/iu.test(
       message,
     )
   )
@@ -270,7 +270,7 @@ export function classifyFailure(error: unknown): CauseCode {
   if (/\b(?:content[ _-]?filter(?:ed)?|requires moderation|was flagged|safety (?:filter|block))\b/iu.test(message))
     return "content_blocked";
   if (
-    /\b(?:model[ _]not[ _]found|unknown model|no such model|not a valid model|no endpoints found|model\b[^.,;:\n]{0,60}\b(?:not found|does not exist|is not supported))\b/iu.test(
+    /\b(?:model[ _]not[ _]found|unknown model|no such model|not a valid model|no endpoints found|model\b(?![.:]\S)(?:[^.,;:\n]|[.:](?=\S)){0,60}\b(?:not found|does not exist|is not supported))\b/iu.test(
       message,
     ) ||
     /\bmodels\/\S+ is not found\b|\bmodel\b(?:\s+\S+)?\s+(?:(?:was|is|has been) retired|is no longer (?:available|supported))\b/iu.test(

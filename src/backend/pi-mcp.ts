@@ -1,19 +1,25 @@
-import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { COMPUTER_USE_MCP_SERVER_NAME } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { LocalMcpSession } from "./local-mcp-bridge";
 import type { ClaudeMcpServer } from "./mcp-provider-shapes";
 import { isInheritedProfileValue } from "./mcp-redaction";
 import { type StdioMcpRelay, startStdioMcpRelay } from "./mcp-stdio-relay";
 import { OPENBOT_DYNAMIC_TOOLS } from "./openbot-tools";
+import { COMPUTER_USE_GUIDE_URI, piMcpServerName } from "./pi-mcp-names";
 import { providerCall } from "./provider-client-effects";
 
 const EXTENSION = String.raw`export default function (pi) {
   pi.on("tool_result", (event) => {
     if (event.toolName !== "tool_search" || event.isError) return undefined;
     return { content: [...event.content, { type: "text", text: ${JSON.stringify(piToolSearchNote())} }] };
+  });
+  pi.on("tool_call", (event) => {
+    const path = event.toolName === "read" && typeof event.input?.path === "string" ? event.input.path : "";
+    if (!/^@?skill:\/\//iu.test(path)) return undefined;
+    return { block: true, reason: path.replace(/^@/u, "") + ${JSON.stringify(piSkillReadNote())} };
   });
   const slot = Symbol.for("openbot.pi.mcpServers");
   globalThis[slot] ??= JSON.parse(process.env.OPENBOT_PI_MCP_SERVERS || "[]");
@@ -41,13 +47,38 @@ const EXTENSION = String.raw`export default function (pi) {
 
 const PI_SEARCH_ONLY_OPENBOT_TOOLS = ["request_api_key", "suggest_marketplace_app", "show_setting"] as const;
 
-function serverName(kind: "external" | "local", name: string): string {
-  return `openbot_${createHash("sha256").update(`${kind}:${name}`).digest("hex").slice(0, 8)}`;
+function piToolSearchNote(): string {
+  const openbot = `mcp__${piMcpServerName("local", OPENBOT_DYNAMIC_TOOLS.name)}`;
+  return `This search loads only the tools of the servers in <mcp_servers>. It never finds OpenBot or browser tools: find them with ${openbot}__tool_search, and run them with ${openbot}__tool_call.`;
 }
 
-function piToolSearchNote(): string {
-  const openbot = `mcp__${serverName("local", OPENBOT_DYNAMIC_TOOLS.name)}`;
-  return `This search loads only the tools of the servers in <mcp_servers>. It never finds OpenBot or browser tools: find them with ${openbot}__tool_search, and run them with ${openbot}__tool_call.`;
+function piSkillReadNote(): string {
+  return ` is an MCP resource, not a file, so read cannot open it. Load read_mcp_resource with tool_search, then call it with this uri and the server that lists it. The Computer Use guide ${COMPUTER_USE_GUIDE_URI} is on server ${piMcpServerName("external", COMPUTER_USE_MCP_SERVER_NAME)}.`;
+}
+
+const PI_MCP_ATTENTION = "MCP servers need attention:";
+const PI_MCP_ATTENTION_LINE = /^\s+(\S+): (?:failed(?:: (.*))?|(needs sign-in))$/u;
+
+export interface PiMcpStartFailure {
+  name: string;
+  status: "failed";
+  error: string;
+  failureReason?: "reauthenticationRequired";
+}
+
+export function piMcpServerKeys(servers: Readonly<Record<string, ClaudeMcpServer>>): ReadonlyMap<string, string> {
+  return new Map(Object.keys(servers).map((name) => [piMcpServerName("external", name), name]));
+}
+
+export function piMcpStartFailures(message: string, keys: ReadonlyMap<string, string>): PiMcpStartFailure[] {
+  if (!message.startsWith(PI_MCP_ATTENTION)) return [];
+  return message.split("\n").flatMap((line): PiMcpStartFailure[] => {
+    const match = PI_MCP_ATTENTION_LINE.exec(line);
+    const name = match?.[1] ? keys.get(match[1]) : undefined;
+    if (!match || !name) return [];
+    if (match[3]) return [{ name, status: "failed", error: "", failureReason: "reauthenticationRequired" }];
+    return [{ name, status: "failed", error: match[2] ?? "" }];
+  });
 }
 
 export interface PiMcpExtension {
@@ -91,12 +122,12 @@ export const createPiMcpExtension = Effect.fn("PiMcp.createExtension")(function*
     Effect.gen(function* () {
       if (server.type === "http")
         return {
-          name: serverName("external", name),
+          name: piMcpServerName("external", name),
           config: { ...server, headers: values(server.headers), exposure: "deferred", description: name },
         };
       if (!relay)
         return {
-          name: serverName("external", name),
+          name: piMcpServerName("external", name),
           config: { ...server, env: values(server.env), exposure: "deferred", description: name },
         };
       const started = yield* startStdioMcpRelay({
@@ -107,7 +138,7 @@ export const createPiMcpExtension = Effect.fn("PiMcp.createExtension")(function*
       });
       relays.push(started);
       return {
-        name: serverName("external", name),
+        name: piMcpServerName("external", name),
         config: {
           type: "http",
           url: started.url,
@@ -119,7 +150,7 @@ export const createPiMcpExtension = Effect.fn("PiMcp.createExtension")(function*
     }),
   ).pipe(Effect.onError(() => closeRelays.pipe(Effect.orDie)));
   const bridge = local.servers.map((server) => ({
-    name: serverName("local", server.name),
+    name: piMcpServerName("local", server.name),
     config: {
       url: server.url,
       headers: values(Object.fromEntries(server.headers.map(({ name, value }) => [name, value]))),

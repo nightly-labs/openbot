@@ -9,6 +9,8 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub bu GitHub Uygulamasının İstemci Kimliğini (Client ID) bilmiyor.",
   "error.connector.githubUnexpected": "GitHub beklenmeyen bir yanıt gönderdi: {detail}",
   "error.connector.githubUnreachable": "OpenBot GitHub'a ulaşamıyor: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot GitHub'a ulaşamıyor. OpenBot'u çalıştıran bilgisayarın veya sunucunun internet bağlantısını ve DNS ayarlarını kontrol edin, sonra tekrar deneyin.",
   "error.connector.githubExpired": "GitHub bağlantısının süresi doldu. GitHub'a tekrar bağlanın.",
   "error.connector.githubFileUnreadable": "GitHub bağlantı dosyası okunamıyor.",
   "error.connector.githubFileTooLarge": "GitHub bağlantı dosyası çok büyük.",
@@ -31,6 +33,8 @@ export const messages = {
     "1Password çok fazla istek aldı. Birkaç dakika bekleyin, ardından tekrar deneyin.",
   "error.connector.onePasswordNoVault":
     "Hizmet hesabı bir kasayı okuyamıyor. Ona bir kasaya erişim verin, ardından tekrar deneyin.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot, 1Password'deki girişlerinizi okuyamıyor. 1Password bağlantısını kesin, ardından yeniden bağlayın.",
   "error.connector.onePasswordFileUnreadable": "1Password bağlantı dosyası okunamıyor.",
   "error.connector.onePasswordFileTooLarge": "1Password bağlantı dosyası çok büyük.",
   "error.connector.bitwardenFailed":
@@ -43,6 +47,10 @@ export const messages = {
     "Bir HTTPS sunucu adresi, API anahtarının client_id ve client_secret değerlerini ve ana parolayı girin.",
   "error.connector.bitwardenHostFailed":
     "Bu sunucuda Bitwarden açılamadı. Sunucu adresini, API anahtarını ve ana parolayı kontrol edin ve bir klasörün adının Shared with OpenBot olduğundan emin olun. Sonra tekrar bağlanın.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Bu sunucuda Bitwarden'da oturum açılamadı. Sunucu adresini ve API anahtarını kontrol edin, sonra tekrar bağlanın.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Bu sunucuda Bitwarden kilidi açılamadı. Ana parolayı kontrol edin, sonra tekrar bağlanın.",
   "error.connector.bitwardenCliInstallFailed":
     "Bu sunucuya Bitwarden CLI yüklenemedi. Ağ bağlantısını kontrol edin, sonra tekrar bağlanın.",
   "error.connector.bitwardenFileUnreadable": "Bitwarden bağlantı dosyası okunamıyor.",

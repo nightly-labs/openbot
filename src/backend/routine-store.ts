@@ -33,11 +33,13 @@ import {
   validateStoredRoutineSchedule,
 } from "@openbot/team-client/routine-schedule";
 import {
+  databaseRow,
   databaseRows,
   optionalStringColumn,
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database/database-rows";
+import { cachedStatement } from "./database/statement-cache";
 import type { OpenBotDatabase } from "./openbot-database";
 import { hasWebhookReceipt, insertWebhookReceipt, revokeRoutineWebhooks } from "./webhook-route-store";
 import { parseEventFilters, validateWebhookTrigger, webhookMismatch, webhookRunInstruction } from "./webhook-trigger";
@@ -574,6 +576,27 @@ export class RoutineStore {
     ).map((row) => this.#run(row));
   }
 
+  protected skippedRowsBefore(ownerId: string, routineId: string, runId: string, createdAt: string): SkippedRunRows {
+    const rows = databaseRows(
+      this.database.connection
+        .prepare(
+          `SELECT missed_count, error FROM ${this.tables.runTable}
+           WHERE routine_id = ? AND ${this.tables.ownerColumn} = ? AND run_kind = 'scheduled' AND run_source IS NULL
+             AND (created_at < ? OR (created_at = ? AND run_id < ?))
+           ORDER BY created_at DESC, run_id DESC LIMIT ?`,
+        )
+        .all(routineId, ownerId, createdAt, createdAt, runId, SKIPPED_ROWS_LIMIT),
+    );
+    const end = rows.findIndex((row) => row.missed_count === null);
+    return {
+      rows: rows.slice(0, end < 0 ? rows.length : end).map((row) => ({
+        count: requiredNumberColumn(row, "missed_count"),
+        error: optionalStringColumn(row, "error"),
+      })),
+      complete: end >= 0 || rows.length < SKIPPED_ROWS_LIMIT,
+    };
+  }
+
   protected pendingRunRows(): OwnedRoutineRun[] {
     return this.#queuedRunRows(`AND ${this.tables.handleColumn} IS NULL`);
   }
@@ -692,8 +715,14 @@ export class RoutineStore {
 
   advanceTrigger(routineId: string, triggerId: string, nextRunAt: string): void {
     const { commandPrefix, eventPrefix, routineAggregate, triggerTable } = this.tables;
+    const current = databaseRow(
+      this.database.connection
+        .prepare(`SELECT next_run_at, last_event_sequence FROM ${triggerTable} WHERE trigger_id = ? AND routine_id = ?`)
+        .get(triggerId, routineId),
+    );
+    if (!current || current.next_run_at === nextRunAt) return;
     this.database.dispatch(
-      `${commandPrefix}-trigger:advance:${triggerId}:${nextRunAt}`,
+      `${commandPrefix}-trigger:advance:${triggerId}:${requiredNumberColumn(current, "last_event_sequence")}:${nextRunAt}`,
       [
         {
           aggregateType: routineAggregate,
@@ -1089,9 +1118,10 @@ export class RoutineStore {
   }
 
   protected runForHandleRow(handleId: string): OwnedRoutineRun | null {
-    const row = this.database.connection
-      .prepare(`SELECT ${this.runColumns} FROM ${this.tables.runTable} WHERE ${this.tables.handleColumn} = ?`)
-      .get(handleId);
+    const row = cachedStatement(
+      this.database.connection,
+      `SELECT ${this.runColumns} FROM ${this.tables.runTable} WHERE ${this.tables.handleColumn} = ?`,
+    ).get(handleId);
     return isDynamicRecord(row) ? this.#run(row) : null;
   }
 
@@ -1241,12 +1271,18 @@ export class RoutineStore {
     return routine;
   }
 
+  protected runRow(runId: string): OwnedRoutineRun | null {
+    const row = cachedStatement(
+      this.database.connection,
+      `SELECT ${this.runColumns} FROM ${this.tables.runTable} WHERE run_id = ?`,
+    ).get(runId);
+    return isDynamicRecord(row) ? this.#run(row) : null;
+  }
+
   #requireRun(runId: string): OwnedRoutineRun {
-    const row = this.database.connection
-      .prepare(`SELECT ${this.runColumns} FROM ${this.tables.runTable} WHERE run_id = ?`)
-      .get(runId);
-    if (!isDynamicRecord(row)) throw new Error("The routine run no longer exists.");
-    return this.#run(row);
+    const run = this.runRow(runId);
+    if (!run) throw new Error("The routine run no longer exists.");
+    return run;
   }
 
   #mutateRun(
@@ -1324,6 +1360,12 @@ export class RoutineStore {
 type RunSource = Pick<OwnedRoutine, "id" | "ownerId" | "name" | "instruction">;
 
 const MISSED_WALK_LIMIT = ROUTINE_MISSED_COUNT_LIMIT + 1;
+const SKIPPED_ROWS_LIMIT = 20;
+
+export interface SkippedRunRows {
+  rows: { count: number; error: string | null }[];
+  complete: boolean;
+}
 const HOUR_MS = 3_600_000;
 const MISSED_WINDOWS_MS = [HOUR_MS, 24 * HOUR_MS, 32 * 24 * HOUR_MS, 400 * 24 * HOUR_MS, Number.POSITIVE_INFINITY];
 

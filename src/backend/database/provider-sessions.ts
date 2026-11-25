@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { type AgentProviderId, isAgentProvider } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
+import { createOpenBotLogger } from "@openbot/logging";
 import type { DatabaseCore } from "./database-core";
 import { databaseRow, databaseRows, optionalStringColumn, requiredStringColumn } from "./database-rows";
 
@@ -34,8 +35,11 @@ export interface ProviderSessionsOptions {
   core: DatabaseCore;
 }
 
+const logger = createOpenBotLogger("provider-sessions");
+
 export class ProviderSessions {
   readonly #core: DatabaseCore;
+  readonly #reportedUnknownProviders = new Set<string>();
 
   constructor(options: ProviderSessionsOptions) {
     this.#core = options.core;
@@ -67,7 +71,22 @@ export class ProviderSessions {
            ORDER BY created_at, last_event_sequence`,
         )
         .all(threadId),
-    ).map((row) => toProviderSession(requiredSessionRow(row)));
+    ).flatMap((row) => {
+      const session = this.#knownProviderRow(row);
+      return session ? [toProviderSession(session)] : [];
+    });
+  }
+
+  #knownProviderRow(row: DynamicRecord): SessionRow | null {
+    if (isAgentProvider(requiredStringColumn(row, "provider"))) return requiredSessionRow(row);
+    const id = requiredStringColumn(row, "id");
+    if (!this.#reportedUnknownProviders.has(id)) {
+      this.#reportedUnknownProviders.add(id);
+      logger.warn("A provider session names a provider that OpenBot does not know, so OpenBot skips it.", {
+        providerSessionId: id,
+      });
+    }
+    return null;
   }
 
   listProviderSessionIds(externalSessionId?: string): string[] {

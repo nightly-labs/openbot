@@ -42,6 +42,12 @@ const SCHEMAS: Partial<Record<string, SavedTool[]>> = {
       parameters: { type: "object", properties: { limit: { type: "number", enum: [10, 50] } } },
     },
   ],
+  openmotion: [
+    {
+      name: "openmotion_restore_version",
+      parameters: { type: "object", properties: { presentation: { enum: ["slides", "video"] } } },
+    },
+  ],
   atlas: [
     { name: "search", parameters: { type: "object", properties: { tags: { type: "string" } } } },
     {
@@ -54,6 +60,11 @@ const SCHEMAS: Partial<Record<string, SavedTool[]>> = {
     },
   ],
 };
+const FAILURES: Record<string, string> = {
+  KEY: "generating and executing: Error 400, Message: API key not valid. Please pass a valid API key., Status: INVALID_ARGUMENT, Details: [map[@type:type.googleapis.com/google.rpc.ErrorInfo reason:API_KEY_INVALID]]",
+  OTHER: "creating trajectory: unexpected step state 7",
+  QUIET: "",
+};
 const GOOGLE_REFUSALS: Partial<Record<string, string>> = {
   ticktick: [
     "* GenerateContentRequest.tools[20].function_declarations[0].parameters.properties[tags].items: missing field.",
@@ -61,6 +72,8 @@ const GOOGLE_REFUSALS: Partial<Record<string, string>> = {
   ].join("\n"),
   bling:
     "* GenerateContentRequest.tools[20].function_declarations[0].parameters.properties[situacoes].items: field predicate failed: $type == Type.ARRAY",
+  openmotion:
+    "Unable to submit request because `mcp_openmotion_openmotion_restore_version` functionDeclaration `parameters.presentation` schema didn't specify the schema type field. Learn more: https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/function-calling",
   aave: [
     "* GenerateContentRequest.tools[23].function_declarations[0].parameters.properties[limit].enum[0]: cannot be empty",
     "* GenerateContentRequest.tools[23].function_declarations[0].parameters.properties[limit].enum[1]: cannot be empty",
@@ -126,7 +139,11 @@ serveFakeAcpAgent({
     const failure = googleRefused
       ? `agent executor error: generating and executing: Error 400, Message: ${GOOGLE_REFUSALS[googleRefused]}, Status: INVALID_ARGUMENT`
       : `agent executor error: building toolbox: tool "${refused}" advertises an invalid parameter schema: "schema://tool-parameters.json#" is not valid against metaschema`;
-    if ((refused || googleRefused) && text.includes("CLI_1_5_9")) peer.say(sessionId, `\n⚠ ${failure}\n`);
+    const own = FAILURES[/\bFAIL_(KEY|OTHER|QUIET)\b/u.exec(text)?.[1] ?? ""];
+    if (own !== undefined) {
+      if (own) log(`E1111 00:00:00.200000     294 errorreport.go:273] agent executor error: ${own}`);
+      peer.say(sessionId, "\n⚠ Agent execution terminated due to error.\n");
+    } else if ((refused || googleRefused) && text.includes("CLI_1_5_9")) peer.say(sessionId, `\n⚠ ${failure}\n`);
     else if (refused || googleRefused) {
       log(`E1111 00:00:00.200000     294 errorreport.go:273] ${failure}`);
       peer.say(sessionId, "\n⚠ Agent execution terminated due to error.\n");

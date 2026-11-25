@@ -12,7 +12,7 @@ import type { ComponentProps } from "@solidjs/web";
 import { createSignal, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { FILES_AGENTS, FILES_NOW, FILES_ROWS } from "./files-fixtures";
+import { FILES_AGENTS, FILES_NOW, FILES_ROWS, FILES_WORKFLOW_ROWS } from "./files-fixtures";
 import { MANY_AGENTS } from "./marketplace-story-support";
 
 const meta = {
@@ -134,11 +134,15 @@ const TEAM_FILES: readonly StoredFileRow[] = [
 ];
 
 const FOLDER_AGENTS = new Set(TEAM_AGENTS.map((agent) => agent.id));
-const FILE_AGENTS = new Map(TEAM_FILES.map((file) => [file.id, file.agentId] as const));
+const FILE_AGENTS = new Map(
+  [...TEAM_FILES, ...FILES_WORKFLOW_ROWS].flatMap((file) =>
+    file.agentId === null && file.workflow === undefined ? [] : [[file.id, file.agentId] as const],
+  ),
+);
 
 const FAVORITES = ["folder-launch", "agent:research"];
 
-function FolderStage(props: { initialLocation?: LibraryLocation }) {
+function FolderStage(props: { initialLocation?: LibraryLocation; files?: readonly StoredFileRow[] }) {
   const [folders, setFolders] = createSignal(FOLDERS_SNAPSHOT);
   const change = (action: LibraryFolderAction) =>
     setFolders((current) =>
@@ -151,7 +155,7 @@ function FolderStage(props: { initialLocation?: LibraryLocation }) {
     <LibraryStage
       args={{
         ...libraryArgs(),
-        files: TEAM_FILES,
+        files: props.files ?? TEAM_FILES,
         agents: TEAM_AGENTS,
         folders: folders(),
         onFolderAction: change,
@@ -172,6 +176,21 @@ export const FoldersAgent: Story = {
 export const FoldersFolder: Story = {
   name: "Folders: a folder",
   render: () => <FolderStage initialLocation={{ kind: "folder", agentId: "chief", folderId: "folder-campaign" }} />,
+};
+
+export const FoldersWorkflows: Story = {
+  name: "Folders: workflows",
+  render: () => <FolderStage files={[...TEAM_FILES, ...FILES_WORKFLOW_ROWS]} />,
+};
+
+export const FoldersWorkflow: Story = {
+  name: "Folders: a workflow",
+  render: () => (
+    <FolderStage
+      files={[...TEAM_FILES, ...FILES_WORKFLOW_ROWS]}
+      initialLocation={{ kind: "workflow", workflowId: "workflow-weekly-posts" }}
+    />
+  ),
 };
 
 export const LoadError: Story = {

@@ -44,7 +44,8 @@
   margin-inline-start: 1px;
 }
 
-.conversation-heading-group:has(.agent-threads-header:not([data-mode="tabs"])) .conversation-agent-title-room {
+.conversation-heading-group:has(.agent-threads-tabs, .agent-threads-header:not([data-mode="tabs"]))
+  .conversation-agent-title-room {
   display: none;
 }
 
@@ -688,6 +689,109 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.threads-pane-scroll {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-8);
+}
+
+.threads-pane-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.threads-pane-item {
+  position: relative;
+}
+
+.threads-pane-row.ui-button {
+  display: flex;
+  width: 100%;
+  height: var(--openbot-control-lg);
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--openbot-space-2);
+  padding-block: 0;
+  padding-inline: var(--openbot-space-2);
+  border-radius: var(--openbot-radius-md);
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-regular);
+  text-align: start;
+}
+
+.threads-pane-row.ui-button[aria-current="true"] {
+  background: var(--openbot-bg-control-active);
+}
+
+.threads-pane-row .agent-threads-menu-stem {
+  margin-block: 0;
+}
+
+.threads-pane-row .agent-threads-tab-mark {
+  width: 24px;
+  justify-content: center;
+}
+
+.threads-pane-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: var(--openbot-text-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.threads-pane-time {
+  min-width: 44px;
+  flex: none;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+
+.threads-pane-beside.ui-button {
+  position: absolute;
+  top: 50%;
+  inset-inline-end: var(--openbot-space-1-5);
+  translate: 0 -50%;
+  opacity: 0;
+}
+
+.threads-pane-item:is(:hover, :focus-within, [data-beside]) .threads-pane-beside.ui-button {
+  opacity: 1;
+}
+
+.threads-pane-item:is(:hover, :focus-within, [data-beside]) .threads-pane-time {
+  visibility: hidden;
+}
+
+.threads-pane-item[data-beside] .threads-pane-beside.ui-button:not(:hover) {
+  color: var(--openbot-text-muted);
+}
+
+.threads-pane-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  margin: auto;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-align: center;
+}
+
+.threads-pane-empty-title {
+  margin: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

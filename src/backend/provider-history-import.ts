@@ -66,12 +66,14 @@ export interface ProviderHistoryImportInput {
   agentId: string;
   publicThreadId: string;
   cwd?: string;
+  retired?: boolean;
   findDelivery(deliveryId: string): DeliveryContext | null;
   findMessageDelivery(messageId: string): DeliveryContext | null;
   quietRoutineDelivery(deliveryId: string): boolean;
   quietTeammateThread?: boolean;
   continuesQuietRun?(delivery: DeliveryContext["delivery"]): boolean;
   requestAnswered?(deliveryId: string): boolean;
+  followsUpOwnAnswer?(delivery: DeliveryContext["delivery"]): boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -93,17 +95,15 @@ export function importProviderHistory(
   input: ProviderHistoryImportInput,
 ): Effect.Effect<ProviderHistoryImportResult, ProviderClientOperationError> {
   return Effect.gen(function* () {
-    const resumeKey = yield* providerSync(() =>
-      importResumeKey(
-        input,
-        input.database.ensureProviderHistoryImport({
-          sessionId: input.sessionId,
-          threadId: input.publicThreadId,
-          provider: input.provider,
-          externalSessionId: input.externalSessionId,
-        }),
-      ),
+    const current = yield* providerSync(() =>
+      input.database.ensureProviderHistoryImport({
+        sessionId: input.sessionId,
+        threadId: input.publicThreadId,
+        provider: input.provider,
+        externalSessionId: input.externalSessionId,
+      }),
     );
+    const resumeKey = yield* providerSync(() => importResumeKey(input, current));
     let turns = 0;
     let messages = 0;
     let providerCovered = false;
@@ -173,7 +173,7 @@ export function importProviderHistory(
           }),
         ),
       );
-    if (providerCovered)
+    if (providerCovered || input.retired === true || current.state === "complete")
       yield* providerSync(() =>
         input.database.markProviderHistoryImportState(input.sessionId, turnWaits ? "active" : "complete"),
       );
@@ -335,6 +335,7 @@ function routineTurnAnswers(
   input: ProviderHistoryImportInput,
   turnId: string,
 ): Effect.Effect<RoutineTurnAnswers, ProviderClientOperationError> {
+  const followsUpOwnAnswer = (delivery: DeliveryContext["delivery"]) => input.followsUpOwnAnswer?.(delivery) === true;
   return Effect.gen(function* () {
     let routine: boolean | undefined;
     let requestsOnly = true;
@@ -360,7 +361,11 @@ function routineTurnAnswers(
           routine =
             delivery !== undefined &&
             ((input.quietTeammateThread === true &&
-              quietTeammateTurnDelivery(delivery, (request) => input.requestAnswered?.(request.id) === true)) ||
+              quietTeammateTurnDelivery(
+                delivery,
+                (request) => input.requestAnswered?.(request.id) === true,
+                followsUpOwnAnswer,
+              )) ||
               (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)) ||
               continuesQuietRun);
           requestsOnly &&= delivery !== undefined && teammateRequest(delivery);
@@ -381,7 +386,7 @@ function routineTurnAnswers(
     if (!routine || (needsNoUpdate && !noUpdateCalled)) return "none";
     if (failureReported) return "answered";
     if (noUpdateCalled) return imageGenerated ? "image" : "quiet";
-    if (requestsOnly) return imageGenerated || storedTurnReport(input, turnId) ? "answered" : "quiet";
+    if (requestsOnly) return imageGenerated || reported || storedTurnReport(input, turnId) ? "answered" : "quiet";
     return markers > 0 && !reported && !imageGenerated ? "quiet" : "answered";
   });
 }

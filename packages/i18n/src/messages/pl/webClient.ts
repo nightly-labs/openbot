@@ -20,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "Odpowiedź logowania jest nieprawidłowa.",
   "webClient.pane.navigation": "Nawigacja obszaru roboczego",
   "webClient.pane.chat": "Czat",
-  "webClient.pane.routines": "Rutyny",
   "webClient.pane.workspace": "Obszar roboczy",
   "webClient.phoneApp.title": "Użyj aplikacji OpenBot",
   "webClient.phoneApp.description":
@@ -38,7 +37,7 @@ export const messages = {
     "Utwórz hostowany serwer, aby rozmawiać z agentami w tej przeglądarce. Możesz też uruchomić OpenBot na komputerze albo dołączyć do serwera przez zaproszenie.",
   "webClient.connect.stepInstall": "Zainstaluj i otwórz OpenBot na komputerze.",
   "webClient.connect.stepSignIn": "Zaloguj się adresem e-mail.",
-  "webClient.connect.stepRemote": "Włącz dostęp zdalny.",
+  "webClient.connect.stepRemote": "W OpenBot otwórz Ustawienia serwera > Członkowie i włącz Opublikuj ten serwer.",
   "webClient.notice.download": "Pobierz OpenBot",
   "webClient.notice.createServer": "Utwórz hostowany serwer",
   "webClient.notice.join": "Dołącz przez zaproszenie",

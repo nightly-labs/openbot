@@ -1,5 +1,154 @@
 [
   {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Zaktualizuj także do tej wersji każdy dołączony serwer. Wiele poprawek poniżej działa na serwerze tylko wtedy, gdy serwer ma tę wersję."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Używaj głosu na kanałach. Gdy podyktujesz wiadomość na kanał, aplikacja odczytuje na głos odpowiedź agenta. Rozmowę głosową możesz też zacząć z pola wiadomości kanału.",
+          "Ukryj serwer na pasku serwerów. Serwer jest też ukryty na twoich pozostałych komputerach. Wybierz go w folderze „Ukryte serwery”, aby znów go pokazać."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Strona Zadania nazywa się teraz Wątki, tak jak w aplikacji na telefon i w panelu bocznym czatu.",
+          "Odpowiedzi strumieniowe i przepływy pracy działające jednocześnie zużywają mniej procesora, a klient webowy otwiera serwer szybciej."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Na Macu przyciski Połącz i Dodaj konto dla Claude otwierają teraz stronę logowania Claude z poziomu OpenBot.",
+          "Gdy połączenie z dołączonym serwerem przestaje przesyłać dane, aplikacja sama łączy się ponownie.",
+          "Długie kanały na dołączonym serwerze otwierają się i aktualizują szybciej.",
+          "Wynik przepływu pracy „Powiadomienie” albo krok czekający na zatwierdzenie wysyła teraz powiadomienie na telefon.",
+          "Czat z Gemini działa dalej, gdy Google odrzuca wynik narzędzia. Wcześniej każda kolejna wiadomość kończyła się błędem."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.77.0",
+    "date": "2026-11-23",
+    "notices": [
+      "Zaktualizuj także do tej wersji każdy serwer, do którego dołączyłeś. Na serwerze modele płatne kredytami OpenBot, wstrzymane i wyeksportowane przepływy pracy, czaty WhatsApp tylko do odczytu, prośby o lokalizację oraz wybór serwera Signal działają tylko wtedy, gdy serwer ma tę wersję.",
+      "Po tej aktualizacji starsza wersja OpenBot nie może otworzyć twoich danych."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kup kredyty OpenBot dla siebie lub dla serwera przyciskiem „Credits” w pasku stron albo w Ustawienia → Rozliczenia. Płatna licencja daje też darmowe kredyty co miesiąc.",
+          "Kroki z obrazami i wideo w przepływie pracy mogą używać modeli OpenBot opłacanych twoimi kredytami, bez dodatkowego logowania. Ustaw w kroku opcję „Liczba”, aby uzyskać jednocześnie do 4 wyników.",
+          "Wstrzymaj przepływ pracy z jego menu. Możesz też wyeksportować przepływ pracy do pliku i zaimportować go na innym komputerze lub serwerze.",
+          "Wpisz {{ w kroku przepływu pracy, aby dodać pole z wcześniejszego kroku. Wyzwalacze Harmonogram, GitHub, Discord, Telegram i Slack też teraz podają pola.",
+          "Agent może poprosić o twoją lokalizację, gdy prośba jej wymaga, na przykład „restauracje w pobliżu”. Nic nie jest wysyłane, dopóki nie odpowiesz.",
+          "Ustaw dozwolony kontakt lub grupę WhatsApp jako tylko do odczytu. Twoi agenci mogą czytać czat, a OpenBot nigdy w nim nie pisze."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Bezczynny czat Claude lub Pi z 200K lub więcej tokenów kontekstu sam się kompaktuje, zanim wygaśnie jego 1-godzinna pamięć podręczna promptu. Kosztuje to mniej niż ponowne odczytanie pełnego kontekstu. Wyłącz to w Ustawienia serwera → Dostawcy.",
+          "Wybierz serwer Signal danego serwera w Ustawienia serwera → Ogólne. „Automatycznie” zachowuje najbliższy.",
+          "Agenci Gemini z „Pełnym dostępem” używają narzędzi OpenBot, takich jak pamięć, przeglądarka i kanały, bez karty zatwierdzenia."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Wiadomość wysłana do agenta Claude podczas jego pracy trafia do niego od razu, także gdy uruchamia subagenta lub długie narzędzie.",
+          "Agent ChatGPT (Codex) ustawiony na „Najpierw pytaj” pyta cię teraz, zanim uruchomi polecenie lub zmieni plik.",
+          "Hostowany lub samodzielnie hostowany serwer, który przestaje odpowiadać, uruchamia się znowu sam po 10 minutach.",
+          "Na macOS dok agentów nie spowalnia już OpenBot ani całego komputera.",
+          "Długie czaty przewijają się płynnie. Wcześniej czat z ponad 100 wiadomościami szarpał podczas przewijania."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Zaktualizuj także do tej wersji każdy serwer, do którego dołączyłeś. Na serwerze zadania uruchamiane równocześnie, konto głosu na żywo, przełącznik pamięci OpenBot, foldery przepływów pracy, typowane odpowiedzi w przepływach pracy i więcej niż 10 kont jednego dostawcy działają tylko wtedy, gdy serwer ma tę wersję.",
+      "Po tej aktualizacji starsza wersja OpenBot nie może otworzyć twoich danych."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agent może podzielić niezwiązaną pracę na zadania uruchamiane równocześnie. Każdy wynik wraca do głównego czatu, a agent łączy wyniki dla ciebie.",
+          "Zobacz wszystkie otwarte wątki agenta na nowej karcie Wątki w panelu bocznym. Karta pokazuje liczbę wątków, które czekają na ciebie.",
+          "Zmień skróty klawiszowe na nowej karcie Klawiatura w Ustawienia. Nowe skróty rozpoczynają wątek i przechodzą do następnego oraz poprzedniego wątku.",
+          "Przepływy pracy otwierają się w kartach, a kroki przepływów pracy mogą przyjmować typowane odpowiedzi. Wpisz {{name}}, aby użyć odpowiedzi w późniejszym kroku.",
+          "Prześlij wideo MP4 lub WebM jako tło okna w Ustawienia > Wygląd.",
+          "Wybierz konto ChatGPT, którego używa głos na żywo GPT, w Ustawienia > Głos."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Dostawca może mieć do 20 kont. Wcześniej limit wynosił 10.",
+          "Dyktowanie nagrywa do 10 minut. Wcześniej zatrzymywało się po 2 minutach.",
+          "Wątek wczytuje starsze wiadomości, gdy przewiniesz blisko góry. Nie musisz klikać przycisku."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Zaplanowana rutyna nie wyłącza się już po cichu, gdy przebieg nie ma nic do zgłoszenia.",
+          "Długi czat zachowuje wszystkie wiadomości, we właściwej kolejności, podczas gdy odpowiedź napływa.",
+          "Połączony numer WhatsApp nie przestaje już odbierać wiadomości, choć nadal pokazuje „Połączono”.",
+          "W systemie Windows agenci OpenCode znów uruchamiają polecenia. Wcześniej często kończyli się błędem „opencode-pty request timed out”.",
+          "Agent, którego wyciszyłeś, nie wysyła już powiadomienia, gdy odpowiada w kanale."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Zaktualizuj także do tej wersji każdy serwer, do którego dołączyłeś. Na serwerze ustawienia kroków przepływu pracy, Uruchom od tego kroku, przekazanie właściciela, przycisk Aktualizuj wszystkie i wiele poprawek dla agentów działają tylko wtedy, gdy serwer ma tę wersję.",
+      "Po tej aktualizacji starsza wersja OpenBot nie może otworzyć twoich danych."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Rozmawiaj z agentem w trybie „Naciśnij, aby mówić”. Przytrzymaj przycisk mówienia albo klawisz mówienia, gdy mówisz. OpenBot wysyła to, co powiedziałeś, gdy puścisz. Zmień klawisz w Ustawienia > Głos.",
+          "Uruchom przepływ pracy ponownie od jednego kroku. W menu kroku wybierz Uruchom od tego kroku. Kroki przed nim zachowują swoje odpowiedzi i nie uruchamiają się ponownie.",
+          "Zobacz ustawienia i dane wejściowe, które dały wynik kroku przepływu pracy. Wybierz Ustawienia przy kroku, a potem Użyj tych ustawień, aby uruchomić go ponownie w ten sam sposób.",
+          "Przekaż swój serwer innemu kontu OpenBot. W sekcji Ustawienia serwera > Członkowie wpisz e-mail nowego właściciela. Serwer zmienia właściciela, gdy on go przyjmie.",
+          "Zaktualizuj wszystkich dostawców naraz. Ustawienia > Dostawcy pokazuje przycisk Aktualizuj wszystkie, gdy jeden lub więcej dostawców ma aktualizację."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot co godzinę aktualizuje CLI dostawców, które pobrał, gdy dostępna jest nowa wersja. Aktualizacja czeka, aż agenci będą bezczynni.",
+          "Każdy wątek agenta może używać kart przeglądarki, które otworzył główny czat albo inny wątek tego agenta.",
+          "Karta Rutyny zniknęła z paska bocznego. Rutyny nadal działają. Zarządzaj nimi w ustawieniach agenta, na stronie Harmonogram i w sekcji Ustawienia serwera > Rutyny."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Restart po pobraniu aktualizacji czeka teraz, aż agenci będą bezczynni, z przyciskiem Anuluj restart. Wcześniej OpenBot zamykał się od razu i zatrzymywał zadanie agenta.",
+          "Agent nie zostaje już w stanie „pracuje” z czekającymi wiadomościami po restarcie ani po limicie użycia. Zatrzymana tura jest pokazywana jako przerwana, a czekające wiadomości zaczynają działać.",
+          "Zajęty serwer z wieloma agentami i dołączonymi urządzeniami nie wyczerpuje już pamięci i nie zawiesza się, gdy wybiera następną turę.",
+          "Wiadomość wysłana po przerwie nie zostaje już w stanie „Nie wysłano” z komunikatem „Połącz Claude, aby kontynuować.”, gdy Claude jest zalogowany.",
+          "Karty przeglądarki agentów, z których nikt nie korzysta, przestają obciążać procesor po 2 minutach."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.74.0",
     "date": "2026-11-19",
     "notices": [

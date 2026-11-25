@@ -20,6 +20,8 @@ export const messages = {
     "도구가 실행되지 않았어요. tool_call이 이 이름의 도구를 찾지 못했어요. tool_search가 알려 주는 정확한 전체 이름(예: openbot_browser.snapshot)을 사용하세요.",
   "error.agent.toolCallUnknownToolSuggest":
     "도구가 실행되지 않았어요. tool_call이 이 이름의 도구를 찾지 못했어요. 전체 이름은 {name}일 수 있어요. 맞다면 그 이름으로 다시 호출하세요.",
+  "error.agent.toolCallNullValue":
+    "도구가 실행되지 않았어요. {name}에는 {paths}에 객체나 목록이 필요하지만 이 목록 항목들이 모두 null로 도착했어요. 다시 호출하고 각 항목을 그 JSON을 담은 문자열로 보내세요.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe가 {names} 이름의 OpenBot 도구를 찾지 못했습니다. openbot.tool_search가 나열하는 OpenBot 및 브라우저 도구만 설명하며 MCP 도구는 설명하지 않습니다.",
   "error.agent.toolDescribeDiscoveryNames":
@@ -52,6 +54,12 @@ export const messages = {
   "error.agent.modelUnavailable": "선택한 에이전트 모델을 사용할 수 없어요.",
   "error.agent.modelProviderNotConnected":
     '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}에 연결되어 있지 않아요.',
+  "error.agent.modelProviderSignInRequired":
+    '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}에 로그인해야 해요. {provider}에 로그인한 후 다시 시도하세요.',
+  "error.agent.modelProviderNotInstalled":
+    '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}이(가) 설치되어 있지 않아요.',
+  "error.agent.modelProviderOutdated":
+    '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}을(를) 업데이트해야 해요.',
   "error.agent.modelListEmpty":
     '선택한 에이전트 모델 "{model}"을(를) 사용할 수 없어요: {provider}에서 모델 목록이 비어 있어요. 마지막 오류: {detail}',
   "error.agent.modelListEmptyNoError":
@@ -121,6 +129,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "에이전트 데이터를 완전히 제거하지 못했어요. 에이전트 삭제를 다시 시도해 주세요.",
   "error.agent.deleteFolderInUse":
     "다른 에이전트의 작업이 아직 이 에이전트의 폴더를 사용하고 있어요. 그 작업이 끝나거나 OpenBot을 다시 시작한 뒤에 다시 삭제해 주세요.",
+  "error.agent.deleteFolderLocked":
+    "다른 프로그램(예: 에이전트가 시작한 프로그램)이 아직 이 에이전트의 폴더를 사용하고 있어요. 그 프로그램을 닫거나 이 에이전트가 실행되는 컴퓨터를 다시 시작한 뒤에 에이전트를 다시 삭제해 주세요.",
   "error.agent.deleteWhenFolderFree":
     "다른 에이전트의 작업이 아직 이 에이전트의 폴더를 사용하고 있어요. 그 작업이 끝나면 OpenBot이 이 에이전트를 삭제해요.",
   "error.agent.duplicationBusy": "이 에이전트를 이미 복제하는 중이에요.",
@@ -145,6 +155,8 @@ export const messages = {
   "error.agent.busyMessageModeLocalOnly":
     "에이전트가 작업 중일 때 메시지를 처리하는 방식은 에이전트를 실행하는 컴퓨터에서만 설정할 수 있어요.",
   "error.agent.backupModelsLocalOnly": "백업 모델은 에이전트를 실행하는 컴퓨터에서만 설정할 수 있어요.",
+  "error.agent.backupModelsAtLimit":
+    "지금은 대신 이어받을 백업 모델이 없어요. 각 백업 모델이 사용 한도에 도달했거나 조금 전에 실패했어요. 한 계정의 모델들은 한도를 함께 쓸 수 있어요. 지금 계속하려면 다른 제공업체나 다른 계정의 백업 모델을 추가하거나, 한도가 초기화될 때까지 기다리세요.",
   "error.agent.taskLimitLocalOnly": "작업 한도는 에이전트를 실행하는 컴퓨터에서만 설정할 수 있어요.",
   "error.agent.localScriptsOff": "이 에이전트는 로컬 스크립트를 허용하지 않아요.",
   "error.agent.localScriptsRateLimited":
@@ -175,6 +187,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "Slack, Discord, Telegram 대화에서는 다른 사람도 파일을 받으므로 화면 캡처를 사용할 수 없어요.",
   "error.agent.screenCaptureDeclined": "사용자가 이 화면 캡처를 허용하지 않았어요. 캡처된 내용은 없어요.",
+  "error.agent.creditMediaDeclined": "사용자가 이 생성을 허용하지 않았습니다. 크레딧은 사용되지 않았습니다.",
+  "error.agent.creditMediaNotSaved": "파일은 만들어졌지만 OpenBot이 채팅에 저장하지 못했습니다.",
   "error.agent.mcpServerDeclined": "사용자가 이 MCP 서버 변경을 허용하지 않았어요. 변경된 내용은 없어요.",
   "error.agent.mcpToolDeclined": "사용자가 이 MCP 도구 호출을 허용하지 않았어요. 도구는 실행되지 않았어요.",
   "error.agent.mcpServerNotSaved": "MCP 서버가 응답하지 않아 저장하지 않았어요. {error}",

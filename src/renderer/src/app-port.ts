@@ -26,21 +26,34 @@ export interface AppPort {
   setAppLogoColorPreference: OpenBotDesktopApi["setAppLogoColorPreference"];
   agent: Pick<
     OpenBotDesktopApi["agent"],
-    "readConversationPage" | "searchConversationMessages" | "searchConversationFiles" | "listRoutines" | "listAgents"
+    | "readConversationPage"
+    | "searchConversationMessages"
+    | "searchConversationFiles"
+    | "listRoutines"
+    | "listAgents"
+    | "onScopedEvent"
   >;
   agentTemplates: Pick<OpenBotDesktopApi["agentTemplates"], "onOpenLink" | "takePendingLink">;
   acpRegistry: OpenBotDesktopApi["acpRegistry"];
   hostedSites: OpenBotDesktopApi["hostedSites"];
   billing: OpenBotDesktopApi["billing"];
+  credits: OpenBotDesktopApi["credits"];
   referral: OpenBotDesktopApi["referral"];
   license: OpenBotDesktopApi["license"];
-  auth: CompanySignInCalls;
+  auth: CompanySignInCalls &
+    Pick<
+      OpenBotDesktopApi["auth"],
+      "listOwnerTransfers" | "acceptOwnerTransfer" | "declineOwnerTransfer" | "onOwnerTransfersChanged"
+    >;
   hostedServers: OpenBotDesktopApi["hostedServers"];
   routineFeed: OpenBotDesktopApi["routineFeed"];
   events: OpenBotDesktopApi["events"];
   plugins: Pick<OpenBotDesktopApi["plugins"], "onOpenListing" | "takePendingListing">;
   marketplace: Pick<OpenBotDesktopApi["marketplace"], "onOpenListing" | "takePendingListing">;
-  servers: Pick<OpenBotDesktopApi["servers"], "onInvite" | "takePendingInvite">;
+  servers: Pick<
+    OpenBotDesktopApi["servers"],
+    "onInvite" | "takePendingInvite" | "getOwnerTransfer" | "startOwnerTransfer" | "cancelOwnerTransfer"
+  >;
 }
 
 export function appPort(): AppPort {

@@ -96,6 +96,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "{host}에서 {name} 로그인을 시작하는 중…",
   "provider.codeLogin.pageOpening": "{host}에서 {name} 로그인 페이지를 여는 중…",
   "provider.codeLogin.linkStep": "{name}에 로그인하세요. OpenBot이 알아서 이어서 진행해요.",
+  "provider.codeLogin.thisComputerDescription": "이 컴퓨터의 브라우저에서 이 링크를 여세요. OpenBot이 여기서 기다려요.",
+  "provider.codeLogin.copyLink": "링크 복사",
   "provider.codeLogin.chatgptDeviceSetting":
     "컴퓨터의 ChatGPT에서 보안 설정을 열고 Codex용 기기 코드 로그인을 켜세요. 회사 계정은 워크스페이스 관리자가 켜요.",
 
@@ -118,11 +120,14 @@ export const messages = {
   "provider.picker.download": "{name} 다운로드",
   "provider.picker.search": "모델 검색",
   "provider.picker.noMatches": "검색과 일치하는 모델이 없어요.",
+  "provider.picker.openrouterNoMatches":
+    "검색과 일치하는 모델이 없어요. openrouter.ai의 개인정보 보호, 제공업체, 가드레일 설정 때문에 이 목록에서 모델이 숨겨질 수 있어요.",
   "provider.picker.workspaceOnlyUnavailable":
     "이 모델은 Windows와 Linux에서 '워크스페이스만'으로 작동하지 않아요. 사용하려면 에이전트 설정에서 '권한'을 바꾸세요.",
   "provider.picker.olderModels": "이전 모델",
   "provider.picker.olderModelsList": "{name} 이전 모델",
-  "provider.picker.noModels": "{name}에서 사용할 수 있는 모델이 없어요.",
+  "provider.picker.noModels":
+    "여기에 표시되는 {name} 모델이 없어요. 꺼져 있다면 관리자가 서버 설정 > 제공자 > {name} > 모델에서 켤 수 있어요.",
   "provider.picker.endpointModelsInCustom":
     "{name}에서 사용자 지정 엔드포인트를 실행해요. 해당 모델은 사용자 지정 탭에 있어요.",
   "provider.picker.showCustomModels": "모델 보기",
@@ -143,6 +148,7 @@ export const messages = {
   "provider.picker.effort": "강도",
   "provider.picker.effortLabel": "에이전트 추론 강도",
   "provider.picker.effortFixed": "{effort} ({provider}에서 고정)",
+  "provider.picker.effortLimited": "Claude 설정이나 조직에서 추론 강도를 {effort}(으)로 제한했어요.",
   "provider.picker.fast": "빠르게",
   "provider.picker.fastText": "더 빠른 응답, 사용량 증가",
   "provider.picker.speed": "속도",
@@ -226,6 +232,7 @@ export const messages = {
   "provider.account.apiKey": "API 키",
   "provider.account.listLabel": "{name} 계정",
   "provider.account.usedBy": "{agents}이(가) 사용 중",
+  "provider.account.sameEmail": "{name}과(와) 같은 이메일",
   "provider.account.failed": "로그인 실패",
   "provider.account.moreActions": "{name} 추가 작업",
   "provider.account.renameLabel": "{name}의 이름",
@@ -303,6 +310,7 @@ export const messages = {
     "저장된 Gemini API 키가 Google 로그인 대신 사용돼요. Google 요금제와 그 모델을 사용하려면 키를 삭제하세요.",
   "provider.settings.claudeKeyInUse":
     "Anthropic은 Claude 플랜이 아닌 키의 API 크레딧으로 청구해요. 에이전트의 모델 메뉴에서 'API 키' 계정을 선택하세요. Claude에 로그인하지 않은 경우 모든 에이전트가 키를 사용해요.",
+  "provider.settings.museKeyInUse": "Muse는 로그인이 아닌 이 키를 사용해요. 로그인을 사용하려면 키를 제거하세요.",
   "provider.settings.addKey": "키 추가",
   "provider.settings.changeKey": "키 변경",
   "provider.settings.runtime": "런타임",
@@ -382,4 +390,5 @@ export const messages = {
   "provider.settings.endpointModels": { other: "{url} · 모델 {count}개" },
   "provider.settings.disconnectLocalOnly":
     "OpenBot이 이 컴퓨터에서 {provider} 로그아웃을 해요. 터미널의 {provider} CLI는 로그인 상태를 유지해요.",
+  "provider.settings.updateAll": "모두 업데이트",
 } as const satisfies PartialTranslation<typeof source>;

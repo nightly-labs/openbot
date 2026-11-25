@@ -12,6 +12,7 @@ import {
   type QuitGuard,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate, LayoutDirection } from "@openbot/i18n";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect } from "effect";
 import {
   app,
@@ -46,6 +47,7 @@ import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
+import { desktopLayoutZoomFactor, onTilingLinuxDesktop, windowMinimumSize } from "./linux-tiling-desktop";
 import { usesX11Windows } from "./linux-wayland-output";
 import { hidePanelFromWindowSwitchers, keepPanelThroughAppHide, preventPanelActivation } from "./mac-panel-activation";
 import {
@@ -65,7 +67,9 @@ import { followAppearance, followWindowGlass, glassWindowOptions, windowBackgrou
 import { followWindowButtonSide, WINDOW_BUTTON_INSET } from "./window-buttons";
 
 const MAIN_WINDOW_DARK_BACKGROUND = "#0b0d0e";
+const logger = createOpenBotLogger("main-window");
 
+const FIRST_LOAD_ATTEMPTS = 3;
 const RENDERER_RELOAD_MAX = 3;
 const RENDERER_RELOAD_WINDOW_MS = 60_000;
 const RESTARTED_RENDERER_QUERY = "restarted";
@@ -122,6 +126,7 @@ export interface MainWindowContext {
   developmentProfile: string | null;
   developmentRemoteRole: "host" | "client" | null;
   developmentTestClientEnabled: boolean;
+  stopsFirstRenderer: boolean;
   isQuitting: () => boolean;
   keepRunningInBackground: () => boolean;
   getServices: () => MainWindowApplicationServices | null;
@@ -140,6 +145,8 @@ export interface MainWindowContext {
 export interface MainWindowController {
   getMainWindow: () => BrowserWindow | null;
   getChatWindows: () => BrowserWindow[];
+  applyInterfaceSize: (zoomFactor: number) => void;
+  chatWindowTarget: (window: BrowserWindow) => ChatWindowTarget | null;
   chatWindowTargets: () => ChatWindowTarget[];
   openChatWindow: (target: ChatWindowTarget) => void;
   openMainWindow: () => BrowserWindow;
@@ -157,6 +164,7 @@ export function createMainWindowController({
   developmentProfile,
   developmentRemoteRole,
   developmentTestClientEnabled,
+  stopsFirstRenderer,
   isQuitting,
   keepRunningInBackground,
   getServices,
@@ -189,6 +197,8 @@ export function createMainWindowController({
       reportError,
     });
   let rendererReloadTimes: number[] = [];
+  let firstLoadPending = false;
+  let firstRendererStopped = false;
   let rendererStoppedDialogOpen = false;
   let closeConfirmationOpen = false;
   let closeConfirmed = false;
@@ -266,19 +276,26 @@ export function createMainWindowController({
       });
   }
 
+  function applyMainWindowZoom(window: BrowserWindow): void {
+    const interfaceSize = getServices()?.interfaceSize;
+    if (!interfaceSize || window.isDestroyed()) return;
+    const zoom = desktopLayoutZoomFactor(window.getContentBounds().width, interfaceSize.zoomFactor);
+    if (window.webContents.getZoomFactor() !== zoom) window.webContents.setZoomFactor(zoom);
+  }
+
   function createWindow(): BrowserWindow {
     const cursor = screen.getCursorScreenPoint();
+    const minimumSize = windowMinimumSize({ minWidth: 960, minHeight: 640 });
     const bounds = resolveMainWindowBounds(
       currentMainWindowBounds(),
       screen.getAllDisplays().map((display) => display.workArea),
       screen.getDisplayNearestPoint(cursor).workArea,
       { width: 1200, height: 820 },
-      { width: 960, height: 640 },
+      { width: minimumSize.minWidth, height: minimumSize.minHeight },
     );
     const window = new BrowserWindow({
       ...bounds,
-      minWidth: 960,
-      minHeight: 640,
+      ...minimumSize,
       show: false,
       ...glassWindowOptions(MAIN_WINDOW_DARK_BACKGROUND),
       title:
@@ -296,6 +313,7 @@ export function createMainWindowController({
         sandbox: true,
         nodeIntegration: false,
         webSecurity: true,
+        backgroundThrottling: !backgroundWindows,
       },
     });
     hideMenuBar(window);
@@ -310,7 +328,8 @@ export function createMainWindowController({
           testClientEnabled: developmentTestClientEnabled,
         })
       ) {
-        window.show();
+        if (backgroundWindows) window.showInactive();
+        else window.show();
       }
     });
     window.on("close", (event) => {
@@ -339,20 +358,23 @@ export function createMainWindowController({
       for (const chat of chatWindows.values()) chat.window.close();
     });
     window.on("move", () => rememberMainWindowBounds(window.getNormalBounds()));
-    window.on("resize", () => rememberMainWindowBounds(window.getNormalBounds()));
+    window.on("resize", () => {
+      rememberMainWindowBounds(window.getNormalBounds());
+      applyMainWindowZoom(window);
+    });
 
+    if (onTilingLinuxDesktop) window.webContents.setZoomMode("isolated");
     window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     window.webContents.on("did-navigate", onRendererLoadStarted);
-    window.webContents.on("did-navigate", () => {
-      const interfaceSize = getServices()?.interfaceSize;
-      if (interfaceSize) window.webContents.setZoomFactor(interfaceSize.zoomFactor);
-    });
+    window.webContents.on("did-navigate", () => applyMainWindowZoom(window));
     window.webContents.on("render-process-gone", onRendererGone);
     window.webContents.once("destroyed", onRendererGone);
     window.webContents.on("render-process-gone", (_event, details) => {
+      logger.warn("The main window renderer stopped.", { reason: details.reason, exitCode: details.exitCode });
       const now = Date.now();
       rendererReloadTimes = rendererReloadTimes.filter((time) => now - time < RENDERER_RELOAD_WINDOW_MS);
-      if (isQuitting() || window.isDestroyed() || !RELOADABLE_RENDERER_EXITS.has(details.reason)) return;
+      if (isQuitting() || window.isDestroyed() || firstLoadPending || !RELOADABLE_RENDERER_EXITS.has(details.reason))
+        return;
       if (rendererReloadTimes.length >= RENDERER_RELOAD_MAX) {
         askAfterRendererStopped(window);
         return;
@@ -410,8 +432,7 @@ export function createMainWindowController({
     const window = new BrowserWindow({
       width: 560,
       height: 760,
-      minWidth: 380,
-      minHeight: 480,
+      ...windowMinimumSize({ minWidth: 380, minHeight: 480 }),
       show: false,
       ...glassWindowOptions(MAIN_WINDOW_DARK_BACKGROUND),
       title: getTranslate()("window.localHostTitle"),
@@ -467,7 +488,28 @@ export function createMainWindowController({
     return window;
   }
 
-  function loadRenderer(window: BrowserWindow, options: { restarted?: boolean } = {}): Promise<void> {
+  async function loadRenderer(window: BrowserWindow, options: { restarted?: boolean } = {}): Promise<void> {
+    if (options.restarted) return loadRendererOnce(window, options);
+    firstLoadPending = true;
+    try {
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          return await loadRendererOnce(window);
+        } catch (error) {
+          if (attempt >= FIRST_LOAD_ATTEMPTS || window.isDestroyed() || !isFailedLoad(error)) throw error;
+          logger.warn(
+            `The main window did not load (attempt ${attempt} of ${FIRST_LOAD_ATTEMPTS}). Loading it again.`,
+            toLogValue(error),
+          );
+        }
+      }
+    } finally {
+      firstLoadPending = false;
+    }
+  }
+
+  function loadRendererOnce(window: BrowserWindow, options: { restarted?: boolean } = {}): Promise<void> {
+    stopFirstRendererForTest(window);
     onRendererLoadStarted();
     const url = appRendererUrl(process.env.ELECTRON_RENDERER_URL);
     if (options.restarted) url.searchParams.set(RESTARTED_RENDERER_QUERY, "1");
@@ -475,6 +517,12 @@ export function createMainWindowController({
       if (!isReplacedLoad(error) || window.isDestroyed() || !window.webContents.isLoading()) throw error;
       return replacementLoad(window.webContents, error);
     });
+  }
+
+  function stopFirstRendererForTest(window: BrowserWindow): void {
+    if (!stopsFirstRenderer || firstRendererStopped) return;
+    firstRendererStopped = true;
+    window.webContents.once("did-navigate", () => window.webContents.forcefullyCrashRenderer());
   }
 
   async function ensureMainWindow(): Promise<BrowserWindow> {
@@ -499,6 +547,13 @@ export function createMainWindowController({
     getMainWindow: () => holder.current,
     getChatWindows: () =>
       [...chatWindows.values()].map((chat) => chat.window).filter((window) => !window.isDestroyed()),
+    applyInterfaceSize: (zoomFactor: number) => {
+      if (holder.current) applyMainWindowZoom(holder.current);
+      for (const chat of chatWindows.values())
+        if (!chat.window.isDestroyed()) chat.window.webContents.setZoomFactor(zoomFactor);
+    },
+    chatWindowTarget: (window: BrowserWindow) =>
+      [...chatWindows.values()].find((chat) => chat.window === window)?.target ?? null,
     chatWindowTargets,
     openChatWindow,
     openMainWindow,
@@ -809,10 +864,15 @@ function chatWindowKey(target: ChatWindowTarget): string {
   return JSON.stringify([target.serverId, target.agentId]);
 }
 
+const FAILED_LOAD_ERROR = -2;
 const REPLACED_LOAD_ERROR = -3;
 
 function isReplacedLoad(error: unknown): error is Error {
   return error instanceof Error && "errno" in error && error.errno === REPLACED_LOAD_ERROR;
+}
+
+function isFailedLoad(error: unknown): boolean {
+  return error instanceof Error && "errno" in error && error.errno === FAILED_LOAD_ERROR;
 }
 
 function replacementLoad(contents: WebContents, replaced: Error): Promise<void> {
@@ -900,6 +960,15 @@ export function sendComputerUseHighlightPlacement(
 }
 
 let windowsKeptHidden = false;
+let backgroundWindows = false;
+
+export function openWindowsInBackground(): void {
+  backgroundWindows = true;
+}
+
+export function windowsOpenInBackground(): boolean {
+  return backgroundWindows;
+}
 
 export function keepWindowsHidden(): void {
   windowsKeptHidden = true;
@@ -935,6 +1004,13 @@ export function loadDynamicIslandRenderer(window: BrowserWindow, display: Displa
     url.searchParams.set("notch-height", String(notch.height));
   }
   return window.loadURL(url.toString());
+}
+
+function closeFocusedDevTools(): void {
+  webContents
+    .getAllWebContents()
+    .find((contents) => !contents.isDestroyed() && contents.isDevToolsFocused())
+    ?.closeDevTools();
 }
 
 function zoomFocusedContents(interfaceSize: InterfaceSizeService, step: InterfaceSizeStep): void {
@@ -1055,6 +1131,12 @@ export function configureApplicationMenu(
           { role: "reload" },
           { role: "forceReload" },
           { role: "toggleDevTools" },
+          {
+            label: translate("menu.closeDeveloperTools"),
+            accelerator: "F12",
+            visible: false,
+            click: closeFocusedDevTools,
+          },
           { type: "separator" },
           {
             label: translate("menu.actualSize"),

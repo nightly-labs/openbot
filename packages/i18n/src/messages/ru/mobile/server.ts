@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "Не удалось покинуть {name}",
   "mobile.server.drawer.removeFailed": "Не удалось удалить {name}",
   "mobile.server.drawer.deleteFailed": "Не удалось удалить {name}",
+  "mobile.server.drawer.hide": "Скрыть сервер",
+  "mobile.server.drawer.show": "Показать сервер",
+  "mobile.server.drawer.hiddenServers": "Скрытые серверы",
+  "mobile.server.drawer.hideFailed": "Не удалось скрыть {name}",
+  "mobile.server.drawer.showFailed": "Не удалось показать {name}",
   "mobile.server.drawer.actionFailed": "OpenBot не смог выполнить это действие. Повторите попытку.",
   "mobile.server.drawer.moveUp": "Выше",
   "mobile.server.drawer.moveDown": "Ниже",
@@ -119,14 +124,17 @@ export const messages = {
   "mobile.server.hosted.intro.description":
     "Облачный сервер выполняет ваших агентов и регулярные задачи, когда компьютер выключен. OpenBot настраивает его и поддерживает в рабочем состоянии.",
   "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
-  "mobile.server.hosted.computer.title": "На компьютере",
+  "mobile.server.hosted.steps.title": "Добавьте его на компьютере",
+  "mobile.server.hosted.steps.open": "Откройте OpenBot на компьютере.",
+  "mobile.server.hosted.steps.settings": "Перейдите в «Настройки» → «Облачные серверы».",
+  "mobile.server.hosted.steps.add": "Выберите «Добавить сервер» и тариф.",
+  "mobile.server.hosted.plansToggle": "Что входит в каждый тариф",
   "mobile.server.hosted.computer.add": "Добавить облачный сервер",
   "mobile.server.hosted.computer.addHint":
     "В OpenBot откройте «Настройки» → «Облачные серверы» и выберите «Добавить сервер».",
   "mobile.server.hosted.computer.change": "Сменить тариф",
   "mobile.server.hosted.computer.changeHint": "В OpenBot откройте «Настройки» → «Оплата».",
   "mobile.server.hosted.yourServers": "Ваши серверы",
-  "mobile.server.hosted.plans": "Тарифы",
   "mobile.server.hosted.currentPlan": "Ваш тариф",
   "mobile.server.hosted.soldOut": "Распродано",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
@@ -270,6 +278,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Ожидание. Хост выполняет столько ходов, сколько позволяет его память.",
   "mobile.server.threads.hold.agentBusy": "Ожидание завершения другой работы этого агента.",
   "mobile.server.threads.hold.oneTurn": "Ожидание. Провайдер этого агента выполняет один ход за раз.",
+  "mobile.server.threads.hold.signIn": "Ожидание. Нужно войти в провайдер этого агента.",
   "mobile.server.threads.offline": "Подключитесь к этому серверу, чтобы увидеть его ветки.",
   "mobile.server.threads.loading": "Загрузка веток…",
   "mobile.server.threads.loadFailed": "Не удалось загрузить ветки некоторых агентов.",
@@ -309,6 +318,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Сервер будет удалён из сервиса аккаунтов для всех участников. Файлы и чаты на его компьютере останутся. Чтобы снова использовать сервер, зарегистрируйте его с того компьютера.",
   "mobile.server.settings.remove": "Удалить сервер",
+  "mobile.server.settings.hide": "Скрыть сервер",
+  "mobile.server.settings.show": "Показать сервер",
   "mobile.server.settings.deleteTitle": "Удалить {name}?",
   "mobile.server.settings.deleteBody":
     "OpenBot останавливает сервер на его компьютере и перемещает его агентов, чаты и файлы в корзину этого компьютера. Сервер исчезнет из списка серверов на всех ваших устройствах.",
@@ -380,8 +391,10 @@ export const messages = {
   "mobile.server.route.invite": "Пригласить людей",
   "mobile.server.route.member": "Участник",
   "mobile.server.route.timezone": "Часовой пояс",
+  "mobile.server.route.signalHome": "Сервер Signal",
   "mobile.server.route.personality": "Личность агента",
   "mobile.server.route.agents": "Агенты",
+  "mobile.server.route.voiceModel": "Распознавание речи",
   "mobile.server.settings.storage": "Хранилище",
   "mobile.server.route.storage": "Хранилище",
   "mobile.server.route.storageFiles": "Все файлы",
@@ -516,6 +529,42 @@ export const messages = {
     "Подключитесь к этому серверу как владелец или администратор, чтобы изменить его часовой пояс.",
   "mobile.server.settings.timezoneUnsupported":
     "Обновите OpenBot на этом сервере, чтобы изменить здесь его часовой пояс.",
+  "mobile.server.settings.signalHomeAutomatic": "Автоматически",
+  "mobile.server.settings.signalHomeNearest": "Ближайший сервер Signal",
+  "mobile.server.settings.signalHomeInUse": "Используется: {name}",
+  "mobile.server.settings.signalHomeLoading": "Измерение серверов Signal…",
+  "mobile.server.settings.signalHomeSaveFailed": "Не удалось сменить сервер Signal. Попробуйте ещё раз.",
+  "mobile.server.settings.signalHomeUnavailable":
+    "Подключитесь к этому серверу как владелец или администратор, чтобы сменить его сервер Signal.",
+  "mobile.server.settings.signalHomeUnsupported":
+    "Обновите OpenBot на этом сервере, чтобы сменить здесь его сервер Signal.",
+  "mobile.server.settings.signalHomeDescription":
+    "Участники подключаются к этому серверу через этот сервер Signal. Сервер Signal с меньшей задержкой даёт более быстрые подключения.",
+  "mobile.server.settings.signalHomeFallback":
+    "{chosen} не отвечает. Сервер использует {name}, пока {chosen} снова не ответит.",
+  "mobile.server.settings.signalHomeMoving":
+    "Сервер переходит на {name}. Участники снова подключатся через несколько секунд.",
+  "mobile.server.settings.signalHomeLoadFailed": "Не удалось загрузить серверы Signal.",
+  "mobile.server.settings.signalHomeLatency": "{latency} мс",
+  "mobile.server.settings.signalHomeNoAnswer": "Нет ответа",
+  "mobile.server.settings.signalHomePlaceHelsinki1": "Хельсинки 1",
+  "mobile.server.settings.signalHomePlaceHelsinki2": "Хельсинки 2",
+  "mobile.server.settings.signalHomePlaceSanJose": "Сан-Хосе",
+  "mobile.server.settings.signalHomePlaceSydney": "Сидней",
+  "mobile.server.settings.signalHomePlaceSingapore": "Сингапур",
+  "mobile.server.settings.voiceModelDescription":
+    "Агенты на этом сервере используют эту модель, чтобы расшифровывать звук видео без субтитров.",
+  "mobile.server.settings.voiceModelLoading": "Загрузка распознавания речи…",
+  "mobile.server.settings.voiceModelLoadFailed": "Не удалось загрузить модель распознавания речи сервера.",
+  "mobile.server.settings.voiceModelSaveFailed": "Не удалось изменить модель распознавания речи. Попробуйте ещё раз.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Обновите OpenBot на этом сервере, чтобы изменить здесь распознавание речи.",
+  "mobile.server.settings.voiceModelReady": "Готово",
+  "mobile.server.settings.voiceModelDownloading": "Загрузка: {percent}",
+  "mobile.server.settings.voiceModelSize": "Загрузка {size}",
+  "mobile.server.settings.voiceModelDownload": "Скачать",
+  "mobile.server.settings.voiceModelCancel": "Остановить",
+  "mobile.server.settings.voiceModelRemove": "Удалить",
   "mobile.server.settings.keySection": "Ключ сервера",
   "mobile.server.settings.keyChanged": "Последнее изменение",
   "mobile.server.settings.keyChange": "Сменить ключ",
@@ -534,12 +583,39 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Не удалось сменить ключ сервера. Попробуйте ещё раз.",
   "mobile.server.settings.keyOwnerOnly": "Сменить ключ сервера может только владелец.",
   "mobile.server.settings.keyUnsupported": "Обновите OpenBot на этом сервере, чтобы сменить его ключ здесь.",
+  "mobile.server.settings.turnLimit": "Ветки одновременно",
+  "mobile.server.settings.turnLimitDescription":
+    "Сколько веток агентов может выполняться одновременно на этом сервере. Больше веток — больше памяти.",
+  "mobile.server.settings.turnLimitAutomatic": "Автоматически ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Автоматически (без ограничения)",
+  "mobile.server.settings.turnLimitUnlimited": "Без ограничения",
+  "mobile.server.settings.turnLimitsLoadFailed": "Не удалось загрузить ограничения веток этого сервера.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Не удалось сохранить ограничение веток. Повторите попытку.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Обновите OpenBot на этом сервере, чтобы изменить здесь его ограничение веток.",
+  "mobile.server.settings.agentTaskLimit": "Параллельные ветки на агента",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Сколько веток одновременно может выполнять каждый агент без собственного ограничения.",
+  "mobile.server.settings.agentTaskLimitDefault": "По умолчанию ({count})",
   "mobile.server.settings.memoryLimit": "Записей памяти на агента",
   "mobile.server.settings.memoryLimitDescription": "Сколько записей памяти может хранить каждый агент на этом сервере.",
   "mobile.server.settings.memoryLimitLoadFailed": "Не удалось загрузить лимит памяти этого сервера.",
   "mobile.server.settings.memoryLimitSaveFailed": "Не удалось сохранить лимит воспоминаний. Повторите попытку.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Обновите OpenBot на этом сервере, чтобы изменить здесь его лимит воспоминаний.",
+  "mobile.server.settings.mediaApprovalCredits": "Спрашивать, если больше",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "кредитов",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed":
+    "Не удалось загрузить порог подтверждения кредитов этого сервера.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed":
+    "Не удалось сохранить порог подтверждения кредитов. Повторите попытку.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "Обновите OpenBot на этом сервере, чтобы изменить здесь его порог подтверждения кредитов.",
+  "mobile.server.settings.mediaApprovalAgents": "Агенты могут использовать кредиты",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed":
+    "Не удалось изменить использование кредитов агентами. Повторите попытку.",
+  "mobile.server.settings.mediaApprovalAsk": "Спрашивать, когда нужны кредиты",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "Не удалось изменить запросы кредитов. Повторите попытку.",
   "mobile.server.settings.memoryReview": "Проверка памяти",
   "mobile.server.settings.memoryReviewDescription":
     "Как часто агенты на этом сервере сохраняют в фоне устойчивые факты из своих чатов.",
@@ -613,6 +689,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Добавить агентов",
   "mobile.server.browserProfiles.agentsHint":
     "Нажатие назначает агенту этот профиль или возвращает его в общий профиль. Изменение закрывает открытые вкладки агента.",
+  "mobile.server.browserProfiles.movedNote":
+    "Входы на сайты остаются в старом профиле. Перемещённому агенту нужно снова войти на эти сайты.",
   "mobile.server.browserProfiles.clear": "Очистить данные",
   "mobile.server.browserProfiles.clearTitle": "Очистить данные профиля {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -998,7 +1076,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "OpenBot получает сообщения из вашего чата «Сообщение себе» и от людей, которым вы разрешили писать.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "OpenBot получает сообщения от людей, которым вы разрешили писать. Остальные получают код, который нужно передать вам.",
+    "OpenBot получает сообщения из вашего чата «Сообщение себе» и от людей, которым вы разрешили писать. Остальные получают код, который нужно передать вам.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp удалил этот сервер из связанных устройств. Привяжите номер заново.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1012,7 +1090,7 @@ export const messages = {
     "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Другие люди не получают ответа. Если выключено, OpenBot отвечает незнакомым людям кодом.",
   "mobile.server.connectors.whatsapp.workingMessage": "Сообщение «Уже работаю…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Запрос, который ждёт предыдущий, тоже получает сообщение об ожидании. Выключите, чтобы отправлять только ответ.",
+    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Запрос, который ждёт предыдущий, тоже получает сообщение об ожидании. На личном номере эти сообщения получает только чат «Сообщение себе». Выключите, чтобы отправлять только ответ.",
   "mobile.server.connectors.whatsapp.statusReactions": "Реакции статуса",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot ставит 👀, когда приходит сообщение, и ✅, когда ответ готов. Выключите, чтобы не отправлять реакции.",
@@ -1076,6 +1154,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "Номер может разрешить не более {count} контактов и групп.",
   "mobile.server.connectors.whatsapp.senderGroup": "Группа",
   "mobile.server.connectors.whatsapp.removeSender": "Удалить",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · Только чтение",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "Сделать только для чтения",
+  "mobile.server.connectors.whatsapp.allowWork": "Разрешить давать задачи",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "Только чтение: агенты могут читать этот чат, а OpenBot никогда в нём не пишет.",
   "mobile.server.connectors.whatsapp.addContact": "Добавить контакт",
   "mobile.server.connectors.whatsapp.addGroup": "Добавить группу",
   "mobile.server.connectors.whatsapp.contactTitle": "Добавить контакт",
@@ -1242,10 +1325,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Не удалось изменить модели. Попробуйте ещё раз.",
   "mobile.server.providers.promptCache": "Кеш промптов",
   "mobile.server.providers.promptCacheHint":
-    "Сколько Claude хранит контекст агента в кеше между ходами. Изменение применяется при следующем запуске Claude.",
-  "mobile.server.providers.promptCacheDefault": "По умолчанию Claude Code",
+    "Как долго Claude и Pi хранят контекст агента в кэше между ходами. Изменение применяется при следующем запуске провайдера.",
+  "mobile.server.providers.promptCacheDefault": "По умолчанию у провайдера",
   "mobile.server.providers.promptCacheHour": "1 час",
   "mobile.server.providers.promptCacheLoadFailed": "Не удалось загрузить время кеша промптов этого сервера.",
+  "mobile.server.providers.cacheExpiryCompaction": "Сжимать до истечения кэша",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Когда чат с контекстом от 200K токенов простаивает с кэшем на 1 час, агент сжимает контекст до истечения кэша. Тогда следующее сообщение не читает весь контекст заново без кэша.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "Не удалось загрузить настройку сжатия этого сервера.",
   "mobile.server.providers.compactWindow": "Сжимать чаты при",
   "mobile.server.providers.compactWindowHint":
     "Claude Code кратко излагает старые ходы чата, когда чат достигает этого размера. Меньше — ходы быстрее и дешевле. Больше — сохраняется больше деталей. Модель с меньшим окном сжимает на своём пределе.",
@@ -1300,6 +1387,8 @@ export const messages = {
     "ChatGPT использует этот ключ, а не ваш план ChatGPT. OpenAI списывает оплату за каждый запрос с ключа. Расход по плану не показывается.",
   "mobile.server.providers.codexKeyAlternative":
     "Или войдите с API-ключом OpenAI. OpenAI списывает оплату за каждый запрос с ключа.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse использует этот ключ, а не ваш вход. Чтобы использовать вход, удалите ключ.",
   "mobile.server.providers.sectionUse": "Использование",
   "mobile.server.providers.unused": "Не используется агентами",
   "mobile.server.providers.usedByCount": {
@@ -1376,6 +1465,8 @@ export const messages = {
   },
   "mobile.server.mcp.signInOnComputer":
     "Этот сервер MCP просит войти. Войдите через OpenBot на компьютере и проверьте снова.",
+  "mobile.server.mcp.signIn": "Войти",
+  "mobile.server.mcp.signInHere": "Этот сервер MCP просит войти. Нажмите «Войти», затем проверьте снова.",
   "mobile.server.mcp.signedInDescription": "{server} выполнил вход на этот сервер MCP.",
   "mobile.server.mcp.signOut": "Выйти",
   "mobile.server.mcp.saveFailed": "Не удалось сохранить изменение. Повторите попытку.",
@@ -1436,6 +1527,7 @@ export const messages = {
     other: "{count} ч",
   },
   "mobile.server.planLimits.window.minutes": "{minutes} мин",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Обновления",
   "mobile.server.settings.updateAvailable": "Доступно обновление",
   "mobile.server.route.updates": "Обновления",
@@ -1487,7 +1579,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "Ожидание: {reasons}.",
   "mobile.server.update.disabledTitle": "Удалённые обновления отключены",
   "mobile.server.update.disabledDescription":
-    "Пользователь {name} отключил обновления от участников сервера. Попросите его обновить OpenBot или включить эту настройку.",
+    "Пользователь {name} отключил обновления от участников сервера. Попросите его обновить OpenBot или открыть на своём компьютере «Настройки» > «Обновления» и включить «Разрешить обновления от участников сервера».",
   "mobile.server.update.managedTitle": "Обновлениями управляет Host Manager",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager обновляет {name}. Обратитесь к администратору хоста.",
@@ -1838,4 +1930,41 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Скопированные агенты используют правила подтверждения сервера {server}.",
   "mobile.server.transfer.copyNoServer":
     "Подключитесь к другому серверу как владелец или администратор, чтобы скопировать на него агентов.",
+  "mobile.server.route.ownerTransfer": "Передать владение",
+  "mobile.server.ownerTransfer.unavailable": "Подключитесь к этому серверу как владелец, чтобы передать владение.",
+  "mobile.server.ownerTransfer.hosted": "Этот сервер размещает OpenBot, поэтому его владелец не может смениться.",
+  "mobile.server.ownerTransfer.lede":
+    "Новый владелец получит письмо и должен принять запрос, войдя с этим адресом. После этого вы будете удалены с сервера.",
+  "mobile.server.ownerTransfer.email": "Email нового владельца",
+  "mobile.server.ownerTransfer.send": "Отправить",
+  "mobile.server.ownerTransfer.sending": "Отправка…",
+  "mobile.server.ownerTransfer.stays":
+    "Агенты, чаты, регулярные задачи, входы в провайдеров, сохранённые ключи, логины из Vault, входы в браузере и подключённые приложения остаются на сервере. Новый владелец сможет ими пользоваться.",
+  "mobile.server.ownerTransfer.expiry": "Запрос истекает через 7 дней.",
+  "mobile.server.ownerTransfer.confirmTitle": "Сделать {email} владельцем?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Когда {email} примет запрос, этот человек станет владельцем {server}, а вы потеряете доступ. Данные остаются на сервере. Запрос истекает через 7 дней.",
+  "mobile.server.ownerTransfer.confirm": "Передать",
+  "mobile.server.ownerTransfer.sendFailed": "Запрос не отправлен.",
+  "mobile.server.ownerTransfer.loadFailed": "Не удалось прочитать ожидающую передачу.",
+  "mobile.server.ownerTransfer.pending": "Ожидание нового владельца",
+  "mobile.server.ownerTransfer.expires": "Истекает {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} должен принять запрос, войдя с этим адресом. До этого вы остаётесь владельцем.",
+  "mobile.server.ownerTransfer.cancel": "Отменить",
+  "mobile.server.ownerTransfer.cancelTitle": "Отменить передачу?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} больше не сможет её принять.",
+  "mobile.server.ownerTransfer.keep": "Оставить",
+  "mobile.server.ownerTransfer.cancelFailed": "Передача не отменена.",
+  "mobile.server.ownerTransfer.incomingTitle": "Стать владельцем {server}?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} хочет сделать вас владельцем {server}. Вы получите полный контроль над сервером, а его агенты, чаты, регулярные задачи и сохранённые входы останутся на нём. {name} теряет доступ. Любой, кто ещё может войти на компьютер, где работает сервер, может пользоваться вашим аккаунтом OpenBot. Смените на нём пароли и SSH-ключи.",
+  "mobile.server.ownerTransfer.accept": "Принять",
+  "mobile.server.ownerTransfer.decline": "Отклонить",
+  "mobile.server.ownerTransfer.accepted": "Теперь вы владелец {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Не удалось принять передачу",
+  "mobile.server.ownerTransfer.declineFailed": "Не удалось отклонить передачу",
+  "mobile.server.ownerTransfer.tryAgain": "Попробуйте позже.",
+  "mobile.server.providers.updateAll": "Обновить все",
+  "mobile.server.providers.updateAllFailed": "Некоторые обновления не запустились. Попробуйте ещё раз.",
 } as const satisfies PartialTranslation<typeof source>;

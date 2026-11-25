@@ -34,7 +34,7 @@ import { Hint, useBoard } from "./workflow-board";
 import { type WorkflowCatalogs, workflowModelProviders } from "./workflow-model";
 import { type WfProvider, wfProviderLogo } from "./workflow-node-parts";
 
-const EFFORT_LABEL = {
+export const EFFORT_LABEL = {
   none: "provider.effort.none",
   minimal: "provider.effort.minimal",
   low: "provider.effort.low",

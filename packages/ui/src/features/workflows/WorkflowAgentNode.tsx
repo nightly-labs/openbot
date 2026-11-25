@@ -1,14 +1,16 @@
 import { ProviderLogo } from "@openbot/brand";
-import { Bot, Button, buttonVariants, ChevronDown, DropdownMenu, Play, Textarea, TriangleAlert } from "@openbot/ui";
+import { Bot, Button, buttonVariants, ChevronDown, DropdownMenu, Play, TriangleAlert } from "@openbot/ui";
 import { Show, untrack } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { PickerMenu, type PickerOption } from "./WorkflowPicker";
+import { AnswerAction, AnswerProblems } from "./workflow-answer-parts";
 import { useBoard } from "./workflow-board";
 import { InputPictures } from "./workflow-input-pictures";
 import type { WorkflowCatalogs } from "./workflow-model";
 import { modelOption } from "./workflow-model-pills";
+import { NameField } from "./workflow-name-field";
 import {
   asString,
   Field,
@@ -21,6 +23,7 @@ import {
   useTextField,
   wfProviderLogo,
 } from "./workflow-node-parts";
+import { StepSettingsAction } from "./workflow-step-settings";
 
 function agentModelName(catalogs: WorkflowCatalogs, agent: AgentProfile): string {
   return modelOption(catalogs.models, agent.model)?.name ?? agent.model;
@@ -134,7 +137,7 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
           class="wfn-run"
           fullWidth
           loading={run.running()}
-          loadingLabel={t("workflow.node.running")}
+          loadingLabel={board.waiting(props.id) ? t("workflow.node.waiting") : t("workflow.node.running")}
           disabled={!task().trim() || locked() || !agent()}
           onClick={run.start}
         >
@@ -148,13 +151,19 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
       kind="agent"
       inputs={["text", "image", "file"]}
       output="text"
-      toolbar={<NodeToolbar id={props.id} name={t("workflow.agent.name")} locked={locked()} onLock={setLocked} />}
+      toolbar={
+        <NodeToolbar id={props.id} name={t("workflow.agent.name")} locked={locked()} onLock={setLocked}>
+          <AnswerAction id={props.id} field="answer" locked={locked()} />
+          <StepSettingsAction id={props.id} kind="agent" />
+        </NodeToolbar>
+      }
     >
       <Field class="wfn-field-task">
         <Show when={pictures().length > 0}>
           <InputPictures sources={pictures()} />
         </Show>
-        <Textarea
+        <NameField
+          node={props.id}
           class="wfn-input"
           aria-label={t("workflow.agent.task")}
           placeholder={t("workflow.agent.taskPlaceholder")}
@@ -172,6 +181,7 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
           <Show when={agent()}>{(found) => <AgentModel agent={found()} />}</Show>
         </div>
       </Field>
+      <AnswerProblems id={props.id} />
       <ResultField id={props.id} running={run.running()} />
     </NodeShell>
   );

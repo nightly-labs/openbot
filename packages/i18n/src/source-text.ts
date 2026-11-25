@@ -20,6 +20,10 @@ export function localizeSourceText(text: string, locale: TranslatedLocale): stri
   return localizer.localize(text, locale);
 }
 
+export function sourceTextValues(text: string, key: keyof SourceMessages): Readonly<Record<string, string>> | null {
+  return localizer.values(text, key);
+}
+
 export function matchingSourceKeys(text: string): readonly string[] {
   return localizer.matchingKeys(text);
 }

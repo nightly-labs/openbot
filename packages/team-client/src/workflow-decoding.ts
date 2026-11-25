@@ -1,5 +1,7 @@
 import {
   isWorkflowDetail,
+  isWorkflowFields,
+  isWorkflowFileHostExport,
   isWorkflowGitHubCatalog,
   isWorkflowGitHubHistory,
   isWorkflowGitHubRepositoryOptions,
@@ -9,10 +11,12 @@ import {
   isWorkflowMediaCreditBalance,
   isWorkflowMediaPrice,
   isWorkflowMediaServiceAccount,
+  isWorkflowMediaUnavailableModel,
   isWorkflowRunDetail,
   isWorkflowRunPage,
   isWorkflowSaveResult,
   isWorkflowStep,
+  isWorkflowStepSource,
   isWorkflowSummary,
   isWorkflowVersion,
   isWorkflowWebhookSecret,
@@ -21,9 +25,6 @@ import {
   WORKFLOW_GITHUB_SKIP_REASONS,
   WORKFLOW_MEDIA_CATALOG_MAX,
   WORKFLOW_MEDIA_SERVICE_ACCOUNT_MAX,
-  WORKFLOW_NODE_KINDS,
-  WORKFLOW_OUTPUT_TARGETS,
-  WORKFLOW_PORT_TYPES,
   WORKFLOW_RUN_SOURCES,
   WORKFLOW_RUN_STATUSES,
   WORKFLOW_STEP_STATUSES,
@@ -37,6 +38,10 @@ import {
   type WorkflowMediaPrice,
   type WorkflowMediaProviders,
   type WorkflowMediaServiceAccount,
+  type WorkflowMediaUnavailableModel,
+  type WorkflowStepSettings,
+  workflowFormatIsNewer,
+  workflowGraphPlaceholders,
 } from "@openbot/contracts/ipc";
 import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
@@ -77,33 +82,16 @@ const version = onRecord((record) => withKnown(record, "kind", WORKFLOW_VERSION_
 
 const trigger = onRecord((record) => withKnown(record, "type", WORKFLOW_TRIGGER_TYPES, "manual"));
 
-function hasUnknownSetting(node: Json): boolean {
-  const fields = isDynamicRecord(node.fields) ? node.fields : {};
-  if (node.kind === "trigger") return isUnknownName(WORKFLOW_TRIGGER_TYPES, fields.trigger);
-  if (node.kind === "output") return isUnknownName(WORKFLOW_OUTPUT_TARGETS, fields.target);
-  return false;
-}
-
 const detail = onRecord((record) => {
   const base = mapList({ ...record, summary: summary(record.summary) }, "triggers", trigger);
   const graph = base.graph;
   if (!isDynamicRecord(graph) || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) return base;
-  const placeholders = new Set<unknown>();
-  const settings = graph.nodes.some((node) => isDynamicRecord(node) && hasUnknownSetting(node));
-  const nodes = graph.nodes.map(
-    onRecord((node) => {
-      if (!isUnknownName(WORKFLOW_NODE_KINDS, node.kind)) return node;
-      placeholders.add(node.id);
-      const { schedule: _schedule, ...rest } = node;
-      return { ...rest, kind: "note", locked: true };
-    }),
-  );
-  const edges = graph.edges.filter(
-    (edge) =>
-      !isDynamicRecord(edge) ||
-      !(isUnknownName(WORKFLOW_PORT_TYPES, edge.type) || placeholders.has(edge.from) || placeholders.has(edge.to)),
-  );
-  const newer = settings || placeholders.size > 0 || edges.length < graph.edges.length;
+  const { nodes, edges, placeholders, newerSettings } = workflowGraphPlaceholders({
+    ...graph,
+    nodes: graph.nodes,
+    edges: graph.edges,
+  });
+  const newer = workflowFormatIsNewer(record.format) || newerSettings || placeholders > 0;
   return { ...base, graph: { ...graph, nodes, edges }, ...(newer ? { needsNewerApp: true } : {}) };
 });
 
@@ -119,6 +107,7 @@ function mapped<T>(map: (value: unknown) => unknown, decode: (value: unknown) =>
 
 export const decodeRemoteWorkflowSummary = mapped(summary, guardedDecoder(isWorkflowSummary, "remote workflow"));
 export const decodeRemoteWorkflowDetail = mapped(detail, guardedDecoder(isWorkflowDetail, "remote workflow"));
+export const decodeRemoteWorkflowFileExport = guardedDecoder(isWorkflowFileHostExport, "remote workflow file");
 export function decodeRemoteWorkflowVersionGraph(value: unknown) {
   if (!isDynamicRecord(value)) throw new Error("Invalid remote workflow version.");
   const mappedDetail = detail({ graph: value.graph });
@@ -135,6 +124,23 @@ export const decodeRemoteWorkflowRunDetail = mapped(
 );
 export const decodeRemoteWorkflowRunPage = mapped(runPage, guardedDecoder(isWorkflowRunPage, "remote workflow runs"));
 export const decodeRemoteWorkflowStep = mapped(step, guardedDecoder(isWorkflowStep, "remote workflow step"));
+export function decodeRemoteWorkflowStepSettings(value: unknown): WorkflowStepSettings {
+  if (
+    !isDynamicRecord(value) ||
+    !(value.settings === null || isWorkflowFields(value.settings)) ||
+    !(value.sources === null || Array.isArray(value.sources))
+  )
+    throw new Error("Invalid remote workflow step settings.");
+  return {
+    settings: value.settings,
+    sources:
+      value.sources === null
+        ? null
+        : value.sources
+            .filter(isWorkflowStepSource)
+            .map(({ from, type, stepId, attachmentId }) => ({ from, type, stepId, attachmentId })),
+  };
+}
 export const decodeRemoteWorkflowSecret = guardedDecoder(isWorkflowWebhookSecret, "remote workflow webhook secret");
 const decodeVersionGraph = guardedDecoder(isWorkflowGraph, "remote workflow version");
 const decodeWorkflowSummaries = guardedListDecoder(isWorkflowSummary, "remote workflow list");
@@ -172,6 +178,11 @@ export function decodeRemoteWorkflowMediaCredits(value: unknown): { sunra: Workf
 export function decodeRemoteHiggsfieldCredits(value: unknown): { higgsfield: WorkflowMediaCreditBalance | null } {
   if (!isDynamicRecord(value)) throw new Error("Invalid remote workflow credits.");
   return { higgsfield: remoteCreditBalance(value.higgsfield) };
+}
+
+export function decodeRemoteCreditMediaCredits(value: unknown): { openbot: WorkflowMediaCreditBalance | null } {
+  if (!isDynamicRecord(value)) throw new Error("Invalid remote workflow credits.");
+  return { openbot: remoteCreditBalance(value.openbot) };
 }
 
 function remoteAccountList<T>(value: unknown, item: (entry: unknown) => entry is T): T[] {
@@ -246,6 +257,14 @@ export function decodeRemoteWorkflowMediaCatalog(value: unknown): WorkflowMediaC
         : {}),
     })),
   };
+}
+
+export function decodeRemoteWorkflowMediaUnavailable(value: unknown): WorkflowMediaUnavailableModel[] {
+  if (!isDynamicRecord(value) || !Array.isArray(value.models) || value.models.length > WORKFLOW_MEDIA_CATALOG_MAX)
+    throw new Error("Invalid remote workflow catalog.");
+  return value.models
+    .filter(isWorkflowMediaUnavailableModel)
+    .map((model) => ({ id: model.id, name: model.name, kinds: [...model.kinds] }));
 }
 
 export function decodeRemoteWorkflowMediaPrice(value: unknown): WorkflowMediaPrice {

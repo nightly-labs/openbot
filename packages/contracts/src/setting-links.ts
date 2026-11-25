@@ -26,6 +26,8 @@ export const SETTING_LINK_SCOPES = {
   "voice.read-replies": "app",
   "voice.speech-voice": "app",
   "voice.speech-speed": "app",
+  "voice.codex-live": "app",
+  "voice.server": "app",
   "phones.devices": "app",
   "app.launch-at-login": "app",
   "app.restore-workspace": "app",
@@ -35,8 +37,10 @@ export const SETTING_LINK_SCOPES = {
   "island.show": "app",
   "dock.show": "app",
   "dock.agents": "app",
+  "computer-use.permissions": "app",
   "updates.track": "app",
   "updates.auto-install": "app",
+  "credits.explainer": "app",
   "agent.model": "agent",
   "agent.backup-models": "agent",
   "agent.chat-color": "agent",
@@ -54,6 +58,7 @@ export const SETTING_LINK_SCOPES = {
   "agent.new-chat": "agent",
   "agent.starts-new-chats": "agent",
   "agent.plan-card": "agent",
+  "agent.builtin-memory": "agent",
 } as const satisfies Record<string, "app" | "agent">;
 
 export type SettingLinkId = keyof typeof SETTING_LINK_SCOPES;

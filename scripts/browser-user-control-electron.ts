@@ -25,6 +25,13 @@ const runId = argument("run-id");
 
 const cases: string[] = [];
 const resultSchema = z.object({ status: z.literal("user-control-ended"), note: z.string(), next: z.string() });
+const tabListSchema = z.object({
+  tabs: z.array(z.object({ id: z.string(), chat: z.string(), otherChatWorking: z.literal(true).optional() })),
+});
+const fixtureChats = new Map([
+  ["fixture-thread", { agentId: "fixture-agent", sideThread: null }],
+  ["fixture-side", { agentId: "fixture-agent", sideThread: { taskId: "fixture-task", title: "Side work" } }],
+]);
 
 const capturePage = `<!doctype html><meta charset="utf-8"><title>Capture</title>
 <style>body{margin:0}button,input,p{position:absolute;left:10px;width:200px;height:30px;margin:0}</style>
@@ -90,6 +97,7 @@ async function main(): Promise<void> {
     const captured: { agentId: string; step: Omit<UserBrowsingStep, "at"> }[] = [];
     const captureState = { enabled: true, onRecord: () => {} };
     browser = new BrowserHost(window, join(fixtureRoot, "downloads"), join(fixtureRoot, "tabs.json"), {
+      agentChat: (threadId) => fixtureChats.get(threadId) ?? null,
       userBrowsing: {
         enabled: () => captureState.enabled,
         record: (agentId, step) => {
@@ -217,6 +225,52 @@ async function main(): Promise<void> {
       const afterRelease = success(await routed(params("list_tabs", {}), never));
       assert.equal(afterRelease.success, true, "A tab list after the release did not run.");
       recordCases("tab-list-waits-for-held-tab", "tab-list-runs-after-release");
+    }
+
+    {
+      const { tab: mainTab } = await open();
+      const channelTab = await runCauseEffect(
+        host.open(`${origin}/page-${++sequence}`, "fixture-channel", "fixture-agent"),
+      );
+      const inThread = (threadId: string, tool: string, args: DynamicToolCallParams["arguments"]) => ({
+        ...params(tool, args),
+        threadId,
+        turnId: `${threadId}-turn`,
+      });
+      const tabList = (result: DynamicToolResult) => {
+        const text = result.contentItems.find((item) => item.type === "inputText");
+        assert(text?.type === "inputText", "Missing tab list text.");
+        return tabListSchema.parse(JSON.parse(text.text)).tabs;
+      };
+      const sideTabs = tabList(success(await routed(inThread("fixture-side", "list_tabs", {}), never)));
+      assert.equal(sideTabs.find((tab) => tab.id === mainTab.id)?.chat, "main chat");
+      assert(!sideTabs.some((tab) => tab.id === channelTab.id), "A side thread listed a channel tab.");
+      const sideRead = success(
+        await routed(inThread("fixture-side", "snapshot", { tabId: mainTab.id, image: "never" }), never),
+      );
+      assert.equal(sideRead.success, true, "A side thread could not read a tab of the main chat.");
+      const sideChannelRead = await routed(
+        inThread("fixture-side", "snapshot", { tabId: channelTab.id, image: "never" }),
+        never,
+      );
+      assert(
+        Exit.isFailure(sideChannelRead) || !sideChannelRead.value.success,
+        "A side thread could read a channel tab.",
+      );
+      const mainTabs = tabList(success(await routed(params("list_tabs", {}), never)));
+      const mainView = mainTabs.find((tab) => tab.id === mainTab.id);
+      assert.equal(mainView?.chat, "this chat");
+      assert.equal(mainView?.otherChatWorking, true, "The main chat did not see the side thread work in its tab.");
+      const channelTabs = tabList(success(await routed(inThread("fixture-channel", "list_tabs", {}), never)));
+      assert(!channelTabs.some((tab) => tab.id === mainTab.id), "A channel listed a tab of the main chat.");
+      assert.equal(channelTabs.find((tab) => tab.id === channelTab.id)?.chat, "this chat");
+      recordCases(
+        "side-thread-lists-main-chat-tab",
+        "side-thread-uses-main-chat-tab",
+        "side-thread-skips-channel-tab",
+        "owner-sees-other-chat-working",
+        "channel-skips-main-chat-tab",
+      );
     }
 
     {

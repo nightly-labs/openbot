@@ -8,6 +8,8 @@ import {
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import { replaceEqualDeep } from "@tanstack/react-query";
 import { Marked, type Token, type TokensList } from "marked";
+import markedCjkFriendly from "marked-cjk-friendly";
+import { nextPhoneNumberIndex, phoneNumberAtStart } from "./chat-phone-number";
 
 const markdown = new Marked({
   gfm: true,
@@ -70,6 +72,24 @@ const markdown = new Marked({
       },
     },
     {
+      name: "phoneNumber",
+      level: "inline",
+      start: nextPhoneNumberIndex,
+      tokenizer(source, tokens) {
+        if (this.lexer.state.inLink) return;
+        const phone = phoneNumberAtStart(source, tokens.at(-1)?.raw.at(-1) ?? "");
+        if (!phone) return;
+        return {
+          type: "link",
+          raw: phone.text,
+          href: phone.href,
+          title: null,
+          text: phone.text,
+          tokens: [{ type: "text", raw: phone.text, text: phone.text, escaped: false }],
+        };
+      },
+    },
+    {
       name: "tabReference",
       level: "inline",
       start: (source) => source.indexOf("@["),
@@ -81,6 +101,7 @@ const markdown = new Marked({
     },
   ],
 });
+markdown.use(markedCjkFriendly());
 
 function parseChatMarkdown(body: string): TokensList {
   return markdown.lexer(body);
@@ -156,7 +177,7 @@ function continueParse(body: string, previous: { body: string; tokens: TokensLis
   return Object.assign([...stable, ...rest], { links: rest.links });
 }
 
-const MAX_CACHED_BODIES = 300;
+const MAX_CACHED_BODIES = 600;
 const parsedBodies = new Map<string, ReturnType<typeof parseChatMarkdown>>();
 
 export function parseFinishedChatMarkdown(body: string) {

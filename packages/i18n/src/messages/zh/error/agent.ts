@@ -19,6 +19,8 @@ export const messages = {
     "工具未运行。tool_call 找不到此名称的工具。请使用 tool_search 给出的准确完整名称，例如 openbot_browser.snapshot。",
   "error.agent.toolCallUnknownToolSuggest":
     "工具未运行。tool_call 找不到此名称的工具。完整名称可能是 {name}。如果是，请使用该名称再次发送调用。",
+  "error.agent.toolCallNullValue":
+    "工具未运行。{name} 在 {paths} 需要对象或列表，但这些列表项都以 null 到达。请再次发送调用，并将每一项作为包含其 JSON 的字符串传入。",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe 未找到名为 {names} 的 OpenBot 工具。它只描述 openbot.tool_search 列出的 OpenBot 和浏览器工具，不描述 MCP 工具。",
   "error.agent.toolDescribeDiscoveryNames": "请直接调用 {names}。tool_describe 不描述发现工具。",
@@ -48,6 +50,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "助手创建失败，且无法移除不完整的助手。",
   "error.agent.modelUnavailable": "所选的助手模型不可用。",
   "error.agent.modelProviderNotConnected": "所选的助手模型“{model}”不可用：{provider} 未连接。",
+  "error.agent.modelProviderSignInRequired":
+    "所选的助手模型“{model}”不可用：{provider} 需要登录。请登录 {provider} 后重试。",
+  "error.agent.modelProviderNotInstalled": "所选的助手模型“{model}”不可用：{provider} 未安装。",
+  "error.agent.modelProviderOutdated": "所选的助手模型“{model}”不可用：{provider} 需要更新。",
   "error.agent.modelListEmpty": "所选的助手模型“{model}”不可用：{provider} 没有列出任何模型。上次错误：{detail}",
   "error.agent.modelListEmptyNoError": "所选的助手模型“{model}”不可用：{provider} 没有列出任何模型。",
   "error.agent.modelNotInProviderList": "所选的助手模型“{model}”不可用：{provider} 未列出该模型。",
@@ -108,6 +114,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "助手数据未能完全移除，请重试删除。",
   "error.agent.deleteFolderInUse":
     "另一个助手的工作仍在使用此助手的文件夹。请在该工作结束后，或重启 OpenBot 后，再次删除此助手。",
+  "error.agent.deleteFolderLocked":
+    "另一个程序（例如助手启动的程序）仍在使用此助手的文件夹。请关闭该程序或重启运行此助手的电脑，然后再次删除此助手。",
   "error.agent.deleteWhenFolderFree": "另一个助手的工作仍在使用此助手的文件夹。该工作结束后，OpenBot 会删除此助手。",
   "error.agent.duplicationBusy": "该助手正在被复制。",
   "error.agent.waitBeforeDuplicate": "请等该助手结束并清空队列后再复制。",
@@ -128,6 +136,8 @@ export const messages = {
   "error.agent.webSearchFailed": "网页搜索未完成。请重试。",
   "error.agent.busyMessageModeLocalOnly": "忙碌时消息的处理方式只能在运行该助手的电脑上设置。",
   "error.agent.backupModelsLocalOnly": "备用模型只能在运行该助手的电脑上设置。",
+  "error.agent.backupModelsAtLimit":
+    "现在没有备用模型可以接手：每个备用模型都已达到使用上限，或刚刚失败。同一账号的模型可能共用一个上限。要现在继续，请添加来自其他服务商或其他账号的备用模型，或等待上限重置。",
   "error.agent.taskLimitLocalOnly": "任务并发数只能在运行该助手的电脑上设置。",
   "error.agent.localScriptsOff": "该助手不允许使用本地脚本。",
   "error.agent.localScriptsRateLimited":
@@ -153,6 +163,8 @@ export const messages = {
   "error.agent.screenCaptureUnavailable": "这台电脑不支持截屏。",
   "error.agent.screenCaptureShared": "在 Slack、Discord、Telegram 对话中无法使用截屏，因为其他人也会收到这些文件。",
   "error.agent.screenCaptureDeclined": "用户未允许本次截屏，没有截取任何内容。",
+  "error.agent.creditMediaDeclined": "用户未允许此次生成。未花费任何积分。",
+  "error.agent.creditMediaNotSaved": "文件已生成，但 OpenBot 无法将其保存到聊天中。",
   "error.agent.mcpServerDeclined": "用户未允许这次 MCP 服务器更改，未做任何更改。",
   "error.agent.mcpToolDeclined": "用户未允许这次 MCP 工具调用，工具没有运行。",
   "error.agent.mcpServerNotSaved": "该 MCP 服务器没有响应，因此未保存。{error}",

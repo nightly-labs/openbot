@@ -3,6 +3,7 @@ import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import { isNarrationItemId, showsNarration } from "@openbot/contracts/conversation-narration";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { itemTypeCountsAsUnread } from "@openbot/contracts/conversation-read";
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import type {
   AgentExchangeSummary,
   AttachmentSummary,
@@ -29,7 +30,9 @@ import {
   channelRoutingConversationEvent,
   isAgentAnswer,
   isContextResetMarker,
+  isNoAnswerNotice,
   marketplaceSuggestionEvent,
+  mcpSignInEvent,
   parseConversationPlanText,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   replacedConversationPlans,
@@ -66,7 +69,9 @@ export type ChatMessage =
       standalone: boolean;
     }
   | { id: string; kind: "context-reset" }
+  | { id: string; kind: "no-answer"; text: string }
   | { id: string; kind: "app-suggestion"; appId: string }
+  | { id: string; kind: "mcp-sign-in"; mcpServerId: string }
   | {
       id: string;
       kind: "routine";
@@ -200,6 +205,7 @@ const projectedQuestions = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedMemoryChanges = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedRoutines = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedResets = new WeakMap<ConversationMessage, ChatMessage>();
+const projectedNoAnswers = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedUpdates = new WeakMap<ConversationMessage, ChatMessage>();
 
 export interface ProgressUpdates {
@@ -255,6 +261,7 @@ function progressBubble(id: string, message: ConversationMessage): Extract<ChatM
 }
 
 const projectedSuggestions = new WeakMap<ConversationMessage, ChatMessage>();
+const projectedSignIns = new WeakMap<ConversationMessage, ChatMessage>();
 
 function suggestedApp(message: ConversationMessage): string | null {
   const appId = marketplaceSuggestionEvent(message)?.appId;
@@ -450,12 +457,29 @@ export function projectChatMessages(
       );
       continue;
     }
+    if (isNoAnswerNotice(message)) {
+      result.push(
+        projectedMarker(projectedNoAnswers, message, () => ({ id: message.id, kind: "no-answer", text: message.text })),
+      );
+      continue;
+    }
     if (marketplaceSuggestionEvent(message)) {
       const appId = suggestedApp(message);
       if (appId)
         result.push(
           projectedMarker(projectedSuggestions, message, () => ({ id: message.id, kind: "app-suggestion", appId })),
         );
+      continue;
+    }
+    const signIn = mcpSignInEvent(message);
+    if (signIn) {
+      result.push(
+        projectedMarker(projectedSignIns, message, () => ({
+          id: message.id,
+          kind: "mcp-sign-in",
+          mcpServerId: signIn.mcpServerId,
+        })),
+      );
       continue;
     }
     if (settingLinkMessage(message)) continue;
@@ -799,6 +823,7 @@ const projectedChannelMessages = new WeakMap<
     progress: boolean;
     replaced: boolean;
     run: RoutineRunStatus | null;
+    localize: (text: string) => string;
     rows: readonly ChatMessage[];
   }
 >();
@@ -810,6 +835,7 @@ function projectChannelMessage(
   progress: boolean,
   replaced: boolean,
   request: ReturnType<typeof channelRoutineRequest>,
+  localize: (text: string) => string,
 ): ChatMessage | null {
   if (request)
     return {
@@ -886,7 +912,7 @@ function projectChannelMessage(
     ...(self ? { mine: true } : {}),
     speaker: entry.author,
     superseded: entry.superseded,
-    body: entry.message.text,
+    body: coordinatorText(entry.author, entry.message.text, localize),
     streaming: entry.message.status === "streaming",
     status: entry.message.status,
     replyToMessageId: entry.message.replyToMessageId,
@@ -902,6 +928,7 @@ export function projectChannelMessages(
   messages: ChannelMessage[],
   tasks: readonly ChannelTask[],
   memberId: string | null,
+  localize: (text: string) => string,
   progressUpdates?: ProgressUpdates,
 ): ChatMessage[] {
   const latestRuns = latestRoutineRunMessages(messages.map((entry) => entry.message));
@@ -949,10 +976,11 @@ export function projectChannelMessages(
         cached.latest === latest &&
         cached.progress === progress &&
         cached.replaced === replaced &&
-        cached.run === run
+        cached.run === run &&
+        cached.localize === localize
       )
         return cached.rows;
-      const message = projectChannelMessage(entry, self, latestRuns, progress, replaced, request);
+      const message = projectChannelMessage(entry, self, latestRuns, progress, replaced, request, localize);
       const rows: readonly ChatMessage[] = !message
         ? []
         : progress
@@ -966,7 +994,7 @@ export function projectChannelMessages(
               },
             ]
           : [message];
-      projectedChannelMessages.set(entry, { self, latest, progress, replaced, run, rows });
+      projectedChannelMessages.set(entry, { self, latest, progress, replaced, run, localize, rows });
       return rows;
     });
 }
