@@ -263,8 +263,17 @@ export function ConversationComposer() {
     return keyError ? props.onManageProviders : undefined;
   };
   const errorInChat = (error: string) => {
-    const marker = props.messages.at(-1)?.actionMarker;
-    return marker?.kind === "sign-in-failure" && readableAgentError(marker.text) === error;
+    for (let index = props.messages.length - 1; index >= 0; index -= 1) {
+      const message = props.messages[index];
+      if (message?.author === "you") return false;
+      const marker = message?.actionMarker;
+      if (
+        (marker?.kind === "sign-in-failure" || marker?.kind === "no-answer") &&
+        readableAgentError(marker.text) === error
+      )
+        return true;
+    }
+    return false;
   };
   const errorBannerAction = () => {
     const updateKey = updateOpenCodeKey();
