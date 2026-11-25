@@ -11,6 +11,7 @@ import {
   sendAccountActivitySnapshots,
 } from "../src/server/account-activity";
 import { ACCOUNT_ANALYTICS_SCHEMA_VERSION, createAccountEventDelivery } from "../src/server/account-analytics";
+import { D1AuthRepository } from "../src/server/d1-auth-repository";
 import { sqliteD1 } from "./sqlite-d1";
 
 const ROOT = resolve(import.meta.dirname, "../../..");
@@ -30,7 +31,7 @@ function migratedDatabase(): DatabaseSync {
   const database = new DatabaseSync(":memory:");
   database.exec("PRAGMA foreign_keys = ON");
   for (const name of readdirSync(MIGRATIONS).sort()) database.exec(readFileSync(join(MIGRATIONS, name), "utf8"));
-  for (const id of ["owner", "member", "removed", "stranger", "other-owner"]) {
+  for (const id of ["owner", "member", "removed", "stranger", "other-owner", "opted-out"]) {
     database
       .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
       .run(id, `email:${id}`, `${id}@example.test`);
@@ -53,6 +54,8 @@ function migratedDatabase(): DatabaseSync {
   membership.run("m-member", "host", "member", "member", null);
   membership.run("m-removed", "host", "removed", "member", 5);
   membership.run("m-other", "other", "member", "member", null);
+  membership.run("m-opted-out", "host", "opted-out", "member", null);
+  database.prepare("UPDATE users SET analytics_enabled = 0, analytics_answered_at = 1 WHERE id = 'opted-out'").run();
   return database;
 }
 
@@ -77,11 +80,19 @@ function rows(database: DatabaseSync) {
 async function main() {
   const sqlite = migratedDatabase();
   const database = sqliteD1(sqlite);
+  const repository = new D1AuthRepository(database);
   const record = (caller: string, accounts: string[], now: number) =>
     Effect.runPromise(recordAccountActivity(database, caller, accounts, now));
 
   const first = await record("owner", ["owner", "member", "removed", "stranger"], LATE_23RD);
   check("an owner records itself and an active member only", first.recorded === 2, first);
+  await record("owner", ["opted-out"], LATE_23RD);
+  await record("opted-out", ["opted-out"], LATE_23RD);
+  check(
+    "an account with analytics off is not recorded, by its own host or by another",
+    !rows(sqlite).some((row) => row.account_id === "opted-out"),
+    rows(sqlite),
+  );
   await record("owner", ["owner", "member"], LATE_23RD);
   await record("member", ["member"], LATE_23RD);
   await record("other-owner", ["other-owner", "member"], LATE_23RD);
@@ -186,6 +197,15 @@ async function main() {
   sent.length = 0;
   await snapshot(NOON_25TH);
   check("a later run sends nothing", sent.length === 0, sent);
+
+  await record("owner", ["owner", "member"], NOON_25TH);
+  await Effect.runPromise(repository.updateUserAnalytics("member", false, NOON_25TH, NOON_25TH));
+  await record("owner", ["member"], NOON_25TH);
+  check(
+    "turning analytics off deletes the account's activity and stops new rows",
+    JSON.stringify(rows(sqlite)) === JSON.stringify([{ day: "2026-11-25", account_id: "owner" }]),
+    rows(sqlite),
+  );
 
   sqlite.prepare("DELETE FROM users WHERE id = 'owner'").run();
   check("a deleted account leaves no activity row", rows(sqlite).length === 0, rows(sqlite));

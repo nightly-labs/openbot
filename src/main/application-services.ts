@@ -3237,8 +3237,9 @@ export async function createApplicationServices({
         (value) => value,
       ),
   });
+  let ownerAnalyticsOn = analyticsPreference.enabled;
   service.on("event", (event) => {
-    if (event.type !== "turn-started") return;
+    if (event.type !== "turn-started" || !ownerAnalyticsOn) return;
     const owner = resolveHostOwner();
     if (owner) accountActivity.record(owner.id);
   });
@@ -3706,7 +3707,10 @@ export async function createApplicationServices({
   const analyticsPreferences = new AnalyticsPreferenceService({
     path: analyticsPreferenceFile,
     account: centralAuth,
-    setTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
+    setTrackingEnabled: (enabled) => {
+      ownerAnalyticsOn = enabled;
+      analytics.setTrackingEnabled(enabled);
+    },
     followed: (enabled) => {
       for (const window of BrowserWindow.getAllWindows())
         sendToRenderer(window, IPC_ENDPOINTS.app.analyticsPreference, { enabled });

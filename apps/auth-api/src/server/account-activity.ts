@@ -62,7 +62,10 @@ export const recordAccountActivity = Effect.fn("AccountActivity.record")(functio
   const recorded = accounts.filter((account) => account === callerId || members.has(account));
   if (recorded.length === 0) return { recorded: 0 };
   const day = accountActivityDay(now);
-  const insert = database.prepare("INSERT OR IGNORE INTO account_active_days(day, account_id) VALUES (?, ?)");
+  const insert = database.prepare(
+    `INSERT OR IGNORE INTO account_active_days(day, account_id)
+     SELECT ?, id FROM users WHERE id = ? AND analytics_enabled IS NOT 0`,
+  );
   yield* Effect.tryPromise({
     try: () => database.batch(recorded.map((account) => insert.bind(day, account))),
     catch: () => new AccountActivityError({}),
