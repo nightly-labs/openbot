@@ -12,6 +12,7 @@ import {
 } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { createAgentApi } from "@near-intents-agent-api/sdk";
 import { type NearWalletStatus, parseNearDepositInput, parseNearWalletCreateInput } from "@openbot/contracts/ipc";
 import { Effect, Result } from "effect";
 import { z } from "zod";
@@ -25,6 +26,7 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/near-wallet-live");
 const PAGE_ORIGIN = "https://api.openbot.run";
 const BASE_URL = process.env.NEAR_LIVE_API_URL || undefined;
 const AGENT_ID = "live-smoke-agent";
+const TEST_WALLET_EXTERNAL_ID = "openbot-mainnet-test-wallet";
 const FIRST_BUDGET_USD = "5";
 const NEXT_BUDGET_USD = "6";
 const WAIT_MS = 180_000;
@@ -179,10 +181,50 @@ function summary(status: NearWalletStatus): string {
   });
 }
 
+async function adoptTestWallet(
+  store: NearWalletStore,
+  gateway: KeyedNearGateway,
+  passkey: SoftwarePasskey,
+  accountId: string,
+): Promise<void> {
+  const api = createAgentApi({
+    apiKey: "openbot-gateway",
+    fetch: gateway.fetch("personal"),
+    ...(BASE_URL ? { baseUrl: BASE_URL } : {}),
+  });
+  const page = await api.listAgents({ external_user_id: TEST_WALLET_EXTERNAL_ID });
+  const agent = page.data.find((item) => item.status === "ACTIVE" && item.wallet?.near_account_id === accountId);
+  assert.ok(agent, "NEAR_TEST_WALLET_ACCOUNT is an active wallet under the partner key");
+  const owner = agent.owner;
+  assert.ok(owner?.type === "passkey", "the test wallet has a passkey owner");
+  assert.equal(owner.public_key, passkey.publicKey, "NEAR_TEST_WALLET_OWNER_KEY owns the test wallet");
+  const view = await api.getPolicy(agent.id);
+  await run(
+    store.update((record) => ({
+      ...record,
+      owner,
+      wallet: {
+        agentId: agent.id,
+        accountId: null,
+        createCorrelationId: null,
+        dailyBudgetUsd: view.policy?.budget.daily_usd ?? FIRST_BUDGET_USD,
+        ownerApproval: view.policy?.owner_approval ?? true,
+        frozen: view.policy?.frozen ?? false,
+        grant: null,
+        gatewayOwner: "personal",
+      },
+      allAgents: false,
+      agentIds: [AGENT_ID],
+      payments: [],
+    })),
+  );
+}
+
 async function main(): Promise<void> {
   await mkdir(OUT, { recursive: true });
   const partnerKey = required("NEAR_INTENTS_PARTNER_KEY").trim();
-  const ownerKey = required("NEAR_TEST_OWNER_PASSKEY");
+  const ownerKey = required("NEAR_TEST_WALLET_OWNER_KEY");
+  const testWallet = required("NEAR_TEST_WALLET_ACCOUNT");
   const passkey = new SoftwarePasskey(ownerKey);
   const store = new NearWalletStore(join(OUT, "near-wallet.json"), new KeyCipher(ownerKey));
   const signing = new NearOwnerSigning({ pageOrigin: PAGE_ORIGIN, openExternal: passkey.openExternal, loopback: true });
@@ -206,25 +248,39 @@ async function main(): Promise<void> {
   };
 
   try {
-    await run(service.load());
-    const ready = await step("create the wallet with a passkey owner", async () => {
-      if (store.read().wallet?.grant?.active) return `already created: ${summary(service.status())}`;
+    await run(store.load());
+    if (store.unreadable()) await run(store.clear());
+    const ready = await step("connect the shared test wallet with a passkey grant", async () => {
+      const stored = store.read().wallet;
+      if (stored?.accountId === testWallet && stored.grant?.active) {
+        await run(service.load());
+        return `already connected: ${summary(service.status())}`;
+      }
+      if (stored?.accountId !== testWallet) await adoptTestWallet(store, gateway, passkey, testWallet);
+      await run(service.load());
       const input = parseNearWalletCreateInput({ dailyBudgetUsd: FIRST_BUDGET_USD, agentIds: [AGENT_ID] });
       assert.ok(input);
       await run(service.create(input));
       const status = await waitFor(
         service,
         "create",
-        (current) => (current.state === "ready" && current.signing === null) || current.error !== null,
+        (current) =>
+          ((current.state === "ready" || current.state === "frozen") && current.signing === null) ||
+          current.error !== null,
       );
       assert.equal(status.error, null);
+      assert.equal(status.account?.accountId, testWallet);
       return `${summary(status)} signed=${passkey.signedActions.join(",")}`;
     });
     if (ready) {
       await step("refresh reads balances and tokens", async () => {
-        const status = await run(service.refresh());
+        await run(service.refresh());
+        const status = await waitFor(
+          service,
+          "refresh",
+          (current) => current.depositAssets.length > 0 || current.error !== null,
+        );
         assert.equal(status.error, null);
-        assert.ok(status.depositAssets.length > 0, "the wallet lists deposit assets");
         return summary(status);
       });
       await step("change the daily budget", async () => {
