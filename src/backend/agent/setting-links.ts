@@ -523,7 +523,7 @@ const SERVER_PLACES: readonly ServerPlaceEntry[] = [
     title: "Parallel threads",
     place: `For one agent, on the phone app: the agent's settings > Advanced > Behavior > Parallel threads. For all agents, on a computer: ${SERVER_SETTINGS} > Agent defaults > Parallel threads per agent and Threads at the same time. On the phone app: the server's Server settings > Agents.`,
     about:
-      "How many threads of an agent run at the same time; the others wait. An agent's Parallel threads on Default uses the server's Parallel threads per agent, which is 4 until an owner or admin changes it. Only the owner or an admin changes the server rows: Parallel threads per agent applies to each agent with no limit of its own, and Threads at the same time limits all agent threads of the server; more threads use more memory. A provider that runs one turn at a time runs one thread at a time.",
+      "Only the owner or an admin changes these rows; a member asks the owner. How many threads of an agent run at the same time; the others wait. An agent's Parallel threads on Default uses the server's Parallel threads per agent, which is 4 until it is changed. Parallel threads per agent applies to each agent with no limit of its own, and Threads at the same time limits all agent threads of the server; more threads use more memory. A provider that runs one turn at a time runs one thread at a time.",
     words: "parallel concurrent concurrency simultaneous simultaneously threads task tasks",
     foundWithoutServerWord: ["parallel", "concurrent", "concurrency", "simultaneous", "simultaneously"],
   },
