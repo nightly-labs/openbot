@@ -20,6 +20,8 @@ export const messages = {
     "Narzędzie nie zostało uruchomione. tool_call nie znalazł narzędzia o tej nazwie. Użyj dokładnej pełnej nazwy z tool_search, na przykład openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "Narzędzie nie zostało uruchomione. tool_call nie znalazł narzędzia o tej nazwie. Pełna nazwa to prawdopodobnie {name}. Jeśli tak, wyślij wywołanie ponownie z tą nazwą.",
+  "error.agent.toolCallNullValue":
+    "Narzędzie nie zostało uruchomione. {name} wymaga obiektu lub listy w {paths}, ale każdy z tych elementów listy dotarł jako null. Wyślij wywołanie ponownie i podaj każdy z tych elementów jako ciąg znaków z jego JSON.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe nie znalazł narzędzia OpenBot o nazwie {names}. Opisuje tylko narzędzia OpenBot i przeglądarki, które podaje openbot.tool_search, a nie narzędzia MCP.",
   "error.agent.toolDescribeDiscoveryNames":

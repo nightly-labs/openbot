@@ -14,6 +14,7 @@ import {
   type ModelInfo,
   type OnElicitation,
   type Options,
+  type PermissionMode,
   type PermissionResult,
   query,
   type SDKUserMessage,
@@ -35,6 +36,14 @@ import { Deferred, Effect, Exit, Fiber, Option, Scope } from "effect";
 import { z } from "zod";
 import { advertisedZodShape } from "./agent/advertised-json-schema";
 import { isTurnContextBlock } from "./agent/developer-instructions";
+import {
+  PLAN_APPROVE,
+  PLAN_MODE_OFF,
+  PLAN_STOP,
+  PLAN_STOPPED,
+  PLAN_UNANSWERED,
+  planApprovalQuestion,
+} from "./agent/plan-approval";
 import {
   type ClaudePlanState,
   foldClaudePlanCall,
@@ -250,8 +259,13 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
       : {}),
     ...(memoryExcludes.length > 0 ? { claudeMdExcludes: memoryExcludes } : {}),
   };
-  return { settings, firstPartyApi };
+  return { settings, firstPartyApi, customApiHost: customClaudeApiHost(environmentValue("ANTHROPIC_BASE_URL")) };
 });
+
+function customClaudeApiHost(baseUrl: string | undefined): string | null {
+  const host = URL.parse(baseUrl?.trim() ?? "")?.hostname;
+  return host && host !== "api.anthropic.com" ? host : null;
+}
 
 function claudeHomeMemoryFiles(): string[] {
   const userFolder = join(homedir(), ".claude");
@@ -391,6 +405,7 @@ interface ActiveTurn {
 interface ThreadRuntime {
   id: string;
   firstPartyApi: boolean;
+  customApiHost: string | null;
   usageCounterId: string;
   usageCost: number;
   resumedUsage: boolean;
@@ -579,6 +594,7 @@ interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
   initializationResult?(): Promise<unknown>;
   mcpServerStatus?(): Promise<unknown>;
   setModel(model?: string): Promise<void>;
+  setPermissionMode(mode: PermissionMode): Promise<void>;
   applyFlagSettings(settings: { effortLevel?: ClaudeEffort | null; fastMode?: boolean }): Promise<void>;
   usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET?(options?: { skipBehaviors?: boolean }): Promise<unknown>;
   close(): void;
@@ -1463,6 +1479,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
                 options.toolUseID ?? randomUUID(),
               );
           }
+          if (toolName === "ExitPlanMode")
+            return yield* this.#requestPlanApprovalEffect(
+              threadId,
+              toolInput,
+              options.toolUseID ?? randomUUID(),
+              options.signal,
+            );
           if (toolName !== "AskUserQuestion") {
             return yield* providerCall(
               () => ({ behavior: "allow", updatedInput: toolInput }) satisfies PermissionResult,
@@ -1539,15 +1562,22 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       ...(launchPath ? { PATH: launchPath } : {}),
       ...this.#environment(this.#onApiKey),
     };
-    const { settings: openBotSettings, firstPartyApi } = config.profileGeneration
+    const {
+      settings: openBotSettings,
+      firstPartyApi,
+      customApiHost,
+    } = config.profileGeneration
       ? {
           settings: {},
           firstPartyApi: CLAUDE_OTHER_API_VARIABLES.every(
             (name) => !(signInSettings.env?.[name] ?? cliEnvironment[name]),
           ),
+          customApiHost: customClaudeApiHost(
+            signInSettings.env?.ANTHROPIC_BASE_URL ?? cliEnvironment.ANTHROPIC_BASE_URL,
+          ),
         }
       : yield* claudeFlagSettings(
-          userSettingsFile,
+          userSetup ? userSettingsFile : { ...userSettingsFile, env: signInSettings.env ?? {} },
           configDirectory,
           config.cwd,
           settingSources,
@@ -1654,6 +1684,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const runtime: ThreadRuntime = {
       id: threadId,
       firstPartyApi,
+      customApiHost,
       usageCounterId: randomUUID(),
       usageCost: 0,
       resumedUsage: resume,
@@ -1920,7 +1951,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const messageId = promptUuid(runtime, clientId);
     takePrompt(runtime, messageId);
     runtime.activeTurn.messageIds.add(messageId);
-    const stopsRunningTools = runtime.activeTurn.toolCalls.size > 0 && runtime.activeTurn.personRequests === 0;
+    const waitsForRunningTools = isRecord(params) && params.waitsForRunningTools === true;
+    const stopsRunningTools =
+      !waitsForRunningTools && runtime.activeTurn.toolCalls.size > 0 && runtime.activeTurn.personRequests === 0;
     if (stopsRunningTools) runtime.activeTurn.untakenSteerIds.add(messageId);
     runtime.input.push({
       type: "user",
@@ -2758,7 +2791,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const signInFailed = !blocked && (turn.authenticationFailed || CLAUDE_NOT_LOGGED_IN.test(String(error)));
       const billing = turn.billingFailed || (turn.balanceSpent && isBalanceDiagnostic(String(error)));
       const apiKey = this.#usesApiKey();
-      const message = claudeTurnError(error, apiKey, !apiKey && runtime.firstPartyApi && this.#onClaudeAccount());
+      const message =
+        runtime.customApiHost && (billing || CLAUDE_PAYMENT_REQUIRED.test(String(error)))
+          ? sourceText("error.provider.claudeCustomEndpointBilling", {
+              host: runtime.customApiHost,
+              detail: String(error),
+            })
+          : claudeTurnError(error, apiKey, !apiKey && runtime.firstPartyApi && this.#onClaudeAccount());
       const crashed = message === String(error) && claudeProcessExited(error) && classifyFailure(message) === "unknown";
       this.emit("notification", {
         method: "error",
@@ -2936,20 +2975,20 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const turn = runtime.activeTurn;
     const hostToolCall = new AbortController();
     turn?.hostToolCalls.add(hostToolCall);
-    const result = yield* this.#awaitHost(
-      threadId,
-      this.#serverRequests.call(
-        "item/tool/call",
-        {
-          threadId,
-          turnId: turn?.id ?? randomUUID(),
-          callId: randomUUID(),
-          namespace,
-          tool: name,
-          arguments: args,
-        },
-        hostToolCall.signal,
-      ),
+    const call = this.#serverRequests.call(
+      "item/tool/call",
+      {
+        threadId,
+        turnId: turn?.id ?? randomUUID(),
+        callId: randomUUID(),
+        namespace,
+        tool: name,
+        arguments: args,
+      },
+      hostToolCall.signal,
+    );
+    const result = yield* (
+      waitsForBrowserPerson(namespace, name, args) ? this.#awaitPerson(threadId, call) : this.#awaitHost(threadId, call)
     ).pipe(
       Effect.ensuring(Effect.sync(() => turn?.hostToolCalls.delete(hostToolCall))),
       toProviderClientOperationError,
@@ -2996,6 +3035,48 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       }),
     );
     return { behavior: "allow", updatedInput: { questions: input.questions, answers } };
+  });
+
+  readonly #requestPlanApprovalEffect = Effect.fn("ClaudeAgentClient.requestPlanApproval")(function* (
+    this: ClaudeAgentClient,
+    threadId: string,
+    input: DynamicRecord,
+    toolUseId: string,
+    signal: AbortSignal,
+  ): Effect.fn.Return<PermissionResult, ProviderClientOperationError> {
+    const runtime = yield* providerSync(() => this.#requireThread(threadId));
+    const question = { ...planApprovalQuestion(input.plan), id: "question-0" };
+    const result = yield* this.#awaitPerson(
+      threadId,
+      this.#serverRequests.call(
+        "item/tool/requestUserInput",
+        {
+          threadId,
+          turnId: runtime.activeTurn?.id ?? randomUUID(),
+          itemId: toolUseId,
+          questions: [question],
+        },
+        signal,
+      ),
+    ).pipe(Effect.orElseSucceed(() => null));
+    const entry = isRecord(result) && isRecord(result.answers) ? result.answers[question.id] : undefined;
+    const chosen = isRecord(entry) && Array.isArray(entry.answers) ? entry.answers.find(isString) : undefined;
+    const answer = chosen?.trim() ?? "";
+    const note = isRecord(result) && isString(result.note) ? result.note : "";
+    if (answer === PLAN_APPROVE) return { behavior: "allow", updatedInput: input };
+    if (answer && answer !== PLAN_STOP)
+      return { behavior: "deny", message: `The user wants changes to the plan: ${answer}` };
+    yield* providerCall(() => runtime.query.setPermissionMode("default")).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() =>
+          queryLogger.warn("Claude stays in plan mode after the plan approval.", { error: error.cause }),
+        ),
+      ),
+    );
+    return {
+      behavior: "deny",
+      message: answer ? PLAN_STOPPED : note ? `${PLAN_MODE_OFF} ${note}` : PLAN_UNANSWERED,
+    };
   });
 
   readonly #requestElicitationEffect = Effect.fn("ClaudeAgentClient.requestElicitation")(function* (
@@ -3074,6 +3155,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 }
 
 type ClaudeSdkLaunch = Pick<Options, "pathToClaudeCodeExecutable" | "spawnClaudeCodeProcess">;
+
+const BROWSER_PERSON_TOOLS: ReadonlySet<string> = new Set(
+  ["request_takeover", "submit_secret"].map((tool) => `mcp__${OPENBOT_BROWSER_NAMESPACE}__${tool}`),
+);
+
+function waitsForBrowserPerson(namespace: string, name: string, args: unknown): boolean {
+  return BROWSER_PERSON_TOOLS.has(claudeBridgedToolName(`mcp__${namespace}__${name}`, args));
+}
 
 const writeClaudeMcpConfig = Effect.fn("ClaudeAgentClient.writeMcpConfig")(function* (
   stateDirectory: string,
@@ -3161,6 +3250,7 @@ const CLAUDE_SANDBOX_BLOCKED =
   /^(?:apply-seccomp: (?:unshare\(|write \/proc\/self\/(?:setgroups|uid_map|gid_map)\b)|bwrap: (?:Failed to make \/ slave|setting up uid map|No permissions to creat(?:e a new|ing new) namespace|Creating new namespace failed|pivot_root\b|loopback: Failed RTM_NEW(?:ADDR|LINK)|Can't mount proc on (?:\/newroot)?\/proc: (?:Operation not permitted|Permission denied|Invalid argument)))/mu;
 
 const CLAUDE_API_CREDIT_EMPTY = /\bcredit balance (?:is )?too low\b/iu;
+const CLAUDE_PAYMENT_REQUIRED = /\bAPI Error: 402\b/u;
 
 const CLAUDE_NOT_LOGGED_IN = /\bnot logged in\b\s*·\s*please run \/login\b/iu;
 

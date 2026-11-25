@@ -115,6 +115,7 @@ const MARKER_ROW_KINDS: ReadonlySet<ChatActionMarkerModel["kind"]> = new Set([
   "skill-lifecycle",
   "instructions-change",
   "plan-continuation",
+  "no-answer",
   "model-switch",
   "channel-change",
   "vault-change",

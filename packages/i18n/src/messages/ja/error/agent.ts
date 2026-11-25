@@ -20,6 +20,8 @@ export const messages = {
     "ツールは実行されませんでした。tool_call はこの名前のツールを見つけられませんでした。tool_search が返す正確な完全修飾名（例: openbot_browser.snapshot）を使ってください。",
   "error.agent.toolCallUnknownToolSuggest":
     "ツールは実行されませんでした。tool_call はこの名前のツールを見つけられませんでした。完全修飾名は {name} の可能性があります。その場合は、その名前でもう一度呼び出してください。",
+  "error.agent.toolCallNullValue":
+    "ツールは実行されませんでした。{name} は {paths} にオブジェクトまたはリストを必要としますが、これらのリスト項目はすべて null として届きました。もう一度呼び出し、それぞれの項目をその JSON を含む文字列として渡してください。",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe は {names} という名前の OpenBot ツールを見つけられませんでした。openbot.tool_search が一覧にする OpenBot とブラウザーのツールだけを説明し、MCP ツールは説明しません。",
   "error.agent.toolDescribeDiscoveryNames":

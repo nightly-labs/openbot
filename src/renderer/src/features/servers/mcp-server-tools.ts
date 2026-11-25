@@ -29,6 +29,8 @@ export interface McpServerSignIn {
   start: (config: McpServerConfig) => Promise<McpTestResult>;
   cancel: (url: string) => Promise<void>;
   signOut: (id: string) => Promise<void>;
+  copyLink?: (() => Promise<void>) | undefined;
+  pasteAddress?: ((address: string) => Promise<void>) | undefined;
   relay?: McpServerRelay | undefined;
   hostTab?: McpServerHostTab | undefined;
   app?: McpPanelSignInApp | undefined;

@@ -20,6 +20,8 @@ export const messages = {
     "도구가 실행되지 않았어요. tool_call이 이 이름의 도구를 찾지 못했어요. tool_search가 알려 주는 정확한 전체 이름(예: openbot_browser.snapshot)을 사용하세요.",
   "error.agent.toolCallUnknownToolSuggest":
     "도구가 실행되지 않았어요. tool_call이 이 이름의 도구를 찾지 못했어요. 전체 이름은 {name}일 수 있어요. 맞다면 그 이름으로 다시 호출하세요.",
+  "error.agent.toolCallNullValue":
+    "도구가 실행되지 않았어요. {name}에는 {paths}에 객체나 목록이 필요하지만 이 목록 항목들이 모두 null로 도착했어요. 다시 호출하고 각 항목을 그 JSON을 담은 문자열로 보내세요.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe가 {names} 이름의 OpenBot 도구를 찾지 못했습니다. openbot.tool_search가 나열하는 OpenBot 및 브라우저 도구만 설명하며 MCP 도구는 설명하지 않습니다.",
   "error.agent.toolDescribeDiscoveryNames":

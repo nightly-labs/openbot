@@ -72,11 +72,10 @@
 }
 
 .backup-models-name {
-  overflow: hidden;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: var(--openbot-leading-sm);
+  overflow-wrap: anywhere;
 }
 
 .backup-models-state {

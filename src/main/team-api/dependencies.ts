@@ -632,6 +632,7 @@ export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "l
 export type TeamApiServerAudit = Pick<ServerAuditStore, "read">;
 
 export interface TeamApiOptions {
+  onMemberUse?: ((memberId: string) => void) | undefined;
   events?: HostEventsApi | undefined;
   channels?: ChannelService | undefined;
   mcpServers?: TeamApiMcpServers | undefined;

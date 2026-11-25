@@ -49,6 +49,7 @@ export const messages = {
     other: "Você pode adicionar no máximo {count} pastas",
   },
   "agentSettings.folders.browse.places": "Ir para",
+  "agentSettings.folders.browse.path": "Caminho da pasta",
   "agentSettings.folders.browse.home": "Pasta pessoal",
   "agentSettings.folders.browse.parent": "Subir para {folder}",
   "agentSettings.folders.browse.failed": "Não foi possível abrir esta pasta.",
@@ -95,6 +96,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Limite de uso atingido · ignorado",
   "agentSettings.backupModels.unavailable": "Indisponível agora · ignorado",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Quando um limite de uso para {name} depois de começar a trabalhar, {name} continua o mesmo trabalho no primeiro modelo disponível da ordem. Volta para {model} quando o limite termina, ou 10 minutos após um erro do provedor.",
   "agentSettings.groups.brain": "Cérebro",

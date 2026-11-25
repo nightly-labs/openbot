@@ -70,6 +70,12 @@ export const messages = {
     "La compattazione non riduce questa chat: dopo due compattazioni usa ancora il {percent}% della finestra di contesto del modello, quindi OpenBot smette di compattarla. Strumenti e istruzioni usano la maggior parte della finestra. Disattiva i server MCP o l'uso del computer che questo agente non usa, oppure scegli un modello con una finestra più grande. Poi avvia una nuova chat.",
   "error.backend.contextCompactionStopped":
     "Due compattazioni di fila di questa chat non sono riuscite, quindi OpenBot smette di compattarla automaticamente. Ogni tentativo invia l'intera chat al modello e consuma il limite del tuo piano. Seleziona «Compatta ora» per riprovare, oppure avvia una nuova chat.",
+  "error.backend.contextCompactionRetrying":
+    "Il provider non è riuscito a compattare questa chat e riprova. I nuovi messaggi di questa chat attendono la fine della compattazione. Se non termina presto, OpenBot la interrompe e invia i tuoi messaggi.",
+  "error.backend.contextCompactionFailed":
+    "La compattazione di questa chat non è riuscita. La chat non è cambiata. I messaggi in attesa vanno ora all’agente.",
+  "error.backend.contextCompactionTimedOut":
+    "La compattazione di questa chat ha richiesto troppo tempo, quindi OpenBot l’ha interrotta. La chat non è cambiata. I messaggi in attesa vanno ora all’agente.",
   "error.backend.providerModelAtCapacity":
     "Il modello è al limite della capacità. Il provider riproverà tra qualche minuto. Per continuare ora, interrompi il turno e scegli un altro modello.",
   "error.backend.providerRetrying":
@@ -117,6 +123,16 @@ export const messages = {
     "Il responsabile del canale non ha risposto in tempo. Scegli un membro o riprova.",
   "error.backend.channelLeadFailed":
     "Il responsabile del canale non è riuscito a instradare questo messaggio. Scegli un membro o riprova.",
+  "error.backend.channelLeadBusy":
+    "Il modello del responsabile è occupato. Riprova tra qualche minuto o scegli un membro.",
+  "error.backend.channelLeadOffline":
+    "Il modello del responsabile ha perso la connessione. Riprova o scegli un membro.",
+  "error.backend.channelLeadSignIn":
+    "L'accesso al provider del responsabile è scaduto. Accedi di nuovo o scegli un membro.",
+  "error.backend.channelLeadModelGone":
+    "Il modello del responsabile non è disponibile. Scegli un altro modello per il responsabile o un membro.",
+  "error.backend.channelLeadRefused":
+    "Il modello del responsabile ha rifiutato questa richiesta. Scegli un membro o un altro modello per il responsabile.",
   "error.backend.channelRequestMemberRequired": "Scegli un membro per questa richiesta.",
   "error.backend.channelDeliveryNotCreated": "La consegna del canale non è stata creata.",
   "error.backend.channelAssignmentStopped": "Questa assegnazione del canale è stata interrotta o sostituita.",
@@ -307,6 +323,8 @@ export const messages = {
     "Il server si è fermato prima di rispondere. Esegui il comando in un terminale per vedere l'errore.",
   "error.backend.mcpServerExitedWithOutput": "Il server si è fermato prima di rispondere. Ha scritto: {detail}",
   "error.backend.mcpServerFailedToStart": "Il server non si è avviato: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot non è riuscito ad avviare il server MCP {name}, perché il suo programma non è installato sul computer che esegue OpenBot. Installa l’app che fornisce {name} su quel computer, oppure disattiva {name} in Marketplace, App.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} ha smesso di attendere prima che il server si avviasse, quindi i suoi agenti non ricevono gli strumenti di questo server.",
   "error.backend.mcpServerStoppedDuringCall": "Il server MCP si è fermato prima di rispondere a questa chiamata.",

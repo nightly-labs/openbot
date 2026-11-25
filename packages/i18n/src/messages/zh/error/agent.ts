@@ -19,6 +19,8 @@ export const messages = {
     "工具未运行。tool_call 找不到此名称的工具。请使用 tool_search 给出的准确完整名称，例如 openbot_browser.snapshot。",
   "error.agent.toolCallUnknownToolSuggest":
     "工具未运行。tool_call 找不到此名称的工具。完整名称可能是 {name}。如果是，请使用该名称再次发送调用。",
+  "error.agent.toolCallNullValue":
+    "工具未运行。{name} 在 {paths} 需要对象或列表，但这些列表项都以 null 到达。请再次发送调用，并将每一项作为包含其 JSON 的字符串传入。",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe 未找到名为 {names} 的 OpenBot 工具。它只描述 openbot.tool_search 列出的 OpenBot 和浏览器工具，不描述 MCP 工具。",
   "error.agent.toolDescribeDiscoveryNames": "请直接调用 {names}。tool_describe 不描述发现工具。",

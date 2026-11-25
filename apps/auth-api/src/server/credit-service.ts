@@ -5,6 +5,8 @@ import {
   CREDIT_METADATA_KIND,
   type CreditActivity,
   type CreditCheckoutRequest,
+  type CreditRedeemRequest,
+  type CreditRedeemResult,
   type CreditServerRole,
   type CreditServerWallet,
   type CreditsState,
@@ -31,6 +33,7 @@ import { paymentReversal } from "./billing-sales";
 import { checkoutTax } from "./billing-tax";
 import { creditActivity } from "./credit-activity";
 import { CreditAudit, creditAuditCode } from "./credit-audit";
+import { type CreditCodeAttempt, redeemCreditCode } from "./credit-codes";
 import {
   CreditGrants,
   consumeGrantsSql,
@@ -433,6 +436,50 @@ export class CreditService {
       direction: request.direction,
     });
     return yield* this.getState(userId);
+  }).bind(this);
+
+  redeem(userId: string, request: CreditRedeemRequest, sourceIp: string): Effect.Effect<CreditRedeemResult, Failure> {
+    return this.#redeem(userId, request, sourceIp).pipe(
+      Effect.tapError((error) =>
+        this.#audit.failed({
+          event: "redeem",
+          code: creditAuditCode(error),
+          wallet: { userId: request.serverId === undefined ? userId : null, serverId: request.serverId ?? null },
+          actorUserId: userId,
+        }),
+      ),
+    );
+  }
+
+  readonly #redeem = Effect.fn("CreditService.redeem")(function* (
+    this: CreditService,
+    userId: string,
+    request: CreditRedeemRequest,
+    sourceIp: string,
+  ): Effect.fn.Return<CreditRedeemResult, Failure> {
+    const report = (attempt: CreditCodeAttempt) => {
+      const wallet = attempt.serverId === null ? "personal" : "server";
+      this.#analytics.track(userId, {
+        name: "credit_code_redeem",
+        outcome: attempt.outcome,
+        wallet,
+        ...(attempt.limit === undefined ? {} : { limit: attempt.limit }),
+        ...(attempt.campaign === undefined ? {} : { campaign: attempt.campaign }),
+        ...(attempt.multiUse === undefined ? {} : { multiUse: attempt.multiUse }),
+        ...(attempt.credits === undefined ? {} : { credits: attempt.credits }),
+      });
+      if (attempt.outcome !== "redeemed" || attempt.credits === undefined) return;
+      this.#analytics.track(userId, {
+        name: "credit_action",
+        action: "redeemed",
+        wallet,
+        credits: attempt.credits,
+        ...(attempt.campaign === undefined ? {} : { campaign: attempt.campaign }),
+        ...(attempt.multiUse === undefined ? {} : { multiUse: attempt.multiUse }),
+      });
+    };
+    const redeemed = yield* redeemCreditCode(this.#database, this.#now(), { userId, sourceIp, request, report });
+    return { credits: redeemed.credits, state: yield* this.getState(userId) };
   }).bind(this);
 
   readonly webhook = Effect.fn("CreditService.webhook")(function* (

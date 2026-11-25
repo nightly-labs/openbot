@@ -47,6 +47,7 @@ export function SpreadsheetFilePreview({ uri, title, insets }: DocumentPreviewPr
         field: String(field),
       }}
       failedText={t("mobile.chat.preview.spreadsheetFailed")}
+      tooLargeText={t("mobile.chat.preview.spreadsheetTooLarge")}
       truncatedText={t("mobile.chat.preview.spreadsheetTruncated", {
         rows: format.number(SPREADSHEET_MAX_ROWS),
         columns: format.number(SPREADSHEET_MAX_COLUMNS),

@@ -246,7 +246,7 @@ export function ServerConnectionSection({
 }) {
   const { t } = useText();
   const serverId = server.id;
-  const { refreshServer, hostedServerStarting, canRestartServerItself, restartServerItself } = useMobileWorkspace();
+  const { reconnectServer, hostedServerStarting, canRestartServerItself, restartServerItself } = useMobileWorkspace();
   const { session } = useMobileSession();
   const action = useLockedAction();
   const { busy, error } = action;
@@ -264,7 +264,7 @@ export function ServerConnectionSection({
         leading={<RowIcon icon={RefreshCcw} tone="accent" />}
         disclosure={false}
         disabled={busy}
-        onPress={() => void perform(() => refreshServer(serverId))}
+        onPress={() => void perform(() => reconnectServer(serverId))}
       >
         <Typography.Paragraph className="text-accent">
           {busy && !restarting ? t("mobile.server.settings.refreshing") : t("mobile.server.settings.refresh")}

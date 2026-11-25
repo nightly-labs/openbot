@@ -5,7 +5,14 @@ import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
 import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
 import type { BillingDetails, BillingDetailsRequest } from "./billing-details";
-import type { CreditActivity, CreditCheckoutRequest, CreditsState, CreditTransferRequest } from "./credits";
+import type {
+  CreditActivity,
+  CreditCheckoutRequest,
+  CreditRedeemRequest,
+  CreditRedeemResult,
+  CreditsState,
+  CreditTransferRequest,
+} from "./credits";
 import type { CustomServerCheckoutRequest, CustomServerCheckoutResult } from "./custom-server-plans";
 import type {
   CreateHostedServerInput,
@@ -1418,6 +1425,7 @@ export const IPC_ENDPOINTS = {
     getActivity: request<undefined, CreditActivity>()("credits:get-activity"),
     openCheckout: request<CreditCheckoutRequest, void>()("credits:open-checkout"),
     transfer: request<CreditTransferRequest, CreditsState>()("credits:transfer"),
+    redeem: request<CreditRedeemRequest, CreditRedeemResult>()("credits:redeem"),
   },
   license: {
     getState: request<undefined, LicenseState>()("license:get-state"),

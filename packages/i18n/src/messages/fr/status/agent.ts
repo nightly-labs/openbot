@@ -128,6 +128,8 @@ export const messages = {
   "status.agent.planContinues": "Le plan a des étapes en cours. L’agent continue ({current} sur {limit}).",
   "status.agent.planStopped":
     "L’agent s’est arrêté avec des étapes en cours dans son plan. Envoyez un message pour continuer.",
+  "status.agent.continuationLimitReached":
+    "L’agent s’est arrêté avant la fin de la demande. Il ne peut plus continuer seul. Envoyez un message pour continuer.",
   "status.agent.compactionContinues":
     "La connexion s’est interrompue pendant que l’agent compactait son contexte. L’agent continue.",
   "status.agent.providerExitContinues": "L’agent s’est arrêté avant de finir sa réponse. L’agent continue.",

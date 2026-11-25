@@ -520,13 +520,13 @@ export class McpOAuth implements McpOAuthAuthority {
   needsSignIn(url: string): boolean {
     const key = mcpOAuthAccountKey(url);
     const record = key === null ? undefined : this.#options.storage.read(key);
-    return record?.lostAt !== undefined && !record.tokens;
+    return (record?.lostAt !== undefined || record?.app !== undefined) && !record.tokens;
   }
 
   hasSignIn(url: string): boolean {
     const key = mcpOAuthAccountKey(url);
     const record = key === null ? undefined : this.#options.storage.read(key);
-    return record?.tokens !== undefined || record?.lostAt !== undefined;
+    return record?.tokens !== undefined || record?.lostAt !== undefined || record?.app !== undefined;
   }
 
   readonly signInOffer = Effect.fn("McpOAuth.signInOffer")(function* (this: McpOAuth, url: string) {

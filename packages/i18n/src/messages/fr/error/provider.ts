@@ -262,6 +262,8 @@ export const messages = {
     "Votre clé d’API OpenCode a expiré. Créez une nouvelle clé dans OpenCode Console, collez-la dans les réglages d’OpenCode, puis réessayez.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go a refusé votre clé d’API enregistrée. La clé a peut-être expiré. Créez une nouvelle clé dans OpenCode Console, collez-la dans les réglages d’OpenCode, puis réessayez.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode n’a pas utilisé la clé que vous avez enregistrée dans OpenBot. Il a utilisé une autre clé OpenCode Go qu’OpenCode conserve lui-même, et OpenCode Go a refusé cette clé. Pour supprimer cette clé, exécutez `opencode auth logout opencode-go` dans un terminal sur l’ordinateur qui exécute l’agent, puis choisissez la clé. Réessayez ensuite.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go a refusé la requête. Une nouvelle clé d'API ne corrige pas ce problème. Votre forfait OpenCode Go n'est peut-être pas actif, ou OpenCode Go bloque peut-être votre réseau : certains services bloquent les VPN, les proxys ou certains pays. Vérifiez que votre forfait est actif dans OpenCode Console ou désactivez le VPN, puis réessayez. Vous pouvez aussi choisir un autre modèle.",
   "error.provider.opencodeServiceFailure":
@@ -390,6 +392,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Connectez-vous avec Cursor ou définissez CURSOR_API_KEY pour utiliser Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor n’a pas pu se connecter à son serveur avec votre connexion. Vérifiez votre connexion Internet, puis reconnectez-vous à Cursor.",
+  "error.provider.cursorNoModels":
+    "Cursor n’a pas envoyé sa liste de modèles. Choisissez « Connecter » pour vous reconnecter à Cursor. Si ce message reste, vérifiez que votre forfait Cursor inclut des modèles.",
   "error.provider.clineArchivePath": "L’archive Cline contient un chemin inattendu.",
   "error.provider.clinePackageMismatch":
     "Le paquet Cline ne correspond pas au catalogue des environnements d’exécution.",
@@ -436,6 +440,8 @@ export const messages = {
     "La clé API Anthropic n'a pas de crédit API. Un forfait Claude ne paie pas les requêtes faites avec une clé API. Ajoutez du crédit dans l'Anthropic Console, ou connectez-vous à Claude dans les réglages et sélectionnez le compte Claude dans le menu des modèles de l'agent.",
   "error.provider.claudeAccountNoCredit":
     "Le solde de crédits de votre compte Claude est trop bas. Certaines requêtes, comme le mode rapide, utilisent des crédits d’utilisation même si votre forfait Claude n’est pas épuisé. Ajoutez des crédits dans votre compte Claude, ou choisissez un autre modèle dans le menu des modèles de l’agent.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code envoie les requêtes à {host}, pas à Anthropic : les réglages de Claude Code ou les variables d’environnement définissent cette adresse d’API. {host} a refusé la requête à cause du solde du compte, pas à cause de votre forfait Claude. Ajoutez des fonds à votre compte {host}, ou choisissez un autre modèle dans le menu des modèles de l’agent.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Le service de Claude a bloqué cette requête. C'est en général un problème passager chez Claude, pas un problème avec votre compte. Renvoyez le message dans quelques minutes.",
   "error.provider.foreignReasoning":

@@ -335,6 +335,17 @@ export function isPlanContinuationMarker(message: ConversationMessage): boolean 
   );
 }
 
+export const NO_ANSWER_NOTICE_ITEM_TYPE = "no-answer-notice";
+
+export function isNoAnswerNotice(message: ConversationMessage): boolean {
+  return (
+    message.author === "system" &&
+    message.source === "system" &&
+    message.status === "completed" &&
+    message.itemType === NO_ANSWER_NOTICE_ITEM_TYPE
+  );
+}
+
 export const SIGN_IN_FAILURE_ITEM_TYPE_PREFIX = "sign-in-failure:";
 
 export function signInFailureProvider(message: ConversationMessage): AgentProviderId | null {

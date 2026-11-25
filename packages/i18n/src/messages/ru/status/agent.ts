@@ -127,6 +127,8 @@ export const messages = {
   "status.agent.planContinues": "В плане есть незавершённые шаги. Агент продолжает ({current} из {limit}).",
   "status.agent.planStopped":
     "Агент остановился, в плане остались незавершённые шаги. Отправьте сообщение, чтобы продолжить.",
+  "status.agent.continuationLimitReached":
+    "Агент остановился, не завершив запрос. Он больше не может продолжить сам. Отправьте сообщение, чтобы продолжить.",
   "status.agent.compactionContinues": "Соединение прервалось, пока агент сжимал контекст. Агент продолжает.",
   "status.agent.providerExitContinues": "Агент остановился, не закончив ответ. Агент продолжает.",
   "status.agent.branchTitle": "Ответвлённый чат",

@@ -8,7 +8,7 @@ import type { DynamicToolNamespace } from "../local-mcp-bridge";
 import { OPENBOT_DYNAMIC_TOOLS, OPENBOT_TOOL_DEFINITIONS } from "../openbot-tools";
 import { type DynamicToolCallParams, isRecord, qualifiedToolName } from "../protocol";
 import { advertisedJsonSchema } from "./advertised-json-schema";
-import { withSchemaTypes } from "./schema-typed-arguments";
+import { nullStructuredItemPaths, withSchemaTypes } from "./schema-typed-arguments";
 import { toolGuidance } from "./tool-guidance";
 
 export const BUILTIN_TOOL_CATALOG = [OPENBOT_DYNAMIC_TOOLS, ...BROWSER_DYNAMIC_TOOLS].flatMap((namespace) =>
@@ -477,6 +477,14 @@ export function resolveDeferredTool(
   if (!entry) return null;
   const args = withSchemaTypes(parsed.data.arguments, entry.inputSchema);
   return { ...params, namespace: entry.namespace, tool: entry.tool, arguments: args };
+}
+
+export function deferredNullValueError(resolved: DynamicToolCallParams, provider: AgentProviderId): string | null {
+  const name = `${resolved.namespace}.${resolved.tool}`;
+  const entry = catalogEntry(catalogFor(provider), name);
+  if (!entry || !isRecord(resolved.arguments)) return null;
+  const paths = nullStructuredItemPaths(resolved.arguments, entry.inputSchema);
+  return paths.length === 0 ? null : sourceText("error.agent.toolCallNullValue", { name, paths: paths.join(", ") });
 }
 
 export function deferredCall(

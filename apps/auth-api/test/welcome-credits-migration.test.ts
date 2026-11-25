@@ -23,7 +23,7 @@ const snapshot = (database: DatabaseSync) => ({
 });
 
 function seeded(): DatabaseSync {
-  const database = migratedDatabase("0071_membership_hidden_at.sql");
+  const database = migratedDatabase("0073_account_active_days.sql");
   databases.push(database);
   database.exec(`
     INSERT INTO users(id, identity_key, email, name, avatar_url, created_at, updated_at)
@@ -59,7 +59,7 @@ describe("welcome credits migration", () => {
     const before = snapshot(database);
 
     database.exec("BEGIN");
-    database.exec(migration("0073_welcome_credits.sql"));
+    database.exec(migration("0074_welcome_credits.sql"));
     database.exec("COMMIT");
 
     expect(snapshot(database)).toEqual(before);
@@ -112,7 +112,7 @@ describe("welcome credits migration", () => {
     const database = seeded();
     database.exec("ALTER TABLE credit_holds ADD COLUMN funding INTEGER");
     database.exec("BEGIN");
-    expect(() => database.exec(migration("0073_welcome_credits.sql"))).toThrow();
+    expect(() => database.exec(migration("0074_welcome_credits.sql"))).toThrow();
     database.exec("ROLLBACK");
     expect(database.prepare("SELECT name FROM pragma_table_info('credit_grants') WHERE name = 'scope'").all()).toEqual(
       [],

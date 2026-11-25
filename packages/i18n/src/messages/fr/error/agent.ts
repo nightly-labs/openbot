@@ -20,6 +20,8 @@ export const messages = {
     "L’outil ne s’est pas exécuté. tool_call n’a trouvé aucun outil avec ce nom. Utilisez le nom qualifié exact que donne tool_search, par exemple openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "L’outil ne s’est pas exécuté. tool_call n’a trouvé aucun outil avec ce nom. Le nom qualifié est peut-être {name}. Si c’est le cas, renvoyez l’appel avec ce nom.",
+  "error.agent.toolCallNullValue":
+    "L’outil ne s’est pas exécuté. {name} attend un objet ou une liste à {paths}, mais chacun de ces éléments de liste est arrivé comme null. Renvoyez l’appel et donnez chacun de ces éléments sous forme de chaîne qui contient son JSON.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe n’a trouvé aucun outil OpenBot nommé {names}. Il décrit uniquement les outils OpenBot et du navigateur que liste openbot.tool_search, pas les outils MCP.",
   "error.agent.toolDescribeDiscoveryNames":

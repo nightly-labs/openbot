@@ -10,6 +10,7 @@ import { Button, Spinner, Typography } from "heroui-native";
 import CircleX from "lucide-react-native/icons/circle-x";
 import CornerUpRight from "lucide-react-native/icons/corner-up-right";
 import GitFork from "lucide-react-native/icons/git-fork";
+import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import {
   type ComponentProps,
   createContext,
@@ -778,6 +779,8 @@ const MessageRow = memo(function MessageRow({
       <RoutineRunGroupRow key={message.id} group={message} />
     ) : message.kind === "context-reset" ? (
       <ContextResetMarkerRow key={message.id} muted={muted} />
+    ) : message.kind === "no-answer" ? (
+      <NoAnswerNotice key={message.id} text={message.text} />
     ) : message.kind === "app-suggestion" ? (
       <ChatAppSuggestion key={message.id} serverId={serverId} messageId={message.id} appId={message.appId} />
     ) : message.kind === "mcp-sign-in" ? (
@@ -1314,6 +1317,20 @@ function TurnFailure({ reason }: { reason: string | undefined }) {
       <CircleX size={14} color={String(danger)} strokeWidth={2} style={{ marginTop: 2 }} />
       <Typography.Paragraph type="body-xs" numberOfLines={6} className="shrink text-danger-text">
         {text}
+      </Typography.Paragraph>
+    </View>
+  );
+}
+
+function NoAnswerNotice({ text }: { text: string }) {
+  const { sourceText } = useText();
+  const [warning] = useCSSVariable(["--openbot-warning-text"]);
+  const notice = sourceText(text);
+  return (
+    <View accessible accessibilityLabel={notice} className="flex-row items-start gap-1.5 self-start px-1">
+      <TriangleAlert size={14} color={String(warning)} strokeWidth={2} style={{ marginTop: 2 }} />
+      <Typography.Paragraph type="body-xs" numberOfLines={6} className="shrink text-warning-text">
+        {notice}
       </Typography.Paragraph>
     </View>
   );

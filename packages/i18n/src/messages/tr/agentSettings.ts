@@ -50,6 +50,7 @@ export const messages = {
     other: "En fazla {count} klasör ekleyebilirsiniz",
   },
   "agentSettings.folders.browse.places": "Git",
+  "agentSettings.folders.browse.path": "Klasör yolu",
   "agentSettings.folders.browse.home": "Ana klasör",
   "agentSettings.folders.browse.parent": "Yukarı: {folder}",
   "agentSettings.folders.browse.failed": "Bu klasör açılamadı.",
@@ -96,6 +97,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Kullanım sınırına ulaşıldı · atlandı",
   "agentSettings.backupModels.unavailable": "Şu an uygun değil · atlandı",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Bir kullanım sınırı {name} işe başladıktan sonra onu durdurursa, {name} aynı işe sıradaki ilk kullanılabilir modelle devam eder. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
   "agentSettings.groups.brain": "Beyin",

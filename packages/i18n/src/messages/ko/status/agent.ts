@@ -132,6 +132,8 @@ export const messages = {
   "status.agent.nextStepContinues": "에이전트가 다음 단계 전에 멈췄어요. 계속해요 ({current}/{limit}).",
   "status.agent.planContinues": "계획에 남은 단계가 있어요. 에이전트가 계속해요 ({current}/{limit}).",
   "status.agent.planStopped": "계획에 남은 단계가 있는데 에이전트가 멈췄어요. 계속하려면 메시지를 보내세요.",
+  "status.agent.continuationLimitReached":
+    "요청이 끝나기 전에 에이전트가 멈췄어요. 에이전트가 더 이상 스스로 계속할 수 없어요. 계속하려면 메시지를 보내세요.",
   "status.agent.compactionContinues": "에이전트가 컨텍스트를 압축하는 동안 연결이 끊겼어요. 에이전트가 계속해요.",
   "status.agent.providerExitContinues": "에이전트가 답변을 끝내기 전에 멈췄어요. 에이전트가 계속해요.",
   "status.agent.branchTitle": "분기된 채팅",

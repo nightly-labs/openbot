@@ -852,6 +852,7 @@ export class TeamApiServer {
   #recordClientUse(sessionId: string | null, memberId: string): void {
     const now = Date.now();
     this.#lastClientUseAt = now;
+    this.#options.onMemberUse?.(memberId);
     if (!sessionId) return;
     this.#sessionUse.set(sessionId, { memberId, at: now });
     pruneSessions(this.#sessionUse, now);

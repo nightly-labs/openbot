@@ -88,7 +88,7 @@ export function ConversationView(props: ConversationProps) {
       <main
         ref={(element) => {
           setConversationPanelElement(element);
-          element.addEventListener("drop", () => setDropActive(false), { capture: true });
+          element.addEventListener("drop", () => setTimeout(() => setDropActive(false)), { capture: true });
         }}
         aria-label={t("conversation.view.label")}
         onKeyDown={handleChatSearchShortcut}

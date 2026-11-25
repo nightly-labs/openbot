@@ -130,6 +130,8 @@ export const messages = {
   "status.agent.planContinues": "Der Plan hat offene Schritte. Der Agent macht weiter ({current} von {limit}).",
   "status.agent.planStopped":
     "Der Agent hat mit offenen Schritten im Plan aufgehört. Sende eine Nachricht, damit er weitermacht.",
+  "status.agent.continuationLimitReached":
+    "Der Agent hat aufgehört, bevor die Anfrage fertig war. Er kann nicht noch einmal selbst weitermachen. Sende eine Nachricht, damit er weitermacht.",
   "status.agent.compactionContinues":
     "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Der Agent macht weiter.",
   "status.agent.providerExitContinues":
