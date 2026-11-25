@@ -39,6 +39,7 @@ const POLL_MS = 20;
 const POLLS_WHILE_HELD = 15;
 const DEADLINE_MS = 20_000;
 const HOLD_MS = 24 * 60 * 60_000;
+const HOSTED_MAXIMUM_WAIT_MS = 300;
 
 type CardState = NonNullable<ConversationMessage["questionPrompt"]>["resolution"] | "pending";
 
@@ -56,6 +57,11 @@ interface Report {
     waitingFor?: string[];
     installsBeforeLimit?: number;
     installsAfterLimit?: number;
+    cardAtInstall?: CardState;
+  };
+  hosted?: {
+    waitingFor?: string[];
+    installsAfterMaximumWait?: number;
     cardAtInstall?: CardState;
   };
   error?: string;
@@ -189,7 +195,7 @@ function card(turnId: string): CardState {
   return message?.questionPrompt?.resolution ?? "pending";
 }
 
-function desktopUpdate() {
+function desktopUpdate(maximumWaitMs?: number) {
   const updater = new StagedReleaseUpdater();
   let readinessChecks = 0;
   const preference: UpdatePreference = { autoDownload: true, allowRemoteUpdates: true, autoInstall: true };
@@ -214,6 +220,8 @@ function desktopUpdate() {
     graceMs: 0,
     automaticSpreadMs: 0,
     random: () => 0,
+    maximumIdleWait:
+      maximumWaitMs === undefined ? undefined : { afterMs: maximumWaitMs, providerOperationPending: () => false },
   });
   return { updater, requested, readinessChecks: () => readinessChecks };
 }
@@ -377,6 +385,21 @@ try {
   report.unanswered.cardAtInstall = card(turn);
   assert.equal(report.unanswered.cardAtInstall, "pending", "The card closed before the restart.");
   await Effect.runPromise(unanswered.requested.dispose());
+
+  report.hosted = {};
+  clockOffsetMs = 0;
+  turn = "turn-3";
+  await askUntilTheCardDetaches();
+  const hosted = desktopUpdate(HOSTED_MAXIMUM_WAIT_MS);
+  await until("the hosted update that waits for the third card", () =>
+    Boolean(hosted.updater.status.scheduledRestart?.waitingFor.includes("open-question")),
+  );
+  report.hosted.waitingFor = hosted.updater.status.scheduledRestart?.waitingFor;
+  await until("the hosted install after the maximum wait", () => hosted.updater.installs === 1);
+  report.hosted.installsAfterMaximumWait = hosted.updater.installs;
+  report.hosted.cardAtInstall = card(turn);
+  assert.equal(report.hosted.cardAtInstall, "pending", "The hosted install did not ignore the open card.");
+  await Effect.runPromise(hosted.requested.dispose());
   registry.clearPrompts();
   report.passed = true;
 } catch (error) {
