@@ -1988,11 +1988,6 @@ svg[data-icon="arrow-right"]:dir(rtl) {
   animation: none;
 }
 
-.landing-pricing[data-glass="on"] .landing-pricing-actions {
-  position: relative;
-  z-index: 1;
-}
-
 .landing-pricing-amount {
   position: relative;
   isolation: isolate;
@@ -2111,6 +2106,8 @@ svg[data-icon="arrow-right"]:dir(rtl) {
 }
 
 .landing-pricing-actions {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
