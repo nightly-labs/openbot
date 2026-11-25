@@ -309,14 +309,24 @@ async function main(): Promise<void> {
     }
 
     {
-      const { contents } = await open();
+      const { tabId, contents } = await open();
+      await runCauseEffect(host.activate(tabId));
+      await runCauseEffect(host.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
+      contents.focus();
       const box = nextBox();
-      await contents.executeJavaScript("document.getElementById('alert').focus()");
-      contents.sendInputEvent({ type: "keyDown", keyCode: "Space" });
+      await contents.executeJavaScript(
+        "new Promise((resolve) => { window.spaceDown = false; addEventListener('keydown', (event) => { if (event.key === ' ') window.spaceDown = true; }, { capture: true }); const ready = () => { document.getElementById('alert').focus(); if (document.hasFocus() && document.activeElement?.id === 'alert') resolve(); else setTimeout(ready, 10); }; ready(); })",
+      );
+      await waitUntil(async () => {
+        if (await contents.executeJavaScript("window.spaceDown")) return true;
+        contents.sendInputEvent({ type: "keyDown", keyCode: "Space" });
+        return false;
+      });
       contents.sendInputEvent({ type: "keyUp", keyCode: "Space" });
       assert.equal((await box).aborted, false, "A person's alert in an agent tab got OK with no person.");
       (await box).answer(0);
       await waitUntil(async () => (await title(contents)) === "alert:done");
+      await runCauseEffect(host.setVisible({ visible: false }));
       recordCases("person-input-alert-in-agent-tab-stays-native");
     }
 
