@@ -1,10 +1,10 @@
 {
-  "version": "1.4.11",
+  "version": "1.4.13",
   "highlights": [
-    "Added new integrations and expanded app connectivity.",
-    "Improved chat with context tracking, subagent progress, and memory updates.",
-    "Redesigned workflow editor with interactive Flow view.",
-    "Added more customization options for chat appearance and behavior.",
-    "Improved file handling, connection reliability, and overall app stability."
+    "Choose how agents access your location: once, always, or never.",
+    "Background refresh keeps agents and chats up to date when you open the app.",
+    "Workflows now support image, video, and asset steps, with pause and resume controls.",
+    "Transfer ownership of your server to another OpenBot account.",
+    "Introducing Neon Coast, a sunset backdrop featuring a police chase and fireworks."
   ]
 }

@@ -5,6 +5,7 @@ import type {
   DynamicIslandPresentation,
 } from "@openbot/contracts/ipc";
 import { DEFAULT_DYNAMIC_ISLAND_PREFERENCE, IDLE_DYNAMIC_ISLAND_PRESENTATION } from "@openbot/contracts/ipc";
+import { presentationPriority } from "@openbot/team-client/dynamic-island-presentation";
 import type { DynamicIslandNotchSize, DynamicIslandStateChangeReason, DynamicIslandViewState } from "@openbot/ui";
 import { OpenBotDynamicIsland } from "@openbot/ui/features/dynamic-island/OpenBotDynamicIsland";
 import { useText } from "@openbot/ui/text";
@@ -16,21 +17,13 @@ import { dynamicIslandPort } from "./dynamic-island-port";
 
 const DEFAULT_NOTCH_WIDTH = 192;
 const DEFAULT_NOTCH_HEIGHT = 32;
-/**
- * Linux gives no pointer moves to a window that lets the pointer through. There the window shape is
- * the island and its hover band: the pointer goes to the apps outside them, and nothing outside shows.
- */
 const SHAPED_WINDOW = currentDevicePlatform() === "linux";
-/** The parts of the island that take the pointer while it is not in use. */
 const SHAPE_PARTS = ".dynamic-island-shell, .dynamic-island-hover-zone";
-/** The shell content at the size where a resize of the shell stops, centered on the shell. */
 const SHAPE_TARGET = ".dynamic-island-shell .dynamic-island-size-target";
-/** Room around a motion: the hover spring goes a little past its end. */
 const MOTION_ROOM = 2;
 
 type ShapeBox = { x: number; y: number; width: number; height: number };
 
-/** The smallest box that holds all of `boxes`. */
 function boxAround(boxes: readonly ShapeBox[]): ShapeBox {
   const left = Math.min(...boxes.map((box) => box.x));
   const top = Math.min(...boxes.map((box) => box.y));
@@ -44,8 +37,6 @@ export function DynamicIslandSurface() {
   const query = new URLSearchParams(window.location.search);
   const displayMode = query.get("display") === "island" ? "island" : "notch";
   const variant = readAppVariant(query.get("variant"));
-  // The main process names a notch only on a MacBook that has one. Without it, the island draws its
-  // own gap, which follows the width setting.
   const queryNotchWidth = query.get("notch-width");
   const initialNotchSize: DynamicIslandNotchSize | undefined =
     queryNotchWidth === null
@@ -60,32 +51,20 @@ export function DynamicIslandSurface() {
     ...DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   });
   const [viewState, setViewState] = createSignal<DynamicIslandViewState>("compact");
-  // A failed action keeps the panel open with this message, so an Approve that did not reach the
-  // agent does not look like it worked.
   const [actionError, setActionError] = createSignal<UserErrorDetails>();
-  // Each action and each clear starts a new generation, so a late failure does not show on another panel.
   let actionGeneration = 0;
   let pointerInside = false;
   let focusInside = false;
-  // A reply field was pressed. The panel is not focusable by default, so main makes it key only until
-  // the focus leaves the island. A focus change inside the island keeps it key: when the panel stops
-  // being key, its blur collapses the island before a click on an option lands.
   let keyboardInside = false;
   let queuedPresentation: DynamicIslandPresentation | undefined;
   let anchor: HTMLFieldSetElement | undefined;
   let sentShape: string | undefined;
-  // While a part moves: the box of all the places of the motion that the shape covered.
   let motionBox: ShapeBox | undefined;
   const followedMotions = new WeakSet<Animation>();
-  // The surface is gone: the end of a motion that it followed sends nothing.
   let shapeStopped = false;
-  // The island motion writes each new size and state to the DOM, and each write gives the window its
-  // new shape. A ResizeObserver is not used: the motion resizes the shell in its own observer callback,
-  // and the browser then reports an observer loop error. No timer runs.
   const shapeObserver = SHAPED_WINDOW ? new MutationObserver(() => followShape()) : undefined;
   const visible = () => presentation().mode !== "idle" || preference().idleVisible;
 
-  /** Linux: tells main the parts of the window that take the pointer. Only a change is sent. */
   function sendShape(parts: readonly ShapeBox[]): void {
     const shape = windowShape(parts);
     const key = JSON.stringify(shape);
@@ -96,11 +75,6 @@ export function DynamicIslandSurface() {
       .catch(() => undefined);
   }
 
-  /**
-   * Sends the shape. While a part moves, one shape covers the place where the motion starts and the
-   * place where it stops, and the shape at rest follows when the motion ends. A new X11 shape at each
-   * frame can stop the main process (#11666).
-   */
   function followShape(): void {
     if (!shapeObserver || shapeStopped) return;
     const parts = visible() && anchor?.isConnected ? [...anchor.querySelectorAll(SHAPE_PARTS)] : [];
@@ -112,7 +86,6 @@ export function DynamicIslandSurface() {
       for (const motion of motions) {
         if (followedMotions.has(motion)) continue;
         followedMotions.add(motion);
-        // A motion that a new one replaces is cancelled, and its promise rejects.
         motion.finished.then(followShape, followShape);
       }
     }
@@ -121,7 +94,6 @@ export function DynamicIslandSurface() {
       sendShape(still);
       return;
     }
-    // The shell already has the size where its motion stops: `.dynamic-island-size-target` has it.
     const target = anchor?.querySelector(SHAPE_TARGET)?.getBoundingClientRect();
     motionBox = boxAround([...(motionBox ? [motionBox] : []), ...moving, ...(target ? [target] : [])]);
     sendShape([
@@ -156,6 +128,7 @@ export function DynamicIslandSurface() {
       queuedPresentation = next;
       return;
     }
+    queuedPresentation = undefined;
     commitPresentation(next);
   }
 
@@ -177,7 +150,6 @@ export function DynamicIslandSurface() {
   }
 
   function changeViewState(next: DynamicIslandViewState, reason: DynamicIslandStateChangeReason): void {
-    // The pointer can leave while the user types a reply. Escape, Close and a click outside still collapse.
     if (reason === "hover-exit" && keyboardInside && isTextField(document.activeElement)) return;
     if (reason === "pointer" || reason === "keyboard" || reason === "escape") performHaptic();
     setViewState(next);
@@ -247,7 +219,6 @@ export function DynamicIslandSurface() {
     endFocusInteraction();
   }
 
-  /** A press on a reply field asks main for key input, then puts the caret in the field. */
   async function requestKeyboard(event: PointerEvent): Promise<void> {
     const field = event.target;
     if (!isTextField(field)) return;
@@ -263,7 +234,6 @@ export function DynamicIslandSurface() {
     return ++actionGeneration;
   }
 
-  /** Resolves `false` when the action failed. */
   async function perform(action: DynamicIslandAction): Promise<boolean> {
     performHaptic();
     const generation = clearActionError();
@@ -381,9 +351,13 @@ function interactionLocksPresentation(
   interacting: boolean,
   typing: boolean,
 ): boolean {
-  // While the user types a reply, a new card must not take the draft to another agent.
   if (!interacting || !(typing || isCriticalPresentation(current))) return false;
+  if (isCriticalPresentation(current) && heldRequestEnded(current, next)) return false;
   return presentationIdentity(current) !== presentationIdentity(next);
+}
+
+function heldRequestEnded(current: DynamicIslandPresentation, next: DynamicIslandPresentation): boolean {
+  return presentationPriority(next.mode) > presentationPriority(current.mode);
 }
 
 function isCriticalPresentation(presentation: DynamicIslandPresentation): boolean {

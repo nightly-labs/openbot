@@ -26,22 +26,17 @@ import { AttachmentThumbnail, showsAsImage, useAttachmentFile } from "../compone
 import { useQueuedChat } from "../context/queued-messages-context";
 import { queuedMessageLocks, queuedMessagePreview } from "../model/queued-message-view";
 
-/** The route name of a thread in the app stack, `app/(app)/task/[taskId].tsx`. */
 const TASK_ROUTE = "task/[taskId]";
 
 export function QueuedMessageActionsScreen() {
   const { t, format } = useText();
   const { chat, deliveryId } = useLocalSearchParams<{ chat: string; deliveryId: string }>();
   const { queue } = useQueuedChat(chat);
-  // The stack inside the queued messages sheet. Its parent is the app stack, where the thread opens.
   const sheetStack = useNavigation().getParent();
   const foreground = useThemeColor("foreground");
   const danger = String(useCSSVariable("--openbot-danger-text"));
   const held = queue?.edit?.delivery ?? null;
-  // A teammate's answer is not the user's message: steer is its only action.
   const reply = queue?.replies.find((item) => item.id === deliveryId);
-  // The host takes the message out of the queue before it answers the move. The screen keeps it until
-  // the new thread opens.
   const [moving, setMoving] = useState<QueueDelivery | null>(null);
   const delivery =
     (held?.id === deliveryId ? held : (queue?.queued.find((item) => item.id === deliveryId) ?? reply)) ?? moving;
@@ -70,8 +65,6 @@ export function QueuedMessageActionsScreen() {
     });
   };
 
-  // As on desktop's "Run in new thread": the message leaves the queue, starts in a new thread, and the
-  // thread opens in place of this sheet.
   const runAsThread = () => {
     setMoving(delivery);
     void queue.runAsThread(delivery).then((task) => {
@@ -95,7 +88,7 @@ export function QueuedMessageActionsScreen() {
         })}
       >
         <SettingsRow>
-          <Typography>{queuedMessagePreview(delivery)}</Typography>
+          <Typography>{queuedMessagePreview(delivery, t)}</Typography>
         </SettingsRow>
       </SettingsSection>
 
@@ -119,13 +112,10 @@ export function QueuedMessageActionsScreen() {
             <Typography>{t("common.edit")}</Typography>
           </SettingsRow>
         )}
-        {/* As on desktop, an agent that cannot steer offers Send now. An answer has no Send now. */}
         {queue.steers || !reply ? (
           <SettingsRow
             leading={<CornerDownRight color={foreground} size={22} style={MIRROR_IN_RTL} />}
             disclosure={false}
-            // As on desktop, Send now waits while another message that is first is being edited: an
-            // edited message keeps its place, and the queue starts nothing while it is first.
             disabled={
               locked || editedElsewhere || !queue.activeTurnId || queue.steerRefused || (!queue.steers && headEdited)
             }
@@ -189,7 +179,6 @@ export function QueuedMessageActionsScreen() {
   );
 }
 
-/** A queued file: an image shows its own thumbnail, and every file opens in the share sheet. */
 function QueuedAttachmentRow({ attachment, serverId }: { attachment: AttachmentSummary; serverId: string }) {
   const { t, format } = useText();
   const muted = useThemeColor("muted");

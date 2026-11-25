@@ -3,6 +3,7 @@ import {
   type ManagedProviderId,
   pasteCodeSignInSupported,
 } from "@openbot/contracts/agent-providers";
+import { providerCliSource } from "@openbot/contracts/cli-version";
 import {
   type AgentProviderId,
   type AgentStatus,
@@ -11,10 +12,12 @@ import {
   isManagedRuntimeProvider,
   LOCAL_SERVER_ID,
   type ProviderRuntimeDownload,
+  type ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
+import { LIVE_VOICE_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-account-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
@@ -23,6 +26,11 @@ import {
   providerAccountRelay,
 } from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import {
+  PROVIDER_FROZEN_ACCOUNTS_LIMIT,
+  PROVIDER_MANY_ACCOUNTS_CAPABILITY,
+  PROVIDER_MANY_ACCOUNTS_LIMIT,
+} from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
 import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
@@ -52,12 +60,6 @@ import { createSimpleContext } from "./simple-context";
 
 type ProviderConnectMethod = Extract<DesktopAnalyticsProperties<"provider_action">["method"], "browser" | "code">;
 
-/**
- * Coding providers (Codex, Claude, Grok) as two paths the renderer reconciles: managed
- * `providerRuntimes` snapshots from main, and the older installed-CLI sign-in state via
- * `AgentStatus`. Consumers pick handlers through `providerRuntimeDownloadsAvailable()`.
- * Nested under `agents` so the edge stays one-way; see docs/architecture/change-rules.md.
- */
 const Providers = createSimpleContext({
   name: "Providers",
   init: () => {
@@ -65,20 +67,10 @@ const Providers = createSimpleContext({
     const { activeServer } = useServers();
     const { appInfo } = usePlatform();
     const [refreshingProviders, setRefreshingProviders] = createSignal(false);
-    /**
-     * A CLI the user installed themselves, and the version it reports. Only the agent status knows
-     * this, and the runtime store needs it to offer that install the same update a managed runtime
-     * gets. Updates install the managed copy without changing the system installation. An incomplete
-     * CLI has none: the Download of the copy that runs in its place is not an update of it (#9139).
-     */
-    function systemCliVersion(provider: AgentProviderId): string | null {
+    function systemCliVersion(provider: AgentProviderId, runtime: ProviderRuntimeStatus): string | null {
       const row = agentStatus().providers?.find((candidate) => candidate.id === provider);
-      return row?.cliSource === "system" && !row.cliIncomplete ? (row.version ?? null) : null;
+      return row && providerCliSource(row, runtime) === "system" && !row.cliIncomplete ? row.version : null;
     }
-    /**
-     * The joined server whose host this window manages, when the account administers it and the host
-     * serves `providers-v1`. A memo, not a value: the host's capabilities arrive after this mounts.
-     */
     const providerAdminServerId = createMemo(() => remoteAdminServer(activeServer(), "providers-v1")?.id);
     const providerAdmin = () => providersPort().providerAdmin;
     const runtimes = createProviderRuntimeStore(
@@ -93,10 +85,8 @@ const Providers = createSimpleContext({
         hostConnection: () => hostConnection(activeServer()),
       },
     );
-    // A boolean, so that a server-list update that keeps the capability does not rebuild the keys.
     const hostReadsClaudeKey = createMemo(() => serverSupportsCapability(activeServer(), CLAUDE_API_KEY_CAPABILITY));
     const hostReadsCodexKey = createMemo(() => serverSupportsCapability(activeServer(), CODEX_API_KEY_CAPABILITY));
-    /** The provider keys of the computer the providers run on. A saved key is recorded, never its value. */
     const providerKeys = createMemo(() => {
       const serverId = providerAdminServerId();
       const api = serverId ? hostProviderKeyApi(providerAdmin, serverId) : providerKeyApi;
@@ -110,7 +100,6 @@ const Providers = createSimpleContext({
           try {
             const result = await api.setProviderApiKey(input);
             analytics.track("provider_action", { ...tracked, result: "succeeded" });
-            // The host downloads Pi for the key when it has none. A joined host sends no event for it.
             if (isKeyOnlyProvider(input.provider)) runtimes.refreshProviderRuntimes();
             return result;
           } catch (error) {
@@ -120,42 +109,25 @@ const Providers = createSimpleContext({
         },
       };
     });
-    /** The host's own endpoints, for Settings and for the picker of a joined server. */
     const hostCustomProviders = createCustomProvidersStore(() => {
       const serverId = providerAdminServerId();
       return serverId ? hostCustomProvidersApi(providerAdmin, serverId) : undefined;
     });
-    /**
-     * The joined server whose custom ACP agents this window manages: the account administers it and
-     * the host serves `custom-agents-v1`. The agents of this computer are in `useCustomAgents`.
-     */
     const customAgentsServerId = createMemo(() => remoteAdminServer(activeServer(), "custom-agents-v1")?.id);
     const hostCustomAgents = createCustomAgentsStore(() => {
       const serverId = customAgentsServerId();
       return serverId ? hostCustomAgentsApi(serverId) : undefined;
     });
     createEffect(customAgentsServerId, (serverId) => {
-      // Each server has its own list, so a switch empties it and drops the previous server's answers.
       hostCustomAgents.resetCustomAgents();
-      // As for this computer's list: a failure leaves it empty, and the Settings registry lists again
-      // after an install.
       if (serverId) void hostCustomAgents.refreshCustomAgents().catch(() => undefined);
     });
     const localCustomProviders = useCustomProviders();
-    /**
-     * The endpoints whose models the active server's OpenCode or Pi lists, which is how the picker puts
-     * those models on its Custom tab. Each computer runs its own endpoints, so a joined server's agents
-     * read the host's list, and this computer's list would file the host's models under OpenCode.
-     * Undefined for a member who does not administer the host: the Team API gives the list only to
-     * an administrator, and the picker then shows those models on the OpenCode tab.
-     */
     function activeCustomProviders(): CustomProviderSummary[] | undefined {
       if (activeServer()?.kind === "local") return localCustomProviders.customProviders();
       if (providerAdminServerId()) return hostCustomProviders.customProviders();
       return undefined;
     }
-    // Read again when the host's capabilities arrive: the `custom-provider-edit-v1` list has the
-    // header names that Edit needs, and a list read before it has none.
     const hostEditsCustomProviders = createMemo(() =>
       serverSupportsCapability(activeServer(), CUSTOM_PROVIDER_EDIT_CAPABILITY),
     );
@@ -165,20 +137,13 @@ const Providers = createSimpleContext({
         return serverId ? `${serverId}:${hostEditsCustomProviders()}` : undefined;
       },
       (key) => {
-        // As for this computer's list: a failure leaves it empty, and nothing retries it from here.
         if (key) void hostCustomProviders.refreshCustomProviders().catch(() => undefined);
       },
     );
-    /** Connect attempts still waiting for the status that says how they ended. */
     const pendingProviderConnections = new Map<
       AgentProviderId,
       { analytics: ReturnType<typeof desktopAnalytics.scope>; method: ProviderConnectMethod }
     >();
-    /**
-     * The status is the completion signal for every connect started here: main
-     * answers `connect()` before the provider has finished coming up, so the
-     * outcome arrives later, in a status this or an agent event applies.
-     */
     function applyAgentStatus(status: AgentStatus): void {
       for (const provider of status.providers ?? []) {
         const { analytics, method } = pendingProviderConnections.get(provider.id) ?? {};
@@ -213,17 +178,10 @@ const Providers = createSimpleContext({
       return appPort().openExternal(descriptor.installGuideLink);
     }
 
-    /**
-     * Signs the user in to one provider, through that provider's own login: Codex opens a browser,
-     * Claude and Grok run their CLI's OAuth command, and OpenCode is asked again. Every sign-in
-     * entry point calls this - the composer notice, the model picker, onboarding and settings - so
-     * none of them leaves the user to read a documentation page and sign in in a terminal.
-     */
     function connectProvider(provider: AgentProviderId): Promise<void> {
       return startBrowserSignIn(provider, () => providersPort().connectProvider(provider));
     }
 
-    /** Signs in on the provider's mainland China site, such as kimi.com, from the row's ⋯ menu. */
     function connectProviderInMainlandChina(provider: AgentProviderId): Promise<void> {
       return startBrowserSignIn(provider, () => providersPort().connectProviderInMainlandChina(provider));
     }
@@ -239,14 +197,12 @@ const Providers = createSimpleContext({
       }
     }
 
-    /** Ends a browser sign-in that Connect started. The provider then shows its state from before. */
     async function cancelProviderSignIn(provider: AgentProviderId): Promise<void> {
       dropProviderConnection(provider);
       const status = await providersPort().cancelProviderSignIn(provider);
       flush(() => applyAgentStatus(status));
     }
 
-    /** Opens a connect attempt: the status that ends it is matched back to this scope by provider. */
     function beginProviderConnection(provider: AgentProviderId, method: ProviderConnectMethod) {
       const analytics = desktopAnalytics.scope();
       pendingProviderConnections.set(provider, { analytics, method });
@@ -259,7 +215,6 @@ const Providers = createSimpleContext({
       return analytics;
     }
 
-    /** The user ended a sign-in that is still waiting. Its status then says nothing about the connect. */
     function dropProviderConnection(provider: AgentProviderId): void {
       const pending = pendingProviderConnections.get(provider);
       if (!pending) return;
@@ -287,7 +242,6 @@ const Providers = createSimpleContext({
       });
     }
 
-    /** `automatic`: the app asks, not the user, so a provider OpenBot stopped starting stays stopped. */
     async function refreshAgentProviders(options = { automatic: false }): Promise<void> {
       if (refreshingProviders() || agentStatus().phase === "starting" || agentStatus().phase === "restarting") {
         return;
@@ -310,19 +264,9 @@ const Providers = createSimpleContext({
       }
     }
 
-    /**
-     * The joined server whose host's provider switch this window uses (`provider-use-v1`). The released
-     * status routes leave out `off`, so the host's off providers come from this route.
-     */
     const providerUseServerId = createMemo(() => remoteAdminServer(activeServer(), PROVIDER_USE_CAPABILITY)?.id);
-    /** The off providers of that host, with the server they are of, so another server's list is not shown. */
     const [hostProviderUse, setHostProviderUse] = createSignal<{ serverId: string; off: AgentProviderId[] }>();
-    /** Changes on each read and switch, so an older answer does not replace a newer list. */
     let providerUseVersion = 0;
-    /**
-     * Reads the off providers of the host again. Another admin can change them, so the Providers
-     * section reads them each time it is shown. A failure keeps the last list.
-     */
     function refreshHostProviderUse(): void {
       const serverId = providerUseServerId();
       if (!serverId) return;
@@ -334,19 +278,13 @@ const Providers = createSimpleContext({
         })
         .catch(() => undefined);
     }
-    // A failure shows each provider as on until the next read.
     createEffect(providerUseServerId, () => untrack(refreshHostProviderUse));
-    /** The off providers of the active joined server's host, or undefined for this computer and an older host. */
     function hostOffProviders(): AgentProviderId[] | undefined {
       const serverId = providerUseServerId();
       const use = hostProviderUse();
       return serverId && use?.serverId === serverId ? use.off : undefined;
     }
 
-    /**
-     * Turns a provider off or on, on this computer or on a joined server's host with `provider-use-v1`.
-     * A provider of this computer restarts after its turns end.
-     */
     async function setProviderOn(provider: AgentProviderId, on: boolean): Promise<void> {
       const server = activeServer();
       if (server && server.kind !== "local" && server.id === providerUseServerId()) {
@@ -360,16 +298,11 @@ const Providers = createSimpleContext({
       if (activeServer()?.id === server.id) flush(() => applyAgentStatus(status));
     }
 
-    /**
-     * The downloaded CLI of a provider of this computer that is off. A joined host has no such call,
-     * so its providers offer no removal.
-     */
     async function measureProviderDownload(provider: AgentProviderId): Promise<ProviderRuntimeDownload> {
       if (activeServer()?.kind !== "local" || !isManagedRuntimeProvider(provider)) return { bytes: 0, versions: 0 };
       return await providersPort().providerRuntimes.measureDownload(provider);
     }
 
-    /** Removes the downloaded CLI of a provider of this computer that is off. */
     async function removeProviderDownload(provider: AgentProviderId): Promise<void> {
       const server = activeServer();
       if (server?.kind !== "local" || !isManagedRuntimeProvider(provider)) return;
@@ -377,29 +310,22 @@ const Providers = createSimpleContext({
       if (activeServer()?.id === server.id) flush(() => runtimes.applyProviderRuntimeSnapshot(snapshot));
     }
 
-    /** The joined server whose host's provider accounts this window manages (`provider-accounts-v1`). */
     const accountsAdminServerId = createMemo(() => remoteAdminServer(activeServer(), PROVIDER_ACCOUNTS_CAPABILITY)?.id);
-    /** The joined server whose host spends the usage reset credits of its accounts (`provider-usage-reset-v1`). */
     const usageResetServerId = createMemo(() => remoteAdminServer(activeServer(), PROVIDER_USAGE_RESET_CAPABILITY)?.id);
-    /** The joined server whose host signs its own provider sign-ins out (`provider-sign-out-v1`). */
     const signOutServerId = createMemo(() => remoteAdminServer(activeServer(), PROVIDER_SIGN_OUT_CAPABILITY)?.id);
-    /** The joined server whose host pools its accounts (`provider-account-pool-v1`). */
     const accountPoolServerId = createMemo(
       () => remoteAdminServer(activeServer(), PROVIDER_ACCOUNT_POOL_CAPABILITY)?.id,
     );
-    /** The joined server whose host signs a provider account in with a code (`provider-account-code-v1`). */
     const accountCodeServerId = createMemo(
       () => remoteAdminServer(activeServer(), PROVIDER_ACCOUNT_CODE_CAPABILITY)?.id,
     );
-    /** The joined server whose host takes an API key as a provider account (`provider-account-keys-v1`). */
+    const liveVoiceAccountServerId = createMemo(
+      () => remoteAdminServer(activeServer(), LIVE_VOICE_ACCOUNT_CAPABILITY)?.id,
+    );
     const accountKeysServerId = createMemo(
       () => remoteAdminServer(activeServer(), PROVIDER_ACCOUNT_KEYS_CAPABILITY)?.id,
     );
 
-    /**
-     * The accounts of the providers of this computer, or of a joined server's host that serves
-     * `provider-accounts-v1`. An older host and a member get none.
-     */
     const providerAccounts = createMemo<ProviderAccountActions | undefined>(() => {
       const hostServerId = accountsAdminServerId();
       if (hostServerId) {
@@ -409,8 +335,6 @@ const Providers = createSimpleContext({
         };
         return {
           connect: async (provider, accountId) => connection.connectAccount(provider, accountId),
-          // The host runs one account sign-in for each provider, so the released cancel names only the provider.
-          // It does not stop a code sign-in, which the code route stops by its account.
           cancel: async (provider, accountId) => {
             await accountSignIn(hostServerId).cancel(provider);
             if (accountCodeServerId() === hostServerId) await accountCode(hostServerId).cancel(provider, accountId);
@@ -419,12 +343,14 @@ const Providers = createSimpleContext({
             changed(providerAdmin().renameAccount({ provider, accountId, label }, hostServerId)),
           remove: (provider, accountId) =>
             changed(providerAdmin().removeAccount({ provider, accountId }, hostServerId)),
+          maxAccounts: serverSupportsCapability(activeServer(), PROVIDER_MANY_ACCOUNTS_CAPABILITY)
+            ? PROVIDER_MANY_ACCOUNTS_LIMIT
+            : PROVIDER_FROZEN_ACCOUNTS_LIMIT,
           ...(usageResetServerId() === hostServerId
             ? {
                 usageResets: (provider: AgentProviderId) => providerAdmin().usageResets(provider, hostServerId),
                 resetUsage: async (provider: AgentProviderId, accountId: string) => {
                   const outcome = await providerAdmin().resetUsage({ provider, accountId }, hostServerId);
-                  // The host sends the reading of its own sign-in; the accounts after the first are read here.
                   await refreshHostAccountUsage().catch(() => undefined);
                   return outcome;
                 },
@@ -439,11 +365,16 @@ const Providers = createSimpleContext({
                   changed(providerAdmin().setAccountPool({ provider, enabled, leftOut: [...leftOut] }, hostServerId)),
               }
             : {}),
+          ...(liveVoiceAccountServerId() === hostServerId
+            ? {
+                setLiveVoiceAccount: (accountId: string | null) =>
+                  changed(providerAdmin().setLiveVoiceAccount({ accountId }, hostServerId)),
+              }
+            : {}),
           ...(accountCodeServerId() === hostServerId
             ? {
                 connectWithCode: async (provider: AgentProviderId, accountId: string | null) =>
                   connection.connectAccountWithCode(provider, accountId),
-                // Only a host that can run a pasted code advertises `providers-v3`.
                 pasteCodeSignIn: serverSupportsCapability(activeServer(), "providers-v3"),
               }
             : {}),
@@ -461,14 +392,13 @@ const Providers = createSimpleContext({
         const status = await request;
         if (activeServer()?.id === serverId) flush(() => applyAgentStatus(status));
       };
-      // A sign-in ends after its answer, and the status has no order, so an older answer could hide how it
-      // ended. The `status` events carry the account's state.
       return {
         connect: async (provider, accountId) => {
           await providersPort().connectProviderAccount({ provider, accountId });
         },
         connectWithCode: async (provider, accountId) => connection.connectAccountWithCode(provider, accountId),
         pasteCodeSignIn: pasteCodeSignInSupported(appInfo()?.platform ?? ""),
+        windowsCodeSignIn: appInfo()?.platform === "win32",
         connectKey: (provider, accountId, key) =>
           apply(providersPort().connectProviderAccountKey({ provider, accountId, key })),
         cancel: async (provider, accountId) => {
@@ -482,6 +412,7 @@ const Providers = createSimpleContext({
         signOut: (provider) => apply(providersPort().signOutProvider(provider)),
         setPool: (provider, enabled, leftOut) =>
           apply(providersPort().setProviderAccountPool({ provider, enabled, leftOut: [...leftOut] })),
+        setLiveVoiceAccount: (accountId) => apply(providersPort().setLiveVoiceAccount({ accountId })),
         local: true,
       };
     });
@@ -494,12 +425,10 @@ const Providers = createSimpleContext({
       await changeProviderRestart(provider, providersPort().cancelProviderRestart);
     }
 
-    /** Runs the CLI the user installed (`installed`), or OpenBot's newer copy, from the provider's restart. */
     async function chooseInstalledCli(provider: ManagedProviderId, installed: boolean): Promise<void> {
       await changeProviderRestart(provider, () => providersPort().chooseInstalledCli({ provider, installed }));
     }
 
-    /** A failed restart is also on the provider's status; this reports a request that main refused. */
     async function changeProviderRestart(
       provider: AgentProviderId,
       request: (provider: AgentProviderId) => Promise<AgentStatus>,
@@ -523,10 +452,6 @@ const Providers = createSimpleContext({
       };
     });
 
-    /**
-     * An account sign-in on the host's page. The released status does not carry the accounts, so the
-     * accounts are read again when the sign-in ends.
-     */
     function accountSignIn(serverId: string) {
       return {
         hostName: activeServer()?.name ?? "",
@@ -547,18 +472,12 @@ const Providers = createSimpleContext({
       };
     }
 
-    /**
-     * The code sign-in of an account, on this computer or on a joined server's host
-     * (`provider-account-code-v1`). The host's status does not carry its accounts, so they are read
-     * again when the sign-in starts and when it ends.
-     */
     function accountCode(serverId: string) {
       const refresh = () =>
         serverId === LOCAL_SERVER_ID ? Promise.resolve() : refreshHostAccounts().catch(() => undefined);
       return {
         start: async (provider: AgentProviderId, accountId: string | null) => {
           const started = await providerAdmin().startAccountCodeLogin({ provider, accountId }, serverId);
-          // The code is shown at once: the code lives for a short time only.
           void refresh();
           return started;
         },
@@ -576,11 +495,6 @@ const Providers = createSimpleContext({
       };
     }
 
-    /**
-     * An account sign-in that the host relays to this computer's browser (`provider-account-relay-v1`
-     * or `-v2`). The other relay requests run it by its provider, and the accounts are read again when
-     * it ends.
-     */
     function accountRelay(serverId: string, relayed: ProviderAccountRelay) {
       return {
         providers: relayed.providers,
@@ -603,10 +517,6 @@ const Providers = createSimpleContext({
       };
     }
 
-    /**
-     * The provider sign-in as the one object its surfaces take. Onboarding, Settings, the composer
-     * and the model picker all offer it, so each offers the same ways in.
-     */
     const connection = createProviderConnection({
       agentStatus,
       applyStatus: applyAgentStatus,
@@ -645,10 +555,11 @@ const Providers = createSimpleContext({
               start: (provider) => providersPort().startProviderCodeLogin(provider),
               submit: (provider, code) => providerAdmin().submitCodeLogin({ provider, code }, LOCAL_SERVER_ID),
               cancel: (provider) => providersPort().cancelProviderCodeLogin(provider),
+              pasteAddress: (provider, address) =>
+                providerAdmin().pasteRelaySignIn({ provider, address }, LOCAL_SERVER_ID),
               accountCode: accountCode(LOCAL_SERVER_ID),
             };
       },
-      // A member of a joined server cannot connect its providers. This computer's own are connected here.
       place: () =>
         providerAdminServerId()
           ? { kind: "app-server", server: activeServer() }

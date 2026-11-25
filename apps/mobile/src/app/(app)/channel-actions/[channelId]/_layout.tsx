@@ -5,6 +5,5 @@ export const unstable_settings = { anchor: "index" };
 
 export default function ChannelActionsLayout() {
   const { t } = useText();
-  // The list starts below the header, so the header is opaque on iOS too.
   return <SheetPageStack title={t("mobile.app.route.actionsNeeded")} opaqueHeader />;
 }

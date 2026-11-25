@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/connector";
 
 export const messages = {
-  // The built-in GitHub connection: the device flow, the token refresh and the stored file.
   "error.connector.githubUnavailable": "该版本的 OpenBot 不包含 GitHub App。",
   "error.connector.githubDenied": "GitHub 登录被拒绝。",
   "error.connector.githubCodeExpired": "GitHub 验证码已过期，请重新连接 GitHub。",
@@ -10,10 +9,11 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub 不认识该 GitHub App 的客户端 ID。",
   "error.connector.githubUnexpected": "GitHub 返回了意外的响应：{detail}",
   "error.connector.githubUnreachable": "OpenBot 无法连接 GitHub：{detail}",
+  "error.connector.githubOffline":
+    "OpenBot 无法连接 GitHub。请检查运行 OpenBot 的电脑或服务器的网络连接和 DNS 设置，然后重试。",
   "error.connector.githubExpired": "GitHub 连接已过期，请重新连接 GitHub。",
   "error.connector.githubFileUnreadable": "GitHub 连接文件无法读取。",
   "error.connector.githubFileTooLarge": "GitHub 连接文件过大。",
-  // The 1Password connection: the CLI that creates the service account, the token and the stored file.
   "error.connector.onePasswordCliMissing":
     "OpenBot 找不到 1Password CLI。请安装它并在 1Password 应用中开启集成，或改用服务账号令牌。",
   "error.connector.onePasswordCliInstallFailed": "OpenBot 无法安装 1Password CLI，请检查网络连接后重试。",
@@ -28,6 +28,8 @@ export const messages = {
   "error.connector.onePasswordUnreachable": "OpenBot 无法连接到 1Password，请检查网络连接后重试。",
   "error.connector.onePasswordRateLimited": "1Password 收到的请求过多，请等待几分钟后重试。",
   "error.connector.onePasswordNoVault": "该服务账号无法读取任何保险库。请授予其保险库访问权限后重试。",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot 无法读取你在 1Password 中的登录信息。请断开 1Password，然后重新连接。",
   "error.connector.onePasswordFileUnreadable": "1Password 连接文件无法读取。",
   "error.connector.onePasswordFileTooLarge": "1Password 连接文件过大。",
   "error.connector.bitwardenFailed":
@@ -39,6 +41,9 @@ export const messages = {
   "error.connector.bitwardenHostInput": "请填写 HTTPS 服务器地址、API 密钥的 client_id 和 client_secret，以及主密码。",
   "error.connector.bitwardenHostFailed":
     "无法在该服务器上打开 Bitwarden。请检查服务器地址、API 密钥和主密码，并确认有一个文件夹名为 Shared with OpenBot，然后重新连接。",
+  "error.connector.bitwardenHostSignInFailed":
+    "无法在该服务器上登录 Bitwarden。请检查服务器地址和 API 密钥，然后重新连接。",
+  "error.connector.bitwardenHostUnlockFailed": "无法在该服务器上解锁 Bitwarden。请检查主密码，然后重新连接。",
   "error.connector.bitwardenCliInstallFailed": "无法在该服务器上安装 Bitwarden CLI。请检查它的网络连接，然后重新连接。",
   "error.connector.bitwardenFileUnreadable": "Bitwarden 连接文件无法读取。",
   "error.connector.passwordManagerUnknown": "OpenBot 不支持此密码管理器。",

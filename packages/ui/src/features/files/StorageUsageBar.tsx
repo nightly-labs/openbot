@@ -2,11 +2,6 @@ import { useText } from "@openbot/ui/text";
 import { createSignal, For } from "solid-js";
 import { type StorageGroup, type StorageGroupTotal, sharePercentLabel } from "./files-view";
 
-/**
- * One stacked bar of where the space goes, with the legend as the readable data. The bar is an
- * image with a text summary; the legend rows carry the names, sizes and shares, so identity is
- * never colour alone. Pointing at a segment or a legend row highlights the pair.
- */
 export function StorageUsageBar(props: { groups: readonly StorageGroupTotal[]; label: string }) {
   const { format } = useText();
   const [active, setActive] = createSignal<StorageGroup | null>(null);

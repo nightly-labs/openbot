@@ -7,18 +7,9 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
 const DEFAULT_PREFERENCE: NotificationPreference = { desktopNotifications: true, messagePreview: true };
 
 interface StoredNotificationPreference extends NotificationPreference {
-  /** Whether OpenBot has already shown the notification that makes macOS ask for permission. */
   permissionRequested: boolean;
 }
 
-/**
- * The desktop notification switches. Main reads them for every agent event, so it is held in memory
- * after `load` rather than read from disk each time.
- *
- * Writes are chained for the reason `update-preference-store.ts` chains its own: each one renames its
- * own temporary file into place, and an earlier rename that lands last would persist the value the
- * user just changed.
- */
 export class NotificationPreferenceStore {
   readonly #path: string;
   #stored: StoredNotificationPreference = { ...DEFAULT_PREFERENCE, permissionRequested: false };
@@ -35,7 +26,6 @@ export class NotificationPreferenceStore {
           if (isDynamicRecord(parsed) && parsed.version === 1 && isBoolean(parsed.desktopNotifications))
             return {
               desktopNotifications: parsed.desktopNotifications,
-              // A file from before the preview switch has no value; the preview is on by default.
               messagePreview: parsed.messagePreview !== false,
               permissionRequested: parsed.permissionRequested === true,
             };
@@ -72,7 +62,6 @@ export class NotificationPreferenceStore {
   #write(
     change: (stored: StoredNotificationPreference) => StoredNotificationPreference,
   ): Effect.Effect<void, PreferenceFileFailure> {
-    // Read state after the preceding write commits so independent fields are retained.
     return this.#writes.withPermit(Effect.uninterruptible(Effect.suspend(() => this.#replace(change(this.#stored)))));
   }
 

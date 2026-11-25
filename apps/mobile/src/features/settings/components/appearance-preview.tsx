@@ -24,12 +24,9 @@ import {
 import { useRoutineCollapsePreference } from "@/features/settings/model/routine-collapse";
 import { useText } from "@/shared/lib/text";
 
-/** The height of the preview: the detail rows, a question and the start of a reply. */
 const PREVIEW_HEIGHT = 230;
-/** A sample agent color: the violet preset of the desktop picker. */
 const SAMPLE_AGENT_COLOR = "#b474f4";
 
-/** A muted detail row of a chat, such as the agent's thinking. */
 function DetailRow({
   icon: Icon,
   label,
@@ -49,12 +46,6 @@ function DetailRow({
   );
 }
 
-/**
- * A short chat as the chats draw it, at the top of Settings › Appearance: the backdrop or the chat
- * background, the reader's bubble, an agent reply and the detail rows that are on. Text size, theme,
- * colors, backdrop and chat details change it at once, so each tab shows its effect. It has no
- * meaning of its own for a screen reader.
- */
 export function AppearancePreview() {
   const { t } = useText();
   const focused = useIsFocused();
@@ -81,14 +72,10 @@ export function AppearancePreview() {
   const backdropBase = useChatBackdropBase();
   const chatBackground = useChatBackgroundColor();
   const base = backdropBase ?? chatBackground ?? background;
-  // A bubble with no color and an agent bubble, as the chat draws them: solid on the chat surface, or
-  // see-through over a backdrop.
   const plain =
     seeThrough && backdropBase !== null ? `${control}99` : (mixColor(base, control, PLAIN_BUBBLE_SHARE) ?? control);
   const solid = pageColor ?? (mode === "custom" ? customColor : SAMPLE_AGENT_COLOR);
-  const bubble =
-    // As the chat: with no message color, the color of an agent page does not apply either.
-    mode === "none" ? plain : style === "tint" ? tintedMessageColor(solid, surface, dark) : solid;
+  const bubble = mode === "none" ? plain : style === "tint" ? tintedMessageColor(solid, surface, dark) : solid;
   return (
     <View
       className="overflow-hidden rounded-3xl border border-border"

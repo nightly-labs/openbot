@@ -1,12 +1,3 @@
-// Checks which Live Activity updates a host sends with priority 10 while several agents run.
-// iOS has an hourly budget of priority 10 updates and can delay or drop the updates above it. Before,
-// each change of state had priority 10, so the work of several agents used the budget, and the update
-// that the member must see came late or not at all. Now priority 10 is only for a new request, a new
-// failure, a new reply, an alert, and an agent that finishes its work. Each other change has priority 5.
-//
-// It runs the real Live Activity push service with a synthetic runtime snapshot of two agents and a
-// local relay adapter, and opens each push with the widget code. It sends nothing. Run it with
-// `bun scripts/live-activity-priority-e2e.ts`. Writes .openbot-build/live-activity-priority-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
@@ -26,7 +17,6 @@ import { openSealedLiveActivity } from "../apps/mobile/src/features/live-activit
 import { LiveActivityPushService } from "../src/main/live-activity-push";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/live-activity-priority-e2e");
-/** A priority 5 change inside one state waits 5 seconds after the last update. */
 const STEP_DEADLINE_MS = 15_000;
 const SESSION = "fixture-session";
 const FIRST = "fixture-agent-a";
@@ -41,11 +31,8 @@ const keys = liveActivityKeys(secret);
 const pushes: LiveActivityRelayPush[] = [];
 const waiters = new Set<() => void>();
 
-/** The host state. Each step changes it and then sends an agent event. */
 const working = new Set<string>(AGENTS);
-/** The agents that wait for an approval, the oldest request first. */
 const approvals: string[] = [];
-/** The unread reply of each agent. */
 const replies = new Map<string, string>();
 
 function snapshot(): AgentRuntimeSnapshot {
@@ -87,7 +74,6 @@ function snapshot(): AgentRuntimeSnapshot {
   };
 }
 
-/** Tells the service that the host state changed. It reads the state again and does not read the event. */
 function changed(agentId: string): void {
   events.emit("event", {
     type: "turn-completed",
@@ -98,7 +84,6 @@ function changed(agentId: string): void {
   });
 }
 
-/** Waits for push number `count`, which can already have gone out. */
 function pushNumber(count: number): Promise<LiveActivityRelayPush> {
   return new Promise((resolvePush, reject) => {
     const deadline = setTimeout(() => {
@@ -117,7 +102,6 @@ function pushNumber(count: number): Promise<LiveActivityRelayPush> {
   });
 }
 
-/** The view that the widget shows for an update, or `null` for the end of the activity. */
 function shown(push: LiveActivityRelayPush): { mode: string; agent: string; footer: string } | null {
   if (push.event === "end") return null;
   assert.ok(push.sealed, "An update must carry sealed content.");
@@ -129,12 +113,10 @@ function shown(push: LiveActivityRelayPush): { mode: string; agent: string; foot
   assert.ok(opened, "The widget must open the push.");
   const props = JSON.parse(opened);
   assert.ok(isDynamicRecord(props) && typeof props.mode === "string");
-  // The compact view of a request names its agent.
   return { mode: props.mode, agent: String(props.compact), footer: String(props.footer) };
 }
 
 const steps: { name: string; passed: boolean; detail?: unknown }[] = [];
-/** Changes the host state, then checks the mode and the priority of the push that follows. */
 async function step(
   name: string,
   change: () => void,
@@ -160,6 +142,7 @@ const service = new LiveActivityPushService({
   agents: {
     on: (event, listener) => events.on(event, listener),
     off: (event, listener) => events.off(event, listener),
+    listAgents: () => [],
     getRuntimeSnapshot: snapshot,
     listConversationReads: () =>
       Object.fromEntries(
@@ -184,7 +167,6 @@ const service = new LiveActivityPushService({
   randomBytes,
 });
 
-/** The phone gives its token again. With `away`, it says that it leaves the foreground. */
 function register(away: boolean): void {
   service.register(
     SESSION,
@@ -244,7 +226,6 @@ try {
     },
     { mode: "approval", priority: 10 },
   );
-  // The same state shows another request, so the state alone does not tell that the update is important.
   assert.equal(shown(next)?.agent, "Second agent");
 
   await step(
@@ -307,7 +288,6 @@ try {
   await step(
     "a phone whose connection closes can show an old view, so the reply has priority 10",
     () => {
-      // The app is on screen again and shows its own view. Then iOS suspends it before it says so.
       register(false);
       service.disconnected(SESSION);
     },

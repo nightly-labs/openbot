@@ -1,19 +1,32 @@
 import type { AppTextKey } from "@openbot/i18n";
 import {
+  Archive,
+  ArrowDown,
+  ArrowUp,
+  Badge,
   Button,
   buttonVariants,
   ChevronDown,
   ContextMenu,
   DropdownMenu,
+  Ellipsis,
   Folder,
+  Globe2,
+  Group,
+  LoaderCircle,
   Maximize2,
   MessageCircleQuestionMark,
   MessageSquare,
+  MessagesSquare,
   Minimize2,
   PanelRight,
   Plus,
+  Rows2,
   Settings,
+  SquareArrowOutUpRight,
   Tabs,
+  Trash2,
+  Ungroup,
   Workflow,
   X,
 } from "@openbot/ui";
@@ -23,38 +36,46 @@ import {
 } from "@openbot/ui/features/conversation/AttachmentReference";
 import { ComputerIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { TabShape } from "@openbot/ui/features/conversation/TabShape";
-import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
+import { type ThreadItem, threadBusy } from "@openbot/ui/features/conversation/threads/thread-types";
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, For, flush, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, flush, onSettled, Show, untrack } from "solid-js";
 import { createTabRow } from "../../components/createTabRow";
+import { useBrowserPageCover } from "../browser/browser-page-cover";
 import { ThreadStatusText, ThreadTabIcon, threadAttention } from "./threads/ThreadStatusMark";
 import { ThreadTabGhost } from "./threads/ThreadTabGhost";
 import { carriedThreadTab, setCarriedThreadTab, swallowNextClick } from "./threads/thread-tab-drag";
 
-/** A tab starts to move after the pointer moves this far, so a click stays a click. */
 const DRAG_START = 4;
-/** The prefix of a thread tab's value, so a thread id cannot be taken for a pane. */
 const THREAD_VALUE = "thread:";
-/** The prefix of a file tab's value. */
 const FILE_VALUE = "file:";
+const PAGE_VALUE = "page:";
 
-/**
- * The value of a file tab. Kobalte finds the selected tab with an unescaped `[data-key="…"]`
- * selector, and a path can hold a quote, so the key is encoded.
- */
+interface CoveringMenu {
+  setOpen: (open: boolean) => void;
+  ref: (element: Element) => void;
+}
+
+function coveringMenu(): CoveringMenu {
+  const [open, setOpen] = createSignal(false);
+  let content: Element | undefined;
+  useBrowserPageCover(open, () => content);
+  return {
+    setOpen,
+    ref: (element) => {
+      content = element;
+    },
+  };
+}
+
 function fileValue(key: string): string {
   return `${FILE_VALUE}${encodeURIComponent(key)}`;
 }
 
-/**
- * The panes of the side panel, with the label and icon of each. Each open pane has a tab at the top
- * of the panel. The icons are the same glyphs as the rest of the app: the browser is the computer.
- * The feature that owns a pane decides when it is available and renders its content.
- */
 const SIDE_PANEL_PANES = {
   browser: { label: "conversation.sidePanel.pane.browser", icon: () => <ComputerIcon /> },
   files: { label: "conversation.sidePanel.pane.files", icon: () => <Folder aria-hidden="true" /> },
+  threads: { label: "conversation.sidePanel.pane.threads", icon: () => <MessagesSquare aria-hidden="true" /> },
   settings: { label: "conversation.sidePanel.pane.settings", icon: () => <Settings aria-hidden="true" /> },
   question: {
     label: "conversation.sidePanel.pane.question",
@@ -63,18 +84,20 @@ const SIDE_PANEL_PANES = {
   subagent: { label: "conversation.sidePanel.pane.subagent", icon: () => <Workflow aria-hidden="true" /> },
 } as const satisfies Record<string, { label: AppTextKey; icon: () => JSX.Element }>;
 
-/**
- * A pane of the side panel. A side question opens from the composer only, and a subagent from its
- * row in the chat, so the launcher and Add do not list them.
- */
 export type SidePanelPane = keyof typeof SIDE_PANEL_PANES;
 
-/** True when a value, such as a panel mode, is the id of a side panel pane. */
+const SIDE_PANEL_MOVES = {
+  split: { label: "conversation.sidePanel.splitDown", icon: () => <Rows2 aria-hidden="true" /> },
+  up: { label: "conversation.sidePanel.moveUp", icon: () => <ArrowUp aria-hidden="true" /> },
+  down: { label: "conversation.sidePanel.moveDown", icon: () => <ArrowDown aria-hidden="true" /> },
+} as const satisfies Record<string, { label: AppTextKey; icon: () => JSX.Element }>;
+
+export type SidePanelMove = keyof typeof SIDE_PANEL_MOVES;
+
 export function isSidePanelPane(value: string): value is SidePanelPane {
   return Object.hasOwn(SIDE_PANEL_PANES, value);
 }
 
-/** The panes in `available`, in the order of `SIDE_PANEL_PANES`. */
 function inPaneOrder(available: readonly SidePanelPane[]): SidePanelPane[] {
   return Object.keys(SIDE_PANEL_PANES)
     .filter(isSidePanelPane)
@@ -85,7 +108,29 @@ function PaneIcon(props: { pane: SidePanelPane }): JSX.Element {
   return SIDE_PANEL_PANES[props.pane].icon();
 }
 
-/** A file tab shows the file-type badge of a file link, and a folder tab a folder. */
+function PaneBadge(props: { badge: SidePanelPaneBadge | undefined }) {
+  return (
+    <Show when={props.badge}>
+      {(badge) => (
+        <>
+          <Badge variant="warning-light" class="side-panel-tab-count" aria-hidden="true">
+            {badge().count}
+          </Badge>
+          <span class="sr-only">{badge().label}</span>
+        </>
+      )}
+    </Show>
+  );
+}
+
+function PageTabIcon(props: { page: SidePanelBrowserTab }): JSX.Element {
+  return (
+    <Show when={props.page.loading} fallback={<Globe2 aria-hidden="true" />}>
+      <LoaderCircle class="browser-full-spin" aria-hidden="true" />
+    </Show>
+  );
+}
+
 function FileTabIcon(props: { file: SidePanelFileTab }): JSX.Element {
   return (
     <Show
@@ -101,19 +146,16 @@ function FileTabIcon(props: { file: SidePanelFileTab }): JSX.Element {
   );
 }
 
-/** The tab and launcher name of a pane. An agent or a channel can give the settings pane its own name. */
 function paneLabel(t: TextValue["t"], pane: SidePanelPane, settingsLabel: string | undefined): string {
   return pane === "settings" && settingsLabel !== undefined ? settingsLabel : t(SIDE_PANEL_PANES[pane].label);
 }
 
 export interface SidePanelToggleProps {
   open: boolean;
-  /** The name of the agent that controls the browser now. */
   actingAgentName?: string | undefined;
   onToggle: () => void;
 }
 
-/** The panel button at the end of the chat header. Its dot shows browser control. */
 export function SidePanelToggle(props: SidePanelToggleProps) {
   const { t } = useText();
   const label = () => {
@@ -143,64 +185,93 @@ export function SidePanelToggle(props: SidePanelToggleProps) {
   );
 }
 
+export interface SidePanelPaneBadge {
+  count: number;
+  label: string;
+}
+
 export interface SidePanelHeaderProps {
-  /** The open panes, in tab order. */
   panes: readonly SidePanelPane[];
   selected: SidePanelPane | null;
-  /** The panes that this chat can open. */
   available: readonly SidePanelPane[];
+  badges?: Partial<Record<SidePanelPane, SidePanelPaneBadge>> | undefined;
   maximized: boolean;
-  /** The name of the settings pane, when it holds other settings than an agent's. */
   settingsLabel?: string | undefined;
   onSelect: (pane: SidePanelPane) => void;
   onClose: (pane: SidePanelPane) => void;
   onToggleMaximized: () => void;
   onCollapse: () => void;
-  /** Opens a new browser tab. While the Browser pane is open, Add lists it first. */
+  outerToggle?: boolean | undefined;
   onNewBrowserTab?: (() => void) | undefined;
-  /** The threads of the agent that show beside the chat. Missing when the chat has no threads. */
   threads?: SidePanelThreads | undefined;
-  /** The open files. Missing when the chat cannot open files. */
   files?: SidePanelFiles | undefined;
+  browsers?: SidePanelBrowsers | undefined;
+  pageTabs?: SidePanelPageTabs | undefined;
+  split?: boolean | undefined;
+  label?: string | undefined;
+  moves?: readonly SidePanelMove[] | undefined;
+  onMove?: ((pane: SidePanelPane, move: SidePanelMove) => void) | undefined;
+  windows?: Partial<Record<SidePanelPane, () => void>> | undefined;
+  onCloseGroup?: (() => void) | undefined;
 }
 
-/** A file or folder with a tab in the side panel. */
 export interface SidePanelFileTab {
   key: string;
   name: string;
   folder: boolean;
-  /** The file did not open. While the tab has the focus, its X closes it also when it is not selected. */
   unavailable?: boolean | undefined;
 }
 
-/** The file tabs of the side panel. They come after the thread tabs. */
 export interface SidePanelFiles {
   items: readonly SidePanelFileTab[];
-  /** The file that the panel shows, or null while a pane or thread shows. */
   selectedKey: string | null;
   onSelect: (key: string) => void;
   onClose: (key: string) => void;
-  /** Puts the file at `index` of the file tabs. */
   onMove: (key: string, index: number) => void;
 }
 
-/** The thread tabs of the side panel. They come after the pane tabs. */
-export interface SidePanelThreads {
-  items: readonly ThreadItem[];
-  /** The thread that the panel shows, or null while a pane shows. */
+export interface SidePanelBrowserTab {
+  id: string;
+  title: string;
+  loading: boolean;
+}
+
+export interface SidePanelBrowsers {
+  items: readonly SidePanelBrowserTab[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
-  /** Puts the thread at `index` of the thread tabs. */
   onMove: (id: string, index: number) => void;
-  /** Moves the thread to the tabs of the chat header and opens it there. */
-  onToChat: (id: string) => void;
 }
 
-/**
- * A thread or file tab that the pointer holds. A tab moves only among the tabs of its own kind. Only a
- * thread tab has a place to go outside the panel, so `thread` is null for a file tab.
- */
+export interface SidePanelPageTabs {
+  shown: boolean;
+  onChange: (shown: boolean) => void;
+}
+
+function pageTabsText(shown: boolean): AppTextKey {
+  return shown ? "conversation.sidePanel.pagesInOneTab" : "conversation.sidePanel.pagesAsTabs";
+}
+
+function PageTabsIcon(props: { shown: boolean }) {
+  return (
+    <Show when={props.shown} fallback={<Ungroup aria-hidden="true" />}>
+      <Group aria-hidden="true" />
+    </Show>
+  );
+}
+
+export interface SidePanelThreads {
+  items: readonly ThreadItem[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onClose: (id: string) => void;
+  onMove: (id: string, index: number) => void;
+  onToChat: (id: string) => void;
+  onArchive?: ((id: string) => void) | undefined;
+  onDelete?: ((id: string) => void) | undefined;
+}
+
 interface TabHold {
   group: TabGroup;
   id: string;
@@ -208,63 +279,46 @@ interface TabHold {
   pointerId: number;
   startX: number;
   startY: number;
-  /** The scroll of the row when the tab starts to move, and the pointer now: a row scroll moves the tab too. */
   startScroll: number;
   x: number;
-  /** The frame that scrolls the row while the held tab is near one of its ends. */
   frame: number;
-  /** False until the pointer moves past `DRAG_START`. */
   moving: boolean;
-  /**
-   * The pointer is over the chat. A drop there moves a thread to the chat header and leaves a file tab
-   * in its place.
-   */
   away: boolean;
-  /** The place of the tab among the tabs of its kind when the pointer lets it go. */
   target: number;
-  /**
-   * The page reads right to left, so the chat is right of the panel. Read once, when the hold starts,
-   * from the header: the tab strip keeps the left-to-right order in every language.
-   */
   rightToLeft: boolean;
 }
 
-/** The kinds of tab that drag, with the class and the data attribute that find them. */
 const TAB_GROUPS = {
   thread: { selector: ":scope > .side-panel-thread-tab", id: (tab: HTMLElement) => tab.dataset.threadId },
   file: { selector: ":scope > .side-panel-file-tab", id: (tab: HTMLElement) => tab.dataset.fileKey },
+  page: { selector: ":scope > .side-panel-page-tab", id: (tab: HTMLElement) => tab.dataset.pageId },
 } as const;
 type TabGroup = keyof typeof TAB_GROUPS;
 
-/** A tab, as the menu of the tabs out of view lists it. */
 interface TabEntry {
   value: string;
   label: string;
   icon: () => JSX.Element;
+  badge?: SidePanelPaneBadge | undefined;
   select: () => void;
 }
 
-/** The tab that a right-click or a long press opened the tab menu on. */
-type MenuTab = { pane: SidePanelPane } | { thread: string } | { file: string };
+type MenuTab = { pane: SidePanelPane } | { thread: string } | { file: string } | { page: string };
 
-/** The tab under the event, or null outside a tab. */
 function tabAt(target: EventTarget | null): MenuTab | null {
   const tab = target instanceof Element ? target.closest<HTMLElement>(".side-panel-tab") : null;
   const pane = tab?.dataset.value;
   if (pane && isSidePanelPane(pane)) return { pane };
   if (tab?.dataset.threadId) return { thread: tab.dataset.threadId };
   if (tab?.dataset.fileKey) return { file: tab.dataset.fileKey };
+  if (tab?.dataset.pageId) return { page: tab.dataset.pageId };
   return null;
 }
 
-/**
- * The top row of the side panel, with a menu on each tab. A right-click or a long press on a tab opens
- * Close tab, and for a thread also Open in the chat, so a thread goes back to the chat without a drag.
- */
 export function SidePanelHeader(props: SidePanelHeaderProps) {
   const { t } = useText();
   const [menuTab, setMenuTab] = createSignal<MenuTab | null>(null);
-  /** The focus when the menu opened, and the top row. The row itself cannot take the focus back. */
+  const coverForTabMenu = coveringMenu();
   let menuReturn: { focus: Element | null; header: Element | null } | undefined;
   const pick = (event: Event) => {
     const tab = tabAt(event.target);
@@ -275,34 +329,50 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
     };
     return tab;
   };
-  /** A right-click outside a tab opens no menu. */
   const pickMenuTab = (event: MouseEvent) => {
     if (!pick(event)) event.preventDefault();
   };
-  /** A long press opens the menu on touch screens. Outside a tab, the menu has no item. */
   const pickTouchMenuTab = (event: PointerEvent) => {
     if (event.pointerType !== "mouse") pick(event);
   };
-  /** The tab of the menu while it is still open in the panel. A tab can close while its menu shows. */
   const liveMenuTab = () => {
     const tab = menuTab();
     if (!tab) return null;
     if ("pane" in tab) return props.panes.includes(tab.pane) ? tab : null;
     if ("thread" in tab) return props.threads?.items.some((item) => item.id === tab.thread) ? tab : null;
+    if ("page" in tab) return props.browsers?.items.some((item) => item.id === tab.page) ? tab : null;
     return props.files?.items.some((item) => item.key === tab.file) ? tab : null;
   };
   const menuThread = () => {
     const tab = liveMenuTab();
     return tab && "thread" in tab ? tab.thread : undefined;
   };
+  const menuThreadItem = () => {
+    const id = menuThread();
+    return id === undefined ? undefined : props.threads?.items.find((item) => item.id === id);
+  };
+  const menuPane = () => {
+    const tab = liveMenuTab();
+    if (tab && "page" in tab) return "browser";
+    return tab && "pane" in tab ? tab.pane : undefined;
+  };
+  const hasPaneActions = (pane: SidePanelPane) =>
+    (props.moves?.length ?? 0) > 0 ||
+    props.windows?.[pane] !== undefined ||
+    (pane === "browser" && props.pageTabs !== undefined);
+  const actionMenuPane = () => {
+    const pane = menuPane();
+    return pane && hasPaneActions(pane) ? pane : undefined;
+  };
+  const threadRemovable = () => props.threads?.onArchive !== undefined || props.threads?.onDelete !== undefined;
   const closeMenuTab = () => {
     const tab = liveMenuTab();
     if (!tab) return;
     if ("pane" in tab) props.onClose(tab.pane);
     else if ("thread" in tab) props.threads?.onClose(tab.thread);
+    else if ("page" in tab) props.browsers?.onClose(tab.page);
     else props.files?.onClose(tab.file);
   };
-  /** The focus goes back where it was, or to the selected tab when that element left with its tab. */
   const returnFocus = (event: Event) => {
     const back = menuReturn?.focus?.isConnected
       ? menuReturn.focus
@@ -312,10 +382,14 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
     back.focus();
   };
   return (
-    <ContextMenu.Root>
+    <ContextMenu.Root onOpenChange={coverForTabMenu.setOpen}>
       <SidePanelTabRow {...props} onTabMenu={pickMenuTab} onTabMenuPress={pickTouchMenuTab} />
       <ContextMenu.Portal>
-        <ContextMenu.Content aria-label={t("conversation.sidePanel.tabActions")} onCloseAutoFocus={returnFocus}>
+        <ContextMenu.Content
+          ref={coverForTabMenu.ref}
+          aria-label={t("conversation.sidePanel.tabActions")}
+          onCloseAutoFocus={returnFocus}
+        >
           <Show when={menuThread()}>
             {(thread) => (
               <>
@@ -327,11 +401,76 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
               </>
             )}
           </Show>
+          <Show when={actionMenuPane()}>
+            {(pane) => (
+              <>
+                <For each={props.moves ?? []}>
+                  {(move) => (
+                    <ContextMenu.Item class="side-panel-menu-item" onSelect={() => props.onMove?.(pane(), move)}>
+                      {SIDE_PANEL_MOVES[move].icon()}
+                      {t(SIDE_PANEL_MOVES[move].label)}
+                    </ContextMenu.Item>
+                  )}
+                </For>
+                <Show when={props.windows?.[pane()]}>
+                  {(open) => (
+                    <ContextMenu.Item class="side-panel-menu-item" onSelect={() => open()()}>
+                      <SquareArrowOutUpRight aria-hidden="true" />
+                      {t("conversation.sidePanel.openWindow")}
+                    </ContextMenu.Item>
+                  )}
+                </Show>
+                <Show when={pane() === "browser" && props.pageTabs}>
+                  {(pageTabs) => (
+                    <ContextMenu.Item
+                      class="side-panel-menu-item"
+                      onSelect={() => pageTabs().onChange(!pageTabs().shown)}
+                    >
+                      <PageTabsIcon shown={pageTabs().shown} />
+                      {t(pageTabsText(pageTabs().shown))}
+                    </ContextMenu.Item>
+                  )}
+                </Show>
+                <ContextMenu.Separator />
+              </>
+            )}
+          </Show>
           <Show when={liveMenuTab()}>
             <ContextMenu.Item class="side-panel-menu-item" onSelect={closeMenuTab}>
               <X aria-hidden="true" />
               {t("conversation.threads.closeTab")}
             </ContextMenu.Item>
+          </Show>
+          <Show when={threadRemovable() && menuThreadItem()}>
+            {(thread) => (
+              <>
+                <ContextMenu.Separator />
+                <Show when={props.threads?.onArchive}>
+                  {(archive) => (
+                    <ContextMenu.Item
+                      class="side-panel-menu-item"
+                      disabled={threadBusy(thread().status)}
+                      onSelect={() => archive()(thread().id)}
+                    >
+                      <Archive aria-hidden="true" />
+                      {t("conversation.threads.archive")}
+                    </ContextMenu.Item>
+                  )}
+                </Show>
+                <Show when={props.threads?.onDelete}>
+                  {(remove) => (
+                    <ContextMenu.Item
+                      class="side-panel-menu-item ui-action-menu-danger"
+                      disabled={threadBusy(thread().status) || thread().status.kind === "queued"}
+                      onSelect={() => remove()(thread().id)}
+                    >
+                      <Trash2 aria-hidden="true" />
+                      {t("common.delete")}
+                    </ContextMenu.Item>
+                  )}
+                </Show>
+              </>
+            )}
           </Show>
         </ContextMenu.Content>
       </ContextMenu.Portal>
@@ -339,25 +478,34 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
   );
 }
 
-/**
- * The top row of the side panel: a tab for each open pane, each thread that shows beside the chat and
- * each open file, then Add and Maximize. A file tab shows the file-type badge of a file link.
- * The X at the end of a tab closes it. It shows on the selected tab, and on another tab under the
- * pointer or with the focus. A middle click also closes a tab.
- * All tabs have one width. When they do not fit, the row scrolls (also with a vertical wheel), its
- * edges fade, and a menu lists the tabs out of view. After a close with the pointer, the tabs keep their
- * width until the pointer leaves the row, so the next X is under the pointer.
- * Add lists the panes that are not open. While the Browser pane is open, Add lists New tab first, so the
- * pane needs no row of its own. Add goes away when it has nothing to list.
- *
- * The tabs are one tab stop. The arrow keys, Home and End select a tab; Delete closes it. The close
- * button is for the pointer only, so the tab list holds only tabs. The panes are labeled regions of
- * their own, so no tab panel is registered.
- *
- * A thread tab drags to a new place among the thread tabs, and to the chat, which opens the thread in
- * the chat header. While the pointer takes a thread tab of the chat header over the panel, the panel
- * shows where the drop puts it. A file tab drags to a new place among the file tabs.
- */
+function pixels(value: string): number {
+  return Number.parseFloat(value.replace(/^\w+\(/, "")) || 0;
+}
+
+function tabWidthFloor(tab: HTMLElement): number {
+  const shrinksToContent = CSS.supports("min-width", "calc-size(max-content, size)");
+  return shrinksToContent ? 0 : pixels(getComputedStyle(tab).minWidth);
+}
+
+function wantedTabWidth(tab: HTMLElement, basis: number): number {
+  const select = tab.querySelector<HTMLElement>(".side-panel-tab-select");
+  const label = tab.querySelector<HTMLElement>(".side-panel-tab-label");
+  if (!select || !label) return tab.offsetWidth;
+  const contentEnd = (select.lastElementChild ?? label).getBoundingClientRect().right;
+  const slack = select.getBoundingClientRect().right - pixels(getComputedStyle(select).paddingInlineEnd) - contentEnd;
+  const content = tab.offsetWidth - Math.max(0, slack) + Math.max(0, label.scrollWidth - label.clientWidth);
+  return Math.max(tabWidthFloor(tab), basis > 0 ? Math.min(basis, content) : content);
+}
+
+function wantedTabsWidth(list: HTMLElement): number {
+  const tabs = [...list.querySelectorAll<HTMLElement>(":scope > .side-panel-tab")];
+  const style = getComputedStyle(list);
+  const gaps = pixels(style.columnGap) * Math.max(0, tabs.length - 1);
+  const padding = pixels(style.paddingInlineStart) + pixels(style.paddingInlineEnd);
+  const basis = pixels(style.getPropertyValue("--side-panel-tab-basis"));
+  return tabs.reduce((sum, tab) => sum + wantedTabWidth(tab, basis), padding + gaps);
+}
+
 function SidePanelTabRow(
   props: SidePanelHeaderProps & {
     onTabMenu: (event: MouseEvent) => void;
@@ -365,29 +513,49 @@ function SidePanelTabRow(
   },
 ) {
   const { t } = useText();
+  const coverForHidden = coveringMenu();
+  const coverForAdd = coveringMenu();
+  const coverForMore = coveringMenu();
+  const coverForAll = coveringMenu();
   let root: HTMLDivElement | undefined;
   let tabList: HTMLDivElement | undefined;
+  let actions: HTMLDivElement | undefined;
+  const [crowded, setCrowded] = createSignal(false);
   const closedPanes = () => inPaneOrder(props.available).filter((pane) => !props.panes.includes(pane));
   const threads = () => props.threads?.items ?? [];
   const files = () => props.files?.items ?? [];
+  const pages = () => props.browsers?.items ?? [];
+  const pageTabs = (pane: SidePanelPane) => pane === "browser" && pages().length > 0;
   const hasTabs = () => props.panes.length + threads().length + files().length > 0;
   const newBrowserTab = () =>
     props.panes.includes("browser") && props.available.includes("browser") ? props.onNewBrowserTab : undefined;
   const labelOf = (pane: SidePanelPane) => paneLabel(t, pane, props.settingsLabel);
+  const actionPane = () =>
+    props.threads?.selectedId == null &&
+    props.files?.selectedKey == null &&
+    props.selected !== null &&
+    props.panes.includes(props.selected)
+      ? props.selected
+      : null;
+  const actionWindow = () => {
+    const pane = actionPane();
+    return pane ? props.windows?.[pane] : undefined;
+  };
+  const actionPageTabs = () => (actionPane() === "browser" ? props.pageTabs : undefined);
   const selectedValue = () => {
     const thread = props.threads?.selectedId;
     if (thread) return `${THREAD_VALUE}${thread}`;
     const file = props.files?.selectedKey;
     if (file) return fileValue(file);
+    const page = props.browsers?.selectedId;
+    if (page) return `${PAGE_VALUE}${page}`;
     return props.selected ?? "__none";
   };
-  /** The value of each tab, in tab order. */
   const tabValues = () => [
-    ...props.panes,
+    ...props.panes.flatMap((pane) => (pageTabs(pane) ? pages().map((page) => `${PAGE_VALUE}${page.id}`) : [pane])),
     ...threads().map((thread) => `${THREAD_VALUE}${thread.id}`),
     ...files().map((file) => fileValue(file.key)),
   ];
-  /** Delete closes the tab. The closed tab leaves the list, so focus moves to the tab that takes its place. */
   const onTabKeyDown = (event: KeyboardEvent, value: string, close: () => void) => {
     if (event.key !== "Delete" && event.key !== "Backspace") return;
     event.preventDefault();
@@ -397,32 +565,66 @@ function SidePanelTabRow(
     const next = values[Math.min(index, values.length - 1)];
     if (next) tabList?.querySelector<HTMLElement>(`[data-key="${CSS.escape(next)}"]`)?.focus();
   };
+  const showAdd = () => hasTabs() && (newBrowserTab() !== undefined || closedPanes().length > 0);
+  const showMore = () =>
+    actionPane() !== null &&
+    ((props.moves?.length ?? 0) > 0 || actionWindow() !== undefined || actionPageTabs() !== undefined);
+  const showMaximize = () => hasTabs() && props.onCloseGroup === undefined;
+  const actionCount = () => [showAdd(), showMore(), showMaximize()].filter(Boolean).length;
+  const combined = () => crowded() && actionCount() > 1;
+  const fitActions = () => {
+    const list = tabList;
+    if (!list || !actions) return;
+    const need = wantedTabsWidth(list);
+    if (!crowded()) {
+      if (need > list.clientWidth + 1) setCrowded(true);
+      return;
+    }
+    const trigger = actions.querySelector<HTMLElement>(".side-panel-all-actions");
+    const step = (trigger?.offsetWidth ?? 0) + pixels(getComputedStyle(actions).columnGap);
+    const freed = combined() ? (actionCount() - 1) * step : 0;
+    if (need + freed <= list.clientWidth) setCrowded(false);
+  };
   const tabRow = createTabRow({
     list: () => tabList,
     tabs: (list) => [...list.querySelectorAll<HTMLElement>(":scope > .side-panel-tab")],
     key: (tab) => tab.dataset.value ?? "",
+    measured: fitActions,
   });
   const row = tabRow.row;
-  // A memo, so a change to the tabs that keeps the selection does not scroll the row.
   createEffect(createMemo(selectedValue), (value) => tabRow.reveal(value));
+  createEffect(
+    createMemo(() => row.hidden.length > 0),
+    () => tabRow.reveal(untrack(selectedValue)),
+  );
   createEffect(
     () => tabValues().join(),
     () => tabRow.measure(),
   );
-  /** Keeps the focus where it is. A focus in the list goes to the selected tab, and the row scrolls to it. */
   const keepFocus = (event: MouseEvent) => event.preventDefault();
   const closeWithPointer = (value: string, close: () => void) => {
     tabRow.freeze(value);
     close();
   };
-  /** Each tab, in tab order, for the menu of the tabs out of view. */
   const entries = (): TabEntry[] => [
-    ...props.panes.map((pane) => ({
-      value: pane,
-      label: labelOf(pane),
-      icon: () => <PaneIcon pane={pane} />,
-      select: () => props.onSelect(pane),
-    })),
+    ...props.panes.flatMap((pane): TabEntry[] =>
+      pageTabs(pane)
+        ? pages().map((page) => ({
+            value: `${PAGE_VALUE}${page.id}`,
+            label: page.title,
+            icon: () => <PageTabIcon page={page} />,
+            select: () => props.browsers?.onSelect(page.id),
+          }))
+        : [
+            {
+              value: pane,
+              label: labelOf(pane),
+              icon: () => <PaneIcon pane={pane} />,
+              badge: props.badges?.[pane],
+              select: () => props.onSelect(pane),
+            },
+          ],
+    ),
     ...threads().map((thread) => ({
       value: `${THREAD_VALUE}${thread.id}`,
       label: thread.title,
@@ -437,12 +639,83 @@ function SidePanelTabRow(
     })),
   ];
   const hiddenEntries = () => entries().filter((entry) => row.hidden.includes(entry.value));
+  createEffect(
+    () =>
+      `${actionCount()}|${entries()
+        .map((entry) => entry.label)
+        .join("|")}`,
+    () => tabRow.measure(),
+  );
+  const addItems = (paneText: (pane: SidePanelPane) => string) => (
+    <>
+      <Show when={newBrowserTab() !== undefined}>
+        <DropdownMenu.Item class="side-panel-menu-item" onSelectAfterClose={() => newBrowserTab()?.()}>
+          <Plus aria-hidden="true" />
+          {t("browser.newTab")}
+        </DropdownMenu.Item>
+        <Show when={closedPanes().length > 0}>
+          <DropdownMenu.Separator />
+        </Show>
+      </Show>
+      <For each={closedPanes()}>
+        {(pane) => (
+          <DropdownMenu.Item class="side-panel-menu-item" onSelectAfterClose={() => props.onSelect(pane)}>
+            <PaneIcon pane={pane} />
+            {paneText(pane)}
+            <PaneBadge badge={props.badges?.[pane]} />
+          </DropdownMenu.Item>
+        )}
+      </For>
+    </>
+  );
+  const moreItems = () => (
+    <>
+      <For each={props.moves ?? []}>
+        {(move) => (
+          <DropdownMenu.Item
+            class="side-panel-menu-item"
+            onSelectAfterClose={() => {
+              const pane = actionPane();
+              if (pane) props.onMove?.(pane, move);
+            }}
+          >
+            {SIDE_PANEL_MOVES[move].icon()}
+            {t(SIDE_PANEL_MOVES[move].label)}
+          </DropdownMenu.Item>
+        )}
+      </For>
+      <Show when={actionWindow()}>
+        {(open) => (
+          <>
+            <Show when={(props.moves?.length ?? 0) > 0}>
+              <DropdownMenu.Separator />
+            </Show>
+            <DropdownMenu.Item class="side-panel-menu-item" onSelectAfterClose={() => open()()}>
+              <SquareArrowOutUpRight aria-hidden="true" />
+              {t("conversation.sidePanel.openWindow")}
+            </DropdownMenu.Item>
+          </>
+        )}
+      </Show>
+      <Show when={actionPageTabs()}>
+        {(pageTabs) => (
+          <>
+            <Show when={(props.moves?.length ?? 0) > 0 || actionWindow() !== undefined}>
+              <DropdownMenu.Separator />
+            </Show>
+            <DropdownMenu.Item
+              class="side-panel-menu-item"
+              onSelectAfterClose={() => pageTabs().onChange(!pageTabs().shown)}
+            >
+              <PageTabsIcon shown={pageTabs().shown} />
+              {t(pageTabsText(pageTabs().shown))}
+            </DropdownMenu.Item>
+          </>
+        )}
+      </Show>
+    </>
+  );
   const carriedHere = () => carriedThreadTab()?.from === "chat";
-  /**
-   * Focus from the arrow keys selects the tab. Focus from a pointer waits for the click, so a drag does
-   * not select the tab. Focus that comes back from another window has no related target and keeps the
-   * selected tab.
-   */
   const keyboardFocus = (event: FocusEvent) =>
     event.relatedTarget !== null &&
     event.currentTarget instanceof Element &&
@@ -458,19 +731,11 @@ function SidePanelTabRow(
     const clearShifts = (group: TabGroup) => {
       for (const tab of groupTabs(group)) tab.style.transform = "";
     };
-    /**
-     * The chat is at the inline start of the panel: left of it, or right of it right to left. A
-     * maximized panel covers the chat, so it has no chat to drop on.
-     */
     const overChat = (x: number, rightToLeft: boolean) => {
       if (props.maximized || root === undefined) return false;
       const bounds = root.getBoundingClientRect();
       return rightToLeft ? x > bounds.right : x < bounds.left;
     };
-    /**
-     * Moves the held tab with the pointer, and the other tabs of its kind make room. A tab can be much
-     * narrower than the held one, so the leading edge of the held tab, not its center, finds its place.
-     */
     const follow = (current: TabHold) => {
       const tabId = TAB_GROUPS[current.group].id;
       const items = groupTabs(current.group).map((tab) => ({ tab, left: tab.offsetLeft, width: tab.offsetWidth }));
@@ -495,10 +760,6 @@ function SidePanelTabRow(
         item.tab.style.transform = shift === 0 ? "" : `translateX(${shift}px)`;
       });
     };
-    /**
-     * Puts the held tab in its new place. Each tab of its kind slides from where it shows now. The move
-     * takes the focused tab out of the document for a moment, so the focus goes back to it.
-     */
     const reorder = (current: TabHold, index: number) => {
       const focused = element.contains(document.activeElement) ? document.activeElement : null;
       const before = new Map(groupTabs(current.group).map((tab) => [tab, tab.getBoundingClientRect().left]));
@@ -507,6 +768,7 @@ function SidePanelTabRow(
         tab.style.transform = "";
       }
       if (current.group === "thread") props.threads?.onMove(current.id, index);
+      else if (current.group === "page") props.browsers?.onMove(current.id, index);
       else props.files?.onMove(current.id, index);
       flush();
       if (focused instanceof HTMLElement && focused !== document.activeElement) focused.focus({ preventScroll: true });
@@ -514,17 +776,12 @@ function SidePanelTabRow(
         const offset = left - tab.getBoundingClientRect().left;
         if (Math.abs(offset) > 0.5) tab.style.transform = `translateX(${offset}px)`;
       }
-      // Start the slide from the old places.
       element.getBoundingClientRect();
       for (const tab of before.keys()) {
         tab.style.transition = "";
         tab.style.transform = "";
       }
     };
-    /**
-     * Near an end of the row, the row scrolls under the held tab, faster nearer the end, so the tab can go
-     * to a place out of view. The held tab follows each scroll, also one from the wheel.
-     */
     const edgeScroll = () => {
       const current = hold;
       if (!current?.moving) return;
@@ -545,7 +802,6 @@ function SidePanelTabRow(
         current.frame = requestAnimationFrame(edgeScroll);
       }
       current.away = overChat(event.clientX, current.rightToLeft);
-      // Over the chat, the tab goes back to its place. A thread tab fades, and a copy follows the pointer.
       tabOf(current)?.setAttribute("data-dragged", current.away ? "away" : "");
       if (current.away) {
         clearShifts(current.group);
@@ -584,17 +840,20 @@ function SidePanelTabRow(
     };
     const onStart = (event: PointerEvent) => {
       if (event.button !== 0 || !event.isPrimary || hold || !(event.target instanceof Element)) return;
-      // A press on the X closes the tab.
       if (event.target.closest(".side-panel-tab-close")) return;
       const threadId = event.target.closest<HTMLElement>(".side-panel-thread-tab")?.dataset.threadId;
       const fileKey = event.target.closest<HTMLElement>(".side-panel-file-tab")?.dataset.fileKey;
+      const pageId = event.target.closest<HTMLElement>(".side-panel-page-tab")?.dataset.pageId;
       const thread = threads().find((item) => item.id === threadId);
       const file = files().find((item) => item.key === fileKey);
+      const page = pages().find((item) => item.id === pageId);
       const held = thread
         ? { group: "thread" as const, id: thread.id, thread }
         : file
           ? { group: "file" as const, id: file.key, thread: null }
-          : null;
+          : page
+            ? { group: "page" as const, id: page.id, thread: null }
+            : null;
       if (!held) return;
       hold = {
         ...held,
@@ -626,11 +885,10 @@ function SidePanelTabRow(
 
   return (
     <>
-      {/* The row is also the trigger of the tab menu, so the row stays a direct child of the panel. */}
       <Tabs.Root
         as={ContextMenu.Trigger}
         ref={root}
-        class="window-drag side-panel-header"
+        class={props.split ? "side-panel-header" : "window-drag side-panel-header"}
         value={selectedValue()}
         activationMode="automatic"
         onContextMenu={props.onTabMenu}
@@ -639,7 +897,7 @@ function SidePanelTabRow(
         <Tabs.List
           ref={tabList}
           class="side-panel-tabs"
-          aria-label={t("conversation.sidePanel.label")}
+          aria-label={props.label ?? t("conversation.sidePanel.label")}
           data-frozen={row.frozen ? "" : undefined}
           data-fade-start={row.fadeStart ? "" : undefined}
           data-fade-end={row.fadeEnd ? "" : undefined}
@@ -649,55 +907,108 @@ function SidePanelTabRow(
           <For each={props.panes}>
             {(pane) => {
               const label = () => labelOf(pane);
+              const pageTab = (page: () => SidePanelBrowserTab) => {
+                const value = () => `${PAGE_VALUE}${page().id}`;
+                const selected = () => props.browsers?.selectedId === page().id;
+                const select = () => props.browsers?.onSelect(page().id);
+                const close = () => props.browsers?.onClose(page().id);
+                return (
+                  <div
+                    role="presentation"
+                    class="side-panel-tab side-panel-page-tab no-drag"
+                    data-value={value()}
+                    data-page-id={page().id}
+                    data-selected={selected() ? "true" : undefined}
+                  >
+                    <Tabs.Trigger
+                      as="button"
+                      type="button"
+                      value={value()}
+                      class={buttonVariants({ variant: "ghost", class: "side-panel-tab-select" })}
+                      aria-keyshortcuts="Delete"
+                      title={page().title}
+                      onClick={select}
+                      onAuxClick={(event: MouseEvent) => {
+                        if (event.button === 1) closeWithPointer(value(), close);
+                      }}
+                      onFocus={(event) => keyboardFocus(event) && !selected() && select()}
+                      onKeyDown={(event) => onTabKeyDown(event, value(), close)}
+                    >
+                      <span class="side-panel-tab-label">{page().title}</span>
+                    </Tabs.Trigger>
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      class="side-panel-tab-close"
+                      tabindex={-1}
+                      aria-hidden="true"
+                      onMouseDown={keepFocus}
+                      title={t("conversation.sidePanel.closePane", { name: page().title })}
+                      onClick={() => closeWithPointer(value(), close)}
+                    >
+                      <span class="side-panel-tab-icon">
+                        <PageTabIcon page={page()} />
+                      </span>
+                      <X class="side-panel-tab-x" aria-hidden="true" />
+                    </Button>
+                  </div>
+                );
+              };
               const selected = () =>
                 props.threads?.selectedId == null && props.files?.selectedKey == null && props.selected === pane;
               const close = () => props.onClose(pane);
               return (
-                <div
-                  role="presentation"
-                  class="side-panel-tab no-drag"
-                  data-value={pane}
-                  data-selected={selected() ? "true" : undefined}
+                <Show
+                  when={!pageTabs(pane)}
+                  fallback={
+                    <For each={pages()} keyed={(page) => page.id}>
+                      {pageTab}
+                    </For>
+                  }
                 >
-                  <Tabs.Trigger
-                    as="button"
-                    type="button"
-                    value={pane}
-                    class={buttonVariants({ variant: "ghost", class: "side-panel-tab-select" })}
-                    aria-keyshortcuts="Delete"
-                    title={label()}
-                    // As in the browser panel, only the user selects a pane: while the tabs register,
-                    // the controlled selection can be absent and suggest the first tab.
-                    onClick={() => props.onSelect(pane)}
-                    onAuxClick={(event: MouseEvent) => {
-                      if (event.button === 1) closeWithPointer(pane, close);
-                    }}
-                    // The arrow keys, Home and End move the focus and select the pane.
-                    onFocus={(event) => keyboardFocus(event) && !selected() && props.onSelect(pane)}
-                    onKeyDown={(event) => onTabKeyDown(event, pane, close)}
+                  <div
+                    role="presentation"
+                    class="side-panel-tab no-drag"
+                    data-value={pane}
+                    data-selected={selected() ? "true" : undefined}
                   >
-                    <span class="side-panel-tab-glyph">
-                      <PaneIcon pane={pane} />
-                    </span>
-                    <span class="side-panel-tab-label">{label()}</span>
-                  </Tabs.Trigger>
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    class="side-panel-tab-close"
-                    tabindex={-1}
-                    aria-hidden="true"
-                    onMouseDown={keepFocus}
-                    title={t("conversation.sidePanel.closePane", { name: label() })}
-                    onClick={() => closeWithPointer(pane, close)}
-                  >
-                    <X class="side-panel-tab-x" aria-hidden="true" />
-                  </Button>
-                </div>
+                    <Tabs.Trigger
+                      as="button"
+                      type="button"
+                      value={pane}
+                      class={buttonVariants({ variant: "ghost", class: "side-panel-tab-select" })}
+                      aria-keyshortcuts="Delete"
+                      title={label()}
+                      onClick={() => props.onSelect(pane)}
+                      onAuxClick={(event: MouseEvent) => {
+                        if (event.button === 1) closeWithPointer(pane, close);
+                      }}
+                      onFocus={(event) => keyboardFocus(event) && !selected() && props.onSelect(pane)}
+                      onKeyDown={(event) => onTabKeyDown(event, pane, close)}
+                    >
+                      <span class="side-panel-tab-label">{label()}</span>
+                      <PaneBadge badge={props.badges?.[pane]} />
+                    </Tabs.Trigger>
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      class="side-panel-tab-close"
+                      tabindex={-1}
+                      aria-hidden="true"
+                      onMouseDown={keepFocus}
+                      title={t("conversation.sidePanel.closePane", { name: label() })}
+                      onClick={() => closeWithPointer(pane, close)}
+                    >
+                      <span class="side-panel-tab-icon">
+                        <PaneIcon pane={pane} />
+                      </span>
+                      <X class="side-panel-tab-x" aria-hidden="true" />
+                    </Button>
+                  </div>
+                </Show>
               );
             }}
           </For>
-          {/* Keyed by id, so a tab keeps its element and its drag when its title or state changes. */}
           <For each={threads()} keyed={(thread) => thread.id}>
             {(thread) => {
               const value = () => `${THREAD_VALUE}${thread().id}`;
@@ -727,9 +1038,6 @@ function SidePanelTabRow(
                     onFocus={(event) => keyboardFocus(event) && !selected() && select()}
                     onKeyDown={(event) => onTabKeyDown(event, value(), close)}
                   >
-                    <span class="side-panel-tab-glyph">
-                      <ThreadTabIcon status={thread().status} unread={thread().unread} />
-                    </span>
                     <span class="side-panel-tab-label">{thread().title}</span>
                     <ThreadStatusText status={thread().status} unread={thread().unread} />
                   </Tabs.Trigger>
@@ -743,6 +1051,9 @@ function SidePanelTabRow(
                     title={t("conversation.threads.closeTab")}
                     onClick={() => closeWithPointer(value(), close)}
                   >
+                    <span class="side-panel-tab-icon">
+                      <ThreadTabIcon status={thread().status} unread={thread().unread} />
+                    </span>
                     <X class="side-panel-tab-x" aria-hidden="true" />
                   </Button>
                 </div>
@@ -778,9 +1089,6 @@ function SidePanelTabRow(
                     onFocus={(event) => keyboardFocus(event) && !selected() && select()}
                     onKeyDown={(event) => onTabKeyDown(event, value(), close)}
                   >
-                    <span class="side-panel-tab-glyph">
-                      <FileTabIcon file={file()} />
-                    </span>
                     <span class="side-panel-tab-label">{file().name}</span>
                   </Tabs.Trigger>
                   <Button
@@ -793,6 +1101,9 @@ function SidePanelTabRow(
                     title={t("conversation.sidePanel.closePane", { name: file().name })}
                     onClick={() => closeWithPointer(value(), close)}
                   >
+                    <span class="side-panel-tab-icon">
+                      <FileTabIcon file={file()} />
+                    </span>
                     <X class="side-panel-tab-x" aria-hidden="true" />
                   </Button>
                 </div>
@@ -800,9 +1111,9 @@ function SidePanelTabRow(
             }}
           </For>
         </Tabs.List>
-        <div class="side-panel-actions no-drag">
+        <div ref={actions} class="side-panel-actions no-drag">
           <Show when={row.hidden.length > 0}>
-            <DropdownMenu.Root modal={false} placement="bottom-end" gutter={4}>
+            <DropdownMenu.Root modal={false} placement="bottom-end" gutter={4} onOpenChange={coverForHidden.setOpen}>
               <DropdownMenu.Trigger
                 class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
                 aria-label={t("browser.tabs.more", { count: row.hidden.length })}
@@ -811,7 +1122,7 @@ function SidePanelTabRow(
                 <ChevronDown aria-hidden="true" />
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
-                <DropdownMenu.Content class="side-panel-hidden-tabs">
+                <DropdownMenu.Content ref={coverForHidden.ref} class="side-panel-hidden-tabs">
                   <For each={hiddenEntries()} keyed={(entry) => entry.value}>
                     {(entry) => (
                       <DropdownMenu.Item
@@ -823,7 +1134,8 @@ function SidePanelTabRow(
                         }}
                       >
                         <span class="side-panel-hidden-tab-icon">{entry().icon()}</span>
-                        <span>{entry().label}</span>
+                        <span class="side-panel-hidden-tab-label">{entry().label}</span>
+                        <PaneBadge badge={entry().badge} />
                       </DropdownMenu.Item>
                     )}
                   </For>
@@ -831,8 +1143,44 @@ function SidePanelTabRow(
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
           </Show>
-          <Show when={hasTabs() && (newBrowserTab() !== undefined || closedPanes().length > 0)}>
-            <DropdownMenu.Root placement="bottom-end" gutter={4}>
+          <Show when={combined()}>
+            <DropdownMenu.Root placement="bottom-end" gutter={4} onOpenChange={coverForAll.setOpen}>
+              <DropdownMenu.Trigger
+                class={buttonVariants({ variant: "ghost", size: "icon-sm", class: "side-panel-all-actions" })}
+                aria-label={t("conversation.sidePanel.more")}
+                title={t("conversation.sidePanel.more")}
+              >
+                <Ellipsis aria-hidden="true" />
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content ref={coverForAll.ref}>
+                  <Show when={showAdd()}>
+                    {addItems((pane) => t("conversation.sidePanel.openPane", { name: labelOf(pane) }))}
+                    <DropdownMenu.Separator />
+                  </Show>
+                  <Show when={showMore()}>
+                    {moreItems()}
+                    <Show when={showMaximize()}>
+                      <DropdownMenu.Separator />
+                    </Show>
+                  </Show>
+                  <Show when={showMaximize()}>
+                    <DropdownMenu.Item
+                      class="side-panel-menu-item"
+                      onSelectAfterClose={() => props.onToggleMaximized()}
+                    >
+                      <Show when={props.maximized} fallback={<Maximize2 aria-hidden="true" />}>
+                        <Minimize2 aria-hidden="true" />
+                      </Show>
+                      {t(props.maximized ? "conversation.sidePanel.restore" : "conversation.sidePanel.maximize")}
+                    </DropdownMenu.Item>
+                  </Show>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          </Show>
+          <Show when={!combined() && showAdd()}>
+            <DropdownMenu.Root placement="bottom-end" gutter={4} onOpenChange={coverForAdd.setOpen}>
               <DropdownMenu.Trigger
                 class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
                 aria-label={t("conversation.sidePanel.add")}
@@ -841,29 +1189,38 @@ function SidePanelTabRow(
                 <Plus aria-hidden="true" />
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
-                <DropdownMenu.Content>
-                  <Show when={newBrowserTab() !== undefined}>
-                    <DropdownMenu.Item class="side-panel-menu-item" onSelectAfterClose={() => newBrowserTab()?.()}>
-                      <Plus aria-hidden="true" />
-                      {t("browser.newTab")}
-                    </DropdownMenu.Item>
-                    <Show when={closedPanes().length > 0}>
-                      <DropdownMenu.Separator />
-                    </Show>
-                  </Show>
-                  <For each={closedPanes()}>
-                    {(pane) => (
-                      <DropdownMenu.Item class="side-panel-menu-item" onSelectAfterClose={() => props.onSelect(pane)}>
-                        <PaneIcon pane={pane} />
-                        {labelOf(pane)}
-                      </DropdownMenu.Item>
-                    )}
-                  </For>
-                </DropdownMenu.Content>
+                <DropdownMenu.Content ref={coverForAdd.ref}>{addItems(labelOf)}</DropdownMenu.Content>
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
           </Show>
-          <Show when={hasTabs()}>
+          <Show when={!combined() && showMore()}>
+            <DropdownMenu.Root placement="bottom-end" gutter={4} onOpenChange={coverForMore.setOpen}>
+              <DropdownMenu.Trigger
+                class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+                aria-label={t("conversation.sidePanel.more")}
+                title={t("conversation.sidePanel.more")}
+              >
+                <Ellipsis aria-hidden="true" />
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content ref={coverForMore.ref}>{moreItems()}</DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          </Show>
+          <Show when={props.onCloseGroup}>
+            {(close) => (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t("conversation.sidePanel.closeGroup")}
+                title={t("conversation.sidePanel.closeGroup")}
+                onClick={() => close()()}
+              >
+                <X aria-hidden="true" />
+              </Button>
+            )}
+          </Show>
+          <Show when={!combined() && showMaximize()}>
             <Button
               variant="ghost"
               size="icon-sm"
@@ -877,8 +1234,7 @@ function SidePanelTabRow(
               </Show>
             </Button>
           </Show>
-          {/* A maximized panel covers the chat header and its panel button, so Collapse takes its place. */}
-          <Show when={props.maximized}>
+          <Show when={props.maximized && !props.outerToggle}>
             <Button
               variant="ghost"
               size="icon-sm"
@@ -908,13 +1264,9 @@ function SidePanelTabRow(
   );
 }
 
-/**
- * With no open pane, the side panel lists the panes it can open. When the last tab closes, the focus
- * goes with it, so the first pane button takes the focus.
- */
 export function SidePanelLauncher(props: {
   available: readonly SidePanelPane[];
-  /** As in `SidePanelHeader`. */
+  badges?: Partial<Record<SidePanelPane, SidePanelPaneBadge>> | undefined;
   settingsLabel?: string | undefined;
   onOpen: (pane: SidePanelPane) => void;
 }) {
@@ -931,6 +1283,7 @@ export function SidePanelLauncher(props: {
           <Button variant="secondary" class="side-panel-launch" onClick={() => props.onOpen(pane)}>
             <PaneIcon pane={pane} />
             {t("conversation.sidePanel.openPane", { name: paneLabel(t, pane, props.settingsLabel) })}
+            <PaneBadge badge={props.badges?.[pane]} />
           </Button>
         )}
       </For>

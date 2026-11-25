@@ -1,17 +1,3 @@
-// Runs turns end to end on the real OpenCode driver against a fake `opencode acp` that picks its key
-// as OpenCode 1.18.30 to 1.18.35 do: config `options.apiKey` first, then the `auth.json` key, then
-// `OPENCODE_API_KEY`. An old key in `auth.json` used to win over the key pasted into OpenBot (#2544).
-// Checks that an expired key reads as the expired-key error, not "Internal error"; that a replaced
-// key reaches a new process and the same thread there, although `auth.json` still holds the old
-// key; that with no stored key the config names no key, so the user's own sign-in stays in use;
-// that a custom endpoint saved as `opencode-go` keeps its URL when a key is stored; that the stored
-// key reaches neither the free tier nor `OPENCODE_API_KEY`, so a refused key cannot fail the free
-// models (#7550); that a model whose provider has no sign-in names that provider and its fix
-// (#2746); that OpenCode 2's `-32000` for a refused saved key names the saved key, not a missing
-// sign-in (#9095), and a 403 that OpenCode 2 stored for the turn names the plan or the network, not the key
-// (#12281); and that a `-32000` for a provider with a key in OpenCode 2's own database says
-// that the provider refused the request, as a firewall's 403 does, not that a sign-in is missing (#10166).
-// `bun run test:opencode-expired-key`. Writes .openbot-build/opencode-expired-key-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -46,6 +32,9 @@ interface Report {
   authRequired?: { error: string };
   refusedV2?: { saved: string; notSaved: string; refused401: string | null; refused403: string | null };
   providerRefused?: { error: string };
+  inheritedEnvKey?: { envKey: string | null; configKey: string | null };
+  ownGoKey?: { error: string };
+  sameGoKey?: { error: string };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-expired-key-e2e-"));
@@ -55,15 +44,12 @@ const clients: AgentClient[] = [];
 let storedKey: string | null = "expired";
 let endpoints: CustomProviderConfig[] = [];
 process.env.FAKE_LOG = log;
-// `FAKE_AUTH_KEY` stands for the key in OpenCode's own `auth.json`.
 process.env.FAKE_AUTH_KEY = "expired";
-// OpenBot reads OpenCode's own key store here, never the developer's.
 const openCodeData = join(root, "data", "opencode");
 process.env.XDG_DATA_HOME = join(root, "data");
 delete process.env.OPENCODE_AUTH_CONTENT;
 delete process.env.OPENCODE_DB;
 
-/** A new process, as the provider runtime starts after a key change. The key is read at spawn. */
 function open(cli: AgentCliInfo): AgentClient {
   const client = requireProviderDriver("opencode").createClient(cli, 10_000, {
     ...NO_PROVIDER_CREDENTIALS,
@@ -82,15 +68,12 @@ try {
   await installFakeAgent(executable, "opencode-expired-key");
   const cli: AgentCliInfo = { executable, version: "1.18.30", source: "managed" };
 
-  // 1. An expired key reads as the expired-key error, with no "Internal error" in front of it.
   const first = open(cli);
   const thread = await startThread(first, { cwd: workspace });
   const { error } = await runTurn(first, thread);
   assert.equal(error, sourceText("error.provider.opencodeKeyExpired"), "An expired key names its own fix.");
   report.expired = { error };
 
-  // 2. A replaced key reaches the next process and the same thread, although `auth.json` still
-  // holds the expired key.
   await runCauseEffect(first.stop());
   storedKey = "fresh";
   const second = open(cli);
@@ -113,7 +96,6 @@ try {
   };
   await runCauseEffect(second.stop());
 
-  // 3. With no stored key the config names no key, so the user's own `auth.json` key stays in use.
   storedKey = null;
   process.env.FAKE_AUTH_KEY = "own";
   await rm(log, { force: true });
@@ -128,8 +110,6 @@ try {
   report.noStoredKey = { configKey: spawn?.configKey ?? null, key: ownPrompt?.key ?? null };
   await runCauseEffect(third.stop());
 
-  // 4. A custom endpoint saved as `opencode-go` replaces that built-in provider, so the stored key
-  // must not drop its URL. The free `opencode` provider gets no key.
   storedKey = "fresh";
   endpoints = [
     {
@@ -150,8 +130,6 @@ try {
   assert.equal(endpointSpawn.zenKey, null, "The free tier gets no stored key (#7550).");
   report.endpoint = { baseURL: endpointSpawn.baseURL ?? null, zenKey: endpointSpawn.zenKey ?? null };
 
-  // 5. A model whose provider has no sign-in names that provider and how to connect it, not the
-  // protocol's bare "Authentication required".
   storedKey = null;
   endpoints = [];
   process.env.FAKE_PROVIDER_AUTH = "1";
@@ -164,17 +142,11 @@ try {
   );
   report.authRequired = { error: authError };
 
-  // 6. OpenCode 2.2.5 sends a refused OpenCode Go key as `-32000` with no reason. With a saved key the
-  // error names that key and its fix. With no saved key OpenBot cannot tell a refused key from a
-  // missing one, so the error stays the missing sign-in.
   delete process.env.FAKE_PROVIDER_AUTH;
   storedKey = "expired-v2";
   const sixth = open(cli);
   const { error: saved } = await runTurn(sixth, await startThread(sixth, { cwd: workspace }));
   assert.equal(saved, sourceText("error.provider.opencodeKeyRefused"), "A refused saved key names its fix.");
-  // OpenCode 2.2.5 keeps the status of the refusal in the newest message row of the session. A 401 is
-  // the key, so the key text stays. A 403 refuses a valid key, such as a plan that is not active, so a
-  // new key cannot help and the error must not ask for one (#12281).
   await mkdir(openCodeData, { recursive: true });
   const sessions = new DatabaseSync(join(openCodeData, "opencode.db"));
   sessions.exec(
@@ -207,7 +179,6 @@ try {
   await runCauseEffect(sixth.stop());
   storedKey = null;
   process.env.FAKE_AUTH_KEY = "expired-v2";
-  // The Go key in OpenCode's own `auth.json` keeps the Go text, which names OpenBot's settings (#10166).
   await mkdir(openCodeData, { recursive: true });
   await writeFile(
     join(openCodeData, "auth.json"),
@@ -223,12 +194,9 @@ try {
   report.refusedV2 = { saved, notSaved, refused401, refused403 };
   await runCauseEffect(seventh.stop());
 
-  // 8. OpenCode 2.3.0 sends each 403 of a provider as `-32000`, also a firewall's block of a VPN
-  // address. With a key for that provider in OpenCode's own database, the provider refused the
-  // request: the error must not say that a sign-in is missing.
   const database = new DatabaseSync(join(openCodeData, "opencode.db"));
   database.exec(
-    "CREATE TABLE credential (id TEXT PRIMARY KEY, integration_id TEXT, label TEXT NOT NULL, value TEXT NOT NULL, active INTEGER)",
+    "CREATE TABLE credential (id TEXT PRIMARY KEY, integration_id TEXT, label TEXT NOT NULL, value TEXT NOT NULL, active INTEGER, time_created INTEGER NOT NULL DEFAULT 0)",
   );
   database
     .prepare("INSERT INTO credential (id, integration_id, label, value, active) VALUES (?, ?, ?, ?, ?)")
@@ -243,6 +211,54 @@ try {
     "A provider with a stored key reads as a refused request, not a missing sign-in.",
   );
   report.providerRefused = { error: refused };
+  await runCauseEffect(eighth.stop());
+
+  delete process.env.FAKE_PROVIDER_AUTH;
+  storedKey = "fresh";
+  const inheritedKey = process.env.OPENCODE_API_KEY;
+  process.env.OPENCODE_API_KEY = "old-env";
+  await rm(log, { force: true });
+  try {
+    await startThread(open(cli), { cwd: workspace });
+  } finally {
+    if (inheritedKey === undefined) delete process.env.OPENCODE_API_KEY;
+    else process.env.OPENCODE_API_KEY = inheritedKey;
+  }
+  const inheritedSpawn = (await readJsonl<LogEntry>(log)).find((entry) => entry.event === "spawn");
+  assert.equal(inheritedSpawn?.envKey, "", "With a saved key, an inherited OPENCODE_API_KEY is cleared (#15988).");
+  assert.equal(inheritedSpawn?.configKey, "fresh", "The saved key stays the OpenCode Go config key.");
+  assert.equal(inheritedSpawn?.zenKey, null, "The free tier gets no key (#7550).");
+  report.inheritedEnvKey = { envKey: inheritedSpawn?.envKey ?? null, configKey: inheritedSpawn?.configKey ?? null };
+
+  storedKey = "expired-v2";
+  const credentials = new DatabaseSync(join(openCodeData, "opencode.db"));
+  credentials
+    .prepare("INSERT INTO credential (id, integration_id, label, value, active) VALUES (?, ?, ?, ?, ?)")
+    .run("cred_2", "opencode-go", "API key", JSON.stringify({ type: "key", key: "old" }), null);
+  credentials.close();
+  const ninth = open(cli);
+  const { error: ownGo } = await runTurn(ninth, await startThread(ninth, { cwd: workspace }));
+  assert.equal(
+    ownGo,
+    sourceText("error.provider.opencodeOwnGoKeyRefused"),
+    "A Go key in OpenCode's own store is named as the refused key, not the key saved in OpenBot (#15988).",
+  );
+  report.ownGoKey = { error: ownGo };
+  await runCauseEffect(ninth.stop());
+
+  const sameKey = new DatabaseSync(join(openCodeData, "opencode.db"));
+  sameKey
+    .prepare("UPDATE credential SET value = ? WHERE id = ?")
+    .run(JSON.stringify({ type: "key", key: "expired-v2" }), "cred_2");
+  sameKey.close();
+  const tenth = open(cli);
+  const { error: sameGo } = await runTurn(tenth, await startThread(tenth, { cwd: workspace }));
+  assert.equal(
+    sameGo,
+    sourceText("error.provider.opencodeKeyRefused"),
+    "When OpenCode's own Go key is the saved key, the saved key is named as refused.",
+  );
+  report.sameGoKey = { error: sameGo };
   report.passed = true;
 } finally {
   await stopClients(clients);

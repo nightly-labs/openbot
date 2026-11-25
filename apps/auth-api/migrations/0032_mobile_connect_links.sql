@@ -1,6 +1,3 @@
--- A reusable Mobile Connect link for one desktop host. Only the SHA-256 hash of the link is stored.
--- A new table only: the deployed Worker does not read it.
--- The link stops when its desktop session, its host or its account is deleted.
 CREATE TABLE mobile_connect_links (
   link_hash TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

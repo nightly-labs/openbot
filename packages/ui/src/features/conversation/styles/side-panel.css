@@ -1,7 +1,3 @@
-/*
- * The side panel: a row of tabs in the top row, above the open pane. The panes keep their own
- * position and width; in the dock they start under the tab row.
- */
 .side-panel-header {
   position: absolute;
   z-index: 16;
@@ -9,14 +5,24 @@
   inset-inline-end: 0;
   display: flex;
   align-items: center;
-  gap: var(--openbot-space-1);
+  gap: var(--openbot-space-0-5);
   width: var(--side-panel-width, 380px);
   height: var(--left-header-height, 38px);
   min-width: 0;
   padding: 0 var(--openbot-space-2);
 }
 
-/* A short line at the start of the tab row, above the panel's divider. */
+.side-panel-toggle-slot {
+  position: absolute;
+  z-index: 17;
+  top: 0;
+  inset-inline-end: 0;
+  display: flex;
+  height: var(--left-header-height, 38px);
+  align-items: center;
+  padding-inline-end: calc(var(--openbot-space-2) + var(--openbot-space-1));
+}
+
 .side-panel-header::before {
   position: absolute;
   top: 50%;
@@ -35,8 +41,7 @@
   align-items: center;
   gap: var(--openbot-space-1);
   min-width: 0;
-  /* A tab drag measures `offsetLeft` from the left edge (`SidePanel.tsx`, `BrowserTabStrip.tsx`), so
-     the tabs keep the left-to-right order in every language. */
+
   direction: ltr;
 }
 
@@ -44,8 +49,13 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: var(--openbot-space-0-5);
+  gap: var(--openbot-space-1);
   color: var(--openbot-text-muted);
+}
+
+.side-panel-actions > .ui-button {
+  width: var(--openbot-control-sm);
+  height: var(--openbot-control-sm);
 }
 
 .side-panel-actions svg {
@@ -53,7 +63,6 @@
   height: var(--openbot-icon-sm);
 }
 
-/* A tab is the same chip as the other controls of the top row. */
 .side-panel-tab {
   position: relative;
   display: flex;
@@ -78,7 +87,6 @@
   color: var(--openbot-text-primary);
 }
 
-/* Between two tabs, in the middle of their gap. It hides next to the selected or hovered tab. */
 .side-panel-tab + .side-panel-tab::before {
   position: absolute;
   top: 50%;
@@ -113,13 +121,11 @@
   cursor: pointer;
 }
 
-/* The tab draws the hover fill, so the shared ghost hover of the button stays off. */
 .side-panel-tab-select:hover:not(:disabled):not([data-disabled]) {
   background: transparent;
   color: inherit;
 }
 
-/* The tab icon slot. On hover or focus, a round fill and an X replace the icon. */
 .side-panel-tab-close {
   position: relative;
   display: grid;
@@ -155,29 +161,23 @@
   opacity: 0;
 }
 
-/* In the side panel, the X sits over the end of the tab, and the icon keeps its place. The X shows on the
- * selected tab, and on another tab under the pointer or with the focus. */
 .side-panel-header .side-panel-tab-close {
   position: absolute;
   z-index: 1;
   top: 50%;
-  inset-inline-end: var(--openbot-space-1);
+  inset-inline-start: var(--openbot-space-1-5);
   translate: 0 -50%;
 }
 
-.side-panel-header :where(.side-panel-tab[data-selected]) .side-panel-tab-x {
-  opacity: 1;
-}
-
-.side-panel-tab:is(:hover, :focus-within) .side-panel-tab-close {
+.side-panel-tab:is(:hover, :has(:focus-visible)) .side-panel-tab-close {
   background: var(--openbot-bg-control-hover);
 }
 
-.side-panel-tab:is(:hover, :focus-within) .side-panel-tab-icon {
+.side-panel-tab:is(:hover, :has(:focus-visible)) .side-panel-tab-icon {
   opacity: 0;
 }
 
-.side-panel-tab:is(:hover, :focus-within) .side-panel-tab-x {
+.side-panel-tab:is(:hover, :has(:focus-visible)) .side-panel-tab-x {
   opacity: 1;
 }
 
@@ -191,15 +191,12 @@
   outline: none;
 }
 
-/* The tab row of the side panel. All tabs share one width, which shrinks to a minimum that still shows
- * a few words of the title; below it, the row scrolls and its edges fade (`SidePanel.tsx`). The row is
- * the offset parent of the tabs, so a drag and the scroll into view measure the tabs in it. */
 .side-panel-header > .side-panel-tabs {
   --side-panel-tab-fade: calc(var(--openbot-space-8) * 2);
+  --side-panel-tab-basis: 140px;
   position: relative;
   overflow-x: auto;
   padding: var(--openbot-space-0-5);
-  /* A tab that scrolls into view keeps the padding, so the first tab does not start under the fade. */
   scroll-padding-inline: var(--openbot-space-0-5);
   scrollbar-width: none;
 }
@@ -227,8 +224,8 @@
 }
 
 .side-panel-header .side-panel-tab {
-  flex: 0 1 200px;
-  min-width: min(120px, 100%);
+  flex: 0 1 var(--side-panel-tab-basis, 140px);
+  min-width: min(96px, 100%);
   padding: 0;
   user-select: none;
   transition:
@@ -236,38 +233,28 @@
     transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/*
- * After a close with the pointer, the tabs keep their width until the pointer leaves the row. The width
- * does not animate on the way in, so the next X is under the pointer at once.
- */
+@supports (min-width: calc-size(max-content, size)) {
+  .side-panel-header .side-panel-tab {
+    min-width: calc-size(max-content, min(96px, 100%, size));
+  }
+}
+
 .side-panel-header > .side-panel-tabs[data-frozen] > .side-panel-tab {
   flex: 0 0 var(--side-panel-tab-frozen);
   transition-property: transform;
 }
 
-/* The whole tab selects it: the icon, the title and the state of a thread. */
 .side-panel-header .side-panel-tab-select {
   display: flex;
   flex: 1;
   align-items: center;
+  justify-content: flex-start;
   align-self: stretch;
   gap: var(--openbot-space-1-5);
-  padding-inline: var(--openbot-space-1-5) var(--openbot-space-2);
+  padding-inline: calc(var(--openbot-space-1-5) * 2 + var(--side-panel-tab-mark, var(--openbot-icon-md)))
+    var(--openbot-space-2);
   border-radius: inherit;
   text-align: start;
-}
-
-.side-panel-tab-glyph {
-  display: grid;
-  flex: none;
-  place-items: center;
-  min-width: var(--openbot-icon-md);
-  opacity: 0.7;
-}
-
-.side-panel-tab-glyph svg {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
 }
 
 .side-panel-header .side-panel-tab-label {
@@ -277,23 +264,23 @@
   white-space: nowrap;
 }
 
-/* The X gives the title room only while it shows. */
-.side-panel-header :where(.side-panel-tab:is([data-selected], :hover, :focus-within)) .side-panel-tab-select {
-  padding-inline-end: calc(var(--openbot-icon-md) + var(--openbot-space-1) * 2);
+.side-panel-tab-count.z-badge {
+  min-width: 18px;
+  height: 18px;
+  flex: none;
+  justify-content: center;
+  padding: 0 var(--openbot-space-1);
+  font-variant-numeric: tabular-nums;
 }
 
-/* A touch does not hover, so only the X that shows takes a tap. */
-@media (pointer: coarse) {
-  .side-panel-header .side-panel-tab:not([data-selected], :focus-within) .side-panel-tab-close {
-    pointer-events: none;
-  }
+:is(.side-panel-launch, .side-panel-menu-item) .side-panel-tab-count.z-badge {
+  margin-inline-start: auto;
 }
 
 .side-panel-hidden-tabs {
   max-width: 320px;
 }
 
-/* File badges have different widths, so the icons share one column and the names start at one line. */
 .side-panel-hidden-tab-icon {
   display: inline-flex;
   flex: none;
@@ -301,14 +288,13 @@
   inline-size: var(--openbot-space-6);
 }
 
-.side-panel-hidden-tabs .side-panel-menu-item > span:last-child {
+.side-panel-hidden-tab-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* In the dock, a pane starts under the tab row. Its inset card starts at the top row's line. */
 .side-panel-docked > :is(.browser-panel, .settings-panel) {
   top: var(--left-header-height, 38px);
 }
@@ -317,19 +303,15 @@
   top: -1px;
 }
 
-/* The tab in the top row names the pane and closes it, so a pane does not repeat its title or its
- * close button. A pane keeps only what the tab does not have: Back, the task actions, the file summary. */
 .side-panel-docked :is(.side-panel-pane-header, .side-panel-pane-title, .side-panel-pane-close) {
   display: none;
 }
 
-/* The settings header is three fixed columns, so its title stays in the middle without the button. */
 .side-panel-docked .settings-panel-header > .side-panel-pane-close {
   display: inline-flex;
   visibility: hidden;
 }
 
-/* With no open pane, the dock lists the panes it can open. */
 .side-panel-empty {
   justify-content: center;
 }
@@ -349,8 +331,95 @@
   gap: var(--openbot-space-3);
 }
 
-/* A maximized dock covers the chat and its header. */
-.side-panel-maximized > :is(.browser-panel, .settings-panel, .side-panel-header) {
+.side-panel-split {
+  --side-split-area: calc(
+    (100% - var(--left-header-height, 38px)) *
+    var(--side-split-share, var(--side-split-count, 1) / (var(--side-split-count, 1) + 1))
+  );
+}
+
+.side-panel-split > :is(.browser-panel, .settings-panel) {
+  bottom: var(--side-split-area);
+}
+
+.side-splits {
+  position: absolute;
+  z-index: 14;
+  inset-inline-end: 0;
+  bottom: 0;
+  display: flex;
+  width: var(--side-panel-width, 380px);
+  height: var(--side-split-area);
+  min-height: 0;
+  flex-direction: column;
+  border-inline-start: 1px solid var(--openbot-border);
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+}
+
+.side-split {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  border-top: 1px solid var(--openbot-border);
+}
+
+.side-split:has(+ .side-split) {
+  flex-grow: calc(1 - var(--side-split-lower, 0.5));
+}
+
+.side-split + .side-split {
+  flex-grow: var(--side-split-lower, 0.5);
+}
+
+.side-split > .side-panel-header {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  width: auto;
+  flex: none;
+}
+
+.side-split > .side-panel-header::before {
+  display: none;
+}
+
+.side-splits-resizer.panel-resizer {
+  position: absolute;
+  z-index: 40;
+  top: 0;
+  inset-inline: 0;
+}
+
+.side-split-body {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.side-split-body > :is(.browser-panel, .settings-panel) {
+  inset: 0;
+  width: auto;
+  max-width: none;
+  border: 0;
+  animation: none;
+}
+
+.side-split-body .right-panel-resizer,
+.side-splits :is(.side-panel-pane-header, .side-panel-pane-title, .side-panel-pane-close) {
+  display: none;
+}
+
+.side-splits .settings-panel-header > .side-panel-pane-close {
+  display: inline-flex;
+  visibility: hidden;
+}
+
+.side-panel-maximized > :is(.browser-panel, .settings-panel, .side-panel-header, .side-splits) {
   width: 100%;
 }
 
@@ -363,7 +432,6 @@
   visibility: hidden;
 }
 
-/* Pane icons have the size of the other menu and row icons. */
 :is(.side-panel-launch, .side-panel-menu-item) svg {
   flex: none;
   width: var(--openbot-icon-sm);
@@ -371,7 +439,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* A file tab shows the file-type badge of a file link at its size in the chat. */
 .side-panel-file-badge {
   display: inline-flex;
 }
@@ -381,8 +448,6 @@
   height: 12px;
 }
 
-/* In the dock, the file tab names the file. The title keeps its place, so the file actions stay at
- * the end of the toolbar. The file comes in with its tab, as the other panes do, without a slide. */
 .side-panel-docked .file-preview-header > .file-preview-file-icon {
   display: none;
 }
@@ -395,9 +460,6 @@
   transition: none;
 }
 
-/* A thread tab: the state badge of the thread takes the icon slot at its own size, and the X shows
- * over it on hover in the copy that a drag carries. A thread that needs the user wears the tint of its
- * badge, as in the chat header. */
 .side-panel-tab-close:has(.agent-threads-state) {
   width: auto;
   min-width: var(--openbot-icon-md);
@@ -405,19 +467,30 @@
   min-height: var(--openbot-icon-md);
 }
 
-.side-panel-tab:not(:hover, :focus-within) .side-panel-tab-icon:has(.agent-threads-state),
-.side-panel-tab-glyph:has(.agent-threads-state) {
+.side-panel-tab:not(:hover, :has(:focus-visible)) .side-panel-tab-icon:has(.agent-threads-state) {
   opacity: 1;
 }
 
-:is(.side-panel-tab-icon, .side-panel-tab-glyph) .agent-threads-state-icon svg {
+.side-panel-tab-icon .agent-threads-state-icon svg {
   width: 12px;
   height: 12px;
 }
 
-/* A thread or file tab that the pointer moves follows the pointer and wears the selection fill, so it covers
- * the tabs that it passes. The dividers and the X hide until the drop. Over the chat, the tab goes
- * back to its place, faded, and a copy follows the pointer. */
+@media (pointer: coarse) {
+  .side-panel-header .side-panel-tab:not([data-selected], :focus-within) .side-panel-tab-close {
+    pointer-events: none;
+  }
+
+  .side-panel-header .side-panel-tab[data-selected] .side-panel-tab-icon,
+  .side-panel-header .side-panel-tab[data-selected] .side-panel-tab-icon:has(.agent-threads-state) {
+    opacity: 0;
+  }
+
+  .side-panel-header .side-panel-tab[data-selected] .side-panel-tab-x {
+    opacity: 1;
+  }
+}
+
 .side-panel-tabs[data-dragging],
 .side-panel-tabs[data-dragging] .side-panel-tab-select {
   cursor: grabbing;
@@ -452,7 +525,6 @@
   opacity: 1;
 }
 
-/* The copy of a thread tab that the pointer takes from one tab row to the other. */
 .thread-tab-ghost {
   position: fixed;
   z-index: 1000;
@@ -471,7 +543,6 @@
   text-overflow: ellipsis;
 }
 
-/* Where a thread tab of the chat header goes when the pointer lets it go over the side panel. */
 .side-panel-drop {
   position: absolute;
   z-index: 17;
@@ -493,5 +564,135 @@
 @media (prefers-reduced-motion: reduce) {
   .side-panel-header .side-panel-tab {
     transition: none;
+  }
+}
+
+.side-panel-header .side-panel-tab:has(.agent-threads-state-working) {
+  --side-panel-tab-mark: var(--openbot-space-6);
+}
+
+.conversation-panel > .conversation-header {
+  transition: padding-inline-end var(--panel-resize-duration, var(--openbot-duration-overlay))
+    cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@property --side-panel-reveal {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --side-panel-slide {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.conversation-panel.browser-panel-active {
+  --side-panel-reveal: var(--browser-panel-width, 380px);
+}
+
+.conversation-panel.browser-panel-active > .side-panel-header {
+  --side-panel-reveal: inherit;
+  --side-panel-slide: calc(var(--browser-panel-width, 380px) - var(--side-panel-reveal));
+  translate: var(--side-panel-slide) 0;
+  clip-path: inset(-100vh calc(var(--side-panel-slide) + var(--side-panel-toggle-space, 0px)) -100vh -100vw);
+}
+
+.conversation-panel.browser-panel-active > .side-panel-header:dir(rtl) {
+  translate: calc(-1 * var(--side-panel-slide)) 0;
+  clip-path: inset(-100vh -100vw -100vh calc(var(--side-panel-slide) + var(--side-panel-toggle-space, 0px)));
+}
+
+.conversation-panel.browser-panel-active > :is(.browser-panel, .settings-panel, .side-splits) {
+  --side-panel-reveal: inherit;
+  --side-panel-slide: calc(var(--browser-panel-width, 380px) - var(--side-panel-reveal));
+  translate: var(--side-panel-slide) 0;
+  clip-path: inset(-100vh var(--side-panel-slide) -100vh -100vw);
+}
+
+.conversation-panel.browser-panel-active > :is(.browser-panel, .settings-panel, .side-splits):dir(rtl) {
+  translate: calc(-1 * var(--side-panel-slide)) 0;
+  clip-path: inset(-100vh -100vw -100vh var(--side-panel-slide));
+}
+
+html:active-view-transition-type(side-panel-close)
+  .side-panel-docked
+  > :is(.side-panel-header, .browser-panel, .settings-panel, .side-splits) {
+  view-transition-name: match-element;
+  view-transition-class: side-panel;
+}
+
+html:active-view-transition-type(side-panel-close) .conversation-panel > .side-panel-toggle-slot {
+  view-transition-name: match-element;
+  view-transition-class: side-panel-toggle;
+}
+
+html:active-view-transition-type(side-panel-close)::view-transition-group(.side-panel-toggle),
+html:active-view-transition-type(side-panel-close)::view-transition-new(.side-panel-toggle) {
+  animation: none;
+}
+
+html:active-view-transition-type(side-panel-close)::view-transition-old(.side-panel-toggle) {
+  animation: none;
+  opacity: 0;
+}
+
+html:active-view-transition-type(side-panel-close)::view-transition-old(root),
+html:active-view-transition-type(side-panel-close)::view-transition-new(root) {
+  animation: none;
+}
+
+html:active-view-transition-type(side-panel-close)::view-transition-old(root) {
+  opacity: 0;
+}
+
+html:active-view-transition-type(side-panel-close)::view-transition-group(.side-panel) {
+  animation: none;
+}
+
+html:active-view-transition-type(side-panel-close)::view-transition-old(.side-panel) {
+  animation: side-panel-close var(--openbot-duration-overlay) cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html:active-view-transition-type(side-panel-close):dir(rtl)::view-transition-old(.side-panel) {
+  animation-name: side-panel-close-rtl;
+}
+
+@keyframes side-panel-close {
+  to {
+    translate: 100% 0;
+  }
+}
+
+@keyframes side-panel-close-rtl {
+  to {
+    translate: -100% 0;
+  }
+}
+
+.conversation-panel:has(> .side-panel-toggle-slot) > .side-panel-header {
+  --side-panel-toggle-space: calc(
+    var(--openbot-space-2) +
+    var(--openbot-space-1) +
+    var(--openbot-control-sm) +
+    var(--openbot-space-1)
+  );
+  padding-inline-end: var(--side-panel-toggle-space);
+}
+
+.conversation-panel:has(> .side-panel-toggle-slot > [aria-expanded="false"]) > .conversation-header {
+  padding-inline-end: calc(
+    var(--openbot-space-2) +
+    var(--openbot-space-1) +
+    var(--openbot-control-sm) +
+    var(--openbot-space-4) +
+    1px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversation-panel.browser-panel-active > :is(.side-panel-header, .browser-panel, .settings-panel, .side-splits) {
+    --side-panel-slide: 0px;
   }
 }

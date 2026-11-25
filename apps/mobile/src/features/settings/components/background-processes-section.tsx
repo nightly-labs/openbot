@@ -20,13 +20,6 @@ import { useText } from "@/shared/lib/text";
 const ICON_SIZE = 26;
 const STARTED_FORMAT: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
 
-/**
- * Settings > Agents > Background processes of one server (`background-processes-v1`): the programs
- * that its agents started and left running, such as a dev server, each with Stop. As the section of
- * the desktop Settings > Agents. The host has no event for these programs, so the page reads them
- * each time it opens. Nothing shows for a host without the capability, or one that cannot find these
- * programs, as on Windows.
- */
 export function BackgroundProcessesSection({ serverId, online }: { serverId: string; online: boolean }) {
   const { t, format, errorMessage } = useText();
   const queryScope = useQueryScope();
@@ -93,7 +86,6 @@ export function BackgroundProcessesSection({ serverId, online }: { serverId: str
   }
 
   const processes = query.data ?? [];
-  // With no program to show, a message takes the place of the rows, as a row of the card.
   const message =
     processes.length > 0
       ? null

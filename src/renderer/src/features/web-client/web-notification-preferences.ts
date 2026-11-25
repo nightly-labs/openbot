@@ -4,10 +4,6 @@ import { z } from "zod";
 
 type NotificationStorage = Pick<Storage, "getItem" | "setItem">;
 
-/**
- * `mutedUntil` null is a mute without an end. An absent `mutedUntil` is no mute. A value this build
- * does not know, such as a level of a newer build, is dropped alone, so the other choices stay.
- */
 const storedSchema = z.record(
   z.string(),
   z
@@ -28,7 +24,6 @@ type Stored = z.infer<typeof storedSchema>;
 export interface WebServerNotificationState {
   muted: boolean;
   mutedUntil: number | null;
-  /** The level for all devices of the user when the host keeps one, else the level of this browser. */
   level: ServerNotificationLevel;
 }
 
@@ -45,17 +40,9 @@ function read(accountId: string, storage: NotificationStorage): Stored {
   }
 }
 
-/**
- * Mute and notification level of each host, as the desktop keeps them for each server. The web client
- * has no main process, so this browser keeps them for the account. Other tabs follow through `storage`.
- * A host with `agent-notification-levels-v1` keeps the level of the user for all devices: that level,
- * as the host last gave it, replaces the level of this browser, which stays as the fallback.
- */
 export function createWebServerNotifications(accountId: string, storage: NotificationStorage = window.localStorage) {
   const [stored, setStored] = createSignal<Stored>(read(accountId, storage));
-  /** The level that each host keeps for all devices of the user. Null: the host keeps none. */
   const [synced, setSynced] = createSignal<Readonly<Record<string, ServerNotificationLevel | null>>>({});
-  // A timed mute ends with no stored change, so the rail reads the state again at its end.
   const [tick, setTick] = createSignal(0);
   let expiry: ReturnType<typeof setTimeout> | undefined;
 
@@ -78,9 +65,7 @@ export function createWebServerNotifications(accountId: string, storage: Notific
     scheduleExpiry(next);
     try {
       storage.setItem(storageKey(accountId), JSON.stringify(next));
-    } catch {
-      // The choice holds for this tab when browser storage is unavailable.
-    }
+    } catch {}
   }
   function update(hostId: string, change: Stored[string]): void {
     const current = stored();
@@ -104,7 +89,6 @@ export function createWebServerNotifications(accountId: string, storage: Notific
       tick();
       const entry = stored()[hostId];
       const mutedUntil = entry?.mutedUntil;
-      // An expired timed mute is no mute, as on desktop.
       const muted = mutedUntil === null || (typeof mutedUntil === "number" && mutedUntil > Date.now());
       return {
         muted,
@@ -115,11 +99,9 @@ export function createWebServerNotifications(accountId: string, storage: Notific
     setMuted(hostId: string, muted: boolean, durationMs?: number): void {
       update(hostId, { mutedUntil: muted ? (durationMs === undefined ? null : Date.now() + durationMs) : undefined });
     },
-    /** Sets the level of this browser, the fallback for a host that keeps no level for the user. */
     setLevel(hostId: string, level: ServerNotificationLevel): void {
       update(hostId, { level });
     },
-    /** The level that a host gave for all devices of the user, or null when it keeps none. */
     setSyncedLevel(hostId: string, level: ServerNotificationLevel | null): void {
       if ((synced()[hostId] ?? null) === level) return;
       setSynced((current) => ({ ...current, [hostId]: level }));

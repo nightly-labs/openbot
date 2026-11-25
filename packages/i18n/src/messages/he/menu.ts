@@ -8,6 +8,7 @@ export const messages = {
   "menu.actualSize": "גודל בפועל",
   "menu.zoomIn": "הגדלה",
   "menu.zoomOut": "הקטנה",
+  "menu.closeDeveloperTools": "סגירת כלי המפתחים",
   "menu.copyLink": "העתקת קישור",
   "menu.copyImage": "העתקת תמונה",
   "menu.quit": "יציאה מ-OpenBot",

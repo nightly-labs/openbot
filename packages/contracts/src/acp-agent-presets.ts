@@ -1,14 +1,5 @@
-// Known agents that speak the Agent Client Protocol on stdio. The UI offers them as a start for the
-// form, and the scan looks for these command names only: it never starts a file to learn what it is.
-//
-// Unverified: each flag comes from the agent's own documentation as of September 2026, not from a
-// run in OpenBot. "Check agent" is the test, and a changed flag is one edit in the form. Oh My Pi is
-// the exception: `omp acp` from omp 18.8.4 ran as a custom agent in #1690.
-
 export interface AcpAgentPreset {
-  /** The custom agent id to suggest. */
   id: string;
-  /** The product name, which is the same in each language. */
   name: string;
   command: string;
   args: readonly string[];
@@ -17,6 +8,5 @@ export interface AcpAgentPreset {
 export const ACP_AGENT_PRESETS: readonly AcpAgentPreset[] = [
   { id: "goose", name: "Goose", command: "goose", args: ["acp"] },
   { id: "qwen", name: "Qwen Code", command: "qwen", args: ["--acp"] },
-  { id: "copilot", name: "GitHub Copilot", command: "copilot", args: ["--acp"] },
   { id: "omp", name: "Oh My Pi", command: "omp", args: ["acp"] },
 ];

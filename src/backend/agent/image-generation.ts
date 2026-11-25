@@ -7,7 +7,6 @@ export function isImageGenerationItem(item: ThreadItem): boolean {
   return item.type === "image_generation_call" || item.type === "imageGeneration";
 }
 
-/** A video that an agent made with a tool. Only the Grok media tools give one (`grok-media.ts`). */
 export function isVideoGenerationItem(item: ThreadItem): boolean {
   return item.type === "videoGeneration";
 }
@@ -30,6 +29,10 @@ export function imageGenerationFailure(item: ThreadItem): string | null {
   return getString(failure, "message") ?? getString(item, "error") ?? getString(item, "failure");
 }
 
+export function imageGenerationUsageLimited(item: ThreadItem): boolean {
+  return getString(getRecord(item, "failure"), "type") === "usageLimitExceeded";
+}
+
 export function generatedImageName(savedPath: string): string {
   const extension = savedPath.match(/\.(png|jpe?g|webp|gif|avif)$/i)?.[1]?.toLowerCase() ?? "png";
   return `generated-image.${extension}`;
@@ -38,10 +41,6 @@ export function generatedImageName(savedPath: string): string {
 const VIDEO_NAME_WORDS = 6;
 const VIDEO_NAME_LENGTH = 48;
 
-/**
- * The file name of a generated video: the first words of its prompt, so that the chat and a download
- * show what the video is. Without a prompt, or with one that has no letters, the name is "generated-video".
- */
 export function generatedVideoName(savedPath: string, prompt?: string | null): string {
   const extension = savedPath.match(/\.(mp4|webm|mov)$/i)?.[1]?.toLowerCase() ?? "mp4";
   const words =
@@ -69,7 +68,6 @@ export function decodeGeneratedImage(value: string): Uint8Array {
   return bytes;
 }
 
-/** The image or video info of a generation message, or null for another message. */
 export function generatedMediaInfo(
   message: ConversationMessage,
 ): { kind: GeneratedMediaKind; info: { error?: string | undefined } } | null {

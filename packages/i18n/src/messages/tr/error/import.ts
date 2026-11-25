@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/import";
 
 export const messages = {
-  // Agent import errors and warnings.
   "error.import.manifestNotJson": "{manifest} geçerli bir JSON değil.",
   "error.import.notAgentExport": "{manifest} bir OpenBot ajan dışa aktarımı değil.",
   "error.import.newerExportSkill":

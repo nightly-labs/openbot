@@ -1,19 +1,3 @@
-// Checks the start import of a Claude Code transcript after a full read (#7686). Runs the real
-// Claude history reader, the provider history importer and SQLite on a temporary profile, with a
-// transcript of many turns. No app, provider, account or network is started.
-//
-// The starts:
-// 1. The first import reads all turns.
-// 2. The next start with an unchanged transcript reads all turns again and saves its turn list.
-// 3. A start with an unchanged transcript sends only the newest turn.
-// 4. New turns, made while OpenBot was closed, import.
-// 5. A rewind: a new prompt answers from inside an older turn, so later turns leave the branch. The
-//    turn list changed, so the read sends all the turns of the new branch, and the new turn imports.
-// 6. A rewritten transcript reads all turns, and its turns import.
-// Each start keeps every earlier answer in the chat.
-//
-// Run: bun scripts/claude-history-resume-e2e.ts
-// Writes .openbot-build/claude-history-resume-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -45,7 +29,6 @@ const report: { turns: number; starts: Start[]; passed: boolean; error?: string 
   passed: false,
 };
 
-/** One line of a Claude Code transcript, without the fields that every line has. */
 interface TranscriptRecord {
   type: "user" | "assistant";
   uuid: string;
@@ -55,7 +38,6 @@ interface TranscriptRecord {
 let parent: string | null = null;
 let clock = Date.parse("2026-11-01T08:00:00.000Z");
 
-/** Claude Code records of `count` turns: a prompt, three tool calls and a final answer each. */
 function turns(prefix: string, count: number): string {
   const lines: string[] = [];
   const push = (record: TranscriptRecord) => {

@@ -1,7 +1,3 @@
-// Group messages with sender keys (`skmsg`) and SenderKeyDistributionMessages. A sender encrypts with
-// a symmetric chain and signs each message; receivers get the chain key and the signing public key
-// from the distribution message.
-
 import { randomBytes, randomInt } from "node:crypto";
 import { aesCbcDecrypt, aesCbcEncrypt, bytesEqual, concatBytes } from "./crypto";
 import { type CurveKeyPair, generateKeyPair, sign, verify, withKeyType } from "./curve";
@@ -28,7 +24,6 @@ export interface OwnSenderKeyInput {
   signingKeyPair: CurveKeyPair;
 }
 
-/** Our own sender key record with one state. Without input, the key ID and keys are random. */
 export function createOwnSenderKey(input?: OwnSenderKeyInput): SenderKeyRecord {
   const signingKeyPair = input?.signingKeyPair ?? generateKeyPair();
   return {
@@ -45,12 +40,10 @@ export function createOwnSenderKey(input?: OwnSenderKeyInput): SenderKeyRecord {
   };
 }
 
-/** True when the record holds our own sender key. */
 export function isOwnSenderKey(record: SenderKeyRecord): boolean {
   return record.states.at(-1)?.signingPrivateKey !== undefined;
 }
 
-/** Distribution message for the current iteration and chain key of our own sender key. */
 export function createDistributionMessage(record: SenderKeyRecord): Uint8Array {
   const state = ownState(record);
   return encodeSenderKeyDistributionMessage({
@@ -61,10 +54,6 @@ export function createDistributionMessage(record: SenderKeyRecord): Uint8Array {
   });
 }
 
-/**
- * Adds the state of a received distribution message. A message for a state that the record has
- * (same key ID and signing key) changes nothing, so kept message keys stay.
- */
 export function processDistributionMessage(
   record: SenderKeyRecord | undefined,
   serialized: Uint8Array,
@@ -89,7 +78,6 @@ export function processDistributionMessage(
   return { states: next.slice(-MAX_SENDER_KEY_STATES) };
 }
 
-/** Encrypts with the current chain iteration, then advances the chain by one. */
 export function encryptGroupMessage(record: SenderKeyRecord, plaintext: Uint8Array): Uint8Array {
   const state = ownState(record);
   const signingPrivateKey = state.signingPrivateKey;
@@ -106,7 +94,6 @@ export function encryptGroupMessage(record: SenderKeyRecord, plaintext: Uint8Arr
   return concatBytes(signed, sign(signingPrivateKey, signed));
 }
 
-/** Decrypts an `skmsg`. The record changes only on success. */
 export function decryptGroupMessage(record: SenderKeyRecord, serialized: Uint8Array): Uint8Array {
   const message = decodeSenderKeyMessage(serialized);
   const index = record.states.findLastIndex((state) => state.keyId === message.keyId);

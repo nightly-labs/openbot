@@ -26,6 +26,7 @@ export const messages = {
   "mcp.signIn.pageDescription": "该页面已在 {host} 的浏览器中打开，请在这里登录。",
   "mcp.signIn.copyHint": "如果页面无法加载，请复制链接并在其他浏览器中打开。",
   "mcp.signIn.copyLink": "复制链接",
+  "mcp.signIn.pasteHint": "如果你在其他设备上登录，请在完成后复制该设备浏览器显示的地址并粘贴到这里。",
   "mcp.test.connected": { one: "已连接 · {count} 个工具", other: "已连接 · {count} 个工具" },
   "mcp.status.testing": "测试中…",
   "mcp.status.failed": "失败",
@@ -34,6 +35,7 @@ export const messages = {
   "mcp.status.signedIn": "已登录",
   "mcp.status.signingIn": "正在登录…",
   "mcp.status.signInNeeded": "需要登录",
+  "mcp.status.signInAppNeeded": "需要登录应用",
   "mcp.status.refused": "被拒绝",
   "mcp.status.checkUrl": "请检查 URL",
   "mcp.status.noAnswer": "无响应",
@@ -91,6 +93,7 @@ export const messages = {
   "mcp.panel.signIn": "登录",
   "mcp.panel.signOut": "退出登录",
   "mcp.panel.cancelSignIn": "取消登录",
+  "mcp.panel.useAddress": "使用此地址",
   "mcp.panel.signInTo": "登录 {name}",
   "mcp.panel.signInWaiting": {
     one: "请在浏览器中完成登录。OpenBot 将在 {count} 分钟后停止等待。",

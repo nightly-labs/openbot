@@ -25,11 +25,10 @@ import type {
 } from "@openbot/ui/features/custom-providers/detected-providers";
 import type { ProviderDetectionSettingsValue } from "@openbot/ui/features/custom-providers/ProviderDetectionSettings";
 import { currentText } from "@openbot/ui/text";
-import { createStore } from "solid-js";
+import { createStore, snapshot } from "solid-js";
 import type { createCustomAgentsStore } from "../../custom-agents/stores/custom-agents-store";
 import type { createCustomProvidersStore } from "./custom-providers-store";
 
-/** A change to the lists is saved when the user stops typing, not on each key. */
 const SETTINGS_SAVE_DELAY_MS = 400;
 
 interface ProviderDetectionState {
@@ -37,13 +36,11 @@ interface ProviderDetectionState {
   agents: DetectedAcpAgent[];
   scanningServers: boolean;
   scanningAgents: boolean;
-  /** Null until main answers, so the settings section does not show defaults it has not read. */
   settings: ProviderDetectionSettings | null;
   settingsError: string | null;
   scanned: boolean;
 }
 
-/** The scans and the detection settings of one computer, with its server already chosen. */
 export interface ProviderDetectionCalls {
   scanModelServers: () => Promise<DetectedModelServer[]>;
   scanAgents: () => Promise<DetectedAcpAgent[]>;
@@ -60,10 +57,6 @@ interface ProviderDetectionStoreOptions {
     ReturnType<typeof createCustomProvidersStore>,
     "customProviders" | "saveCustomProvider" | "updateCustomProvider"
   >;
-  /**
-   * The custom agents of the same computer. A joined server's host has no trial start in
-   * `custom-agents-v1`, so its agents come without `checkCustomAgent`, and the form has no Check.
-   */
   agents: Pick<AgentsStore, "customAgents" | "saveCustomAgent"> & Partial<Pick<AgentsStore, "checkCustomAgent">>;
 }
 
@@ -121,11 +114,6 @@ function agentRow(found: DetectedAcpAgent, saved: CustomAgentSummary | undefined
   };
 }
 
-/**
- * What one computer found: local model servers and known ACP agent commands, with the saved ones
- * marked, and the settings of where to look. `api` names the computer: this one, or a joined
- * server's host, which scans itself.
- */
 export function createProviderDetectionStore(options: ProviderDetectionStoreOptions) {
   const [state, setState] = createStore<ProviderDetectionState>({
     servers: [],
@@ -136,14 +124,11 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
     settingsError: null,
     scanned: false,
   });
-  /** A reply to an older scan must not replace the rows of a newer one. */
   let generation = 0;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let pendingRescan = false;
   let settingsLoad: Promise<ProviderDetectionSettings | null> | undefined;
-  /** The value main last accepted. Its lists are valid, also while the user types one that is not. */
   let lastSaved: ProviderDetectionSettings | null = null;
-  /** One write at a time, so the reply to an older write cannot replace what a newer one saved. */
   let writes: Promise<void> = Promise.resolve();
 
   function settings(): ProviderDetectionSettings {
@@ -162,7 +147,6 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
         });
         return value;
       } catch {
-        // A settings file this build cannot read still leaves a scan with the defaults.
         settingsLoad = undefined;
         return null;
       }
@@ -192,8 +176,6 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
       draft.scanningAgents = true;
       draft.scanned = true;
     });
-    // Each source replaces its own rows when it answers, so a quick server list does not wait for
-    // the agent lookup. A failed source finds nothing: detection is a help, not a requirement.
     const servers = group
       .scanModelServers()
       .catch(() => [])
@@ -217,15 +199,10 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
     await Promise.all([servers, agents]);
   }
 
-  /** First run scans once, however often the step renders. */
   function scanOnce(): void {
     if (!state.scanned) void scan();
   }
 
-  /**
-   * Saves the value that `payload` gives when the write starts. `listsChanged` is false for Hide
-   * and Show hidden, whose reply must not replace lists that the user is still typing.
-   */
   function writeSettings(payload: () => ProviderDetectionSettings, listsChanged: boolean, rescan: boolean): void {
     const group = options.api();
     if (!group) return;
@@ -234,9 +211,8 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
     });
     writes = writes.then(async () => {
       try {
-        const saved = await group.setSettings(payload());
+        const saved = await group.setSettings(snapshot(payload()));
         lastSaved = saved;
-        // An edit made while this save ran is newer than its reply, and its own save follows.
         if (listsChanged && saveTimer === undefined) {
           setState((draft) => {
             draft.settings = saved;
@@ -252,7 +228,6 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
     });
   }
 
-  /** The switch and the lists. A new place to look scans again once the change is saved. */
   function setSettings(value: ProviderDetectionSettingsValue): void {
     const next: ProviderDetectionSettings = {
       enabled: value.enabled,
@@ -261,7 +236,6 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
       hiddenIds: [...settings().hiddenIds],
     };
     const before = settings();
-    // Each key press restarts the delay, so a change of place stays pending until the save runs.
     pendingRescan ||=
       before.enabled !== next.enabled ||
       before.addresses.join("\n") !== next.addresses.join("\n") ||
@@ -274,15 +248,10 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
       saveTimer = undefined;
       const rescan = pendingRescan;
       pendingRescan = false;
-      // The current value, not the one of the last key press: a Hide in the delay stays saved.
       writeSettings(settings, true, rescan);
     }, SETTINGS_SAVE_DELAY_MS);
   }
 
-  /**
-   * Hide and Show hidden are one click each, so they save at once, with the lists main last
-   * accepted: a list the user is still typing may not be valid yet, and main refuses the whole write.
-   */
   function setHidden(hiddenIds: string[]): void {
     setState((draft) => {
       draft.settings = { ...settings(), hiddenIds };
@@ -325,7 +294,6 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
     return async (value, savedAgentId) => checkResult(await check(customAgentCheckInput(value, savedAgentId)));
   }
 
-  /** First run scans once, so it has no scan-again control. */
   const firstRunApi: DetectedProviderApi = {
     save,
     hide: (provider) => setHidden([...new Set([...settings().hiddenIds, provider.key])]),
@@ -352,7 +320,6 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
     scan,
     scanOnce,
     loadSettings,
-    /** The switch and the lists, for the settings section. Null until main answers. */
     settingsValue: (): ProviderDetectionSettingsValue | null => state.settings,
     settingsError: () => state.settingsError,
     setSettings,

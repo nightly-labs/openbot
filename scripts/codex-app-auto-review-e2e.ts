@@ -1,10 +1,3 @@
-// Checks issue #12353: a ChatGPT app (Codex `codex_apps`) that refuses to run because Codex has full
-// access and its automatic approval review is off gets one plain OpenBot notice for the chat, for an
-// agent with Ask first or Full access. A Workspace only agent, another failure of the app, and the same
-// text from another MCP server keep the old behavior. OpenBot still sends `approvalsReviewer: "user"`.
-// Runs the real agent service on a temporary profile with a fake Codex app-server. A turn whose input
-// has `APP-CASE <name>` completes one `mcpToolCall` item of that case, then answers.
-// `bun scripts/codex-app-auto-review-e2e.ts`. Writes .openbot-build/codex-app-auto-review-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -22,7 +15,6 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -38,15 +30,9 @@ const { LibraryFoldersStore } = await import("../src/backend/library-folders-sto
 
 const CASE_MARK = "APP-CASE";
 const NOTICE_CODE = "mcp_app_auto_review";
-/** The text of issue #12353, as the app sends it. */
 const REFUSAL =
   'Finances and Health tools are unavailable in Full Access mode while automatic approval review is disabled. Switch to "Approve for me" mode, then retry.';
 
-/**
- * A Codex app-server with the methods that the service calls. It logs the params of each
- * `thread/start`, `thread/resume` and `turn/start`. A turn with `APP-CASE <name>` first completes the
- * `mcpToolCall` item of that case.
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -157,9 +143,9 @@ const browser: AgentBrowserHost = {
   shareTab: () => undefined,
   unshareThread: () => undefined,
   agentTab: () => null,
+  toolCanUseTab: () => false,
 };
 
-/** Waits for a state of the service. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -212,25 +198,23 @@ const agents = new AgentService({
     mutate: (action, context) => library.mutate(action, context),
     removeAgent: (agentId) => library.removeAgent(agentId),
     fileAgents: () => Effect.succeed(new Map<string, string | null>()),
+    fileWorkflows: () => Effect.succeed(new Map()),
   },
   preferredProvider: "codex",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
   timezone: () => "UTC",
-  // Ask first: the agent reaches the whole computer and asks, as the reporter's agent did.
   approvalAutomation: {
     autoApproves: () => false,
     set: () => Effect.succeed({ defaultAutoApprove: false, autoApproveOverrides: {} }),
   },
 });
 
-/** The error events that the service sends, in order. */
 const errors: { code: string; message: string; agentId?: string }[] = [];
 agents.on("event", (event) => {
   if (event.type === "error")
     errors.push({ code: event.code, message: event.message, ...(event.agentId ? { agentId: event.agentId } : {}) });
 });
 
-/** Waits until the agent's chat has no open delivery. */
 function idle(agentId: string) {
   return waitFor("the chat turn to end", () =>
     agents
@@ -239,7 +223,6 @@ function idle(agentId: string) {
   );
 }
 
-/** Runs one turn of a case and returns the notices of this issue that it sent. */
 async function runCase(name: string, agentId: string, access: string) {
   const before = errors.length;
   const turnsBefore = requestLogs().filter((entry) => entry.method === "turn/start").length;
@@ -274,7 +257,6 @@ try {
   );
   await idle(agent.id);
 
-  // 1. The refusal of the issue, with full access: one notice in the user's terms.
   const fromResult = await runCase("refusal-result", agent.id, "full");
   pass(
     "The refusal in the tool result gives one notice with the OpenBot text",
@@ -288,13 +270,11 @@ try {
     JSON.stringify(fromError),
   );
 
-  // 2. Other failures keep the old behavior.
   const other = await runCase("other-failure", agent.id, "full");
   pass("Another failure of a ChatGPT app gives no notice", other.length === 0, JSON.stringify(other));
   const ownServer = await runCase("other-server", agent.id, "full");
   pass("The same text from another MCP server gives no notice", ownServer.length === 0, JSON.stringify(ownServer));
 
-  // 3. The approval settings that OpenBot sends do not change (#7800).
   const requests = requestLogs();
   pass(
     "Each thread and turn request still sends approvalsReviewer user",
@@ -302,7 +282,6 @@ try {
     JSON.stringify(requests),
   );
 
-  // 4. A Workspace only agent does not have full access, so the app's text does not apply to it.
   await runCauseEffect(agents.updateAgent({ agentId: agent.id, access: "workspace" }));
   const workspace = await runCase("refusal-result", agent.id, "workspace");
   const lastTurn = requestLogs()

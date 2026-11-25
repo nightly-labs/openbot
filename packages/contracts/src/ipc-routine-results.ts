@@ -2,32 +2,9 @@ import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { MESSAGING_LIMITS, MESSAGING_PLATFORMS, type MessagingPlatform } from "./ipc-messaging";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
-/**
- * Routine results: the answer of an agent routine's run, sent on to a messaging place outside OpenBot.
- * Whether the answer reached the place is the delivery's status, not the run's: a run that succeeded
- * keeps that status when its delivery fails. Only this computer's host keeps a destination. An owner or
- * admin of a joined server reads the connections and sets a destination through `routine-results-v1`;
- * the deliveries never cross the Team API.
- */
-
-/**
- * - `pending` waits to try again: the connection does not run now.
- * - `sending` is on its way.
- * - `sent` reached the place.
- * - `failed` did not reach the place, and nothing of it was posted.
- * - `uncertain` failed or stopped during the post: a part of a long answer can be in the place.
- */
 export const ROUTINE_RESULT_DELIVERY_STATUSES = ["pending", "sending", "sent", "failed", "uncertain"] as const;
 export type RoutineResultDeliveryStatus = (typeof ROUTINE_RESULT_DELIVERY_STATUSES)[number];
 
-/**
- * - `expired`: the connection did not run for a day.
- * - `connection-gone`: the connection was removed or turned off.
- * - `refused`: the connection cannot post in that place.
- * - `send-failed`: the platform refused or did not answer the post.
- * - `restart`: OpenBot stopped during the post.
- * - `stopped`: the user stopped sending to a place before the answer went.
- */
 export const ROUTINE_RESULT_DELIVERY_REASONS = [
   "expired",
   "connection-gone",
@@ -38,7 +15,6 @@ export const ROUTINE_RESULT_DELIVERY_REASONS = [
 ] as const;
 export type RoutineResultDeliveryReason = (typeof ROUTINE_RESULT_DELIVERY_REASONS)[number];
 
-/** The place a routine sends its answers to, with the names the user picked it by. */
 export interface RoutineResultDestination {
   connectionId: string;
   platform: MessagingPlatform;
@@ -52,7 +28,6 @@ export interface RoutineResultPlace {
   name: string;
 }
 
-/** An enabled connection and the places it can post in. `placesFailed` is true when the platform did not answer. */
 export interface RoutineResultConnectionOption {
   connectionId: string;
   platform: MessagingPlatform;
@@ -76,7 +51,6 @@ export interface RoutineResultRoutineInput {
   routineId: string;
 }
 
-/** Null `destination` stops sending. The connection's name and platform come from the host. */
 export interface SetRoutineResultDestinationInput {
   agentId: string;
   routineId: string;
@@ -164,14 +138,12 @@ export function isResendRoutineResultInput(value: unknown): value is ResendRouti
   return isDynamicRecord(value) && isIdentifier(value.agentId) && isIdentifier(value.runId);
 }
 
-/** The `routine-results-v1` options answer. The route codec has already checked its fields. */
 export function decodeRoutineResultConnectionOptions(value: unknown): RoutineResultConnectionOption[] {
   if (!isDynamicRecord(value) || !isRoutineResultConnectionOptions(value.connections))
     throw new Error("Invalid routine result connections.");
   return value.connections;
 }
 
-/** The `routine-results-v1` destination answer. */
 export function decodeRoutineResultDestinationAnswer(value: unknown): RoutineResultDestination | null {
   if (!isDynamicRecord(value) || !isNullableRoutineResultDestination(value.destination))
     throw new Error("Invalid routine result destination.");

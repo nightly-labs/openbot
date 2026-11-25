@@ -19,14 +19,13 @@ import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { CONNECTOR_LISTINGS } from "../connectors/connector-catalog";
+import { XTile } from "../settings/brand-marks";
 import { LogoTile } from "../settings/IntegrationLayout";
 import type { MarketplaceListing } from "./marketplace-listing";
 import type { MarketplaceApp, MarketplaceModel } from "./marketplace-model";
 
-/** The part of a page that waits for the full listing: a status line, or the failure with Retry. */
 export function DetailState(props: {
   status: "loading" | "loaded" | "failed";
-  /** The code of the failed read, when it has one. */
   reference?: string | null | undefined;
   loadingLabel: string;
   onRetry: () => void;
@@ -56,7 +55,6 @@ export function DetailState(props: {
   );
 }
 
-/** Copies the public page of a listing, as an app page copies its plugin's. */
 export function CopyListingLink(props: { model: MarketplaceModel; link: MarketplaceListingLink }) {
   const { t } = useText();
   return (
@@ -67,7 +65,6 @@ export function CopyListingLink(props: { model: MarketplaceModel; link: Marketpl
   );
 }
 
-/** A link named a listing that the Marketplace does not have. The list opens with this notice on top. */
 export function MissingNotice(props: { children: string }) {
   return (
     <div class="marketplace-empty" role="alert">
@@ -78,7 +75,6 @@ export function MissingNotice(props: { children: string }) {
   );
 }
 
-/** A state that has no action: "Added", "Connected". */
 export function Done(props: { children: JSX.Element }) {
   return (
     <span class="marketplace-done">
@@ -98,7 +94,6 @@ export function MenuCheck(props: { on: boolean }) {
   );
 }
 
-/** A skill's own icon, or a spark when it has none or the icon does not load. "row" is the tile of a list row. */
 export function SkillMark(props: { skill: Pick<MarketplaceSkillSummary, "iconUrl">; size: "sm" | "row" | "md" }) {
   const [failed, setFailed] = createSignal<string | null>(null);
   const url = () => (props.skill.iconUrl && props.skill.iconUrl !== failed() ? props.skill.iconUrl : null);
@@ -109,7 +104,6 @@ export function SkillMark(props: { skill: Pick<MarketplaceSkillSummary, "iconUrl
   );
 }
 
-/** A skill's icon, or the sparkles when it has none or the icon does not load. */
 export function SkillIcon(props: { url: string | null | undefined; onError?: (url: string) => void }) {
   const [failed, setFailed] = createSignal<string | null>(null);
   const url = () => (props.url && props.url !== failed() ? props.url : null);
@@ -129,10 +123,6 @@ export function SkillIcon(props: { url: string | null | undefined; onError?: (ur
   );
 }
 
-/**
- * The icon of an app, without its tile. A connector's icon and a catalog app's icon fill the tile: a
- * container that shows one needs a rule for `.connector-brand-tile` and for `img`.
- */
 export function AppMark(props: { app: MarketplaceApp }) {
   const [failed, setFailed] = createSignal<string | null>(null);
   const url = () => {
@@ -151,11 +141,13 @@ export function AppMark(props: { app: MarketplaceApp }) {
       <Match when={props.app.kind === "custom"}>
         <Plug aria-hidden="true" />
       </Match>
+      <Match when={props.app.kind === "x"}>
+        <XTile />
+      </Match>
     </Switch>
   );
 }
 
-/** The mark of an app, on its tile. */
 export function AppLogo(props: { app: MarketplaceApp; size?: "md" | "lg" }) {
   return (
     <LogoTile size={props.size ?? "md"}>
@@ -164,10 +156,6 @@ export function AppLogo(props: { app: MarketplaceApp; size?: "md" | "lg" }) {
   );
 }
 
-/**
- * Example requests on the listing's gradient, each with a Try arrow. The caption says why the arrows
- * are off.
- */
 export function TryCard(props: {
   seed: string;
   chip: { kind: "agent" | "skill" | "plugin"; name: string; icon: JSX.Element };
@@ -216,12 +204,10 @@ export function TryCard(props: {
   );
 }
 
-/** A listing's first load, its failure, its rows, and "Load more" while the server has more. */
 export function ListingPanel(props: {
   listing: MarketplaceListing<unknown>;
   loadingLabel: string;
   count: number;
-  /** False: no "Load more", as on the Skills tab, where each group has its own page. */
   paged?: boolean;
   empty: JSX.Element;
   children: JSX.Element;
@@ -254,14 +240,12 @@ export function ListingPanel(props: {
         </div>
       }
     >
-      {/* A failed "Load more" keeps the rows that loaded. */}
       <Show when={!props.listing.error() || props.count > 0} fallback={failure()}>
         <div class="marketplace-stack">
           <Show when={props.count > 0 || props.listing.pending()} fallback={props.empty}>
             {props.children}
           </Show>
           <Show when={!props.listing.error()} fallback={failure()}>
-            {/* A filter can hide each loaded row while a later page still holds a match. */}
             <Show when={props.paged !== false && props.listing.hasMore()}>
               <Button
                 type="button"

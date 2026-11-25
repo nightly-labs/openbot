@@ -10,7 +10,6 @@ import {
   string,
 } from "./admin-wire";
 
-/** Registry administration installs commands on the selected host. Every route requires an admin. */
 export const ACP_REGISTRY_CAPABILITY = "acp-registry-v1";
 export const ACP_REGISTRY_ROUTES = {
   search: "/v1/admin/acp-registry/search",

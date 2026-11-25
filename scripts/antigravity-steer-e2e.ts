@@ -1,11 +1,3 @@
-// Runs the real `antigravity` provider driver over a fake `agy acp` (`provider-fakes/agents/antigravity-steer.ts`)
-// to check that a steered message goes into the running turn through a second `session/prompt`.
-// `agy acp` 1.5.0 and later answers the open prompt with `end_turn` at once and goes on under the new one.
-// Cases: one steer, two steers in a row, a steer for a turn that is not the running one, a steer after
-// the turn ended, a steer while a permission card is open, a steer that the CLI refuses because its
-// prompt waits for an approval that has not reached OpenBot yet (#11107), and a CLI older than 1.5.0. Each refused
-// steer must send nothing to the agent and must not stop the running turn, so the message can wait in
-// the queue. `bun run test:antigravity-steer`. Writes .openbot-build/antigravity-steer-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -17,34 +9,45 @@ import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/p
 import { installFakeAgent, readJsonl, startThread, stopClients } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/antigravity-steer-e2e");
-const TURN_TIMEOUT_MS = 20_000;
+const TURN_TIMEOUT_MS = 60_000;
+const COMMAND_ANSWER = "The build finished: 42 files.";
+const TEST_ANSWER = "The tests passed: 7 of 7.";
 
 interface LogEntry {
   event: string;
   sessionId?: string;
   text?: string;
   steer?: boolean;
+  wake?: boolean;
 }
 
 interface Finished {
   reply: string;
   status: string | null;
-  /** The `turn/started` notifications of the thread while the turn ran. */
   started: number;
-  /** The `openbot/usage` notifications of the turn. */
   usage: number;
+}
+
+interface CommandWake {
+  status: string | null;
+  answers: number;
+  testAnswers: number;
+  wakePrompts: number;
 }
 
 interface Report {
   passed: boolean;
   steered?: Finished & { turnId: string; prompts: LogEntry[]; cancelSent: boolean };
   twice?: Finished & { prompts: LogEntry[] };
+  beforeAnswer?: Finished & { events: string[] };
   wrongTurn?: { refused: string; prompts: number };
   afterTurn?: { refused: string; prompts: number };
   waitingOnUser?: { refused: string; prompts: number; reply: string; status: string | null };
   refusedByCli?: { refused: string; cliRefusals: number; reply: string; status: string | null };
   oldCli?: { refused: string; prompts: number; status: string | null };
   heldWork?: { status: string | null; releasable: boolean | undefined; closedSessions: number; daemonRuns: boolean };
+  reloadNote?: { afterIdleStop: boolean; secondPrompt: boolean; heldSession: boolean };
+  commandWake?: { agentReplies: CommandWake; silentAgent: CommandWake; chained: CommandWake };
   failure?: string;
 }
 
@@ -56,10 +59,11 @@ const clients: AgentClient[] = [];
 async function open(
   name: string,
   env: Readonly<Record<string, string>>,
+  agent = "antigravity-steer",
 ): Promise<{ client: AgentClient; log: string }> {
   const executable = join(root, name, "bin", "antigravity");
   const log = join(root, name, "agent.jsonl");
-  await installFakeAgent(executable, "antigravity-steer", { FAKE_LOG: log, ...env });
+  await installFakeAgent(executable, agent, { FAKE_LOG: log, ...env });
   const client = requireProviderDriver("antigravity").createClient(
     { executable, version: "1.5.4", source: "managed" },
     10_000,
@@ -69,7 +73,6 @@ async function open(
   return { client, log };
 }
 
-/** Waits until the fake logs an entry that matches, or fails after `timeoutMs`. */
 async function waitForEntry(log: string, match: (entry: LogEntry) => boolean, timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!(await readJsonl<LogEntry>(log)).some(match)) {
@@ -85,7 +88,6 @@ interface RunningTurn {
   done: Promise<Finished>;
 }
 
-/** Starts a turn with this text. A `work` turn stays open with one tool call until a steer ends it. */
 async function startTurn(client: AgentClient, thread: string, log: string, text: string): Promise<RunningTurn> {
   let reply = "";
   let started = 0;
@@ -126,7 +128,6 @@ async function startTurn(client: AgentClient, thread: string, log: string, text:
   return { id, done };
 }
 
-/** Steers the turn with this text. Answers the turn id that the client reports. */
 function steer(client: AgentClient, thread: string, turnId: string, text: string): Promise<string | null> {
   return runCauseEffect(
     client.request(
@@ -142,7 +143,6 @@ function steer(client: AgentClient, thread: string, turnId: string, text: string
   );
 }
 
-/** The process of the session that got the `index`th prompt with this text. The fake's session ids hold it. */
 async function sessionPid(log: string, text: string, index: number): Promise<number> {
   const sessionId = (await prompts(log)).filter((entry) => entry.text === text)[index]?.sessionId ?? "";
   const pid = Number(/^agy-(\d+)-/u.exec(sessionId)?.[1]);
@@ -159,13 +159,25 @@ function isRunning(pid: number): boolean {
   }
 }
 
-/** Waits until the process ends, or fails after 10 s. */
 async function waitForExit(pid: number): Promise<void> {
   const deadline = Date.now() + 10_000;
   while (isRunning(pid)) {
     if (Date.now() > deadline) throw new Error(`The session process ${pid} did not end.`);
     await new Promise((settle) => setTimeout(settle, 25));
   }
+}
+
+async function commandWake(name: string, env: Readonly<Record<string, string>>): Promise<CommandWake> {
+  const run = await open(name, env, "antigravity-command-wake");
+  run.client.start();
+  const thread = await startThread(run.client, { cwd: root });
+  const finished = await (await startTurn(run.client, thread, run.log, "build it")).done;
+  return {
+    status: finished.status,
+    answers: finished.reply.split(COMMAND_ANSWER).length - 1,
+    testAnswers: finished.reply.split(TEST_ANSWER).length - 1,
+    wakePrompts: (await prompts(run.log)).filter((entry) => entry.wake).length,
+  };
 }
 
 async function refusal(operation: Promise<string | null>): Promise<string> {
@@ -178,8 +190,9 @@ async function refusal(operation: Promise<string | null>): Promise<string> {
 }
 
 try {
-  const { client, log } = await open("native", {});
-  /** The permission request that the test holds open, and how to answer it. */
+  const firstUpdateRelease = join(root, "native-release", "first-update");
+  await mkdir(join(root, "native-release"), { recursive: true });
+  const { client, log } = await open("native", { FAKE_FIRST_UPDATE_RELEASE: firstUpdateRelease });
   let heldApproval: (() => void) | undefined;
   let approvals = 0;
   let approvalAsked: () => void = () => undefined;
@@ -198,7 +211,6 @@ try {
   client.start();
   const thread = await startThread(client, { cwd: root });
 
-  // A steer goes into the running turn: one turn, no stop, a usage report for each prompt.
   const turn = await startTurn(client, thread, log, "work");
   assert.equal(await steer(client, thread, turn.id, "use the other branch"), turn.id);
   const steered = await turn.done;
@@ -218,7 +230,6 @@ try {
   assert.equal(cancelSent, false, "The steer must not cancel the turn.");
   report.steered = { turnId: turn.id, ...steered, prompts: steeredPrompts, cancelSent };
 
-  // Two steers in a row: the turn ends only with the reply of the last prompt.
   const twiceTurn = await startTurn(client, thread, log, "work");
   const beforeTwice = (await prompts(log)).length - 1;
   assert.equal(await steer(client, thread, twiceTurn.id, "more context"), twiceTurn.id);
@@ -236,7 +247,21 @@ try {
   );
   report.twice = { ...twice, prompts: twicePrompts };
 
-  // A steer for a turn that is not the running one is refused before it reaches the agent.
+  const slow = await startTurn(client, thread, log, "slow start");
+  const beforeSlow = await readJsonl<LogEntry>(log);
+  const slowSteer = steer(client, thread, slow.id, "before the first answer");
+  await writeFile(firstUpdateRelease, "");
+  assert.equal(await slowSteer, slow.id);
+  const slowFinished = await slow.done;
+  const slowEvents = (await readJsonl<LogEntry>(log))
+    .slice(beforeSlow.length)
+    .map((entry) => (entry.event === "prompt" ? `prompt:${entry.text}` : entry.event));
+  assert.equal(slowFinished.status, "completed");
+  assert.match(slowFinished.reply, /steered: before the first answer/u);
+  assert.equal(slowFinished.started, 1, "The steer must not start another turn.");
+  assert.deepEqual(slowEvents, ["first-update", "prompt:before the first answer"]);
+  report.beforeAnswer = { ...slowFinished, events: slowEvents };
+
   const third = await startTurn(client, thread, log, "work");
   const beforeWrong = (await prompts(log)).length;
   const wrongTurn = await refusal(steer(client, thread, "another-turn", "late"));
@@ -245,13 +270,11 @@ try {
   await steer(client, thread, third.id, "end");
   await third.done;
 
-  // After the turn ended, a second prompt would start a turn of its own.
   const beforeAfter = (await prompts(log)).length;
   const afterTurn = await refusal(steer(client, thread, third.id, "too late"));
   assert.equal((await prompts(log)).length, beforeAfter);
   report.afterTurn = { refused: afterTurn, prompts: (await prompts(log)).length - beforeAfter };
 
-  // A new prompt would close an open permission card, so the steer waits in the queue.
   const asking = await startTurn(client, thread, log, "ask");
   await Promise.race([
     approval,
@@ -273,8 +296,6 @@ try {
     status: asked.status,
   };
 
-  // The CLI waits for an approval before its request reaches OpenBot, and refuses the steer prompts
-  // (#11107). The steers are refused, so the messages wait in the queue, and the turn goes on.
   const toolShown = new Promise<void>((shown) => {
     const listener = (notification: AppServerNotification) => {
       if (notification.method !== "item/started" || getString(notification.params, "threadId") !== thread) return;
@@ -286,7 +307,6 @@ try {
   const approvalsBefore = approvals;
   const holding = await startTurn(client, thread, log, "hold");
   await toolShown;
-  // Two messages at the same time: the second steer must not take the refusal of the first for its own answer.
   const [cliRefused] = await Promise.all([
     refusal(steer(client, thread, holding.id, "do this too")),
     refusal(steer(client, thread, holding.id, "and this")),
@@ -304,7 +324,6 @@ try {
   assert.match(holdFinished.reply, /held: done/u);
   report.refusedByCli = { refused: cliRefused, cliRefusals, reply: holdFinished.reply, status: holdFinished.status };
 
-  // An `agy` older than 1.5.0 cancels the open prompt on a second one, so the steer is refused.
   const old = await open("old-cli", { FAKE_VERSION: "1.4.5" });
   old.client.start();
   const oldThread = await startThread(old.client, { cwd: root });
@@ -320,9 +339,6 @@ try {
     status: oldFinished.status,
   };
 
-  // A turn that ends while a daemon command runs keeps its session's process (#9551). The idle limit
-  // keeps one idle session, so the end of each later turn closes the session that went idle before it,
-  // but not the one whose command runs. The provider's idle stop also keeps the process.
   const held = await open("held-work", {});
   held.client.start();
   const daemonThread = await startThread(held.client, { cwd: root });
@@ -331,17 +347,51 @@ try {
   const releasable = held.client.canReleaseProcess?.();
   assert.equal(releasable, false, "Running work must keep the provider process.");
   const laterPids: number[] = [];
+  const laterThreads: string[] = [];
   for (let index = 0; index < 3; index += 1) {
     const thread = await startThread(held.client, { cwd: root });
+    laterThreads.push(thread);
     assert.equal((await (await startTurn(held.client, thread, held.log, "hello")).done).status, "completed");
     laterPids.push(await sessionPid(held.log, "hello", index));
   }
-  // The first two later sessions went idle before another one, so the limit closed them.
   await Promise.all(laterPids.slice(0, 2).map((pid) => waitForExit(pid)));
   const daemonRuns = isRunning(await sessionPid(held.log, "daemon", 0));
   assert.ok(daemonRuns, "The idle limit closed the session whose daemon command runs.");
   const closedSessions = laterPids.filter((pid) => !isRunning(pid)).length;
   report.heldWork = { status: daemon.status, releasable, closedSessions, daemonRuns };
+
+  const notedPrompt = async (thread: string, text: string) => {
+    assert.equal((await (await startTurn(held.client, thread, held.log, text)).done).status, "completed");
+    const prompt = (await prompts(held.log)).findLast((entry) => entry.text?.endsWith(text));
+    return prompt?.text?.includes("<openbot_session_reload>") === true;
+  };
+  const [stoppedThread] = laterThreads;
+  if (!stoppedThread) throw new Error("The later sessions did not start.");
+  report.reloadNote = {
+    afterIdleStop: await notedPrompt(stoppedThread, "again after the idle stop"),
+    secondPrompt: await notedPrompt(stoppedThread, "once more on the same process"),
+    heldSession: await notedPrompt(daemonThread, "again on the held session"),
+  };
+  assert.ok(report.reloadNote.afterIdleStop, "A session that OpenBot stopped as idle must get the reload note.");
+  assert.ok(!report.reloadNote.secondPrompt, "The reload note must come only once.");
+  assert.ok(!report.reloadNote.heldSession, "A session whose work held its process must not get the reload note.");
+
+  const agentReplies = await commandWake("command-wake-reply", {});
+  const silentAgent = await commandWake("command-wake-silent", { FAKE_SILENT_WAKE: "1" });
+  const chained = await commandWake("command-wake-chain", { FAKE_CHAIN: "1" });
+  report.commandWake = { agentReplies, silentAgent, chained };
+  assert.equal(agentReplies.status, "completed");
+  assert.equal(agentReplies.answers, 1, "The agent's own answer to a finished command must show once.");
+  assert.equal(agentReplies.wakePrompts, 0, "An agent that replied by itself must get no wake prompt.");
+  assert.equal(silentAgent.status, "completed");
+  assert.equal(silentAgent.wakePrompts, 1, "An agent that stays silent must still get one wake prompt.");
+  assert.equal(silentAgent.answers, 1, "The answer to the wake prompt must show once.");
+  assert.equal(chained.status, "completed");
+  assert.deepEqual(
+    [chained.answers, chained.testAnswers, chained.wakePrompts],
+    [1, 1, 0],
+    "A reply that starts a new background command must wait for it and show each answer once.",
+  );
 
   report.passed = true;
 } catch (error) {

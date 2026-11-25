@@ -12,7 +12,6 @@ import { useLandingText } from "./LandingText";
 
 interface DownloadCardContentProps {
   action?: string;
-  /** Links of the card's own, in place of `action`, for a card that is not one link. */
   actions?: JSX.Element;
   description: string;
   platform: PlatformLogoVariant | MobilePlatformLogoVariant;
@@ -67,8 +66,6 @@ export function DownloadSection() {
         </header>
 
         <div class="landing-download-grid">
-          {/* The Apple silicon installer does not open on an Intel Mac, and a browser cannot reliably
-              tell the two apart. So the card also has the Intel installer, as the Android card has the APK. */}
           <div
             class="landing-download-card"
             data-download-platform="macos"
@@ -114,8 +111,6 @@ export function DownloadSection() {
             />
           </a>
 
-          {/* The hero selector already offers Linux and /download/linux/latest resolves an AppImage, so the
-              card is the same link the other two are. A non-clickable card here contradicted both. */}
           <a
             class="landing-download-card"
             href={linux.href}
@@ -137,8 +132,6 @@ export function DownloadSection() {
           <For each={MOBILE_APP_ORDER}>
             {(platform) => {
               const app = MOBILE_APPS[platform];
-              // Android has two downloads while a version has an APK. A link cannot contain a link,
-              // so the card is a box: the Google Play link covers it, and the APK link is on top.
               if (platform === "android" && ANDROID_APK_AVAILABLE)
                 return (
                   <div
@@ -198,9 +191,6 @@ export function DownloadSection() {
           </For>
         </div>
 
-        {/* The cards start the download, so the pages that explain each installer get their own
-            links. They are also how a crawler finds those pages from the home page. The phone apps
-            are a separate group after a rule, as their cards are a separate row. */}
         <p class="landing-download-pages">
           {text().pages}
           <For each={DOWNLOAD_PLATFORM_ORDER}>

@@ -1,11 +1,3 @@
-/**
- * Saved proxies for named browser profiles. A proxy is saved once on the computer that runs the
- * agents; each named profile uses one of them, or none ("Automatic": the proxy settings of that
- * computer). The password never comes back from the host: a summary says only that one is saved.
- * A proxy can also be the computer of one member: the pages then go out through the internet
- * connection of that member's OpenBot desktop app, while the member shares it (`browser-egress-v1`).
- */
-
 import { integerInRange } from "./ipc-bounded-values";
 import { BROWSER_PROFILE_LIMIT, isBrowserProfileId } from "./ipc-browser-profiles";
 import { isDynamicRecord, isString } from "./runtime-values";
@@ -18,7 +10,6 @@ export type BrowserProxyScheme = (typeof BROWSER_PROXY_SCHEMES)[number];
 
 const DEFAULT_PORT: Record<BrowserProxyScheme, number> = { socks5: 1080, http: 80, https: 443 };
 const BROWSER_PROXY_ID = /^[0-9a-f]{32}$/u;
-/** A DNS name or an IPv4 address, or an IPv6 address in brackets. Chromium proxy rules split on other characters. */
 const PROXY_HOST =
   /^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*|\[[0-9A-Fa-f:.]+\])$/u;
 
@@ -30,7 +21,6 @@ export function isBrowserProxyId(value: unknown): value is string {
   return isString(value) && BROWSER_PROXY_ID.test(value);
 }
 
-/** A proxy address with its sign-in, as the user types it: `scheme://[user[:password]@]host[:port]`. */
 export interface BrowserProxyAddress {
   scheme: BrowserProxyScheme;
   host: string;
@@ -39,7 +29,6 @@ export interface BrowserProxyAddress {
   password: string | null;
 }
 
-/** A user name or password as typed: percent-encoded when it decodes, else the raw text. */
 function signInPart(value: string): string | null {
   if (value === "") return null;
   try {
@@ -52,7 +41,6 @@ function signInPart(value: string): string | null {
 const PROXY_SCHEME_PREFIX = /^([A-Za-z][A-Za-z0-9+.-]*):\/\//u;
 const PROXY_PORT = /^\d{1,5}$/u;
 
-/** `host:port`, `host` (with a scheme only) or `[ipv6]:port`, with an optional "/" at the end. */
 function hostAndPort(value: string, portRequired: boolean): { host: string; port: string | null } | null {
   const text = value.endsWith("/") ? value.slice(0, -1) : value;
   const bracket = text.startsWith("[") ? text.indexOf("]") : -1;
@@ -71,11 +59,6 @@ interface AddressParts {
   password: string;
 }
 
-/**
- * Splits `host:port:user:password` (a usual format of proxy sellers), or
- * `[user[:password]@]host[:port]` at the last "@". The password can have any character: "/", "#",
- * ":" and "@" too. With no scheme, the port is necessary.
- */
 function addressParts(rest: string, portRequired: boolean): AddressParts | null {
   const fields = rest.startsWith("[") ? [] : rest.split(":");
   const [host = "", port = "", username = "", ...password] = fields;
@@ -91,18 +74,12 @@ function addressParts(rest: string, portRequired: boolean): AddressParts | null 
     : { ...target, username: signIn.slice(0, colon), password: signIn.slice(colon + 1) };
 }
 
-/** The longest SOCKS5 user name and password in bytes (RFC 1929). */
 const SOCKS_SIGN_IN_MAX_BYTES = 255;
 
 function utf8Length(value: string | null): number {
   return value === null ? 0 : new TextEncoder().encode(value).length;
 }
 
-/**
- * Reads an address that a person typed, or gives null for an address that is not correct. Without a
- * scheme it is http, and the port is necessary; with a scheme the port can be left out: each scheme
- * has its usual port.
- */
 export function parseBrowserProxyAddress(text: string): BrowserProxyAddress | null {
   const value = text.trim();
   if (value.length === 0 || value.length > BROWSER_PROXY_ADDRESS_MAX || /\s/u.test(value)) return null;
@@ -117,7 +94,6 @@ export function parseBrowserProxyAddress(text: string): BrowserProxyAddress | nu
   if (!integerInRange(port, 1, 65_535)) return null;
   const username = signInPart(parts.username);
   const password = signInPart(parts.password);
-  // A proxy signs in with a user name and a password; a password alone is not a sign-in.
   if (username === null && password !== null) return null;
   if (
     scheme === "socks5" &&
@@ -127,7 +103,6 @@ export function parseBrowserProxyAddress(text: string): BrowserProxyAddress | nu
   return { scheme, host, port, username, password };
 }
 
-/** The address to show and to compare. It has the user name and never the password. */
 export function browserProxyAddressText(proxy: {
   scheme: BrowserProxyScheme;
   host: string;
@@ -140,7 +115,6 @@ export function browserProxyAddressText(proxy: {
 
 export type BrowserProxyNameParts = Pick<BrowserProxySummary, "id" | "scheme" | "host" | "port" | "username">;
 
-/** The parts of a proxy name, from short to long. */
 const PROXY_NAME_FORMS: readonly ((proxy: BrowserProxyNameParts) => string)[] = [
   (proxy) => proxy.host,
   (proxy) => `${proxy.host}:${proxy.port}`,
@@ -148,21 +122,12 @@ const PROXY_NAME_FORMS: readonly ((proxy: BrowserProxyNameParts) => string)[] = 
   browserProxyAddressText,
 ];
 
-/**
- * The name of a saved proxy: its host. When another saved proxy has the same host, the name adds the
- * port, then the user name, then the scheme, until no other saved proxy has the same name. The
- * desktop app, the web client and the phone name a proxy with it.
- */
 export function browserProxyName(proxy: BrowserProxyNameParts, proxies: readonly BrowserProxyNameParts[]): string {
   const others = proxies.filter((other) => other.id !== proxy.id && other.host === proxy.host);
   const form = PROXY_NAME_FORMS.find((name) => others.every((other) => name(other) !== name(proxy)));
   return (form ?? browserProxyAddressText)(proxy);
 }
 
-/**
- * Why the last page load through a proxy failed: the proxy did not answer or could not reach the
- * site (`unreachable`), or it refused the saved sign-in (`signIn`).
- */
 export const BROWSER_PROXY_FAILURES = ["unreachable", "signIn"] as const;
 export type BrowserProxyFailure = (typeof BROWSER_PROXY_FAILURES)[number];
 
@@ -176,18 +141,13 @@ export interface BrowserProxySummary {
   host: string;
   port: number;
   username: string | null;
-  /** True when a password is saved. The password itself stays on the host. */
   hasPassword: boolean;
-  /** The named profiles that use the proxy. */
   profileIds: string[];
-  /** Why the last page load through the proxy failed, or null when it did not fail. */
   failure: BrowserProxyFailure | null;
 }
 
-/** Stands in for a saved password in the address field. The password itself stays on the host. */
 const BROWSER_PROXY_SAVED_PASSWORD = "••••••••";
 
-/** The address to edit: a saved password shows as a mask. */
 export function editableBrowserProxyAddress(proxy: BrowserProxySummary | null | undefined): string {
   if (!proxy) return "";
   if (!proxy.hasPassword) return browserProxyAddressText(proxy);
@@ -195,10 +155,6 @@ export function editableBrowserProxyAddress(proxy: BrowserProxySummary | null | 
   return `${proxy.scheme}://${user}:${BROWSER_PROXY_SAVED_PASSWORD}@${proxy.host}:${proxy.port}`;
 }
 
-/**
- * The address to save from the edited text. When the mask of a saved password stays, the address has
- * no password and `keepPassword` is true, so the host keeps the saved password.
- */
 export function browserProxySaveAddress(
   proxy: BrowserProxySummary | null | undefined,
   parsed: BrowserProxyAddress,
@@ -208,16 +164,11 @@ export function browserProxySaveAddress(
   return { address: keepPassword ? browserProxyAddressText(parsed) : text.trim(), keepPassword };
 }
 
-/** The computer of one member, as a proxy. Each member has at most one. */
 export interface BrowserProxyComputer {
   id: string;
-  /** The membership of the member on the host. */
   memberId: string;
-  /** The name of the member, or null when the host does not know it. */
   name: string | null;
-  /** True when the OpenBot app of the member is connected and shares its connection now. */
   online: boolean;
-  /** True when the member who asked for the list is this member. */
   mine: boolean;
   profileIds: string[];
   failure: BrowserProxyFailure | null;
@@ -228,11 +179,6 @@ export interface BrowserProxyList {
   computers: BrowserProxyComputer[];
 }
 
-/**
- * A new proxy, or a change to one. A change also has `previousAddress`: the address that the person
- * changed, as `browserProxyAddressText` gave it. When the proxy is different now, the host refuses the
- * change. `keepPassword`: the address has no password, and the saved password stays.
- */
 export interface SaveBrowserProxyInput {
   proxyId?: string;
   previousAddress?: string;
@@ -240,16 +186,11 @@ export interface SaveBrowserProxyInput {
   address: string;
 }
 
-/**
- * A delete, with the named profiles that the person saw use the proxy. Those profiles change to
- * Automatic. When different profiles use it now, the host refuses the delete.
- */
 export interface DeleteBrowserProxyInput {
   proxyId: string;
   profileIds: string[];
 }
 
-/** The proxy of one named profile. Null: the proxy settings of the computer. */
 export interface SetBrowserProfileProxyInput {
   profileId: string;
   proxyId: string | null;
@@ -326,7 +267,6 @@ export function decodeBrowserProxyList(value: unknown): BrowserProxyList {
   };
 }
 
-/** Null: the host has no proxy routes. */
 export function decodeOptionalBrowserProxyList(value: unknown): BrowserProxyList | null {
   return value === null ? null : decodeBrowserProxyList(value);
 }
@@ -370,11 +310,6 @@ export function parseSetBrowserProfileProxyInput(value: unknown): SetBrowserProf
   return { profileId: value.profileId, proxyId: value.proxyId === null ? null : parseBrowserProxyId(value.proxyId) };
 }
 
-/**
- * Whether this desktop app shares its internet connection with one joined server, so that the
- * profiles that use the computer of this member send their pages through it. It is a setting of
- * this computer, not of the server.
- */
 export interface BrowserComputerSharing {
   sharing: boolean;
 }
@@ -384,7 +319,6 @@ export function decodeBrowserComputerSharing(value: unknown): BrowserComputerSha
   return { sharing: value.sharing };
 }
 
-/** Null: this app cannot share its connection with the server. */
 export function decodeOptionalBrowserComputerSharing(value: unknown): BrowserComputerSharing | null {
   return value === null ? null : decodeBrowserComputerSharing(value);
 }

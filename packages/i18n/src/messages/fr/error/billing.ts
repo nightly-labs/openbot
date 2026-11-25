@@ -12,7 +12,6 @@ export const messages = {
   "error.billing.storageUnavailable": "Ce stockage n'est pas disponible pour ce serveur.",
   "error.billing.storagePaymentFailed":
     "Le paiement du stockage a échoué. Mettez à jour le moyen de paiement et réessayez.",
-  // Billing errors.
   "error.billing.licenseExists": "Ce compte a déjà une licence. Modifiez plutôt son nombre d'utilisateurs.",
   "error.billing.licenseCurrency": "La licence doit utiliser la devise de vos autres forfaits.",
   "error.billing.planCurrency": "Un nouveau forfait doit utiliser la devise de vos autres forfaits.",
@@ -38,4 +37,6 @@ export const messages = {
   "error.billing.invalidRequest": "La demande de facturation n’est pas valide.",
   "error.billing.invalidResponse": "La réponse de facturation n’est pas valide.",
   "error.billing.notStripePage": "La page de facturation n’est pas une page Stripe.",
+  "error.billing.customServerOfferMissing": "Ce serveur n’a aucune offre à payer.",
+  "error.billing.checkoutUnavailable": "Le paiement ne peut pas démarrer maintenant. Réessayez dans une minute.",
 } as const satisfies PartialTranslation<typeof source>;

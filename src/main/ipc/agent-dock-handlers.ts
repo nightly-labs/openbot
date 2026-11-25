@@ -1,6 +1,3 @@
-// The agent dock window: the main renderer publishes what it shows, and the dock window reads it,
-// sends its actions back, and says when it takes the pointer and the keyboard.
-
 import type { Effect } from "effect";
 import type { IpcMainInvokeEvent } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -8,6 +5,7 @@ import { type AgentDockWindowController, requireAgentDockSender } from "../agent
 import {
   parseAgentDockAction,
   parseAgentDockDragPhase,
+  parseAgentDockExtent,
   parseAgentDockInputRegion,
   parseAgentDockInteractive,
   parseAgentDockPresentation,
@@ -25,10 +23,10 @@ export interface AgentDockIpcDependencies {
     | "performAction"
     | "setInteractive"
     | "setInputRegion"
+    | "setExtent"
     | "listDisplays"
     | "drag"
   >;
-  /** On Wayland, starts OpenBot again on XWayland at each start, or stops that. */
   setXWayland: (enabled: boolean) => Effect.Effect<void, { readonly cause: unknown }>;
 }
 
@@ -58,6 +56,9 @@ export function agentDockIpcHandlers({
       ),
       setInputRegion: authorizedHandler(fromDockRenderer, parseAgentDockInputRegion, (event, rects) =>
         agentDock.setInputRegion(event.sender.id, rects),
+      ),
+      setExtent: authorizedHandler(fromDockRenderer, parseAgentDockExtent, (event, extent) =>
+        agentDock.setExtent(event.sender.id, extent),
       ),
       drag: authorizedHandler(fromDockRenderer, parseAgentDockDragPhase, (event, phase) =>
         agentDock.drag(event.sender.id, phase),

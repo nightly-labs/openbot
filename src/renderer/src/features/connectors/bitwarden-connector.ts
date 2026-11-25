@@ -9,23 +9,14 @@ import {
   NO_WATCH,
 } from "./connector-controller";
 
-/**
- * The Bitwarden connection of this computer or of a joined server. Reads the status once and then
- * follows the port's `changed` event. The page asks for a session key, or on a joined server for an
- * API key and the master password, so a card has no one-click connect.
- */
 export function createBitwardenConnector(
   port: () => BitwardenConnectorPort = bitwardenConnectorPort,
-  /** The joined server whose connection this is, or undefined for this computer's. */
   hostName?: () => string | undefined,
 ): ConnectorController {
   const [status, setStatus] = createSignal<BitwardenConnectorStatus>(DISCONNECTED_BITWARDEN_CONNECTOR);
-  /** False until the first status read ends. Until then, the page does not show the default status. */
   const [read, setRead] = createSignal(false);
-  /** Why the last status read failed, until a newer status comes. While it is set, the state is not known. */
   const [statusError, setStatusError] = createSignal<string | null>(null);
   const actions = createConnectorActions("connector.bitwarden.actionFailed", "bitwarden");
-  /** Counts the statuses that came, so a failed read does not hide a status that came after it started. */
   let statuses = 0;
   const show = (next: BitwardenConnectorStatus) => {
     statuses += 1;

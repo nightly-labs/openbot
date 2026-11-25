@@ -1,17 +1,9 @@
-/**
- * The finished-work shelf beside the agent dock. It shows the three newest results that the user did
- * not read yet. Older ones fold into "+N more". Each result hides some seconds after it came; the seat
- * keeps the unread badge. While the pointer is on the dock or on the shelf the clock stops and the
- * hidden results come back, so nothing goes while the user looks at it.
- */
-
 import { Button, FileText, MessageSquareText } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, For, onSettled, Show, untrack } from "solid-js";
 import type { ComposerAgent } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 
-/** A file or an answer that an agent finished. `at` is when it came, in milliseconds since the epoch. */
 export interface AgentDockShelfResult {
   id: string;
   agentId: string;
@@ -20,42 +12,38 @@ export interface AgentDockShelfResult {
   at: number;
 }
 
-/** The shelf shows this many results; the others fold into "+N more". */
 const SHOWN = 3;
-/** A result hides this long after it came, while nobody looks at the dock. */
 const LIFE = 8000;
-/** A result that hides fades out for this long. */
 const LEAVE = 300;
-/** Looking ends this long after the pointer leaves the dock and the shelf: it crosses a gap between them. */
 const LOOK_GRACE = 600;
 const CLOCK_STEP = 100;
-/** The parts of the dock where the pointer shows that the user looks at it. */
 const LOOK_TARGETS = ".agent-dock-seats, .agent-dock-hit, .agent-dock-shelf";
+const MORE_KEY = "more";
+
+export interface AgentDockShelfItem {
+  key: string;
+  agentId: string | null;
+  element: HTMLLIElement;
+}
 
 export interface AgentDockShelfProps {
-  /** The unread results, oldest first. */
   results: readonly AgentDockShelfResult[];
   agent: (agentId: string) => ComposerAgent | undefined;
-  /** The shelf hides, for example while a chat is open. */
   hidden: boolean;
-  /** The dock stage. The pointer on its seats, body or shelf stops the clock. */
   stage: () => HTMLElement | undefined;
   onOpen: (agentId: string) => void;
-  /** Called when the shelf shows results and when it becomes empty. */
   onShownChange?: ((shown: boolean) => void) | undefined;
+  onItemsChange?: ((items: readonly AgentDockShelfItem[], shown: boolean) => void) | undefined;
   ref: (element: HTMLUListElement) => void;
 }
 
 export function AgentDockShelf(props: AgentDockShelfProps) {
   const { t } = useText();
-  /** The shelf clock. It does not move while the user looks at the dock. */
   const [clock, setClock] = createSignal(0);
   const [looking, setLooking] = createSignal(false);
   const [expanded, setExpanded] = createSignal(false);
-  /* The shelf clock time when each result came. A result that is older than the dock starts older. */
   const came = new Map<string, number>();
 
-  /* While the user looks, every age is 0: the hidden results come back. */
   const ages = createMemo(() => {
     const now = clock();
     const look = looking();
@@ -80,7 +68,6 @@ export function AgentDockShelf(props: AgentDockShelfProps) {
   const folded = () => live().length - shown().length;
   const visible = () => !props.hidden && live().length > 0;
 
-  /* The clock moves only while a result shows and can hide. */
   createEffect(
     () => live().length > 0 && !looking(),
     (running) => {
@@ -97,6 +84,21 @@ export function AgentDockShelf(props: AgentDockShelfProps) {
     },
   );
 
+  const elements = new Map<string, HTMLLIElement>();
+  createEffect(
+    () => [visible(), folded() > 0, ...shown().map((result) => result.id)].join("\n"),
+    () => {
+      const keys = untrack(() => [...(folded() > 0 ? [MORE_KEY] : []), ...shown().map((result) => result.id)]);
+      for (const key of elements.keys()) if (!keys.includes(key)) elements.delete(key);
+      const agents = new Map(untrack(shown).map((result) => [result.id, result.agentId]));
+      const items = keys.flatMap((key) => {
+        const element = elements.get(key);
+        return element ? [{ key, agentId: agents.get(key) ?? null, element }] : [];
+      });
+      untrack(() => props.onItemsChange?.(items, visible()));
+    },
+  );
+
   createEffect(visible, (value) => {
     untrack(() => props.onShownChange?.(value));
   });
@@ -108,7 +110,6 @@ export function AgentDockShelf(props: AgentDockShelfProps) {
       if (on) setLooking(true);
       else if (untrack(looking)) grace = window.setTimeout(endLook, LOOK_GRACE);
     };
-    /* A result that came back while the user looked fades out when the look ends; it does not vanish. */
     const endLook = () => {
       const now = untrack(clock);
       for (const [id, start] of came) came.set(id, Math.max(start, now - LIFE));
@@ -137,7 +138,7 @@ export function AgentDockShelf(props: AgentDockShelfProps) {
       hidden={visible() ? undefined : true}
     >
       <Show when={folded() > 0}>
-        <li class="agent-dock-shelf-item">
+        <li class="agent-dock-shelf-item" ref={(element) => elements.set(MORE_KEY, element)}>
           <Button type="button" variant="ghost" class="agent-dock-shelf-more" onClick={() => setExpanded(true)}>
             {t("agent.dock.finished.more", { count: folded() })}
           </Button>
@@ -145,7 +146,11 @@ export function AgentDockShelf(props: AgentDockShelfProps) {
       </Show>
       <For each={shown()} keyed={(result) => result.id}>
         {(result) => (
-          <li class="agent-dock-shelf-item" data-leaving={age(result().id) >= LIFE ? "" : undefined}>
+          <li
+            class="agent-dock-shelf-item"
+            data-leaving={age(result().id) >= LIFE ? "" : undefined}
+            ref={(element) => elements.set(untrack(result).id, element)}
+          >
             <Show when={props.agent(result().agentId)}>
               {(agent) => (
                 <Button

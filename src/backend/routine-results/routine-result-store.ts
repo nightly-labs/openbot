@@ -1,10 +1,3 @@
-/**
- * The routine result tables: each routine's destination and each run's delivery. Rows are written
- * directly, not through `database.dispatch`, because a delivery holds the answer text and the event log
- * is never deleted from. It reads the routine and run tables but never writes them. It owns no events:
- * the runtime says when something changed.
- */
-
 import {
   MESSAGING_PLATFORMS,
   ROUTINE_RESULT_DELIVERY_REASONS,
@@ -18,7 +11,6 @@ import { databaseRow, databaseRows } from "../database/database-rows";
 import { withTransaction } from "../database/sqlite-transaction";
 import type { OpenBotDatabase } from "../openbot-database";
 
-/** A delivery the runtime can send: its place and the text, which a quiet run never has. */
 export interface RoutineResultOutgoing {
   runId: string;
   agentId: string;
@@ -28,24 +20,17 @@ export interface RoutineResultOutgoing {
   expiresAt: string;
 }
 
-/**
- * A run with an answer (succeeded, or failed by its agent's report) whose routine has a destination,
- * and no delivery yet.
- */
 export interface RoutineResultPendingRun {
   runId: string;
   routineId: string;
   agentId: string;
   routineName: string;
   deliveryId: string | null;
-  /** When the run ended: a result that waits for a teammate's answer waits from then. */
   endedAt: string;
   destination: RoutineResultDestination;
 }
 
-/** How long a delivery waits for its connection to run before it fails. */
 const ROUTINE_RESULT_EXPIRY_MS = 24 * 60 * 60 * 1000;
-/** The newest deliveries the editor shows, which is more than its run history lists. */
 const DELIVERY_LIST_LIMIT = 50;
 
 export class RoutineResultStore {
@@ -55,7 +40,6 @@ export class RoutineResultStore {
     this.#database = database;
   }
 
-  /** The agent a routine belongs to, or null when the routine is gone. */
   routineOwner(routineId: string): string | null {
     const row = databaseRow(
       this.#database.connection
@@ -74,12 +58,6 @@ export class RoutineResultStore {
     return row ? toDestination(row) : null;
   }
 
-  /**
-   * Saves or removes a routine's destination. A save marks the time, so only the runs that end after
-   * it send their answers there. The same place again keeps the time: nothing new is sent. A removal
-   * also ends the answers that wait, so none posts after the user stopped sending. A post on its way
-   * keeps going: part of it can be in the place already.
-   */
   setDestination(
     routineId: string,
     destination: RoutineResultDestination | null,
@@ -119,19 +97,15 @@ export class RoutineResultStore {
     return this.destination(routineId);
   }
 
-  /**
-   * Runs with an answer that ended since `since`, after their routine got its destination, with no
-   * delivery: succeeded runs, and failed runs whose agent answered and reported the failure, so their
-   * queue delivery completed. A provider failure has no answer and sends nothing.
-   */
   runsWithoutDelivery(since: string): RoutineResultPendingRun[] {
     return databaseRows(
       this.#database.connection
         .prepare(
           `SELECT run.run_id, run.routine_id, run.agent_id, run.routine_name, run.delivery_id, run.updated_at AS run_updated_at, destination.*
            FROM projection_routine_runs AS run
-           JOIN routine_result_destinations AS destination ON destination.routine_id = run.routine_id
-           WHERE (run.status = 'succeeded'
+           CROSS JOIN routine_result_destinations AS destination ON destination.routine_id = run.routine_id
+           WHERE run.status IN ('succeeded', 'failed')
+             AND (run.status = 'succeeded'
                OR (run.status = 'failed' AND EXISTS (SELECT 1 FROM projection_deliveries AS queued
                  WHERE queued.delivery_id = run.delivery_id AND queued.status = 'completed')))
              AND run.updated_at >= ? AND run.updated_at >= destination.updated_at
@@ -150,7 +124,6 @@ export class RoutineResultStore {
     }));
   }
 
-  /** Records a run's answer for its place. Null text is a quiet run: it ends at once and sends nothing. */
   createDelivery(run: RoutineResultPendingRun, text: string | null, now = new Date().toISOString()): void {
     const { destination } = run;
     this.#database.connection
@@ -178,7 +151,6 @@ export class RoutineResultStore {
       );
   }
 
-  /** Pending deliveries whose time came, oldest first. */
   due(now: string): RoutineResultOutgoing[] {
     return databaseRows(
       this.#database.connection
@@ -198,7 +170,6 @@ export class RoutineResultStore {
     }));
   }
 
-  /** When the next pending delivery is due, or null when none waits. */
   nextAttemptAt(): string | null {
     const row = databaseRow(
       this.#database.connection
@@ -208,7 +179,6 @@ export class RoutineResultStore {
     return row ? nullableString(row.next) : null;
   }
 
-  /** Marks a pending delivery as on its way, before the post starts. False when it is not pending now. */
   claim(runId: string, now = new Date().toISOString()): boolean {
     const result = this.#database.connection
       .prepare(
@@ -229,7 +199,6 @@ export class RoutineResultStore {
       .run(now, now, runId);
   }
 
-  /** Puts a delivery back to wait: nothing of it was posted. */
   retryAt(runId: string, nextAttemptAt: string, now = new Date().toISOString()): void {
     this.#database.connection
       .prepare(
@@ -239,7 +208,6 @@ export class RoutineResultStore {
       .run(nextAttemptAt, now, runId);
   }
 
-  /** Ends a delivery that is on its way or waits. */
   end(
     runId: string,
     status: "failed" | "uncertain",
@@ -254,7 +222,6 @@ export class RoutineResultStore {
       .run(status, reason, now, runId);
   }
 
-  /** A post that a stop or a crash cut off may be in the place in part. Returns the agents it touched. */
   interruptSending(now = new Date().toISOString()): string[] {
     const db = this.#database.connection;
     const agents = databaseRows(
@@ -267,7 +234,6 @@ export class RoutineResultStore {
     return agents;
   }
 
-  /** A routine's deliveries, newest first. A quiet run sent nothing, so it has none to show. */
   deliveries(routineId: string): RoutineResultDelivery[] {
     return databaseRows(
       this.#database.connection
@@ -279,7 +245,6 @@ export class RoutineResultStore {
     ).map(toDelivery);
   }
 
-  /** The agent of a run's delivery, or null when it has none. */
   deliveryOwner(runId: string): string | null {
     const row = databaseRow(
       this.#database.connection.prepare("SELECT agent_id FROM routine_result_deliveries WHERE run_id = ?").get(runId),
@@ -287,10 +252,6 @@ export class RoutineResultStore {
     return row ? String(row.agent_id) : null;
   }
 
-  /**
-   * Sends an ended delivery again, with the saved text and place, and a new day to wait. False when
-   * the delivery waits or is on its way already, or the run was quiet.
-   */
   resend(runId: string, now = new Date().toISOString()): boolean {
     const result = this.#database.connection
       .prepare(
@@ -314,7 +275,6 @@ function nullableString(value: unknown): string | null {
 function toDestination(row: DynamicRecord): RoutineResultDestination {
   return {
     connectionId: String(row.connection_id),
-    // The host writes only known platforms; the guard only narrows the type.
     platform: isOneOf(MESSAGING_PLATFORMS, row.platform) ? row.platform : "slack",
     connectionName: String(row.connection_name),
     placeId: String(row.place_id),
@@ -325,7 +285,6 @@ function toDestination(row: DynamicRecord): RoutineResultDestination {
 function toDelivery(row: DynamicRecord): RoutineResultDelivery {
   return {
     runId: String(row.run_id),
-    // The CHECK constraint holds the column to these values; `quiet` rows are not read here.
     status: isOneOf(ROUTINE_RESULT_DELIVERY_STATUSES, row.status) ? row.status : "failed",
     reason: isOneOf(ROUTINE_RESULT_DELIVERY_REASONS, row.reason) ? row.reason : null,
     attempts: Number(row.attempts),

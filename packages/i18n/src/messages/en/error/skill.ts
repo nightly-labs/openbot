@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.skill", {
-  // Skill package, library, and marketplace errors.
   "error.skill.symlinks": "Skill packages cannot contain symbolic links.",
   "error.skill.expandedTooLarge": "The expanded skill must be under 10 MB.",
   "error.skill.irregularEntry": "Skill packages can contain only regular files and folders.",
@@ -44,7 +43,8 @@ export const messages = defineMessages("error.skill", {
   "error.skill.publishUntracked":
     "{name} was installed before exact-version tracking. Update or repair it before publishing.",
   "error.skill.tooManySkills": "An agent can have up to {limit} skills.",
-  "error.skill.unmanagedExists": "An unmanaged skill already exists at {path}.",
+  "error.skill.ownSkillExists":
+    "This agent already has its own skill named {slug}. Ask the agent to rename or delete that skill, then add this skill again.",
   "error.skill.managedSlug": "OpenBot gives every agent its own {slug} skill. Give this skill a different name.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md is larger than 64 KB. Shorten it before publishing.",
   "error.skill.localNoRevisions": "Local skill has no published revisions.",
@@ -60,7 +60,6 @@ export const messages = defineMessages("error.skill", {
   "error.skill.localMissingSkillFile": "The skill folder needs SKILL.md at its root.",
   "error.skill.pathSymlink": "Skill paths cannot contain symbolic links.",
   "error.skill.folderNotRead": "{provider} does not read {folder}. Copy this folder to {target}.",
-  // Skills from a public GitHub link. {repository} is "owner/name". {folder} is "owner/name/path".
   "error.skill.githubLinkInvalid": "Paste a link to a GitHub repository or folder.",
   "error.skill.githubNotFound": "OpenBot cannot open {repository}. The repository is private, or it does not exist.",
   "error.skill.githubNoSkills": "There is no SKILL.md in {folder}.",

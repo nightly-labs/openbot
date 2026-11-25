@@ -20,6 +20,8 @@ export const messages = {
     "L’outil ne s’est pas exécuté. tool_call n’a trouvé aucun outil avec ce nom. Utilisez le nom qualifié exact que donne tool_search, par exemple openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "L’outil ne s’est pas exécuté. tool_call n’a trouvé aucun outil avec ce nom. Le nom qualifié est peut-être {name}. Si c’est le cas, renvoyez l’appel avec ce nom.",
+  "error.agent.toolCallNullValue":
+    "L’outil ne s’est pas exécuté. {name} attend un objet ou une liste à {paths}, mais chacun de ces éléments de liste est arrivé comme null. Renvoyez l’appel et donnez chacun de ces éléments sous forme de chaîne qui contient son JSON.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe n’a trouvé aucun outil OpenBot nommé {names}. Il décrit uniquement les outils OpenBot et du navigateur que liste openbot.tool_search, pas les outils MCP.",
   "error.agent.toolDescribeDiscoveryNames":
@@ -57,6 +59,12 @@ export const messages = {
   "error.agent.modelUnavailable": "Le modèle d’agent sélectionné est indisponible.",
   "error.agent.modelProviderNotConnected":
     "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} n’est pas connecté.",
+  "error.agent.modelProviderSignInRequired":
+    "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} demande une connexion. Connectez-vous à {provider}, puis réessayez.",
+  "error.agent.modelProviderNotInstalled":
+    "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} n’est pas installé.",
+  "error.agent.modelProviderOutdated":
+    "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} doit être mis à jour.",
   "error.agent.modelListEmpty":
     "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} n’a listé aucun modèle. Dernière erreur : {detail}",
   "error.agent.modelListEmptyNoError":
@@ -137,6 +145,10 @@ export const messages = {
     "Les données de l’agent n’ont pas pu être entièrement supprimées. Relancez la suppression de l’agent.",
   "error.agent.deleteFolderInUse":
     "Le travail d'un autre agent utilise encore le dossier de cet agent. Supprimez à nouveau cet agent quand ce travail se termine, ou après avoir redémarré OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Un autre programme utilise encore le dossier de cet agent, par exemple un programme que l’agent a lancé. Fermez ce programme ou redémarrez l’ordinateur sur lequel cet agent fonctionne, puis supprimez à nouveau l’agent.",
+  "error.agent.deleteWhenFolderFree":
+    "Le travail d'un autre agent utilise encore le dossier de cet agent. OpenBot supprime cet agent quand ce travail se termine.",
   "error.agent.duplicationBusy": "Cet agent est déjà en cours de duplication.",
   "error.agent.waitBeforeDuplicate":
     "Attendez que l’agent ait terminé et videz sa file d’attente avant de le dupliquer.",
@@ -162,6 +174,8 @@ export const messages = {
     "Le comportement des messages pendant le travail de l’agent ne peut être réglé que sur l’ordinateur qui exécute l’agent.",
   "error.agent.backupModelsLocalOnly":
     "Les modèles de secours ne peuvent être réglés que sur l’ordinateur qui exécute l’agent.",
+  "error.agent.backupModelsAtLimit":
+    "Aucun modèle de secours ne peut prendre le relais : chacun a atteint sa limite d’utilisation ou a échoué il y a peu. Les modèles d’un même compte peuvent partager une limite. Pour continuer, ajoutez un modèle de secours d’un autre fournisseur ou d’un autre compte, ou attendez la réinitialisation.",
   "error.agent.taskLimitLocalOnly": "La limite de tâches se règle uniquement sur l’ordinateur qui exécute l’agent.",
   "error.agent.localScriptsOff": "Cet agent n’autorise pas les scripts locaux.",
   "error.agent.localScriptsRateLimited":
@@ -192,6 +206,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "La capture d’écran ne fonctionne pas dans une conversation Slack, Discord ou Telegram, car d’autres personnes reçoivent ses fichiers.",
   "error.agent.screenCaptureDeclined": "L’utilisateur n’a pas autorisé cette capture d’écran. Rien n’a été capturé.",
+  "error.agent.creditMediaDeclined": "L’utilisateur n’a pas autorisé cette génération. Aucun crédit n’a été dépensé.",
+  "error.agent.creditMediaNotSaved": "Le fichier a été créé, mais OpenBot n’a pas pu l’enregistrer dans le chat.",
   "error.agent.mcpToolDeclined": "L’utilisateur n’a pas autorisé cet appel d’outil MCP. L’outil n’a pas été exécuté.",
   "error.agent.screenCaptureWindowMissing":
     "Cette fenêtre n’est pas ouverte. Appelez list_capture_sources pour obtenir les identifiants actuels des fenêtres.",
@@ -201,6 +217,8 @@ export const messages = {
     "La zone n’est pas entièrement dans un seul écran. Utilisez des points du bureau situés dans les limites d’un écran renvoyées par list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot n’a pas l’autorisation « Enregistrement de l’écran ». Demandez à l’utilisateur d’ouvrir Réglages Système > Confidentialité et sécurité > Enregistrement de l’écran et de l’audio du système, d’activer OpenBot, puis de quitter et de rouvrir OpenBot.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot n’a pas encore l’autorisation « Enregistrement de l’écran » et ne peut donc pas lister les fenêtres. Pour capturer un écran, appelez capture_screen avec target screen. L’utilisateur approuve d’abord la capture, puis macOS peut lui demander l’autorisation.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows a renvoyé une image vide. Demandez à l’utilisateur de déverrouiller l’ordinateur et de fermer le contenu protégé. Une stratégie de l’organisation peut aussi bloquer la capture d’écran.",
   "error.agent.screenCaptureFailed": "La capture d’écran a échoué. Réessayez.",

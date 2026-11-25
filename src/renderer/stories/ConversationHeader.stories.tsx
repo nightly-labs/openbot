@@ -31,7 +31,6 @@ const STORY_PINS: PinnedMessageItem[] = [
   },
 ];
 
-/** 50 pins of several chats, with short, long and unbroken messages and long thread names. */
 const MANY_STORY_PINS: PinnedMessageItem[] = Array.from({ length: 50 }, (_, index) => {
   const base = STORY_PINS[index % STORY_PINS.length] ?? {
     id: "pin",
@@ -70,7 +69,6 @@ const meta = {
       onChange: fn(),
       onReasoningEffortChange: fn(),
     },
-    sidePanel: { open: false, onToggle: fn() },
   },
   parameters: { layout: "fullscreen", a11y: { test: "error" } },
 } satisfies Meta<typeof ConversationHeader>;
@@ -91,7 +89,6 @@ export const OfflineHost: Story = {
 export const AgentUsingBrowser: Story = {
   args: { sidePanel: { open: true, actingAgentName: STORY_AGENT.name, onToggle: fn() } },
 };
-/** A model chosen during the turn. The picker names it; the badge says that it starts with the next turn. */
 export const ModelAfterThisTurn: Story = {
   args: {
     pendingModel: { running: "GPT-5.6 Luna", next: "GPT-5.6 Terra" },
@@ -106,7 +103,6 @@ export const ModelAfterThisTurn: Story = {
     },
   },
 };
-/** A provider chosen during the turn. The running turn keeps its provider; the next turn uses the new one. */
 export const ProviderAfterThisTurn: Story = {
   args: {
     pendingModel: { running: "Codex · GPT-5.6 Luna", next: "Grok · Grok 4.6" },
@@ -122,9 +118,6 @@ export const ProviderAfterThisTurn: Story = {
     },
   },
 };
-/** The pin button with three pins. Open the list: each pin is a quote, and Unpin shows on hover. */
 export const PinnedMessages: Story = { args: { pinnedMessages: pinnedMessages(STORY_PINS) } };
-/** A chat at its limit of 50 pins. The list scrolls under its title, and each quote stays at four lines. */
 export const ManyPinnedMessages: Story = { args: { pinnedMessages: pinnedMessages(MANY_STORY_PINS) } };
-/** A chat with no pin. The list says how to pin a message. */
 export const NoPinnedMessages: Story = { args: { pinnedMessages: pinnedMessages([]) } };

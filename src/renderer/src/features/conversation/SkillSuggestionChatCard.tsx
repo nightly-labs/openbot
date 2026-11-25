@@ -1,4 +1,5 @@
 import type { SkillSuggestionEvent } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
 import {
   MarketplaceSuggestionCard,
@@ -8,18 +9,8 @@ import { useText } from "@openbot/ui/text";
 import { createSignal } from "solid-js";
 import { dismissMarketplaceSuggestion, marketplaceSuggestionDismissed } from "./marketplace-suggestion-dismissals";
 
-/**
- * Where a skill suggestion is. `open`: the user has not answered. `working`: the agent works on the
- * answer. `saved`: the agent saved the skill. `answered`: the user answered and the agent saved
- * nothing, or the user wrote about something else.
- */
 export type SkillSuggestionOutcome = "open" | "working" | "saved" | "answered";
 
-/**
- * The outcome from the messages after the suggestion. Only the first user message after it carries
- * the suggestion to the agent, so a later one cannot save it: a new skill after a later message counts
- * only when it has the suggested name, as when the host saved it from the Save button.
- */
 export function skillSuggestionOutcome(
   messages: readonly AgentMessage[],
   messageId: string,
@@ -45,32 +36,18 @@ export function skillSuggestionOutcome(
   return turnActive ? "working" : "answered";
 }
 
-/** The result of Save: the host saved the skill, the yes went to the agent, or the chat cannot send now. */
 export type SkillSuggestionSaveResult = "saved" | "sent" | null;
 
 export interface SkillSuggestionChatCardProps {
   messageId: string;
   suggestion: SkillSuggestionEvent;
   outcome: SkillSuggestionOutcome;
-  /**
-   * Saves the skill on the host in the background, or sends `reply`, the user's yes, to the agent of
-   * this chat when the host saved nothing. `saved` when the host saved the skill, `sent` when the yes
-   * went to the agent, and null when the chat cannot send now.
-   */
   onSave?: ((reply: string) => Promise<SkillSuggestionSaveResult>) | undefined;
-  /** Opens the skill that an update changes. */
   onOpenSkill?: ((skill: { skillId: string }) => void) | undefined;
 }
 
-/**
- * A memory review's question to save a skill from the chat. Save asks the host to write the skill in
- * the background, and the card turns to Saved when the host has saved it. The skill line can come
- * later, after a turn that runs. When the host saves nothing, Save sends the user's yes to the agent,
- * which saves the skill in a turn.
- */
 export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
   const { t } = useText();
-  /* The save or the yes runs before the chat shows its result, so the card waits from the click. */
   const [press, setPress] = createSignal<"pending" | "saved" | null>(null);
   const state = () => {
     if (props.outcome === "saved" || press() === "saved") return "connected";
@@ -84,7 +61,13 @@ export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
       props.suggestion.action === "create" ? t("chat.suggestion.saveReply") : t("chat.suggestion.updateReply");
     const result = await props.onSave?.(reply);
     if (result === "saved") setPress("saved");
-    else if (!result) setPress(null);
+    else if (!result) {
+      setPress(null);
+      toast.error(t("chat.suggestion.saveFailed"), {
+        id: `skill-suggestion-save:${props.messageId}`,
+        report: { operation: "memory", source: "action", cause_code: "unknown" },
+      });
+    }
   };
   const skillAction = (): MarketplaceSuggestionSkillAction =>
     props.suggestion.action === "create" ? "save" : "update";

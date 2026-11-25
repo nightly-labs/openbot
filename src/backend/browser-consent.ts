@@ -1,15 +1,12 @@
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type { WebContents } from "electron";
 
-/** The isolated world of the consent script. The page cannot read its state or its functions. */
 export const CONSENT_WORLD = 1_019;
 
-/** How long a document can show its banner after `dom-ready`. After this, the script stops watching. */
 const WATCH_MS = 15_000;
 
 const logger = createOpenBotLogger("browser-consent");
 
-/** The buttons of common consent platforms that refuse all optional cookies in one click. */
 const REJECT_SELECTORS = [
   "#onetrust-reject-all-handler",
   "#CybotCookiebotDialogBodyButtonDecline",
@@ -21,10 +18,6 @@ const REJECT_SELECTORS = [
   "[data-testid='uc-deny-all-button']",
 ];
 
-/**
- * The whole label of a button that refuses optional cookies, after lower case and with punctuation
- * changed to spaces. A label that accepts all cookies never matches.
- */
 const REJECT_LABEL = new RegExp(
   `^(?:${[
     "(?:reject|decline|deny|refuse|disagree)(?: all)?(?: (?:optional |non essential |additional )?cookies)?",
@@ -45,20 +38,10 @@ const REJECT_LABEL = new RegExp(
   "u",
 );
 
-/**
- * Text that a cookie banner shows. Banners in these languages use the word "cookie". Words such as
- * "consent" also show on sign-in and terms dialogs, where a "Decline" button must stay.
- */
 const COOKIE_TEXT = /cookie|ciasteczk/iu;
 
-/** An id or class of a consent container. */
 const CONSENT_NAME = /cookie|consent|gdpr|cmp/iu;
 
-/**
- * Runs once in each document. It clicks one reject button and stops, or stops after `WATCH_MS`. A
- * button counts only when it is visible, its whole label refuses cookies, and it is in a banner: an
- * ancestor shows cookie text, and an ancestor is a dialog, fixed or sticky, or has a consent name.
- */
 const CONSENT_SCRIPT = String.raw`(() => {
   if (globalThis.__openbotConsent) return;
   globalThis.__openbotConsent = true;
@@ -93,7 +76,6 @@ const CONSENT_SCRIPT = String.raw`(() => {
     const href = element.getAttribute("href");
     return !href || href.startsWith("#") || href.startsWith("javascript:");
   };
-  // innerText leaves out the text of shadow roots, so a banner made of web components shows none.
   const deepText = (node, depth) => {
     let content = node.nodeType === Node.ELEMENT_NODE ? node.innerText || "" : "";
     if (node.nodeType !== Node.ELEMENT_NODE)
@@ -158,7 +140,6 @@ const CONSENT_SCRIPT = String.raw`(() => {
     attributes: true,
     attributeFilter: ["class", "style", "hidden", "aria-hidden", "open"],
   };
-  // A subtree observer does not see into shadow roots, and a platform can fill its root later.
   const watch = (all) => {
     for (const root of all) {
       if (watched.has(root)) continue;
@@ -187,20 +168,14 @@ const CONSENT_SCRIPT = String.raw`(() => {
   scan();
 })();`;
 
-/**
- * Refuses the cookie banner of the main frame. Call it once per document, on `dom-ready`. It never
- * accepts: when a banner has no reject button, it stays.
- */
 export function refuseCookieBanners(contents: WebContents): void {
   const url = contents.getURL();
   if (!url.startsWith("https://") && !url.startsWith("http://")) return;
-  // A navigation during the run also rejects it, so this is a debug note and not a warning.
   void contents
     .executeJavaScriptInIsolatedWorld(CONSENT_WORLD, [{ code: CONSENT_SCRIPT }])
     .catch((error: unknown) => logger.debug("Cookie banner script stopped", { error: toLogValue(error) }));
 }
 
-/** Stops the script of the current document, when a person or a secret entry takes the tab. */
 export function stopCookieBanners(contents: WebContents): void {
   if (contents.isDestroyed()) return;
   void contents

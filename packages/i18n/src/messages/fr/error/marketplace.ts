@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/marketplace";
 
 export const messages = {
-  // Agent marketplace and agent link errors.
   "error.marketplace.timezoneInvalid": "Le fuseau horaire local n’est pas valide.",
   "error.marketplace.installedAgentMissing": "L’agent installé n’existe plus.",
   "error.marketplace.differentListing": "Cet agent local a été installé à partir d’un autre agent de la marketplace.",

@@ -78,6 +78,9 @@ export const messages = {
   "mobile.channel.form.deselectAll": "選択を解除",
   "mobile.channel.form.memories": "メモリー",
   "mobile.channel.form.routines": "ルーティン",
+  "mobile.channel.folders.description":
+    "{channel} のすべてのメンバーが、これらのフォルダーでファイルを変更し、コマンドを実行できます。",
+  "mobile.channel.folders.removeBody": "{channel} のメンバーは {folder} のファイルを変更できなくなりました",
   "mobile.channel.form.deleteTitle": "チャンネルを削除しますか？",
   "mobile.channel.form.deleteBody":
     "チャンネルを停止します。履歴は「削除したチャンネル」にプレビュー専用で残ります。そこから復元できます。メンバーのエージェントは残ります。",

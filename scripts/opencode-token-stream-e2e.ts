@@ -1,9 +1,3 @@
-// Checks that an answer streamed in sub-word tokens through a custom OpenCode endpoint keeps its words
-// whole (#3351). Runs the real OpenCode driver and CLI against a fake OpenAI-compatible server on
-// loopback. Cases: plain tokens, tokens with an empty `reasoning_content` beside each one, tokens with
-// reasoning between them, and a control where the endpoint itself sends the spaces.
-// `bun scripts/opencode-token-stream-e2e.ts [<opencode binary>]`. Without an argument it uses
-// `OPENBOT_OPENCODE_PATH`. Writes .openbot-build/opencode-token-stream-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -18,7 +12,6 @@ if (!binary) throw new Error("Give the OpenCode binary as the first argument or 
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-token-stream-"));
 const home = join(root, "home");
 mkdirSync(home, { recursive: true });
-// Before the driver loads: OpenCode keeps its state under the home folder.
 process.env.HOME = home;
 process.env.XDG_CONFIG_HOME = join(home, ".config");
 process.env.XDG_DATA_HOME = join(home, ".local/share");
@@ -32,7 +25,6 @@ type AgentClient = import("../src/backend/agent-client").AgentClient;
 
 const MODEL = "token-model";
 const PROVIDER = "token-endpoint";
-/** The start of the reported message, cut as a sub-word tokenizer cuts it. */
 const TOKENS = [
   "B",
   "aca",
@@ -61,7 +53,6 @@ const CASES: Record<string, Delta[]> = {
   ),
   "endpoint-spaces": TOKENS.map((content, index) => ({ content: index === 0 ? content : ` ${content.trimStart()}` })),
 };
-/** What the control case sends: the space in "B aca" comes from the endpoint, and stays. */
 const SPACED = (CASES["endpoint-spaces"] ?? []).map((delta) => delta.content).join("");
 
 function stream(response: ServerResponse, deltas: readonly Delta[]): void {
@@ -83,7 +74,6 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
   request.on("end", () => {
     if (!request.url?.endsWith("/chat/completions")) return void response.writeHead(404).end();
     const name = Object.keys(CASES).find((key) => body.includes(`case:${key}`));
-    // OpenCode's title request also holds the prompt, so it gets the stream of the same case.
     stream(response, name ? (CASES[name] ?? []) : [{ content: "Title" }]);
   });
 });

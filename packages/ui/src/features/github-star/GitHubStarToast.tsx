@@ -5,19 +5,12 @@ import { currentText } from "../../text";
 import { GitHubMark } from "../settings/brand-marks";
 
 interface GitHubStarToastProps {
-  /** True after the user chose to star. The toast then thanks them in place of the question. */
   thanked: boolean;
   onStar: () => void;
   onClose: () => void;
 }
 
-/**
- * The one-time request for a GitHub star. Raise it unstyled, with sonner's own timer and close
- * button off (`duration: Infinity`), in the `github-star-toast-host` class. The caller holds the
- * `thanked` state: sonner renders the content more than once, and each copy would get its own.
- */
 export function GitHubStarToast(props: GitHubStarToastProps) {
-  // The app's Toaster renders outside the text provider, so `useText()` would always give English.
   const { t } = currentText();
   const titleId = `github-star-toast-${createUniqueId()}`;
   return (

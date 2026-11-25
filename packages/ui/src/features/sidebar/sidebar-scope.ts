@@ -1,12 +1,3 @@
-/**
- * Everything `Sidebar` is, minus the markup. The component builds this once and reads it, and the
- * regions read it through the scope context.
- *
- * The body here is composition: each store under `stores/` owns one concern and is built in
- * dependency order, because a store can only be handed what already exists. The drag&drop pipeline
- * is the one part that needs a closure of its own, and `createSidebarDragEngine` is it.
- */
-
 import { createContext, createEffect, createSignal, onCleanup, useContext } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { createSidebarDragEngine } from "./createSidebarDragEngine";
@@ -17,22 +8,15 @@ import { createSidebarDataStore } from "./stores/data-store";
 import { createSidebarDragStateStore } from "./stores/drag-state-store";
 import { createSidebarLayoutActions } from "./stores/layout-actions";
 import { createSidebarPendingStore } from "./stores/pending-store";
+import { createSidebarTabStore } from "./stores/tab-store";
 
 export function createSidebarScope(props: SidebarProps) {
   const layoutMutable = () => props.layoutMutable !== false;
   const scrollFades = createScrollFades({ stuck: ".sidebar-folder > header" });
 
   const { announce, announceError, reorderAnnouncement } = createSidebarAnnouncementStore();
-  // The drag state is built from the data store, so the data store reads it through this reference,
-  // which is set once the drag state exists.
   let dragActive = () => false;
-  /**
-   * True while a mouse or pen is over the list, or over a menu that is open on it. The read open chat
-   * keeps its place in an unread order only then. A touch is false: a finger leaves nothing under it
-   * after a tap.
-   */
   const [pointerInList, setPointerInList] = createSignal(false);
-  /** The agents whose side threads show under their rows. Only this window keeps them. */
   const [threadsOpenIds, setThreadsOpenIds] = createSignal<ReadonlySet<string>>(new Set());
   const agentThreadsOpen = (agentId: string) => threadsOpenIds().has(agentId);
   const toggleAgentThreads = (agentId: string) =>
@@ -78,11 +62,13 @@ export function createSidebarScope(props: SidebarProps) {
     visibleSectionIds,
     waitingChats,
   } = createSidebarDataStore({ props, dragActive: () => dragActive(), pointerInList });
-  /**
-   * Nothing drags while a filter is set: a drop places a row among the rows that show, and the rows
-   * that the filter hides would lose their place. A chat drags only in the manual orders, because
-   * "Recent activity" and "Unread first" sort each section.
-   */
+  const sidebarTabs = createSidebarTabStore({
+    props,
+    filterFolders,
+    listFilter,
+    listFilterCount,
+    setListFilter,
+  });
   const layoutDraggable = () => layoutMutable() && !listFiltered();
   const chatsDraggable = () => layoutDraggable() && !sidebarChatOrderSortsSections(props.chatOrder);
   const {
@@ -104,10 +90,6 @@ export function createSidebarScope(props: SidebarProps) {
     startRenameSection,
     updateSectionEditorName,
   } = createSidebarPendingStore({ customSectionById, props });
-  /**
-   * A new folder has no chats, so a filter hides it and its name editor. Thus a new folder clears the
-   * filter first.
-   */
   const startCreateSection = (agentId?: string, parentId?: string) => {
     setListFilter(SIDEBAR_NO_LIST_FILTER);
     startCreateSectionEditor(agentId, parentId);
@@ -179,9 +161,6 @@ export function createSidebarScope(props: SidebarProps) {
     visibleSectionIds,
   });
 
-  // `pointerover` also fires when a menu closes and the pointer moves on, which a `pointerleave` on
-  // the list does not report. An overlay (a menu, a tooltip, a popover) keeps the current state: one
-  // opened from the list holds the row, and one opened elsewhere does not start a hold.
   const trackListPointer = (event: PointerEvent) => {
     const target = event.target instanceof Element ? event.target : null;
     if (event.pointerType === "touch" || target === null) {
@@ -191,11 +170,9 @@ export function createSidebarScope(props: SidebarProps) {
     if (agentList?.contains(target) === true) setPointerInList(true);
     else if (target.closest("[data-popper-positioner], .agent-context-menu") === null) setPointerInList(false);
   };
-  // The pointer left the window.
   const releaseListPointer = (event: PointerEvent) => {
     if (event.relatedTarget === null) setPointerInList(false);
   };
-  // Another app or a keyboard shortcut took the focus while the pointer did not move.
   const releaseOnBlur = () => setPointerInList(false);
   document.addEventListener("pointerover", trackListPointer);
   document.addEventListener("pointerout", releaseListPointer);
@@ -223,16 +200,11 @@ export function createSidebarScope(props: SidebarProps) {
     },
   );
 
-  /** The two statements the list's `ref` used to run inline, in the same order. */
   const setAgentListElement = (element: HTMLElement) => {
     agentList = element;
     scrollFades.bind(element);
   };
 
-  /**
-   * The scope's public surface, and the whole of what a region component may reach for. The drag
-   * store's writers are deliberately absent: only the engine may move a drag along.
-   */
   return {
     agentThreadsOpen,
     assignChatSection,
@@ -299,6 +271,7 @@ export function createSidebarScope(props: SidebarProps) {
     setSectionNameInput,
     shownPeople,
     sidebarClickIsSuppressed,
+    sidebarTabs,
     startChatDragging,
     startCreateSection,
     startNativeItemDragging,
