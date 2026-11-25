@@ -186,7 +186,7 @@ export class TeamWebRtcFileTransfer {
           () =>
             Effect.gen({ self: this }, function* () {
               const hash = createHash("sha256");
-              const check = (size: number) => this.#checkOutgoing(size);
+              const check = (size: number) => this.#checkSpool(pending, size);
               yield* remoteCall(() =>
                 pipeline(
                   Readable.from(input.body),
@@ -205,7 +205,6 @@ export class TeamWebRtcFileTransfer {
               const size = pending.size;
               const source = yield* remoteCall(() => open(path, "r"));
               file = source;
-              this.#writing.delete(pending);
               yield* remoteDecode(() => this.#checkOutgoing(size));
               const transferId = yield* this.#sendOutgoingEffect(peerId, {
                 name: input.name,
@@ -236,6 +235,15 @@ export class TeamWebRtcFileTransfer {
     if (this.#stopped) throw new Error(sourceText("error.remote.fileTransportIsStopped"));
     if (size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES)
       throw new TeamFileTooLargeError(sourceText("error.remote.fileTooLarge"));
+  }
+
+  #checkSpool(own: { peerId: string; size: number }, size: number): void {
+    this.#checkOutgoing(size);
+    const heldBytes = [...this.#writing]
+      .filter((item) => item !== own && item.peerId === own.peerId)
+      .reduce((sum, item) => sum + item.size, size);
+    if (heldBytes > TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES + TEAM_PROTOCOL_V2_MAX_FILE_BYTES)
+      throw new Error(sourceText("error.remote.fileSetTooLarge"));
   }
 
   #reserveOutgoing(transfer: OutgoingTransfer): boolean {
