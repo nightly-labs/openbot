@@ -44,7 +44,14 @@ function allowed(reply: unknown): boolean {
 async function writeInstructions(peer: AcpPeer, sessionId: string, file: string, content: string, index: number) {
   const toolCallId = `write-${index}`;
   const locations = [{ path: file }];
-  peer.update(sessionId, { sessionUpdate: "tool_call", toolCallId, title: "write", kind: "edit", status: "pending" });
+  peer.update(sessionId, {
+    sessionUpdate: "tool_call",
+    toolCallId,
+    title: "write",
+    kind: "edit",
+    status: "in_progress",
+    locations,
+  });
   const reply = await peer.ask("session/request_permission", {
     sessionId,
     toolCall: {
@@ -67,7 +74,6 @@ async function writeInstructions(peer: AcpPeer, sessionId: string, file: string,
     sessionUpdate: "tool_call_update",
     toolCallId,
     status: accepted ? "completed" : "failed",
-    locations,
   });
 }
 

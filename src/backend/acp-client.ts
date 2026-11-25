@@ -3748,7 +3748,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         params: {
           threadId: thread.id,
           turnId: turn.id,
-          filePaths: update.locations?.map((location) => location.path),
+          filePaths: (update.locations?.length ? update.locations : turn.toolLocations.get(update.toolCallId))?.map(
+            (location) => location.path,
+          ),
           item: shown,
         },
       });
