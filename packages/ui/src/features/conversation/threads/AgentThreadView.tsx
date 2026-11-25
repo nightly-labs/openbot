@@ -13,6 +13,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import { isAgentTaskActive } from "@openbot/team-client/agent-tasks";
 import { Button, CopyButton, toast } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import type {
   AgentMessage,
   AgentProfile,
@@ -1036,6 +1037,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           </Show>
         </div>
       </section>
+      <ScrollEdgeBlur fades={fades} />
       <div class="composer-wrap">
         <div class="composer-stack">
           <ComposerStackCard when={failed()}>

@@ -3,6 +3,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import { Button, ChevronDown, Dialog, ExternalLink, Heading, IconButton, Text, TriangleAlert, X } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, createUniqueId, For, Match, onSettled, Show, Switch } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import {
   summarizeWhatsNew,
@@ -118,56 +119,59 @@ export function WhatsNewBody(props: {
   createEffect(summary, () => fades.remeasure());
 
   return (
-    <div
-      class={["whats-new-body", fades.classes()]}
-      ref={fades.bind}
-      onScroll={fades.measure}
-      aria-busy={props.notes.status === "loading" ? "true" : undefined}
-    >
-      <Switch>
-        <Match when={props.notes.status === "loading"}>
-          <div class="whats-new-state">
-            <Text tone="muted">{t("update.whatsNew.loading")}</Text>
-          </div>
-        </Match>
-        <Match when={props.notes.status === "failed"}>
-          <div class="whats-new-state" role="alert">
-            <TriangleAlert class="whats-new-state-icon" aria-hidden="true" />
-            <Heading as="h3" size="sm">
-              {t("update.whatsNew.failed.title")}
-            </Heading>
-            <Text tone="muted">{t("update.whatsNew.failed.body")}</Text>
-            <Button type="button" variant="outline" size="sm" onClick={() => props.onRetry()}>
-              {t("common.retry")}
-            </Button>
-          </div>
-        </Match>
-        <Match when={summary().groups.length === 0 && summary().notices.length === 0}>
-          <div class="whats-new-state">
-            <Heading as="h3" size="sm">
-              {t("update.whatsNew.empty.title")}
-            </Heading>
-            <Text tone="muted">{t("update.whatsNew.empty.body")}</Text>
-          </div>
-        </Match>
-        <Match when>
-          <Show when={summary().notices.length > 0}>
-            <section class="whats-new-notice" aria-labelledby={noticeTitleId}>
-              <h3 class="whats-new-notice-title" id={noticeTitleId}>
-                <TriangleAlert aria-hidden="true" />
-                {t("update.whatsNew.notices")}
-              </h3>
-              <ul class="whats-new-list">
-                <For each={summary().notices}>{(notice) => <WhatsNewItem text={notice} />}</For>
-              </ul>
-            </section>
-          </Show>
-          <For each={summary().groups}>
-            {(group) => <WhatsNewGroupSection group={group} onToggle={fades.remeasure} />}
-          </For>
-        </Match>
-      </Switch>
-    </div>
+    <>
+      <div
+        class={["whats-new-body", fades.classes()]}
+        ref={fades.bind}
+        onScroll={fades.measure}
+        aria-busy={props.notes.status === "loading" ? "true" : undefined}
+      >
+        <Switch>
+          <Match when={props.notes.status === "loading"}>
+            <div class="whats-new-state">
+              <Text tone="muted">{t("update.whatsNew.loading")}</Text>
+            </div>
+          </Match>
+          <Match when={props.notes.status === "failed"}>
+            <div class="whats-new-state" role="alert">
+              <TriangleAlert class="whats-new-state-icon" aria-hidden="true" />
+              <Heading as="h3" size="sm">
+                {t("update.whatsNew.failed.title")}
+              </Heading>
+              <Text tone="muted">{t("update.whatsNew.failed.body")}</Text>
+              <Button type="button" variant="outline" size="sm" onClick={() => props.onRetry()}>
+                {t("common.retry")}
+              </Button>
+            </div>
+          </Match>
+          <Match when={summary().groups.length === 0 && summary().notices.length === 0}>
+            <div class="whats-new-state">
+              <Heading as="h3" size="sm">
+                {t("update.whatsNew.empty.title")}
+              </Heading>
+              <Text tone="muted">{t("update.whatsNew.empty.body")}</Text>
+            </div>
+          </Match>
+          <Match when>
+            <Show when={summary().notices.length > 0}>
+              <section class="whats-new-notice" aria-labelledby={noticeTitleId}>
+                <h3 class="whats-new-notice-title" id={noticeTitleId}>
+                  <TriangleAlert aria-hidden="true" />
+                  {t("update.whatsNew.notices")}
+                </h3>
+                <ul class="whats-new-list">
+                  <For each={summary().notices}>{(notice) => <WhatsNewItem text={notice} />}</For>
+                </ul>
+              </section>
+            </Show>
+            <For each={summary().groups}>
+              {(group) => <WhatsNewGroupSection group={group} onToggle={fades.remeasure} />}
+            </For>
+          </Match>
+        </Switch>
+      </div>
+      <ScrollEdgeBlur fades={fades} />
+    </>
   );
 }
 

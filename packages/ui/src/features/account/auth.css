@@ -1483,6 +1483,101 @@ textarea:not(.ui-textarea):focus-visible {
   );
 }
 
+.scroll-edge-blur {
+  display: none;
+}
+
+@supports (position-anchor: --scroll-edge) and (anchor-scope: --scroll-edge) {
+  :has(> .scroll-edge-blur) {
+    anchor-scope: --scroll-edge;
+  }
+
+  :has(+ .scroll-edge-blur) {
+    anchor-name: --scroll-edge;
+  }
+
+  .scroll-edge-blur {
+    position: absolute;
+    position-anchor: --scroll-edge;
+    top: anchor(top);
+    right: anchor(right);
+    bottom: anchor(bottom);
+    left: anchor(left);
+    display: block;
+    pointer-events: none;
+  }
+}
+
+.scroll-edge-blur-band {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: var(--scroll-edge-blur-size, calc(var(--openbot-space-1) * 12));
+}
+
+.scroll-edge-blur-band[data-edge="top"] {
+  --scroll-edge-blur-direction: to top;
+  top: var(--scroll-edge-blur-offset, 0);
+}
+
+.scroll-edge-blur-band[data-edge="bottom"] {
+  --scroll-edge-blur-direction: to bottom;
+  bottom: 0;
+}
+
+.scroll-edge-blur-layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  -webkit-backdrop-filter: blur(var(--scroll-edge-blur-radius));
+  backdrop-filter: blur(var(--scroll-edge-blur-radius));
+  -webkit-mask-image: linear-gradient(
+    var(--scroll-edge-blur-direction),
+    transparent var(--scroll-edge-blur-from),
+    var(--openbot-text-primary) var(--scroll-edge-blur-to)
+  );
+  mask-image: linear-gradient(
+    var(--scroll-edge-blur-direction),
+    transparent var(--scroll-edge-blur-from),
+    var(--openbot-text-primary) var(--scroll-edge-blur-to)
+  );
+  transition: opacity var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.scroll-edge-blur-visible > .scroll-edge-blur-layer {
+  opacity: 1;
+}
+
+.scroll-edge-blur-layer:nth-child(1) {
+  --scroll-edge-blur-radius: 0.5px;
+  --scroll-edge-blur-from: 0%;
+  --scroll-edge-blur-to: 25%;
+}
+
+.scroll-edge-blur-layer:nth-child(2) {
+  --scroll-edge-blur-radius: 1.5px;
+  --scroll-edge-blur-from: 20%;
+  --scroll-edge-blur-to: 45%;
+}
+
+.scroll-edge-blur-layer:nth-child(3) {
+  --scroll-edge-blur-radius: 3px;
+  --scroll-edge-blur-from: 40%;
+  --scroll-edge-blur-to: 65%;
+}
+
+.scroll-edge-blur-layer:nth-child(4) {
+  --scroll-edge-blur-radius: 5px;
+  --scroll-edge-blur-from: 60%;
+  --scroll-edge-blur-to: 85%;
+}
+
+.scroll-edge-blur-layer:nth-child(5) {
+  --scroll-edge-blur-radius: 8px;
+  --scroll-edge-blur-from: 80%;
+  --scroll-edge-blur-to: 100%;
+}
+
 body,
 .account-login-screen,
 .initial-setup-screen,

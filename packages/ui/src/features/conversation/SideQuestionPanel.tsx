@@ -12,6 +12,7 @@ import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { For, onSettled, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { createComposerRowsResize } from "./createComposerRowsResize";
 
 export interface SideQuestionExchange {
@@ -146,6 +147,7 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
             </Show>
           </div>
         </section>
+        <ScrollEdgeBlur fades={fades} />
       </Show>
       <div class="composer-wrap">
         <div class="composer-stack">

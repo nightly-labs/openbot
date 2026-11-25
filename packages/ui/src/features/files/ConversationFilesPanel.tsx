@@ -4,6 +4,7 @@ import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { onSettled, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { AgentPicker, type AgentPickerAgent } from "../agents/AgentPicker";
 import { FileList } from "./FileList";
 import { fileCountLabel, type StoredFileAction, type StoredFileRow } from "./files-view";
@@ -123,6 +124,7 @@ export function ConversationFilesPanel(props: ConversationFilesPanelProps) {
           />
         </div>
       </div>
+      <ScrollEdgeBlur fades={fades} />
     </aside>
   );
 }

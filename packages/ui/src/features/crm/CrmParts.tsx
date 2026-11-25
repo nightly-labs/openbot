@@ -31,6 +31,7 @@ import {
   X,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
@@ -783,16 +784,19 @@ export function SideBody(props: { children: JSX.Element }) {
   const autoScroll = createAutoScroll();
   onCleanup(() => fades.stop());
   return (
-    <div
-      ref={(element: HTMLDivElement) => {
-        fades.bind(element);
-        autoScroll.bind(element);
-      }}
-      class={["crm-side-body", fades.classes()]}
-      onScroll={() => fades.measure()}
-    >
-      {props.children}
-    </div>
+    <>
+      <div
+        ref={(element: HTMLDivElement) => {
+          fades.bind(element);
+          autoScroll.bind(element);
+        }}
+        class={["crm-side-body", fades.classes()]}
+        onScroll={() => fades.measure()}
+      >
+        {props.children}
+      </div>
+      <ScrollEdgeBlur fades={fades} />
+    </>
   );
 }
 

@@ -5,6 +5,7 @@ import { useText } from "../text";
 import { holdFlag } from "../utils";
 import { createScrollFades } from "./createScrollFades";
 import { PanelResizer } from "./PanelResizer";
+import { ScrollEdgeBlur } from "./ScrollEdgeBlur";
 
 export const SETTINGS_PANEL_DEFAULT = 360;
 export const SETTINGS_PANEL_MAX = 1600;
@@ -121,9 +122,12 @@ export function SettingsPanelContent(props: { children: JSX.Element }): JSX.Elem
   const fades = createScrollFades();
   onSettled(() => fades.stop);
   return (
-    <div class={["settings-panel-content", fades.classes()]} ref={fades.bind} onScroll={fades.measure}>
-      <div ref={fades.watch}>{props.children}</div>
-    </div>
+    <>
+      <div class={["settings-panel-content", fades.classes()]} ref={fades.bind} onScroll={fades.measure}>
+        <div ref={fades.watch}>{props.children}</div>
+      </div>
+      <ScrollEdgeBlur fades={fades} />
+    </>
   );
 }
 

@@ -6,6 +6,7 @@ import { FEEDBACK_WITHDRAW_CAPABILITY } from "@openbot/contracts/team-protocol/f
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import { feedbackApproval } from "@openbot/team-client/feedback-approval";
 import { Button } from "@openbot/ui";
+import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import type { AgentMessage, ChatActionMarkerModel, MessageKind } from "@openbot/ui/data";
 import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
 import { AgentActivityIndicator, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
@@ -1807,6 +1808,7 @@ export function ConversationTimeline() {
           </div>
         </Show>
       </div>
+      <ScrollEdgeBlur fades={scrollFades} />
       <DeleteMessageDialog
         messageId={deleteTargetId()}
         onDelete={deleteMessage}

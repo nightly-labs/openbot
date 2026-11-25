@@ -3578,6 +3578,52 @@ svg[data-icon="arrow-right"]:dir(rtl) {
   }
 }
 
+.landing-edge-blur {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 30;
+  height: 96px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.landing-edge-blur::after,
+.landing-edge-blur-layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.landing-edge-blur::after {
+  content: "";
+  background: linear-gradient(
+    to bottom,
+    var(--openbot-bg-canvas-clear) 0%,
+    color-mix(in srgb, var(--openbot-bg-canvas) 18%, transparent) 45%,
+    color-mix(in srgb, var(--openbot-bg-canvas) 60%, transparent) 100%
+  );
+}
+
+.landing-edge-blur-layer {
+  -webkit-backdrop-filter: blur(var(--edge-blur));
+  backdrop-filter: blur(var(--edge-blur));
+  -webkit-mask-image: linear-gradient(to bottom, transparent var(--edge-from), #000 var(--edge-to));
+  mask-image: linear-gradient(to bottom, transparent var(--edge-from), #000 var(--edge-to));
+}
+
+.landing-edge-blur[data-visible="true"]::after,
+.landing-edge-blur[data-visible="true"] .landing-edge-blur-layer {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-edge-blur::after,
+  .landing-edge-blur-layer {
+    transition: none;
+  }
+}
+
 .landing-footer {
   background: var(--openbot-bg-canvas);
   color: var(--openbot-text-primary);

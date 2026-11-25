@@ -7,6 +7,10 @@
   padding: 8px 12px var(--openbot-space-6);
 }
 
+.conversation-scroll + .scroll-edge-blur {
+  --scroll-edge-blur-size: calc(var(--openbot-space-4) * 4);
+}
+
 .virtual-chat-list {
   position: relative;
   width: 100%;

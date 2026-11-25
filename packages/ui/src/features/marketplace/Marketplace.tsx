@@ -1,5 +1,6 @@
 import { ErrorReference, IconButton, X } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { PageHeader, type PageHeaderParent } from "@openbot/ui/features/window/PageHeader";
 import { useText } from "@openbot/ui/text";
 import { holdFlag } from "@openbot/ui/utils";
@@ -215,6 +216,7 @@ function MarketplaceWindow(props: MarketplaceProps) {
           )}
         </Show>
       </div>
+      <ScrollEdgeBlur fades={fades} />
       <p class="marketplace-visually-hidden" role="status" data-live-announcer="">
         {props.model.notice()}
       </p>

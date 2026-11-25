@@ -42,6 +42,10 @@
   content-visibility: hidden;
 }
 
+.conversation-panel > .conversation-covered + .scroll-edge-blur {
+  visibility: hidden;
+}
+
 .conversation-panel > .composer-wrap.conversation-covered {
   top: auto;
 }
