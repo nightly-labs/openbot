@@ -4020,6 +4020,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!this.#turnRunsNowhere(agentId, turnId, channelLaneId)) return;
     logger.warn("A chat turn that no provider runs held the agent's queue. It ends as interrupted.", {
       agentId,
+      threadId,
       turnId,
     });
     yield* this.#turn.settleOrphanedTurn(agentId, threadId, turnId, "interrupted");
