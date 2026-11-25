@@ -469,6 +469,14 @@ const SERVER_PLACES: readonly ServerPlaceEntry[] = [
     words: "vault api key keys token tokens secret secrets password passwords credential credentials",
     foundWithoutServerWord: ["vault", "api", "key", "keys", "token", "secret", "credential", "password"],
   },
+  {
+    title: "Use my Claude Code setup",
+    place: `On a computer: ${SERVER_SETTINGS} > Providers > Claude > Use my Claude Code setup.`,
+    about:
+      "Only the owner or an admin. On: Claude agents load the CLAUDE.md, skills, agents, hooks and plugins from ~/.claude on that server. Off, the default: each turn sends a shorter prompt. Workspace files load either way. A member asks the owner.",
+    words: "claude code claude.md home user own personal setup config hooks plugins skills load",
+    foundWithoutServerWord: ["claude"],
+  },
 ];
 
 const CHAT_PLACES: readonly SettingLinkEntry[] = [
