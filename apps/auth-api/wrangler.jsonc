@@ -72,6 +72,10 @@
     {
       "binding": "EMAIL_RELAY",
       "service": "openbot-email-relay"
+    },
+    {
+      "binding": "MEDIA_GATEWAY",
+      "service": "openbot-media-gateway"
     }
   ],
   "send_email": [

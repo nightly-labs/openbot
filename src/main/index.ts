@@ -757,6 +757,8 @@ function registerIpcHandlers({
   promptCacheTtl,
   claudeUserSetup,
   cacheExpiryCompaction,
+  mediaApprovalCredits,
+  creditAsks,
   claudeCompactWindow,
   providerEnvironment,
   modelVisibility,
@@ -1035,6 +1037,7 @@ function registerIpcHandlers({
       promptCacheTtl,
       claudeUserSetup,
       cacheExpiryCompaction,
+      mediaApprovalCredits,
       claudeCompactWindow,
       providerEnvironment,
       modelVisibility,
@@ -1110,6 +1113,7 @@ function registerIpcHandlers({
       openExternal: openLink,
       modelVisibility,
       closeChatNotifications,
+      creditAsks,
     }),
     ...browserIpcHandlers({
       browserPictureInPicture,
@@ -1606,6 +1610,7 @@ if (!hasSingleInstanceLock) {
       });
       service.on("toolUsage", (usage) => built.analytics.handleToolUsage(usage));
       service.on("workflowRun", (end) => built.analytics.handleWorkflowRun(end));
+      service.on("creditMedia", (report) => built.analytics.handleCreditMedia(report));
       service.on("liveVoice", forwardVoiceLiveEvent);
       built.browser.onSiteVisited((visit) => built.analytics.handleSiteVisit(visit));
       sidebarLayout.on("changed", (layout) => forwardAgentEvent("local", { type: "sidebar-layout-changed", layout }));

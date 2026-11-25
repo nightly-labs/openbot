@@ -167,6 +167,9 @@ export const messages = {
     "Cette connexion ne prend pas en charge la taille de compactage de Claude.",
   "error.team.cacheExpiryCompactionUnsupported":
     "Cette connexion ne prend pas en charge le compactage avant l’expiration du cache.",
+  "error.team.mediaApprovalCreditsUnsupported":
+    "Cette connexion ne prend pas en charge le seuil d’approbation des crédits.",
+  "error.team.mediaApprovalCreditsInvalid": "Saisissez un nombre entier de crédits entre 0 et 100 000.",
   "error.team.providerEnvironmentUnsupported": "Cette connexion ne prend pas en charge les variables de fournisseur.",
   "error.team.modelVisibilityUnsupported": "Cette connexion ne prend pas en charge la liste des modèles.",
   "error.team.providerDefaultUnsupported": "Cette connexion ne prend pas en charge le fournisseur par défaut.",
@@ -236,4 +239,7 @@ export const messages = {
   "error.team.providerUseUnsupported":
     "Cette connexion ne prend pas en charge l’activation et la désactivation des fournisseurs.",
   "error.team.providerUseInvalid": "Ce fournisseur n’a pas d’interrupteur d’activation.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "Ce serveur ne permet pas de choisir le modèle dans les approbations de médias. Mettez à jour OpenBot sur le serveur.",
+  "error.team.mediaApprovalChoiceInvalid": "Le choix de l'approbation de média n'est pas valide.",
 } as const satisfies PartialTranslation<typeof source>;

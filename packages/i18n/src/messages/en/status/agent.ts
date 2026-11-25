@@ -37,6 +37,12 @@ export const messages = defineMessages("status.agent", {
   "status.agent.screenCaptureScreen": "Capture the main screen and send the image to the agent's model.",
   "status.agent.screenCaptureChannel":
     "The image shows in the channel {channel}, and each member of this server who reads the channel can see it.",
+  "status.agent.creditImageApproval": "Generate an image with {model}. This uses {credits} credits.",
+  "status.agent.creditVideoApproval": "Generate a video with {model}. This uses {credits} credits.",
+  "status.agent.creditMediaChannel":
+    "The result shows in the channel {channel}, and each member of this server who reads the channel can see it.",
+  "status.agent.creditsHoldBalance": "This uses {credits} credits, and the balance is {balance} credits.",
+  "status.agent.creditsHoldAgentsOff": "Agents on this server cannot use credits.",
   "status.agent.screenCapturePermissionNext": "macOS can then ask you to allow Screen Recording for OpenBot.",
   "status.agent.screenCaptureDisplay": "Capture the display {name} and send the image to the agent's model.",
   "status.agent.screenCaptureWindow": "Capture the window {name} and send the image to the agent's model.",

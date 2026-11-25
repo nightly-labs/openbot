@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "אירועים אינם זמינים במארח הזה.",
   "error.backend.databaseIntegrity": "מסד הנתונים של OpenBot נכשל בבדיקת השלמות.",
+  "error.backend.creditsHoldAdminOnly": "רק בעלים או מנהל של השרת הזה יכולים לאפשר לסוכנים להשתמש בקרדיטים.",
+  "error.backend.creditsHoldShort": "עדיין אין מספיק קרדיטים.",
   "error.backend.webhookRouteLimit": "במארח אחד יכולות להיות לכל היותר {limit} שגרות webhook.",
   "error.backend.webhookSettingsInvalid": "יש לבדוק את הגדרות ה-webhook ולנסות שוב.",
   "error.backend.webhookSenderSecretInvalid":

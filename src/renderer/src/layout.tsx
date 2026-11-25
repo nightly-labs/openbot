@@ -1,7 +1,12 @@
 import type { AppInfo } from "@openbot/contracts/ipc";
 import type { ServerView } from "@openbot/ui/features/servers/ServerMenu";
 import { SIDEBAR_CHAT_ORDERS, type SidebarChatOrder } from "@openbot/ui/features/sidebar/sidebar-types";
-import { PAGE_RAIL_PINNABLE_PAGES, type PageRailPinnablePage } from "@openbot/ui/features/window/PageRail";
+import {
+  PAGE_RAIL_HIDEABLE_ITEMS,
+  PAGE_RAIL_PINNABLE_PAGES,
+  type PageRailHideableItem,
+  type PageRailPinnablePage,
+} from "@openbot/ui/features/window/PageRail";
 import { createEffect, createMemo, createSignal, onSettled } from "solid-js";
 import { z } from "zod";
 import { readPanelWidth } from "./components/panel-width-storage";
@@ -15,6 +20,7 @@ import {
   LEFT_PANEL_STORAGE_KEY,
   MAC_SERVER_RAIL_WIDTH,
   NARROW_SERVER_RAIL_WIDTH,
+  RAIL_HIDDEN_STORAGE_KEY,
   RAIL_PINS_STORAGE_KEY,
   SERVER_RAIL_WIDTH,
   SERVER_VIEW_STORAGE_KEY,
@@ -51,15 +57,21 @@ const railPinChoicesSchema = z.record(z.string(), z.boolean().optional().catch(u
 
 type RailPinChoices = z.infer<typeof railPinChoicesSchema>;
 
-function readRailPinChoices(): RailPinChoices {
+function readRailChoices(key: string): RailPinChoices {
   try {
-    const parsed = railPinChoicesSchema.safeParse(
-      JSON.parse(window.localStorage.getItem(RAIL_PINS_STORAGE_KEY) ?? "{}"),
-    );
+    const parsed = railPinChoicesSchema.safeParse(JSON.parse(window.localStorage.getItem(key) ?? "{}"));
     return parsed.success ? parsed.data : {};
   } catch {
     return {};
   }
+}
+
+function readRailPinChoices(): RailPinChoices {
+  return readRailChoices(RAIL_PINS_STORAGE_KEY);
+}
+
+function readRailHiddenChoices(): RailPinChoices {
+  return readRailChoices(RAIL_HIDDEN_STORAGE_KEY);
 }
 
 function readSidebarChatOrder(): SidebarChatOrder {
@@ -90,6 +102,11 @@ const Layout = createSimpleContext({
       const choices = railPinChoices();
       return PAGE_RAIL_PINNABLE_PAGES.filter((page) => choices[page] ?? RAIL_PINNED_BY_DEFAULT.has(page));
     });
+    const [railHiddenChoices, setRailHiddenChoices] = createSignal<RailPinChoices>(readRailHiddenChoices());
+    const railHidden = createMemo(() => {
+      const choices = railHiddenChoices();
+      return PAGE_RAIL_HIDEABLE_ITEMS.filter((item) => choices[item] === true);
+    });
     const [leftPanelAutoCompact, setLeftPanelAutoCompact] = createSignal(false);
     const [sidebarClosed, setSidebarClosedSignal] = createSignal(
       window.localStorage.getItem(LEFT_PANEL_CLOSED_STORAGE_KEY) === "true",
@@ -118,6 +135,7 @@ const Layout = createSimpleContext({
 
     function readRailPinsFromStorage(event: StorageEvent): void {
       if (event.key === null || event.key === RAIL_PINS_STORAGE_KEY) setRailPinChoices(readRailPinChoices());
+      if (event.key === null || event.key === RAIL_HIDDEN_STORAGE_KEY) setRailHiddenChoices(readRailHiddenChoices());
       if (event.key === null || event.key === SIDEBAR_CHAT_ORDER_STORAGE_KEY)
         setSidebarChatOrderSignal(readSidebarChatOrder());
     }
@@ -157,6 +175,14 @@ const Layout = createSimpleContext({
       } catch {}
     }
 
+    function setRailHidden(item: PageRailHideableItem, hidden: boolean): void {
+      const choices = { ...railHiddenChoices(), ...readRailHiddenChoices(), [item]: hidden };
+      setRailHiddenChoices(choices);
+      try {
+        window.localStorage.setItem(RAIL_HIDDEN_STORAGE_KEY, JSON.stringify(choices));
+      } catch {}
+    }
+
     function expandSidebar(): void {
       setSidebarClosed(false);
       setSidebarCollapsed(false);
@@ -179,6 +205,8 @@ const Layout = createSimpleContext({
       setSidebarChatOrder,
       railPinned,
       setRailPinned,
+      railHidden,
+      setRailHidden,
     };
   },
 });

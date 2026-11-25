@@ -22,6 +22,7 @@ import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
 import { setBrowserProfileToolSchema } from "./agent/browser-profile-tool";
 import { createChannelToolSchema, listChannelsToolSchema, updateChannelToolSchema } from "./agent/channel-agent-tools";
 import { setCommitCoAuthorToolSchema } from "./agent/commit-co-author-tool";
+import { CREDIT_MEDIA_TOOL_DEFINITIONS } from "./agent/credit-media-tools";
 import { CRM_TOOL_DEFINITIONS } from "./agent/crm-tool";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
 import { deleteAgentToolSchema } from "./agent/delete-agent-tool";
@@ -290,6 +291,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...WORKFLOW_TOOL_DEFINITIONS,
   WORKFLOW_ANSWER_TOOL_DEFINITION,
   ...CRM_TOOL_DEFINITIONS,
+  ...CREDIT_MEDIA_TOOL_DEFINITIONS,
   ...MCP_SERVER_TOOL_DEFINITIONS,
   {
     name: "list_sites",
