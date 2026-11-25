@@ -3620,6 +3620,14 @@ fieldset.wfn-picker-group {
   min-width: 0;
 }
 
+.wfn-alert:has(> .wfn-alert-clamp) {
+  align-items: flex-start;
+}
+
+.wfn-alert-icon-first-line {
+  margin-top: calc((var(--openbot-leading-sm) - var(--openbot-icon-sm)) / 2);
+}
+
 .wfn-alert .wfn-alert-clamp .wfn-step-text-body {
   max-height: calc(var(--openbot-leading-sm) * 3);
   color: inherit;

@@ -2,18 +2,10 @@ import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure } from "@openbot/telemetry";
 import type { AgentProvider } from "../agent-client";
+import { isSpentBalanceDiagnostic } from "./provider-diagnostics";
 import { providerLabel } from "./thread-items";
 
 const PROVIDER_REASON_LIMIT = 300;
-
-const PROVIDER_ONLY_CAUSES: ReadonlySet<CauseCode> = new Set([
-  "billing",
-  "usage_limit",
-  "permission",
-  "content_blocked",
-  "context_too_long",
-  "invalid_request",
-]);
 
 export function workflowGenerationError(
   cause: unknown,
@@ -28,10 +20,10 @@ export function workflowGenerationError(
     return failure.message;
   const providerError = workflowProviderError(failure, provider, sourceText("error.workflow.modelTimedOut"));
   if (providerError) return providerError;
+  if (failure?.message === sourceText("error.agent.profileToolUse")) return sourceText("error.workflow.modelToolUse");
   const reason = failure?.message === sourceText("error.agent.profileFailed") ? providerReason(failure, redact) : null;
   const refusal = providerRefusal(failure, reason);
   if (refusal) return refusal;
-  if (failure?.message === sourceText("error.agent.profileToolUse")) return sourceText("error.workflow.modelToolUse");
   return reason ? sourceText("error.workflow.providerRefused", { reason }) : sourceText("error.workflow.modelFailed");
 }
 
@@ -73,15 +65,16 @@ function workflowProviderError(failure: Error | null, provider: AgentProvider, t
 }
 
 function providerRefusal(failure: Error | null, reason: string | null): string | null {
-  const providerCause = failure?.cause instanceof Error ? classifyFailure(failure.cause) : "unknown";
-  const ownCause = classifyFailure(failure);
-  const found: CauseCode =
-    providerCause !== "unknown" ? providerCause : PROVIDER_ONLY_CAUSES.has(ownCause) ? "unknown" : ownCause;
+  const said = failure?.cause instanceof Error ? failure.cause : null;
+  if (!said) return null;
+  const found: CauseCode = classifyFailure(said);
   switch (found) {
     case "billing":
       return sourceText("error.workflow.providerBilling");
     case "usage_limit":
-      return sourceText("error.provider.usageLimitReached");
+      return isSpentBalanceDiagnostic(said.message)
+        ? sourceText("error.workflow.providerBilling")
+        : sourceText("error.provider.usageLimitReached");
     case "permission":
       return reason
         ? sourceText("error.workflow.modelRefusedReason", { reason })

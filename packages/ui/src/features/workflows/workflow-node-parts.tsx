@@ -706,7 +706,7 @@ export function FailureAlert(props: { id: string; running: boolean }) {
     <Show when={props.running ? undefined : resultFailure(board, props.id)} keyed>
       {(failure) => (
         <div class="wfn-alert" data-tone="danger">
-          <CircleX aria-hidden="true" />
+          <CircleX class="wfn-alert-icon-first-line" aria-hidden="true" />
           <ClampedText class="wfn-alert-clamp" value={failure} />
         </div>
       )}
