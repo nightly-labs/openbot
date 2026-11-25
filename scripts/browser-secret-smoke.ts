@@ -307,7 +307,8 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         <label>User<input id="user" type="text" value="someone"></label>
         <label>Password<input id="masked-visible" class="mask" type="text" oninput="document.querySelector('#real-password').value = this.value"></label>
         <input id="real-password" name="password" type="password" style="display:none">
-        <button id="hidden-submit">Sign in</button></form></body>`,
+        <button id="hidden-submit">Sign in</button></form>
+        <script>document.body.addEventListener("change", (event) => { if (event.target.matches("[name=password]")) event.target.value = ""; });</script></body>`,
         { headers: { "Content-Type": "text/html" } },
       );
     if (url.pathname === "/modal") {
