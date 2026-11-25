@@ -218,6 +218,8 @@ const TAKEOVER_TAB_OF_OTHER_CHAT =
 const USER_ANSWER_LIMIT_MS = 10 * 60_000;
 const TAKEOVER_ALREADY_WAITING = "A takeover of this tab already waits for the user. Wait for it to return.";
 const VAULT_UNAVAILABLE = "No Vault is available on this computer. Ask the user.";
+const ROUTINE_SAVED_LOGIN_NOT_FILLED =
+  "This is a routine run, so nobody can answer a password card. When this text says how to correct the call, correct it and call submit_secret again with the loginId. Else stop the sign-in and say in your report that the user must sign in, and why OpenBot did not fill the saved login. Do not call submit_secret without loginId or request_takeover.";
 const NO_LOGIN_FOR_SITE =
   "No saved login is for the site of this page. A login fits only the site of a website saved in it, with its subdomains, and a sign-in page can be on a different site than the service. When the user says that a login for this account is saved, tell them what to check. In a password manager: add the address of this sign-in page as a website of the login, and keep the login where they share logins with OpenBot; the page of each password manager in Marketplace shows where. In the OpenBot Vault, a login has one website: save a second login for the address of this sign-in page in Server settings > Vault, and let this agent use the login under Agents. Until then, continue as for a site with no saved login.";
 const VAULT_LOGIN_ADD_FIELDS =
@@ -1000,6 +1002,16 @@ export class AttentionRegistry {
         this.#resolveBrowserTakeover(input.requestId, pending, "complete", vault);
         return;
       }
+      if (pending.vaultLoginId !== undefined && this.#routines.runsTurn(pending.request.turnId)) {
+        const reason = pending.secureInputFailed ? ` ${pending.secureInputFailed}` : "";
+        pending.resolve(
+          browserTakeoverError(
+            `OpenBot could not finish filling saved login ${pending.vaultLoginId}.${reason} ${ROUTINE_SAVED_LOGIN_NOT_FILLED}`,
+          ),
+        );
+        this.#resolveBrowserTakeover(input.requestId, pending, "cancel");
+        return;
+      }
     }
     secret.cancel();
     delete pending.secret;
@@ -1305,6 +1317,13 @@ export class AttentionRegistry {
         ) {
           if (this.#messagingRequestTurn(agentId, turnId)) {
             pending.resolve(browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED));
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (getString(args, "loginId") && this.#routines.runsTurn(turnId)) {
+            pending.resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped ?? "OpenBot did not fill a saved login: no password manager is connected."} ${ROUTINE_SAVED_LOGIN_NOT_FILLED}`,
+              ),
+            );
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
           } else if (pending.secret?.withCode) {
             pending.resolve(
