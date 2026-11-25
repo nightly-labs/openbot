@@ -254,7 +254,11 @@ async function main(): Promise<void> {
       const stored = store.read().wallet;
       if (stored?.accountId === testWallet && stored.grant?.active) {
         await run(service.load());
-        return `already connected: ${summary(service.status())}`;
+        if (service.status().account?.grantExpiresAt) return `already connected: ${summary(service.status())}`;
+        const renewed = await run(service.renewGrant());
+        assert.equal(renewed.error, null);
+        assert.ok(renewed.account?.grantExpiresAt, "the renewed grant is valid");
+        return `grant renewed: ${summary(renewed)} signed=${passkey.signedActions.join(",")}`;
       }
       if (stored?.accountId !== testWallet) await adoptTestWallet(store, gateway, passkey, testWallet);
       await run(service.load());
