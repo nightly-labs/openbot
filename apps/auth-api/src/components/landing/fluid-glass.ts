@@ -1050,6 +1050,13 @@ function startEngine(
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
 
+  const stop = () => {
+    lost = true;
+    cancelAnimationFrame(raf);
+    raf = 0;
+    parts.onLive(false);
+  };
+
   function frame(now: number) {
     raf = 0;
     if (resizePending) {
@@ -1104,6 +1111,10 @@ function startEngine(
       ((morph.t < 1 ? 0.05 * wobble * Math.sin(Math.PI * morph.t) : 0) - body.ripple) * (1 - Math.exp(-dt / 0.08));
 
     if (!current) {
+      if (!entry || entry.failed) {
+        stop();
+        return;
+      }
       drawFallback();
       schedule();
       return;
@@ -1216,10 +1227,7 @@ function startEngine(
 
   const onLost = (event: Event) => {
     event.preventDefault();
-    lost = true;
-    cancelAnimationFrame(raf);
-    raf = 0;
-    parts.onLive(false);
+    stop();
   };
 
   const resizeObserver = new ResizeObserver(resize);
