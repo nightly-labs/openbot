@@ -66,7 +66,10 @@ import { ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-pro
 import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { BROWSER_PAGE_STATE_CAPABILITY } from "@openbot/contracts/team-protocol/browser-page-state-v1";
-import { BROWSER_PERMISSIONS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-permissions-v1";
+import {
+  BROWSER_PERMISSIONS_CAPABILITY,
+  browserPermissionRequests,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import { BROWSER_PROFILES_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-events-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
@@ -2062,9 +2065,7 @@ export class TeamApiServer {
   }
 
   #sendBrowserPermissions(client: Ws.WebSocket, connection: EventClientState): void {
-    const requests = this.#options.browser
-      .listTabs()
-      .flatMap((tab) => (tab.permissionRequest ? [{ tabId: tab.id, ...tab.permissionRequest }] : []));
+    const requests = browserPermissionRequests(this.#options.browser.listTabs());
     if (client.readyState !== webSockets.WebSocket.OPEN) return;
     client.send(JSON.stringify(this.#eventFor(connection, { type: "browser-permissions-changed", requests })));
   }

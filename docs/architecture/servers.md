@@ -977,7 +977,7 @@ host that reports the page state; for an older host, Back and Forward stay enabl
 see, and each change sends `browser-permissions-changed` with the same list. The frozen tab projection
 does not carry the request, so the client adds it from this list. An Allow must carry the location of
 the member's device; without it the host answers 400 `browserLocationRequired`. `always: true` is
-valid only with an Allow, and keeps the Allow for the origin in all tabs until the host restarts. A client shows the
+valid only with an Allow, and keeps the Allow and the location for the origin in all tabs of the same agent (or thread) until the host restarts. A client shows the
 Allow and Block question only for a host with the capability. For an older host, the page gets Block, as
 before.
 

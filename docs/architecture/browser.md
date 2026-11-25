@@ -670,10 +670,13 @@ close or a sleep of the tab blocks the pending request and forgets the answer. A
 private session tab, a closing tab and a page that is not `http` or `https` get Block at once. A tab
 with a pending request does not sleep.
 
-Allow always also grants the origin in every other tab that an agent or thread owns, and answers the
-pending requests of that origin in the other tabs. The host keeps these origins in memory only, so a
-restart of the app or the server forgets them. A remote Allow always also keeps the location of the
-member's device for the origin, and the host sets that location on each tab that the origin asks from.
+Allow always from the computer that runs the browser grants the origin in every tab that an agent or
+thread owns, and answers the pending requests of that origin in those tabs. An answer for a tab clears
+an earlier Block of that origin in the other tabs. A remote Allow always carries the location of the
+member's device, so it grants the origin only in the tabs of the same agent (or thread), and the host
+sets that location on each of those tabs that the origin asks from. The host keeps these grants in
+memory only, so a restart of the app or the server forgets them. When the client cannot read the
+location of its device, it sends no answer, and the request stays open.
 
 An answer from the computer that runs the browser lets Chromium read the location of that computer.
 An answer from a joined server (desktop or phone) sends the location of the member's

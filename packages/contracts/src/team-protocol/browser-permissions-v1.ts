@@ -1,4 +1,4 @@
-import type { BrowserLocation, BrowserPermissionAnswer } from "../ipc-browser";
+import type { BrowserLocation, BrowserPermissionAnswer, BrowserPermissionRequest } from "../ipc-browser";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
 import {
   type AdminDecoder,
@@ -30,6 +30,16 @@ export type BrowserPermissionRequestState = {
   permission: "geolocation";
 };
 export type BrowserPermissionsSnapshot = { requests: BrowserPermissionRequestState[] };
+
+export function browserPermissionRequests(
+  tabs: readonly { id: string; permissionRequest?: BrowserPermissionRequest | undefined }[],
+): BrowserPermissionRequestState[] {
+  return tabs.flatMap((tab) => (tab.permissionRequest ? [{ tabId: tab.id, ...tab.permissionRequest }] : []));
+}
+
+export function browserPermissionSite(origin: string): string {
+  return URL.canParse(origin) ? new URL(origin).host : origin;
+}
 
 function isBoundedNumber(value: unknown, min: number, max: number): value is number {
   return isNumber(value) && Number.isFinite(value) && value >= min && value <= max;

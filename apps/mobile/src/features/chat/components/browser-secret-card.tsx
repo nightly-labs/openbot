@@ -6,7 +6,10 @@ import type {
   RespondToBrowserSecretInput,
 } from "@openbot/contracts/ipc";
 import { markdownInlinePlainText } from "@openbot/contracts/markdown-preview-text";
-import type { BrowserPermissionRequestState } from "@openbot/contracts/team-protocol/browser-permissions-v1";
+import {
+  type BrowserPermissionRequestState,
+  browserPermissionSite,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { GlassView } from "expo-glass-effect";
 import { Button, Spinner, Typography } from "heroui-native";
@@ -19,7 +22,7 @@ import X from "lucide-react-native/icons/x";
 import { type ReactNode, useState } from "react";
 import { Pressable, TextInput, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { answerBrowserLocation, browserLocationSite } from "@/features/browser/components/use-browser-location-request";
+import { answerBrowserLocation } from "@/features/browser/components/use-browser-location-request";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { InactiveRequestError } from "@/features/workspace/model/pending-approvals";
 import { haptics } from "@/shared/lib/haptics";
@@ -201,7 +204,7 @@ export function BrowserLocationCard({
   return (
     <BrowserRequestCard
       icon={<MapPin color={String(muted)} size={14} strokeWidth={2.2} />}
-      title={t("mobile.browser.location.title", { site: browserLocationSite(request.origin) })}
+      title={t("mobile.browser.location.title", { site: browserPermissionSite(request.origin) })}
       body={t("mobile.browser.location.description")}
       busy={pending}
       onCancel={() => void finish(false)}

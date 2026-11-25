@@ -9,6 +9,7 @@ import {
 import {
   BROWSER_PERMISSIONS_CAPABILITY,
   BROWSER_PERMISSIONS_ROUTES,
+  browserPermissionRequests,
   decodeBrowserPermissionAnswer,
 } from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import {
@@ -219,10 +220,7 @@ export async function routeBrowser(
       await runCauseEffect(browser.answerPermission(answer));
     }
     return json(200, {
-      requests: browser
-        .listTabs()
-        .filter((tab) => tab.permissionRequest && !hidden(tab.id))
-        .flatMap((tab) => (tab.permissionRequest ? [{ tabId: tab.id, ...tab.permissionRequest }] : [])),
+      requests: browserPermissionRequests(browser.listTabs().filter((tab) => !hidden(tab.id))),
     });
   }
 

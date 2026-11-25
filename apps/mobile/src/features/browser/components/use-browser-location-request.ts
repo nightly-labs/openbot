@@ -1,19 +1,14 @@
 import type { BrowserLocation, BrowserPermissionAnswer } from "@openbot/contracts/ipc";
-import type { BrowserPermissionRequestState } from "@openbot/contracts/team-protocol/browser-permissions-v1";
-import { useEffect, useRef } from "react";
+import {
+  type BrowserPermissionRequestState,
+  browserPermissionSite,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
+import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { readCurrentLocation } from "@/features/chat/model/location-request";
 import { useBrowserPermissionRequest } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { useText } from "@/shared/lib/text";
-
-export function browserLocationSite(origin: string): string {
-  try {
-    return new URL(origin).host;
-  } catch {
-    return origin;
-  }
-}
 
 async function deviceLocation(): Promise<BrowserLocation | null> {
   const reading = await readCurrentLocation(true);
@@ -29,13 +24,14 @@ export async function answerBrowserLocation(
   always = false,
 ): Promise<"answered" | "unavailable"> {
   const location = allow ? await deviceLocation() : null;
+  if (allow && !location) return "unavailable";
   await send({
     tabId: request.tabId,
     requestId: request.id,
-    allow: location !== null,
+    allow,
     ...(location ? { location, ...(always ? { always: true } : {}) } : {}),
   });
-  return allow && !location ? "unavailable" : "answered";
+  return "answered";
 }
 
 export function useBrowserLocationRequest({
@@ -53,18 +49,25 @@ export function useBrowserLocationRequest({
   const { answerBrowserPermission } = useMobileWorkspace();
   const request = useBrowserPermissionRequest(serverId, enabled ? tabId : null);
   const shown = useRef<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!request || shown.current === request.id) return;
-    shown.current = request.id;
+    if (!request || shown.current === `${request.id}:${attempt}`) return;
+    shown.current = `${request.id}:${attempt}`;
+    const askAgain = () => setAttempt((value) => value + 1);
     const run = (allow: boolean, always = false) =>
       void answerBrowserLocation((answer) => answerBrowserPermission(serverId, answer), request, allow, always)
         .then((result) => {
-          if (result === "unavailable") notify(t("mobile.browser.location.unavailable"));
+          if (result !== "unavailable") return;
+          notify(t("mobile.browser.location.unavailable"));
+          askAgain();
         })
-        .catch(() => notify(t("mobile.browser.location.answerFailed")));
+        .catch(() => {
+          notify(t("mobile.browser.location.answerFailed"));
+          askAgain();
+        });
     Alert.alert(
-      t("mobile.browser.location.title", { site: browserLocationSite(request.origin) }),
+      t("mobile.browser.location.title", { site: browserPermissionSite(request.origin) }),
       t("mobile.browser.location.description"),
       [
         { text: t("mobile.browser.location.block"), style: "cancel", onPress: () => run(false) },
@@ -73,5 +76,5 @@ export function useBrowserLocationRequest({
       ],
       { cancelable: false },
     );
-  }, [request, serverId, answerBrowserPermission, notify, t]);
+  }, [request, attempt, serverId, answerBrowserPermission, notify, t]);
 }

@@ -39,8 +39,7 @@ export async function answerLocationRequest(
     return "answered";
   }
   const location = await readDeviceLocation().catch(() => null);
-  await browser.answerPermission(
-    location ? { ...answer, location } : { tabId: answer.tabId, requestId: answer.requestId, allow: false },
-  );
-  return location ? "answered" : "unavailable";
+  if (!location) return "unavailable";
+  await browser.answerPermission({ ...answer, location });
+  return "answered";
 }

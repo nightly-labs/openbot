@@ -6,6 +6,7 @@ import type {
   BrowserTakeoverRequest,
   LocalBrowserSecretResponse,
 } from "@openbot/contracts/ipc";
+import { browserPermissionSite } from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import { type FeedbackApproval, feedbackApproval } from "@openbot/team-client/feedback-approval";
 import { approvalIsCut } from "@openbot/team-client/runtime-attention";
 import { classifyFailure } from "@openbot/telemetry";
@@ -493,10 +494,6 @@ function PermissionDetails(props: { permissions: AgentApproval["permissions"] })
   );
 }
 
-function browserLocationSite(origin: string): string {
-  return URL.canParse(origin) ? new URL(origin).host : origin;
-}
-
 export function BrowserLocationCard(props: {
   request: BrowserPermissionRequest;
   pending: boolean;
@@ -507,7 +504,7 @@ export function BrowserLocationCard(props: {
     <UiBlockCard
       class="approval-card"
       status="pending"
-      title={t("browser.location.title", { site: browserLocationSite(props.request.origin) })}
+      title={t("browser.location.title", { site: browserPermissionSite(props.request.origin) })}
       subtitle={t("browser.location.description")}
       busy={props.pending}
       waiting

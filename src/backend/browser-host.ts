@@ -85,7 +85,13 @@ import {
   toPublicTab,
 } from "./browser-host-tab";
 import { BrowserHintRequests, sessionBrowserUserAgent } from "./browser-identity";
-import { BrowserLocationRequests, locationOrigin } from "./browser-location";
+import {
+  alwaysLocationKey,
+  BrowserLocationRequests,
+  EVERY_LOCATION_OWNER,
+  locationOrigin,
+  locationOwner,
+} from "./browser-location";
 import {
   describeBrowserTarget,
   isCommittedNavigationTimeout,
@@ -542,6 +548,7 @@ export class BrowserHost {
   });
   readonly #sharedLocations = new Map<string, BrowserLocation>();
   readonly #alwaysLocations = new Map<string, BrowserLocation>();
+  readonly #answeringLocations = new Set<string>();
   #activeTabId: string | null = null;
   #visible = false;
   #bounds: BrowserBounds | null = null;
@@ -1266,7 +1273,19 @@ export class BrowserHost {
   ): Effect.fn.Return<void, BrowserOperationError> {
     const tab = yield* this.#requireTab(answer.tabId);
     const origin = this.#locations.pendingOrigin(tab.id, answer.requestId);
-    if (origin === null) return;
+    if (origin === null || this.#answeringLocations.has(answer.requestId)) return;
+    this.#answeringLocations.add(answer.requestId);
+    yield* this.#applyLocationAnswer(tab, origin, answer).pipe(
+      Effect.ensuring(Effect.sync(() => this.#answeringLocations.delete(answer.requestId))),
+    );
+  }).bind(this);
+
+  readonly #applyLocationAnswer = Effect.fn("BrowserHost.applyLocationAnswer")(function* (
+    this: BrowserHost,
+    tab: BrowserHostTab,
+    origin: string,
+    answer: BrowserPermissionAnswer,
+  ): Effect.fn.Return<void, BrowserOperationError> {
     const location = answer.allow ? answer.location : undefined;
     if (location) {
       const applied = yield* tab.engine.setLocation(location).pipe(
@@ -1279,24 +1298,29 @@ export class BrowserHost {
       }
       this.#sharedLocations.set(tab.id, location);
     } else if (this.#sharedLocations.delete(tab.id)) yield* tab.engine.setLocation(null);
-    const always = answer.allow && answer.always === true;
-    const alwaysBefore = this.#alwaysLocations.get(origin);
-    if (always) this.#rememberAlwaysLocation(origin, location);
-    if (!this.#locations.decide(tab.id, answer.requestId, answer.allow, always)) {
-      if (always) this.#rememberAlwaysLocation(origin, alwaysBefore);
-      if (location) {
-        this.#sharedLocations.delete(tab.id);
-        yield* tab.engine.setLocation(null);
-      }
+    const owner = locationOwner(tab);
+    const alwaysOwner =
+      answer.allow && answer.always === true && owner ? (location ? owner : EVERY_LOCATION_OWNER) : null;
+    const alwaysKey = alwaysOwner && location ? alwaysLocationKey(alwaysOwner, origin) : null;
+    const alwaysBefore = alwaysKey ? this.#alwaysLocations.get(alwaysKey) : undefined;
+    if (alwaysKey && location) this.#alwaysLocations.set(alwaysKey, location);
+    if (this.#locations.decide(tab.id, answer.requestId, answer.allow, alwaysOwner)) return;
+    if (alwaysKey && this.#alwaysLocations.get(alwaysKey) === location) {
+      if (alwaysBefore) this.#alwaysLocations.set(alwaysKey, alwaysBefore);
+      else this.#alwaysLocations.delete(alwaysKey);
+    }
+    if (location && this.#sharedLocations.get(tab.id) === location) {
+      this.#sharedLocations.delete(tab.id);
+      yield* tab.engine.setLocation(null);
     }
   }).bind(this);
 
-  #locationAsker(contents: WebContents | null): { tab: BrowserHostTab; origin: string } | null {
+  #locationAsker(contents: WebContents | null): { tab: BrowserHostTab; owner: string; origin: string } | null {
     const tab = contents ? [...this.#tabs.values()].find((candidate) => candidate.contents === contents) : undefined;
-    if (!tab || (tab.ownerAgentId === null && tab.ownerThreadId === null)) return null;
-    if (tab.secret || tab.privateSession || tab.closing) return null;
+    const owner = tab ? locationOwner(tab) : null;
+    if (!tab || !owner || tab.secret || tab.privateSession || tab.closing) return null;
     const origin = locationOrigin(tab.contents.getURL());
-    return origin ? { tab, origin } : null;
+    return origin ? { tab, owner, origin } : null;
   }
 
   #askLocation(contents: WebContents, answer: (granted: boolean) => void): void {
@@ -1305,9 +1329,11 @@ export class BrowserHost {
       answer(false);
       return;
     }
-    const { tab, origin } = asker;
-    this.#locations.ask(tab.id, origin, (granted) => {
-      const shared = granted ? (this.#sharedLocations.get(tab.id) ?? this.#alwaysLocations.get(origin)) : undefined;
+    const { tab, owner, origin } = asker;
+    this.#locations.ask(tab.id, owner, origin, (granted) => {
+      const shared = granted
+        ? (this.#sharedLocations.get(tab.id) ?? this.#alwaysLocations.get(alwaysLocationKey(owner, origin)))
+        : undefined;
       if (!shared) {
         answer(granted);
         return;
@@ -1320,14 +1346,9 @@ export class BrowserHost {
     });
   }
 
-  #rememberAlwaysLocation(origin: string, location: BrowserLocation | undefined): void {
-    if (location) this.#alwaysLocations.set(origin, location);
-    else this.#alwaysLocations.delete(origin);
-  }
-
   #locationAllowed(contents: WebContents | null): boolean {
     const asker = this.#locationAsker(contents);
-    return asker !== null && this.#locations.allowed(asker.tab.id, asker.origin);
+    return asker !== null && this.#locations.allowed(asker.tab.id, asker.owner, asker.origin);
   }
 
   #forgetLocation(tabId: string): void {

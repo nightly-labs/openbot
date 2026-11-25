@@ -10,8 +10,20 @@ interface PendingLocation {
 }
 
 interface TabLocation {
+  owner: string;
   pending?: PendingLocation | undefined;
   decision?: { origin: string; allowed: boolean } | undefined;
+}
+
+export const EVERY_LOCATION_OWNER = "*";
+
+export function alwaysLocationKey(owner: string, origin: string): string {
+  return `${owner}\n${origin}`;
+}
+
+export function locationOwner(tab: { ownerAgentId: string | null; ownerThreadId: string | null }): string | null {
+  if (tab.ownerAgentId !== null) return `agent:${tab.ownerAgentId}`;
+  return tab.ownerThreadId === null ? null : `thread:${tab.ownerThreadId}`;
 }
 
 export function locationOrigin(url: string): string | null {
@@ -36,8 +48,16 @@ export class BrowserLocationRequests {
     this.#changed = changed;
   }
 
-  ask(tabId: string, origin: string, answer: Answer): void {
-    const state = this.#tabs.get(tabId) ?? {};
+  #alwaysAllowed(owner: string, origin: string): boolean {
+    return (
+      this.#always.has(alwaysLocationKey(EVERY_LOCATION_OWNER, origin)) ||
+      this.#always.has(alwaysLocationKey(owner, origin))
+    );
+  }
+
+  ask(tabId: string, owner: string, origin: string, answer: Answer): void {
+    const state = this.#tabs.get(tabId) ?? { owner };
+    state.owner = owner;
     this.#tabs.set(tabId, state);
     if (state.decision?.origin === origin) {
       answer(state.decision.allowed);
@@ -49,7 +69,7 @@ export class BrowserLocationRequests {
     }
     const replaced = state.pending;
     settle(replaced, false);
-    if (this.#always.has(origin)) {
+    if (this.#alwaysAllowed(owner, origin)) {
       state.pending = undefined;
       state.decision = { origin, allowed: true };
       if (replaced) this.#changed(tabId);
@@ -60,9 +80,10 @@ export class BrowserLocationRequests {
     this.#changed(tabId);
   }
 
-  allowed(tabId: string, origin: string): boolean {
+  allowed(tabId: string, owner: string, origin: string): boolean {
     const decision = this.#tabs.get(tabId)?.decision;
-    return (decision?.origin === origin && decision.allowed) || this.#always.has(origin);
+    if (decision?.origin === origin) return decision.allowed;
+    return this.#alwaysAllowed(owner, origin);
   }
 
   request(tabId: string): BrowserPermissionRequest | undefined {
@@ -75,17 +96,20 @@ export class BrowserLocationRequests {
     return pending?.id === requestId ? pending.origin : null;
   }
 
-  decide(tabId: string, requestId: string, allowed: boolean, always = false): boolean {
+  decide(tabId: string, requestId: string, allowed: boolean, alwaysOwner: string | null = null): boolean {
     const state = this.#tabs.get(tabId);
     const pending = state?.pending;
     if (!state || pending?.id !== requestId) return false;
-    if (!allowed || !always) {
+    if (!allowed || alwaysOwner === null) {
       this.#settle(tabId, state, allowed);
       return true;
     }
-    this.#always.add(pending.origin);
-    for (const [askingTabId, asking] of [...this.#tabs])
-      if (asking.pending?.origin === pending.origin) this.#settle(askingTabId, asking, true);
+    this.#always.add(alwaysLocationKey(alwaysOwner, pending.origin));
+    for (const [otherTabId, other] of [...this.#tabs]) {
+      if (alwaysOwner !== EVERY_LOCATION_OWNER && other.owner !== alwaysOwner) continue;
+      if (other.decision?.origin === pending.origin && !other.decision.allowed) other.decision = undefined;
+      if (other.pending?.origin === pending.origin) this.#settle(otherTabId, other, true);
+    }
     return true;
   }
 
