@@ -81,6 +81,7 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
       { label: t("plugin.link.terms"), url: plugin().termsUrl },
     ].flatMap((link) => (link.url ? [{ label: link.label, url: link.url, text: pluginLinkText(link.url) }] : []));
   const refused = () => plugin().apps.find((app) => props.app.connections[app.id]?.signInNeeded);
+  const paused = () => !refused() && plugin().apps.some((app) => props.app.connections[app.id]?.paused);
   const accountsEntry = () =>
     model().canConnectApps() ? plugin().apps.find((app) => props.app.connections[app.id]?.multipleAccounts) : undefined;
   const automation = () =>
@@ -107,7 +108,7 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
       logo={<AppMark app={props.app} />}
       name={props.app.name}
       status={props.app.status}
-      statusLabel={t(STATUS_LABEL[props.app.status])}
+      statusLabel={t(paused() ? "marketplace.app.paused" : STATUS_LABEL[props.app.status])}
       subtitle={props.app.tagline}
       actions={
         <>
@@ -141,10 +142,20 @@ function PluginAppPage(props: { scope: MarketplaceScope; app: PluginApp }) {
               <Show
                 when={refused()}
                 fallback={
-                  <>
-                    <AlertTitle>{t("marketplace.app.partialTitle", { name: props.app.name })}</AlertTitle>
-                    <AlertDescription>{t("marketplace.app.partialDescription")}</AlertDescription>
-                  </>
+                  <Show
+                    when={paused()}
+                    fallback={
+                      <>
+                        <AlertTitle>{t("marketplace.app.partialTitle", { name: props.app.name })}</AlertTitle>
+                        <AlertDescription>{t("marketplace.app.partialDescription")}</AlertDescription>
+                      </>
+                    }
+                  >
+                    <AlertTitle>{t("marketplace.app.pausedTitle", { name: props.app.name })}</AlertTitle>
+                    <AlertDescription>
+                      {t("marketplace.app.pausedDescription", { name: props.app.name })}
+                    </AlertDescription>
+                  </Show>
                 }
               >
                 {(app) => (

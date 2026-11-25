@@ -837,12 +837,13 @@ export function createMarketplaceController(
       accounts,
       multipleAccounts: accounts.length > 0 && accountsOffered(app),
       keySaved: rows[0] !== undefined && savedKeyFlow(app.server.auth, rows[0]) !== null,
+      paused: rows.some((row) => !row.enabled),
     };
   }
   const pluginAgentId = () => activeAgentId() || agents()[0]?.id || "";
   const pluginSkillHeld = (skillId: string) => Boolean(installedSkill(pluginAgentId(), skillId));
   function pluginStatus(plugin: MarketplacePluginDetail): MarketplaceAppStatus {
-    if (plugin.apps.some((app) => appConnection(app).signInNeeded)) return "attention";
+    if (plugin.apps.some((app) => appConnection(app).signInNeeded || appConnection(app).paused)) return "attention";
     const parts = [
       ...plugin.apps.map((app) => Boolean(heldApp(app))),
       ...plugin.skills.map((skill) => pluginSkillHeld(skill.id)),
@@ -1419,6 +1420,12 @@ export function createMarketplaceController(
           if (!held) addedSkills.push(skill.id);
         }
         for (const app of plugin.apps) {
+          const paused = heldApps(app).filter((row) => !row.enabled);
+          if (paused.length > 0) {
+            for (const row of paused)
+              setServers(await calls().mcp.setMcpServerEnabled({ mcpServerId: row.id, enabled: true }, serverId));
+            continue;
+          }
           const config = pluginAppConfig(app);
           const invalid = Object.values(mcpConfigErrors(config))[0];
           if (invalid) throw new Error(t("marketplace.error.appInvalid", { name: app.name, reason: invalid }));
