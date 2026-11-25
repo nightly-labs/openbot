@@ -4531,7 +4531,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         : ["edit", "delete", "move"].includes(toolKind ?? "")
           ? "file-change"
           : "permissions";
-    const namedToolCall = { ...toolCall, title: toolCall.title ?? turn?.toolNames.get(toolCallId) };
+    const namedToolCall = { ...toolCall, title: toolCall.title ?? turn?.toolNames.get(toolCallId) ?? null };
     if (
       thread &&
       turn &&
