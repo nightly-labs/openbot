@@ -24,6 +24,7 @@ export const messages = {
   "error.host.identityLocalOnly":
     "De naam en het logo van de server kun je alleen wijzigen op de computer waarop de server draait.",
   "error.host.timezoneInvalid": "Deze tijdzone is onbekend.",
+  "error.host.signalHomeUnknown": "Deze Signal-server is niet beschikbaar.",
   "error.host.turnLimitInvalid": "Deze threadlimiet is ongeldig.",
   "error.host.maintenanceInterrupted":
     "Onderhoud van de host is onderbroken. Controleer de app en zet de status van de host terug voordat je het opnieuw probeert.",

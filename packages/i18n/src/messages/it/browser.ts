@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "Chiudi la scheda del browser",
   "browser.newTab": "Nuova scheda del browser",
   "browser.backToChat": "Torna alla chat",
+  "browser.fullView.open": "Apri a schermo intero",
   "browser.goBack": "Indietro",
   "browser.goForward": "Avanti",
   "browser.reload": "Ricarica la pagina",
@@ -94,6 +95,7 @@ export const messages = {
   "browser.secret.submitting": "Invio…",
   "browser.secret.takeOver": "Intervieni",
   "browser.secret.failed": "Non è stato possibile completare la richiesta. Controlla la connessione e riprova.",
+  "browser.secret.ended": "Questa richiesta di accesso è terminata. Chiedi all’agente di riprovare.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot non ha usato le tue credenziali salvate perché l’agente ha eseguito uno script in questa pagina. Per usarle, chiedi all’agente di ricaricare la pagina e riprovare.",
   "browser.secret.vaultSkip.fieldKind":

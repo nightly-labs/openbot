@@ -8,6 +8,7 @@ export const VOICE_SERVER_VOICE_PATHS = ["audio/voices", "audio/speech/voices"] 
 
 const TRANSCRIPTION_MODEL = /whisper|transcri|stt|asr|parakeet|scribe|canary|sensevoice|speech-to-text/i;
 const SPEECH_MODEL = /tts|kokoro|piper|orpheus|xtts|kitten|chatterbox|melo|zonos|supertonic|text-to-speech/i;
+const REALTIME_ONLY_MODEL = /(?:^|\/)gpt-(?:[^/]*[-_.])?(?:realtime|live)(?:[-_.]|$)/i;
 
 export function voiceServerModelLists(body: unknown): { transcription: string[]; speech: string[] } | null {
   if (!isDynamicRecord(body) || !Array.isArray(body.data)) return null;
@@ -23,11 +24,13 @@ export function voiceServerModelLists(body: unknown): { transcription: string[];
         ? transcription
         : task === "text-to-speech"
           ? speech
-          : TRANSCRIPTION_MODEL.test(id)
-            ? transcription
-            : SPEECH_MODEL.test(id)
-              ? speech
-              : null;
+          : REALTIME_ONLY_MODEL.test(id)
+            ? null
+            : TRANSCRIPTION_MODEL.test(id)
+              ? transcription
+              : SPEECH_MODEL.test(id)
+                ? speech
+                : null;
     if (route && !route.includes(id) && route.length < VOICE_SERVER_LIMITS.entries) route.push(id);
   }
   return { transcription, speech };

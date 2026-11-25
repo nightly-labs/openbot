@@ -101,20 +101,33 @@ function messageEvent(
   const reply = isDynamicRecord(message.reply_to_message) ? message.reply_to_message : null;
   const replyFrom = reply && isDynamicRecord(reply.from) ? reply.from : null;
   const replyToBot = replyFrom !== null && String(replyFrom.id) === botId;
+  const replyFiles = reply ? inboundFiles(reply) : [];
+  const replyText = reply
+    ? (isString(reply.text) ? reply.text : isString(reply.caption) ? reply.caption : "") || fileNames(replyFiles)
+    : "";
   if (reply && replyFrom && !replyToBot && isNumber(reply.message_id)) {
     const replyAuthor = String(replyFrom.id);
     state.rememberName(replyAuthor, personName(replyFrom));
-    const replyFiles = inboundFiles(reply);
     state.rememberMessage({
       id: String(reply.message_id),
       threadKey,
       authorId: replyAuthor,
       authorName: state.name(replyAuthor) ?? replyAuthor,
-      text: (isString(reply.text) ? reply.text : isString(reply.caption) ? reply.caption : "") || fileNames(replyFiles),
+      text: replyText,
       sentAt: sentAt(reply.date),
       ...(replyFiles.length ? { files: replyFiles } : {}),
     });
   }
+  const quotedText = isDynamicRecord(message.quote) && isString(message.quote.text) ? message.quote.text : "";
+  const replyTo =
+    reply && replyFrom && (quotedText || replyText)
+      ? {
+          authorName: state.name(String(replyFrom.id)) ?? (personName(replyFrom) || String(replyFrom.id)),
+          text: quotedText || replyText,
+          mentionedUserIds: [],
+          sentAt: sentAt(reply.date),
+        }
+      : null;
   const { text, mentioned } = withoutMention(rawText, entities, botId, state.botUsername);
   const files = inboundFiles(message);
   state.rememberMessage({
@@ -142,6 +155,7 @@ function messageEvent(
       text,
       mentionedUserIds: [],
       files,
+      replyTo,
     },
   };
 }

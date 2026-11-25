@@ -1,3 +1,4 @@
+import { X_AGENT_LISTING_ID, X_EXTENSION_URL } from "@openbot/contracts/browser-extension-x";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AddedAgent,
@@ -43,6 +44,7 @@ import { safeBrowserUrl } from "@openbot/ui/features/conversation/RichMessageTex
 import type {
   AgentListingState,
   GithubSkillRead,
+  MarketplaceAgent,
   MarketplaceApp,
   MarketplaceAppConnection,
   MarketplaceAppStatus,
@@ -55,7 +57,7 @@ import type {
   MarketplaceSkillRef,
   SkillRead,
 } from "@openbot/ui/features/marketplace/marketplace-model";
-import { pluginNeedsMac } from "@openbot/ui/features/marketplace/marketplace-model";
+import { pluginNeedsMac, X_APP_ID } from "@openbot/ui/features/marketplace/marketplace-model";
 import { serverAddress } from "@openbot/ui/features/marketplace/marketplace-view";
 import type { McpConnectSubject } from "@openbot/ui/features/settings/McpConnectShell";
 import {
@@ -121,6 +123,7 @@ export interface MarketplaceControllerProps {
   hostServerId?: string | undefined;
   agentServerId?: string | undefined;
   agentUpdateServerId?: string | undefined;
+  xApp?: boolean | undefined;
   githubSkills?: boolean | undefined;
   onRunPluginPrompt?: ((agentId: string, prompt: MarketplacePluginPrompt) => void) | undefined;
   connectors?: ConnectorRegistry | undefined;
@@ -231,7 +234,7 @@ export function createMarketplaceController(
   props: MarketplaceControllerProps,
   serverSlots?: (tools: McpServerTools) => MarketplaceServerSlots,
 ) {
-  const { t, format } = useText();
+  const { t, format, sourceText } = useText();
   const calls = () => props.calls ?? desktopMarketplaceCalls();
   const skillCalls = () => calls().agentSkills(props.hostServerId);
   const agents = createMemo(() => props.agents);
@@ -856,6 +859,20 @@ export function createMarketplaceController(
     return entry?.access === "available" ? entry.controller : undefined;
   };
 
+  const xAgent = createMemo((): MarketplaceAgent | null => {
+    const copy = agents().find((agent) => agent.marketplaceSource?.listingId === X_AGENT_LISTING_ID);
+    return copy
+      ? {
+          id: copy.id,
+          name: copy.name,
+          title: copy.title,
+          avatarSeed: copy.avatarSeed,
+          avatarHue: copy.avatarHue,
+          avatarUrl: copy.avatarUrl,
+        }
+      : null;
+  });
+
   const apps = createMemo((): MarketplaceApp[] => {
     const plugins = localPlugins();
     return [
@@ -872,6 +889,20 @@ export function createMarketplaceController(
           status: status === "unavailable" ? "idle" : status,
         };
       }),
+      ...(props.xApp && X_EXTENSION_URL
+        ? [
+            {
+              kind: "x",
+              id: X_APP_ID,
+              name: t("marketplace.xApp.title"),
+              tagline: t("marketplace.xApp.tagline"),
+              category: "productivity",
+              status: xAgent() ? "connected" : "idle",
+              agent: xAgent(),
+              extensionUrl: X_EXTENSION_URL,
+            } satisfies MarketplaceApp,
+          ]
+        : []),
       ...plugins.map(
         (plugin): MarketplaceApp => ({
           kind: "plugin",
@@ -1015,7 +1046,7 @@ export function createMarketplaceController(
     const here = flowsHere(app);
     const saved = savedKeyFlow(here, row);
     const [first, ...rest] = saved ? [saved, ...here.filter((flow) => flow !== saved)] : here;
-    if (!first) return Promise.resolve(config);
+    if (!first) return startedApp(app, config);
     return new Promise((resolve) => {
       setConnecting({
         subject: { name: app.name, iconUrl: app.iconUrl, config },
@@ -1035,11 +1066,19 @@ export function createMarketplaceController(
     return calls().mcp.testMcpServer({ config }, serverId);
   }
 
+  async function startedApp(app: MarketplacePluginApp, config: McpServerConfig): Promise<McpServerConfig | null> {
+    const result = await testPluginApp(config);
+    if (!result.error) return config;
+    setError(t("marketplace.error.appNotConnected", { name: app.name, reason: sourceText(result.error) }));
+    return null;
+  }
+
   const signInRelay = () => (props.pluginSignInRelay ? calls().signInRelay : undefined);
   const [relayed, setRelayed] = createSignal<MarketplaceSignInRelayState | null>(null);
   const [hostTabbed, setHostTabbed] = createSignal<{ url: string; tabId: string } | null>(null);
   let stopSignIn: (() => void) | undefined;
   let copySignIn: (() => Promise<void>) | undefined;
+  let pasteSignIn: ((address: string) => Promise<void>) | undefined;
 
   async function signInPluginApp(config: McpServerConfig) {
     const serverId = props.pluginServerId;
@@ -1051,8 +1090,11 @@ export function createMarketplaceController(
     const stop = () => void mcp.cancelMcpSignIn({ url: config.url }, serverId).catch(() => undefined);
     const copyLink = calls().copySignInLink;
     const copy = copyLink ? () => copyLink(config.url, serverId) : undefined;
+    const pasteAddress = calls().signInRelay?.paste;
+    const paste = pasteAddress ? (address: string) => pasteAddress(config.url, address, serverId) : undefined;
     stopSignIn = stop;
     copySignIn = copy;
+    pasteSignIn = paste;
     if (relay) void followSignInRelay(relay, config.url, serverId, () => waiting);
     if (relay?.hostTab && props.pluginHostView)
       void followSignInHostTab(relay.hostTab, config.url, serverId, () => waiting);
@@ -1060,6 +1102,7 @@ export function createMarketplaceController(
       waiting = false;
       if (stopSignIn === stop) stopSignIn = undefined;
       if (copy && copySignIn === copy) copySignIn = undefined;
+      if (paste && pasteSignIn === paste) pasteSignIn = undefined;
     });
   }
 
@@ -1125,6 +1168,11 @@ export function createMarketplaceController(
   async function copySignInLink(): Promise<void> {
     if (!copySignIn) throw new Error(t("error.mcp.relayEnded"));
     await copySignIn();
+  }
+
+  async function pasteSignInAddress(address: string): Promise<void> {
+    if (!pasteSignIn) throw new Error(t("error.mcp.relayEnded"));
+    await pasteSignIn(address);
   }
 
   function cancelSignIn(): void {
@@ -1227,6 +1275,12 @@ export function createMarketplaceController(
         signInsRead += 1;
         setSignIns(mcpSignInRecord(states));
       }
+    },
+    get copyLink() {
+      return props.pluginHostName || !calls().copySignInLink ? undefined : copySignInLink;
+    },
+    get pasteAddress() {
+      return props.pluginHostName || !calls().signInRelay ? undefined : pasteSignInAddress;
     },
     get relay() {
       const relay = signInRelay();
@@ -1684,7 +1738,7 @@ export function createMarketplaceController(
   const model: MarketplaceModel = {
     listAgents: async (query) => {
       const page = await calls().agents.list(agentQuery(query));
-      return { items: page.agents, nextCursor: page.nextCursor };
+      return { items: page.agents.filter((agent) => agent.id !== X_AGENT_LISTING_ID), nextCursor: page.nextCursor };
     },
     get agentHomeCache() {
       return agentHomeCache(calls());
@@ -1807,6 +1861,7 @@ export function createMarketplaceController(
     pasteSignInRelay,
     cancelSignIn,
     copySignInLink: () => (calls().copySignInLink ? copySignInLink : undefined),
+    pasteSignInAddress: () => (calls().signInRelay ? pasteSignInAddress : undefined),
     openPluginUrl,
     mcpServerApp,
     signInPluginServer,

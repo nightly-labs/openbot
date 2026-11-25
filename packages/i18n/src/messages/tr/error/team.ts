@@ -125,6 +125,8 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Sunucu kimliği değişiklikleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.hostUpdateUnsupported": "Ana makine güncellemeleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.hostTimezoneUnsupported": "Bu bağlantı sunucunun saat dilimini desteklemiyor.",
+  "error.team.hostSignalHomeUnsupported": "Bu bağlantı Signal sunucusu seçimini desteklemiyor.",
+  "error.team.hostVoiceModelUnsupported": "Bu bağlantı sunucunun konuşma tanıma modelini desteklemiyor.",
   "error.team.hostRestartUnsupported": "Bu bağlantı sunucuyu yeniden başlatmayı desteklemiyor.",
   "error.team.ownerTransferUnsupported": "Bu sunucu sahiplik devrini desteklemiyor.",
   "error.team.hostKeyRotationUnsupported": "Bu bağlantı sunucu anahtarı değişikliğini desteklemiyor.",
@@ -140,6 +142,9 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Bu bağlantı istem önbelleği süresini desteklemiyor.",
   "error.team.claudeUserSetupUnsupported": "Bu bağlantı Claude Code kurulumu anahtarını desteklemiyor.",
   "error.team.claudeCompactWindowUnsupported": "Bu bağlantı Claude sıkıştırma boyutunu desteklemiyor.",
+  "error.team.cacheExpiryCompactionUnsupported": "Bu bağlantı önbelleğin süresi dolmadan sıkıştırmayı desteklemiyor.",
+  "error.team.mediaApprovalCreditsUnsupported": "Bu bağlantı kredi onay sınırını desteklemiyor.",
+  "error.team.mediaApprovalCreditsInvalid": "0 ile 100.000 arasında tam sayı olarak kredi girin.",
   "error.team.providerEnvironmentUnsupported": "Bu bağlantı sağlayıcı değişkenlerini desteklemiyor.",
   "error.team.modelVisibilityUnsupported": "Bu bağlantı model listesini desteklemiyor.",
   "error.team.providerDefaultUnsupported": "Bu bağlantı varsayılan sağlayıcıyı desteklemiyor.",
@@ -202,4 +207,7 @@ export const messages = {
   "error.team.backgroundProcessesUnsupported": "Bu bağlantı arka plan işlemlerini desteklemiyor.",
   "error.team.providerUseUnsupported": "Bu bağlantı sağlayıcıları açıp kapatmayı desteklemiyor.",
   "error.team.providerUseInvalid": "Bu sağlayıcının açma/kapatma anahtarı yok.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "Bu sunucu medya onaylarında model seçimini desteklemiyor. Sunucudaki OpenBot'u güncelleyin.",
+  "error.team.mediaApprovalChoiceInvalid": "Medya onayı seçimi geçerli değil.",
 } as const satisfies PartialTranslation<typeof source>;

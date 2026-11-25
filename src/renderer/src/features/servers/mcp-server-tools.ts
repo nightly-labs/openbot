@@ -9,6 +9,7 @@ import {
   type McpTestResult,
   type McpTestState,
   mcpFailureKind,
+  mcpSignInAddress,
   mcpTestMessage,
 } from "./mcp-servers";
 
@@ -28,6 +29,8 @@ export interface McpServerSignIn {
   start: (config: McpServerConfig) => Promise<McpTestResult>;
   cancel: (url: string) => Promise<void>;
   signOut: (id: string) => Promise<void>;
+  copyLink?: (() => Promise<void>) | undefined;
+  pasteAddress?: ((address: string) => Promise<void>) | undefined;
   relay?: McpServerRelay | undefined;
   hostTab?: McpServerHostTab | undefined;
   app?: McpPanelSignInApp | undefined;
@@ -55,7 +58,15 @@ export function useMcpRuns(tools: () => McpServerTools) {
   }
 
   function settled(result: McpTestResult): SettledTest {
-    if (result.error) return { status: "failed", error: failureText(result.error), kind: mcpFailureKind(result.error) };
+    if (result.error) {
+      const address = mcpSignInAddress(result.error);
+      return {
+        status: "failed",
+        error: failureText(result.error),
+        kind: mcpFailureKind(result.error),
+        ...(address ? { address } : {}),
+      };
+    }
     return { status: "passed", toolCount: result.toolCount };
   }
 

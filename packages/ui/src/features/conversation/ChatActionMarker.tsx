@@ -1058,6 +1058,7 @@ function markerLabel(
     marker.kind === "channel-change" ||
     marker.kind === "vault-change" ||
     marker.kind === "plan-continuation" ||
+    marker.kind === "no-answer" ||
     marker.kind === "instructions-change" ||
     marker.kind === "sign-in-failure"
   )
@@ -1150,6 +1151,7 @@ function markerAccessibleLabel(
     marker.kind === "channel-change" ||
     marker.kind === "vault-change" ||
     marker.kind === "plan-continuation" ||
+    marker.kind === "no-answer" ||
     marker.kind === "instructions-change" ||
     marker.kind === "sign-in-failure"
   )

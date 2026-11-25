@@ -85,6 +85,7 @@ export function ServerProviderAccountScreen() {
       provider={provider}
       account={account}
       index={index}
+      list={list}
       accounts={admin.accounts}
       pool={pool}
       usageResets={admin.usageResets}
@@ -107,6 +108,7 @@ function AccountPage({
   provider,
   account,
   index,
+  list,
   accounts,
   pool,
   usageResets,
@@ -118,6 +120,7 @@ function AccountPage({
   provider: AgentProviderId;
   account: ProviderAccountStatus;
   index: number;
+  list: readonly ProviderAccountStatus[];
   accounts: NonNullable<ProviderAdmin["accounts"]>;
   pool: ProviderAccountPool | undefined;
   usageResets: ProviderAdmin["usageResets"];
@@ -127,7 +130,7 @@ function AccountPage({
 }) {
   const { t, sourceText, errorMessage } = useText();
   const accountName = useProviderAccountName();
-  const name = accountName(account, index);
+  const name = accountName(account, index, list);
   const [label, setLabel] = useState(account.label ?? "");
   const [pending, setPending] = useState<"rename" | "remove" | "reset" | "sign-out" | "pool" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);

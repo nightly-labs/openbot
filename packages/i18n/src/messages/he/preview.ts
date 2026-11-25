@@ -23,6 +23,7 @@ export const messages = {
   "preview.tooLarge.title": "הקובץ גדול מדי לתצוגה מקדימה",
   "preview.tooLarge.description": "התצוגה המקדימה מוגבלת ל-100MB. אפשר לפתוח את הקובץ באפליקציית ברירת המחדל שלו.",
   "preview.spreadsheet.readFailed": "לא ניתן לקרוא את הגיליון.",
+  "preview.spreadsheet.tooLarge": "הגיליון גדול מדי לתצוגה מקדימה. אפשר לפתוח או להוריד את הקובץ כדי לראות את כולו.",
   "preview.spreadsheet.truncated": "התצוגה המקדימה מוגבלת ל-{rows} השורות הראשונות ול-{columns} העמודות הראשונות.",
   "preview.document.readFailed": "לא ניתן לקרוא את המסמך הזה.",
   "preview.document.empty": "אין במסמך הזה טקסט להצגה.",

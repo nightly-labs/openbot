@@ -287,6 +287,7 @@ function normalizeQuestions(questions: PromptEvent["questions"], text: DynamicIs
     id: normalizeTechnical(question.id, `question-${questionIndex + 1}`, INPUT_LIMITS.identifier),
     header: normalizeRequired(question.header, text.questionHeader, INPUT_LIMITS.promptHeader),
     question: normalizeRequired(question.question, text.questionText, INPUT_LIMITS.promptQuestion),
+    ...questionDetail(question.detail),
     isSecret: question.isSecret,
     options:
       question.options?.slice(0, INPUT_LIMITS.promptOptions).map((option, optionIndex) => {
@@ -303,6 +304,11 @@ function normalizeQuestions(questions: PromptEvent["questions"], text: DynamicIs
         };
       }) ?? null,
   }));
+}
+
+function questionDetail(detail: string | undefined): { detail?: string } {
+  const text = detail?.trim();
+  return text ? { detail: truncate(text, INPUT_LIMITS.promptQuestion) } : {};
 }
 
 function normalizeTechnical(value: string, fallback: string, length: number): string {
@@ -324,7 +330,7 @@ function approvalTitle(approval: AgentApproval, text: DynamicIslandText) {
   return text.approvalPermissions;
 }
 
-function presentationPriority(mode: DynamicIslandPresentation["mode"]): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
+export function presentationPriority(mode: DynamicIslandPresentation["mode"]): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
   if (mode === "question") return 0;
   if (mode === "approval") return 1;
   if (mode === "takeover") return 2;

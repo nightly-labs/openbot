@@ -21,6 +21,7 @@
 @import "@openbot/ui/features/account/language-wheel.css";
 @import "./features/onboarding/onboarding.css";
 @import "@openbot/ui/features/agents/first-agent-setup.css";
+@import "@openbot/ui/features/agents/avatar-editor.css";
 @import "./styles/app-shell.css";
 @import "@openbot/ui/features/sidebar/sidebar-working-badge.css";
 @import "@openbot/ui/features/sidebar/sidebar-felt-badges.css";
@@ -57,7 +58,7 @@
 @import "@openbot/ui/features/usage/usage-machine-meter.css";
 @import "./features/usage/usage.css";
 @import "./features/schedule/schedule.css";
-@import "@openbot/ui/features/agents/agent-picker.css";
+@import "@openbot/ui/components/search-picker.css";
 @import "@openbot/ui/features/tasks/tasks.css";
 @import "@openbot/ui/styles/chart.css";
 @import "@openbot/ui/features/files/files.css";

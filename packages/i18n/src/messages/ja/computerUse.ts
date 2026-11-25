@@ -19,6 +19,7 @@ export const messages = {
   "computerUse.ready.title": "Computer Use の準備ができました",
   "computerUse.ready.description":
     "OpenBot はこのコンピューターのアプリを見て操作できます。このシステムでは追加の権限は必要ありません。",
+  "computerUse.limited.title": "このデスクトップでは Computer Use が制限されています",
   "computerUse.openSettingsFailed.title": "システム設定を開けませんでした",
   "computerUse.restartRequired.title": "再起動が必要です",
   "computerUse.restartRequired.description":

@@ -12,7 +12,7 @@ import { storedSync } from "../backend/stored-state-effects";
 
 export interface LibraryFoldersSources {
   store: Pick<LibraryFoldersStore, "getSnapshot" | "mutate" | "placeInPath" | "removeAgent" | "removeFiles">;
-  storage: Pick<StorageUsageService, "usage" | "invalidate">;
+  storage: Pick<StorageUsageService, "hostFiles" | "invalidate">;
   agents: () => readonly { id: string }[];
 }
 
@@ -205,7 +205,7 @@ export class LibraryFoldersService {
     const fresh = Date.now() - this.#keptAt < KEPT_FILES_MS;
     if (useKept && fresh && this.#known && !missing(this.#known)) return this.#known;
     const scan = () =>
-      this.#sources.storage.usage({ scope: "host" }).pipe(
+      this.#sources.storage.hostFiles().pipe(
         Effect.map((usage) => {
           const known: KnownFiles = {
             at: Date.parse(usage.scannedAt),

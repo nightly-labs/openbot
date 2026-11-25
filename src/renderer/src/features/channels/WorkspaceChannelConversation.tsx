@@ -9,6 +9,8 @@ import { useAgents } from "../agents/agents-context";
 import { useBrowserTabs } from "../browser/browser-context";
 import { useConnectors } from "../connectors/connectors-context";
 import { Conversation } from "../conversation/Conversation";
+import { creditsHoldControls } from "../conversation/credits-hold-controls";
+import { desktopMediaApprovalDefault } from "../conversation/media-approval-default";
 import { trackUsageLimitShown, useUsageLimitAsk } from "../conversation/usage-limit-ask";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import {
@@ -23,6 +25,7 @@ import { createServerResponseStyle } from "../servers/server-personality";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
+import { appSettingRowOpener } from "../settings/setting-link-targets";
 import { useSettings } from "../settings/settings-context";
 import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
@@ -48,7 +51,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
   const { selectAgent, messageFocusRequest, globalSearchOpen } = useNavigation();
   const auth = useAuth();
   const { teamPresence, readerMemberId } = usePresence();
-  const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
+  const { activeServer, activeServerId, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { serverSettingsOpen } = useServerSettings();
   const {
     appSettingsOpen,
@@ -58,6 +61,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
     mcpSignIns,
     refreshMcpSignIns,
     generalSettings,
+    openAppSettingRow,
   } = useSettings();
   const { agentStatus, agentList, updateAgent, setAgentAvatar, userPausedAgentIds } = useAgents();
   const { approvals, pendingPrompts, usageLimits } = useTurns();
@@ -131,6 +135,10 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       notice={<ChannelErrorNotice />}
       platform={platform.appInfo()?.platform}
       connectors={connectors.active}
+      appSettingOpener={appSettingRowOpener(
+        () => ({ platform: platform.appInfo()?.platform, chatWindow: platform.chatWindow !== null }),
+        openAppSettingRow,
+      )}
       agentStatus={shownAgentStatus()}
       agent={undefined}
       agents={agentList()}
@@ -186,6 +194,18 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       onTypingChange={() => {}}
       onAnswerPrompt={view.onAnswerPrompt}
       onRespondToApproval={view.onRespondToApproval}
+      mediaApproval={{
+        ...view.mediaApproval,
+        setDefault: desktopMediaApprovalDefault(activeServerId),
+        hold: creditsHoldControls({
+          agents: agentList,
+          credits: windowPage.creditsMenu,
+          walletId: () =>
+            activeServer()?.kind === "local" ? (windowPage.creditsMenu().localServerId ?? null) : activeServerId(),
+          serverId: () => activeServer()?.id,
+          ...view.creditsHold,
+        }),
+      }}
       onRespondToBrowserTakeover={view.onRespondToBrowserTakeover}
       onCancelQueuedMessage={() => {}}
       onSteerQueuedMessage={() => {}}

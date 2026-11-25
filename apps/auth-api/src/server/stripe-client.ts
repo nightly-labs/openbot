@@ -569,6 +569,64 @@ export class StripeClient {
     return { id: session.id, url: session.url };
   }).bind(this);
 
+  readonly createPaymentCheckoutSession = Effect.fn("StripeClient.createPaymentCheckoutSession")(function* (
+    this: StripeClient,
+    input: {
+      customerId: string;
+      priceId: string;
+      currency: BillingCurrency;
+      clientReferenceId: string;
+      metadata: Readonly<Record<string, string>>;
+      tax: CheckoutTax | null;
+      successUrl: string;
+      cancelUrl: string;
+      nowSeconds: number;
+    },
+  ): Effect.fn.Return<{ id: string; url: string }, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams({
+      mode: "payment",
+      customer: input.customerId,
+      "line_items[0][price]": input.priceId,
+      "line_items[0][quantity]": "1",
+      currency: input.currency,
+      client_reference_id: input.clientReferenceId,
+      ui_mode: "hosted",
+      origin_context: "web",
+      submit_type: "pay",
+      billing_address_collection: "required",
+      "phone_number_collection[enabled]": "false",
+      "customer_update[name]": "auto",
+      "customer_update[address]": "auto",
+      "consent_collection[terms_of_service]": "required",
+      "name_collection[individual][enabled]": "true",
+      "name_collection[individual][optional]": "true",
+      success_url: input.successUrl,
+      cancel_url: input.cancelUrl,
+      expires_at: String(input.nowSeconds + CHECKOUT_LIFETIME_SECONDS),
+      "invoice_creation[enabled]": "true",
+    });
+    if (input.tax) {
+      if (input.tax.rateId) body.set("line_items[0][tax_rates][0]", input.tax.rateId);
+      const vat = { [VAT_METADATA.country]: input.tax.country, [VAT_METADATA.treatment]: input.tax.treatment };
+      for (const [key, value] of Object.entries(vat)) {
+        body.set(`metadata[${key}]`, value);
+        body.set(`invoice_creation[invoice_data][metadata][${key}]`, value);
+      }
+    } else {
+      body.set("automatic_tax[enabled]", "true");
+      body.set("tax_id_collection[enabled]", "true");
+      body.set("tax_id_collection[required]", "never");
+    }
+    for (const [key, value] of Object.entries(input.metadata)) {
+      body.set(`metadata[${key}]`, value);
+      body.set(`payment_intent_data[metadata][${key}]`, value);
+      body.set(`invoice_creation[invoice_data][metadata][${key}]`, value);
+    }
+    const session = yield* this.#requestEffect("POST", "/v1/checkout/sessions", body, checkoutSessionSchema);
+    if (!session.url) return yield* new StripeRequestError(200, "invalid_response", "missing_url");
+    return { id: session.id, url: session.url };
+  }).bind(this);
+
   readonly #activePromotionCodeId = Effect.fn("StripeClient.activePromotionCodeId")(function* (
     this: StripeClient,
     code: string,

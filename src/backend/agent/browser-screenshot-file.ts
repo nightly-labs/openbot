@@ -15,16 +15,17 @@ export const saveBrowserScreenshot = Effect.fn("saveBrowserScreenshot")(function
 ) {
   if (!result.success || !savesFile(args)) return result;
   const image = result.contentItems.find((item) => item.type === "inputImage");
-  const png = image && /^data:image\/png;base64,(.+)$/su.exec(image.imageUrl)?.[1];
-  if (!png) return withNote(result, "The image was not saved as a file.");
+  const match = image && /^data:image\/(png|jpeg);base64,(.+)$/su.exec(image.imageUrl);
+  if (!match) return withNote(result, "The image was not saved as a file.");
+  const [, extension, data] = match;
   return yield* Effect.tryPromise(async () => {
     const folder = join(workspacePath(), "browser-screenshots");
     const path = join(
       folder,
-      `screenshot-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}.png`,
+      `screenshot-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}.${extension === "jpeg" ? "jpg" : "png"}`,
     );
     await mkdir(folder, { recursive: true, mode: 0o700 });
-    await writeFile(path, Buffer.from(png, "base64"), { flag: "wx", mode: 0o600 });
+    await writeFile(path, Buffer.from(data ?? "", "base64"), { flag: "wx", mode: 0o600 });
     return withNote(
       result,
       `Saved as ${path}. To show it to the user, pass this path to openbot.attach_files_to_response.`,

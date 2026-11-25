@@ -87,8 +87,10 @@ CPU, and its browser runs WebGL on the CPU (SwiftShader) for sites such as the F
 process crash on a server writes `gpu-crash.json` and turns off WebGL at the next start. Chromium
 also renders on the CPU when it blocks the GPU driver, for example in a remote desktop.
 
-When OpenBot renders on the CPU, dialogs and panels do not blur what is behind them, and agent
-avatars do not move. These two effects used the most CPU time.
+When OpenBot renders on the CPU, dialogs and panels do not blur what is behind them, agent
+avatars do not move, and a theme change does not show its sweep. These effects used the most CPU time.
+The agents' browser keeps WebGL on the CPU (SwiftShader), so sites such as CapCut and the Figma editor
+still open.
 
 On a Wayland session, a start that renders on the CPU opens OpenBot again on XWayland: on Wayland,
 Chromium can leave the window empty, and KDE then shows only a 1x1 taskbar entry. The log then shows
@@ -98,7 +100,7 @@ on Wayland. To stay on Wayland, start OpenBot with `--ozone-platform=wayland`.
 - To try the GPU again, for example after a driver update, remove the file. The log names it.
 - To always use the GPU, start OpenBot with `OPENBOT_DISABLE_GPU=0`. A server ignores this value.
 - If OpenBot stops at each start, start it with `OPENBOT_DISABLE_GPU=1` to always render on the CPU.
-  On a server, this value also turns off WebGL.
+  This value also turns off WebGL.
 
 ## OpenBot does not start on Linux when the monitor is off
 

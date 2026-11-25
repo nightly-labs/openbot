@@ -8,6 +8,16 @@ const TAB_CLOSED = "Browser tab was closed during navigation.";
 const ERR_ABORTED = -3;
 const SUCCESSOR_TIMEOUT_MS = 10_000;
 
+class NavigationTimeoutError extends Error {
+  constructor(readonly committed: boolean) {
+    super(NAVIGATION_TIMED_OUT);
+  }
+}
+
+export function isCommittedNavigationTimeout(failure: BrowserOperationError): boolean {
+  return failure.cause instanceof NavigationTimeoutError && failure.cause.committed;
+}
+
 export function navigateAndWait(
   contents: WebContents,
   initiate: () => boolean | Promise<unknown>,
@@ -84,7 +94,7 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
         else resume(Effect.void);
       };
       const complete = () => {
-        finish(timedOut ? new Error(NAVIGATION_TIMED_OUT) : undefined);
+        finish(timedOut ? new NavigationTimeoutError(committed) : undefined);
       };
       const supersededBy = (code: unknown) => {
         if (code !== ERR_ABORTED || timedOut || !successorStarted || !contents.isLoading()) return false;
@@ -116,7 +126,9 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
           return;
         }
         if (supersededBy(code)) return;
-        finish(new Error(timedOut ? NAVIGATION_TIMED_OUT : `Navigation failed (${code}): ${description}`));
+        finish(
+          timedOut ? new NavigationTimeoutError(committed) : new Error(`Navigation failed (${code}): ${description}`),
+        );
       };
       const destroyed = () => {
         finish(new Error(TAB_CLOSED));
@@ -163,7 +175,7 @@ const watchNavigation = Effect.fn("Browser.watchNavigation")(
                   if (!contents.isLoading()) complete();
                   return;
                 }
-                finish(timedOut ? new Error(NAVIGATION_TIMED_OUT) : error);
+                finish(timedOut ? new NavigationTimeoutError(committed) : error);
               }),
           );
         }

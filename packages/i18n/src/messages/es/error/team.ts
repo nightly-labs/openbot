@@ -130,6 +130,8 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Esta conexión no admite cambios en la identidad del servidor.",
   "error.team.hostUpdateUnsupported": "Esta conexión no admite actualizaciones del host.",
   "error.team.hostTimezoneUnsupported": "Esta conexión no admite la zona horaria del servidor.",
+  "error.team.hostSignalHomeUnsupported": "Esta conexión no admite elegir el servidor de Signal.",
+  "error.team.hostVoiceModelUnsupported": "Esta conexión no admite el modelo de reconocimiento de voz del servidor.",
   "error.team.hostRestartUnsupported": "Esta conexión no admite reiniciar el servidor.",
   "error.team.ownerTransferUnsupported": "Este servidor no admite transferir la propiedad.",
   "error.team.hostKeyRotationUnsupported": "Esta conexión no admite cambiar la clave del servidor.",
@@ -145,6 +147,9 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Esta conexión no admite la duración de la caché de prompts.",
   "error.team.claudeUserSetupUnsupported": "Esta conexión no admite el interruptor de configuración de Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "Esta conexión no admite el tamaño de compactación de Claude.",
+  "error.team.cacheExpiryCompactionUnsupported": "Esta conexión no admite compactar antes de que caduque la caché.",
+  "error.team.mediaApprovalCreditsUnsupported": "Esta conexión no admite el límite de aprobación de créditos.",
+  "error.team.mediaApprovalCreditsInvalid": "Introduce un número entero de créditos entre 0 y 100.000.",
   "error.team.providerEnvironmentUnsupported": "Esta conexión no admite variables de proveedor.",
   "error.team.modelVisibilityUnsupported": "Esta conexión no admite la lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexión no admite el proveedor predeterminado.",
@@ -209,4 +214,7 @@ export const messages = {
   "error.team.backgroundProcessesUnsupported": "Esta conexión no admite procesos en segundo plano.",
   "error.team.providerUseUnsupported": "Esta conexión no admite activar y desactivar proveedores.",
   "error.team.providerUseInvalid": "Este proveedor no tiene un interruptor de activación.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "Este servidor no admite elegir el modelo en las aprobaciones de medios. Actualiza OpenBot en el servidor.",
+  "error.team.mediaApprovalChoiceInvalid": "La elección de la aprobación de medios no es válida.",
 } as const satisfies PartialTranslation<typeof source>;

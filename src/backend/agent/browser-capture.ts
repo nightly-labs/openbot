@@ -9,10 +9,10 @@ const POLL = Duration.millis(250);
 
 export function signInPageByOpenBot(
   onHost: boolean,
-  command: { readonly windowsPageByOpenBot?: true },
+  command: { readonly pageByOpenBotOn?: readonly NodeJS.Platform[] },
   platform: NodeJS.Platform = process.platform,
 ): boolean {
-  return onHost || (platform === "win32" && command.windowsPageByOpenBot === true);
+  return onHost || command.pageByOpenBotOn?.includes(platform) === true;
 }
 
 export const captureBrowser = Effect.fn("captureBrowser")(function* (openPage: (url: string) => Promise<void>) {

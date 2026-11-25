@@ -5,15 +5,4 @@ minimumReleaseAge = 259200
 minimumReleaseAgeExcludes = [
   "@norbert_bodziony/bloub",
   "effect",
-  "solid-js",
-  "@solidjs/signals",
-  "@solidjs/web",
-  "@solidjs/vite-plugin",
-  "@solidjs/compiler",
-  "@solidjs/compiler-darwin-arm64",
-  "@solidjs/compiler-darwin-x64",
-  "@solidjs/compiler-linux-arm64-gnu",
-  "@solidjs/compiler-linux-x64-gnu",
-  "@solidjs/compiler-wasm32-wasi",
-  "@solidjs/compiler-win32-x64-msvc",
 ]

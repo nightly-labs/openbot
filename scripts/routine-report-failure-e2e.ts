@@ -1020,6 +1020,47 @@ try {
       !linkedPrompt.includes(`routineId "${relayed.id}"`),
     linkedPrompt,
   );
+  pass(
+    "A linked step of a Test run reads as a Test run",
+    linkedPrompt?.includes("Run type: manual Test run") === true,
+    linkedPrompt,
+  );
+
+  const quietRelay = createRoutine(
+    relay.id,
+    "Quiet relay",
+    `Report and hand on. <<NEXT${JSON.stringify([noUpdate])}NEXT>>`,
+  );
+  await connect(quietRelay.id, relay.id, responder.id);
+  await connect(quietRelay.id, responder.id, finisher.id);
+  await runCauseEffect(agents.updateAgent({ agentId: relay.id, allowAutomation: true }));
+  const quietRelayRun = await settledRun(
+    "Quiet relay",
+    await runCauseEffect(agents.runRoutineFromAutomation({ agentId: relay.id, routineId: quietRelay.id, payload: "" })),
+  );
+  const quietRelaySteps = await steps("Quiet relay", quietRelayRun.run.id, 3);
+  const quietLinked = quietRelaySteps.find((step) => step.agentId === responder.id);
+  const quietLinkedTurnId = quietLinked?.deliveryId
+    ? (mailbox.getDelivery(quietLinked.deliveryId)?.delivery.turnId ?? null)
+    : null;
+  const quietLinkedResult = toolResults(quietLinkedTurnId, "routine_no_update")[0]?.result;
+  const quietLinkedAnswers = quietLinkedTurnId
+    ? store.database.readTurnAssistantMessages(responder.id, quietLinkedTurnId)
+    : [];
+  pass(
+    "A linked step of a script run ends quiet after routine_no_update (#14510)",
+    quietLinked?.status === "succeeded" &&
+      quietLinkedResult?.success === true &&
+      quietLinkedResult.contentItems.some((item) => item.text.includes('"quiet"')) &&
+      quietLinkedAnswers.length > 0 &&
+      quietLinkedAnswers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE),
+    { steps: report.flowSteps["Quiet relay"], quietLinkedResult, quietLinkedAnswers },
+  );
+  pass(
+    "The agent after a quiet linked step is skipped",
+    quietRelaySteps.find((step) => step.agentId === finisher.id)?.status === "skipped",
+    report.flowSteps["Quiet relay"],
+  );
 
   const selfPausing = async (name: string, routineCalls: (routineId: string) => FakeCall[]) => {
     const routine = createRoutine(checker.id, name, "Check the folders.");

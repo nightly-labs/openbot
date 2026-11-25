@@ -1,7 +1,7 @@
 {
   "name": "@openbot/mobile",
   "main": "expo-router/entry",
-  "version": "1.4.12",
+  "version": "1.4.14",
   "expo": {
     "install": {
       "exclude": [
@@ -76,6 +76,7 @@
     "expo-linking": "~58.0.17",
     "expo-local-authentication": "~58.0.3",
     "expo-localization": "~58.0.5",
+    "expo-location": "~58.0.22",
     "expo-media-library": "~58.0.14",
     "expo-network": "~58.0.5",
     "expo-notifications": "~58.1.9",
@@ -96,6 +97,7 @@
     "katex": "catalog:",
     "lucide-react-native": "^1.73.0",
     "marked": "catalog:",
+    "marked-cjk-friendly": "catalog:",
     "mermaid": "catalog:",
     "pdfjs-dist": "catalog:",
     "react": "19.3.0",

@@ -47,9 +47,12 @@
   background: var(--openbot-bg-sidebar);
 }
 
-.message-preview-body[data-preview-kind="mermaid"] {
+.message-preview-diagram-scroll {
   max-height: 420px;
-  overflow: auto;
+  background: var(--openbot-bg-sidebar);
+}
+
+.message-preview-diagram-view {
   padding: var(--openbot-space-3);
   overscroll-behavior-x: contain;
 }

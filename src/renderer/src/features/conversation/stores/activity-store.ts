@@ -274,10 +274,20 @@ export function createActivityStore(deps: ActivityStoreDeps) {
       !deps.props.approval &&
       !deps.props.browserTakeover,
   );
+  const compactionRunning = () => {
+    const state = deps.props.contextState;
+    const agent = deps.props.agent;
+    return state?.compaction?.status === "running" && state.agentId === agent?.id && state.threadId === agent?.threadId;
+  };
   const turnUpdate = () => {
     const turnId = deps.props.activeTurnId;
     if (!turnId) return null;
-    const parts: unknown[] = [turnId, deps.props.activityDetail, deps.props.turnStepLines?.[turnId]?.at(-1)?.id];
+    const parts: unknown[] = [
+      turnId,
+      deps.props.activityDetail,
+      deps.props.turnStepLines?.[turnId]?.at(-1)?.id,
+      compactionRunning(),
+    ];
     for (let index = deps.props.messages.length - 1; index >= 0; index -= 1) {
       const message = deps.props.messages[index];
       if (message?.author !== "agent") continue;
@@ -306,7 +316,7 @@ export function createActivityStore(deps: ActivityStoreDeps) {
   window.addEventListener("online", updateOnline);
   window.addEventListener("offline", updateOnline);
   const providerSilentMinutes = createMemo(() => {
-    if (!waitsForProvider() || deps.props.activityRunning) return null;
+    if (!waitsForProvider() || deps.props.activityRunning || compactionRunning()) return null;
     const minutes = Math.floor((clock() - lastTurnUpdateAt()) / PROVIDER_SILENT_AFTER_MS);
     return minutes >= 1 ? minutes : null;
   });

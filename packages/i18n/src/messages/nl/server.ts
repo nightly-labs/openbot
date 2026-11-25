@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Je kunt een andere server kiezen terwijl deze laadt.",
   "server.connection.cachedHint":
     "Geladen inhoud en concepten blijven bewaard. Serveracties gaan verder zodra de verbinding terug is.",
+  "server.connection.computerOffline":
+    "{name} is offline. Controleer of de computer aan staat, OpenBot open is en Publiceer deze server aan staat in Serverinstellingen > Leden.",
   "server.connection.conversationFailed": "Het gesprek kon niet laden. Probeer het opnieuw.",
   "server.connection.panelsFailed": "Sommige panelen van de werkruimte konden niet laden. Probeer het opnieuw.",
   "server.connection.retry": "Opnieuw",
@@ -236,6 +238,9 @@ export const messages = {
   "server.rail.delete": "Server wissen",
   "server.rail.hide": "Server verbergen",
   "server.rail.showLocal": "{name} tonen",
+  "server.rail.hiddenServers": "Verborgen servers",
+  "server.rail.hideFailed": "Kan {name} niet verbergen",
+  "server.rail.showFailed": "Kan {name} niet tonen",
   "server.plan.daysLeft": {
     one: "{count} dag",
     other: "{count} dagen",
@@ -365,6 +370,7 @@ export const messages = {
     "Toon de CRM-pagina aan eigenaren en beheerders, laat agents het CRM lezen en synchroniseer Stripe. Als je het uitzet, blijven de gegevens bewaard.",
   "server.settings.agentDefaultsTitle": "Standaarden voor agents",
   "server.settings.threadsCard": "Threads en tijdzone",
+  "server.settings.creditsCard": "Credits",
   "server.settings.memoryTitle": "Geheugen",
   "server.settings.memoryDescription": "Bepaal wat agents op deze server onthouden en leren.",
   "server.settings.memoriesCard": "Herinneringen",
@@ -404,6 +410,31 @@ export const messages = {
     "Nieuwe routines gebruiken deze tijdzone als het bericht de tijdzone van de afzender niet geeft. Op een server gebruikt ook de browser deze tijdzone na de volgende herstart.",
   "server.settings.timezoneAutomatic": "Automatisch ({zone})",
   "server.settings.timezoneLoadFailed": "Kan de tijdzone van de server niet laden.",
+  "server.settings.connectionTitle": "Verbinding",
+  "server.settings.signalHome": "Signal-server",
+  "server.settings.signalHomeDescription":
+    "Leden maken via deze Signal-server verbinding met deze server. Een Signal-server met een lagere latentie geeft snellere verbindingen.",
+  "server.settings.signalHomeFallback":
+    "{chosen} antwoordt niet. De server gebruikt {name} tot {chosen} weer antwoordt.",
+  "server.settings.signalHomeMoving":
+    "De server gaat over naar {name}. Leden maken binnen enkele seconden opnieuw verbinding.",
+  "server.settings.signalHomeLoadFailed": "Kan de Signal-servers niet laden.",
+  "server.settings.signalHomeAutomatic": "Automatisch (dichtstbij)",
+  "server.settings.signalHomeAutomaticUsing": "Automatisch ({name})",
+  "server.settings.signalHomeOption": "{name} · {latency}",
+  "server.settings.signalHomeLatency": "{latency} ms",
+  "server.settings.signalHomeNoAnswer": "Geen antwoord",
+  "server.settings.signalHomePlaceHelsinki1": "Helsinki 1",
+  "server.settings.signalHomePlaceHelsinki2": "Helsinki 2",
+  "server.settings.signalHomePlaceSanJose": "San Jose",
+  "server.settings.signalHomePlaceSydney": "Sydney",
+  "server.settings.signalHomePlaceSingapore": "Singapore",
+  "server.settings.voiceModel.section": "Spraakherkenning",
+  "server.settings.voiceModel.description":
+    "Agents op deze server gebruiken dit model om het geluid van video’s zonder ondertiteling uit te schrijven.",
+  "server.settings.voiceModel.loadFailed": "Kan het spraakherkenningsmodel van de server niet laden.",
+  "server.settings.voiceModel.group": "Op deze server",
+  "server.settings.voiceModel.removeLabel": "{name} van deze server verwijderen",
   "server.settings.turnLimit": "Threads tegelijk",
   "server.settings.turnLimitDescription":
     "Hoeveel agentthreads tegelijk kunnen draaien op deze server. Meer threads gebruiken meer geheugen.",
@@ -414,6 +445,11 @@ export const messages = {
   "server.settings.agentTaskLimit": "Parallelle threads per agent",
   "server.settings.agentTaskLimitDescription": "Hoeveel threads elke agent zonder eigen limiet tegelijk kan draaien.",
   "server.settings.agentTaskLimitDefault": "Standaard ({count})",
+  "server.settings.mediaApprovalCredits": "Vragen bij meer dan",
+  "server.settings.mediaApprovalCreditsUnit": "credits",
+  "server.settings.mediaApprovalCreditsLoadFailed": "Kan de creditgoedkeuringsgrens van deze server niet laden.",
+  "server.settings.mediaApprovalAgents": "Agents mogen credits gebruiken",
+  "server.settings.mediaApprovalAsk": "Vragen wanneer credits nodig zijn",
   "server.settings.memoryLimit": "Herinneringen per agent",
   "server.settings.memoryLimitDescription": "Hoeveel herinneringen elke agent op deze server kan bewaren.",
   "server.settings.memoryLimitLoadFailed": "Kan de geheugenlimiet van deze server niet laden.",
@@ -613,6 +649,7 @@ export const messages = {
     "Er is geen apart wachtwoord voor extern bureaublad. Met de instellingen hieronder kies je wie deze computer mag bedienen.",
   "server.desktop.componentInstalled": "Hostonderdeel geïnstalleerd",
   "server.desktop.componentNotInstalled": "Hostonderdeel niet geïnstalleerd",
+  "server.desktop.needsX11Session": "X11-sessie nodig",
   "server.desktop.sessions": "Onbeheerd: {unattended} · Actieve sessies: {active}/{max}",
   "server.desktop.unattendedEnabled": "ingeschakeld",
   "server.desktop.unattendedUnavailable": "niet beschikbaar",
@@ -696,7 +733,7 @@ export const messages = {
   "server.update.waitingFor": "Wacht op {reasons}.",
   "server.update.disabledTitle": "Updates op afstand staan uit",
   "server.update.disabledDescription":
-    "De gebruiker van {name} heeft updates van serverleden uitgezet. Vraag diegene om OpenBot bij te werken of de instelling aan te zetten.",
+    "De gebruiker van {name} heeft updates van serverleden uitgezet. Vraag diegene om OpenBot bij te werken, of om op die computer Instellingen > Updates te openen en “Sta updates van serverleden toe” aan te zetten.",
   "server.update.managedTitle": "Een Host Manager regelt updates",
   "server.update.managedDescription":
     "OpenBot Host Manager werkt {name} bij. Neem contact op met de beheerder van de host.",

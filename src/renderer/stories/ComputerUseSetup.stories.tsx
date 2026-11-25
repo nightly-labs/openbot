@@ -93,6 +93,19 @@ export const ReadyWithoutPermissions: Story = {
   render: () => <MockedSetup state={{ status: "ready", permissions: [], message: null }} />,
 };
 
+export const ReadyWithoutInput: Story = {
+  render: () => (
+    <MockedSetup
+      state={{
+        status: "ready",
+        permissions: [],
+        message:
+          "On this desktop, OpenBot cannot type or click in other apps. For tasks on websites, ask the agent to use the OpenBot browser.",
+      }}
+    />
+  ),
+};
+
 export const Failure: Story = {
   render: () => <MockedSetup error={new Error("OpenBot could not check Computer Use.")} />,
 };

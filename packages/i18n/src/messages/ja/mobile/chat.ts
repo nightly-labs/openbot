@@ -97,6 +97,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "次のパート",
   "mobile.chat.preview.pdfFailed": "この PDF を表示できませんでした。",
   "mobile.chat.preview.spreadsheetFailed": "このスプレッドシートを読み込めませんでした。",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "このスプレッドシートは大きすぎてプレビューできません。共有して別のアプリで開いてください。",
   "mobile.chat.preview.spreadsheetTruncated": "プレビューは最初の {rows} 行と {columns} 列までです。",
   "mobile.chat.copyFailedMessage": "もう一度お試しください。",
   "mobile.chat.message.copyFailed": "メッセージをコピーできませんでした",
@@ -144,6 +146,7 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "閉じる",
   "mobile.chat.attachment.sharingUnavailable": "このデバイスではファイルの共有を利用できません。",
   "mobile.chat.attachment.unavailable": "添付ファイルを利用できません。もう一度お試しください。",
+  "mobile.chat.attachment.downloadStopped": "ダウンロードが止まりました。サーバーに接続すると、もう一度始まります。",
   "mobile.chat.attachment.openFailed": "添付ファイルを開けませんでした",
   "mobile.chat.attachment.photosNeedUpdate": "写真を保存するには、アプリを最新版に更新してください。",
   "mobile.chat.attachment.photosPermission": "この画像を保存するには、設定で OpenBot に写真の追加を許可してください。",
@@ -156,6 +159,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesNeedsUpdate":
     "複数のファイルを共有するには、アプリを最新バージョンにしてください。",
   "mobile.chat.attachment.preview": "{name} のプレビュー",
+  "mobile.chat.attachment.seeAll": "タップしてすべて表示",
   "mobile.chat.attachment.displayFailed": "この画像を表示できませんでした。",
   "mobile.chat.attachment.loadingImage": "画像を読み込み中",
   "mobile.chat.attachment.uploading": "{name} をアップロード中",
@@ -186,6 +190,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "添付ファイルが破損しています。もう一度選択してください。",
   "mobile.chat.attachment.tooLarge": "{name} は {limit} を超えています。",
   "mobile.chat.attachment.cameraPermission": "写真を撮るには、設定でカメラへのアクセスを許可してください。",
+  "mobile.chat.attachment.photoNotLoaded":
+    "写真を読み込めませんでした。写真アプリで完全に表示されるまで開いてから、もう一度お試しください。",
   "mobile.chat.composer.send": "メッセージを送信",
   "mobile.chat.composer.stop": "{name} を停止",
   "mobile.chat.composer.dictate": "メッセージを音声入力",
@@ -221,7 +227,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "サーバーに接続していません。再接続すると会話を続けます。",
   "mobile.chat.liveVoice.speakFailed": "返信を読み上げられませんでした。",
   "mobile.chat.liveVoice.voiceNotReady": "設定 > 音声 で返信の声を選んでください。",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 はこの言語を読み上げられません。",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 はこの言語を読み上げられません。設定 > 音声 で別の返信の声を選んでください。",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs が API キーを受け付けませんでした。",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "ElevenLabs のキーに権限が不足しています。設定 > 音声 で確認してください。",
@@ -232,6 +239,8 @@ export const messages = {
     "このサーバーは GPT Live Voice に対応していません。サーバーを実行しているコンピューターの OpenBot を更新してください。",
   "mobile.chat.liveVoice.gptFailed": "GPT Live Voice を開始できませんでした。ミュートを解除して再試行してください。",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice が停止しました。ミュートを解除すると再開します。",
+  "mobile.chat.liveVoice.gptFailedTitle": "GPT Live Voice を開始できませんでした",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice が停止しました",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "設定で OpenBot にマイクの使用を許可してから、ミュートを解除して再試行してください。",
   "mobile.chat.composer.addAttachment": "添付ファイルを追加",
@@ -240,6 +249,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "写真を撮れませんでした。もう一度お試しください。",
   "mobile.chat.camera.startFailed": "カメラを起動できませんでした。カメラを閉じて、もう一度お試しください。",
   "mobile.chat.camera.close": "カメラを閉じる",
+  "mobile.chat.camera.fullScreenTipTitle": "もっと大きく見たいですか？",
+  "mobile.chat.camera.fullScreenTipBody":
+    "ズームとすべてのレンズを使える全画面カメラを使いましょう。「設定 > 会話」で変更できます。",
+  "mobile.chat.camera.fullScreenTipUse": "全画面を使う",
+  "mobile.chat.camera.fullScreenTipDismiss": "ヒントを隠す",
   "mobile.chat.camera.takePhoto": "写真を撮る",
   "mobile.chat.camera.switch": "カメラを切り替え",
   "mobile.chat.header.info": "{name} の情報",
@@ -309,6 +323,8 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "再生速度：{speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "メッセージを読み上げられませんでした",
+  "mobile.chat.message.readAloudModelMissing":
+    "メッセージを聞くには、設定 > 音声 で音声モデルをダウンロードしてください。",
   "mobile.chat.message.selectText": "テキストを選択",
   "mobile.chat.message.copyImage": "画像をコピー",
   "mobile.chat.message.copyText": "テキストをコピー",
@@ -378,6 +394,8 @@ export const messages = {
   "mobile.chat.audio.unplayable": "この音声ファイルは再生できません。",
   "mobile.chat.browserSecret.password": "パスワード",
   "mobile.chat.browserSecret.authenticatorCode": "認証コード",
+  "mobile.chat.browserSecret.ended":
+    "このサインインのリクエストは終了しました。エージェントにもう一度試すよう依頼してください。",
   "mobile.chat.browserSecret.oneTimeCode": "ワンタイムコード",
   "mobile.chat.browserSecret.takeoverTitle": "ブラウザーの引き継ぎ",
   "mobile.chat.browserSecret.takeoverBody":
@@ -499,6 +517,7 @@ export const messages = {
   "mobile.chat.history.connecting": "サーバーに接続中",
   "mobile.chat.history.loading": "チャット履歴を読み込み中",
   "mobile.chat.history.waiting": "接続を待っています",
+  "mobile.chat.history.syncing": "新しいメッセージを確認中",
   "mobile.chat.history.loadFailed": "チャット履歴を読み込めませんでした",
   "mobile.chat.scrollToLatest": "最新のメッセージへ移動",
   "mobile.chat.agentUnavailable.title": "エージェントを利用できません",
@@ -540,6 +559,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "キューにメッセージはありません",
   "mobile.chat.queue.emptyBody": "エージェントの作業中は、新しいメッセージがキューに入ります。",
   "mobile.chat.queue.noLongerQueued": "このメッセージはキューにありません。",
+  "mobile.chat.queue.routine": "ルーティン：{name}",
   "mobile.chat.queue.position": "{position} 番目 · {date}",
   "mobile.chat.queue.attachments": "添付ファイル",
   "mobile.chat.queue.steer": "方向を指示",
@@ -648,4 +668,17 @@ export const messages = {
   "mobile.chat.context.noAuto": "このエージェントはコンテキストを圧縮しません。",
   "mobile.chat.context.lastCompaction": "前回の圧縮: {before} → {after} トークン",
   "mobile.chat.context.unavailable": "このチャットは現在コンテキストを報告していません。",
+  "mobile.chat.locationRequest.share": "今回だけ共有",
+  "mobile.chat.locationRequest.decline": "共有しない",
+  "mobile.chat.locationRequest.alwaysAllow": "常に許可",
+  "mobile.chat.locationRequest.alwaysAllowed": "アプリの使用中は、このエージェントが確認なしで現在地を受け取ります。",
+  "mobile.chat.locationRequest.askEveryTime": "毎回確認する",
+  "mobile.chat.locationRequest.locating": "現在地を取得しています…",
+  "mobile.chat.locationRequest.private": "スマートフォンの現在地をこのエージェントに一度だけ送ります。",
+  "mobile.chat.locationRequest.shared": "位置情報を共有しました",
+  "mobile.chat.locationRequest.declined": "共有しませんでした",
+  "mobile.chat.locationRequest.unavailable": "現在地を取得できませんでした。もう一度お試しください。",
+  "mobile.chat.locationRequest.deniedTitle": "位置情報へのアクセスがオフです",
+  "mobile.chat.locationRequest.denied": "位置情報を共有するには、設定で OpenBot に位置情報の使用を許可してください。",
+  "mobile.chat.locationRequest.openSettings": "設定を開く",
 } as const satisfies PartialTranslation<typeof source>;
