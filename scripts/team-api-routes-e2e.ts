@@ -411,6 +411,7 @@ import {
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   PROVIDER_ACCOUNT_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_LEFT_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-left-out-v1";
 import {
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   PROVIDER_ACCOUNT_POOL_ROUTES,
@@ -4936,6 +4937,13 @@ try {
         older.status === 200 &&
         !list(field(older.body, "capabilities")).includes(PROVIDER_ACCOUNT_POOL_CAPABILITY),
       [summary(compatibility), summary(older)],
+    );
+    const leftOutCurrent = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    check(
+      "the host advertises provider-account-pool-left-out-v1 to a protocol 10 peer only",
+      list(field(leftOutCurrent.body, "capabilities")).includes(PROVIDER_ACCOUNT_POOL_LEFT_OUT_CAPABILITY) &&
+        !list(field(compatibility.body, "capabilities")).includes(PROVIDER_ACCOUNT_POOL_LEFT_OUT_CAPABILITY),
+      [summary(leftOutCurrent).status, list(field(compatibility.body, "capabilities")).length],
     );
     const unsupported = await call("POST", PROVIDER_ACCOUNT_POOL_ROUTES.list, {
       token: adaToken,

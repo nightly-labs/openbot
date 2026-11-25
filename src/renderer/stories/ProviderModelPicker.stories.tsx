@@ -1,4 +1,6 @@
+import type { AgentModelId, AgentProviderId, AgentStatus, ProviderAccountPool } from "@openbot/contracts/ipc";
 import { ProviderModelPicker } from "@openbot/ui/components/ProviderModelPicker";
+import { createSignal } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENT_STATUS, STORY_MODELS } from "./fixtures";
@@ -332,4 +334,47 @@ export const CodexModelCatalogSource: Story = {
     modelOptions: [...codexOllamaModels, ...STORY_MODELS.filter((model) => model.provider !== "codex")],
     agentStatus: codexStatusWithSource({ kind: "catalog" }),
   },
+};
+
+const POOL_ACCOUNTS = [
+  { id: "default", label: null, email: "person@example.com", state: "connected" as const, message: null },
+  { id: "a1111111111111111", label: "Work", email: null, state: "connected" as const, message: null },
+  { id: "a2222222222222222", label: "Reserved", email: null, state: "connected" as const, message: null },
+];
+
+const poolStatus = (accountPool: ProviderAccountPool): AgentStatus => ({
+  ...STORY_AGENT_STATUS,
+  providers: STORY_AGENT_STATUS.providers?.map((provider) =>
+    provider.id === "codex" ? { ...provider, accounts: POOL_ACCOUNTS, accountPool } : provider,
+  ),
+});
+
+function PoolPicker(props: { accountPool: ProviderAccountPool }) {
+  const [provider, setProvider] = createSignal<AgentProviderId>("codex");
+  const [model, setModel] = createSignal<AgentModelId>("gpt-5.6-luna");
+  const [account, setAccount] = createSignal<string | undefined>("a1111111111111111");
+  return (
+    <ProviderModelPicker
+      {...args}
+      agentStatus={poolStatus(props.accountPool)}
+      provider={provider()}
+      value={model()}
+      accountChoice
+      leftOutAccountChoice
+      providerAccountId={account()}
+      onChange={(nextModel, nextProvider, accountId) => {
+        setModel(nextModel);
+        setProvider(nextProvider);
+        if (accountId !== undefined) setAccount(accountId ?? undefined);
+      }}
+    />
+  );
+}
+
+export const PoolWithAccountLeftOut: Story = {
+  render: () => <PoolPicker accountPool={{ leftOut: ["a2222222222222222"], inUse: "a1111111111111111" }} />,
+};
+
+export const PoolWithOwnSignInLeftOut: Story = {
+  render: () => <PoolPicker accountPool={{ leftOut: ["default"], inUse: "a1111111111111111" }} />,
 };

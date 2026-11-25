@@ -8,6 +8,7 @@ import {
   providerDisplayName,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
+import { PROVIDER_ACCOUNT_POOL_LEFT_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-left-out-v1";
 import { reasoningLabel } from "@openbot/ui/components/ProviderModelPicker";
 import { findModelOption, providerAccountName } from "@openbot/ui/components/provider-accounts";
 import { ConversationHeader as SharedConversationHeader } from "@openbot/ui/features/conversation/ConversationHeader";
@@ -15,6 +16,7 @@ import { ThreadHeader } from "@openbot/ui/features/conversation/threads/ThreadHe
 import { DRAFT_THREAD_ID, MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { Show } from "solid-js";
 import { actionToast } from "../../action-toast";
+import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useConversationViewScope } from "./conversation-scope";
 
 const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
@@ -150,6 +152,7 @@ export function ConversationHeader() {
         onManageProviders: props.onManageProviders,
         disabledReason: t("conversation.header.modelsUnavailable"),
         accountChoice: true,
+        leftOutAccountChoice: serverSupportsCapability(props.server, PROVIDER_ACCOUNT_POOL_LEFT_OUT_CAPABILITY),
         providerAccountId: props.agent ? agentNextProviderAccountId(props.agent) : undefined,
         workspaceOnly: props.agent ? workspaceAccessEnforced(props.agent) : false,
         accountUsage: props.accountUsage,

@@ -3782,14 +3782,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     next: AgentModelChoice | undefined,
   ): string | null | undefined {
     if (move !== null || input.leaveUsageLimit) return undefined;
-    if (initiatingAgentId === undefined)
-      return input.provider !== undefined || input.model !== undefined || input.providerAccountId !== undefined
-        ? null
-        : undefined;
+    if (initiatingAgentId === undefined) return this.#personAccountPin(input, next);
     if (input.providerAccountId === undefined) return undefined;
     if (!next || !this.#pooled(next)) return null;
     if (next.providerAccountId) return next.providerAccountId;
     return input.providerAccountId === DEFAULT_PROVIDER_ACCOUNT_ID ? DEFAULT_PROVIDER_ACCOUNT_ID : null;
+  }
+
+  #personAccountPin(input: AgentUpdate, next: AgentModelChoice | undefined): string | null | undefined {
+    if (input.provider === undefined && input.model === undefined && input.providerAccountId === undefined)
+      return undefined;
+    const account = next?.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
+    if (!next || !this.#providers.accountPool(next.provider)?.leftOut.includes(account)) return null;
+    return input.providerAccountId === undefined ? undefined : account;
   }
 
   #withAccountModel(input: AgentUpdate): AgentUpdate {
