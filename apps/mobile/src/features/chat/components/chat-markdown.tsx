@@ -910,6 +910,52 @@ function TableCopyActions({
   );
 }
 
+function isDisplayMath(token: Token): token is MathToken {
+  return tokenIs(token, "inlineMath") && token.display;
+}
+
+function isBlankInline(token: Token): boolean {
+  return token.type === "br" || (tokenIs(token, "text") && !token.text.trim());
+}
+
+function trimmedEdge(token: Token | undefined, trim: (text: string) => string): Token[] {
+  if (!token) return [];
+  if (!tokenIs(token, "text") || token.tokens) return [token];
+  return [{ ...token, text: trim(token.text) }];
+}
+
+function textRun(token: Tokens.Paragraph | Tokens.Text, run: Token[]): Token[] {
+  const start = run.findIndex((child) => !isBlankInline(child));
+  if (start < 0) return [];
+  const end = run.findLastIndex((child) => !isBlankInline(child));
+  const edges = run.slice(start, end + 1);
+  const first = trimmedEdge(edges[0], (text) => text.trimStart());
+  const tokens =
+    edges.length === 1
+      ? trimmedEdge(first[0], (text) => text.trimEnd())
+      : [...first, ...edges.slice(1, -1), ...trimmedEdge(edges.at(-1), (text) => text.trimEnd())];
+  const raw = tokens.map((child) => child.raw).join("");
+  return [{ ...token, raw, text: raw, tokens }];
+}
+
+function withDisplayMathBlocks(tokens: Token[]): Token[] {
+  return tokens.flatMap((token) => {
+    if (!(tokenIs(token, "paragraph") || tokenIs(token, "text")) || !token.tokens?.some(isDisplayMath)) return [token];
+    const blocks: Token[] = [];
+    let run: Token[] = [];
+    for (const child of token.tokens) {
+      if (!isDisplayMath(child)) {
+        run.push(child);
+        continue;
+      }
+      blocks.push(...textRun(token, run), { ...child, type: "blockMath" });
+      run = [];
+    }
+    blocks.push(...textRun(token, run));
+    return blocks;
+  });
+}
+
 function MarkdownBlocks({
   tokens,
   presentation,
@@ -919,9 +965,10 @@ function MarkdownBlocks({
   presentation: TextPresentation;
   inList?: boolean;
 }) {
+  const blocks = useMemo(() => withDisplayMathBlocks(tokens), [tokens]);
   return (
     <View className={inList ? "min-w-0 gap-1.5" : "min-w-0 gap-2.5"}>
-      {sourceEntries(tokens, (token) => token.raw).map(({ value: token, offset }) => (
+      {sourceEntries(blocks, (token) => token.raw).map(({ value: token, offset }) => (
         <MarkdownBlock key={offset} token={token} presentation={presentation} inList={inList} />
       ))}
     </View>
