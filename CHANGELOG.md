@@ -142,6 +142,8 @@ All notable changes to OpenBot will be documented here. The project follows
 - The credit packs now show the clip length and resolution of each estimate: "9 videos Seedance 2.5 (5 s, 480p)" and "37 images Nano Banana Pro (1K)".
 - When you have only free credits, the model list on an image or video approval card marks the models that free credits pay for with "Free credits". Models that need paid credits are dimmed, show "Paid credits only", and you cannot pick them. On a joined server, the marks show only when the server and the app both have this version.
 - The credits page on openbot.run now shows a price table for each model type, with the live price at each resolution. A video shows its price for each second, and also the price without sound when it is lower. The models that you cannot use yet show under "Soon".
+- In the footer of the website, the column headers are now lighter and the links are grey. When you move the pointer onto a footer link, the link becomes white and shows an underline.
+- Billing > Delete server no longer has an "Immediately" option. Delete server now schedules the deletion for the end of the paid period, and you can stop it with Keep server before that date. When a server already has a scheduled deletion, Delete server is disabled.
 
 ### Fixed
 
@@ -712,6 +714,22 @@ All notable changes to OpenBot will be documented here. The project follows
   replied to it. Before, a follow-up that the teammate took into its running work stayed "Working"
   until that work ended, so one busy teammate looked like many running tasks.
 - When you open Your settings, Server settings or another full page, the agent list in the sidebar no longer shows through the page.
+- When an agent asks you to do a step on a browser page, such as a sign-in or a CAPTCHA, the message box
+  now folds into a small tab at the bottom of the page. Before, the box stayed open over the page and
+  could cover a button that you had to click, such as "Verify". Click the tab to open the box and click
+  "I’m done". The box opens again by itself when the step ends.
+- When OpenCode loses the session of a chat while a message starts, OpenBot now starts a new OpenCode session with the chat history and sends the message again one time. Before, the message failed with the technical text "Invalid params: session not found", and you had to send it again. When the agent had already started to answer, the chat now says that OpenBot started a new OpenCode session and that you can try again.
+- After an agent continues a request by itself, the next completion check now reads the agent's earlier answers to the request and what the earlier check found. It no longer opens a finished request again only because the agent's last reply was short.
+- An agent that checks its work again after an automatic continuation no longer writes in the chat that "the check" or "the verification" is right or wrong. It says that it checked again and that its last answer stays correct.
+- The OpenBot database no longer grows by tens of megabytes each day while agents work. Before, OpenBot kept every intermediate save of each chat message, also after a newer save replaced it. Now OpenBot removes these replaced saves when it starts and every 6 hours. Chats and their history do not change.
+- In a WhatsApp chat, a long request now keeps one "Working on it…" message. Before, after about 14 minutes, or after the WhatsApp connection started again during the request, each new progress line came as one more message, and these messages stayed in the chat after the answer.
+- In GPT live voice, a spoken request no longer shows internal text such as `# AGENTS.md instructions`,
+  `<environment_context>` and `<realtime_delegation>` in the chat. The chat and the agent get only the
+  request. On a joined server, the server must also be on this version.
+- When an MCP server needs more access for a tool than your sign-in gives, OpenBot now shows "Sign-in needed" for that server, the agent shows a Sign in card, and Sign in asks the service for the missing access. The other tools of the server keep working until you sign in again. Before, the server showed as signed in, the connection test said it was ready, and the tool failed in the chat with a technical "insufficient_scope" error. On a joined server, the server must also be on this version.
+- A new API key that you save for a provider is used in your next message, also when the provider could not
+  start again at once after the save. Before, the provider kept the previous key for up to 10 minutes, and each
+  message failed with an error that said that your saved key was refused.
 
 ## [0.78.0] - 2026-11-24
 
