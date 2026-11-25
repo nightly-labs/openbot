@@ -788,8 +788,9 @@ fails a model that the session does not list (#11964), so a queued message faile
 offer" although OpenCode offered the model a moment later (#15963). OpenCode reloads its catalog when
 it gets a model that it does not list, and refuses a model that is still missing with -32602 and
 `data.modelId` (OpenCode 1.19 and 2). The OpenCode flavor sets `modelNotOffered` to match that
-error, so OpenBot sends the model and lets OpenCode decide. Only that refusal fails the turn with
-`ProviderModelNotOfferedError`. Other ACP agents keep the check before the send, because Antigravity
+error, so OpenBot sends the model and lets OpenCode decide. That refusal fails the turn with
+`ProviderModelNotOfferedError`, and so does a reply whose model list still does not have the model:
+OpenCode 1.15 sets any model with no check. Other ACP agents keep the check before the send, because Antigravity
 kept its own model and gave no error for a model that it did not list (#11797).
 
 The CLI reports no Go quota over ACP. `readOpenCodeGoUsage` (`src/backend/opencode-usage.ts`)

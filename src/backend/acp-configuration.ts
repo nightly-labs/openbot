@@ -469,6 +469,8 @@ export class AcpConfiguration {
           )
         : yield* this.#confirmingSet(thread, option.id, request);
       thread.configOptions = response.configOptions;
+      if (notListed && !listsValue(response.configOptions, option.id, selected))
+        return yield* this.#modelNotOffered(value, models);
       if (category === "model") thread.currentModelId = selected;
     }
   });
@@ -846,6 +848,11 @@ function availableModels(response: SessionSetupResponse): Array<{
 
 function selectValues(option: Extract<SessionConfigOption, { type: "select" }>) {
   return option.options.flatMap((entry) => ("options" in entry ? entry.options : [entry]));
+}
+
+function listsValue(options: readonly SessionConfigOption[], configId: string, value: string): boolean {
+  const option = options.find((candidate) => candidate.id === configId);
+  return option?.type === "select" && selectValues(option).some((entry) => entry.value === value);
 }
 
 function reasoningEffortWireValues(values: string[]): Map<string, string> {
