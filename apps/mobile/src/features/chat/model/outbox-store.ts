@@ -413,7 +413,9 @@ export class OutboxStore {
 
   private pump(): void {
     if (!this.loaded) return;
-    const blocked = new Set<string>();
+    const blocked = new Set(
+      this.messages.filter((message) => message.state === "sending").map((message) => outboxTargetKey(message.target)),
+    );
     for (const message of this.messages) {
       const key = outboxTargetKey(message.target);
       if (
