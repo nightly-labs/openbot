@@ -825,6 +825,22 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     return true;
   }
 
+  function targetShown(target: ConversationTarget): boolean {
+    const activeTarget = deps.currentTarget();
+    return activeTarget?.agentId === target.agentId && activeTarget.serverId === target.serverId;
+  }
+
+  function sendWaits(target: ConversationTarget): boolean {
+    return (
+      targetShown(target) &&
+      !deps.props.channel &&
+      !hostSteers() &&
+      (Boolean(deps.props.activeTurnId) ||
+        deps.orderedQueuedDeliveries().length > 0 ||
+        deps.pendingSends.list(target).some((send) => send.state !== "failed"))
+    );
+  }
+
   function queueSend(
     target: ConversationTarget,
     draft: ComposerDraft,
@@ -832,18 +848,9 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     voice?: VoiceSend,
     steer = false,
   ): void {
-    const onScreen = () => {
-      const activeTarget = deps.currentTarget();
-      return activeTarget?.agentId === target.agentId && activeTarget.serverId === target.serverId;
-    };
+    const onScreen = () => targetShown(target);
     if (onScreen()) deps.followSentMessage();
-    const queued =
-      onScreen() &&
-      !deps.props.channel &&
-      !hostSteers() &&
-      (Boolean(deps.props.activeTurnId) ||
-        deps.orderedQueuedDeliveries().length > 0 ||
-        deps.pendingSends.list(target).some((send) => send.state !== "failed"));
+    const queued = sendWaits(target);
     const send = deps.props.onSendMessage;
     const steerQueued = agentSteers() ? deps.props.onSteerQueuedMessage : deps.props.onSendQueuedMessageNow;
     const server = deps.props.server;
@@ -975,6 +982,11 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     return true;
   }
 
+  function sendCardReplyNow(body: string, target = deps.currentTarget()): boolean {
+    if (!target || !targetShown(target) || sendWaits(target)) return false;
+    return sendCardMessage(body, target);
+  }
+
   async function sendCardFile(body: string, file: File): Promise<boolean> {
     const target = deps.currentTarget();
     if (!target || deps.submitting() || !deps.agentReady()) return false;
@@ -1007,6 +1019,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     composerAnswersPrompt,
     sendSelectionInstruction,
     sendCardMessage,
+    sendCardReplyNow,
     sendCardFile,
     retryPendingSend,
     editPendingSend,

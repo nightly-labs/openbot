@@ -95,6 +95,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "正在 {host} 上启动 {name} 登录…",
   "provider.codeLogin.pageOpening": "正在 {host} 上打开 {name} 登录页面…",
   "provider.codeLogin.linkStep": "登录 {name}，OpenBot 会自动继续。",
+  "provider.codeLogin.thisComputerDescription": "请在这台电脑的浏览器中打开此链接。OpenBot 会在这里等待。",
+  "provider.codeLogin.copyLink": "复制链接",
   "provider.codeLogin.chatgptDeviceSetting":
     "在电脑上的 ChatGPT 中打开安全设置，为 Codex 开启设备代码登录。工作账号由工作区管理员开启。",
 
@@ -143,6 +145,7 @@ export const messages = {
   "provider.picker.effort": "强度",
   "provider.picker.effortLabel": "助手推理强度",
   "provider.picker.effortFixed": "{effort}（由 {provider} 固定）",
+  "provider.picker.effortLimited": "你的 Claude 设置或组织将推理强度限制为 {effort}。",
   "provider.picker.fast": "快速",
   "provider.picker.fastText": "响应更快，用量更多",
   "provider.picker.speed": "速度",

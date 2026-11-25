@@ -12,6 +12,8 @@ export const messages = {
   "error.workflow.duplicateEdge": "이 두 단계에는 이미 이 연결이 있어요.",
   "error.workflow.serverTooOld":
     "이 서버는 워크플로를 지원하지 않아요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
+  "error.workflow.newerSteps":
+    "이 워크플로에는 최신 버전 OpenBot의 단계가 있어요. 변경하려면 OpenBot을 업데이트하세요.",
   "error.workflow.nodeUnsupported": "이 버전의 OpenBot은 아직 이미지, 파일, 메시지 단계를 실행할 수 없어요.",
   "error.workflow.interrupted": "이 단계가 실행되는 동안 OpenBot이 중지됐어요. 다시 실행해 주세요.",
   "error.workflow.agentMissing": "이 단계의 에이전트를 선택하세요.",

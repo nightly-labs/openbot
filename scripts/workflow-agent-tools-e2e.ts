@@ -21,6 +21,7 @@ const WAIT_MS = 5_000;
 const AGENTS = new Set(["agent-research"]);
 const TITLE_ANSWER = "A red bicycle at dawn";
 const CALLER = "agent-builder";
+const REQUESTER_TIMEZONE = "Europe/Warsaw";
 
 const created = z.object({ workflowId: z.string(), ids: z.record(z.string(), z.string()) });
 const workflowRead = z.object({
@@ -153,7 +154,16 @@ async function call(
   const resolved = resolveDeferredTool(params("tool_call", { name: `openbot.${name}`, arguments: args }), "codex");
   assert.ok(resolved, `tool_call refused openbot.${name}`);
   const response = await runCauseEffect(
-    handleWorkflowTool(resolved.tool, resolved.arguments, workflows, CALLER, callKey, AGENTS, confirmDelete),
+    handleWorkflowTool(
+      resolved.tool,
+      resolved.arguments,
+      workflows,
+      CALLER,
+      callKey,
+      AGENTS,
+      REQUESTER_TIMEZONE,
+      confirmDelete,
+    ),
   );
   assert.ok(response, `no handler for ${name}`);
   const item = response.contentItems[0];
@@ -804,11 +814,26 @@ try {
     workflowId,
     ops: [{ op: "update", node: ids.start, schedule: { kind: "daily", time: "08:00" } }],
   });
-  const trigger = (await runCauseEffect(workflows.get(workflowId))).graph.nodes.find((node) => node.id === ids.start);
+  const scheduledDetail = await runCauseEffect(workflows.get(workflowId));
+  const trigger = scheduledDetail.graph.nodes.find((node) => node.id === ids.start);
   check(
     "a schedule on a manual trigger makes it a schedule trigger",
     scheduled.ok && trigger?.fields.trigger === "schedule" && JSON.stringify(trigger.schedule).includes("08:00"),
     trigger,
+  );
+  const nextDueAt = scheduledDetail.triggers.find((state) => state.nodeId === ids.start)?.nextDueAt;
+  const requesterClock =
+    nextDueAt &&
+    new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: REQUESTER_TIMEZONE,
+    }).format(new Date(nextDueAt));
+  check(
+    "a schedule that an agent sets runs at that time in the requester's time zone, not the host's",
+    trigger?.fields.timezone === REQUESTER_TIMEZONE && requesterClock === "08:00",
+    { timezone: trigger?.fields.timezone, nextDueAt },
   );
 
   deleteAnswer = false;
@@ -824,6 +849,34 @@ try {
   check("delete_workflow removes it after the approval", removed.ok && deleteAsked.length === 2, removed.value);
   const gone = await call("failure-missing", "read_workflow", { workflowId });
   check("a deleted workflow reads as a tool failure", !gone.ok, gone.value);
+
+  const untriggered = await call("create-no-trigger", "edit_workflow", {
+    title: "Poster title",
+    ops: [
+      { op: "add", ref: "idea", kind: "prompt", fields: { text: "A bicycle poster for a spring sale." } },
+      { op: "add", ref: "title", kind: "llm", from: "idea", fields: { prompt: "Write a title for this poster." } },
+    ],
+  });
+  check("edit_workflow makes a workflow with no trigger", untriggered.ok, untriggered.value);
+  const plain = created.parse(untriggered.value);
+  const plainRun = await call("run-no-trigger", "run_workflow", { workflowId: plain.workflowId });
+  check("run_workflow runs a workflow with no trigger", plainRun.ok, plainRun.value);
+  const plainRunId = runStarted.parse(plainRun.value).runId;
+  const plainDeadline = Date.now() + WAIT_MS;
+  const plainTitle = async () =>
+    runRead
+      .parse(
+        (await call("runs-no-trigger", "read_workflow_runs", { workflowId: plain.workflowId, runId: plainRunId }))
+          .value,
+      )
+      .steps.find((step) => step.nodeId === plain.ids.title);
+  let titled = await plainTitle();
+  while (titled?.status !== "done") {
+    if (Date.now() > plainDeadline) throw new Error(`The run with no trigger did not end: ${JSON.stringify(titled)}`);
+    await new Promise((done) => setImmediate(done));
+    titled = await plainTitle();
+  }
+  check("each step of a run with no trigger runs", titled.output === TITLE_ANSWER, titled);
 
   report.passed = true;
 } catch (error) {

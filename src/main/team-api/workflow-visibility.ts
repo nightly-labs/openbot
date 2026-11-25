@@ -26,6 +26,31 @@ export async function runWorkflowEffect<A>(operation: Effect.Effect<A, { readonl
   }
 }
 
+interface WorkflowViewer {
+  admin: boolean;
+  protocol: number;
+  hiddenAgentIds: ReadonlySet<string>;
+}
+
+function workflowAgentsVisible(
+  viewer: WorkflowViewer,
+  agentIds: readonly string[],
+  known: ReadonlySet<string>,
+): boolean {
+  return agentIds.every((agentId) => !viewer.hiddenAgentIds.has(agentId) && (viewer.admin || known.has(agentId)));
+}
+
+export function workflowGraphVisible(
+  viewer: WorkflowViewer,
+  graph: WorkflowGraph,
+  known: ReadonlySet<string>,
+): boolean {
+  return (
+    workflowAgentsVisible(viewer, graphAgentIds(graph), known) &&
+    graph.nodes.every((node) => !isPeerHiddenProvider(node.fields.provider, viewer.protocol))
+  );
+}
+
 export function workflowVisibility(
   context: TeamApiRequestContext,
   workflows: Pick<TeamApiWorkflows, "get">,
@@ -33,19 +58,18 @@ export function workflowVisibility(
   hiddenAgentIds: ReadonlySet<string>,
 ) {
   const admin = canAdministerServer(context.member.role);
+  const viewer: WorkflowViewer = { admin, protocol: context.protocol, hiddenAgentIds };
   const listed = () => new Set(agents.listAgents().map((agent) => agent.id));
   const visibleAgents = (agentIds: readonly string[], known: ReadonlySet<string>) =>
-    agentIds.every((agentId) => !hiddenAgentIds.has(agentId) && (admin || known.has(agentId)));
-  const visibleGraph = (graph: WorkflowGraph, known: ReadonlySet<string>) =>
-    visibleAgents(graphAgentIds(graph), known) &&
-    graph.nodes.every((node) => !isPeerHiddenProvider(node.fields.provider, context.protocol));
+    workflowAgentsVisible(viewer, agentIds, known);
+  const visibleGraph = (graph: WorkflowGraph, known: ReadonlySet<string>) => workflowGraphVisible(viewer, graph, known);
   const requireUsable = (graph: WorkflowGraph, level: WorkflowUseLevel) => {
     if (!visibleGraph(graph, listed())) workflowMissing();
     for (const agentId of graphAgentIds(graph)) requireAgentLevel(context, agentId, level);
   };
   const visibleDetail = async (workflowId: string) => {
     const detail = await runWorkflowEffect(workflows.get(workflowId));
-    if (!visibleGraph(detail.graph, listed())) workflowMissing();
+    if (detail.needsNewerApp || !visibleGraph(detail.graph, listed())) workflowMissing();
     return detail;
   };
   const usableDetail = async (workflowId: string, level: WorkflowUseLevel) => {
@@ -66,5 +90,9 @@ export async function visibleWorkflowIds(
   const { listed, visibleGraph } = workflowVisibility(context, workflows, agents, hiddenAgentIds);
   const known = listed();
   const all = await runWorkflowEffect(workflows.listWithGraphs());
-  return new Set(all.filter(({ graph }) => visibleGraph(graph, known)).map(({ summary }) => summary.id));
+  return new Set(
+    all
+      .filter(({ graph, needsNewerApp }) => !needsNewerApp && visibleGraph(graph, known))
+      .map(({ summary }) => summary.id),
+  );
 }

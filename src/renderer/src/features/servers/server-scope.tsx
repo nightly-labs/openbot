@@ -27,6 +27,7 @@ import { useBrowserTabs } from "../browser/browser-context";
 import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
+import { clearStorageUsageCache } from "../files/storage-usage";
 import { useSetup } from "../onboarding/onboarding-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { usePresence } from "../team/team-context";
@@ -391,6 +392,7 @@ const ServerScope = createSimpleContext({
         if (!signedOut) return;
         deleteRemoteWorkspaceFrames(null);
         keepCachedWorkflows(null);
+        clearStorageUsageCache();
       },
     );
     createEffect(

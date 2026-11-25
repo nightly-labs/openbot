@@ -64,7 +64,9 @@ import {
 import { useChannels } from "../channels/channels-context";
 import { browserSecretVault } from "../conversation/browser-secret-vault";
 import { useConversation } from "../conversation/conversation-context";
+import { useConversationController } from "../conversation/conversation-controller-context";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
+import { useDesktopMediaApproval } from "../conversation/desktop-media-approval";
 import { createAgentMessageDeleteAccess, desktopAgentMessageDeleteAccess } from "../conversation/message-delete-access";
 import { narrationRows, placeTurnRowsByTime } from "../conversation/narration-rows";
 import { usageLimitAskFrom } from "../conversation/usage-limit-ask";
@@ -97,6 +99,14 @@ export function useAgentDockPlacement(): () => AgentDockPlacement | null {
   };
 }
 
+function useTakeoverPageOpener(mainTabOf: (agentId: string) => string | undefined) {
+  const { selectAgent } = useNavigation();
+  const { setBrowserTakeoverPageRequest } = useConversationController();
+  return (agentId: string, tabId: string) => {
+    if (selectAgent(agentId, mainTabOf(agentId))) setBrowserTakeoverPageRequest({ agentId, tabId });
+  };
+}
+
 export function AgentDockHost() {
   const { activeServerId } = useServers();
   const placement = useAgentDockPlacement();
@@ -110,7 +120,7 @@ export function AgentDockHost() {
       if (info?.platform !== "linux") return undefined;
       return {
         on: preference().shown && preference().placement === "screen",
-        onWayland: info.aboveAppsSupport !== undefined,
+        onWayland: info.aboveAppsSupport !== undefined && info.aboveAppsSupport !== "no-compositor",
       };
     },
     (state) => {
@@ -712,16 +722,20 @@ function WindowAgentDock(props: { serverId: string }) {
   const channels = useChannels();
   const { openAppSettings } = useSettings();
   const dock = createServerDock(props.serverId, { readWhenHidden: false });
+  const media = useDesktopMediaApproval();
   const voice = createAgentDockVoice(() => props.serverId);
+  const openTakeoverPage = useTakeoverPageOpener((agentId) => dock.mainTabOf(agentId));
   const answers: AgentDockChatAnswers = {
     approval: (approval, decision) => dock.respondToApproval(approval.agentId, approval.requestId, decision),
     prompt: (prompt, values) => dock.answerPrompt(prompt.agentId, prompt.threadId, prompt.requestId, values),
     takeover: ({ request }, decision) =>
       dock.respondToTakeover(request.agentId, request.threadId, request.requestId, decision),
     takeoverDone: ({ request }) => props.serverId === LOCAL_SERVER_ID || request.reason !== "sign-in-blocked",
+    openTakeover: ({ request }) => openTakeoverPage(request.agentId, request.tabId),
     secret: (_takeover, input) => agentDockPort().agent.respondToBrowserSecret(input, props.serverId),
     usageLimitSend: (limit, option, remember) => dock.sendOnBackup(limit.agentId, option.key, remember),
     usageLimitWait: (limit) => dock.waitForReset(limit.agentId),
+    media,
   };
 
   return (
@@ -761,6 +775,7 @@ function ScreenAgentDock(props: { serverId: string }) {
   const { openAppSettings } = useSettings();
   const preference = useAgentDockPreference();
   const dock = createServerDock(props.serverId, { readWhenHidden: true });
+  const openTakeoverPage = useTakeoverPageOpener((agentId) => dock.mainTabOf(agentId));
 
   const presentation = createMemo(
     (): AgentDockPresentation => ({
@@ -854,6 +869,9 @@ function ScreenAgentDock(props: { serverId: string }) {
           return;
         case "open-agent":
           selectAgent(action.agentId, dock.mainTabOf(action.agentId));
+          return;
+        case "open-browser-takeover":
+          openTakeoverPage(action.agentId, action.tabId);
           return;
         case "open-channel":
           void channels.open(action.channelId);

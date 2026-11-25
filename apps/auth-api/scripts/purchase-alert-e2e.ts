@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { CREDIT_METADATA, CREDIT_METADATA_KIND } from "@openbot/contracts/credits";
 import { licensePeriodAmount } from "@openbot/contracts/license";
 import { Effect } from "effect";
 import { createHostedBilling } from "../src/server/hosted-billing";
@@ -15,6 +16,7 @@ const ALERT_URL = "https://alerts.example/webhook";
 const WEBHOOK_SECRET = "whsec_test";
 const SERVER_BUYER = { id: "server-buyer", email: "server.buyer@example.test" };
 const LICENSE_BUYER = { id: "license-buyer", email: "license.buyer@example.test" };
+const CREDIT_BUYER = { id: "credit-buyer", email: "credit.buyer@example.test" };
 const SERVER_ID = "0b0f6f0e-6f0f-4a55-9a51-2f5a4e7b8c01";
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
@@ -26,7 +28,7 @@ function migratedDatabase(): DatabaseSync {
   const database = new DatabaseSync(":memory:");
   database.exec("PRAGMA foreign_keys = ON");
   for (const name of readdirSync(MIGRATIONS).sort()) database.exec(readFileSync(join(MIGRATIONS, name), "utf8"));
-  for (const user of [SERVER_BUYER, LICENSE_BUYER]) {
+  for (const user of [SERVER_BUYER, LICENSE_BUYER, CREDIT_BUYER]) {
     database
       .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
       .run(user.id, `email:${user.email}`, user.email);
@@ -132,11 +134,7 @@ async function run(alertUrl: string | undefined) {
   );
   if (!billing) throw new Error("Billing is off.");
   let sent = 0;
-  const deliver = async (
-    type: string,
-    object: { id: string; subscription?: string; amount_paid?: number; currency?: string },
-    eventId?: string,
-  ) => {
+  const deliver = async (type: string, object: { id: string; [key: string]: unknown }, eventId?: string) => {
     sent += 1;
     const created = Math.floor(Date.now() / 1000);
     const payload = JSON.stringify({ id: eventId ?? `evt_${sent}`, type, created, data: { object } });
@@ -262,6 +260,30 @@ async function purchasesAlertTheOperator() {
     alerts.length === 9 &&
       alerts[7] === `🚪 **Cancelled** ${licenseTerms} · ends 2027-01-31` &&
       alerts[8] === `⛔ **Ended** ${licenseTerms} · not paid`,
+    alerts,
+  );
+
+  await deliver(
+    "checkout.session.completed",
+    {
+      id: "cs_credit",
+      mode: "payment",
+      payment_status: "paid",
+      payment_intent: "pi_credit",
+      amount_total: 1000,
+      currency: "eur",
+      metadata: {
+        [CREDIT_METADATA.kind]: CREDIT_METADATA_KIND,
+        [CREDIT_METADATA.userId]: CREDIT_BUYER.id,
+        [CREDIT_METADATA.credits]: "167",
+      },
+    },
+    "evt_credit_purchase",
+  );
+  check(
+    "a credit purchase sends one message with the email, credits and amount",
+    alerts.length === 10 &&
+      alerts[9] === `💳 **Credits purchased** · \`${CREDIT_BUYER.email}\` · 167 credits · €10 · personal wallet`,
     alerts,
   );
 

@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "이 호스트에서는 이벤트를 사용할 수 없어요.",
   "error.backend.databaseIntegrity": "OpenBot 데이터베이스가 무결성 검사에 실패했어요.",
+  "error.backend.creditsHoldAdminOnly": "이 서버의 소유자나 관리자만 에이전트가 크레딧을 사용하도록 허용할 수 있어요.",
+  "error.backend.creditsHoldShort": "크레딧이 아직 충분하지 않아요.",
   "error.backend.webhookRouteLimit": "호스트 하나에는 웹훅 루틴을 최대 {limit}개까지 둘 수 있어요.",
   "error.backend.webhookSettingsInvalid": "웹훅 설정을 확인한 후 다시 시도해 주세요.",
   "error.backend.webhookSenderSecretInvalid":
@@ -54,6 +56,8 @@ export const messages = {
   "error.backend.browserUserControlUnsupported": "이 원격 호스트는 브라우저 탭 제어권 가져오기를 지원하지 않아요.",
   "error.backend.browserSignInUnsupported": "이 원격 호스트는 이 컴퓨터에서 로그인을 받을 수 없어요.",
   "error.backend.browserSignInOpenFailed": "OpenBot이 로그인 창을 열 수 없었어요.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot이 로그인 창에서 페이지를 불러올 수 없었어요. 인터넷 연결을 확인한 다음 로그인 창을 다시 열어 주세요.",
   "error.backend.browserSignInReadFailed": "OpenBot이 창에서 로그인 정보를 읽을 수 없었어요.",
   "error.backend.browserStopUnsupported": "이 원격 호스트는 페이지 로딩을 중지할 수 없어요.",
   "error.backend.sharedDataLocalOnly": "공유 데이터는 이 에이전트를 실행하는 컴퓨터에서 관리해요.",
@@ -65,6 +69,12 @@ export const messages = {
     "압축해도 이 채팅이 작아지지 않아요. 두 번 압축한 뒤에도 모델 컨텍스트 창의 {percent}%를 사용해서 OpenBot이 압축을 멈춰요. 창의 대부분은 도구와 지침이 사용해요. 이 에이전트에 필요 없는 MCP 서버나 컴퓨터 사용을 끄거나, 창이 더 큰 모델을 선택하세요. 그런 다음 새 채팅을 시작하세요.",
   "error.backend.contextCompactionStopped":
     '이 채팅의 압축이 두 번 연속 실패하여 OpenBot이 자동 압축을 중지합니다. 시도할 때마다 채팅 전체가 모델로 전송되어 요금제 한도를 사용합니다. 다시 시도하려면 "지금 압축"을 선택하거나 새 채팅을 시작하세요.',
+  "error.backend.contextCompactionRetrying":
+    "공급자가 이 채팅을 압축하지 못해 다시 시도하고 있습니다. 압축이 끝날 때까지 이 채팅의 새 메시지는 대기합니다. 곧 끝나지 않으면 OpenBot이 압축을 중지하고 메시지를 보냅니다.",
+  "error.backend.contextCompactionFailed":
+    "이 채팅을 압축하지 못했습니다. 채팅은 변경되지 않았습니다. 대기 중인 메시지가 이제 에이전트로 전송됩니다.",
+  "error.backend.contextCompactionTimedOut":
+    "이 채팅의 압축 시간이 너무 오래 걸려 OpenBot이 중지했습니다. 채팅은 변경되지 않았습니다. 대기 중인 메시지가 이제 에이전트로 전송됩니다.",
   "error.backend.providerModelAtCapacity":
     "모델 용량이 가득 찼습니다. 제공업체가 몇 분 후에 다시 시도합니다. 지금 계속하려면 턴을 중지하고 다른 모델을 선택하세요.",
   "error.backend.providerRetrying":
@@ -105,6 +115,14 @@ export const messages = {
   "error.backend.channelRoutingFailed": "라우팅에 실패했어요. 멤버를 선택하거나 다시 시도해 주세요.",
   "error.backend.channelLeadTimedOut": "채널 리더가 제시간에 답하지 않았어요. 멤버를 선택하거나 다시 시도해 주세요.",
   "error.backend.channelLeadFailed": "채널 리더가 이 메시지를 전달하지 못했어요. 멤버를 선택하거나 다시 시도해 주세요.",
+  "error.backend.channelLeadBusy": "채널 리더의 모델이 지금 바빠요. 몇 분 뒤에 다시 시도하거나 멤버를 선택해 주세요.",
+  "error.backend.channelLeadOffline": "채널 리더의 모델 연결이 끊겼어요. 다시 시도하거나 멤버를 선택해 주세요.",
+  "error.backend.channelLeadSignIn":
+    "채널 리더의 제공업체 로그인이 만료되었어요. 다시 로그인하거나 멤버를 선택해 주세요.",
+  "error.backend.channelLeadModelGone":
+    "채널 리더의 모델을 사용할 수 없어요. 리더에게 다른 모델을 고르거나 멤버를 선택해 주세요.",
+  "error.backend.channelLeadRefused":
+    "채널 리더의 모델이 이 요청을 거부했어요. 멤버를 선택하거나 리더에게 다른 모델을 골라 주세요.",
   "error.backend.channelRequestMemberRequired": "이 요청을 맡을 멤버를 선택하세요.",
   "error.backend.channelDeliveryNotCreated": "채널 전달이 만들어지지 않았어요.",
   "error.backend.channelAssignmentStopped": "이 채널 배정은 중지되었거나 다른 배정으로 바뀌었어요.",
@@ -282,7 +300,11 @@ export const messages = {
     "로그인 서버가 OpenBot이 읽을 수 없는 응답을 보냈어요. 서비스에서 API 키나 토큰을 제공한다면 이 서버의 설정에 추가한 후 다시 연결을 테스트해 주세요.",
   "error.backend.mcpServerExited": "서버가 응답하기 전에 중지되었어요. 터미널에서 명령을 실행해 오류를 확인하세요.",
   "error.backend.mcpServerExitedWithOutput": "서버가 응답하기 전에 중지되었어요. 출력: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "다운로드에 실패해서 서버가 시작되지 않았어요. 인터넷 연결을 확인한 다음 다시 시도하세요.",
   "error.backend.mcpServerFailedToStart": "서버가 시작되지 않았어요: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot을 실행하는 컴퓨터에 MCP 서버 {name}의 프로그램이 설치되어 있지 않아서 OpenBot이 시작할 수 없었어요. 그 컴퓨터에 {name}을(를) 제공하는 앱을 설치하거나, 마켓플레이스, 앱에서 {name}을(를) 끄세요.",
   "error.backend.mcpServerStartAbandoned":
     "서버가 시작되기 전에 {provider}가 기다리기를 멈췄어요. 그래서 {provider} 에이전트는 이 서버의 도구를 받지 못해요.",
   "error.backend.mcpServerStoppedDuringCall": "MCP 서버가 이 호출에 응답하기 전에 멈췄어요.",
@@ -407,6 +429,8 @@ export const messages = {
   "error.backend.browserCertificateUntrusted": "이 사이트의 보안 인증서를 신뢰할 수 없어 페이지를 열지 못했어요.",
   "error.backend.browserLowMemory":
     "이 서버의 메모리가 부족해서 브라우저에서 탭을 더 열 수 없어요. 탭을 닫거나 다른 에이전트가 끝날 때까지 기다리세요.",
+  "error.backend.browserNoMemory":
+    "이 서버의 메모리가 거의 없어서 지금은 브라우저에서 탭을 열 수 없어요. 다른 에이전트가 끝난 뒤 다시 시도하세요.",
   "error.backend.browserOpenFailed": "{url}을(를) 열 수 없어요: {reason}",
   "error.backend.popupSecureInput":
     "보안 입력 중에는 팝업이 차단돼요. 보안 입력을 마치거나 취소한 후 페이지에서 다시 시도하세요.",

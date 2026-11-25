@@ -1,6 +1,11 @@
 import type { ProviderLogoVariant } from "@openbot/brand";
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
-import { isAgentProviderRef, WORKFLOW_STEP_NAME_FIELD } from "@openbot/contracts/ipc";
+import {
+  isAgentProviderRef,
+  parseWorkflowAnswerSpec,
+  WORKFLOW_ANSWER_FIELD,
+  WORKFLOW_STEP_NAME_FIELD,
+} from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Button,
@@ -67,6 +72,33 @@ export type NoteTone = "yellow" | "orange" | "red" | "pink" | "blue" | "teal" | 
 export type CanvasColor = "ink" | NoteTone;
 export type ShapeKind = "rectangle" | "circle" | "diamond" | "triangle" | "inverted" | "oval" | "star";
 type BlockKind = "trigger" | "condition" | "output" | "approval" | "note" | "shape";
+
+const readClock = () => ({ wall: Date.now(), mono: performance.now() });
+
+function createSharedClock(intervalMs: number) {
+  const [now, setNow] = createSignal(readClock());
+  let users = 0;
+  let timer: ReturnType<typeof setInterval> | undefined;
+  const subscribe = () => {
+    users += 1;
+    setNow(readClock());
+    if (users === 1) timer = setInterval(() => setNow(readClock()), intervalMs);
+    return () => {
+      users -= 1;
+      if (users !== 0 || timer === undefined) return;
+      clearInterval(timer);
+      timer = undefined;
+    };
+  };
+  const read = () => {
+    const value = now();
+    return users === 0 ? readClock() : value;
+  };
+  return { now: read, subscribe };
+}
+
+const runTimeClock = createSharedClock(100);
+const workflowClock = createSharedClock(250);
 
 export function PortIcon(props: { type: WfnPortType }) {
   return (
@@ -141,7 +173,13 @@ export function Toolbar(props: { id: string; children: JSX.Element }) {
   onSettled(() => {
     const target = element;
     if (!target) return;
-    const observer = new ResizeObserver(() => setBar({ width: target.offsetWidth, height: target.offsetHeight }));
+    const observer = new ResizeObserver(() => {
+      const width = target.offsetWidth;
+      const height = target.offsetHeight;
+      const previous = bar();
+      if (previous?.width === width && previous.height === height) return;
+      setBar({ width, height });
+    });
     observer.observe(target);
     return () => observer.disconnect();
   });
@@ -514,31 +552,22 @@ function StepName(props: { id: string; kind: string }) {
 function RunTime(props: { id: string }) {
   const board = useBoard();
   const { t, format } = useText();
-  const [clock, setClock] = createStore({ ms: 0, done: false });
+  const [clock, setClock] = createStore<{ startMs: number | undefined; finishedMs: number; done: boolean }>({
+    startMs: undefined,
+    finishedMs: 0,
+    done: false,
+  });
   let start = 0;
   createEffect(
     () => board.status(props.id),
     (status, before) => {
       if (status === "running") {
         start = performance.now();
-        setClock((draft) => {
-          draft.ms = 0;
-          draft.done = false;
-        });
-        const timer = setInterval(
-          () =>
-            setClock((draft) => {
-              draft.ms = performance.now() - start;
-            }),
-          100,
-        );
-        return () => clearInterval(timer);
+        setClock(() => ({ startMs: start, finishedMs: 0, done: false }));
+        return runTimeClock.subscribe();
       }
       if (status === "done" && before === "running") {
-        setClock((draft) => {
-          draft.ms = performance.now() - start;
-          draft.done = true;
-        });
+        setClock(() => ({ startMs: start, finishedMs: performance.now() - start, done: true }));
         const timer = setTimeout(
           () =>
             setClock((draft) => {
@@ -554,6 +583,11 @@ function RunTime(props: { id: string }) {
       return undefined;
     },
   );
+  const elapsedMs = () => {
+    if (clock.done) return clock.finishedMs;
+    const startMs = clock.startMs;
+    return startMs === undefined ? 0 : Math.max(0, runTimeClock.now().mono - startMs);
+  };
   return (
     <Show
       when={board.status(props.id) === "running" || clock.done}
@@ -571,7 +605,10 @@ function RunTime(props: { id: string }) {
           <CircleCheck aria-hidden="true" />
         </Show>
         {t("workflow.node.runTime", {
-          seconds: format.number(clock.ms / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+          seconds: format.number(elapsedMs() / 1000, {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1,
+          }),
         })}
       </span>
     </Show>
@@ -584,6 +621,12 @@ export function ResultField(props: { id: string; running: boolean }) {
   const value = () => resultValue(board.shown(props.id)) ?? "";
   const failure = () => resultFailure(board, props.id);
   const live = () => (props.running ? board.progress(props.id) : undefined);
+  const answer = () => {
+    const text = value();
+    const spec = board.field(props.id, WORKFLOW_ANSWER_FIELD);
+    const givesAnswer = typeof spec === "string" && parseWorkflowAnswerSpec(spec).fields.length > 0;
+    return text && givesAnswer ? answerEntries(t, text) : undefined;
+  };
   return (
     <Show when={value() || failure() || props.running}>
       <Field class="wfn-field-result">
@@ -601,7 +644,20 @@ export function ResultField(props: { id: string; running: boolean }) {
         </div>
         <div class="wfn-result-body" data-running={props.running ? "" : undefined} data-live={live() ? "" : undefined}>
           <Show when={value() || failure()}>
-            <p data-failed={value() ? undefined : ""}>{value() || failure()}</p>
+            <p data-failed={value() ? undefined : ""}>
+              <Show when={answer()} fallback={value() || failure()}>
+                {(entries) => (
+                  <For each={entries()}>
+                    {(entry) => (
+                      <span class="wfn-result-answer">
+                        <span class="wfn-result-answer-name">{entry.name}</span>
+                        <span class="wfn-result-answer-value">{entry.text}</span>
+                      </span>
+                    )}
+                  </For>
+                )}
+              </Show>
+            </p>
           </Show>
           <Show when={props.running}>
             <ResultPending />
@@ -611,6 +667,31 @@ export function ResultField(props: { id: string; running: boolean }) {
       </Field>
     </Show>
   );
+}
+
+type AnswerEntry = { name: string; text: string };
+
+function answerEntries(t: AppTranslate, value: string): AnswerEntry[] | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+  const entries = Object.entries(parsed).flatMap(([name, item]) => {
+    const text = answerText(t, item);
+    return text ? [{ name, text }] : [];
+  });
+  return entries.length > 0 ? entries : undefined;
+}
+
+function answerText(t: AppTranslate, value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (typeof value === "boolean") return value ? t("workflow.node.result.yes") : t("workflow.node.result.no");
+  if (Array.isArray(value)) return value.map((item) => answerText(t, item)).join("\n");
+  return value === null || value === undefined ? "" : JSON.stringify(value);
 }
 
 function resultFailure(board: WfnBoard, id: string): string | undefined {
@@ -829,29 +910,31 @@ function PendingTake(props: { number: number; since: string; current: boolean; o
 export const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
 export function useElapsed(running: () => boolean) {
-  const [now, setNow] = createSignal(0);
-  let start = 0;
+  const [span, setSpan] = createSignal<{ start: number; end: number | undefined }>();
   createEffect(running, (on) => {
-    if (!on) return;
-    start = performance.now();
-    setNow(start);
-    const timer = setInterval(() => setNow(performance.now()), 250);
-    return () => clearInterval(timer);
+    if (!on) {
+      setSpan((current) => current && { start: current.start, end: untrack(() => workflowClock.now().mono) });
+      return;
+    }
+    setSpan({ start: performance.now(), end: undefined });
+    return workflowClock.subscribe();
   });
-  return () => Math.max(0, Math.floor((now() - start) / 1000));
+  return () => {
+    const current = span();
+    if (!current) return 0;
+    const end = current.end ?? workflowClock.now().mono;
+    return Math.max(0, Math.floor((end - current.start) / 1000));
+  };
 }
 
 export function useSince(since: () => string | undefined) {
-  const [now, setNow] = createSignal(Date.now());
   createEffect(since, (at) => {
     if (at === undefined) return;
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(timer);
+    return workflowClock.subscribe();
   });
   return () => {
     const at = since();
-    return at === undefined ? undefined : Math.max(0, Math.floor((now() - Date.parse(at)) / 1000));
+    return at === undefined ? undefined : Math.max(0, Math.floor((workflowClock.now().wall - Date.parse(at)) / 1000));
   };
 }
 

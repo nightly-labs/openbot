@@ -62,6 +62,7 @@ export const messages = {
     other: "Можно добавить не больше {count} папки",
   },
   "agentSettings.folders.browse.places": "Перейти",
+  "agentSettings.folders.browse.path": "Путь к папке",
   "agentSettings.folders.browse.home": "Домашняя папка",
   "agentSettings.folders.browse.parent": "Вверх: {folder}",
   "agentSettings.folders.browse.failed": "Не удалось открыть эту папку.",
@@ -117,6 +118,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Лимит использования исчерпан · пропущена",
   "agentSettings.backupModels.unavailable": "Сейчас недоступна · пропущена",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Если лимит использования остановит {name} после начала работы, {name} продолжит ту же работу на первой доступной модели из списка. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
   "agentSettings.groups.brain": "Мозг",
@@ -207,6 +209,7 @@ export const messages = {
     "Агент начнёт заново, но при необходимости найдёт сообщения этого чата. Сообщения останутся видны над разделителем. Инструкции, модель, инструменты, память, рабочее пространство и браузер не изменятся.",
   "agentSettings.newChat.confirm": "Начать новый чат",
   "agentSettings.newChat.failed": "Не удалось начать новый чат.",
+  "agentSettings.newChat.busy": "Агент работает. Чтобы начать новый чат, дождитесь окончания или остановите агента.",
   "agentSettings.deleteHistory.title": "Удалить историю",
   "agentSettings.deleteHistory.description":
     "Сообщения этого чата удаляются, и агент их забывает. Его настройки остаются.",
@@ -216,6 +219,10 @@ export const messages = {
     "Все сообщения и файлы этого чата будут удалены из OpenBot, и агент их забудет. Это нельзя отменить. Побочные ветки, инструкции, модель, инструменты, воспоминания, рабочая папка и браузер не изменятся.",
   "agentSettings.deleteHistory.confirm": "Удалить историю",
   "agentSettings.deleteHistory.failed": "Не удалось удалить историю.",
+  "agentSettings.deleteAgent.title": "Удалить агента",
+  "agentSettings.deleteAgent.description":
+    "Агент, его чат, память, регулярные задачи и рабочее пространство удаляются из OpenBot.",
+  "agentSettings.deleteAgent.button": "Удалить",
 
   "agentSettings.fullAccess.title": "Дать этому агенту полный доступ?",
   "agentSettings.fullAccess.askTitle": "Разрешить этому агенту работать за пределами рабочего пространства?",

@@ -96,6 +96,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "{host}에서 {name} 로그인을 시작하는 중…",
   "provider.codeLogin.pageOpening": "{host}에서 {name} 로그인 페이지를 여는 중…",
   "provider.codeLogin.linkStep": "{name}에 로그인하세요. OpenBot이 알아서 이어서 진행해요.",
+  "provider.codeLogin.thisComputerDescription": "이 컴퓨터의 브라우저에서 이 링크를 여세요. OpenBot이 여기서 기다려요.",
+  "provider.codeLogin.copyLink": "링크 복사",
   "provider.codeLogin.chatgptDeviceSetting":
     "컴퓨터의 ChatGPT에서 보안 설정을 열고 Codex용 기기 코드 로그인을 켜세요. 회사 계정은 워크스페이스 관리자가 켜요.",
 
@@ -146,6 +148,7 @@ export const messages = {
   "provider.picker.effort": "강도",
   "provider.picker.effortLabel": "에이전트 추론 강도",
   "provider.picker.effortFixed": "{effort} ({provider}에서 고정)",
+  "provider.picker.effortLimited": "Claude 설정이나 조직에서 추론 강도를 {effort}(으)로 제한했어요.",
   "provider.picker.fast": "빠르게",
   "provider.picker.fastText": "더 빠른 응답, 사용량 증가",
   "provider.picker.speed": "속도",

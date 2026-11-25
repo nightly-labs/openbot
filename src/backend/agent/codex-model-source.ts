@@ -50,6 +50,31 @@ function codexStartSettings(config: unknown, timeoutMs: number) {
   );
 }
 
+const OPENAI_HOSTS: ReadonlySet<string> = new Set(["api.openai.com", "chatgpt.com"]);
+
+function codexRouteBaseUrl(config: unknown): string | null | undefined {
+  const providerId = getString(config, "model_provider")?.trim() || OPENAI_PROVIDER_ID;
+  if (providerId === OPENAI_PROVIDER_ID) return getString(config, "openai_base_url")?.trim() || null;
+  const provider = getRecord(getRecord(config, "model_providers"), providerId);
+  return provider ? getString(provider, "base_url")?.trim() || null : undefined;
+}
+
+function codexRoutesToOpenai(config: unknown): boolean {
+  const baseUrl = codexRouteBaseUrl(config);
+  if (baseUrl === undefined) return false;
+  if (baseUrl === null) return true;
+  const url = URL.parse(baseUrl);
+  return url?.protocol === "https:" && OPENAI_HOSTS.has(url.hostname);
+}
+
+export const readCodexRoutesToOpenai = Effect.fn("Agent.readCodexRoutesToOpenai")(function* (
+  client: AgentClient,
+  timeoutMs: number,
+) {
+  const response = yield* client.request("config/read", { includeLayers: false }, decodeRecordResponse, timeoutMs);
+  return codexRoutesToOpenai(getRecord(response, "config"));
+});
+
 export const readCodexModelSource = Effect.fn("Agent.readCodexModelSource")(function* (
   client: AgentClient,
   timeoutMs: number,

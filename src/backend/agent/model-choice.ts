@@ -114,6 +114,22 @@ export function startingChoice(
   return null;
 }
 
+export function runnableStartingChoice(
+  models: AgentModelOption[],
+  preference: ProviderPreference,
+  providers: readonly AgentProviderStatus[],
+  context: { developmentDefaults: boolean; providerAvailable: (provider: AgentProvider) => boolean },
+): ModelChoice | null {
+  const starting = startingChoice(models, preference, context);
+  if (!starting || providerCanRun(starting.provider, providers)) return starting;
+  for (const provider of PICKER_PROVIDERS) {
+    if (provider === starting.provider || !context.providerAvailable(provider)) continue;
+    const model = startingModel(provider, models, preference);
+    if (model) return { provider, model };
+  }
+  return starting;
+}
+
 export function workflowProvider(
   starting: AgentProvider,
   preference: ProviderPreference,

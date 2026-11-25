@@ -210,7 +210,7 @@ export class UsageLimitGate {
       notOffered: notOffered || previous?.notOffered === true,
       timer: this.#armFailure(key, endsAt),
     });
-    if (dropped) this.#wakeReturning(key);
+    if (dropped) this.#wakeReturning(provider, turnModel);
     this.#hooks.emitRuntimeSnapshot();
   }
 
@@ -293,7 +293,7 @@ export class UsageLimitGate {
     else if (limit.resetsAt === null) limit.readBlind = false;
     this.#limits.set(key, limit);
     this.#arm(key, limit);
-    if (dropped) this.#wakeReturning(key);
+    if (dropped) this.#wakeReturning(provider, turnModel);
     yield* this.#hooks.held(this.#heldAgents(limit).map((held) => held.id));
     this.#hooks.emitRuntimeSnapshot();
     if (limit.resetsAt !== null) {
@@ -495,7 +495,7 @@ export class UsageLimitGate {
         () => this.#readReturn(key, limit, hold),
         Math.max(0, Math.min(untilReset, USAGE_LIMIT_RECHECK_MS)),
       );
-      if (waited) this.#wakeReturning(key);
+      if (waited) this.#wakeReturning(limit.provider, limit.model);
       return;
     }
     this.#forgetReturnHold(key);
@@ -511,11 +511,10 @@ export class UsageLimitGate {
     return true;
   }
 
-  #wakeReturning(key: string): void {
+  #wakeReturning(provider: AgentProvider, model: string): void {
     for (const agent of this.#store.list()) {
       const returnTo = agent.usageLimitReturn;
-      if (returnTo && limitKey(returnTo.provider, accountOf(returnTo), returnTo.model) === key)
-        this.#hooks.scheduleDrain(agent.id);
+      if (returnTo?.provider === provider && returnTo.model === model) this.#hooks.scheduleDrain(agent.id);
     }
   }
 

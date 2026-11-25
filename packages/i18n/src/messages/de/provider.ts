@@ -101,6 +101,9 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Die Anmeldung bei {name} wird auf {host} gestartet…",
   "provider.codeLogin.pageOpening": "Die Anmeldeseite von {name} wird auf {host} geöffnet…",
   "provider.codeLogin.linkStep": "Melde dich bei {name} an. OpenBot fährt automatisch fort.",
+  "provider.codeLogin.thisComputerDescription":
+    "Öffne diesen Link in einem Browser auf diesem Computer. OpenBot wartet hier.",
+  "provider.codeLogin.copyLink": "Link kopieren",
   "provider.codeLogin.chatgptDeviceSetting":
     "Öffne ChatGPT auf einem Computer, gehe zu den Sicherheitseinstellungen und aktiviere die Anmeldung per Gerätecode für Codex. Bei einem Arbeitskonto aktiviert sie der Admin deines Workspace.",
   "provider.useApp.title": "{name} in der OpenBot-App verbinden",
@@ -149,6 +152,8 @@ export const messages = {
   "provider.picker.effort": "Aufwand",
   "provider.picker.effortLabel": "Denkaufwand des Agenten",
   "provider.picker.effortFixed": "{effort}, festgelegt von {provider}",
+  "provider.picker.effortLimited":
+    "Deine Claude-Einstellungen oder deine Organisation begrenzen den Aufwand auf {effort}.",
   "provider.picker.fast": "Schnell",
   "provider.picker.fastText": "Schnellere Antworten, höhere Nutzung",
   "provider.picker.speed": "Geschwindigkeit",

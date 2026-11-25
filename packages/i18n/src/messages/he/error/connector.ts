@@ -40,6 +40,8 @@ export const messages = {
     "OpenBot לא הצליח להתחבר ל-1Password. יש לבדוק את החיבור לאינטרנט ולנסות שוב.",
   "error.connector.onePasswordRateLimited": "1Password קיבל יותר מדי בקשות. יש להמתין כמה דקות ולנסות שוב.",
   "error.connector.onePasswordNoVault": "חשבון השירות לא יכול לקרוא אף כספת. יש לתת לו גישה לכספת ולנסות שוב.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot לא יכול לקרוא את פרטי ההתחברות שלך ב-1Password. יש לנתק את 1Password ולחבר אותו שוב.",
   "error.connector.onePasswordFileUnreadable": "קובץ החיבור ל-1Password אינו קריא.",
   "error.connector.onePasswordFileTooLarge": "קובץ החיבור ל-1Password גדול מדי.",
   "error.connector.bitwardenFailed":
@@ -52,6 +54,10 @@ export const messages = {
     "יש להזין כתובת שרת HTTPS, את client_id ו-client_secret של מפתח ה-API ואת הסיסמה הראשית.",
   "error.connector.bitwardenHostFailed":
     "לא ניתן לפתוח את Bitwarden בשרת הזה. יש לבדוק את כתובת השרת, את מפתח ה-API ואת הסיסמה הראשית, ולוודא שתיקייה אחת נקראת Shared with OpenBot. לאחר מכן יש להתחבר שוב.",
+  "error.connector.bitwardenHostSignInFailed":
+    "לא ניתן להיכנס ל-Bitwarden בשרת הזה. יש לבדוק את כתובת השרת ואת מפתח ה-API ולהתחבר שוב.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "לא ניתן לבטל את הנעילה של Bitwarden בשרת הזה. יש לבדוק את הסיסמה הראשית ולהתחבר שוב.",
   "error.connector.bitwardenCliInstallFailed":
     "לא ניתן להתקין את ה-CLI של Bitwarden בשרת הזה. יש לבדוק את חיבור הרשת שלו ולהתחבר שוב.",
   "error.connector.bitwardenFileUnreadable": "קובץ החיבור ל-Bitwarden אינו קריא.",

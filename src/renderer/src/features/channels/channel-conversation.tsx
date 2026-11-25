@@ -3,10 +3,12 @@ import {
   type AgentApproval,
   type AgentEvent,
   type BrowserTakeoverRequest,
+  type CreditsHoldAction,
   channelBrowserAgent,
 } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
+import type { MediaApprovalControls } from "@openbot/ui/features/conversation/MediaApprovalCard";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo } from "solid-js";
 import { agentMessagesEqual } from "../../app-message-projection";
@@ -18,6 +20,7 @@ import type {
   SendMessageResult,
 } from "../conversation/conversation-types";
 import { readerCanDeleteMessage } from "../conversation/message-delete-access";
+import { speechReading } from "../speech/speech-playback";
 import {
   ChannelAboveComposer,
   ChannelEmptyState,
@@ -145,6 +148,19 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     const current = page();
     return current ? activeChannelRuns(current) : [];
   });
+  const replyView = createMemo(() => ({ messages: page()?.messages ?? [], tasks: page()?.tasks ?? [] }));
+  const voiceAgent = createMemo(() => {
+    const current = page();
+    if (!current) return undefined;
+    const readingId = speechReading()?.messageId;
+    const reader = readingId
+      ? current.messages.find((entry) => entry.id === readingId && entry.author.kind === "agent")?.author.id
+      : undefined;
+    const running = new Set(activeRuns());
+    const worker = current.tasks.findLast((task) => running.has(task.id) && task.ownerAgentId)?.ownerAgentId;
+    const speakerId = reader ?? worker ?? current.channel.leadAgentId ?? current.channel.members[0]?.agentId;
+    return channels.agents().find((agent) => agent.id === speakerId);
+  });
 
   let settingsNonce = 0;
   const settingsRequest = createMemo<AgentSettingsRequest | null>((previous) => {
@@ -263,6 +279,8 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
           rowStopping = false;
         });
     },
+    replyView,
+    voiceAgent,
     HeaderTitle: (props) => <ChannelHeaderTitle channelId={channelId} onOpenSettings={props.onOpenSettings} />,
     SettingsPane: (props) => (
       <ChannelSettingsPane
@@ -321,6 +339,29 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
       const requestId = approval()?.requestId;
       if (requestId === undefined) return Promise.resolve(false);
       return respond(() => channels.port().agent.respondToApproval({ requestId, decision }));
+    },
+    mediaApproval: {
+      read: (item) => {
+        const read = channels.port().agent.readMediaApproval;
+        return read
+          ? read({ agentId: item.agentId, requestId: item.requestId })
+          : Promise.resolve({ media: null, hold: null });
+      },
+      allow: (item, choice) => {
+        const respondToMedia = channels.port().agent.respondToMediaApproval;
+        if (!respondToMedia) return Promise.resolve(false);
+        return respond(() => respondToMedia({ agentId: item.agentId, requestId: item.requestId, choice }));
+      },
+    } satisfies MediaApprovalControls,
+    creditsHold: {
+      respond: (item: AgentApproval, action: CreditsHoldAction) => {
+        const respondToHold = channels.port().agent.respondToCreditsHold;
+        if (!respondToHold) return Promise.resolve(null);
+        return respondToHold({ agentId: item.agentId, requestId: item.requestId, action });
+      },
+      setMuted: async (muted: boolean) => {
+        await channels.port().agent.setCreditsAskMuted?.({ muted });
+      },
     },
     onRespondToBrowserTakeover: (decision: "complete" | "cancel") => {
       const requestId = browserTakeover()?.requestId;

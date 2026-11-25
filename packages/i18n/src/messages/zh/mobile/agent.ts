@@ -360,6 +360,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "移除 {model}",
   "mobile.agent.backupModels.unavailable": "当前不可用 · 已跳过",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "{name} 开始工作后若因用量上限停止，会用顺序中第一个可用的模型继续同一项工作。额度重置后会回到 {model}；出现服务商错误时，则在 10 分钟后回到 {model}。",
   "mobile.agent.busyMessage.label": "工作期间",
@@ -501,6 +502,7 @@ export const messages = {
   "mobile.agent.usage.collection": "统计自 {started} 开始，最近更新于 {updated}。",
   "mobile.agent.usage.never": "从未",
   "mobile.agent.record.time": "时间",
+  "mobile.agent.record.date": "日期",
   "mobile.agent.section.changeFailed": "无法更改文件夹",
   "mobile.agent.section.tryAgain": "请重试。",
   "mobile.agent.section.moveUp": "上移",
@@ -579,7 +581,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "无法加载你的服务器",
   "mobile.agent.home.serversFailedBody": "请确认桌面应用正在运行，然后重试。",
   "mobile.agent.home.noServers": "没有可用的服务器",
-  "mobile.agent.home.noServersBody": "请重新连接桌面应用，或加入一个远程服务器。",
+  "mobile.agent.home.noServersBody":
+    "请用这个账号打开电脑上的 OpenBot，并在“服务器设置 → 成员”中打开“发布该服务器”。也可以加入一个远程服务器。",
   "mobile.agent.home.chooseServer": "选择服务器",
   "mobile.agent.home.openServers": "打开服务器列表",
   "mobile.agent.home.noChatOpen": "未打开聊天",
@@ -650,6 +653,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "不再排除",
   "mobile.agent.folders.browseTitle": "选择文件夹",
   "mobile.agent.folders.places": "前往",
+  "mobile.agent.folders.path": "文件夹路径",
   "mobile.agent.folders.home": "主文件夹",
   "mobile.agent.folders.parent": "向上：{folder}",
   "mobile.agent.folders.browseFailed": "无法打开此文件夹。",

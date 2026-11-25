@@ -43,7 +43,9 @@ export function AgentModelPickerScreen() {
   }, [request]);
   const words = search.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
   const options = withAccountModels(
-    models.data?.filter((option) => option.provider === request?.provider) ?? [],
+    models.data?.filter(
+      (option) => option.provider === request?.provider && (option.listing !== "kept" || option.id === request?.model),
+    ) ?? [],
     request?.accountModels ?? [],
   );
   const matches = options.filter((option) => {

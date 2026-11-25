@@ -98,6 +98,9 @@ export const messages = {
   "provider.codeLogin.relayStarting": "{host} で {name} のサインインを開始しています…",
   "provider.codeLogin.pageOpening": "{host} で {name} のサインインページを開いています…",
   "provider.codeLogin.linkStep": "{name} にログインします。OpenBot は自動で続行します。",
+  "provider.codeLogin.thisComputerDescription":
+    "このコンピューターのブラウザーでこのリンクを開いてください。OpenBot はここで待機します。",
+  "provider.codeLogin.copyLink": "リンクをコピー",
   "provider.codeLogin.chatgptDeviceSetting":
     "パソコンの ChatGPT でセキュリティ設定を開き、Codex のデバイスコードによるサインインをオンにします。仕事用アカウントでは、ワークスペースの管理者がオンにします。",
   "provider.useApp.title": "OpenBot アプリで {name} に接続",
@@ -147,6 +150,7 @@ export const messages = {
   "provider.picker.effort": "推論の強さ",
   "provider.picker.effortLabel": "エージェントの推論の強さ",
   "provider.picker.effortFixed": "{effort}（{provider} が固定）",
+  "provider.picker.effortLimited": "Claude の設定または組織により、推論の強さは {effort} までに制限されています。",
   "provider.picker.fast": "高速",
   "provider.picker.fastText": "応答が速く、使用量が増えます",
   "provider.picker.speed": "速度",

@@ -51,9 +51,9 @@ import {
 } from "./application-services";
 import { type BackgroundTray, createBackgroundTray } from "./background-tray";
 import { removeClaudeCodeSessionEnvironment } from "./claude-session-environment";
+import { guardConsoleOutput } from "./console-output";
 import { type DeepLink, findDeepLink, parseDeepLink } from "./deep-link-router";
 import { requestNotificationPermission, showRetainedNotification } from "./desktop-notifications";
-import { guardDevelopmentOutput } from "./development-output";
 import {
   developmentUserDataName,
   developmentWorktreeColor,
@@ -151,7 +151,9 @@ import {
   createMainWindowHolder,
   hideWindowsForQuit,
   keepWindowsHidden,
+  openWindowsInBackground,
   showMainWindow,
+  windowsOpenInBackground,
 } from "./main-window";
 import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
 import { MessageLinkRelay, openMessageLink } from "./message-link-relay";
@@ -180,7 +182,7 @@ import { applyServerTimezone, SERVER_TIMEZONE_PREFERENCE_FILE } from "./server-t
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { singleInstanceExitMessage, singleInstanceOwnerPid } from "./single-instance-owner";
-import { StartAttempts, takeForcedStartFailure } from "./start-attempts";
+import { StartAttempts, takeForcedRendererStop, takeForcedStartFailure } from "./start-attempts";
 import { compatiblePreviousRelease, readDatabaseSchemaVersion } from "./start-recovery-release";
 import { openStartRecoveryWindow, type StartRecovery } from "./start-recovery-window";
 import { trustSystemCertificates } from "./system-certificates";
@@ -194,6 +196,9 @@ import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance"
 import { placeWindowButtons } from "./window-buttons";
 import { restartOutsideWindowsPackage } from "./windows-package-restart";
 
+guardConsoleOutput([process.stdout, process.stderr], () => {
+  if (!app.isPackaged) app.quit();
+});
 const logger = createOpenBotLogger("main");
 
 let crashTrace: TraceFile | null = null;
@@ -203,6 +208,7 @@ let startAttempts: StartAttempts | null = null;
 let previousStartHalt: StartHaltRecord | null = null;
 let startHaltExitCode: number | null = null;
 let serverSafeMode: ServerSafeMode | null = null;
+let openStartRecovery: StartRecovery | null = null;
 const SERVER_SAFE_MODE_LIFETIME_MS = 60 * 60 * 1_000;
 process.on("unhandledRejection", (reason) => reportMainProcessFailure("unhandledRejection", reason));
 process.on("uncaughtExceptionMonitor", (error, origin) => reportMainProcessFailure(origin, error));
@@ -274,6 +280,7 @@ const serverMode = takeServerModeEnvironment(process.env, app.isPackaged, proces
 const localServerChildEnvironment = takeLocalServerChildEnvironment(process.env, commandLineUserDataDirectory);
 const localServerChild = serverMode || hostedServer ? null : localServerChildEnvironment;
 const forcedStartFailure = takeForcedStartFailure(process.env, app.isPackaged);
+const forcedRendererStop = takeForcedRendererStop(process.env, app.isPackaged);
 const serverStartGuard =
   serverMode !== null || hostedServer !== null || takeServerStartGuardTest(process.env, app.isPackaged);
 const localServerControl = localServerChild
@@ -283,6 +290,7 @@ const localServerControl = localServerChild
   : null;
 if (serverMode || hostedServer || localServerChild) hideExceptionErrorBox();
 if (serverMode || hostedServer || localServerChild) keepWindowsHidden();
+if (developmentProfile && process.env.OPENBOT_DEV_WINDOW_FOCUS === "background") openWindowsInBackground();
 if (localServerChild && process.platform === "darwin") app.dock?.hide();
 const inviteLinkOptions = {
   allowLocalDevelopmentApiUrl: developmentRemoteRole !== null,
@@ -319,7 +327,8 @@ const systemTimezone =
     ? applyServerTimezone(join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE), process.env)
     : localTimezone;
 app.enableSandbox();
-if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
+if (process.platform === "win32")
+  app.setAppUserModelId(app.isPackaged ? "app.openbot.desktop" : "app.openbot.desktop.dev");
 if (
   app.isPackaged &&
   !(serverMode || hostedServer || localServerChildEnvironment) &&
@@ -416,7 +425,6 @@ configureLinuxGpu({
   server: hostedServer !== null || serverMode !== null,
 });
 const appVariant = readAppVariant(process.env.OPENBOT_APP_VARIANT, app.isPackaged);
-if (!app.isPackaged) guardDevelopmentOutput([process.stdout, process.stderr], () => app.quit());
 const appIconPath = resolveAppIconPath({
   variant: appVariant,
   platform: process.platform,
@@ -578,6 +586,7 @@ const windows = createMainWindowController({
   developmentProfile,
   developmentRemoteRole,
   developmentTestClientEnabled,
+  stopsFirstRenderer: forcedRendererStop === "first-load",
   isQuitting: () => isQuitting,
   keepRunningInBackground: () => services?.appBehavior.keepRunningInBackground ?? false,
   getServices: () => services,
@@ -751,6 +760,8 @@ function registerIpcHandlers({
   promptCacheTtl,
   claudeUserSetup,
   cacheExpiryCompaction,
+  mediaApprovalCredits,
+  creditAsks,
   claudeCompactWindow,
   providerEnvironment,
   modelVisibility,
@@ -796,6 +807,7 @@ function registerIpcHandlers({
   instanceTransfer,
   voice,
   hostVoiceModel,
+  hostSignalHome,
   speech,
   voiceServer,
   dynamicIsland,
@@ -1017,6 +1029,7 @@ function registerIpcHandlers({
       remoteServers,
       serverTimezone,
       voiceModel: hostVoiceModel,
+      signalHome: hostSignalHome,
       hostTurnLimits,
       serverPersonality,
       agentMemoryLimit,
@@ -1027,6 +1040,7 @@ function registerIpcHandlers({
       promptCacheTtl,
       claudeUserSetup,
       cacheExpiryCompaction,
+      mediaApprovalCredits,
       claudeCompactWindow,
       providerEnvironment,
       modelVisibility,
@@ -1102,6 +1116,7 @@ function registerIpcHandlers({
       openExternal: openLink,
       modelVisibility,
       closeChatNotifications,
+      creditAsks,
     }),
     ...browserIpcHandlers({
       browserPictureInPicture,
@@ -1187,8 +1202,12 @@ async function recoverFromStartLoop(): Promise<
     locale,
     translate: translateFor(locale),
     iconPath: appIconPath,
+    showWithoutFocus: windowsOpenInBackground(),
+    stopsRenderer: forcedRendererStop === "recovery",
   });
+  openStartRecovery = recovery;
   const choice = await recovery.choice;
+  openStartRecovery = null;
   logger.info(`Recovery window choice: ${choice}.`);
   return choice === "quit" ? "quit" : recovery;
 }
@@ -1197,7 +1216,7 @@ async function presentApplication(): Promise<void> {
   await ensureMacApplicationPresence(
     process.platform,
     (policy) => app.setActivationPolicy(policy),
-    () => app.dock?.show() ?? Promise.resolve(),
+    () => (windowsOpenInBackground() ? Promise.resolve() : (app.dock?.show() ?? Promise.resolve())),
   );
   await Effect.runPromise(
     installLinuxDesktopEntry({ platform: process.platform, environment: process.env, iconPath: appIconPath }),
@@ -1417,6 +1436,10 @@ if (!hasSingleInstanceLock) {
   app.on("second-instance", (_event, argv) => {
     const deepLink = findDeepLink(argv, inviteLinkOptions);
     if (deepLink) acceptDeepLink(deepLink);
+    if (openStartRecovery) {
+      openStartRecovery.present();
+      return;
+    }
     const window = windowHolder.current;
     const hasMainWindow = Boolean(window && !window.isDestroyed());
     const response = secondLaunchResponse({
@@ -1597,6 +1620,7 @@ if (!hasSingleInstanceLock) {
       });
       service.on("toolUsage", (usage) => built.analytics.handleToolUsage(usage));
       service.on("workflowRun", (end) => built.analytics.handleWorkflowRun(end));
+      service.on("creditMedia", (report) => built.analytics.handleCreditMedia(report));
       service.on("liveVoice", forwardVoiceLiveEvent);
       built.browser.onSiteVisited((visit) => built.analytics.handleSiteVisit(visit));
       sidebarLayout.on("changed", (layout) => forwardAgentEvent("local", { type: "sidebar-layout-changed", layout }));

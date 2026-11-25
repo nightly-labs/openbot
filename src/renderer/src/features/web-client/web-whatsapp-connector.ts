@@ -1,4 +1,5 @@
-import { withWhatsAppStatusReactions, withWhatsAppWorkingMessages } from "@openbot/contracts/ipc";
+import { withWhatsAppReadOnly, withWhatsAppStatusReactions, withWhatsAppWorkingMessages } from "@openbot/contracts/ipc";
+import { WHATSAPP_READ_ONLY_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { runTeamEffect } from "@openbot/team-client";
@@ -12,10 +13,12 @@ import {
   whatsappConnectorGroups,
   whatsappConnectorLinkState,
   whatsappConnectorOverview,
+  whatsappConnectorReadOnly,
   whatsappConnectorReconnect,
   whatsappConnectorRemoveSender,
   whatsappConnectorSetEnabled,
   whatsappConnectorSetOwnNumber,
+  whatsappConnectorSetSenderReadOnly,
   whatsappConnectorSetStatusReactions,
   whatsappConnectorSetWorkingMessage,
   whatsappConnectorStartLink,
@@ -40,11 +43,15 @@ export function webHostWhatsApp(
             whatsappConnectorOverview(target),
             has(WHATSAPP_WORKING_MESSAGE_CAPABILITY) ? whatsappConnectorWorkingMessages(target) : Effect.succeed(null),
             has(WHATSAPP_STATUS_REACTIONS_CAPABILITY) ? whatsappConnectorStatusReactions(target) : Effect.succeed(null),
+            has(WHATSAPP_READ_ONLY_CAPABILITY) ? whatsappConnectorReadOnly(target) : Effect.succeed(null),
           ],
           { concurrency: "unbounded" },
         ).pipe(
-          Effect.map(([overview, workingMessages, statusReactions]) =>
-            withWhatsAppStatusReactions(withWhatsAppWorkingMessages(overview, workingMessages), statusReactions),
+          Effect.map(([overview, workingMessages, statusReactions, readOnly]) =>
+            withWhatsAppReadOnly(
+              withWhatsAppStatusReactions(withWhatsAppWorkingMessages(overview, workingMessages), statusReactions),
+              readOnly,
+            ),
           ),
         ),
       ),
@@ -69,5 +76,7 @@ export function webHostWhatsApp(
       run(serverId, (target) => whatsappConnectorSetWorkingMessage(target, input)),
     hostSetWhatsAppStatusReactions: (input, serverId) =>
       run(serverId, (target) => whatsappConnectorSetStatusReactions(target, input)),
+    hostSetWhatsAppSenderReadOnly: (input, serverId) =>
+      run(serverId, (target) => whatsappConnectorSetSenderReadOnly(target, input)),
   };
 }

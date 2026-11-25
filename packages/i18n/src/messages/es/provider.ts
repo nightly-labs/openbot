@@ -100,6 +100,9 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Empezando el inicio de sesión de {name} en {host}…",
   "provider.codeLogin.pageOpening": "Abriendo la página de inicio de sesión de {name} en {host}…",
   "provider.codeLogin.linkStep": "Inicia sesión en {name}. OpenBot continúa automáticamente.",
+  "provider.codeLogin.thisComputerDescription":
+    "Abre este enlace en un navegador de este ordenador. OpenBot espera aquí.",
+  "provider.codeLogin.copyLink": "Copiar enlace",
   "provider.codeLogin.chatgptDeviceSetting":
     "En ChatGPT en un ordenador, abre la configuración de seguridad y activa el inicio de sesión con código de dispositivo para Codex. En una cuenta de trabajo, lo activa el administrador del espacio de trabajo.",
   "provider.useApp.title": "Conecta {name} en la app de OpenBot",
@@ -148,6 +151,7 @@ export const messages = {
   "provider.picker.effort": "Esfuerzo",
   "provider.picker.effortLabel": "Esfuerzo de razonamiento del agente",
   "provider.picker.effortFixed": "{effort}, fijado por {provider}",
+  "provider.picker.effortLimited": "Tu configuración de Claude o tu organización limitan el esfuerzo a {effort}.",
   "provider.picker.fast": "Rápido",
   "provider.picker.fastText": "Respuestas más rápidas, mayor uso",
   "provider.picker.speed": "Velocidad",

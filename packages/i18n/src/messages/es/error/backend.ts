@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "Los eventos no están disponibles en este host.",
   "error.backend.databaseIntegrity": "La base de datos de OpenBot no superó la comprobación de integridad.",
+  "error.backend.creditsHoldAdminOnly":
+    "Solo un propietario o administrador de este servidor puede permitir que los agentes usen créditos.",
+  "error.backend.creditsHoldShort": "Aún no hay suficientes créditos.",
   "error.backend.webhookRouteLimit": "Un host puede tener un máximo de {limit} rutinas de webhook.",
   "error.backend.webhookSettingsInvalid": "Comprueba los ajustes del webhook e inténtalo de nuevo.",
   "error.backend.webhookSenderSecretInvalid":
@@ -57,6 +60,8 @@ export const messages = {
     "Este host remoto no admite tomar el control de una pestaña del navegador.",
   "error.backend.browserSignInUnsupported": "Este host remoto no puede recibir un inicio de sesión de este equipo.",
   "error.backend.browserSignInOpenFailed": "OpenBot no pudo abrir la ventana de inicio de sesión.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot no pudo cargar la página en la ventana de inicio de sesión. Comprueba la conexión a internet y vuelve a abrir la ventana de inicio de sesión.",
   "error.backend.browserSignInReadFailed": "OpenBot no pudo leer el inicio de sesión de la ventana.",
   "error.backend.browserStopUnsupported": "Este host remoto no puede detener la carga de una página.",
   "error.backend.sharedDataLocalOnly": "Los datos compartidos se gestionan en el equipo que ejecuta estos agentes.",
@@ -68,6 +73,12 @@ export const messages = {
     "La compactación no reduce este chat: tras dos compactaciones aún usa el {percent}% de la ventana de contexto del modelo, así que OpenBot deja de compactarlo. Las herramientas y las instrucciones usan la mayor parte de la ventana. Desactiva los servidores MCP o el uso del ordenador que este agente no necesita, o elige un modelo con una ventana mayor. Después, inicia un chat nuevo.",
   "error.backend.contextCompactionStopped":
     "Dos compactaciones seguidas de este chat fallaron, así que OpenBot deja de compactarlo automáticamente. Cada intento envía todo el chat al modelo y consume el límite de tu plan. Selecciona «Compactar ahora» para intentarlo de nuevo o inicia un chat nuevo.",
+  "error.backend.contextCompactionRetrying":
+    "El proveedor no pudo compactar este chat y lo intenta de nuevo. Los mensajes nuevos de este chat esperan hasta que termine la compactación. Si no termina pronto, OpenBot la detiene y envía tus mensajes.",
+  "error.backend.contextCompactionFailed":
+    "La compactación de este chat falló. El chat no cambió. Los mensajes en espera se envían ahora al agente.",
+  "error.backend.contextCompactionTimedOut":
+    "La compactación de este chat tardó demasiado, así que OpenBot la detuvo. El chat no cambió. Los mensajes en espera se envían ahora al agente.",
   "error.backend.providerModelAtCapacity":
     "El modelo está al límite de su capacidad. El proveedor lo intentará de nuevo en unos minutos. Para continuar ahora, detén el turno y elige otro modelo.",
   "error.backend.providerRetrying":
@@ -113,6 +124,16 @@ export const messages = {
     "El coordinador del canal no respondió a tiempo. Elige un miembro o inténtalo de nuevo.",
   "error.backend.channelLeadFailed":
     "El coordinador del canal no pudo asignar este mensaje. Elige un miembro o inténtalo de nuevo.",
+  "error.backend.channelLeadBusy":
+    "El modelo del coordinador está ocupado. Inténtalo de nuevo en unos minutos o elige un miembro.",
+  "error.backend.channelLeadOffline":
+    "El modelo del coordinador perdió la conexión. Inténtalo de nuevo o elige un miembro.",
+  "error.backend.channelLeadSignIn":
+    "La sesión del proveedor del coordinador expiró. Vuelve a iniciar sesión o elige un miembro.",
+  "error.backend.channelLeadModelGone":
+    "El modelo del coordinador no está disponible. Elige otro modelo para el coordinador o elige un miembro.",
+  "error.backend.channelLeadRefused":
+    "El modelo del coordinador rechazó esta solicitud. Elige un miembro u otro modelo para el coordinador.",
   "error.backend.channelRequestMemberRequired": "Elige un miembro para esta solicitud.",
   "error.backend.channelDeliveryNotCreated": "No se creó la entrega del canal.",
   "error.backend.channelAssignmentStopped": "Esta asignación del canal se detuvo o se reemplazó.",
@@ -302,7 +323,11 @@ export const messages = {
   "error.backend.mcpServerExited":
     "El servidor se detuvo antes de responder. Ejecuta el comando en una terminal para ver su error.",
   "error.backend.mcpServerExitedWithOutput": "El servidor se detuvo antes de responder. Escribió: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "El servidor no se inició porque su descarga falló. Comprueba la conexión a internet y vuelve a intentarlo.",
   "error.backend.mcpServerFailedToStart": "El servidor no se inició: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot no pudo iniciar el servidor MCP {name}, porque su programa no está instalado en el equipo que ejecuta OpenBot. Instala la aplicación que ofrece {name} en ese equipo, o desactiva {name} en Marketplace, Apps.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} dejó de esperar antes de que el servidor se iniciara, así que sus agentes no reciben las herramientas de este servidor.",
   "error.backend.mcpServerStoppedDuringCall": "El servidor MCP se detuvo antes de responder a esta llamada.",
@@ -430,6 +455,8 @@ export const messages = {
     "El certificado de seguridad de este sitio no es de confianza, así que la página no se abrió.",
   "error.backend.browserLowMemory":
     "Este servidor tiene poca memoria disponible, por lo que el navegador no puede abrir otra pestaña. Cierra una pestaña o espera a que terminen otros agentes.",
+  "error.backend.browserNoMemory":
+    "Este servidor casi no tiene memoria libre, por lo que el navegador no puede abrir una pestaña ahora. Espera a que terminen otros agentes y vuelve a intentarlo.",
   "error.backend.browserOpenFailed": "No se pudo abrir {url}: {reason}",
   "error.backend.popupSecureInput":
     "Las ventanas emergentes están bloqueadas durante la entrada segura. Termina o cancela la entrada segura y vuelve a intentarlo desde la página.",

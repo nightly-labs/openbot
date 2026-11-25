@@ -20,6 +20,8 @@ export const messages = {
     "De tool is niet uitgevoerd. tool_call heeft geen tool met deze naam gevonden. Gebruik de exacte gekwalificeerde naam die tool_search geeft, zoals openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "De tool is niet uitgevoerd. tool_call heeft geen tool met deze naam gevonden. De gekwalificeerde naam is mogelijk {name}. Als dat zo is, stuur de aanroep dan opnieuw met die naam.",
+  "error.agent.toolCallNullValue":
+    "De tool is niet uitgevoerd. {name} heeft bij {paths} een object of een lijst nodig, maar elk van deze lijstitems kwam aan als null. Stuur de aanroep opnieuw en geef elk van deze items als tekenreeks met de JSON ervan.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe heeft geen OpenBot-tool met de naam {names} gevonden. Het beschrijft alleen de OpenBot- en browsertools die openbot.tool_search toont, geen MCP-tools.",
   "error.agent.toolDescribeDiscoveryNames":
@@ -202,6 +204,9 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "Schermopname werkt niet in een gesprek in Slack, Discord of Telegram, omdat andere mensen de bestanden krijgen.",
   "error.agent.screenCaptureDeclined": "De gebruiker heeft deze schermopname niet toegestaan. Er is niets opgenomen.",
+  "error.agent.creditMediaDeclined":
+    "De gebruiker heeft deze generatie niet toegestaan. Er zijn geen credits gebruikt.",
+  "error.agent.creditMediaNotSaved": "Het bestand is gemaakt, maar OpenBot kon het niet in de chat opslaan.",
   "error.agent.mcpServerDeclined":
     "De gebruiker heeft deze wijziging van de MCP-server niet toegestaan. Er is niets gewijzigd.",
   "error.agent.mcpToolDeclined": "De gebruiker heeft deze MCP-toolaanroep niet toegestaan. De tool is niet uitgevoerd.",

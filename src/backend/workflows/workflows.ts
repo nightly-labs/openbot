@@ -397,7 +397,10 @@ export function workflowNoticeEvent(event: AgentEvent): boolean {
 
 interface WorkflowsShape {
   list(): Effect.Effect<WorkflowSummary[], WorkflowFailed>;
-  listWithGraphs(): Effect.Effect<{ summary: WorkflowSummary; graph: WorkflowGraph }[], WorkflowFailed>;
+  listWithGraphs(): Effect.Effect<
+    { summary: WorkflowSummary; graph: WorkflowGraph; needsNewerApp?: true }[],
+    WorkflowFailed
+  >;
   get(workflowId: string): Effect.Effect<WorkflowDetail, WorkflowFailed>;
   create(input: CreateWorkflowInput, agentId?: string): Effect.Effect<WorkflowDetail, WorkflowFailed>;
   createCopy(input: CreateWorkflowInput): Effect.Effect<WorkflowDetail, WorkflowFailed>;
@@ -586,6 +589,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             const answer = delivery.turnId ? dependencies.turnAnswer(step.agentId, delivery.turnId) : null;
             const output = answer === null || isNoUpdateAnswer(answer) ? "" : answer;
             if (fields.length === 0) return settle(step, { status: "done", output });
+            const quietAnswer = output === "" ? readGivenAnswer(fields, {}) : null;
+            if (quietAnswer && "output" in quietAnswer)
+              return settle(step, { status: "done", output: quietAnswer.output });
             const read = readAnswer(fields, output);
             if ("output" in read) return settle(step, { status: "done", output: read.output });
             const fix = yield* askAnswerFix(step, step.agentId, step.deliveryId, answerFixAsk(fields, read.problems));
@@ -762,28 +768,30 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 : [];
             const result = empty
               ? Result.fail({ message: sourceText("error.workflow.mediaEmptyRequest") })
-              : !generateMedia || !model
+              : !generateMedia
                 ? Result.fail({ message: sourceText("error.workflow.nodeUnsupported") })
-                : yield* (paysWithCredits(model.provider) ? creditMedia : subscriptionMedia)
-                    .withPermit(
-                      Effect.suspend(() => {
-                        if (model.provider === "openbot") paidMedia.add(step.id);
-                        return generateMedia({
-                          jobId: step.id,
-                          earlierJobIds: earlier,
-                          kind,
-                          provider: model.provider,
-                          model: model.providerModel ?? model.id,
-                          catalogId: model.id,
-                          account: mediaAccount(node.fields),
-                          specs,
-                          prompt: mediaStepPrompt(node.fields, kind, step.input, specs, model.provider),
-                          images,
-                          voice: mediaVoice(node.fields, kind, model),
-                        });
-                      }).pipe(Effect.flatMap(sized(specs))),
-                    )
-                    .pipe(Effect.result);
+                : !model
+                  ? Result.fail({ message: sourceText("error.workflow.modelUnavailable") })
+                  : yield* (paysWithCredits(model.provider) ? creditMedia : subscriptionMedia)
+                      .withPermit(
+                        Effect.suspend(() => {
+                          if (model.provider === "openbot") paidMedia.add(step.id);
+                          return generateMedia({
+                            jobId: step.id,
+                            earlierJobIds: earlier,
+                            kind,
+                            provider: model.provider,
+                            model: model.providerModel ?? model.id,
+                            catalogId: model.id,
+                            account: mediaAccount(node.fields),
+                            specs,
+                            prompt: mediaStepPrompt(node.fields, kind, step.input, specs, model.provider),
+                            images,
+                            voice: mediaVoice(node.fields, kind, model),
+                          });
+                        }).pipe(Effect.flatMap(sized(specs))),
+                      )
+                      .pipe(Effect.result);
             if (Result.isFailure(result)) settle(step, { status: "failed", error: result.failure.message });
             else settle(step, { status: "done", output: result.success });
             yield* requestSweep();
@@ -1482,8 +1490,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             if (run.status === "stopping")
               for (const step of runs.steps(run.id)) if (isOpenStep(step)) yield* stopNow(step);
           }
+          const unreadable = runs.unreadableOpenRunIds();
           for (const step of runs.openSteps()) {
-            if (step.status !== "running") continue;
+            if (step.status !== "running" || (step.runId && unreadable.has(step.runId))) continue;
             let ended = false;
             if (step.kind === "agent") {
               if (!step.deliveryId) {
@@ -1635,6 +1644,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             triggerNodeId: from?.kind === "trigger" ? from.id : null,
             fromNodeId: from && from.kind !== "trigger" ? from.id : null,
           };
+          if (detail.needsNewerApp) return yield* refuse("refused", sourceText("error.workflow.newerSteps"));
           const workflowId = detail.summary.id;
           const answered = currentAnswers(detail.graph, runs.latestDone(workflowId), answerGraphs());
           const scope = runScope(detail.graph, start, new Set(answered.keys()));
@@ -1794,10 +1804,11 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         }) =>
           locked(
             Effect.gen(function* (): Effect.fn.Return<MessagingMentionResult, WorkflowFailed> {
-              const triggers = (yield* attempt(() => store.listWithGraphs())).flatMap(({ summary, graph }) =>
-                summary.paused
-                  ? []
-                  : graph.nodes.filter(chat.matches).map((node) => ({ workflowId: summary.id, node })),
+              const triggers = (yield* attempt(() => store.listWithGraphs())).flatMap(
+                ({ summary, graph, needsNewerApp }) =>
+                  summary.paused || needsNewerApp
+                    ? []
+                    : graph.nodes.filter(chat.matches).map((node) => ({ workflowId: summary.id, node })),
               );
               if (triggers.length === 0) return "none";
               let started = false;
@@ -1871,8 +1882,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         });
 
         const githubTriggers = () =>
-          store.listWithGraphs().flatMap(({ summary, graph }) =>
-            (summary.paused ? [] : graph.nodes).flatMap((node) => {
+          store.listWithGraphs().flatMap(({ summary, graph, needsNewerApp }) =>
+            (summary.paused || needsNewerApp ? [] : graph.nodes).flatMap((node) => {
               const event = node.fields.event;
               return githubTriggerRepositories(node).length > 0 && isOneOf(WORKFLOW_GITHUB_EVENTS, event)
                 ? [{ workflowId: summary.id, node, event }]
@@ -2142,6 +2153,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return yield* locked(
             Effect.gen(function* () {
               const detail = yield* attempt(() => detailOf(input.workflowId));
+              if (detail.needsNewerApp) return yield* refuse("refused", sourceText("error.workflow.newerSteps"));
               const node = detail.graph.nodes.find((candidate) => candidate.id === input.nodeId);
               if (!node) return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
               if (unsupportedNode(node)) return yield* refuse("refused", sourceText("error.workflow.nodeUnsupported"));

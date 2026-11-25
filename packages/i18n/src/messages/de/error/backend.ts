@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "Auf diesem Host sind keine Ereignisse verfügbar.",
   "error.backend.databaseIntegrity": "Die OpenBot-Datenbank hat die Integritätsprüfung nicht bestanden.",
+  "error.backend.creditsHoldAdminOnly":
+    "Nur ein Eigentümer oder Admin dieses Servers kann Agenten erlauben, Credits zu verwenden.",
+  "error.backend.creditsHoldShort": "Es sind noch nicht genug Credits vorhanden.",
   "error.backend.webhookRouteLimit": "Ein Host kann höchstens {limit} Webhook-Routinen haben.",
   "error.backend.webhookSettingsInvalid": "Prüfe die Webhook-Einstellungen und versuche es erneut.",
   "error.backend.webhookSenderSecretInvalid":
@@ -56,6 +59,8 @@ export const messages = {
   "error.backend.browserSignInUnsupported":
     "Dieser entfernte Host kann keine Anmeldung von diesem Computer übernehmen.",
   "error.backend.browserSignInOpenFailed": "OpenBot konnte das Anmeldefenster nicht öffnen.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot konnte die Seite im Anmeldefenster nicht laden. Prüfe die Internetverbindung und öffne das Anmeldefenster dann erneut.",
   "error.backend.browserSignInReadFailed": "OpenBot konnte die Anmeldung im Fenster nicht lesen.",
   "error.backend.browserStopUnsupported": "Dieser entfernte Host kann das Laden einer Seite nicht stoppen.",
   "error.backend.sharedDataLocalOnly":
@@ -68,6 +73,12 @@ export const messages = {
     "Die Komprimierung macht diesen Chat nicht kleiner: Nach zwei Komprimierungen nutzt er noch {percent}% des Kontextfensters des Modells, daher komprimiert OpenBot ihn nicht mehr. Tools und Anweisungen nutzen den größten Teil des Fensters. Schalte die MCP-Server oder die Computersteuerung aus, die dieser Agent nicht braucht, oder wähle ein Modell mit größerem Fenster. Starte dann einen neuen Chat.",
   "error.backend.contextCompactionStopped":
     "Zwei Komprimierungen dieses Chats sind nacheinander fehlgeschlagen, daher komprimiert OpenBot ihn nicht mehr automatisch. Jeder Versuch sendet den ganzen Chat an das Modell und verbraucht dein Planlimit. Wähle „Jetzt komprimieren“, um es erneut zu versuchen, oder starte einen neuen Chat.",
+  "error.backend.contextCompactionRetrying":
+    "Der Anbieter konnte diesen Chat nicht komprimieren und versucht es erneut. Neue Nachrichten in diesem Chat warten, bis die Komprimierung endet. Wenn sie nicht bald endet, stoppt OpenBot sie und sendet deine Nachrichten.",
+  "error.backend.contextCompactionFailed":
+    "Die Komprimierung dieses Chats ist fehlgeschlagen. Der Chat wurde nicht geändert. Wartende Nachrichten gehen jetzt an den Agenten.",
+  "error.backend.contextCompactionTimedOut":
+    "Die Komprimierung dieses Chats hat zu lange gedauert, daher hat OpenBot sie gestoppt. Der Chat wurde nicht geändert. Wartende Nachrichten gehen jetzt an den Agenten.",
   "error.backend.providerModelAtCapacity":
     "Das Modell ist ausgelastet. Der Anbieter versucht es in einigen Minuten erneut. Um sofort weiterzumachen, stoppe den Durchlauf und wähle ein anderes Modell.",
   "error.backend.providerRetrying":
@@ -115,6 +126,16 @@ export const messages = {
     "Die Kanalleitung hat nicht rechtzeitig geantwortet. Wähle ein Mitglied oder versuche es erneut.",
   "error.backend.channelLeadFailed":
     "Die Kanalleitung konnte diese Nachricht nicht zuweisen. Wähle ein Mitglied oder versuche es erneut.",
+  "error.backend.channelLeadBusy":
+    "Das Modell der Kanalleitung ist gerade ausgelastet. Versuche es in ein paar Minuten erneut, oder wähle ein Mitglied.",
+  "error.backend.channelLeadOffline":
+    "Das Modell der Kanalleitung hat die Verbindung verloren. Versuche es erneut, oder wähle ein Mitglied.",
+  "error.backend.channelLeadSignIn":
+    "Die Anmeldung beim Anbieter der Kanalleitung ist abgelaufen. Melde dich erneut an, oder wähle ein Mitglied.",
+  "error.backend.channelLeadModelGone":
+    "Das Modell der Kanalleitung ist nicht verfügbar. Wähle ein anderes Modell für die Leitung, oder wähle ein Mitglied.",
+  "error.backend.channelLeadRefused":
+    "Das Modell der Kanalleitung hat diese Anfrage abgelehnt. Wähle ein Mitglied oder ein anderes Modell für die Leitung.",
   "error.backend.channelRequestMemberRequired": "Wähle ein Mitglied für diese Anfrage.",
   "error.backend.channelDeliveryNotCreated": "Die Kanalzustellung wurde nicht erstellt.",
   "error.backend.channelAssignmentStopped": "Dieser Kanalauftrag wurde gestoppt oder ersetzt.",
@@ -314,7 +335,11 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Der Server wurde beendet, bevor er geantwortet hat. Führe den Befehl in einem Terminal aus, um seinen Fehler zu sehen.",
   "error.backend.mcpServerExitedWithOutput": "Der Server wurde beendet, bevor er geantwortet hat. Er schrieb: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "Der Server ist nicht gestartet, weil sein Download fehlgeschlagen ist. Prüfe die Internetverbindung und versuche es dann erneut.",
   "error.backend.mcpServerFailedToStart": "Der Server ist nicht gestartet: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot konnte den MCP-Server {name} nicht starten, weil sein Programm nicht auf dem Computer installiert ist, auf dem OpenBot läuft. Installiere die App, die {name} bereitstellt, auf diesem Computer, oder schalte {name} unter Marketplace, Apps aus.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} hat nicht mehr gewartet, bevor der Server gestartet ist. Seine Agenten erhalten die Tools dieses Servers daher nicht.",
   "error.backend.mcpServerStoppedDuringCall":
@@ -447,6 +472,8 @@ export const messages = {
     "Das Sicherheitszertifikat dieser Website ist nicht vertrauenswürdig, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserLowMemory":
     "Dieser Server hat wenig freien Arbeitsspeicher. Der Browser kann daher keinen weiteren Tab öffnen. Schließe einen Tab oder warte, bis andere Agenten fertig sind.",
+  "error.backend.browserNoMemory":
+    "Der Arbeitsspeicher dieses Servers ist fast voll. Der Browser kann daher jetzt keinen Tab öffnen. Warte, bis andere Agenten fertig sind, und versuche es dann erneut.",
   "error.backend.browserOpenFailed": "{url} konnte nicht geöffnet werden: {reason}",
   "error.backend.popupSecureInput":
     "Pop-ups sind während der sicheren Eingabe blockiert. Beende die sichere Eingabe oder brich sie ab und versuche es dann erneut auf der Seite.",

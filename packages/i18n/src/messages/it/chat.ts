@@ -68,6 +68,7 @@ export const messages = {
   "chat.trace.duration": "Durata",
   "chat.trace.cost": "Costo",
   "chat.trace.tokens": "Token",
+  "chat.trace.cachedInput": "Input in cache",
   "chat.trace.llmCalls": "Chiamate LLM",
   "chat.trace.toolCalls": "Chiamate a strumenti",
   "chat.trace.errors": "Errori",
@@ -485,6 +486,8 @@ export const messages = {
   "chat.suggestion.updating": "Aggiornamento…",
   "chat.suggestion.saveReply": "Sì, salvalo come skill.",
   "chat.suggestion.updateReply": "Sì, aggiungilo alla skill.",
+  "chat.suggestion.saveFailed":
+    "Non è stato possibile salvare la skill. Riprova quando l'agente ha finito il suo lavoro.",
   "chat.suggestion.detailsNamed": "Apri {name} nel Marketplace",
   "chat.suggestion.dismissed": "Suggerimento {name} ignorato.",
   "chat.suggestion.undo": "Annulla",

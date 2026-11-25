@@ -86,7 +86,9 @@ function receive(link: Extract<LiveActivityLink, { type: "action" }>): void {
 function open(target: OutsideTarget | null, initial: boolean): string | null {
   if (initial || !navigate) {
     unopened = target?.threadId ? target : null;
-    return target === null ? "/" : `/chat/${encodeURIComponent(target.agentId)}`;
+    if (target === null) return "/";
+    const chat = `/chat/${encodeURIComponent(target.agentId)}`;
+    return target.serverId ? `${chat}?serverId=${encodeURIComponent(target.serverId)}` : chat;
   }
   navigate(target);
   return null;

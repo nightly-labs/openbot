@@ -269,6 +269,9 @@ export const messages = {
   "settings.agentDock.xwayland.unsupported":
     "ב-Wayland בלי XWayland, המעגן לא יכול להופיע מעל אפליקציות אחרות. הוא מוצג בחלון OpenBot.",
   "settings.agentDock.xwayland.restart": "הפעלה מחדש",
+  "settings.agentDock.noCompositor.title": "מוצג בחלון OpenBot",
+  "settings.agentDock.noCompositor.description":
+    "שולחן העבודה שלך לא יכול להציג חלונות שקופים, ולכן המעגן מוצג בחלון OpenBot. כדי להציג אותו מעל אפליקציות אחרות, הפעל אפקטים של שולחן העבודה (קומפוזיטור) בהגדרות המערכת, ואז הפעל מחדש את OpenBot.",
   "settings.agentDock.display.title": "תצוגה",
   "settings.agentDock.display.description": "אם התצוגה הזו אינה מחוברת, המעגן עובר לתצוגה של חלון OpenBot.",
   "settings.agentDock.display.window": "עם חלון OpenBot",

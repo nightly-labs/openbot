@@ -427,8 +427,18 @@ export class ModelVisibility {
     return this.#picker(this.#options.listModels()).pipe(
       Effect.map((models) =>
         models.flatMap((model) =>
-          model.listing ? [{ provider: model.provider, id: model.id, listing: model.listing }] : [],
+          model.listing && model.listing !== "kept"
+            ? [{ provider: model.provider, id: model.id, listing: model.listing }]
+            : [],
         ),
+      ),
+    );
+  }
+
+  kept(): Effect.Effect<{ provider: string; id: string }[]> {
+    return this.#picker(this.#options.listModels()).pipe(
+      Effect.map((models) =>
+        models.flatMap((model) => (model.listing === "kept" ? [{ provider: model.provider, id: model.id }] : [])),
       ),
     );
   }
@@ -500,12 +510,11 @@ export class ModelVisibility {
       const picker = pickers.get(model.provider);
       if (!picker) return [model];
       const used = inUse.has(modelKey(model.provider, model.id));
-      if (picker.hidden.has(model.id) && !used) return [];
-      if (picker.byDefault.has(model.id)) {
-        const released = Date.parse(picker.released.get(model.id) ?? "");
-        return now - released < NEW_MODEL_MS ? [{ ...model, listing: "new" }] : [model];
-      }
-      return used ? [model] : [{ ...model, listing: "older" }];
+      if (picker.hidden.has(model.id)) return used ? [{ ...model, listing: "kept" }] : [];
+      if (model.listing === "older" || !picker.byDefault.has(model.id))
+        return used ? [{ ...model, listing: undefined }] : [{ ...model, listing: "older" }];
+      const released = Date.parse(picker.released.get(model.id) ?? "");
+      return now - released < NEW_MODEL_MS ? [{ ...model, listing: "new" }] : [model];
     });
   });
 

@@ -77,6 +77,7 @@ export function MachineUsageSummary({ serverId }: { serverId: string }) {
             key={metric}
             metrics={metrics}
             metric={metric}
+            hostedPlan={planGb !== null}
             onPress={metric === "disk" ? openStorage : undefined}
           />
         ))}
@@ -88,10 +89,12 @@ export function MachineUsageSummary({ serverId }: { serverId: string }) {
 function MachineMetricItem({
   metrics,
   metric,
+  hostedPlan,
   onPress,
 }: {
   metrics: MachineMetrics;
   metric: MachineMetric;
+  hostedPlan: boolean;
   onPress: (() => void) | undefined;
 }) {
   const text = useText();
@@ -99,7 +102,7 @@ function MachineMetricItem({
   const tone = machineMetricTone(percent, machineAlertLevel(DEFAULT_MACHINE_ALERT_SETTINGS, metric));
   const name = text.t(METRIC_LABELS[metric]);
   const percentText = percent === null ? text.t("mobile.server.machine.unknown") : text.format.percent(percent / 100);
-  const detail = metricDetail(metrics, metric, text);
+  const detail = metricDetail(metrics, metric, hostedPlan, text);
   const content = (
     <>
       <MachineMetricRing metric={metric} percent={percent ?? 0} tone={tone} />
@@ -139,7 +142,12 @@ function MachineMetricItem({
   );
 }
 
-function metricDetail(metrics: MachineMetrics, metric: MachineMetric, { t, format }: MobileText): string {
+function metricDetail(
+  metrics: MachineMetrics,
+  metric: MachineMetric,
+  hostedPlan: boolean,
+  { t, format }: MobileText,
+): string {
   if (metric === "cpu") {
     const cores = metrics.cpuMillicores / 1000;
     return t("mobile.server.machine.cores", {
@@ -150,7 +158,8 @@ function metricDetail(metrics: MachineMetrics, metric: MachineMetric, { t, forma
   if (metric === "disk") {
     const { diskUsedBytes: used, diskTotalBytes: total } = metrics;
     if (used === null || total === null) return t("mobile.server.machine.unknown");
-    return t("mobile.server.machine.sizeDetail", { used: format.fileSize(used), total: format.fileSize(total) });
+    const size = hostedPlan ? format.fileSize : format.diskSize;
+    return t("mobile.server.machine.sizeDetail", { used: size(used), total: size(total) });
   }
   const { memoryTotalBytes: total, memoryAvailableBytes: free } = metrics;
   if (total === null || free === null) return t("mobile.server.machine.unknown");

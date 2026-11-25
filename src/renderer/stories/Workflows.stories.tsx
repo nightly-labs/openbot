@@ -1,4 +1,4 @@
-import type { AgentStepActivity, WorkflowStepSettings } from "@openbot/contracts/ipc";
+import type { AgentStepActivity, WorkflowStep, WorkflowStepSettings } from "@openbot/contracts/ipc";
 import { Toaster } from "@openbot/ui";
 import { AgentNode } from "@openbot/ui/features/workflows/WorkflowAgentNode";
 import { ApprovalNode } from "@openbot/ui/features/workflows/WorkflowApprovalNode";
@@ -96,6 +96,66 @@ export const InAppOpening: Story = {
 export const HiggsfieldVideo: Story = {
   name: "Higgsfield video",
   render: () => <WorkflowStory workflows={[higgsfieldVideo()]} features={STORY_ALL_FEATURES} />,
+};
+
+const CONCURRENT_MEDIA_WORKFLOW: StoryWorkflow = {
+  id: "concurrent-media",
+  title: "Concurrent media generation",
+  graph: {
+    nodes: Array.from({ length: 4 }, (_, index) => ({
+      kind: "image" as const,
+      id: `image-${index + 1}`,
+      at: { x: (index % 2) * 520, y: Math.floor(index / 2) * 520 },
+      fields: { prompt: `Generation ${index + 1}`, aspect: "1:1" },
+    })),
+    edges: [],
+    strokes: [],
+  },
+};
+
+const concurrentMediaStartedAt = secondsAgo(30);
+const concurrentMediaSteps: WorkflowStep[] = CONCURRENT_MEDIA_WORKFLOW.graph.nodes.map((node, index) => ({
+  id: `concurrent-media-step-${index + 1}`,
+  workflowId: CONCURRENT_MEDIA_WORKFLOW.id,
+  runId: "concurrent-media-run",
+  nodeId: node.id,
+  attempt: 1,
+  agentId: null,
+  status: "running",
+  output: null,
+  branch: null,
+  error: null,
+  startedAt: concurrentMediaStartedAt,
+  endedAt: null,
+}));
+
+const CONCURRENT_MEDIA_RUNNING: StoryWorkflow = {
+  ...CONCURRENT_MEDIA_WORKFLOW,
+  runs: {
+    runs: [
+      {
+        run: {
+          id: "concurrent-media-run",
+          workflowId: CONCURRENT_MEDIA_WORKFLOW.id,
+          number: 1,
+          triggerNodeId: null,
+          source: "manual",
+          status: "running",
+          error: null,
+          startedAt: concurrentMediaStartedAt,
+          endedAt: null,
+        },
+        steps: concurrentMediaSteps,
+      },
+    ],
+    soloSteps: [],
+    nextBefore: null,
+  },
+};
+
+export const ConcurrentMediaGeneration: Story = {
+  name: "Concurrent media generation",
+  render: () => <WorkflowStory workflows={[CONCURRENT_MEDIA_RUNNING]} features={STORY_ALL_FEATURES} />,
 };
 
 export const ExampleAfterRun: Story = {
@@ -369,6 +429,21 @@ export const VideoCustomLength: Story = {
     >
       <ImageNode id="listed" prompt="A drone shot over a coastal town at sunrise" />
       <ImageNode id="custom" prompt="A drone shot over a coastal town at sunrise" />
+    </NodeGallery>
+  ),
+};
+
+const UNAVAILABLE_VIDEO_MODEL = { id: "openbot-kling-4.0-omni", name: "Kling 4.0 · Omni", kinds: ["video"] } as const;
+
+export const VideoModelUnavailable: Story = {
+  name: "Video, model not available",
+  render: () => (
+    <NodeGallery
+      selected="saved"
+      catalogs={{ ...STORY_CATALOGS, imageModelsReady: true, unavailableModels: [UNAVAILABLE_VIDEO_MODEL] }}
+      fields={{ saved: { media: "video", model: UNAVAILABLE_VIDEO_MODEL.id, aspect: "16:9", duration: 5 } }}
+    >
+      <ImageNode id="saved" prompt="A drone shot over a coastal town at sunrise" />
     </NodeGallery>
   ),
 };

@@ -6,6 +6,7 @@ import {
   type AgentAuthState,
   type AgentModelOption,
   type AgentProviderId,
+  composedCustomModelId,
   customProviderOfModel,
   DEFAULT_PROMPT_CACHE_TTL,
   type KeyOnlyProviderId,
@@ -36,6 +37,7 @@ import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
 import { acpSessionSteers, steerAcpSession } from "./acp-session-steering";
 import type { AcpArgv, AcpExtensionMethod } from "./acp-sign-in";
 import { CODEX_VARIABLE_PROVIDER, readCodexModelSource } from "./agent/codex-model-source";
+import type { ImageFitter } from "./agent/image-reader";
 import { readMuseAccount } from "./agent/muse-login";
 import { claudeModelName, modelsAfterOpenCodeDiscoveryFailure, serviceTierFields } from "./agent/provider-models";
 import type { TurnContext } from "./agent/turn-context";
@@ -68,7 +70,12 @@ import {
 } from "./cli";
 import { clineFreeModels } from "./cline-free-models";
 import { checkCursorApiKey, readCursorUsage } from "./cursor-usage";
-import { CustomAcpAgentsClient, type CustomAgentConfig, type CustomAgentSource } from "./custom-acp-agents-client";
+import {
+  CustomAcpAgentsClient,
+  type CustomAgentConfig,
+  type CustomAgentSource,
+  isDeniedWriteLine,
+} from "./custom-acp-agents-client";
 import { isMissingFileError } from "./file-errors";
 import { GrokAgentClient } from "./grok-client";
 import { hermesSettingsEnvironment } from "./hermes-settings";
@@ -83,14 +90,21 @@ import { openCodeAgentDefaultsEnv } from "./opencode-agent-defaults";
 import {
   CUSTOM_ENDPOINT_SILENCE_MS,
   type CustomProviderSource,
+  clearedInheritedOpenCodeKeyEnv,
   customProvidersOn,
   OPENCODE_AGENT_CONFIG,
+  OPENCODE_GO_PROVIDER,
   OPENCODE_PROFILE_CONFIG,
   openCodeConfigEnv,
   openCodeModelName,
   openCodeSignInMessage,
 } from "./opencode-config";
-import { hasOpenCodeProviderKey, readOpenCodeGoUsage, readOpenCodeRefusalStatus } from "./opencode-usage";
+import {
+  hasOpenCodeProviderKey,
+  readOpenCodeGoUsage,
+  readOpenCodeRefusalStatus,
+  readOpenCodeStoredKey,
+} from "./opencode-usage";
 import { PiAgentClient } from "./pi-client";
 import {
   antigravityStatePaths,
@@ -121,6 +135,7 @@ import {
   piStatePaths,
   type SpawnTarget,
 } from "./process-confinement";
+import type { ProcessLaunch } from "./process-launch";
 import { type AccountReadResult, isCodexLoginType, type ModelListResponse } from "./protocol";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 
@@ -130,7 +145,7 @@ interface ProviderCliCommand {
   readonly timeoutMs: number;
   readonly closeInput?: true;
   readonly acpLogout?: true | AcpExtensionMethod;
-  readonly windowsPageByOpenBot?: true;
+  readonly pageByOpenBotOn?: readonly NodeJS.Platform[];
   readonly failureText?: (output: string) => string | null;
 }
 
@@ -143,6 +158,11 @@ interface ProviderSignInCommand extends Omit<ProviderCliCommand, "argv" | "env">
   readonly pipedInput?: true;
 }
 
+interface ProviderAccountCodeCommand extends Omit<ProviderCliCommand, "argv"> {
+  readonly argv: AcpArgv;
+  readonly pipedInput?: true;
+}
+
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
 
 const CURSOR_KEY_ACCOUNTS_MIN_VERSION = "2026.10.01";
@@ -150,7 +170,7 @@ const CURSOR_KEY_ACCOUNTS_MIN_VERSION = "2026.10.01";
 export interface ProviderHomeAccountSupport {
   readonly homeVariable: string;
   readonly signIn: ProviderCliCommand | AcpAuthenticateSignIn;
-  readonly codeSignIn?: { readonly flow: "device" | "paste" | "link"; readonly command: ProviderCliCommand };
+  readonly codeSignIn?: { readonly flow: "device" | "paste" | "link"; readonly command: ProviderAccountCodeCommand };
   readonly signOut?: ProviderCliCommand;
   supports?(cli: AgentCliInfo): boolean;
   readonly usageLeavesSession?: boolean;
@@ -197,7 +217,7 @@ const CLAUDE_SIGN_IN: ProviderCliCommand = {
   argv: ["auth", "login", "--claudeai"],
   env: CLAUDE_COMMAND_ENV,
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
-  windowsPageByOpenBot: true,
+  pageByOpenBotOn: ["win32", "darwin"],
   failureText: claudeSignInFailure,
 };
 
@@ -329,6 +349,13 @@ const ANTIGRAVITY_CODE_SIGN_IN: ProviderSignInCommand = {
   pipedInput: true,
 };
 
+const ANTIGRAVITY_ACCOUNT_CODE_SIGN_IN: ProviderAccountCodeCommand = {
+  argv: (env) => [...antigravityArgv(env), "--login"],
+  env: () => ({ ...ANTIGRAVITY_ENV }),
+  timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+  pipedInput: true,
+};
+
 const CLINE_ARGV: readonly string[] = ["--acp"];
 
 const CLINE_ENV: Readonly<Record<string, string>> = {
@@ -431,10 +458,12 @@ export interface ProviderClientContext {
   readonly customAgents?: CustomAgentSource;
   readonly promptCacheTtl?: () => PromptCacheTtl;
   readonly claudeUserSetup?: () => boolean;
+  readonly launchProcess?: ProcessLaunch;
   readonly claudeCompactWindow?: () => number | null;
   readonly codexTurnContext?: TurnContext;
   readonly providerEnvironment?: (provider: ProviderEnvironmentProvider) => Readonly<Record<string, string>>;
   readonly systemProxyFetch?: (url: string, init: RequestInit) => Promise<Response>;
+  readonly fitImage?: ImageFitter | null;
 }
 
 const CODEX_ADDRESS_VARIABLE = "OPENAI_BASE_URL";
@@ -750,6 +779,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         undefined,
         claudeFallbackApiKey(context),
         context.claudeUserSetup,
+        context.launchProcess,
       ),
     authState: (account) => ({ kind: "claude", email: account?.email ?? null }),
     validateAccount: () => undefined,
@@ -789,6 +819,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         confinement,
         withAccountEnvironment(context),
         context.history?.("grok"),
+        context.fitImage,
+        () => discoveryFolder("grok"),
       ),
     createProfileClient: (cli, requestTimeoutMs, { accountEnvironment }) =>
       new GrokAgentClient(
@@ -801,6 +833,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         undefined,
         undefined,
         accountEnvironment && (() => accountEnvironment),
+        undefined,
+        undefined,
+        () => discoveryFolder("grok"),
       ),
     createMediaClient: (cli, requestTimeoutMs, { accountEnvironment }) =>
       new GrokAgentClient(
@@ -813,6 +848,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         undefined,
         undefined,
         accountEnvironment && (() => accountEnvironment),
+        undefined,
+        undefined,
+        () => discoveryFolder("grok"),
       ),
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),
     validateAccount: () => undefined,
@@ -845,8 +883,10 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
               context.providerStateDirectory,
               { ...process.env, ...agentEnvironment },
               cli.version,
+              confinement ? "confined" : "provider-asks",
             ),
             ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
+            ...clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode")),
             ...(confinement ? OPENCODE_CONFINED_ENV : {}),
           };
         },
@@ -854,11 +894,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         modelName: (id, name) => openCodeModelName(id, name, openCodeEndpoints(context)),
         customEndpoint: (modelId) => {
           const endpoint = customProviderOfModel(modelId, openCodeEndpoints(context)());
+          const contextWindow = endpoint?.models.find(
+            (model) => composedCustomModelId(endpoint.id, model.id) === modelId,
+          )?.contextWindow;
           return endpoint
             ? {
                 name: endpoint.name,
                 hasCredentials: Boolean(endpoint.apiKey) || endpoint.headers.length > 0,
                 stallMs: CUSTOM_ENDPOINT_SILENCE_MS,
+                ...(contextWindow === undefined ? {} : { contextWindow }),
               }
             : null;
         },
@@ -868,8 +912,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           Effect.runSync(hasOpenCodeProviderKey(provider, { ...process.env, ...context.agentEnvironment?.() })),
         providerRefusalStatus: (sessionId) =>
           Effect.runSync(readOpenCodeRefusalStatus(sessionId, { ...process.env, ...context.agentEnvironment?.() })),
+        savedKeyShadowed: () => {
+          const ownKey = Effect.runSync(
+            readOpenCodeStoredKey(OPENCODE_GO_PROVIDER, { ...process.env, ...context.agentEnvironment?.() }),
+          );
+          return ownKey !== null && ownKey !== context.apiKey("opencode");
+        },
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -891,6 +942,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         extraEnv: () => ({
           ...opencodeEnv(cli),
           ...openCodeConfigEnv(OPENCODE_PROFILE_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
+          ...clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode")),
         }),
         signInMessage: openCodeSignInMessage(openCodeEndpoints(context)().length),
         modelName: (id, name) => openCodeModelName(id, name, openCodeEndpoints(context)),
@@ -906,6 +958,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     accounts: {
       homeVariable: "GEMINI_HOME",
       signIn: ANTIGRAVITY_SIGN_IN,
+      codeSignIn: { flow: "paste", command: ANTIGRAVITY_ACCOUNT_CODE_SIGN_IN },
       supports: (cli) => antigravityTakesStateFolders(cli.version),
       usageLeavesSession: true,
     },
@@ -932,6 +985,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         signInMessage: sourceText("error.provider.antigravitySignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1008,6 +1062,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
             }),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1055,6 +1110,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         signInMessage: sourceText("error.provider.clineSignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1120,6 +1176,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         signInMessage: sourceText("error.provider.kimiSignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1168,6 +1225,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         noModelsWhenSignedOut: true,
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1224,6 +1282,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         noModelsWhenSignedOut: true,
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1278,6 +1337,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         signInMessage: sourceText("error.provider.mistralSignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1338,6 +1398,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         authenticate: requireHermesProvider,
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
+        fitImage: context.fitImage,
         reportMcpDrops: context.reportMcpDrops,
         mcpToolRuntimes: context.mcpToolRuntimes,
         mcpEndpoint: context.mcpEndpoint,
@@ -1417,7 +1478,12 @@ function customAgentChild(
     env,
     ...(profileGeneration ? { profileGeneration: true } : {}),
     history: profileGeneration ? undefined : history,
-    ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, customAgentStatePaths()) } : {}),
+    ...(confinement
+      ? {
+          confine: (target) => confineSpawnTarget(target, confinement, customAgentStatePaths()),
+          causeLine: isDeniedWriteLine,
+        }
+      : {}),
     signInMessage: sourceText("error.provider.customAgentSignIn"),
     servesModel: () => savedCustomAgents(context).some((saved) => saved.id === config.id),
     steer: steerAcpSession,
@@ -1434,6 +1500,7 @@ function customAgentChild(
               ),
             ),
           mcpServers: context.mcpServers,
+          fitImage: context.fitImage,
           reportMcpDrops: context.reportMcpDrops,
           mcpToolRuntimes: context.mcpToolRuntimes,
           mcpEndpoint: context.mcpEndpoint,

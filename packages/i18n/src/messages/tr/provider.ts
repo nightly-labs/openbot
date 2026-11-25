@@ -96,6 +96,9 @@ export const messages = {
   "provider.codeLogin.relayStarting": "{name} oturum açma işlemi {host} üzerinde başlatılıyor…",
   "provider.codeLogin.pageOpening": "{name} oturum açma sayfası {host} üzerinde açılıyor…",
   "provider.codeLogin.linkStep": "{name} hesabında oturum açın. OpenBot kendiliğinden devam eder.",
+  "provider.codeLogin.thisComputerDescription":
+    "Bu bağlantıyı bu bilgisayardaki bir tarayıcıda açın. OpenBot burada bekler.",
+  "provider.codeLogin.copyLink": "Bağlantıyı kopyala",
   "provider.codeLogin.chatgptDeviceSetting":
     "Bir bilgisayarda ChatGPT'de güvenlik ayarlarını açın ve Codex için cihaz koduyla oturum açmayı açın. İş hesabında bunu çalışma alanı yöneticiniz açar.",
   "provider.useApp.title": "{name} bağlantısını OpenBot uygulamasında yapın",
@@ -144,6 +147,7 @@ export const messages = {
   "provider.picker.effort": "Efor",
   "provider.picker.effortLabel": "Ajan akıl yürütme eforu",
   "provider.picker.effortFixed": "{effort}, {provider} tarafından sabit",
+  "provider.picker.effortLimited": "Claude ayarların veya kuruluşun eforu {effort} ile sınırlıyor.",
   "provider.picker.fast": "Hızlı",
   "provider.picker.fastText": "Daha hızlı yanıtlar, daha fazla kullanım",
   "provider.picker.speed": "Hız",

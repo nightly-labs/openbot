@@ -129,7 +129,7 @@ export function vaultIpcHandlers({
 
   return {
     vault: {
-      list: handler(() => vault.state()),
+      list: handler(() => runCauseEffect(vault.reload())),
       save: payloadHandler(decodeVaultSaveInput, (input) => runCauseEffect(vault.save(input))),
       delete: payloadHandler(stringPayload("id", 64), (id) => runCauseEffect(vault.delete(id))),
       reveal: payloadHandler(decodeVaultSecretRequest, (request) => vault.reveal(request)),
@@ -150,7 +150,7 @@ export function vaultIpcHandlers({
       reset: handler(() => runCauseEffect(vault.reset())),
       codes: handler(() => runCauseEffect(vault.codes())),
       hostList: scopedQueryHandler({
-        local: () => vault.state(),
+        local: () => runCauseEffect(vault.reload()),
         remote: (serverId) => post(serverId, "list", hostState(serverId)),
       }),
       hostSave: scopedHandler(decodeVaultSaveInput, {

@@ -48,6 +48,7 @@ const githubUserSchema = z.object({
 });
 const GITHUB_PAGE_SIZE = 100;
 const MAX_LISTED_REPOSITORIES = 500;
+const PUBLIC_REPOSITORIES_CACHE_MS = 60_000;
 const githubInstallationsSchema = z.object({
   installations: z.array(z.object({ id: z.number(), events: z.array(z.string()).optional() })),
 });
@@ -58,6 +59,9 @@ interface InstallationRepository extends GitHubConnectorRepository {
 const githubRepositoriesSchema = z.object({
   total_count: z.number(),
   repositories: z.array(z.object({ full_name: z.string().min(1), private: z.boolean() })),
+});
+const publicRepositoriesSchema = z.object({
+  repositories: z.array(z.object({ installationId: z.number(), fullName: z.string().min(1) })),
 });
 
 export interface GitHubConnectorServiceOptions {
@@ -83,6 +87,7 @@ export class GitHubConnectorService {
   readonly #scope = Scope.makeUnsafe();
   readonly #operations = new Set<Deferred.Deferred<void>>();
   readonly #fetch: GitHubFetch;
+  readonly #apiUrl: string;
   readonly #now: () => number;
   readonly #statusListeners = new Set<(status: GitHubConnectorStatus) => void>();
   readonly #accessListeners = new Set<() => void>();
@@ -102,6 +107,11 @@ export class GitHubConnectorService {
   #repositoriesWritten: string | null = null;
   #mcpProxy: GitHubMcpProxy | null = null;
   #mcpProxySecret = randomBytes(32).toString("base64url");
+  #publicRepositoriesCache: {
+    token: string;
+    at: number;
+    repositories: z.infer<typeof publicRepositoriesSchema>["repositories"];
+  } | null = null;
 
   constructor(options: GitHubConnectorServiceOptions) {
     this.#app = options.app;
@@ -110,6 +120,7 @@ export class GitHubConnectorService {
     this.#fetch = options.fetch ?? ((url, init) => fetch(url, init));
     this.#platform = GitHubPlatform.layer(this.#fetch, options.openExternal);
     this.#now = options.now ?? Date.now;
+    this.#apiUrl = options.apiUrl;
     this.#botTokens = new GitHubBotTokens({ apiUrl: options.apiUrl, fetch: this.#fetch, now: this.#now });
     registerSecretValue(this.#mcpProxySecret);
   }
@@ -387,16 +398,21 @@ export class GitHubConnectorService {
     if (!this.#agentConnected()) return {};
     const tokenFile = shellQuote(this.#credentialFile().replaceAll("\\", "/"));
     const repositoriesFile = shellQuote(this.#repositoriesFile().replaceAll("\\", "/"));
-    const first = gitConfigCount(inherited.GIT_CONFIG_COUNT);
+    const inheritedGitConfig = inherited.GIT_CONFIG_PARAMETERS;
     const ownGhConfig =
       inherited.GH_CONFIG_DIR === undefined
         ? "unset GH_CONFIG_DIR"
         : `GH_CONFIG_DIR=${shellQuote(inherited.GH_CONFIG_DIR)}; export GH_CONFIG_DIR`;
+    const ownGitConfig = [
+      `m=$(printf '\\047%s\\047' ${GIT_USE_HTTP_PATH_KEY}=true)`,
+      `case $GIT_CONFIG_PARAMETERS in (*"$m"*) a=\${GIT_CONFIG_PARAMETERS##*"$m"};; (*) a=;; esac`,
+      `a=${shellQuote(inheritedGitConfig ?? "")}$a; GIT_CONFIG_PARAMETERS=\${a# }; export GIT_CONFIG_PARAMETERS`,
+    ].join("; ");
     const helper = [
       '!f() { test "$1" = get || exit 0; p=; s=; h=; u=',
       "while IFS='=' read -r k v; do case $k in (path) p=$v;; (protocol) s=$v;; (host) h=$v;; (username) u=$v;; esac; done",
       `t=; test -n "$p" && t=$(awk -F '\\t' -v r="$p" 'BEGIN { sub(/\\/+$/, "", r); sub(/\\.git$/, "", r) } tolower($1) == tolower(r) { print $2; exit }' ${repositoriesFile} 2>/dev/null)`,
-      `test -n "$t" || { o=$({ printf 'protocol=%s\\nhost=%s\\n' "$s" "$h"; test -z "$p" || printf 'path=%s\\n' "$p"; test -z "$u" || printf 'username=%s\\n' "$u"; echo; } | (${ownGhConfig}; GIT_CONFIG_COUNT=${first} GIT_ASKPASS= SSH_ASKPASS= GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never exec git credential fill) 2>/dev/null) || o=`,
+      `test -n "$t" || { o=$({ printf 'protocol=%s\\nhost=%s\\n' "$s" "$h"; test -z "$p" || printf 'path=%s\\n' "$p"; test -z "$u" || printf 'username=%s\\n' "$u"; echo; } | (${ownGhConfig}; ${ownGitConfig}; GIT_ASKPASS= SSH_ASKPASS= GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never exec git credential fill) 2>/dev/null) || o=`,
       "c=$(printf '%s\\n' \"$o\" | while IFS= read -r l; do case $l in (username=?*|password=?*) printf '%s\\n' \"$l\";; esac; done)",
       "case $c in (*password=*) printf '%s\\n' \"$c\"; exit 0;; esac; }",
       "echo username=x-access-token; printf 'password='",
@@ -404,13 +420,12 @@ export class GitHubConnectorService {
     ].join("; ");
     return {
       GH_CONFIG_DIR: this.#ghConfigDirectory(),
-      GIT_CONFIG_COUNT: String(first + 3),
-      [`GIT_CONFIG_KEY_${first}`]: GIT_CREDENTIAL_KEY,
-      [`GIT_CONFIG_VALUE_${first}`]: "",
-      [`GIT_CONFIG_KEY_${first + 1}`]: GIT_CREDENTIAL_KEY,
-      [`GIT_CONFIG_VALUE_${first + 1}`]: helper,
-      [`GIT_CONFIG_KEY_${first + 2}`]: GIT_USE_HTTP_PATH_KEY,
-      [`GIT_CONFIG_VALUE_${first + 2}`]: "true",
+      GIT_CONFIG_PARAMETERS: [
+        ...(inheritedGitConfig ? [inheritedGitConfig] : []),
+        gitConfigParameter(GIT_CREDENTIAL_KEY, ""),
+        gitConfigParameter(GIT_CREDENTIAL_KEY, helper),
+        gitConfigParameter(GIT_USE_HTTP_PATH_KEY, "true"),
+      ].join(" "),
     };
   }
 
@@ -535,16 +550,27 @@ export class GitHubConnectorService {
     this: GitHubConnectorService,
     token: string,
   ): Effect.fn.Return<{ repositories: InstallationRepository[]; total: number }, GitHubOperationError, GitHubPlatform> {
-    const { installations } = yield* this.#getGitHubEffect(
-      `https://api.github.com/user/installations?per_page=${GITHUB_PAGE_SIZE}`,
-      token,
-      githubInstallationsSchema,
+    const [{ installations }, publicRepositories] = yield* Effect.all(
+      [
+        this.#getGitHubEffect(
+          `https://api.github.com/user/installations?per_page=${GITHUB_PAGE_SIZE}`,
+          token,
+          githubInstallationsSchema,
+        ),
+        this.#publicRepositories(token).pipe(Effect.orElseSucceed(() => [])),
+      ],
+      { concurrency: "unbounded" },
     );
     const repositories: InstallationRepository[] = [];
+    const eventsByInstallation = new Map(
+      installations.map((installation) => {
+        const subscribed = installation.events ?? [];
+        return [installation.id, GITHUB_ROUTE_EVENTS.every((event) => subscribed.includes(event))] as const;
+      }),
+    );
     let total = 0;
     for (const installation of installations) {
-      const subscribed = installation.events ?? [];
-      const events = GITHUB_ROUTE_EVENTS.every((event) => subscribed.includes(event));
+      const events = eventsByInstallation.get(installation.id) ?? false;
       for (let page = 1; ; page += 1) {
         const answer = yield* this.#getGitHubEffect(
           `https://api.github.com/user/installations/${installation.id}/repositories?per_page=${GITHUB_PAGE_SIZE}&page=${page}`,
@@ -560,11 +586,43 @@ export class GitHubConnectorService {
       }
       if (repositories.length >= MAX_LISTED_REPOSITORIES) break;
     }
+    const listed = new Set(repositories.map((repository) => repository.fullName.toLowerCase()));
+    for (const repository of publicRepositories) {
+      if (repositories.length >= MAX_LISTED_REPOSITORIES) break;
+      const events = eventsByInstallation.get(repository.installationId);
+      if (events === undefined || listed.has(repository.fullName.toLowerCase())) continue;
+      listed.add(repository.fullName.toLowerCase());
+      repositories.push({ fullName: repository.fullName, private: false, events });
+      total += 1;
+    }
     repositories.sort((left, right) => left.fullName.localeCompare(right.fullName, "en", { sensitivity: "base" }));
     return {
       repositories: repositories.slice(0, MAX_LISTED_REPOSITORIES),
       total: Math.max(total, repositories.length),
     };
+  });
+
+  readonly #publicRepositories = Effect.fn("GitHubConnector.publicRepositories")(function* (
+    this: GitHubConnectorService,
+    token: string,
+  ): Effect.fn.Return<z.infer<typeof publicRepositoriesSchema>["repositories"], GitHubOperationError, GitHubPlatform> {
+    const cached = this.#publicRepositoriesCache;
+    if (cached?.token === token && this.#now() - cached.at < PUBLIC_REPOSITORIES_CACHE_MS) return cached.repositories;
+    const response = yield* GitHubPlatform.use((platform) =>
+      platform.fetch(new URL("/v1/github/public-repositories", this.#apiUrl).toString(), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        signal: AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS),
+      }),
+    );
+    if (!response.ok) {
+      void response.body?.cancel();
+      return [];
+    }
+    const answer = publicRepositoriesSchema.safeParse(yield* githubCall(() => response.json().catch(() => null)));
+    if (!answer.success) return [];
+    this.#publicRepositoriesCache = { token, at: this.#now(), repositories: answer.data.repositories };
+    return answer.data.repositories;
   });
 
   readonly #canRead = Effect.fn("GitHubConnector.canRead")(
@@ -929,8 +987,8 @@ function registerTokenSecrets(tokens: Pick<GitHubTokenSet, "accessToken" | "refr
   if (tokens.refreshToken) registerSecretValue(tokens.refreshToken);
 }
 
-function gitConfigCount(value: string | undefined): number {
-  return value && /^\d+$/u.test(value) ? Number(value) : 0;
+function gitConfigParameter(key: string, value: string): string {
+  return shellQuote(`${key}=${value}`);
 }
 
 function shellQuote(value: string): string {

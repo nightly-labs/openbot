@@ -1,4 +1,10 @@
-import type { AgentModelOption, AgentReasoningEffort, AgentSummary, UpdateAgentInput } from "@openbot/contracts/ipc";
+import type {
+  AgentModelChoice,
+  AgentModelOption,
+  AgentReasoningEffort,
+  AgentSummary,
+  UpdateAgentInput,
+} from "@openbot/contracts/ipc";
 import {
   CUSTOM_AGENT_DEFAULT_MODEL,
   CUSTOM_PROVIDER_HARNESSES,
@@ -31,6 +37,8 @@ export interface CustomEndpointsHooks {
   modelsChanged(): void;
   stopProfileClients(): Effect.Effect<void>;
   emitError(code: string, error: unknown, agentId?: string): void;
+  removedModelBackup(agent: AgentSummary): UpdateAgentInput | null;
+  noteModelRemoved(agent: AgentSummary, removed: AgentModelChoice): void;
   providerAvailable(provider: AgentProvider): boolean;
   preference(): ProviderPreference;
 }
@@ -69,6 +77,7 @@ export class CustomEndpoints {
   #committedRevision = 0;
   readonly #chain = Semaphore.makeUnsafe(1);
   readonly #pendingMoves = new Map<string, { endpointId: string; harness: CustomProviderHarness }>();
+  readonly #unlistedAtLastStart = new Map<string, string>();
 
   constructor(options: CustomEndpointsOptions) {
     this.#store = options.store;
@@ -524,6 +533,23 @@ export class CustomEndpoints {
     );
   }
 
+  moveAgentsOffModelsUnlistedTwice(provider: AgentProvider): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      const models = this.available().filter((model) => model.provider === provider);
+      if (models.length === 0) return Effect.void;
+      const unlisted = new Map(this.#agentsOffList(provider, models).map((agent) => [agent.id, agent.model]));
+      const twice = new Set<string>();
+      for (const agent of this.#store.list()) {
+        if (providerForAgent(agent) !== provider) continue;
+        const model = unlisted.get(agent.id);
+        if (model === undefined) this.#unlistedAtLastStart.delete(agent.id);
+        else if (this.#unlistedAtLastStart.get(agent.id) === model) twice.add(agent.id);
+        else this.#unlistedAtLastStart.set(agent.id, model);
+      }
+      return twice.size ? this.moveAgentsOffUnlistedModels(provider, twice) : Effect.void;
+    });
+  }
+
   readonly moveAgentsOffUnlistedModels = Effect.fn("CustomEndpoints.moveAgentsOffUnlistedModels")(function* (
     this: CustomEndpoints,
     provider: AgentProvider,
@@ -536,30 +562,47 @@ export class CustomEndpoints {
       const listed = this.#agentModels(provider, agent, models) ?? models;
       const variant = provider === "acp" ? null : effortVariant(listed, agent.model);
       const family = provider === "acp" || variant ? null : newestOfFamily(listed, agent.model);
-      const fallback =
+      const nearest =
         variant?.model ??
         family ??
         (provider === "acp"
           ? listed.find((model) => sameCustomAgent(model.id, agent.model) && !isCustomAgentDefaultModel(model.id))
-          : providerFallback);
-      if (!fallback) continue;
+          : undefined);
+      const backup = nearest || provider === "acp" ? null : this.#hooks.removedModelBackup(agent);
+      const fallback = nearest ?? (provider === "acp" ? undefined : providerFallback);
       const keptEffort =
         family && family.reasoningEffortConfigurable !== false
           ? ([effortInModelId(agent.model), agent.reasoningEffort].find(
               (effort) => effort !== null && family.supportedReasoningEfforts.includes(effort),
             ) ?? null)
           : null;
-      yield* this.#hooks
-        .applyAgentUpdate({
-          agentId: agent.id,
-          model: fallback.id,
-          reasoningEffort: variant?.effort ?? keptEffort ?? fallback.defaultReasoningEffort,
-        })
+      const moves = [
+        ...(backup ? [backup] : []),
+        ...(fallback
+          ? [
+              {
+                agentId: agent.id,
+                model: fallback.id,
+                reasoningEffort: variant?.effort ?? keptEffort ?? fallback.defaultReasoningEffort,
+              },
+            ]
+          : []),
+      ];
+      if (moves.length === 0) continue;
+      const removed: AgentModelChoice = {
+        provider,
+        model: agent.model,
+        ...(agent.providerAccountId ? { providerAccountId: agent.providerAccountId } : {}),
+      };
+      yield* Effect.firstSuccessOf(moves.map((move) => Effect.suspend(() => this.#hooks.applyAgentUpdate(move))))
         .pipe(toEndpointChangeFailed)
         .pipe(
-          Effect.catch((failure) =>
-            Effect.sync(() => this.#hooks.emitError("agent_model_fallback_failed", failure.cause, agent.id)),
-          ),
+          Effect.match({
+            onFailure: (failure) => this.#hooks.emitError("agent_model_fallback_failed", failure.cause, agent.id),
+            onSuccess: (moved) => {
+              if (!variant) this.#hooks.noteModelRemoved(moved, removed);
+            },
+          }),
         );
     }
   }, Effect.uninterruptible).bind(this);

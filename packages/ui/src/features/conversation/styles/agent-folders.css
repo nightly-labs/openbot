@@ -240,9 +240,10 @@
 .host-folder-picker-path {
   margin: 0;
   padding: 0 var(--openbot-space-3) var(--openbot-space-2);
-  overflow-wrap: anywhere;
-  color: var(--openbot-text-muted);
-  font-size: var(--openbot-text-sm);
+}
+
+.host-folder-picker-path .ui-input {
+  width: 100%;
 }
 
 .host-folder-picker .provider-more-list {

@@ -19,6 +19,8 @@ export const messages = {
     "لم تعمل الأداة. لم يجد tool_call أداة بهذا الاسم. استخدم الاسم المؤهل الدقيق الذي يعطيه tool_search، مثل openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "لم تعمل الأداة. لم يجد tool_call أداة بهذا الاسم. قد يكون الاسم المؤهل {name}. إذا كان كذلك، فأرسل الاستدعاء مرة أخرى بهذا الاسم.",
+  "error.agent.toolCallNullValue":
+    "لم تعمل الأداة. تحتاج {name} إلى كائن أو قائمة في {paths}، لكن كل عنصر من عناصر القائمة هذه وصل بقيمة null. أرسل الاستدعاء مرة أخرى وأعطِ كل عنصر منها كنص يحتوي على JSON الخاص به.",
   "error.agent.toolDescribeUnknownNames":
     "لم يعثر tool_describe على أداة OpenBot باسم {names}. يصف فقط أدوات OpenBot والمتصفح التي يسردها openbot.tool_search، وليس أدوات MCP.",
   "error.agent.toolDescribeDiscoveryNames": "استدعِ {names} مباشرةً. لا يصف tool_describe أدوات البحث.",
@@ -174,6 +176,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "لا يعمل التقاط الشاشة في محادثة Slack أو Discord أو Telegram، لأن أشخاصًا آخرين يتلقون ملفاته.",
   "error.agent.screenCaptureDeclined": "لم يسمح المستخدم بالتقاط الشاشة هذا. لم يُلتقط شيء.",
+  "error.agent.creditMediaDeclined": "لم يسمح المستخدم بعملية الإنشاء هذه. لم يُنفق أي رصيد.",
+  "error.agent.creditMediaNotSaved": "تم إنشاء الملف، لكن OpenBot لم يتمكن من حفظه في الدردشة.",
   "error.agent.mcpServerDeclined": "لم يسمح المستخدم بتغيير خادم MCP هذا. لم يتغير شيء.",
   "error.agent.mcpToolDeclined": "لم يسمح المستخدم باستدعاء أداة MCP هذه. لم تعمل الأداة.",
   "error.agent.mcpServerNotSaved": "لم يستجب خادم MCP، لذا لم يُحفظ. {error}",

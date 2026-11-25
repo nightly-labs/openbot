@@ -138,6 +138,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "La modifica dell'identità del server non è supportata da questa connessione.",
   "error.team.hostUpdateUnsupported": "Gli aggiornamenti dell'host non sono supportati da questa connessione.",
   "error.team.hostTimezoneUnsupported": "Questa connessione non supporta il fuso orario del server.",
+  "error.team.hostSignalHomeUnsupported": "Questa connessione non supporta la scelta del server Signal.",
   "error.team.hostVoiceModelUnsupported":
     "Questa connessione non supporta il modello di riconoscimento vocale del server.",
   "error.team.hostRestartUnsupported": "Questa connessione non supporta il riavvio del server.",
@@ -159,6 +160,9 @@ export const messages = {
     "Questa connessione non supporta la dimensione di compattazione di Claude.",
   "error.team.cacheExpiryCompactionUnsupported":
     "Questa connessione non supporta la compattazione prima della scadenza della cache.",
+  "error.team.mediaApprovalCreditsUnsupported":
+    "Questa connessione non supporta la soglia di approvazione dei crediti.",
+  "error.team.mediaApprovalCreditsInvalid": "Inserisci un numero intero di crediti da 0 a 100.000.",
   "error.team.providerEnvironmentUnsupported": "Questa connessione non supporta le variabili del provider.",
   "error.team.modelVisibilityUnsupported": "Questa connessione non supporta l'elenco dei modelli.",
   "error.team.providerDefaultUnsupported": "Questa connessione non supporta il provider predefinito.",
@@ -226,4 +230,7 @@ export const messages = {
   "error.team.providerUseUnsupported":
     "Questa connessione non supporta l’attivazione e la disattivazione dei provider.",
   "error.team.providerUseInvalid": "Questo provider non ha un interruttore di attivazione.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "Questo server non supporta la scelta del modello nelle approvazioni dei contenuti multimediali. Aggiorna OpenBot sul server.",
+  "error.team.mediaApprovalChoiceInvalid": "La scelta dell'approvazione multimediale non è valida.",
 } as const satisfies PartialTranslation<typeof source>;
