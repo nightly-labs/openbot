@@ -1430,7 +1430,7 @@ export class TurnLifecycle {
         const item = getRecord(params, "item");
         if (!turnId || !item) return;
         const workspace = this.#store.get(agentId)?.workspacePath;
-        if (notification.method === "item/completed" && workspace) {
+        if (notification.method === "item/completed" && item.status === "completed" && workspace) {
           const written = writesFiles(item) ? getArray(params, "filePaths").filter(isString) : [];
           if (written.length > 0) yield* this.#instructions.agentWrote(agentId, workspace, written);
           else if (runsCommand(item) && mentionsInstructionFile(JSON.stringify([item.command, item.arguments])))

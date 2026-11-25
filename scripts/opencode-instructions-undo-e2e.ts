@@ -37,6 +37,7 @@ interface Scenario {
   approvals: Approvals;
   outsideEdit: string | null;
   shellWrite?: string;
+  failedEdit?: boolean;
   expectedBefore: string;
 }
 
@@ -61,6 +62,13 @@ const SCENARIOS: Scenario[] = [
     outsideEdit: null,
     shellWrite: SHELL_WRITE,
     expectedBefore: START_TEXT,
+  },
+  {
+    name: "outside edit, then a failed agent edit",
+    approvals: "automatic",
+    outsideEdit: OUTSIDE_EDIT,
+    failedEdit: true,
+    expectedBefore: OUTSIDE_EDIT,
   },
 ];
 
@@ -110,6 +118,7 @@ async function run(scenario: Scenario, index: number): Promise<ScenarioResult> {
     JSON.stringify({
       outsideEdit: scenario.outsideEdit,
       shellWrite: scenario.shellWrite ?? null,
+      failedEdit: scenario.failedEdit === true,
       goFile: join(folder, "go"),
       writes: [AGENT_FIRST, AGENT_SECOND],
     }),

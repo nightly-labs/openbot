@@ -10,6 +10,7 @@ const MODELS = {
 const plan = JSON.parse(readFileSync(process.env.FAKE_PLAN ?? "", "utf8"));
 const outsideEdit = isDynamicRecord(plan) && typeof plan.outsideEdit === "string" ? plan.outsideEdit : null;
 const shellWrite = isDynamicRecord(plan) && typeof plan.shellWrite === "string" ? plan.shellWrite : null;
+const failedEdit = isDynamicRecord(plan) && plan.failedEdit === true;
 const writes =
   isDynamicRecord(plan) && Array.isArray(plan.writes)
     ? plan.writes.filter((value): value is string => typeof value === "string")
@@ -77,6 +78,28 @@ async function writeInstructions(peer: AcpPeer, sessionId: string, file: string,
   });
 }
 
+async function failEdit(peer: AcpPeer, sessionId: string, file: string) {
+  const toolCallId = "failed-edit";
+  const locations = [{ path: file }];
+  peer.update(sessionId, {
+    sessionUpdate: "tool_call",
+    toolCallId,
+    title: "edit",
+    kind: "edit",
+    status: "in_progress",
+  });
+  const reply = await peer.ask("session/request_permission", {
+    sessionId,
+    toolCall: { toolCallId, title: file, kind: "edit", status: "pending", locations },
+    options: [
+      { optionId: "allow", name: "Allow", kind: "allow_once" },
+      { optionId: "reject", name: "Reject", kind: "reject_once" },
+    ],
+  });
+  logEntry({ event: "failed-edit", sessionId, accepted: allowed(reply) });
+  peer.update(sessionId, { sessionUpdate: "tool_call_update", toolCallId, status: "failed" });
+}
+
 function writeWithShell(peer: AcpPeer, sessionId: string, file: string, content: string) {
   const toolCallId = "shell-1";
   const rawInput = { command: `sed -i 's/old-place/shell-place/' ${file}` };
@@ -119,6 +142,7 @@ serveFakeAcpAgent({
     await waitForGo();
     if (outsideEdit !== null) writeFileSync(file, outsideEdit);
     if (shellWrite !== null) writeWithShell(peer, sessionId, file, shellWrite);
+    if (failedEdit) await failEdit(peer, sessionId, file);
     for (const [index, content] of writes.entries()) await writeInstructions(peer, sessionId, file, content, index + 1);
     peer.say(sessionId, "done");
     peer.reply(request, { stopReason: "end_turn" });
