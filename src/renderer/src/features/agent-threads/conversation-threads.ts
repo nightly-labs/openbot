@@ -128,6 +128,8 @@ export function conversationThreads(input: ConversationThreadsInput): Conversati
       onMove: (id, index) => tabs.move(agentId, id, index),
       onArchive: (id) => void tabs.archive(agentId, id),
       onRestore: (id) => void tabs.restore(agentId, id),
+      olderArchived: tasks.olderArchived(agentId),
+      onShowOlderArchived: () => tasks.loadArchivedPage(agentId),
       onRename: editable ? (id, title) => void tabs.rename(agentId, id, title) : undefined,
       onDelete: editable ? (id) => void tabs.remove(agentId, id) : undefined,
     },

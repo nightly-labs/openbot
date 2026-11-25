@@ -155,9 +155,9 @@ export const messages = {
   "sidebar.announce.movedPinned": "Chat fissata spostata in posizione {position} di {total}.",
   "sidebar.announce.personFallback": "persona",
   "sidebar.announce.chatFallback": "chat",
-  "sidebar.mobileApp.title": "OpenBot per dispositivi mobili",
-  "sidebar.mobileApp.body": "L'app è ora disponibile su iPhone e Android.",
-  "sidebar.mobileApp.howToInstall": "Come installarla",
+  "sidebar.mobileApp.pocketTitle": "I tuoi agenti, in tasca",
+  "sidebar.mobileApp.iphone": "iPhone",
+  "sidebar.mobileApp.android": "Android",
   "sidebar.mobileApp.dismiss": "Chiudi l'annuncio dell'app mobile",
   "sidebar.storage.lowTitle": "Spazio quasi esaurito",
   "sidebar.storage.fullTitle": "Spazio esaurito",
@@ -165,6 +165,10 @@ export const messages = {
   "sidebar.storage.fullBody":
     "{used} di {total} in uso su {server}. Gli agenti potrebbero non riuscire a salvare i file.",
   "sidebar.storage.meterLabel": "Spazio in uso su {server}",
+  "sidebar.storage.bodyThisComputer": "{used} di {total} in uso su questo computer.",
+  "sidebar.storage.fullBodyThisComputer":
+    "{used} di {total} in uso su questo computer. Gli agenti potrebbero non riuscire a salvare i file.",
+  "sidebar.storage.meterLabelThisComputer": "Spazio in uso su questo computer",
   "sidebar.storage.used": "{percent} in uso",
   "sidebar.storage.freeUpSpace": "Libera spazio",
   "sidebar.storage.dismiss": "Nascondi finché lo spazio non è esaurito",

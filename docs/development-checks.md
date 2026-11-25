@@ -269,7 +269,7 @@ A shared module can have many dependents. Do a list first to see the set without
 `tools/vitest/hermetic-setup.ts` is the first setup file of the `node` and `renderer` projects, so it
 runs before each test file imports anything. It deletes credential-shaped variables (`*_API_KEY`,
 `*_TOKEN`, `*_SECRET`, `*_PASSWORD`, `*_PRIVATE_KEY`, and `ANTHROPIC_*`, `OPENAI_*`, `OPENROUTER_*`,
-`XAI_*`, `GEMINI_*`, `AWS_*`), the directory overrides `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, `XDG_CONFIG_HOME`, `XDG_DATA_HOME`,
+`XAI_*`, `GEMINI_*`, `AWS_*`, `DOTENV_PRIVATE_KEY_*`), the directory overrides `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, `XDG_CONFIG_HOME`, `XDG_DATA_HOME`,
 `XDG_STATE_HOME` and `XDG_CACHE_HOME`,
 and `ELECTRON_RUN_AS_NODE`. It sets `TZ=UTC` and `LANG=C.UTF-8`, and points `HOME`, `USERPROFILE`,
 `APPDATA` and `LOCALAPPDATA` at a temporary directory for the file, which it removes after the file. The `renderer` project runs

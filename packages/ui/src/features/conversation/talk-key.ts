@@ -179,6 +179,8 @@ export function talkKeyParts({ key, platform, layout }: TalkKeyBinding): readonl
   if (code === "Space") parts.push({ text: "conversation.voice.spaceKey" });
   else if (code === "Enter")
     parts.push(platform === "darwin" ? { symbol: "enter" } : { text: "conversation.voice.key.enter" });
+  else if (code === "Tab") parts.push(platform === "darwin" ? { cap: "⇥" } : { text: "conversation.voice.key.tab" });
+  else if (code === "Escape") parts.push({ text: "conversation.voice.key.escape" });
   else parts.push({ cap: upperCap(layout?.(code) ?? keyCap(code)) });
   return parts;
 }
@@ -188,8 +190,11 @@ function upperCap(cap: string): string {
   return upper.length === cap.length ? upper : cap;
 }
 
+const ARROW_CAPS: Record<string, string> = { ArrowLeft: "←", ArrowRight: "→", ArrowUp: "↑", ArrowDown: "↓" };
+
 function keyCap(code: string): string {
   if (code.startsWith("Key")) return code.slice(3);
+  if (code in ARROW_CAPS) return ARROW_CAPS[code] ?? code;
   if (code.startsWith("Digit")) return code.slice(5);
   return PUNCTUATION[code] ?? code;
 }

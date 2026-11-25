@@ -6,11 +6,15 @@ export const messages = {
   "error.workflow.versionMissing": "Cette version du workflow n’existe plus.",
   "error.workflow.annotation": "Les textes, les notes et les formes ne peuvent pas avoir de connexions.",
   "error.workflow.port": "Une étape ne peut pas recevoir ce type d’entrée.",
+  "error.workflow.unknownValue":
+    "Cet OpenBot ne connaît pas un réglage d’une étape. Mettez à jour OpenBot, puis réessayez.",
   "error.workflow.branch": "Seule une condition peut avoir des connexions oui et non.",
   "error.workflow.conditionBranch": "Chaque connexion d’une condition doit être oui ou non.",
   "error.workflow.duplicateEdge": "Ces deux étapes ont déjà cette connexion.",
   "error.workflow.serverTooOld":
     "Ce serveur ne prend pas en charge les workflows. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
+  "error.workflow.newerSteps":
+    "Ce workflow contient des étapes d’une version plus récente d’OpenBot. Mettez OpenBot à jour pour le modifier.",
   "error.workflow.nodeUnsupported":
     "Cette version d’OpenBot ne peut pas encore exécuter les étapes d’image, de fichier et de message.",
   "error.workflow.interrupted": "OpenBot s’est arrêté pendant cette étape. Relancez-la.",
@@ -19,6 +23,17 @@ export const messages = {
   "error.workflow.agentStepEnded": "Le message à l’agent a été supprimé avant sa réponse.",
   "error.workflow.agentStepStopped": "L’agent s’est arrêté avant de répondre à cette étape. Relancez l’étape.",
   "error.workflow.conditionUnclear": "Le modèle n’a pas répondu oui ou non.",
+  "error.workflow.answerInvalid":
+    "La réponse n’avait pas les champs demandés par cette étape : {fields}. Relancez l’étape.",
+  "error.workflow.answerSetup":
+    "Les champs de réponse de ce workflow posent un problème ici : {fields}. Corrige le workflow, puis relance l’étape.",
+  "error.workflow.answerSourceEnded":
+    "Ces champs n’ont pas de valeur, car l’étape qui les fournit ne s’est pas terminée : {fields}. Relance d’abord cette étape.",
+  "error.workflow.runInputInvalid":
+    "L’entrée de l’exécution ne correspond pas aux champs de réponse du déclencheur : {fields}. Envoie un objet JSON avec ces champs.",
+  "error.workflow.sourceNotDone":
+    "Une étape précédente a échoué ou a été arrêtée lors de sa dernière exécution. Relance d’abord cette étape.",
+  "error.workflow.checkInvalid": "La vérification de cette étape n’est pas valide. Corrigez-la, puis relancez l’étape.",
   "error.workflow.modelFailed": "Le modèle n’a pas pu répondre. Relancez l’étape.",
   "error.workflow.modelTimedOut":
     "Le modèle n’a pas répondu à temps. Choisissez un effort plus bas ou un modèle plus rapide pour cette étape, puis relancez-la.",

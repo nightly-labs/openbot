@@ -1,5 +1,7 @@
 import { canPreviewAttachment, type StoredFileRow } from "@openbot/contracts/ipc";
+import type { AgentPickerAgent } from "@openbot/ui/features/agents/AgentPicker";
 import { ConversationFilesPanel } from "@openbot/ui/features/files/ConversationFilesPanel";
+import type { JSX } from "@solidjs/web";
 import { type FilesPort, filesPort } from "./files-port";
 import { createStorageUsage } from "./storage-usage";
 
@@ -16,6 +18,9 @@ export default function ChatFilesPanel(props: {
   onPreviewFile: (file: StoredFileRow) => void;
   onShowMessage: (messageId: string) => void;
   calls?: FilesPort | undefined;
+  workspaceAgents: readonly AgentPickerAgent[];
+  onOpenWorkspace: (agentId: string) => void;
+  resizer?: JSX.Element;
 }) {
   const storage = createStorageUsage(
     () => ({
@@ -51,6 +56,9 @@ export default function ChatFilesPanel(props: {
         canPreviewAttachment(file) ? props.onPreviewFile(file) : void storage.fileAction(file, "open", showInChat)
       }
       onFileAction={(file, action) => storage.fileAction(file, action, showInChat)}
+      workspaceAgents={props.workspaceAgents}
+      onOpenWorkspace={props.onOpenWorkspace}
+      resizer={props.resizer}
     />
   );
 }

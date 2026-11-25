@@ -17,7 +17,7 @@ import {
   onSettled,
   untrack,
 } from "solid-js";
-import { isGlobalSearchShortcut } from "../../global-search-shortcut";
+import { matchesShortcut } from "../../keyboard-shortcut-preference";
 import { useNavigation } from "../../navigation";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
@@ -27,6 +27,7 @@ import { useBrowserTabs } from "../browser/browser-context";
 import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
 import { useDirectMessages } from "../conversation/direct-messages-context";
+import { clearStorageUsageCache } from "../files/storage-usage";
 import { useSetup } from "../onboarding/onboarding-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { usePresence } from "../team/team-context";
@@ -303,7 +304,7 @@ const ServerScope = createSimpleContext({
     onSettled(() => {
       const handleGlobalSearchShortcut = (event: KeyboardEvent) => {
         if (
-          !isGlobalSearchShortcut(event) ||
+          !matchesShortcut(event, "globalSearch") ||
           centralAuth().status !== "signed_in" ||
           setupState()?.completed !== true
         ) {
@@ -391,6 +392,7 @@ const ServerScope = createSimpleContext({
         if (!signedOut) return;
         deleteRemoteWorkspaceFrames(null);
         keepCachedWorkflows(null);
+        clearStorageUsageCache();
       },
     );
     createEffect(

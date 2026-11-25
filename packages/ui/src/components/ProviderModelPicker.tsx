@@ -36,6 +36,7 @@ import {
   KeyRound,
   Layers,
   Listbox,
+  Lock,
   Plus,
   Popover,
   Progress,
@@ -235,8 +236,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   let shownProvider = untrack(activeProvider);
 
   function railModelOptions(rail: RailId): ClientAgentModelOption[] {
-    if (rail === CUSTOM_RAIL) return props.modelOptions.filter((option) => isCustomModel(option, customIds()));
-    return props.modelOptions.filter((option) => option.provider === rail && !isCustomModel(option, customIds()));
+    const options = props.modelOptions.filter(
+      (option) => option.listing !== "kept" || (option.provider === props.provider && option.id === props.value),
+    );
+    if (rail === CUSTOM_RAIL) return options.filter((option) => isCustomModel(option, customIds()));
+    return options.filter((option) => option.provider === rail && !isCustomModel(option, customIds()));
   }
 
   const agentCount = () => {
@@ -270,6 +274,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const harnesses = new Set<string>(customIds().values());
     const rows = props.agentStatus.providers?.filter((row) => harnesses.has(row.id)) ?? [];
     return rows.length > 0 && rows.every((row) => row.endpointsPending === false);
+  };
+  const endpointsWaiting = (): boolean => {
+    if (!props.customProviders?.length) return false;
+    const harnesses = new Set<string>(customIds().values());
+    return props.agentStatus.providers?.some((row) => harnesses.has(row.id) && row.endpointsPending === true) ?? false;
   };
   const railStatus = (rail: RailId): AgentProviderStatus => {
     if (rail !== CUSTOM_RAIL) return providerAvailability(props.agentStatus, props.modelOptions, rail, t);
@@ -906,25 +915,43 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                   return list.find((model) => model.id === railDefaultModel(provider)) ?? list[0];
                 });
                 const effortOption = () => (ownsSelection() ? selectedModel() : pickerModelOption(effortModel()));
-                const effortOptions = createMemo<{ id: string; name: string }[]>(
+                const effortLimit = () => {
+                  const option = effortOption();
+                  if (option?.provider !== "claude" || effortModel()?.variants.length) return;
+                  const efforts = option.supportedReasoningEfforts;
+                  return efforts.includes("low") && !efforts.includes("high") ? efforts.at(-1) : undefined;
+                };
+                const effortOptions = createMemo<EffortChoice[]>(
                   () => {
                     const variants = effortModel()?.variants ?? [];
                     if (variants.length) return variants;
                     const option = effortOption();
-                    return showsReasoningEffort() &&
-                      option &&
-                      option.reasoningEffortConfigurable !== false &&
-                      !fixedModelSettings(option)
-                      ? option.supportedReasoningEfforts.map((effort) => ({
-                          id: effort,
-                          name: reasoningLabel(effort, t),
-                        }))
-                      : [];
+                    if (
+                      !showsReasoningEffort() ||
+                      !option ||
+                      option.reasoningEffortConfigurable === false ||
+                      fixedModelSettings(option)
+                    )
+                      return [];
+                    const limit = effortLimit();
+                    const locked = limit ? CLAUDE_EFFORT_LEVELS.slice(CLAUDE_EFFORT_LEVELS.indexOf(limit) + 1) : [];
+                    return [
+                      ...option.supportedReasoningEfforts.map((effort) => ({
+                        id: effort,
+                        name: reasoningLabel(effort, t),
+                      })),
+                      ...locked.map((effort) => ({ id: effort, name: reasoningLabel(effort, t), locked: true })),
+                    ];
                   },
                   {
                     equals: (previous, next) =>
                       previous.length === next.length &&
-                      previous.every((option, i) => option.id === next[i]?.id && option.name === next[i]?.name),
+                      previous.every(
+                        (option, i) =>
+                          option.id === next[i]?.id &&
+                          option.name === next[i]?.name &&
+                          option.locked === next[i]?.locked,
+                      ),
                   },
                 );
                 const effortValue = () => {
@@ -1084,6 +1111,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         {t("provider.picker.workspaceOnlyUnavailable")}
                       </div>
                     </Show>
+                    <Show when={provider === CUSTOM_RAIL && groups().length > 0 && endpointsWaiting()}>
+                      <div class="provider-model-empty" role="status">
+                        {t("provider.picker.customPending")}
+                      </div>
+                    </Show>
                     <Input
                       class="provider-model-search"
                       aria-label={t("provider.picker.search")}
@@ -1098,7 +1130,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           <Show when={available()}>
                             <div class="provider-model-empty" role="status">
                               <Show
-                                when={provider === CUSTOM_RAIL && !search().trim()}
+                                when={provider === CUSTOM_RAIL && (!search().trim() || endpointsWaiting())}
                                 fallback={
                                   <Show
                                     when={!search().trim() && endpointModelsElsewhere()}
@@ -1197,25 +1229,51 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                     <Show when={effortOptions().length > 0}>
                       <div class="provider-model-effort">
                         <span>{t("provider.picker.effort")}</span>
-                        <Select<{ id: string; name: string }>
+                        <Select<EffortChoice>
                           class="provider-model-effort-select"
                           options={effortOptions()}
                           optionValue="id"
                           optionTextValue="name"
-                          value={effortOptions().find((option) => option.id === effortValue())}
+                          optionDisabled={(option) => option.locked === true}
+                          sameWidth={!effortLimit()}
+                          placement={effortLimit() ? "bottom-end" : undefined}
+                          value={effortOptions().find((option) => !option.locked && option.id === effortValue())}
                           onChange={(option) => option && chooseEffort(option.id)}
-                          itemComponent={(item) => <SelectItem item={item.item}>{item.item.rawValue.name}</SelectItem>}
+                          itemComponent={(item) => (
+                            <SelectItem item={item.item}>
+                              <span class="provider-model-effort-item">
+                                {item.item.rawValue.name}
+                                <Show when={item.item.rawValue.locked}>
+                                  <Lock class="provider-model-effort-lock" aria-hidden="true" />
+                                </Show>
+                              </span>
+                            </SelectItem>
+                          )}
                         >
                           <SelectTrigger
                             size="sm"
                             aria-label={t("provider.picker.effortLabel")}
                             disabled={effortLocked()}
                           >
-                            <SelectValue<{ id: string; name: string }>>
+                            <SelectValue<EffortChoice>>
                               {(state) => state.selectedOption()?.name ?? t("provider.picker.selectEffort")}
                             </SelectValue>
                           </SelectTrigger>
-                          <SelectContent class="provider-model-effort-content" />
+                          <SelectContent
+                            class={cx(
+                              "provider-model-effort-content",
+                              effortLimit() && "provider-model-effort-limited",
+                            )}
+                            footer={
+                              effortLimit() ? (
+                                <Text variant="caption" tone="muted" class="provider-model-effort-note">
+                                  {t("provider.picker.effortLimited", {
+                                    effort: reasoningLabel(effortLimit() ?? "medium", t),
+                                  })}
+                                </Text>
+                              ) : undefined
+                            }
+                          />
                         </Select>
                       </div>
                     </Show>
@@ -1390,6 +1448,14 @@ const SPEED_TEXT: Record<Speed, AppTextKey> = {
 function speedName(speed: Speed, t: AppTranslate): string {
   return t(SPEED_NAME[speed]);
 }
+
+interface EffortChoice {
+  id: string;
+  name: string;
+  locked?: boolean;
+}
+
+const CLAUDE_EFFORT_LEVELS: AgentReasoningEffort[] = ["low", "medium", "high", "xhigh", "max"];
 
 export function reasoningLabel(effort: AgentReasoningEffort, t: AppTranslate = currentText().t): string {
   return t(REASONING_LABEL[effort]);

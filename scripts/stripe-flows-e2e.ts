@@ -19,6 +19,13 @@ import {
   storageTierOf,
 } from "@openbot/contracts/billing";
 import { type BillingDetailsRequest, VAT_TAX_RATE } from "@openbot/contracts/billing-details";
+import {
+  CREDIT_METADATA,
+  CREDIT_METADATA_KIND,
+  type CreditCheckoutRequest,
+  creditLookupKey,
+  creditStops,
+} from "@openbot/contracts/credits";
 import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import {
   LICENSE_INCLUDED_USERS,
@@ -88,6 +95,7 @@ const SCENARIOS = [
   "order-trial",
   "promotion-link",
   "vat",
+  "credits",
   "invite",
 ] as const;
 type Scenario = (typeof SCENARIOS)[number];
@@ -302,6 +310,7 @@ type BrowserApiBody =
   | LicenseRenewalRequest
   | { role: "member"; reactivate?: true }
   | { token: string }
+  | CreditCheckoutRequest
   | Record<string, never>;
 
 function print(line: string) {
@@ -736,7 +745,18 @@ const browser = () => {
   return chrome;
 };
 
-async function payCheckout(url: string, returnOrigin: string, screenshot: string) {
+const CHECKOUT_ADDRESSES = {
+  PL: { line1: "Marszalkowska 1", zip: "00-001", city: "Warszawa" },
+  DE: { line1: "Unter den Linden 1", zip: "10117", city: "Berlin" },
+} as const;
+
+async function payCheckout(
+  url: string,
+  returnOrigin: string,
+  screenshot: string,
+  country: keyof typeof CHECKOUT_ADDRESSES = "PL",
+) {
+  const address = CHECKOUT_ADDRESSES[country];
   const context = await (await browser()).newContext();
   try {
     const page = await context.newPage();
@@ -785,13 +805,13 @@ async function payCheckout(url: string, returnOrigin: string, screenshot: string
     await form.locator(id.number).fill("4242424242424242");
     await form.locator(id.expiry).fill("12 / 34");
     await form.locator(id.cvc).fill("123");
-    const country = form.locator(id.country).first();
-    if (await country.count()) await country.selectOption("PL");
+    const countryField = form.locator(id.country).first();
+    if (await countryField.count()) await countryField.selectOption(country);
     for (const [field, value] of [
       [id.name, "Stripe E2E"],
-      [id.line1, "Marszalkowska 1"],
-      [id.zip, "00-001"],
-      [id.city, "Warszawa"],
+      [id.line1, address.line1],
+      [id.zip, address.zip],
+      [id.city, address.city],
     ] as const) {
       const input = form.locator(field).first();
       if ((await input.count()) && (await input.isVisible())) await input.fill(value);
@@ -1282,6 +1302,28 @@ function addsPolishVat(session: CheckoutView | null) {
 function addsNoVat(session: CheckoutView | null, treatment: "reverse" | "none") {
   const view = vatView(session);
   return view?.treatment === treatment && view.tax === 0;
+}
+
+const creditSessionSchema = checkoutLinesSchema.extend({
+  invoice: z.string().nullable(),
+  invoice_creation: z.object({ enabled: z.boolean() }).nullable(),
+});
+const creditInvoiceSchema = z.object({
+  id: z.string(),
+  status: z.string().nullable(),
+  currency: z.string(),
+  total: z.number(),
+  total_excluding_tax: z.number().nullable(),
+  invoice_pdf: z.string().nullable(),
+  metadata: z.record(z.string(), z.string()),
+  customer_address: z.object({ country: z.string().nullable() }).nullable(),
+});
+
+function creditSession(url: string) {
+  return stripe("GET", `/v1/checkout/sessions/${checkoutSessionId(url)}`, creditSessionSchema, {
+    "expand[0]": "line_items",
+    "expand[1]": "line_items.data.price",
+  });
 }
 
 function licenseSession(url: string) {
@@ -4207,6 +4249,121 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         invoice.total > counted.amount_eur,
       { counted, invoice },
     );
+  },
+
+  async credits(account) {
+    const [stop] = creditStops("eur");
+    if (!stop) throw new Error("No credit packs");
+    const creditStateSchema = z.object({ balance: z.number() });
+    const balance = async () =>
+      creditStateSchema.safeParse((await account.request("GET", "v1/me/credits")).body).data?.balance ?? null;
+    const save = (body: BillingDetailsRequest) => account.request("PUT", "v1/me/billing/details", body);
+    const open = async () => {
+      const opened = await account.request("POST", "v1/me/credits/checkout", {
+        credits: stop.credits,
+        currency: "eur",
+      });
+      const url = licenseCheckoutSchema.safeParse(opened.body).data?.url ?? "";
+      return { opened, url, session: url ? await creditSession(url) : null };
+    };
+    const paidInvoice = async (url: string) => {
+      const session = await waitFor("credit invoice", async () => {
+        const read = await creditSession(url);
+        return read.invoice ? read : null;
+      });
+      const invoice = await stripe("GET", `/v1/invoices/${session.invoice}`, creditInvoiceSchema);
+      return { session, invoice };
+    };
+    const ossRow = (invoiceId: string) =>
+      waitFor("credit OSS sale", async () => {
+        const rows = d1(
+          `SELECT country, amount_eur FROM billing_vat_oss_sales WHERE invoice_id = ${quote(invoiceId)}`,
+          z.object({ country: z.string(), amount_eur: z.number() }),
+        );
+        return rows[0] ?? null;
+      });
+
+    const before = await balance();
+    const domestic = await open();
+    const line = domestic.session?.line_items.data[0];
+    record(
+      "credits",
+      "the Worker gives a checkout.stripe.com page for the smallest credit pack in EUR, with an invoice and 23% Polish VAT on top for a buyer in Poland",
+      domestic.opened.status === 200 &&
+        new URL(domestic.url).host === "checkout.stripe.com" &&
+        line?.quantity === 1 &&
+        line.price.lookup_key === creditLookupKey(stop) &&
+        line.price.tax_behavior === "exclusive" &&
+        domestic.session?.currency === "eur" &&
+        domestic.session.invoice_creation?.enabled === true &&
+        domestic.session.metadata?.[CREDIT_METADATA.kind] === CREDIT_METADATA_KIND &&
+        domestic.session.metadata?.[CREDIT_METADATA.credits] === String(stop.credits) &&
+        addsPolishVat(domestic.session),
+      { status: domestic.opened.status, code: domestic.opened.code, line, vat: vatView(domestic.session) },
+    );
+
+    if (REAL_CHECKOUT) {
+      await payCheckout(domestic.url, account.api, "credits-e2e-checkout.png");
+      const { session, invoice } = await paidInvoice(domestic.url);
+      const after = await waitFor("credits granted", async () => {
+        const value = await balance();
+        return value !== null && before !== null && value >= before + stop.credits ? value : null;
+      });
+      record(
+        "credits",
+        "the paid credit pack adds its credits, and its invoice is paid, in EUR, with the net price, 23% Polish VAT, the VAT and credit metadata and a PDF",
+        before !== null &&
+          after === before + stop.credits &&
+          invoice.status === "paid" &&
+          invoice.currency === "eur" &&
+          invoice.total_excluding_tax === session.amount_subtotal &&
+          invoice.total - (invoice.total_excluding_tax ?? 0) ===
+            Math.round(((invoice.total_excluding_tax ?? 0) * VAT_TAX_RATE.percentage) / 100) &&
+          invoice.metadata[VAT_METADATA.treatment] === "standard" &&
+          invoice.metadata[VAT_METADATA.country] === "PL" &&
+          invoice.metadata[CREDIT_METADATA.kind] === CREDIT_METADATA_KIND &&
+          invoice.customer_address?.country === "PL" &&
+          typeof invoice.invoice_pdf === "string" &&
+          invoice.invoice_pdf.length > 0,
+        { before, after, invoice },
+      );
+    } else {
+      await expireCheckout(domestic.url);
+    }
+
+    const consumer = await save({ country: "DE" });
+    const german = await open();
+    record(
+      "credits",
+      "a consumer in Germany with no VAT ID gets Polish VAT on a credit pack",
+      consumer.status === 200 && addsPolishVat(german.session) && vatView(german.session)?.country === "DE",
+      { status: consumer.status, vat: vatView(german.session) },
+    );
+    if (REAL_CHECKOUT) {
+      await payCheckout(german.url, account.api, "credits-e2e-checkout-de.png", "DE");
+      const { invoice } = await paidInvoice(german.url);
+      const counted = await ossRow(invoice.id);
+      record(
+        "credits",
+        "a paid credit invoice of a consumer in Germany adds its net amount, not the VAT, to the One Stop Shop count",
+        counted.country === "DE" &&
+          counted.amount_eur === invoice.total_excluding_tax &&
+          invoice.total > counted.amount_eur,
+        { counted, invoice },
+      );
+    } else {
+      await expireCheckout(german.url);
+    }
+
+    const outside = await save({ country: "US" });
+    const american = await open();
+    record(
+      "credits",
+      "a buyer in the United States pays no VAT on a credit pack",
+      outside.status === 200 && addsNoVat(american.session, "none"),
+      { status: outside.status, vat: vatView(american.session) },
+    );
+    await expireCheckout(american.url);
   },
 };
 

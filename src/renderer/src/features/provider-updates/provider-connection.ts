@@ -73,6 +73,11 @@ interface ProviderAccountRelayTarget extends Omit<ProviderRelayTarget, "start"> 
 }
 
 const HOST_SIGN_IN_POLL_MS = 1_000;
+const HOST_SIGN_IN_STATUS_RETRY_MS = 60_000;
+
+function waitForNextPoll(): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, HOST_SIGN_IN_POLL_MS));
+}
 
 export interface ProviderConnectionOptions {
   agentStatus: () => AgentStatus;
@@ -207,7 +212,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
           await followAccountCodeSignIn(provider, accountCode, account.accountId, generation);
           return;
         }
-        showCode(account.start);
+        showCode(provider, account.start);
         codeLoginExpiry = window.setTimeout(
           () => {
             if (generation !== codeLoginGeneration) return;
@@ -228,7 +233,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
         endProviderCodeLogin(provider, { kind: "connected", accountLabel: row?.email ?? null });
         return;
       }
-      showCode(started);
+      showCode(provider, started);
       codeLoginExpiry = window.setTimeout(
         () => {
           if (generation !== codeLoginGeneration) return;
@@ -252,22 +257,49 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
     }
   }
 
-  function showCode(started: Exclude<ProviderCodeLoginStart, { kind: "connected" }>): void {
+  function showCode(provider: AgentProviderId, started: Exclude<ProviderCodeLoginStart, { kind: "connected" }>): void {
     flush(() =>
       setCodeLoginState(
-        started.kind === "paste" || started.kind === "link"
-          ? { phase: started.kind, verificationUrl: started.verificationUrl, expiresAt: started.expiresAt }
-          : {
-              phase: "waiting",
-              userCode: started.userCode,
+        started.kind === "link"
+          ? {
+              phase: "link",
               verificationUrl: started.verificationUrl,
-              ...(started.verificationUrlComplete === undefined
-                ? {}
-                : { verificationUrlComplete: started.verificationUrlComplete }),
               expiresAt: started.expiresAt,
-            },
+              ...(agentProviderDescriptor(provider).windowsCodeSignIn === "link" ? { onThisComputer: true } : {}),
+            }
+          : started.kind === "paste"
+            ? { phase: "paste", verificationUrl: started.verificationUrl, expiresAt: started.expiresAt }
+            : {
+                phase: "waiting",
+                userCode: started.userCode,
+                verificationUrl: started.verificationUrl,
+                ...(started.verificationUrlComplete === undefined
+                  ? {}
+                  : { verificationUrlComplete: started.verificationUrlComplete }),
+                expiresAt: started.expiresAt,
+              },
       ),
     );
+  }
+
+  async function readSignInStatus<T>(
+    read: () => Promise<T>,
+    cancel: () => Promise<unknown>,
+    generation: number,
+  ): Promise<T> {
+    const firstAttemptAt = Date.now();
+    for (;;) {
+      try {
+        return await read();
+      } catch (error) {
+        if (generation !== codeLoginGeneration) throw error;
+        if (Date.now() - firstAttemptAt >= HOST_SIGN_IN_STATUS_RETRY_MS) {
+          void cancel().catch(() => undefined);
+          throw error;
+        }
+      }
+      await waitForNextPoll();
+    }
   }
 
   async function followAccountCodeSignIn(
@@ -277,17 +309,18 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
     generation: number,
   ): Promise<void> {
     while (generation === codeLoginGeneration) {
-      const status = await accountCode.status(provider, accountId).catch((error: unknown) => {
-        if (generation === codeLoginGeneration) void accountCode.cancel(provider, accountId).catch(() => undefined);
-        throw error;
-      });
+      const status = await readSignInStatus(
+        () => accountCode.status(provider, accountId),
+        () => accountCode.cancel(provider, accountId),
+        generation,
+      );
       if (generation !== codeLoginGeneration) return;
       if (status.result) {
         if (status.result.error) endProviderCodeLogin(provider, { kind: "failed", message: status.result.error });
         else endProviderCodeLogin(provider, { kind: "connected", accountLabel: signedInLabel(provider) });
         return;
       }
-      await new Promise((resolve) => window.setTimeout(resolve, HOST_SIGN_IN_POLL_MS));
+      await waitForNextPoll();
     }
   }
 
@@ -297,10 +330,11 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
     generation: number,
   ): Promise<void> {
     while (generation === codeLoginGeneration) {
-      const status = await host.status(provider).catch((error: unknown) => {
-        if (generation === codeLoginGeneration) void host.cancel(provider).catch(() => undefined);
-        throw error;
-      });
+      const status = await readSignInStatus(
+        () => host.status(provider),
+        () => host.cancel(provider),
+        generation,
+      );
       if (generation !== codeLoginGeneration) return;
       if (status.result) {
         if (status.result.error) {
@@ -318,7 +352,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
           hostName: host.hostName,
           page: status.tabId ? { runtime: host.runtime, tabId: status.tabId, clipboard: host.clipboard } : null,
         });
-      await new Promise((resolve) => window.setTimeout(resolve, HOST_SIGN_IN_POLL_MS));
+      await waitForNextPoll();
     }
   }
 
@@ -336,10 +370,11 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
     generation: number,
   ): Promise<void> {
     while (generation === codeLoginGeneration) {
-      const status = await relay.status(provider).catch((error: unknown) => {
-        if (generation === codeLoginGeneration) void relay.cancel(provider).catch(() => undefined);
-        throw error;
-      });
+      const status = await readSignInStatus(
+        () => relay.status(provider),
+        () => relay.cancel(provider),
+        generation,
+      );
       if (generation !== codeLoginGeneration) return;
       if (status.result) {
         if (status.result.error) {
@@ -357,7 +392,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
           : status.page;
       if (!page && shown) setCodeLoginState({ phase: "verifying" });
       else if (page && !samePage(shown, page)) setCodeLoginState({ phase: "relay", hostName: relay.hostName, page });
-      await new Promise((resolve) => window.setTimeout(resolve, HOST_SIGN_IN_POLL_MS));
+      await waitForNextPoll();
     }
   }
 

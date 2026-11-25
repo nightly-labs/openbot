@@ -13,6 +13,8 @@ import {
   type AgentTaskHold,
   type AgentTasksSnapshot,
   type AgentTurnCompletedEvent,
+  type ArchivedAgentTasksCursor,
+  type ArchivedAgentTasksPage,
   type AttachmentSummary,
   agentTaskLimit,
   type BranchAgentTaskInput,
@@ -130,6 +132,7 @@ export class AgentTasks implements TaskLanes {
   readonly #userStops = new Map<string, string>();
   readonly #progressPublish = new Map<string, NodeJS.Timeout>();
   readonly #turnEndWaiters = new Map<string, Set<Deferred.Deferred<void>>>();
+  readonly #pendingReports = new Map<string, number>();
   readonly #branches = Semaphore.makeUnsafe(1);
   readonly #starts = Semaphore.makeUnsafe(1);
 
@@ -143,6 +146,10 @@ export class AgentTasks implements TaskLanes {
   threadId(taskId: string): string | null {
     const task = this.#store.task(taskId);
     return task && task.closedAt === null ? task.threadId : null;
+  }
+
+  reporting(taskId: string): boolean {
+    return this.#pendingReports.has(taskId);
   }
 
   openTaskIds(agentId: string): readonly string[] {
@@ -174,6 +181,15 @@ export class AgentTasks implements TaskLanes {
       agentId,
       tasks: tasks.map((task) => this.#publicTask(task, work, awaited)),
       limit: this.limit(agentId),
+    };
+  }
+
+  archivedPage(agentId: string, before: ArchivedAgentTasksCursor | null): ArchivedAgentTasksPage {
+    const rows = this.#store.archivedPage(agentId, before, INPUT_LIMITS.agentTasks + 1);
+    const awaited = this.#mailbox.awaitedThreadRequests();
+    return {
+      tasks: rows.slice(0, INPUT_LIMITS.agentTasks).map((task) => this.#publicTask(task, new Map(), awaited)),
+      hasMore: rows.length > INPUT_LIMITS.agentTasks,
     };
   }
 
@@ -218,21 +234,37 @@ export class AgentTasks implements TaskLanes {
   routineThread(agentId: string, routineId: string, routineName: string): AgentThreadRecord | null {
     const existing = this.#store.threadForRoutine(agentId, routineId);
     const title = taskTitle(routineName);
-    if (existing?.closedAt === null) {
-      this.#conversation.registerTaskThread(agentId, existing.threadId);
-      return this.#followRoutineName(existing, title);
+    if (existing) {
+      const opened = this.#openWithRoom(agentId, existing);
+      return opened ? this.#followRoutineName(opened, title) : null;
     }
     if (this.#store.openTaskIds(agentId).length >= INPUT_LIMITS.agentTasks) return null;
-    if (existing) {
-      this.reopen(existing);
-      const reopened = this.#store.task(existing.taskId);
-      return reopened ? this.#followRoutineName(reopened, title) : null;
-    }
     if (!title) return null;
     const task = this.#store.create({ agentId, origin: "agent", title, titleSource: "agent", routineId });
     this.#conversation.registerTaskThread(agentId, task.threadId);
     this.changed(agentId);
     return task;
+  }
+
+  isSideThread(agentId: string, taskId: string): boolean {
+    const task = this.#store.task(taskId);
+    return task?.agentId === agentId && task.origin === "user" && task.routineId === null;
+  }
+
+  waitThread(agentId: string, taskId: string): AgentThreadRecord | null {
+    const task = this.#store.task(taskId);
+    if (!task || !this.isSideThread(agentId, taskId)) return null;
+    return this.#openWithRoom(agentId, task);
+  }
+
+  #openWithRoom(agentId: string, task: AgentThreadRecord): AgentThreadRecord | null {
+    if (task.closedAt === null) {
+      this.#conversation.registerTaskThread(agentId, task.threadId);
+      return task;
+    }
+    if (this.#store.openTaskIds(agentId).length >= INPUT_LIMITS.agentTasks) return null;
+    this.reopen(task);
+    return this.#store.task(task.taskId);
   }
 
   #followRoutineName(thread: AgentThreadRecord, title: string | null): AgentThreadRecord {
@@ -252,7 +284,7 @@ export class AgentTasks implements TaskLanes {
       .slice(0, TASK_REPORT_RUNNING_LIMIT)
       .map((other) => ({ taskId: other.taskId, title: other.title }));
     const outcome = task.outcome === "interrupted" && this.#userStops.has(task.taskId) ? "stopped" : task.outcome;
-    return { taskId: task.taskId, title: task.title, outcome, stillRunning };
+    return { taskId: task.taskId, title: task.title, outcome, closed: task.closedAt !== null, stillRunning };
   }
 
   isRoutineThread(taskId: string): boolean {
@@ -601,7 +633,7 @@ export class AgentTasks implements TaskLanes {
     const started = this.#mailbox.deliveryForKey(idempotencyKey);
     const startedTaskId = started ? this.#mailbox.taskIdForDelivery(started.delivery.id) : null;
     const startedTask = startedTaskId ? this.#store.task(startedTaskId) : null;
-    if (startedTask) return startedTaskResult(startedTask);
+    if (startedTask) return this.#startedResult(startedTask);
     const open = this.#store.openTaskIds(caller.agentId).flatMap((taskId) => this.#store.task(taskId) ?? []);
     const finished = open.filter((task) => this.#finished(task));
     if (this.#unfinishedTasks(caller.agentId) >= AGENT_STARTED_UNFINISHED_TASKS)
@@ -624,6 +656,7 @@ export class AgentTasks implements TaskLanes {
         sender: { kind: "agent", agentId: caller.agentId },
         requesterIds: caller.requesterIds,
         taskId: task.taskId,
+        heldRequestIds: this.#mailbox.openTeammateRequestIds(caller.agentId, params.turnId),
         recipientAgentIds: [caller.agentId],
         text: input.brief,
         replyToMessageId: null,
@@ -638,6 +671,7 @@ export class AgentTasks implements TaskLanes {
           }),
         ),
       );
+    for (const archivedTask of archived) yield* this.releaseHeldRequests(archivedTask);
     if (!queued) {
       this.discard(task);
       if (archived.length > 0) this.changed(caller.agentId);
@@ -645,8 +679,78 @@ export class AgentTasks implements TaskLanes {
     }
     this.changed(caller.agentId);
     this.#hooks.queued(caller.agentId);
-    return startedTaskResult(task);
+    return this.#startedResult(task);
   });
+
+  #startedResult(task: AgentThreadRecord): OpenBotToolResponse {
+    const waiting = [
+      ...new Set(
+        this.#mailbox
+          .openRequestsHeldByTask(task.agentId, task.taskId)
+          .flatMap((requestId) => this.#mailbox.requestSenderAgentId(requestId) ?? []),
+      ),
+    ].map((agentId) => this.#hooks.agent(agentId)?.name ?? agentId);
+    return startedTaskResult(task, waiting);
+  }
+
+  readonly releaseHeldRequests = Effect.fn("AgentTasks.releaseHeldRequests")(function* (
+    this: AgentTasks,
+    task: AgentThreadRecord,
+  ): Effect.fn.Return<void> {
+    const requestIds = this.#requestsLeft(task);
+    if (requestIds.length === 0) return;
+    const queued = yield* this.#mailbox
+      .enqueue({
+        sender: { kind: "agent", agentId: task.agentId },
+        requesterIds: this.#mailbox.taskRequesterIds(task.taskId),
+        senderTaskId: task.taskId,
+        heldRequestIds: requestIds,
+        recipientAgentIds: [task.agentId],
+        text: task.title,
+        replyToMessageId: null,
+        expectsReply: false,
+        idempotencyKey: `task-release:${createHash("sha256")
+          .update(JSON.stringify([task.taskId, requestIds]))
+          .digest("hex")}`,
+      })
+      .pipe(
+        Effect.as(true),
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            logger.warn("Could not queue the report of a closed task.", {
+              agentId: task.agentId,
+              error: failure.cause,
+            });
+            return false;
+          }),
+        ),
+      );
+    if (queued) this.#hooks.queued(task.agentId);
+  });
+
+  readonly releaseAfterLostWork = Effect.fn("AgentTasks.releaseAfterLostWork")(function* (
+    this: AgentTasks,
+    taskId: string,
+  ): Effect.fn.Return<void> {
+    const task = this.#store.task(taskId);
+    if (
+      !task ||
+      task.closedAt !== null ||
+      this.#mailbox.taskAwaitsTeammate(task.agentId, taskId) ||
+      this.#requestsLeft(task).length === 0
+    )
+      return;
+    this.#store.setOutcome(taskId, "interrupted");
+    this.changed(task.agentId);
+    yield* this.releaseHeldRequests(task);
+  });
+
+  #requestsLeft(task: AgentThreadRecord): string[] {
+    return this.#mailbox.requestsLeftByTask(task.agentId, task.taskId).filter((requestId) => {
+      const requesterId = this.#mailbox.requestSenderAgentId(requestId);
+      return requesterId !== null && this.#hooks.agent(requesterId) !== undefined;
+    });
+  }
 
   changed(agentId: string): void {
     this.#cancelProgressPublish(agentId);
@@ -732,7 +836,7 @@ export class AgentTasks implements TaskLanes {
             routine: task.routineId !== null,
             turn: event,
           });
-          if (reports) this.#hooks.fork(this.#report(task, event));
+          if (reports) this.#hooks.fork(this.#reportOnce(task, event));
         }
         return true;
       }
@@ -745,10 +849,25 @@ export class AgentTasks implements TaskLanes {
   }
 
   #reportsTurn(task: AgentThreadRecord, event: AgentTurnCompletedEvent): boolean {
-    if (!isStartedTask(task) || task.closedAt !== null || event.origin === "user") return false;
+    if (!isStartedTask(task) || task.closedAt !== null) return false;
+    if (event.origin === "user" && this.#mailbox.openRequestsHeldByTask(task.agentId, task.taskId).length === 0)
+      return false;
     if (this.#mailbox.taskAwaitsAgent(task.agentId, task.taskId)) return false;
     const stopped = this.#stoppedTurns.get(task.taskId) === event.turnId;
     return !stopped || this.#userStops.get(task.taskId) === event.turnId;
+  }
+
+  #reportOnce(task: AgentThreadRecord, event: AgentTurnCompletedEvent): Effect.Effect<void> {
+    this.#pendingReports.set(task.taskId, (this.#pendingReports.get(task.taskId) ?? 0) + 1);
+    return this.#report(task, event).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          const left = (this.#pendingReports.get(task.taskId) ?? 1) - 1;
+          if (left > 0) this.#pendingReports.set(task.taskId, left);
+          else this.#pendingReports.delete(task.taskId);
+        }),
+      ),
+    );
   }
 
   readonly #report = Effect.fn("AgentTasks.report")(function* (
@@ -771,6 +890,7 @@ export class AgentTasks implements TaskLanes {
         sender: { kind: "agent", agentId: task.agentId },
         requesterIds: this.#mailbox.taskRequesterIds(task.taskId),
         senderTaskId: task.taskId,
+        heldRequestIds: this.#mailbox.openRequestsHeldByTask(task.agentId, task.taskId),
         recipientAgentIds: [task.agentId],
         text,
         replyToMessageId: null,
@@ -950,11 +1070,16 @@ function branchTitle(sourceTitle: string, titles: readonly string[]): string {
   return `${prefix}${last + 1}`;
 }
 
-function startedTaskResult(task: AgentThreadRecord): OpenBotToolResponse {
+function startedTaskResult(task: AgentThreadRecord, waiting: readonly string[]): OpenBotToolResponse {
+  const note =
+    "The task runs in its own conversation beside this chat, and the user can follow it in its tab. When its turn ends, OpenBot sends its final answer to your main chat as a task report. Start the other independent tasks now, do the quick parts yourself, tell the user in one sentence what runs, and end your turn. Do not wait for the task or read it to check progress.";
   return openBotToolResult({
     taskId: task.taskId,
     title: task.title,
-    note: "The task runs in its own conversation beside this chat, and the user can follow it in its tab. When its turn ends, OpenBot sends its final answer to your main chat as a task report. Start the other independent tasks now, do the quick parts yourself, tell the user in one sentence what runs, and end your turn. Do not wait for the task or read it to check progress.",
+    note:
+      waiting.length === 0
+        ? note
+        : `${note} ${waiting.join(", ")} still wait for the result of their request: OpenBot sends them your answer to the task report as your reply. Do not send them a status or a result now.`,
   });
 }
 
@@ -1002,6 +1127,7 @@ function publicHold(reason: string | null): AgentTaskHold | null {
       return "task-limit";
     case "agent-client-changing":
     case "provider-cli-replaced":
+    case "endpoint-reload":
       return "agent-restarting";
     case "usage-limit":
       return "usage-limit";

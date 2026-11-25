@@ -136,6 +136,42 @@ export function Terms() {
         of these Terms.
       </p>
 
+      <h2>OpenBot Credits</h2>
+      <p>
+        OpenBot credits ("Credits") are prepaid units that you buy with a one-time payment. A Credits purchase is not a
+        subscription and does not renew. The price, the currency, the number of Credits and the taxes are shown before
+        you pay. All payments for Credits are processed through Stripe.
+      </p>
+      <p>Credits that you buy do not expire.</p>
+      <p>
+        A paid commercial license also includes free Credits each month: 50 Credits for a Starter license, and 100
+        Credits for a Team license plus 50 Credits for each user after the first. The free Credits go to the balance of
+        the license owner at the start of each paid month, also during a yearly license. A free trial does not include
+        them. OpenBot uses free Credits before bought Credits. Free Credits that are not used expire at the end of their
+        month. When the owner moves free Credits to a server, they keep the same end date. When a license changes during
+        a month, the free Credits of that month do not change. Free Credits have no cash value and are not refunded.
+      </p>
+      <p>
+        You can buy Credits for your own balance or for the balance of a server where you are an active member. The
+        owner of a server can move Credits between the owner's own balance and the balance of that server. Credits
+        cannot be moved to another account, sold, or exchanged for money, and they have no cash value.
+      </p>
+      <p>
+        When a server is removed or deleted, the Credits on its balance go to the balance of the server owner. When a
+        payment for a server completes after that server was removed, the Credits go to the balance of the user who
+        paid.
+      </p>
+      <p>
+        Credits are not refunded, and the 2-hour refund offer in "Consumer Right of Withdrawal" does not apply to
+        Credits. This does not limit your mandatory statutory rights. When you are a consumer with a statutory right of
+        withdrawal, you can ask at checkout that OpenBot delivers the Credits at once. You then lose the right of
+        withdrawal when the Credits are delivered to the balance.
+      </p>
+      <p>
+        When a payment for Credits is refunded or a dispute is lost, OpenBot takes the Credits of that payment back from
+        the balance that received them, up to the Credits that remain on it.
+      </p>
+
       <h2>Conclusion and Duration of the Agreement</h2>
       <p>
         An agreement for the use of the OpenBot Platform is concluded when the User completes the registration process
@@ -547,7 +583,7 @@ export function Terms() {
       <h2>Fees, Subscriptions and Payments</h2>
       <p>
         Certain OpenBot Services, including Commercial Licenses and Hosted Server Services, are available on a paid
-        subscription basis.
+        subscription basis. Credits are bought with one-time payments, as described in "OpenBot Credits".
       </p>
       <p>
         The applicable fees, billing periods, plan characteristics, and any additional charges are presented on the{" "}
@@ -663,7 +699,8 @@ export function Terms() {
       <p>
         If you submit a refund request by email to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> within 2
         hours of completing your purchase, OpenBot offers a refund of 90% of the amount paid, retaining the remaining
-        10% as an administrative handling fee, provided that this does not limit your mandatory statutory rights.
+        10% as an administrative handling fee, provided that this does not limit your mandatory statutory rights. This
+        offer does not apply to Credits.
       </p>
       <p>
         If you are a consumer residing in the European Union, the United Kingdom, or Turkey and exercise your statutory

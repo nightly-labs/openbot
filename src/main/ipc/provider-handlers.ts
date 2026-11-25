@@ -102,7 +102,7 @@ export function providerIpcHandlers({
         runCauseEffect(service.chooseInstalledCli(provider, installed)),
       ),
       startProviderCodeLogin: payloadHandler(parseProviderId, (provider) =>
-        runCauseEffect(service.startProviderCodeLogin(provider)),
+        runCauseEffect(service.startProviderCodeLogin(provider, true)),
       ),
       cancelProviderCodeLogin: payloadHandler(parseProviderId, (provider) =>
         runCauseEffect(service.cancelProviderCodeLogin(provider)),

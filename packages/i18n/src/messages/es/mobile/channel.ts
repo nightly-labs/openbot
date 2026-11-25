@@ -78,6 +78,9 @@ export const messages = {
   "mobile.channel.form.deselectAll": "Quitar selección",
   "mobile.channel.form.memories": "Recuerdos",
   "mobile.channel.form.routines": "Rutinas",
+  "mobile.channel.folders.description":
+    "Todos los miembros de {channel} pueden cambiar archivos y ejecutar comandos en estas carpetas.",
+  "mobile.channel.folders.removeBody": "Los miembros de {channel} ya no pueden cambiar archivos en {folder}",
   "mobile.channel.form.deleteTitle": "¿Eliminar el canal?",
   "mobile.channel.form.deleteBody":
     "Esto detiene el canal. Su historial permanece en Canales eliminados solo para consulta. Puedes restaurarlo desde allí. Los agentes miembros se conservan.",

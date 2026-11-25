@@ -20,6 +20,8 @@ export const messages = {
     "Das Werkzeug wurde nicht ausgeführt. tool_call hat kein Werkzeug mit diesem Namen gefunden. Verwende den genauen qualifizierten Namen aus tool_search, zum Beispiel openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "Das Werkzeug wurde nicht ausgeführt. tool_call hat kein Werkzeug mit diesem Namen gefunden. Der qualifizierte Name ist möglicherweise {name}. Wenn ja, sende den Aufruf mit diesem Namen erneut.",
+  "error.agent.toolCallNullValue":
+    "Das Werkzeug wurde nicht ausgeführt. {name} braucht bei {paths} ein Objekt oder eine Liste, aber jedes dieser Listenelemente kam als null an. Sende den Aufruf erneut und gib jedes dieser Elemente als Zeichenkette mit seinem JSON an.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe hat kein OpenBot-Werkzeug mit dem Namen {names} gefunden. Es beschreibt nur die OpenBot- und Browser-Werkzeuge, die openbot.tool_search auflistet, keine MCP-Werkzeuge.",
   "error.agent.toolDescribeDiscoveryNames":
@@ -180,6 +182,8 @@ export const messages = {
     "Das Verhalten von Nachrichten während der Arbeit des Agenten kann nur auf dem Computer eingestellt werden, auf dem der Agent läuft.",
   "error.agent.backupModelsLocalOnly":
     "Ersatzmodelle können nur auf dem Computer eingestellt werden, auf dem der Agent läuft.",
+  "error.agent.backupModelsAtLimit":
+    "Kein Ersatzmodell kann jetzt übernehmen: Jedes hat sein Nutzungslimit erreicht oder ist vor Kurzem fehlgeschlagen. Modelle eines Kontos können sich ein Limit teilen. Um jetzt weiterzumachen, füge ein Ersatzmodell eines anderen Anbieters oder Kontos hinzu, oder warte auf das Zurücksetzen.",
   "error.agent.taskLimitLocalOnly":
     "Das Aufgabenlimit lässt sich nur auf dem Computer festlegen, auf dem der Agent läuft.",
   "error.agent.localScriptsOff": "Dieser Agent erlaubt keine lokalen Skripte.",
@@ -212,6 +216,9 @@ export const messages = {
     "Die Bildschirmaufnahme funktioniert nicht in einer Slack-, Discord- oder Telegram-Unterhaltung, da andere Personen ihre Dateien erhalten.",
   "error.agent.screenCaptureDeclined":
     "Der Benutzer hat diese Bildschirmaufnahme nicht erlaubt. Es wurde nichts aufgenommen.",
+  "error.agent.creditMediaDeclined":
+    "Der Benutzer hat diese Erstellung nicht erlaubt. Es wurden keine Credits verbraucht.",
+  "error.agent.creditMediaNotSaved": "Die Datei wurde erstellt, aber OpenBot konnte sie nicht im Chat speichern.",
   "error.agent.mcpToolDeclined":
     "Der Benutzer hat diesen MCP-Toolaufruf nicht erlaubt. Das Tool wurde nicht ausgeführt.",
   "error.agent.screenCaptureWindowMissing":

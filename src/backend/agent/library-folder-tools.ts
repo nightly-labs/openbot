@@ -7,6 +7,7 @@ import {
   libraryFolderBranch,
   libraryFolderPath,
   libraryFolderTree,
+  type StoredFileWorkflow,
 } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { z } from "zod";
@@ -17,6 +18,9 @@ import { StoredStateFailure } from "../stored-state-effects";
 export interface AgentLibraryFolders
   extends Pick<LibraryFoldersStore, "getSnapshot" | "placeInPath" | "mutate" | "removeAgent"> {
   fileAgents(files: readonly LibraryFileStamp[]): Effect.Effect<ReadonlyMap<string, string | null>, StoredStateFailure>;
+  fileWorkflows(
+    files: readonly LibraryFileStamp[],
+  ): Effect.Effect<ReadonlyMap<string, StoredFileWorkflow>, StoredStateFailure>;
 }
 
 export interface LibraryFileStamp {
@@ -58,9 +62,17 @@ interface ListedFile {
 
 export type AttachedLibraryFolder = { path: string; created: boolean } | { placed: false; reason: string };
 
+interface WorkflowFileGroup {
+  workflow: string;
+  workflowFolder: string | null;
+  fileCount: number;
+  files: ListedFile[];
+}
+
 export interface LibraryFolderListing {
   folders: { path: string; fileCount: number; files: ListedFile[] }[];
   unfiled?: { fileCount: number; files: ListedFile[] };
+  workflowFiles?: WorkflowFileGroup[];
   truncated: boolean;
 }
 
@@ -134,6 +146,7 @@ export function listLibraryFolders(
   snapshot: Pick<LibraryFoldersSnapshot, "folders" | "placement">,
   storedFiles: readonly MailboxStoredFile[],
   fileAgents: ReadonlyMap<string, string | null>,
+  fileWorkflows: ReadonlyMap<string, StoredFileWorkflow>,
   agentId: string,
   folder?: string,
 ): LibraryFolderListing {
@@ -146,6 +159,7 @@ export function listLibraryFolders(
   const ownIds = new Set(own.map((candidate) => candidate.id));
   const filesByFolder = new Map<string, ListedFile[]>();
   const unfiled: ListedFile[] = [];
+  const byWorkflow = new Map<string, { workflow: StoredFileWorkflow; files: ListedFile[] }>();
   const seen = new Set<string>();
   for (const stored of storedFiles) {
     const { id, name } = stored.attachment;
@@ -158,6 +172,13 @@ export function listLibraryFolders(
       if (files) files.push(file);
       else filesByFolder.set(folderId, [file]);
     } else if (folderId === undefined && fileAgents.get(id) === agentId) unfiled.push(file);
+    else if (folderId === undefined) {
+      const workflow = fileWorkflows.get(id);
+      if (!workflow) continue;
+      const group = byWorkflow.get(workflow.id);
+      if (group) group.files.push(file);
+      else byWorkflow.set(workflow.id, { workflow, files: [file] });
+    }
   }
 
   let room = LISTED_FILES;
@@ -171,10 +192,21 @@ export function listLibraryFolders(
     return { path: pathText(libraryFolderPath(own, entry.id)), fileCount: all.length, files: take(all) };
   });
   const loose = top ? undefined : { fileCount: unfiled.length, files: take(unfiled) };
+  const workflowFiles: WorkflowFileGroup[] = top
+    ? []
+    : [...byWorkflow.values()].map(({ workflow, files }) => ({
+        workflow: workflow.name,
+        workflowFolder: workflow.folder?.name ?? null,
+        fileCount: files.length,
+        files: take(files),
+      }));
   return {
     folders,
     ...(loose ? { unfiled: loose } : {}),
-    truncated: [...folders, ...(loose ? [loose] : [])].some((entry) => entry.files.length < entry.fileCount),
+    ...(workflowFiles.length > 0 ? { workflowFiles } : {}),
+    truncated: [...folders, ...(loose ? [loose] : []), ...workflowFiles].some(
+      (entry) => entry.files.length < entry.fileCount,
+    ),
   };
 }
 
@@ -209,12 +241,20 @@ export function organizeLibrary(
         new Error(`No Library file has the id "${fileId}". list_library_folders gives the ids of your files.`);
       const missing = fileIds.find((fileId) => !stored.has(fileId));
       if (missing !== undefined) throw unknown(missing);
-      const fileAgents = yield* libraryFolders.fileAgents(
-        fileIds.map((fileId) => ({ id: fileId, storedAt: stored.get(fileId)?.createdAt ?? null })),
-      );
+      const stamps = fileIds.map((fileId) => ({ id: fileId, storedAt: stored.get(fileId)?.createdAt ?? null }));
+      const fileAgents = yield* libraryFolders.fileAgents(stamps);
+      const workflowFiles = fileIds.some((fileId) => fileAgents.get(fileId) === null)
+        ? yield* libraryFolders.fileWorkflows(stamps)
+        : new Map<string, StoredFileWorkflow>();
       for (const fileId of fileIds) {
         const fileAgent = fileAgents.get(fileId);
         if (fileAgent === undefined) throw unknown(fileId);
+        if (fileAgent === null && workflowFiles.has(fileId)) {
+          const holder = snapshot.folders.find((folder) => folder.id === snapshot.placement[fileId])?.agentId;
+          if (holder !== undefined && holder !== agentId)
+            throw new Error(`The file "${fileId}" is in a Library folder of another agent.`);
+          continue;
+        }
         if (fileAgent !== agentId) throw new Error(`The file "${fileId}" is not one of your Library files.`);
       }
       const context: LibraryFolderContext = {
@@ -288,4 +328,15 @@ export function libraryFileAgents(
     file.createdAt === null ? [] : [{ id: file.attachment.id, storedAt: file.createdAt }],
   );
   return libraryFolders.fileAgents(stamped).pipe(Effect.mapError(safeFailure));
+}
+
+export function libraryFileWorkflows(
+  libraryFolders: AgentLibraryFolders,
+  storedFiles: readonly MailboxStoredFile[],
+): Effect.Effect<ReadonlyMap<string, StoredFileWorkflow>, StoredStateFailure> {
+  const generated = storedFiles.flatMap((file) =>
+    file.source === "generated" && file.agentId === null ? [{ id: file.attachment.id, storedAt: null }] : [],
+  );
+  if (generated.length === 0) return Effect.succeed(new Map());
+  return libraryFolders.fileWorkflows(generated).pipe(Effect.mapError(safeFailure));
 }

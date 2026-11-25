@@ -9,6 +9,8 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub nie zna Client ID tej GitHub App.",
   "error.connector.githubUnexpected": "GitHub wysłał nieoczekiwaną odpowiedź: {detail}",
   "error.connector.githubUnreachable": "OpenBot nie może połączyć się z GitHub: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot nie może połączyć się z GitHub. Sprawdź połączenie z internetem i ustawienia DNS komputera lub serwera, na którym działa OpenBot, a potem spróbuj ponownie.",
   "error.connector.githubExpired": "Połączenie z GitHub wygasło. Połącz GitHub ponownie.",
   "error.connector.githubFileUnreadable": "Nie można odczytać pliku połączenia z GitHub.",
   "error.connector.githubFileTooLarge": "Plik połączenia z GitHub jest za duży.",
@@ -31,6 +33,8 @@ export const messages = {
     "1Password otrzymał zbyt wiele żądań. Poczekaj kilka minut i spróbuj ponownie.",
   "error.connector.onePasswordNoVault":
     "Konto usługi nie może odczytać żadnego sejfu. Daj mu dostęp do sejfu i spróbuj ponownie.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot nie może odczytać Twoich danych logowania w 1Password. Odłącz 1Password, a potem połącz go ponownie.",
   "error.connector.onePasswordFileUnreadable": "Nie można odczytać pliku połączenia z 1Password.",
   "error.connector.onePasswordFileTooLarge": "Plik połączenia z 1Password jest za duży.",
   "error.connector.bitwardenFailed":
@@ -43,6 +47,10 @@ export const messages = {
     "Wpisz adres serwera HTTPS, client_id i client_secret klucza API oraz hasło główne.",
   "error.connector.bitwardenHostFailed":
     "Nie udało się otworzyć Bitwarden na tym serwerze. Sprawdź adres serwera, klucz API i hasło główne oraz upewnij się, że jeden folder ma nazwę Shared with OpenBot. Następnie połącz ponownie.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Nie udało się zalogować do Bitwarden na tym serwerze. Sprawdź adres serwera i klucz API, a następnie połącz ponownie.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Nie udało się odblokować Bitwarden na tym serwerze. Sprawdź hasło główne, a następnie połącz ponownie.",
   "error.connector.bitwardenCliInstallFailed":
     "Nie udało się zainstalować Bitwarden CLI na tym serwerze. Sprawdź jego połączenie sieciowe, a następnie połącz ponownie.",
   "error.connector.bitwardenFileUnreadable": "Nie można odczytać pliku połączenia Bitwarden.",

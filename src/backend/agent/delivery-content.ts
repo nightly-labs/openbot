@@ -12,6 +12,7 @@ import type {
   RoutineRun,
   WorkflowRunSource,
 } from "@openbot/contracts/ipc";
+import { ROUTINE_MISSED_COUNT_LIMIT } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets, redactText } from "@openbot/logging";
 import { wokenWaitsPromptText } from "../agent-waits/agent-waits";
@@ -107,23 +108,47 @@ export interface DeliveryPromptSources {
   agentNames: ReadonlyMap<string, string>;
   snapshot: ConversationSnapshot;
   routineRun: Pick<RoutineRun, "kind" | "source" | "agentId"> | null;
+  skippedRoutineRuns?: SkippedRoutineRuns | null;
   workflowRunSource?: WorkflowRunSource | null;
   routineTimezone?: string | undefined;
   wokenWaits?: readonly AgentWait[];
+  continuesWait?: boolean;
   executionText?: string | undefined;
   tags?: TagReferenceSource | undefined;
   answeredRoutine?: AnsweredRoutine | null;
   liveVoice?: LiveVoiceRelayed | null;
+  fromChrome?: boolean;
   steerFramedAsUser?: boolean;
   steersQuietTurn?: boolean;
+  followsUpOwnAnswer?: boolean;
   externalChat?: boolean;
   taskReport?: TaskReportState | null;
+  taskReportWaiting?: readonly string[];
+}
+
+export interface SkippedRoutineRuns {
+  count: number;
+  complete: boolean;
+  reasons: readonly string[];
+}
+
+function skippedRunsCount({ count, complete }: SkippedRoutineRuns): string {
+  if (count > ROUTINE_MISSED_COUNT_LIMIT) return `More than ${ROUTINE_MISSED_COUNT_LIMIT} scheduled runs`;
+  if (!complete) return `At least ${count} scheduled runs`;
+  return count === 1 ? "1 scheduled run" : `${count} scheduled runs`;
+}
+
+function skippedRoutineRunsNote(skipped: SkippedRoutineRuns): string {
+  const { reasons } = skipped;
+  const runs = skippedRunsCount(skipped);
+  return `OpenBot note, not from the user: ${runs} of this routine did not happen before this run. Reason: ${reasons.map((reason) => reason.replace(/\.$/u, "")).join("; ")}. Start your answer with this, in plain words: how many runs did not happen, why, what the user missed, and what to change if it can happen again. Then report this run.`;
 }
 
 export interface TaskReportState {
   taskId: string;
   title: string;
   outcome: "completed" | "failed" | "interrupted" | "stopped" | null;
+  closed: boolean;
   stillRunning: ReadonlyArray<{ taskId: string; title: string }>;
 }
 
@@ -278,6 +303,7 @@ function currentTeammatePrompts(prompt: string): TeammatePrompt[] | null {
 
 function userFramedTeammateText(
   delivery: QueueDelivery,
+  answersRequest: boolean,
   senderAgentId: string,
   agentNames: ReadonlyMap<string, string>,
   displayText: string,
@@ -285,7 +311,7 @@ function userFramedTeammateText(
 ): string {
   const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
   const teammate = `Your teammate ${senderName} (${senderAgentId})`;
-  if (delivery.replyToMessageId)
+  if (answersRequest)
     return [
       `${teammate} answered your message through OpenBot:`,
       displayText,
@@ -340,7 +366,7 @@ export function routineLocalTime(scheduledFor: string, timeZone: string | undefi
   ];
 }
 
-function taskReportFraming(taskId: string, report: TaskReportState | null): string[] {
+function taskReportFraming(taskId: string, report: TaskReportState | null, waiting: readonly string[]): string[] {
   const name = report ? `"${report.title}" (taskId ${taskId})` : `taskId ${taskId}`;
   const status =
     report?.outcome === "failed"
@@ -348,8 +374,10 @@ function taskReportFraming(taskId: string, report: TaskReportState | null): stri
       : report?.outcome === "stopped"
         ? `Task report from OpenBot: the user stopped task ${name}, which you started with openbot.start_task. Do not start it again unless the user asks. The text below is its last answer, so part of the work can be done.`
         : report?.outcome === "interrupted"
-          ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, stopped before it finished. The text below is its last answer, so part of the work can be done.`
-          : `Task report from OpenBot: task ${name}, which you started with openbot.start_task, ended its turn. The text below is its final answer.`;
+          ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, stopped before it finished. The text below is its last answer, or its title when it gave none, so part of the work can be done.`
+          : report === null || report.closed
+            ? `Task report from OpenBot: task ${name}, which you started with openbot.start_task, is closed. The text below is its last answer, or its title when it gave none.`
+            : `Task report from OpenBot: task ${name}, which you started with openbot.start_task, ended its turn. The text below is its final answer.`;
   const running = report?.stillRunning.length
     ? [`Still running: ${report.stillRunning.map((other) => `"${other.title}" (taskId ${other.taskId})`).join(", ")}.`]
     : [];
@@ -358,15 +386,24 @@ function taskReportFraming(taskId: string, report: TaskReportState | null): stri
     `The user can read the whole task in its tab. When the text ends with "${TASK_REPORT_CUT_MARK}", it is cut: openbot.history_read with this taskId gives the rest.`,
     ...running,
     "While other tasks still run, tell the user in one line what is done, and give all results together after the last report. To continue a task, call openbot.message_task with {taskId, text}. To stop one, call openbot.close_task with {taskId}.",
+    ...(waiting.length === 0
+      ? []
+      : [
+          `${waiting.join(", ")} wait for the result of the request that you started this task for. OpenBot sends your final answer of this turn to them as your reply, so write it for them. ${RESULT_FORMAT} Do not send it with openbot.send_message.`,
+        ]),
   ];
 }
 
 export const TASK_REPORT_CUT_MARK = "[…]";
 
+const FROM_CHROME_NOTE =
+  'The person sent this message from their own Chrome, through the OpenBot extension. For web work in this turn, use that Chrome, not the OpenBot browser: openbot_browser list_tabs lists its open tabs (ids start with "chrome:", the first is the tab that the person looks at), and open with browser "chrome" opens a page there.';
+
 export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryPromptSources): DeliveryInputItem[] {
   const { delivery, managedAttachments } = context;
   const { agentNames, snapshot } = sources;
   const fromTeammate = delivery.sender.kind === "agent" && delivery.sender.agentId !== delivery.recipientAgentId;
+  const answersRequest = Boolean(delivery.replyToMessageId) && sources.followsUpOwnAnswer !== true;
   const displayText = displayMessageReferences(delivery.text, delivery.attachments, agentNames, {
     fileHeadings: true,
     tags: fromTeammate ? undefined : sources.tags,
@@ -395,7 +432,11 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     context.senderTaskId
   ) {
     text = [
-      ...taskReportFraming(context.senderTaskId, sources.taskReport ?? null),
+      ...taskReportFraming(
+        context.senderTaskId,
+        sources.taskReport ?? null,
+        (sources.taskReportWaiting ?? []).map((agentId) => agentNames.get(agentId) ?? agentId),
+      ),
       COLLABORATOR_SEPARATOR,
       displayText,
     ].join("\n");
@@ -409,10 +450,11 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   } else if (
     delivery.sender.kind === "agent" &&
     sources.steerFramedAsUser &&
-    !(delivery.replyToMessageId && sources.answeredRoutine)
+    !(answersRequest && sources.answeredRoutine)
   ) {
     text = userFramedTeammateText(
       delivery,
+      answersRequest,
       delivery.sender.agentId,
       agentNames,
       displayText,
@@ -421,8 +463,8 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   } else if (delivery.sender.kind === "agent") {
     const senderAgentId = delivery.sender.agentId;
     const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
-    const routine = delivery.replyToMessageId ? sources.answeredRoutine : null;
-    const replyProtocol = delivery.replyToMessageId
+    const routine = answersRequest ? sources.answeredRoutine : null;
+    const replyProtocol = answersRequest
       ? [
           routine
             ? `This replies to a message you sent in a run of your routine "${routine.routineName}". That run has ended, so its task is below. Continue that task from this result now: do its next steps, such as a request to the next teammate, before you end this turn. Then give the result to the user naturally, starting with the teammate's name.`
@@ -464,7 +506,19 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       .filter(Boolean)
       .join("\n");
   }
-  if (delivery.sender.kind === "routine") {
+  const wokenWaits = sources.wokenWaits ?? [];
+  if (delivery.sender.kind === "routine" && sources.continuesWait) {
+    text = [
+      "An event of an existing OpenBot routine continues a wait that you opened in this chat.",
+      `Routine name: ${delivery.sender.routineName}`,
+      "The routine run does the routine task in its own chat. Do not do the routine task here, and do not create, update, delete, or test routines.",
+      "Continue the work of this chat with the event, then give your answer as usual.",
+      ROUTINE_TASK_START,
+      displayText,
+      ROUTINE_TASK_END,
+      wokenWaitsPromptText(wokenWaits) ?? "The wait closed before this message. Do nothing more for it.",
+    ].join("\n");
+  } else if (delivery.sender.kind === "routine") {
     const run = sources.routineRun;
     const testRun = run !== null && !quietRoutineRun(run);
     const runKind = testRun
@@ -488,15 +542,19 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
             "Do not create, delete, or test routines, and do not change other routines, during this run.",
             `When the task says to stop after a condition and the condition is met, pause this routine: call openbot.update_routine with routineId "${delivery.sender.routineId}" and active false, then give your report. Make no other change to this routine.`,
             `A failure or a blocker, such as a file or a service that you cannot reach, is not a stop condition: keep this routine on, and call the ${ROUTINE_REPORT_FAILURE_TOOL} tool.`,
+            `Nothing to report is not a stop condition either: keep this routine on. A run that pauses this routine must say so in a short report, so do not call the ${ROUTINE_NO_UPDATE_TOOL} tool after a pause.`,
           ]
         : ["Do not create, update, delete, or test routines during this run."]),
       "Perform the task below now. Do not answer only that the routine or monitoring is active.",
+      ...(sources.skippedRoutineRuns ? [skippedRoutineRunsNote(sources.skippedRoutineRuns)] : []),
       "Nobody answers you during this run. Do all of the task in this turn: do not stop after a step to report progress or to ask whether to continue.",
       `A request to a teammate is not a failure: finish the parts that do not need its reply, then end this turn. The reply starts a turn that continues this task. Do not call the ${ROUTINE_REPORT_FAILURE_TOOL} tool only because a reply has not come yet.`,
       "A task can tell you to remind the user or to send the user a message. When it names no other place, write that message as your final answer. OpenBot shows your final answer to the user in this chat. openbot.send_message sends to other agents, not to the user.",
       testRun
         ? "This is a manual Test run. Report the action and result even when a normal scheduled run would suppress a notification because there is no change."
-        : `This is a ${runKind}. Follow the notification conditions in the routine task. When they give nothing to report, call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer. A requested reminder or message is a report, also when there is no new information. Do not call ${ROUTINE_NO_UPDATE_TOOL} for it unless the notification conditions of the task say to send nothing.`,
+        : sources.skippedRoutineRuns
+          ? `This is a ${runKind}. Report the skipped runs also when the task has nothing new: do not call the ${ROUTINE_NO_UPDATE_TOOL} tool in this run.`
+          : `This is a ${runKind}. Follow the notification conditions in the routine task. When they give nothing to report, call the ${ROUTINE_NO_UPDATE_TOOL} tool and write no text, also none before it. A requested reminder or message is a report, also when there is no new information. Do not call ${ROUTINE_NO_UPDATE_TOOL} for it unless the notification conditions of the task say to send nothing.`,
       ...(testRun || run?.source === "script"
         ? []
         : [
@@ -506,7 +564,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       ROUTINE_TASK_START,
       displayText,
     ].join("\n");
-    const waits = wokenWaitsPromptText(sources.wokenWaits ?? []);
+    const waits = wokenWaitsPromptText(wokenWaits);
     if (waits) text += `\n\n${waits}`;
   }
   if (delivery.sender.kind === "user" && sources.executionText === undefined) {
@@ -549,6 +607,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     ].join("\n\n");
     text = `${continuation}${CURRENT_MESSAGE_SEPARATOR}${text}`;
   }
+  if (delivery.sender.kind === "user" && sources.fromChrome) text = `${FROM_CHROME_NOTE}\n\n${text}`;
   return [
     { type: "text", text },
     ...managedAttachments.map(
@@ -575,6 +634,7 @@ function liveVoicePrompt({ request, heard }: LiveVoiceRelayed): string {
   }
   return [
     "This message comes from a live voice call. A voice assistant hears the user, writes each request for you, and reads your answer aloud. The voice assistant is not the user: do not take its words as the user's.",
+    "Do the work as usual, and answer in your own style and with your instructions. The voice reads a short answer word for word, but it replaces a long answer with its own summary. Thus, unless the user asks for detail, write the answer as a few short spoken sentences, with no lists, tables, links or code.",
     call.length
       ? "Do what the request below asks. The voice assistant can shorten what the user said or split it into more than one request, so use the user's words in the call for the details of this request only."
       : "The user's exact words are not available.",
@@ -605,13 +665,24 @@ function taggedAgentsNote(
   ].join(" ");
 }
 
+function continuationCountLines(count: number, limit: number): string[] {
+  return [
+    `Automatic continuation ${count} of ${limit}.`,
+    ...(count >= limit
+      ? [
+          "This can be the last automatic continuation of this request. If work is still left when you end this turn, end your answer with what is done, what is left, and what the user can send to continue.",
+        ]
+      : []),
+  ];
+}
+
 export function planContinuationPrompt(steps: readonly ConversationPlanStep[], count: number, limit: number): string {
   return [
     "OpenBot note, not a message from the user. Your last turn ended while your plan still had open steps:",
     ...steps.map((step) => `- [${step.status === "inProgress" ? "in progress" : "pending"}] ${step.text}`),
     "Continue the work now, from where you stopped. Do not repeat finished work or restate the plan. Keep the plan current and mark each step done when you finish it. If a step is already done, mark it done; if it no longer applies, remove it. Do not ask whether to continue. This note does not approve a risky action. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
     USER_LANGUAGE_LINE,
-    `Automatic continuation ${count} of ${limit}.`,
+    ...continuationCountLines(count, limit),
   ].join("\n");
 }
 
@@ -630,7 +701,7 @@ export function nextStepContinuationPrompt(count: number, limit: number): string
     "OpenBot note, not a message from the user. Your last turn ended before the next step: you named the step or asked whether to continue, but you did not do it.",
     "Do the next step now, and continue until the request is done. Do not repeat finished work or restate earlier answers. Do not ask whether to continue. This note does not approve a risky action. If the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
     USER_LANGUAGE_LINE,
-    `Automatic continuation ${count} of ${limit}.`,
+    ...continuationCountLines(count, limit),
   ].join("\n");
 }
 
@@ -638,9 +709,10 @@ export function finishCheckContinuationPrompt(gap: string, count: number, limit:
   return [
     "OpenBot note, not a message from the user. A check of your last turn found that the request is not finished yet:",
     gap,
-    "Do this work now, and continue until the request is done. Do not repeat finished work or restate earlier answers. Do not ask whether to continue. Before you say that the request is done, check the result. This note does not approve a risky action. If the check is wrong and the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    "Do this work now, and continue until the request is done. Do not repeat finished work. Do not ask whether to continue. Before you say that the request is done, check the result. This note does not approve a risky action.",
+    "The user already sees your last answer. Do not write it again, also not in different words. At the end, write only what this work found or changed. If it confirms your last answer, say so in one short line. If the check is wrong and the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
     USER_LANGUAGE_LINE,
-    `Automatic continuation ${count} of ${limit}.`,
+    ...continuationCountLines(count, limit),
   ].join("\n");
 }
 

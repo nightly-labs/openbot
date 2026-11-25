@@ -118,6 +118,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "جارٍ بدء تسجيل الدخول إلى {name} على {host}…",
   "provider.codeLogin.pageOpening": "جارٍ فتح صفحة تسجيل الدخول إلى {name} على {host}…",
   "provider.codeLogin.linkStep": "سجّل الدخول إلى {name}. سيتابع OpenBot تلقائيًا.",
+  "provider.codeLogin.thisComputerDescription": "افتح هذا الرابط في متصفح على هذا الكمبيوتر. ينتظر OpenBot هنا.",
+  "provider.codeLogin.copyLink": "نسخ الرابط",
   "provider.codeLogin.chatgptDeviceSetting":
     "في ChatGPT على كمبيوتر، افتح إعدادات الأمان وفعّل تسجيل الدخول برمز الجهاز لـ Codex. في حساب العمل، يفعّله مسؤول مساحة العمل.",
   "provider.useApp.title": "توصيل {name} في تطبيق OpenBot",
@@ -144,7 +146,8 @@ export const messages = {
     "لا تعمل هذه النماذج مع «مساحة العمل فقط» على Windows وLinux. لاستخدامها، غيّر «الأذونات» في إعدادات الوكيل.",
   "provider.picker.olderModels": "نماذج أقدم",
   "provider.picker.olderModelsList": "نماذج {name} الأقدم",
-  "provider.picker.noModels": "لا تتوفر نماذج من {name}.",
+  "provider.picker.noModels":
+    "لا تظهر هنا نماذج من {name}. إذا كانت متوقفة، يمكن للمسؤول تشغيلها في إعدادات الخادم > المزوّدون > {name} > النماذج.",
   "provider.picker.endpointModelsInCustom": "يشغّل {name} نقاط النهاية المخصصة لديك. نماذجها في تبويب مخصص.",
   "provider.picker.showCustomModels": "عرض النماذج",
   "provider.picker.museNoModels":
@@ -163,6 +166,7 @@ export const messages = {
   "provider.picker.effort": "الجهد",
   "provider.picker.effortLabel": "جهد التفكير لدى الوكيل",
   "provider.picker.effortFixed": "{effort}، يحدده {provider}",
+  "provider.picker.effortLimited": "إعدادات Claude أو مؤسستك تحدّ الجهد عند {effort}.",
   "provider.picker.fast": "سريع",
   "provider.picker.fastText": "ردود أسرع واستخدام أكبر",
   "provider.picker.speed": "السرعة",
@@ -257,6 +261,7 @@ export const messages = {
   "provider.account.apiKey": "مفتاح API",
   "provider.account.listLabel": "حسابات {name}",
   "provider.account.usedBy": "يستخدمه {agents}",
+  "provider.account.sameEmail": "نفس البريد الإلكتروني مثل {name}",
   "provider.account.failed": "فشل تسجيل الدخول",
   "provider.account.moreActions": "إجراءات إضافية لـ {name}",
   "provider.account.renameLabel": "اسم {name}",
@@ -352,6 +357,7 @@ export const messages = {
   "provider.settings.codexKeyInUse":
     "يستخدم ChatGPT هذا المفتاح، لا خطة ChatGPT. تحتسب OpenAI كل طلب على المفتاح. لا يُعرض استخدام الخطة.",
   "provider.settings.codexKeyAlternative": "أو سجّل الدخول بمفتاح OpenAI API. تحتسب OpenAI كل طلب على المفتاح.",
+  "provider.settings.museKeyInUse": "يستخدم Muse هذا المفتاح، لا تسجيل دخولك. لاستخدام تسجيل الدخول، أزل المفتاح.",
   "provider.settings.addKey": "إضافة مفتاح",
   "provider.settings.changeKey": "تغيير المفتاح",
   "provider.settings.runtime": "بيئة التشغيل",
@@ -371,10 +377,14 @@ export const messages = {
   "provider.settings.cache": "ذاكرة التخزين المؤقت",
   "provider.settings.promptCache": "ذاكرة التخزين المؤقت للموجّه",
   "provider.settings.promptCacheDescription":
-    "المدة التي يحتفظ فيها Claude بسياق الوكيل في ذاكرة التخزين المؤقت بين الأدوار.",
+    "المدة التي يحتفظ فيها Claude وPi بسياق الوكيل في ذاكرة التخزين المؤقت بين الأدوار.",
   "provider.settings.promptCacheHour": "ساعة واحدة",
-  "provider.settings.promptCacheDefault": "الافتراضي في Claude Code",
+  "provider.settings.promptCacheDefault": "الإعداد الافتراضي للمزوّد",
   "provider.settings.promptCacheLoadFailed": "تعذّر تحميل مدة ذاكرة التخزين المؤقت للموجّه لهذا الخادم.",
+  "provider.settings.cacheExpiryCompaction": "الضغط قبل انتهاء ذاكرة التخزين المؤقت",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "عندما تكون محادثة ذات سياق من 200 ألف رمز أو أكثر خاملة مع ذاكرة تخزين مؤقت لمدة ساعة، يضغط الوكيل السياق قبل انتهاء ذاكرة التخزين المؤقت. عندها لا تقرأ الرسالة التالية السياق الكامل مرة أخرى بدون ذاكرة تخزين مؤقت.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "تعذّر تحميل إعداد الضغط لهذا الخادم.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "استخدام إعداد Claude Code الخاص بي",
   "provider.settings.claudeUserSetupDescription":

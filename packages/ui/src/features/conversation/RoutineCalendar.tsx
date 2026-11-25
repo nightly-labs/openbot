@@ -148,8 +148,14 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
 
   const entriesByDay = createMemo(() => {
     const byDay = new Map<CalendarDay, CalendarEntry[]>();
+    const pausedDays = new Set<string>();
     for (const entry of entries()) {
       const day = calendarDayOf(new Date(entry.run.at), props.timeZone);
+      if (entry.run.status === "paused") {
+        const pausedDay = `${entry.routine.id}@${day}`;
+        if (pausedDays.has(pausedDay)) continue;
+        pausedDays.add(pausedDay);
+      }
       const list = byDay.get(day);
       if (list) list.push(entry);
       else byDay.set(day, [entry]);

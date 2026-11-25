@@ -42,6 +42,7 @@ export type ProviderCodeLoginState =
       phase: "link";
       verificationUrl: string;
       expiresAt: number;
+      onThisComputer?: true;
     }
   | {
       phase: "page";
@@ -73,6 +74,7 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
   const waiting = () => (props.state.phase === "waiting" ? props.state : null);
   const pasting = () => (props.state.phase === "paste" ? props.state : null);
   const linking = () => (props.state.phase === "link" ? props.state : null);
+  const linkOnThisComputer = () => linking()?.onThisComputer === true;
   const hostPage = () => (props.state.phase === "page" ? props.state : null);
   const relay = () => (props.state.phase === "relay" ? props.state : null);
   const addressPaste = () => props.state.phase === "address";
@@ -87,6 +89,7 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
     if (addressPaste()) return t("provider.codeLogin.addressDescription");
     const host = hostPage();
     if (host) return t("provider.codeLogin.pageDescription", { host: host.hostName });
+    if (linkOnThisComputer()) return t("provider.codeLogin.thisComputerDescription");
     const relayed = relay();
     if (!relayed) return t("provider.codeLogin.description");
     if (!relayed.page)
@@ -107,9 +110,9 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
           <Dialog.Content class="provider-code-login-dialog" data-page={hostPage() ? "" : undefined} as="section">
             <header class="provider-code-login-header">
               <Dialog.Title class="provider-code-login-title">
-                {linking()
+                {linking() && !linkOnThisComputer()
                   ? t("provider.codeLogin.linkTitle", { name: props.providerName })
-                  : hostPage() || relay() || addressPaste()
+                  : hostPage() || relay() || linking() || addressPaste()
                     ? t("provider.codeLogin.pageTitle", { name: props.providerName })
                     : t("provider.codeLogin.title", { name: props.providerName })}
               </Dialog.Title>
@@ -246,11 +249,13 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
               <Show when={linking()}>
                 {(link) => (
                   <div class="provider-code-login-code" role="status">
-                    <QrCode
-                      value={link().verificationUrl}
-                      label={t("provider.codeLogin.qrLabel", { name: props.providerName })}
-                      size={160}
-                    />
+                    <Show when={!link().onThisComputer}>
+                      <QrCode
+                        value={link().verificationUrl}
+                        label={t("provider.codeLogin.qrLabel", { name: props.providerName })}
+                        size={160}
+                      />
+                    </Show>
 
                     <ol class="provider-code-login-steps">
                       <li>
@@ -269,6 +274,16 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
                         <Text as="span">{t("provider.codeLogin.linkStep", { name: props.providerName })}</Text>
                       </li>
                     </ol>
+
+                    <Show when={link().onThisComputer}>
+                      <CopyButton
+                        class="provider-code-login-copy"
+                        value={link().verificationUrl}
+                        label={t("provider.codeLogin.copyLink")}
+                        copiedLabel={t("common.copied")}
+                        variant="outline"
+                      />
+                    </Show>
 
                     <Text class="provider-code-login-expiry" as="p" variant="caption" tone="muted" aria-live="off">
                       <Show when={remaining() > 0} fallback={t("provider.codeLogin.pasteExpired")}>

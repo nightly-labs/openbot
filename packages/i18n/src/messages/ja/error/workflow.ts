@@ -6,11 +6,15 @@ export const messages = {
   "error.workflow.versionMissing": "このバージョンのワークフローはもう存在しません。",
   "error.workflow.annotation": "テキスト、メモ、図形には接続を付けられません。",
   "error.workflow.port": "このステップはこの種類の入力を受け取れません。",
+  "error.workflow.unknownValue":
+    "この OpenBot はステップの設定を認識できません。OpenBot を更新してから、もう一度お試しください。",
   "error.workflow.branch": "「はい」と「いいえ」の接続を持てるのは条件だけです。",
   "error.workflow.conditionBranch": "条件からの接続は、それぞれ「はい」か「いいえ」である必要があります。",
   "error.workflow.duplicateEdge": "この 2 つのステップにはすでにこの接続があります。",
   "error.workflow.serverTooOld":
     "このサーバーはワークフローに対応していません。サーバーを実行しているコンピューターの OpenBot を更新してください。",
+  "error.workflow.newerSteps":
+    "このワークフローには新しいバージョンの OpenBot のステップがあります。変更するには OpenBot を更新してください。",
   "error.workflow.nodeUnsupported":
     "このバージョンの OpenBot では、画像、ファイル、メッセージのステップはまだ実行できません。",
   "error.workflow.interrupted": "このステップの実行中に OpenBot が停止しました。もう一度実行してください。",
@@ -20,6 +24,17 @@ export const messages = {
   "error.workflow.agentStepStopped":
     "エージェントはこのステップに回答する前に停止しました。ステップをもう一度実行してください。",
   "error.workflow.conditionUnclear": "モデルが「はい」か「いいえ」で回答しませんでした。",
+  "error.workflow.answerInvalid":
+    "回答に、このステップが求めるフィールドがありませんでした: {fields}。ステップをもう一度実行してください。",
+  "error.workflow.answerSetup":
+    "このワークフローの回答フィールドにここで問題があります: {fields}。ワークフローを修正してから、ステップをもう一度実行してください。",
+  "error.workflow.answerSourceEnded":
+    "これらのフィールドには値がありません。値を渡すステップが完了しなかったためです: {fields}。先にそのステップをもう一度実行してください。",
+  "error.workflow.runInputInvalid":
+    "実行の入力がトリガーの回答フィールドに合いません: {fields}。これらのフィールドを持つ JSON オブジェクトを 1 つ送信してください。",
+  "error.workflow.sourceNotDone":
+    "前のステップが前回の実行で失敗したか停止しました。先にそのステップをもう一度実行してください。",
+  "error.workflow.checkInvalid": "このステップのチェックが無効です。修正してから、ステップをもう一度実行してください。",
   "error.workflow.modelFailed": "モデルが回答できませんでした。ステップをもう一度実行してください。",
   "error.workflow.modelTimedOut":
     "モデルが時間内に回答しませんでした。このステップの推論レベルを下げるか、より速いモデルを選んでから、もう一度実行してください。",

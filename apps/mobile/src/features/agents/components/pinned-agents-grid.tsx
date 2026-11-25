@@ -3,20 +3,14 @@ import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { Children, createContext, memo, type PropsWithChildren, useContext, useMemo, useState } from "react";
 import { View } from "react-native";
-import Animated, {
-  CurvedTransition,
-  Easing,
-  FadeIn,
-  FadeOut,
-  LinearTransition,
-  ReduceMotion,
-} from "react-native-reanimated";
+import Animated, { Easing, FadeIn, FadeOut, LinearTransition, ReduceMotion } from "react-native-reanimated";
 import { useAgentChatPreview } from "@/features/agents/components/agent-chat-preview";
 import { AgentAndroidMenu, AgentContextMenuLink } from "@/features/agents/components/agent-context-menu";
 import { type AgentListRevealState, AgentListRowReveal } from "@/features/agents/components/agent-list-reveal";
-import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
+import { pinnedTileEntering, pinnedTileExiting } from "@/features/agents/components/agent-pin-motion";
 import { AgentUnreadBadge } from "@/features/agents/components/agent-unread-badge";
 import { AgentWaitBadge, agentListStateLabel } from "@/features/agents/components/agent-wait-badge";
+import { AvatarCutout } from "@/features/agents/components/avatar-cutout";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import {
   AgentDragPreview,
@@ -27,6 +21,7 @@ import {
   useHoldMenu,
 } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
+import { PINNED_AVATAR_SIZE } from "@/features/agents/components/chat-row";
 import {
   agentListWaitReason,
   useAgentListActivity,
@@ -40,12 +35,7 @@ import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
-const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
-const PINNED_LAYOUT = LinearTransition.duration(220).easing(EASE_IN_OUT).reduceMotion(ReduceMotion.System);
-const PINNED_ITEM_LAYOUT = CurvedTransition.duration(240)
-  .easingX(EASE_IN_OUT)
-  .easingY(EASE_IN_OUT)
-  .reduceMotion(ReduceMotion.System);
+const PINNED_LAYOUT = LinearTransition.duration(240).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const PINNED_ENTER = FadeIn.duration(180).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const PINNED_EXIT = FadeOut.duration(140).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const PINNED_COLUMNS = 4;
@@ -163,49 +153,51 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
       onPressOut={holdMenu.onPressOut}
       style={({ pressed }) => ({ opacity: pressed ? 0.58 : 1 })}
     >
-      <AgentPinAvatar agentId={agent.id} location="pinned" size={64}>
-        <BloubAvatar
-          agentId={agent.id}
-          serverId={agent.serverId}
-          hue={agent.avatarHue}
-          color={agent.avatarColor}
-          seed={agent.avatarSeed}
-          avatarUrl={agent.avatarUrl}
-          size={64}
-          animateIdle={false}
-          rings
-          activityMood={agentActivityMood(activity)}
-        />
-        {waitReason ? (
-          <AgentWaitBadge reason={waitReason} size={22} />
-        ) : unreadCount > 0 || unreadThreads ? (
-          <AgentUnreadBadge count={unreadCount} avatarSize={64} />
-        ) : null}
-      </AgentPinAvatar>
-      <View className="w-full gap-0.5">
-        <Typography.Paragraph
-          align="center"
-          className="w-full text-text-secondary"
-          numberOfLines={1}
-          style={typeScale.small}
+      <View style={{ width: PINNED_AVATAR_SIZE, height: PINNED_AVATAR_SIZE }}>
+        <AvatarCutout
+          size={PINNED_AVATAR_SIZE}
+          badge={
+            waitReason ? (
+              <AgentWaitBadge reason={waitReason} size={22} />
+            ) : unreadCount > 0 || unreadThreads ? (
+              <AgentUnreadBadge count={unreadCount} avatarSize={PINNED_AVATAR_SIZE} />
+            ) : null
+          }
         >
-          {agent.name}
-        </Typography.Paragraph>
-        {agent.title.trim() ? (
-          <Typography.Paragraph align="center" className="w-full text-muted" numberOfLines={1} style={typeScale.small}>
-            {agent.title.trim()}
-          </Typography.Paragraph>
-        ) : null}
+          <BloubAvatar
+            agentId={agent.id}
+            serverId={agent.serverId}
+            hue={agent.avatarHue}
+            color={agent.avatarColor}
+            seed={agent.avatarSeed}
+            avatarUrl={agent.avatarUrl}
+            size={PINNED_AVATAR_SIZE}
+            animateIdle={false}
+            rings
+            activityMood={agentActivityMood(activity)}
+          />
+        </AvatarCutout>
       </View>
+      <Typography.Paragraph
+        align="center"
+        className="w-full text-text-secondary"
+        numberOfLines={1}
+        style={typeScale.pinnedName}
+      >
+        {agent.name}
+      </Typography.Paragraph>
       {agentChatPreview.measurer}
     </ChatLinkPressable>
   );
   return (
-    <PinnedChatItem>
+    <PinnedChatItem chatId={agent.id}>
       <ChatDragArea drag={drag} fill>
         {isAndroid ? (
           <View className="w-full">
-            <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
+            <Link
+              href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }}
+              asChild
+            >
               <Link.Trigger>{trigger}</Link.Trigger>
             </Link>
             {menuKey > 0 ? <AgentAndroidMenu key={menuKey} agent={agent} onClose={() => setMenuKey(0)} /> : null}
@@ -220,13 +212,15 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
   );
 });
 
-export function PinnedChatItem({ children }: PropsWithChildren) {
+export function PinnedChatItem({ chatId, children }: PropsWithChildren<{ chatId: string }>) {
   const place = useContext(PinnedRevealContext);
+  const entering = useMemo(() => pinnedTileEntering(chatId), [chatId]);
+  const exiting = useMemo(() => pinnedTileExiting(chatId), [chatId]);
   return (
     <Animated.View
-      entering={PINNED_ENTER}
-      exiting={PINNED_EXIT}
-      layout={PINNED_ITEM_LAYOUT}
+      entering={entering}
+      exiting={exiting}
+      layout={PINNED_LAYOUT}
       style={{ width: `${100 / PINNED_COLUMNS}%`, alignItems: "center" }}
     >
       {place ? (

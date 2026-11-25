@@ -47,6 +47,7 @@ interface AuthServiceOptions {
   repository: AuthRepository;
   delivery: EmailCodeDelivery | null;
   exposeDevelopmentCode?: boolean;
+  storeReviewSignIn?: StoreReviewSignIn | null;
   now?: () => number;
   flushSessionRevocations?: () => Effect.Effect<void, RemoteFailure>;
   profileChanged?: (userId: string) => Effect.Effect<void, RemoteFailure>;
@@ -54,6 +55,11 @@ interface AuthServiceOptions {
   attribution?: AccountAttribution;
   referrals?: Referrals;
   usesCompanySignIn?: (email: string) => Effect.Effect<boolean, AuthOperationError>;
+}
+
+export interface StoreReviewSignIn {
+  email: string;
+  code: string;
 }
 
 export interface EmailSignInStart {
@@ -76,6 +82,7 @@ class AuthDependencies extends Context.Service<
     repository: AuthRepository;
     delivery: EmailCodeDelivery | null;
     exposeDevelopmentCode: boolean;
+    storeReviewSignIn: StoreReviewSignIn | null;
     now: () => number;
     flushSessionRevocations: () => Effect.Effect<void, RemoteFailure>;
     profileChanged: (userId: string) => Effect.Effect<void, RemoteFailure>;
@@ -114,6 +121,7 @@ export class AuthService {
       repository: options.repository,
       delivery: options.delivery,
       exposeDevelopmentCode: options.exposeDevelopmentCode ?? false,
+      storeReviewSignIn: options.storeReviewSignIn ?? null,
       now: options.now ?? Date.now,
       flushSessionRevocations: options.flushSessionRevocations ?? (() => Effect.void),
       profileChanged: options.profileChanged ?? (() => Effect.void),
@@ -185,9 +193,10 @@ export class AuthService {
         );
       }
 
-      const code = dependencies.exposeDevelopmentCode
-        ? yield* developmentOneTimeCode(challengeId)
-        : generateOneTimeCode();
+      const storeReviewCode = storeReviewCodeFor(dependencies.storeReviewSignIn, email);
+      const code =
+        storeReviewCode ??
+        (dependencies.exposeDevelopmentCode ? yield* developmentOneTimeCode(challengeId) : generateOneTimeCode());
       const expiresAt = now + CHALLENGE_TTL_MS;
       const codeHash = yield* sha256(normalizeOneTimeCode(code));
       const sourceIpHash = yield* sha256(normalizeSourceIp(sourceIp));
@@ -207,7 +216,9 @@ export class AuthService {
       }
       const delivery = dependencies.delivery;
       const deliveryResult = yield* Effect.result(
-        delivery ? delivery.send({ email, code, expiresAt }).pipe(Effect.mapError(safeDeliveryError)) : Effect.void,
+        delivery && storeReviewCode === null
+          ? delivery.send({ email, code, expiresAt }).pipe(Effect.mapError(safeDeliveryError))
+          : Effect.void,
       );
       if (Result.isFailure(deliveryResult)) {
         const deliveryError = deliveryResult.failure;
@@ -958,6 +969,17 @@ function authFailure(error: unknown): AuthServiceError | AuthOperationError {
 
 function authValidate<A>(operation: () => A): Effect.Effect<A, AuthServiceError | AuthOperationError> {
   return Effect.try({ try: operation, catch: authFailure });
+}
+
+function storeReviewCodeFor(review: StoreReviewSignIn | null, email: string): string | null {
+  return review?.email === email ? review.code : null;
+}
+
+export function readStoreReviewSignIn(email: string | undefined, code: string | undefined): StoreReviewSignIn | null {
+  if (!email || !code) return null;
+  const normalizedEmail = normalizeEmailAddress(email);
+  const normalizedCode = normalizeSharedOneTimeCode(code);
+  return normalizedEmail && normalizedCode ? { email: normalizedEmail, code: normalizedCode } : null;
 }
 
 function generateOneTimeCode(): string {

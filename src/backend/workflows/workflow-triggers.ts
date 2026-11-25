@@ -1,4 +1,5 @@
 import type { RoutineSchedule, WorkflowGraph } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
 import {
   collapseMissedOccurrences,
@@ -122,6 +123,16 @@ export function prepareWorkflowSchedules(graph: WorkflowGraph, timezone: string,
 
 export function workflowScheduleOutput(runAt: string, timeZone: string): string {
   return [`Run time: ${runAt}`, ...routineLocalTime(runAt, timeZone)].join("\n");
+}
+
+const SCHEDULE_RUN_TIME = /^Run time: (\S+)$/mu;
+const SCHEDULE_LOCAL_TIME = /^Local time of this run: ([A-Za-z]+), (\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}) in /mu;
+
+export function workflowScheduleRecord(output: string): DynamicRecord | null {
+  const runTime = SCHEDULE_RUN_TIME.exec(output)?.[1];
+  if (!runTime) return null;
+  const local = SCHEDULE_LOCAL_TIME.exec(output);
+  return local ? { runTime, weekday: local[1], localDate: local[2], localTime: local[3] } : { runTime };
 }
 
 export function workflowWebhookPayload(nodeId: string, event: ReceivedWebhookEvent): string {

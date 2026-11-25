@@ -1,6 +1,6 @@
 import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
+import { appendVoiceTranscript } from "@openbot/ui/voice-recording";
 import { createMemo } from "solid-js";
-import { appendVoiceTranscript } from "../../../voice-recording";
 import { EMPTY_DRAFT, rowAttachments, type StoredQueueEdit } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
 import type { ComposerDraft, ConversationProps, ConversationTarget } from "../conversation-types";
@@ -22,7 +22,12 @@ export interface ComposerStoreDeps {
   seenMessageIds: Set<string>;
 }
 
-export function conversationOwnerId(props: ConversationProps): string | undefined {
+type ConversationOwner = {
+  agent?: Pick<NonNullable<ConversationProps["agent"]>, "id"> | undefined;
+  channel?: Pick<NonNullable<ConversationProps["channel"]>, "id"> | undefined;
+};
+
+export function conversationOwnerId(props: ConversationOwner): string | undefined {
   return props.channel?.id ?? props.agent?.id;
 }
 

@@ -56,7 +56,7 @@ export async function routeAgentTasks(
     return json(200, agentTasksWireSnapshot(tasks.listTasks(agentId), capabilities));
   if (url.pathname !== AGENT_TASKS_ROUTES.read) requireAgentLevel(context, agentId, "chat");
   if (url.pathname === AGENT_TASKS_ROUTES.start)
-    return json(200, agentTaskWire(await startTask(tasks, agentId, body, member), capabilities));
+    return json(200, agentTaskWire(await startTask(tasks, agentId, body, member, context.fromChrome), capabilities));
   const taskId = stringField(body, "taskId");
   switch (url.pathname) {
     case AGENT_TASKS_ROUTES.read:
@@ -73,6 +73,8 @@ export async function routeAgentTasks(
               ...clientMessageId(body),
             },
             memberSender(member),
+            undefined,
+            context.fromChrome,
           ),
         ),
       );
@@ -89,11 +91,19 @@ export async function routeAgentTasks(
   return "unmatched";
 }
 
-function startTask(tasks: TeamApiAgentTasks, agentId: string, body: DynamicRecord, member: TeamMemberSummary) {
+function startTask(
+  tasks: TeamApiAgentTasks,
+  agentId: string,
+  body: DynamicRecord,
+  member: TeamMemberSummary,
+  fromChrome: boolean,
+) {
   return runCauseEffect(
     tasks.startTask(
       { agentId, text: stringField(body, "text", false, INPUT_LIMITS.messageText), ...clientMessageId(body) },
       memberSender(member),
+      undefined,
+      fromChrome,
     ),
   );
 }

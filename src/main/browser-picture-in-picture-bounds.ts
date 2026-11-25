@@ -39,7 +39,7 @@ export function constrainBrowserPictureInPictureBounds(
   };
 }
 
-function rectanglesIntersect(left: BrowserBounds, right: BrowserBounds): boolean {
+export function rectanglesIntersect(left: BrowserBounds, right: BrowserBounds): boolean {
   return (
     left.x < right.x + right.width &&
     left.x + left.width > right.x &&

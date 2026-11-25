@@ -3,6 +3,7 @@ import type { OptionalRouteCodec } from "./admin-wire";
 import { AGENT_ACCESS_CODECS } from "./agent-access-v1";
 import { AGENT_ACTIVE_QUEUES_CODECS } from "./agent-active-queues-v1";
 import { AGENT_ADMIN_CODECS } from "./agent-admin-v1";
+import { AGENT_ARCHIVED_THREADS_CODECS } from "./agent-archived-threads-v1";
 import { AGENT_BACKUP_MODELS_CODECS } from "./agent-backup-models-v1";
 import { AGENT_BUILTIN_MEMORY_CODECS } from "./agent-builtin-memory-v1";
 import { AGENT_COLORS_CODECS } from "./agent-colors-v1";
@@ -49,10 +50,13 @@ import { BROWSER_SIGN_IN_CODECS } from "./browser-sign-in-v1";
 import { BROWSER_TEACH_CODECS } from "./browser-teach-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
 import { BROWSING_MEMORY_CODECS } from "./browsing-memory-v1";
+import { CACHE_EXPIRY_COMPACTION_CODECS } from "./cache-expiry-compaction-v1";
+import { CHANNEL_FOLDERS_CODECS } from "./channel-folders-v1";
 import { CHAT_COLORS_CODECS } from "./chat-colors-v1";
 import { CHAT_HISTORY_CODECS } from "./chat-history-v1";
 import { CLAUDE_COMPACT_WINDOW_CODECS } from "./claude-compact-window-v1";
 import { CLAUDE_USER_SETUP_CODECS } from "./claude-user-setup-v1";
+import { CLIENT_BROWSER_CODECS } from "./client-browser-v1";
 import { COMPUTER_ACTIVITY_CODECS } from "./computer-activity-v1";
 import { CONNECTORS_CODECS } from "./connectors-v1";
 import { CONTEXT_COMPACT_CODECS } from "./context-compact-v1";
@@ -77,9 +81,11 @@ import { HOST_MEMBER_UPDATE_CODECS } from "./host-member-update-v1";
 import { HOST_PERSONALITY_CODECS } from "./host-personality-v1";
 import { HOST_RELEASE_CODECS } from "./host-release-v1";
 import { HOST_RESTART_CODECS } from "./host-restart-v1";
+import { HOST_SIGNAL_HOME_CODECS } from "./host-signal-home-v1";
 import { HOST_TIMEZONE_CODECS } from "./host-timezone-v1";
 import { HOST_TURN_LIMITS_CODECS } from "./host-turn-limits-v1";
 import { HOST_UPDATE_CODECS } from "./host-update-v1";
+import { HOST_VOICE_MODEL_CODECS } from "./host-voice-model-v1";
 import { HOSTED_SITES_CODECS } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CODECS } from "./instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_FULL_COPY_CODECS } from "./instance-transfer-full-copy-v1";
@@ -93,10 +99,13 @@ import { MACHINE_RESOURCES_CODECS } from "./machine-resources-v1";
 import { MCP_ACCESS_CODECS } from "./mcp-access-v1";
 import { MCP_SIGN_IN_APP_CODECS } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CODECS } from "./mcp-sign-in-v1";
+import { MEDIA_APPROVAL_CHOICE_CODECS } from "./media-approval-choice-v1";
+import { MEDIA_APPROVAL_CREDITS_CODECS } from "./media-approval-credits-v1";
 import { MEMORY_REVIEW_CODECS } from "./memory-review-v1";
 import { MESSAGE_DELETE_CODECS } from "./message-delete-v1";
 import { MESSAGE_PINS_CODECS } from "./message-pins-v1";
 import { MODEL_STEERING_CODECS } from "./model-steering-v1";
+import { MODEL_VISIBILITY_KEPT_CODECS } from "./model-visibility-kept-v1";
 import { MODEL_VISIBILITY_CODECS } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CODECS } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CODECS } from "./password-managers-v1";
@@ -157,19 +166,25 @@ import { VAULT_CODECS } from "./vault-v1";
 import { VAULT_V2_CODECS } from "./vault-v2";
 import { VAULT_V3_CODECS } from "./vault-v3";
 import { VAULT_V4_CODECS } from "./vault-v4";
+import { VOICE_TRANSCRIPTION_CODECS } from "./voice-transcription-v1";
 import { WEBHOOK_AGENT_SECRET_CODECS } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CODECS } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CODECS } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CODECS } from "./whatsapp-connector-v1";
+import { WHATSAPP_READ_ONLY_CODECS } from "./whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_CODECS } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CODECS } from "./whatsapp-working-message-v1";
 import { WORKFLOW_FOLDERS_CODECS } from "./workflow-folders-v1";
+import { WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CODECS } from "./workflows-credit-media-unavailable-v1";
+import { WORKFLOWS_CREDIT_MEDIA_CODECS } from "./workflows-credit-media-v1";
 import { WORKFLOWS_GITHUB_CODECS } from "./workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_CODECS } from "./workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_CATALOG_CODECS } from "./workflows-media-catalog-v1";
 import { WORKFLOWS_MEDIA_CATALOG_V2_CODECS } from "./workflows-media-catalog-v2";
 import { WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CODECS } from "./workflows-media-service-account-v1";
 import { WORKFLOWS_MEDIA_CODECS } from "./workflows-media-v1";
+import { WORKFLOWS_PAUSE_CODECS } from "./workflows-pause-v1";
+import { WORKFLOWS_PORTABLE_CODECS } from "./workflows-portable-v1";
 import { WORKFLOWS_STEP_SETTINGS_CODECS } from "./workflows-step-settings-v1";
 import { WORKFLOWS_SUNRA_CODECS } from "./workflows-sunra-v1";
 import { WORKFLOWS_CODECS } from "./workflows-v1";
@@ -200,6 +215,8 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...HOST_ADMIN_CODECS,
   ...HOST_UPDATE_CODECS,
   ...HOST_TIMEZONE_CODECS,
+  ...HOST_VOICE_MODEL_CODECS,
+  ...HOST_SIGNAL_HOME_CODECS,
   ...HOST_TURN_LIMITS_CODECS,
   ...HOST_PERSONALITY_CODECS,
   ...HOST_KEY_ROTATION_CODECS,
@@ -212,6 +229,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...MODEL_STEERING_CODECS,
   ...PROVIDER_MODEL_SOURCE_CODECS,
   ...MODEL_VISIBILITY_CODECS,
+  ...MODEL_VISIBILITY_KEPT_CODECS,
   ...SERVER_AUDIT_CODECS,
   ...PROVIDER_DEFAULT_CODECS,
   ...DISCORD_ACCESS_CODECS,
@@ -237,6 +255,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_TASK_LIMIT_CODECS,
   ...AGENT_NEW_CHAT_CODECS,
   ...AGENT_FOLDERS_CODECS,
+  ...CHANNEL_FOLDERS_CODECS,
   ...AGENT_FAST_MODE_CODECS,
   ...AGENT_SPEED_CODECS,
   ...CONTEXT_COMPACT_CODECS,
@@ -257,12 +276,16 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...ROUTINE_RUN_COMMAND_CODECS,
   ...CLAUDE_USER_SETUP_CODECS,
   ...CLAUDE_COMPACT_WINDOW_CODECS,
+  ...CACHE_EXPIRY_COMPACTION_CODECS,
+  ...MEDIA_APPROVAL_CREDITS_CODECS,
+  ...MEDIA_APPROVAL_CHOICE_CODECS,
   ...PROVIDER_ENVIRONMENT_CODECS,
   ...PROVIDER_ACCOUNT_MODELS_CODECS,
   ...PROVIDER_ACCOUNT_POOL_CODECS,
   ...PROVIDER_ACCOUNT_KEYS_CODECS,
   ...PROVIDER_ACCOUNT_CODE_CODECS,
   ...GITHUB_SKILLS_CODECS,
+  ...AGENT_ARCHIVED_THREADS_CODECS,
   ...AGENT_THREAD_QUEUE_CODECS,
   ...AGENT_THREAD_REQUESTS_CODECS,
   ...AGENT_ACTIVE_QUEUES_CODECS,
@@ -306,6 +329,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WHATSAPP_CONNECTOR_CODECS,
   ...WHATSAPP_WORKING_MESSAGE_CODECS,
   ...WHATSAPP_STATUS_REACTIONS_CODECS,
+  ...WHATSAPP_READ_ONLY_CODECS,
   ...MESSAGE_DELETE_CODECS,
   ...CHAT_HISTORY_CODECS,
   ...CONVERSATION_UNREAD_FROM_CODECS,
@@ -331,6 +355,8 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...SIDE_QUESTION_CODECS,
   ...LIVE_VOICE_CODECS,
   ...LIVE_VOICE_ACCOUNT_CODECS,
+  ...VOICE_TRANSCRIPTION_CODECS,
+  ...CLIENT_BROWSER_CODECS,
   ...BROWSER_PROFILES_CODECS,
   ...WORKFLOWS_CODECS,
   ...CRM_CODECS,
@@ -341,7 +367,11 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CODECS,
   ...WORKFLOWS_MEDIA_CATALOG_CODECS,
   ...WORKFLOWS_MEDIA_CATALOG_V2_CODECS,
+  ...WORKFLOWS_CREDIT_MEDIA_CODECS,
+  ...WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CODECS,
   ...WORKFLOWS_STEP_SETTINGS_CODECS,
+  ...WORKFLOWS_PAUSE_CODECS,
+  ...WORKFLOWS_PORTABLE_CODECS,
   ...SIDEBAR_FOLDERS_CODECS,
   ...LIBRARY_FOLDERS_CODECS,
   ...WORKFLOW_FOLDERS_CODECS,

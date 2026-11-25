@@ -34,12 +34,14 @@ export function quietRoutineRun(run: Pick<RoutineRun, "kind" | "source">): boole
   return run.kind === "scheduled" || run.source === "script" || run.source === "webhook";
 }
 
-export function quietTeammateDelivery(delivery: QueueDelivery): boolean {
+export type FollowsUpOwnAnswer = (delivery: QueueDelivery) => boolean;
+
+export function quietTeammateDelivery(delivery: QueueDelivery, followsUpOwnAnswer: FollowsUpOwnAnswer): boolean {
   return (
     delivery.sender.kind === "agent" &&
     delivery.sender.agentId !== delivery.recipientAgentId &&
     delivery.expectsReply === false &&
-    !delivery.replyToMessageId
+    (!delivery.replyToMessageId || followsUpOwnAnswer(delivery))
   );
 }
 
@@ -64,8 +66,9 @@ export function teammateRequest(delivery: QueueDelivery): boolean {
 export function quietTeammateTurnDelivery(
   delivery: QueueDelivery,
   answered: (delivery: QueueDelivery) => boolean,
+  followsUpOwnAnswer: FollowsUpOwnAnswer,
 ): boolean {
-  return quietTeammateDelivery(delivery) || (teammateRequest(delivery) && answered(delivery));
+  return quietTeammateDelivery(delivery, followsUpOwnAnswer) || (teammateRequest(delivery) && answered(delivery));
 }
 
 export function isNoUpdateAnswer(text: string): boolean {
@@ -145,10 +148,13 @@ export function settleQuietChannelTurn(snapshot: ConversationSnapshot, turnId: s
   return true;
 }
 
-export function textAnswersOnly(snapshot: ConversationSnapshot, turnId: string): boolean {
+export function writesNoAnswer(snapshot: ConversationSnapshot, turnId: string): boolean {
   return snapshot.messages.every(
     (message) =>
-      message.author !== "assistant" || message.turnId !== turnId || isWorkNote(message) || isTextAnswer(message),
+      message.author !== "assistant" ||
+      message.turnId !== turnId ||
+      isWorkNote(message) ||
+      (isTextAnswer(message) && !keptQuietAnswer(message)),
   );
 }
 

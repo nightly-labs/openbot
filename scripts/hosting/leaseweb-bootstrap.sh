@@ -71,6 +71,7 @@ set -euo pipefail
 export LC_ALL=C
 STATE=/etc/openbot/egress-router
 PRIVATE4="0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 169.254.0.0/16, 172.16.0.0/12, 192.0.0.0/24, 192.168.0.0/16, 198.18.0.0/15, 224.0.0.0/4, 240.0.0.0/4"
+GOOGLE6="2001:4860::/32, 2404:6800::/32, 2404:f340::/32, 2605:ef80::/32, 2606:40::/32, 2606:73c0::/32, 2607:1c0:241:40::/60, 2607:1c0:300::/40, 2607:f8b0::/32, 2620:11a:a000::/40, 2620:120:e000::/40, 2800:3f0::/32, 2a00:1450::/32, 2a03:ace0::/32, 2c0f:fb50::/32"
 
 user=$(</opt/OpenBot/hosted/service-user)
 uid=$(id -u "$user")
@@ -103,12 +104,17 @@ table inet openbot_egress {
     type ipv6_addr; flags interval
     elements = { fc00::/7, fe80::/10, ff00::/8 }
   }
+  set google6 {
+    type ipv6_addr; flags interval
+    elements = { $GOOGLE6 }
+  }
   chain output {
     type filter hook output priority filter; policy accept;
     oifname "lo" accept
     tcp dport 25 counter reject with tcp reset comment "no direct mail"
     meta skuid $uid ip daddr @private4 counter reject comment "service user: no local ranges or metadata"
     meta skuid $uid ip6 daddr @private6 counter reject comment "service user: no local ranges"
+    meta skuid $uid ip6 daddr @google6 counter reject
   }
 }
 RULES

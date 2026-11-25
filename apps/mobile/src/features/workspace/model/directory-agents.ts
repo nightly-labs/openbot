@@ -34,3 +34,14 @@ export function keepDirectoryAgents(
     ? previous
     : next;
 }
+
+export function findChatAgent(
+  agents: readonly MobileAgent[],
+  agentId: string | undefined,
+  serverId: string | undefined,
+  activeServerId: string,
+): MobileAgent | undefined {
+  const withId = agents.filter((agent) => agent.id === agentId);
+  if (serverId) return withId.find((agent) => agent.serverId === serverId);
+  return withId.find((agent) => agent.serverId === activeServerId) ?? withId[0];
+}

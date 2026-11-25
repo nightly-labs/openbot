@@ -59,9 +59,15 @@ async function localAttachment(
 ): Promise<LocalFile> {
   const copy = mediaFile(serverId, attachment);
   if (!copy.exists || copy.size !== attachment.size) {
-    const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment));
     copy.parentDirectory.create({ intermediates: true, idempotent: true });
-    await writeMediaFile(copy, data.base64);
+    const data = await downloadAttachment(
+      serverId,
+      attachment.id,
+      largeDownloadOf(attachment, copy.uri),
+      undefined,
+      true,
+    );
+    if (!data.file) await writeMediaFile(copy, data.base64);
   }
   const mimeType = attachment.mimeType || attachmentMimeTypeForName(attachment.name);
   return { uri: copy.uri, name: attachment.name, mimeType, size: attachment.size };

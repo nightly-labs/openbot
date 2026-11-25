@@ -1,9 +1,11 @@
 import type { AppInfo, SettingLinkId } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import type { AgentSettingLinkId } from "@openbot/ui/features/conversation/agent-setting-links";
-import type { SettingsTab } from "./settings-tabs";
+import { type SettingsTab, settingsTabShown } from "./settings-tabs";
 
-export type AppSettingLinkId = Exclude<SettingLinkId, AgentSettingLinkId>;
+type CreditsSettingLinkId = "credits.explainer";
+
+export type AppSettingLinkId = Exclude<SettingLinkId, AgentSettingLinkId | CreditsSettingLinkId>;
 
 export interface AppSettingLinkTarget {
   tab: SettingsTab;
@@ -44,6 +46,7 @@ const TARGETS: Record<Exclude<AppSettingLinkId, "island.show">, AppSettingLinkTa
   "app.keep-awake-on-battery": { tab: "app-behavior", row: "settings.keepAwakeOnBattery.title" },
   "dock.show": { tab: "agent-dock", row: "settings.agentDock.show.title" },
   "dock.agents": { tab: "agent-dock", row: "settings.agentDock.agents.title" },
+  "computer-use.permissions": { tab: "computer-use", row: "computerUse.permissions.title" },
   "updates.track": { tab: "updates", row: "settings.updates.track.title" },
   "updates.auto-install": { tab: "updates", row: "settings.updates.autoInstall.title" },
 };
@@ -56,5 +59,16 @@ export function appSettingLinkTarget(
   return {
     tab: "dynamic-island",
     row: platform === "darwin" ? "settings.notch.show.title" : "settings.notch.show.titleTopOfScreen",
+  };
+}
+
+export function appSettingRowOpener(
+  surface: () => { platform: AppInfo["platform"] | undefined; chatWindow: boolean },
+  openRow: (tab: SettingsTab, row: AppTextKey) => void,
+): (settingId: AppSettingLinkId) => (() => void) | undefined {
+  return (settingId) => {
+    const current = surface();
+    const target = appSettingLinkTarget(settingId, current.platform);
+    return settingsTabShown(target.tab, current) ? () => openRow(target.tab, target.row) : undefined;
   };
 }

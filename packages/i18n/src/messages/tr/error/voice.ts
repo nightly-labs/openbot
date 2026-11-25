@@ -12,6 +12,9 @@ export const messages = {
   "error.voice.prepareRequired":
     "Yerel ses dökümü kullanılamıyor. `bun run voice:prepare` komutunu çalıştırın ve OpenBot'u yeniden başlatın.",
   "error.voice.transcriptionFailed": "OpenBot bu kaydın dökümünü çıkaramadı.",
+  "error.voice.videoModelMissing": "Ayarlar → Ses bölümünde kayıtlar için bir konuşma tanıma modeli ayarlanmamış.",
+  "error.voice.videoModelMissingServer":
+    "Bu sunucuda bir konuşma tanıma modeli ayarlanmamış. Bir sahip veya yönetici, sunucu ayarlarındaki Konuşma tanıma bölümünden bir model ayarlayabilir.",
   "error.voice.cloud.keyRequired": "{provider} API anahtarınızı Ayarlar → Ses bölümünde ekleyin.",
   "error.voice.cloud.keyRejected":
     "{provider} API anahtarını kabul etmedi. Anahtarı Ayarlar → Ses bölümünde kontrol edin.",
@@ -25,10 +28,13 @@ export const messages = {
   "error.voice.speech.modelRequired": "Konuşma modelini Ayarlar → Ses bölümünden indirin.",
   "error.voice.speech.timedOut": "Yanıtı sesli okuma zaman aşımına uğradı.",
   "error.voice.speech.failed": "OpenBot yanıtı sesli okuyamadı.",
+  "error.voice.speech.providerRefused": "{provider} sesi oluşturmayı reddetti: {reason}",
   "error.voice.recordingNotKept": "OpenBot ses kaydını saklayamadı.",
   "error.voice.live.timedOut": "Codex canlı ses zamanında başlamadı. Tekrar dene.",
   "error.voice.live.failed": "Canlı ses durdu: {reason}",
   "error.voice.live.disconnected": "Canlı ses bağlantısı kesildi.",
+  "error.voice.live.startFailed":
+    "Canlı ses başlatılamadı. Aracıyı çalıştıran bilgisayarda Codex'i güncelleyin ve ChatGPT ile oturum açın, sonra yeniden deneyin. Neden: {reason}",
   "error.voice.live.hostFailed":
     "Sunucudaki Codex canlı sesi başlatamadı. Sahibinden o bilgisayardaki Codex'i güncellemesini ve ChatGPT ile oturum açmasını isteyin, sonra yeniden deneyin.",
   "error.voice.live.signIn": "Canlı sesi kullanmak için ChatGPT hesabınızla Codex'e giriş yapın.",
@@ -38,4 +44,6 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI canlı sesi başlatmayı reddetti. Daha sonra yeniden deneyin veya sesle konuşmak için Ayarlar'dan canlı sesi kapatın.",
   "error.voice.live.off": "Codex canlı ses kapalı. Ayarlar → Ses bölümünden açın.",
+  "error.voice.server.modelUnsupported":
+    "{host}, {model} ile yazıya dökemiyor. Ayarlar → Ses bölümünde ses sunucusu için başka bir dikte modeli seçin.",
 } as const satisfies PartialTranslation<typeof source>;

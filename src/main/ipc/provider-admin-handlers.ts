@@ -350,7 +350,7 @@ export function providerAdminIpcHandlers({
   return {
     providerAdmin: {
       startCodeLogin: scopedHandler(parseProviderId, {
-        local: (provider) => runCauseEffect(service.startProviderCodeLogin(provider)),
+        local: (provider) => runCauseEffect(service.startProviderCodeLogin(provider, true)),
         remote: (provider, serverId) =>
           remote(serverId, signInRoutes(serverId, provider).codeLoginStart, { provider }, decodeProviderCodeLoginStart),
       }),

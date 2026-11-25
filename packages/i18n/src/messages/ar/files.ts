@@ -122,6 +122,8 @@ export const messages = {
     other: "كل الوكلاء ({count})",
   },
   "files.library.folders": "المجلدات",
+  "files.library.workflows": "سير العمل",
+  "files.library.workflowsOf": "سير العمل في {name}",
   "files.library.favorite": "تفضيل {name}",
   "files.folder.new": "مجلد جديد",
   "files.folder.name": "اسم المجلد",
@@ -284,6 +286,8 @@ export const messages = {
   "files.conversation.title": "الملفات",
   "files.conversation.summary": "{files} · الدردشة {size}",
   "files.conversation.close": "إغلاق الملفات",
+  "files.conversation.workspace": "مجلد مساحة العمل",
+  "files.conversation.workspaces": "مجلدات مساحات العمل",
   "files.conversation.emptyTitle": "لا ملفات في هذه الدردشة",
   "files.conversation.emptyDescription": "تظهر هنا الملفات التي ترفقها والملفات التي يصنعها الوكيل.",
 } as const satisfies PartialTranslation<typeof source>;

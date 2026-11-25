@@ -11,13 +11,16 @@ const BUILT_IN = [
   { modelId: "grok-4.5", name: "Grok 4.5" },
 ];
 const CATALOGUE = [{ modelId: "grok-4.7", name: "Grok 4.7" }, ...BUILT_IN];
-const partial = Number(JSON.parse(readFileSync(process.env.FAKE_CONTROL ?? "", "utf8")).partial) || 0;
+const control = JSON.parse(readFileSync(process.env.FAKE_CONTROL ?? "", "utf8"));
+const partial = Number(control.partial) || 0;
+const marksLists = control.markLists === true;
 let setups = 0;
 let count = 0;
 
 function setup(request: AcpRequest, peer: AcpPeer, sessionId: string): void {
   setups += 1;
-  const models = setups <= partial ? BUILT_IN : CATALOGUE;
+  const short = marksLists ? [...BUILT_IN, { modelId: `grok-list-${setups}`, name: `Grok list ${setups}` }] : BUILT_IN;
+  const models = setups <= partial ? short : CATALOGUE;
   logEntry({ event: "setup", pid: process.pid, setup: setups, models: models.map((model) => model.modelId) });
   peer.reply(request, { sessionId, models: { availableModels: models, currentModelId: models[0]?.modelId } });
 }

@@ -16,8 +16,10 @@ import { isChannelHistoryExtentRoute, withChannelHistoryExtent } from "./history
 import { isMcpSignInListRoute, mcpManyServersResponse, mcpManySignInsResponse } from "./mcp-many-servers-v1";
 import { isMcpRoute, mcpRequest, mcpResponse } from "./mcp-v1";
 import { optionalRouteCodec } from "./optional-routes";
+import { providerManyAccountsRequest, providerManyAccountsResponse } from "./provider-many-accounts-v1";
 import { isRoutineResultsRoute, routineResultsWhatsAppResponse } from "./routine-results-whatsapp-v1";
 import { isStorageRoute, storageRequest, storageResponse } from "./storage-v1";
+import { withStorageWorkflowFiles } from "./storage-workflow-files-v1";
 import type { TeamProtocolV2Json } from "./webrtc-framing";
 
 export interface TeamSideRouteOptions {
@@ -30,7 +32,9 @@ export interface TeamSideRouteOptions {
   channelSeenSubtasks?: boolean;
   channelTaskWaits?: boolean;
   mcpManyServers?: boolean;
+  providerManyAccounts?: boolean;
   routineResultsWhatsApp?: boolean;
+  storageWorkflowFiles?: boolean;
 }
 
 export interface TeamSideRouteCodec {
@@ -78,7 +82,13 @@ const MCP_CODEC: TeamSideRouteCodec = {
   response: (path, status, value, options) =>
     options?.mcpManyServers ? mcpManyServersResponse(path, status, value) : mcpResponse(path, status, value),
 };
-const STORAGE_CODEC: TeamSideRouteCodec = { request: storageRequest, response: storageResponse };
+const STORAGE_CODEC: TeamSideRouteCodec = {
+  request: storageRequest,
+  response: (path, status, value, options) => {
+    const projected = storageResponse(path, status, value);
+    return options?.storageWorkflowFiles && status < 400 ? withStorageWorkflowFiles(path, projected, value) : projected;
+  },
+};
 const ATTACHMENT_PREVIEW_SIDE_CODEC: TeamSideRouteCodec = {
   request: (_path, value) => ATTACHMENT_PREVIEW_CODEC.request(value),
   response: (_path, status, value) => ATTACHMENT_PREVIEW_CODEC.response(status, value),
@@ -93,10 +103,16 @@ export function teamSideRouteCodec(path: string): TeamSideRouteCodec | null {
   const admin = optionalRouteCodec(path);
   return admin
     ? {
-        request: (_path, value) => admin.request(value),
+        request: (path, value, options) => {
+          const manyAccounts = options?.providerManyAccounts ? providerManyAccountsRequest(path) : null;
+          return manyAccounts ? manyAccounts(value) : admin.request(value);
+        },
         response: (path, status, value, options) => {
-          const projected =
-            options?.mcpManyServers && status < 400 && isMcpSignInListRoute(path)
+          const manyAccounts =
+            options?.providerManyAccounts && status < 400 ? providerManyAccountsResponse(path) : null;
+          const projected = manyAccounts
+            ? manyAccounts(value)
+            : options?.mcpManyServers && status < 400 && isMcpSignInListRoute(path)
               ? mcpManySignInsResponse(value)
               : options?.routineResultsWhatsApp && status < 400 && isRoutineResultsRoute(path)
                 ? routineResultsWhatsAppResponse(path, value)

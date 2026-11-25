@@ -101,6 +101,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "יש לפתוח את דף ההתחברות של {name}.",
   "mobile.marketplace.app.stepAllow": "יש להתחבר ולאשר גישה.",
   "mobile.marketplace.app.stepReturn": "יש לחזור לכאן. {name} מתחבר בשרת שלך.",
+  "mobile.marketplace.app.stepBlank": "הדף האחרון לא נטען. זה תקין.",
+  "mobile.marketplace.app.stepCopy": "יש ללחוץ על שורת הכתובת ולהעתיק את הכתובת המלאה.",
+  "mobile.marketplace.app.stepPaste": "יש לחזור ל-OpenBot ולהדביק את הכתובת למטה.",
   "mobile.marketplace.app.openSignIn": "פתיחת דף ההתחברות",
   "mobile.marketplace.app.keySecure": "המפתח נשלח רק לשרת שלך, בחיבור מוצפן.",
   "mobile.marketplace.app.connecting": "מתחבר",
@@ -116,8 +119,6 @@ export const messages = {
     "האפליקציה הזו דורשת התחברות בדפדפן. יש לעדכן את OpenBot בשרת, או לחבר את האפליקציה במחשב.",
   "mobile.marketplace.app.waiting": "ממתין לדף ההתחברות…",
   "mobile.marketplace.app.openAgain": "פתיחת דף ההתחברות שוב",
-  "mobile.marketplace.app.pasteHint":
-    "בסוף התהליך הדף פותח כתובת שלא נטענת. יש להעתיק את הכתובת הזו ולהדביק אותה למטה.",
   "mobile.marketplace.app.pasteLabel": "הכתובת אחרי ההתחברות",
   "mobile.marketplace.app.pasteInvalid": "הכתובת הזו אינה סוף ההתחברות הזו.",
   "mobile.marketplace.app.finishSignIn": "סיום ההתחברות",
