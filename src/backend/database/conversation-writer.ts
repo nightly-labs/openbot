@@ -1022,7 +1022,7 @@ export const CONVERSATION_UPDATED = "conversation.snapshot-updated";
 export const GENERATED_UPDATE_COMMAND =
   /^conversation:conversation\.snapshot-updated:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-export function updateActivityId(sequence: number): string {
+function updateActivityId(sequence: number): string {
   return `${CONVERSATION_UPDATED}:${sequence}`;
 }
 

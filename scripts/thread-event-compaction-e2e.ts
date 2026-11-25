@@ -67,6 +67,7 @@ interface Context {
   write(changedMessages: ConversationMessage[], activeTurnId?: string | null): void;
   remove(messageIds: string[], activeTurnId?: string | null): void;
   compactBatch(): void;
+  compactAll(): void;
 }
 
 interface Case {
@@ -264,6 +265,19 @@ const cases: Case[] = [
       write([message("z", 3)]);
     },
   },
+  {
+    name: "a compacted thread with many new events is taken again",
+    minimumRewritten: 0,
+    minimumDeleted: 1000,
+    run: ({ write, compactAll }) => {
+      write([message("a", 1, { text: "a0" }), message("b", 2, { text: "b0" })]);
+      compactAll();
+      for (let step = 1; step <= 520; step++) {
+        write([message("a", 1, { text: `a${step}` })]);
+        write([message("b", 2, { text: `b${step}` })]);
+      }
+    },
+  },
 ];
 
 interface Side {
@@ -355,6 +369,9 @@ function context(side: Side, compacts: boolean): Context {
     },
     compactBatch: () => {
       if (compacts) compactBatch(side);
+    },
+    compactAll: () => {
+      if (compacts) while (compactBatch(side)) {}
     },
   };
 }
@@ -491,9 +508,9 @@ async function runCase(test: Case): Promise<CaseReport> {
       result.deleted >= result.minimumDeleted &&
       (test.minimumDeleted === undefined ? result.deleted === 0 : result.compactedEvents === result.events - deleted) &&
       result.laterPassDeleted === 0 &&
-      (test.oldEventsLater || result.secondPassRewritten === 0) &&
+      (test.oldEventsLater ? result.secondPassRewritten > 0 : result.secondPassRewritten === 0) &&
       result.thirdPassRewritten === 0 &&
-      result.bytesAfter < result.bytesBefore;
+      (result.rewritten === 0 || result.bytesAfter < result.bytesBefore);
     if (keyDifference) result.difference = keyDifference;
     else if (!replayMatches) result.difference = "the rebuilt chats differ";
     else if (!rowsMatch) {

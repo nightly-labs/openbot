@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { CONVERSATION_UPDATED, GENERATED_UPDATE_COMMAND, updateActivityId } from "./conversation-writer";
+import { CONVERSATION_UPDATED, GENERATED_UPDATE_COMMAND } from "./conversation-writer";
 import { type DatabaseCore, deleteReceiptsOf } from "./database-core";
 import { databaseRow, objectValue, requiredNumberColumn, requiredStringColumn } from "./database-rows";
 import { withTransaction } from "./sqlite-transaction";
@@ -39,6 +39,7 @@ interface SupersededUpdates {
 }
 
 const BATCH_EVENTS = 256;
+const REFOLD_MIN_NEW_EVENTS = 1000;
 const BATCH_BYTES = 4 * 1024 * 1024;
 const MAX_RESTARTS = 3;
 
@@ -102,14 +103,14 @@ export class ThreadEventCompaction {
            WHERE t.thread_id > ?
              AND NOT EXISTS (
                SELECT 1 FROM thread_event_compaction c
-               WHERE c.thread_id = t.thread_id AND c.through_sequence >= (
-                 SELECT coalesce(max(e.sequence), 0) FROM orchestration_events e
-                 WHERE e.aggregate_type = 'thread' AND e.aggregate_id = t.thread_id
-               )
+               WHERE c.thread_id = t.thread_id AND (
+                 SELECT count(*) FROM orchestration_events e
+                 WHERE e.aggregate_type = 'thread' AND e.aggregate_id = t.thread_id AND e.sequence > c.through_sequence
+               ) < max(?, (SELECT count(*) FROM projection_thread_messages m WHERE m.thread_id = t.thread_id))
              )
            ORDER BY t.thread_id LIMIT 1`,
         )
-        .get(this.#afterThreadId),
+        .get(this.#afterThreadId, REFOLD_MIN_NEW_EVENTS),
     );
     if (!row) return null;
     const threadId = requiredStringColumn(row, "thread_id");
@@ -321,13 +322,15 @@ function deleteSupersededUpdates(db: DatabaseSync, progress: ThreadProgress, seq
      WHERE sequence = ? AND aggregate_type = 'thread' AND aggregate_id = ? AND event_type = ?
      RETURNING command_id`,
   );
-  const removeActivity = db.prepare("DELETE FROM projection_thread_activities WHERE activity_id = ?");
+  const removeActivities = db.prepare(
+    "DELETE FROM projection_thread_activities WHERE thread_id = ? AND last_event_sequence = ?",
+  );
   const commandIds: string[] = [];
   for (const sequence of sequences) {
     const row = databaseRow(remove.get(sequence, progress.threadId, CONVERSATION_UPDATED));
     if (!row) continue;
     commandIds.push(requiredStringColumn(row, "command_id"));
-    removeActivity.run(updateActivityId(sequence));
+    removeActivities.run(progress.threadId, sequence);
     progress.count -= 1;
     progress.sequenceSum -= sequence;
   }

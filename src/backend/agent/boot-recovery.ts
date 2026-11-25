@@ -556,9 +556,23 @@ export class BootRecovery {
     );
   });
 
-  readonly compactThreadEvents = Effect.fn("BootRecovery.compactThreadEvents")(function* (this: BootRecovery) {
-    if (this.#threadEventsCompacted) return;
-    this.#threadEventsCompacted = true;
+  compactThreadEvents(): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      if (this.#threadEventsCompacted) return Effect.void;
+      this.#threadEventsCompacted = true;
+      return this.#compactThreadEventsOnce().pipe(
+        Effect.andThen(Effect.sleep(THREAD_EVENT_COMPACTION_INTERVAL)),
+        Effect.forever,
+        Effect.ensuring(
+          Effect.sync(() => {
+            this.#threadEventsCompacted = false;
+          }),
+        ),
+      );
+    });
+  }
+
+  readonly #compactThreadEventsOnce = Effect.fn("BootRecovery.compactThreadEvents")(function* (this: BootRecovery) {
     yield* compactThreadEvents(this.#store.database).pipe(
       Effect.tap((result) =>
         Effect.sync(() => {
@@ -574,8 +588,6 @@ export class BootRecovery {
           });
         }),
       ),
-      Effect.andThen(Effect.sleep(THREAD_EVENT_COMPACTION_INTERVAL)),
-      Effect.forever,
     );
   });
 
