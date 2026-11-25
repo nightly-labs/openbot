@@ -22,7 +22,7 @@ function valuesNamed(environment: NodeJS.ProcessEnv, names: ReadonlySet<string>)
   );
 }
 
-export function grokProxyEnvironment(rules: string, environment: NodeJS.ProcessEnv): Record<string, string> {
+function grokProxyEnvironment(rules: string, environment: NodeJS.ProcessEnv): Record<string, string> {
   if (valuesNamed(environment, USER_PROXY_NAMES).length > 0) return {};
   const userBypass = valuesNamed(environment, new Set(["no_proxy"])).flatMap((value) => value.split(/[\s,]+/u));
   if (userBypass.includes("*")) return {};
