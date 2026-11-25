@@ -221,6 +221,18 @@ const PREVIEW_STALE_AFTER_MS = 1_000;
 const VIEW_FRAME_QUALITY = 60;
 const VIEW_FRAME_MAX_WIDTH = 1_280;
 const VIEW_FRAME_MAX_HEIGHT = 800;
+const VIEW_FRAME_LIMIT = 2_048;
+const VIEW_FRAME_MAX_PIXELS = 2_048 * 1_080;
+
+function viewFrameBox(asked: BrowserViewViewport | undefined): { maxWidth: number; maxHeight: number } {
+  if (!asked) return { maxWidth: VIEW_FRAME_MAX_WIDTH, maxHeight: VIEW_FRAME_MAX_HEIGHT };
+  const maxWidth = Math.min(VIEW_FRAME_LIMIT, Math.max(VIEW_FRAME_MAX_WIDTH, Math.round(asked.width)));
+  const tallest = Math.max(VIEW_FRAME_MAX_HEIGHT, Math.floor(VIEW_FRAME_MAX_PIXELS / maxWidth));
+  return {
+    maxWidth,
+    maxHeight: Math.min(VIEW_FRAME_LIMIT, tallest, Math.max(VIEW_FRAME_MAX_HEIGHT, Math.round(asked.height))),
+  };
+}
 const TAB_SET_TOOLS: ReadonlySet<string> = new Set(["open", "list_tabs", "status"]);
 const VIEW_CONTEXT_MENU_MS = 1_500;
 const DIALOG_ACTION_WAIT_MS = 10_000;
@@ -241,6 +253,7 @@ const DOWNLOAD_TOO_LARGE =
 export interface BrowserViewOptions {
   onCursor?: (cursor: BrowserViewCursor) => void;
   viewport?: BrowserViewViewport;
+  frameSize?: BrowserViewViewport;
   onPageCopy?: (text: string) => void;
 }
 
@@ -2225,7 +2238,7 @@ export class BrowserHost {
     onEnded?: (reason: string) => void,
     options: BrowserViewOptions = {},
   ): Effect.fn.Return<() => Effect.Effect<void>, BrowserOperationError> {
-    const { onCursor, viewport, onPageCopy } = options;
+    const { onCursor, viewport, frameSize, onPageCopy } = options;
     const tab = yield* this.#requireTab(tabId);
     const protection = tab.secret;
     if (protection?.submitted && !protection.running && this.#takeoverTabIds.has(tabId))
@@ -2271,8 +2284,7 @@ export class BrowserHost {
       tab.engine.startScreencast(
         {
           quality: VIEW_FRAME_QUALITY,
-          maxWidth: VIEW_FRAME_MAX_WIDTH,
-          maxHeight: VIEW_FRAME_MAX_HEIGHT,
+          ...viewFrameBox(frameSize),
           ...(viewport ? { viewport } : {}),
           ...(onPageCopy
             ? {

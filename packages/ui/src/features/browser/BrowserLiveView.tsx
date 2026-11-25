@@ -64,11 +64,11 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
       bitmap.close();
       return;
     }
-    if (element.width !== next.width || element.height !== next.height) {
-      element.width = next.width;
-      element.height = next.height;
+    if (element.width !== bitmap.width || element.height !== bitmap.height) {
+      element.width = bitmap.width;
+      element.height = bitmap.height;
     }
-    context.drawImage(bitmap, 0, 0, next.width, next.height);
+    context.drawImage(bitmap, 0, 0);
     bitmap.close();
     setFrame({ sequence: next.sequence, width: next.width, height: next.height });
   };
