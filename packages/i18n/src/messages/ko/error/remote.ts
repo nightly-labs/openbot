@@ -96,6 +96,8 @@ export const messages = {
   "error.remote.connectionServiceUnreachable":
     "이 컴퓨터가 OpenBot 연결 서비스에 연결할 수 없어요. 인터넷 연결을 확인하세요. OpenBot이 자동으로 다시 연결해요.",
   "error.remote.serverAnswerTimeout": "서버가 제때 응답하지 않았어요. OpenBot이 자동으로 다시 연결해요.",
+  "error.remote.signInConnectionClosed":
+    "로그인 중에 서버 연결이 끊겼어요. 계속 그러면 서버와 이 기기의 날짜와 시간이 맞는지 확인하세요.",
   "error.remote.connectionCancelled": "원격 연결이 취소되었어요.",
   "error.remote.hostDisconnected": "서버와의 연결이 끊어졌어요. 작업이 완료되었는지 확인한 후 다시 시도해 주세요.",
   "error.remote.eventGap": "호스트 이벤트 순서에 누락이 있어요.",

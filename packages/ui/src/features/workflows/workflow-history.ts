@@ -10,7 +10,12 @@ import {
 import { createSignal } from "solid-js";
 import type { BoardSnapshot, WfnFields, WfnPoint, WfnSize } from "./workflow-board";
 import type { Stroke } from "./workflow-ink";
-import { defaultWorkflowModel, type WorkflowCatalogs, type WorkflowFeatures } from "./workflow-model";
+import {
+  defaultWorkflowModel,
+  offeredModelProviders,
+  type WorkflowCatalogs,
+  type WorkflowFeatures,
+} from "./workflow-model";
 import { isColor } from "./workflow-node-parts";
 
 export interface CanvasItem {
@@ -107,17 +112,24 @@ export function stableJson(value: unknown): string {
   );
 }
 
+export interface HistoryRename {
+  readonly workflowId: string;
+  readonly before: string;
+  readonly after: string;
+}
+
 export function createCanvasHistory(options: {
   capture: () => CanvasSnapshot;
   apply: (snapshot: CanvasSnapshot) => void;
   beforeCommit: () => void;
 }) {
-  type Entry = { snapshot: CanvasSnapshot; at: number };
+  type Entry = { snapshot: CanvasSnapshot; at: number; rename?: HistoryRename };
   let past: Entry[] = [];
   let future: Entry[] = [];
   let rebases: ((snapshot: CanvasSnapshot) => CanvasSnapshot)[] = [];
   let first = 0;
-  const entry = (snapshot: CanvasSnapshot): Entry => ({ snapshot, at: first + rebases.length });
+  const entry = (snapshot: CanvasSnapshot, rename?: HistoryRename): Entry =>
+    rename ? { snapshot, at: first + rebases.length, rename } : { snapshot, at: first + rebases.length };
   const take = (saved: Entry) =>
     rebases.slice(saved.at - first).reduce((snapshot, change) => change(snapshot), saved.snapshot);
   const prune = () => {
@@ -145,23 +157,29 @@ export function createCanvasHistory(options: {
       if (joined === 0) push(options.capture());
     },
     push,
-    undo: () => {
+    renamedWith: (rename: HistoryRename) => {
+      const last = past.at(-1);
+      if (last) past = [...past.slice(0, -1), { ...last, rename }];
+    },
+    undo: (): HistoryRename | undefined => {
       const saved = past.at(-1);
       if (!saved) return;
-      future = [...future, entry(options.capture())];
+      future = [...future, entry(options.capture(), saved.rename)];
       past = past.slice(0, -1);
       options.apply(take(saved));
       prune();
       count();
+      return saved.rename;
     },
-    redo: () => {
+    redo: (): HistoryRename | undefined => {
       const saved = future.at(-1);
       if (!saved) return;
-      past = [...past, entry(options.capture())];
+      past = [...past, entry(options.capture(), saved.rename)];
       future = future.slice(0, -1);
       options.apply(take(saved));
       prune();
       count();
+      return saved.rename;
     },
     clear: () => {
       past = [];
@@ -186,7 +204,17 @@ export function createCanvasHistory(options: {
 
 export const newTriggerSchedule = () => ({ kind: "daily", time: "09:00" }) satisfies RoutineSchedule;
 
-const localTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+export const localTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+export function knownTimeZone(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length === 0) return undefined;
+  try {
+    new Intl.DateTimeFormat(undefined, { timeZone: value });
+    return value;
+  } catch {
+    return undefined;
+  }
+}
 
 export function hostDefaults(
   kind: WorkflowNodeKind,
@@ -196,7 +224,8 @@ export function hostDefaults(
 ): WfnFields {
   switch (kind) {
     case "agent": {
-      const agent = catalogs.agents[0];
+      const offered = new Set(offeredModelProviders(catalogs));
+      const agent = catalogs.agents.find((choice) => offered.has(choice.provider)) ?? catalogs.agents[0];
       return agent ? { agentId: agent.id, model: agent.model, provider: agent.provider } : {};
     }
     case "llm":
@@ -212,7 +241,8 @@ export function hostDefaults(
     }
     case "image": {
       const media = initial?.media === "video" ? "video" : "image";
-      const model = catalogs.imageModels.find((choice) => choice.kinds.includes(media));
+      const fits = catalogs.imageModels.filter((choice) => choice.kinds.includes(media));
+      const model = fits.find((choice) => choice.provider !== "openbot") ?? fits[0];
       return model ? { model: model.id } : {};
     }
     case "trigger": {

@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "Os eventos não estão disponíveis neste computador anfitrião.",
   "error.backend.databaseIntegrity": "O banco de dados do OpenBot falhou na verificação de integridade.",
+  "error.backend.creditsHoldAdminOnly":
+    "Somente um proprietário ou administrador deste servidor pode permitir que os agentes usem créditos.",
+  "error.backend.creditsHoldShort": "Ainda não há créditos suficientes.",
   "error.backend.webhookRouteLimit": "Um computador anfitrião pode ter no máximo {limit} rotinas de webhook.",
   "error.backend.webhookSettingsInvalid": "Verifique as configurações do webhook e tente de novo.",
   "error.backend.webhookSenderSecretInvalid":
@@ -73,6 +76,12 @@ export const messages = {
     "A compactação não reduz este chat: após duas compactações, ele ainda usa {percent}% da janela de contexto do modelo, por isso o OpenBot para de compactá-lo. Ferramentas e instruções usam a maior parte da janela. Desative os servidores MCP ou o uso do computador de que este agente não precisa, ou escolha um modelo com uma janela maior. Depois, inicie um novo chat.",
   "error.backend.contextCompactionStopped":
     'Duas compactações seguidas deste chat falharam, então o OpenBot para de compactá-lo automaticamente. Cada tentativa envia o chat inteiro ao modelo e consome o limite do seu plano. Selecione "Compactar agora" para tentar de novo ou inicie um novo chat.',
+  "error.backend.contextCompactionRetrying":
+    "O provedor não conseguiu compactar este chat e está tentando de novo. As novas mensagens deste chat esperam até a compactação terminar. Se ela não terminar logo, o OpenBot a interrompe e envia suas mensagens.",
+  "error.backend.contextCompactionFailed":
+    "A compactação deste chat falhou. O chat não mudou. As mensagens em espera vão agora para o agente.",
+  "error.backend.contextCompactionTimedOut":
+    "A compactação deste chat demorou demais, então o OpenBot a interrompeu. O chat não mudou. As mensagens em espera vão agora para o agente.",
   "error.backend.providerModelAtCapacity":
     "O modelo está no limite da capacidade. O provedor vai tentar de novo em alguns minutos. Para continuar agora, pare o turno e escolha outro modelo.",
   "error.backend.providerRetrying":
@@ -117,6 +126,14 @@ export const messages = {
   "error.backend.channelLeadTimedOut": "O líder do canal não respondeu a tempo. Escolha um membro ou tente novamente.",
   "error.backend.channelLeadFailed":
     "O líder do canal não conseguiu encaminhar esta mensagem. Escolha um membro ou tente novamente.",
+  "error.backend.channelLeadBusy":
+    "O modelo do líder está ocupado agora. Tente novamente em alguns minutos ou escolha um membro.",
+  "error.backend.channelLeadOffline": "O modelo do líder perdeu a conexão. Tente novamente ou escolha um membro.",
+  "error.backend.channelLeadSignIn": "O login no provedor do líder expirou. Entre novamente ou escolha um membro.",
+  "error.backend.channelLeadModelGone":
+    "O modelo do líder não está disponível. Escolha outro modelo para o líder ou escolha um membro.",
+  "error.backend.channelLeadRefused":
+    "O modelo do líder recusou esta solicitação. Escolha um membro ou outro modelo para o líder.",
   "error.backend.channelRequestMemberRequired": "Escolha um membro para esta solicitação.",
   "error.backend.channelDeliveryNotCreated": "A entrega do canal não foi criada.",
   "error.backend.channelAssignmentStopped": "Esta tarefa atribuída pelo canal foi interrompida ou substituída.",
@@ -304,7 +321,11 @@ export const messages = {
   "error.backend.mcpServerExited":
     "O servidor parou antes de responder. Execute o comando em um terminal para ver o erro.",
   "error.backend.mcpServerExitedWithOutput": "O servidor parou antes de responder. Ele escreveu: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "O servidor não iniciou, porque o download falhou. Verifique a conexão com a internet e tente novamente.",
   "error.backend.mcpServerFailedToStart": "O servidor não iniciou: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "O OpenBot não conseguiu iniciar o servidor MCP {name}, porque o programa dele não está instalado no computador que executa o OpenBot. Instale o app que fornece {name} nesse computador, ou desative {name} na Loja, Apps.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} parou de esperar antes de o servidor iniciar, por isso os agentes dele não recebem as ferramentas deste servidor.",
   "error.backend.mcpServerStoppedDuringCall": "O servidor MCP parou antes de responder a esta chamada.",
@@ -430,6 +451,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "O proxy {name} recusou o início de sessão, por isso a página não abriu.",
   "error.backend.browserSystemProxyFailed":
     "O proxy nas configurações do computador que executa o OpenBot não responde ou recusou a conexão, por isso a página não abriu. Verifique as configurações de proxy desse computador.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "O site ou o proxy nas configurações do computador que executa o OpenBot fechou a conexão sem resposta, por isso a página não abriu. Se nenhum site abrir, verifique as configurações de proxy desse computador.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "O site ou o proxy deste perfil do navegador fechou a conexão sem resposta, por isso a página não abriu. Se nenhum site abrir, verifique o proxy do perfil.",
   "error.backend.browserProxyComputerUnreachable":
     "O computador que este perfil usa não responde, por isso a página não abriu.",
   "error.backend.browserProxyComputerLocalAddress":
@@ -438,6 +463,8 @@ export const messages = {
     "O certificado de segurança deste site não é confiável, por isso a página não abriu.",
   "error.backend.browserLowMemory":
     "Este servidor está com pouca memória, por isso o navegador não pode abrir outra aba. Feche uma aba ou aguarde os outros agentes terminarem.",
+  "error.backend.browserNoMemory":
+    "Este servidor está quase sem memória, por isso o navegador não pode abrir uma aba agora. Aguarde os outros agentes terminarem e tente novamente.",
   "error.backend.browserOpenFailed": "Não foi possível abrir {url}: {reason}",
   "error.backend.popupSecureInput":
     "Pop-ups são bloqueados durante a entrada segura. Conclua ou cancele a entrada segura e tente novamente na página.",

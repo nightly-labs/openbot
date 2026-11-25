@@ -13,6 +13,7 @@ import { AGENT_BUILTIN_MEMORY_CAPABILITY } from "./agent-builtin-memory-v1";
 import { AGENT_COLORS_CAPABILITY } from "./agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "./agent-create-operation-v1";
 import { AGENT_DEFAULTS_CAPABILITY } from "./agent-defaults-v1";
+import { AGENT_ERROR_LINK_CAPABILITY } from "./agent-error-link-v1";
 import { AGENT_FAST_MODE_CAPABILITY } from "./agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "./agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "./agent-hidden-v1";
@@ -46,6 +47,7 @@ import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
 import { AGENT_USAGE_LIMIT_CAPABILITY } from "./agent-usage-limit-v1";
 import { AGENT_WAITS_CAPABILITY } from "./agent-waits-v1";
 import { AGENT_WELCOME_CAPABILITY } from "./agent-welcome-v1";
+import { ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY } from "./antigravity-code-sign-in-v1";
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "./attachment-preview-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "./background-processes-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "./bitwarden-connector-v1";
@@ -67,6 +69,7 @@ import {
   TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY,
   TEAM_BROWSER_VIEW_CURSOR_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY,
   TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
   TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
 } from "./browser-view-v1";
@@ -76,6 +79,7 @@ import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CHANNEL_BROWSER_CAPABILITY } from "./channel-browser-v1";
 import { CHANNEL_FOLDERS_CAPABILITY } from "./channel-folders-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
+import { CHANNEL_PAGE_TASKS_CAPABILITY } from "./channel-page-tasks-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "./channel-picture-v1";
 import { CHANNEL_SEEN_SUBTASKS_CAPABILITY } from "./channel-seen-subtasks-v1";
 import { CHANNEL_TASK_WAITS_CAPABILITY } from "./channel-task-waits-v1";
@@ -84,6 +88,7 @@ import { CHAT_HISTORY_CAPABILITY } from "./chat-history-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
 import { CLAUDE_COMPACT_WINDOW_CAPABILITY } from "./claude-compact-window-v1";
 import { CLAUDE_USER_SETUP_CAPABILITY } from "./claude-user-setup-v1";
+import { CLIENT_BROWSER_CAPABILITY } from "./client-browser-v1";
 import { CODEX_API_KEY_CAPABILITY } from "./codex-api-key-v1";
 import { COMPUTER_ACTIVITY_CAPABILITY } from "./computer-activity-v1";
 import { CONNECTORS_CAPABILITY } from "./connectors-v1";
@@ -113,6 +118,7 @@ import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
 import { HOST_RESTART_CAPABILITY } from "./host-restart-v1";
 import { HOST_SIGNAL_HOME_CAPABILITY } from "./host-signal-home-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
+import { HOST_TURN_LIMITS_EVENTS_CAPABILITY } from "./host-turn-limits-events-v1";
 import { HOST_TURN_LIMITS_CAPABILITY } from "./host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOST_VOICE_MODEL_CAPABILITY } from "./host-voice-model-v1";
@@ -132,6 +138,8 @@ import { MCP_ACCESS_CAPABILITY } from "./mcp-access-v1";
 import { MCP_MANY_SERVERS_CAPABILITY } from "./mcp-many-servers-v1";
 import { MCP_SIGN_IN_APP_CAPABILITY } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "./mcp-sign-in-v1";
+import { MEDIA_APPROVAL_CHOICE_CAPABILITY } from "./media-approval-choice-v1";
+import { MEDIA_APPROVAL_CREDITS_CAPABILITY } from "./media-approval-credits-v1";
 import { TEAM_MEMORY_CHANGES_CAPABILITY } from "./memory-changes-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "./memory-review-v1";
 import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "./message-client-id-v1";
@@ -142,12 +150,14 @@ import { MODEL_STEERING_CAPABILITY } from "./model-steering-v1";
 import { MODEL_VISIBILITY_KEPT_CAPABILITY } from "./model-visibility-kept-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
+import { OPENBOT_CREDITS_EVENTS_CAPABILITY } from "./openbot-credits-events-v1";
 import { OWNER_TRANSFER_CAPABILITY } from "./owner-transfer-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
 import { PENDING_PROMPTS_CAPABILITY } from "./pending-prompts-v1";
 import { PHONE_FEEDBACK_CAPABILITY } from "./phone-feedback-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY, PROMPT_CACHE_TTL_PI_CAPABILITY } from "./prompt-cache-ttl-v1";
+import { TEAM_PROMPT_DETAIL_CAPABILITY } from "./prompt-detail-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "./provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "./provider-account-keys-v1";
@@ -173,6 +183,7 @@ import { PROVIDERS_V4_CAPABILITY } from "./providers-v4";
 import { PROVIDERS_V5_CAPABILITY } from "./providers-v5";
 import { PROVIDERS_V8_CAPABILITY } from "./providers-v8";
 import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "./push-notification-threads-v1";
+import { PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY } from "./push-notification-workflows-v1";
 import { ANDROID_PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-android-v1";
 import { PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
@@ -246,10 +257,12 @@ import { VAULT_V2_CAPABILITY } from "./vault-v2";
 import { VAULT_V3_CAPABILITY } from "./vault-v3";
 import { VAULT_V4_CAPABILITY } from "./vault-v4";
 import { TEAM_VIDEO_GENERATION_CAPABILITY } from "./video-generation-v1";
+import { VOICE_TRANSCRIPTION_CAPABILITY } from "./voice-transcription-v1";
 import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
+import { WHATSAPP_READ_ONLY_CAPABILITY } from "./whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-v1";
 import { WORKFLOW_FOLDERS_CAPABILITY } from "./workflow-folders-v1";
@@ -257,6 +270,7 @@ import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "./workflows-agent-files-v1";
 import { WORKFLOWS_ANSWERS_CAPABILITY } from "./workflows-answers-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
+import { WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY } from "./workflows-credit-media-unavailable-v1";
 import { WORKFLOWS_CREDIT_MEDIA_CAPABILITY } from "./workflows-credit-media-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_CAPABILITY } from "./workflows-higgsfield-v1";
@@ -302,6 +316,7 @@ export {
   AGENT_COLORS_CAPABILITY,
   AGENT_CREATE_OPERATION_CAPABILITY,
   AGENT_DEFAULTS_CAPABILITY,
+  AGENT_ERROR_LINK_CAPABILITY,
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FOLDERS_CAPABILITY,
   AGENT_HIDDEN_CAPABILITY,
@@ -354,6 +369,7 @@ export {
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_FOLDERS_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
+  CHANNEL_PAGE_TASKS_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
@@ -383,6 +399,7 @@ export {
   HOST_RESTART_CAPABILITY,
   HOST_TIMEZONE_CAPABILITY,
   HOST_TURN_LIMITS_CAPABILITY,
+  HOST_TURN_LIMITS_EVENTS_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
@@ -399,12 +416,15 @@ export {
   MCP_SERVERS_CAPABILITY,
   MCP_SIGN_IN_APP_CAPABILITY,
   MCP_SIGN_IN_CAPABILITY,
+  MEDIA_APPROVAL_CHOICE_CAPABILITY,
+  MEDIA_APPROVAL_CREDITS_CAPABILITY,
   MEMORY_REVIEW_CAPABILITY,
   MESSAGE_DELETE_CAPABILITY,
   MESSAGE_PINS_CAPABILITY,
   MODEL_STEERING_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
+  OPENBOT_CREDITS_EVENTS_CAPABILITY,
   PASSWORD_MANAGERS_CAPABILITY,
   PENDING_APPROVAL_CAPABILITY,
   PHONE_FEEDBACK_CAPABILITY,
@@ -461,6 +481,7 @@ export {
   TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY,
   TEAM_BROWSER_VIEW_CURSOR_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY,
   TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
   TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
   TEAM_CHANNEL_ATTENTION_CAPABILITY,
@@ -468,6 +489,7 @@ export {
   TEAM_HISTORY_EXTENT_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_REASONING_EFFORTS_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
@@ -501,6 +523,7 @@ export {
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
   WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
@@ -827,6 +850,20 @@ const TEAM_CAPABILITY_REGISTRY = [
   [MODEL_VISIBILITY_KEPT_CAPABILITY, V10],
   [TEAM_UI_BLOCK_LOCATION_CAPABILITY, V10],
   [HOST_SIGNAL_HOME_CAPABILITY, V10],
+  [WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY, V10],
+  [ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY, V10],
+  [WHATSAPP_READ_ONLY_CAPABILITY, V10],
+  [VOICE_TRANSCRIPTION_CAPABILITY, V10],
+  [CLIENT_BROWSER_CAPABILITY, V10],
+  [CHANNEL_PAGE_TASKS_CAPABILITY, V10],
+  [PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY, V10],
+  [TEAM_PROMPT_DETAIL_CAPABILITY, V10],
+  [HOST_TURN_LIMITS_EVENTS_CAPABILITY, V10],
+  [MEDIA_APPROVAL_CREDITS_CAPABILITY, V10],
+  [MEDIA_APPROVAL_CHOICE_CAPABILITY, V10],
+  [OPENBOT_CREDITS_EVENTS_CAPABILITY, V10],
+  [TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY, V10],
+  [AGENT_ERROR_LINK_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

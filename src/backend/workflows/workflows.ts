@@ -589,6 +589,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             const answer = delivery.turnId ? dependencies.turnAnswer(step.agentId, delivery.turnId) : null;
             const output = answer === null || isNoUpdateAnswer(answer) ? "" : answer;
             if (fields.length === 0) return settle(step, { status: "done", output });
+            const quietAnswer = output === "" ? readGivenAnswer(fields, {}) : null;
+            if (quietAnswer && "output" in quietAnswer)
+              return settle(step, { status: "done", output: quietAnswer.output });
             const read = readAnswer(fields, output);
             if ("output" in read) return settle(step, { status: "done", output: read.output });
             const fix = yield* askAnswerFix(step, step.agentId, step.deliveryId, answerFixAsk(fields, read.problems));
@@ -765,28 +768,30 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 : [];
             const result = empty
               ? Result.fail({ message: sourceText("error.workflow.mediaEmptyRequest") })
-              : !generateMedia || !model
+              : !generateMedia
                 ? Result.fail({ message: sourceText("error.workflow.nodeUnsupported") })
-                : yield* (paysWithCredits(model.provider) ? creditMedia : subscriptionMedia)
-                    .withPermit(
-                      Effect.suspend(() => {
-                        if (model.provider === "openbot") paidMedia.add(step.id);
-                        return generateMedia({
-                          jobId: step.id,
-                          earlierJobIds: earlier,
-                          kind,
-                          provider: model.provider,
-                          model: model.providerModel ?? model.id,
-                          catalogId: model.id,
-                          account: mediaAccount(node.fields),
-                          specs,
-                          prompt: mediaStepPrompt(node.fields, kind, step.input, specs, model.provider),
-                          images,
-                          voice: mediaVoice(node.fields, kind, model),
-                        });
-                      }).pipe(Effect.flatMap(sized(specs))),
-                    )
-                    .pipe(Effect.result);
+                : !model
+                  ? Result.fail({ message: sourceText("error.workflow.modelUnavailable") })
+                  : yield* (paysWithCredits(model.provider) ? creditMedia : subscriptionMedia)
+                      .withPermit(
+                        Effect.suspend(() => {
+                          if (model.provider === "openbot") paidMedia.add(step.id);
+                          return generateMedia({
+                            jobId: step.id,
+                            earlierJobIds: earlier,
+                            kind,
+                            provider: model.provider,
+                            model: model.providerModel ?? model.id,
+                            catalogId: model.id,
+                            account: mediaAccount(node.fields),
+                            specs,
+                            prompt: mediaStepPrompt(node.fields, kind, step.input, specs, model.provider),
+                            images,
+                            voice: mediaVoice(node.fields, kind, model),
+                          });
+                        }).pipe(Effect.flatMap(sized(specs))),
+                      )
+                      .pipe(Effect.result);
             if (Result.isFailure(result)) settle(step, { status: "failed", error: result.failure.message });
             else settle(step, { status: "done", output: result.success });
             yield* requestSweep();

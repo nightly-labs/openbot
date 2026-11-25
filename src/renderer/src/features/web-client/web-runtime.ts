@@ -32,18 +32,23 @@ import type {
   ConversationReadState,
   ConversationSearchPage,
   CreateAgentInput,
+  CreditsHold,
   DuplicateAgentResult,
   EditQueuedMessageInput,
   HiddenAgentsSnapshot,
   InvitePreview,
   LocalBrowserSecretResponse,
+  MediaApprovalRead,
   PinnedMessagesSnapshot,
   ProviderModelSourceEntry,
   QueueSnapshot,
+  ReadMediaApprovalInput,
   ReadPendingApprovalInput,
   ReorderQueueInput,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
+  RespondToCreditsHoldInput,
+  RespondToMediaApprovalInput,
   RespondToPromptInput,
   ServerNotificationLevel,
   SetAgentHiddenInput,
@@ -69,6 +74,7 @@ import {
   decodeAgentFastModels,
   decodeAgentModelListings,
   decodeAgentSteeringModels,
+  decodeCreditsAskMuted,
   decodeProviderModelSources,
   decodeUsageCredits,
   decodeWorkspaceDirectory,
@@ -142,6 +148,7 @@ import {
   decodeBrowserViewInputValue,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY,
   TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
@@ -166,6 +173,12 @@ import {
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY, TEAM_WEB_CLIENT_PROTOCOL } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
+import {
+  decodeCreditsHoldResponse,
+  decodeMediaApprovalReadResponse,
+  MEDIA_APPROVAL_CHOICE_CAPABILITY,
+  MEDIA_APPROVAL_CHOICE_ROUTES,
+} from "@openbot/contracts/team-protocol/media-approval-choice-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
   decodeMessagePinsResponse,
@@ -234,6 +247,7 @@ import {
 } from "@openbot/team-client/remote-directory";
 import {
   createRemoteTeamPeer,
+  type RemoteDownloadWatch,
   type RemoteFileUpload,
   type RemoteLargeDownload,
   type RemoteTeamCommandResult,
@@ -360,6 +374,7 @@ export interface WebWorkspaceRuntime {
   listHosts(): Promise<RemoteTeamHost[]>;
   leaveHost(hostId: string, membershipId: string): Promise<void>;
   removeOwnedHost?: (hostId: string) => Promise<void>;
+  setHostHidden?: (hostId: string, hidden: boolean) => Promise<void>;
   ownerTransfers?: WebOwnerTransfers;
   previewInvite(url: string): Promise<InvitePreview>;
   acceptInvite(url: string): Promise<RemoteTeamHost>;
@@ -381,6 +396,11 @@ export interface WebWorkspaceRuntime {
   setMessagePinned?: (input: SetMessagePinnedInput) => Promise<PinnedMessagesSnapshot>;
   cancelWait?: (agentId: string, waitId: string) => Promise<void>;
   readPendingApproval?: (input: ReadPendingApprovalInput) => Promise<AgentApproval | null>;
+  readMediaApproval?: (input: ReadMediaApprovalInput) => Promise<MediaApprovalRead>;
+  respondToMediaApproval?: (input: RespondToMediaApprovalInput) => Promise<void>;
+  respondToCreditsHold?: (input: RespondToCreditsHoldInput) => Promise<CreditsHold | null>;
+  setCreditsAskMuted?: (input: { muted: boolean }) => Promise<void>;
+  readCreditsAskMuted?: () => Promise<{ muted: boolean }>;
   listPendingPrompts?: () => Promise<AgentRuntimePrompt[]>;
   focusUse(): Promise<void>;
   send(
@@ -404,7 +424,7 @@ export interface WebWorkspaceRuntime {
   upload(file: File): Promise<AttachmentSummary>;
   cancelUpload(): Promise<void>;
   discard(attachmentId: string): Promise<void>;
-  download(attachmentId: string): Promise<WebFile>;
+  download(attachmentId: string, progress?: RemoteDownloadWatch): Promise<WebFile>;
   downloadPreview(attachmentId: string): Promise<WebFile>;
   sharedFile(path: string): Promise<WebFile>;
   workspaceFile(agentId: string, path: string, options?: { exactPath?: boolean }): Promise<WebFile>;
@@ -592,6 +612,7 @@ export function createWebWorkspaceRuntime(
       if (!sessionsEnded) await runTeamEffect(directory.endSession(id));
     },
   };
+  const downloadProgress = new Map<string, RemoteDownloadWatch["onProgress"]>();
   let waitingHostId: string | null = null;
   const openedActions: RemoteTeamPeerActions = {
     ...sessionActions,
@@ -611,6 +632,7 @@ export function createWebWorkspaceRuntime(
     onTeamEvent: async (id, event) => events.event(id, event),
     onAccountProfileChanged: events.accountChanged,
     onAccountServersChanged: async () => events.serversChanged?.(),
+    onDownloadProgress: async ({ commandId, received, total }) => downloadProgress.get(commandId)?.(received, total),
   };
   const hostProtocols = {
     get: (id: string) => savedHostProtocol(accountId, id),
@@ -765,22 +787,28 @@ export function createWebWorkspaceRuntime(
     body: TeamProtocolV2Json = {},
     upload?: RemoteFileUpload,
     largeDownload?: RemoteLargeDownload,
+    download?: RemoteDownloadWatch,
   ) {
     if (disposed) throw new Error(currentText().t("webClient.error.connectionClosed"));
     const current = generation;
     const requestHostId = lockedHostId;
     const timeoutMs =
       method === "GET" && path === TEAM_API_ROUTES.me ? 15_000 : remoteWorkspaceReadTimeout(method, path);
-    const result = await peer.execute({
-      id: crypto.randomUUID(),
-      type: "request",
-      method,
-      path,
-      body,
-      ...(upload === undefined ? {} : { upload }),
-      ...(timeoutMs === undefined ? {} : { timeoutMs }),
-      ...(largeDownload === undefined ? {} : { largeDownload }),
-    });
+    const id = crypto.randomUUID();
+    if (download) downloadProgress.set(id, download.onProgress);
+    const result = await peer
+      .execute({
+        id,
+        type: "request",
+        method,
+        path,
+        body,
+        ...(upload === undefined ? {} : { upload }),
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+        ...(largeDownload === undefined ? {} : { largeDownload }),
+        ...(download === undefined ? {} : { downloadSize: download.size }),
+      })
+      .finally(() => downloadProgress.delete(id));
     if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
     const membershipRead = method === "GET" && path === TEAM_API_ROUTES.me;
     if (result.status === 403 && !membershipRead) {
@@ -980,6 +1008,9 @@ export function createWebWorkspaceRuntime(
       contextMenu: false,
       viewport: null,
       pageCopy: capabilities.includes(TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY),
+      frameSize: capabilities.includes(TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY)
+        ? { width: window.innerWidth * window.devicePixelRatio, height: window.innerHeight * window.devicePixelRatio }
+        : null,
     }),
   );
   let liveView: RemoteBrowserView | null = null;
@@ -1287,6 +1318,7 @@ export function createWebWorkspaceRuntime(
       Effect.runPromise(respondToBrowserTakeover(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     listHosts: () => runTeamEffect(directory.listHosts()),
     leaveHost: (hostId, membershipId) => runTeamEffect(directory.leaveHost(hostId, membershipId)),
+    setHostHidden: (hostId, hidden) => runTeamEffect(directory.setHostHidden(hostId, hidden)),
     ownerTransfers: {
       pending: (hostId) => runTeamEffect(directory.pendingOwnerTransfer(hostId)),
       start: (hostId, email) => runTeamEffect(directory.startOwnerTransfer(hostId, email)),
@@ -1435,6 +1467,30 @@ export function createWebWorkspaceRuntime(
       if (!capabilities.includes(PENDING_APPROVAL_CAPABILITY)) return null;
       return decodePendingApprovalResponse(await request("POST", PENDING_APPROVAL_ROUTES.read, { ...input }));
     },
+    async readMediaApproval(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY)) return { media: null, hold: null };
+      return decodeMediaApprovalReadResponse(await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.read, { ...input }));
+    },
+    async respondToMediaApproval(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.respond, { ...input, choice: { ...input.choice } });
+    },
+    async respondToCreditsHold(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      return decodeCreditsHoldResponse(await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.hold, { ...input }));
+    },
+    async setCreditsAskMuted(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.muted, { muted: input.muted });
+    },
+    async readCreditsAskMuted() {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      return decodeCreditsAskMuted(await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.mutedRead, {}));
+    },
     async listPendingPrompts() {
       if (!capabilities.includes(PENDING_PROMPTS_CAPABILITY)) return [];
       return decodePendingPromptsResponse(await request("POST", PENDING_PROMPTS_ROUTES.list, {}));
@@ -1568,8 +1624,10 @@ export function createWebWorkspaceRuntime(
       removeCompletedDrafts([id]);
       revokeLocalDraftPreviews([id]);
     },
-    async download(id) {
-      return decodeWebFile(await request("GET", TEAM_API_ROUTES.attachment(id), {}, undefined, WEB_FILE_DOWNLOAD));
+    async download(id, progress) {
+      return decodeWebFile(
+        await request("GET", TEAM_API_ROUTES.attachment(id), {}, undefined, WEB_FILE_DOWNLOAD, progress),
+      );
     },
     async downloadPreview(id) {
       return decodeWebFile(

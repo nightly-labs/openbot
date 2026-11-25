@@ -105,6 +105,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "Otwórz stronę logowania {name}.",
   "mobile.marketplace.app.stepAllow": "Zaloguj się i zezwól na dostęp.",
   "mobile.marketplace.app.stepReturn": "Wróć tutaj. {name} połączy się na Twoim serwerze.",
+  "mobile.marketplace.app.stepBlank": "Ostatnia strona się nie wczyta. To prawidłowe.",
+  "mobile.marketplace.app.stepCopy": "Stuknij pasek adresu i skopiuj cały adres.",
+  "mobile.marketplace.app.stepPaste": "Wróć do OpenBot i wklej adres poniżej.",
   "mobile.marketplace.app.openSignIn": "Otwórz logowanie",
   "mobile.marketplace.app.keySecure": "Klucz trafia tylko do Twojego serwera, przez szyfrowane połączenie.",
   "mobile.marketplace.app.connecting": "Łączenie",
@@ -121,8 +124,6 @@ export const messages = {
     "Ta aplikacja wymaga logowania w przeglądarce. Zaktualizuj OpenBot na serwerze lub połącz aplikację na komputerze.",
   "mobile.marketplace.app.waiting": "Oczekiwanie na stronę logowania…",
   "mobile.marketplace.app.openAgain": "Otwórz ponownie stronę logowania",
-  "mobile.marketplace.app.pasteHint":
-    "Na końcu strona otwiera adres, który się nie wczytuje. Skopiuj ten adres i wklej go poniżej.",
   "mobile.marketplace.app.pasteLabel": "Adres po zalogowaniu",
   "mobile.marketplace.app.pasteInvalid": "Ten adres nie jest końcem tego logowania.",
   "mobile.marketplace.app.finishSignIn": "Zakończ logowanie",

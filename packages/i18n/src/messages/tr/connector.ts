@@ -381,7 +381,7 @@ export const messages = {
     "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Diğer kişiler yanıt almaz. Kapalıyken OpenBot tanımadığınız kişilere bir kodla yanıt verir.",
   "connector.whatsapp.workingMessage": "“Üzerinde çalışılıyor…” mesajı",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Önceki bir isteği bekleyen istek de bir bekleme mesajı alır. Yalnızca yanıtı göndermek için kapatın.",
+    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Önceki bir isteği bekleyen istek de bir bekleme mesajı alır. Kişisel numarada bu mesajları yalnızca “Kendine mesaj gönder” sohbetiniz alır. Yalnızca yanıtı göndermek için kapatın.",
   "connector.whatsapp.statusReactions": "Durum tepkileri",
   "connector.whatsapp.statusReactionsDescription":
     "OpenBot bir mesaj geldiğinde 👀, yanıt hazır olduğunda ✅ tepkisi verir. Hiç tepki göndermemek için kapatın.",
@@ -459,6 +459,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "Bir numara en fazla {count} kişiye ve gruba izin verebilir.",
   "connector.whatsapp.senderGroup": "Grup",
   "connector.whatsapp.removeSender": "Kaldır",
+  "connector.whatsapp.senderAccess": "{name} erişimi",
+  "connector.whatsapp.senderReplies": "İş verebilir",
+  "connector.whatsapp.senderReadOnly": "Salt okunur",
   "connector.whatsapp.addContact": "Kişi ekle",
   "connector.whatsapp.addGroup": "Grup ekle",
   "connector.whatsapp.contactTitle": "Bir kişi ekleyin",

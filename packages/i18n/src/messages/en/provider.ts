@@ -95,6 +95,8 @@ export const messages = defineMessages("provider", {
   "provider.codeLogin.relayStarting": "Starting the {name} sign-in on {host}…",
   "provider.codeLogin.pageOpening": "Opening the {name} sign-in page on {host}…",
   "provider.codeLogin.linkStep": "Log in to {name}. OpenBot continues by itself.",
+  "provider.codeLogin.thisComputerDescription": "Open this link in a browser on this computer. OpenBot waits here.",
+  "provider.codeLogin.copyLink": "Copy link",
   "provider.codeLogin.chatgptDeviceSetting":
     "In ChatGPT on a computer, open the security settings and turn on device code sign-in for Codex. For a work account, your workspace admin turns it on.",
 
@@ -234,6 +236,7 @@ export const messages = defineMessages("provider", {
   "provider.account.apiKey": "API key",
   "provider.account.listLabel": "{name} accounts",
   "provider.account.usedBy": "Used by {agents}",
+  "provider.account.sameEmail": "Same email as {name}",
   "provider.account.failed": "Sign-in failed",
   "provider.account.moreActions": "More actions for {name}",
   "provider.account.renameLabel": "Name of {name}",

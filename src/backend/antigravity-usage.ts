@@ -49,6 +49,7 @@ const VALIDATION_REQUIRED = "VALIDATION_REQUIRED";
 const QuotaBucket = Schema.Struct({
   window: Schema.optional(Schema.String),
   displayName: Schema.optional(Schema.String),
+  description: Schema.optional(Schema.String),
   resetTime: Schema.optional(Schema.String),
   remainingFraction: Schema.optional(Schema.Number),
   remainingAmount: Schema.optional(Schema.Union([Schema.String, Schema.Number])),
@@ -114,12 +115,14 @@ export const readAntigravityQuota = Effect.fn("AntigravityUsage.read")(function*
   const call = yield* codeAssistCall({ ...options, timeoutMs: QUOTA_CALL_TIMEOUT_MS });
   if (!call) return NO_USAGE;
   return yield* call(CODE_ASSIST_URL, "loadCodeAssist", {}, LoadCodeAssistAnswer).pipe(
-    Effect.flatMap(({ cloudaicompanionProject: project }) =>
-      project
-        ? call(DAILY_CODE_ASSIST_URL, "retrieveUserQuotaSummary", { project }, AntigravityQuotaSummary)
-        : Effect.succeed({}),
-    ),
-    Effect.map((summary) => antigravityRateLimits(summary, options.model)),
+    Effect.flatMap(({ cloudaicompanionProject: project }) => {
+      const requestedAt = Date.now();
+      return (
+        project
+          ? call(DAILY_CODE_ASSIST_URL, "retrieveUserQuotaSummary", { project }, AntigravityQuotaSummary)
+          : Effect.succeed({})
+      ).pipe(Effect.map((summary) => antigravityRateLimits(summary, options.model, requestedAt)));
+    }),
     Effect.orElseSucceed(() => NO_USAGE),
   );
 });
@@ -175,9 +178,10 @@ function antigravityUserAgent(): string {
 
 function antigravityRateLimits(
   summary: AntigravityQuotaSummary,
-  model: string | null = null,
+  model: string | null,
+  requestedAt: number,
 ): AccountRateLimitsReadResult {
-  const groups = quotaGroups(summary).filter((group) => group.primary || group.secondary);
+  const groups = quotaGroups(summary, requestedAt).filter((group) => group.primary || group.secondary);
   const listed = groups.some((group) => group.models.length > 0);
   const group =
     model && listed
@@ -199,7 +203,24 @@ function leastRoom(groups: readonly QuotaGroup[]): QuotaGroup | undefined {
   );
 }
 
-function quotaGroups(summary: AntigravityQuotaSummary): QuotaGroup[] {
+const UNTOUCHED_RESET_TOLERANCE_MS = 60_000;
+
+function untouchedRollingReset(
+  bucket: QuotaBucket,
+  remainingFraction: number,
+  windowDurationMins: number | null,
+  resetsAt: number,
+  requestedAt: number,
+): boolean {
+  return (
+    remainingFraction === 1 &&
+    bucket.description === undefined &&
+    windowDurationMins !== null &&
+    Math.abs(resetsAt - requestedAt - windowDurationMins * 60_000) <= UNTOUCHED_RESET_TOLERANCE_MS
+  );
+}
+
+function quotaGroups(summary: AntigravityQuotaSummary, requestedAt: number): QuotaGroup[] {
   const groups: QuotaGroup[] = [];
   for (const entry of summary.groups ?? []) {
     const name = entry.displayName?.trim();
@@ -219,14 +240,19 @@ function quotaGroups(summary: AntigravityQuotaSummary): QuotaGroup[] {
       if (remainingFraction === undefined) continue;
       const label = `${bucket.window ?? ""} ${bucket.displayName ?? ""}`;
       const resetsAt = bucket.resetTime ? Date.parse(bucket.resetTime) : Number.NaN;
+      const windowDurationMins = /week/iu.test(label)
+        ? WEEKLY_WINDOW_MINS
+        : /\b5\s*-?\s*h|five.?hour/iu.test(label)
+          ? FIVE_HOUR_WINDOW_MINS
+          : null;
       const window: UsageWindow = {
         usedPercent: Math.max(0, Math.min(100, 100 - remainingFraction * 100)),
-        windowDurationMins: /week/iu.test(label)
-          ? WEEKLY_WINDOW_MINS
-          : /\b5\s*-?\s*h|five.?hour/iu.test(label)
-            ? FIVE_HOUR_WINDOW_MINS
+        windowDurationMins,
+        resetsAt:
+          Number.isFinite(resetsAt) &&
+          !untouchedRollingReset(bucket, remainingFraction, windowDurationMins, resetsAt, requestedAt)
+            ? resetsAt / 1_000
             : null,
-        resetsAt: Number.isFinite(resetsAt) ? resetsAt / 1_000 : null,
       };
       if (window.windowDurationMins === FIVE_HOUR_WINDOW_MINS) group.primary = bindingWindow(group.primary, window);
       else group.secondary = bindingWindow(group.secondary, window);

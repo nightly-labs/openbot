@@ -46,7 +46,9 @@ export interface RemoteTeamHost {
   membershipId: string;
   role: "owner" | "admin" | "member";
   memberLimit?: number;
+  licenseRaisesMemberLimit?: boolean;
   hosted?: boolean;
+  hidden?: true;
   restartAvailable?: boolean;
   storageGb?: number;
   keyChangedAt?: number;
@@ -189,6 +191,7 @@ export class RemoteTeamDirectoryClient {
             if (!isDynamicRecord(candidate) || !isString(candidate.devicePublicKey) || !candidate.devicePublicKey)
               return [];
             const memberLimit = candidate.memberLimit;
+            const licenseRaisesMemberLimit = candidate.licenseRaisesMemberLimit;
             const hosted = candidate.hosted;
             const restartAvailable = candidate.restartAvailable;
             const storageGb = candidate.storageGb;
@@ -225,7 +228,9 @@ export class RemoteTeamDirectoryClient {
                 membershipId: candidate.membershipId,
                 role: candidate.role,
                 ...(memberLimit === undefined ? {} : { memberLimit }),
+                ...(isBoolean(licenseRaisesMemberLimit) ? { licenseRaisesMemberLimit } : {}),
                 ...(isBoolean(hosted) ? { hosted } : {}),
+                ...(candidate.hidden === true ? { hidden: true as const } : {}),
                 ...(isBoolean(restartAvailable) ? { restartAvailable } : {}),
                 ...(isNumber(storageGb) && Number.isSafeInteger(storageGb) && storageGb >= 1 ? { storageGb } : {}),
                 ...(keyChangedAt === null ? {} : { keyChangedAt }),
@@ -416,6 +421,13 @@ export class RemoteTeamDirectoryClient {
         method: "POST",
       });
     });
+  }
+
+  setHostHidden(hostId: string, hidden: boolean): Effect.Effect<void, DirectoryFailure> {
+    return this.#request(`/v2/remote/hosts/${encodeURIComponent(hostId)}/hidden`, {
+      method: "PUT",
+      body: { hidden },
+    }).pipe(Effect.asVoid);
   }
 
   removeOwnedHost(hostId: string): Effect.Effect<void, DirectoryFailure> {

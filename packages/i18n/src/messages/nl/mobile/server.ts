@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "Kan {name} niet verlaten",
   "mobile.server.drawer.removeFailed": "Kan {name} niet verwijderen",
   "mobile.server.drawer.deleteFailed": "Kan {name} niet verwijderen",
+  "mobile.server.drawer.hide": "Server verbergen",
+  "mobile.server.drawer.show": "Server tonen",
+  "mobile.server.drawer.hiddenServers": "Verborgen servers",
+  "mobile.server.drawer.hideFailed": "Kan {name} niet verbergen",
+  "mobile.server.drawer.showFailed": "Kan {name} niet tonen",
   "mobile.server.drawer.actionFailed": "OpenBot kan deze actie niet voltooien. Probeer het opnieuw.",
   "mobile.server.drawer.moveUp": "Omhoog",
   "mobile.server.drawer.moveDown": "Omlaag",
@@ -99,13 +104,16 @@ export const messages = {
   "mobile.server.hosted.intro.description":
     "Een cloudserver voert je agents en routines uit als je computer uit staat. OpenBot zet hem op en houdt hem draaiende.",
   "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
-  "mobile.server.hosted.computer.title": "Op je computer",
+  "mobile.server.hosted.steps.title": "Voeg hem toe op je computer",
+  "mobile.server.hosted.steps.open": "Open OpenBot op je computer.",
+  "mobile.server.hosted.steps.settings": "Ga naar Instellingen → Gehoste servers.",
+  "mobile.server.hosted.steps.add": "Kies Server toevoegen en kies een abonnement.",
+  "mobile.server.hosted.plansToggle": "Wat elk abonnement bevat",
   "mobile.server.hosted.computer.add": "Cloudserver toevoegen",
   "mobile.server.hosted.computer.addHint": "Open in OpenBot Instellingen → Gehoste servers en kies Server toevoegen.",
   "mobile.server.hosted.computer.change": "Abonnement wijzigen",
   "mobile.server.hosted.computer.changeHint": "Open in OpenBot Instellingen → Facturering.",
   "mobile.server.hosted.yourServers": "Je servers",
-  "mobile.server.hosted.plans": "Abonnementen",
   "mobile.server.hosted.currentPlan": "Je abonnement",
   "mobile.server.hosted.soldOut": "Uitverkocht",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
@@ -268,6 +276,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Hiermee verwijder je de server uit de accountdienst voor alle leden. Bestanden en chats op de computer blijven bewaard. Registreer de server vanaf die computer om hem weer te gebruiken.",
   "mobile.server.settings.remove": "Server verwijderen",
+  "mobile.server.settings.hide": "Server verbergen",
+  "mobile.server.settings.show": "Server tonen",
   "mobile.server.settings.deleteTitle": "{name} verwijderen?",
   "mobile.server.settings.deleteBody":
     "OpenBot stopt de server op zijn computer en verplaatst de agents, chats en bestanden naar de prullenbak van die computer. De server verdwijnt uit de serverlijst op al je apparaten.",
@@ -520,12 +530,38 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Kan de serversleutel niet wijzigen. Probeer het opnieuw.",
   "mobile.server.settings.keyOwnerOnly": "Alleen de eigenaar kan de serversleutel wijzigen.",
   "mobile.server.settings.keyUnsupported": "Werk OpenBot op deze server bij om de sleutel hier te wijzigen.",
+  "mobile.server.settings.turnLimit": "Threads tegelijk",
+  "mobile.server.settings.turnLimitDescription":
+    "Hoeveel agentthreads tegelijk kunnen draaien op deze server. Meer threads gebruiken meer geheugen.",
+  "mobile.server.settings.turnLimitAutomatic": "Automatisch ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Automatisch (geen limiet)",
+  "mobile.server.settings.turnLimitUnlimited": "Geen limiet",
+  "mobile.server.settings.turnLimitsLoadFailed": "Kan de threadlimieten van deze server niet laden.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Kan de threadlimiet niet opslaan. Probeer het opnieuw.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Werk OpenBot bij op deze server om de threadlimiet hier te wijzigen.",
+  "mobile.server.settings.agentTaskLimit": "Parallelle threads per agent",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Hoeveel threads elke agent zonder eigen limiet tegelijk kan draaien.",
+  "mobile.server.settings.agentTaskLimitDefault": "Standaard ({count})",
   "mobile.server.settings.memoryLimit": "Herinneringen per agent",
   "mobile.server.settings.memoryLimitDescription": "Hoeveel herinneringen elke agent op deze server kan bewaren.",
   "mobile.server.settings.memoryLimitLoadFailed": "Kan de geheugenlimiet van deze server niet laden.",
   "mobile.server.settings.memoryLimitSaveFailed": "Kan de geheugenlimiet niet opslaan. Probeer het opnieuw.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Werk OpenBot bij op deze server om de geheugenlimiet hier te wijzigen.",
+  "mobile.server.settings.mediaApprovalCredits": "Vragen bij meer dan",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "credits",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed": "Kan de creditgoedkeuringsgrens van deze server niet laden.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed":
+    "Kan de creditgoedkeuringsgrens niet opslaan. Probeer het opnieuw.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "Werk OpenBot op deze server bij om de creditgoedkeuringsgrens hier te wijzigen.",
+  "mobile.server.settings.mediaApprovalAgents": "Agents mogen credits gebruiken",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed":
+    "Kan het creditgebruik door agents niet wijzigen. Probeer het opnieuw.",
+  "mobile.server.settings.mediaApprovalAsk": "Vragen wanneer credits nodig zijn",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "Kan de creditaanvragen niet wijzigen. Probeer het opnieuw.",
   "mobile.server.settings.memoryReview": "Geheugencontrole",
   "mobile.server.settings.memoryReviewDescription":
     "Hoe vaak agents op deze server op de achtergrond blijvende feiten uit hun chats bewaren.",
@@ -928,7 +964,7 @@ export const messages = {
     "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Andere mensen krijgen geen antwoord. Als dit uit staat, antwoordt OpenBot onbekende mensen met een code.",
   "mobile.server.connectors.whatsapp.workingMessage": "Bericht “Mee bezig…”",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Een verzoek dat op een eerder verzoek wacht, krijgt ook een wachtbericht. Zet dit uit om alleen het antwoord te sturen.",
+    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Een verzoek dat op een eerder verzoek wacht, krijgt ook een wachtbericht. Bij een persoonlijk nummer krijgt alleen je chat “Bericht aan jezelf” deze berichten. Zet dit uit om alleen het antwoord te sturen.",
   "mobile.server.connectors.whatsapp.statusReactions": "Statusreacties",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot reageert met 👀 als er een bericht binnenkomt en met ✅ als het antwoord klaar is. Zet dit uit om geen reacties te sturen.",
@@ -991,6 +1027,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "Een nummer kan maximaal {count} contacten en groepen toestaan.",
   "mobile.server.connectors.whatsapp.senderGroup": "Groep",
   "mobile.server.connectors.whatsapp.removeSender": "Verwijderen",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · Alleen lezen",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "Alleen lezen maken",
+  "mobile.server.connectors.whatsapp.allowWork": "Taken laten geven",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "Alleen lezen: agents kunnen deze chat lezen en OpenBot schrijft er nooit in.",
   "mobile.server.connectors.whatsapp.addContact": "Contact toevoegen",
   "mobile.server.connectors.whatsapp.addGroup": "Groep toevoegen",
   "mobile.server.connectors.whatsapp.contactTitle": "Voeg een contact toe",

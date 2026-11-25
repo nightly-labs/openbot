@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "{name} sunucusundan ayrılınamadı",
   "mobile.server.drawer.removeFailed": "{name} kaldırılamadı",
   "mobile.server.drawer.deleteFailed": "{name} silinemedi",
+  "mobile.server.drawer.hide": "Sunucuyu gizle",
+  "mobile.server.drawer.show": "Sunucuyu göster",
+  "mobile.server.drawer.hiddenServers": "Gizli sunucular",
+  "mobile.server.drawer.hideFailed": "{name} gizlenemedi",
+  "mobile.server.drawer.showFailed": "{name} gösterilemedi",
   "mobile.server.drawer.actionFailed": "OpenBot bu işlemi tamamlayamadı. Tekrar deneyin.",
   "mobile.server.drawer.moveUp": "Yukarı taşı",
   "mobile.server.drawer.moveDown": "Aşağı taşı",
@@ -103,14 +108,17 @@ export const messages = {
   "mobile.server.hosted.intro.description":
     "Bulut sunucusu, bilgisayarınız kapalıyken ajanlarınızı ve rutinlerinizi çalıştırır. OpenBot onu kurar ve çalışır durumda tutar.",
   "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
-  "mobile.server.hosted.computer.title": "Bilgisayarınızda",
+  "mobile.server.hosted.steps.title": "Bilgisayarınızda ekleyin",
+  "mobile.server.hosted.steps.open": "Bilgisayarınızda OpenBot'u açın.",
+  "mobile.server.hosted.steps.settings": "Ayarlar → Barındırılan sunucular bölümüne gidin.",
+  "mobile.server.hosted.steps.add": "“Sunucu ekle”yi seçin ve bir plan seçin.",
+  "mobile.server.hosted.plansToggle": "Her planın içeriği",
   "mobile.server.hosted.computer.add": "Bulut sunucusu ekleyin",
   "mobile.server.hosted.computer.addHint":
     "OpenBot'ta Ayarlar → Barındırılan sunucular bölümünü açın ve “Sunucu ekle” seçeneğini seçin.",
   "mobile.server.hosted.computer.change": "Planı değiştirin",
   "mobile.server.hosted.computer.changeHint": "OpenBot'ta Ayarlar → Faturalandırma bölümünü açın.",
   "mobile.server.hosted.yourServers": "Sunucularınız",
-  "mobile.server.hosted.plans": "Planlar",
   "mobile.server.hosted.currentPlan": "Planınız",
   "mobile.server.hosted.soldOut": "Tükendi",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
@@ -273,6 +281,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Bu işlem sunucuyu tüm üyeler için hesap hizmetinden kaldırır. Bilgisayarındaki dosyalar ve sohbetler kalır. Yeniden kullanmak için o bilgisayardan kaydedin.",
   "mobile.server.settings.remove": "Sunucuyu kaldır",
+  "mobile.server.settings.hide": "Sunucuyu gizle",
+  "mobile.server.settings.show": "Sunucuyu göster",
   "mobile.server.settings.deleteTitle": "{name} silinsin mi?",
   "mobile.server.settings.deleteBody":
     "OpenBot sunucuyu bilgisayarında durdurur ve ajanlarını, sohbetlerini ve dosyalarını o bilgisayarın çöp kutusuna taşır. Sunucu tüm cihazlarınızdaki sunucu listesinden çıkar.",
@@ -524,12 +534,36 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Sunucu anahtarı değiştirilemedi. Tekrar deneyin.",
   "mobile.server.settings.keyOwnerOnly": "Sunucu anahtarını yalnızca sahip değiştirebilir.",
   "mobile.server.settings.keyUnsupported": "Anahtarını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.turnLimit": "Aynı anda mesaj dizileri",
+  "mobile.server.settings.turnLimitDescription":
+    "Bu sunucuda aynı anda kaç ajan mesaj dizisinin çalışabileceği. Daha fazla dizi daha fazla bellek kullanır.",
+  "mobile.server.settings.turnLimitAutomatic": "Otomatik ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Otomatik (sınırsız)",
+  "mobile.server.settings.turnLimitUnlimited": "Sınırsız",
+  "mobile.server.settings.turnLimitsLoadFailed": "Bu sunucunun mesaj dizisi sınırları yüklenemedi.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Mesaj dizisi sınırı kaydedilemedi. Tekrar deneyin.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Mesaj dizisi sınırını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.agentTaskLimit": "Ajan başına paralel mesaj dizileri",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Kendi sınırı olmayan her ajanın aynı anda kaç mesaj dizisi çalıştırabileceği.",
+  "mobile.server.settings.agentTaskLimitDefault": "Varsayılan ({count})",
   "mobile.server.settings.memoryLimit": "Ajan başına bellek",
   "mobile.server.settings.memoryLimitDescription": "Bu sunucudaki her ajanın tutabileceği bellek sayısı.",
   "mobile.server.settings.memoryLimitLoadFailed": "Bu sunucunun bellek sınırı yüklenemedi.",
   "mobile.server.settings.memoryLimitSaveFailed": "Anı sınırı kaydedilemedi. Tekrar deneyin.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Anı sınırını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.mediaApprovalCredits": "Şu miktarı aşınca sor",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "kredi",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed": "Bu sunucunun kredi onay sınırı yüklenemedi.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed": "Kredi onay sınırı kaydedilemedi. Tekrar deneyin.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "Kredi onay sınırını buradan değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.mediaApprovalAgents": "Ajanlar kredi kullanabilir",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed": "Ajanların kredi kullanımı değiştirilemedi. Tekrar deneyin.",
+  "mobile.server.settings.mediaApprovalAsk": "Kredi gerektiğinde sor",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "Kredi istekleri değiştirilemedi. Tekrar deneyin.",
   "mobile.server.settings.memoryReview": "Bellek incelemesi",
   "mobile.server.settings.memoryReviewDescription":
     "Bu sunucudaki ajanların sohbetlerindeki kalıcı bilgileri arka planda ne sıklıkla kaydettiği.",
@@ -956,7 +990,7 @@ export const messages = {
     "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Diğer kişiler yanıt almaz. Kapalıyken OpenBot tanımadığınız kişilere bir kodla yanıt verir.",
   "mobile.server.connectors.whatsapp.workingMessage": "“Üzerinde çalışılıyor…” mesajı",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Önceki bir isteği bekleyen istek de bir bekleme mesajı alır. Yalnızca yanıtı göndermek için kapatın.",
+    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Önceki bir isteği bekleyen istek de bir bekleme mesajı alır. Kişisel numarada bu mesajları yalnızca “Kendine mesaj gönder” sohbetiniz alır. Yalnızca yanıtı göndermek için kapatın.",
   "mobile.server.connectors.whatsapp.statusReactions": "Durum tepkileri",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot bir mesaj geldiğinde 👀, yanıt hazır olduğunda ✅ tepkisi verir. Hiç tepki göndermemek için kapatın.",
@@ -1018,6 +1052,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "Bir numara en fazla {count} kişiye ve gruba izin verebilir.",
   "mobile.server.connectors.whatsapp.senderGroup": "Grup",
   "mobile.server.connectors.whatsapp.removeSender": "Kaldır",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · Salt okunur",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "Salt okunur yap",
+  "mobile.server.connectors.whatsapp.allowWork": "İş vermesine izin ver",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "Salt okunur: ajanlar bu sohbeti okuyabilir ve OpenBot buraya asla yazmaz.",
   "mobile.server.connectors.whatsapp.addContact": "Kişi ekle",
   "mobile.server.connectors.whatsapp.addGroup": "Grup ekle",
   "mobile.server.connectors.whatsapp.contactTitle": "Bir kişi ekleyin",

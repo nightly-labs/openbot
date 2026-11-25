@@ -17,6 +17,7 @@ export interface ProviderStatePaths {
   readonly protectedInProjects?: { readonly folders: readonly string[]; readonly names: readonly string[] };
   readonly writableContents?: readonly string[];
   readonly lockFolders?: readonly string[];
+  readonly lockFilesIn?: readonly string[];
 }
 
 export interface SpawnTarget {
@@ -174,15 +175,28 @@ export function hermesHome(
   home = homedir(),
   platform: NodeJS.Platform = process.platform,
 ): string {
+  const root = hermesConfiguredHome(env, home, platform);
+  return isHermesProfile(root) ? root : hermesActiveProfile(root);
+}
+
+function hermesConfiguredHome(env: NodeJS.ProcessEnv, home: string, platform: NodeJS.Platform): string {
   const configured = env.HERMES_HOME?.trim();
-  const root = configured
+  return configured
     ? configured === "~" || configured.startsWith("~/")
       ? join(home, configured.slice(1))
       : configured
     : platform === "win32"
       ? join(env.LOCALAPPDATA?.trim() || join(home, "AppData", "Local"), "hermes")
       : join(home, ".hermes");
-  return basename(dirname(root)) === "profiles" ? root : hermesActiveProfile(root);
+}
+
+function isHermesProfile(path: string): boolean {
+  return basename(dirname(path)) === "profiles";
+}
+
+function hermesInstallStates(env: NodeJS.ProcessEnv, home: string): string {
+  const configured = hermesConfiguredHome(env, home, process.platform);
+  return join(isHermesProfile(configured) ? dirname(dirname(configured)) : configured, "installs");
 }
 
 function hermesActiveProfile(root: string): string {
@@ -226,6 +240,7 @@ export function hermesStatePaths(env: NodeJS.ProcessEnv = process.env, home = ho
       "bootstrap-cache",
       "tools",
     ].map((name) => join(root, name)),
+    lockFilesIn: [hermesInstallStates(env, home)],
   };
 }
 
@@ -472,6 +487,7 @@ export function confineSpawnTarget(
           state.protectedInProjects,
           state.writableContents ?? [],
           state.lockFolders ?? [],
+          state.lockFilesIn ?? [],
           held,
         ),
         target.command,
@@ -497,6 +513,7 @@ function seatbeltProfile(
   inProjects: ProviderStatePaths["protectedInProjects"],
   contents: readonly string[],
   lockFolders: readonly string[],
+  lockFilesIn: readonly string[],
   held: readonly string[],
 ): string {
   const writableReal = unique(writable.flatMap(realPaths));
@@ -506,6 +523,10 @@ function seatbeltProfile(
   ).map((path) => `(literal ${sbplString(path)})`);
   const files = unique(contents.flatMap(realPaths)).map((path) => `(literal ${sbplString(path)})`);
   const locks = unique(lockFolders.flatMap(realPaths)).map((path) => `(literal ${sbplString(path)})`);
+  const lockFiles = unique(lockFilesIn.flatMap(realPaths)).flatMap((folder) => [
+    `(regex ${sbplString(`^${regexText(folder)}/(.+/)?\\.[A-Za-z0-9_-]+\\.lock$`)})`,
+    `(regex ${sbplString(`^${regexText(folder)}/(.+/)?\\.leases(/[^/]+)?$`)})`,
+  ]);
   const names = inProjects?.names.map(regexText).join("|");
   const denied = [
     ...unique(protectedPaths.flatMap(realPaths)).map(
@@ -531,6 +552,7 @@ function seatbeltProfile(
       : []),
     '(allow file-write* (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty") (literal "/dev/ptmx") (literal "/dev/dtracehelper") (regex #"^/dev/ttys[0-9]+$") (regex #"^/dev/fd/"))',
     ...(denied.length > 0 ? [`(deny file-write* ${denied.join(" ")})`] : []),
+    ...(lockFiles.length > 0 ? [`(allow file-write* ${lockFiles.join(" ")})`] : []),
     ...(holders.length > 0 ? [`(deny file-write-unlink file-write-create ${holders.join(" ")})`] : []),
     "",
   ].join("\n");

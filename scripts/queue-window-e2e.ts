@@ -134,6 +134,7 @@ function requestContext(request: IncomingMessage, response: ServerResponse, url:
     agentLevel: () => "manage",
     sessionId: "session",
     sessionExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+    fromChrome: false,
     json: (status, value) => {
       const body = teamHttpCodec(protocol).encodeResponse(method, url.pathname, status, value, {
         preserveSemanticTags: supportsTeamSemanticTags(capabilities),

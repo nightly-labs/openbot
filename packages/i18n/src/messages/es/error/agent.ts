@@ -20,6 +20,8 @@ export const messages = {
     "La herramienta no se ejecutó. tool_call no encontró ninguna herramienta con este nombre. Usa el nombre calificado exacto que da tool_search, como openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "La herramienta no se ejecutó. tool_call no encontró ninguna herramienta con este nombre. Es posible que el nombre calificado sea {name}. Si lo es, vuelve a enviar la llamada con ese nombre.",
+  "error.agent.toolCallNullValue":
+    "La herramienta no se ejecutó. {name} necesita un objeto o una lista en {paths}, pero cada uno de estos elementos de la lista llegó como null. Vuelve a enviar la llamada y da cada uno de estos elementos como una cadena que contenga su JSON.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe no encontró ninguna herramienta de OpenBot llamada {names}. Solo describe las herramientas de OpenBot y del navegador que lista openbot.tool_search, no las herramientas MCP.",
   "error.agent.toolDescribeDiscoveryNames":
@@ -198,6 +200,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "La captura de pantalla no funciona en una conversación de Slack, Discord o Telegram, porque otras personas reciben sus archivos.",
   "error.agent.screenCaptureDeclined": "El usuario no permitió esta captura de pantalla. No se capturó nada.",
+  "error.agent.creditMediaDeclined": "El usuario no permitió esta generación. No se gastaron créditos.",
+  "error.agent.creditMediaNotSaved": "El archivo se creó, pero OpenBot no pudo guardarlo en el chat.",
   "error.agent.mcpToolDeclined":
     "El usuario no permitió esta llamada a la herramienta MCP. La herramienta no se ejecutó.",
   "error.agent.screenCaptureWindowMissing":

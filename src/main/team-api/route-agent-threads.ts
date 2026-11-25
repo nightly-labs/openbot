@@ -120,10 +120,23 @@ export async function routeAgentThreadFiles(
     ...(isString(body.clientMessageId) ? { clientMessageId: body.clientMessageId } : {}),
   };
   if (url.pathname === AGENT_THREAD_FILES_ROUTES.start)
-    return json(200, agentTaskWire(await runCauseEffect(tasks.startTask(message, memberSender(member))), capabilities));
+    return json(
+      200,
+      agentTaskWire(
+        await runCauseEffect(tasks.startTask(message, memberSender(member), undefined, context.fromChrome)),
+        capabilities,
+      ),
+    );
   return json(
     202,
-    await runCauseEffect(tasks.sendMessage({ ...message, taskId: stringField(body, "taskId") }, memberSender(member))),
+    await runCauseEffect(
+      tasks.sendMessage(
+        { ...message, taskId: stringField(body, "taskId") },
+        memberSender(member),
+        undefined,
+        context.fromChrome,
+      ),
+    ),
   );
 }
 
@@ -149,7 +162,10 @@ export async function routeAgentThreadReplies(
     replyToMessageId: stringField(body, "replyToMessageId"),
     ...(isString(body.clientMessageId) ? { clientMessageId: body.clientMessageId } : {}),
   };
-  return json(202, await runCauseEffect(tasks.sendMessage(message, memberSender(member))));
+  return json(
+    202,
+    await runCauseEffect(tasks.sendMessage(message, memberSender(member), undefined, context.fromChrome)),
+  );
 }
 
 export async function routeAgentThreadBranches(

@@ -21,6 +21,7 @@ import type {
   TeamPresenceSnapshot,
   UpdateHostIdentityInput,
   VoiceLiveEvent,
+  VoiceTranscriptionResult,
 } from "@openbot/contracts/ipc";
 import type { Logger } from "@openbot/logging";
 import type { Effect } from "effect";
@@ -56,6 +57,7 @@ import type { CacheExpiryCompactionControl } from "../cache-expiry-compaction-pr
 import type { ChannelFolders } from "../channel-folders";
 import type { ClaudeCompactWindowControl } from "../claude-compact-window-preference-store";
 import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
+import type { ClientBrowserHub } from "../client-browser-hub";
 import type { CustomAgentChanges } from "../custom-agent-changes";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { GitHubConnectorService } from "../github-connector-service";
@@ -77,6 +79,7 @@ import type { MachineAlertMonitor } from "../machine-alerts";
 import type { McpAccessControl } from "../mcp-access-store";
 import type { McpHostSignIns } from "../mcp-host-sign-ins";
 import type { McpServerOwnersStore } from "../mcp-server-owners-store";
+import type { CreditAsksControl, MediaApprovalCreditsControl } from "../media-approval-credits-preference-store";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
 import type { ModelVisibility } from "../model-visibility";
 import type { OnePasswordConnectorService } from "../onepassword-connector-service";
@@ -102,6 +105,7 @@ import type { SkillLearningPreferenceStore } from "../skill-learning-preference-
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import type { TeamStore } from "../team-store";
 import type { VaultService } from "../vault-service";
+import type { VoiceOperationError } from "../voice-model-service";
 import type { WorkflowFileExporter } from "../workflow-file-export";
 import type { WorkflowFoldersService } from "../workflow-folders-service";
 
@@ -193,9 +197,13 @@ type TeamApiAgentMethods = Pick<
   | "compactTaskContext"
   | "agentIdForRequest"
   | "pendingApproval"
+  | "pendingMediaApproval"
+  | "pendingCreditsHold"
   | "pendingPrompts"
   | "respondToPrompt"
   | "respondToApproval"
+  | "respondToMediaApproval"
+  | "respondToCreditsHold"
   | "respondToBrowserSecret"
   | "respondToBrowserTakeover"
 >;
@@ -256,6 +264,7 @@ export interface TeamApiConnectors {
     | "setWhatsAppOwnNumber"
     | "setWhatsAppWorkingMessage"
     | "setWhatsAppStatusReactions"
+    | "setWhatsAppSenderReadOnly"
   >;
 }
 
@@ -480,6 +489,8 @@ export interface TeamApiAdmin {
   promptCacheTtl?: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   claudeUserSetup?: ClaudeUserSetupControl;
   cacheExpiryCompaction?: CacheExpiryCompactionControl;
+  mediaApprovalCredits?: MediaApprovalCreditsControl;
+  creditAsks?: Pick<CreditAsksControl, "setMuted" | "mutedFor">;
   claudeCompactWindow?: ClaudeCompactWindowControl;
   providerEnvironment?: Pick<ProviderEnvironmentControl, "get" | "set">;
   providerDetection?: {
@@ -608,10 +619,20 @@ export type TeamApiLiveVoice = Pick<AgentService, "startLiveVoice" | "stopLiveVo
   subscribe(listener: (event: VoiceLiveEvent, memberId: string | null) => void): () => void;
 };
 
+export interface TeamApiVoiceTranscription {
+  transcribe(audio: Uint8Array): Effect.Effect<VoiceTranscriptionResult, VoiceOperationError>;
+}
+
+export type TeamApiClientBrowser = Pick<
+  ClientBrowserHub,
+  "setPresence" | "resolve" | "sessionEnded" | "subscribe" | "shares"
+>;
+
 export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "levels" | "set" | "subscribe">;
 export type TeamApiServerAudit = Pick<ServerAuditStore, "read">;
 
 export interface TeamApiOptions {
+  onMemberUse?: ((memberId: string) => void) | undefined;
   events?: HostEventsApi | undefined;
   channels?: ChannelService | undefined;
   mcpServers?: TeamApiMcpServers | undefined;
@@ -635,6 +656,8 @@ export interface TeamApiOptions {
   machine?: TeamApiMachine;
   backgroundProcesses?: TeamApiBackgroundProcesses;
   liveVoice?: TeamApiLiveVoice;
+  voiceTranscription?: TeamApiVoiceTranscription;
+  clientBrowser?: TeamApiClientBrowser;
   hostedSites?: TeamApiHostedSites;
   agentImport?: TeamApiAgentImport;
   hermesImport?: TeamApiHermesImport;

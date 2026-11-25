@@ -2,7 +2,7 @@ import type { TooltipRootOptions } from "@kobalte/core/tooltip";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal } from "solid-js";
 import { Tooltip } from "./complex";
-import { type MotionPlace, useMenuMotion } from "./menu-motion";
+import { type MotionPlace, panelShownInGroup, useMenuMotion } from "./menu-motion";
 
 const LABEL_OPEN_DELAY = 150;
 const LABEL_CLOSE_DELAY = 0;
@@ -62,6 +62,10 @@ export function MotionTooltip(props: MotionTooltipProps) {
           trigger = element;
         }}
         class="ui-motion-tooltip-trigger"
+        onPointerEnter={(event: PointerEvent) => {
+          const group = place()?.group;
+          if (event.pointerType !== "touch" && group && panelShownInGroup(group)) setOpen(true);
+        }}
         onFocusIn={(event: FocusEvent) => {
           if (event.target instanceof Element && event.target.matches(":focus-visible")) setOpen(true);
         }}

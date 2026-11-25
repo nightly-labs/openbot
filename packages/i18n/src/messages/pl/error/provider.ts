@@ -242,6 +242,8 @@ export const messages = {
     "Twój klucz API OpenCode wygasł. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go odrzucił Twój zapisany klucz API. Klucz mógł wygasnąć. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode nie użył klucza zapisanego w OpenBot. Użył innego klucza OpenCode Go, który OpenCode przechowuje sam, a OpenCode Go odrzucił ten klucz. Aby usunąć ten klucz, uruchom `opencode auth logout opencode-go` w terminalu na komputerze, na którym działa agent, i wybierz klucz. Potem spróbuj ponownie.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go odrzucił żądanie. Nowy klucz API tego nie naprawi. Twój plan OpenCode Go może być nieaktywny albo OpenCode Go może blokować Twoją sieć: niektóre usługi blokują VPN, serwery proxy lub niektóre kraje. Sprawdź w OpenCode Console, czy plan jest aktywny, albo wyłącz VPN, a potem spróbuj ponownie. Możesz też wybrać inny model.",
   "error.provider.opencodeServiceFailure":
@@ -286,6 +288,10 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "Linux zatrzymał dostawcę, ponieważ OpenBot ma limit czasu procesora w czasie rzeczywistym równy 0. Ten limit pochodzi z Twojego systemu. Zainstaluj i uruchom rtkit (`rtkit-daemon`), uruchom `systemctl --user restart xdg-desktop-portal`, a potem uruchom ponownie OpenBot. Sam restart xdg-desktop-portal nie pomoże, dopóki brakuje rtkit.",
   "error.provider.cpuUnsupported": "Procesor tego komputera nie może uruchomić tego dostawcy. Użyj innego dostawcy.",
+  "error.provider.largeMemoryPages":
+    "Ten dostawca nie może działać na tym jądrze Linux, bo jądro używa stron pamięci większych niż 4 KiB, jak na Raspberry Pi 5 lub w Asahi Linux. Użyj jądra ze stronami 4 KiB albo innego dostawcy.",
+  "error.provider.ipv6Missing":
+    "Ten dostawca potrzebuje IPv6, a IPv6 jest wyłączone na tym komputerze. Włącz IPv6 i spróbuj ponownie. W WSL usuń ipv6.disable=1 z .wslconfig i uruchom wsl --shutdown.",
   "error.provider.windowsBlocked":
     "Ustawienia zabezpieczeń systemu Windows, takie jak Inteligentna kontrola aplikacji, nie pozwoliły uruchomić tego dostawcy. Użyj innego dostawcy.",
   "error.provider.opencodeDatabaseNewer":
@@ -296,8 +302,12 @@ export const messages = {
     "Model OpenCode zakończył turę bez odpowiedzi. Spróbuj ponownie albo wybierz inny model.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "Model OpenCode zakończył turę po rozumowaniu, bez odpowiedzi. Spróbuj ponownie albo wybierz inny model.",
+  "error.provider.opencodeToolCallsAsText":
+    "Model OpenCode zapisał swoje działania jako tekst i ich nie wykonał. Spróbuj ponownie albo wybierz inny model.",
   "error.provider.acpNoAnswer":
     "{provider} zakończył turę bez odpowiedzi. Wyślij wiadomość ponownie albo rozpocznij nowy czat.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} otrzymał wyniki od członków zespołu, a potem zakończył turę bez odpowiedzi. Poproś agenta, aby kontynuował.",
   "error.provider.noAnswerAfterSteps":
     "{provider} wykonał kilka kroków, a potem zakończył turę bez odpowiedzi. Zanim wyślesz tę samą prośbę ponownie, zapytaj agenta, co zrobił.",
   "error.provider.acpRefusedNoReason": "{provider} zatrzymał się bez odpowiedzi. Wyślij wiadomość ponownie.",
@@ -362,6 +372,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Zaloguj się przez Cursor lub ustaw CURSOR_API_KEY, aby używać Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor nie mógł połączyć się ze swoim serwerem przy użyciu Twojego logowania. Sprawdź połączenie z internetem, a potem zaloguj się ponownie do Cursor.",
+  "error.provider.cursorNoModels":
+    "Cursor nie wysłał listy modeli. Wybierz „Połącz”, aby ponownie zalogować się do Cursor. Jeśli ten komunikat nie znika, sprawdź, czy Twój plan Cursor obejmuje modele.",
   "error.provider.clineArchivePath": "Archiwum Cline ma nieoczekiwaną ścieżkę.",
   "error.provider.clinePackageMismatch": "Pakiet Cline nie pasuje do katalogu środowisk uruchomieniowych.",
   "error.provider.clineChecksum": "Niezgodna suma kontrolna środowiska uruchomieniowego Cline.",
@@ -395,6 +407,8 @@ export const messages = {
     "Hermes utracił połączenie podczas tej wiadomości, więc nie wie, czy praca się zakończyła. Sprawdź, co zrobił agent, zanim wyślesz wiadomość ponownie.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot nie mógł użyć tego modelu: model nie przyjął jego ustawienia myślenia. Wybierz inny model dla tego agenta, a potem wyślij wiadomość ponownie.",
+  "error.provider.copilotAnswerIncomplete":
+    "Model zatrzymał się, zanim skończył odpowiedź. Wyślij wiadomość ponownie lub wybierz inny model dla tego agenta.",
   "error.provider.usageLimitReached": "Konto osiągnęło limit użycia.",
   "error.provider.claudeContextFull":
     "Ten czat stał się za długi dla Claude. OpenBot rozpoczął nową sesję Claude Code z historią czatu. Spróbuj ponownie.",
@@ -402,6 +416,8 @@ export const messages = {
     "Klucz API Anthropic nie ma środków API. Plan Claude nie płaci za zapytania z kluczem API. Doładuj środki w Anthropic Console albo zaloguj się do Claude w Ustawieniach i wybierz konto Claude w menu modeli agenta.",
   "error.provider.claudeAccountNoCredit":
     "Saldo środków na koncie Claude jest za niskie. Niektóre zapytania, na przykład w trybie szybkim, korzystają ze środków na użycie, także gdy plan Claude ma jeszcze limit. Doładuj środki na użycie na koncie Claude albo wybierz inny model w menu modeli agenta.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code wysyła zapytania do {host}, nie do Anthropic: ten adres API ustawiają ustawienia Claude Code lub zmienne środowiskowe. {host} odrzucił zapytanie z powodu salda konta, nie z powodu planu Claude. Doładuj konto {host} albo wybierz inny model w menu modeli agenta.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Usługa Claude zablokowała to zapytanie. Zwykle to krótki problem po stronie Claude, a nie problem z Twoim kontem. Wyślij wiadomość ponownie za kilka minut.",
   "error.provider.foreignReasoning":
@@ -418,6 +434,8 @@ export const messages = {
     "{provider} zablokował tę wiadomość z powodu swoich zasad bezpieczeństwa: {reason} Jeśli {provider} zablokuje także twoje kolejne wiadomości, rozpocznij nowy czat.",
   "error.provider.codexAudioRefused":
     "Ten model nie może słuchać dźwięku, więc nie przyjął dźwięku z tego czatu. OpenBot rozpoczął nową sesję Codex z historią czatu. Aby kontynuować, wyślij prośbę ponownie i poproś agenta, aby pracował bez dźwięku. Aby sprawdzić dźwięk, wybierz w menu modeli agenta model, który może słuchać dźwięku.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex nie mógł wczytać ustawień Twojego konta ChatGPT, więc agent się zatrzymał. Spróbuj ponownie. Jeśli znów się zatrzyma, wybierz Połącz ponownie dla ChatGPT w Ustawieniach serwera → Dostawcy.",
   "error.provider.imageTooSmall":
     "Model nie przyjął obrazu z tego czatu, ponieważ obraz jest za mały. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.imageTooLarge":
@@ -439,8 +457,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code nie znalazł zapisanej sesji tego czatu. OpenBot rozpoczął nową sesję Claude Code z historią czatu. Spróbuj ponownie.",
   "error.provider.grokSignIn": "Uruchom `grok login` lub ustaw XAI_API_KEY, aby używać Grok.",
+  "error.provider.acpSignInNoStart":
+    "Dostawca się nie uruchomił, więc logowanie nie mogło się zacząć. Spróbuj ponownie lub uruchom ponownie OpenBot.",
   "error.provider.acpSignInTimedOut": "Upłynął limit czasu logowania.",
   "error.provider.acpSignInStopped": "Logowanie zatrzymało się przed zakończeniem.",
+  "error.provider.geminiNoBrowserUseCode":
+    "Ten komputer nie ma przeglądarki do logowania w Google. Wybierz „Zaloguj się kodem”, otwórz link na dowolnym urządzeniu, a potem wklej kod.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini nie otworzył strony logowania. Zainstaluj przeglądarkę i xdg-utils, a potem połącz się z sesji pulpitu na tym hoście. Serwer bez pulpitu nie może ukończyć tego logowania.",
   "error.provider.geminiBrowserOpenFailed":
@@ -549,6 +571,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Nie udało się odczytać wersji {provider} CLI.",
   "error.provider.piSessionBusy": "Zaczekaj na zakończenie bieżącej tury Pi.",
   "error.provider.acpSessionBusy": "{provider} wciąż kończy zatrzymaną turę. Spróbuj ponownie za chwilę.",
+  "error.provider.acpSettingsConflict":
+    "{provider} zmienił ten czat, gdy OpenBot stosował jego ustawienia. Spróbuj ponownie.",
   "error.provider.acpSessionStale":
     "{provider} nie może wczytać najnowszej wersji tego czatu. Wyślij wiadomość ponownie.",
   "error.provider.acpModelNotOffered":

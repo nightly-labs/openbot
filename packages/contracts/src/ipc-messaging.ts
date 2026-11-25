@@ -258,6 +258,7 @@ export interface WhatsAppSender {
   id: string;
   kind: "contact" | "group";
   name: string;
+  readOnly?: boolean;
 }
 
 export interface WhatsAppPairingRequest {
@@ -342,6 +343,16 @@ export interface WhatsAppStatusReactionsList {
   numbers: { workspaceId: string; statusReactions: boolean }[];
 }
 
+export interface SetWhatsAppSenderReadOnlyInput {
+  workspaceId: string;
+  senderId: string;
+  readOnly: boolean;
+}
+
+export interface WhatsAppReadOnlyList {
+  numbers: { workspaceId: string; readOnly: string[] }[];
+}
+
 export type AddWhatsAppOrchestratorInput = Omit<AddMessagingOrchestratorInput, "workspaceId">;
 
 const WHATSAPP_NUMBER = /^[0-9]{5,20}$/u;
@@ -356,7 +367,8 @@ export function isWhatsAppSender(value: unknown): value is WhatsAppSender {
     (value.kind === "contact"
       ? WHATSAPP_NUMBER.test(value.id)
       : value.kind === "group" && WHATSAPP_GROUP.test(value.id)) &&
-    isBoundedString(value.name, MESSAGING_LIMITS.name)
+    isBoundedString(value.name, MESSAGING_LIMITS.name) &&
+    (value.readOnly === undefined || isBoolean(value.readOnly))
   );
 }
 
@@ -465,6 +477,42 @@ export function withWhatsAppStatusReactions(
     accounts: overview.accounts.map((account) => {
       const statusReactions = values.get(account.workspaceId);
       return statusReactions === undefined ? account : { ...account, statusReactions };
+    }),
+  };
+}
+
+export function isWhatsAppReadOnlyList(value: unknown): value is WhatsAppReadOnlyList {
+  return (
+    isDynamicRecord(value) &&
+    Array.isArray(value.numbers) &&
+    value.numbers.length <= MESSAGING_LIMITS.connections &&
+    value.numbers.every(
+      (entry: unknown) =>
+        isDynamicRecord(entry) &&
+        isIdentifier(entry.workspaceId) &&
+        Array.isArray(entry.readOnly) &&
+        entry.readOnly.length <= MESSAGING_LIMITS.allowedSenders &&
+        entry.readOnly.every((id: unknown) => isBoundedString(id, 128)),
+    )
+  );
+}
+
+export function withWhatsAppReadOnly(
+  overview: WhatsAppOverview,
+  settings: WhatsAppReadOnlyList | null,
+): WhatsAppOverview {
+  if (!settings) return overview;
+  const values = new Map(settings.numbers.map((entry) => [entry.workspaceId, new Set(entry.readOnly)]));
+  return {
+    ...overview,
+    accounts: overview.accounts.map((account) => {
+      const readOnly = values.get(account.workspaceId);
+      return readOnly
+        ? {
+            ...account,
+            allowedSenders: account.allowedSenders.map((sender) => ({ ...sender, readOnly: readOnly.has(sender.id) })),
+          }
+        : account;
     }),
   };
 }

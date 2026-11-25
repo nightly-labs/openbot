@@ -328,7 +328,8 @@ function OpenedMenu({
     return () => subscription.remove();
   }, [isOpen, onOpenChange]);
 
-  const items = groups(actions).map((group, index) => (
+  const menuGroups = groups(actions);
+  const items = menuGroups.map((group, index) => (
     <Fragment key={group.map(actionId).join("|")}>
       {index > 0 ? <Separator className="mx-2.5 my-1.5" style={{ backgroundColor: colors.separator }} /> : null}
       {group.map((action) => (
@@ -336,7 +337,7 @@ function OpenedMenu({
       ))}
     </Fragment>
   ));
-  const scrolls = !visible(actions).some((action) => action.subactions?.length && !action.displayInline);
+  const scrolls = !menuGroups.flat().some((action) => action.subactions?.length);
 
   return (
     <Menu isOpen={isOpen} onOpenChange={onOpenChange} pointerEvents="none" style={StyleSheet.absoluteFill}>

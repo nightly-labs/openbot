@@ -30,7 +30,7 @@ export const messages = {
   "mobile.auth.signIn.helpTitle": "איפה קוד ה-QR?",
   "mobile.auth.signIn.helpStep1": "1. פותחים את OpenBot במחשב.",
   "mobile.auth.signIn.helpStep2": "2. עוברים אל הגדרות ← Mobile Connect.",
-  "mobile.auth.signIn.helpStep3": "3. בוחרים ביצירת קוד QR וסורקים אותו כאן.",
+  "mobile.auth.signIn.helpStep3": "3. בוחרים באפשרות הוספת טלפון ← כן, התחברות, וסורקים את הקוד כאן.",
   "mobile.auth.signIn.emailButton": "המשך עם אימייל",
   "mobile.auth.done.title": "מחובר",
   "mobile.auth.done.body": "התחברת בהצלחה.",

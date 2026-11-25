@@ -4,6 +4,7 @@ import type {
   AgentDockAction,
   AgentDockApproval,
   AgentDockChannel,
+  AgentDockExtent,
   AgentDockPresentation,
   AgentDockSeatRef as AgentDockSeatContract,
   AgentRuntimeApproval,
@@ -40,6 +41,28 @@ const SHAPED_WINDOW = currentDevicePlatform() === "linux" || currentDevicePlatfo
 const FITTED_WINDOW = currentDevicePlatform() === "darwin";
 const POINTER_ZONE_WHILE_MOVING = currentDevicePlatform() === "win32";
 const WIDEN_WAIT_MS = 250;
+const EXTENT_SETTLE_MS = 700;
+const EXTENT_SLACK = 4;
+const EXTENT_SIDES = ["inward", "above", "below"] as const;
+
+function extentChange(
+  current: AgentDockExtent | null | undefined,
+  next: AgentDockExtent | null,
+): "keep" | "grow" | "shrink" {
+  if (current === undefined) return "grow";
+  if (current === null) return next === null ? "keep" : "shrink";
+  if (next === null || EXTENT_SIDES.some((side) => next[side] > current[side])) return "grow";
+  return EXTENT_SIDES.every((side) => current[side] - next[side] <= EXTENT_SLACK) ? "keep" : "shrink";
+}
+
+function grownExtent(current: AgentDockExtent | null | undefined, next: AgentDockExtent | null) {
+  if (!current || !next) return next;
+  return {
+    inward: Math.max(current.inward, next.inward),
+    above: Math.max(current.above, next.above),
+    below: Math.max(current.below, next.below),
+  };
+}
 
 function nextGrowth(): Promise<void> {
   return new Promise((resolve) => {
@@ -88,7 +111,8 @@ export function AgentDockSurface() {
   let sent: { interactive: boolean; keyboard: boolean } | null = null;
   let dockShape: readonly AgentDockShapeRect[] | null = null;
   let sentShape = "";
-  let sentExtent = "";
+  let sentExtent: AgentDockExtent | null | undefined;
+  let shrinkTimer: ReturnType<typeof setTimeout> | undefined;
   let failed: { seatKey: string; text: string; clientMessageId: string } | null = null;
 
   const apply = (next: AgentDockPresentation | null) => {
@@ -153,30 +177,43 @@ export function AgentDockSurface() {
     };
   }
 
-  const fitted = () => sentExtent !== "" && sentExtent !== "null";
+  const fitted = () => sentExtent !== undefined && sentExtent !== null;
+  const stopShrink = () => {
+    clearTimeout(shrinkTimer);
+    shrinkTimer = undefined;
+  };
 
-  function syncExtent() {
+  function syncExtent(settled = false) {
     const body = isTucked && edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
     if (menuOpen()) menuWanted = false;
     const extent =
-      dockShape === null || menuWanted || menuOpen() || (pointerIn && !fitted())
+      dockShape === null || chatOpen || menuWanted || menuOpen() || (pointerIn && !fitted())
         ? null
         : windowExtent(
             isTucked ? [...dockShape, tuckedStrip(body, AGENT_DOCK_STRIP_FEEL)] : dockShape,
             presentation()?.edge ?? "right",
           );
-    const key = JSON.stringify(extent);
-    if (key === sentExtent) return;
-    if (extent === null && fitted()) {
+    const change = extentChange(sentExtent, extent);
+    if (change === "keep") return stopShrink();
+    if (change === "shrink" && !settled) {
+      shrinkTimer ??= setTimeout(() => {
+        shrinkTimer = undefined;
+        syncExtent(true);
+      }, EXTENT_SETTLE_MS);
+      return;
+    }
+    stopShrink();
+    const next = change === "grow" ? grownExtent(sentExtent, extent) : extent;
+    if (next === null && fitted()) {
       const resized = nextGrowth();
       widening = resized;
       void resized.then(() => {
         if (widening === resized) widening = null;
       });
     }
-    sentExtent = key;
+    sentExtent = next;
     void agentDockPort()
-      .agentDock.setExtent(extent)
+      .agentDock.setExtent(next)
       .catch(() => undefined);
   }
 
@@ -294,6 +331,7 @@ export function AgentDockSurface() {
       window.removeEventListener("contextmenu", onContextMenu, true);
       window.removeEventListener("blur", onBlur);
       stopTuckTimer();
+      stopShrink();
     };
   });
 
@@ -394,6 +432,13 @@ export function AgentDockSurface() {
       return true;
     },
     takeoverDone: ({ request }) => server === LOCAL_SERVER_ID || request.reason !== "sign-in-blocked",
+    openTakeover: ({ request }) =>
+      void perform({
+        type: "open-browser-takeover",
+        serverId: server,
+        agentId: request.agentId,
+        tabId: request.tabId,
+      }).catch(() => undefined),
     secret: (_takeover, input) => agentDockPort().agent.respondToBrowserSecret(input, server),
     usageLimitSend: async (limit, option, remember) => {
       await perform({

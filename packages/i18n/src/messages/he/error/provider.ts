@@ -228,6 +228,8 @@ export const messages = {
     "תוקף מפתח ה-API של OpenCode פג. יש ליצור מפתח חדש ב-OpenCode Console, להדביק אותו בהגדרות OpenCode ואז לנסות שוב.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go דחה את מפתח ה-API השמור. ייתכן שתוקף המפתח פג. יש ליצור מפתח חדש ב-OpenCode Console, להדביק אותו בהגדרות OpenCode ואז לנסות שוב.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode לא השתמש במפתח ששמרת ב-OpenBot. הוא השתמש במפתח OpenCode Go אחר ש-OpenCode שומר בעצמו, ו-OpenCode Go דחה את המפתח הזה. כדי להסיר את המפתח הזה, הרץ את `opencode auth logout opencode-go` בטרמינל במחשב שמריץ את הסוכן, ובחר את המפתח. לאחר מכן נסה שוב.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go דחה את הבקשה. מפתח API חדש לא יפתור את זה. ייתכן שהתוכנית שלך ב-OpenCode Go לא פעילה, או ש-OpenCode Go חוסם את הרשת שלך: חלק מהשירותים חוסמים VPN, שרתי Proxy או מדינות מסוימות. ודא ב-OpenCode Console שהתוכנית פעילה, או כבה את ה-VPN, ואז נסה שוב. אפשר גם לבחור מודל אחר.",
   "error.provider.opencodeServiceFailure":
@@ -271,6 +273,10 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "Linux עצר את הספק כי ל-OpenBot יש מגבלת מעבד בזמן אמת של 0. המגבלה מגיעה מהמערכת שלך. יש להתקין ולהפעיל את rtkit (`rtkit-daemon`), להריץ `systemctl --user restart xdg-desktop-portal`, ואז להפעיל מחדש את OpenBot. הפעלה מחדש של xdg-desktop-portal בלבד לא תעזור כל עוד rtkit חסר.",
   "error.provider.cpuUnsupported": "המעבד של המחשב הזה לא יכול להריץ את הספק הזה. השתמש בספק אחר.",
+  "error.provider.largeMemoryPages":
+    "הספק הזה לא יכול לרוץ על ליבת Linux הזו, כי הליבה משתמשת בדפי זיכרון גדולים מ-4 KiB, כמו ב-Raspberry Pi 5 או ב-Asahi Linux. השתמש בליבה עם דפים של 4 KiB או בספק אחר.",
+  "error.provider.ipv6Missing":
+    "הספק הזה צריך IPv6, ו-IPv6 כבוי במחשב הזה. הפעל IPv6 ונסה שוב. ב-WSL, הסר את ipv6.disable=1 מ-.wslconfig והרץ wsl --shutdown.",
   "error.provider.windowsBlocked":
     "הגדרות האבטחה של Windows, כמו Smart App Control, מנעו מהספק הזה להתחיל. השתמש בספק אחר.",
   "error.provider.opencodeDatabaseNewer":
@@ -280,7 +286,11 @@ export const messages = {
   "error.provider.opencodeNoAnswer": "מודל OpenCode סיים את הפעולה בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "מודל OpenCode סיים את הפעולה אחרי החשיבה שלו, בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
+  "error.provider.opencodeToolCallsAsText":
+    "מודל OpenCode כתב את הפעולות שלו כטקסט ולא ביצע אותן. יש לנסות שוב, או לבחור מודל אחר.",
   "error.provider.acpNoAnswer": "{provider} סיים את התור בלי תשובה. יש לשלוח את ההודעה שוב, או להתחיל צ'אט חדש.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} קיבל את התוצאות מחברי הצוות, ואז סיים את התור בלי תשובה. יש לבקש מהסוכן להמשיך.",
   "error.provider.noAnswerAfterSteps":
     "{provider} ביצע כמה צעדים ואז סיים את התור בלי תשובה. יש לשאול את הסוכן מה הוא עשה לפני שליחת אותה בקשה שוב.",
   "error.provider.acpRefusedNoReason": "{provider} עצר בלי תשובה. יש לשלוח את ההודעה שוב.",
@@ -343,6 +353,8 @@ export const messages = {
   "error.provider.cursorSignIn": "יש להתחבר עם Cursor או להגדיר CURSOR_API_KEY כדי להשתמש ב-Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor לא הצליח להתחבר לשרת שלו עם פרטי ההתחברות שלך. יש לבדוק את החיבור לאינטרנט ואז להתחבר שוב ל-Cursor.",
+  "error.provider.cursorNoModels":
+    'Cursor לא שלח את רשימת המודלים שלו. בחרו "חיבור" כדי להתחבר שוב ל-Cursor. אם ההודעה הזו נשארת, בדקו שהתוכנית שלכם ב-Cursor כוללת מודלים.',
   "error.provider.clineArchivePath": "בארכיון של Cline יש נתיב לא צפוי.",
   "error.provider.clinePackageMismatch": "החבילה של Cline אינה תואמת לקטלוג סביבות ההרצה.",
   "error.provider.clineChecksum": "סכום הביקורת של סביבת ההרצה של Cline אינו תואם.",
@@ -375,6 +387,8 @@ export const messages = {
     "Hermes איבד את החיבור שלו במהלך ההודעה הזו, ולכן הוא לא יודע אם העבודה הסתיימה. יש לבדוק מה הסוכן עשה לפני שליחת ההודעה שוב.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot לא הצליח להשתמש במודל הזה: המודל לא קיבל את הגדרת החשיבה שלו. בחרו מודל אחר לסוכן הזה ושלחו שוב את ההודעה.",
+  "error.provider.copilotAnswerIncomplete":
+    "המודל עצר לפני שהתשובה שלו הושלמה. שלחו שוב את ההודעה, או בחרו מודל אחר לסוכן הזה.",
   "error.provider.usageLimitReached": "החשבון הגיע למגבלת השימוש שלו.",
   "error.provider.claudeContextFull":
     "הצ'אט הזה נעשה ארוך מדי עבור Claude. OpenBot התחיל סשן חדש של Claude Code עם היסטוריית הצ'אט. יש לנסות שוב.",
@@ -382,6 +396,8 @@ export const messages = {
     "אין קרדיט API במפתח Anthropic API. מינוי Claude לא משלם על בקשות עם מפתח API. אפשר להוסיף קרדיט ב-Anthropic Console, או להתחבר ל-Claude בהגדרות ולבחור את חשבון Claude בתפריט המודל של הסוכן.",
   "error.provider.claudeAccountNoCredit":
     "יתרת הקרדיט בחשבון Claude שלך נמוכה מדי. חלק מהבקשות, כמו המצב המהיר, משתמשות בקרדיטים לשימוש גם כשנשאר שימוש במינוי Claude. אפשר להוסיף קרדיטים לשימוש בחשבון Claude, או לבחור מודל אחר בתפריט המודל של הסוכן.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code שולח בקשות אל {host}, לא אל Anthropic: ההגדרות של Claude Code או משתני הסביבה קובעים את כתובת ה-API הזו. {host} דחה את הבקשה בגלל יתרת החשבון, לא בגלל מינוי Claude שלך. אפשר להוסיף כסף לחשבון {host} שלך, או לבחור מודל אחר בתפריט המודל של הסוכן.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "השירות של Claude חסם את הבקשה הזו. בדרך כלל זו תקלה קצרה אצל Claude, ולא בעיה בחשבון שלך. אפשר לשלוח את ההודעה שוב בעוד כמה דקות.",
   "error.provider.foreignReasoning":
@@ -398,6 +414,8 @@ export const messages = {
     "{provider} חסם את ההודעה הזאת בגלל כללי הבטיחות שלו: {reason} אם {provider} חוסם גם את ההודעות הבאות שלך, התחל צ'אט חדש.",
   "error.provider.codexAudioRefused":
     "המודל הזה לא יכול להאזין לאודיו, ולכן הוא לא קיבל את הצליל בצ'אט הזה. OpenBot התחיל סשן Codex חדש עם היסטוריית הצ'אט. כדי להמשיך, שלח שוב את הבקשה ובקש מהסוכן לעבוד בלי הצליל. כדי לבדוק צליל, בחר בתפריט המודל של הסוכן מודל שיכול להאזין לאודיו.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex לא הצליח לטעון את ההגדרות של חשבון ChatGPT, ולכן הסוכן נעצר. יש לנסות שוב. אם הוא נעצר שוב, יש לבחור חיבור מחדש עבור ChatGPT בהגדרות שרת ← ספקים.",
   "error.provider.imageTooSmall":
     "המודל לא קיבל תמונה בצ'אט הזה כי התמונה קטנה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.imageTooLarge":
@@ -419,8 +437,11 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code לא מצא את הסשן השמור של הצ'אט הזה. OpenBot התחיל סשן חדש של Claude Code עם היסטוריית הצ'אט. יש לנסות שוב.",
   "error.provider.grokSignIn": "יש להריץ `grok login` או להגדיר XAI_API_KEY כדי להשתמש ב-Grok.",
+  "error.provider.acpSignInNoStart": "הספק לא הופעל, ולכן ההתחברות לא יכלה להתחיל. נסה שוב או הפעל מחדש את OpenBot.",
   "error.provider.acpSignInTimedOut": "זמן ההתחברות אזל.",
   "error.provider.acpSignInStopped": "ההתחברות נעצרה לפני שהושלמה.",
+  "error.provider.geminiNoBrowserUseCode":
+    "למחשב הזה אין דפדפן להתחברות ל-Google. בחר „התחברות עם קוד”, פתח את הקישור בכל מכשיר ואז הדבק את הקוד.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini לא הצליח לפתוח את דף ההתחברות. יש להתקין דפדפן ו-xdg-utils, ואז להתחבר מסשן שולחן עבודה במארח הזה. שרת בלי שולחן עבודה לא יכול להשלים את ההתחברות הזו.",
   "error.provider.geminiBrowserOpenFailed":
@@ -519,6 +540,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "לא ניתן לקרוא את הגרסה של ה-CLI של {provider}.",
   "error.provider.piSessionBusy": "יש להמתין לסיום הפעולה הנוכחית של Pi.",
   "error.provider.acpSessionBusy": "{provider} עדיין מסיים פעולה שנעצרה. יש לנסות שוב בעוד רגע.",
+  "error.provider.acpSettingsConflict":
+    "{provider} שינה את הצ'אט הזה בזמן ש-OpenBot החיל את ההגדרות שלו. יש לנסות שוב.",
   "error.provider.acpSessionStale": "{provider} לא הצליח לטעון את הגרסה האחרונה של הצ'אט הזה. יש לשלוח את ההודעה שוב.",
   "error.provider.acpModelNotOffered": "{provider} לא מציע כעת את {model}. בחרו מודל אחר לסוכן הזה ונסו שוב.",
   "error.provider.piStopped": "Pi אינו פועל. יש לחבר את Pi ולנסות שוב.",

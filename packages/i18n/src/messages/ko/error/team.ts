@@ -141,6 +141,8 @@ export const messages = {
   "error.team.claudeUserSetupUnsupported": "이 연결은 Claude Code 설정 스위치를 지원하지 않아요.",
   "error.team.claudeCompactWindowUnsupported": "이 연결은 Claude 압축 크기를 지원하지 않아요.",
   "error.team.cacheExpiryCompactionUnsupported": "이 연결은 캐시가 만료되기 전 압축을 지원하지 않아요.",
+  "error.team.mediaApprovalCreditsUnsupported": "이 연결은 크레딧 승인 한도를 지원하지 않아요.",
+  "error.team.mediaApprovalCreditsInvalid": "0에서 100,000 사이의 정수로 크레딧을 입력해 주세요.",
   "error.team.providerEnvironmentUnsupported": "이 연결은 공급자 변수를 지원하지 않아요.",
   "error.team.modelVisibilityUnsupported": "이 연결에서는 모델 목록을 지원하지 않아요.",
   "error.team.providerDefaultUnsupported": "이 연결에서는 기본 제공자를 지원하지 않아요.",
@@ -206,4 +208,7 @@ export const messages = {
   "error.team.backgroundProcessesUnsupported": "이 연결에서는 백그라운드 프로세스를 지원하지 않아요.",
   "error.team.providerUseUnsupported": "이 연결에서는 제공자를 켜고 끌 수 없어요.",
   "error.team.providerUseInvalid": "이 제공자에는 켜기/끄기 스위치가 없어요.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "이 서버는 미디어 승인에서 모델 선택을 지원하지 않습니다. 서버의 OpenBot을 업데이트하세요.",
+  "error.team.mediaApprovalChoiceInvalid": "미디어 승인 선택이 올바르지 않습니다.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -19,12 +19,13 @@ import {
   SelectValue,
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, Show, untrack } from "solid-js";
+import { createEffect, createSignal, onSettled, Show, untrack } from "solid-js";
 
 export type HostTurnLimitsCalls = Pick<OpenBotDesktopApi["hostAdmin"], "getTurnLimits" | "setTurnLimits">;
 
 export interface ServerTurnLimitsOptions {
   calls?: HostTurnLimitsCalls;
+  onChanged?: (listener: (serverId: string) => void) => () => void;
 }
 
 type LimitChoice = "default" | `${number}`;
@@ -76,32 +77,48 @@ export function ServerTurnLimitsSetting(
   const [loaded, setLoaded] = createSignal(false);
   let generation = 0;
 
+  function load(serverId: string): void {
+    const current = ++generation;
+    untrack(calls)
+      .getTurnLimits(serverId)
+      .then(
+        (next) => {
+          if (current !== generation) return;
+          lastSettings.set(serverId, next);
+          setSettings(next);
+          setLoadError(null);
+          setLoaded(true);
+        },
+        (error: unknown) => {
+          if (current !== generation) return;
+          if (!untrack(loaded)) {
+            lastSettings.delete(serverId);
+            setSettings(null);
+          }
+          setLoadError(errorMessage(error, t("server.settings.turnLimitsLoadFailed")));
+        },
+      );
+  }
+
   createEffect(
     () => props.serverId,
     (serverId) => {
-      const current = ++generation;
       setSettings(lastSettings.get(serverId) ?? null);
       setLoadError(null);
       setLoaded(false);
-      untrack(calls)
-        .getTurnLimits(serverId)
-        .then(
-          (next) => {
-            if (current !== generation) return;
-            lastSettings.set(serverId, next);
-            setSettings(next);
-            setLoaded(true);
-          },
-          (error: unknown) => {
-            if (current === generation) {
-              lastSettings.delete(serverId);
-              setSettings(null);
-              setLoadError(errorMessage(error, t("server.settings.turnLimitsLoadFailed")));
-            }
-          },
-        );
+      load(serverId);
     },
   );
+
+  onSettled(() => {
+    const listener = (serverId: string) => {
+      if (serverId === untrack(() => props.serverId)) load(serverId);
+    };
+    if (props.onChanged) return props.onChanged(listener);
+    return window.openbot.agent.onScopedEvent(({ serverId, event }) => {
+      if (event.type === "host-turn-limits-changed") listener(serverId);
+    });
+  });
 
   function save(change: Partial<HostTurnLimitsInput>): void {
     const current = settings();

@@ -10,6 +10,7 @@ const MOBILE_LAN_PATHS = new Set([
   "/v1/me/billing/",
   "/v1/me/credits/",
   "/v1/me/credits/activity",
+  "/v1/me/credits/transfer",
   "/v1/me/referrals",
   "/v1/mobile/features",
   "/v1/mobile/changelog",
@@ -76,7 +77,10 @@ export function developmentNetworkRequestAllowed(remoteAddress: string | undefin
     segments[1] === "remote" &&
     segments[2] === "hosts" &&
     segments[3] &&
-    (segments[4] === "logo" || segments[4] === "appearance" || segments[4] === "owner-transfer")
+    (segments[4] === "logo" ||
+      segments[4] === "appearance" ||
+      segments[4] === "owner-transfer" ||
+      segments[4] === "hidden")
   )
     return true;
   if (

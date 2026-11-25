@@ -833,7 +833,7 @@ function ViewerPicture({
   motion: ViewerMotion;
   onSize: (key: string, size: ImageDimensions) => void;
 }) {
-  const file = useAttachmentFile(serverId, attachment, true);
+  const file = useAttachmentFile(serverId, attachment, true, true);
   const [loaded, setLoaded] = useState(false);
   const knownWidth = file.dimensions?.width;
   const knownHeight = file.dimensions?.height;

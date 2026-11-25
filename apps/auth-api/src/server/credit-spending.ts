@@ -5,10 +5,9 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit } from "effect";
 import { type AccountAnalytics, type CreditActionEvent, NO_ACCOUNT_ANALYTICS } from "./account-analytics";
 import { BillingError, type BillingOperationError, billingCall } from "./billing-errors";
-import { consumeGrantsSql } from "./credit-grants";
+import { consumeGrantsSql, type WalletColumn, welcomeTenthsSql } from "./credit-grants";
 
 type Failure = BillingError | BillingOperationError;
-type WalletColumn = "user_id" | "server_id";
 
 export const CREDIT_HOLD_START_GRACE_MS = 10 * 60 * 1_000;
 export const CREDIT_HOLD_FIRST_CHECK_MS = 15 * 60 * 1_000;
@@ -19,6 +18,7 @@ const SWEEP_BATCH = 50;
 
 export type CreditWallet = { userId: string } | { serverId: string };
 type CreditHoldStatus = "held" | "charged" | "released";
+type CreditHoldFunding = "paid" | "welcome";
 export type CreditHoldOutcome = "completed" | "failed" | "canceled" | "refused" | "abandoned" | "expired";
 export type CreditJobResult =
   | { outcome: "completed"; charged?: number }
@@ -39,6 +39,7 @@ export interface CreditHoldInput {
   actorUserId: string | null;
   modelId: string;
   credits: number;
+  welcome?: boolean;
 }
 
 export interface CreditHold {
@@ -53,18 +54,21 @@ export interface CreditHold {
   charged: number | null;
   providerJobId: string | null;
   upstream: string | null;
+  funding: CreditHoldFunding;
 }
 
 export interface CreditSubmitTarget {
   upstream: string;
   model: string;
   params: string;
+  fields: string;
 }
 
 interface SubmitTargetRow {
   upstream: string;
   upstream_model: string;
   upstream_params: string;
+  upstream_fields: string | null;
 }
 
 export interface CreditSweepResult {
@@ -109,6 +113,7 @@ interface HoldRow {
   charged_tenths: number | null;
   provider_job_id: string | null;
   upstream: string | null;
+  funding: string;
 }
 
 interface DueRow {
@@ -119,6 +124,7 @@ interface DueRow {
   expires_at: number;
 }
 
+const HOLD_FUNDINGS: readonly CreditHoldFunding[] = ["paid", "welcome"];
 const HOLD_STATUSES: readonly CreditHoldStatus[] = ["held", "charged", "released"];
 const HOLD_OUTCOMES: readonly CreditHoldOutcome[] = [
   "completed",
@@ -132,6 +138,10 @@ const HOLD_OUTCOMES: readonly CreditHoldOutcome[] = [
 export function availableTenthsSql(column: WalletColumn, idParam: string): string {
   return `((SELECT COALESCE(SUM(amount_tenths), 0) FROM credit_ledger WHERE ${column} = ${idParam})
     - (SELECT COALESCE(SUM(credits_tenths), 0) FROM credit_holds WHERE ${column} = ${idParam} AND status = 'held'))`;
+}
+
+export function paidTenthsSql(column: WalletColumn, idParam: string): string {
+  return `(${availableTenthsSql(column, idParam)} - ${welcomeTenthsSql(column, idParam)})`;
 }
 
 export function overdueGrantTenthsSql(column: WalletColumn, idParam: string, nowParam: string): string {
@@ -163,6 +173,7 @@ function toHold(row: HoldRow): CreditHold {
     charged: row.charged_tenths === null ? null : creditsFromTenths(row.charged_tenths),
     providerJobId: row.provider_job_id,
     upstream: row.upstream,
+    funding: isOneOf(HOLD_FUNDINGS, row.funding) ? row.funding : "paid",
   };
 }
 
@@ -231,15 +242,17 @@ export class CreditSpending {
     const ids = walletIds(input.wallet);
     const column: WalletColumn = ids.userId === null ? "server_id" : "user_id";
     const now = this.#now();
+    const welcome = `(?11 = 1 AND ${welcomeTenthsSql(column, "?10")} >= ?6)`;
     yield* billingCall(() =>
       this.#database
         .prepare(
           `INSERT INTO credit_holds(
-             job_id, user_id, server_id, actor_user_id, model_id, credits_tenths, created_at, check_at, expires_at
+             job_id, user_id, server_id, actor_user_id, model_id, credits_tenths, created_at, check_at, expires_at,
+             funding
            )
-           SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
+           SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, CASE WHEN ${welcome} THEN 'welcome' ELSE 'paid' END
             WHERE ${spenderSql(input.wallet)}
-              AND ${availableTenthsSql(column, "?10")} - ${overdueGrantTenthsSql(column, "?10", "?7")} >= ?6
+              AND (${welcome} OR ${paidTenthsSql(column, "?10")} - ${overdueGrantTenthsSql(column, "?10", "?7")} >= ?6)
            ON CONFLICT(job_id) DO NOTHING`,
         )
         .bind(
@@ -253,6 +266,7 @@ export class CreditSpending {
           now + CREDIT_HOLD_FIRST_CHECK_MS,
           now + CREDIT_HOLD_LIMIT_MS,
           ids.userId ?? ids.serverId,
+          input.welcome === true ? 1 : 0,
         )
         .run(),
     );
@@ -298,7 +312,7 @@ export class CreditSpending {
   readonly claimSubmit = Effect.fn("CreditSpending.claimSubmit")(function* (
     this: CreditSpending,
     jobId: string,
-    target: CreditSubmitTarget,
+    target: CreditSubmitTarget | null,
   ): Effect.fn.Return<CreditSubmitTarget | null, Failure> {
     const now = this.#now();
     const claimed = yield* billingCall(() =>
@@ -307,16 +321,31 @@ export class CreditSpending {
           `UPDATE credit_holds
               SET submitted_at = COALESCE(submitted_at, ?2), submit_lease_until = ?3,
                   upstream = COALESCE(upstream, ?4), upstream_model = COALESCE(upstream_model, ?5),
-                  upstream_params = COALESCE(upstream_params, ?6)
+                  upstream_params = COALESCE(upstream_params, ?6),
+                  upstream_fields = CASE WHEN upstream IS NULL THEN ?7 ELSE upstream_fields END
             WHERE job_id = ?1 AND status = 'held' AND provider_job_id IS NULL
               AND (submit_lease_until IS NULL OR submit_lease_until <= ?2)
-           RETURNING upstream, upstream_model, upstream_params`,
+              AND (?4 IS NOT NULL OR upstream IS NOT NULL)
+           RETURNING upstream, upstream_model, upstream_params, upstream_fields`,
         )
-        .bind(jobId, now, now + CREDIT_HOLD_SUBMIT_LEASE_MS, target.upstream, target.model, target.params)
+        .bind(
+          jobId,
+          now,
+          now + CREDIT_HOLD_SUBMIT_LEASE_MS,
+          target?.upstream ?? null,
+          target?.model ?? null,
+          target?.params ?? null,
+          target?.fields ?? null,
+        )
         .first<SubmitTargetRow>(),
     );
     if (!claimed) return null;
-    return { upstream: claimed.upstream, model: claimed.upstream_model, params: claimed.upstream_params };
+    return {
+      upstream: claimed.upstream,
+      model: claimed.upstream_model,
+      params: claimed.upstream_params,
+      fields: claimed.upstream_fields ?? "{}",
+    };
   }).bind(this);
 
   readonly endSubmit = Effect.fn("CreditSpending.endSubmit")(function* (
@@ -357,7 +386,7 @@ export class CreditSpending {
         this.#database
           .prepare(
             consumeGrantsSql(
-              `SELECT user_id, server_id, charged_tenths AS tenths, created_at FROM credit_holds
+              `SELECT user_id, server_id, funding, charged_tenths AS tenths, created_at FROM credit_holds
                 WHERE job_id = ?1 AND status = 'charged'
                   AND NOT EXISTS (SELECT 1 FROM credit_ledger WHERE entry_id = 'spend:' || ?1)`,
             ),
@@ -388,7 +417,7 @@ export class CreditSpending {
       this.#database
         .prepare(
           `SELECT job_id, user_id, server_id, actor_user_id, model_id, credits_tenths, status, outcome, charged_tenths,
-                  provider_job_id, upstream
+                  provider_job_id, upstream, funding
              FROM credit_holds WHERE job_id = ?`,
         )
         .bind(jobId)

@@ -52,6 +52,9 @@ interface AgentAnalyticsProperties {
   server_kind: ServerKind;
 }
 
+const CREDITS_CARD_ACTIONS = ["buy", "enable", "continue", "skip", "mute", "unmute", "allow", "set_default"] as const;
+type CreditsCardAnalyticsAction = (typeof CREDITS_CARD_ACTIONS)[number];
+
 const WORKFLOW_ACTIONS = [
   "create",
   "rename",
@@ -109,6 +112,15 @@ interface DesktopAnalyticsEvents {
   };
   queue_action: {
     action: "cancel" | "steer" | "send_now" | "edit" | "reorder" | "interrupt";
+    result: AnalyticsResult;
+    failure_code?: string;
+  };
+  credits_card_action: {
+    card: "hold" | "approval";
+    action: CreditsCardAnalyticsAction;
+    server_kind: "local" | "remote" | "unknown";
+    media_kind?: "image" | "video";
+    still_short?: boolean;
     result: AnalyticsResult;
     failure_code?: string;
   };
@@ -329,7 +341,16 @@ interface DesktopAnalyticsEvents {
     failure_code?: string;
   };
   computer_use_action: { action: "permission_opened"; permission: "screen-recording" | "accessibility" };
-  help_link_opened: { destination: "discord" | "feedback" | "report-problem" | "guides" | "changelog" };
+  help_link_opened: {
+    destination:
+      | "discord"
+      | "feedback"
+      | "report-problem"
+      | "guides"
+      | "changelog"
+      | "credits-explainer"
+      | "credit-prices";
+  };
   channel_action: {
     action: "created" | "archived" | "member_added";
     result: AnalyticsResult;
@@ -395,6 +416,7 @@ const EVENT_PROPERTY_ALLOWLIST = {
   ],
   agent_input_action: ["kind", "decision", "result", "failure_code"],
   queue_action: ["action", "result", "failure_code"],
+  credits_card_action: ["card", "action", "server_kind", "media_kind", "still_short", "result", "failure_code"],
   routine_action: ["action", "trigger_type", "duration_ms", "result", "failure_code"],
   workflow_action: ["action", "node_kind", "duration_ms", "result", "failure_code"],
   team_action: ["action", "result", "server_kind", "role", "email_bound", "entry_point", "failure_code"],
@@ -545,6 +567,8 @@ const SAFE_FAILURE_CODES = new Set([
   "checksum_failed",
   "version_mismatch",
   "cpu_unsupported",
+  "large_memory_pages",
+  "ipv6_missing",
   "windows_blocked",
   "cli_update_failed",
   "cli_activate_failed",
@@ -558,6 +582,7 @@ const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
   agent_action: ["create", "update", "delete", "duplicate", "branch"],
   agent_input_action: ["prompt", "approval"],
   queue_action: ["cancel", "steer", "send_now", "edit", "reorder", "interrupt"],
+  credits_card_action: CREDITS_CARD_ACTIONS,
   routine_action: ["create", "update", "delete", "test"],
   workflow_action: WORKFLOW_ACTIONS,
   team_action: [
@@ -652,6 +677,7 @@ const EVENT_ENUMS: Partial<Record<AnalyticsEventName, Readonly<Record<string, re
   agent_template_action: { entry_point: ["deep_link", "in_app"] },
   usage_viewed: { scope: ["agent", "server"] },
   workflow_action: { node_kind: WORKFLOW_NODE_KINDS },
+  credits_card_action: { card: ["hold", "approval"], media_kind: ["image", "video"] },
 };
 
 const PROPERTY_ENUMS: Readonly<Record<string, readonly string[]>> = {
@@ -675,7 +701,7 @@ const PROPERTY_ENUMS: Readonly<Record<string, readonly string[]>> = {
   connector: ["slack", "discord", "telegram", "whatsapp", "github", "onepassword", "bitwarden", "protonpass"],
   permission: ["screen-recording", "accessibility"],
   method: ["browser", "code", "api_key"],
-  destination: ["discord", "feedback", "report-problem", "guides", "changelog"],
+  destination: ["discord", "feedback", "report-problem", "guides", "changelog", "credits-explainer", "credit-prices"],
   range: ["7d", "30d", "90d", "1y"],
   from_provider: AGENT_PROVIDERS,
   to_provider: AGENT_PROVIDERS,
@@ -794,6 +820,7 @@ function sanitizeDesktopProperty(
       "completed",
       "skipped",
       "filtered",
+      "still_short",
     ].includes(key)
   ) {
     return isBoolean(value) ? value : undefined;

@@ -2,6 +2,7 @@ import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { File } from "expo-file-system";
 import { router } from "expo-router";
 import { useState } from "react";
+import { queryKeys } from "@/features/workspace/model/query-keys";
 import { useText } from "@/shared/lib/text";
 import {
   type AttachmentPreviewKind,
@@ -11,7 +12,7 @@ import {
 import { type CodePreviewEntry, storeCodePreview } from "../model/code-preview-store";
 import { useAttachmentDownload } from "../model/large-files";
 import { showFileFailure } from "./attachment-preview";
-import { useMediaFile } from "./use-media-file";
+import { requestFile, useMediaFile } from "./use-media-file";
 
 export async function openFilePreview(
   kind: AttachmentPreviewKind,
@@ -41,7 +42,9 @@ export function useAttachmentPreview(serverId: string, attachment: AttachmentSum
     if (!kind) return;
     setOpening(true);
     try {
-      const result = file.data ? { data: file.data, error: null } : await file.refetch();
+      const result = file.data
+        ? { data: file.data, error: null }
+        : await requestFile(queryKeys.chatMediaFile(serverId, attachment.id), () => file.refetch());
       if (result.error) throw result.error;
       if (!result.data) throw new Error(t("mobile.chat.attachment.unavailable"));
       await openFilePreview(kind, { uri: result.data, name: attachment.name, mimeType: attachment.mimeType });

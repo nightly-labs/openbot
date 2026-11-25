@@ -389,7 +389,7 @@ export const messages = {
     "Solo pueden escribir tu chat «Envíate un mensaje» y las personas que permitas. Las demás no reciben respuesta. Si está desactivado, OpenBot responde a las personas desconocidas con un código.",
   "connector.whatsapp.workingMessage": "Mensaje «Trabajando en ello…»",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot lo envía mientras el agente trabaja y luego lo sustituye por la respuesta. Una solicitud que espera a otra anterior también recibe un mensaje de espera. Desactívalo para enviar solo la respuesta.",
+    "OpenBot lo envía mientras el agente trabaja y luego lo sustituye por la respuesta. Una solicitud que espera a otra anterior también recibe un mensaje de espera. Con un número personal, solo tu chat «Envíate un mensaje» recibe estos mensajes. Desactívalo para enviar solo la respuesta.",
   "connector.whatsapp.statusReactions": "Reacciones de estado",
   "connector.whatsapp.statusReactionsDescription":
     "OpenBot reacciona con 👀 cuando llega un mensaje y con ✅ cuando la respuesta está lista. Desactívalas para no enviar reacciones.",
@@ -468,6 +468,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "Un número puede permitir hasta {count} contactos y grupos.",
   "connector.whatsapp.senderGroup": "Grupo",
   "connector.whatsapp.removeSender": "Quitar",
+  "connector.whatsapp.senderAccess": "Acceso de {name}",
+  "connector.whatsapp.senderReplies": "Puede dar tareas",
+  "connector.whatsapp.senderReadOnly": "Solo lectura",
   "connector.whatsapp.addContact": "Añadir contacto",
   "connector.whatsapp.addGroup": "Añadir grupo",
   "connector.whatsapp.contactTitle": "Añadir un contacto",
