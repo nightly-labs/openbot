@@ -659,9 +659,12 @@ again, because a reload could send a form again or lose the work of the person.
 
 ### Page dialogs
 
-A page `alert` or `confirm` that an agent action opens goes to that agent; every other dialog stays in
-Electron's native box for a person. `runTabAction` watches for a dialog only while the agent's own
-input action runs (`BrowserDialogTurn` names the thread and turn), and until the page settles after it.
+A page `alert` or `confirm` that an agent action opens goes to that agent. An `alert` that the page
+opens by itself in a tab that an agent runs (not a person's tab, a takeover, person control or a
+sign-in) gets OK at once, and its redacted text goes to the agent as a `console` warning in the next
+snapshot. Electron shows that box on the main window, so it would block the whole app. Every other
+dialog stays in Electron's native box for a person. `runTabAction` watches for a dialog only while
+the agent's own input action runs (`BrowserDialogTurn` names the thread and turn), and until the page settles after it.
 The engine then sends `Page.enable` on its own debugger and keeps the debugger attached while a watch
 runs, so it also sees a dialog that a page load or a timer opens with no command in flight. A tab
 queue drain ends the watch. `Page.javascriptDialogOpening` ends the action with the dialog:
@@ -674,10 +677,13 @@ Electron shows its own box for the same dialog, after the CDP event. After the C
 emits Electron's internal `-cancel-dialogs` on the tab, which aborts the box without its callback. The
 agent gets a dialog only when the engine owns the debugger and Electron has a `-cancel-dialogs`
 listener. Otherwise, for example under an external debugger, the result says that a person must answer.
+For a page's own `alert` with no watch, the engine calls the reply callback of Electron's internal
+`-run-dialog` event with OK, then emits `-cancel-dialogs`, so it needs no debugger.
 `scripts/browser-dialogs-e2e.ts` fails if an Electron upgrade changes these internal events.
 
 | Event | Dialog |
 | --- | --- |
+| Page's own `alert` in an agent tab, with no agent action | OK at once. The agent gets the text in its next snapshot. |
 | Person's click, or a tool that is not an input action | Native box. The agent is not told. |
 | Turn ends | Handed off: the box stays for a person, and the agent can no longer answer it. |
 | Person answers first | `handle_dialog` fails with "This dialog is closed". |

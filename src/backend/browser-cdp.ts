@@ -942,6 +942,7 @@ export class BrowserCdpEngine {
   #dialogBoxPending = false;
   #cancelDialogBox = false;
   #dialogsReleased = false;
+  #acceptsPageAlert: ((message: string) => boolean) | undefined;
   #highlightSessionId: string | undefined;
   readonly #uploadDocumentIds = new Set<string>();
   readonly #targetSessions = new Map<string, { sessionId: string; url: string }>();
@@ -953,11 +954,14 @@ export class BrowserCdpEngine {
       this.#closing = true;
     });
     const internalEvents: NodeJS.EventEmitter = contents;
-    internalEvents.on(RUN_DIALOG_EVENT, () => {
+    internalEvents.on(RUN_DIALOG_EVENT, (info: unknown, reply: unknown) => {
       this.#dialogBoxPending = false;
-      if (!this.#cancelDialogBox) return;
-      this.#cancelDialogBox = false;
-      contents.emit(CANCEL_DIALOGS_EVENT);
+      if (this.#cancelDialogBox) {
+        this.#cancelDialogBox = false;
+        contents.emit(CANCEL_DIALOGS_EVENT);
+        return;
+      }
+      if (this.#acceptedPageAlert(info, reply)) contents.emit(CANCEL_DIALOGS_EVENT);
     });
     contents.on("did-start-navigation", (details) => {
       if (details.isMainFrame) this.#navigationGeneration += 1;
@@ -2224,6 +2228,20 @@ export class BrowserCdpEngine {
     if (!changed) return;
     this.#signalDialogChange();
     this.#releaseIdleDebugger();
+  }
+
+  acceptPageAlerts(accepts: (message: string) => boolean): void {
+    this.#acceptsPageAlert = accepts;
+  }
+
+  #acceptedPageAlert(info: unknown, reply: unknown): boolean {
+    if (!this.#acceptsPageAlert || this.#dialogsReleased || this.#dialogWatches.size > 0 || this.#dialog?.agent)
+      return false;
+    if (!isRecord(info) || info.dialogType !== "alert" || typeof reply !== "function") return false;
+    const message = redactText(this.#cardScrub.text(stringValue(info.messageText))).slice(0, DIALOG_MESSAGE_LIMIT);
+    if (!this.#acceptsPageAlert(message)) return false;
+    reply(true, "");
+    return true;
   }
 
   releaseDialogs(): void {

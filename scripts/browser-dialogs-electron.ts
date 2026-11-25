@@ -285,6 +285,36 @@ async function main(): Promise<void> {
 
     {
       const { tabId, contents } = await open();
+      const box = nextBox();
+      await contents.executeJavaScript(
+        "setTimeout(() => { alert('Session expired password=hunter2'); document.title = 'noticed' })",
+      );
+      await waitUntil(async () => (await title(contents)) === "noticed");
+      assert.equal((await box).aborted, true, "Electron's box stayed open after the page alert.");
+      recordCases("page-alert-accepted-in-agent-tab");
+      const snapshot = await call("snapshot", { tabId, image: "never" });
+      assert.equal(snapshot.success, true, text(snapshot));
+      assert.match(text(snapshot), /Session expired/);
+      assert(!text(snapshot).includes("hunter2"), "The alert text kept a secret.");
+      recordCases("page-alert-reported-to-agent");
+    }
+
+    {
+      const tab = await runCauseEffect(host.open(`${origin}/person-${++sequence}`));
+      const contents = webContents.getAllWebContents().find((item) => item.getURL() === tab.url);
+      assert(contents, "Missing person tab contents.");
+      const box = nextBox();
+      const shown = contents.executeJavaScript("alert('Hello'); document.title = 'person:alert'", true);
+      assert.equal((await box).aborted, false);
+      (await box).answer(0);
+      await shown;
+      assert.equal(await title(contents), "person:alert");
+      recordCases("person-tab-alert-stays-native");
+      await runCauseEffect(host.close(tab.id));
+    }
+
+    {
+      const { tabId, contents } = await open();
       contents.debugger.attach("1.3");
       await contents.debugger.sendCommand("Page.enable");
       const box = nextBox();

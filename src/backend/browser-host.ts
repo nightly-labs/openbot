@@ -346,6 +346,7 @@ const USES_BACKGROUND_WINDOW =
   process.platform === "darwin" || process.platform === "win32" || process.platform === "linux";
 
 const SHOWS_VIEWS_IN_BACKGROUND = process.platform === "linux";
+const PAGE_ALERT_ACCEPTED = "The page showed an alert. OpenBot pressed OK so the app stays usable. Alert text: ";
 
 function createBackgroundWindow(): BaseWindow {
   const window = new BaseWindow({
@@ -3659,9 +3660,23 @@ export class BrowserHost {
     });
   }
 
+  #agentRunsTab(tab: BrowserHostTab): boolean {
+    return (
+      (tab.ownerThreadId !== null || tab.ownerAgentId !== null) &&
+      !tab.secret &&
+      !this.#takeoverTabIds.has(tab.id) &&
+      !this.#userControlTabIds.has(tab.id)
+    );
+  }
+
   #bindTabEvents(tab: BrowserHostTab): void {
     const contents = tab.contents;
     const changed = () => this.#emitChanged();
+    tab.engine.acceptPageAlerts((message) => {
+      if (tab.closing || !this.#agentRunsTab(tab)) return false;
+      tab.diagnostics.add({ kind: "console", level: "warning", message: `${PAGE_ALERT_ACCEPTED}${message}` });
+      return true;
+    });
     if (this.#tabProxy(tab)) contents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
     let proxySignIns = 0;
     contents.on("login", (event, _details, authInfo, callback) => {
@@ -3800,13 +3815,7 @@ export class BrowserHost {
     contents.on("did-start-loading", changed);
     contents.on("dom-ready", () => {
       void contents.insertCSS(":where(html) { scrollbar-gutter: stable; }").catch(() => undefined);
-      if (
-        (tab.ownerThreadId !== null || tab.ownerAgentId !== null) &&
-        !tab.secret &&
-        !this.#takeoverTabIds.has(tab.id) &&
-        !this.#userControlTabIds.has(tab.id)
-      )
-        refuseCookieBanners(contents);
+      if (this.#agentRunsTab(tab)) refuseCookieBanners(contents);
     });
     contents.on("did-stop-loading", () => {
       if (tab.closing || tab.contents !== contents || contents.isDestroyed()) return;
