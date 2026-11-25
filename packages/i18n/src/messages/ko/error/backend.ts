@@ -300,6 +300,8 @@ export const messages = {
     "로그인 서버가 OpenBot이 읽을 수 없는 응답을 보냈어요. 서비스에서 API 키나 토큰을 제공한다면 이 서버의 설정에 추가한 후 다시 연결을 테스트해 주세요.",
   "error.backend.mcpServerExited": "서버가 응답하기 전에 중지되었어요. 터미널에서 명령을 실행해 오류를 확인하세요.",
   "error.backend.mcpServerExitedWithOutput": "서버가 응답하기 전에 중지되었어요. 출력: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "다운로드에 실패해서 서버가 시작되지 않았어요. 인터넷 연결을 확인한 다음 다시 시도하세요.",
   "error.backend.mcpServerFailedToStart": "서버가 시작되지 않았어요: {reason}",
   "error.backend.mcpServerProgramMissing":
     "OpenBot을 실행하는 컴퓨터에 MCP 서버 {name}의 프로그램이 설치되어 있지 않아서 OpenBot이 시작할 수 없었어요. 그 컴퓨터에 {name}을(를) 제공하는 앱을 설치하거나, 마켓플레이스, 앱에서 {name}을(를) 끄세요.",
