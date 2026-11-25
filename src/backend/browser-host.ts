@@ -4739,8 +4739,8 @@ export class BrowserHost {
     open: () => Effect.Effect<A, BrowserOperationError>,
   ) {
     const start = yield* Effect.forkChild(open(), { startImmediately: true });
-    const started = yield* Fiber.join(start).pipe(Effect.timeoutOption(VIEW_START_CHECK_MS));
-    if (Option.isSome(started)) return started.value;
+    const started = yield* Fiber.await(start).pipe(Effect.timeoutOption(VIEW_START_CHECK_MS));
+    if (Option.isSome(started) && Exit.isSuccess(started.value)) return started.value.value;
     if (!(yield* this.#leaveSilentPage(tabId))) return yield* Fiber.join(start);
     yield* Fiber.interrupt(start);
     yield* this.#reloadPage(tabId).pipe(Effect.ignore);
