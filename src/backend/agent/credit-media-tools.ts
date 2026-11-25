@@ -415,7 +415,7 @@ function freeNote(planned: PlannedJob): { note?: string } {
   return planned.freeInsteadOf === null
     ? {}
     : {
-        note: `The paid balance was too low for ${planned.freeInsteadOf}, so OpenBot used ${listedModel(planned.model).name} with free credits.`,
+        note: `The paid balance was too low for ${planned.freeInsteadOf}, so OpenBot used ${listedModel(planned.model).name}, which takes free credits.`,
       };
 }
 
