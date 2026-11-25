@@ -100,7 +100,7 @@ export const messages = {
   "browser.secret.failed": "リクエストを完了できませんでした。接続を確認して、もう一度お試しください。",
   "browser.secret.ended": "このサインインのリクエストは終了しました。エージェントにもう一度試すよう依頼してください。",
   "browser.secret.vaultSkip.agentScript":
-    "エージェントがこのページでスクリプトを実行したため、OpenBot は保存したログイン情報を使いませんでした。使うには、ページを再読み込みしてもう一度試すようにエージェントに頼んでください。",
+    "エージェントがこのサイトでスクリプトを実行したため、OpenBot は保存したログイン情報を使いませんでした。使うには、このサイトのほかのタブを閉じてから、ページを再読み込みしてもう一度試すようにエージェントに頼んでください。",
   "browser.secret.vaultSkip.fieldKind":
     "エージェントがページ上の違う欄を選んだため、OpenBot は保存したログイン情報を使いませんでした。",
   "browser.secret.vaultSkip.loginChoice":

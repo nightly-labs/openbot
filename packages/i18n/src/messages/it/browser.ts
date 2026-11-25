@@ -101,7 +101,7 @@ export const messages = {
   "browser.secret.failed": "Non è stato possibile completare la richiesta. Controlla la connessione e riprova.",
   "browser.secret.ended": "Questa richiesta di accesso è terminata. Chiedi all’agente di riprovare.",
   "browser.secret.vaultSkip.agentScript":
-    "OpenBot non ha usato le tue credenziali salvate perché l’agente ha eseguito uno script in questa pagina. Per usarle, chiedi all’agente di ricaricare la pagina e riprovare.",
+    "OpenBot non ha usato le tue credenziali salvate perché un agente ha eseguito uno script su questo sito. Per usarle, chiudi le altre schede di questo sito, poi chiedi all’agente di ricaricare la pagina e riprovare.",
   "browser.secret.vaultSkip.fieldKind":
     "OpenBot non ha usato le tue credenziali salvate perché l’agente ha scelto il campo sbagliato nella pagina.",
   "browser.secret.vaultSkip.loginChoice":

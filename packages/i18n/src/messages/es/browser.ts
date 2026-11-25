@@ -101,7 +101,7 @@ export const messages = {
   "browser.secret.failed": "No se pudo completar la solicitud. Comprueba la conexión e inténtalo de nuevo.",
   "browser.secret.ended": "Esta solicitud de inicio de sesión terminó. Pide al agente que lo intente de nuevo.",
   "browser.secret.vaultSkip.agentScript":
-    "OpenBot no usó tu inicio de sesión guardado porque el agente ejecutó un script en esta página. Para usarlo, pide al agente que recargue la página y lo intente de nuevo.",
+    "OpenBot no usó tu inicio de sesión guardado porque un agente ejecutó un script en este sitio. Para usarlo, cierra las otras pestañas de este sitio y luego pide al agente que recargue la página y lo intente de nuevo.",
   "browser.secret.vaultSkip.fieldKind":
     "OpenBot no usó tu inicio de sesión guardado porque el agente eligió un campo incorrecto en la página.",
   "browser.secret.vaultSkip.loginChoice":

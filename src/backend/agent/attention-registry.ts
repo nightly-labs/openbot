@@ -59,7 +59,7 @@ import { getDomain } from "tldts";
 import type { AgentApiKeys, SavedApiKey } from "../agent-api-keys";
 import type { AgentClient, AgentProvider } from "../agent-client";
 import { type BrowserOperationError, browserFailure, secureInputFailure } from "../browser-effects";
-import type { PreparedBrowserSecret } from "../browser-host";
+import type { AgentScriptTab, PreparedBrowserSecret } from "../browser-host";
 import type { BrowserCardVault } from "../browser-tool-actions";
 import { repairBrowserToolInput } from "../browser-tool-input";
 import { type BrowserToolArguments, parseBrowserToolCall } from "../browser-tools";
@@ -274,6 +274,46 @@ interface MediaApprovalAnswer {
   readonly decision: ToolApprovalDecision;
   readonly choice?: MediaApprovalChoice;
   readonly via: CreditAnswerVia;
+}
+
+const RELOAD_AND_RETRY =
+  "with navigate direction=reload, not with evaluate or by opening its address again, and call submit_secret again.";
+
+function agentScriptTabOwner(
+  tab: AgentScriptTab,
+  agentId: string,
+  agentName: (agentId: string) => string | undefined,
+): string {
+  if (tab.ownerAgentId === null) return "a tab that the user opened";
+  if (tab.ownerAgentId === agentId) return "a tab of another chat of this agent";
+  const name = agentName(tab.ownerAgentId);
+  return name ? `a tab of the agent ${JSON.stringify(name)}` : "a tab of another agent";
+}
+
+function agentScriptNote(
+  tabs: readonly AgentScriptTab[],
+  agentId: string,
+  agentName: (agentId: string) => string | undefined,
+): string {
+  if (tabs.length === 0)
+    return `a script that ran with evaluate can still run in this page or in data that this site keeps in the browser. Reload this page ${RELOAD_AND_RETRY}`;
+  const usable = tabs.flatMap((tab) => (tab.tabId === null ? [] : [tab.tabId]));
+  const hidden = [
+    ...new Set(tabs.filter((tab) => tab.tabId === null).map((tab) => agentScriptTabOwner(tab, agentId, agentName))),
+  ];
+  const steps = [
+    ...(usable.length === 0
+      ? []
+      : [
+          `Close ${usable.length === 1 ? "tab" : "tabs"} ${usable.join(", ")} with close_tab, or navigate ${usable.length === 1 ? "it" : "them"} to another site.`,
+        ]),
+    ...(hidden.length === 0
+      ? []
+      : [
+          `Ask the user to close ${hidden.join(", ")} on this site in the Browser panel. list_tabs does not show tabs of other agents or of the user.`,
+        ]),
+  ];
+  return `a script that ran with evaluate can still run in another open tab of this site. ${steps.join(" ")} Then reload this page ${RELOAD_AND_RETRY}`;
 }
 
 const TOOL_APPROVAL_METHOD = "openbot/tool-approval";
@@ -2723,7 +2763,7 @@ export class AttentionRegistry {
     if (pending.secret?.agentScriptedOrigin !== false)
       return skip(
         "agent-scripted-origin",
-        "a script that you ran with evaluate can still run in this page or in another open page of this site. First close or navigate each other tab of this site, also a popup or opener tab where you did not run evaluate. A tab of another agent or a channel can also block the fill, and list_tabs does not show it: when no other tab of this site is in list_tabs, ask the user to close the other tabs of this site. Then reload this page with navigate direction=reload, not with evaluate or by opening its address again, and call submit_secret again.",
+        agentScriptNote(pending.secret?.agentScriptTabs ?? [], agentId, this.#agentName),
         namedCard("agent-script"),
       );
     const withCode = pending.secret.withCode;

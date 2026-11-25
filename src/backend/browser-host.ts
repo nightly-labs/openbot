@@ -415,9 +415,15 @@ function browserWebPreferences(preload: string | undefined) {
     : { ...BROWSER_WEB_PREFERENCES, preload, nodeIntegrationInSubFrames: true };
 }
 
+export interface AgentScriptTab {
+  tabId: string | null;
+  ownerAgentId: string | null;
+}
+
 export interface PreparedBrowserSecret {
   request: BrowserSecretRequest;
   agentScriptedOrigin: boolean;
+  agentScriptTabs: AgentScriptTab[];
   vaultFillable: boolean;
   withCode: boolean;
   submit(secret: string, vault: boolean, code?: string): Effect.Effect<"submitted" | "takeover", BrowserOperationError>;
@@ -1748,11 +1754,13 @@ export class BrowserHost {
           ),
         );
       const codeFields = args.method === "password" ? args.targets.length - 1 : args.targets.length;
+      const agentScriptedOrigin =
+        this.#agentCodeReaches(tab, [url.origin]) ||
+        (yield* this.#agentCodeCanRead(tab, [fieldOrigin], entry.servedByWorker));
       return {
         request: { method: args.method, origin: fieldOrigin, digits: args.method === "password" ? 6 : args.digits },
-        agentScriptedOrigin:
-          this.#agentCodeReaches(tab, [url.origin]) ||
-          (yield* this.#agentCodeCanRead(tab, [fieldOrigin], entry.servedByWorker)),
+        agentScriptedOrigin,
+        agentScriptTabs: agentScriptedOrigin ? this.#agentScriptTabs(params, tab, [url.origin, fieldOrigin]) : [],
         vaultFillable:
           entry.hiddenPasswordFill ||
           entry.kinds.every((kind, index) =>
@@ -1986,6 +1994,15 @@ export class BrowserHost {
       (origin) =>
         tab.workerExposedOrigins?.has(origin) || others.some((candidate) => candidate.scriptedOrigins?.has(origin)),
     );
+  }
+
+  #agentScriptTabs(params: DynamicToolCallParams, tab: BrowserHostTab, origins: string[]): AgentScriptTab[] {
+    return this.#sessionTabs(this.#tabSession(tab))
+      .filter((other) => other !== tab && origins.some((origin) => other.scriptedOrigins?.has(origin)))
+      .map((other) => ({
+        tabId: this.#canUseToolTab(params, other) ? other.id : null,
+        ownerAgentId: other.ownerAgentId,
+      }));
   }
 
   readonly #agentCodeCanRead = Effect.fn("BrowserHost.agentCodeCanRead")(function* (
