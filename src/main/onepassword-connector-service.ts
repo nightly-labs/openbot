@@ -211,6 +211,15 @@ async function createSdkClient(token: string, appVersion: string): Promise<OnePa
 
 function tokenConnectErrorText(error: unknown): string {
   if (error instanceof OnePasswordConnectError) return error.message;
+  const passing = passingFailureText(error);
+  if (passing) return passing;
+  const message = error instanceof Error ? error.message : String(error);
+  if (/(invalid|bad) service account token|create another token|you are not authenticated/i.test(message))
+    return sourceText("error.connector.onePasswordTokenRejected");
+  return sourceText("error.connector.onePasswordUnexpected", { detail: redactText(message) });
+}
+
+function passingFailureText(error: unknown): string | null {
   const message = error instanceof Error ? error.message : String(error);
   if (
     (error instanceof Error && error.constructor.name === "RateLimitExceededError") ||
@@ -219,9 +228,11 @@ function tokenConnectErrorText(error: unknown): string {
     return sourceText("error.connector.onePasswordRateLimited");
   if (/error sending request|request timeout/i.test(message))
     return sourceText("error.connector.onePasswordUnreachable");
-  if (/(invalid|bad) service account token|create another token|you are not authenticated/i.test(message))
-    return sourceText("error.connector.onePasswordTokenRejected");
-  return sourceText("error.connector.onePasswordUnexpected", { detail: redactText(message) });
+  return null;
+}
+
+function readErrorText(error: unknown): string {
+  return passingFailureText(error) ?? sourceText("error.connector.onePasswordReadFailed");
 }
 
 export class OnePasswordConnectorService implements PasswordVault {
@@ -243,6 +254,7 @@ export class OnePasswordConnectorService implements PasswordVault {
   #connecting: AbortController | null = null;
   #accounts: OnePasswordAccount[] = [];
   #error: string | null = null;
+  #readError: string | null = null;
   #client: { token: string; client: Deferred.Deferred<OnePasswordClient, OnePasswordOperationError> } | null = null;
   #index: LoginIndex | null = null;
   #indexing: Deferred.Deferred<LoginIndex, OnePasswordOperationError> | null = null;
@@ -291,7 +303,7 @@ export class OnePasswordConnectorService implements PasswordVault {
       accounts: this.#connecting || connected ? [] : [...this.#accounts],
       vaultNames: connected ? [...(this.#index?.vaultNames ?? [])] : [],
       loginCount: connected ? (this.#index?.logins.length ?? null) : null,
-      error: this.#error,
+      error: this.#error ?? (connected ? this.#readError : null),
     };
   }
 
@@ -404,6 +416,7 @@ export class OnePasswordConnectorService implements PasswordVault {
     this.#connecting = null;
     this.#accounts = [];
     this.#error = null;
+    this.#readError = null;
     this.#generation += 1;
     this.#client = null;
     this.#index = null;
@@ -436,6 +449,7 @@ export class OnePasswordConnectorService implements PasswordVault {
         { concurrency: "unbounded" },
       );
       if (generation !== this.#generation) return null;
+      if (items.length > 0) this.#readWorked(generation);
       return items
         .filter(({ item }) => savedFor(item.websites, origin))
         .map(({ login, item }) => ({
@@ -445,7 +459,7 @@ export class OnePasswordConnectorService implements PasswordVault {
           hasOneTimePassword: item.fields.some((field) => field.fieldType === "Totp"),
         }));
     },
-    (operation) => operation.pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause }))),
+    (operation) => this.#reported(operation).pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause }))),
   ).bind(this);
 
   readonly secretFor = Effect.fn("OnePasswordConnector.secretFor")(
@@ -461,6 +475,7 @@ export class OnePasswordConnectorService implements PasswordVault {
       if (!login) return null;
       const client = yield* this.#clientForToken();
       const item = yield* onePasswordCall(() => client.items.get(login.vaultId, login.id));
+      this.#readWorked(generation);
       if (generation !== this.#generation || !savedFor(item.websites, origin)) return null;
       const value =
         kind === "password"
@@ -470,7 +485,7 @@ export class OnePasswordConnectorService implements PasswordVault {
       registerSecretValue(value);
       return value;
     },
-    (operation) => operation.pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause }))),
+    (operation) => this.#reported(operation).pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause }))),
   ).bind(this);
 
   readonly dispose = Effect.fn("OnePasswordConnector.dispose")(function* (
@@ -650,6 +665,7 @@ export class OnePasswordConnectorService implements PasswordVault {
     const ready = Deferred.makeUnsafe<OnePasswordClient, OnePasswordOperationError>();
     yield* Deferred.succeed(ready, client);
     this.#generation += 1;
+    this.#readError = null;
     this.#client = { token: record.token, client: ready };
     this.#index = index;
     this.#indexing = null;
@@ -690,6 +706,7 @@ export class OnePasswordConnectorService implements PasswordVault {
       const index = yield* this.#buildIndex(yield* this.#clientForToken());
       if (generation === this.#generation) {
         this.#index = index;
+        this.#readError = null;
         this.#emitStatus();
       }
       return index;
@@ -705,7 +722,7 @@ export class OnePasswordConnectorService implements PasswordVault {
 
   #readIndexInBackground(maxAgeMs: number): Effect.Effect<void> {
     return Effect.forkIn(
-      this.#readIndex(maxAgeMs).pipe(
+      this.#reported(this.#readIndex(maxAgeMs)).pipe(
         Effect.catch(({ cause }) =>
           Effect.sync(() => {
             logger.warn("The 1Password vault could not be read.", { cause: toLogValue(cause) });
@@ -714,6 +731,28 @@ export class OnePasswordConnectorService implements PasswordVault {
       ),
       this.#scope,
     ).pipe(Effect.asVoid);
+  }
+
+  #reported<A>(read: Effect.Effect<A, OnePasswordOperationError>): Effect.Effect<A, OnePasswordOperationError> {
+    return Effect.suspend(() => {
+      const generation = this.#generation;
+      return read.pipe(
+        Effect.tapError(({ cause }) =>
+          Effect.sync(() => {
+            const text = readErrorText(cause);
+            if (generation !== this.#generation || this.#readError === text) return;
+            this.#readError = text;
+            this.#emitStatus();
+          }),
+        ),
+      );
+    });
+  }
+
+  #readWorked(generation: number): void {
+    if (generation !== this.#generation || this.#readError === null) return;
+    this.#readError = null;
+    this.#emitStatus();
   }
 
   readonly #buildIndex = Effect.fn("OnePasswordConnector.buildIndex")(function* (

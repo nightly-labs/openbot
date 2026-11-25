@@ -7,6 +7,7 @@ import {
   prunedWorkflowFolders,
   type StartWorkflowRunInput,
   WORKFLOW_AUTO_VERSION_INTERVAL_MS,
+  WORKFLOW_FORMAT,
   WORKFLOW_MAX_VERSIONS,
   WORKFLOW_MEDIA_MODELS,
   type WorkflowDetail,
@@ -31,6 +32,7 @@ import {
   workflowCatalogProvider,
   workflowFixedCatalogModel,
   workflowGitHubTriggerRepositories,
+  workflowGraphFormat,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { nextValidRoutineOccurrence } from "@openbot/team-client/routine-schedule";
@@ -212,12 +214,14 @@ export function mockWorkflows(
         },
       ];
     });
+  const pausedIds = new Set<string>();
   const summaryOf = (id: string, title: string, graph: WorkflowGraph, updatedAt: string): WorkflowSummary => ({
     id,
     title,
     steps: graph.nodes.filter((node) => isWorkflowStepKind(node.kind)).length,
     updatedAt,
     lastRun: null,
+    ...(pausedIds.has(id) ? { paused: true } : {}),
   });
   const put = (id: string, title: string, graph: WorkflowGraph, revision: number, updatedAt = stamp()) => {
     const versions = records.get(id)?.versions ?? [];
@@ -226,6 +230,8 @@ export function mockWorkflows(
       graph: structuredClone(graph),
       revision,
       triggers: triggersOf(id, graph),
+      format: workflowGraphFormat(graph),
+      hostFormat: WORKFLOW_FORMAT,
     };
     records.set(id, { detail, versions });
     return detail;
@@ -495,6 +501,7 @@ export function mockWorkflows(
     get: async (workflowId) => structuredClone(record(workflowId).detail),
     create: async (input) => {
       const id = crypto.randomUUID();
+      if (input.paused) pausedIds.add(id);
       const detail = put(id, input.title.trim(), input.graph ?? { nodes: [], edges: [], strokes: [] }, 0);
       emit(id);
       return structuredClone(detail);
@@ -504,6 +511,18 @@ export function mockWorkflows(
       const next = put(input.workflowId, input.title.trim(), detail.graph, detail.revision);
       emit(input.workflowId);
       return structuredClone(next.summary);
+    },
+    setPaused: async (input) => {
+      const { detail } = record(input.workflowId);
+      if (input.paused) pausedIds.add(input.workflowId);
+      else pausedIds.delete(input.workflowId);
+      const next = put(input.workflowId, detail.summary.title, detail.graph, detail.revision);
+      emit(input.workflowId);
+      return structuredClone(next.summary);
+    },
+    exportFile: async (workflowId) => {
+      record(workflowId);
+      return { saved: false, problem: null };
     },
     delete: async (workflowId) => {
       for (const step of steps.values()) if (step.workflowId === workflowId) stopStep(step);

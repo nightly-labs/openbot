@@ -116,7 +116,6 @@ function ThreadHeaderStory(props: HeaderFixture) {
           onChange: fn(),
           onReasoningEffortChange: fn(),
         }}
-        sidePanel={{ open: false, onToggle: fn() }}
         threads={
           <ThreadHeader
             threads={state.threads}

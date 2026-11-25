@@ -303,6 +303,17 @@ function edgeInputs(join: boolean, edges: readonly WorkflowEdge[], reasons: Reas
   });
 }
 
+export function endedWithoutAnswer(
+  graph: WorkflowGraph,
+  nodeId: string,
+  latest: ReadonlyMap<string, StoredWorkflowStep>,
+): boolean {
+  const source = latest.get(nodeId);
+  if (!source) return false;
+  const reasons = { before: incoming(graph.edges), loops: workflowLoopEdges(graph.nodes, graph.edges), latest };
+  return missingAnswer(source, reasons, new Set()) !== null;
+}
+
 function missingAnswer(source: StoredWorkflowStep, reasons: Reasons, seen: Set<string>): string | null {
   if (source.status === "failed") return withError("No answer: this step failed.", source.error);
   if (source.status === "stopped") return withError("No answer: this step was stopped.", source.error);

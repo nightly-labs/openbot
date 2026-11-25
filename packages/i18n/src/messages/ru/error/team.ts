@@ -126,6 +126,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Это подключение не поддерживает изменение идентификатора сервера.",
   "error.team.hostUpdateUnsupported": "Это подключение не поддерживает обновление хоста.",
   "error.team.hostTimezoneUnsupported": "Это подключение не поддерживает часовой пояс сервера.",
+  "error.team.hostSignalHomeUnsupported": "Это подключение не поддерживает выбор сервера Signal.",
   "error.team.hostVoiceModelUnsupported": "Это подключение не поддерживает модель распознавания речи сервера.",
   "error.team.hostRestartUnsupported": "Это подключение не поддерживает перезапуск сервера.",
   "error.team.ownerTransferUnsupported": "Этот сервер не поддерживает передачу владения.",
@@ -143,6 +144,8 @@ export const messages = {
   "error.team.claudeUserSetupUnsupported": "Это подключение не поддерживает переключатель настроек Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "Это подключение не поддерживает размер сжатия Claude.",
   "error.team.cacheExpiryCompactionUnsupported": "Это подключение не поддерживает сжатие до истечения кэша.",
+  "error.team.mediaApprovalCreditsUnsupported": "Это подключение не поддерживает порог подтверждения кредитов.",
+  "error.team.mediaApprovalCreditsInvalid": "Введите целое число кредитов от 0 до 100 000.",
   "error.team.providerEnvironmentUnsupported": "Это подключение не поддерживает переменные провайдера.",
   "error.team.modelVisibilityUnsupported": "Это подключение не поддерживает список моделей.",
   "error.team.providerDefaultUnsupported": "Это подключение не поддерживает провайдера по умолчанию.",
@@ -205,4 +208,7 @@ export const messages = {
   "error.team.backgroundProcessesUnsupported": "Это подключение не поддерживает фоновые процессы.",
   "error.team.providerUseUnsupported": "Это подключение не поддерживает включение и выключение провайдеров.",
   "error.team.providerUseInvalid": "У этого провайдера нет переключателя включения.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "Этот сервер не поддерживает выбор модели в одобрениях медиа. Обновите OpenBot на сервере.",
+  "error.team.mediaApprovalChoiceInvalid": "Выбор в одобрении медиа недействителен.",
 } as const satisfies PartialTranslation<typeof source>;

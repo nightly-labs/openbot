@@ -31,12 +31,13 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
   env: Record<string, string>;
   timeoutMs: number;
   closeInput?: boolean;
+  pipedInput?: boolean;
   savedSignIn?: Effect.Effect<string | null>;
   platform?: NodeJS.Platform;
 }) {
   const platform = options.platform ?? process.platform;
   const command = yield* Effect.try({
-    try: () => (options.flow === "paste" ? terminalCommand(platform, options.argv) : null),
+    try: () => (options.flow === "paste" && !options.pipedInput ? terminalCommand(platform, options.argv) : null),
     catch: (cause) => new CliCodeLoginFailed({ cause }),
   });
   const watch = yield* watchSavedSignIn(options.savedSignIn);
@@ -100,7 +101,7 @@ export const startCliCodeLogin = Effect.fnUntraced(function* (options: {
       registerSecretValue(value);
       if (!child.stdin || child.exitCode !== null) throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
       submitted = true;
-      child.stdin.write(`${value}\r`);
+      child.stdin.write(`${value}${options.pipedInput ? "\n" : "\r"}`);
     },
   } satisfies CliCodeLogin;
 });
@@ -195,7 +196,7 @@ function parseCliCodePrompt(flow: CliCodePrompt["flow"], output: string): CliCod
     return null;
   }
   if (flow === "paste") {
-    return /paste code/i.test(text) ? { flow, verificationUrl: parsed.href } : null;
+    return /paste (?:the authorization )?code/i.test(text) ? { flow, verificationUrl: parsed.href } : null;
   }
   if (flow === "link") return { flow, verificationUrl: parsed.href };
   const userCode = codeAfterConfirmLine(text) ?? codeOnEnterLine(text);

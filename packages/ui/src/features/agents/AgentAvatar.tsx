@@ -18,6 +18,7 @@ import { documentStillFaces } from "../../document-rendering";
 import { observeOnScreen } from "../../on-screen";
 
 const AVATAR_FPS = 80;
+const BACKGROUND_AVATAR_FPS = 30;
 
 interface PlushMood {
   state: PlushState;
@@ -237,7 +238,7 @@ function GeneratedAvatar(props: {
     { equals: sameAppearance },
   );
   const flatBreathe = () => {
-    const amount = flat() && !cyclesFaces() && ambientMotion() ? avatarMoodPresentation(props.mood).breathe : 0;
+    const amount = flat() && ambientMotion() ? avatarMoodPresentation(props.mood).breathe : 0;
     return amount > 0 ? String(amount) : undefined;
   };
   const spanStyle = () => {
@@ -249,6 +250,8 @@ function GeneratedAvatar(props: {
     (plushMood().busy && ambientMotion()) ||
     (!STATIC_MOTIONS.has(props.motion) && documentFocused()) ||
     interacting();
+  const frameRate = () =>
+    interacting() || props.followPointer || !STATIC_MOTIONS.has(props.motion) ? AVATAR_FPS : BACKGROUND_AVATAR_FPS;
 
   createEffect(
     () => cyclesFaces() && !reducedMotion() && ambientMotion() && onScreen(),
@@ -315,7 +318,7 @@ function GeneratedAvatar(props: {
       state={appearance().state}
       transition={props.transition}
       paused={!animated()}
-      fps={AVATAR_FPS}
+      fps={frameRate()}
       autoPause
       initialPhase={props.animationOffset ?? avatarAnimationPhase(props.seed)}
       follow={props.followPointer}
@@ -334,7 +337,7 @@ function GeneratedAvatar(props: {
       expression={flatAppearance().expression}
       state={flatAppearance().state}
       paused={!animated()}
-      fps={AVATAR_FPS}
+      fps={frameRate()}
       autoPause
       initialPhase={props.animationOffset ?? avatarAnimationPhase(props.seed)}
       follow={props.followPointer}

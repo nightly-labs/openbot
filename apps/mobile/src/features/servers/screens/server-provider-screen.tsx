@@ -105,6 +105,7 @@ function keyDescription(row: ProviderRow, key: ProviderApiKeyStatus | undefined,
   if (row.id === "opencode") return t("mobile.server.providers.keyOptional");
   if (row.id === "antigravity" && saved) return t("mobile.server.providers.geminiKeyInUse");
   if (row.id === "claude" && saved) return t("mobile.server.providers.claudeKeyInUse");
+  if (row.id === "muse" && saved) return t("mobile.server.providers.museKeyInUse");
   if (row.id === "codex")
     return t(saved ? "mobile.server.providers.codexKeyInUse" : "mobile.server.providers.codexKeyAlternative");
   if (isKeyOnlyProvider(row.id)) return t("mobile.server.providers.keyHint");
@@ -760,7 +761,7 @@ function ProviderAccountsSection({
         </SettingsRow>
       ) : null}
       {accounts.map((account, index) => {
-        const name = accountName(account, index);
+        const name = accountName(account, index, accounts);
         const member = account.id !== CLAUDE_API_KEY_ACCOUNT_ID && !isProviderKeyAccount(provider, account.id);
         const leftOut = member && pool?.leftOut.includes(account.id) === true;
         const inUse = member && !leftOut && pool?.inUse === account.id;

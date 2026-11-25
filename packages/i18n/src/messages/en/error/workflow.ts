@@ -5,10 +5,12 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.versionMissing": "This version of the workflow no longer exists.",
   "error.workflow.annotation": "Text, notes and shapes cannot have connections.",
   "error.workflow.port": "A step cannot take this type of input.",
+  "error.workflow.unknownValue": "This OpenBot does not know a setting of a step. Update OpenBot, then try again.",
   "error.workflow.branch": "Only a condition can have yes and no connections.",
   "error.workflow.conditionBranch": "Each connection from a condition must be yes or no.",
   "error.workflow.duplicateEdge": "These two steps already have this connection.",
   "error.workflow.serverTooOld": "This server does not support workflows. Update OpenBot on the computer that runs it.",
+  "error.workflow.newerSteps": "This workflow has steps from a newer OpenBot. Update OpenBot to change it.",
   "error.workflow.nodeUnsupported": "This version of OpenBot cannot run image, file and message steps yet.",
   "error.workflow.interrupted": "OpenBot stopped while this step ran. Run it again.",
   "error.workflow.agentMissing": "Choose an agent for this step.",
@@ -18,6 +20,14 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.conditionUnclear": "The model did not answer yes or no.",
   "error.workflow.answerInvalid":
     "The answer did not have the fields that this step asks for: {fields}. Run the step again.",
+  "error.workflow.answerSetup":
+    "The answer fields of this workflow have a problem here: {fields}. Correct the workflow, then run the step again.",
+  "error.workflow.answerSourceEnded":
+    "These fields have no value, because the step that gives them did not finish: {fields}. Run that step again first.",
+  "error.workflow.runInputInvalid":
+    "The run input does not fit the answer fields of the trigger: {fields}. Send one JSON object with these fields.",
+  "error.workflow.sourceNotDone":
+    "A step before this one failed or stopped the last time it ran. Run that step again first.",
   "error.workflow.checkInvalid": "The check of this step is not valid. Correct it, then run the step again.",
   "error.workflow.modelFailed": "The model could not answer. Run the step again.",
   "error.workflow.modelTimedOut":

@@ -111,6 +111,16 @@ export function applyTaskEvent(
   }
 }
 
+export async function loadNewestTaskConversation(
+  queryClient: QueryClient,
+  queryKey: ReturnType<typeof queryKeys.agentTaskConversation>,
+  load: () => Promise<ConversationSnapshot>,
+): Promise<ConversationSnapshot> {
+  const fetched = await load();
+  const stored = queryClient.getQueryData<ConversationSnapshot>(queryKey);
+  return stored && stored.revision > fetched.revision ? stored : fetched;
+}
+
 export function addStartedTask(queryClient: QueryClient, scope: QueryScope, serverId: string, task: AgentTask): void {
   queryClient.setQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(scope, serverId, task.agentId), (stored) =>
     stored && !stored.tasks.some((entry) => entry.id === task.id)

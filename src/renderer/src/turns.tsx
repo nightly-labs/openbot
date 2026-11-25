@@ -4,6 +4,10 @@ import type {
   AgentEvent,
   AgentModelChoice,
   AgentWaitsSnapshot,
+  CreditsHold,
+  CreditsHoldAction,
+  MediaApprovalChoice,
+  MediaApprovalRead,
   QueueSnapshot,
   RoutineFields,
 } from "@openbot/contracts/ipc";
@@ -25,7 +29,7 @@ import type { TurnStepLines } from "./features/conversation/turn-step-lines";
 import { useDynamicIsland } from "./features/dynamic-island/dynamic-island-context";
 import { useServers } from "./features/servers/servers-context";
 import { queuedDeliveriesInOrder } from "./queue-reconciliation";
-import { isRoutineSteerRefusal } from "./routine-steer-refusal";
+import { isQuietSteerRefusal } from "./quiet-steer-refusal";
 import { createScopeGuard } from "./scope-lifetime";
 import { createSimpleContext } from "./simple-context";
 import { turnsPort } from "./turns-port";
@@ -355,6 +359,51 @@ const Turns = createSimpleContext({
       }
     }
 
+    function readMediaApproval(approval: AgentApproval): Promise<MediaApprovalRead> {
+      return turnsPort().agent.readMediaApproval({ agentId: approval.agentId, requestId: approval.requestId });
+    }
+
+    async function respondToCreditsHold(
+      approval: AgentApproval,
+      action: CreditsHoldAction,
+    ): Promise<CreditsHold | null> {
+      const hold = await turnsPort().agent.respondToCreditsHold({
+        agentId: approval.agentId,
+        requestId: approval.requestId,
+        action,
+      });
+      if (!hold) forgetApproval(approval.agentId, approval.requestId);
+      return hold;
+    }
+
+    function setCreditsAskMuted(muted: boolean): Promise<void> {
+      return turnsPort().agent.setCreditsAskMuted({ muted });
+    }
+
+    async function respondToMediaApproval(approval: AgentApproval, choice: MediaApprovalChoice): Promise<boolean> {
+      const serverId = activeServerId();
+      const analytics = desktopAnalytics.scope();
+      try {
+        await turnsPort().agent.respondToMediaApproval({
+          agentId: approval.agentId,
+          requestId: approval.requestId,
+          choice,
+        });
+        forgetApproval(approval.agentId, approval.requestId);
+        analytics.track("agent_input_action", { kind: "approval", decision: "accept", result: "succeeded" });
+        return true;
+      } catch (error) {
+        analytics.track("agent_input_action", {
+          kind: "approval",
+          decision: "accept",
+          result: "failed",
+          failure_code: "response_failed",
+        });
+        appendUiError(approval.agentId, error, currentText().t("app.errorStatus.approval"), serverId);
+        return false;
+      }
+    }
+
     async function respondToApproval(decision: "accept" | "decline"): Promise<boolean> {
       const agent = activeAgent();
       const approval = agent ? approvalOfThread(agent.id, agent.threadId) : undefined;
@@ -435,7 +484,7 @@ const Turns = createSimpleContext({
           if (activeTurns()[agent.id] !== turnId) return;
           const delivery = queues()[agent.id]?.deliveries.find((item) => item.id === deliveryId);
           if (delivery && delivery.status !== "queued") return;
-          if (isRoutineSteerRefusal(error)) return;
+          if (isQuietSteerRefusal(error)) return;
           appendUiError(agent.id, error, currentText().t("app.errorStatus.steer"), serverId);
         });
     }
@@ -612,6 +661,10 @@ const Turns = createSimpleContext({
       answerPromptRequest,
       respondToApproval,
       respondToApprovalRequest,
+      readMediaApproval,
+      respondToMediaApproval,
+      respondToCreditsHold,
+      setCreditsAskMuted,
       respondToBrowserTakeover,
       respondToBrowserTakeoverRequest,
       cancelQueuedMessage,

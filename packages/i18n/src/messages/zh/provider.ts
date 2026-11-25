@@ -95,6 +95,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "正在 {host} 上启动 {name} 登录…",
   "provider.codeLogin.pageOpening": "正在 {host} 上打开 {name} 登录页面…",
   "provider.codeLogin.linkStep": "登录 {name}，OpenBot 会自动继续。",
+  "provider.codeLogin.thisComputerDescription": "请在这台电脑的浏览器中打开此链接。OpenBot 会在这里等待。",
+  "provider.codeLogin.copyLink": "复制链接",
   "provider.codeLogin.chatgptDeviceSetting":
     "在电脑上的 ChatGPT 中打开安全设置，为 Codex 开启设备代码登录。工作账号由工作区管理员开启。",
 
@@ -123,7 +125,8 @@ export const messages = {
     "在 Windows 和 Linux 上，这些模型无法以“仅工作区”运行。要使用它们，请在助手设置中更改“权限”。",
   "provider.picker.olderModels": "旧版模型",
   "provider.picker.olderModelsList": "旧版 {name} 模型",
-  "provider.picker.noModels": "{name} 没有可用的模型。",
+  "provider.picker.noModels":
+    "这里没有显示 {name} 模型。如果它们已关闭，管理员可以在“服务器设置 > 服务商 > {name} > 模型”中开启它们。",
   "provider.picker.endpointModelsInCustom": "{name} 运行你的自定义端点。它们的模型在“自定义”标签页中。",
   "provider.picker.showCustomModels": "查看模型",
   "provider.picker.museNoModels":
@@ -142,6 +145,7 @@ export const messages = {
   "provider.picker.effort": "强度",
   "provider.picker.effortLabel": "助手推理强度",
   "provider.picker.effortFixed": "{effort}（由 {provider} 固定）",
+  "provider.picker.effortLimited": "你的 Claude 设置或组织将推理强度限制为 {effort}。",
   "provider.picker.fast": "快速",
   "provider.picker.fastText": "响应更快，用量更多",
   "provider.picker.speed": "速度",
@@ -220,6 +224,7 @@ export const messages = {
   "provider.account.numbered": "账号 {number}",
   "provider.account.listLabel": "{name} 的账号",
   "provider.account.usedBy": "被 {agents} 使用",
+  "provider.account.sameEmail": "与 {name} 的邮箱相同",
   "provider.account.failed": "登录失败",
   "provider.account.moreActions": "{name} 的更多操作",
   "provider.account.renameLabel": "{name} 的名称",
@@ -289,6 +294,7 @@ export const messages = {
   "provider.settings.geminiKeyInUse": "Gemini 使用该密钥，而不是你的 Google AI 套餐。不显示该套餐的用量。",
   "provider.settings.geminiKeyReplacesAccount":
     "已保存的 Gemini API 密钥代替 Google 登录使用。要使用 Google 套餐及其模型，请删除该密钥。",
+  "provider.settings.museKeyInUse": "Muse 使用此密钥，而不是你的登录。要使用你的登录，请移除该密钥。",
   "provider.settings.addKey": "添加密钥",
   "provider.settings.changeKey": "更换密钥",
   "provider.settings.runtime": "运行时",

@@ -13,7 +13,7 @@ export type {
   McpSignInState,
   McpTestResult,
 } from "@openbot/contracts/ipc";
-export { mcpConfigErrors, mcpConfigIsValid, normalizeMcpConfig } from "@openbot/contracts/ipc";
+export { isMcpHeaderName, mcpConfigErrors, mcpConfigIsValid, normalizeMcpConfig } from "@openbot/contracts/ipc";
 
 export type McpStatusVariant = "success-light" | "destructive-light" | "warning-light" | "secondary";
 
@@ -38,6 +38,7 @@ const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
   "error.backend.mcpSignInResponseTimedOut": "timeout",
   "error.backend.mcpServerExited": "startup",
   "error.backend.mcpServerExitedWithOutput": "startup",
+  "error.backend.mcpServerDownloadFailed": "startup",
   "error.backend.mcpCommandNotFound": "startup",
   "error.backend.mcpRemoteBridge": "startup",
   "error.backend.mcpServerUnreachable": "unreachable",

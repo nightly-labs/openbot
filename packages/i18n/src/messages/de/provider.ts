@@ -101,6 +101,9 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Die Anmeldung bei {name} wird auf {host} gestartet…",
   "provider.codeLogin.pageOpening": "Die Anmeldeseite von {name} wird auf {host} geöffnet…",
   "provider.codeLogin.linkStep": "Melde dich bei {name} an. OpenBot fährt automatisch fort.",
+  "provider.codeLogin.thisComputerDescription":
+    "Öffne diesen Link in einem Browser auf diesem Computer. OpenBot wartet hier.",
+  "provider.codeLogin.copyLink": "Link kopieren",
   "provider.codeLogin.chatgptDeviceSetting":
     "Öffne ChatGPT auf einem Computer, gehe zu den Sicherheitseinstellungen und aktiviere die Anmeldung per Gerätecode für Codex. Bei einem Arbeitskonto aktiviert sie der Admin deines Workspace.",
   "provider.useApp.title": "{name} in der OpenBot-App verbinden",
@@ -127,7 +130,8 @@ export const messages = {
     "Diese Modelle funktionieren unter Windows und Linux nicht mit „Nur Arbeitsbereich“. Ändere dafür „Zugriff“ in den Agenteneinstellungen.",
   "provider.picker.olderModels": "Ältere Modelle",
   "provider.picker.olderModelsList": "Ältere {name}-Modelle",
-  "provider.picker.noModels": "Keine Modelle von {name} verfügbar.",
+  "provider.picker.noModels":
+    "Hier werden keine Modelle von {name} angezeigt. Wenn sie ausgeschaltet sind, kann ein Administrator sie unter Servereinstellungen > Anbieter > {name} > Modelle einschalten.",
   "provider.picker.endpointModelsInCustom":
     "{name} führt deine eigenen Endpunkte aus. Ihre Modelle sind im Tab Benutzerdefiniert.",
   "provider.picker.showCustomModels": "Modelle zeigen",
@@ -148,6 +152,8 @@ export const messages = {
   "provider.picker.effort": "Aufwand",
   "provider.picker.effortLabel": "Denkaufwand des Agenten",
   "provider.picker.effortFixed": "{effort}, festgelegt von {provider}",
+  "provider.picker.effortLimited":
+    "Deine Claude-Einstellungen oder deine Organisation begrenzen den Aufwand auf {effort}.",
   "provider.picker.fast": "Schnell",
   "provider.picker.fastText": "Schnellere Antworten, höhere Nutzung",
   "provider.picker.speed": "Geschwindigkeit",
@@ -232,6 +238,7 @@ export const messages = {
   "provider.account.apiKey": "API-Schlüssel",
   "provider.account.listLabel": "{name}-Konten",
   "provider.account.usedBy": "Verwendet von {agents}",
+  "provider.account.sameEmail": "Gleiche E-Mail wie {name}",
   "provider.account.failed": "Anmeldung fehlgeschlagen",
   "provider.account.moreActions": "Weitere Aktionen für {name}",
   "provider.account.renameLabel": "Name von {name}",
@@ -273,6 +280,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot meldet {provider} auf dem Server ab.",
   "provider.settings.geminiKeyReplacesAccount":
     "Ein gespeicherter Gemini-API-Schlüssel wird statt einer Google-Anmeldung verwendet. Entferne den Schlüssel, um einen Google-Plan und seine Modelle zu nutzen.",
+  "provider.settings.museKeyInUse":
+    "Muse nutzt diesen Schlüssel, nicht deine Anmeldung. Entferne den Schlüssel, um deine Anmeldung zu nutzen.",
   "provider.settings.versionInstalledByUser": "{version} · von dir installiert",
   "provider.settings.versionDownloaded": "{version} · von OpenBot geladen",
   "provider.settings.otherVersionInstalledByUser": "Nicht in Gebrauch: {version} · von dir installiert",

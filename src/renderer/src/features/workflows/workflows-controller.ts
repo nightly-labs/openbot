@@ -10,7 +10,10 @@ import {
   type WorkflowGitHubRepositoryOptions,
   type WorkflowGraph,
   type WorkflowNodeKind,
+  type WorkflowRunDetail,
+  type WorkflowRunPage,
   type WorkflowSaveResult,
+  type WorkflowStep,
   type WorkflowSummary,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
@@ -32,7 +35,7 @@ import type {
   WorkflowSlackWorkspace,
   WorkflowTelegramChat,
 } from "@openbot/ui/features/workflows/workflow-model";
-import { EMPTY_WORKFLOW_RUN_VIEW } from "@openbot/ui/features/workflows/workflow-run-view";
+import { EMPTY_WORKFLOW_RUN_VIEW, sameWorkflowStep } from "@openbot/ui/features/workflows/workflow-run-view";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, untrack } from "solid-js";
 import { agentAskedHere } from "../../agent-requests";
@@ -45,6 +48,7 @@ import type { WorkflowHost } from "./workflows-port";
 const RUN_PAGE = 20;
 const CACHED_WORKFLOWS = 20;
 const SAVE_DELAY_MS = 400;
+const REFRESH_DELAY_MS = 50;
 
 const NO_OPTIONS: WorkflowGitHubRepositoryOptions = { labels: [], people: [] };
 
@@ -68,9 +72,49 @@ export interface WorkflowRequest {
   taken: () => void;
 }
 
-type WorkflowBase = { revision: number; graph: WorkflowGraph };
+type WorkflowBase = { revision: number; graph: WorkflowGraph; readOnly?: true };
 
 type WorkflowsControllerProps = Omit<WorkflowCanvasProps, "workflow" | "features" | "frame" | "readOnly" | "catalogs">;
+
+const sameRun = (left: WorkflowRunDetail, right: WorkflowRunDetail): boolean => {
+  const one = left.run;
+  const other = right.run;
+  if (
+    one.id !== other.id ||
+    one.workflowId !== other.workflowId ||
+    one.number !== other.number ||
+    one.triggerNodeId !== other.triggerNodeId ||
+    one.source !== other.source ||
+    one.status !== other.status ||
+    one.error !== other.error ||
+    one.startedAt !== other.startedAt ||
+    one.endedAt !== other.endedAt ||
+    left.steps.length !== right.steps.length
+  )
+    return false;
+  return left.steps.every((step, index) => {
+    const otherStep = right.steps[index];
+    return otherStep !== undefined && sameWorkflowStep(step, otherStep);
+  });
+};
+
+type RunPageLike = Pick<WorkflowRunPage, "nextBefore"> & {
+  readonly runs: readonly WorkflowRunDetail[];
+  readonly soloSteps: readonly WorkflowStep[];
+};
+
+const sameRunPage = (left: RunPageLike, right: RunPageLike): boolean =>
+  left.nextBefore === right.nextBefore &&
+  left.soloSteps.length === right.soloSteps.length &&
+  left.runs.length === right.runs.length &&
+  left.runs.every((run, index) => {
+    const other = right.runs[index];
+    return other !== undefined && sameRun(run, other);
+  }) &&
+  left.soloSteps.every((step, index) => {
+    const other = right.soloSteps[index];
+    return other !== undefined && sameWorkflowStep(step, other);
+  });
 
 const lastWorkflowKey = (hostKey: string) => `openbot:last-workflow:${hostKey}`;
 function readLastWorkflow(hostKey: string): string | undefined {
@@ -170,12 +214,18 @@ export function createWorkflowsController(
   let current = visited?.detail.summary.id ?? "";
   const bases = new Map<string, WorkflowBase>();
   const setBase = (detail: WorkflowDetail) =>
-    bases.set(detail.summary.id, { revision: detail.revision, graph: detail.graph });
+    bases.set(detail.summary.id, {
+      revision: detail.revision,
+      graph: detail.graph,
+      ...(detail.needsNewerApp ? { readOnly: true } : {}),
+    });
   if (visited) setBase(visited.detail);
   let limit = RUN_PAGE;
   let disposed = false;
   let pending: { workflowId: string; graph: WorkflowGraph } | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  const refreshPending = new Map<string, { workflowId: string | null; agentId: string | undefined }>();
   let edits = 0;
   let writing = 0;
   let previewRequest = 0;
@@ -319,8 +369,8 @@ export function createWorkflowsController(
     if (workflowId !== current || !list.some((summary) => summary.id === workflowId)) return;
     const [next, page, versions, github] = await (details ?? readDetail(workflowId));
     if (disposed || workflowId !== current) return;
-    const open = stored()?.detail;
-    const shown = open?.summary.id === workflowId ? open : undefined;
+    const open = stored();
+    const shown = open?.detail.summary.id === workflowId ? open.detail : undefined;
     const known = shown && bases.get(workflowId);
     const detail = shown && known && next.revision < known.revision ? shown : next;
     const newer = known !== undefined && next.revision > known.revision;
@@ -330,7 +380,12 @@ export function createWorkflowsController(
       const entry = cache.get(hostKey);
       if (entry) entry.last = workflowId;
     }
-    const value = { detail, runs: page, versions, github };
+    const value = {
+      detail,
+      runs: open && shown ? (sameRunPage(open.runs, page) ? open.runs : page) : page,
+      versions,
+      github,
+    };
     if (newer && idle && agentId !== undefined && shown) {
       playBuild(workflowId, agentId, shown.graph);
       show(value);
@@ -379,13 +434,13 @@ export function createWorkflowsController(
     if (foreignCount(workflowId) !== queuedOn.seen) {
       if (canvasShows(workflowId)) return;
       const now = bases.get(workflowId);
-      if (!now || !queuedOn.from) return;
+      if (!now || now.readOnly || !queuedOn.from) return;
       const merged = mergeWorkflowGraphs(queuedOn.from.graph, edit.graph, now.graph);
       if (stableJson(merged) === stableJson(now.graph)) return;
       return save({ workflowId, graph: merged }, { from: now, seen: foreignCount(workflowId) });
     }
     const from = bases.get(workflowId);
-    if (!from) return;
+    if (!from || from.readOnly) return;
     saving = { workflowId, json: stableJson(edit.graph) };
     let result: WorkflowSaveResult;
     try {
@@ -407,7 +462,7 @@ export function createWorkflowsController(
     if (newer.revision <= known.revision) return;
     takeForeign(newer);
     putDetail(workflowId, () => newer);
-    if (canvasShows(workflowId)) return;
+    if (canvasShows(workflowId) || newer.needsNewerApp) return;
     const merged = mergeWorkflowGraphs(from.graph, edit.graph, newer.graph);
     if (stableJson(merged) !== stableJson(newer.graph)) {
       await save({ workflowId, graph: merged }, { from: bases.get(workflowId), seen: foreignCount(workflowId) });
@@ -552,7 +607,7 @@ export function createWorkflowsController(
     return libraryPictures();
   };
 
-  const refresh = (workflowId: string | null, agentId?: string) => {
+  const refreshNow = (workflowId: string | null, agentId?: string) => {
     if (
       workflowId !== null &&
       agentId !== undefined &&
@@ -575,6 +630,25 @@ export function createWorkflowsController(
     readFolders();
   };
 
+  const flushRefresh = () => {
+    refreshTimer = undefined;
+    if (disposed) return;
+    const requests = [...refreshPending.values()];
+    refreshPending.clear();
+    for (const request of requests) {
+      try {
+        refreshNow(request.workflowId, request.agentId);
+      } catch (error) {
+        report(error);
+      }
+    }
+  };
+
+  const refresh = (workflowId: string | null, agentId?: string) => {
+    refreshPending.set(`${workflowId ?? ""}\u0000${agentId ?? ""}`, { workflowId, agentId });
+    refreshTimer ??= setTimeout(flushRefresh, REFRESH_DELAY_MS);
+  };
+
   onSettled(() => {
     const stop = host.onChanged(refresh);
     const stopFolders = host.onFoldersChanged(readFolders);
@@ -583,6 +657,7 @@ export function createWorkflowsController(
       stop();
       stopFolders();
       window.removeEventListener("focus", onFocus);
+      if (refreshTimer !== undefined) clearTimeout(refreshTimer);
       flush();
       disposed = true;
     };
@@ -796,13 +871,29 @@ export function createWorkflowsController(
     },
     onCreate: (input) => {
       flush();
-      write(async () => {
+      return queued(async () => {
         const created = await tracked("create", () => host.workflows.create(input));
-        await load(created.summary.id);
-      });
+        await load(created.summary.id).catch(report);
+      }).then(
+        () => true,
+        () => false,
+      );
     },
     onRename: (workflowId, title) => {
       tracked("rename", () => host.workflows.rename({ workflowId, title })).catch(report);
+    },
+    get onSetPaused() {
+      if (!host.pauseSupported()) return undefined;
+      return (workflowId: string, paused: boolean) => {
+        host.workflows.setPaused({ workflowId, paused }).catch(report);
+      };
+    },
+    get onExport() {
+      if (!host.portableSupported()) return undefined;
+      return (workflowId: string) => {
+        flush();
+        return queued(() => host.workflows.exportFile(workflowId));
+      };
     },
     onDelete: (workflowId) => {
       flush();
@@ -832,6 +923,9 @@ export function createWorkflowsController(
       return row;
     });
 
+  const hostDownload = host.downloadMedia;
+  const downloadMedia = hostDownload ? (attachmentId: string) => reported(hostDownload(attachmentId)) : undefined;
+
   return {
     detail: () => stored()?.detail,
     failed,
@@ -842,6 +936,7 @@ export function createWorkflowsController(
     slack,
     pictures,
     uploadPicture,
+    downloadMedia,
     readOnly: () => lock() !== undefined,
     github,
     props,

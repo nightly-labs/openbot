@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { WorkflowKindTile } from "@/features/workflows/components/workflow-kind-tile";
 import { rowIndent } from "@/features/workflows/components/workflow-steps-list";
-import { STEP_STATUS_LABEL, stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
+import { stepLabel, stepStatusLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -47,7 +47,12 @@ export function WorkflowRunStepRow({
       className={`flex-row gap-3 py-3 pr-4 ${depth === undefined ? "pl-4" : ""} ${status === "skipped" || !status ? "opacity-60" : ""}`}
       style={depth === undefined ? undefined : { paddingLeft: rowIndent(depth) }}
     >
-      <WorkflowKindTile kind={node.kind} trigger={node.kind === "trigger" ? triggerType(node) : undefined} size={30} />
+      <WorkflowKindTile
+        kind={node.kind}
+        trigger={node.kind === "trigger" ? triggerType(node) : undefined}
+        fields={node.fields}
+        size={30}
+      />
       <View className="min-w-0 flex-1 gap-1">
         <View className="flex-row items-center justify-between gap-2">
           <Typography.Paragraph
@@ -61,7 +66,7 @@ export function WorkflowRunStepRow({
             className={status ? STATUS_CLASS[status] : "text-text-secondary"}
             style={typeScale.small}
           >
-            {status ? t(STEP_STATUS_LABEL[status]) : t("mobile.workflow.status.notRun")}
+            {step ? t(stepStatusLabel(step)) : t("mobile.workflow.status.notRun")}
           </Typography.Paragraph>
         </View>
         <Typography.Paragraph style={typeScale.preview}>{stepText(node, t)}</Typography.Paragraph>

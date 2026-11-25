@@ -17,6 +17,7 @@ import { messages as conversation } from "./conversation";
 import { messages as crm } from "./crm";
 import { messages as customProvider } from "./customProvider";
 import { messages as dialog } from "./dialog";
+import { messages as extension } from "./extension";
 import { messages as files } from "./files";
 import { messages as importAgent } from "./import";
 import { messages as island } from "./island";
@@ -87,6 +88,7 @@ export const pl = {
   ...mcp,
   ...messaging,
   ...webClient,
+  ...extension,
   ...account,
   ...onboarding,
   ...usage,

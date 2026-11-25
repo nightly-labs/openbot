@@ -50,6 +50,7 @@ export const messages = {
     other: "Vous pouvez ajouter {count} dossiers au maximum",
   },
   "agentSettings.folders.browse.places": "Aller à",
+  "agentSettings.folders.browse.path": "Chemin du dossier",
   "agentSettings.folders.browse.home": "Dossier personnel",
   "agentSettings.folders.browse.parent": "Remonter à {folder}",
   "agentSettings.folders.browse.failed": "Impossible d’ouvrir ce dossier.",
@@ -96,6 +97,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Limite d’utilisation atteinte · ignoré",
   "agentSettings.backupModels.unavailable": "Indisponible pour le moment · ignoré",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Si une limite d’utilisation arrête {name} après le début du travail, {name} poursuit le même travail avec le premier modèle disponible dans l’ordre. Il revient à {model} quand la limite prend fin, ou 10 minutes après une erreur du fournisseur.",
   "agentSettings.groups.brain": "Cerveau",
@@ -186,6 +188,8 @@ export const messages = {
     "L’agent repart de zéro et peut encore consulter cette discussion au besoin. Les messages restent visibles au-dessus d’un séparateur. Les instructions, le modèle, les outils, les souvenirs, l’espace de travail et le navigateur ne changent pas.",
   "agentSettings.newChat.confirm": "Nouvelle discussion",
   "agentSettings.newChat.failed": "Impossible de commencer une nouvelle discussion.",
+  "agentSettings.newChat.busy":
+    "L’agent travaille. Pour commencer une nouvelle discussion, attendez qu’il termine ou arrêtez-le.",
   "agentSettings.deleteHistory.title": "Supprimer l’historique",
   "agentSettings.deleteHistory.description":
     "Les messages de cette discussion sont supprimés et l’agent les oublie. Sa configuration reste.",
@@ -195,6 +199,10 @@ export const messages = {
     "Tous les messages et fichiers de cette discussion sont supprimés d’OpenBot et l’agent les oublie. Cette action est irréversible. Les fils secondaires, les instructions, le modèle, les outils, les mémoires, l’espace de travail et le navigateur ne changent pas.",
   "agentSettings.deleteHistory.confirm": "Supprimer l’historique",
   "agentSettings.deleteHistory.failed": "Impossible de supprimer l’historique.",
+  "agentSettings.deleteAgent.title": "Supprimer l’agent",
+  "agentSettings.deleteAgent.description":
+    "L’agent, sa discussion, ses souvenirs, ses routines et son espace de travail sont retirés d’OpenBot.",
+  "agentSettings.deleteAgent.button": "Supprimer",
 
   "agentSettings.fullAccess.title": "Donner un accès complet à cet agent ?",
   "agentSettings.fullAccess.askTitle": "Laisser cet agent travailler hors de son espace de travail ?",

@@ -1,6 +1,6 @@
 import { type CreditsMenu, createCreditsSummary } from "@openbot/ui/features/credits/credits-store";
 import type { SettingsPageBack, SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
-import { createEffect, createMemo, createSignal, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { appPort } from "../../app-port";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
@@ -49,6 +49,11 @@ const context = createSimpleContext({
     const credits = createCreditsSummary(
       () => appPort().credits,
       () => signedInAccount()?.id ?? null,
+    );
+    onCleanup(
+      appPort().agent.onScopedEvent(({ event }) => {
+        if (event.type === "openbot-credits-changed") credits.refresh();
+      }),
     );
     const [settingsMounts, setSettingsMounts] = createSignal<SettingsPagePlacement | undefined>();
     const [serverSettingsQuery, setServerSettingsQuery] = createSignal("");

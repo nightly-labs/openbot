@@ -72,6 +72,7 @@ interface ChatVisualProps {
   onOpenLink: (url: string) => void;
   onMessage?: ((text: string) => void) | undefined;
   onContext?: ((text: string) => void) | undefined;
+  onUse?: (() => void) | undefined;
   isAppShortcut?: ((key: ChatVisualKey) => boolean) | undefined;
   onQuote?: ((text: string) => void) | undefined;
   onOpenInSidePanel?: (() => void) | undefined;
@@ -164,6 +165,9 @@ function VisualFrame(props: ChatVisualProps) {
     switch (message.type) {
       case "size":
         setReported(message.height);
+        return;
+      case "focused":
+        if (document.activeElement === frame) props.onUse?.();
         return;
       case "open-link": {
         reply({});

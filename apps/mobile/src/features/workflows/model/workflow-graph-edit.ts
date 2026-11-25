@@ -1,17 +1,12 @@
-import {
-  WORKFLOW_PORTS,
-  type WorkflowBranch,
-  type WorkflowEdge,
-  type WorkflowGraph,
-  type WorkflowNode,
-} from "@openbot/contracts/ipc";
-import type { AddableKind } from "./workflow-outline";
+import type { WorkflowBranch, WorkflowEdge, WorkflowGraph, WorkflowNode } from "@openbot/contracts/ipc";
+import { ADD_KEYS, type AddKey, addFields, addKind, isFeederKind } from "./workflow-add";
+import { edgeTypeFor, linkType } from "./workflow-ports";
 
 export type GraphPlace = { kind: "edge"; edgeId: string } | { kind: "after"; nodeId: string; branch?: WorkflowBranch };
 
-const CHAIN_KINDS = ["agent", "llm", "approval", "condition"] as const satisfies readonly AddableKind[];
-const isChainKind = (kind: AddableKind): kind is (typeof CHAIN_KINDS)[number] =>
-  CHAIN_KINDS.some((chain) => chain === kind);
+type PortNode = Pick<WorkflowNode, "kind" | "fields">;
+
+const isChain = (node: PortNode) => node.kind !== "output" && !isFeederKind(node.kind);
 
 const STEP_GAP = 360;
 const LANE_OFFSET = 200;
@@ -21,42 +16,41 @@ function edgeAt(graph: WorkflowGraph, place: GraphPlace): WorkflowEdge | undefin
   return place.kind === "edge" ? graph.edges.find((edge) => edge.id === place.edgeId) : undefined;
 }
 
-export function placeKinds(graph: WorkflowGraph, place: GraphPlace, kinds: readonly AddableKind[]): AddableKind[] {
-  const byId = new Map(graph.nodes.map((node) => [node.id, node]));
+function fitsPlace(graph: WorkflowGraph, place: GraphPlace, node: PortNode): boolean {
+  const byId = new Map(graph.nodes.map((item) => [item.id, item]));
   if (place.kind === "after") {
     const from = byId.get(place.nodeId);
-    const type = from ? WORKFLOW_PORTS[from.kind].out[0] : undefined;
-    if (!type) return [];
-    return kinds.filter((kind) => kind !== "prompt" && WORKFLOW_PORTS[kind].in.includes(type));
+    return Boolean(from) && !isFeederKind(node.kind) && from !== undefined && linkType(from, node) !== null;
   }
   const edge = edgeAt(graph, place);
+  const from = edge ? byId.get(edge.from) : undefined;
   const to = edge ? byId.get(edge.to) : undefined;
-  if (!edge || !to) return [];
-  return kinds.filter((kind) => {
-    if (isChainKind(kind))
-      return WORKFLOW_PORTS[kind].in.includes(edge.type) && WORKFLOW_PORTS[to.kind].in.includes("text");
-    if (kind === "prompt") return WORKFLOW_PORTS[to.kind].in.includes("text");
-    return true;
-  });
+  if (!edge || !from || !to) return false;
+  if (isFeederKind(node.kind)) return linkType(node, to) !== null;
+  if (!isChain(node)) return edgeTypeFor(from, node, edge.type) !== null;
+  return edgeTypeFor(from, node, edge.type) !== null && linkType(node, to) !== null;
+}
+
+export function placeKeys(graph: WorkflowGraph, place: GraphPlace): AddKey[] {
+  return ADD_KEYS.filter((key) => fitsPlace(graph, place, { kind: addKind(key), fields: addFields(key) }));
 }
 
 export function insertAtPlace(
   graph: WorkflowGraph,
   place: GraphPlace,
-  kind: AddableKind,
   node: WorkflowNode,
   newId: () => string,
 ): WorkflowGraph | null {
+  if (!fitsPlace(graph, place, node)) return null;
   const byId = new Map(graph.nodes.map((item) => [item.id, item]));
   if (place.kind === "after") {
     const from = byId.get(place.nodeId);
-    if (!from) return null;
+    const type = from ? linkType(from, node) : null;
+    if (!from || !type) return null;
     const at = {
       x: snap(from.at.x + STEP_GAP),
       y: snap(from.at.y + (place.branch === "no" ? LANE_OFFSET : 0)),
     };
-    const type = WORKFLOW_PORTS[from.kind].out[0];
-    if (!type) return null;
     const edge: WorkflowEdge = {
       id: newId(),
       from: from.id,
@@ -72,29 +66,34 @@ export function insertAtPlace(
   if (!edge || !from || !to) return null;
   const middle = { x: snap((from.at.x + to.at.x) / 2), y: snap((from.at.y + to.at.y) / 2) };
   const branch = edge.branch ? { branch: edge.branch } : {};
-  if (isChainKind(kind)) {
-    const into: WorkflowEdge = { id: newId(), from: from.id, to: node.id, type: edge.type, ...branch };
-    const onward: WorkflowEdge = {
-      id: newId(),
-      from: node.id,
-      to: to.id,
-      type: "text",
-      ...(kind === "condition" ? { branch: "yes" as const } : {}),
-    };
-    return {
-      ...graph,
-      nodes: [...graph.nodes, { ...node, at: middle }],
-      edges: [...graph.edges.filter((item) => item.id !== edge.id), into, onward],
-    };
-  }
-  if (kind === "prompt") {
-    const feeds: WorkflowEdge = { id: newId(), from: node.id, to: to.id, type: "text" };
+  if (isFeederKind(node.kind)) {
+    const type = linkType(node, to);
+    if (!type) return null;
+    const feeds: WorkflowEdge = { id: newId(), from: node.id, to: to.id, type };
     const at = { x: snap(to.at.x - STEP_GAP / 2), y: snap(to.at.y - LANE_OFFSET) };
     return { ...graph, nodes: [...graph.nodes, { ...node, at }], edges: [...graph.edges, feeds] };
   }
-  const takes: WorkflowEdge = { id: newId(), from: from.id, to: node.id, type: edge.type, ...branch };
-  const at = { x: snap(middle.x), y: snap(middle.y + LANE_OFFSET) };
-  return { ...graph, nodes: [...graph.nodes, { ...node, at }], edges: [...graph.edges, takes] };
+  const intoType = edgeTypeFor(from, node, edge.type);
+  if (!intoType) return null;
+  const into: WorkflowEdge = { id: newId(), from: from.id, to: node.id, type: intoType, ...branch };
+  if (!isChain(node)) {
+    const at = { x: snap(middle.x), y: snap(middle.y + LANE_OFFSET) };
+    return { ...graph, nodes: [...graph.nodes, { ...node, at }], edges: [...graph.edges, into] };
+  }
+  const onwardType = linkType(node, to);
+  if (!onwardType) return null;
+  const onward: WorkflowEdge = {
+    id: newId(),
+    from: node.id,
+    to: to.id,
+    type: onwardType,
+    ...(node.kind === "condition" ? { branch: "yes" as const } : {}),
+  };
+  return {
+    ...graph,
+    nodes: [...graph.nodes, { ...node, at: middle }],
+    edges: [...graph.edges.filter((item) => item.id !== edge.id), into, onward],
+  };
 }
 
 export function placeAfter(graph: WorkflowGraph, nodeId: string, branch?: WorkflowBranch): GraphPlace {

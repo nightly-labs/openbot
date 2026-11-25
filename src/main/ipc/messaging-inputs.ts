@@ -14,6 +14,7 @@ import type {
   SetDiscordAccessInput,
   SetMessagingEnabledInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppSenderReadOnlyInput,
   SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
   StartWhatsAppLinkInput,
@@ -163,4 +164,13 @@ export function parseSetWhatsAppWorkingMessageInput(value: unknown): SetWhatsApp
 export function parseSetWhatsAppStatusReactionsInput(value: unknown): SetWhatsAppStatusReactionsInput {
   if (!isObject(value) || !isBoolean(value.statusReactions)) throw new Error("A messaging request is invalid.");
   return { workspaceId: requireString(value.workspaceId, "Workspace id"), statusReactions: value.statusReactions };
+}
+
+export function parseSetWhatsAppSenderReadOnlyInput(value: unknown): SetWhatsAppSenderReadOnlyInput {
+  if (!isObject(value) || !isBoolean(value.readOnly)) throw new Error("A messaging request is invalid.");
+  return {
+    workspaceId: requireString(value.workspaceId, "Workspace id"),
+    senderId: requireString(value.senderId, "Sender id"),
+    readOnly: value.readOnly,
+  };
 }

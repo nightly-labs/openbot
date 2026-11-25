@@ -7,6 +7,7 @@ import MousePointer2 from "lucide-react-native/icons/mouse-pointer-2";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { useAvatarHole } from "@/features/agents/components/avatar-cutout";
 import type { MobileAgentWaitReason } from "@/features/workspace/model/agent-activity";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
@@ -16,6 +17,8 @@ const WAIT_ICON = {
   approval: ShieldCheck,
   takeover: MousePointer2,
 } as const satisfies Record<MobileAgentWaitReason, LucideIcon>;
+
+const WAIT_RING = 3;
 
 export const AGENT_WAIT_ACTION = {
   question: "mobile.agent.list.waiting.action.question",
@@ -50,20 +53,25 @@ export function AgentWaitBadge({ reason, size = 20 }: { reason: MobileAgentWaitR
   const [background] = useThemeColor(["background"]);
   const [warning] = useCSSVariable(["--openbot-warning"]);
   const Icon = WAIT_ICON[reason];
+  const reportHole = useAvatarHole();
   return (
     <View
       pointerEvents="none"
-      className="absolute items-center justify-center rounded-full border-2"
+      className="absolute rounded-full"
+      onLayout={reportHole}
       style={{
-        right: -3,
-        bottom: -3,
-        width: size,
-        height: size,
-        borderColor: background,
-        backgroundColor: String(warning),
+        right: -1 - WAIT_RING,
+        bottom: -1 - WAIT_RING,
+        padding: WAIT_RING,
+        backgroundColor: reportHole ? "transparent" : background,
       }}
     >
-      <Icon color={String(background)} size={Math.round(size * 0.58)} strokeWidth={2.4} />
+      <View
+        className="items-center justify-center rounded-full"
+        style={{ width: size - 4, height: size - 4, backgroundColor: String(warning) }}
+      >
+        <Icon color={String(background)} size={Math.round(size * 0.58)} strokeWidth={2.4} />
+      </View>
     </View>
   );
 }

@@ -13,8 +13,10 @@ import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Result, Schema } from "effect";
 import {
   type AgentProvider,
+  ProviderModelLimitedError,
   ProviderModelNotOfferedError,
   ProviderSessionBusyError,
+  ProviderSettingsConflictError,
   ProviderStoppedError,
   ProviderTurnActiveError,
 } from "../agent-client";
@@ -46,7 +48,7 @@ import type { MailboxSync } from "./mailbox-sync";
 import type { MemoryHold } from "./memory-hold";
 import type { PlanContinuation } from "./plan-continuation";
 import type { ProfileSave } from "./profile-save";
-import { isPlanLimitDiagnostic } from "./provider-diagnostics";
+import { isPlanLimitDiagnostic, providerResetDelayMs } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { RoutineStartRetry } from "./routine-start-retry";
@@ -100,11 +102,14 @@ export interface DrainHooks {
   redactMcp(text: string): string;
   tagReferences(agentId: string, threadId: string | null): TagReferenceSource;
   liveVoiceRelayed(deliveryId: string): LiveVoiceRelayed | null;
+  fromChrome(deliveryId: string): boolean;
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
   mayContinueOnBackup(agentId: string): boolean;
   mayFailOver(agentId: string): boolean;
   followUsageLimit(agentId: string): boolean;
   followPendingRuntime(agentId: string): boolean;
+  pendingRuntimeWaits(agentId: string): boolean;
+  settleStaleTaskTurns(agentId: string): void;
   turnEnded(turnId: string): boolean;
   staleTurnSettlement(agentId: string, threadId: string, turnId: string): Effect.Effect<void> | null;
   orphanedDeliveryRecovery(agentId: string): Effect.Effect<void> | null;
@@ -203,6 +208,7 @@ export class DrainScheduler {
   readonly #settlingTurns = new Set<string>();
   readonly #recoveringAgents = new Set<string>();
   readonly #drainTasks = new Map<string, Deferred.Deferred<void, DeliveryStartFailed>>();
+  readonly #unconfirmedStarts = new Map<string, Deferred.Deferred<void>>();
   readonly #startRetry = new RoutineStartRetry({
     retry: (deliveryId, agentId, provider) => Effect.runFork(this.#retryRoutineStart(deliveryId, agentId, provider)),
   });
@@ -409,6 +415,7 @@ export class DrainScheduler {
     if (this.#compactionHolds(lane)) return "compaction";
     if (!this.#routines.mayDrain(agentId)) return "routine";
     if (!this.#usageLimits.mayDrain(agentId) && !this.#usageLimits.mayTry(agentId)) return "usage-limit";
+    if (this.#hooks.pendingRuntimeWaits(agentId)) return "pending-runtime";
     return null;
   }
 
@@ -416,6 +423,7 @@ export class DrainScheduler {
     const key = laneKey(lane);
     if (this.#reportedHolds.get(key) === reason || !this.#mailbox.nextQueued(lane.agentId, lane.taskId)) return;
     this.#reportedHolds.set(key, reason);
+    if (reason === "endpoint-reload") this.#mailboxSync.emitQueue(lane.agentId);
     const working =
       reason === "active-turn" && lane.taskId === null ? this.#conversation.workingSnapshot(lane.agentId) : undefined;
     const channelId = laneChannelId(lane.taskId);
@@ -468,11 +476,25 @@ export class DrainScheduler {
     return this.#heldBy(lane) ?? this.#providerHold(agentId) ?? (heldByMachine ? "machine" : null);
   }
 
-  #providerHold(agentId: string): "providers-not-ready" | "provider-cli-replaced" | null {
+  #providerHold(agentId: string): "providers-not-ready" | "provider-cli-replaced" | "endpoint-reload" | null {
     if (!this.#providers.isReady()) return "providers-not-ready";
     if (this.#deliveryProviders(agentId).some((provider) => this.#providers.isReplacingCli(provider)))
       return "provider-cli-replaced";
+    if (this.awaitsEndpointReload(agentId)) return "endpoint-reload";
     return null;
+  }
+
+  awaitsEndpointReload(agentId: string): boolean {
+    const agent = this.#store.get(agentId);
+    if (!agent) return false;
+    const provider = providerForAgent(agent);
+    if (!this.#providers.reloadPending(provider)) return false;
+    const client = this.#providers.runningAgentClient(agent);
+    return (
+      client !== null &&
+      this.#hooks.servesModel(agent.model, provider, null) &&
+      !this.#hooks.servesModel(agent.model, provider, this.#providers.configRevision(client))
+    );
   }
 
   scheduleDrain(agentId: string, followUsageLimit = true): void {
@@ -558,6 +580,7 @@ export class DrainScheduler {
       (this.#heldByMachine(lane) && "machine");
     if (hold) this.#reportHold(lane, hold);
     if (hold === "active-turn") this.#settleStaleOwnTurn(lane);
+    if (hold === "pending-runtime") this.#hooks.settleStaleTaskTurns(lane.agentId);
     if (hold === "machine") this.#recoverIdleLane(lane);
     if (followUsageLimit && hold === "sign-in" && this.#hooks.followPendingRuntime(lane.agentId)) return true;
     if (followUsageLimit && (!hold || hold === "usage-limit") && this.#hooks.followUsageLimit(lane.agentId))
@@ -670,6 +693,7 @@ export class DrainScheduler {
     if (hold) {
       this.#reportHold(lane, hold);
       if (hold === "active-turn") this.#settleStaleOwnTurn(lane);
+      if (hold === "pending-runtime") this.#hooks.settleStaleTaskTurns(agentId);
       if (hold === "machine") this.#recoverIdleLane(lane);
       return;
     }
@@ -753,7 +777,7 @@ export class DrainScheduler {
           deliveryTaskId === null
             ? this.#conversation.loadedSnapshot(agentId)
             : taskThreadId
-              ? this.#conversation.loadedExecutionSnapshot(taskThreadId)
+              ? this.#conversation.executionSnapshot(taskThreadId)
               : undefined;
         if (!snapshot) continue;
         this.#mailboxSync.syncDeliveryMessage(snapshot, deliveryId);
@@ -948,10 +972,12 @@ export class DrainScheduler {
                   ? this.#routines.timezoneForDelivery(item.delivery.id)
                   : undefined,
               answeredRoutine: this.answeredRoutine(item.delivery),
+              followsUpOwnAnswer: this.#mailbox.followsUpOwnAnswer(item.delivery),
               taskReport: this.taskReport(item),
               taskReportWaiting: this.taskReportWaiting(item),
               tags,
               liveVoice: this.#hooks.liveVoiceRelayed(item.delivery.id),
+              fromChrome: this.#hooks.fromChrome(item.delivery.id),
               externalChat: this.#messaging?.ownsDelivery(item.delivery.id) === true,
               ...(executionText === undefined ? {} : { executionText }),
             });
@@ -996,7 +1022,7 @@ export class DrainScheduler {
         snapshot.messages.push({
           id: item.id,
           author: item.sender.kind === "agent" ? "agent" : "user",
-          source: item.sender.kind === "agent" ? "agent" : "user",
+          source: item.sender.kind === "agent" ? "agent" : item.sender.kind === "routine" ? "routine" : "user",
           ...(item.sender.kind === "agent" ? { senderAgentId: item.sender.agentId } : {}),
           replyToMessageId: item.replyToMessageId,
           attachments: item.attachments,
@@ -1015,6 +1041,17 @@ export class DrainScheduler {
                 channelDelivery && this.#channels?.resumesAfterSubtasks(item.id)
                 ? { itemType: CHANNEL_RESUME_ITEM_TYPE }
                 : {}),
+          ...(item.sender.kind === "routine"
+            ? {
+                itemType: "routine",
+                routine: {
+                  routineId: item.sender.routineId,
+                  runId: item.sender.runId,
+                  name: item.sender.routineName,
+                  scheduledFor: item.sender.scheduledFor,
+                },
+              }
+            : {}),
         });
       }
       this.#conversation.emitConversation(snapshot);
@@ -1047,7 +1084,9 @@ export class DrainScheduler {
                   ? { clientTurnId: randomUUID() }
                   : {}),
                 answerOptional:
-                  delivery.sender.kind === "agent" && delivery.expectsReply === false && !delivery.replyToMessageId,
+                  delivery.sender.kind === "agent" &&
+                  delivery.expectsReply === false &&
+                  (!delivery.replyToMessageId || this.#mailbox.followsUpOwnAnswer(delivery)),
                 wakeAfterCommands: inOwnChat(providerThreadId),
                 input: inputForThread(providerThreadId),
                 cwd: agent.workspacePath,
@@ -1145,8 +1184,9 @@ export class DrainScheduler {
           }
           const recipient = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
           const providerStopped = error instanceof ProviderStoppedError;
+          const settingsConflict = error instanceof ProviderSettingsConflictError;
           const resumeTimedOut =
-            (providerStopped || isRequestTimeout(error, "thread/resume")) &&
+            (providerStopped || settingsConflict || isRequestTimeout(error, "thread/resume")) &&
             this.#mayRetryResume(
               delivery.recipientAgentId,
               laneKey({ agentId: delivery.recipientAgentId, taskId: laneId }),
@@ -1167,24 +1207,36 @@ export class DrainScheduler {
               logger.warn(
                 providerStopped
                   ? "The provider stopped before the turn was sent. Its messages try again."
-                  : "A session did not open in time. Its messages try again.",
+                  : settingsConflict
+                    ? "The provider changed the session while its settings were set. Its messages try again."
+                    : "A session did not open in time. Its messages try again.",
                 { agentId: delivery.recipientAgentId, provider: error.providerName },
               );
             if (error instanceof ProviderSessionBusyError || resumeTimedOut)
               yield* this.#retryBusySession(delivery.recipientAgentId);
             return;
           }
+          const modelLimited = error instanceof ProviderModelLimitedError;
           if (
-            error instanceof ProviderModelNotOfferedError &&
+            (error instanceof ProviderModelNotOfferedError || modelLimited) &&
             !channelDelivery &&
             !messagingDelivery &&
             this.#hooks.mayFailOver(delivery.recipientAgentId)
           ) {
-            logger.warn("A session does not offer the agent's model. The agent moves to its backup model.", {
-              agentId: delivery.recipientAgentId,
-              model: requestedModel,
-            });
-            this.#usageLimits.notOffered(delivery.recipientAgentId, requestedModel);
+            if (modelLimited) {
+              logger.warn("The provider refused the agent's model at a limit. The agent moves to its backup model.", {
+                agentId: delivery.recipientAgentId,
+                model: requestedModel,
+                reason: this.#hooks.redactMcp(error.message),
+              });
+              this.#usageLimits.failed(delivery.recipientAgentId, requestedModel, providerResetDelayMs(error.message));
+            } else {
+              logger.warn("A session does not offer the agent's model. The agent moves to its backup model.", {
+                agentId: delivery.recipientAgentId,
+                model: requestedModel,
+              });
+              this.#usageLimits.notOffered(delivery.recipientAgentId, requestedModel);
+            }
             for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
             this.#mailboxSync.emitQueue(delivery.recipientAgentId);
             if (!this.#hooks.followUsageLimit(delivery.recipientAgentId))
@@ -1222,13 +1274,25 @@ export class DrainScheduler {
             this.#channels?.deliveryUncertain(delivery.id);
             this.#hooks.emitError(
               "delivery_start_unconfirmed",
-              `${error.providerName} did not confirm the turn start in time. OpenBot will wait for lifecycle events instead of retrying potentially duplicated work.`,
+              sourceText("error.backend.turnStartUnconfirmed", { provider: error.providerName }),
               delivery.recipientAgentId,
             );
             const ids = batch.map(({ delivery: item }) => item.id);
+            const settleNow = Deferred.makeUnsafe<void>();
+            for (const id of ids) this.#unconfirmedStarts.set(id, settleNow);
             yield* Effect.forkDetach(
-              this.#settleUnstarted(delivery.recipientAgentId, ids, releaseReservation, routineThreadId).pipe(
-                Effect.delay(TURN_START_GRACE_MS),
+              Deferred.await(settleNow).pipe(
+                Effect.as(true),
+                Effect.timeoutOrElse({ duration: TURN_START_GRACE_MS, orElse: () => Effect.succeed(false) }),
+                Effect.flatMap((resumed) =>
+                  this.#settleUnstarted(delivery.recipientAgentId, ids, releaseReservation, routineThreadId, resumed),
+                ),
+                Effect.ensuring(
+                  Effect.sync(() => {
+                    for (const id of ids)
+                      if (this.#unconfirmedStarts.get(id) === settleNow) this.#unconfirmedStarts.delete(id);
+                  }),
+                ),
               ),
             );
             return;
@@ -1239,7 +1303,9 @@ export class DrainScheduler {
             ? "error.provider.stoppedBeforeStart"
             : sessionStartTimedOut
               ? "error.provider.sessionStartTimedOut"
-              : null;
+              : isRequestTimeout(error, "thread/resume")
+                ? "error.provider.sessionResumeTimedOut"
+                : null;
           const stoppedReason =
             stoppedKey && recipient
               ? sourceText(stoppedKey, { provider: providerLabel(providerForAgent(recipient)) })
@@ -1425,6 +1491,7 @@ export class DrainScheduler {
       deliveryIds: readonly string[],
       releaseReservation: () => void,
       routineThreadId: string | null,
+      resumed: boolean,
     ) {
       if (this.#hooks.isStopping()) return;
       let settled = false;
@@ -1443,10 +1510,17 @@ export class DrainScheduler {
       if (routineThreadId) yield* this.#threads.closeRoutineThread(routineThreadId);
       releaseReservation();
       this.#mailboxSync.emitQueue(agentId);
+      if (!resumed)
+        this.#hooks.emitError("delivery_start_unconfirmed", sourceText("error.backend.turnStartAbandoned"), agentId);
       this.scheduleDrain(agentId);
     },
     Effect.catch((failure) => Effect.sync(() => this.#hooks.emitError("delivery_start_unconfirmed", failure.cause))),
   );
+
+  settleUnconfirmedStart(deliveryId: string): Effect.Effect<void> {
+    const settleNow = this.#unconfirmedStarts.get(deliveryId);
+    return settleNow ? Effect.asVoid(Deferred.succeed(settleNow, undefined)) : Effect.void;
+  }
 
   modelForTurn(agentId: string, turnId: string): string | null {
     for (const [key, running] of this.#turnModels)

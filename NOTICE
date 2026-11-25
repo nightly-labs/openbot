@@ -149,7 +149,7 @@ text is in packages/ui/src/assets/fonts/noto-greeting-emoji-OFL.txt and at
 https://openfontlicense.org.
 
 This product includes model maker logos from LobeHub Icons 1.104.0
-(apps/auth-api/src/components/credits/logos). The logos are trademarks of their owners.
+(packages/ui/src/assets/maker-logos). The logos are trademarks of their owners.
 Copyright (c) 2023 LobeHub
 
 MIT License

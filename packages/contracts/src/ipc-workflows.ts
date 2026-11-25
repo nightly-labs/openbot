@@ -4,6 +4,10 @@ import { integerInRange, isBoundedString, isFiniteNumber, isIdentifier } from ".
 import { isRoutineSchedule, type RoutineSchedule } from "./ipc-routines";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
+export function isWorkflowFormat(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 1;
+}
+
 export const WORKFLOW_NODE_KINDS = [
   "text",
   "prompt",
@@ -62,6 +66,7 @@ export type WorkflowFields = Record<string, WorkflowFieldValue>;
 
 export const WORKFLOW_GROUP_FIELDS = { id: "group", name: "groupName", folded: "groupFolded" } as const;
 export const WORKFLOW_STEP_NAME_FIELD = "stepName";
+export const WORKFLOW_UNLINKED_CONNECTION = "unlinked";
 
 export const WORKFLOW_MEDIA_KINDS = ["image", "video"] as const;
 export type WorkflowMediaKind = (typeof WORKFLOW_MEDIA_KINDS)[number];
@@ -651,6 +656,7 @@ export interface WorkflowSummary {
   steps: number;
   updatedAt: string;
   lastRun: { status: WorkflowRunStatus; at: string } | null;
+  paused?: true;
 }
 
 export interface WorkflowTriggerState {
@@ -666,6 +672,8 @@ export interface WorkflowDetail {
   revision: number;
   triggers: WorkflowTriggerState[];
   needsNewerApp?: true;
+  format?: number;
+  hostFormat?: number;
 }
 
 export interface WorkflowVersion {
@@ -700,65 +708,8 @@ export interface WorkflowStep {
   error: string | null;
   startedAt: string | null;
   endedAt: string | null;
+  waiting?: boolean;
 }
-
-export const WORKFLOW_RUNTIME_FIELDS: Readonly<Record<WorkflowNodeKind, readonly string[]>> = {
-  trigger: [
-    "trigger",
-    "timezone",
-    "repositories",
-    "event",
-    "filters",
-    "labels",
-    "titleText",
-    "branch",
-    "connectionId",
-    "placeId",
-    "roles",
-    "text",
-    "answer",
-  ],
-  agent: ["agentId", "task", "answer"],
-  llm: ["provider", "model", "effort", "prompt", "system", "answer"],
-  condition: ["rule", "provider", "model", "effort", "check"],
-  approval: ["question"],
-  output: [
-    "target",
-    "connectionId",
-    "placeId",
-    "channelId",
-    "repository",
-    "item",
-    "action",
-    "labels",
-    "labelsFrom",
-    "person",
-    "reason",
-    "title",
-    "emoji",
-  ],
-  prompt: ["text"],
-  text: ["text"],
-  note: ["text"],
-  shape: ["text"],
-  asset: ["fileId"],
-  image: [
-    "media",
-    "model",
-    "account",
-    "prompt",
-    "aspect",
-    "width",
-    "height",
-    "background",
-    "duration",
-    "resolution",
-    "firstFrame",
-    "lastFrame",
-    "voice",
-    "options",
-  ],
-};
 
 export interface WorkflowStepSource {
   from: string;
@@ -786,11 +737,17 @@ export interface WorkflowRunPage {
 export interface CreateWorkflowInput {
   title: string;
   graph?: WorkflowGraph;
+  paused?: true;
 }
 
 export interface RenameWorkflowInput {
   workflowId: string;
   title: string;
+}
+
+export interface SetWorkflowPausedInput {
+  workflowId: string;
+  paused: boolean;
 }
 
 export interface SaveWorkflowGraphInput {
@@ -968,7 +925,8 @@ export function isWorkflowSummary(value: unknown): value is WorkflowSummary {
     (value.lastRun === null ||
       (isDynamicRecord(value.lastRun) &&
         isOneOf(WORKFLOW_RUN_STATUSES, value.lastRun.status) &&
-        isString(value.lastRun.at)))
+        isString(value.lastRun.at))) &&
+    (value.paused === undefined || value.paused === true)
   );
 }
 
@@ -990,7 +948,9 @@ export function isWorkflowDetail(value: unknown): value is WorkflowDetail {
     isRevision(value.revision) &&
     Array.isArray(value.triggers) &&
     value.triggers.every(isTriggerState) &&
-    (value.needsNewerApp === undefined || value.needsNewerApp === true)
+    (value.needsNewerApp === undefined || value.needsNewerApp === true) &&
+    (value.format === undefined || isWorkflowFormat(value.format)) &&
+    (value.hostFormat === undefined || isWorkflowFormat(value.hostFormat))
   );
 }
 
@@ -1038,7 +998,8 @@ export function isWorkflowStep(value: unknown): value is WorkflowStep {
     (value.branch === null || isOneOf(WORKFLOW_BRANCHES, value.branch)) &&
     isNullableString(value.error) &&
     isNullableString(value.startedAt) &&
-    isNullableString(value.endedAt)
+    isNullableString(value.endedAt) &&
+    (value.waiting === undefined || typeof value.waiting === "boolean")
   );
 }
 
@@ -1085,11 +1046,20 @@ export function isWorkflowRunPage(value: unknown): value is WorkflowRunPage {
 }
 
 export function isCreateWorkflowInput(value: unknown): value is CreateWorkflowInput {
-  return isDynamicRecord(value) && isTitle(value.title) && (value.graph === undefined || isWorkflowGraph(value.graph));
+  return (
+    isDynamicRecord(value) &&
+    isTitle(value.title) &&
+    (value.graph === undefined || isWorkflowGraph(value.graph)) &&
+    (value.paused === undefined || value.paused === true)
+  );
 }
 
 export function isRenameWorkflowInput(value: unknown): value is RenameWorkflowInput {
   return isDynamicRecord(value) && isIdentifier(value.workflowId) && isTitle(value.title);
+}
+
+export function isSetWorkflowPausedInput(value: unknown): value is SetWorkflowPausedInput {
+  return isDynamicRecord(value) && isIdentifier(value.workflowId) && isBoolean(value.paused);
 }
 
 export function isSaveWorkflowGraphInput(value: unknown): value is SaveWorkflowGraphInput {
@@ -1271,8 +1241,15 @@ export interface WorkflowMediaCatalogModel {
 
 export const WORKFLOW_MEDIA_FRAME_COUNT_MAX = 2;
 
+export interface WorkflowMediaUnavailableModel {
+  id: string;
+  name: string;
+  kinds: readonly WorkflowMediaKind[];
+}
+
 export interface WorkflowMediaCatalog {
   models: readonly WorkflowMediaCatalogModel[];
+  unavailable?: readonly WorkflowMediaUnavailableModel[];
 }
 
 const isListOf = <T>(value: unknown, max: number, item: (entry: unknown) => entry is T): value is readonly T[] =>
@@ -1331,8 +1308,22 @@ function isWorkflowMediaOptionValue(value: unknown): value is WorkflowMediaOptio
   return isDynamicRecord(value) && isIdentifier(value.name) && isOptionText(value.value);
 }
 
+export function isWorkflowMediaUnavailableModel(value: unknown): value is WorkflowMediaUnavailableModel {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.id) &&
+    isBoundedString(value.name, WORKFLOW_MEDIA_NAME_MAX) &&
+    isListOf(value.kinds, 2, (entry): entry is WorkflowMediaKind => isOneOf(WORKFLOW_MEDIA_KINDS, entry))
+  );
+}
+
 export function isWorkflowMediaCatalog(value: unknown): value is WorkflowMediaCatalog {
-  return isDynamicRecord(value) && isListOf(value.models, WORKFLOW_MEDIA_CATALOG_MAX, isWorkflowMediaCatalogModel);
+  return (
+    isDynamicRecord(value) &&
+    isListOf(value.models, WORKFLOW_MEDIA_CATALOG_MAX, isWorkflowMediaCatalogModel) &&
+    (value.unavailable === undefined ||
+      isListOf(value.unavailable, WORKFLOW_MEDIA_CATALOG_MAX, isWorkflowMediaUnavailableModel))
+  );
 }
 
 const WORKFLOW_CATALOG_SOURCE_NAMES: Readonly<Record<WorkflowCatalogSource, string>> = {

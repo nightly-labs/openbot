@@ -65,7 +65,7 @@ export class McpServerStore {
   save(config: McpServerConfig, now = new Date().toISOString()): McpServerConfig {
     const normalized = normalizeMcpConfig(config);
     const errors = mcpConfigErrors(normalized);
-    const firstError = errors.name ?? errors.command ?? errors.url;
+    const firstError = errors.name ?? errors.command ?? errors.url ?? errors.headers;
     if (firstError) throw new McpServerError(firstError);
     if (!isMcpServerConfig(normalized)) throw new McpServerError(sourceText("error.backend.mcpServerInvalid"));
 

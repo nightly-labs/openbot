@@ -264,7 +264,11 @@ export class AgentUsage {
     return [...models.values()];
   }
 
-  readTurnTotals(agentId: string, turnId: string, since: string): { tokens: number; costUsd: number | null } | null {
+  readTurnTotals(
+    agentId: string,
+    turnId: string,
+    since: string,
+  ): { tokens: number; cachedInput: number; costUsd: number | null } | null {
     const rows = databaseRows(
       this.#core.connection
         .prepare(
@@ -274,14 +278,16 @@ export class AgentUsage {
     );
     if (rows.length === 0) return null;
     let tokens = 0;
+    let cachedInput = 0;
     let costUsd: number | null = 0;
     for (const row of rows) {
       const counts = decodeUsageTokens(JSON.parse(requiredStringColumn(row, "tokens_json")));
       for (const key of TOKEN_KEYS) tokens += counts[key] ?? 0;
+      cachedInput += counts.cachedInput ?? 0;
       const cost = recordCost(row, counts);
       costUsd = costUsd === null || cost === null ? null : costUsd + cost;
     }
-    return { tokens, costUsd };
+    return { tokens, cachedInput, costUsd };
   }
 
   read(raw: AgentAnalyticsInput): AgentAnalytics {

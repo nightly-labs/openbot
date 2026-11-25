@@ -21,6 +21,7 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="role" options={{ title: t("mobile.server.route.role") }} />
       <Stack.Screen name="audit" options={{ title: t("mobile.server.route.audit") }} />
       <Stack.Screen name="timezone" options={{ title: t("mobile.server.route.timezone") }} />
+      <Stack.Screen name="signal-home" options={{ title: t("mobile.server.route.signalHome") }} />
       <Stack.Screen name="agents" options={{ title: t("mobile.server.route.agents") }} />
       <Stack.Screen name="voice-model" options={{ title: t("mobile.server.route.voiceModel") }} />
       <Stack.Screen name="connector" options={{ title: t("mobile.server.route.connectors") }} />
@@ -47,6 +48,7 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="provider-environment" options={{ title: t("mobile.server.environment.title") }} />
       <Stack.Screen name="mcp-server" options={{ title: t("mobile.server.route.mcpServer") }} />
       <Stack.Screen name="mcp-server-agents" options={{ title: t("mobile.server.mcp.access.agents") }} />
+      <Stack.Screen name="logo" options={{ title: t("mobile.server.settings.logo") }} />
       <Stack.Screen name="crop-logo" options={{ title: t("mobile.server.route.cropLogo") }} />
       <Stack.Screen name="vault" options={{ title: t("mobile.server.route.vault") }} />
       <Stack.Screen name="vault-item" options={{ title: t("mobile.server.route.vault") }} />

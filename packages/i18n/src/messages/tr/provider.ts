@@ -96,6 +96,9 @@ export const messages = {
   "provider.codeLogin.relayStarting": "{name} oturum açma işlemi {host} üzerinde başlatılıyor…",
   "provider.codeLogin.pageOpening": "{name} oturum açma sayfası {host} üzerinde açılıyor…",
   "provider.codeLogin.linkStep": "{name} hesabında oturum açın. OpenBot kendiliğinden devam eder.",
+  "provider.codeLogin.thisComputerDescription":
+    "Bu bağlantıyı bu bilgisayardaki bir tarayıcıda açın. OpenBot burada bekler.",
+  "provider.codeLogin.copyLink": "Bağlantıyı kopyala",
   "provider.codeLogin.chatgptDeviceSetting":
     "Bir bilgisayarda ChatGPT'de güvenlik ayarlarını açın ve Codex için cihaz koduyla oturum açmayı açın. İş hesabında bunu çalışma alanı yöneticiniz açar.",
   "provider.useApp.title": "{name} bağlantısını OpenBot uygulamasında yapın",
@@ -123,7 +126,8 @@ export const messages = {
     'Bu modeller Windows ve Linux\'ta "Yalnızca çalışma alanı" ile çalışmaz. Kullanmak için ajan ayarlarında "İzinler"i değiştirin.',
   "provider.picker.olderModels": "Eski modeller",
   "provider.picker.olderModelsList": "Eski {name} modelleri",
-  "provider.picker.noModels": "{name} sağlayıcısından kullanılabilir model yok.",
+  "provider.picker.noModels":
+    "Burada {name} modeli görünmüyor. Kapalıysalar, bir yönetici bunları Sunucu ayarları > Sağlayıcılar > {name} > Modeller bölümünden açabilir.",
   "provider.picker.endpointModelsInCustom": "{name} özel uç noktalarınızı çalıştırıyor. Modelleri Özel sekmesinde.",
   "provider.picker.showCustomModels": "Modelleri göster",
   "provider.picker.museNoModels":
@@ -143,6 +147,7 @@ export const messages = {
   "provider.picker.effort": "Efor",
   "provider.picker.effortLabel": "Ajan akıl yürütme eforu",
   "provider.picker.effortFixed": "{effort}, {provider} tarafından sabit",
+  "provider.picker.effortLimited": "Claude ayarların veya kuruluşun eforu {effort} ile sınırlıyor.",
   "provider.picker.fast": "Hızlı",
   "provider.picker.fastText": "Daha hızlı yanıtlar, daha fazla kullanım",
   "provider.picker.speed": "Hız",
@@ -227,6 +232,7 @@ export const messages = {
   "provider.account.apiKey": "API anahtarı",
   "provider.account.listLabel": "{name} hesapları",
   "provider.account.usedBy": "Kullanan: {agents}",
+  "provider.account.sameEmail": "{name} ile aynı e-posta",
   "provider.account.failed": "Oturum açılamadı",
   "provider.account.moreActions": "{name} için diğer eylemler",
   "provider.account.renameLabel": "{name} adı",
@@ -267,6 +273,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot sunucuda {provider} oturumunu kapatır.",
   "provider.settings.geminiKeyReplacesAccount":
     "Google oturumu yerine kayıtlı bir Gemini API anahtarı kullanılıyor. Bir Google planını ve modellerini kullanmak için anahtarı kaldır.",
+  "provider.settings.museKeyInUse":
+    "Muse oturum açmanızı değil, bu anahtarı kullanır. Oturum açmanızı kullanmak için anahtarı kaldırın.",
   "provider.settings.versionInstalledByUser": "{version} · senin yüklediğin",
   "provider.settings.versionDownloaded": "{version} · OpenBot tarafından indirildi",
   "provider.settings.otherVersionInstalledByUser": "Kullanılmıyor: {version} · senin yüklediğin",

@@ -1,9 +1,10 @@
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
+import { type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODELS = { availableModels: [{ modelId: "gemini-fake", name: "Gemini Fake" }], currentModelId: "gemini-fake" };
 const COMMAND = "tool-linger";
+const ownReply = process.env.FAKE_OWN_REPLY === "1";
 const sessions = new Map<string, { cwd: string; updatedAt: number; commandAt: number | null; finished: boolean }>();
 let opened = 0;
 let replies = 0;
@@ -16,7 +17,13 @@ function promptText(request: AcpRequest): string {
     .trim();
 }
 
-function finishedCommand(sessionId: string): boolean {
+function replyAfterCommand(peer: AcpPeer, sessionId: string): void {
+  peer.update(sessionId, { sessionUpdate: "tool_call_update", toolCallId: COMMAND, status: "completed" });
+  peer.say(sessionId, "The command finished by itself.");
+  peer.update(sessionId, { sessionUpdate: "usage_update", used: 100, size: 1000 });
+}
+
+function finishedCommand(sessionId: string, peer?: AcpPeer): boolean {
   const session = sessions.get(sessionId);
   if (!session) return false;
   const finish = join(process.env.FAKE_FINISH_DIR ?? "", sessionId);
@@ -25,6 +32,7 @@ function finishedCommand(sessionId: string): boolean {
     session.finished = true;
     session.updatedAt += 1_000;
     logEntry({ event: "command-finished", sessionId });
+    if (ownReply && peer) setTimeout(() => replyAfterCommand(peer, sessionId), 500);
   }
   return session.finished;
 }
@@ -57,7 +65,7 @@ serveFakeAcpAgent({
   "session/list": (request, peer) => {
     const listed = [...sessions.entries()]
       .filter(([sessionId, session]) => {
-        finishedCommand(sessionId);
+        finishedCommand(sessionId, peer);
         return session.cwd === request.params.cwd;
       })
       .map(([sessionId, session]) => ({

@@ -1,5 +1,8 @@
 import type {
+  CreditActivity,
   CreditCheckoutRequest,
+  CreditRedeemRequest,
+  CreditRedeemResult,
   CreditServerWallet,
   CreditsState,
   CreditTransferRequest,
@@ -12,11 +15,13 @@ import { createStripeReturnLoad } from "../billing/billing-store";
 
 export interface CreditsCalls {
   getState: () => Promise<CreditsState>;
+  getActivity: () => Promise<CreditActivity>;
   openCheckout: (request: CreditCheckoutRequest) => Promise<void>;
   transfer: (request: CreditTransferRequest) => Promise<CreditsState>;
+  redeem: (request: CreditRedeemRequest) => Promise<CreditRedeemResult>;
 }
 
-export type CreditsAction = "checkout" | "transfer";
+export type CreditsAction = "checkout" | "transfer" | "redeem";
 
 interface CreditsCheckout {
   serverId: string | null;
@@ -30,6 +35,8 @@ interface CreditsStoreState {
   credits: CreditsState | null;
   checkout: CreditsCheckout | null;
   added: { serverId: string | null; credits: number; nonce: number } | null;
+  activity: CreditActivity | null;
+  activityFailed: boolean;
 }
 
 export function creditsBalance(credits: CreditsState | null, serverId: string | null): number {
@@ -43,10 +50,33 @@ export function creditsServer(credits: CreditsState | null, serverId: string | n
   return credits.servers.find((server) => server.serverId === serverId) ?? null;
 }
 
+export interface CreditsRailWallet {
+  balance: number;
+  welcome: number | null;
+  serverId: string | null;
+  name: string | null;
+  movable: CreditServerWallet | null;
+}
+
+export function creditsRailWallet(
+  credits: CreditsState | null,
+  server: { kind: "local" | "remote"; id: string } | null,
+  localServerId: string | null | undefined,
+): CreditsRailWallet | null {
+  if (!credits) return null;
+  const walletId = server?.kind === "remote" ? server.id : (localServerId ?? null);
+  const wallet = creditsServer(credits, walletId);
+  const movable = wallet?.role === "owner" ? wallet : null;
+  if (!wallet)
+    return { balance: credits.balance, welcome: credits.welcome ?? null, serverId: null, name: null, movable };
+  return { balance: wallet.balance, welcome: null, serverId: wallet.serverId, name: wallet.name, movable };
+}
+
 export function createCreditsStore(
   calls: () => CreditsCalls | undefined,
   isActive: () => boolean,
   onChange?: (credits: CreditsState) => void,
+  options: { activity?: boolean } = {},
 ) {
   const [state, setState] = createStore<CreditsStoreState>({
     loading: false,
@@ -55,6 +85,8 @@ export function createCreditsStore(
     credits: null,
     checkout: null,
     added: null,
+    activity: null,
+    activityFailed: false,
   });
   let addedNonce = 0;
 
@@ -79,6 +111,21 @@ export function createCreditsStore(
     onChange?.(credits);
   }
 
+  async function loadActivity(api: CreditsCalls) {
+    if (!options.activity) return;
+    try {
+      const activity = await api.getActivity();
+      setState((draft) => {
+        draft.activity = activity;
+        draft.activityFailed = false;
+      });
+    } catch {
+      setState((draft) => {
+        draft.activityFailed = true;
+      });
+    }
+  }
+
   const load = createStripeReturnLoad({
     available: () => calls() !== undefined,
     isActive,
@@ -91,7 +138,8 @@ export function createCreditsStore(
       try {
         const api = calls();
         if (!api) return;
-        apply(await api.getState());
+        const [credits] = await Promise.all([api.getState(), loadActivity(api)]);
+        apply(credits);
       } catch (error) {
         setState((draft) => {
           const text = currentText();
@@ -109,7 +157,10 @@ export function createCreditsStore(
     });
     try {
       const credits = await call(api);
-      if (credits) apply(credits);
+      if (credits) {
+        apply(credits);
+        void loadActivity(api);
+      }
       return true;
     } catch (error) {
       const text = currentText();
@@ -126,9 +177,28 @@ export function createCreditsStore(
     }
   }
 
+  async function redeem(request: CreditRedeemRequest): Promise<CreditRedeemResult | null> {
+    const api = calls();
+    if (!api || state.pending) return null;
+    setState((draft) => {
+      draft.pending = "redeem";
+    });
+    try {
+      const result = await api.redeem(request);
+      apply(result.state);
+      void loadActivity(api);
+      return result;
+    } finally {
+      setState((draft) => {
+        draft.pending = null;
+      });
+    }
+  }
+
   return {
     state,
     load,
+    redeem,
     openCheckout: (request: CreditCheckoutRequest) => {
       const serverId = request.serverId ?? null;
       setState((draft) => {

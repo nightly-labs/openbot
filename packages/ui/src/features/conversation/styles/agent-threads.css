@@ -44,7 +44,8 @@
   margin-inline-start: 1px;
 }
 
-.conversation-heading-group:has(.agent-threads-header:not([data-mode="tabs"])) .conversation-agent-title-room {
+.conversation-heading-group:has(.agent-threads-tabs, .agent-threads-header:not([data-mode="tabs"]))
+  .conversation-agent-title-room {
   display: none;
 }
 

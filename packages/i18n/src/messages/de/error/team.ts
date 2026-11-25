@@ -134,6 +134,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Diese Verbindung unterstützt keine Änderungen der Serveridentität.",
   "error.team.hostUpdateUnsupported": "Diese Verbindung unterstützt keine Host-Aktualisierungen.",
   "error.team.hostTimezoneUnsupported": "Diese Verbindung unterstützt die Zeitzone des Servers nicht.",
+  "error.team.hostSignalHomeUnsupported": "Diese Verbindung unterstützt die Wahl des Signal-Servers nicht.",
   "error.team.hostVoiceModelUnsupported":
     "Das Spracherkennungsmodell des Servers wird von dieser Verbindung nicht unterstützt.",
   "error.team.hostRestartUnsupported": "Diese Verbindung unterstützt keinen Neustart des Servers.",
@@ -154,6 +155,8 @@ export const messages = {
   "error.team.claudeCompactWindowUnsupported": "Diese Verbindung unterstützt die Claude-Komprimierungsgröße nicht.",
   "error.team.cacheExpiryCompactionUnsupported":
     "Diese Verbindung unterstützt das Komprimieren vor Ablauf des Caches nicht.",
+  "error.team.mediaApprovalCreditsUnsupported": "Diese Verbindung unterstützt die Credit-Freigabegrenze nicht.",
+  "error.team.mediaApprovalCreditsInvalid": "Gib eine ganze Zahl an Credits von 0 bis 100.000 ein.",
   "error.team.providerEnvironmentUnsupported": "Diese Verbindung unterstützt keine Anbietervariablen.",
   "error.team.modelVisibilityUnsupported": "Diese Verbindung unterstützt die Modellliste nicht.",
   "error.team.providerDefaultUnsupported": "Diese Verbindung unterstützt den Standardanbieter nicht.",
@@ -222,4 +225,7 @@ export const messages = {
   "error.team.providerUseUnsupported":
     "Das Ein- und Ausschalten von Anbietern wird von dieser Verbindung nicht unterstützt.",
   "error.team.providerUseInvalid": "Dieser Anbieter hat keinen Ein-/Aus-Schalter.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "Dieser Server unterstützt keine Modellwahl bei Medienfreigaben. Aktualisiere OpenBot auf dem Server.",
+  "error.team.mediaApprovalChoiceInvalid": "Die Auswahl für die Medienfreigabe ist ungültig.",
 } as const satisfies PartialTranslation<typeof source>;

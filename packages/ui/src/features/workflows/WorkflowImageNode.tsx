@@ -22,7 +22,7 @@ import {
 } from "./workflow-media-step";
 import {
   clock,
-  download,
+  downloadMedia,
   NodeShell,
   NodeToolbar,
   ToolAction,
@@ -232,7 +232,10 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                   text={t("workflow.node.toolbar.download")}
                   label={text("download")}
                   icon={<Download />}
-                  onClick={() => download(url(), fileName())}
+                  onClick={() => {
+                    const value = shownValue();
+                    if (value) downloadMedia(board, value, url(), fileName());
+                  }}
                 />
               )}
             </Show>
@@ -341,6 +344,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                 kind={kind()}
                 models={step.models()}
                 model={model()}
+                savedName={step.savedModelName()}
                 account={step.account()}
                 title={text("models")}
                 disabled={step.specsDisabled()}
@@ -356,7 +360,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                     disabled={!step.runnable() || step.locked() || step.short() || !model()}
                     aria-label={step.runLabel()}
                   >
-                    <RunContent credits={step.total()} takes={step.batch()} />
+                    <RunContent credits={step.total()} takes={step.batch()} modelMissing={step.modelMissing()} />
                   </Button>
                 }
               >
@@ -374,7 +378,8 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
           <ImageLightbox
             opening={opening()}
             onDownload={(attachment) => {
-              if (attachment.previewUrl) download(attachment.previewUrl, attachment.name);
+              const value = resultValue(board.results(props.id).find((result) => result.id === attachment.id));
+              if (value && attachment.previewUrl) downloadMedia(board, value, attachment.previewUrl, attachment.name);
             }}
             onClose={() => setViewer(undefined)}
           />

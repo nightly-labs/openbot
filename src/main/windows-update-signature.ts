@@ -54,18 +54,23 @@ function runSignatureScript(file: string): Effect.Effect<string, SignatureCheckF
     env[FILE_ENV] = file;
     const args = ["-NoProfile", "-NonInteractive", "-InputFormat", "None", "-EncodedCommand"];
     args.push(Buffer.from(SCRIPT, "utf16le").toString("base64"));
-    execFile(
-      powershell,
-      args,
-      { env, timeout: VERIFY_TIMEOUT_MS, windowsHide: true, signal },
-      (error, stdout, stderr) => {
-        if (error) {
-          const result = error.killed ? "did not finish in time" : `exited with code ${String(error.code)}`;
-          const reason = `Get-AuthenticodeSignature ${result}. ${stderr.trim().slice(0, 500)}`.trim();
-          resume(Effect.fail(new SignatureCheckFailed({ reason })));
-        } else resume(Effect.succeed(stdout));
-      },
-    );
+    try {
+      execFile(
+        powershell,
+        args,
+        { env, timeout: VERIFY_TIMEOUT_MS, windowsHide: true, signal },
+        (error, stdout, stderr) => {
+          if (error) {
+            const result = error.killed ? "did not finish in time" : `exited with code ${String(error.code)}`;
+            const reason = `Get-AuthenticodeSignature ${result}. ${stderr.trim().slice(0, 500)}`.trim();
+            resume(Effect.fail(new SignatureCheckFailed({ reason })));
+          } else resume(Effect.succeed(stdout));
+        },
+      );
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      resume(Effect.fail(new SignatureCheckFailed({ reason: `Windows PowerShell could not start: ${detail}` })));
+    }
   });
 }
 

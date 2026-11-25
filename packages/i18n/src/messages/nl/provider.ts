@@ -91,6 +91,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Inloggen bij {name} starten op {host}…",
   "provider.codeLogin.pageOpening": "Inlogpagina van {name} openen op {host}…",
   "provider.codeLogin.linkStep": "Log in bij {name}. OpenBot gaat vanzelf verder.",
+  "provider.codeLogin.thisComputerDescription": "Open deze link in een browser op deze computer. OpenBot wacht hier.",
+  "provider.codeLogin.copyLink": "Link kopiëren",
   "provider.codeLogin.chatgptDeviceSetting":
     "Open in ChatGPT op een computer de beveiligingsinstellingen en zet inloggen met apparaatcode voor Codex aan. Bij een werkaccount zet de beheerder van je workspace dit aan.",
   "provider.useApp.title": "Verbind {name} in de OpenBot-app",
@@ -117,7 +119,8 @@ export const messages = {
     "Deze modellen werken niet met ‘Alleen werkruimte’ op Windows en Linux. Wijzig ‘Machtigingen’ in de agentinstellingen om ze te gebruiken.",
   "provider.picker.olderModels": "Oudere modellen",
   "provider.picker.olderModelsList": "Oudere {name}-modellen",
-  "provider.picker.noModels": "{name} heeft geen modellen beschikbaar.",
+  "provider.picker.noModels":
+    "Hier staan geen modellen van {name}. Als ze uitstaan, kan een beheerder ze aanzetten in Serverinstellingen > Aanbieders > {name} > Modellen.",
   "provider.picker.endpointModelsInCustom":
     "{name} draait je eigen endpoints. Hun modellen staan op het tabblad Eigen.",
   "provider.picker.showCustomModels": "Modellen tonen",
@@ -138,6 +141,7 @@ export const messages = {
   "provider.picker.effort": "Denkniveau",
   "provider.picker.effortLabel": "Redeneerniveau van de agent",
   "provider.picker.effortFixed": "{effort}, vastgezet door {provider}",
+  "provider.picker.effortLimited": "Je Claude-instellingen of je organisatie beperken de inspanning tot {effort}.",
   "provider.picker.fast": "Snel",
   "provider.picker.fastText": "Snellere antwoorden, meer verbruik",
   "provider.picker.speed": "Snelheid",
@@ -220,6 +224,7 @@ export const messages = {
   "provider.account.apiKey": "API-sleutel",
   "provider.account.listLabel": "Accounts van {name}",
   "provider.account.usedBy": "Gebruikt door {agents}",
+  "provider.account.sameEmail": "Zelfde e-mail als {name}",
   "provider.account.failed": "Inloggen mislukt",
   "provider.account.moreActions": "Meer acties voor {name}",
   "provider.account.renameLabel": "Naam van {name}",
@@ -298,6 +303,8 @@ export const messages = {
     "Een opgeslagen Gemini API-sleutel wordt gebruikt in plaats van een Google-aanmelding. Verwijder de sleutel om een Google-abonnement en de modellen ervan te gebruiken.",
   "provider.settings.claudeKeyInUse":
     "Anthropic brengt het API-tegoed van de sleutel in rekening, niet je Claude-abonnement. Kies het API-sleutelaccount in het modelmenu van een agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
+  "provider.settings.museKeyInUse":
+    "Muse gebruikt deze sleutel, niet je login. Verwijder de sleutel om je login te gebruiken.",
   "provider.settings.addKey": "Sleutel toevoegen",
   "provider.settings.changeKey": "Sleutel wijzigen",
   "provider.settings.runtime": "Runtime",

@@ -22,6 +22,8 @@ export interface FinishCheckPending {
 
 const STOPPED = { kind: "stopped" } as const;
 
+const LIMIT_REACHED = { kind: "limitReached" } as const;
+
 const FINISH_CHECK_LIMIT = 3;
 
 const NEXT_STEP_LIMIT = 2;
@@ -174,6 +176,7 @@ interface Chain {
   nextSteps: number;
   checks: number;
   gap: string | null;
+  final?: true;
   failureContinued: boolean;
   plan: ConversationPlan | null;
   openSteps: string;
@@ -210,6 +213,7 @@ export class PlanContinuation {
     earlierPlan: ConversationPlan | null;
     answer: string | undefined;
     finishCheck?: FinishCheckMode;
+    nextStep?: boolean;
   }): ({ kind: ContinuationKind } & ContinuationCount) | typeof STOPPED | FinishCheckPending | null {
     const key = laneKey(input.agentId, input.taskId);
     const previous = this.#chains.get(key);
@@ -226,10 +230,28 @@ export class PlanContinuation {
         );
     const count = chained ? previous.count : 0;
     const open = plan ? openSteps(plan, earlierSteps) : [];
-    if (count >= this.#limit) return chained && open.length > 0 ? STOPPED : null;
     const nextSteps = chained ? previous.nextSteps : 0;
     const checks = chained ? previous.checks : 0;
     const mode = input.finishCheck ?? "no";
+    const checkAtLimit = (): FinishCheckPending | null => {
+      if (!chained || mode === "no") return null;
+      this.#chains.set(key, {
+        deliveryIds: new Set(input.deliveryIds),
+        count,
+        kind: "finishCheck",
+        shown: previous.shown,
+        nextSteps,
+        checks,
+        gap: null,
+        final: true,
+        failureContinued: previous.failureContinued,
+        plan,
+        openSteps: JSON.stringify(open.map(stepKey)),
+        earlierSteps,
+      });
+      return { kind: "check", continuations: count };
+    };
+    if (count >= this.#limit) return chained && open.length > 0 ? STOPPED : checkAtLimit();
     let kind: ContinuationKind;
     if (open.length > 0 && mode !== "only") {
       const signature = JSON.stringify(open.map(stepKey));
@@ -241,7 +263,13 @@ export class PlanContinuation {
       )
         return STOPPED;
       kind = "plan";
-    } else if (mode !== "only" && nextSteps < NEXT_STEP_LIMIT && stoppedBeforeNextStep(input.answer)) kind = "nextStep";
+    } else if (
+      mode !== "only" &&
+      input.nextStep !== false &&
+      nextSteps < NEXT_STEP_LIMIT &&
+      stoppedBeforeNextStep(input.answer)
+    )
+      kind = "nextStep";
     else if (mode !== "no" && checks < FINISH_CHECK_LIMIT) {
       this.#chains.set(key, {
         deliveryIds: new Set(input.deliveryIds),
@@ -257,7 +285,7 @@ export class PlanContinuation {
         earlierSteps,
       });
       return { kind: "check", continuations: count };
-    } else return null;
+    } else return checkAtLimit();
     const shown =
       kind === "plan"
         ? { current: count + 1, limit: this.#limit }
@@ -282,12 +310,12 @@ export class PlanContinuation {
     agentId: string,
     taskId: string | null,
     gap: string,
-  ): ({ kind: ContinuationKind } & ContinuationCount) | null {
+  ): ({ kind: ContinuationKind } & ContinuationCount) | typeof LIMIT_REACHED | null {
     const key = laneKey(agentId, taskId);
     const chain = this.#chains.get(key);
-    if (chain?.kind !== "finishCheck" || chain.gap !== null) {
+    if (chain?.kind !== "finishCheck" || chain.gap !== null || chain.final) {
       this.#chains.delete(key);
-      return null;
+      return chain?.final ? LIMIT_REACHED : null;
     }
     const shown = {
       current: chain.checks + 1,

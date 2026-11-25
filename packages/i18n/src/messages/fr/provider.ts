@@ -98,6 +98,9 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Démarrage de la connexion à {name} sur {host}…",
   "provider.codeLogin.pageOpening": "Ouverture de la page de connexion de {name} sur {host}…",
   "provider.codeLogin.linkStep": "Connectez-vous à {name}. OpenBot continue tout seul.",
+  "provider.codeLogin.thisComputerDescription":
+    "Ouvrez ce lien dans un navigateur sur cet ordinateur. OpenBot attend ici.",
+  "provider.codeLogin.copyLink": "Copier le lien",
   "provider.codeLogin.chatgptDeviceSetting":
     "Dans ChatGPT sur un ordinateur, ouvrez les paramètres de sécurité et activez la connexion par code d’appareil pour Codex. Pour un compte professionnel, l’administrateur de votre espace de travail l’active.",
   "provider.useApp.title": "Connectez {name} dans l’app OpenBot",
@@ -125,7 +128,8 @@ export const messages = {
     "Ces modèles ne fonctionnent pas avec « Espace de travail seul » sous Windows et Linux. Pour les utiliser, modifiez « Accès » dans les réglages de l’agent.",
   "provider.picker.olderModels": "Modèles plus anciens",
   "provider.picker.olderModelsList": "Modèles {name} plus anciens",
-  "provider.picker.noModels": "Aucun modèle n’est disponible chez {name}.",
+  "provider.picker.noModels":
+    "Aucun modèle {name} ne s’affiche ici. S’ils sont désactivés, un admin peut les activer dans Réglages du serveur > Fournisseurs > {name} > Modèles.",
   "provider.picker.endpointModelsInCustom":
     "{name} exécute vos points de terminaison personnalisés. Leurs modèles sont dans l’onglet Personnalisé.",
   "provider.picker.showCustomModels": "Voir les modèles",
@@ -146,6 +150,7 @@ export const messages = {
   "provider.picker.effort": "Effort",
   "provider.picker.effortLabel": "Effort de raisonnement de l’agent",
   "provider.picker.effortFixed": "{effort}, fixé par {provider}",
+  "provider.picker.effortLimited": "Vos paramètres Claude ou votre organisation limitent l’effort à {effort}.",
   "provider.picker.fast": "Rapide",
   "provider.picker.fastText": "Réponses plus rapides, utilisation accrue",
   "provider.picker.speed": "Vitesse",
@@ -230,6 +235,7 @@ export const messages = {
   "provider.account.apiKey": "Clé API",
   "provider.account.listLabel": "Comptes {name}",
   "provider.account.usedBy": "Utilisé par {agents}",
+  "provider.account.sameEmail": "Même e-mail que {name}",
   "provider.account.failed": "Échec de la connexion",
   "provider.account.moreActions": "Autres actions pour {name}",
   "provider.account.renameLabel": "Nom de {name}",
@@ -270,6 +276,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot déconnecte {provider} sur le serveur.",
   "provider.settings.geminiKeyReplacesAccount":
     "Une clé API Gemini enregistrée est utilisée à la place d'une connexion Google. Pour utiliser un abonnement Google et ses modèles, supprimez la clé.",
+  "provider.settings.museKeyInUse":
+    "Muse utilise cette clé, pas votre connexion. Pour utiliser votre connexion, supprimez la clé.",
   "provider.settings.versionInstalledByUser": "{version} · installée par vous",
   "provider.settings.versionDownloaded": "{version} · téléchargée par OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Non utilisée : {version} · installée par vous",

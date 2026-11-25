@@ -5,7 +5,14 @@ import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
 import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
 import type { BillingDetails, BillingDetailsRequest } from "./billing-details";
-import type { CreditCheckoutRequest, CreditsState, CreditTransferRequest } from "./credits";
+import type {
+  CreditActivity,
+  CreditCheckoutRequest,
+  CreditRedeemRequest,
+  CreditRedeemResult,
+  CreditsState,
+  CreditTransferRequest,
+} from "./credits";
 import type { CustomServerCheckoutRequest, CustomServerCheckoutResult } from "./custom-server-plans";
 import type {
   CreateHostedServerInput,
@@ -384,6 +391,7 @@ import type { HiddenAgentsSnapshot, SetAgentHiddenInput } from "./ipc-hidden-age
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
 import type { HostPersonality } from "./ipc-host-personality";
 import type { HostReleaseStatus } from "./ipc-host-release";
+import type { HostSignalHomeSettings } from "./ipc-host-signal-home";
 import type { HostTimezoneSettings } from "./ipc-host-timezone";
 import type { HostTurnLimits, HostTurnLimitsInput } from "./ipc-host-turn-limits";
 import type {
@@ -433,6 +441,14 @@ import type {
   SignOutMcpServerInput,
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
+import type {
+  CreditsHold,
+  MediaApprovalRead,
+  ReadMediaApprovalInput,
+  RespondToCreditsHoldInput,
+  RespondToMediaApprovalInput,
+} from "./ipc-media-approval";
+import type { MediaApprovalCreditsSetting, MediaApprovalCreditsUpdate } from "./ipc-media-approval-credits";
 import type { PinnedMessagesSnapshot, SetMessagePinnedInput } from "./ipc-message-pins";
 import type {
   AddMessagingOrchestratorInput,
@@ -460,6 +476,7 @@ import type {
   SetSlackEnabledInput,
   SetTelegramEnabledInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppSenderReadOnlyInput,
   SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
   SlackOverview,
@@ -600,6 +617,7 @@ import type {
   ScopedTeamPresenceSnapshot,
   SendDirectMessageInput,
   ServerSummary,
+  SetServerHiddenInput,
   SetServerMutedInput,
   SetServerNotificationLevelInput,
   SetTeamTypingInput,
@@ -637,6 +655,7 @@ import type {
   VoiceTranscriptionInput,
   VoiceTranscriptionResult,
 } from "./ipc-voice";
+import type { WorkflowFileSaveResult } from "./ipc-workflow-file";
 import type { WorkflowFolderAction, WorkflowFoldersSnapshot } from "./ipc-workflow-folders";
 import type {
   WorkflowGitHubCatalog,
@@ -652,6 +671,7 @@ import type {
   RetryWorkflowStepInput,
   RunWorkflowStepInput,
   SaveWorkflowGraphInput,
+  SetWorkflowPausedInput,
   StartWorkflowRunInput,
   WorkflowDetail,
   WorkflowGraph,
@@ -1151,6 +1171,9 @@ export const IPC_ENDPOINTS = {
     setWhatsAppStatusReactions: request<SetWhatsAppStatusReactionsInput, void>()(
       "messaging:set-whatsapp-status-reactions",
     ),
+    setWhatsAppSenderReadOnly: request<SetWhatsAppSenderReadOnlyInput, void>()(
+      "messaging:set-whatsapp-sender-read-only",
+    ),
     hostOverview: scopedRequest<HostMessagingPlatformInput, MessagingOverview, "required">()("messaging:host-overview"),
     hostConnect: scopedRequest<HostMessagingConnectInput, void, "required">()("messaging:host-connect"),
     hostDisconnect: scopedRequest<HostMessagingWorkspaceInput, void, "required">()("messaging:host-disconnect"),
@@ -1205,6 +1228,9 @@ export const IPC_ENDPOINTS = {
     hostSetWhatsAppStatusReactions: scopedRequest<SetWhatsAppStatusReactionsInput, void, "required">()(
       "messaging:host-set-whatsapp-status-reactions",
     ),
+    hostSetWhatsAppSenderReadOnly: scopedRequest<SetWhatsAppSenderReadOnlyInput, void, "required">()(
+      "messaging:host-set-whatsapp-sender-read-only",
+    ),
   },
   hostAdmin: {
     updateIdentity: scopedRequest<UpdateHostIdentityInput, ServerSummary, "required">()("host-admin:update-identity"),
@@ -1221,6 +1247,8 @@ export const IPC_ENDPOINTS = {
     ),
     getTimezone: scopedQuery<HostTimezoneSettings, "required">()("host-admin:get-timezone"),
     setTimezone: scopedRequest<string | null, HostTimezoneSettings, "required">()("host-admin:set-timezone"),
+    getSignalHome: scopedQuery<HostSignalHomeSettings, "required">()("host-admin:get-signal-home"),
+    setSignalHome: scopedRequest<string | null, HostSignalHomeSettings, "required">()("host-admin:set-signal-home"),
     getVoiceModel: scopedQuery<HostVoiceModel, "required">()("host-admin:get-voice-model"),
     changeVoiceModel: scopedRequest<HostVoiceModelChange, HostVoiceModel, "required">()(
       "host-admin:change-voice-model",
@@ -1250,6 +1278,12 @@ export const IPC_ENDPOINTS = {
     ),
     setCacheExpiryCompaction: scopedRequest<boolean, CacheExpiryCompactionSetting, "required">()(
       "host-admin:set-cache-expiry-compaction",
+    ),
+    getMediaApprovalCredits: scopedQuery<MediaApprovalCreditsSetting, "required">()(
+      "host-admin:get-media-approval-credits",
+    ),
+    setMediaApprovalCredits: scopedRequest<MediaApprovalCreditsUpdate, MediaApprovalCreditsSetting, "required">()(
+      "host-admin:set-media-approval-credits",
     ),
     getClaudeUserSetup: scopedQuery<ClaudeUserSetupSetting, "required">()("host-admin:get-claude-user-setup"),
     setClaudeUserSetup: scopedRequest<boolean, ClaudeUserSetupSetting, "required">()(
@@ -1388,8 +1422,10 @@ export const IPC_ENDPOINTS = {
   },
   credits: {
     getState: request<undefined, CreditsState>()("credits:get-state"),
+    getActivity: request<undefined, CreditActivity>()("credits:get-activity"),
     openCheckout: request<CreditCheckoutRequest, void>()("credits:open-checkout"),
     transfer: request<CreditTransferRequest, CreditsState>()("credits:transfer"),
+    redeem: request<CreditRedeemRequest, CreditRedeemResult>()("credits:redeem"),
   },
   license: {
     getState: request<undefined, LicenseState>()("license:get-state"),
@@ -1599,6 +1635,13 @@ export const IPC_ENDPOINTS = {
     respondToPrompt: scopedRequest<RespondToPromptInput, void>()("agent:respond-to-prompt"),
     respondToApproval: scopedRequest<RespondToApprovalInput, void>()("agent:respond-to-approval"),
     readPendingApproval: scopedRequest<ReadPendingApprovalInput, AgentApproval | null>()("agent:read-pending-approval"),
+    readMediaApproval: scopedRequest<ReadMediaApprovalInput, MediaApprovalRead>()("agent:read-media-approval"),
+    respondToMediaApproval: scopedRequest<RespondToMediaApprovalInput, void>()("agent:respond-to-media-approval"),
+    respondToCreditsHold: scopedRequest<RespondToCreditsHoldInput, CreditsHold | null>()(
+      "agent:respond-to-credits-hold",
+    ),
+    setCreditsAskMuted: scopedRequest<{ muted: boolean }, void>()("agent:set-credits-ask-muted"),
+    readCreditsAskMuted: scopedQuery<{ muted: boolean }>()("agent:read-credits-ask-muted"),
     listPendingPrompts: scopedQuery<AgentRuntimePrompt[]>()("agent:list-pending-prompts"),
     respondToBrowserSecret: scopedRequest<LocalBrowserSecretResponse, void>()("agent:respond-to-browser-secret"),
     respondToBrowserTakeover: scopedRequest<RespondToBrowserTakeoverInput, void>()("agent:respond-to-browser-takeover"),
@@ -1658,6 +1701,8 @@ export const IPC_ENDPOINTS = {
     get: scopedRequest<string, WorkflowDetail>()("workflows:get"),
     create: scopedRequest<CreateWorkflowInput, WorkflowDetail>()("workflows:create"),
     rename: scopedRequest<RenameWorkflowInput, WorkflowSummary>()("workflows:rename"),
+    setPaused: scopedRequest<SetWorkflowPausedInput, WorkflowSummary>()("workflows:setPaused"),
+    exportFile: scopedRequest<string, WorkflowFileSaveResult>()("workflows:export-file"),
     delete: scopedRequest<string, void>()("workflows:delete"),
     saveGraph: scopedRequest<SaveWorkflowGraphInput, WorkflowSaveResult>()("workflows:save-graph"),
     versions: scopedRequest<string, WorkflowVersion[]>()("workflows:versions"),
@@ -1800,6 +1845,7 @@ export const IPC_ENDPOINTS = {
     select: request<string, ServerSummary[]>()("servers:select"),
     reorder: request<ReorderServersInput, ServerSummary[]>()("servers:reorder"),
     setMuted: request<SetServerMutedInput, ServerSummary[]>()("servers:set-muted"),
+    setHidden: request<SetServerHiddenInput, ServerSummary[]>()("servers:set-hidden"),
     setNotificationLevel: request<SetServerNotificationLevelInput, ServerSummary[]>()("servers:set-notification-level"),
     join: request<JoinServerInput, ServerSummary>()("servers:join"),
     previewInvite: request<JoinServerInput, InvitePreview>()("servers:preview-invite"),

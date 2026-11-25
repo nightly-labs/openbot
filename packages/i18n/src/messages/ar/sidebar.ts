@@ -273,6 +273,10 @@ export const messages = {
   "sidebar.storage.body": "تم استخدام {used} من {total} على {server}.",
   "sidebar.storage.fullBody": "تم استخدام {used} من {total} على {server}. قد يتعذّر على الوكلاء حفظ الملفات.",
   "sidebar.storage.meterLabel": "التخزين المستخدم على {server}",
+  "sidebar.storage.bodyThisComputer": "تم استخدام {used} من {total} على هذا الحاسوب.",
+  "sidebar.storage.fullBodyThisComputer":
+    "تم استخدام {used} من {total} على هذا الحاسوب. قد يتعذّر على الوكلاء حفظ الملفات.",
+  "sidebar.storage.meterLabelThisComputer": "التخزين المستخدم على هذا الحاسوب",
   "sidebar.storage.used": "{percent} مستخدم",
   "sidebar.storage.freeUpSpace": "إفراغ مساحة",
   "sidebar.storage.dismiss": "إخفاء حتى يمتلئ التخزين",

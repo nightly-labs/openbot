@@ -95,6 +95,8 @@ export const messages = defineMessages("provider", {
   "provider.codeLogin.relayStarting": "Starting the {name} sign-in on {host}…",
   "provider.codeLogin.pageOpening": "Opening the {name} sign-in page on {host}…",
   "provider.codeLogin.linkStep": "Log in to {name}. OpenBot continues by itself.",
+  "provider.codeLogin.thisComputerDescription": "Open this link in a browser on this computer. OpenBot waits here.",
+  "provider.codeLogin.copyLink": "Copy link",
   "provider.codeLogin.chatgptDeviceSetting":
     "In ChatGPT on a computer, open the security settings and turn on device code sign-in for Codex. For a work account, your workspace admin turns it on.",
 
@@ -123,7 +125,8 @@ export const messages = defineMessages("provider", {
     "These models do not work with Workspace only on Windows and Linux. To use them, change Permissions in the agent settings.",
   "provider.picker.olderModels": "Older models",
   "provider.picker.olderModelsList": "Older {name} models",
-  "provider.picker.noModels": "No models are available from {name}.",
+  "provider.picker.noModels":
+    "No {name} models show here. If they are turned off, an admin can turn them on in Server settings > Providers > {name} > Models.",
   "provider.picker.endpointModelsInCustom": "{name} runs your custom endpoints. Their models are on the Custom tab.",
   "provider.picker.showCustomModels": "Show models",
   "provider.picker.museNoModels":
@@ -143,6 +146,7 @@ export const messages = defineMessages("provider", {
   "provider.picker.effort": "Effort",
   "provider.picker.effortLabel": "Agent reasoning effort",
   "provider.picker.effortFixed": "{effort}, set by {provider}",
+  "provider.picker.effortLimited": "Your Claude settings or organization limit the effort to {effort}.",
   "provider.picker.fast": "Fast",
   "provider.picker.fastText": "Faster responses, increased usage",
   "provider.picker.speed": "Speed",
@@ -232,6 +236,7 @@ export const messages = defineMessages("provider", {
   "provider.account.apiKey": "API key",
   "provider.account.listLabel": "{name} accounts",
   "provider.account.usedBy": "Used by {agents}",
+  "provider.account.sameEmail": "Same email as {name}",
   "provider.account.failed": "Sign-in failed",
   "provider.account.moreActions": "More actions for {name}",
   "provider.account.renameLabel": "Name of {name}",
@@ -313,6 +318,7 @@ export const messages = defineMessages("provider", {
   "provider.settings.codexKeyInUse":
     "ChatGPT uses this key, not your ChatGPT plan. OpenAI bills each request to the key. The plan's usage is not shown.",
   "provider.settings.codexKeyAlternative": "Or log in with an OpenAI API key. OpenAI bills each request to the key.",
+  "provider.settings.museKeyInUse": "Muse uses this key, not your sign-in. To use your sign-in, remove the key.",
   "provider.settings.addKey": "Add key",
   "provider.settings.changeKey": "Change key",
   "provider.settings.runtime": "Runtime",

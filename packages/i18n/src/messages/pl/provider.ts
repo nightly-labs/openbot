@@ -113,6 +113,9 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Uruchamianie logowania do {name} na {host}…",
   "provider.codeLogin.pageOpening": "Otwieranie strony logowania {name} na {host}…",
   "provider.codeLogin.linkStep": "Zaloguj się do {name}. OpenBot będzie kontynuować samodzielnie.",
+  "provider.codeLogin.thisComputerDescription":
+    "Otwórz ten link w przeglądarce na tym komputerze. OpenBot czeka tutaj.",
+  "provider.codeLogin.copyLink": "Kopiuj link",
   "provider.codeLogin.chatgptDeviceSetting":
     "W ChatGPT na komputerze otwórz ustawienia bezpieczeństwa i włącz logowanie kodem urządzenia dla Codex. Na koncie służbowym włącza je administrator obszaru roboczego.",
   "provider.useApp.title": "Połącz {name} w aplikacji OpenBot",
@@ -140,7 +143,8 @@ export const messages = {
     "Te modele nie działają z opcją „Tylko obszar roboczy” w systemach Windows i Linux. Aby ich użyć, zmień „Dostęp” w ustawieniach agenta.",
   "provider.picker.olderModels": "Starsze modele",
   "provider.picker.olderModelsList": "Starsze modele {name}",
-  "provider.picker.noModels": "Brak dostępnych modeli od: {name}.",
+  "provider.picker.noModels":
+    "Nie widać tu modeli od: {name}. Jeśli są wyłączone, administrator może je włączyć w Ustawienia serwera > Dostawcy > {name} > Modele.",
   "provider.picker.endpointModelsInCustom": "{name} obsługuje Twoje własne endpointy. Ich modele są na karcie Własny.",
   "provider.picker.showCustomModels": "Pokaż modele",
   "provider.picker.museNoModels":
@@ -160,6 +164,7 @@ export const messages = {
   "provider.picker.effort": "Wysiłek",
   "provider.picker.effortLabel": "Wysiłek rozumowania agenta",
   "provider.picker.effortFixed": "{effort}, ustawia {provider}",
+  "provider.picker.effortLimited": "Ustawienia Claude lub organizacja ograniczają wysiłek do poziomu {effort}.",
   "provider.picker.fast": "Szybki",
   "provider.picker.fastText": "Szybsze odpowiedzi, większe zużycie",
   "provider.picker.speed": "Szybkość",
@@ -248,6 +253,7 @@ export const messages = {
   "provider.account.apiKey": "Klucz API",
   "provider.account.listLabel": "Konta {name}",
   "provider.account.usedBy": "Używane przez: {agents}",
+  "provider.account.sameEmail": "Ten sam e-mail co {name}",
   "provider.account.failed": "Błąd logowania",
   "provider.account.moreActions": "Więcej działań: {name}",
   "provider.account.renameLabel": "Nazwa: {name}",
@@ -290,6 +296,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot wyloguje {provider} na serwerze.",
   "provider.settings.geminiKeyReplacesAccount":
     "Zapisany klucz API Gemini jest używany zamiast logowania przez Google. Aby używać planu Google i jego modeli, usuń klucz.",
+  "provider.settings.museKeyInUse":
+    "Muse używa tego klucza, a nie Twojego logowania. Aby używać logowania, usuń klucz.",
   "provider.settings.versionInstalledByUser": "{version} · zainstalowana przez Ciebie",
   "provider.settings.versionDownloaded": "{version} · pobrana przez OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Nieużywana: {version} · zainstalowana przez Ciebie",

@@ -23,6 +23,7 @@ const PROJECT = "fake-account-project";
 const TOKEN_FILE = "antigravity-oauth-token";
 const LEGACY_TOKEN_FILE = "acp_token.json";
 const MARKER = "openbot-token-imported";
+const SAME_EMAIL = "same.person@example.com";
 
 const fakeAntigravity = (version: string) => `#!/usr/bin/env node
 if (process.argv[2] === "--version") {
@@ -92,7 +93,7 @@ function handle(message) {
             expiry: new Date(Date.now() + 3600000).toISOString(),
           },
           auth_method: "consumer",
-          id_token_email: "",
+          id_token_email: process.env.FAKE_AGY_EMAIL ?? "",
         }), { mode: 0o600 });
         write({ id: message.id, result: {} });
       }, 20);
@@ -176,6 +177,7 @@ interface Report {
   firstAccountTokens?: { legacyUnchanged: boolean; importedUnchanged: boolean };
   noSecondImport?: { tokenAtStart: boolean | undefined; tokenFile: boolean; legacyUnchanged: boolean };
   otherSignIn?: { tokenFile: boolean; marker: boolean; legacyUnchanged: boolean; started: boolean };
+  sameLogin?: { ownEmailAtStart: string | null; error: string; stored: number; rows: number };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-accounts-e2e-"));
@@ -273,7 +275,11 @@ const agents = new AgentStore(join(root, "profile"), join(root, "home"), databas
 
 const busyAgents = new Set<string>();
 
-function createRuntime(executable: string, accounts: ProviderAccountStore): ProviderRuntime {
+function createRuntime(
+  executable: string,
+  accounts: ProviderAccountStore,
+  savedKey: string | null = SAVED_KEY,
+): ProviderRuntime {
   return new ProviderRuntime({
     offProviders: BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id).filter((id) => id !== "antigravity"),
     conversation: new ConversationRuntime(
@@ -302,7 +308,7 @@ function createRuntime(executable: string, accounts: ProviderAccountStore): Prov
     preferredProvider: "antigravity",
     clientFactory: null,
     bundledExecutables: { antigravity: executable },
-    credentials: { ...NO_PROVIDER_CREDENTIALS, apiKey: (provider) => (provider === "antigravity" ? SAVED_KEY : null) },
+    credentials: { ...NO_PROVIDER_CREDENTIALS, apiKey: (provider) => (provider === "antigravity" ? savedKey : null) },
     accounts,
     redactMcp: (text) => text,
   });
@@ -560,6 +566,41 @@ try {
   assert.equal(report.otherSignIn.tokenFile, false, "another sign-in is not copied");
   assert.equal(report.otherSignIn.marker, false);
   assert.ok(report.otherSignIn.legacyUnchanged);
+  await stop(runtime);
+  runtime = undefined;
+
+  const sameHome = join(root, "same-gemini");
+  const sameData = join(sameHome, "antigravity-acp");
+  const ownToken = (email: string) =>
+    JSON.stringify({
+      token: { access_token: "own", token_type: "Bearer", refresh_token: "own", expiry: "2099-01-01T00:00:00Z" },
+      auth_method: "consumer",
+      id_token_email: email,
+    });
+  await mkdir(sameData, { recursive: true });
+  await writeFile(join(sameData, MARKER), "");
+  await writeFile(join(sameData, TOKEN_FILE), ownToken(""), { mode: 0o600 });
+  process.env.GEMINI_HOME = sameHome;
+  process.env.FAKE_AGY_EMAIL = SAME_EMAIL;
+  const sameStore = new ProviderAccountStore(join(root, "same-accounts.json"), join(root, "same-accounts"));
+  await runCauseEffect(sameStore.load());
+  runtime = createRuntime(await cli("1.5.4"), sameStore, null);
+  await runCauseEffect(runtime.ensureProvider("antigravity"));
+  const ownEmailAtStart = accountRows(runtime)?.[0]?.email ?? null;
+  await writeFile(join(sameData, TOKEN_FILE), ownToken(SAME_EMAIL), { mode: 0o600 });
+  const sameExit = await Effect.runPromiseExit(runtime.signInProviderAccountOnHost("antigravity", null, openPage));
+  delete process.env.FAKE_AGY_EMAIL;
+  const sameError = Exit.isFailure(sameExit) ? Cause.squash(sameExit.cause) : null;
+  report.sameLogin = {
+    ownEmailAtStart,
+    error: sameError instanceof Error && sameError.cause instanceof Error ? sameError.cause.message : "",
+    stored: sameStore.list("antigravity").length,
+    rows: accountRows(runtime)?.length ?? 0,
+  };
+  assert.equal(report.sameLogin.ownEmailAtStart, null, "the first account had no email when Gemini started");
+  assert.equal(report.sameLogin.error, sourceText("error.provider.accountAlreadyAdded", { provider: "Gemini" }));
+  assert.equal(report.sameLogin.stored, 0, "the second sign-in with the same Google account is not kept");
+  assert.equal(report.sameLogin.rows, 1);
 
   report.passed = true;
 } finally {

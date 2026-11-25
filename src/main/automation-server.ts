@@ -25,7 +25,12 @@ import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
 import { AgentSettingsRefused } from "../backend/agent/agent-settings-refused";
 import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "../backend/agent/inactive-attention-request";
-import { type ModelRequest, requestedRuntime } from "../backend/agent/model-tools";
+import {
+  type ModelRequest,
+  type ProviderStatusRow,
+  requestedRuntime,
+  requireRunnableChange,
+} from "../backend/agent/model-tools";
 import type { AgentLifecycleFailed, AgentService } from "../backend/agent-service";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 import { AUTOMATION_HEADERS_FILE, AUTOMATION_TOKEN_FILE, AUTOMATION_URL_FILE } from "../backend/automation-command";
@@ -68,6 +73,7 @@ export interface AutomationServerOptions {
   >[];
   agentDefaults: () => AgentDefaults;
   listModels: () => AgentModelOption[];
+  providerStatuses: () => readonly ProviderStatusRow[];
   listRoutines: (agentId: string) => readonly Pick<Routine, "id" | "name" | "active">[];
   runRoutine: (input: {
     agentId: string;
@@ -117,6 +123,10 @@ export class AutomationServer {
 
   readonly requestSync = Effect.fn("AutomationServer.requestSync")(function* (this: AutomationServer) {
     yield* Effect.forkIn(this.sync(), this.#scope, { startImmediately: true });
+  }).bind(this);
+
+  readonly removeStaleFiles = Effect.fn("AutomationServer.removeStaleFiles")(function* (this: AutomationServer) {
+    yield* this.#step(this.#close());
   }).bind(this);
 
   readonly stop = Effect.fn("AutomationServer.stop")(function* (this: AutomationServer) {
@@ -260,9 +270,11 @@ export class AutomationServer {
     const agent = this.#requireAgent(agentId);
     if (route === "settings") {
       const { runtime, providerAccountId } = settingsRequest(value);
+      const requested = requestedRuntime(agent, runtime, this.#options.listModels());
+      requireRunnableChange(agent, requested, this.#options.providerStatuses());
       const input: UpdateAgentInput = {
         agentId,
-        ...requestedRuntime(agent, runtime, this.#options.listModels()),
+        ...requested,
         ...(providerAccountId === undefined ? {} : { providerAccountId }),
       };
       const updated = await runCauseEffect(this.#options.updateAgent(input));

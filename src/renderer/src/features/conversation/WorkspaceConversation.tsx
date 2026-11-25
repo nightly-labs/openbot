@@ -33,6 +33,7 @@ import { useAuth } from "../account/account-context";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
 import { conversationThreads } from "../agent-threads/conversation-threads";
+import { useAgentActions } from "../agents/agent-actions";
 import { attentionKey } from "../agents/agent-runtime-snapshot";
 import { agentTakeoverTabIds, agentThreadAttention } from "../agents/agent-thread-attention";
 import { useAgents } from "../agents/agents-context";
@@ -46,15 +47,19 @@ import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useCustomProviders } from "../custom-providers/custom-providers-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import { useServerActions } from "../servers/server-actions";
-import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import {
+  remoteMcpSignIn,
+  serverCanAdminister,
+  serverRoleCanAdminister,
+  serverSupportsCapability,
+} from "../servers/server-capabilities";
 import { createServerResponseStyle } from "../servers/server-personality";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { serversPort } from "../servers/servers-port";
-import { appSettingLinkTarget } from "../settings/setting-link-targets";
+import { appSettingRowOpener } from "../settings/setting-link-targets";
 import { useSettings } from "../settings/settings-context";
-import { settingsTabShown } from "../settings/settings-tabs";
 import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
 import { useUsage } from "../usage/usage-context";
@@ -65,6 +70,7 @@ import { useConversation } from "./conversation-context";
 import { useConversationController } from "./conversation-controller-context";
 import { messagePromptRequestKey, promptRequestKey } from "./conversation-keys";
 import type { ConversationThreads } from "./conversation-types";
+import { useDesktopMediaApproval } from "./desktop-media-approval";
 import {
   createAgentMessageDeleteAccess,
   desktopAgentMessageDeleteAccess,
@@ -157,6 +163,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     failedModels,
     queues,
   } = useTurns();
+
   const {
     activeMessages,
     conversations,
@@ -186,6 +193,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const panelAgentStatus = () => (remoteLoading() ? { ...agentStatus(), phase: "starting" as const } : agentStatus());
   const usage = useUsage();
   const windowPage = useWindowPage();
+  const mediaApproval = useDesktopMediaApproval();
   const auth = useAuth();
   const { teamPresence, readerMemberId } = usePresence();
   const { selectAgent, openAgentMessage, messageFocusRequest, globalSearchOpen } = useNavigation();
@@ -249,6 +257,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
       await loadLatestAgentMessages(agent.id);
     };
   });
+
+  const { deleteAgent } = useAgentActions();
+  const deleteAgentAllowed = () => !platform.chatWindow && serverRoleCanAdminister(activeServer());
 
   const compactActiveAgentContext = createMemo(() => {
     const agent = activeAgent();
@@ -480,14 +491,10 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           setPendingPluginSlug(request.appId);
           setSkillsMarketplaceOpen(true);
         }}
-        appSettingOpener={(settingId) => {
-          const target = appSettingLinkTarget(settingId, platform.appInfo()?.platform);
-          const shown = settingsTabShown(target.tab, {
-            platform: platform.appInfo()?.platform,
-            chatWindow: platform.chatWindow !== null,
-          });
-          return shown ? () => openAppSettingRow(target.tab, target.row) : undefined;
-        }}
+        appSettingOpener={appSettingRowOpener(
+          () => ({ platform: platform.appInfo()?.platform, chatWindow: platform.chatWindow !== null }),
+          openAppSettingRow,
+        )}
         onOpenMcpSignIn={(() => {
           const server = activeServer();
           if (!server || (server.kind === "remote" && !remoteMcpSignIn(server))) return undefined;
@@ -637,6 +644,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         onPromptResolutionPresented={presentPromptResolution}
         onRespondToApproval={respondToApproval}
         onAlwaysAllowApproval={alwaysAllowApproval()}
+        mediaApproval={mediaApproval}
         agentAutoApproves={activeAgentAutoApproves()}
         remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
         remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
@@ -654,6 +662,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         agentMemoryLimit={generalSettings().agentMemoryLimit}
         onClearAgentContext={clearActiveAgentContext()}
         onDeleteAgentHistory={deleteActiveAgentHistory()}
+        onDeleteAgent={deleteAgentAllowed() ? (agentId) => deleteAgent(agentId) : undefined}
         onCompactAgentContext={compactActiveAgentContext()}
         onRespondToBrowserTakeover={(decision, options) => respondToBrowserTakeover(decision, openThreadId(), options)}
         onCancelQueuedMessage={cancelQueuedMessage}

@@ -83,6 +83,7 @@ import { ProviderAccountRenameField } from "../../components/ProviderAccountList
 import type { ProviderPickerOption } from "../../components/ProviderPicker";
 import {
   accountCodeSignInOffered,
+  earlierAccountWithSameEmail,
   hasKeyAccounts,
   isApiKeyAccount,
   isProviderKeyAccount,
@@ -1048,6 +1049,12 @@ function AccountRow(
   const { t, format, sourceText } = useText();
   const [renaming, setRenaming] = createSignal(false);
   const name = () => providerAccountName(t, props.accounts, props.account.id);
+  const sameEmailNote = () => {
+    const earlier = earlierAccountWithSameEmail(props.accounts, props.account.id);
+    return earlier
+      ? t("provider.account.sameEmail", { name: providerAccountName(t, props.accounts, earlier.id) })
+      : null;
+  };
   const own = () => props.account.id === DEFAULT_PROVIDER_ACCOUNT_ID;
   const apiKey = () => isApiKeyAccount(props.account.id);
   const keyAccount = () => isProviderKeyAccount(props.option.id, props.account.id);
@@ -1065,6 +1072,7 @@ function AccountRow(
   const detail = () =>
     [
       props.account.email && props.account.email !== name() ? props.account.email : null,
+      sameEmailNote(),
       agents().length > 0 ? t("provider.account.usedBy", { agents: format.list(agents()) }) : null,
     ]
       .filter(Boolean)
@@ -1559,7 +1567,9 @@ function ApiKeySection(props: SectionProps) {
                       ? saved()
                         ? t("provider.settings.codexKeyInUse")
                         : t("provider.settings.codexKeyAlternative")
-                      : t("provider.settings.keyAlternative", { name: props.option.name })}
+                      : props.option.id === "muse" && saved()
+                        ? t("provider.settings.museKeyInUse")
+                        : t("provider.settings.keyAlternative", { name: props.option.name })}
             </ItemDescription>
           </ItemContent>
           <ItemActions>
@@ -2515,12 +2525,25 @@ function servesCustomEndpoints(props: ProviderSettingsPageProps): boolean {
 }
 
 function CustomEndpointsPage(props: ProviderSettingsPageProps) {
-  const { t, format } = useText();
+  const { t, format, errorMessage } = useText();
   const endpoints = () => props.customProviders ?? [];
   const engine = () => props.options.find((option) => option.id === "opencode");
   const ready = () => servesCustomEndpoints(props);
+  const engineOff = () => !ready() && Boolean(engine()?.off);
+  const turnOnOffered = () => engineOff() && Boolean(props.onSetProviderOn);
+  const [turningOn, setTurningOn] = createSignal(false);
+  async function turnEngineOn() {
+    setTurningOn(true);
+    try {
+      await props.onSetProviderOn?.("opencode", true);
+    } catch (error) {
+      toast.error(errorMessage(error, t("error.provider.useChangeFailed")));
+    } finally {
+      setTurningOn(false);
+    }
+  }
   const engineAction = () => {
-    if (ready() || (!props.onDownloadProvider && !props.onCancelProviderDownload)) return undefined;
+    if (ready() || turnOnOffered() || (!props.onDownloadProvider && !props.onCancelProviderDownload)) return undefined;
     return customEngineDownloadAction(engine());
   };
   const runsOn = (endpoint: CustomProviderSummary) =>
@@ -2542,7 +2565,9 @@ function CustomEndpointsPage(props: ProviderSettingsPageProps) {
         subtitle={
           ready() || !engine()
             ? t("provider.custom.description")
-            : providerStatusLabel(t, format, engine()?.state ?? "checking")
+            : engineOff()
+              ? t("provider.settings.turnOnFirst", { name: engine()?.name ?? "" })
+              : providerStatusLabel(t, format, engine()?.state ?? "checking")
         }
       />
       <SettingsSection
@@ -2551,17 +2576,33 @@ function CustomEndpointsPage(props: ProviderSettingsPageProps) {
           <Show
             when={engineAction()}
             fallback={
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                aria-label={t("provider.custom.addLabel")}
-                disabled={props.disabled || !ready()}
-                onClick={() => props.onAddCustomProvider?.()}
+              <Show
+                when={turnOnOffered()}
+                fallback={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-label={t("provider.custom.addLabel")}
+                    disabled={props.disabled || !ready()}
+                    onClick={() => props.onAddCustomProvider?.()}
+                  >
+                    <Plus aria-hidden="true" />
+                    {t("common.add")}
+                  </Button>
+                }
               >
-                <Plus aria-hidden="true" />
-                {t("common.add")}
-              </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  aria-label={t("provider.aria.use", { name: engine()?.name ?? "" })}
+                  loading={turningOn()}
+                  disabled={props.disabled || turningOn()}
+                  onClick={() => void turnEngineOn()}
+                >
+                  {t("provider.settings.useTitle", { name: engine()?.name ?? "" })}
+                </Button>
+              </Show>
             }
           >
             {(action) => (

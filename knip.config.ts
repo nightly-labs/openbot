@@ -80,6 +80,9 @@ const config: KnipConfig = {
       project: ["src/**/*.{ts,tsx,css}", "test/**/*.ts", "scripts/**/*.ts", "*.ts"],
       ignoreDependencies: ["cloudflare"],
     },
+    "apps/browser-extension": {
+      entry: ["src/x-content.ts"],
+    },
     "apps/site-router": {
       project: ["src/**/*.ts"],
     },

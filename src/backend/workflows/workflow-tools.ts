@@ -3,6 +3,7 @@ import {
   isGitHubRepositoryName,
   isRoutineSchedule,
   isWorkflowGraph,
+  lastJsonObject,
   WORKFLOW_BRANCHES,
   WORKFLOW_DISCORD_EVENTS,
   WORKFLOW_GITHUB_EVENTS,
@@ -30,6 +31,7 @@ import {
   workflowGraphProblemAt,
   workflowListField,
   workflowMediaKind,
+  workflowUnknownFields,
 } from "@openbot/contracts/ipc";
 
 import { isOneOf } from "@openbot/contracts/runtime-values";
@@ -39,7 +41,8 @@ import { z } from "zod";
 import { openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
 import { ToolOperationFailed, toolStep } from "../agent/tool-operation";
 import { githubTriggerRepositories } from "./github-matching";
-import { runtimeFields } from "./workflow-graph";
+import { WORKFLOW_ANSWER_TOOL } from "./workflow-answers";
+import { nodeTimezone, runtimeFields } from "./workflow-graph";
 import { WorkflowStoreError } from "./workflow-store";
 import type { WorkflowsHandle } from "./workflows";
 
@@ -56,6 +59,7 @@ export type WorkflowTools = Pick<
   | "runs"
   | "run"
   | "stepSettings"
+  | "giveAnswer"
 >;
 
 const identifier = z.string().min(1).max(INPUT_LIMITS.identifier);
@@ -121,7 +125,7 @@ export const WORKFLOW_TOOL_DEFINITIONS = [
   {
     name: "edit_workflow",
     description:
-      "Create a workflow, a canvas of steps a trigger starts (no workflowId, title required), or change one: rename, and apply ops in order to add, update, move or remove nodes and connect or disconnect them. One agent's scheduled task is a routine.",
+      "Create a workflow, a canvas of steps (no workflowId, title required), or change one: rename, and apply ops in order to nodes and edges. A trigger is optional: without one, run_workflow runs all steps. One agent's scheduled task is a routine.",
     shape: editSchema.shape,
   },
   {
@@ -142,6 +146,53 @@ export const WORKFLOW_TOOL_DEFINITIONS = [
     shape: runsSchema.shape,
   },
 ] as const;
+
+const answerToolSchema = z
+  .object({
+    answer: z
+      .union([z.object({}).catchall(z.unknown()), z.string().max(INPUT_LIMITS.workflowStepInput)])
+      .describe("the answer fields of the step as one JSON object"),
+  })
+  .strict();
+
+export const WORKFLOW_ANSWER_TOOL_DEFINITION = {
+  name: WORKFLOW_ANSWER_TOOL,
+  description:
+    "Only in a workflow step that asks for answer fields: give them as one JSON object. OpenBot checks them at once and tells you what to correct; then call it again. The last answer that fits is the result of the step.",
+  shape: answerToolSchema.shape,
+} as const;
+
+export const handleWorkflowAnswerTool = Effect.fn("WorkflowTools.answer")(function* (
+  args: unknown,
+  workflows: Pick<WorkflowTools, "giveAnswer"> | null,
+  deliveryIds: readonly string[],
+) {
+  const input = yield* toolStep(() => answerToolSchema.parse(args ?? {}));
+  if (!workflows) return yield* new ToolOperationFailed({ cause: new Error("Workflows are unavailable.") });
+  const value = typeof input.answer === "string" ? (lastJsonObject(input.answer) ?? input.answer) : input.answer;
+  const result = yield* workflows
+    .giveAnswer(deliveryIds, value)
+    .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+  switch (result.kind) {
+    case "saved":
+      return openBotToolResult({
+        status: "saved",
+        note: "OpenBot keeps this answer as the result of the step. Finish your turn.",
+      });
+    case "problems":
+      return openBotToolFailure(result.text);
+    case "free":
+      return openBotToolFailure("This workflow step asks for no answer fields. Give your answer as text.");
+    case "several":
+      return openBotToolFailure(
+        "This turn has more than one workflow step. End your reply with one JSON object with the answer fields.",
+      );
+    case "none":
+      return openBotToolFailure(
+        "Use this tool only in a workflow step that asks for answer fields. Give your answer as usual.",
+      );
+  }
+});
 
 export const WORKFLOW_TOOL_NAMES: ReadonlySet<string> = new Set(WORKFLOW_TOOL_DEFINITIONS.map((tool) => tool.name));
 
@@ -366,6 +417,14 @@ function checkTriggerEvent(node: WorkflowNode, op: number): void {
   refuse(`Op ${op}: the ${trigger} trigger ${given}. Set event to one of: ${events.join(", ")}.`);
 }
 
+function checkKnownValues(node: WorkflowNode, op: number, names: ReadonlySet<string>): void {
+  const unknown = workflowUnknownFields(node.kind, node.fields).find((field) => names.has(field.name));
+  if (!unknown) return;
+  refuse(
+    `Op ${op}: ${unknown.name} "${String(node.fields[unknown.name])}" is unknown. Set ${unknown.name} to one of: ${unknown.values.join(", ")}.`,
+  );
+}
+
 function checkAgentStepModel(kind: WorkflowNodeKind, patch: WorkflowOp["fields"], op: number): void {
   if (kind !== "agent") return;
   const given = STEP_MODEL_FIELDS.filter((name) => {
@@ -384,11 +443,21 @@ function checkedSchedule(value: WorkflowOp["schedule"]) {
   return value;
 }
 
-function withSchedule(node: WorkflowNode, scheduled: ReturnType<typeof checkedSchedule>): WorkflowNode {
+function withSchedule(
+  node: WorkflowNode,
+  scheduled: ReturnType<typeof checkedSchedule>,
+  scheduleTimezone: string | undefined,
+): WorkflowNode {
   if (node.kind !== "trigger") return node;
-  const fields = scheduled && node.fields.trigger === "manual" ? { ...node.fields, trigger: "schedule" } : node.fields;
+  const triggerFields =
+    scheduled && node.fields.trigger === "manual" ? { ...node.fields, trigger: "schedule" } : node.fields;
   const schedule =
-    scheduled ?? node.schedule ?? (fields.trigger === "schedule" ? { kind: "daily", time: "09:00" } : undefined);
+    scheduled ?? node.schedule ?? (triggerFields.trigger === "schedule" ? { kind: "daily", time: "09:00" } : undefined);
+  const scheduleChanged = schedule !== undefined && (scheduled !== undefined || node.schedule === undefined);
+  const fields =
+    scheduleChanged && scheduleTimezone && !nodeTimezone({ ...node, fields: triggerFields })
+      ? { ...triggerFields, timezone: scheduleTimezone }
+      : triggerFields;
   return { ...node, fields, ...(schedule ? { schedule } : {}) };
 }
 
@@ -421,7 +490,8 @@ function applyWorkflowOps(
   graph: WorkflowGraph,
   ops: readonly WorkflowOp[],
   agentIds: ReadonlySet<string>,
-  tidy = false,
+  tidy: boolean,
+  scheduleTimezone: string | undefined,
 ): { graph: WorkflowGraph; ids: Record<string, string> } {
   let nodes = graph.nodes.map((node) => ({ ...node }));
   let edges = [...graph.edges];
@@ -444,6 +514,12 @@ function applyWorkflowOps(
   const placed: { id: string; withFrom: boolean }[] = [];
   const pinned = new Set<string>();
   const eventChanges = new Map<string, number>();
+  const valueChanges = new Map<string, { op: number; names: ReadonlySet<string> }>();
+  const noteValues = (id: string, op: number, patch: WorkflowOp["fields"]) => {
+    if (!patch) return;
+    const before = valueChanges.get(id)?.names ?? [];
+    valueChanges.set(id, { op, names: new Set([...before, ...Object.keys(patch)]) });
+  };
 
   ops.forEach((op, index) => {
     const n = index + 1;
@@ -457,9 +533,10 @@ function applyWorkflowOps(
         checkAgent(fields, n);
         const scheduled = checkedSchedule(op.schedule);
         if (scheduled && op.kind !== "trigger") refuse(`Op ${n}: only a trigger has a schedule.`);
-        const node = withSchedule({ id, kind: op.kind, at: { x: 0, y: 0 }, fields }, scheduled);
+        const node = withSchedule({ id, kind: op.kind, at: { x: 0, y: 0 }, fields }, scheduled, scheduleTimezone);
         checkMedia(node, n);
         if (changesTriggerEvent(op.fields)) eventChanges.set(id, n);
+        noteValues(id, n, op.fields);
         const upstream = op.from === undefined ? undefined : resolve(op.from, n);
         node.at = op.at
           ? { x: clampCoordinate(op.at.x), y: clampCoordinate(op.at.y) }
@@ -478,10 +555,11 @@ function applyWorkflowOps(
         checkAgent(fields, n);
         const scheduled = checkedSchedule(op.schedule);
         if (scheduled && node.kind !== "trigger") refuse(`Op ${n}: only a trigger has a schedule.`);
-        const next = withSchedule({ ...node, fields }, scheduled);
+        const next = withSchedule({ ...node, fields }, scheduled, scheduleTimezone);
         if (op.fields && ("media" in op.fields || "model" in op.fields)) checkMedia(next, n);
         replace(next);
         if (changesTriggerEvent(op.fields)) eventChanges.set(node.id, n);
+        noteValues(node.id, n, op.fields);
         return;
       }
       case "move": {
@@ -519,6 +597,8 @@ function applyWorkflowOps(
   for (const node of nodes) {
     const op = eventChanges.get(node.id);
     if (op !== undefined) checkTriggerEvent(node, op);
+    const changed = valueChanges.get(node.id);
+    if (changed !== undefined) checkKnownValues(node, changed.op, changed.names);
   }
   const empty = graph.nodes.every((node) => ANNOTATION_KINDS.has(node.kind));
   if (tidy || empty) {
@@ -658,6 +738,7 @@ function compactStep(step: WorkflowStep, nodes: ReadonlyMap<string, WorkflowNode
     nodeId: step.nodeId,
     ...stepLabel(nodes.get(step.nodeId)),
     status: step.status,
+    ...(step.waiting ? { waitsInAgentQueue: true } : {}),
     ...(step.branch ? { branch: step.branch } : {}),
     ...(step.error ? { error: step.error } : {}),
     ...(step.output ? { output: cut(step.output) } : {}),
@@ -683,6 +764,7 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
   callerId: string,
   callKey: string,
   agentIds: ReadonlySet<string>,
+  scheduleTimezone: string | undefined,
   confirmDelete: (title: string) => Effect.Effect<boolean, ToolOperationFailed>,
 ) {
   if (!WORKFLOW_TOOL_NAMES.has(tool)) return null;
@@ -695,7 +777,7 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
   ) {
     let detail = yield* workflows.get(workflowId);
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const applied = yield* toolStep(() => applyWorkflowOps(detail.graph, ops, agentIds, tidy));
+      const applied = yield* toolStep(() => applyWorkflowOps(detail.graph, ops, agentIds, tidy, scheduleTimezone));
       const answers = newAnswerProblems(detail.graph, applied);
       const problem = graphProblem(applied.graph) ?? answers.refusal;
       if (problem) return yield* toolStep(() => refuse(problem));
@@ -745,7 +827,7 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
       if (workflowId === undefined) {
         if (input.title === undefined) return openBotToolFailure("A new workflow needs a title.");
         const empty: WorkflowGraph = { nodes: [], edges: [], strokes: [] };
-        const applied = yield* toolStep(() => applyWorkflowOps(empty, ops, agentIds, tidy));
+        const applied = yield* toolStep(() => applyWorkflowOps(empty, ops, agentIds, tidy, scheduleTimezone));
         const answers = newAnswerProblems(empty, applied);
         const problem = graphProblem(applied.graph) ?? answers.refusal;
         if (problem) return openBotToolFailure(problem);

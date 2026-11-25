@@ -9,7 +9,7 @@ import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/p
 import { installFakeAgent, readJsonl, startThread, stopClients } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/antigravity-background-command-e2e");
-const WAIT_MS = 20_000;
+const WAIT_MS = 60_000;
 
 interface LogEntry {
   event: string;
@@ -36,6 +36,7 @@ interface Report {
   };
   otherTurn?: { events: Seen[]; turnsStarted: number; listedWhileOpen: boolean };
   answeredInNextTurn?: { events: Seen[]; waitsAfterTurn: boolean };
+  ownReply?: { events: Seen[]; prompts: number; waitsAfterReply: boolean };
   failure?: string;
 }
 
@@ -73,10 +74,17 @@ function record(client: AgentClient, thread: string): Seen[] {
   return seen;
 }
 
-async function open(name: string): Promise<{ client: AgentClient; log: string; thread: string }> {
+async function open(
+  name: string,
+  env: Record<string, string> = {},
+): Promise<{ client: AgentClient; log: string; thread: string }> {
   const executable = join(root, name, "bin", "antigravity");
   const log = join(root, name, "agent.jsonl");
-  await installFakeAgent(executable, "antigravity-background-command", { FAKE_LOG: log, FAKE_FINISH_DIR: finishDir });
+  await installFakeAgent(executable, "antigravity-background-command", {
+    FAKE_LOG: log,
+    FAKE_FINISH_DIR: finishDir,
+    ...env,
+  });
   const client = requireProviderDriver("antigravity").createClient(
     { executable, version: "1.5.14", source: "managed" },
     10_000,
@@ -197,6 +205,33 @@ try {
   const waitsAfterTurn = await waits(next.client, next.thread);
   assert.equal(waitsAfterTurn, false);
   report.answeredInNextTurn = { events: statusEvents, waitsAfterTurn };
+
+  const replying = await open("own-reply", { FAKE_OWN_REPLY: "1" });
+  const replySeen = record(replying.client, replying.thread);
+  await startTurn(replying.client, replying.thread, true);
+  await waitFor(() => completions(replySeen) === 1, "the chat turn completes while its command runs");
+  const replyAnswered = replySeen.length;
+  const listedBeforeReply = await lists(replying.log);
+  await waitFor(async () => (await lists(replying.log)) > listedBeforeReply, "the idle chat checks the session");
+  const replySession =
+    (await readJsonl<LogEntry>(replying.log)).find((entry) => entry.event === "prompt")?.sessionId ?? "";
+  await writeFile(join(finishDir, replySession), "");
+  await waitFor(() => completions(replySeen) === 2, "the agent's own reply after the command shows in a turn");
+  const replyEvents = replySeen.slice(replyAnswered);
+  assert.deepEqual(
+    replyEvents.filter((entry) => entry.method !== "item/completed"),
+    [
+      { method: "background-work", running: false },
+      { method: "turn/started", unprompted: true },
+      { method: "turn/completed", status: "completed" },
+    ],
+  );
+  assert.equal(replyEvents.filter((entry) => entry.text === "The command finished by itself.").length, 1);
+  const prompts = (await readJsonl<LogEntry>(replying.log)).filter((entry) => entry.event === "prompt").length;
+  assert.equal(prompts, 1, "An agent that replies by itself must not get the wake prompt.");
+  const waitsAfterReply = await waits(replying.client, replying.thread);
+  assert.equal(waitsAfterReply, false);
+  report.ownReply = { events: replyEvents, prompts, waitsAfterReply };
 
   report.passed = true;
 } catch (error) {

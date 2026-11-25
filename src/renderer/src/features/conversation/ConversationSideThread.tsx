@@ -1,6 +1,7 @@
 import { canPreviewAttachment } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { classifyFailure } from "@openbot/telemetry";
+import { Input } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
 import { contextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { AgentThreadView } from "@openbot/ui/features/conversation/threads/AgentThreadView";
@@ -8,7 +9,7 @@ import type { AgentThreadBranchSource } from "@openbot/ui/features/conversation/
 import { TaskAnswerCard } from "@openbot/ui/features/tasks/TaskPanel";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createProjection, Show } from "solid-js";
+import { createEffect, createMemo, createProjection, createSignal, onSettled, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
@@ -17,6 +18,7 @@ import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
+import { remoteAgentError } from "../agents/agent-error-text";
 import { useThreadVisualReplyCard } from "./ChatVisualReply";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { conversationRuntime } from "./conversation-runtime";
@@ -35,6 +37,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
   const {
     props: view,
     openExternalMessageUrl,
+    openFileFromThread,
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
@@ -47,6 +50,8 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     openTaggedReference,
     threadComposer,
     threadQueue,
+    threadVoice,
+    besideFocusRequest,
     movePanelThreadToChat,
     copyMessage,
     copiedMessageId,
@@ -54,6 +59,8 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     messagePins,
     changeMarkerActions,
     openWaitingAgent,
+    shownSubagentId,
+    toggleSubagentPanel,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(view));
   const threadBackgroundWorkSince = (taskId: string | undefined) =>
@@ -106,7 +113,13 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
       if (messageId && read) read(messageId);
     },
   );
+  const fromThread = (open: () => void) => openFileFromThread(props.threadId, open);
   const draftKey = () => threadComposer.sideDraftKey(props.threadId);
+  const shownAt = untrack(besideFocusRequest);
+  const focusRequest = () => {
+    const request = besideFocusRequest();
+    return request > shownAt ? request : undefined;
+  };
   const rowImages = () => {
     const key = draftKey();
     return key ? threadComposer.rowImages(key) : [];
@@ -115,6 +128,36 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     const key = draftKey();
     return key ? threadComposer.draft(key) : undefined;
   };
+  function attachFiles(files: File[]): void {
+    if (!files.length) return;
+    const end = (draft()?.text ?? "").length;
+    void threadComposer.pasteFiles(files, { start: end, end }, draftKey());
+  }
+  const [panel, setPanel] = createSignal<HTMLElement>();
+  const [picker, setPicker] = createSignal<HTMLInputElement>();
+  const openPicker = () => {
+    const input = picker();
+    if (!input) return;
+    input.value = "";
+    input.click();
+  };
+  onSettled(() => {
+    const conversation = panel()?.closest<HTMLElement>(".conversation-panel");
+    if (!conversation) return;
+    const takeDrop = (event: DragEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest(SIDE_DROP_TARGETS)) return;
+      const rect = panel()?.getBoundingClientRect();
+      if (!rect || event.clientX < rect.left || event.clientX > rect.right) return;
+      if (event.clientY < rect.top || event.clientY > rect.bottom) return;
+      const files = droppedFiles(event.dataTransfer);
+      if (!files.length) return;
+      event.preventDefault();
+      event.stopPropagation();
+      attachFiles(files);
+    };
+    conversation.addEventListener("drop", takeDrop, { capture: true });
+    return () => conversation.removeEventListener("drop", takeDrop, { capture: true });
+  });
   function sendSide(side: SideThread, text: string): Promise<boolean> {
     const key = draftKey();
     if (!key) return Promise.resolve(false);
@@ -133,7 +176,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
   const mcpSignInCard = useThreadMcpSignInCard((body) => thread()?.onSend(body, [], null) ?? Promise.resolve(false));
   const marketplaceCard = useThreadMarketplaceSuggestionCard();
   const settingLinkCard = useThreadSettingLinkCard();
-  const visualReplyCard = useThreadVisualReplyCard(draftKey);
+  const visualReplyCard = useThreadVisualReplyCard(draftKey, undefined, props.threadId);
   const branch = () => {
     if (!view.threads?.onBranch) return undefined;
     return (messageId: string) => void branchThread(props.threadId, messageId);
@@ -179,15 +222,25 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
   };
   return (
     <aside
+      ref={setPanel}
       id="side-thread-panel"
       class="browser-panel side-thread-panel"
       aria-label={t("conversation.threads.view.label", { title: item()?.title ?? "" })}
     >
       {props.resizer}
+      <Input
+        ref={setPicker}
+        type="file"
+        multiple
+        hidden
+        tabindex={-1}
+        onChange={(event) => attachFiles(Array.from(event.currentTarget.files ?? []))}
+      />
       <Show when={shown()}>
         {(current) => (
           <AgentThreadView
             task={current().thread.task}
+            failureText={view.server && view.server.kind !== "local" ? remoteAgentError : undefined}
             limit={view.threads?.limit ?? 1}
             agent={current().agent}
             agents={view.agents}
@@ -206,23 +259,31 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             onPasteFiles={(files, selection, text) => threadComposer.pasteFiles(files, selection, draftKey(), text)}
             onDraftChange={(text) => threadComposer.setText(draftKey(), text)}
             onOpenDraftAttachment={(attachment) =>
-              canPreviewAttachment(attachment)
-                ? void previewAttachment(attachment)
-                : attachmentAction(attachment, "open")
+              fromThread(() =>
+                canPreviewAttachment(attachment)
+                  ? void previewAttachment(attachment)
+                  : attachmentAction(attachment, "open"),
+              )
             }
+            onAttachFiles={view.threads?.acceptsFiles ? openPicker : undefined}
+            voice={threadVoice(draftKey())}
+            focusRequest={focusRequest()}
             mediaSource={view.runtime?.attachmentMedia}
             downloads={attachmentDownloads}
             onSend={(text) => sendSide(current().thread, text)}
             onStop={() => current().thread.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
-            onOpenFile={openThreadFile}
+            onOpenFile={(kind, agentId, path, asWritten) =>
+              fromThread(() => openThreadFile(kind, agentId, path, asWritten))
+            }
             onSelectAgent={view.onSelectAgent}
             onOpenWaitingAgent={openWaitingAgent}
             changeMarkerActions={changeMarkerActions}
-            onPreview={(attachment) => void previewAttachment(attachment)}
-            onAttachmentAction={attachmentAction}
+            onPreview={(attachment) => fromThread(() => void previewAttachment(attachment))}
+            onAttachmentAction={(attachment, action) => fromThread(() => attachmentAction(attachment, action))}
             backdropAction={backdropAction}
             approval={current().thread.approval}
+            media={view.mediaApproval}
             onRespondApproval={(decision) =>
               current().thread.onRespondApproval(decision, failureToast("prompt.approval.answerFailed"))
             }
@@ -261,9 +322,22 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             queue={threadQueue.view(current().thread.task, draftKey())}
             awaiting={awaiting()}
             selectionActions={selectionActions(current().thread)}
+            subagents={{ selectedId: shownSubagentId(), onOpen: toggleSubagentPanel }}
           />
         )}
       </Show>
     </aside>
   );
+}
+
+const SIDE_DROP_TARGETS = "#side-thread-panel, .attachment-drop-overlay, .agent-folders-chat-drop";
+
+function droppedFiles(transfer: DataTransfer | null): File[] {
+  if (!transfer) return [];
+  const items = Array.from(transfer.items).filter((item) => item.kind === "file");
+  if (items.some((item) => item.webkitGetAsEntry()?.isDirectory === true)) return [];
+  return items.flatMap((item) => {
+    const file = item.getAsFile();
+    return file ? [file] : [];
+  });
 }

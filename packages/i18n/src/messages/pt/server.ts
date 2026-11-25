@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Você pode selecionar outro servidor enquanto este carrega.",
   "server.connection.cachedHint":
     "O conteúdo carregado e os rascunhos são mantidos. As ações do servidor serão retomadas após a reconexão.",
+  "server.connection.computerOffline":
+    "{name} está offline. Verifique se o computador dele está ligado, se o OpenBot está aberto e se Publicar este servidor está ativado em Configurações do servidor > Membros.",
   "server.connection.conversationFailed": "A conversa não pôde ser carregada. Tente de novo.",
   "server.connection.panelsFailed": "Alguns painéis do espaço de trabalho não puderam ser carregados. Tente de novo.",
   "server.connection.retry": "Repetir",
@@ -227,6 +229,9 @@ export const messages = {
   "server.rail.delete": "Excluir servidor",
   "server.rail.hide": "Ocultar servidor",
   "server.rail.showLocal": "Mostrar {name}",
+  "server.rail.hiddenServers": "Servidores ocultos",
+  "server.rail.hideFailed": "Não foi possível ocultar {name}",
+  "server.rail.showFailed": "Não foi possível mostrar {name}",
   "server.plan.daysLeft": {
     one: "{count} dia",
     other: "{count} dias",
@@ -352,6 +357,7 @@ export const messages = {
     "Mostra a página do CRM a proprietários e administradores, permite que os agentes leiam o CRM e sincroniza o Stripe. Ao desativar, os dados ficam.",
   "server.settings.agentDefaultsTitle": "Padrões dos agentes",
   "server.settings.threadsCard": "Tópicos e fuso horário",
+  "server.settings.creditsCard": "Créditos",
   "server.settings.memoryTitle": "Memória",
   "server.settings.memoryDescription": "Escolha o que os agentes deste servidor lembram e aprendem.",
   "server.settings.memoriesCard": "Memórias",
@@ -391,6 +397,25 @@ export const messages = {
     "As novas rotinas usam este fuso horário quando a mensagem não informa o fuso horário do remetente. Em um servidor, o navegador também o usa após a próxima reinicialização.",
   "server.settings.timezoneAutomatic": "Automático ({zone})",
   "server.settings.timezoneLoadFailed": "Não foi possível carregar o fuso horário do servidor.",
+  "server.settings.connectionTitle": "Conexão",
+  "server.settings.signalHome": "Servidor do Signal",
+  "server.settings.signalHomeDescription":
+    "Os membros se conectam a este servidor por meio deste servidor do Signal. Um servidor do Signal com menor latência dá conexões mais rápidas.",
+  "server.settings.signalHomeFallback":
+    "{chosen} não responde. O servidor usa {name} até que {chosen} responda novamente.",
+  "server.settings.signalHomeMoving":
+    "O servidor muda para {name}. Os membros se conectam novamente em alguns segundos.",
+  "server.settings.signalHomeLoadFailed": "Não foi possível carregar os servidores do Signal.",
+  "server.settings.signalHomeAutomatic": "Automático (mais próximo)",
+  "server.settings.signalHomeAutomaticUsing": "Automático ({name})",
+  "server.settings.signalHomeOption": "{name} · {latency}",
+  "server.settings.signalHomeLatency": "{latency} ms",
+  "server.settings.signalHomeNoAnswer": "Sem resposta",
+  "server.settings.signalHomePlaceHelsinki1": "Helsinque 1",
+  "server.settings.signalHomePlaceHelsinki2": "Helsinque 2",
+  "server.settings.signalHomePlaceSanJose": "San José",
+  "server.settings.signalHomePlaceSydney": "Sydney",
+  "server.settings.signalHomePlaceSingapore": "Singapura",
   "server.settings.voiceModel.section": "Reconhecimento de fala",
   "server.settings.voiceModel.description":
     "Os agentes deste servidor usam este modelo para transcrever o som de vídeos que não têm legendas.",
@@ -408,6 +433,12 @@ export const messages = {
   "server.settings.agentTaskLimitDescription":
     "Quantos tópicos cada agente sem limite próprio pode executar ao mesmo tempo.",
   "server.settings.agentTaskLimitDefault": "Padrão ({count})",
+  "server.settings.mediaApprovalCredits": "Perguntar antes de gastar mais de",
+  "server.settings.mediaApprovalCreditsUnit": "créditos",
+  "server.settings.mediaApprovalCreditsLoadFailed":
+    "Não foi possível carregar o limite de aprovação de créditos deste servidor.",
+  "server.settings.mediaApprovalAgents": "Os agentes podem usar créditos",
+  "server.settings.mediaApprovalAsk": "Perguntar quando precisar de créditos",
   "server.settings.memoryLimit": "Memórias por agente",
   "server.settings.memoryLimitDescription": "Quantas memórias cada agente neste servidor pode manter.",
   "server.settings.memoryLimitLoadFailed": "Não foi possível carregar o limite de memórias deste servidor.",
@@ -549,6 +580,7 @@ export const messages = {
     "Não há uma senha separada para a área de trabalho remota. As configurações abaixo escolhem quem pode controlar este computador.",
   "server.desktop.componentInstalled": "Componente instalado",
   "server.desktop.componentNotInstalled": "Componente não instalado",
+  "server.desktop.needsX11Session": "Requer sessão X11",
   "server.desktop.sessions": "Acesso não supervisionado: {unattended} · Sessões ativas: {active}/{max}",
   "server.desktop.unattendedEnabled": "ativado",
   "server.desktop.unattendedUnavailable": "indisponível",
@@ -632,7 +664,7 @@ export const messages = {
   "server.update.waitingFor": "Aguardando {reasons}.",
   "server.update.disabledTitle": "As atualizações remotas estão desativadas",
   "server.update.disabledDescription":
-    "O usuário de {name} desativou as atualizações por membros do servidor. Peça que atualize o OpenBot ou ative a opção.",
+    "O usuário de {name} desativou as atualizações por membros do servidor. Peça que atualize o OpenBot ou que abra Configurações > Atualizações nesse computador e ative “Permitir atualizações por membros do servidor”.",
   "server.update.managedTitle": "Um Host Manager controla as atualizações",
   "server.update.managedDescription":
     "O OpenBot Host Manager atualiza {name}. Entre em contato com o administrador do computador anfitrião.",

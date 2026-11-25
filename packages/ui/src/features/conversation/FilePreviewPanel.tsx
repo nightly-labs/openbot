@@ -124,16 +124,17 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
     setRawSource(false);
   });
   createEffect(
-    () => ({ preview: file(), sourceUrl: props.sourceUrl }),
-    ({ preview, sourceUrl }) => {
+    () => ({ preview: file(), sourceUrl: props.sourceUrl, pageUrl: props.pageUrl }),
+    ({ preview, sourceUrl, pageUrl }) => {
       if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
       currentPreviewUrl = null;
       if (!preview) {
         setPreviewUrl(null);
         return;
       }
-      if (sourceUrl && BLOB_PREVIEW_KINDS.has(preview.previewKind)) {
-        setPreviewUrl(sourceUrl);
+      const directUrl = sourceUrl || (preview.previewKind === "pdf" ? pageUrl : null);
+      if (directUrl && BLOB_PREVIEW_KINDS.has(preview.previewKind)) {
+        setPreviewUrl(directUrl);
         return;
       }
       if (!preview.bytes || !BLOB_PREVIEW_KINDS.has(preview.previewKind)) {
@@ -166,7 +167,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
 
   let panel!: HTMLElement;
   onSettled(() => {
-    const conversation = panel.closest(".conversation-panel");
+    const conversation = panel.closest("[data-side-split]") ? null : panel.closest(".conversation-panel");
     return conversation ? holdFlag(conversation, "file-preview-panel") : undefined;
   });
 

@@ -365,7 +365,7 @@ export const messages = {
   "connector.whatsapp.ownNumberNote":
     "Dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, erreichen OpenBot.",
   "connector.whatsapp.dedicatedNote":
-    "Die Personen, die du zulässt, erreichen OpenBot. Andere Personen bekommen einen Code, den sie dir geben.",
+    "Dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, erreichen OpenBot. Andere Personen bekommen einen Code, den sie dir geben.",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp hat diesen Computer aus den verknüpften Geräten entfernt. Verknüpfe die Nummer erneut.",
   "connector.whatsapp.helpLoggedOutHost":
@@ -391,7 +391,7 @@ export const messages = {
     "Nur dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, können schreiben. Andere bekommen keine Antwort. Wenn es aus ist, antwortet OpenBot unbekannten Personen mit einem Code.",
   "connector.whatsapp.workingMessage": "Nachricht „Wird bearbeitet…“",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot sendet sie, während der Agent arbeitet, und ersetzt sie dann durch die Antwort. Eine Anfrage, die auf eine frühere wartet, bekommt auch eine Wartemeldung. Schalte sie aus, um nur die Antwort zu senden.",
+    "OpenBot sendet sie, während der Agent arbeitet, und ersetzt sie dann durch die Antwort. Eine Anfrage, die auf eine frühere wartet, bekommt auch eine Wartemeldung. Bei einer privaten Nummer bekommt nur dein Chat „Nachricht an dich selbst“ diese Meldungen. Schalte sie aus, um nur die Antwort zu senden.",
   "connector.whatsapp.statusReactions": "Status-Reaktionen",
   "connector.whatsapp.statusReactionsDescription":
     "OpenBot reagiert mit 👀, wenn eine Nachricht ankommt, und mit ✅, wenn die Antwort fertig ist. Schalte sie aus, um keine Reaktionen zu senden.",
@@ -471,6 +471,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "Eine Nummer kann bis zu {count} Kontakte und Gruppen zulassen.",
   "connector.whatsapp.senderGroup": "Gruppe",
   "connector.whatsapp.removeSender": "Entfernen",
+  "connector.whatsapp.senderAccess": "Zugriff für {name}",
+  "connector.whatsapp.senderReplies": "Kann Aufgaben geben",
+  "connector.whatsapp.senderReadOnly": "Nur lesen",
   "connector.whatsapp.addContact": "Kontakt hinzufügen",
   "connector.whatsapp.addGroup": "Gruppe hinzufügen",
   "connector.whatsapp.contactTitle": "Kontakt hinzufügen",

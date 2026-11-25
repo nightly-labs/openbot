@@ -99,7 +99,11 @@ let jobLookups = 0;
 
 const gateway: CreditMediaGateway = {
   available: () => true,
-  catalog: () => Effect.succeed({ models: MODELS }),
+  catalog: () =>
+    Effect.succeed({
+      models: MODELS,
+      unavailable: [{ id: "kling-omni", kind: "video" as const, name: "Kling 4.0", variant: "Omni" }],
+    }),
   balance: () => Effect.succeed({ wallet: "personal", available: 100 }),
   submit: (request, inputs) =>
     Effect.suspend(() => (submitFailure ? Effect.fail(submitFailure) : Effect.void)).pipe(
@@ -182,8 +186,16 @@ async function generate(request: Omit<CreditMediaRequest, "model" | "jobId" | "e
 }
 
 async function flow() {
-  const catalog = await Effect.runPromise(workflows.catalog());
+  const listed = await Effect.runPromise(workflows.catalog());
+  const catalog = listed.models;
   const entry = (id: string) => catalog.find((item) => item.id === `openbot-${id}`);
+  check(
+    "a model with no route stays by workflow id and full name, apart from the models that can run",
+    JSON.stringify(listed.unavailable) ===
+      JSON.stringify([{ id: "openbot-kling-omni", name: "Kling 4.0 · Omni", kinds: ["video"] }]) &&
+      entry("kling-omni") === undefined,
+    { unavailable: listed.unavailable },
+  );
   const imageText = entry("image-text");
   const videoBoth = entry("video-both");
   check(

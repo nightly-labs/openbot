@@ -53,6 +53,20 @@ function webHost(url: string | undefined): string | null {
   }
 }
 
+const LOOPBACK_HOST = /^(?:localhost|.+\.localhost|127(?:\.\d{1,3}){3}|\[::1\])$/iu;
+
+function returnsToBrowserComputer(redirect: string): boolean {
+  if (!URL.canParse(redirect)) return false;
+  const { protocol, hostname } = new URL(redirect);
+  return !/^https?:$/iu.test(protocol) || LOOPBACK_HOST.test(hostname);
+}
+
+function isLoopbackOAuthPage(url: string): boolean {
+  if (!URL.canParse(url)) return false;
+  const redirect = new URL(url).searchParams.get("redirect_uri");
+  return redirect !== null && returnsToBrowserComputer(redirect);
+}
+
 function canonicalBrowserUrl(url: string): string {
   try {
     return new URL(url).toString();
@@ -63,6 +77,7 @@ function canonicalBrowserUrl(url: string): string {
 
 interface BrowserPanels {
   activeRightPanel: () => RightPanelMode;
+  paneShown: (pane: "browser") => boolean;
   setActiveRightPanel: (mode: RightPanelMode, agentId?: string) => void;
   reattachBrowserWindow: () => void;
   closeBrowserPane: () => void;
@@ -92,7 +107,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   const browserInteractionAvailable = createMemo(
     () => deps.props.browserEnabled !== false && !deps.props.browserVisibilitySuspended,
   );
-  const browserSidebarOpen = () => browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser";
+  const browserSidebarOpen = () => browserInteractionAvailable() && deps.panels.paneShown("browser");
   const browserExpandedOpen = () =>
     browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser-expanded";
   const browserPipOpen = () => browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser-pip";
@@ -265,7 +280,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       previousBrowserTabs = { owner, count };
       if (!enabled || previous.owner !== owner || previous.count === 0 || count > 0) return;
       const mode = untrack(deps.panels.activeRightPanel);
-      if (mode === "browser" || mode === "browser-expanded" || mode === "browser-pip")
+      if (untrack(() => deps.panels.paneShown("browser")) || mode === "browser-expanded" || mode === "browser-pip")
         untrack(deps.panels.closeBrowserPane);
     },
   );
@@ -306,15 +321,19 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   };
 
   const [localSignIn, setLocalSignIn] = createSignal<LocalSignIn | null>(null);
-  const canSignInLocally = (tab: BrowserTab | undefined) =>
+  const canSendLocalSignIn = (tab: BrowserTab | undefined) =>
     !deps.props.runtime &&
     deps.props.server?.kind === "remote" &&
     serverSupportsCapability(deps.props.server, "browser-sign-in") &&
     webHost(tab?.url) !== null;
 
+  const canSignInLocally = (tab: BrowserTab | undefined) =>
+    canSendLocalSignIn(tab) && !isLoopbackOAuthPage(tab?.url ?? "");
+
   const canSignInTakeoverLocally = () => {
     const tab = browserTakeoverTab();
-    return tab !== undefined && browserTabs().some((entry) => entry.id === tab.id) && canSignInLocally(tab);
+    if (tab === undefined || !browserTabs().some((entry) => entry.id === tab.id)) return false;
+    return deps.props.browserTakeover?.reason === "sign-in-blocked" ? canSendLocalSignIn(tab) : canSignInLocally(tab);
   };
 
   const takeoverNeedsDesktopSignIn = () =>
