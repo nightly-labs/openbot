@@ -123,7 +123,11 @@ const CODEX_TOOLS_CONFIG = {
   experimental_request_user_input: { enabled: false },
 } as const;
 
-export const CODEX_FEATURES_CONFIG = { "features.goals": false, "features.request_permissions_tool": false } as const;
+export const CODEX_FEATURES_CONFIG = {
+  "features.goals": false,
+  "features.request_permissions_tool": false,
+  "features.multi_agent_v2_dynamic_tools": true,
+} as const;
 
 const CODEX_COMPUTER_USE_PLUGINS_OFF = {
   "plugins.computer-use@openai-bundled.enabled": false,
@@ -834,6 +838,7 @@ export class ThreadLifecycle {
         mcp_optional_startup_grace_ms: number;
         "features.goals": false;
         "features.request_permissions_tool": false;
+        "features.multi_agent_v2_dynamic_tools": true;
         "features.code_mode.direct_only_tool_namespaces": string[];
         [variable: `shell_environment_policy.set.${string}`]: string;
       } & CodexPromptSettings &
