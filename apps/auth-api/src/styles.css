@@ -2042,6 +2042,7 @@ svg[data-icon="arrow-right"]:dir(rtl) {
 .landing-pricing[data-glass="on"] .landing-pricing-amount {
   background-image: none;
   filter: none;
+  animation: none;
 }
 
 .landing-pricing-glass {

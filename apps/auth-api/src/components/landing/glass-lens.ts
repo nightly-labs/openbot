@@ -72,6 +72,7 @@ const WALL_ROOM = 1.1;
 const SOFT_BOUNCE = 0.35;
 const HARD_BOUNCE = 0.62;
 const TAP_SLOP = 6;
+const DOUBLE_TAP_MS = 400;
 const THROW_SPEED = 60;
 const REST_SPEED = 30;
 const MORPH_SECONDS = 0.7;
@@ -409,6 +410,7 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
   let sceneReady = false;
   let placed = false;
   let flying = false;
+  let pendingTap: ReturnType<typeof setTimeout> | undefined;
   let clock = Math.random() * 30;
   let frameId = 0;
   let last = 0;
@@ -716,6 +718,24 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     wake();
   };
 
+  const cancelTap = () => {
+    clearTimeout(pendingTap);
+    pendingTap = undefined;
+  };
+
+  const queueMorph = () => {
+    if (pendingTap !== undefined) {
+      cancelTap();
+      return;
+    }
+    pendingTap = setTimeout(() => {
+      pendingTap = undefined;
+      const { cycle } = read();
+      if (cycle.length > 1) morph.next = cycle[(cycle.indexOf(morph.next ?? morph.to) + 1) % cycle.length] ?? null;
+      wake();
+    }, DOUBLE_TAP_MS);
+  };
+
   const onPointerUp = (event: PointerEvent) => {
     if (!pointer.down) return;
     pointer.down = false;
@@ -728,8 +748,7 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     const tapped = Math.hypot(spot.x - pointer.startX, spot.y - pointer.startY) <= TAP_SLOP;
     if (tapped && spot.inside && touches(spot.x, spot.y)) {
       kick(3);
-      const { cycle } = read();
-      if (cycle.length > 1) morph.next = cycle[(cycle.indexOf(morph.next ?? morph.to) + 1) % cycle.length] ?? null;
+      queueMorph();
     }
     if (event.pointerType !== "mouse") pointer.inside = false;
     wake();
@@ -790,6 +809,7 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     dispose() {
       stopped = true;
       cancelAnimationFrame(frameId);
+      cancelTap();
       sizeObserver.disconnect();
       viewObserver.disconnect();
       window.removeEventListener("pointermove", onPointerMove);
