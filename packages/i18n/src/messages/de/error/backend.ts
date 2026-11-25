@@ -441,6 +441,10 @@ export const messages = {
     "Der Proxy {name} hat die Anmeldung abgelehnt, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserSystemProxyFailed":
     "Der Proxy in den Einstellungen des Computers, auf dem OpenBot läuft, antwortet nicht oder hat die Verbindung abgelehnt, daher wurde die Seite nicht geöffnet. Prüfe die Proxy-Einstellungen dieses Computers.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "Die Website oder der Proxy in den Einstellungen des Computers, auf dem OpenBot läuft, hat die Verbindung ohne Antwort geschlossen, daher wurde die Seite nicht geöffnet. Wenn sich keine Website öffnet, prüfe die Proxy-Einstellungen dieses Computers.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "Die Website oder der Proxy dieses Browserprofils hat die Verbindung ohne Antwort geschlossen, daher wurde die Seite nicht geöffnet. Wenn sich keine Website öffnet, prüfe den Proxy des Profils.",
   "error.backend.browserProxyComputerUnreachable":
     "Der Computer dieses Profils antwortet nicht, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserProxyComputerLocalAddress":

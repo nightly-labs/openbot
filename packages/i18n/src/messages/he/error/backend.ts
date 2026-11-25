@@ -392,6 +392,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "הפרוקסי {name} דחה את ההתחברות, ולכן הדף לא נפתח.",
   "error.backend.browserSystemProxyFailed":
     "הפרוקסי בהגדרות של המחשב שמריץ את OpenBot אינו עונה או דחה את החיבור, ולכן הדף לא נפתח. בדקו את הגדרות הפרוקסי של המחשב הזה.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "האתר או הפרוקסי בהגדרות של המחשב שמריץ את OpenBot סגרו את החיבור בלי תשובה, ולכן הדף לא נפתח. אם אף אתר לא נפתח, בדקו את הגדרות הפרוקסי של המחשב הזה.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "האתר או הפרוקסי של פרופיל הדפדפן הזה סגרו את החיבור בלי תשובה, ולכן הדף לא נפתח. אם אף אתר לא נפתח, בדקו את הפרוקסי של הפרופיל.",
   "error.backend.browserProxyComputerUnreachable": "המחשב שהפרופיל הזה משתמש בו אינו עונה, ולכן הדף לא נפתח.",
   "error.backend.browserProxyComputerLocalAddress":
     "המחשב שהפרופיל הזה משתמש בו פותח רק אתרים ציבוריים. הוא לא פותח כתובות ברשת מקומית, ולכן הדף לא נפתח.",

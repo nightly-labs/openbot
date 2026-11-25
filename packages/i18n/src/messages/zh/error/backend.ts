@@ -374,6 +374,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "代理 {name} 拒绝了登录，因此页面没有打开。",
   "error.backend.browserSystemProxyFailed":
     "运行 OpenBot 的计算机设置中的代理没有响应或拒绝了连接，因此页面没有打开。请检查该计算机的代理设置。",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "网站或运行 OpenBot 的计算机设置中的代理没有应答就关闭了连接，因此页面没有打开。如果所有网站都打不开，请检查该计算机的代理设置。",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "网站或此浏览器配置文件的代理没有应答就关闭了连接，因此页面没有打开。如果所有网站都打不开，请检查该配置文件的代理。",
   "error.backend.browserProxyComputerUnreachable": "此配置文件使用的计算机没有响应，因此页面没有打开。",
   "error.backend.browserProxyComputerLocalAddress":
     "此配置文件使用的计算机只打开公共网站。它不打开本地网络上的地址，因此页面没有打开。",

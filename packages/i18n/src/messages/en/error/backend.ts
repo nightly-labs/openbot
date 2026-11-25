@@ -420,6 +420,10 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserProxySignInRefused": "The proxy {name} refused the sign-in, so the page did not open.",
   "error.backend.browserSystemProxyFailed":
     "The proxy in the settings of the computer that runs OpenBot does not answer or refused the connection, so the page did not open. Check the proxy settings of that computer.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "The site or the proxy in the settings of the computer that runs OpenBot closed the connection with no answer, so the page did not open. If no site opens, check the proxy settings of that computer.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "The site or the proxy of this browser profile closed the connection with no answer, so the page did not open. If no site opens, check the proxy of the profile.",
   "error.backend.browserProxyComputerUnreachable":
     "The computer that this profile uses does not answer, so the page did not open.",
   "error.backend.browserProxyComputerLocalAddress":

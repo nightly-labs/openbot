@@ -288,6 +288,7 @@ const PROXY_ERROR_LIST: readonly (readonly [name: string, code: number, failure:
   ["net::ERR_PROXY_CERTIFICATE_INVALID", -136, "unreachable"],
   ["net::ERR_MANDATORY_PROXY_CONFIGURATION_FAILED", -131, "unreachable"],
 ];
+const EMPTY_RESPONSE_ERROR_CODE = -324;
 const PROXY_ERRORS = new Map(PROXY_ERROR_LIST.map(([name, , failure]) => [name, failure]));
 const PROXY_ERROR_CODES = new Map(PROXY_ERROR_LIST.map(([, code, failure]) => [code, failure]));
 
@@ -1082,7 +1083,7 @@ export class BrowserHost {
             }
             this.#emitChanged();
             yield* this.#persistState();
-            const proxyFailure = this.#proxyLoadFailure(tab, operationFailure);
+            const proxyFailure = yield* this.#loadFailure(tab, operationFailure, normalizedUrl);
             if (proxyFailure !== operationFailure) return yield* proxyFailure;
             const certificateFailure = closeOnFailure ? operationFailure : certificateLoadFailure(operationFailure);
             if (certificateFailure !== operationFailure) return yield* certificateFailure;
@@ -1155,7 +1156,11 @@ export class BrowserHost {
             tab,
             navigateAndWait(tab.contents, () => tab.contents.loadURL(normalizedUrl, browserLoadOptions())),
           ).pipe(
-            Effect.mapError((failure) => certificateLoadFailure(this.#proxyLoadFailure(tab, failure))),
+            Effect.catch((failure) =>
+              this.#loadFailure(tab, failure, normalizedUrl).pipe(
+                Effect.flatMap((loadFailure) => Effect.fail(certificateLoadFailure(loadFailure))),
+              ),
+            ),
             Effect.ensuring(
               Effect.sync(() => {
                 tab.focusOnCommit = false;
@@ -2984,7 +2989,11 @@ export class BrowserHost {
               tab.contents,
               () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
               operationTimeout,
-            ).pipe(Effect.mapError((failure) => this.#proxyLoadFailure(tab, failure)));
+            ).pipe(
+              Effect.catch((failure) =>
+                this.#loadFailure(tab, failure, normalizedUrl).pipe(Effect.flatMap(Effect.fail)),
+              ),
+            );
           } else if (direction === "reload") {
             yield* navigateAndWait(
               tab.contents,
@@ -3416,6 +3425,30 @@ export class BrowserHost {
       });
     this.#onProxyStatusChanged();
   }
+
+  readonly #loadFailure = Effect.fn("BrowserHost.loadFailure")(function* (
+    this: BrowserHost,
+    tab: BrowserHostTab,
+    failure: BrowserOperationError,
+    url: string,
+  ) {
+    const proxyFailure = this.#proxyLoadFailure(tab, failure);
+    if (proxyFailure !== failure || chromiumErrorCode(String(failure.cause)) !== EMPTY_RESPONSE_ERROR_CODE)
+      return proxyFailure;
+    const route = yield* Effect.tryPromise(() => this.#tabSession(tab).resolveProxy(url)).pipe(
+      Effect.orElseSucceed(() => "DIRECT"),
+    );
+    if (route.trim().startsWith("DIRECT")) return failure;
+    return browserFailure(
+      new Error(
+        sourceText(
+          this.#tabProxy(tab) === null
+            ? "error.backend.browserSystemProxyOrSiteClosed"
+            : "error.backend.browserProfileProxyOrSiteClosed",
+        ),
+      ),
+    );
+  }).bind(this);
 
   #proxyLoadFailure(tab: BrowserHostTab, failure: BrowserOperationError): BrowserOperationError {
     const proxy = this.#tabProxy(tab);
