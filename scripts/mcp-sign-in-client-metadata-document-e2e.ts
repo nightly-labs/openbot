@@ -432,7 +432,7 @@ async function main(): Promise<void> {
     const noRegistration = await runCase("no-registration-no-document", false, false, false);
     check(
       noRegistration,
-      noRegistration.attempts[0]?.error === sourceText("error.backend.mcpRegistrationUnavailable"),
+      noRegistration.attempts[0]?.error === sourceText("error.backend.mcpSignInAppNeeded"),
       `the sign-in said: ${noRegistration.attempts[0]?.error}`,
     );
     check(

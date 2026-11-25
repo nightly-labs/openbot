@@ -264,7 +264,7 @@ export interface WorkflowCanvasProps {
   onRestoreVersion: (versionId: string) => void;
   onPreviewVersion?: ((versionId: string | null) => void) | undefined;
   onSelect: (workflowId: string) => void;
-  onCreate: (input: { title: string; graph?: WorkflowGraph; paused?: true }) => void;
+  onCreate: (input: { title: string; graph?: WorkflowGraph; paused?: true }) => Promise<boolean>;
   onRename: (workflowId: string, title: string) => void;
   onSetPaused?: ((workflowId: string, paused: boolean) => void) | undefined;
   onExport?: ((workflowId: string) => Promise<WorkflowFileSaveResult>) | undefined;
@@ -1208,10 +1208,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     if (action.startsWith("version:")) return openVersion(action.slice("version:".length));
     if (action === "live") return closeVersion();
     if (action !== "rename") closeVersion();
-    if (action === "new") props.onCreate({ title: t("workflow.canvas.untitled") });
+    if (action === "new") void props.onCreate({ title: t("workflow.canvas.untitled") });
     else if (action === "rename") startRename();
     else if (action === "duplicate")
-      props.onCreate({
+      void props.onCreate({
         title: t("workflow.canvas.copyOf", { name: name() }),
         graph: liveCanvas ? graphFromSnapshot(liveCanvas) : graph(),
         ...(props.onSetPaused ? { paused: true } : {}),
@@ -1257,9 +1257,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       },
     );
   };
-  const finishImport = (input: { title: string; graph: WorkflowGraph }) => {
-    setImporting(undefined);
-    props.onCreate({ ...input, ...(props.onSetPaused ? { paused: true } : {}) });
+  const finishImport = async (input: { title: string; graph: WorkflowGraph }) => {
+    if (await props.onCreate({ ...input, ...(props.onSetPaused ? { paused: true } : {}) })) setImporting(undefined);
   };
   const startRename = () => {
     setFolderEdit(undefined);

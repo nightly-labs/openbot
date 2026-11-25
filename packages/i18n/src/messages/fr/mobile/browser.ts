@@ -85,6 +85,13 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Rendre la main",
   "mobile.browser.help.handBack.body":
     "Quand un agent vous demande de prendre la main, choisissez « J’ai terminé » dans le menu ···. L’agent continue ensuite dans cet onglet.",
+  "mobile.browser.location.title": "{site} veut connaître votre position",
+  "mobile.browser.location.description": "Autorisez uniquement les sites de confiance.",
+  "mobile.browser.location.block": "Bloquer",
+  "mobile.browser.location.allow": "Autoriser",
+  "mobile.browser.location.allowAlways": "Toujours autoriser",
+  "mobile.browser.location.unavailable": "Impossible d’obtenir la position de cet appareil.",
+  "mobile.browser.location.answerFailed": "Impossible de répondre à la demande de position.",
   "mobile.browser.httpSignIn.title": "Se connecter à {site}",
   "mobile.browser.httpSignIn.description": "Ce site demande son propre nom d’utilisateur et son mot de passe.",
   "mobile.browser.httpSignIn.refused": "Le site n’a pas accepté ce nom d’utilisateur ou ce mot de passe.",

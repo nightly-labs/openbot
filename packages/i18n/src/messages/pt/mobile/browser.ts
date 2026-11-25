@@ -84,6 +84,13 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Devolver o controle",
   "mobile.browser.help.handBack.body":
     "Quando um agente pedir que você assuma o controle, escolha Concluí no menu ···. O agente continua nesta aba.",
+  "mobile.browser.location.title": "{site} quer saber sua localização",
+  "mobile.browser.location.description": "Permita apenas para sites confiáveis.",
+  "mobile.browser.location.block": "Bloquear",
+  "mobile.browser.location.allow": "Permitir",
+  "mobile.browser.location.allowAlways": "Permitir sempre",
+  "mobile.browser.location.unavailable": "Não foi possível obter a localização deste dispositivo.",
+  "mobile.browser.location.answerFailed": "Não foi possível responder ao pedido de localização.",
   "mobile.browser.httpSignIn.title": "Entrar em {site}",
   "mobile.browser.httpSignIn.description": "Este site pede o próprio nome de usuário e senha.",
   "mobile.browser.httpSignIn.refused": "O site não aceitou este nome de usuário ou esta senha.",

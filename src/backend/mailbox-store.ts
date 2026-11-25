@@ -1592,7 +1592,9 @@ export class MailboxStore {
       const ids = new Set(
         this.#queuedFor(agentId).flatMap((delivery) => {
           const message = this.#requireMessage(delivery.messageId);
-          return message.taskId === taskId && message.sender.kind === "agent" && message.sender.agentId !== agentId
+          return message.taskId === taskId &&
+            message.sender.kind === "agent" &&
+            (message.sender.agentId !== agentId || message.replyToMessageId !== null)
             ? [message.id]
             : [];
         }),
@@ -1688,7 +1690,8 @@ export class MailboxStore {
     const holders = this.#requestHolders();
     for (const message of selectedStoredMessages) {
       const deliveries = deliveriesByMessage.get(message.id) ?? [];
-      if (message.sender.kind === "agent" && message.sender.agentId === agentId) {
+      const onlyToSelf = deliveries.length > 0 && deliveries.every((delivery) => delivery.recipientAgentId === agentId);
+      if (message.sender.kind === "agent" && message.sender.agentId === agentId && !onlyToSelf) {
         messages.push({
           id: `outbox-${message.id}`,
           turnId: turnIds.get(message.id),
@@ -3254,7 +3257,6 @@ export class MailboxStore {
     const key = `${RESTARTED_RESULT_KEY_PREFIX}${deliveryId}`;
     const teammateResult =
       message?.sender.kind === "agent" &&
-      message.sender.agentId !== delivery?.recipientAgentId &&
       message.replyToMessageId !== null &&
       message.expectsReply === false &&
       !message.channelId;

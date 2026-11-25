@@ -169,6 +169,8 @@ export interface ConversationProps {
   waits?: readonly AgentWait[] | undefined;
   threads?: ConversationThreads | undefined;
   browserTabs: BrowserTab[];
+  noticedBrowserTabIds?: ReadonlySet<string> | undefined;
+  onNoticeBrowserTabs?: ((tabIds: readonly string[]) => void) | undefined;
   activeBrowserTabId: string | null;
   browserVisibilitySuspended: boolean;
   workspaceCovered?: boolean | undefined;

@@ -65,6 +65,7 @@ export const messages = {
   "provider.aria.install": "{name} をインストール",
   "provider.aria.signIn": "{name} にサインイン",
   "provider.aria.codeFallback": "コードで {name} にログイン",
+  "provider.aria.addressFallback": "{name} のサインインアドレスを貼り付け",
   "provider.aria.moreActions": "{name} のその他の操作",
   "provider.aria.use": "OpenBot で {name} を使用",
   "provider.use.inUseOne":
@@ -93,6 +94,8 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "待機しています。このログインは残り {time} で停止します。",
   "provider.codeLogin.linkTitle": "別のデバイスで {name} にログイン",
   "provider.codeLogin.pageTitle": "{name} にサインイン",
+  "provider.codeLogin.addressDescription":
+    "ブラウザーでサインインを完了してください。サインインが完了すると、このウィンドウは閉じます。",
   "provider.codeLogin.pageDescription":
     "このページは {host} のブラウザーで開いています。ここでサインインしてください。",
   "provider.codeLogin.relayStarting": "{host} で {name} のサインインを開始しています…",
@@ -233,6 +236,7 @@ export const messages = {
   "provider.account.apiKey": "APIキー",
   "provider.account.listLabel": "{name} のアカウント",
   "provider.account.usedBy": "{agents} が使用中",
+  "provider.account.sameEmail": "{name} と同じメールアドレス",
   "provider.account.failed": "サインイン失敗",
   "provider.account.moreActions": "{name} のその他の操作",
   "provider.account.renameLabel": "{name} の名前",

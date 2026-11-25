@@ -277,4 +277,11 @@ export const messages = {
   },
   "browser.proxies.changeTitle": "Zmienić serwer proxy profilu {name}?",
   "browser.proxies.change": "Zmień serwer proxy",
+  "browser.location.title": "{site} chce znać Twoją lokalizację",
+  "browser.location.description": "Zezwalaj tylko zaufanym witrynom.",
+  "browser.location.block": "Blokuj",
+  "browser.location.allow": "Zezwól",
+  "browser.location.allowAlways": "Zawsze zezwalaj",
+  "browser.location.unavailable": "Nie można pobrać lokalizacji tego urządzenia.",
+  "browser.location.answerFailed": "Nie można odpowiedzieć na prośbę o lokalizację.",
 } as const satisfies PartialTranslation<typeof source>;

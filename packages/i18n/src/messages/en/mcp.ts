@@ -39,6 +39,7 @@ export const messages = defineMessages("mcp", {
   "mcp.status.signedIn": "Signed in",
   "mcp.status.signingIn": "Signing in…",
   "mcp.status.signInNeeded": "Sign-in needed",
+  "mcp.status.signInAppNeeded": "Sign-in app needed",
   "mcp.status.refused": "Refused",
   "mcp.status.checkUrl": "Check the URL",
   "mcp.status.noAnswer": "No answer",

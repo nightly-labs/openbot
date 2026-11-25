@@ -169,6 +169,7 @@ interface WebWorkspaceState {
   threadContextStates: Record<string, AgentContextState>;
   backgroundWork: Record<string, number>;
   browserTabs: BrowserTab[];
+  noticedBrowserTabIds: string[] | null;
   activeBrowserTabId: string | null;
   browserControlState: BrowserControlState;
   presence: TeamPresenceSnapshot | null;
@@ -253,6 +254,7 @@ export function createWebWorkspace(
     threadContextStates: {},
     backgroundWork: {},
     browserTabs: [],
+    noticedBrowserTabIds: null,
     activeBrowserTabId: null,
     browserControlState: { sessions: [] },
     presence: null,
@@ -1105,6 +1107,7 @@ export function createWebWorkspace(
             setStepLines({});
             draft.takeovers = [];
             draft.browserTabs = [];
+            draft.noticedBrowserTabIds = null;
             draft.activeBrowserTabId = null;
             draft.browserControlState = { sessions: [] };
             draft.sidebarLayout = defaultSidebarLayout();
@@ -1250,6 +1253,7 @@ export function createWebWorkspace(
       setStepLines({});
       draft.takeovers = [];
       draft.browserTabs = [];
+      draft.noticedBrowserTabIds = null;
       draft.activeBrowserTabId = null;
       draft.browserControlState = { sessions: [] };
       draft.sidebarLayout = defaultSidebarLayout();
@@ -1381,6 +1385,7 @@ export function createWebWorkspace(
       if (!keepWorkspace) {
         draft.progress = {};
         draft.browserTabs = [];
+        draft.noticedBrowserTabIds = null;
         draft.activeBrowserTabId = null;
         draft.sidebarLayout = defaultSidebarLayout();
         draft.userHiddenAgents = [];
@@ -1587,6 +1592,7 @@ export function createWebWorkspace(
           if (!isCurrent()) return;
           setState((draft) => {
             draft.browserTabs = browserTabs;
+            draft.noticedBrowserTabIds ??= browserTabs.map((tab) => tab.id);
             draft.activeBrowserTabId = browserTabs.some((tab) => tab.id === draft.activeBrowserTabId)
               ? draft.activeBrowserTabId
               : (browserTabs[0]?.id ?? null);
@@ -2459,6 +2465,14 @@ export function createWebWorkspace(
       if (state.browserTabs.some((tab) => tab.id === tabId))
         setState((draft) => {
           draft.activeBrowserTabId = tabId;
+        });
+    },
+    noticeBrowserTabs(tabIds: readonly string[]) {
+      const noticed = state.noticedBrowserTabIds;
+      const added = noticed ? tabIds.filter((tabId) => !noticed.includes(tabId)) : [];
+      if (added.length > 0)
+        setState((draft) => {
+          draft.noticedBrowserTabIds?.push(...added);
         });
     },
     async openSearchMessage(messageId: string): Promise<boolean> {

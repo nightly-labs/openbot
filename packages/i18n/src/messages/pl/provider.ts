@@ -79,6 +79,7 @@ export const messages = {
   "provider.aria.install": "Zainstaluj {name}",
   "provider.aria.signIn": "Zaloguj się do {name}",
   "provider.aria.codeFallback": "Zaloguj się do {name} kodem",
+  "provider.aria.addressFallback": "Wklej adres logowania do {name}",
   "provider.aria.moreActions": "Więcej działań: {name}",
 
   "provider.aria.use": "Używaj {name} w OpenBot",
@@ -109,6 +110,8 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "Czekamy na ciebie. To logowanie wygaśnie za {time}.",
   "provider.codeLogin.linkTitle": "Zaloguj się do {name} na innym urządzeniu",
   "provider.codeLogin.pageTitle": "Zaloguj się do {name}",
+  "provider.codeLogin.addressDescription":
+    "Dokończ logowanie w przeglądarce. To okno zamknie się, gdy logowanie się zakończy.",
   "provider.codeLogin.pageDescription": "Ta strona jest otwarta w przeglądarce na: {host}. Zaloguj się tutaj.",
   "provider.codeLogin.relayStarting": "Uruchamianie logowania do {name} na {host}…",
   "provider.codeLogin.pageOpening": "Otwieranie strony logowania {name} na {host}…",
@@ -253,6 +256,7 @@ export const messages = {
   "provider.account.apiKey": "Klucz API",
   "provider.account.listLabel": "Konta {name}",
   "provider.account.usedBy": "Używane przez: {agents}",
+  "provider.account.sameEmail": "Ten sam e-mail co {name}",
   "provider.account.failed": "Błąd logowania",
   "provider.account.moreActions": "Więcej działań: {name}",
   "provider.account.renameLabel": "Nazwa: {name}",

@@ -5,6 +5,11 @@ import {
   decodeBrowserHttpSignInSnapshot,
 } from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
 import {
+  BROWSER_PERMISSIONS_CAPABILITY,
+  BROWSER_PERMISSIONS_ROUTES,
+  decodeBrowserPermissionsSnapshot,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
+import {
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY,
   TEAM_BROWSER_VIEW_CURSOR_CAPABILITY,
@@ -40,7 +45,7 @@ export function createBrowserActions({
   capabilities: ServerCapabilities;
 }): Pick<
   MobileWorkspaceContextValue,
-  "browserViewSupport" | "openBrowserView" | "controlBrowserTab" | "answerBrowserHttpSignIn"
+  "browserViewSupport" | "openBrowserView" | "controlBrowserTab" | "answerBrowserPermission" | "answerBrowserHttpSignIn"
 > {
   return {
     browserViewSupport: (serverId) => {
@@ -52,6 +57,7 @@ export function createBrowserActions({
         contextMenu: view && advertised.includes(TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY),
         viewport: view && advertised.includes(TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY),
         navigation: view && advertised.includes(TEAM_BROWSER_NAVIGATION_CAPABILITY),
+        permissions: view && advertised.includes(BROWSER_PERMISSIONS_CAPABILITY),
         httpSignIn: view && advertised.includes(BROWSER_HTTP_SIGN_IN_CAPABILITY),
       };
     },
@@ -84,6 +90,18 @@ export function createBrowserActions({
         },
         listener,
       );
+    },
+    answerBrowserPermission: async (serverId, answer) => {
+      const { location, ...decision } = answer;
+      const body = location ? { ...decision, location: { ...location } } : decision;
+      const { requests } = await request(
+        "POST",
+        BROWSER_PERMISSIONS_ROUTES.answer,
+        decodeBrowserPermissionsSnapshot,
+        body,
+        serverId,
+      );
+      liveState.update("browserPermissions", (current) => ({ ...current, [serverId]: requests }));
     },
     controlBrowserTab: async (serverId, action) => {
       const readTabs = () =>

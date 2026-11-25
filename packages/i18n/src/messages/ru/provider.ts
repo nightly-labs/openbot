@@ -79,6 +79,7 @@ export const messages = {
   "provider.aria.install": "Установить: {name}",
   "provider.aria.signIn": "Войти в {name}",
   "provider.aria.codeFallback": "Войти в {name} по коду",
+  "provider.aria.addressFallback": "Вставить адрес входа для {name}",
   "provider.aria.moreActions": "Другие действия для {name}",
 
   "provider.aria.use": "Использовать {name} в OpenBot",
@@ -109,6 +110,7 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "Ждём вас. Вход прекратится через {time}.",
   "provider.codeLogin.linkTitle": "Вход в {name} на другом устройстве",
   "provider.codeLogin.pageTitle": "Вход в {name}",
+  "provider.codeLogin.addressDescription": "Завершите вход в браузере. Это окно закроется, когда вход будет выполнен.",
   "provider.codeLogin.pageDescription": "Эта страница открыта в браузере на {host}. Войдите здесь.",
   "provider.codeLogin.relayStarting": "Запуск входа в {name} на {host}…",
   "provider.codeLogin.pageOpening": "Открываем страницу входа {name} на {host}…",
@@ -252,6 +254,7 @@ export const messages = {
   "provider.account.apiKey": "API-ключ",
   "provider.account.listLabel": "Аккаунты {name}",
   "provider.account.usedBy": "Используют: {agents}",
+  "provider.account.sameEmail": "Тот же адрес эл. почты, что у {name}",
   "provider.account.failed": "Ошибка входа",
   "provider.account.moreActions": "Другие действия для {name}",
   "provider.account.renameLabel": "Имя: {name}",

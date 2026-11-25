@@ -247,4 +247,11 @@ export const messages = {
   },
   "browser.proxies.changeTitle": "{name} のプロキシを変更しますか？",
   "browser.proxies.change": "プロキシを変更",
+  "browser.location.title": "{site} が現在地を知りたがっています",
+  "browser.location.description": "信頼できるサイトにのみ許可してください。",
+  "browser.location.block": "ブロック",
+  "browser.location.allow": "許可",
+  "browser.location.allowAlways": "常に許可",
+  "browser.location.unavailable": "このデバイスの位置情報を取得できませんでした。",
+  "browser.location.answerFailed": "位置情報のリクエストに応答できませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

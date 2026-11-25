@@ -63,6 +63,7 @@ export interface ConversationRuntime {
     | "publishWindowModel"
     | "reload"
     | "stop"
+    | "answerPermission"
     | "answerHttpSignIn"
     | "releaseControl"
     | "setVisible"

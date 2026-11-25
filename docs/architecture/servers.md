@@ -970,6 +970,17 @@ sends `browser-page-state-changed` with the same list. A stop ends the load at o
 tab operations, and a stop of a tab that does not load changes nothing. A client shows Stop only for a
 host that reports the page state; for an older host, Back and Forward stay enabled.
 
+`browser-permissions-v1` (protocol 10) adds `POST /v1/browser/permissions` (empty body) and
+`POST /v1/browser/permissions/answer` (`{ tabId, requestId, allow, always?, location? }`, with
+`location: { latitude, longitude, accuracyMeters }`). Both answer with
+`{ requests: [{ tabId, id, origin, permission: "geolocation" }] }` for the tabs that the session can
+see, and each change sends `browser-permissions-changed` with the same list. The frozen tab projection
+does not carry the request, so the client adds it from this list. An Allow must carry the location of
+the member's device; without it the host answers 400 `browserLocationRequired`. `always: true` is
+valid only with an Allow, and keeps the Allow and the location for the origin in all tabs of the same agent (or thread) until the host restarts. A client shows the
+Allow and Block question only for a host with the capability. For an older host, the page gets Block, as
+before.
+
 `browser-sign-in-v1` adds `POST /v1/browser/sign-in` with `{ tabId, cookies }`, up to 150 cookies,
 and answers with `{ cookies }`, the count that the host set. Some sites refuse a sign-in from a
 data-center address, but accept the session that the member's own computer made. The desktop opens a

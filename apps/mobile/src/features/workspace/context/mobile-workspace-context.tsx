@@ -39,6 +39,11 @@ import {
   BROWSER_HTTP_SIGN_IN_ROUTES,
   decodeBrowserHttpSignInSnapshot,
 } from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
+import {
+  BROWSER_PERMISSIONS_CAPABILITY,
+  BROWSER_PERMISSIONS_ROUTES,
+  decodeBrowserPermissionsSnapshot,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSING_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/browsing-memory-v1";
@@ -671,6 +676,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       liveState.update("approvalRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserTabs", (current) => withoutKeys(current, serverIds));
+      liveState.update("browserPermissions", (current) => withoutKeys(current, serverIds));
       liveState.update("browserHttpSignIns", (current) => withoutKeys(current, serverIds));
       const kept = keptHosts.current;
       if (kept?.some((host) => serverIds.has(host.hostId)))
@@ -1351,6 +1357,15 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             })
             .catch(() => undefined);
       }
+      if (compatibility.capabilities.includes(BROWSER_PERMISSIONS_CAPABILITY)) {
+        void client
+          .request("POST", BROWSER_PERMISSIONS_ROUTES.state, decodeBrowserPermissionsSnapshot, {})
+          .then(({ requests }) => {
+            if (!context.isCurrent()) return;
+            liveState.update("browserPermissions", (current) => ({ ...current, [serverId]: requests }));
+          })
+          .catch(() => undefined);
+      }
       const reads =
         early && sameCapabilities(early.capabilities, compatibility.capabilities)
           ? early.reads
@@ -1960,6 +1975,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       openBrowserView: browser.openBrowserView,
       remoteDesktopConnection: (serverId) => connections.current.get(serverId)?.client ?? null,
       controlBrowserTab: browser.controlBrowserTab,
+      answerBrowserPermission: browser.answerBrowserPermission,
       answerBrowserHttpSignIn: browser.answerBrowserHttpSignIn,
       mutateSidebarLayout: async (serverId, action) => {
         requireCapability(

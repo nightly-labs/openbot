@@ -57,6 +57,9 @@ export const messages = {
     "OpenBot לא הצליח לטעון את הדף בחלון ההתחברות. בדקו את החיבור לאינטרנט, ואז פתחו שוב את חלון ההתחברות.",
   "error.backend.browserSignInReadFailed": "OpenBot לא הצליח לקרוא את ההתחברות מהחלון.",
   "error.backend.browserStopUnsupported": "המארח המרוחק הזה אינו יכול לעצור טעינת דף.",
+  "error.backend.browserLocationFailed": "לא ניתן להגדיר את המיקום עבור הדף.",
+  "error.backend.browserPermissionsUnsupported": "המארח המרוחק הזה לא יכול להשיב לבקשות מיקום.",
+  "error.backend.browserLocationRequired": "שלח את מיקום המכשיר כדי לאשר את הבקשה.",
   "error.backend.browserHttpSignInInactive": "האתר הזה כבר לא מבקש התחברות. יש לטעון מחדש את הדף כדי לנסות שוב.",
   "error.backend.browserHttpSignInUnsupported": "המארח המרוחק הזה אינו יכול לקבל התחברות לאתר.",
   "error.backend.sharedDataLocalOnly": "נתונים משותפים מנוהלים במחשב שמריץ את הסוכנים האלה.",
@@ -269,6 +272,8 @@ export const messages = {
     "שרת ההתחברות עדיין אינו מקבל את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. יש להשתמש בדרך חיבור אחרת, כמו שרת MCP מקומי.",
   "error.backend.mcpRegistrationUnavailable":
     "שרת ההתחברות אינו יכול לרשום את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. כדי להתחבר, יש לשמור את השרת הזה בחנות, אפליקציות, ואחר כך להוסיף לו אפליקציית התחברות.",
+  "error.backend.mcpSignInAppNeeded":
+    "שרת ההתחברות אינו יכול לרשום את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. כדי להתחבר, יש לפתוח את השרת הזה בחנות, אפליקציות, ללחוץ על בדיקת חיבור, ואחר כך להוסיף אפליקציית התחברות.",
   "error.backend.mcpSignInAbandonedGeneric": "ההתחברות ננטשה.",
   "error.backend.mcpSignInForgotten": "התחברות ה-MCP נשכחה בזמן שהיא רצה.",
   "error.backend.mcpSignInAbandoned": "התחברות ה-MCP ננטשה.",
@@ -409,6 +414,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "הפרוקסי {name} דחה את ההתחברות, ולכן הדף לא נפתח.",
   "error.backend.browserSystemProxyFailed":
     "הפרוקסי בהגדרות של המחשב שמריץ את OpenBot אינו עונה או דחה את החיבור, ולכן הדף לא נפתח. בדקו את הגדרות הפרוקסי של המחשב הזה.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "האתר או הפרוקסי בהגדרות של המחשב שמריץ את OpenBot סגרו את החיבור בלי תשובה, ולכן הדף לא נפתח. אם אף אתר לא נפתח, בדקו את הגדרות הפרוקסי של המחשב הזה.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "האתר או הפרוקסי של פרופיל הדפדפן הזה סגרו את החיבור בלי תשובה, ולכן הדף לא נפתח. אם אף אתר לא נפתח, בדקו את הפרוקסי של הפרופיל.",
   "error.backend.browserProxyComputerUnreachable": "המחשב שהפרופיל הזה משתמש בו אינו עונה, ולכן הדף לא נפתח.",
   "error.backend.browserProxyComputerLocalAddress":
     "המחשב שהפרופיל הזה משתמש בו פותח רק אתרים ציבוריים. הוא לא פותח כתובות ברשת מקומית, ולכן הדף לא נפתח.",

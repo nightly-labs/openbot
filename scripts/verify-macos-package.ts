@@ -130,6 +130,13 @@ expectEqual(
   "OpenBot uses the microphone to transcribe voice prompts locally on this Mac.",
   "microphone usage description",
 );
+for (const key of ["NSLocationUsageDescription", "NSLocationWhenInUseUsageDescription"] as const) {
+  expectEqual(
+    plist[key],
+    "OpenBot shares the location of this Mac with a page in the OpenBot browser only when you allow it.",
+    "location usage description",
+  );
+}
 
 const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 if (!isDynamicRecord(packageJson)) throw new Error("package.json is not a JSON object.");

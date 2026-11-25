@@ -52,6 +52,7 @@ import { BrowserHttpSignInCard } from "../components/browser-http-sign-in-card";
 import { BrowserLiveStage, type BrowserLiveStageHandle } from "../components/browser-live-stage";
 import { useBrowserFeature } from "../components/use-browser-feature";
 import { useBrowserLiveView } from "../components/use-browser-live-view";
+import { useBrowserLocationRequest } from "../components/use-browser-location-request";
 import { useUnseenBrowserTabs } from "../components/use-unseen-browser-tabs";
 import { namedKeyInputs, pasteInput, selectAllInputs, textChangeInputs, typedTextInputs } from "../model/browser-keys";
 import { useProvideBrowserSheetControls } from "../model/browser-sheet-bridge";
@@ -77,6 +78,7 @@ const NO_SUPPORT: MobileBrowserViewSupport = {
   contextMenu: false,
   viewport: false,
   navigation: false,
+  permissions: false,
   httpSignIn: false,
 };
 
@@ -183,6 +185,12 @@ function BrowserView({
     at: { x: number; y: number };
   } | null>(null);
   const pageMenuView = useRef<MenuComponentRef>(null);
+  useBrowserLocationRequest({
+    serverId: agent.serverId,
+    tabId: tab?.id ?? null,
+    enabled: allowed && online && support.permissions,
+    notify: setNotice,
+  });
   const takeover = useBrowserRequests(agent.serverId).find(
     (request) => request.agentId === agent.id && (!request.secret || request.secret.requiresReload),
   );

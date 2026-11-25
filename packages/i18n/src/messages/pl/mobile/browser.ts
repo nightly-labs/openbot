@@ -89,6 +89,13 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Oddaj sterowanie",
   "mobile.browser.help.handBack.body":
     "Gdy agent poprosi cię o przejęcie, wybierz „Gotowe” w menu ···. Agent będzie wtedy kontynuować w tej karcie.",
+  "mobile.browser.location.title": "{site} chce znać Twoją lokalizację",
+  "mobile.browser.location.description": "Zezwalaj tylko zaufanym witrynom.",
+  "mobile.browser.location.block": "Blokuj",
+  "mobile.browser.location.allow": "Zezwól",
+  "mobile.browser.location.allowAlways": "Zawsze zezwalaj",
+  "mobile.browser.location.unavailable": "Nie można pobrać lokalizacji tego urządzenia.",
+  "mobile.browser.location.answerFailed": "Nie można odpowiedzieć na prośbę o lokalizację.",
   "mobile.browser.httpSignIn.title": "Zaloguj się do {site}",
   "mobile.browser.httpSignIn.description": "Ta strona prosi o własną nazwę użytkownika i hasło.",
   "mobile.browser.httpSignIn.refused": "Strona nie przyjęła tej nazwy użytkownika lub tego hasła.",

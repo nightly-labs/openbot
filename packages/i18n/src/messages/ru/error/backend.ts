@@ -61,6 +61,9 @@ export const messages = {
     "OpenBot не удалось загрузить страницу в окне входа. Проверьте подключение к интернету, затем снова откройте окно входа.",
   "error.backend.browserSignInReadFailed": "OpenBot не удалось прочитать вход из окна.",
   "error.backend.browserStopUnsupported": "Этот удалённый хост не может остановить загрузку страницы.",
+  "error.backend.browserLocationFailed": "Не удалось задать местоположение для страницы.",
+  "error.backend.browserPermissionsUnsupported": "Этот удаленный хост не может отвечать на запросы местоположения.",
+  "error.backend.browserLocationRequired": "Отправьте местоположение устройства, чтобы разрешить запрос.",
   "error.backend.browserHttpSignInInactive":
     "Этот сайт больше не запрашивает вход. Перезагрузите страницу, чтобы попробовать снова.",
   "error.backend.browserHttpSignInUnsupported": "Этот удалённый хост не может принять вход на сайт.",
@@ -295,6 +298,8 @@ export const messages = {
     "Сервер входа пока не принимает OpenBot как приложение. Дело не в вашем аккаунте. Подключитесь другим способом, например через локальный сервер MCP.",
   "error.backend.mcpRegistrationUnavailable":
     "Сервер входа не может зарегистрировать OpenBot как приложение. Дело не в вашем аккаунте. Чтобы подключиться, сохраните этот сервер в разделе Каталог, Приложения, затем добавьте к нему приложение входа.",
+  "error.backend.mcpSignInAppNeeded":
+    "Сервер входа не может зарегистрировать OpenBot как приложение. Дело не в вашем аккаунте. Чтобы подключиться, откройте этот сервер в разделе Каталог, Приложения, нажмите Проверить подключение, затем добавьте приложение входа.",
   "error.backend.mcpSignInAbandonedGeneric": "Вход прерван.",
   "error.backend.mcpSignInForgotten": "Вход в MCP был забыт, пока выполнялся.",
   "error.backend.mcpSignInAbandoned": "Вход в MCP прерван.",
@@ -442,6 +447,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "Прокси {name} отклонил вход, поэтому страница не открылась.",
   "error.backend.browserSystemProxyFailed":
     "Прокси в настройках компьютера, на котором работает OpenBot, не отвечает или отклонил подключение, поэтому страница не открылась. Проверьте настройки прокси этого компьютера.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "Сайт или прокси в настройках компьютера, на котором работает OpenBot, закрыл подключение без ответа, поэтому страница не открылась. Если не открывается ни один сайт, проверьте настройки прокси этого компьютера.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "Сайт или прокси этого профиля браузера закрыл подключение без ответа, поэтому страница не открылась. Если не открывается ни один сайт, проверьте прокси профиля.",
   "error.backend.browserProxyComputerUnreachable":
     "Компьютер этого профиля не отвечает, поэтому страница не открылась.",
   "error.backend.browserProxyComputerLocalAddress":

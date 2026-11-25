@@ -85,6 +85,13 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Geef terug",
   "mobile.browser.help.handBack.body":
     "Als een agent je vraagt het over te nemen, kies je Ik ben klaar in het ···-menu. De agent gaat dan verder in dit tabblad.",
+  "mobile.browser.location.title": "{site} wil je locatie weten",
+  "mobile.browser.location.description": "Sta dit alleen toe voor sites die je vertrouwt.",
+  "mobile.browser.location.block": "Blokkeren",
+  "mobile.browser.location.allow": "Toestaan",
+  "mobile.browser.location.allowAlways": "Altijd toestaan",
+  "mobile.browser.location.unavailable": "Kan de locatie van dit apparaat niet ophalen.",
+  "mobile.browser.location.answerFailed": "Kan het locatieverzoek niet beantwoorden.",
   "mobile.browser.httpSignIn.title": "Inloggen bij {site}",
   "mobile.browser.httpSignIn.description": "Deze site vraagt om een eigen gebruikersnaam en wachtwoord.",
   "mobile.browser.httpSignIn.refused": "De site heeft deze gebruikersnaam of dit wachtwoord niet geaccepteerd.",

@@ -61,6 +61,9 @@ export const messages = {
     "OpenBot non è riuscito a caricare la pagina nella finestra di accesso. Controlla la connessione a internet, poi apri di nuovo la finestra di accesso.",
   "error.backend.browserSignInReadFailed": "OpenBot non è riuscito a leggere l’accesso dalla finestra.",
   "error.backend.browserStopUnsupported": "Questo host remoto non può interrompere il caricamento di una pagina.",
+  "error.backend.browserLocationFailed": "Impossibile impostare la posizione per la pagina.",
+  "error.backend.browserPermissionsUnsupported": "Questo host remoto non può rispondere alle richieste di posizione.",
+  "error.backend.browserLocationRequired": "Invia la posizione del dispositivo per consentire la richiesta.",
   "error.backend.browserHttpSignInInactive": "Questo sito non chiede più l’accesso. Ricarica la pagina per riprovare.",
   "error.backend.browserHttpSignInUnsupported": "Questo host remoto non può ricevere un accesso a un sito.",
   "error.backend.sharedDataLocalOnly": "I dati condivisi sono gestiti sul computer su cui girano questi agenti.",
@@ -301,6 +304,8 @@ export const messages = {
     "Il server di accesso non accetta ancora OpenBot come app. La causa non è il tuo account. Usa un altro modo per connetterti, ad esempio un server MCP locale.",
   "error.backend.mcpRegistrationUnavailable":
     "Il server di accesso non può registrare OpenBot come app. La causa non è il tuo account. Per connetterti, salva questo server in Marketplace, App, poi aggiungi un’app di accesso.",
+  "error.backend.mcpSignInAppNeeded":
+    "Il server di accesso non può registrare OpenBot come app. La causa non è il tuo account. Per connetterti, apri questo server in Marketplace, App, fai clic su Prova la connessione, poi aggiungi un’app di accesso.",
   "error.backend.mcpSignInAbandonedGeneric": "L'accesso è stato abbandonato.",
   "error.backend.mcpSignInForgotten": "L'accesso MCP è stato dimenticato mentre era in corso.",
   "error.backend.mcpSignInAbandoned": "L'accesso MCP è stato abbandonato.",
@@ -449,6 +454,10 @@ export const messages = {
     "Il proxy {name} ha rifiutato l’accesso, quindi la pagina non si è aperta.",
   "error.backend.browserSystemProxyFailed":
     "Il proxy nelle impostazioni del computer che esegue OpenBot non risponde o ha rifiutato la connessione, quindi la pagina non si è aperta. Controlla le impostazioni proxy di quel computer.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "Il sito o il proxy nelle impostazioni del computer che esegue OpenBot ha chiuso la connessione senza risposta, quindi la pagina non si è aperta. Se non si apre nessun sito, controlla le impostazioni proxy di quel computer.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "Il sito o il proxy di questo profilo del browser ha chiuso la connessione senza risposta, quindi la pagina non si è aperta. Se non si apre nessun sito, controlla il proxy del profilo.",
   "error.backend.browserProxyComputerUnreachable":
     "Il computer di questo profilo non risponde, quindi la pagina non si è aperta.",
   "error.backend.browserProxyComputerLocalAddress":

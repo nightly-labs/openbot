@@ -84,6 +84,13 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Zurückgeben",
   "mobile.browser.help.handBack.body":
     "Wenn ein Agent dich bittet zu übernehmen, wähle „Fertig“ im Menü ···. Der Agent macht dann in diesem Tab weiter.",
+  "mobile.browser.location.title": "{site} möchte deinen Standort wissen",
+  "mobile.browser.location.description": "Erlaube das nur für Websites, denen du vertraust.",
+  "mobile.browser.location.block": "Blockieren",
+  "mobile.browser.location.allow": "Erlauben",
+  "mobile.browser.location.allowAlways": "Immer erlauben",
+  "mobile.browser.location.unavailable": "Der Standort dieses Geräts ist nicht verfügbar.",
+  "mobile.browser.location.answerFailed": "Die Standortanfrage konnte nicht beantwortet werden.",
   "mobile.browser.httpSignIn.title": "Bei {site} anmelden",
   "mobile.browser.httpSignIn.description": "Diese Website fragt nach ihrem eigenen Benutzernamen und Passwort.",
   "mobile.browser.httpSignIn.refused": "Die Website hat diesen Benutzernamen oder dieses Passwort nicht angenommen.",

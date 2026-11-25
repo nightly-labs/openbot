@@ -7,6 +7,7 @@ import { withAgentTaskEventUiBlocks } from "./agent-task-ui-blocks-v1";
 import { type AgentTasksEvent, agentTasksEvent } from "./agent-tasks-v1";
 import { type BrowserHttpSignInEvent, browserHttpSignInEvent } from "./browser-http-sign-in-v1";
 import { type BrowserPageStateEvent, browserPageStateEvent } from "./browser-page-state-v1";
+import { type BrowserPermissionsEvent, browserPermissionsEvent } from "./browser-permissions-v1";
 import { type BrowserProfilesEvent, browserProfilesEvent } from "./browser-profiles-events-v1";
 import { type BrowserUserControlEvent, browserUserControlEvent } from "./browser-user-control-v1";
 import { type ChannelEvent, channelEvent } from "./channels-v1";
@@ -41,6 +42,7 @@ export type OptionalTeamEvent =
   | ClientBrowserCommandEvent
   | BrowserHttpSignInEvent
   | BrowserPageStateEvent
+  | BrowserPermissionsEvent
   | BrowserProfilesEvent
   | BrowserUserControlEvent
   | AgentTasksEvent
@@ -79,6 +81,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     clientBrowserCommandEvent(value) ??
     browserHttpSignInEvent(value) ??
     browserPageStateEvent(value) ??
+    browserPermissionsEvent(value) ??
     browserProfilesEvent(value) ??
     browserUserControlEvent(value) ??
     agentTasksEvent(value) ??

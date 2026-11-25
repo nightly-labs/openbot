@@ -84,6 +84,13 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Restituisci il browser",
   "mobile.browser.help.handBack.body":
     "Quando un agente ti chiede di intervenire, scegli «Ho finito» nel menu ···. L'agente poi continua in questa scheda.",
+  "mobile.browser.location.title": "{site} vuole conoscere la tua posizione",
+  "mobile.browser.location.description": "Consenti solo ai siti attendibili.",
+  "mobile.browser.location.block": "Blocca",
+  "mobile.browser.location.allow": "Consenti",
+  "mobile.browser.location.allowAlways": "Consenti sempre",
+  "mobile.browser.location.unavailable": "Impossibile ottenere la posizione di questo dispositivo.",
+  "mobile.browser.location.answerFailed": "Impossibile rispondere alla richiesta di posizione.",
   "mobile.browser.httpSignIn.title": "Accedi a {site}",
   "mobile.browser.httpSignIn.description": "Questo sito chiede un proprio nome utente e una propria password.",
   "mobile.browser.httpSignIn.refused": "Il sito non ha accettato questo nome utente o questa password.",

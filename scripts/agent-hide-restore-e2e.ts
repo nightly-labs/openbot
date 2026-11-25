@@ -242,6 +242,7 @@ const teamBrowser: TeamApiBrowser = {
   navigate: unused,
   reload: unused,
   stop: unused,
+  answerPermission: unused,
   takeUserControl: unused,
   startTeach: unused,
   stopTeach: () => [],

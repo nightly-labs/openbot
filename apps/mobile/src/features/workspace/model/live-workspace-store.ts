@@ -1,4 +1,5 @@
 import type { BrowserTakeoverRequest } from "@openbot/contracts/ipc";
+import type { BrowserPermissionRequestState } from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import type { MobileBrowserTabs, MobileHttpSignIns } from "@/features/browser/model/browser-tabs";
 import type { MobileAgentActivities } from "./agent-activity";
 import type { MobileContextStates } from "./context-states";
@@ -16,6 +17,7 @@ export interface LiveWorkspaceState {
   firstUnreadMessageIds: Record<string, string | null>;
   browserRequests: Record<string, BrowserTakeoverRequest[]>;
   browserTabs: Record<string, MobileBrowserTabs>;
+  browserPermissions: Record<string, readonly BrowserPermissionRequestState[]>;
   browserHttpSignIns: Record<string, MobileHttpSignIns>;
   approvalRequests: Record<string, readonly PendingApproval[]>;
 }
@@ -31,6 +33,7 @@ export class LiveWorkspaceStore {
     firstUnreadMessageIds: {},
     browserRequests: {},
     browserTabs: {},
+    browserPermissions: {},
     browserHttpSignIns: {},
     approvalRequests: {},
   };

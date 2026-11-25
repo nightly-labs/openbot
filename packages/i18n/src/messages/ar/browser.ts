@@ -296,4 +296,11 @@ export const messages = {
   },
   "browser.proxies.changeTitle": "هل تريد تغيير بروكسي {name}؟",
   "browser.proxies.change": "تغيير البروكسي",
+  "browser.location.title": "يريد {site} معرفة موقعك",
+  "browser.location.description": "اسمح بذلك للمواقع الموثوقة فقط.",
+  "browser.location.block": "حظر",
+  "browser.location.allow": "سماح",
+  "browser.location.allowAlways": "السماح دائمًا",
+  "browser.location.unavailable": "تعذر الحصول على موقع هذا الجهاز.",
+  "browser.location.answerFailed": "تعذر الرد على طلب الموقع.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -5,6 +5,7 @@ import {
   type AgentStatus,
   type AvatarColor,
   type BrowserHttpSignIn,
+  type BrowserPermissionRequest,
   type BrowserTab,
   type ChatColors,
   type ClientAgentSummary,
@@ -63,6 +64,7 @@ export class RemoteEventRefresh {
   readonly #rosterLoads = new Map<string, Deferred.Deferred<void, RemoteWorkflowError>>();
   readonly #browserHolds = new Map<string, ReadonlySet<string>>();
   readonly #browserPageStates = new Map<string, ReadonlyMap<string, { canGoBack: boolean; canGoForward: boolean }>>();
+  readonly #browserPermissions = new Map<string, ReadonlyMap<string, BrowserPermissionRequest>>();
   readonly #browserHttpSignIns = new Map<string, ReadonlyMap<string, BrowserHttpSignIn>>();
   readonly #browserStates = new Map<string, { tabs: BrowserTab[]; activeTabId: string | null }>();
   readonly #agentColors = new Map<string, ReadonlyMap<string, AvatarColor>>();
@@ -109,11 +111,17 @@ export class RemoteEventRefresh {
     } else if (
       event.type === "browser-user-control-changed" ||
       event.type === "browser-page-state-changed" ||
+      event.type === "browser-permissions-changed" ||
       event.type === "browser-http-sign-in-changed"
     ) {
       if (event.type === "browser-user-control-changed") this.#browserHolds.set(serverId, new Set(event.tabIds));
       else if (event.type === "browser-page-state-changed")
         this.#browserPageStates.set(serverId, new Map(event.tabs.map(({ tabId, ...state }) => [tabId, state])));
+      else if (event.type === "browser-permissions-changed")
+        this.#browserPermissions.set(
+          serverId,
+          new Map(event.requests.map(({ tabId, ...request }) => [tabId, request])),
+        );
       else
         this.#browserHttpSignIns.set(
           serverId,
@@ -153,15 +161,25 @@ export class RemoteEventRefresh {
   ): Extract<AgentEvent, { type: "browser-changed" }> {
     const held = this.#browserHolds.get(serverId);
     const pageStates = this.#browserPageStates.get(serverId);
+    const permissions = this.#browserPermissions.get(serverId);
     const httpSignIns = this.#browserHttpSignIns.get(serverId);
     const tabs = state.tabs.map((tab) => {
-      const { userControl: _, canGoBack: _back, canGoForward: _forward, httpSignIn: _signIn, ...rest } = tab;
+      const {
+        userControl: _,
+        canGoBack: _back,
+        canGoForward: _forward,
+        permissionRequest: _permissionRequest,
+        httpSignIn: _signIn,
+        ...rest
+      } = tab;
       const pageState = pageStates?.get(tab.id);
+      const permissionRequest = permissions?.get(tab.id);
       const httpSignIn = httpSignIns?.get(tab.id);
       return {
         ...rest,
         ...(held?.has(tab.id) ? { userControl: true as const } : {}),
         ...(pageState ? { canGoBack: pageState.canGoBack, canGoForward: pageState.canGoForward } : {}),
+        ...(permissionRequest ? { permissionRequest } : {}),
         ...(httpSignIn ? { httpSignIn } : {}),
       };
     });
@@ -365,6 +383,7 @@ export class RemoteEventRefresh {
     this.#memberChatColors.delete(serverId);
     this.#browserHolds.delete(serverId);
     this.#browserPageStates.delete(serverId);
+    this.#browserPermissions.delete(serverId);
     this.#browserHttpSignIns.delete(serverId);
     this.#browserStates.delete(serverId);
     this.#runtimeSnapshots.delete(serverId);
@@ -393,6 +412,7 @@ export class RemoteEventRefresh {
     this.#memberChatColors.clear();
     this.#browserHolds.clear();
     this.#browserPageStates.clear();
+    this.#browserPermissions.clear();
     this.#browserHttpSignIns.clear();
     this.#browserStates.clear();
     this.#runtimeSnapshots.clear();

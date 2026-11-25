@@ -55,6 +55,7 @@ import { BROWSER_EGRESS_CAPABILITY } from "./browser-egress-v1";
 import { BROWSER_HTTP_SIGN_IN_CAPABILITY } from "./browser-http-sign-in-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "./browser-navigation-v1";
 import { BROWSER_PAGE_STATE_CAPABILITY } from "./browser-page-state-v1";
+import { BROWSER_PERMISSIONS_CAPABILITY } from "./browser-permissions-v1";
 import { BROWSER_PROFILES_EVENTS_CAPABILITY } from "./browser-profiles-events-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "./browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "./browser-proxies-v1";
@@ -356,6 +357,7 @@ export {
   BROWSER_EGRESS_CAPABILITY,
   BROWSER_HTTP_SIGN_IN_CAPABILITY,
   BROWSER_PAGE_STATE_CAPABILITY,
+  BROWSER_PERMISSIONS_CAPABILITY,
   BROWSER_PROFILES_CAPABILITY,
   BROWSER_PROFILES_EVENTS_CAPABILITY,
   BROWSER_PROXIES_CAPABILITY,
@@ -866,6 +868,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [OPENBOT_CREDITS_EVENTS_CAPABILITY, V10],
   [TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY, V10],
   [AGENT_ERROR_LINK_CAPABILITY, V10],
+  [BROWSER_PERMISSIONS_CAPABILITY, V10],
   [BROWSER_HTTP_SIGN_IN_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 

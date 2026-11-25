@@ -16,6 +16,12 @@ import {
   decodeBrowserPageStateSnapshot,
 } from "@openbot/contracts/team-protocol/browser-page-state-v1";
 import {
+  BROWSER_PERMISSIONS_CAPABILITY,
+  BROWSER_PERMISSIONS_ROUTES,
+  decodeBrowserPermissionAnswer,
+  decodeBrowserPermissionsSnapshot,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
+import {
   BROWSER_SIGN_IN_STORAGE_CAPABILITY,
   BROWSER_SIGN_IN_STORAGE_ROUTES,
   decodeBrowserSignInStorageResult,
@@ -104,6 +110,7 @@ export interface BrowserIpcDependencies {
     | "navigate"
     | "reload"
     | "stop"
+    | "answerPermission"
     | "close"
     | "takeUserControl"
     | "releaseUserControl"
@@ -137,8 +144,10 @@ export function browserIpcHandlers({
     liveViewOwners.add(owner);
     owner.once("destroyed", () => void runCauseEffect(browserView.stop(owner.id)).catch(() => undefined));
   };
-  const withUserControl = async (serverId: string, tabs: BrowserTab[]): Promise<BrowserTab[]> => {
-    if (!remoteServers.supportsCapability(serverId, BROWSER_USER_CONTROL_CAPABILITY)) return tabs;
+  type TabUpdate = (tab: BrowserTab) => BrowserTab;
+  const keepTab: TabUpdate = (tab) => tab;
+  const userControlUpdate = async (serverId: string): Promise<TabUpdate> => {
+    if (!remoteServers.supportsCapability(serverId, BROWSER_USER_CONTROL_CAPABILITY)) return keepTab;
     const { tabIds } = await runCauseEffect(
       remoteServers.request(serverId, BROWSER_USER_CONTROL_ROUTES.state, decodeBrowserUserControlSnapshot, {
         method: "POST",
@@ -146,10 +155,10 @@ export function browserIpcHandlers({
       }),
     );
     const held = new Set(tabIds);
-    return tabs.map((tab) => (held.has(tab.id) ? { ...tab, userControl: true } : tab));
+    return (tab) => (held.has(tab.id) ? { ...tab, userControl: true } : tab);
   };
-  const withPageState = async (serverId: string, tabs: BrowserTab[]): Promise<BrowserTab[]> => {
-    if (!remoteServers.supportsCapability(serverId, BROWSER_PAGE_STATE_CAPABILITY)) return tabs;
+  const pageStateUpdate = async (serverId: string): Promise<TabUpdate> => {
+    if (!remoteServers.supportsCapability(serverId, BROWSER_PAGE_STATE_CAPABILITY)) return keepTab;
     const snapshot = await runCauseEffect(
       remoteServers.request(serverId, BROWSER_PAGE_STATE_ROUTES.state, decodeBrowserPageStateSnapshot, {
         method: "POST",
@@ -157,13 +166,29 @@ export function browserIpcHandlers({
       }),
     );
     const states = new Map(snapshot.tabs.map((state) => [state.tabId, state]));
-    return tabs.map((tab) => {
+    return (tab) => {
       const state = states.get(tab.id);
       return state ? { ...tab, canGoBack: state.canGoBack, canGoForward: state.canGoForward } : tab;
-    });
+    };
   };
-  const withHttpSignIn = async (serverId: string, tabs: BrowserTab[]): Promise<BrowserTab[]> => {
-    if (!remoteServers.supportsCapability(serverId, BROWSER_HTTP_SIGN_IN_CAPABILITY)) return tabs;
+  const permissionsUpdate = async (serverId: string): Promise<TabUpdate> => {
+    if (!remoteServers.supportsCapability(serverId, BROWSER_PERMISSIONS_CAPABILITY)) return keepTab;
+    const snapshot = await runCauseEffect(
+      remoteServers.request(serverId, BROWSER_PERMISSIONS_ROUTES.state, decodeBrowserPermissionsSnapshot, {
+        method: "POST",
+        body: {},
+      }),
+    );
+    const requests = new Map(snapshot.requests.map((request) => [request.tabId, request]));
+    return (tab) => {
+      const request = requests.get(tab.id);
+      return request
+        ? { ...tab, permissionRequest: { id: request.id, origin: request.origin, permission: request.permission } }
+        : tab;
+    };
+  };
+  const httpSignInUpdate = async (serverId: string): Promise<TabUpdate> => {
+    if (!remoteServers.supportsCapability(serverId, BROWSER_HTTP_SIGN_IN_CAPABILITY)) return keepTab;
     const snapshot = await runCauseEffect(
       remoteServers.request(serverId, BROWSER_HTTP_SIGN_IN_ROUTES.state, decodeBrowserHttpSignInSnapshot, {
         method: "POST",
@@ -171,15 +196,22 @@ export function browserIpcHandlers({
       }),
     );
     const prompts = new Map(snapshot.tabs.map((prompt) => [prompt.tabId, prompt]));
-    return tabs.map((tab) => {
+    return (tab) => {
       const prompt = prompts.get(tab.id);
       return prompt
         ? { ...tab, httpSignIn: { origin: prompt.origin, ...(prompt.refused ? { refused: true } : {}) } }
         : tab;
-    });
+    };
   };
-  const withTabState = async (serverId: string, tabs: BrowserTab[]): Promise<BrowserTab[]> =>
-    withHttpSignIn(serverId, await withPageState(serverId, await withUserControl(serverId, tabs)));
+  const withTabState = async (serverId: string, tabs: BrowserTab[]): Promise<BrowserTab[]> => {
+    const updates = await Promise.all([
+      userControlUpdate(serverId),
+      pageStateUpdate(serverId),
+      permissionsUpdate(serverId),
+      httpSignInUpdate(serverId),
+    ]);
+    return tabs.map((tab) => updates.reduce((updated, update) => update(updated), tab));
+  };
   const userControlRequest = async (serverId: string, route: string, tabId: string): Promise<void> => {
     if (!remoteServers.supportsCapability(serverId, BROWSER_USER_CONTROL_CAPABILITY))
       throw new Error(sourceText("error.backend.browserUserControlUnsupported"));
@@ -287,6 +319,21 @@ export function browserIpcHandlers({
               remoteServers.request(serverId, BROWSER_PAGE_STATE_ROUTES.stop, decodeBrowserPageStateSnapshot, {
                 method: "POST",
                 body: { tabId },
+              }),
+            );
+          },
+        }),
+      ),
+      answerPermission: payloadHandler(decodeBrowserPermissionAnswer, (answer) =>
+        routeToServer(remoteServers.activeServerId, {
+          local: () => runCauseEffect(browser.answerPermission(answer)),
+          remote: async (serverId) => {
+            if (!remoteServers.supportsCapability(serverId, BROWSER_PERMISSIONS_CAPABILITY))
+              throw new Error(sourceText("error.backend.browserPermissionsUnsupported"));
+            await runCauseEffect(
+              remoteServers.request(serverId, BROWSER_PERMISSIONS_ROUTES.answer, decodeBrowserPermissionsSnapshot, {
+                method: "POST",
+                body: answer,
               }),
             );
           },
