@@ -766,6 +766,7 @@ export const messages = {
   "server.update.reason.browserControl": "에이전트의 브라우저 제어",
   "server.update.reason.updateOperation": "다른 업데이트 단계",
   "server.update.reason.initialization": "OpenBot 시작",
+  "server.update.reason.openQuestion": "에이전트 질문에 대한 답변",
   "server.update.reason.other": "기타 작업",
   "server.restartNotice.waitingTitle": "업데이트를 설치하기 위해 {name}이(가) 다시 시작돼요",
   "server.restartNotice.waitingVersionTitle": "OpenBot {version}을(를) 설치하기 위해 {name}이(가) 다시 시작돼요",

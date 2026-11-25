@@ -731,6 +731,7 @@ export const messages = {
   "server.update.reason.browserControl": "bir ajan tarafından tarayıcı kontrolü",
   "server.update.reason.updateOperation": "başka bir güncelleme adımı",
   "server.update.reason.initialization": "OpenBot'un başlatılması",
+  "server.update.reason.openQuestion": "bir ajanın sorusuna yanıt",
   "server.update.reason.other": "diğer çalışmalar",
   "server.restartNotice.waitingTitle": "{name}, bir güncellemeyi yüklemek için yeniden başlatılacak",
   "server.restartNotice.waitingVersionTitle": "{name}, OpenBot {version} sürümünü yüklemek için yeniden başlatılacak",

@@ -13,6 +13,7 @@ const RESTART_REASON_LABELS: Record<string, AppTextKey> = {
   "browser-control": "server.update.reason.browserControl",
   "update-operation": "server.update.reason.updateOperation",
   initialization: "server.update.reason.initialization",
+  "open-question": "server.update.reason.openQuestion",
 };
 
 export function restartReasonKey(reason: string): AppTextKey {

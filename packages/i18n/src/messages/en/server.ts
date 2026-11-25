@@ -825,6 +825,7 @@ export const messages = defineMessages("server", {
   "server.update.reason.browserControl": "browser control by an agent",
   "server.update.reason.updateOperation": "another update step",
   "server.update.reason.initialization": "the start of OpenBot",
+  "server.update.reason.openQuestion": "an answer to an agent's question",
   "server.update.reason.other": "other work",
   "server.restartNotice.waitingTitle": "{name} restarts to install an update",
   "server.restartNotice.waitingVersionTitle": "{name} restarts to install OpenBot {version}",

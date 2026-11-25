@@ -715,6 +715,7 @@ export const messages = {
   "server.update.reason.browserControl": "エージェントによるブラウザー操作",
   "server.update.reason.updateOperation": "別のアップデート手順",
   "server.update.reason.initialization": "OpenBot の起動",
+  "server.update.reason.openQuestion": "エージェントの質問への回答",
   "server.update.reason.other": "その他の作業",
   "server.restartNotice.waitingTitle": "{name} はアップデートをインストールするため再起動します",
   "server.restartNotice.waitingVersionTitle": "{name} は OpenBot {version} をインストールするため再起動します",

@@ -157,6 +157,7 @@ interface PendingPrompt {
   autoAnswer?: { state: UiBlockAutoAnswer; timer: ReturnType<typeof setTimeout> };
   detach?: { target: LateAnswerTarget; timer?: ReturnType<typeof setTimeout> };
   detached?: LateAnswerTarget;
+  detachedAt?: number;
   expireTimer?: ReturnType<typeof setTimeout>;
   subagent?: true;
 }
@@ -291,6 +292,7 @@ const TAKEOVER_TAB_ID_MISSING = "Give tabId: the id of the tab, from open or lis
 const TAKEOVER_TAB_OF_OTHER_CHAT =
   "This chat cannot use this tab. Open the page in this chat with open, then call this tool with the new tabId.";
 const USER_ANSWER_LIMIT_MS = 10 * 60_000;
+const DETACHED_QUESTION_RESTART_HOLD_MS = 24 * 60 * 60_000;
 const TAKEOVER_ALREADY_WAITING = "A takeover of this tab already waits for the user. Wait for it to return.";
 const VAULT_UNAVAILABLE = "No Vault is available on this computer. Ask the user.";
 const ROUTINE_SAVED_LOGIN_NOT_FILLED =
@@ -572,6 +574,7 @@ export interface AttentionRegistryOptions {
     sender: ConversationMessageSender | undefined,
   ): void;
   userAnswerLimitMs?: number;
+  detachedQuestionRestartHoldMs?: number;
 }
 
 export interface CodexSubagentParent {
@@ -615,6 +618,7 @@ export class AttentionRegistry {
   readonly #lateAnswerTarget: (agentId: string, publicThreadId: string) => LateAnswerTarget | null;
   readonly #sendLateAnswer: NonNullable<AttentionRegistryOptions["sendLateAnswer"]>;
   readonly #userAnswerLimitMs: number;
+  readonly #detachedQuestionRestartHoldMs: number;
   readonly #prompts = new Map<RequestId, PendingPrompt>();
   readonly #approvals = new Map<RequestId, PendingApproval>();
   readonly #takeovers = new Map<RequestId, PendingBrowserTakeover>();
@@ -644,6 +648,7 @@ export class AttentionRegistry {
     this.#lateAnswerTarget = options.lateAnswerTarget ?? (() => null);
     this.#sendLateAnswer = options.sendLateAnswer ?? (() => undefined);
     this.#userAnswerLimitMs = options.userAnswerLimitMs ?? USER_ANSWER_LIMIT_MS;
+    this.#detachedQuestionRestartHoldMs = options.detachedQuestionRestartHoldMs ?? DETACHED_QUESTION_RESTART_HOLD_MS;
     this.#codexSubagentParent = options.codexSubagentParent ?? (() => undefined);
   }
 
@@ -868,6 +873,14 @@ export class AttentionRegistry {
     const handle = randomUUID();
     this.#localHandles.set(pending, handle);
     return handle;
+  }
+
+  hasDetachedQuestionHoldingRestart(now = Date.now()): boolean {
+    for (const pending of this.#prompts.values()) {
+      if (!pending.detached || pending.saving || pending.detachedAt === undefined) continue;
+      if (now - pending.detachedAt < this.#detachedQuestionRestartHoldMs) return true;
+    }
+    return false;
   }
 
   pendingPrompts(): RuntimeAttention["pendingPrompts"] {
@@ -2579,6 +2592,7 @@ export class AttentionRegistry {
     clearTimeout(pending.detach?.timer);
     delete pending.detach;
     pending.detached = target;
+    pending.detachedAt = Date.now();
     this.#routines.markRunningForTurn(pending.turnId);
     if (pending.client.running) {
       try {
