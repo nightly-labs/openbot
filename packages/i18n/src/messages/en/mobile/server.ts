@@ -110,6 +110,11 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.drawer.leaveFailed": "Could not leave {name}",
   "mobile.server.drawer.removeFailed": "Could not remove {name}",
   "mobile.server.drawer.deleteFailed": "Could not delete {name}",
+  "mobile.server.drawer.hide": "Hide server",
+  "mobile.server.drawer.show": "Show server",
+  "mobile.server.drawer.hiddenServers": "Hidden servers",
+  "mobile.server.drawer.hideFailed": "Could not hide {name}",
+  "mobile.server.drawer.showFailed": "Could not show {name}",
   "mobile.server.drawer.actionFailed": "OpenBot could not complete this action. Try again.",
   "mobile.server.drawer.moveUp": "Move up",
   "mobile.server.drawer.moveDown": "Move down",
@@ -373,6 +378,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.removeBody":
     "This removes the server from the account service for all members. Files and chats on its computer stay. To use it again, register it from that computer.",
   "mobile.server.settings.remove": "Remove server",
+  "mobile.server.settings.hide": "Hide server",
+  "mobile.server.settings.show": "Show server",
   "mobile.server.settings.deleteTitle": "Delete {name}?",
   "mobile.server.settings.deleteBody":
     "OpenBot stops the server on its computer and moves its agents, chats and files to the Trash of that computer. The server leaves the server list on all your devices.",
@@ -632,6 +639,16 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.memoryLimitLoadFailed": "Could not load the memory limit of this server.",
   "mobile.server.settings.memoryLimitSaveFailed": "Could not save the memory limit. Try again.",
   "mobile.server.settings.memoryLimitUnsupported": "Update OpenBot on this server to change its memory limit here.",
+  "mobile.server.settings.mediaApprovalCredits": "Ask before spending more than",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "credits",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed": "Could not load the credit approval limit of this server.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed": "Could not save the credit approval limit. Try again.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "Update OpenBot on this server to change its credit approval limit here.",
+  "mobile.server.settings.mediaApprovalAgents": "Agents can use credits",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed": "Could not change agent use of credits. Try again.",
+  "mobile.server.settings.mediaApprovalAsk": "Ask when credits are needed",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "Could not change credit requests. Try again.",
   "mobile.server.settings.memoryReview": "Memory review",
   "mobile.server.settings.memoryReviewDescription":
     "How often agents on this server save lasting facts from their chats in the background.",

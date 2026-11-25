@@ -259,13 +259,15 @@ const STORY_TUCK_DELAY_MS = 900;
 
 function AgentDockStory(props: {
   seats: AgentDockSeatRef[];
+  temporary?: AgentDockSeatRef[];
   results?: AgentDockShelfResult[];
   edgeStrip?: boolean;
   requests?: StoryRequests;
 }) {
   const answered: string[] = [];
   const [state, setState] = createStore({
-    seats: props.seats.map(agentDockSeatKey),
+    seats: [...props.seats, ...(props.temporary ?? [])].map(agentDockSeatKey),
+    temporary: (props.temporary ?? []).map(agentDockSeatKey),
     messages: structuredClone(MESSAGES),
     working: workingFixture(),
     results: [...(props.results ?? [])],
@@ -320,9 +322,10 @@ function AgentDockStory(props: {
       const working = state.working[id] ?? false;
       const asks = asksOf(id);
       const badge: SidebarAgentState | undefined = asks ?? (working ? { kind: "working" } : activity?.state);
+      const temporary = state.temporary.includes(key);
       if (key.startsWith("channel:")) {
         const channel = CHANNELS.find((candidate) => candidate.id === id);
-        return channel ? [{ kind: "channel", channel, state: badge }] : [];
+        return channel ? [{ kind: "channel", channel, state: badge, temporary }] : [];
       }
       const agent = AGENTS.find((candidate) => candidate.id === id);
       return agent
@@ -332,6 +335,7 @@ function AgentDockStory(props: {
               agent,
               mood: asks ? "waiting" : working ? "working" : (activity?.mood ?? "idle"),
               state: badge,
+              temporary,
             },
           ]
         : [];
@@ -418,7 +422,11 @@ function AgentDockStory(props: {
         }}
         onAdd={(seat) =>
           setState((draft) => {
-            draft.seats.push(agentDockSeatKey(seat));
+            const key = agentDockSeatKey(seat);
+            const firstTemporary = draft.seats.findIndex((item) => draft.temporary.includes(item));
+            draft.temporary = draft.temporary.filter((item) => item !== key);
+            draft.seats = draft.seats.filter((item) => item !== key);
+            draft.seats.splice(firstTemporary < 0 ? draft.seats.length : firstTemporary, 0, key);
           })
         }
         onRemove={(seat) =>
@@ -504,6 +512,15 @@ export const Channels: Story = {
         { kind: "channel", id: "launch" },
         { kind: "channel", id: "support-desk" },
       ]}
+    />
+  ),
+};
+
+export const NewMessageSeats: Story = {
+  render: () => (
+    <AgentDockStory
+      seats={agentSeats("chief", "design")}
+      temporary={[...agentSeats("research", "sales"), { kind: "channel", id: "launch" }]}
     />
   ),
 };

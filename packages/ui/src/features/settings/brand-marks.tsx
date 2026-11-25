@@ -51,7 +51,7 @@ export function WhatsAppMark(props: { class?: string | undefined }) {
 }
 
 const X_MARK_PATH =
-  "M17.5 3h3.2l-7 8 8.2 10h-6.4l-5-6.5L4.7 21H1.5l7.5-8.5L1.1 3h6.5l4.5 6 5.4-6Zm-1.1 16h1.8L7.6 4.9H5.7L16.4 19Z";
+  "m21.62 21.5-7.47-10.9 6.97-8.1H18.7l-5.62 6.54L8.6 2.5H2.48L9.68 13l-7.3 8.5H4.8l5.96-6.93 4.76 6.93zM7.8 4.03l10.93 15.94H16.3L5.38 4.03z";
 
 export function XMark(props: { class?: string | undefined }) {
   return (

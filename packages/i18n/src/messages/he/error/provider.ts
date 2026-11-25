@@ -228,6 +228,8 @@ export const messages = {
     "תוקף מפתח ה-API של OpenCode פג. יש ליצור מפתח חדש ב-OpenCode Console, להדביק אותו בהגדרות OpenCode ואז לנסות שוב.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go דחה את מפתח ה-API השמור. ייתכן שתוקף המפתח פג. יש ליצור מפתח חדש ב-OpenCode Console, להדביק אותו בהגדרות OpenCode ואז לנסות שוב.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode לא השתמש במפתח ששמרת ב-OpenBot. הוא השתמש במפתח OpenCode Go אחר ש-OpenCode שומר בעצמו, ו-OpenCode Go דחה את המפתח הזה. כדי להסיר את המפתח הזה, הרץ את `opencode auth logout opencode-go` בטרמינל במחשב שמריץ את הסוכן, ובחר את המפתח. לאחר מכן נסה שוב.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go דחה את הבקשה. מפתח API חדש לא יפתור את זה. ייתכן שהתוכנית שלך ב-OpenCode Go לא פעילה, או ש-OpenCode Go חוסם את הרשת שלך: חלק מהשירותים חוסמים VPN, שרתי Proxy או מדינות מסוימות. ודא ב-OpenCode Console שהתוכנית פעילה, או כבה את ה-VPN, ואז נסה שוב. אפשר גם לבחור מודל אחר.",
   "error.provider.opencodeServiceFailure":
@@ -284,6 +286,8 @@ export const messages = {
   "error.provider.opencodeNoAnswer": "מודל OpenCode סיים את הפעולה בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "מודל OpenCode סיים את הפעולה אחרי החשיבה שלו, בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
+  "error.provider.opencodeToolCallsAsText":
+    "מודל OpenCode כתב את הפעולות שלו כטקסט ולא ביצע אותן. יש לנסות שוב, או לבחור מודל אחר.",
   "error.provider.acpNoAnswer": "{provider} סיים את התור בלי תשובה. יש לשלוח את ההודעה שוב, או להתחיל צ'אט חדש.",
   "error.provider.noAnswerAfterSteps":
     "{provider} ביצע כמה צעדים ואז סיים את התור בלי תשובה. יש לשאול את הסוכן מה הוא עשה לפני שליחת אותה בקשה שוב.",
@@ -347,6 +351,8 @@ export const messages = {
   "error.provider.cursorSignIn": "יש להתחבר עם Cursor או להגדיר CURSOR_API_KEY כדי להשתמש ב-Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor לא הצליח להתחבר לשרת שלו עם פרטי ההתחברות שלך. יש לבדוק את החיבור לאינטרנט ואז להתחבר שוב ל-Cursor.",
+  "error.provider.cursorNoModels":
+    'Cursor לא שלח את רשימת המודלים שלו. בחרו "חיבור" כדי להתחבר שוב ל-Cursor. אם ההודעה הזו נשארת, בדקו שהתוכנית שלכם ב-Cursor כוללת מודלים.',
   "error.provider.clineArchivePath": "בארכיון של Cline יש נתיב לא צפוי.",
   "error.provider.clinePackageMismatch": "החבילה של Cline אינה תואמת לקטלוג סביבות ההרצה.",
   "error.provider.clineChecksum": "סכום הביקורת של סביבת ההרצה של Cline אינו תואם.",
@@ -388,6 +394,8 @@ export const messages = {
     "אין קרדיט API במפתח Anthropic API. מינוי Claude לא משלם על בקשות עם מפתח API. אפשר להוסיף קרדיט ב-Anthropic Console, או להתחבר ל-Claude בהגדרות ולבחור את חשבון Claude בתפריט המודל של הסוכן.",
   "error.provider.claudeAccountNoCredit":
     "יתרת הקרדיט בחשבון Claude שלך נמוכה מדי. חלק מהבקשות, כמו המצב המהיר, משתמשות בקרדיטים לשימוש גם כשנשאר שימוש במינוי Claude. אפשר להוסיף קרדיטים לשימוש בחשבון Claude, או לבחור מודל אחר בתפריט המודל של הסוכן.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code שולח בקשות אל {host}, לא אל Anthropic: ההגדרות של Claude Code או משתני הסביבה קובעים את כתובת ה-API הזו. {host} דחה את הבקשה בגלל יתרת החשבון, לא בגלל מינוי Claude שלך. אפשר להוסיף כסף לחשבון {host} שלך, או לבחור מודל אחר בתפריט המודל של הסוכן.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "השירות של Claude חסם את הבקשה הזו. בדרך כלל זו תקלה קצרה אצל Claude, ולא בעיה בחשבון שלך. אפשר לשלוח את ההודעה שוב בעוד כמה דקות.",
   "error.provider.foreignReasoning":
@@ -404,6 +412,8 @@ export const messages = {
     "{provider} חסם את ההודעה הזאת בגלל כללי הבטיחות שלו: {reason} אם {provider} חוסם גם את ההודעות הבאות שלך, התחל צ'אט חדש.",
   "error.provider.codexAudioRefused":
     "המודל הזה לא יכול להאזין לאודיו, ולכן הוא לא קיבל את הצליל בצ'אט הזה. OpenBot התחיל סשן Codex חדש עם היסטוריית הצ'אט. כדי להמשיך, שלח שוב את הבקשה ובקש מהסוכן לעבוד בלי הצליל. כדי לבדוק צליל, בחר בתפריט המודל של הסוכן מודל שיכול להאזין לאודיו.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex לא הצליח לטעון את ההגדרות של חשבון ChatGPT, ולכן הסוכן נעצר. יש לנסות שוב. אם הוא נעצר שוב, יש לבחור חיבור מחדש עבור ChatGPT בהגדרות שרת ← ספקים.",
   "error.provider.imageTooSmall":
     "המודל לא קיבל תמונה בצ'אט הזה כי התמונה קטנה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.imageTooLarge":

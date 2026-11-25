@@ -98,6 +98,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Nächster Teil",
   "mobile.chat.preview.pdfFailed": "Dieses PDF konnte nicht angezeigt werden.",
   "mobile.chat.preview.spreadsheetFailed": "Diese Tabelle konnte nicht gelesen werden.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Diese Tabelle ist zu groß für die Vorschau. Teile sie, um sie in einer anderen App zu öffnen.",
   "mobile.chat.preview.spreadsheetTruncated": "Vorschau auf die ersten {rows} Zeilen und {columns} Spalten begrenzt.",
   "mobile.chat.copyFailedMessage": "Versuche es erneut.",
   "mobile.chat.message.copyFailed": "Nachricht konnte nicht kopiert werden",
@@ -190,6 +192,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "Der Anhang ist beschädigt. Wähle ihn erneut aus.",
   "mobile.chat.attachment.tooLarge": "{name} ist größer als {limit}.",
   "mobile.chat.attachment.cameraPermission": "Erlaube den Kamerazugriff in den Einstellungen, um ein Foto aufzunehmen.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "Das Foto wurde nicht geladen. Öffne es in der Fotos-App, bis es ganz angezeigt wird, und versuche es dann erneut.",
   "mobile.chat.composer.send": "Nachricht senden",
   "mobile.chat.composer.stop": "{name} stoppen",
   "mobile.chat.composer.dictate": "Nachricht diktieren",
@@ -226,7 +230,8 @@ export const messages = {
     "Der Server ist nicht verbunden. Das Gespräch geht weiter, sobald er wieder verbunden ist.",
   "mobile.chat.liveVoice.speakFailed": "Die Antwort konnte nicht vorgelesen werden.",
   "mobile.chat.liveVoice.voiceNotReady": "Wähle eine Antwortstimme unter Einstellungen > Stimme.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 kann diese Sprache nicht lesen.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 kann diese Sprache nicht lesen. Wähle eine andere Antwortstimme unter Einstellungen > Stimme.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs hat den API-Schlüssel nicht akzeptiert.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "Dem ElevenLabs-Schlüssel fehlt eine Berechtigung. Prüfe sie unter Einstellungen > Stimme.",
@@ -248,6 +253,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "Das Foto konnte nicht aufgenommen werden. Versuche es erneut.",
   "mobile.chat.camera.startFailed": "Die Kamera konnte nicht gestartet werden. Schließe sie und versuche es erneut.",
   "mobile.chat.camera.close": "Kamera schließen",
+  "mobile.chat.camera.fullScreenTipTitle": "Größere Ansicht?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "Verwende die Vollbildkamera mit Zoom und allen Objektiven. Du kannst das unter Einstellungen > Unterhaltungen ändern.",
+  "mobile.chat.camera.fullScreenTipUse": "Vollbild verwenden",
+  "mobile.chat.camera.fullScreenTipDismiss": "Tipp ausblenden",
   "mobile.chat.camera.takePhoto": "Foto aufnehmen",
   "mobile.chat.camera.switch": "Kamera wechseln",
   "mobile.chat.header.info": "Infos zu {name}",
@@ -524,6 +534,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Verbindung zum Server wird hergestellt",
   "mobile.chat.history.loading": "Chatverlauf wird geladen",
   "mobile.chat.history.waiting": "Warten auf Verbindung",
+  "mobile.chat.history.syncing": "Suche nach neuen Nachrichten",
   "mobile.chat.history.loadFailed": "Chatverlauf konnte nicht geladen werden",
   "mobile.chat.scrollToLatest": "Zur neuesten Nachricht scrollen",
   "mobile.chat.agentUnavailable.title": "Agent nicht verfügbar",
@@ -567,6 +578,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Keine Nachrichten in der Warteschlange",
   "mobile.chat.queue.emptyBody": "Neue Nachrichten kommen in die Warteschlange, während der Agent arbeitet.",
   "mobile.chat.queue.noLongerQueued": "Diese Nachricht ist nicht mehr in der Warteschlange.",
+  "mobile.chat.queue.routine": "Routine: {name}",
   "mobile.chat.queue.position": "Position {position} · {date}",
   "mobile.chat.queue.attachments": "Anhänge",
   "mobile.chat.queue.steer": "Steuern",

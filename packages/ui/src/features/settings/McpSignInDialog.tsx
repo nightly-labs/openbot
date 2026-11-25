@@ -52,9 +52,10 @@ export function McpSignInDialog(props: McpSignInDialogProps) {
   );
 }
 
-function McpSignInLinkCopy(props: {
+export function McpSignInLinkCopy(props: {
   onCopy: () => Promise<void>;
   onPaste?: ((address: string) => Promise<void>) | undefined;
+  waitingNote?: boolean | undefined;
 }) {
   const { t, errorMessage } = useText();
   const [copied, setCopied] = createSignal(false);
@@ -74,7 +75,10 @@ function McpSignInLinkCopy(props: {
     <>
       <p class="mcp-connect-privacy mcp-sign-in-page-note">
         <Text as="span" tone="muted">
-          {t("mcp.panel.signInWaiting", { count: MCP_SIGN_IN_TIMEOUT_MS / 60_000 })} {t("mcp.signIn.copyHint")}
+          <Show when={props.waitingNote !== false}>
+            {t("mcp.panel.signInWaiting", { count: MCP_SIGN_IN_TIMEOUT_MS / 60_000 })}{" "}
+          </Show>
+          {t("mcp.signIn.copyHint")}
         </Text>
       </p>
       <Button type="button" variant="outline" class="mcp-sign-in-copy" onClick={() => void copy()}>

@@ -547,8 +547,35 @@ export const messages = {
   "workflow.canvas.presence.follow": "Seguir a {name}",
   "workflow.canvas.presence.you": "{name} (tú)",
   "workflow.canvas.presence.following": "Siguiendo a {name}",
-  "workflow.canvas.empty.title": "Empieza con un activador",
-  "workflow.canvas.empty.add": "Añadir activador",
+  "workflow.canvas.start.title": "Empieza con una plantilla",
+  "workflow.canvas.start.blank": "Lienzo en blanco",
+  "workflow.template.morningBrief.title": "Resumen matinal",
+  "workflow.template.morningBrief.brief": "Cada mañana a las 08:00, recibe 5 líneas de noticias sobre tus temas.",
+  "workflow.template.morningBrief.task":
+    "Busca noticias del último día sobre estos temas: IA, startups. Escribe las 5 más importantes, una línea cada una, con un enlace.",
+  "workflow.template.answerIssues.title": "Responder issues nuevos",
+  "workflow.template.answerIssues.brief": "Cuando alguien abre un issue en GitHub, respóndelo y añade una etiqueta.",
+  "workflow.template.answerIssues.task":
+    "Lee el issue. Busca la causa probable en el código. Escribe una respuesta corta y amable y elige una etiqueta.",
+  "workflow.template.weeklyReport.title": "Informe semanal",
+  "workflow.template.weeklyReport.brief": "Cada viernes a las 16:00, resume la semana. Lo apruebas antes de enviarlo.",
+  "workflow.template.weeklyReport.task":
+    "Resume lo que hizo el equipo esta semana: trabajo terminado, problemas abiertos y próximos pasos. Usa listas cortas.",
+  "workflow.template.weeklyReport.question": "¿Enviar este informe semanal?",
+  "workflow.template.priceWatch.title": "Vigilar un precio",
+  "workflow.template.priceWatch.brief":
+    "Cada mañana a las 09:00, revisa el precio de un producto. Recibe un aviso cuando baje de tu límite.",
+  "workflow.template.priceWatch.task":
+    "Abre esta página de producto y lee el precio: https://example.com/product. Escribe solo el precio y el enlace.",
+  "workflow.template.priceWatch.rule": "El precio es menor que 100.",
+  "workflow.template.priceWatch.alert": "Bajada de precio",
+  "workflow.template.socialPost.title": "Publicación con imagen",
+  "workflow.template.socialPost.brief":
+    "Escribe una idea. Obtén una publicación corta y una imagen cuadrada para ella.",
+  "workflow.template.socialPost.idea": "Ahora abrimos los domingos, de 10:00 a 16:00.",
+  "workflow.template.socialPost.prompt":
+    "Escribe una publicación para redes sobre esta noticia en menos de 280 caracteres. Usa una primera línea clara y sin hashtags.",
+  "workflow.template.socialPost.picture": "Una imagen limpia y luminosa para esta publicación.",
   "workflow.canvas.tool.label": "Herramientas del lienzo",
   "workflow.canvas.tool.select": "Seleccionar",
   "workflow.canvas.tool.pan": "Mover",

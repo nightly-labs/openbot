@@ -143,6 +143,8 @@ export const messages = {
   "error.team.claudeUserSetupUnsupported": "この接続は Claude Code 設定のスイッチに対応していません。",
   "error.team.claudeCompactWindowUnsupported": "この接続は Claude の圧縮サイズに対応していません。",
   "error.team.cacheExpiryCompactionUnsupported": "この接続はキャッシュの期限切れ前の圧縮に対応していません。",
+  "error.team.mediaApprovalCreditsUnsupported": "この接続はクレジット確認の上限に対応していません。",
+  "error.team.mediaApprovalCreditsInvalid": "0 から 100,000 までの整数でクレジットを入力してください。",
   "error.team.providerEnvironmentUnsupported": "この接続はプロバイダーの変数に対応していません。",
   "error.team.modelVisibilityUnsupported": "この接続はモデル一覧に対応していません。",
   "error.team.providerDefaultUnsupported": "この接続はデフォルトのプロバイダーに対応していません。",
@@ -208,4 +210,7 @@ export const messages = {
   "error.team.backgroundProcessesUnsupported": "この接続ではバックグラウンドプロセスを使用できません。",
   "error.team.providerUseUnsupported": "この接続ではプロバイダーのオン・オフを切り替えられません。",
   "error.team.providerUseInvalid": "このプロバイダーにはオン・オフの切り替えがありません。",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "このサーバーはメディア承認でのモデル選択に対応していません。サーバーの OpenBot を更新してください。",
+  "error.team.mediaApprovalChoiceInvalid": "メディア承認の選択が無効です。",
 } as const satisfies PartialTranslation<typeof source>;

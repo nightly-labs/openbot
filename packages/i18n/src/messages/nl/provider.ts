@@ -91,6 +91,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Inloggen bij {name} starten op {host}…",
   "provider.codeLogin.pageOpening": "Inlogpagina van {name} openen op {host}…",
   "provider.codeLogin.linkStep": "Log in bij {name}. OpenBot gaat vanzelf verder.",
+  "provider.codeLogin.thisComputerDescription": "Open deze link in een browser op deze computer. OpenBot wacht hier.",
+  "provider.codeLogin.copyLink": "Link kopiëren",
   "provider.codeLogin.chatgptDeviceSetting":
     "Open in ChatGPT op een computer de beveiligingsinstellingen en zet inloggen met apparaatcode voor Codex aan. Bij een werkaccount zet de beheerder van je workspace dit aan.",
   "provider.useApp.title": "Verbind {name} in de OpenBot-app",

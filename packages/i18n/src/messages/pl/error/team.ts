@@ -144,6 +144,8 @@ export const messages = {
   "error.team.claudeCompactWindowUnsupported": "To połączenie nie obsługuje rozmiaru kompaktowania Claude.",
   "error.team.cacheExpiryCompactionUnsupported":
     "To połączenie nie obsługuje kompaktowania przed wygaśnięciem pamięci podręcznej.",
+  "error.team.mediaApprovalCreditsUnsupported": "To połączenie nie obsługuje progu zatwierdzania kredytów.",
+  "error.team.mediaApprovalCreditsInvalid": "Wpisz liczbę całkowitą kredytów od 0 do 100 000.",
   "error.team.providerEnvironmentUnsupported": "To połączenie nie obsługuje zmiennych dostawcy.",
   "error.team.modelVisibilityUnsupported": "To połączenie nie obsługuje listy modeli.",
   "error.team.providerDefaultUnsupported": "To połączenie nie obsługuje domyślnego dostawcy.",
@@ -207,4 +209,7 @@ export const messages = {
   "error.team.backgroundProcessesUnsupported": "To połączenie nie obsługuje procesów w tle.",
   "error.team.providerUseUnsupported": "To połączenie nie obsługuje włączania i wyłączania dostawców.",
   "error.team.providerUseInvalid": "Ten dostawca nie ma przełącznika włączania.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "Ten serwer nie obsługuje wyboru modelu w zatwierdzeniach multimediów. Zaktualizuj OpenBot na serwerze.",
+  "error.team.mediaApprovalChoiceInvalid": "Wybór w zatwierdzeniu multimediów jest nieprawidłowy.",
 } as const satisfies PartialTranslation<typeof source>;

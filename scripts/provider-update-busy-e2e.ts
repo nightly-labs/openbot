@@ -182,7 +182,7 @@ try {
     state: row()?.state,
   };
   assert.equal(installs, 0, "nothing is installed while the turn runs");
-  assert.ok(report.queued.holdsNewTurns, "new turns wait for the update");
+  assert.equal(report.queued.holdsNewTurns, false, "other agents keep starting turns while the update waits");
   assert.ok(report.queued.countsAsActiveWork, "an idle restart of the app does not cut the wait");
   assert.equal(row()?.state, "available", "the provider keeps its row while the update waits");
 

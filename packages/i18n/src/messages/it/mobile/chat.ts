@@ -97,6 +97,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Parte successiva",
   "mobile.chat.preview.pdfFailed": "Impossibile mostrare questo PDF.",
   "mobile.chat.preview.spreadsheetFailed": "Impossibile leggere questo foglio di calcolo.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Questo foglio di calcolo è troppo grande per l’anteprima. Condividilo per aprirlo in un’altra app.",
   "mobile.chat.preview.spreadsheetTruncated": "Anteprima limitata alle prime {rows} righe e {columns} colonne.",
   "mobile.chat.copyFailedMessage": "Riprova.",
   "mobile.chat.message.copyFailed": "Impossibile copiare il messaggio",
@@ -189,6 +191,8 @@ export const messages = {
   "mobile.chat.attachment.tooLarge": "{name} supera i {limit}.",
   "mobile.chat.attachment.cameraPermission":
     "Consenti l'accesso alla fotocamera nelle Impostazioni per scattare una foto.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "La foto non è stata caricata. Aprila nell’app Foto finché non si vede per intero, poi riprova.",
   "mobile.chat.composer.send": "Invia messaggio",
   "mobile.chat.composer.stop": "Ferma {name}",
   "mobile.chat.composer.dictate": "Detta messaggio",
@@ -224,7 +228,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "Il server non è connesso. La conversazione riprende quando si riconnette.",
   "mobile.chat.liveVoice.speakFailed": "Non è stato possibile leggere la risposta ad alta voce.",
   "mobile.chat.liveVoice.voiceNotReady": "Scegli una voce in Impostazioni > Voce.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 non legge questa lingua.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 non legge questa lingua. Scegli un'altra voce in Impostazioni > Voce.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs non ha accettato la chiave API.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "Alla chiave ElevenLabs manca un permesso. Controllalo in Impostazioni > Voce.",
@@ -245,6 +250,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "Impossibile scattare la foto. Riprova.",
   "mobile.chat.camera.startFailed": "Impossibile avviare la fotocamera. Chiudila e riprova.",
   "mobile.chat.camera.close": "Chiudi fotocamera",
+  "mobile.chat.camera.fullScreenTipTitle": "Ti serve una vista più grande?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "Usa la fotocamera a schermo intero, con zoom e tutti gli obiettivi. Puoi cambiarlo in Impostazioni > Conversazioni.",
+  "mobile.chat.camera.fullScreenTipUse": "Usa schermo intero",
+  "mobile.chat.camera.fullScreenTipDismiss": "Nascondi suggerimento",
   "mobile.chat.camera.takePhoto": "Scatta foto",
   "mobile.chat.camera.switch": "Cambia fotocamera",
   "mobile.chat.header.info": "Info su {name}",
@@ -514,6 +524,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Connessione al server",
   "mobile.chat.history.loading": "Caricamento della cronologia della chat",
   "mobile.chat.history.waiting": "In attesa della connessione",
+  "mobile.chat.history.syncing": "Ricerca di nuovi messaggi",
   "mobile.chat.history.loadFailed": "Impossibile caricare la cronologia della chat",
   "mobile.chat.scrollToLatest": "Vai all'ultimo messaggio",
   "mobile.chat.agentUnavailable.title": "Agente non disponibile",
@@ -556,6 +567,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Nessun messaggio in coda",
   "mobile.chat.queue.emptyBody": "I nuovi messaggi si mettono in coda mentre l'agente lavora.",
   "mobile.chat.queue.noLongerQueued": "Questo messaggio non è più in coda.",
+  "mobile.chat.queue.routine": "Routine: {name}",
   "mobile.chat.queue.position": "Posizione {position} · {date}",
   "mobile.chat.queue.attachments": "Allegati",
   "mobile.chat.queue.steer": "Indirizza",

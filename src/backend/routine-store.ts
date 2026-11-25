@@ -39,6 +39,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database/database-rows";
+import { cachedStatement } from "./database/statement-cache";
 import type { OpenBotDatabase } from "./openbot-database";
 import { hasWebhookReceipt, insertWebhookReceipt, revokeRoutineWebhooks } from "./webhook-route-store";
 import { parseEventFilters, validateWebhookTrigger, webhookMismatch, webhookRunInstruction } from "./webhook-trigger";
@@ -1130,9 +1131,10 @@ export class RoutineStore {
   }
 
   protected runForHandleRow(handleId: string): OwnedRoutineRun | null {
-    const row = this.database.connection
-      .prepare(`SELECT ${this.runColumns} FROM ${this.tables.runTable} WHERE ${this.tables.handleColumn} = ?`)
-      .get(handleId);
+    const row = cachedStatement(
+      this.database.connection,
+      `SELECT ${this.runColumns} FROM ${this.tables.runTable} WHERE ${this.tables.handleColumn} = ?`,
+    ).get(handleId);
     return isDynamicRecord(row) ? this.#run(row) : null;
   }
 
@@ -1297,9 +1299,10 @@ export class RoutineStore {
   }
 
   protected runRow(runId: string): OwnedRoutineRun | null {
-    const row = this.database.connection
-      .prepare(`SELECT ${this.runColumns} FROM ${this.tables.runTable} WHERE run_id = ?`)
-      .get(runId);
+    const row = cachedStatement(
+      this.database.connection,
+      `SELECT ${this.runColumns} FROM ${this.tables.runTable} WHERE run_id = ?`,
+    ).get(runId);
     return isDynamicRecord(row) ? this.#run(row) : null;
   }
 

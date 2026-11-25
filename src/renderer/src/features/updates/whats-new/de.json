@@ -1,5 +1,38 @@
 [
   {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Viele der Korrekturen unten funktionieren auf einem Server nur, wenn der Server diese Version hat."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Nutze Sprache in Kanälen. Wenn du einem Kanal eine Nachricht diktierst, liest die App die Antwort eines Agenten laut vor. Du kannst auch ein Sprachgespräch über das Eingabefeld des Kanals starten.",
+          "Blende einen Server in der Serverleiste aus. Der Server ist auch auf deinen anderen Computern ausgeblendet. Wähle ihn im Ordner „Ausgeblendete Server“ aus, um ihn wieder anzuzeigen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Die Seite Aufgaben heißt jetzt Threads, wie in der Handy-App und in der Seitenleiste des Chats.",
+          "Gestreamte Antworten und Workflows, die gleichzeitig laufen, brauchen weniger Prozessorleistung, und der Web-Client öffnet einen Server schneller."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Auf dem Mac öffnen „Verbinden“ und „Konto hinzufügen“ für Claude jetzt die Anmeldeseite von Claude in OpenBot.",
+          "Wenn die Verbindung zu einem verbundenen Server keine Daten mehr sendet, verbindet sich die App jetzt von selbst neu.",
+          "Lange Kanäle auf einem verbundenen Server öffnen und aktualisieren sich schneller.",
+          "Eine Workflow-Ausgabe „Benachrichtigung“ oder ein Schritt, der auf eine Freigabe wartet, sendet jetzt eine Benachrichtigung aufs Handy.",
+          "Ein Gemini-Chat läuft weiter, nachdem Google ein Werkzeugergebnis abgelehnt hat. Vorher schlug jede spätere Nachricht fehl."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.77.0",
     "date": "2026-11-23",
     "notices": [

@@ -1,9 +1,14 @@
 import type { ProviderLogoVariant } from "@openbot/brand";
-import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
+import {
+  isFreeOpencodeModel,
+  isKnownAgentProvider,
+  OPENCODE_DEFAULT_FREE_MODEL,
+} from "@openbot/contracts/agent-providers";
 import {
   type AgentProviderRef,
   type AgentStatus,
   type ClientAgentModelOption,
+  defaultProviderModel,
   type MessagingPlatform,
   type ProviderAccountStatus,
   type StoredFileRow,
@@ -23,6 +28,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { providerOffersModels } from "../../components/provider-model-options";
 import type { AgentProfile } from "../../data";
+import type { CreationPreference } from "../agents/agent-creation-model";
 
 export interface WorkflowFeatures {
   kinds: readonly WorkflowNodeKind[];
@@ -113,6 +119,7 @@ export interface WorkflowCatalogs {
   mediaSize?: boolean | undefined;
   agentFiles?: boolean | undefined;
   answers?: boolean | undefined;
+  preference?: CreationPreference | null | undefined;
   stepSettings?: ((stepId: string) => Promise<WorkflowStepSettings>) | undefined;
   files: readonly StoredFileRow[];
   media?: ((attachmentId: string, kind: WorkflowMediaKind) => string | null | undefined) | undefined;
@@ -122,18 +129,55 @@ export interface WorkflowCatalogs {
   self?: string | undefined;
 }
 
-export function workflowModelProviders(catalogs: WorkflowCatalogs, current?: AgentProviderRef): AgentProviderRef[] {
-  const all = [...new Set(catalogs.models.map((option) => option.provider))];
-  const offered = all.filter(
+const FREE_MODEL_PROVIDER: AgentProviderRef = "opencode";
+
+export function offeredModelProviders(catalogs: WorkflowCatalogs, current?: AgentProviderRef): AgentProviderRef[] {
+  return [...new Set(catalogs.models.map((option) => option.provider))].filter(
     (provider) =>
       provider === current ||
       !isKnownAgentProvider(provider) ||
       providerOffersModels(catalogs.status, catalogs.models, provider),
   );
-  return offered.length ? offered : all;
+}
+
+export function workflowModelProviders(catalogs: WorkflowCatalogs, current?: AgentProviderRef): AgentProviderRef[] {
+  const offered = offeredModelProviders(catalogs, current);
+  return offered.length ? offered : [...new Set(catalogs.models.map((option) => option.provider))];
+}
+
+function startingModel(
+  provider: AgentProviderRef,
+  options: readonly ClientAgentModelOption[],
+  preference: CreationPreference | null | undefined,
+): ClientAgentModelOption | undefined {
+  const preferred =
+    preference?.preferredProvider === provider && preference.preferredModel
+      ? options.find((option) => option.id === preference.preferredModel)
+      : undefined;
+  if (preferred) return preferred;
+  if (provider === FREE_MODEL_PROVIDER)
+    return (
+      options.find((option) => option.id === OPENCODE_DEFAULT_FREE_MODEL) ??
+      options.find((option) => isFreeOpencodeModel(option.id, option.name)) ??
+      options[0]
+    );
+  const usual = isKnownAgentProvider(provider) ? defaultProviderModel(provider) : undefined;
+  return options.find((option) => option.id === usual) ?? options[0];
 }
 
 export function defaultWorkflowModel(catalogs: WorkflowCatalogs): ClientAgentModelOption | undefined {
-  const [provider] = workflowModelProviders(catalogs);
-  return catalogs.models.find((option) => option.provider === provider);
+  const providers = workflowModelProviders(catalogs);
+  const preferred = catalogs.preference?.preferredProvider;
+  const ranked = [
+    ...providers.filter((provider) => provider === preferred),
+    ...providers.filter((provider) => provider !== preferred && provider !== FREE_MODEL_PROVIDER),
+    ...providers.filter((provider) => provider !== preferred && provider === FREE_MODEL_PROVIDER),
+  ];
+  for (const provider of ranked) {
+    const options = catalogs.models.filter((option) => option.provider === provider && option.listing !== "kept");
+    const model = startingModel(provider, options, catalogs.preference);
+    if (model) return model;
+  }
+  const fallback = catalogs.models.filter((option) => option.provider === providers[0]);
+  return fallback.find((option) => option.listing !== "kept") ?? fallback[0];
 }

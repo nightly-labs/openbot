@@ -96,6 +96,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.preview.nextPart": "Next part",
   "mobile.chat.preview.pdfFailed": "Could not show this PDF.",
   "mobile.chat.preview.spreadsheetFailed": "Could not read this spreadsheet.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "This spreadsheet is too large to preview. Share it to open it in another app.",
   "mobile.chat.preview.spreadsheetTruncated": "Preview limited to the first {rows} rows and {columns} columns.",
   "mobile.chat.copyFailedMessage": "Please try again.",
   "mobile.chat.message.copyFailed": "Could not copy message",
@@ -185,6 +187,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.attachment.damaged": "The attachment is damaged. Select it again.",
   "mobile.chat.attachment.tooLarge": "{name} is larger than {limit}.",
   "mobile.chat.attachment.cameraPermission": "Allow camera access in Settings to take a photo.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "The photo did not load. Open it in the Photos app until it shows fully, then try again.",
   "mobile.chat.composer.send": "Send message",
   "mobile.chat.composer.stop": "Stop {name}",
   "mobile.chat.composer.dictate": "Dictate message",
@@ -220,7 +224,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.liveVoice.offline": "The server is not connected. The conversation continues when it connects again.",
   "mobile.chat.liveVoice.speakFailed": "The reply could not be read aloud.",
   "mobile.chat.liveVoice.voiceNotReady": "Choose a reply voice in Settings > Voice.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 cannot read this language.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 cannot read this language. Choose another reply voice in Settings > Voice.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs did not accept the API key.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "The ElevenLabs key is missing a permission. Check it in Settings > Voice.",
@@ -241,6 +246,11 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.camera.captureFailed": "Could not take the photo. Try again.",
   "mobile.chat.camera.startFailed": "Could not start the camera. Close it and try again.",
   "mobile.chat.camera.close": "Close camera",
+  "mobile.chat.camera.fullScreenTipTitle": "Need a bigger view?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "Use the full-screen camera, with zoom and all lenses. You can change this in Settings > Conversations.",
+  "mobile.chat.camera.fullScreenTipUse": "Use full screen",
+  "mobile.chat.camera.fullScreenTipDismiss": "Hide tip",
   "mobile.chat.camera.takePhoto": "Take photo",
   "mobile.chat.camera.switch": "Switch camera",
   "mobile.chat.header.info": "Info for {name}",
@@ -500,6 +510,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.history.connecting": "Connecting to server",
   "mobile.chat.history.loading": "Loading chat history",
   "mobile.chat.history.waiting": "Waiting for connection",
+  "mobile.chat.history.syncing": "Checking for new messages",
   "mobile.chat.history.loadFailed": "Could not load chat history",
   "mobile.chat.scrollToLatest": "Scroll to latest message",
   "mobile.chat.agentUnavailable.title": "Agent unavailable",
@@ -542,6 +553,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.queue.emptyTitle": "No queued messages",
   "mobile.chat.queue.emptyBody": "New messages join the queue while the agent works.",
   "mobile.chat.queue.noLongerQueued": "This message is no longer queued.",
+  "mobile.chat.queue.routine": "Routine: {name}",
   "mobile.chat.queue.position": "Position {position} · {date}",
   "mobile.chat.queue.attachments": "Attachments",
   "mobile.chat.queue.steer": "Steer",

@@ -10,6 +10,7 @@ import { SettingsSwitch } from "@/features/settings/components/settings-controls
 import { SettingsPictureChoice } from "@/features/settings/components/settings-picture-choice";
 import { ComposerPicture, SwipePicture } from "@/features/settings/components/settings-pictures";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
+import { saveFullScreenCameraPreference, useFullScreenCameraPreference } from "@/features/settings/model/camera-mode";
 import {
   type ChatSwipeAction,
   saveChatPullPreference,
@@ -26,7 +27,7 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { END_X } from "@/shared/lib/text-direction";
 
-type ConversationSetting = "compactComposer" | "swipe" | "pull" | "largeFiles" | "photoQuality";
+type ConversationSetting = "compactComposer" | "swipe" | "pull" | "largeFiles" | "photoQuality" | "camera";
 
 function withoutSetting(
   settings: ReadonlySet<ConversationSetting>,
@@ -61,6 +62,7 @@ export function ConversationsSettingsScreen() {
   const chatPull = useChatPullPreference();
   const largeFiles = useLargeFilePreference();
   const photoQuality = usePhotoQualityPreference();
+  const camera = useFullScreenCameraPreference();
   const chatSwipeLabel =
     END_X === 1 ? t("mobile.settings.conversations.swipeLeft") : t("mobile.settings.conversations.swipeRight");
 
@@ -168,6 +170,17 @@ export function ConversationsSettingsScreen() {
             label={t("mobile.settings.conversations.fullQualityPhotos")}
             dark={dark}
             onValueChange={(fullQuality) => save("photoQuality", savePhotoQualityPreference(fullQuality))}
+          />
+        </SettingsRow>
+      </SettingsSection>
+      <SettingsSection footer={footer("camera", t("mobile.settings.conversations.fullScreenCameraFooter"))}>
+        <SettingsRow>
+          <SettingsSwitch
+            value={camera.fullScreen}
+            disabled={!camera.ready || camera.saving}
+            label={t("mobile.settings.conversations.fullScreenCamera")}
+            dark={dark}
+            onValueChange={(fullScreen) => save("camera", saveFullScreenCameraPreference(fullScreen))}
           />
         </SettingsRow>
       </SettingsSection>

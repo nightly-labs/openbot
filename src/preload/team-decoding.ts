@@ -288,6 +288,7 @@ function server(summary: DynamicRecord): ServerSummary {
     customPlan,
     keyChangedAt,
     thisComputer,
+    hidden,
     appearance,
   } = summary;
   if (!isOneOf(SERVER_NOTIFICATION_LEVELS, notificationLevel)) throw new Error("Invalid notificationLevel.");
@@ -309,6 +310,7 @@ function server(summary: DynamicRecord): ServerSummary {
     throw new Error("Invalid keyChangedAt.");
   }
   if (thisComputer !== undefined && thisComputer !== true) throw new Error("Invalid thisComputer.");
+  if (hidden !== undefined && !isBoolean(hidden)) throw new Error("Invalid hidden.");
   if (paymentRequired !== undefined && paymentRequired !== true) throw new Error("Invalid paymentRequired.");
   const plan = customPlan === undefined ? undefined : parseCustomServerPlan(customPlan);
   if (plan === null) throw new Error("Invalid customPlan.");
@@ -349,6 +351,7 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(plan === undefined ? {} : { customPlan: plan }),
     ...(keyChangedAt === undefined ? {} : { keyChangedAt }),
     ...(thisComputer === undefined ? {} : { thisComputer }),
+    ...(hidden === undefined ? {} : { hidden }),
   };
 }
 

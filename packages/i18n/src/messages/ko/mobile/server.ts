@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "{name}에서 나가지 못했어요",
   "mobile.server.drawer.removeFailed": "{name}을(를) 삭제하지 못했어요",
   "mobile.server.drawer.deleteFailed": "{name}을(를) 삭제할 수 없습니다",
+  "mobile.server.drawer.hide": "서버 숨기기",
+  "mobile.server.drawer.show": "서버 표시",
+  "mobile.server.drawer.hiddenServers": "숨긴 서버",
+  "mobile.server.drawer.hideFailed": "{name}을(를) 숨길 수 없습니다",
+  "mobile.server.drawer.showFailed": "{name}을(를) 표시할 수 없습니다",
   "mobile.server.drawer.actionFailed": "OpenBot에서 이 작업을 완료하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.drawer.moveUp": "위로 이동",
   "mobile.server.drawer.moveDown": "아래로 이동",
@@ -265,6 +270,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "모든 멤버의 계정 서비스에서 이 서버가 삭제돼요. 해당 컴퓨터의 파일과 채팅은 그대로 유지돼요. 다시 사용하려면 그 컴퓨터에서 서버를 등록하세요.",
   "mobile.server.settings.remove": "서버 삭제",
+  "mobile.server.settings.hide": "서버 숨기기",
+  "mobile.server.settings.show": "서버 표시",
   "mobile.server.settings.deleteTitle": "{name}을(를) 삭제할까요?",
   "mobile.server.settings.deleteBody":
     "OpenBot이 해당 컴퓨터에서 서버를 중지하고 에이전트, 채팅, 파일을 그 컴퓨터의 휴지통으로 옮깁니다. 서버는 모든 기기의 서버 목록에서 사라집니다.",
@@ -521,6 +528,17 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "메모리 한도를 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.memoryLimitUnsupported":
     "여기에서 메모리 한도를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.mediaApprovalCredits": "다음 값을 넘으면 확인",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "크레딧",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed": "이 서버의 크레딧 승인 한도를 불러오지 못했어요.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed": "크레딧 승인 한도를 저장하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "여기에서 크레딧 승인 한도를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.mediaApprovalAgents": "에이전트의 크레딧 사용 허용",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed":
+    "에이전트의 크레딧 사용을 변경하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.mediaApprovalAsk": "크레딧이 필요할 때 묻기",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "크레딧 요청 설정을 변경하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.memoryReview": "메모리 검토",
   "mobile.server.settings.memoryReviewDescription":
     "이 서버의 에이전트가 채팅에서 오래 쓸 사실을 백그라운드에서 저장하는 빈도예요.",

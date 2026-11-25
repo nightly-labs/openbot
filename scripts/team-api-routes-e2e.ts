@@ -16,6 +16,7 @@ import { request as httpRequest } from "node:http";
 import { homedir, tmpdir } from "node:os";
 import { join, parse, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
+import type { CreditMediaModel } from "@openbot/contracts/credit-media";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AccountUsageLimit,
@@ -64,6 +65,7 @@ import {
   type LibraryFolderAction,
   LOCAL_VOICE_MODEL_IDS,
   type LocalVoiceModelId,
+  type MediaApprovalOffer,
   type PasswordManagerConnectMethod,
   type PasswordManagerStatus,
   type PinnedMessagesSnapshot,
@@ -363,6 +365,18 @@ import {
   type MachineAlertEvent,
   machineAlertEvent,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import {
+  decodeCreditsHoldResponse,
+  decodeMediaApprovalReadResponse,
+  MEDIA_APPROVAL_CHOICE_CAPABILITY,
+  MEDIA_APPROVAL_CHOICE_CODECS,
+  MEDIA_APPROVAL_CHOICE_ROUTES,
+} from "@openbot/contracts/team-protocol/media-approval-choice-v1";
+import {
+  MEDIA_APPROVAL_CREDITS_CAPABILITY,
+  MEDIA_APPROVAL_CREDITS_CODECS,
+  MEDIA_APPROVAL_CREDITS_ROUTES,
+} from "@openbot/contracts/team-protocol/media-approval-credits-v1";
 import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY, MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
@@ -376,6 +390,7 @@ import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
 } from "@openbot/contracts/team-protocol/model-visibility-v1";
+import { OPENBOT_CREDITS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/openbot-credits-events-v1";
 import {
   PASSWORD_MANAGERS_CAPABILITY,
   PASSWORD_MANAGERS_CODECS,
@@ -571,6 +586,7 @@ import { RoutineResultError } from "../src/backend/routine-results/routine-resul
 import type { OwnedRoutineRecord } from "../src/backend/routine-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
 import { resolveSharedFile as resolveSharedFileOnDisk } from "../src/backend/workspace-paths";
+import { HostAccountActivity } from "../src/main/account-activity-reporter";
 import type { AgentAccessState } from "../src/main/agent-access-store";
 import { createAgentDefaultsPreferenceStore } from "../src/main/agent-defaults-preference-store";
 import { createAgentDefaultsSettings } from "../src/main/agent-defaults-settings";
@@ -616,6 +632,10 @@ import {
 } from "../src/main/instance-transfer-manifest";
 import { LibraryFoldersService, type LibraryFoldersSources } from "../src/main/library-folders-service";
 import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/machine-alerts";
+import {
+  createMediaApprovalCreditsPreferenceStore,
+  mediaApprovalCreditsControl,
+} from "../src/main/media-approval-credits-preference-store";
 import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
 import { ModelReleaseCatalog, ModelVisibility } from "../src/main/model-visibility";
 import type { PasswordManagerDriver } from "../src/main/password-managers/driver";
@@ -781,6 +801,7 @@ const calls: RecordedCall[] = [];
 const logged: string[] = [];
 const uploads: AttachmentDataInput[] = [];
 let clock = Date.now();
+let reportMemberUse: (memberId: string) => void = () => undefined;
 const routineResultOptions: RoutineResultConnectionOption[] = [
   {
     connectionId: "slack-acme",
@@ -1066,6 +1087,7 @@ function queueSnapshot(agentId: string): QueueSnapshot {
 const providerKeys = new Set<string>();
 let codexOnKey = false;
 const offProviders = new Set<string>();
+const mutedCreditAskMembers = new Set<string>();
 const NO_STATUS: AgentStatus = {
   phase: "ready",
   cliVersion: null,
@@ -1196,9 +1218,9 @@ function libraryScan(): StorageUsage {
   };
 }
 const libraryStorage: LibraryFoldersSources["storage"] = {
-  usage: (input) =>
+  hostFiles: () =>
     Effect.sync(() => {
-      record("libraryScan", input);
+      record("libraryScan");
       return libraryScan();
     }),
   invalidate: () => {
@@ -1377,6 +1399,36 @@ function pinnedSnapshot(agentId: string, messageIds: string[] = ["message-pinned
     })),
   };
 }
+
+const fakeMediaModel = (id: string, name: string, credits: number): CreditMediaModel => ({
+  id,
+  kind: "image",
+  name,
+  maker: "openai",
+  variant: null,
+  aspects: ["1:1", "16:9"],
+  defaultAspect: "1:1",
+  resolutions: [],
+  defaultResolution: null,
+  durations: [],
+  defaultDuration: null,
+  frames: 0,
+  references: 4,
+  audio: false,
+  maxCount: 1,
+  promptRequired: true,
+  prices: [{ resolution: null, unit: "item", credits, silentCredits: null }],
+});
+
+const fakeMediaOffer: MediaApprovalOffer = {
+  kind: "image",
+  prompt: "A red fox in snow",
+  agentModel: "gpt-image-2",
+  choice: { model: "gpt-image-2", aspect: "1:1", resolution: null, duration: null, audio: false },
+  defaultModel: null,
+  canSetDefault: true,
+  models: [fakeMediaModel("gpt-image-2", "GPT Image 2", 12), fakeMediaModel("nano-banana-2", "Nano Banana 2", 8)],
+};
 
 const fakeAgents: TeamApiAgents = {
   on: (_event, listener) => {
@@ -1898,6 +1950,49 @@ const fakeAgents: TeamApiAgents = {
         permissions: null,
       };
     return undefined;
+  },
+  pendingMediaApproval: (agentId, requestId) => {
+    record("pendingMediaApproval", agentId, requestId);
+    return agentId === "agent-ada" && requestId === 8 ? fakeMediaOffer : undefined;
+  },
+  pendingCreditsHold: (agentId, requestId, canEnable) => {
+    record("pendingCreditsHold", agentId, requestId, canEnable);
+    return agentId === "agent-ada" && requestId === 10
+      ? { reason: "agentsOff", images: 2, videos: 1, cost: 160, balance: null, canEnable }
+      : undefined;
+  },
+  respondToCreditsHold: (input, responder) => {
+    record("respondToCreditsHold", input, responder);
+    if (input.requestId !== 10)
+      return Effect.fail(
+        new AgentLifecycleFailed({
+          operation: "respondToCreditsHold",
+          cause: new InactiveAttentionRequest(sourceText("error.backend.approvalInactive")),
+        }),
+      );
+    if (input.action === "enable" && !responder?.person?.canAdminister)
+      return Effect.fail(
+        new AgentLifecycleFailed({
+          operation: "respondToCreditsHold",
+          cause: new ForbiddenAttentionAnswer(sourceText("error.backend.creditsHoldAdminOnly")),
+        }),
+      );
+    return Effect.succeed(
+      input.action === "continue"
+        ? { reason: "agentsOff" as const, images: 2, videos: 1, cost: 160, balance: null, canEnable: false }
+        : null,
+    );
+  },
+  respondToMediaApproval: (input, responder) => {
+    record("respondToMediaApproval", input, responder);
+    if (input.requestId !== 8)
+      return Effect.fail(
+        new AgentLifecycleFailed({
+          operation: "respondToMediaApproval",
+          cause: new InactiveAttentionRequest(sourceText("error.backend.approvalInactive")),
+        }),
+      );
+    return Effect.void;
   },
   respondToPrompt: (input, responder) => Effect.sync(() => record("respondToPrompt", input, responder)),
   respondToApproval: (input, responder) => {
@@ -2605,11 +2700,13 @@ const githubSkillsAdmin: Pick<
 const adaSkills = join(root, "workspaces", "agent-ada", ".claude", "skills");
 mkdirSync(join(adaSkills, "good-skill"), { recursive: true });
 writeFileSync(join(adaSkills, "good-skill", "SKILL.md"), "---\nname: good-skill\ndescription: Works.\n---\n# Good\n");
-mkdirSync(join(adaSkills, "settlement-economy"), { recursive: true });
+mkdirSync(join(adaSkills, "bom-skill"), { recursive: true });
 writeFileSync(
-  join(adaSkills, "settlement-economy", "SKILL.md"),
-  "\uFEFF---\r\nname: settlement-economy\r\ndescription: Settles.\r\n---\r\n# Settle\r\n",
+  join(adaSkills, "bom-skill", "SKILL.md"),
+  "\uFEFF---\r\nname: bom-skill\r\ndescription: Saved with a byte order mark.\r\n---\r\n# Bom\r\n",
 );
+mkdirSync(join(adaSkills, "settlement-economy"), { recursive: true });
+writeFileSync(join(adaSkills, "settlement-economy", "SKILL.md"), "\uFEFF# Settle\r\n");
 const chatSkills = new SkillMarketplaceService(
   {
     requestAuthorized: () => Effect.die("Not used."),
@@ -2791,6 +2888,7 @@ try {
   });
   server = new TeamApiServer({
     appVersion: APP_VERSION,
+    onMemberUse: (memberId) => reportMemberUse(memberId),
     agentImport,
     libraryFolders,
     store,
@@ -2989,6 +3087,20 @@ try {
         createClaudeCompactWindowPreferenceStore(join(root, "claude-compact-window.json")),
         () => record("claudeCompactWindowChanged"),
       ),
+      mediaApprovalCredits: mediaApprovalCreditsControl(
+        createMediaApprovalCreditsPreferenceStore(join(root, "media-approval-credits.json")),
+        () => record("mediaApprovalCreditsChanged"),
+      ),
+      creditAsks: {
+        setMuted: (person, muted) =>
+          Effect.sync(() => {
+            record("setCreditAsksMuted", person, muted);
+            if (!person || person.canAdminister) return;
+            if (muted) mutedCreditAskMembers.add(person.id);
+            else mutedCreditAskMembers.delete(person.id);
+          }),
+        mutedFor: (person) => person !== null && !person.canAdminister && mutedCreditAskMembers.has(person.id),
+      },
       promptCacheTtl: {
         get: () => ({ ttl: "1h" as const }),
         set: (ttl) => Effect.succeed({ ttl }),
@@ -3516,6 +3628,51 @@ try {
     { redeemedServerIds, serverId },
   );
   assert.ok(typeof bobToken === "string" && typeof bobId === "string", "bob did not join.");
+
+  {
+    const sends: string[][] = [];
+    const activity = new HostAccountActivity({
+      analyticsOn: true,
+      resolveOwner: () => null,
+      memberAccountId: (memberId) => store.getMemberAccountId(memberId),
+      send: (accounts) => Effect.sync(() => sends.push([...accounts])),
+    });
+    reportMemberUse = (memberId) => activity.memberUsed(memberId);
+    const bobAccount = store.getMemberAccountId(bobId);
+    await call("GET", TEAM_API_ROUTES.me, { token: bobToken });
+    await activity.idle();
+    const afterRead = sends.length;
+    await call("POST", TEAM_API_ROUTES.team.invites, { token: bobToken, json: { role: "member" } });
+    await call("POST", TEAM_API_ROUTES.team.invites, { token: bobToken, json: { role: "member" } });
+    await call("PUT", TEAM_API_ROUTES.me, { token: adaToken, json: {} });
+    await activity.idle();
+    check(
+      "a member's client use reports the member's account once a day, and a read or a member with no account reports nothing",
+      bobAccount !== null && afterRead === 0 && isDeepStrictEqual(sends, [[bobAccount]]),
+      { afterRead, sends, bobAccount },
+    );
+
+    const offSends: string[][] = [];
+    const offActivity = new HostAccountActivity({
+      analyticsOn: false,
+      resolveOwner: () => null,
+      memberAccountId: (memberId) => store.getMemberAccountId(memberId),
+      send: (accounts) => Effect.sync(() => offSends.push([...accounts])),
+    });
+    reportMemberUse = (memberId) => offActivity.memberUsed(memberId);
+    await call("POST", TEAM_API_ROUTES.team.invites, { token: bobToken, json: { role: "member" } });
+    await offActivity.idle();
+    const whileOff = offSends.length;
+    offActivity.setAnalyticsOn(true);
+    await call("POST", TEAM_API_ROUTES.team.invites, { token: bobToken, json: { role: "member" } });
+    await offActivity.idle();
+    check(
+      "a host with analytics off reports no member, and reports again when analytics is turned on",
+      whileOff === 0 && isDeepStrictEqual(offSends, [[bobAccount]]),
+      { whileOff, offSends },
+    );
+    reportMemberUse = () => undefined;
+  }
 
   const seatInvite = await runCauseEffect(store.createInvite("member"));
   const fourth = await call("POST", TEAM_API_ROUTES.join.server, {
@@ -4260,12 +4417,13 @@ try {
         TEAM_PROTOCOL_V1_WEBSOCKET,
         `openbot-token.${bobToken}`,
       ]);
-      const state = { declared: false, changed: 0, marked: false };
+      const state = { declared: false, changed: 0, credits: 0, marked: false };
       const waiters = new Set<() => void>();
       socket.addEventListener("message", (message) => {
         const value = JSON.parse(String(message.data));
         if (isDynamicRecord(value) && value.type === "chat-colors-changed") state.declared = true;
         if (isDynamicRecord(value) && value.type === "host-turn-limits-changed") state.changed++;
+        if (isDynamicRecord(value) && value.type === "openbot-credits-changed") state.credits++;
         if (isDynamicRecord(value) && value.type === "library-folders-changed") state.marked = true;
         for (const wake of waiters) wake();
       });
@@ -4314,6 +4472,23 @@ try {
       "a change of the limits reaches a member socket that has the events capability, and not an older socket",
       listening.ready && older.ready && heard && olderMarked && older.state.changed === 0,
       JSON.stringify({ listening: listening.state, older: older.state }),
+    );
+    const creditsListening = await openTurnLimitsSocket([OPENBOT_CREDITS_EVENTS_CAPABILITY]);
+    const creditsOlder = await openTurnLimitsSocket([]);
+    for (const listener of agentEventListeners) listener({ type: "openbot-credits-changed" });
+    const creditsHeard = await creditsListening.until(() => creditsListening.state.credits === 1);
+    for (const listener of agentEventListeners) listener({ type: "library-folders-changed" });
+    const creditsOlderMarked = await creditsOlder.until(() => creditsOlder.state.marked);
+    creditsListening.socket.close();
+    creditsOlder.socket.close();
+    check(
+      "a credits change reaches a member socket that has the credits events capability, and not an older socket",
+      creditsListening.ready &&
+        creditsOlder.ready &&
+        creditsHeard &&
+        creditsOlderMarked &&
+        creditsOlder.state.credits === 0,
+      JSON.stringify({ listening: creditsListening.state, older: creditsOlder.state }),
     );
     const reloaded = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
     await runCauseEffect(reloaded.load());
@@ -7739,14 +7914,19 @@ try {
         .filter((skill) => skill.skillId.startsWith("workspace:"))
         .map(({ slug, problem }) => ({ slug, problem }));
     check(
-      "an older client gets only the usable skill folder, as before",
-      plain.status === 200 && isDeepStrictEqual(named(plain), [{ slug: "good-skill", problem: undefined }]),
+      "an older client gets only the usable skill folders, as before, and a byte order mark does not make a folder unusable",
+      plain.status === 200 &&
+        isDeepStrictEqual(named(plain), [
+          { slug: "bom-skill", problem: undefined },
+          { slug: "good-skill", problem: undefined },
+        ]),
       summary(plain),
     );
     check(
-      "a client with skill-problems-v1 also gets the folder whose SKILL.md has a byte order mark, with the reason",
+      "a client with skill-problems-v1 also gets the folder whose SKILL.md has no frontmatter, with the reason",
       withProblems.status === 200 &&
         isDeepStrictEqual(named(withProblems), [
+          { slug: "bom-skill", problem: undefined },
           { slug: "good-skill", problem: undefined },
           { slug: "settlement-economy", problem: sourceText("error.skill.frontmatterMissing") },
         ]),
@@ -9690,6 +9870,365 @@ try {
         isDeepStrictEqual(reset.body, { tokens: null }) &&
         callsOf("claudeCompactWindowChanged").length === 2,
       [summary(member), summary(memberRead), summary(noCapability), summary(reset)],
+    );
+  }
+
+  {
+    const setup = { token: adaToken, protocol: TEAM_PROTOCOL_V10, capabilities: [MEDIA_APPROVAL_CREDITS_CAPABILITY] };
+    const route = MEDIA_APPROVAL_CREDITS_ROUTES;
+    const newest = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const before = await call("POST", route.settings, { ...setup, json: {} });
+    const set = await call("POST", route.update, { ...setup, json: { credits: 250 } });
+    const after = await call("POST", route.settings, { ...setup, json: {} });
+    const saved = parseJson(readFileSync(join(root, "media-approval-credits.json"), "utf8"));
+    check(
+      "the host advertises media-approval-credits-v1 to a protocol 10 peer only, and an admin reads the default of 50 credits and sets a new limit, which the host saves",
+      list(field(newest.body, "capabilities")).includes(MEDIA_APPROVAL_CREDITS_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(MEDIA_APPROVAL_CREDITS_CAPABILITY) &&
+        isDeepStrictEqual(before.body, {
+          agents: true,
+          askWhenBlocked: true,
+          credits: 50,
+          imageModel: null,
+          videoModel: null,
+        }) &&
+        isDeepStrictEqual(set.body, {
+          agents: true,
+          askWhenBlocked: true,
+          credits: 250,
+          imageModel: null,
+          videoModel: null,
+        }) &&
+        isDeepStrictEqual(after.body, {
+          agents: true,
+          askWhenBlocked: true,
+          credits: 250,
+          imageModel: null,
+          videoModel: null,
+        }) &&
+        MEDIA_APPROVAL_CREDITS_CODECS.get(route.update)?.response(200, set.body) !== undefined &&
+        isDeepStrictEqual(saved, {
+          version: 1,
+          agents: true,
+          askWhenBlocked: true,
+          credits: 250,
+          imageModel: null,
+          videoModel: null,
+        }),
+      [summary(newest), summary(older), summary(before), summary(set), summary(after)],
+    );
+    const negative = await call("POST", route.update, { ...setup, json: { credits: -1 } });
+    const tooLarge = await call("POST", route.update, { ...setup, json: { credits: 100_001 } });
+    const fraction = await call("POST", route.update, { ...setup, json: { credits: 12.5 } });
+    const text = await call("POST", route.update, { ...setup, json: { credits: "100" } });
+    const unchanged = await call("POST", route.settings, { ...setup, json: {} });
+    check(
+      "the host refuses a limit below 0, above 100,000 or not whole, and keeps the saved limit",
+      [negative, tooLarge, fraction, text].every((reply) => reply.status === 400) &&
+        isDeepStrictEqual(unchanged.body, {
+          agents: true,
+          askWhenBlocked: true,
+          credits: 250,
+          imageModel: null,
+          videoModel: null,
+        }),
+      [summary(negative), summary(tooLarge), summary(fraction), summary(text), summary(unchanged)],
+    );
+    const memberRead = await call("POST", route.settings, { ...setup, token: bobToken, json: {} });
+    const memberChange = await call("POST", route.update, { ...setup, token: bobToken, json: { credits: 0 } });
+    const noCapability = await call("POST", route.update, {
+      token: adaToken,
+      protocol: TEAM_PROTOCOL_V10,
+      json: { credits: 0 },
+    });
+    const zero = await call("POST", route.update, { ...setup, json: { credits: 0 } });
+    const top = await call("POST", route.update, { ...setup, json: { credits: 100_000 } });
+    check(
+      "a member cannot read or set the limit (403), a client without media-approval-credits-v1 gets 400, and an admin sets 0 and 100,000",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberChange, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(noCapability, 400, sourceText("error.team.mediaApprovalCreditsUnsupported")) &&
+        isDeepStrictEqual(zero.body, {
+          agents: true,
+          askWhenBlocked: true,
+          credits: 0,
+          imageModel: null,
+          videoModel: null,
+        }) &&
+        isDeepStrictEqual(top.body, {
+          agents: true,
+          askWhenBlocked: true,
+          credits: 100_000,
+          imageModel: null,
+          videoModel: null,
+        }),
+      [summary(memberRead), summary(memberChange), summary(noCapability), summary(zero), summary(top)],
+    );
+    const imageDefault = await call("POST", route.update, { ...setup, json: { imageModel: "nano-banana-2" } });
+    const videoDefault = await call("POST", route.update, { ...setup, json: { videoModel: "kling-3" } });
+    const badModel = await call("POST", route.update, { ...setup, json: { imageModel: "Bad Model!" } });
+    const clearImage = await call("POST", route.update, { ...setup, json: { imageModel: null } });
+    check(
+      "an admin sets and clears the default image and video model one field at a time, the credit limit stays, and the host refuses a model that is not valid",
+      isDeepStrictEqual(imageDefault.body, {
+        agents: true,
+        askWhenBlocked: true,
+        credits: 100_000,
+        imageModel: "nano-banana-2",
+        videoModel: null,
+      }) &&
+        isDeepStrictEqual(videoDefault.body, {
+          agents: true,
+          askWhenBlocked: true,
+          credits: 100_000,
+          imageModel: "nano-banana-2",
+          videoModel: "kling-3",
+        }) &&
+        badModel.status === 400 &&
+        isDeepStrictEqual(clearImage.body, {
+          agents: true,
+          askWhenBlocked: true,
+          credits: 100_000,
+          imageModel: null,
+          videoModel: "kling-3",
+        }),
+      [summary(imageDefault), summary(videoDefault), summary(badModel), summary(clearImage)],
+    );
+    const agentsOff = await call("POST", route.update, { ...setup, json: { agents: false } });
+    const agentsText = await call("POST", route.update, { ...setup, json: { agents: "no" } });
+    const memberAgents = await call("POST", route.update, { ...setup, token: bobToken, json: { agents: true } });
+    const offRead = await call("POST", route.settings, { ...setup, json: {} });
+    const agentsOn = await call("POST", route.update, { ...setup, json: { agents: true } });
+    check(
+      "an admin turns agent use of credits off and on, the other fields stay, a member cannot change it (403), and the host refuses a value that is not true or false",
+      isDeepStrictEqual(agentsOff.body, {
+        agents: false,
+        askWhenBlocked: true,
+        credits: 100_000,
+        imageModel: null,
+        videoModel: "kling-3",
+      }) &&
+        agentsText.status === 400 &&
+        errorIs(memberAgents, 403, sourceText("error.team.adminRequired")) &&
+        isDeepStrictEqual(offRead.body, agentsOff.body) &&
+        isDeepStrictEqual(agentsOn.body, {
+          agents: true,
+          askWhenBlocked: true,
+          credits: 100_000,
+          imageModel: null,
+          videoModel: "kling-3",
+        }),
+      [summary(agentsOff), summary(agentsText), summary(memberAgents), summary(offRead), summary(agentsOn)],
+    );
+    const askOff = await call("POST", route.update, { ...setup, json: { askWhenBlocked: false } });
+    const askText = await call("POST", route.update, { ...setup, json: { askWhenBlocked: "no" } });
+    const memberAsk = await call("POST", route.update, { ...setup, token: bobToken, json: { askWhenBlocked: true } });
+    const askOn = await call("POST", route.update, { ...setup, json: { askWhenBlocked: true } });
+    check(
+      "an admin turns the credit asks off and on, the other fields stay, a member cannot change it (403), and the host refuses a value that is not true or false",
+      isDeepStrictEqual(askOff.body, {
+        agents: true,
+        askWhenBlocked: false,
+        credits: 100_000,
+        imageModel: null,
+        videoModel: "kling-3",
+      }) &&
+        askText.status === 400 &&
+        errorIs(memberAsk, 403, sourceText("error.team.adminRequired")) &&
+        field(askOn.body, "askWhenBlocked") === true,
+      [summary(askOff), summary(askText), summary(memberAsk), summary(askOn)],
+    );
+    const together = await Promise.all([
+      call("POST", route.update, { ...setup, json: { credits: 75 } }),
+      call("POST", route.update, { ...setup, json: { imageModel: "nano-banana-2" } }),
+      call("POST", route.update, { ...setup, json: { agents: false } }),
+      call("POST", route.update, { ...setup, json: { askWhenBlocked: false } }),
+    ]);
+    const afterTogether = await call("POST", route.settings, { ...setup, json: {} });
+    check(
+      "updates of different fields at the same time keep each change",
+      together.every((reply) => reply.status === 200) &&
+        isDeepStrictEqual(afterTogether.body, {
+          agents: false,
+          askWhenBlocked: false,
+          credits: 75,
+          imageModel: "nano-banana-2",
+          videoModel: "kling-3",
+        }),
+      [...together.map(summary), summary(afterTogether)],
+    );
+    await call("POST", route.update, {
+      ...setup,
+      json: { credits: 100_000, imageModel: null, agents: true, askWhenBlocked: true },
+    });
+  }
+
+  {
+    const capabilities = [MEDIA_APPROVAL_CHOICE_CAPABILITY];
+    const v10 = { capabilities, protocol: TEAM_PROTOCOL_V10 };
+    const route = MEDIA_APPROVAL_CHOICE_ROUTES;
+    const newest = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const unsupported = await call("POST", route.read, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      json: { agentId: "agent-ada", requestId: 8 },
+    });
+    const missingAgent = await call("POST", route.read, {
+      token: bobToken,
+      ...v10,
+      json: { agentId: "agent-missing", requestId: 8 },
+    });
+    const invalid = await call("POST", route.read, { token: bobToken, ...v10, json: { agentId: "agent-ada" } });
+    check(
+      "the host advertises media-approval-choice-v1 to a protocol 10 peer only, and refuses a read without the capability, of an unknown agent, or without a request ID",
+      list(field(newest.body, "capabilities")).includes(MEDIA_APPROVAL_CHOICE_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(MEDIA_APPROVAL_CHOICE_CAPABILITY) &&
+        errorIs(unsupported, 400, sourceText("error.team.mediaApprovalChoiceUnsupported")) &&
+        errorIs(missingAgent, 404, sourceText("error.team.agentNotFound")) &&
+        invalid.status === 400 &&
+        callsOf("pendingMediaApproval").length === 0,
+      [summary(unsupported), summary(missingAgent), summary(invalid)],
+    );
+    const memberRead = await call("POST", route.read, {
+      token: bobToken,
+      ...v10,
+      json: { agentId: "agent-ada", requestId: 8 },
+    });
+    const adminRead = await call("POST", route.read, {
+      token: adaToken,
+      ...v10,
+      json: { agentId: "agent-ada", requestId: 8 },
+    });
+    const other = await call("POST", route.read, {
+      token: bobToken,
+      ...v10,
+      json: { agentId: "agent-ada", requestId: 9 },
+    });
+    const memberOffer = decodeMediaApprovalReadResponse(memberRead.body).media;
+    check(
+      "a member reads the media offer with the agent's choice and the model list, only an admin can set the default, and a request that is not a media approval reads as null",
+      memberRead.status === 200 &&
+        memberOffer?.agentModel === "gpt-image-2" &&
+        memberOffer.models.length === 2 &&
+        memberOffer.canSetDefault === false &&
+        field(adminRead.body, "media", "canSetDefault") === true &&
+        MEDIA_APPROVAL_CHOICE_CODECS.get(route.read)?.response(200, memberRead.body) !== undefined &&
+        isDeepStrictEqual(other.body, { media: null, hold: null }),
+      [summary(memberRead), summary(adminRead), summary(other)],
+    );
+    const choice = { model: "nano-banana-2", aspect: "16:9", resolution: null, duration: null, audio: false };
+    const allowed = await call("POST", route.respond, {
+      token: bobToken,
+      ...v10,
+      json: { agentId: "agent-ada", requestId: 8, choice },
+    });
+    const badChoice = await call("POST", route.respond, {
+      token: bobToken,
+      ...v10,
+      json: { agentId: "agent-ada", requestId: 8, choice: { ...choice, model: "Bad Model!" } },
+    });
+    const inactive = await call("POST", route.respond, {
+      token: bobToken,
+      ...v10,
+      json: { agentId: "agent-ada", requestId: 9, choice },
+    });
+    check(
+      "a member allows the media approval with another model and aspect, the host refuses a choice that is not valid (400) and a request that is not pending (409)",
+      allowed.status === 204 &&
+        isDeepStrictEqual(callsOf("respondToMediaApproval")[0], [
+          { agentId: "agent-ada", requestId: 8, choice },
+          { owner: false },
+        ]) &&
+        badChoice.status === 400 &&
+        errorIs(inactive, 409, sourceText("error.backend.approvalInactive")) &&
+        callsOf("respondToMediaApproval").length === 2,
+      [summary(allowed), summary(badChoice), summary(inactive)],
+    );
+    const holdRead = { agentId: "agent-ada", requestId: 10 };
+    const memberHoldRead = await call("POST", route.read, { token: bobToken, ...v10, json: holdRead });
+    const adminHoldRead = await call("POST", route.read, { token: adaToken, ...v10, json: holdRead });
+    const memberHold = decodeMediaApprovalReadResponse(memberHoldRead.body).hold;
+    check(
+      "a credits hold reads with its cost and counts, and only an admin reads that the hold can turn agent credits on",
+      memberHoldRead.status === 200 &&
+        memberHold?.reason === "agentsOff" &&
+        memberHold.cost === 160 &&
+        memberHold.images === 2 &&
+        memberHold.videos === 1 &&
+        memberHold.canEnable === false &&
+        decodeMediaApprovalReadResponse(adminHoldRead.body).hold?.canEnable === true &&
+        MEDIA_APPROVAL_CHOICE_CODECS.get(route.read)?.response(200, adminHoldRead.body) !== undefined,
+      [summary(memberHoldRead), summary(adminHoldRead)],
+    );
+    const memberEnable = await call("POST", route.hold, {
+      token: bobToken,
+      ...v10,
+      json: { ...holdRead, action: "enable" },
+    });
+    const stillHeld = await call("POST", route.hold, {
+      token: bobToken,
+      ...v10,
+      json: { ...holdRead, action: "continue" },
+    });
+    const skipped = await call("POST", route.hold, { token: bobToken, ...v10, json: { ...holdRead, action: "skip" } });
+    const badAction = await call("POST", route.hold, {
+      token: bobToken,
+      ...v10,
+      json: { ...holdRead, action: "wait" },
+    });
+    const goneHold = await call("POST", route.hold, {
+      token: bobToken,
+      ...v10,
+      json: { agentId: "agent-ada", requestId: 11, action: "skip" },
+    });
+    check(
+      "a member cannot turn agent credits on from a hold (403), a continue that is still short returns the hold, a skip returns null, and the host refuses a bad action (400) and a hold that is not pending (409)",
+      errorIs(memberEnable, 403, sourceText("error.backend.creditsHoldAdminOnly")) &&
+        stillHeld.status === 200 &&
+        decodeCreditsHoldResponse(stillHeld.body)?.cost === 160 &&
+        skipped.status === 200 &&
+        decodeCreditsHoldResponse(skipped.body) === null &&
+        isDeepStrictEqual(callsOf("respondToCreditsHold").at(-2), [
+          { ...holdRead, action: "skip" },
+          { owner: false, person: { id: bobId, canAdminister: false } },
+        ]) &&
+        badAction.status === 400 &&
+        errorIs(goneHold, 409, sourceText("error.backend.approvalInactive")),
+      [summary(memberEnable), summary(stillHeld), summary(skipped), summary(badAction), summary(goneHold)],
+    );
+    const memberMute = await call("POST", route.muted, { token: bobToken, ...v10, json: { muted: true } });
+    const adminUnmute = await call("POST", route.muted, { token: adaToken, ...v10, json: { muted: false } });
+    const badMute = await call("POST", route.muted, { token: bobToken, ...v10, json: { muted: "yes" } });
+    const mutes = callsOf("setCreditAsksMuted");
+    check(
+      "a member mutes credit asks for that member, an admin's change is marked as an admin change, and the host refuses a value that is not a boolean",
+      memberMute.status === 204 &&
+        adminUnmute.status === 204 &&
+        isDeepStrictEqual(mutes, [
+          [{ id: bobId, canAdminister: false }, true],
+          [{ id: adaId, canAdminister: true }, false],
+        ]) &&
+        badMute.status === 400,
+      [summary(memberMute), summary(adminUnmute), summary(badMute), mutes],
+    );
+    const memberMutedRead = await call("POST", route.mutedRead, { token: bobToken, ...v10, json: {} });
+    const adminMutedRead = await call("POST", route.mutedRead, { token: adaToken, ...v10, json: {} });
+    const memberUnmute = await call("POST", route.muted, { token: bobToken, ...v10, json: { muted: false } });
+    const memberUnmutedRead = await call("POST", route.mutedRead, { token: bobToken, ...v10, json: {} });
+    const mutedResponse = MEDIA_APPROVAL_CHOICE_CODECS.get(route.mutedRead)?.response;
+    check(
+      "a member reads that member's credit asks mute, an admin reads the admin state, and a member unmute reads back as not muted",
+      memberMutedRead.status === 200 &&
+        isDeepStrictEqual(memberMutedRead.body, { muted: true }) &&
+        adminMutedRead.status === 200 &&
+        isDeepStrictEqual(adminMutedRead.body, { muted: false }) &&
+        memberUnmute.status === 204 &&
+        isDeepStrictEqual(memberUnmutedRead.body, { muted: false }) &&
+        mutedResponse?.(200, memberMutedRead.body) !== undefined,
+      [summary(memberMutedRead), summary(adminMutedRead), summary(memberUnmute), summary(memberUnmutedRead)],
     );
   }
 
@@ -16089,7 +16628,6 @@ try {
           placement: { "file-ada-1": "folder-campaign" },
         }) &&
         scans() === 1 &&
-        isDeepStrictEqual(callsOf("libraryScan")[0], [{ scope: "host" }]) &&
         invalidations() === 0,
       summary(created),
     );

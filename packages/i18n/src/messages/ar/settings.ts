@@ -279,6 +279,9 @@ export const messages = {
   "settings.agentDock.xwayland.unsupported":
     "على Wayland بدون XWayland، لا يمكن أن يظهر الشريط فوق التطبيقات الأخرى. يظهر في نافذة OpenBot.",
   "settings.agentDock.xwayland.restart": "إعادة التشغيل",
+  "settings.agentDock.noCompositor.title": "معروض في نافذة OpenBot",
+  "settings.agentDock.noCompositor.description":
+    "لا يمكن لسطح المكتب عرض نوافذ شفافة، لذلك يظهر الشريط في نافذة OpenBot. لعرضه فوق التطبيقات الأخرى، فعّل تأثيرات سطح المكتب (مُركِّب) في إعدادات النظام، ثم أعد تشغيل OpenBot.",
   "settings.agentDock.display.title": "الشاشة",
   "settings.agentDock.display.description": "إذا لم تكن تلك الشاشة متصلة، فسينتقل الشريط إلى شاشة نافذة OpenBot.",
   "settings.agentDock.display.window": "مع نافذة OpenBot",

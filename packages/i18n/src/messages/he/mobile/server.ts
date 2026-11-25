@@ -111,6 +111,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "לא ניתן לעזוב את {name}",
   "mobile.server.drawer.removeFailed": "לא ניתן להסיר את {name}",
   "mobile.server.drawer.deleteFailed": "לא ניתן למחוק את {name}",
+  "mobile.server.drawer.hide": "הסתרת השרת",
+  "mobile.server.drawer.show": "הצגת השרת",
+  "mobile.server.drawer.hiddenServers": "שרתים מוסתרים",
+  "mobile.server.drawer.hideFailed": "לא ניתן להסתיר את {name}",
+  "mobile.server.drawer.showFailed": "לא ניתן להציג את {name}",
   "mobile.server.drawer.actionFailed": "OpenBot לא הצליח להשלים את הפעולה. אפשר לנסות שוב.",
   "mobile.server.drawer.moveUp": "הזזה למעלה",
   "mobile.server.drawer.moveDown": "הזזה למטה",
@@ -385,6 +390,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "הפעולה מסירה את השרת משירות החשבונות עבור כל החברים. הקבצים והצ'אטים במחשב שלו נשמרים. כדי להשתמש בו שוב, יש לרשום אותו מאותו מחשב.",
   "mobile.server.settings.remove": "הסרת השרת",
+  "mobile.server.settings.hide": "הסתרת השרת",
+  "mobile.server.settings.show": "הצגת השרת",
   "mobile.server.settings.deleteTitle": "למחוק את {name}?",
   "mobile.server.settings.deleteBody":
     "OpenBot עוצר את השרת במחשב שלו ומעביר את הסוכנים, הצ'אטים והקבצים שלו לפח של אותו מחשב. השרת נעלם מרשימת השרתים בכל המכשירים שלך.",
@@ -643,6 +650,16 @@ export const messages = {
   "mobile.server.settings.memoryLimitLoadFailed": "לא ניתן לטעון את מגבלת הזיכרונות של השרת הזה.",
   "mobile.server.settings.memoryLimitSaveFailed": "לא ניתן לשמור את מגבלת הזיכרונות. אפשר לנסות שוב.",
   "mobile.server.settings.memoryLimitUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את מגבלת הזיכרונות שלו.",
+  "mobile.server.settings.mediaApprovalCredits": "לשאול לפני הוצאה של יותר מ־",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "קרדיטים",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed": "לא ניתן לטעון את סף אישור הקרדיטים של השרת הזה.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed": "לא ניתן לשמור את סף אישור הקרדיטים. אפשר לנסות שוב.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את סף אישור הקרדיטים שלו.",
+  "mobile.server.settings.mediaApprovalAgents": "סוכנים יכולים להשתמש בקרדיטים",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed": "לא ניתן לשנות את השימוש של סוכנים בקרדיטים. אפשר לנסות שוב.",
+  "mobile.server.settings.mediaApprovalAsk": "לשאול כשצריך קרדיטים",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "לא ניתן לשנות את בקשות הקרדיטים. אפשר לנסות שוב.",
   "mobile.server.settings.memoryReview": "סקירת זיכרון",
   "mobile.server.settings.memoryReviewDescription":
     "באיזו תדירות סוכנים בשרת הזה שומרים ברקע עובדות מתמשכות מהצ'אטים שלהם.",

@@ -506,6 +506,9 @@ export const CREDIT_MODEL_COSTS: readonly CreditModelCost[] = [
 ];
 
 export const CREDIT_CLIP_SECONDS = 5;
+export const CREDIT_WELCOME = 10;
+
+export const CREDIT_PRICES_URL = "https://openbot.run/credits";
 
 export const CREDIT_MIN_RATE = 0.1;
 
@@ -601,6 +604,7 @@ export interface CreditsState {
   balance: number;
   servers: CreditServerWallet[];
   expiring?: CreditExpiring;
+  welcome?: number;
 }
 
 export const CREDITS_UNAVAILABLE_STATE: CreditsState = {
@@ -623,6 +627,41 @@ export interface CreditTransferRequest {
   direction: CreditTransferDirection;
   credits: number;
 }
+
+export interface CreditRedeemRequest {
+  code: string;
+  serverId?: string;
+}
+
+export interface CreditRedeemResult {
+  credits: number;
+  state: CreditsState;
+}
+
+export const CREDIT_CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+export const CREDIT_CODE_LENGTH = 16;
+const CREDIT_CODE_GROUP = 4;
+const MAX_CREDIT_CODE_INPUT = 64;
+
+export function normalizeCreditCode(value: string): string {
+  return value.toUpperCase().replace(/[^0-9A-Z]/gu, "");
+}
+
+export function isCreditCode(value: string): boolean {
+  return (
+    value.length === CREDIT_CODE_LENGTH && [...value].every((character) => CREDIT_CODE_ALPHABET.includes(character))
+  );
+}
+
+export function formatCreditCode(value: string): string {
+  const code = normalizeCreditCode(value).slice(0, CREDIT_CODE_LENGTH);
+  const groups: string[] = [];
+  for (let start = 0; start < code.length; start += CREDIT_CODE_GROUP)
+    groups.push(code.slice(start, start + CREDIT_CODE_GROUP));
+  return groups.join("-");
+}
+
+export const CREDIT_CODE_INPUT_LENGTH = CREDIT_CODE_LENGTH + CREDIT_CODE_LENGTH / CREDIT_CODE_GROUP - 1;
 
 const CREDIT_SERVER_ROLES: readonly CreditServerRole[] = ["owner", "admin", "member"];
 const CREDIT_TRANSFER_DIRECTIONS: readonly CreditTransferDirection[] = ["to_server", "to_personal"];
@@ -691,6 +730,7 @@ export function parseCreditsState(value: unknown): CreditsState | null {
   };
   const expiring = parseExpiring(value.expiring);
   if (expiring) state.expiring = expiring;
+  if (isCreditAmount(value.welcome) && value.welcome > 0) state.welcome = Math.min(value.welcome, value.balance);
   return state;
 }
 
@@ -717,6 +757,22 @@ export function parseCreditTransferRequest(value: unknown): CreditTransferReques
   )
     return null;
   return { serverId: value.serverId, direction: value.direction, credits: value.credits };
+}
+
+export function parseCreditRedeemRequest(value: unknown): CreditRedeemRequest | null {
+  if (!isDynamicRecord(value) || !isString(value.code) || value.code.length > MAX_CREDIT_CODE_INPUT) return null;
+  const request: CreditRedeemRequest = { code: value.code };
+  if (value.serverId !== undefined) {
+    if (!isServerId(value.serverId)) return null;
+    request.serverId = value.serverId;
+  }
+  return request;
+}
+
+export function parseCreditRedeemResult(value: unknown): CreditRedeemResult | null {
+  if (!isDynamicRecord(value) || !isCreditAmount(value.credits) || value.credits <= 0) return null;
+  const state = parseCreditsState(value.state);
+  return state ? { credits: value.credits, state } : null;
 }
 
 export function parseCreditCheckoutUrl(value: unknown): string | null {

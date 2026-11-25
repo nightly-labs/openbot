@@ -109,6 +109,7 @@ interface TeamWebRtcClientTransportOptions {
   ) => Effect.Effect<void, CentralAuthOperationError>;
   removeMember: (hostId: string, membershipId: string) => Effect.Effect<void, CentralAuthOperationError>;
   removeOwnedHost: (hostId: string) => Effect.Effect<void, CentralAuthOperationError>;
+  setHostHidden: (hostId: string, hidden: boolean) => Effect.Effect<void, CentralAuthOperationError>;
   getPrincipalId: () => string;
   controlPlaneUrl: string;
   downloadHostLogo: (
@@ -349,6 +350,14 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         yield* this.#options.removeOwnedHost(hostId).pipe(toRemoteWorkflowError);
       }),
     );
+  }).bind(this);
+
+  readonly setHostHidden = Effect.fn("TeamWebRtcClient.setHostHidden")(function* (
+    this: TeamWebRtcClientTransport,
+    hostId: string,
+    hidden: boolean,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
+    return yield* this.#owned(this.#options.setHostHidden(hostId, hidden).pipe(toRemoteWorkflowError));
   }).bind(this);
 
   readonly sendDesktop = Effect.fn("TeamWebRtcClient.sendDesktop")(function* (
@@ -1518,8 +1527,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.emit("path", hostId, path);
   };
   readonly #onError = (hostId: string, code: string, message: string): void => {
-    if (!this.#active.has(hostId)) return;
-    this.emit("error", hostId, code, message);
+    const active = this.#active.get(hostId);
+    if (!active) return;
+    if (code === "data_channel_error" && !active.connected && active.authentication?.started)
+      this.emit("error", hostId, "sign_in_closed", sourceText("error.remote.signInConnectionClosed"));
+    else this.emit("error", hostId, code, message);
   };
 
   #sendRecoverable(hostId: string, channel: "events", data: string): void {

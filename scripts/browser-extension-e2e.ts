@@ -72,6 +72,30 @@ document.querySelector('[data-testid="replyComposerSubmit"]').addEventListener("
   box.textContent = "";
 });
 </script></body></html>`;
+const X_REDESIGN_STATUS = "2124944836277260700";
+const X_REDESIGN_PATH = `/x-fixture/redesign/dana/status/${X_REDESIGN_STATUS}`;
+const X_REDESIGN_FIXTURE = `<!doctype html><html><head><meta charset="utf-8"><title>X</title></head><body>
+<main>
+<div tabindex="-1" data-navigation-stop=""><article>
+<div><span><a href="/dana"><div dir="auto">Dana</div></a></span><span><a href="/dana"><span>@dana</span></a></span></div>
+<div dir="auto" lang="en">Coffee doubles your focus for ten hours.</div>
+<a data-engagement-action="media" href="${X_REDESIGN_PATH}/photo/1"><img src="https://pbs.twimg.com/media/coffee.jpg" alt=""></a>
+<a data-base-ui-tooltip-trigger="" href="${X_REDESIGN_PATH}">Nov 23</a>
+<div><div aria-hidden="true"></div><textarea aria-label="Post your reply" aria-multiline="true" rows="1"></textarea>
+<button data-slot="xds-button" type="button" class="x-button bg-btn-primary" style="border-radius:999px;padding:8px 16px">Reply</button></div>
+</article></div>
+<article>
+<div><span><a href="/erin"><div dir="auto">Erin</div></a></span><span><a href="/erin"><span>@erin</span></a></span></div>
+<div dir="auto" lang="en">Erin thinks this is nonsense.</div>
+</article>
+</main>
+<script>
+document.querySelector("button.bg-btn-primary").addEventListener("click", () => {
+  const box = document.querySelector("textarea");
+  document.body.dataset.posted = box.value;
+  box.value = "";
+});
+</script></body></html>`;
 const servedRules: XPageRules = {
   mention: X_PAGE_RULES_DEFAULT.mention,
   selectors: {
@@ -92,6 +116,8 @@ const xServer = Bun.serve({
       });
     if (url.pathname.startsWith("/share-fixture/"))
       return new Response(SHARE_FIXTURE, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+    if (url.pathname.startsWith("/x-fixture/redesign/"))
+      return new Response(X_REDESIGN_FIXTURE, { headers: { "Content-Type": "text/html; charset=utf-8" } });
     if (url.pathname.startsWith("/x-fixture/"))
       return new Response(X_FIXTURE, { headers: { "Content-Type": "text/html; charset=utf-8" } });
     return new Response("Not found", { status: 404 });
@@ -168,6 +194,7 @@ interface Report {
     otherReplyLeftOut: boolean;
     postedAtOnce: boolean;
     queueEmptyAfterSend: boolean;
+    redesign?: { posted: boolean; messageComplete: boolean };
     panelStayed?: boolean;
   };
   create?: {
@@ -804,6 +831,58 @@ try {
   assert.ok(messageHasPostThreadAndWords, `The X agent message is not complete: ${sent.text}`);
   assert.ok(otherReplyLeftOut, "The X agent message has the reply of another person.");
   assert.ok(postedAtOnce, "The page did not post the reply at once.");
+
+  const redesignQuestion = `Is the redesign claim true? ${run}`;
+  const redesignTasksBefore = new Set(
+    (await host.page.evaluate((id) => window.openbot.agent.listTasks(id), xAgentId)).tasks.map((entry) => entry.id),
+  );
+  await xPage.goto(`${xBase}${X_REDESIGN_PATH}`);
+  await xPage.locator("textarea").click();
+  await xPage.keyboard.type(`@OpenBot_ ${redesignQuestion}`);
+  const redesignReply = xPage.locator('button.bg-btn-primary[data-openbot-x="armed"]');
+  await redesignReply.waitFor({ timeout: 60_000 });
+  await shot(xPage, "8a-x-redesign-armed");
+  await redesignReply.click();
+  await xPage.waitForFunction(() => document.body.dataset.posted !== undefined, null, { timeout: 5_000 });
+  const redesignPosted = (await xPage.evaluate(() => document.body.dataset.posted ?? "")).includes(redesignQuestion);
+  const redesignTasks = await waitFor(
+    host.page,
+    "The X agent has a thread for the redesigned page",
+    (): Promise<AgentTasksSnapshot> => host.page.evaluate((id) => window.openbot.agent.listTasks(id), xAgentId),
+    (snapshot) => snapshot.tasks.some((entry) => !redesignTasksBefore.has(entry.id)),
+  );
+  const redesignTask = redesignTasks.tasks.find((entry) => !redesignTasksBefore.has(entry.id));
+  assert.ok(redesignTask, "The X agent has no thread for the post on the redesigned page.");
+  const redesignThread = await waitFor(
+    host.page,
+    "the redesigned page thread has the post",
+    (): Promise<ConversationSnapshot> =>
+      host.page.evaluate((value) => window.openbot.agent.readTask(value), {
+        agentId: xAgentId,
+        taskId: redesignTask.id,
+      }),
+    (snapshot) => snapshot.messages.some((entry) => entry.author === "user" && entry.text.includes(redesignQuestion)),
+  );
+  const redesignSent = redesignThread.messages.find(
+    (entry) => entry.author === "user" && entry.text.includes(redesignQuestion),
+  );
+  assert.ok(redesignSent);
+  const redesignMessageComplete =
+    redesignSent.text.includes("Coffee doubles your focus") &&
+    redesignSent.text.includes("Dana (@dana)") &&
+    redesignSent.text.includes("2026") &&
+    redesignSent.text.includes(`${xBase}${X_REDESIGN_PATH}`) &&
+    !redesignSent.text.includes(`${X_REDESIGN_PATH}/photo`) &&
+    redesignSent.text.includes("https://pbs.twimg.com/media/coffee.jpg") &&
+    !redesignSent.text.includes("Erin thinks") &&
+    !redesignSent.text.includes("@OpenBot_");
+  report.x = { ...report.x, redesign: { posted: redesignPosted, messageComplete: redesignMessageComplete } };
+  assert.ok(redesignPosted, "The redesigned page did not post the reply.");
+  assert.ok(
+    redesignMessageComplete,
+    `The X agent message from the redesigned page is not complete: ${redesignSent.text}`,
+  );
+  await waitFor(host.page, "the queue of posts is empty", outbox, (count) => count === 0);
   await xPage.close();
 
   const panelStayed = await page.getByRole("button", { name: english("extension.home.serverMenu") }).isVisible();

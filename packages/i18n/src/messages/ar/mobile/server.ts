@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "تعذّرت مغادرة {name}",
   "mobile.server.drawer.removeFailed": "تعذّرت إزالة {name}",
   "mobile.server.drawer.deleteFailed": "تعذّر حذف {name}",
+  "mobile.server.drawer.hide": "إخفاء الخادم",
+  "mobile.server.drawer.show": "إظهار الخادم",
+  "mobile.server.drawer.hiddenServers": "الخوادم المخفية",
+  "mobile.server.drawer.hideFailed": "تعذر إخفاء {name}",
+  "mobile.server.drawer.showFailed": "تعذر إظهار {name}",
   "mobile.server.drawer.actionFailed": "تعذّر على OpenBot إكمال هذا الإجراء. أعد المحاولة.",
   "mobile.server.drawer.moveUp": "نقل لأعلى",
   "mobile.server.drawer.moveDown": "نقل لأسفل",
@@ -340,6 +345,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "يزيل هذا الخادم من خدمة الحسابات لكل الأعضاء. تبقى الملفات والدردشات على حاسوبه. لاستخدامه مجددًا، سجّله من ذلك الحاسوب.",
   "mobile.server.settings.remove": "إزالة الخادم",
+  "mobile.server.settings.hide": "إخفاء الخادم",
+  "mobile.server.settings.show": "إظهار الخادم",
   "mobile.server.settings.deleteTitle": "هل تريد حذف {name}؟",
   "mobile.server.settings.deleteBody":
     "يوقف OpenBot الخادم على حاسوبه وينقل وكلاءه ودردشاته وملفاته إلى سلة المهملات في ذلك الحاسوب. ويختفي الخادم من قائمة الخوادم على كل أجهزتك.",
@@ -615,6 +622,16 @@ export const messages = {
   "mobile.server.settings.memoryLimitLoadFailed": "تعذّر تحميل حد الذاكرة لهذا الخادم.",
   "mobile.server.settings.memoryLimitSaveFailed": "تعذّر حفظ حد الذاكرة. أعد المحاولة.",
   "mobile.server.settings.memoryLimitUnsupported": "حدّث OpenBot على هذا الخادم لتغيير حد الذاكرة من هنا.",
+  "mobile.server.settings.mediaApprovalCredits": "اسأل قبل إنفاق أكثر من",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "رصيد",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed": "تعذّر تحميل حد الموافقة على الأرصدة لهذا الخادم.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed": "تعذّر حفظ حد الموافقة على الأرصدة. أعد المحاولة.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "حدّث OpenBot على هذا الخادم لتغيير حد الموافقة على الأرصدة من هنا.",
+  "mobile.server.settings.mediaApprovalAgents": "يمكن للوكلاء استخدام الأرصدة",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed": "تعذّر تغيير استخدام الوكلاء للأرصدة. أعد المحاولة.",
+  "mobile.server.settings.mediaApprovalAsk": "اسأل عند الحاجة إلى أرصدة",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "تعذّر تغيير طلبات الأرصدة. أعد المحاولة.",
   "mobile.server.settings.memoryReview": "مراجعة الذاكرة",
   "mobile.server.settings.memoryReviewDescription":
     "عدد المرات التي يحفظ فيها وكلاء هذا الخادم الحقائق الدائمة من دردشاتهم في الخلفية.",

@@ -150,6 +150,8 @@ export const messages = {
   "error.team.claudeUserSetupUnsupported": "Esta conexión no admite el interruptor de configuración de Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "Esta conexión no admite el tamaño de compactación de Claude.",
   "error.team.cacheExpiryCompactionUnsupported": "Esta conexión no admite compactar antes de que caduque la caché.",
+  "error.team.mediaApprovalCreditsUnsupported": "Esta conexión no admite el límite de aprobación de créditos.",
+  "error.team.mediaApprovalCreditsInvalid": "Introduce un número entero de créditos entre 0 y 100.000.",
   "error.team.providerEnvironmentUnsupported": "Esta conexión no admite variables de proveedor.",
   "error.team.modelVisibilityUnsupported": "Esta conexión no admite la lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexión no admite el proveedor predeterminado.",
@@ -214,4 +216,7 @@ export const messages = {
   "error.team.backgroundProcessesUnsupported": "Esta conexión no admite procesos en segundo plano.",
   "error.team.providerUseUnsupported": "Esta conexión no admite activar y desactivar proveedores.",
   "error.team.providerUseInvalid": "Este proveedor no tiene un interruptor de activación.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "Este servidor no admite elegir el modelo en las aprobaciones de medios. Actualiza OpenBot en el servidor.",
+  "error.team.mediaApprovalChoiceInvalid": "La elección de la aprobación de medios no es válida.",
 } as const satisfies PartialTranslation<typeof source>;

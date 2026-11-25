@@ -115,10 +115,6 @@ export function isUsageReadDiagnostic(message: string): boolean {
   return /\bERROR\s+billing:\s+(?:upstream request failed|upstream error|failed to parse response)\b/.test(message);
 }
 
-export function isGitSpawnDiagnostic(message: string): boolean {
-  return /\bERROR\s+git_cli:\s+(?:Command::output\(\) FAILED \(spawn error\)|spawn failed\b)/.test(message);
-}
-
 export function isAcpHandlerDiagnostic(message: string): boolean {
   return /^Error handling (?:request|notification)\b/.test(message);
 }
@@ -285,6 +281,10 @@ export function isImageCountDiagnostic(message: string): boolean {
 
 export function isRequestBodyLimitDiagnostic(message: string): boolean {
   return /\brequest body exceeds \d+ bytes\b|\bmessage size exceeds [\d.,]+ ?MB limit\b/iu.test(message);
+}
+
+export function isCodexAccountSettingsFailure(message: string): boolean {
+  return /\bfailed to (?:re)?load workspace requirements\b/iu.test(message);
 }
 
 export function isUnreadableContentDiagnostic(message: string): boolean {

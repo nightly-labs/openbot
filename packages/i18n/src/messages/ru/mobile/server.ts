@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "Не удалось покинуть {name}",
   "mobile.server.drawer.removeFailed": "Не удалось удалить {name}",
   "mobile.server.drawer.deleteFailed": "Не удалось удалить {name}",
+  "mobile.server.drawer.hide": "Скрыть сервер",
+  "mobile.server.drawer.show": "Показать сервер",
+  "mobile.server.drawer.hiddenServers": "Скрытые серверы",
+  "mobile.server.drawer.hideFailed": "Не удалось скрыть {name}",
+  "mobile.server.drawer.showFailed": "Не удалось показать {name}",
   "mobile.server.drawer.actionFailed": "OpenBot не смог выполнить это действие. Повторите попытку.",
   "mobile.server.drawer.moveUp": "Выше",
   "mobile.server.drawer.moveDown": "Ниже",
@@ -313,6 +318,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Сервер будет удалён из сервиса аккаунтов для всех участников. Файлы и чаты на его компьютере останутся. Чтобы снова использовать сервер, зарегистрируйте его с того компьютера.",
   "mobile.server.settings.remove": "Удалить сервер",
+  "mobile.server.settings.hide": "Скрыть сервер",
+  "mobile.server.settings.show": "Показать сервер",
   "mobile.server.settings.deleteTitle": "Удалить {name}?",
   "mobile.server.settings.deleteBody":
     "OpenBot останавливает сервер на его компьютере и перемещает его агентов, чаты и файлы в корзину этого компьютера. Сервер исчезнет из списка серверов на всех ваших устройствах.",
@@ -596,6 +603,19 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Не удалось сохранить лимит воспоминаний. Повторите попытку.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Обновите OpenBot на этом сервере, чтобы изменить здесь его лимит воспоминаний.",
+  "mobile.server.settings.mediaApprovalCredits": "Спрашивать, если больше",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "кредитов",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed":
+    "Не удалось загрузить порог подтверждения кредитов этого сервера.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed":
+    "Не удалось сохранить порог подтверждения кредитов. Повторите попытку.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "Обновите OpenBot на этом сервере, чтобы изменить здесь его порог подтверждения кредитов.",
+  "mobile.server.settings.mediaApprovalAgents": "Агенты могут использовать кредиты",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed":
+    "Не удалось изменить использование кредитов агентами. Повторите попытку.",
+  "mobile.server.settings.mediaApprovalAsk": "Спрашивать, когда нужны кредиты",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "Не удалось изменить запросы кредитов. Повторите попытку.",
   "mobile.server.settings.memoryReview": "Проверка памяти",
   "mobile.server.settings.memoryReviewDescription":
     "Как часто агенты на этом сервере сохраняют в фоне устойчивые факты из своих чатов.",

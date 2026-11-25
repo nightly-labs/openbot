@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "Impossible de quitter {name}",
   "mobile.server.drawer.removeFailed": "Impossible de supprimer {name}",
   "mobile.server.drawer.deleteFailed": "Impossible de supprimer {name}",
+  "mobile.server.drawer.hide": "Masquer le serveur",
+  "mobile.server.drawer.show": "Afficher le serveur",
+  "mobile.server.drawer.hiddenServers": "Serveurs masqués",
+  "mobile.server.drawer.hideFailed": "Impossible de masquer {name}",
+  "mobile.server.drawer.showFailed": "Impossible d’afficher {name}",
   "mobile.server.drawer.actionFailed": "OpenBot n’a pas pu terminer cette action. Réessayez.",
   "mobile.server.drawer.moveUp": "Monter",
   "mobile.server.drawer.moveDown": "Descendre",
@@ -274,6 +279,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Le serveur est supprimé du service de comptes pour tous les membres. Les fichiers et les discussions sur son ordinateur restent. Pour le réutiliser, enregistrez-le depuis cet ordinateur.",
   "mobile.server.settings.remove": "Supprimer le serveur",
+  "mobile.server.settings.hide": "Masquer le serveur",
+  "mobile.server.settings.show": "Afficher le serveur",
   "mobile.server.settings.deleteTitle": "Supprimer {name} ?",
   "mobile.server.settings.deleteBody":
     "OpenBot arrête le serveur sur son ordinateur et déplace ses agents, discussions et fichiers dans la corbeille de cet ordinateur. Le serveur quitte la liste des serveurs sur tous vos appareils.",
@@ -548,6 +555,19 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Impossible d’enregistrer la limite de souvenirs. Réessayez.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Mettez à jour OpenBot sur ce serveur pour changer sa limite de souvenirs ici.",
+  "mobile.server.settings.mediaApprovalCredits": "Demander avant de dépenser plus de",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "crédits",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed":
+    "Impossible de charger le seuil d’approbation des crédits de ce serveur.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed":
+    "Impossible d’enregistrer le seuil d’approbation des crédits. Réessayez.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "Mettez à jour OpenBot sur ce serveur pour modifier ici son seuil d’approbation des crédits.",
+  "mobile.server.settings.mediaApprovalAgents": "Les agents peuvent utiliser des crédits",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed":
+    "Impossible de modifier l’utilisation des crédits par les agents. Réessayez.",
+  "mobile.server.settings.mediaApprovalAsk": "Demander quand des crédits sont nécessaires",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "Impossible de modifier les demandes de crédits. Réessayez.",
   "mobile.server.settings.memoryReview": "Revue des souvenirs",
   "mobile.server.settings.memoryReviewDescription":
     "À quelle fréquence les agents de ce serveur enregistrent en arrière-plan les faits durables de leurs discussions.",

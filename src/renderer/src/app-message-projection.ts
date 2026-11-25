@@ -11,6 +11,7 @@ import {
   hostedSiteConversationEvent,
   isChannelChangeMarker,
   isContextResetMarker,
+  isNoAnswerNotice,
   isPlanContinuationMarker,
   isVaultChangeMarker,
   marketplaceSuggestionEvent,
@@ -425,6 +426,7 @@ function chatActionMarker(
   if (isVaultChangeMarker(message)) return { kind: "vault-change", text: message.text, timestamp: message.createdAt };
   if (isPlanContinuationMarker(message))
     return { kind: "plan-continuation", text: message.text, timestamp: message.createdAt };
+  if (isNoAnswerNotice(message)) return { kind: "no-answer", text: message.text, timestamp: message.createdAt };
   const signInProvider = signInFailureProvider(message);
   if (signInProvider)
     return { kind: "sign-in-failure", provider: signInProvider, text: message.text, timestamp: message.createdAt };

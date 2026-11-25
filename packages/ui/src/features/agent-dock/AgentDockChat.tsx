@@ -38,6 +38,7 @@ import { ComposerEditor } from "../conversation/ComposerEditor";
 import { ApprovalCard, BrowserTakeoverCard } from "../conversation/ConversationPrompts";
 import { createComposerRowsResize } from "../conversation/createComposerRowsResize";
 import { MarkdownMessageText } from "../conversation/MarkdownMessageText";
+import type { MediaApprovalControls } from "../conversation/MediaApprovalCard";
 import { ComposerVoiceControls, type VoicePhase } from "../conversation/VoiceRecordingMorph";
 import { SidebarWaitIcon } from "../sidebar/SidebarAgentIndicator";
 import { SIDEBAR_WAIT_ACTION, SIDEBAR_WAIT_TITLE } from "../sidebar/sidebar-filtering";
@@ -70,6 +71,7 @@ export interface AgentDockChatAnswers {
   secret: (takeover: AgentDockTakeover, input: LocalBrowserSecretResponse) => Promise<void>;
   usageLimitSend: (limit: AgentDockUsageLimit, option: AgentDockBackupModel, remember: boolean) => Promise<void>;
   usageLimitWait: (limit: AgentDockUsageLimit) => void;
+  media?: MediaApprovalControls | undefined;
 }
 
 export interface AgentDockPendingMessage {
@@ -545,6 +547,7 @@ export function AgentDockChat(props: {
                         approval={current().approval}
                         onApprove={() => respond(current().approval, "accept")}
                         onReject={() => respond(current().approval, "decline")}
+                        media={props.answers?.media}
                       />
                     </div>
                   )}

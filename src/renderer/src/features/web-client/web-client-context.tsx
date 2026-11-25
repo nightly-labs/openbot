@@ -24,7 +24,10 @@ import type {
   MemberChatColorEntry,
   ProviderModelSourceEntry,
   QueueSnapshot,
+  ReadMediaApprovalInput,
   RespondToApprovalInput,
+  RespondToCreditsHoldInput,
+  RespondToMediaApprovalInput,
   RespondToPromptInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
@@ -1132,8 +1135,11 @@ export function createWebWorkspace(
         }
         if (!hostId) {
           const savedHostId = readWebServerSelection(props.accountId);
+          const ordered = orderWebHosts(hosts, serverOrder());
           const initialHost =
-            hosts.find((host) => host.hostId === savedHostId) ?? orderWebHosts(hosts, serverOrder())[0];
+            hosts.find((host) => host.hostId === savedHostId && host.hidden !== true) ??
+            ordered.find((host) => host.hidden !== true) ??
+            ordered[0];
           if (initialHost) await connect(initialHost);
         }
         if (!disposed) runtime.hosts?.setHosts(hosts);
@@ -1170,6 +1176,18 @@ export function createWebWorkspace(
     const remove = runtime.removeOwnedHost;
     if (!remove) throw new Error(currentText().t("server.settings.actionFailed"));
     await departHost(host, () => remove(host.hostId));
+  }
+  async function setHostHidden(host: RemoteTeamHost, hidden: boolean): Promise<void> {
+    const change = runtime.setHostHidden;
+    if (!change) throw new Error(currentText().t("server.settings.actionFailed"));
+    await change(host.hostId, hidden);
+    setState((draft) => {
+      const listed = draft.hosts.find((candidate) => candidate.hostId === host.hostId);
+      if (!listed) return;
+      if (hidden) listed.hidden = true;
+      else delete listed.hidden;
+    });
+    void (hostsRefreshPromise ?? Promise.resolve()).catch(() => undefined).then(retryHosts);
   }
   async function departHost(host: RemoteTeamHost, operation: () => Promise<void>): Promise<void> {
     leftHostIds.add(host.hostId);
@@ -2091,7 +2109,7 @@ export function createWebWorkspace(
       runtime.hosts?.refresh();
       void props
         .onSessionCheck()
-        .then(() => refreshHosts())
+        .then(retryHosts)
         .then(() => {
           if (state.status === "online") return Date.now() - syncedAt < FOCUS_RESYNC_MS ? undefined : resync();
           if (state.recovery?.phase !== "suspended") recoverNow();
@@ -2166,6 +2184,8 @@ export function createWebWorkspace(
     setHostAppearance,
     leaveHost,
     removeOwnedHost,
+    setHostHidden,
+    canHideHosts: runtime.setHostHidden !== undefined,
     retryHosts,
     reconnect,
     restartRequested,
@@ -2484,6 +2504,42 @@ export function createWebWorkspace(
     async approve(input: RespondToApprovalInput) {
       const current = generation;
       await runtime.approve(input);
+      if (disposed || current !== generation) return;
+      setState((draft) => {
+        draft.approvals = draft.approvals.filter((item) => item.requestId !== input.requestId);
+      });
+      await refresh();
+    },
+    readMediaApproval(input: ReadMediaApprovalInput) {
+      return runtime.readMediaApproval?.(input) ?? Promise.resolve({ media: null, hold: null });
+    },
+    async respondToCreditsHold(input: RespondToCreditsHoldInput) {
+      const respond = runtime.respondToCreditsHold;
+      if (!respond) throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      const current = generation;
+      const hold = await respond(input);
+      if (hold || disposed || current !== generation) return hold;
+      setState((draft) => {
+        draft.approvals = draft.approvals.filter((item) => item.requestId !== input.requestId);
+      });
+      await refresh();
+      return hold;
+    },
+    async setCreditsAskMuted(muted: boolean) {
+      const setMuted = runtime.setCreditsAskMuted;
+      if (!setMuted) throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      await setMuted({ muted });
+    },
+    async readCreditsAskMuted() {
+      const read = runtime.readCreditsAskMuted;
+      if (!read) throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      return read();
+    },
+    async respondToMediaApproval(input: RespondToMediaApprovalInput) {
+      const respond = runtime.respondToMediaApproval;
+      if (!respond) throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      const current = generation;
+      await respond(input);
       if (disposed || current !== generation) return;
       setState((draft) => {
         draft.approvals = draft.approvals.filter((item) => item.requestId !== input.requestId);

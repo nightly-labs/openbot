@@ -79,7 +79,10 @@ export function ChatQuestionPrompt({
   const formTitle = formTitleOf(uiBlock, prompt.questions[0]?.question);
   if (!prompt.resolution && !controller && onActivate) {
     return (
-      <View className={`max-w-[92%] self-start gap-2 rounded-[20px] ${card.fillClass} px-4 py-3`} style={card.style}>
+      <View
+        className={`w-full max-w-[92%] self-start gap-2 rounded-[20px] ${card.fillClass} px-4 py-3`}
+        style={card.style}
+      >
         {confirm ? (
           <ConfirmBody spec={confirm} compact selectValue={answeredSelect(prompt, null, t)} />
         ) : (
@@ -95,7 +98,10 @@ export function ChatQuestionPrompt({
     prompt.resolution ?? controller?.resolution ?? (controller ? null : { status: "expired" as const });
   if (resolution) {
     return (
-      <View className={`max-w-[92%] self-start gap-2 rounded-[20px] ${card.fillClass} px-4 py-3`} style={card.style}>
+      <View
+        className={`w-full max-w-[92%] self-start gap-2 rounded-[20px] ${card.fillClass} px-4 py-3`}
+        style={card.style}
+      >
         <View className="flex-row items-center gap-2">
           {resolution.status === "answered" ? <Check color={String(muted)} size={18} /> : null}
           <Typography type="body-sm" className="text-text-secondary">

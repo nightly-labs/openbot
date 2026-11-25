@@ -273,6 +273,9 @@ export const messages = defineMessages("settings", {
   "settings.agentDock.xwayland.unsupported":
     "On Wayland without XWayland, the dock cannot show above other apps. It shows in the OpenBot window.",
   "settings.agentDock.xwayland.restart": "Restart",
+  "settings.agentDock.noCompositor.title": "Shown in the OpenBot window",
+  "settings.agentDock.noCompositor.description":
+    "Your desktop cannot show see-through windows, so the dock shows in the OpenBot window. To show it above other apps, turn on desktop effects (a compositor) in your system settings, then restart OpenBot.",
   "settings.agentDock.display.title": "Display",
   "settings.agentDock.display.description":
     "If that display is not connected, the dock goes to the display of the OpenBot window.",

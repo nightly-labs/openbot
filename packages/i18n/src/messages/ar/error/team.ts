@@ -142,6 +142,8 @@ export const messages = {
   "error.team.claudeUserSetupUnsupported": "هذا الاتصال لا يدعم مفتاح إعداد Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "هذا الاتصال لا يدعم حجم ضغط Claude.",
   "error.team.cacheExpiryCompactionUnsupported": "هذا الاتصال لا يدعم الضغط قبل انتهاء ذاكرة التخزين المؤقت.",
+  "error.team.mediaApprovalCreditsUnsupported": "هذا الاتصال لا يدعم حد الموافقة على الأرصدة.",
+  "error.team.mediaApprovalCreditsInvalid": "أدخل عددًا صحيحًا من الأرصدة من 0 إلى 100,000.",
   "error.team.providerEnvironmentUnsupported": "لا يدعم هذا الاتصال متغيرات المزوّد.",
   "error.team.modelVisibilityUnsupported": "قائمة النماذج غير مدعومة في هذا الاتصال.",
   "error.team.providerDefaultUnsupported": "المزوّد الافتراضي غير مدعوم في هذا الاتصال.",
@@ -209,4 +211,7 @@ export const messages = {
   "error.team.backgroundProcessesUnsupported": "هذا الاتصال لا يدعم العمليات في الخلفية.",
   "error.team.providerUseUnsupported": "هذا الاتصال لا يدعم تشغيل المزوّدين وإيقافهم.",
   "error.team.providerUseInvalid": "هذا المزوّد ليس له مفتاح تشغيل وإيقاف.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "هذا الخادم لا يدعم اختيار النموذج في موافقات الوسائط. حدّث OpenBot على الخادم.",
+  "error.team.mediaApprovalChoiceInvalid": "اختيار موافقة الوسائط غير صالح.",
 } as const satisfies PartialTranslation<typeof source>;
