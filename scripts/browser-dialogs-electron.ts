@@ -300,6 +300,18 @@ async function main(): Promise<void> {
     }
 
     {
+      const { contents } = await open();
+      const box = nextBox();
+      await contents.executeJavaScript("document.getElementById('alert').focus()");
+      contents.sendInputEvent({ type: "keyDown", keyCode: "Space" });
+      contents.sendInputEvent({ type: "keyUp", keyCode: "Space" });
+      assert.equal((await box).aborted, false, "A person's alert in an agent tab got OK with no person.");
+      (await box).answer(0);
+      await waitUntil(async () => (await title(contents)) === "alert:done");
+      recordCases("person-input-alert-in-agent-tab-stays-native");
+    }
+
+    {
       const tab = await runCauseEffect(host.open(`${origin}/person-${++sequence}`));
       const contents = webContents.getAllWebContents().find((item) => item.getURL() === tab.url);
       assert(contents, "Missing person tab contents.");

@@ -662,7 +662,9 @@ again, because a reload could send a form again or lose the work of the person.
 A page `alert` or `confirm` that an agent action opens goes to that agent. An `alert` that the page
 opens by itself in a tab that an agent runs (not a person's tab, a takeover, person control or a
 sign-in) gets OK at once, and its redacted text goes to the agent as a `console` warning in the next
-snapshot. Electron shows that box on the main window, so it would block the whole app. Every other
+snapshot. An alert in the 5 s after a person presses the mouse or a key in the tab stays for the
+person: the engine counts that input only while no agent command holds the debugger, because CDP
+input also fires `before-mouse-event`. Electron shows that box on the main window, so it would block the whole app. Every other
 dialog stays in Electron's native box for a person. `runTabAction` watches for a dialog only while
 the agent's own input action runs (`BrowserDialogTurn` names the thread and turn), and until the page settles after it.
 The engine then sends `Page.enable` on its own debugger and keeps the debugger attached while a watch
@@ -683,7 +685,7 @@ For a page's own `alert` with no watch, the engine calls the reply callback of E
 
 | Event | Dialog |
 | --- | --- |
-| Page's own `alert` in an agent tab, with no agent action | OK at once. The agent gets the text in its next snapshot. |
+| Page's own `alert` in an agent tab, with no agent action and no person input in the last 5 s | OK at once. The agent gets the text in its next snapshot. |
 | Person's click, or a tool that is not an input action | Native box. The agent is not told. |
 | Turn ends | Handed off: the box stays for a person, and the agent can no longer answer it. |
 | Person answers first | `handle_dialog` fails with "This dialog is closed". |
