@@ -5,8 +5,6 @@ import {
   decodePasswordManagerResponses,
 } from "./password-manager-decoding";
 
-// A status never holds a key or a password, and the sign-in page is kept only while a sign-in runs.
-// A response for a manager that this build does not know is refused; its event is dropped.
 describe("password manager decoding", () => {
   const signingIn = {
     manager: "protonpass",

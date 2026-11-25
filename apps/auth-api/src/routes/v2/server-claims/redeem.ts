@@ -5,7 +5,6 @@ import { readJsonObject } from "../../../server/json-body";
 import { authErrorResponse, json, requestAuthService } from "../../../server/request-auth";
 import { requestSourceIp } from "../../../server/source-ip";
 
-/** A server exchanges an operator's claim for a session of the claim's user. */
 export const Route = createFileRoute("/v2/server-claims/redeem")({
   server: {
     handlers: {

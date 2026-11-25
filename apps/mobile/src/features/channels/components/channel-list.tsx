@@ -1,30 +1,36 @@
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
-import * as Clipboard from "expo-clipboard";
 import * as Crypto from "expo-crypto";
 import { Link, router } from "expo-router";
 import { Typography } from "heroui-native";
-import { useThemeColor } from "heroui-native/hooks";
-import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
-import { useUniwind } from "uniwind";
-import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
+import { memo, type ReactNode, useMemo, useRef, useState } from "react";
+import { Alert, View } from "react-native";
+import { AndroidRowMenu, OpenRowMenu } from "@/features/agents/components/agent-context-menu";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
-import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
+import { AvatarCutout, useAvatarHole } from "@/features/agents/components/avatar-cutout";
 import { ChatDragArea, DRAG_AVATAR_SIZE, useChatDrag, useHoldMenu } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
+import {
+  CHAT_ROW_AVATAR_SIZE,
+  ChatRowHeading,
+  ChatRowTime,
+  PINNED_AVATAR_SIZE,
+} from "@/features/agents/components/chat-row";
 import { PinnedChatItem } from "@/features/agents/components/pinned-agents-grid";
+import { useChatPinToggle } from "@/features/agents/components/use-chat-pin-toggle";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
-import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
+import { canToggleChatPin } from "@/features/workspace/model/agent-pins";
 import { showsOnline } from "@/features/workspace/model/server-status";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
-import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
+import type { MenuAction } from "@/shared/components/menu-view";
+import { copyWithHaptic } from "@/shared/lib/clipboard";
 import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import { haptics } from "@/shared/lib/haptics";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
@@ -35,11 +41,11 @@ import { ChannelAvatar } from "./channel-avatar";
 function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
   const { t } = useText();
   const workspace = useMobileWorkspaceReader();
-  const { toggleChannelPinAnimated } = useAgentPinTransition();
+  const { toggleChannelPin } = useChatPinToggle();
   const sectionMenu = useChatSectionMenu(serverId, channel.id);
   const isPinned = useMobileWorkspaceSelector(({ pinnedChannelIds }) => pinnedChannelIds.includes(channel.id));
   const canPin = useMobileWorkspaceSelector(({ pinnedAgentIds, pinnedChannelIds }) =>
-    canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], channel.id),
+    canToggleChatPin(pinnedAgentIds, pinnedChannelIds, channel.id),
   );
   const online = useMobileWorkspaceSelector(({ servers }) =>
     servers.some((server) => server.id === serverId && showsOnline(server)),
@@ -48,18 +54,15 @@ function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
     ({ servers }) => servers.find((server) => server.id === serverId)?.role === "member",
   );
   const canDelete = online && !isMember && !channel.archived;
-  // The host refuses to delete a channel while a task runs there: the user stops it first.
   const deleteBlocked = channel.activeTasks > 0;
   const deleting = useRef(false);
-  const handlePin = (withHaptic = true) => toggleChannelPinAnimated(channel, serverId, { haptic: withHaptic });
+  const handlePin = (withHaptic = true) => toggleChannelPin(channel, serverId, { haptic: withHaptic });
   const handleHide = () => {
     if (workspace().hideChannel(channel.id, serverId)) void haptics.impact();
   };
   const handleInfo = () =>
     router.push({ pathname: "/channel-info/[channelId]", params: { channelId: channel.id, serverId } });
-  const handleCopyId = () => {
-    void Clipboard.setStringAsync(channel.id).then(() => haptics.notification());
-  };
+  const handleCopyId = () => copyWithHaptic(channel.id);
   const handleDelete = () =>
     Alert.alert(t("mobile.channel.list.deleteTitle", { name: channel.name }), t("mobile.channel.list.deleteBody"), [
       { text: t("common.cancel"), style: "cancel" },
@@ -106,7 +109,6 @@ function useChannelMenuActions(channel: ChannelSummary, serverId: string) {
   };
 }
 
-/** The chat link of a channel on iOS, with its context menu. Android uses `ChannelAndroidMenu`. */
 function ChannelContextMenuLink({
   channel,
   serverId,
@@ -163,7 +165,6 @@ function ChannelContextMenuLink({
   );
 }
 
-/** The long-press menu of a channel on Android. It opens when it mounts, as `AgentAndroidMenu` does. */
 function ChannelAndroidMenu({
   channel,
   serverId,
@@ -173,16 +174,10 @@ function ChannelAndroidMenu({
   serverId: string;
   onClose: () => void;
 }) {
-  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   return (
-    <View
-      // The open menu draws in a portal. The row under it keeps its touches.
-      pointerEvents="none"
-      style={StyleSheet.absoluteFill}
-      onLayout={({ nativeEvent }) => setSize({ width: nativeEvent.layout.width, height: nativeEvent.layout.height })}
-    >
-      {size ? <OpenChannelMenu channel={channel} serverId={serverId} size={size} onClose={onClose} /> : null}
-    </View>
+    <AndroidRowMenu>
+      {(size) => <OpenChannelMenu channel={channel} serverId={serverId} size={size} onClose={onClose} />}
+    </AndroidRowMenu>
   );
 }
 
@@ -198,11 +193,6 @@ function OpenChannelMenu({
   onClose: () => void;
 }) {
   const { t } = useText();
-  const { theme } = useUniwind();
-  const menu = useRef<MenuComponentRef>(null);
-  useEffect(() => {
-    menu.current?.show();
-  }, []);
   const {
     isPinned,
     canPin,
@@ -248,24 +238,27 @@ function OpenChannelMenu({
     delete: handleDelete,
   };
   return (
-    <MenuView
-      ref={menu}
-      colorScheme={theme === "dark" ? "dark" : "light"}
-      shouldOpenOnLongPress
+    <OpenRowMenu
       actions={actions}
-      onCloseMenu={onClose}
-      onPressAction={({ nativeEvent }) => {
-        sectionMenu.onAction(nativeEvent.event);
-        handlers[nativeEvent.event]?.();
+      size={size}
+      onClose={onClose}
+      onAction={(id) => {
+        sectionMenu.onAction(id);
+        handlers[id]?.();
       }}
-    >
-      {/* The anchor of the menu: the size of the row it covers. */}
-      <View style={size} />
-    </MenuView>
+    />
   );
 }
 
-/** A channel in the home list, or in the pinned grid, with the look and menus of an agent chat. */
+function PinnedUnreadDot() {
+  const reportHole = useAvatarHole();
+  return (
+    <View pointerEvents="none" className="absolute right-0 top-0 rounded-full p-0.5" onLayout={reportHole}>
+      <View className="size-2.5 rounded-full bg-accent" />
+    </View>
+  );
+}
+
 export const ChannelListRow = memo(function ChannelListRow({
   channel,
   serverId,
@@ -281,18 +274,16 @@ export const ChannelListRow = memo(function ChannelListRow({
   leftInset?: number;
   rightInset?: number;
 }) {
-  const { t, format } = useText();
-  const [background, accent] = useThemeColor(["background", "accent"]);
+  const { t, format, sourceText } = useText();
   const rowBackground = useChatRowBackground(channel.id);
-  const { toggleChannelPinAnimated } = useAgentPinTransition();
+  const { toggleChannelPin } = useChatPinToggle();
   const isPinned = useMobileWorkspaceSelector(({ pinnedChannelIds }) => pinnedChannelIds.includes(channel.id));
   const pinBlocked = useMobileWorkspaceSelector(
-    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], channel.id),
+    ({ pinnedAgentIds, pinnedChannelIds }) => !canToggleChatPin(pinnedAgentIds, pinnedChannelIds, channel.id),
   );
   const disconnected = useMobileWorkspaceSelector(
     ({ servers }) => !servers.some((server) => server.id === serverId && showsOnline(server)),
   );
-  // Each long press mounts the Android menu again, so it opens even if an earlier one did not close.
   const [menuKey, setMenuKey] = useState(0);
   const drag = useChatDrag(pinned ? "pin" : "row", () => ({
     chat: { kind: "channel", id: channel.id },
@@ -310,26 +301,32 @@ export const ChannelListRow = memo(function ChannelListRow({
   }));
   const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
   const previewLine = useMemo(
-    () => (channel.lastMessage ? markdownPreviewText(channel.lastMessage.text) : t("mobile.channel.list.noMessages")),
-    [channel.lastMessage, t],
+    () =>
+      channel.lastMessage
+        ? markdownPreviewText(coordinatorText(channel.lastMessage.author, channel.lastMessage.text, sourceText))
+        : t("mobile.channel.list.noMessages"),
+    [channel.lastMessage, t, sourceText],
   );
   const title = channel.title.trim();
   const unread = channel.unreadCount > 0;
-  const togglePin = (withHaptic = true) => toggleChannelPinAnimated(channel, serverId, { haptic: withHaptic });
+  const togglePin = (withHaptic = true) => toggleChannelPin(channel, serverId, { haptic: withHaptic });
   const openLabel = title
     ? t("mobile.channel.list.openWithTitle", { name: channel.name, title })
     : t("mobile.channel.list.open", { name: channel.name });
-  const size = pinned ? 64 : 54;
+  const size = pinned ? PINNED_AVATAR_SIZE : CHAT_ROW_AVATAR_SIZE;
+  const channelAvatar = (
+    <ChannelAvatar channel={channel} agents={agents} size={size} serverId={serverId} disconnected={disconnected} />
+  );
   const avatar = (
-    <AgentPinAvatar agentId={channel.id} location={pinned ? "pinned" : "row"} size={size}>
-      <ChannelAvatar channel={channel} agents={agents} size={size} serverId={serverId} disconnected={disconnected} />
-      {pinned && unread ? (
-        <View
-          className="absolute right-0 top-0 size-3.5 rounded-full border-2 bg-accent"
-          style={{ borderColor: background, backgroundColor: accent }}
-        />
-      ) : null}
-    </AgentPinAvatar>
+    <View style={{ width: size, height: size }}>
+      {pinned ? (
+        <AvatarCutout size={size} badge={unread ? <PinnedUnreadDot /> : null}>
+          {channelAvatar}
+        </AvatarCutout>
+      ) : (
+        channelAvatar
+      )}
+    </View>
   );
 
   const trigger = (
@@ -357,31 +354,19 @@ export const ChannelListRow = memo(function ChannelListRow({
       {pinned ? (
         <>
           {avatar}
-          <View className="w-full gap-0.5">
-            <Typography.Paragraph
-              align="center"
-              className="w-full text-text-secondary"
-              numberOfLines={1}
-              style={typeScale.small}
-            >
-              {channel.name}
-            </Typography.Paragraph>
-            {title ? (
-              <Typography.Paragraph
-                align="center"
-                className="w-full text-muted"
-                numberOfLines={1}
-                style={typeScale.small}
-              >
-                {title}
-              </Typography.Paragraph>
-            ) : null}
-          </View>
+          <Typography.Paragraph
+            align="center"
+            className="w-full text-text-secondary"
+            numberOfLines={1}
+            style={typeScale.pinnedName}
+          >
+            {channel.name}
+          </Typography.Paragraph>
         </>
       ) : (
         ({ pressed }) => (
           <View
-            className="min-h-20 w-full flex-row items-center gap-3 py-1"
+            className="min-h-17 w-full flex-row items-center gap-3.5 py-1"
             style={{
               backgroundColor: rowBackground,
               opacity: pressed ? 0.58 : 1,
@@ -391,25 +376,13 @@ export const ChannelListRow = memo(function ChannelListRow({
           >
             {avatar}
             <View className="min-w-0 flex-1 gap-0.5">
-              <View className="flex-row items-center gap-2">
-                {unread ? <View className="size-2 rounded-full bg-accent" /> : null}
-                <Typography.Paragraph
-                  className="font-semibold min-w-0 flex-1"
-                  numberOfLines={1}
-                  style={typeScale.rowTitle}
-                >
-                  {channel.name}
-                </Typography.Paragraph>
-                <Typography.Paragraph className="text-muted" style={typeScale.caption}>
-                  {formatUpdatedAt(channel.lastMessage?.at ?? channel.createdAt, format)}
-                </Typography.Paragraph>
-              </View>
-              {title ? (
-                <Typography.Paragraph className="text-muted" numberOfLines={1} style={typeScale.caption}>
-                  {title}
-                </Typography.Paragraph>
-              ) : null}
-              <Typography.Paragraph className="text-text-secondary" numberOfLines={1} style={typeScale.preview}>
+              <ChatRowHeading
+                name={channel.name}
+                title={title}
+                leading={unread ? <View className="size-2.5 rounded-full bg-accent" /> : null}
+                trailing={<ChatRowTime label={formatUpdatedAt(channel.lastMessage?.at ?? channel.createdAt, format)} />}
+              />
+              <Typography.Paragraph className="text-text-secondary" numberOfLines={1} style={typeScale.chatDetail}>
                 {previewLine}
               </Typography.Paragraph>
             </View>
@@ -433,7 +406,7 @@ export const ChannelListRow = memo(function ChannelListRow({
     </ChannelContextMenuLink>
   );
   return pinned ? (
-    <PinnedChatItem>
+    <PinnedChatItem chatId={channel.id}>
       <ChatDragArea drag={drag} fill>
         {content}
       </ChatDragArea>

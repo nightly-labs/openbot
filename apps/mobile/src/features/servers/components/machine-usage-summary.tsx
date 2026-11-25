@@ -39,35 +39,23 @@ const METRIC_LABELS = {
 
 const METRIC_ICONS: Record<MachineMetric, LucideIcon> = { cpu: Cpu, memory: MemoryStick, disk: HardDrive };
 
-/** As on desktop: CPU and memory first, as they decide whether a turn starts at once. */
 const METRIC_ORDER = ["cpu", "memory", "disk"] as const satisfies readonly MachineMetric[];
 
-/** Below the alert level the percentage takes the text colour of the row. */
 const TONE_TEXT = {
   normal: "",
   warning: "text-warning-text",
   danger: "text-danger-text",
 } as const satisfies Record<MachineMetricTone, string>;
 
-/**
- * The machine use of a server on its Usage screen, as the desktop Usage header shows it: one row with
- * CPU, memory and disk side by side, each with a ring and, beside it, its percentage and name. The disk opens
- * Storage. Only an owner or admin of a host with `machine-resources-v1` sees it. It is live while the
- * screen is on top. A failed read hides it, so an old reading does not look live. The colours follow
- * the default machine alert levels. A hosted server shows its disk against the plan storage, as Storage
- * does: its VPS disk is much larger than the plan.
- */
 export function MachineUsageSummary({ serverId }: { serverId: string }) {
   const { t } = useText();
   const { canReadServerStorage, servers } = useMobileWorkspace();
   const { available, query } = useMachineMetrics(serverId);
   const server = servers.find((item) => item.id === serverId);
   const planGb = server?.hosted === true ? (server.storageGb ?? null) : null;
-  // The size of the users' files. A failed read counts them from the free space.
   const disk = useServerDisk(serverId, available && planGb !== null);
   const reading = query.data;
   if (!available || !reading || query.isError) return null;
-  // Until the first answer comes, the disk is unknown, so the whole VPS disk never shows.
   const metrics =
     planGb === null
       ? reading
@@ -89,6 +77,7 @@ export function MachineUsageSummary({ serverId }: { serverId: string }) {
             key={metric}
             metrics={metrics}
             metric={metric}
+            hostedPlan={planGb !== null}
             onPress={metric === "disk" ? openStorage : undefined}
           />
         ))}
@@ -100,10 +89,12 @@ export function MachineUsageSummary({ serverId }: { serverId: string }) {
 function MachineMetricItem({
   metrics,
   metric,
+  hostedPlan,
   onPress,
 }: {
   metrics: MachineMetrics;
   metric: MachineMetric;
+  hostedPlan: boolean;
   onPress: (() => void) | undefined;
 }) {
   const text = useText();
@@ -111,8 +102,7 @@ function MachineMetricItem({
   const tone = machineMetricTone(percent, machineAlertLevel(DEFAULT_MACHINE_ALERT_SETTINGS, metric));
   const name = text.t(METRIC_LABELS[metric]);
   const percentText = percent === null ? text.t("mobile.server.machine.unknown") : text.format.percent(percent / 100);
-  const detail = metricDetail(metrics, metric, text);
-  // The sizes do not fit beside the ring in a third of the row; the label reads them.
+  const detail = metricDetail(metrics, metric, hostedPlan, text);
   const content = (
     <>
       <MachineMetricRing metric={metric} percent={percent ?? 0} tone={tone} />
@@ -152,9 +142,12 @@ function MachineMetricItem({
   );
 }
 
-/** "4 cores", or "5.1 GB of 7.6 GB" for memory and disk. */
-function metricDetail(metrics: MachineMetrics, metric: MachineMetric, { t, format }: MobileText): string {
-  // A container limit can be part of a core, such as 1.5.
+function metricDetail(
+  metrics: MachineMetrics,
+  metric: MachineMetric,
+  hostedPlan: boolean,
+  { t, format }: MobileText,
+): string {
   if (metric === "cpu") {
     const cores = metrics.cpuMillicores / 1000;
     return t("mobile.server.machine.cores", {
@@ -165,7 +158,8 @@ function metricDetail(metrics: MachineMetrics, metric: MachineMetric, { t, forma
   if (metric === "disk") {
     const { diskUsedBytes: used, diskTotalBytes: total } = metrics;
     if (used === null || total === null) return t("mobile.server.machine.unknown");
-    return t("mobile.server.machine.sizeDetail", { used: format.fileSize(used), total: format.fileSize(total) });
+    const size = hostedPlan ? format.fileSize : format.diskSize;
+    return t("mobile.server.machine.sizeDetail", { used: size(used), total: size(total) });
   }
   const { memoryTotalBytes: total, memoryAvailableBytes: free } = metrics;
   if (total === null || free === null) return t("mobile.server.machine.unknown");
@@ -175,7 +169,6 @@ function metricDetail(metrics: MachineMetrics, metric: MachineMetric, { t, forma
   });
 }
 
-/** One ring filled to the use, in the tone of the metric, with its icon in the middle. The row text names it. */
 function MachineMetricRing({
   metric,
   percent,

@@ -4,6 +4,14 @@ import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
+import {
+  WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_MEDIA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-v1";
+import {
+  WORKFLOWS_PAUSE_CAPABILITY,
+  WORKFLOWS_PAUSE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-pause-v1";
 import { WORKFLOWS_CAPABILITY, WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
 import {
   decodeRemoteWorkflowDetail,
@@ -11,6 +19,7 @@ import {
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
   decodeRemoteWorkflowList,
+  decodeRemoteWorkflowPicture,
   decodeRemoteWorkflowRunDetail,
   decodeRemoteWorkflowRunPage,
   decodeRemoteWorkflowSaveResult,
@@ -22,11 +31,15 @@ import {
 } from "@openbot/team-client/workflow-decoding";
 import * as Crypto from "expo-crypto";
 import type { WorkspaceRequest } from "@/features/workspace/context/host-request-actions";
+import {
+  loadWorkflowCreditBalance,
+  loadWorkflowMediaModels,
+  loadWorkflowMediaPrice,
+} from "@/features/workspace/context/workflow-media-models";
 import { requireCapability, type ServerCapabilities } from "@/features/workspace/model/server-capabilities";
 import { ignoreResponse } from "@/features/workspace/model/workspace-records";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
 
-/** The runs that one page of the Runs list reads. */
 const RUN_PAGE_SIZE = 20;
 
 type WorkflowActions = Pick<
@@ -35,6 +48,7 @@ type WorkflowActions = Pick<
   | "loadWorkflow"
   | "createWorkflow"
   | "renameWorkflow"
+  | "setWorkflowPaused"
   | "deleteWorkflow"
   | "saveWorkflowGraph"
   | "loadWorkflowRuns"
@@ -49,23 +63,24 @@ type WorkflowActions = Pick<
   | "loadWorkflowVersions"
   | "loadWorkflowVersionGraph"
   | "restoreWorkflowVersion"
+  | "loadWorkflowMediaModels"
+  | "loadWorkflowMediaPrice"
+  | "loadWorkflowCreditBalance"
   | "loadWorkflowGitHubCatalog"
   | "loadWorkflowGitHubOptions"
   | "loadWorkflowGitHubHistory"
   | "runWorkflowGitHubLastEvent"
+  | "keepWorkflowPicture"
 >;
 
-/**
- * The workflows of a host, through the `workflows-v1` routes, and its GitHub triggers and outputs,
- * through the `workflows-github-v1` routes. The host checks the level of the member on each agent of
- * a workflow, and the role for the GitHub catalog, so these actions do not check roles.
- */
 export function createWorkflowActions({
   request,
   capabilities,
+  loadAgentModels,
 }: {
   request: WorkspaceRequest;
   capabilities: ServerCapabilities;
+  loadAgentModels: MobileWorkspaceContextValue["loadAgentModels"];
 }): WorkflowActions {
   const send = <T>(serverId: string, path: string, decode: (value: unknown) => T, body: TeamProtocolV2Json) => {
     requireCapability(capabilities, serverId, WORKFLOWS_CAPABILITY, "mobile.workflow.unsupported");
@@ -89,6 +104,13 @@ export function createWorkflowActions({
         workflowId: input.workflowId,
         title: input.title,
       }),
+    setWorkflowPaused: (input, serverId) => {
+      requireCapability(capabilities, serverId, WORKFLOWS_PAUSE_CAPABILITY, "mobile.workflow.pause.unsupported");
+      return send(serverId, WORKFLOWS_PAUSE_ROUTES.pause, decodeRemoteWorkflowSummary, {
+        workflowId: input.workflowId,
+        paused: input.paused,
+      });
+    },
     deleteWorkflow: (workflowId, serverId) => send(serverId, WORKFLOWS_ROUTES.delete, ignoreResponse, { workflowId }),
     saveWorkflowGraph: (input, serverId) =>
       send(serverId, WORKFLOWS_ROUTES.saveGraph, decodeRemoteWorkflowSaveResult, {
@@ -104,7 +126,6 @@ export function createWorkflowActions({
       }),
     loadWorkflowRun: (runId, serverId) =>
       send(serverId, WORKFLOWS_ROUTES.run, decodeRemoteWorkflowRunDetail, { runId }),
-    // Each press is a new request: a repeat of the same request would start the run only once.
     startWorkflowRun: (workflowId, serverId, fromNodeId) =>
       send(serverId, WORKFLOWS_ROUTES.startRun, decodeRemoteWorkflowRunDetail, {
         workflowId,
@@ -140,23 +161,30 @@ export function createWorkflowActions({
         workflowId: input.workflowId,
         versionId: input.versionId,
       }),
+    loadWorkflowMediaModels: (serverId) =>
+      loadWorkflowMediaModels({ request, capabilities, loadAgentModels, serverId }),
+    loadWorkflowMediaPrice: (input, serverId) => loadWorkflowMediaPrice({ request, capabilities, serverId, input }),
+    loadWorkflowCreditBalance: (serverId) => loadWorkflowCreditBalance({ request, capabilities, serverId }),
     loadWorkflowGitHubCatalog: (serverId) =>
       sendGitHub(serverId, WORKFLOWS_GITHUB_ROUTES.catalog, decodeRemoteWorkflowGitHubCatalog, {}),
     loadWorkflowGitHubOptions: (repository, serverId) =>
       sendGitHub(serverId, WORKFLOWS_GITHUB_ROUTES.options, decodeRemoteWorkflowGitHubOptions, { repository }),
     loadWorkflowGitHubHistory: (workflowId, serverId) =>
       sendGitHub(serverId, WORKFLOWS_GITHUB_ROUTES.history, decodeRemoteWorkflowGitHubHistory, { workflowId }),
-    // Each press is a new request, as for a start.
     runWorkflowGitHubLastEvent: (input, serverId) =>
       sendGitHub(serverId, WORKFLOWS_GITHUB_ROUTES.runLastEvent, decodeRemoteWorkflowRunDetail, {
         workflowId: input.workflowId,
         nodeId: input.nodeId,
         requestId: Crypto.randomUUID(),
       }),
+    keepWorkflowPicture: async (draftId, serverId) => {
+      requireCapability(capabilities, serverId, WORKFLOWS_MEDIA_CAPABILITY, "mobile.workflow.asset.unsupported");
+      const fileId = await send(serverId, WORKFLOWS_MEDIA_ROUTES.keepPicture, decodeRemoteWorkflowPicture, { draftId });
+      return { fileId };
+    },
   };
 }
 
-/** A graph as the request body carries it. Each optional field goes only when it is set. */
 function graphJson(graph: WorkflowGraph): TeamProtocolV2Json {
   return {
     nodes: graph.nodes.map((node) => ({

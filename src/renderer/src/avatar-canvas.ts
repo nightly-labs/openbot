@@ -1,6 +1,3 @@
-// Drawing an agent's avatar on a canvas: the share card of a published agent and the icon of the
-// agent's Slack app both need it.
-
 export function loadSvg(svg: SVGSVGElement, size: number): Promise<HTMLImageElement> {
   svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   svg.setAttribute("width", String(size));
@@ -8,10 +5,6 @@ export function loadSvg(svg: SVGSVGElement, size: number): Promise<HTMLImageElem
   return loadImage(new Blob([new XMLSerializer().serializeToString(svg)], { type: "image/svg+xml" }));
 }
 
-/**
- * A `data:` URL, not a `blob:` one: the app's Content Security Policy allows `data:` images and
- * refuses `blob:`, so a blob URL fails to decode in the app although it works in Storybook.
- */
 export async function loadImage(blob: Blob): Promise<HTMLImageElement> {
   const url = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();

@@ -104,6 +104,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "Apri la pagina di accesso di {name}.",
   "mobile.marketplace.app.stepAllow": "Accedi e consenti l’accesso.",
   "mobile.marketplace.app.stepReturn": "Torna qui. {name} si collega al tuo server.",
+  "mobile.marketplace.app.stepBlank": "L'ultima pagina non si carica. È corretto.",
+  "mobile.marketplace.app.stepCopy": "Tocca la barra degli indirizzi e copia l'indirizzo completo.",
+  "mobile.marketplace.app.stepPaste": "Torna su OpenBot e incolla l'indirizzo qui sotto.",
   "mobile.marketplace.app.openSignIn": "Apri pagina di accesso",
   "mobile.marketplace.app.keySecure": "La chiave va solo al tuo server, con una connessione cifrata.",
   "mobile.marketplace.app.connecting": "Connessione",
@@ -120,8 +123,6 @@ export const messages = {
     "Questa app chiede l’accesso nel browser. Aggiorna OpenBot sul server oppure connetti l’app sul computer.",
   "mobile.marketplace.app.waiting": "In attesa della pagina di accesso…",
   "mobile.marketplace.app.openAgain": "Riapri la pagina di accesso",
-  "mobile.marketplace.app.pasteHint":
-    "Alla fine, la pagina apre un indirizzo che non si carica. Copia quell’indirizzo e incollalo qui sotto.",
   "mobile.marketplace.app.pasteLabel": "Indirizzo dopo l’accesso",
   "mobile.marketplace.app.pasteInvalid": "Questo indirizzo non è la fine di questo accesso.",
   "mobile.marketplace.app.finishSignIn": "Completa accesso",

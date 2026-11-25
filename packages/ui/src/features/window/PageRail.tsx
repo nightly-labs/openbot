@@ -10,6 +10,8 @@ import {
   ContextMenu,
   DropdownMenu,
   Ellipsis,
+  Eye,
+  EyeOff,
   GalleryVerticalEnd,
   ListChecks,
   MotionTooltip,
@@ -19,23 +21,23 @@ import {
   Settings,
   Sparkles,
   Store,
+  toast,
   Waypoints,
-  Workflow,
 } from "@openbot/ui";
 import { AccountUsageDetails, AccountUsageWindowList } from "@openbot/ui/features/account/AccountUsageDetails";
 import { type AccountUsageProviderRow, accountUsageRowKey } from "@openbot/ui/features/account/account-usage-view";
 import { useText } from "@openbot/ui/text";
 import { Dynamic, type JSX } from "@solidjs/web";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { CreditIcon } from "../credits/CreditIcon";
+import { CreditsRailChip } from "../credits/CreditsRailChip";
 
-/** An item of the right-click menu of a rail button. */
 interface RailMenuItem {
   label: string;
   icon: typeof Bot;
   open: (button: HTMLElement) => void;
 }
 
-/** The right-click menu of a pinned rail button: the actions of its page, then Unpin. */
 function RailContextMenu(props: {
   label: string;
   items: readonly RailMenuItem[];
@@ -62,23 +64,16 @@ function RailContextMenu(props: {
   );
 }
 
-/**
- * One rail button. Its name shows as a tooltip, unless it has a `card`: the card shows instead. With
- * `menu`, a right-click opens a menu of more actions of the page.
- */
 function RailButton(props: {
   label: string;
-  /** Renders the card while it is open. */
   card?: () => JSX.Element;
   current?: boolean;
   class?: string;
   menu?: readonly RailMenuItem[] | undefined;
   onClick: (button: HTMLElement) => void;
-  /** Starts to load the page when the pointer or the focus comes to the button, before the click. */
   onPreload?: (() => void) | undefined;
   children: JSX.Element;
 }) {
-  // The open menu hides the tooltip, as the More menu does.
   const [menuOpen, setMenuOpen] = createSignal(false);
   const plain = () => (
     <Button
@@ -147,7 +142,6 @@ function RailButton(props: {
   );
 }
 
-/** The hover card of a usage ring: the limits of its readings, with no refresh. */
 function UsageCard(props: { rows: AccountUsageProviderRow[] }) {
   const { t } = useText();
   return (
@@ -163,16 +157,8 @@ function UsageCard(props: { rows: AccountUsageProviderRow[] }) {
   );
 }
 
-/** Two tracks in a 34px box, with 4.5px between their centers. */
 const RING = { size: 34, stroke: 2.25, spacing: 4.5 };
 
-/**
- * The limits of one provider as concentric rings: the outer ring is the longest window, the inner
- * ring the shortest. Each arc shows how much is left, in the tone of that window. The hover card
- * shows the windows with their reset times. `shared` are the readings that count the same quota, such
- * as Cursor on a merged Grok plan: the card lists them, with no ring of their own. The ring draws the
- * reading with the least left, so a shared reading that runs out first still shows.
- */
 function UsageRings(props: {
   row: AccountUsageProviderRow;
   shared: readonly AccountUsageProviderRow[];
@@ -181,16 +167,23 @@ function UsageRings(props: {
   const { t, format } = useText();
   const rows = () => [props.row, ...props.shared];
   const label = () =>
-    t("app.rail.usageRings", {
-      name: format.list(rows().map((row) => row.name)),
-      windows: rows()
-        .flatMap((row) => row.windows)
-        .map((window) => t("account.usage.row.window", { window: window.label, percent: window.remainingPercent }))
-        .join(", "),
-    });
-  const ringRow = () =>
-    rows().reduce((lowest, row) => ((row.remainingPercent ?? 100) < (lowest.remainingPercent ?? 100) ? row : lowest));
+    unavailable()
+      ? t("app.rail.usageUnavailable", { name: format.list(rows().map((row) => row.name)) })
+      : t("app.rail.usageRings", {
+          name: format.list(rows().map((row) => row.name)),
+          windows: rows()
+            .flatMap((row) => row.windows)
+            .map((window) => t("account.usage.row.window", { window: window.label, percent: window.remainingPercent }))
+            .join(", "),
+        });
+  const ringRow = () => {
+    const read = rows().filter((row) => !row.readFailed);
+    return (read.length > 0 ? read : rows()).reduce((lowest, row) =>
+      (row.remainingPercent ?? 100) < (lowest.remainingPercent ?? 100) ? row : lowest,
+    );
+  };
   const windows = () => [...ringRow().ringWindows].reverse().slice(0, 2);
+  const unavailable = () => props.row.readFailed && windows().length === 0;
   const outerRadius = (RING.size - RING.stroke) / 2;
   return (
     <RailButton
@@ -226,33 +219,48 @@ function UsageRings(props: {
             </g>
           )}
         </For>
+        <Show when={unavailable()}>
+          <circle
+            class="window-rail-usage-track"
+            cx={RING.size / 2}
+            cy={RING.size / 2}
+            r={outerRadius}
+            stroke-width={RING.stroke}
+            pathLength={100}
+            stroke-dasharray="4 6"
+          />
+        </Show>
       </svg>
       <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo" />
     </RailButton>
   );
 }
 
-/** One usage ring: a reading, and the readings that count the same quota. */
 interface UsageRing {
   row: AccountUsageProviderRow;
   shared: AccountUsageProviderRow[];
 }
 
-/** The part left of the reading in the ring with the least left. */
 function ringLeft(ring: UsageRing): number {
   return Math.min(...[ring.row, ...ring.shared].map((row) => row.remainingPercent ?? 100));
 }
 
-/**
- * The rings that do not fit in the rail, as one ring with their number. The hover card lists their
- * readings. A click opens the usage page.
- */
+function providerRings(rings: readonly UsageRing[]): UsageRing[] {
+  const byProvider = new Map<AccountUsageProviderRow["provider"], UsageRing>();
+  for (const ring of rings) {
+    const first = byProvider.get(ring.row.provider);
+    if (first) first.shared.push(ring.row, ...ring.shared);
+    else byProvider.set(ring.row.provider, { row: ring.row, shared: [...ring.shared] });
+  }
+  return [...byProvider.values()];
+}
+
 function MoreUsageRings(props: { rings: readonly UsageRing[]; onOpen: (button: HTMLElement) => void }) {
   const { t } = useText();
   const rows = () => props.rings.flatMap((ring) => [ring.row, ...ring.shared]);
   return (
     <RailButton
-      label={t("app.rail.moreUsage", { count: props.rings.length })}
+      label={t("app.rail.moreUsage", { count: rows().length })}
       card={() => <UsageCard rows={rows()} />}
       class="window-rail-usage window-rail-usage-more"
       onClick={props.onOpen}
@@ -267,32 +275,21 @@ function MoreUsageRings(props: { rings: readonly UsageRing[]; onOpen: (button: H
         />
       </svg>
       <span class="window-rail-usage-count" aria-hidden="true">
-        {t("app.rail.moreUsageCount", { count: props.rings.length })}
+        {t("app.rail.moreUsageCount", { count: rows().length })}
       </span>
     </RailButton>
   );
 }
 
-/**
- * The most ring places in the rail, also in a tall window: four rings and the "+N" ring, or five
- * rings. A "+N" ring never takes the place of one ring. When the window has space for one place
- * only, the "+N" ring shows all the readings.
- */
-const MAX_RING_PLACES = 5;
-/** The space in pixels that stays between the pages and the end of the rail. */
+const START_RING_PLACES = 5;
 const RAIL_MIN_FREE = 12;
 
-/** The answer of one custom agent to its usage prompt. OpenBot cannot read a percent from it. */
 export interface CustomAgentUsageRailRow {
   id: string;
   name: string;
   text: string;
 }
 
-/**
- * The plan usage of one custom agent: the agent logo, with no ring. The hover card shows the answer
- * as the agent wrote it.
- */
 function CustomAgentUsageButton(props: { row: CustomAgentUsageRailRow; onOpen: (button: HTMLElement) => void }) {
   const { t } = useText();
   return (
@@ -312,28 +309,70 @@ function CustomAgentUsageButton(props: { row: CustomAgentUsageRailRow; onOpen: (
   );
 }
 
-/** The credits of a media service that a canvas step spends, such as Sunra or Higgsfield. */
 export interface MediaCreditsRailRow {
+  key: string;
   provider: "sunra" | "higgsfield";
   name: string;
-  /** The credits that the account can spend now. */
   available: number;
-  /** The limit of a team member, or null for an account with no limit of its own. */
   quota: number | null;
+  number?: number | undefined;
 }
 
-/**
- * The credits of one media service. A team quota draws a ring with the part that is left, as the
- * plan limits of a provider do. An account with no limit of its own shows the logo with the number of
- * credits under it. The hover card shows the full number.
- */
+function mediaCreditsPercent(row: MediaCreditsRailRow): number {
+  const quota = row.quota ?? 0;
+  return quota > 0 ? Math.min(100, Math.round((row.available / quota) * 100)) : 0;
+}
+
+function mediaCreditsTone(row: MediaCreditsRailRow) {
+  if (row.quota !== null) return usageTone(mediaCreditsPercent(row));
+  return row.available > 0 ? "neutral" : "critical";
+}
+
+function CreditsRailButton(props: {
+  balance: number | undefined;
+  welcome: number | null | undefined;
+  current: boolean;
+  agents: boolean | undefined;
+  onAgentsChange: ((agents: boolean) => void) | undefined;
+  ask: boolean | undefined;
+  onAskChange: ((ask: boolean) => void) | undefined;
+  walletName: string | null | undefined;
+  onMove: (() => void) | undefined;
+  onOpenPrices: (() => void) | undefined;
+  onOpen: () => void;
+}) {
+  const { t } = useText();
+  return (
+    <Show
+      when={props.balance === undefined}
+      fallback={
+        <CreditsRailChip
+          balance={props.balance ?? 0}
+          welcome={props.welcome}
+          current={props.current}
+          agents={props.agents}
+          onAgentsChange={props.onAgentsChange}
+          ask={props.ask}
+          onAskChange={props.onAskChange}
+          walletName={props.walletName}
+          onMove={props.onMove}
+          onOpenPrices={props.onOpenPrices}
+          onBuy={props.onOpen}
+        />
+      }
+    >
+      <RailButton label={t("app.rail.credits")} class="credit-rail-icon" current={props.current} onClick={props.onOpen}>
+        <span class="credit-rail-tile">
+          <CreditIcon />
+        </span>
+      </RailButton>
+    </Show>
+  );
+}
+
 function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: HTMLElement) => void }) {
   const { t, format } = useText();
-  /** The part of the quota that is left, 0 to 100. A quota of 0 has nothing left. */
-  const percent = () => {
-    const quota = props.row.quota ?? 0;
-    return quota > 0 ? Math.min(100, Math.round((props.row.available / quota) * 100)) : 0;
-  };
+  const percent = () => mediaCreditsPercent(props.row);
   const label = () => {
     const credits = format.number(props.row.available);
     const quota = props.row.quota;
@@ -341,7 +380,6 @@ function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: 
       ? t("app.rail.mediaCreditsQuota", { name: props.row.name, credits, quota: format.number(quota) })
       : t("app.rail.mediaCredits", { name: props.row.name, credits });
   };
-  const radius = (RING.size - RING.stroke) / 2;
   return (
     <RailButton
       label={label()}
@@ -382,50 +420,26 @@ function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: 
           </li>
         </ul>
       )}
-      class="window-rail-usage"
+      class="window-rail-credits"
       onClick={props.onOpen}
     >
-      <Show
-        when={props.row.quota !== null}
-        fallback={
-          <span class="window-rail-credits" aria-hidden="true">
-            <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo" />
-            <span class="window-rail-credits-count">{format.compact(props.row.available)}</span>
+      <ProviderLogo provider={props.row.provider} class="window-rail-credits-logo" />
+      <span class="window-rail-credits-count" data-usage-tone={mediaCreditsTone(props.row)} aria-hidden="true">
+        {format.compact(props.row.available)}
+      </span>
+      <Show when={props.row.number}>
+        {(number) => (
+          <span class="window-rail-credits-badge" aria-hidden="true">
+            {number()}
           </span>
-        }
-      >
-        <svg class="window-rail-usage-ring" viewBox={`0 0 ${RING.size} ${RING.size}`} fill="none" aria-hidden="true">
-          <circle
-            class="window-rail-usage-track"
-            cx={RING.size / 2}
-            cy={RING.size / 2}
-            r={radius}
-            stroke-width={RING.stroke}
-          />
-          <Show when={percent() > 0}>
-            <circle
-              class="window-rail-usage-arc"
-              data-usage-tone={usageTone(percent())}
-              cx={RING.size / 2}
-              cy={RING.size / 2}
-              r={radius}
-              stroke-width={RING.stroke}
-              stroke-linecap="round"
-              pathLength={100}
-              stroke-dasharray={`${percent()} 100`}
-            />
-          </Show>
-        </svg>
-        <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo" />
+        )}
       </Show>
     </RailButton>
   );
 }
 
-/** The rail pages. Agents and Routines show the same page with a different sidebar list. */
 export type PageRailPage =
   | "agents"
-  | "routines"
   | "workflows"
   | "tasks"
   | "schedule"
@@ -434,11 +448,10 @@ export type PageRailPage =
   | "providers"
   | "crm"
   | "marketplace"
+  | "credits"
   | "settings";
 
-/** The pages that the user can pin to the rail, in rail order. Agents always shows. */
 export const PAGE_RAIL_PINNABLE_PAGES = [
-  "routines",
   "workflows",
   "tasks",
   "schedule",
@@ -449,74 +462,57 @@ export const PAGE_RAIL_PINNABLE_PAGES = [
 ] as const satisfies readonly PageRailPage[];
 export type PageRailPinnablePage = (typeof PAGE_RAIL_PINNABLE_PAGES)[number];
 
+export const PAGE_RAIL_HIDEABLE_ITEMS = ["credits", "marketplace", "help"] as const;
+export type PageRailHideableItem = (typeof PAGE_RAIL_HIDEABLE_ITEMS)[number];
+
 export interface PageRailProps {
   hidden: boolean;
-  /** The page in the card, or `null` while a page that the rail does not open shows. */
   current: PageRailPage | null;
-  /** The pages that show as rail buttons. The More menu has all pages, with a pin for each one. */
   pinned: readonly PageRailPinnablePage[];
   onPinChange: (page: PageRailPinnablePage, pinned: boolean) => void;
-  /** The plan limits of each provider account. Each one with a reported window shows as rings. */
   usageRows: readonly AccountUsageProviderRow[];
-  /** The answers of the custom agents on this computer that have a usage prompt. Absent on the web. */
   customAgentUsage?: readonly CustomAgentUsageRailRow[] | undefined;
-  /** The credits of the media services that the open Canvas page can spend. Absent on other pages. */
   mediaCredits?: readonly MediaCreditsRailRow[] | undefined;
-  /** Opens the app page of a media service. */
   onMediaCredits?: ((provider: MediaCreditsRailRow["provider"]) => void) | undefined;
   onAgents: () => void;
-  /** Absent when the server has no routines. */
-  onRoutines?: (() => void) | undefined;
-  /** Absent when the server has no workflows. */
   onWorkflows?: (() => void) | undefined;
-  /** Starts to load the code of the Workflows page before a click opens it. */
   onPreloadWorkflows?: (() => void) | undefined;
-  /** Absent where the server keeps no tasks. */
   onTasks?: ((button: HTMLElement) => void) | undefined;
-  /** Absent where there is no schedule page. */
   onSchedule?: ((button: HTMLElement) => void) | undefined;
   onUsage: (button: HTMLElement) => void;
-  /** Absent where the server keeps no files, such as the web client. */
   onLibrary?: ((button: HTMLElement) => void) | undefined;
-  /** Opens the Providers settings of the server. Absent when this account cannot manage them. */
   onProviders?: ((button: HTMLElement) => void) | undefined;
-  /** Absent for a member, and on a joined server without the CRM. */
   onCrm?: ((button: HTMLElement) => void) | undefined;
-  /** Opens the CRM with its connectors, from the right-click menu of the CRM button. */
   onCrmConnectors?: ((button: HTMLElement) => void) | undefined;
-  /** Absent while Marketplace cannot open. */
   onMarketplace?: (() => void) | undefined;
+  onCredits?: (() => void) | undefined;
+  creditBalance?: number | undefined;
+  creditWelcome?: number | null | undefined;
+  creditAgents?: boolean | undefined;
+  onCreditAgentsChange?: ((agents: boolean) => void) | undefined;
+  creditAsk?: boolean | undefined;
+  onCreditAskChange?: ((ask: boolean) => void) | undefined;
+  creditWalletName?: string | null | undefined;
+  onCreditMove?: (() => void) | undefined;
+  onCreditPrices?: (() => void) | undefined;
+  hiddenItems?: readonly PageRailHideableItem[] | undefined;
+  onHiddenChange?: ((item: PageRailHideableItem, hidden: boolean) => void) | undefined;
   onSettings: (button: HTMLElement) => void;
-  /** A notice for the Settings button, such as an update, when no other place shows it. A dot marks it. */
   settingsNotice?: string | undefined;
-  /** The Help menu, between Marketplace and Settings. */
   help: JSX.Element;
-  /** The menu of the open server, below Settings. Absent where the window has one server and no menu. */
   server?: JSX.Element;
-  /**
-   * The OpenBot logo in the top row, for a window that has no macOS window buttons there. With
-   * `href`, the logo is a link to the OpenBot site.
-   */
   logo?: { variant: AppLogoVariant; href?: string | undefined } | undefined;
 }
 
-/** A page that the user can pin to the rail. */
 interface RailPage {
   id: PageRailPinnablePage;
   label: string;
   icon: typeof Bot;
   open: (button: HTMLElement) => void;
-  /** Starts to load the page before a click opens it. */
   preload?: (() => void) | undefined;
-  /** The right-click menu of its rail button. */
   menu?: readonly RailMenuItem[] | undefined;
 }
 
-/**
- * The More button of the rail. Its menu lists every page that the user can pin. A row opens its page;
- * the pin at the end of the row pins or unpins it, and the menu stays open. When the open page has no
- * rail button, the More button shows as the current page.
- */
 function RailMoreMenu(props: {
   pages: readonly RailPage[];
   current: PageRailPage | null;
@@ -526,8 +522,6 @@ function RailMoreMenu(props: {
   const { t } = useText();
   const [open, setOpen] = createSignal(false);
   let trigger: HTMLElement | undefined;
-  // A pin adds or removes a rail button above More, so the trigger moves. The menu keeps the place
-  // where it opened, so the row under the pointer stays the same.
   let anchor: DOMRect | undefined;
   const changeOpen = (next: boolean) => {
     anchor = next ? trigger?.getBoundingClientRect() : undefined;
@@ -558,7 +552,6 @@ function RailMoreMenu(props: {
         <DropdownMenu.Content class="agent-context-menu window-rail-more-menu" aria-label={t("app.rail.more")}>
           <For each={props.pages} keyed={(page) => page.id}>
             {(page) => (
-              // The pin is its own menu item beside the page, so the keyboard reaches it.
               <div role="none" class="window-rail-more-row" data-pinned={pinned(page().id) ? "" : undefined}>
                 <DropdownMenu.Item
                   onPointerEnter={() => page().preload?.()}
@@ -586,7 +579,45 @@ function RailMoreMenu(props: {
   );
 }
 
-/** The logo in the top row of the rail, in line with the icons of the rail and the server logo of the sidebar. */
+function RailItemsMenu(props: {
+  items: readonly { id: PageRailHideableItem; label: string }[];
+  hidden: (item: PageRailHideableItem) => boolean;
+  onHiddenChange: (item: PageRailHideableItem, hidden: boolean) => void;
+}) {
+  const { t } = useText();
+  const hide = (item: { id: PageRailHideableItem; label: string }) => {
+    props.onHiddenChange(item.id, true);
+    toast(t("app.rail.itemHidden", { name: item.label }), {
+      description: t("app.rail.itemHiddenHint"),
+      action: { label: t("menu.undo"), onClick: () => props.onHiddenChange(item.id, false) },
+    });
+  };
+  return (
+    <ContextMenu.Portal>
+      <ContextMenu.Content class="agent-context-menu" aria-label={t("app.rail.label")}>
+        <For each={props.items} keyed={(item) => item.id}>
+          {(item) => (
+            <Show
+              when={props.hidden(item().id)}
+              fallback={
+                <ContextMenu.Item onSelectAfterClose={() => hide(item())}>
+                  <EyeOff class="agent-context-icon size-4" aria-hidden="true" />
+                  <span>{t("app.rail.hideItem", { name: item().label })}</span>
+                </ContextMenu.Item>
+              }
+            >
+              <ContextMenu.Item onSelectAfterClose={() => props.onHiddenChange(item().id, false)}>
+                <Eye class="agent-context-icon size-4" aria-hidden="true" />
+                <span>{t("app.rail.showItem", { name: item().label })}</span>
+              </ContextMenu.Item>
+            </Show>
+          )}
+        </For>
+      </ContextMenu.Content>
+    </ContextMenu.Portal>
+  );
+}
+
 function RailLogo(props: { variant: AppLogoVariant; href: string | undefined }) {
   const { t } = useText();
   return (
@@ -610,32 +641,20 @@ function RailLogo(props: { variant: AppLogoVariant; href: string | undefined }) 
   );
 }
 
-/**
- * The page rail at the left of the window, on desktop and on the web. Its buttons change the page in
- * the card. A usage ring shows the plan limits of one provider and opens the usage page.
- */
 export function PageRail(props: PageRailProps) {
   const { t } = useText();
-  /**
-   * One ring per reading, except a reading that counts the quota of another provider's own sign-in,
-   * such as Cursor on a merged Grok plan: that ring's card lists it instead.
-   */
   const rings = createMemo((): UsageRing[] => {
-    const rows = props.usageRows.filter((row) => row.reportsUsage && row.windows.length > 0);
+    const rows = props.usageRows.filter((row) => row.reportsUsage && (row.windows.length > 0 || row.readFailed));
     const owner = (row: AccountUsageProviderRow) =>
       rows.find((other) => other.accountId === null && other.provider === row.sharedQuotaWith);
     return rows
       .filter((row) => !owner(row))
       .map((row) => ({ row, shared: rows.filter((other) => owner(other) === row) }));
   });
-  /** The number of ring places that fit between the pages and the end buttons. */
-  const [ringSlots, setRingSlots] = createSignal(MAX_RING_PLACES);
-  /**
-   * When all rings do not fit, the rings with the least left stay, in their order, and one "+N" ring
-   * takes the last place.
-   */
+  const [ringSlots, setRingSlots] = createSignal(START_RING_PLACES);
   const ringLayout = createMemo(() => {
-    const all = rings();
+    if (rings().length <= ringSlots()) return { shown: rings(), more: [] };
+    const all = providerRings(rings());
     if (all.length <= ringSlots()) return { shown: all, more: [] };
     const kept = new Set([...all].sort((a, b) => ringLeft(a) - ringLeft(b)).slice(0, ringSlots() - 1));
     return { shown: all.filter((ring) => kept.has(ring)), more: all.filter((ring) => !kept.has(ring)) };
@@ -644,8 +663,6 @@ export function PageRail(props: PageRailProps) {
   let pageGroup: HTMLElement | undefined;
   let railEnd: HTMLElement | undefined;
   let endGroup: HTMLElement | undefined;
-  /* The free height comes from the layout: the rail height, the pages, and the end buttons other
-   * than the rings. One place is one button and the gap after it. */
   onSettled(() => {
     if (!rail || !pageGroup || !railEnd || !endGroup) return;
     const [nav, pagesBox, endBox, end] = [rail, pageGroup, railEnd, endGroup];
@@ -661,10 +678,8 @@ export function PageRail(props: PageRailProps) {
         pagesBox.getBoundingClientRect().bottom -
         endWithoutRings -
         RAIL_MIN_FREE;
-      setRingSlots(Math.max(1, Math.min(MAX_RING_PLACES, Math.floor(free / slot))));
+      setRingSlots(Math.max(1, Math.floor(free / slot)));
     };
-    /* A new ring count changes the size of the end group, which this observer watches. The measure
-     * waits for the next frame, so the change does not come back in the same observer loop. */
     let frame = 0;
     const observer = new ResizeObserver(() => {
       cancelAnimationFrame(frame);
@@ -676,18 +691,9 @@ export function PageRail(props: PageRailProps) {
       cancelAnimationFrame(frame);
     };
   });
-  /** The pages that this server has, in rail order. */
   const pages = createMemo((): RailPage[] => {
     const list: RailPage[] = [];
-    const { onRoutines, onWorkflows, onTasks, onSchedule } = props;
-    if (onRoutines) {
-      list.push({
-        id: "routines",
-        label: t("sidebar.view.routines"),
-        icon: Workflow,
-        open: () => onRoutines(),
-      });
-    }
+    const { onWorkflows, onTasks, onSchedule } = props;
     if (onWorkflows) {
       list.push({
         id: "workflows",
@@ -730,98 +736,132 @@ export function PageRail(props: PageRailProps) {
     }
     return list;
   });
+  const shown = (item: PageRailHideableItem) => !props.hiddenItems?.includes(item);
+  const hideableItems = () => [
+    ...(props.onCredits ? [{ id: "credits" as const, label: t("app.rail.credits") }] : []),
+    ...(props.onMarketplace ? [{ id: "marketplace" as const, label: t("app.rail.marketplace") }] : []),
+    { id: "help" as const, label: t("app.help.label") },
+  ];
   return (
-    <nav
-      class="window-rail"
-      aria-label={t("app.rail.label")}
-      hidden={props.hidden}
-      ref={(element) => {
-        rail = element;
-      }}
-    >
-      <Show when={props.logo}>{(logo) => <RailLogo variant={logo().variant} href={logo().href} />}</Show>
-      <div
-        class="window-rail-group"
-        ref={(element) => {
-          pageGroup = element;
+    <ContextMenu.Root modal={false}>
+      <ContextMenu.Trigger
+        as="nav"
+        class="window-rail"
+        aria-label={t("app.rail.label")}
+        hidden={props.hidden}
+        disabled={!props.onHiddenChange}
+        ref={(element: HTMLElement) => {
+          rail = element;
         }}
       >
-        <RailButton label={t("app.rail.agents")} current={props.current === "agents"} onClick={props.onAgents}>
-          <Bot aria-hidden="true" />
-        </RailButton>
-        <For each={pages().filter((page) => props.pinned.includes(page.id))} keyed={(page) => page.id}>
-          {(page) => (
-            <RailButton
-              label={page().label}
-              current={props.current === page().id}
-              menu={[
-                ...(page().menu ?? []),
-                { label: t("sidebar.unpin"), icon: PinOff, open: () => props.onPinChange(page().id, false) },
-              ]}
-              onClick={page().open}
-              onPreload={page().preload}
-            >
-              <Dynamic component={page().icon} aria-hidden="true" />
-            </RailButton>
-          )}
-        </For>
-        <RailMoreMenu pages={pages()} current={props.current} pinned={props.pinned} onPinChange={props.onPinChange} />
-      </div>
-      <div
-        class="window-rail-end"
-        ref={(element) => {
-          railEnd = element;
-        }}
-      >
+        <Show when={props.logo}>{(logo) => <RailLogo variant={logo().variant} href={logo().href} />}</Show>
         <div
           class="window-rail-group"
           ref={(element) => {
-            endGroup = element;
+            pageGroup = element;
           }}
         >
-          {/* A status update builds new rows. The key keeps each ring, and its open hover card, mounted. */}
-          <For each={ringLayout().shown} keyed={(ring) => accountUsageRowKey(ring.row)}>
-            {(ring) => <UsageRings row={ring().row} shared={ring().shared} onOpen={props.onUsage} />}
-          </For>
-          <Show when={ringLayout().more.length > 0}>
-            <MoreUsageRings rings={ringLayout().more} onOpen={props.onUsage} />
-          </Show>
-          <For each={props.customAgentUsage ?? []} keyed={(row) => row.id}>
-            {(row) => <CustomAgentUsageButton row={row()} onOpen={props.onUsage} />}
-          </For>
-          <For each={props.mediaCredits ?? []} keyed={(row) => row.provider}>
-            {(row) => <MediaCreditsButton row={row()} onOpen={() => props.onMediaCredits?.(row().provider)} />}
-          </For>
-          <Show when={props.onMarketplace}>
-            {(onMarketplace) => (
+          <RailButton label={t("app.rail.agents")} current={props.current === "agents"} onClick={props.onAgents}>
+            <Bot aria-hidden="true" />
+          </RailButton>
+          <For each={pages().filter((page) => props.pinned.includes(page.id))} keyed={(page) => page.id}>
+            {(page) => (
               <RailButton
-                label={t("app.rail.marketplace")}
-                current={props.current === "marketplace"}
-                onClick={() => onMarketplace()()}
+                label={page().label}
+                current={props.current === page().id}
+                menu={[
+                  ...(page().menu ?? []),
+                  { label: t("sidebar.unpin"), icon: PinOff, open: () => props.onPinChange(page().id, false) },
+                ]}
+                onClick={page().open}
+                onPreload={page().preload}
               >
-                <Store aria-hidden="true" />
+                <Dynamic component={page().icon} aria-hidden="true" />
               </RailButton>
             )}
-          </Show>
-          {props.help}
-          <RailButton
-            label={
-              props.settingsNotice
-                ? t("app.rail.settingsNotice", { notice: props.settingsNotice })
-                : t("app.rail.settings")
-            }
-            current={props.current === "settings"}
-            onClick={props.onSettings}
-          >
-            <Settings aria-hidden="true" />
-            <Show when={props.settingsNotice}>
-              <span class="window-rail-notice" aria-hidden="true" />
-            </Show>
-          </RailButton>
+          </For>
+          <RailMoreMenu pages={pages()} current={props.current} pinned={props.pinned} onPinChange={props.onPinChange} />
         </div>
-        {/* The slot shows no line while it is empty. */}
-        <div class="window-rail-server-slot">{props.server}</div>
-      </div>
-    </nav>
+        <div
+          class="window-rail-end"
+          ref={(element) => {
+            railEnd = element;
+          }}
+        >
+          <div
+            class="window-rail-group"
+            ref={(element) => {
+              endGroup = element;
+            }}
+          >
+            <For each={ringLayout().shown} keyed={(ring) => accountUsageRowKey(ring.row)}>
+              {(ring) => <UsageRings row={ring().row} shared={ring().shared} onOpen={props.onUsage} />}
+            </For>
+            <Show when={ringLayout().more.length > 0}>
+              <MoreUsageRings rings={ringLayout().more} onOpen={props.onUsage} />
+            </Show>
+            <For each={props.customAgentUsage ?? []} keyed={(row) => row.id}>
+              {(row) => <CustomAgentUsageButton row={row()} onOpen={props.onUsage} />}
+            </For>
+            <For each={props.mediaCredits ?? []} keyed={(row) => row.key}>
+              {(row) => <MediaCreditsButton row={row()} onOpen={() => props.onMediaCredits?.(row().provider)} />}
+            </For>
+            <Show when={shown("credits") && props.onCredits}>
+              {(onCredits) => (
+                <CreditsRailButton
+                  balance={props.creditBalance}
+                  welcome={props.creditWelcome}
+                  current={props.current === "credits"}
+                  agents={props.creditAgents}
+                  onAgentsChange={props.onCreditAgentsChange}
+                  ask={props.creditAsk}
+                  onAskChange={props.onCreditAskChange}
+                  walletName={props.creditWalletName}
+                  onMove={props.onCreditMove}
+                  onOpenPrices={props.onCreditPrices}
+                  onOpen={() => onCredits()()}
+                />
+              )}
+            </Show>
+            <Show when={shown("marketplace") && props.onMarketplace}>
+              {(onMarketplace) => (
+                <RailButton
+                  label={t("app.rail.marketplace")}
+                  current={props.current === "marketplace"}
+                  onClick={() => onMarketplace()()}
+                >
+                  <Store aria-hidden="true" />
+                </RailButton>
+              )}
+            </Show>
+            <Show when={shown("help")}>{props.help}</Show>
+            <RailButton
+              label={
+                props.settingsNotice
+                  ? t("app.rail.settingsNotice", { notice: props.settingsNotice })
+                  : t("app.rail.settings")
+              }
+              current={props.current === "settings"}
+              onClick={props.onSettings}
+            >
+              <Settings aria-hidden="true" />
+              <Show when={props.settingsNotice}>
+                <span class="window-rail-notice" aria-hidden="true" />
+              </Show>
+            </RailButton>
+          </div>
+          <div class="window-rail-server-slot">{props.server}</div>
+        </div>
+      </ContextMenu.Trigger>
+      <Show when={props.onHiddenChange}>
+        {(onHiddenChange) => (
+          <RailItemsMenu
+            items={hideableItems()}
+            hidden={(item) => !shown(item)}
+            onHiddenChange={(item, hidden) => onHiddenChange()(item, hidden)}
+          />
+        )}
+      </Show>
+    </ContextMenu.Root>
   );
 }

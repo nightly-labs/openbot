@@ -299,11 +299,59 @@ with an update prompt. See [Providers](providers.md) for the frozen lists that h
 from peers below 8.
 
 Protocol 9 is the protocol 8 wire with capability lists of up to 256 names (`v9.ts`). Protocols 7
-and 8 read at most 128 capabilities, and their lists are full. A capability added after them is in
-`TEAM_PROTOCOL_V9_ONLY_CAPABILITIES` (`current.ts`): a host leaves it out of the compatibility list
-of a peer below 9, and a client sends it only to a host that negotiated 9. On WebRTC, where no
-protocol header is sent, the marker `long-capability-lists-v1` says that a peer reads 256. It is in
-the bootstrap list, so the first compatibility read of a protocol 9 host is already complete.
+and 8 read at most 128 capabilities, and their lists are full. A capability with `since: 9` in
+`TEAM_CAPABILITY_REGISTRY` (`current.ts`) is in `TEAM_PROTOCOL_V9_ONLY_CAPABILITIES`: a host leaves
+it out of the compatibility list of a peer below 9, and a client sends it only to a host that
+negotiated 9. On WebRTC, where no protocol header is sent, the marker `long-capability-lists-v1` says
+that a peer reads 256. It is in the bootstrap list, so the first compatibility read of a protocol 9
+host is already complete.
+
+Protocol 10 is the protocol 9 wire with two capability lists (`v10.ts`). The protocol 9 list is full,
+and protocol 10 does not send it again: it is the frozen baseline. A protocol 10 peer sends
+`capabilities`, with the names after protocol 9 and the markers, and `absent`, with the baseline
+names that it does not serve. The full set is `(baseline - absent) + capabilities`. Over HTTP the
+lists are the `OpenBot-Capabilities` and `OpenBot-Absent-Capabilities` headers; over WebRTC they are
+the `capabilities` and `absent` keys of `http.request`, and the marker `capability-baseline-v1` says
+that a request has the two lists. `capabilities` also keeps `long-capability-lists-v1`, so a host of
+protocol 9 reads a protocol 10 request as protocol 9. A host ignores an unknown name in `absent`
+and refuses a malformed list with `protocol_error`. `/v1/compatibility` answers above the protocol
+gate, so a client can always read the update instruction. A protocol 10 compatibility answer has the
+two lists, and a client expands it (`decodeTeamProtocolSupportExpanded`). The desktop client and the
+web client speak 10. The mobile workspace speaks 10 too, for `server-safe-mode-v1`, and keeps 9 for
+a host of protocols 1-9. The mobile share extension stays on 9. The
+`agent-event-scope` message has no length limit and always sends the full list.
+
+All WebRTC frames of protocols 1 to 10 use one framing (`webrtc-framing.ts`; the names keep the
+`V2` spelling, and `v2.ts` only re-exports it). The bodyless request frame of protocols 4 to 10 (a
+GET, a DELETE, the routine test POST and the remote viewer routes) is in
+`webrtc-bodyless-requests.ts`. Both are current code: deleting an old protocol does not delete them.
+`scripts/team-webrtc-wire-parity-e2e.ts --before=<ref>` compares their bytes with a base commit. On
+WebRTC, the host reads the protocol of an `http.request` from the capability markers. A request
+with no marker comes from a release before v0.7.0, and the host refuses it with status 426 and
+`client_update_required`, as the HTTP gate refuses a request with no protocol header.
+
+### Server safe mode
+
+A server that stopped its start loop (see [hosted servers](../hosted-servers.md#start-loop)) keeps a
+minimal Team API up: `src/main/server-safe-mode.ts`, with the routes in
+`src/main/team-api/server-safe-mode-api.ts`. It opens no `openbot.db` and starts no service. It reads
+the team file without a write, so members sign in with their sessions and the WebRTC peer
+(`TeamWebRtcHostGateway`) works as before. It answers:
+
+- `/v1/compatibility`, above the gate: protocol 10 only. A client of protocols 1-9 reads that it must
+  update. A protocol 10 client reads the optional capability `server-safe-mode-v1` and no other.
+- `GET /v1/server/safe-mode`, for each signed-in member of any role: the reason word
+  (`newer_database` or `start_failed`), the app version and the time. No path, no error text, no
+  secret.
+- Each other request: 426 `client_update_required` below protocol 10, else 503 `server_safe_mode`.
+  The events socket gets 503.
+
+The normal `TeamApiServer` never serves `server-safe-mode-v1`. A client that reads it reads the
+reason once and shows it with a translated sentence: the desktop as the `server_safe_mode` issue on
+`RemoteCompatibilityScreen`, the web client on its incompatible-host screen, and mobile as the
+connection error. There is no action: a newer release fixes it, through the normal update path of
+the server. `scripts/server-safe-mode-e2e.ts` checks the routes, the roles, the WebRTC peer, the
+refusal of protocols 1-9 and that no file of the profile changes.
 
 Capabilities describe additive behavior. The client sends its capability list when it sets the event scope. The host sends optional events only when the client declared the related capability. A missing capability disables only that feature. An unknown optional event is ignored. A malformed known event closes the connection as `protocol_error` because the client cannot safely apply it.
 
@@ -423,6 +471,18 @@ the whole copy when the next snapshot comes (`keepWholeApprovals` in
 404, a member needs `chat` on the agent (else 403), and a request that no longer waits, or a request of
 another agent, gets 409.
 
+The optional `pending-prompts-v1` capability (protocol 10 only) adds `POST /v1/agent-prompts/list`
+(empty body). It returns `{ prompts }`: every question that an agent waits on, oldest first, up to 200
+and up to the byte limit of a runtime snapshot (`pendingPromptsWithinLimits`), in the form of a runtime
+snapshot entry. A runtime snapshot holds at most 4 questions, approvals and
+browser takeovers of all agents together, and sets `attentionComplete: false` when it leaves some out.
+A client that gets such a snapshot reads this list. It shows each listed question in its chat, in
+place of an older question that the list does not confirm, and keeps the listed questions until a
+complete snapshot comes. Without the read, a question that came while the client was away had no card after a restart, a
+reload or a reconnect, and the agent waited (#13486). `src/main/team-api/route-pending-prompts.ts`
+leaves out the questions of a hidden or missing agent and of an agent that the member cannot see.
+The phone draws a question card from the chat messages, so it does not read this list.
+
 The optional `phone-feedback-v1` capability (protocol 9 only) adds
 `POST /v1/agent-approvals/send-phone-feedback` (`requestId`, `phone`). `phone` is what only the phone
 has: `platform` (`iOS` or `Android`), `appVersion`, `system`, `network` (the kind of connection and
@@ -524,6 +584,55 @@ admins can use them (else 403); the wire codec refuses a size outside the range 
 applies to the Claude processes that start after it, and the host sends the provider status event, so
 open settings pages read it again. `src/main/team-api/route-claude-compact-window.ts` owns them.
 Without the capability a client hides the row for that host.
+
+The optional `media-approval-credits-v1` capability (protocol 10 only) adds
+`POST /v1/admin/host/media-approval-credits` (empty request) and
+`POST /v1/admin/host/media-approval-credits/update` (`agents` and `askWhenBlocked`: booleans;
+`credits`: a whole number from 0 to 100,000; `imageModel` and `videoModel`: a model ID or `null`; each
+field is optional and a missing field stays). Both give
+`{ agents, askWhenBlocked, credits, imageModel, videoModel }`; the default is agents on, asks on,
+50 credits and no default model. When `agents` is false, or the balance is less than the price,
+`generate_image` and `generate_video` hold the call with a credits hold (see `media-approval-choice-v1`)
+and spend no credits; `list_media_models` still works. When `askWhenBlocked` is false, the call does
+not hold: the tool tells the agent that it skipped the step. When
+one `generate_image` or `generate_video` call costs more credits than this limit, the user must approve
+it. When the agent names no model, the call uses the default model of its kind if that model takes the
+input pictures. With no default model set, it uses the preferred model
+(`CREDIT_MEDIA_PREFERRED_MODELS`: `gpt-image-2.6` for images, `seedance-2.5` for videos), and
+`list_media_models` gives these as `defaultModels`. Only owners and admins can use them (else 403); the host refuses a value outside the
+range, not whole, or a model ID that is not valid with 400. A change applies to the next call.
+`src/main/team-api/route-media-approval-credits.ts` owns them. Without the capability a client hides
+the row for that host.
+
+The optional `media-approval-choice-v1` capability (protocol 10 only) lets a member change the request
+in a pending media approval. The approval itself stays a `permissions` approval with no command, folder
+or permissions, so an older client shows the plain Allow card. `POST /v1/agent-approvals/media/read`
+(`agentId`, `requestId`) gives `{ media }`: `null` when the request is not a pending media approval,
+else the kind, the prompt, the agent's model and settings (`choice`), the default model, at most 200
+models that take the input pictures, and `canSetDefault` (true for owners and admins).
+`POST /v1/agent-approvals/media/respond` (`agentId`, `requestId`, `choice`: `model`, `aspect`,
+`resolution`, `duration`, `audio`) allows the approval with that choice and gives 204. The host plans
+the job again with the choice; when the new price is higher, it checks the balance again. A member
+needs the chat level on the agent. An unknown or hidden agent gets 404, a request that is not valid
+400, a request that is no longer pending 409. To decline, the client uses the normal approval route.
+"Set as default" uses `media-approval-credits-v1`. `src/main/team-api/route-media-approval-choice.ts`
+owns the routes. Without the capability a client shows the plain Allow card.
+
+The same capability carries the credits hold. The read also gives `hold`: `null`, or the hold of the
+turn with `reason` (`balance` or `agentsOff`), the number of held `images` and `videos`, their total
+`cost`, the `balance` (`null` for `agentsOff`) and `canEnable` (true for owners and admins). All held
+calls of one turn share one approval, so one answer answers all of them.
+`POST /v1/agent-approvals/media/hold` (`agentId`, `requestId`, `action`: `continue`, `enable`, `skip`
+or `mute`) gives `{ hold }`. `continue` checks the balance again: when it is enough, the calls continue
+and `hold` is `null`; else `hold` has the new balance. `enable` turns agent use of credits on (owners
+and admins only, else 403), then continues. `skip` and `mute` end the hold with no charge. `mute` from
+an owner or an admin sets `askWhenBlocked` to false; from a member, it stops the asks for the turns
+that member starts. `POST /v1/agent-approvals/media/muted` (`muted`: a boolean) gives 204 and sets the
+same mute (the client's Undo and the switch in the Credits rail hover card).
+`POST /v1/agent-approvals/media/muted/read` (empty body) gives `{ muted }`: for an owner or an admin,
+`askWhenBlocked` is false; for a member, that member muted the asks. The host keeps the muted members in
+`openbot-credit-asks-muted-v1.json`. An older client shows the hold as a plain approval card: Allow
+continues and Decline skips.
 
 The optional `provider-environment-v1` capability (protocol 9 only) adds
 `POST /v1/admin/host/provider-environment` (`provider`: `claude`, `codex` or `antigravity`) and

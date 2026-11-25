@@ -1,31 +1,3 @@
-// Starts the real desktop app of this worktree with `bun run dev` as a server stops its start loop
-// (`src/main/server-start-halt.ts`). Server mode needs a packaged Linux build, so the development-only
-// `OPENBOT_E2E_SERVER_START_GUARD=1` turns on the server behavior of the start.
-//
-// Run: bun scripts/server-start-loop-e2e.ts
-// Stop this worktree's own dev stack first: the script starts and stops the stack twelve times.
-//
-// First, bash runs the real `check` of scripts/hosting/openbot-hosted-update with a stub `systemctl`
-// and `stage`: `openbot-update.timer` runs it each hour, it starts a stopped start loop again at each
-// run, and it stages only about each 6 hours while OpenBot runs.
-//
-// Then the app. The runs use their own dev profile (`OpenBot Dev wt-<hash of "server-start-loop-e2e"
-// and this path>`), so the worktree's normal dev data does not change. A "migration" run removes the
-// marker of the latest migration and adds a trigger that refuses it again: the real migration runs,
-// fails and rolls back. The test then puts the marker back.
-// 0. A normal start, so that the profile has its database.
-// 1-2. A migration fails: a failed start, and no halt.
-// 3. The main process crashes before the database opens (`OPENBOT_E2E_FORCE_START_FAILURE=crash`).
-// 4. No flag: three failures, so the server stops its start loop before the start. It exits with 78
-//    and writes the reason `start_failed`. It does not count as a fourth failure.
-// 5. No flag: the start after a halt tries once more. It removes the reason file and finishes.
-// 6-7. Two crashes.
-// 8. A migration fails: the third failure in a row, so the server stops its start loop at once.
-// 9. No flag: the start after a halt tries once more and finishes.
-// 10. The database has a migration version that is newer than this build: the server stops at once
-//    with `newer_database`. The test then removes that version.
-// 11. No flag: the start tries again and finishes.
-// It writes .openbot-build/server-start-loop-e2e/report.json, and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { type ChildProcess, execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -55,9 +27,7 @@ const NAME = "server-start-loop-e2e";
 const ROOT = resolve(import.meta.dirname, "..");
 const OUT = join(ROOT, ".openbot-build", NAME);
 const POLL_MS = 250;
-// The first start of a stack can build the main bundle and seed the new profile.
 const RUN_TIMEOUT_MS = 5 * 60_000;
-// Far above each migration version that OpenBot can have.
 const NEWER_DATABASE_VERSION = 999_999;
 const MIGRATION_TRIGGER = "server_start_loop_e2e_refuse_marker";
 const HOSTING = join(ROOT, "scripts", "hosting");
@@ -78,7 +48,6 @@ const AttemptsFile = Schema.Struct({
 type Attempts = typeof AttemptsFile.Type;
 const decodeAttempts = Schema.decodeUnknownOption(AttemptsFile);
 
-// Exactly these keys: the reason file has fixed words, a version and a time only.
 const HaltFile = Schema.Struct({
   version: Schema.Number,
   reason: Schema.String,
@@ -93,8 +62,8 @@ interface RunReport {
   run: number;
   mode: Mode;
   exitCode: number | null;
+  safeMode: boolean;
   attemptsAfter: Attempts | null;
-  /** The reason file after the run. */
   haltAfter: Halt | null;
 }
 
@@ -106,7 +75,6 @@ function readAttempts(): Attempts | null {
   }
 }
 
-/** `null` when the file is missing, or when it is not exactly a reason file. */
 function readHalt(): Halt | null {
   if (!existsSync(haltPath)) return null;
   const decoded = Option.getOrNull(decodeHalt(JSON.parse(readFileSync(haltPath, "utf8"))));
@@ -140,21 +108,27 @@ function startStack(run: number, mode: Mode): { child: ChildProcess; exit: Promi
     OPENBOT_DEV_INSTANCE_ID: instanceId,
     OPENBOT_E2E_SERVER_START_GUARD: "1",
   };
-  // An Electron harness shell sets it, and Electron then starts as Node.
   delete env.ELECTRON_RUN_AS_NODE;
   if (mode === "crash") env.OPENBOT_E2E_FORCE_START_FAILURE = mode;
   else delete env.OPENBOT_E2E_FORCE_START_FAILURE;
   const child = spawn("bun", ["run", "dev"], { cwd: ROOT, env, stdio: ["ignore", logFile, logFile] });
+  logPath = join(OUT, `run-${run}.log`);
   const exit = new Promise<number | null>((done) => child.once("exit", (code) => done(code)));
   void exit.then(() => closeSync(logFile));
   return { child, exit };
+}
+
+let logPath: string | null = null;
+const SAFE_MODE_ON = /\[server-safe-mode\] Safe mode is on \((start_failed|newer_database)\)/u;
+
+function safeModeIsOn(): boolean {
+  return logPath !== null && existsSync(logPath) && SAFE_MODE_ON.test(readFileSync(logPath, "utf8"));
 }
 
 function stopStack(): void {
   execFileSync("bun", ["run", "dev:stop"], { cwd: ROOT, stdio: "inherit" });
 }
 
-/** A new attempt of this run is on disk. */
 function startedAfter(time: number): Attempts | null {
   const attempts = readAttempts();
   return attempts?.attempt && attempts.attempt.startedAt >= time ? attempts : null;
@@ -173,7 +147,6 @@ function setNewerDatabase(on: boolean): void {
   }
 }
 
-/** The marker of the latest migration, which a "migration" run removes. */
 interface MigrationMarker {
   version: number;
   appliedAt: string;
@@ -183,7 +156,6 @@ const decodeMarkerRow = Schema.decodeUnknownOption(
   Schema.Struct({ version: Schema.Number, applied_at: Schema.String }),
 );
 
-/** The real latest migration runs again at the next start, and the trigger makes it fail and roll back. */
 function breakLatestMigration(): MigrationMarker {
   const database = new DatabaseSync(databasePath);
   try {
@@ -219,10 +191,8 @@ interface CheckCase {
   name: string;
   activeState: string;
   execMainStatus: string;
-  /** The age of the stage stamp, or null when there is none. */
   stampAgeMs: number | null;
   stageFails: boolean;
-  /** The version that `staged_version` gives, or "" when no release is staged. */
   stagedVersion: string;
   expected: { calls: string[]; exitCode: number; stampRefreshed: boolean };
 }
@@ -233,10 +203,6 @@ interface CheckResult extends CheckCase {
   stampRefreshed: boolean;
 }
 
-/**
- * Runs the real `check` in bash with a stub `systemctl`, `stage` and `apply`. Sourcing the script
- * runs only its definitions.
- */
 function runCheck(entry: CheckCase): CheckResult {
   const directory = mkdtempSync(join(tmpdir(), `${NAME}-`));
   try {
@@ -366,7 +332,6 @@ const CHECK_CASES: CheckCase[] = [
   },
 ];
 
-/** `openbot-update.timer` runs `check` each hour, and `openbot-update.service` runs `check`. */
 function checkTimerUnits(): { timer: string; service: string } {
   const timer = readFileSync(join(HOSTING, "openbot-update.timer"), "utf8");
   const service = readFileSync(join(HOSTING, "openbot-update.service"), "utf8");
@@ -387,13 +352,11 @@ let error: string | undefined;
 let newerDatabase = false;
 const stack: { running: ReturnType<typeof startStack> | null } = { running: null };
 
-/** A start that finishes. The app then quits with `bun run dev:stop`. */
 async function finishingRun(run: number): Promise<Attempts> {
   const startedAt = Date.now();
   stack.running = startStack(run, "none");
   const begun = await waitFor(`run ${run} records its attempt`, () => startedAfter(startedAt));
   appVersion ??= begun.appVersion;
-  // The start after a halt removes the reason file before it continues.
   assert.equal(existsSync(haltPath), false, `run ${run} removed the reason file`);
   const finished = await waitFor(`run ${run} finishes its start`, () => {
     const attempts = readAttempts();
@@ -403,31 +366,43 @@ async function finishingRun(run: number): Promise<Attempts> {
   stopStack();
   const exitCode = await stack.running.exit;
   stack.running = null;
-  runs.push({ run, mode: "none", exitCode, attemptsAfter: readAttempts(), haltAfter: readHalt() });
+  runs.push({ run, mode: "none", exitCode, safeMode: false, attemptsAfter: readAttempts(), haltAfter: readHalt() });
   return begun;
 }
 
-/** A start that ends by itself: a forced crash, a failed migration, or a halt. */
-async function endingRun(run: number, mode: Mode, expectedFailures: number): Promise<number | null> {
+async function endingRun(run: number, mode: Mode, expectedFailures: number): Promise<RunReport> {
   const startedAt = Date.now();
   if (mode === "migration") brokenMigration = breakLatestMigration();
   stack.running = startStack(run, mode);
   const begun = await waitFor(`run ${run} records its attempt`, () => startedAfter(startedAt));
   assert.equal(begun.appVersion, appVersion, `run ${run} has the version of run 0`);
   assert.equal(begun.consecutiveFailures, expectedFailures, `run ${run} counts the earlier failures`);
-  const exitCode = await stack.running.exit;
+  const running = stack.running;
+  let exited = false;
+  void running.exit.then(() => {
+    exited = true;
+  });
+  await waitFor(`run ${run} ends or runs the safe mode`, () => exited || safeModeIsOn());
+  const safeMode = !exited;
+  if (safeMode) stopStack();
+  const exitCode = await running.exit;
   stack.running = null;
   if (brokenMigration) {
     repairLatestMigration(brokenMigration);
     brokenMigration = null;
   }
-  runs.push({ run, mode, exitCode, attemptsAfter: readAttempts(), haltAfter: readHalt() });
-  return exitCode;
+  const report: RunReport = { run, mode, exitCode, safeMode, attemptsAfter: readAttempts(), haltAfter: readHalt() };
+  runs.push(report);
+  return report;
 }
 
-/** A migration fails before the third failure: a failed start, and the server does not stop its loop. */
+function assertHalted(report: RunReport, message: string): void {
+  assert.ok(report.safeMode || report.exitCode === START_LOOP_EXIT_CODE, message);
+}
+
 async function migrationFailureWithoutHalt(run: number, expectedFailures: number): Promise<void> {
-  const exitCode = await endingRun(run, "migration", expectedFailures);
+  const { exitCode, safeMode } = await endingRun(run, "migration", expectedFailures);
+  assert.equal(safeMode, false, `run ${run}: no safe mode`);
   assert.notEqual(exitCode, START_LOOP_EXIT_CODE, `run ${run}: a failed migration alone does not stop the loop`);
   assert.equal(existsSync(haltPath), false, `run ${run} writes no reason file`);
   const attempts = readAttempts();
@@ -450,7 +425,6 @@ try {
     );
   }
 
-  // Only this test's files in this test's profile. The rest of the profile stays.
   for (const path of [attemptsPath, `${attemptsPath}.tmp`, haltPath, `${haltPath}.tmp`]) rmSync(path, { force: true });
 
   await finishingRun(0);
@@ -462,8 +436,7 @@ try {
   await endingRun(3, "crash", 2);
   assert.equal(existsSync(haltPath), false, "a crash writes no reason file");
 
-  const haltCode = await endingRun(4, "none", 3);
-  assert.equal(haltCode, START_LOOP_EXIT_CODE, "the halted start exits with the start-loop status");
+  assertHalted(await endingRun(4, "none", 3), "the halted start runs the safe mode or exits with 78");
   assertHalt("start_failed", version);
   const afterHalt = readAttempts();
   assert.equal(afterHalt?.attempt?.state, "quitting", "the halt is not a failed start");
@@ -473,8 +446,7 @@ try {
 
   await endingRun(6, "crash", 0);
   await endingRun(7, "crash", 1);
-  const migrationHaltCode = await endingRun(8, "migration", 2);
-  assert.equal(migrationHaltCode, START_LOOP_EXIT_CODE, "a failed migration as the third failure stops the loop");
+  assertHalted(await endingRun(8, "migration", 2), "a failed migration as the third failure stops the loop");
   assertHalt("start_failed", version);
   assert.equal(readAttempts()?.attempt?.state, "failed", "the third failure counts");
 
@@ -482,8 +454,7 @@ try {
 
   setNewerDatabase(true);
   newerDatabase = true;
-  const newerCode = await endingRun(10, "none", 0);
-  assert.equal(newerCode, START_LOOP_EXIT_CODE, "data from a newer version stops the loop at once");
+  assertHalted(await endingRun(10, "none", 0), "data from a newer version stops the loop at once");
   assertHalt("newer_database", version);
   setNewerDatabase(false);
   newerDatabase = false;

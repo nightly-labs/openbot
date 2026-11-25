@@ -1,16 +1,13 @@
-// The client's side of the live browser view: one socket at a time, onto one tab of one host.
-//
-// The renderer asks for a tab, not for a session: which host it is, whether that host is reachable
-// on the network or only through the WebRTC tunnel, and which session the frames belong to are all
-// answered here. Starting a second view replaces the first, because a user looks at one tab. The
-// window that started a view is its owner: it alone gets the frames, and only it stops the view.
-
 import type { BrowserLiveViewEvent } from "@openbot/contracts/ipc";
 import {
+  BROWSER_VIEW_DIALOG_QUERY,
   BROWSER_VIEW_FRAME_ACK_QUERY,
+  BROWSER_VIEW_FRAME_SIZE_QUERY,
   BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS,
   BROWSER_VIEW_PAGE_COPY_QUERY,
   type BrowserViewInput,
+  type BrowserViewViewport,
+  browserViewFrameSizeQuery,
   browserViewInputForHost,
   decodeBrowserViewFrame,
   decodeBrowserViewHostMessage,
@@ -18,7 +15,9 @@ import {
   isBrowserViewUserAction,
   TEAM_BROWSER_VIEW_CAPABILITY,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
+  TEAM_BROWSER_VIEW_DIALOG_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY,
   TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -31,10 +30,9 @@ export interface BrowserViewClientOptions {
     RemoteServerManager,
     "activeServerId" | "supportsCapability" | "openBrowserViewStream" | "closeBrowserViewSession"
   >;
-  /** `owner` is the id that `start` got, so the event goes to the window that started the view. */
   onEvent: (event: BrowserLiveViewEvent, owner: number) => void;
-  /** Puts the text that the host's page copied on this computer's clipboard. */
   writeClipboard: (text: string) => void;
+  frameSize?: (owner: number) => BrowserViewViewport | null;
 }
 
 interface ActiveView {
@@ -43,14 +41,12 @@ interface ActiveView {
   tabId: string;
   owner: number;
   socket: WebSocket;
-  /** When the user last clicked or pressed a key in this view, as `Date.now()`. */
   lastActionAt: number;
 }
 
 export class BrowserViewClient {
   readonly #options: BrowserViewClientOptions;
   #view: ActiveView | null = null;
-  /** Start and stop both replace the view, so they run one after another rather than at once. */
   #chain: Deferred.Deferred<void> | null = null;
   readonly #events = new Set<Fiber.Fiber<void>>();
 
@@ -69,13 +65,18 @@ export class BrowserViewClient {
       yield* this.#closeViewEffect();
       const stream = yield* this.#options.servers.openBrowserViewStream(serverId, tabId);
       const url = new URL(stream.url);
-      // The host keeps a frame's size only for a client that will say when that frame is on screen.
-      // An older client never does, and the host must not retain every frame for the whole session.
       if (this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY)) {
         url.searchParams.set(BROWSER_VIEW_FRAME_ACK_QUERY, "1");
       }
       if (this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY)) {
         url.searchParams.set(BROWSER_VIEW_PAGE_COPY_QUERY, "1");
+      }
+      if (this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_DIALOG_CAPABILITY)) {
+        url.searchParams.set(BROWSER_VIEW_DIALOG_QUERY, "1");
+      }
+      const frameSize = this.#options.frameSize?.(owner);
+      if (frameSize && this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY)) {
+        url.searchParams.set(BROWSER_VIEW_FRAME_SIZE_QUERY, browserViewFrameSizeQuery(frameSize));
       }
       const socket = yield* remoteDecode(() => new WebSocket(url, stream.protocols));
       socket.binaryType = "arraybuffer";
@@ -83,13 +84,15 @@ export class BrowserViewClient {
       this.#view = view;
       socket.addEventListener("message", (message) => {
         if (this.#view !== view) return;
-        // Text is the answer to a copy, or a copy the page made. Any other text is not an answer.
         if (typeof message.data === "string") {
           try {
             const hostMessage = decodeBrowserViewHostMessage(message.data);
-            if (hostMessage?.type === "copied" || hostMessage?.type === "copyTooLarge")
+            if (
+              hostMessage?.type === "copied" ||
+              hostMessage?.type === "copyTooLarge" ||
+              hostMessage?.type === "dialog"
+            )
               this.#options.onEvent({ ...hostMessage, tabId }, owner);
-            // The host also checks this. A host must not fill the clipboard when the user did nothing.
             else if (hostMessage?.type === "pageCopied") {
               if (Date.now() - view.lastActionAt <= BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS)
                 this.#options.writeClipboard(hostMessage.text);
@@ -124,7 +127,6 @@ export class BrowserViewClient {
     (operation) => this.#queue(operation),
   ).bind(this);
 
-  /** With `owner`, stops the view only when that window started it: another window's view stays. */
   readonly stop = Effect.fn("BrowserViewClient.stop")((owner?: number) =>
     this.#queue(
       Effect.gen({ self: this }, function* () {
@@ -135,14 +137,9 @@ export class BrowserViewClient {
     ),
   );
 
-  /**
-   * Input is dropped rather than queued when no view is open: a click belongs to the frame the user
-   * was looking at, and the next view shows a different page.
-   */
   sendInput(input: BrowserViewInput): void {
     const view = this.#view;
     if (!view || view.socket.readyState !== WebSocket.OPEN) return;
-    // An older host drops an unknown sequence and would expand the point with a newer frame.
     const namesFrames = this.#options.servers.supportsCapability(
       view.serverId,
       TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,

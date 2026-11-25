@@ -246,7 +246,8 @@ Then state the stops explicitly. Any one of these means **the version is not cut
 - a frozen Team API codec, adapter or fixture that was deleted, renamed, or modified **in a way
   that can change what an encoded payload means** — the narrow exception gate C allows, a hunk that
   provably cannot alter the wire, is not a stop, and gate C is where that call gets made;
-- a DDL migration not mirrored into `LATEST_SCHEMA_SQL`;
+- a shipped migration that changed, or a new migration with no entry in
+  `openbot-database-schema-history.json`;
 - a renamed on-disk file, or a bumped stored `version`, with no read path for the old one;
 - a D1 contraction without the two-step release;
 - a changed `appId`, `ElectronTeamID`, or `publish` target;

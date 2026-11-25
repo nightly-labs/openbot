@@ -37,26 +37,20 @@ import { currentText, useText } from "../../text";
 import { formatUsageReset } from "./ComposerNotice";
 import { UiBlockCard } from "./ui-blocks/UiBlockCard";
 
-/** `limit`: a usage limit holds it now. `unavailable`: its provider or account cannot run it now. */
 export type BackupModelState = "ready" | "limit" | "unavailable";
 
-/** One model and account an agent can move to, as the backup model controls show it. */
 export interface BackupModelOption {
   key: string;
   choice: AgentModelChoice;
   model: string;
-  /** Set only when the provider has more than one account, so the user can tell them apart. */
   account: string | null;
   state: BackupModelState;
 }
 
-/** What the options are built from: the host's models and providers, and its usage limits. */
 export interface BackupModelSource {
   modelOptions: readonly ClientAgentModelOption[];
   providers: AgentStatus["providers"];
-  /** Whether a usage limit holds this model and account now. */
   limited?: ((choice: AgentModelChoice) => boolean) | undefined;
-  /** Whether a provider error holds this model and account now, so that a switch passes over it. */
   failed?: ((choice: AgentModelChoice) => boolean) | undefined;
 }
 
@@ -65,7 +59,6 @@ export function backupModelOption(choice: AgentModelChoice, source: BackupModelS
   const provider = source.providers?.find((status) => status.id === choice.provider);
   const accounts = provider?.accounts;
   const account = accounts?.find((candidate) => candidate.id === accountId);
-  // A model that only the choice's own account serves is in that account's list (#5217).
   const model =
     source.modelOptions.find((option) => option.provider === choice.provider && option.id === choice.model) ??
     account?.models?.find((option) => option.id === choice.model);
@@ -84,34 +77,52 @@ export function backupModelOption(choice: AgentModelChoice, source: BackupModelS
   };
 }
 
-/** Every model of every provider and account the host has, except the ones in `exclude`. */
 export function backupModelOptions(
   source: BackupModelSource,
   exclude: readonly AgentModelChoice[],
 ): BackupModelOption[] {
-  return source.modelOptions.flatMap((model) => {
-    // A provider that this build does not know cannot be a backup: its model cannot be chosen here.
+  const option = (choice: AgentModelChoice) =>
+    exclude.some((other) => sameAgentModelChoice(other, choice)) ? [] : [backupModelOption(choice, source)];
+  const shared = source.modelOptions.flatMap((model) => {
+    if (model.listing === "kept") return [];
     const modelProvider = model.provider;
     if (!isKnownAgentProvider(modelProvider)) return [];
     const provider = source.providers?.find((status) => status.id === modelProvider);
     const accountIds = provider?.accounts?.map((account) => account.id) ?? [DEFAULT_PROVIDER_ACCOUNT_ID];
-    return accountIds.flatMap((accountId) => {
-      const choice: AgentModelChoice = {
+    return accountIds.flatMap((accountId) =>
+      option({
         provider: modelProvider,
         model: model.id,
         ...(accountId === DEFAULT_PROVIDER_ACCOUNT_ID ? {} : { providerAccountId: accountId }),
-      };
-      return exclude.some((other) => sameAgentModelChoice(other, choice)) ? [] : [backupModelOption(choice, source)];
-    });
+      }),
+    );
   });
+  const own = (source.providers ?? []).flatMap((provider) => {
+    const providerId = provider.id;
+    if (!isKnownAgentProvider(providerId)) return [];
+    return (provider.accounts ?? []).flatMap((account) =>
+      account.id === DEFAULT_PROVIDER_ACCOUNT_ID
+        ? []
+        : (account.models ?? [])
+            .filter(
+              (model) =>
+                !source.modelOptions.some((listed) => listed.provider === providerId && listed.id === model.id),
+            )
+            .flatMap((model) => option({ provider: providerId, model: model.id, providerAccountId: account.id })),
+    );
+  });
+  return [...shared, ...own];
 }
 
 function useOptionLabel() {
   const { t } = useText();
-  return (option: BackupModelOption) =>
-    option.account
-      ? t("agentSettings.backupModels.withAccount", { model: option.model, account: option.account })
-      : option.model;
+  return (option: BackupModelOption) => {
+    const model = t("agentSettings.backupModels.withProvider", {
+      model: option.model,
+      provider: agentProviderName(option.choice.provider),
+    });
+    return option.account ? t("agentSettings.backupModels.withAccount", { model, account: option.account }) : model;
+  };
 }
 
 function OptionLogo(props: { provider: AgentProviderId }) {
@@ -142,22 +153,18 @@ function move<T>(list: readonly T[], index: number, by: -1 | 1): T[] {
 
 export interface BackupModelsPageProps {
   agentName: string;
-  /** The agent's own model: the one it leaves at a usage limit and goes back to. */
   ownModel: string;
   own: AgentModelChoice;
   value: AgentBackupModels | null;
   source: BackupModelSource;
-  /** Null returns the agent to the default: ask, with no saved order. */
   onChange: (next: AgentBackupModels | null) => void;
 }
 
-/** The agent settings page that sets what the agent does when a usage limit holds a message. */
 export function BackupModelsPage(props: BackupModelsPageProps) {
   const { t } = useText();
   const label = useOptionLabel();
   const automatic = () => props.value?.automatic === true;
   const order = () => props.value?.order ?? [];
-  // A switch passes over a saved backup that a provider error holds, so the list does not show it as ready (#5802).
   const entries = () =>
     order().map((choice) => {
       const option = backupModelOption(choice, props.source);
@@ -167,7 +174,6 @@ export function BackupModelsPage(props: BackupModelsPageProps) {
     });
   const addable = () =>
     backupModelOptions(props.source, [props.own, ...order()]).filter((option) => option.state !== "unavailable");
-  // The value can come from a store, and IPC cannot clone a store proxy, so each choice is copied.
   const save = (next: AgentBackupModels) =>
     props.onChange(
       next.automatic || next.order.length > 0
@@ -273,10 +279,7 @@ export function BackupModelsPage(props: BackupModelsPageProps) {
             value={null}
             optionValue={(option) => option.key}
             label={label}
-            // OpenRouter lists hundreds of models, so the search also reads the provider and the model id.
-            optionTextValue={(option) =>
-              `${label(option)} ${agentProviderName(option.choice.provider)} ${option.choice.model}`
-            }
+            optionTextValue={(option) => `${label(option)} ${option.choice.model}`}
             itemContent={(option) => <OptionContent option={option} />}
             onChange={(option) => save({ automatic: automatic(), order: [...order(), option.choice] })}
           >
@@ -295,24 +298,16 @@ export function BackupModelsPage(props: BackupModelsPageProps) {
 }
 
 export interface UsageLimitAskCardProps {
-  /** The provider whose usage limit holds the message. */
   provider: AgentProviderId;
-  /** The name of the model that the limit holds, when it is known. A limit can cover one model only. */
   model?: string | undefined;
-  /** The agent whose work waits, in a channel, where the work is not the reader's own message. */
   agentName?: string | undefined;
-  /** Epoch seconds, or null when the provider has not said. */
   resetsAt: number | null;
-  /** The models that can take the message now, the first one preselected. */
   options: readonly BackupModelOption[];
-  /** Whether the reader can save the choice in the backup models. Absent means yes. */
   rememberable?: boolean;
-  /** Moves the agent. `remember` saves the choice first in the order and switches without asking next time. */
   onSend: (option: BackupModelOption, remember: boolean) => Promise<void>;
   onWait: () => void;
 }
 
-/** In the chat: a usage limit holds a message that has not started. The user moves it or waits. */
 export function UsageLimitAskCard(props: UsageLimitAskCardProps) {
   const { t, format, errorMessage } = useText();
   const label = useOptionLabel();
@@ -426,7 +421,6 @@ export function UsageLimitAskCard(props: UsageLimitAskCardProps) {
   );
 }
 
-/** The ready options for the ask card: the saved order first, then every other ready model. */
 export function usageLimitAskOptions(
   own: AgentModelChoice,
   backupModels: AgentBackupModels | undefined,
@@ -439,13 +433,11 @@ export function usageLimitAskOptions(
   ].filter((option) => option.state === "ready");
 }
 
-/** The saved order after the user chose `choice` with "switch without asking": it goes first. */
 export function rememberedBackupModels(
   choice: AgentModelChoice,
   backupModels: AgentBackupModels | undefined,
 ): AgentBackupModels {
   const rest = (backupModels?.order ?? []).filter((other) => !sameAgentModelChoice(other, choice));
-  // Copies, as in `BackupModelsPage`: the saved order can come from a store, and IPC cannot clone a proxy.
   return {
     automatic: true,
     order: [choice, ...rest].slice(0, AGENT_BACKUP_MODEL_LIMIT).map((other) => ({ ...other })),

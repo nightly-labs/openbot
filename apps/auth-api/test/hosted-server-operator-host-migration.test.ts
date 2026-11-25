@@ -54,7 +54,6 @@ describe("hosted server operator host migration", () => {
   it("accepts the writes of the Worker that runs before the deploy", () => {
     const database = beforeMigration();
     database.exec(migration(MIGRATION));
-    // The deployed Worker names neither column in its insert, its setup, its wake or its delete.
     database.exec(`
       INSERT INTO hosted_servers(
         server_id, owner_user_id, name, size, plan, billing_interval, currency, desired_state, observed_state,
@@ -93,14 +92,12 @@ describe("hosted server operator host migration", () => {
         .get(),
     ).toEqual({ provider_sandbox_id: null, operator_host: "leaseweb:12728110", retired_sandbox_id: "sbx_1" });
 
-    // A row with a machine outside boat and a sandbox would have two servers with one identity.
     expect(() =>
       database.exec("UPDATE hosted_servers SET operator_host = 'leaseweb:12728111' WHERE server_id = 'idle'"),
     ).toThrow(/CHECK constraint failed/u);
     expect(() =>
       database.exec("UPDATE hosted_servers SET provider_sandbox_id = 'sbx_9' WHERE server_id = 'running'"),
     ).toThrow(/CHECK constraint failed/u);
-    // One machine holds one server.
     expect(() => database.prepare(MOVE).run("leaseweb:12728110", "idle")).toThrow(/UNIQUE constraint failed/u);
 
     database.exec(`

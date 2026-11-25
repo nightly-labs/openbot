@@ -6,7 +6,6 @@ import { PixelRatio } from "react-native";
 import { loadFurBody, plushPixels } from "@/features/agents/model/plush/plush-assets";
 import { saturationMatrix } from "@/features/agents/model/plush/plush-draw";
 
-/** Pictures kept in memory. A server list and the shape choices of the settings fit in it. */
 const MAX_PICTURES = 32;
 
 const pictures = new Map<string, Promise<string>>();
@@ -23,10 +22,6 @@ function remember<T>(cache: Map<string, T>, key: string, value: T): T {
 const pictureKey = (shape: ServerAppearanceShape, hex: string, pixels: number, saturation: number) =>
   `${shape}|${hex}|${pixels}|${saturation}`;
 
-/**
- * The felt body of a server with no logo as a PNG `data:` URI: the shape in `hex`, with no eyes,
- * `pixels` square. `saturation` below 1 greys it, as a disconnected server shows.
- */
 function loadServerPlush(shape: ServerAppearanceShape, hex: string, pixels: number, saturation: number) {
   const key = pictureKey(shape, hex, pixels, saturation);
   const cached = pictures.get(key);
@@ -42,17 +37,10 @@ function loadServerPlush(shape: ServerAppearanceShape, hex: string, pixels: numb
     remember(ready, key, uri);
     return uri;
   });
-  // A failed load tries again next time.
   loading.catch(() => pictures.delete(key));
   return remember(pictures, key, loading);
 }
 
-/**
- * The plush picture of `appearance` for a square of `size` points. With no appearance, it is the
- * squircle in the automatic colour of the server. `enabled={false}` draws nothing, for a server
- * that shows its logo. `uri` is null while it is drawn; `failed` is true when it cannot be drawn,
- * so the caller shows its other look.
- */
 export function useServerPlush(
   serverId: string,
   appearance: ServerAppearance | null | undefined,

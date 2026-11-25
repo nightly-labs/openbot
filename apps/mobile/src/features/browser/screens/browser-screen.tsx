@@ -31,6 +31,7 @@ import { ChatGlassButton, ChatGlassIconButton } from "@/features/chat/components
 import {
   useAgentBrowserTab,
   useAgentBrowserTabs,
+  useBrowserHttpSignIn,
   useBrowserRequests,
   useBrowserTabsLoaded,
 } from "@/features/workspace/components/use-live-workspace";
@@ -45,30 +46,27 @@ import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { useAppForeground } from "@/shared/lib/use-app-foreground";
+import { useCloseScreen } from "@/shared/lib/use-close-screen";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
+import { BrowserHttpSignInCard } from "../components/browser-http-sign-in-card";
 import { BrowserLiveStage, type BrowserLiveStageHandle } from "../components/browser-live-stage";
 import { useBrowserFeature } from "../components/use-browser-feature";
 import { useBrowserLiveView } from "../components/use-browser-live-view";
+import { useBrowserLocationRequest } from "../components/use-browser-location-request";
 import { useUnseenBrowserTabs } from "../components/use-unseen-browser-tabs";
 import { namedKeyInputs, pasteInput, selectAllInputs, textChangeInputs, typedTextInputs } from "../model/browser-keys";
 import { useProvideBrowserSheetControls } from "../model/browser-sheet-bridge";
+import { urlHost } from "../model/browser-tabs";
 import type { LiveViewMode } from "../model/live-view-gestures";
 
-/** The floating controls are 48 points, 8 points from the safe area, as in the chat. */
 const CONTROL_SIZE = 48;
-/** The agent title. In the iOS native bar it is as tall as the bar, as the bar buttons beside it are. */
 const TITLE_HEIGHT = isIOS ? NATIVE_BAR_HEIGHT : CONTROL_SIZE;
-/** The widest agent title in the iOS native bar, so a long name leaves room for the bar buttons. */
 const TITLE_MAX_WIDTH = 220;
 const CONTROL_OFFSET = 8;
-/** A paste on a host without the clipboard capability goes as keystrokes, so it is kept short. */
 const TYPED_PASTE_MAX_LENGTH = 2_000;
-/** The hidden field is emptied past this length, so its text never grows with a long session. */
 const KEYBOARD_FIELD_MAX_LENGTH = 256;
 const NOTICE_MS = 2_200;
-/** A new tab opens this page, as on the desktop. */
 const NEW_TAB_URL = "https://www.google.com";
-/** The fade of a control that hides in place, as in `ChatGlassButton`. */
 const FADE: CSSTransitionProperties = {
   transitionProperty: "opacity",
   transitionDuration: 200,
@@ -80,22 +78,17 @@ const NO_SUPPORT: MobileBrowserViewSupport = {
   contextMenu: false,
   viewport: false,
   navigation: false,
+  permissions: false,
+  httpSignIn: false,
 };
 
-// Trackpad mode is the default. The mode lasts for the app session: a user who turned it off keeps
-// it off on the next tab.
 let rememberedMode: LiveViewMode = "trackpad";
 
-/**
- * An agent's browser tabs on the host, live, as a browser the user can use with touch: the
- * pointer follows the page's cursor, and the keyboard and the clipboard reach the page.
- */
 export function BrowserScreen() {
   const { agentId, serverId, tabId, agentIds } = useLocalSearchParams<{
     agentId: string;
     serverId?: string;
     tabId?: string;
-    /** From a channel: the members, joined by commas, whose browser the person can switch to. */
     agentIds?: string;
   }>();
   const { agents } = useMobileWorkspace();
@@ -104,14 +97,12 @@ export function BrowserScreen() {
     agents.find((candidate) => candidate.id === id && (!serverId || candidate.serverId === serverId));
   const agent = onServer(selectedId) ?? null;
   const choices = (agentIds?.split(",") ?? []).flatMap((id) => onServer(id) ?? []);
-  // Reconnect mounts the view again, with a new session, the same pointer mode and the same tab.
   const [attempt, setAttempt] = useState(0);
   const [chosenTabId, setChosenTabId] = useState(tabId);
   return (
     <>
       {agent ? (
         <BrowserView
-          // Another agent has its own tabs and its own live view.
           key={`${agent.id}:${attempt}`}
           agent={agent}
           choices={choices.length > 1 ? choices : []}
@@ -139,15 +130,14 @@ function BrowserView({
   onReconnect,
 }: {
   agent: MobileAgent;
-  /** The agents of a channel whose browser the person can switch to. Empty for one agent. */
   choices: readonly MobileAgent[];
   onChooseAgent: (agentId: string) => void;
-  /** The tab to show when it is the agent's, such as the tab of a takeover or the tab the user chose. */
   preferredTabId?: string;
   onChooseTab: (tabId: string | undefined) => void;
   onReconnect: () => void;
 }) {
   const { t, sourceText, format, errorMessage } = useText();
+  const closeBrowser = useCloseScreen(leaveFirstBrowser);
   const insets = useSafeAreaInsets();
   const liquidGlass = useLiquidGlass();
   const reducedMotion = useReducedMotion();
@@ -155,19 +145,27 @@ function BrowserView({
   const { theme } = useUniwind();
   const appearance = theme === "dark" ? "dark" : "light";
   const iconColor = String(foreground);
-  const { servers, browserViewSupport, respondToBrowserTakeover, controlBrowserTab, conversationStore } =
-    useMobileWorkspace();
+  const {
+    servers,
+    browserViewSupport,
+    respondToBrowserTakeover,
+    controlBrowserTab,
+    answerBrowserHttpSignIn,
+    conversationStore,
+  } = useMobileWorkspace();
   const server = servers.find((candidate) => candidate.id === agent.serverId);
   const online = server?.state === "online";
   const support = online ? browserViewSupport(agent.serverId) : NO_SUPPORT;
   const allowed = useBrowserFeature();
-  // The agent's thread, from its chat. A tab with no agent owner belongs to the agent by its thread.
   const threadId = conversationStore.get(agent.id)?.threadId ?? null;
   const tabs = useAgentBrowserTabs(agent.serverId, agent.id, threadId);
   const tab = useAgentBrowserTab(agent.serverId, agent.id, preferredTabId, threadId);
-  // The view stays open under the help sheet, and closes while the app is in the background.
+  const livePrompt = useBrowserHttpSignIn(agent.serverId, tab?.id ?? null);
+  const [answering, setAnswering] = useState<{ tabId: string; origin: string } | null>(null);
+  const [signInUsername, setSignInUsername] = useState({ key: "", value: "" });
+  const httpSignIn =
+    livePrompt ?? (tab && answering?.tabId === tab.id ? { origin: answering.origin, refused: false } : undefined);
   const appForeground = useAppForeground();
-  // The menu needs the clipboard and the input, which need the view: it is read when a menu comes.
   const contextMenu = useRef<(menu: BrowserViewContextMenu) => void>(() => undefined);
   const live = useBrowserLiveView(
     agent.serverId,
@@ -183,21 +181,24 @@ function BrowserView({
   const [keyboardShown, setKeyboardShown] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [openingTab, setOpeningTab] = useState(false);
-  // A tab that opened behind this one, such as from a link, puts a dot on the tab button.
   const tabsLoaded = useBrowserTabsLoaded(agent.serverId);
   const unseenTabs = useUnseenBrowserTabs(tabs, tab?.id ?? null, tabsLoaded, openingTab);
-  // Android shows the page's menu as a dropdown that opens from code, at the pointer.
   const [pageMenu, setPageMenu] = useState<{
     actions: MenuAction[];
     run: Map<string, () => void>;
     at: { x: number; y: number };
   } | null>(null);
   const pageMenuView = useRef<MenuComponentRef>(null);
+  useBrowserLocationRequest({
+    serverId: agent.serverId,
+    tabId: tab?.id ?? null,
+    enabled: allowed && online && support.permissions,
+    notify: setNotice,
+  });
   const takeover = useBrowserRequests(agent.serverId).find(
     (request) => request.agentId === agent.id && (!request.secret || request.secret.requiresReload),
   );
 
-  // The connection came back: a view that ended with it opens again.
   const wasOnline = useRef(online);
   useEffect(() => {
     const reconnected = online && !wasOnline.current;
@@ -205,7 +206,6 @@ function BrowserView({
     if (reconnected && (live.status.kind === "ended" || live.status.kind === "offline")) onReconnect();
   }, [online, live.status.kind, onReconnect]);
 
-  // The phone keyboard types on a tab. When the last tab closes, it closes too.
   useEffect(() => {
     if (!tab) keyboardField.current?.blur();
   }, [tab]);
@@ -253,7 +253,6 @@ function BrowserView({
     }
   };
 
-  /** Copies the page's selection to the phone. The text copied, or null when nothing was. */
   const copy = async () => {
     try {
       const text = await live.requestSelection();
@@ -291,7 +290,6 @@ function BrowserView({
     );
   };
 
-  /** Loads an address in the tab on screen. A host that cannot do that opens it in a new tab. */
   const loadUrl = (url: string) => {
     if (!tab || !support.navigation) {
       void openTab(url);
@@ -303,7 +301,6 @@ function BrowserView({
     );
   };
 
-  /** A new tab of this agent, in the agent's thread so that the agent can use it too. */
   const openTab = async (url: string) => {
     const ownerThreadId = threadId ?? tabs.find((candidate) => candidate.ownerThreadId)?.ownerThreadId;
     setOpeningTab(true);
@@ -316,14 +313,12 @@ function BrowserView({
       });
       if (opened) onChooseTab(opened.id);
     } catch (error) {
-      // The host's reason, such as its tab limit, says what the user can change.
       fail(errorMessage(error, t("mobile.browser.notice.openTabFailed")));
     } finally {
       setOpeningTab(false);
     }
   };
 
-  /** Closes one of the agent's tabs. When it is the tab on screen, the next one of the agent's tabs shows. */
   const closeTab = async (closedId: string) => {
     const index = tabs.findIndex((candidate) => candidate.id === closedId);
     const next = tabs[index + 1] ?? tabs[index - 1];
@@ -335,8 +330,6 @@ function BrowserView({
     }
   };
 
-  // The host's menu of a right-click, as the phone's own action sheet. A right-click on nothing in
-  // particular offers the page's actions, as a desktop browser does.
   contextMenu.current = (menu) => {
     const choices: { title: string; run: () => void }[] = [];
     const { link, image } = menu;
@@ -349,7 +342,6 @@ function BrowserView({
       else if (item === "cut")
         choices.push({
           title: t("mobile.browser.menu.cut"),
-          // The host deletes the selection only while it is still the text the phone has.
           run: () => void copy().then((text) => text && live.send({ type: "cut", text })),
         });
       else if (item === "copy") choices.push({ title: t("mobile.browser.menu.copy"), run: () => void copy() });
@@ -365,8 +357,6 @@ function BrowserView({
       );
     }
     if (isIOS) {
-      // A SwiftUI menu of `@expo/ui` opens only from a touch on its own button, and this menu opens
-      // when the host answers a right-click. The system action sheet opens from code.
       ActionSheetIOS.showActionSheetWithOptions(
         {
           options: [...choices.map((choice) => choice.title), t("common.cancel")],
@@ -377,7 +367,6 @@ function BrowserView({
       );
       return;
     }
-    // The Android menu of `@expo/ui` opens from code, under its trigger: a point at the pointer.
     const actions: MenuAction[] = [];
     const run = new Map<string, () => void>();
     for (const [index, choice] of choices.entries()) {
@@ -397,7 +386,7 @@ function BrowserView({
     try {
       await respondToBrowserTakeover(agent.serverId, { requestId: takeover.requestId, decision: "complete" });
       void haptics.notification("success");
-      if (router.canGoBack()) router.back();
+      closeBrowser();
     } catch {
       void haptics.notification("error");
       setNotice(t("mobile.browser.notice.handBackFailed"));
@@ -454,8 +443,6 @@ function BrowserView({
     return null;
   })();
   const canUseTab = ready && tab !== null;
-  // The bar acts on the host's tabs, so it shows only for a host and an app version that allow it:
-  // the tab's controls, or one New tab button when the agent has no tab.
   const showControls = allowed && support.view && tab !== null;
   const showNewTab = allowed && support.view && tab === null;
   const controlBottom = keyboardShown ? CONTROL_OFFSET : insets.bottom + CONTROL_OFFSET;
@@ -498,7 +485,6 @@ function BrowserView({
   };
   const titleView =
     choices.length > 0 ? (
-      // In a channel where several agents work, the name switches to the browser of another one.
       <MenuView
         actions={choices.map((choice) => ({
           id: choice.id,
@@ -617,7 +603,37 @@ function BrowserView({
               <Typography.Paragraph type="body-sm">{notice}</Typography.Paragraph>
             </Animated.View>
           ) : null}
-          {/* The controls and the New tab button share one place, and one fades into the other. */}
+          {allowed && support.httpSignIn && tab && httpSignIn ? (
+            <View
+              pointerEvents="box-none"
+              className="absolute inset-x-0"
+              style={{
+                bottom: controlBottom + CONTROL_SIZE + 12,
+                paddingLeft: insets.left + 16,
+                paddingRight: insets.right + 16,
+              }}
+            >
+              <BrowserHttpSignInCard
+                key={`${tab.id}\n${httpSignIn.origin}`}
+                site={urlHost(httpSignIn.origin) || httpSignIn.origin}
+                refused={httpSignIn.refused}
+                initialUsername={signInUsername.key === `${tab.id}\n${httpSignIn.origin}` ? signInUsername.value : ""}
+                onUsernameChange={(value) => setSignInUsername({ key: `${tab.id}\n${httpSignIn.origin}`, value })}
+                answer={async (value) => {
+                  const prompt = { tabId: tab.id, origin: httpSignIn.origin };
+                  if (value) setAnswering(prompt);
+                  try {
+                    await answerBrowserHttpSignIn(
+                      agent.serverId,
+                      value ? { tabId: tab.id, ...value } : { tabId: tab.id, cancel: true },
+                    );
+                  } finally {
+                    if (value) setAnswering((current) => (current === prompt ? null : current));
+                  }
+                }}
+              />
+            </View>
+          ) : null}
           <View
             pointerEvents="box-none"
             className="absolute inset-x-0"
@@ -626,7 +642,6 @@ function BrowserView({
             <View
               pointerEvents="box-none"
               className="absolute inset-0 flex-row items-center justify-between"
-              // Clear of the side insets: the rail of iPhone Duo and the edges in landscape.
               style={{ paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
             >
               <ChatGlassIconButton
@@ -735,7 +750,6 @@ function BrowserView({
       </KeyboardAvoidingView>
 
       {isIOS ? (
-        // The native bar, so its items morph with the items of the chat under the browser.
         <>
           <Stack.Toolbar placement="left">
             <Stack.Toolbar.Button icon="chevron.backward" accessibilityLabel={t("common.back")} onPress={goBack} />
@@ -799,7 +813,6 @@ function BrowserView({
         </View>
       )}
 
-      {/* The phone keyboard types into this field. What changes in it goes to the page. */}
       <TextInput
         ref={keyboardField}
         accessibilityLabel={t("mobile.browser.keyboard.field")}
@@ -826,7 +839,6 @@ function BrowserView({
           }
         }}
         onKeyPress={(event: TextInputKeyPressEvent) => {
-          // Backspace in an empty field changes no text, so the change handler never hears it.
           if (event.nativeEvent.key === "Backspace" && typed.current === "") sendKeys(namedKeyInputs("Backspace"));
         }}
       />
@@ -836,11 +848,10 @@ function BrowserView({
 
 function ignoreInput() {}
 
-/**
- * A glass circle of the control size, as the chat header draws one. The menu owns the touch. Hidden,
- * it fades as `ChatGlassButton` does: the glass turns to `none` with its native animation, because
- * glass stops rendering under an ancestor with no opacity, and only the content fades.
- */
+function leaveFirstBrowser() {
+  if (router.canGoBack()) router.back();
+}
+
 function GlassCircle({
   liquidGlass,
   fallbackBackground,
@@ -881,7 +892,6 @@ function GlassCircle({
   );
 }
 
-/** A glass capsule of the control height, as the chat header draws its title. The menu owns the touch. */
 function GlassCapsule({
   liquidGlass,
   fallbackBackground,
@@ -910,7 +920,6 @@ function GlassCapsule({
   );
 }
 
-/** A menu that takes no touch and is not read out while its button is hidden. */
 function HideableMenu({ hidden, children }: { hidden: boolean; children: ReactNode }) {
   return (
     <View

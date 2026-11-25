@@ -1,28 +1,3 @@
-// Measures what the Hermes features that OpenBot agents do not use cost in each request. Runs the real
-// Hermes CLI through `AcpAgentClient`, with the OpenBot tools, on a free Nous Portal model, in a
-// temporary git workspace that Hermes reads as code. Each variant runs these turns, each in a new
-// session:
-//   1. a one-word reply: the request prompt is the fixed prefix of every request (system prompt,
-//      tools, skills) plus a short message,
-//   2. a small task with tools, which makes several requests.
-// `current` is what `hermes-settings.ts` gives an OpenBot agent. `without-openbot-settings` is Hermes
-// as it is. The other variants put one setting in the user's `config.yaml` instead. `user-keys-win`
-// sets both keys to the Hermes defaults in the user's `config.yaml`: it must cost what
-// `without-openbot-settings` costs.
-// The report holds, for each turn: the input, output and cache read tokens of each request (from the
-// Hermes request log), the tools that Hermes keeps and defers, and the system prompt length.
-//
-// The bench uses a temporary Hermes profile, `openbot-bench-<random>`, in the user's Hermes folder: a
-// home outside that folder installs its own Hermes runtime (about 1 GB), and that install rewrites
-// the shared `hermes` launchers for its own Python. A profile shares the user's runtime and has its own
-// `config.yaml`, sessions and bundled skills. The bench takes the Nous sign-in from the shared store of
-// the user's Hermes, as a second profile does, and deletes the profile at the end. It stops when the
-// launchers in `hermes-agent/.hermes/bin` change. The browser tools need `agent-browser` and Chromium:
-// the bench uses the ones in the user's Hermes `tools` folder, read only.
-// `bun run bench:hermes-prompt-settings`; `--variant=<name>[,<name>]` runs those variants; `--runs=<n>` (3);
-// `--model=<id>` replaces the free LongCat model. `--verbose` prints the Hermes log. Writes
-// .openbot-build/hermes-prompt-settings-bench/report.json.
-
 import { Database } from "bun:sqlite";
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -60,16 +35,10 @@ const TURN_TIMEOUT_MS = 240_000;
 
 interface Variant {
   name: string;
-  /** Whether OpenBot gives its settings (a provider state folder). */
   openbotSettings: boolean;
-  /** The `agent` keys of the user's `config.yaml`. */
   userAgent?: HermesAgentSettings;
 }
 
-/**
- * Toolsets that OpenBot agents keep, measured as references on top of `current`. Each one takes away
- * a feature that OpenBot has no replacement for.
- */
 const REFERENCE_TOOLSETS = ["web", "code_execution", "delegation", "memory", "skills"] as const;
 
 const VARIANTS: Variant[] = [
@@ -106,13 +75,11 @@ function option(name: string): string | undefined {
   return process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
 }
 
-/** The user's Hermes root: the folder of the Hermes home, or the folder above a profile. */
 function userHermesRoot(): string {
   const home = hermesHome();
   return basename(dirname(home)) === "profiles" ? dirname(dirname(home)) : home;
 }
 
-/** The `agent-browser` and Chromium variables of the user's Hermes `tools` folder. */
 function browserEnvironment(root: string): Record<string, string> {
   const store = join(root, "tools");
   let facts: unknown;
@@ -136,7 +103,6 @@ function browserEnvironment(root: string): Record<string, string> {
   return environment;
 }
 
-/** Runs the Hermes CLI with no terminal, without the lazy runtime install that can rewrite the launchers. */
 function hermes(executable: string, args: readonly string[], home: string): void {
   const result = spawnSync(executable, args, {
     env: { ...process.env, HERMES_HOME: home, HERMES_DISABLE_LAZY_INSTALLS: "1" },
@@ -149,7 +115,6 @@ function hermes(executable: string, args: readonly string[], home: string): void
   }
 }
 
-/** The content of the shared launchers, which the bench must not change. */
 function launchers(root: string): string {
   const folder = join(root, "hermes-agent", ".hermes", "bin");
   if (!existsSync(folder)) return "";
@@ -159,13 +124,10 @@ function launchers(root: string): string {
     .join("\n");
 }
 
-/** Removes the folder when it is empty: the bench made it. */
 function removeEmptyFolder(path: string): void {
   try {
     rmdirSync(path);
-  } catch {
-    // It has other entries.
-  }
+  } catch {}
 }
 
 function makeWorkspace(root: string): string {
@@ -173,7 +135,6 @@ function makeWorkspace(root: string): string {
   mkdirSync(workspace, { recursive: true });
   writeFileSync(join(workspace, "notes.md"), "# Harbor inventory\n\nThe crates arrive on Monday.\n");
   writeFileSync(join(workspace, "count.txt"), "42\n");
-  // A code file: Hermes uses its coding context only in a code workspace.
   writeFileSync(join(workspace, "count.py"), 'print(open("count.txt").read().strip())\n');
   spawnSync("git", ["init", "--quiet"], { cwd: workspace, stdio: "ignore" });
   return workspace;
@@ -236,8 +197,6 @@ async function measureTurn(
     const match = API_CALL.exec(line);
     return match ? [{ input: Number(match[1]), output: Number(match[2]), cacheRead: Number(match[3] ?? 0) }] : [];
   });
-  // Hermes logs the tools again when the OpenBot MCP tools arrive, but only in the first session of a
-  // process. The summary takes the most tools that a turn of the variant logged.
   const search = lines
     .flatMap((line) => {
       const match = TOOL_SEARCH.exec(line);
@@ -299,20 +258,16 @@ const report = {
 let failed = false;
 let profileCreated = false;
 let cleanedUp = false;
-/** Removes the scratch folder and the profile, and checks the launchers. */
 function cleanUp(): void {
   if (cleanedUp) return;
   cleanedUp = true;
   rmSync(scratch, { recursive: true, force: true });
   if (profileCreated) {
-    // Hermes 0.21.5 removes the profile and then fails to purge its identity from the removed
-    // profile's `state.db`: that error is not a failure when the profile folder is gone.
     try {
       hermes(cli.executable, ["profile", "delete", "-y", profile], root);
     } catch (error) {
       if (existsSync(home)) throw error;
     }
-    // `profile delete` leaves a tombstone for the name. The name is random, so nothing reuses it.
     rmSync(join(profiles, ".deleted", profile), { force: true });
   }
   if (!profilesExisted) {
@@ -326,7 +281,6 @@ function cleanUp(): void {
     failed = true;
   }
 }
-// Ctrl-C stops Bun without the `finally` below, and the profile would stay in the user's Hermes.
 process.once("SIGINT", () => {
   try {
     cleanUp();
@@ -336,8 +290,6 @@ process.once("SIGINT", () => {
 });
 
 try {
-  // Without `--clone`, the profile gets the bundled skills and none of the user's settings. A failed
-  // create can leave a part of the profile, so the clean-up deletes it too.
   profileCreated = true;
   hermes(cli.executable, ["profile", "create", profile, "--no-alias"], root);
   Object.assign(process.env, browserEnvironment(root), {
@@ -346,7 +298,6 @@ try {
     HERMES_DISABLE_LAZY_INSTALLS: "1",
   });
   const workspace = makeWorkspace(scratch);
-  // Without a terminal, `auth add` takes the sign-in from the shared Nous store.
   hermes(cli.executable, ["auth", "add", "nous", "--type", "oauth", "--no-browser"], home);
   for (const variant of variants) {
     writeFileSync(

@@ -97,4 +97,6 @@ export const messages = {
   "error.import.transferValuesCleared":
     "{name}: 비밀 정보가 들어 있을 수 있는 값을 인수 또는 주소에서 제거했어요. 설정에서 다시 입력해 주세요.",
   "error.import.transferSharedKept": "공유 폴더의 파일 {number}개는 이미 여기에 있어서 그대로 두었어요.",
+  "error.import.transferPartSkipped":
+    "파일의 일부를 가져오지 못했어요. 나머지 부분은 이 서버에 있으니 파일을 다시 가져오지 마세요.",
 } as const satisfies PartialTranslation<typeof source>;

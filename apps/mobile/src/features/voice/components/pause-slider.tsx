@@ -3,7 +3,6 @@ import type { PauseSliderProps } from "./pause-slider.types";
 
 const first = (value: number | number[]) => (Array.isArray(value) ? (value[0] ?? 0) : value);
 
-/** Android: the HeroUI slider. The iOS file uses the native SwiftUI slider. */
 export function PauseSlider({
   value,
   minimum,

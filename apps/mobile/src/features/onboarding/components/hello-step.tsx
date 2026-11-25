@@ -12,11 +12,6 @@ import {
 } from "@/features/onboarding/components/onboarding-motion";
 import { useText } from "@/shared/lib/text";
 
-/**
- * The welcome: a group of agents and what they do. When the user goes on, the group flies off the
- * screen, each member away from the middle, and the text fades. The empty home has the same
- * layout, so when the user skips, the group is already in its place there.
- */
 export function HelloStep({ motion, leaving }: { motion: OnboardingMotion; leaving: boolean }) {
   const { t } = useText();
   const insets = useSafeAreaInsets();
@@ -31,7 +26,6 @@ export function HelloStep({ motion, leaving }: { motion: OnboardingMotion; leavi
       <View style={{ flex: CROWD_SHARE }}>
         <AgentCrowd motion={motion} leaving={leaving} />
       </View>
-      {/* The text sits in the middle of the space between the group and the main action. */}
       <Animated.View className="items-center justify-center px-8" style={[{ flex: TEXT_SHARE }, fade]}>
         <Animated.View entering={popEntering(motion, STAGGER_MS * 4)} className="items-center gap-3">
           <Typography.Heading type="h2" align="center" accessibilityRole="header" className="tracking-openbot-tight">

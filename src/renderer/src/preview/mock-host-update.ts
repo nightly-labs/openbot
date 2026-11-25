@@ -3,7 +3,6 @@ import { sourceText } from "@openbot/i18n/source";
 import { clone } from "./mock-support";
 
 export interface MockHostUpdateOptions {
-  /** The update of a joined server's host, as `host-update-v1` reports it. */
   hostUpdate?: HostUpdateStatus;
   hostRelease?: HostReleaseStatus;
 }
@@ -31,10 +30,6 @@ type MockHostUpdateApi = Pick<
   | "setUpdateSettings"
 >;
 
-/**
- * One remote host's update. A start downloads at once, and a restart that waits for idle waits for
- * one agent turn until the admin chooses `now`; the preview host then stays at "installing".
- */
 export function createMockHostUpdate(options: MockHostUpdateOptions): MockHostUpdateApi {
   let status = clone(options.hostUpdate ?? MOCK_HOST_UPDATE);
   const refuse = () => {

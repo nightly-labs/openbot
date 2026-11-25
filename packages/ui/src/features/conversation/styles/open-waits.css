@@ -1,8 +1,3 @@
-/*
- * Open waits: the "Waiting for replies" card, with a two-line row for each wait and a menu at the
- * row end.
- */
-
 .open-waits .task-list-title-name {
   font-weight: var(--openbot-weight-medium);
 }
@@ -10,6 +5,13 @@
 .open-waits .task-list-count {
   color: var(--openbot-warning-text);
   font-size: var(--openbot-text-sm);
+}
+
+.open-waits .task-list-items:has(> :nth-child(7)) {
+  grid-auto-rows: max-content;
+  max-height: 325px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .open-waits-row {
@@ -47,10 +49,6 @@
   min-width: 0;
   color: var(--openbot-text-dim);
   text-overflow: ellipsis;
-}
-
-[data-wait-state="woken"] .open-waits-row-state {
-  color: var(--openbot-warning-text);
 }
 
 [data-wait-state="resuming"] .open-waits-row-state {

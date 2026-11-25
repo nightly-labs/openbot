@@ -13,6 +13,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "ל-{previous} לא נשארו קרדיטים. עבר ל-{model}. כדי להשתמש בו שוב, הוסף קרדיטים ואז בחר בו.",
   "status.agent.modelReturnedAfterError": "חזר אל {model} אחרי שגיאת הספק.",
+  "status.agent.modelSwitchedForRemovedModel": "{previous} כבר לא זמין. עבר אל {model}.",
   "status.agent.marketplaceSuggested": "הציע אפליקציה מהחנות: {app}.",
   "status.agent.settingShown": "הציג הגדרה: {setting}.",
   "status.agent.channelMemberAdded": "{agent} הוסיף את {member} לערוץ. {person} ביקש זאת.",
@@ -24,6 +25,12 @@ export const messages = {
   "status.agent.channelTaskCancelled": "{agent} ביטל את המשימה ״{task}״ ואת תתי-המשימות שלה. {person} ביקש זאת.",
   "status.agent.screenCaptureScreen": "צילום המסך הראשי ושליחת התמונה אל המודל של הסוכן.",
   "status.agent.screenCaptureChannel": "התמונה מוצגת בערוץ {channel}, וכל חבר בשרת הזה שקורא את הערוץ יכול לראות אותה.",
+  "status.agent.creditImageApproval": "יצירת תמונה עם {model}. זה עולה {credits} קרדיטים.",
+  "status.agent.creditVideoApproval": "יצירת סרטון עם {model}. זה עולה {credits} קרדיטים.",
+  "status.agent.creditMediaChannel": "התוצאה מוצגת בערוץ {channel}, וכל חבר בשרת הזה שקורא את הערוץ יכול לראות אותה.",
+  "status.agent.creditsHoldBalance": "זה משתמש ב-{credits} קרדיטים, והיתרה היא {balance} קרדיטים.",
+  "status.agent.creditsHoldAgentsOff": "סוכנים בשרת הזה לא יכולים להשתמש בקרדיטים.",
+  "status.agent.screenCapturePermissionNext": "לאחר מכן macOS עשוי לבקש ממך לאפשר ל-OpenBot את Screen Recording.",
   "status.agent.screenCaptureDisplay": "צילום התצוגה {name} ושליחת התמונה אל המודל של הסוכן.",
   "status.agent.screenCaptureWindow": "צילום החלון {name} ושליחת התמונה אל המודל של הסוכן.",
   "status.agent.screenCaptureRegion":
@@ -68,6 +75,7 @@ export const messages = {
   "status.agent.browserActing": "משתמש בדף האינטרנט…",
   "status.agent.browserReviewing": "בודק את דף האינטרנט…",
   "status.agent.memoriesSearching": "מחפש בזיכרונות שלו…",
+  "status.agent.chatsSearching": "מחפש בצ'אטים הקודמים שלו…",
   "status.agent.memoriesSearched": {
     one: "חיפש בזיכרונות שלו: נמצא אחד",
     two: "חיפש בזיכרונות שלו: נמצאו שניים",
@@ -111,6 +119,7 @@ export const messages = {
     "הוספת שרת MCP {name}: {target}. כל סוכן בשרת הזה מקבל את הכלים שלו. OpenBot מתחבר אליו כדי לבדוק אותו.",
   "status.agent.mcpServerChange":
     "שינוי שרת MCP {name} אל {target}. כל סוכן בשרת הזה מקבל את הכלים שלו. OpenBot מתחבר אליו כדי לבדוק אותו.",
+  "status.agent.mcpServerHeaders": "הוא גם משנה את הכותרות האלה: {names}.",
   "status.agent.mcpServerEnable": "הפעלת שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerDisable": "כיבוי שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerRemove": "הסרת שרת MCP {name} וההתחברות שלו מכל סוכן בשרת הזה.",
@@ -124,6 +133,10 @@ export const messages = {
   "status.agent.apiKeyScope.label": "שמירה עבור",
   "status.agent.apiKeyScope.vault": "כל הסוכנים (כספת)",
   "status.agent.apiKeyScope.agent": "הסוכן הזה בלבד",
+  "status.agent.location.field": "המיקום שלך",
+  "status.agent.location.placeholder": "עיר, כתובת או מקום",
+  "status.agent.location.submit": "שיתוף",
+  "status.agent.location.shared": "המיקום שותף",
   "status.agent.vaultExpiryHint": "MM/YY",
   "status.agent.vaultField.website": "אתר",
   "status.agent.vaultField.username": "שם משתמש או אימייל",
@@ -144,6 +157,9 @@ export const messages = {
   "status.agent.vaultField.email": "כתובת אימייל",
   "status.agent.nextStepContinues": "הסוכן נעצר לפני השלב הבא שלו. הוא ממשיך ({current} מתוך {limit}).",
   "status.agent.planContinues": "בתוכנית יש שלבים פתוחים. הסוכן ממשיך ({current} מתוך {limit}).",
+  "status.agent.planStopped": "הסוכן עצר כשבתוכנית שלו יש שלבים פתוחים. שלחו הודעה כדי להמשיך.",
+  "status.agent.continuationLimitReached":
+    "הסוכן עצר לפני שהבקשה הסתיימה. הוא לא יכול להמשיך שוב בעצמו. שלחו הודעה כדי להמשיך.",
   "status.agent.compactionContinues": "החיבור נפסק בזמן שהסוכן כיווץ את ההקשר שלו. הסוכן ממשיך.",
   "status.agent.providerExitContinues": "הסוכן נעצר לפני שסיים את התשובה שלו. הסוכן ממשיך.",
   "status.agent.branchTitle": "צ'אט מסועף",

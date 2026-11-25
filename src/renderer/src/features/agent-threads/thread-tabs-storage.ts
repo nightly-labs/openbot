@@ -1,19 +1,14 @@
 import { z } from "zod";
 
-/** The side threads that have a tab on this device, in tab order, and the open tab. */
 export interface AgentThreadTabs {
-  /** The tabs of the chat header. */
   open: string[];
   active: string | null;
-  /** The tabs of the side panel, where each thread shows beside the agent's own chat. */
   side: string[];
 }
 
-/** Server id → agent id → tabs. */
 export type ThreadTabsByServer = Record<string, Record<string, AgentThreadTabs>>;
 
 const THREAD_TABS_STORAGE_KEY = "openbot:thread-tabs:v1";
-/** More tabs than this do not fit in a header. */
 const MAX_STORED_TABS = 50;
 
 type ThreadTabsStorage = Pick<Storage, "getItem" | "setItem">;
@@ -37,7 +32,6 @@ export function readThreadTabs(storage: ThreadTabsStorage = window.localStorage)
       for (const [agentId, tabs] of Object.entries(agents)) {
         if (!tabs) continue;
         const side = uniqueIds(tabs.side);
-        // `open` also holds the side panel tabs, so an older version shows them in the chat header.
         const open = uniqueIds(tabs.open).filter((tab) => !side.includes(tab));
         if (open.length > 0 || side.length > 0 || tabs.active) byAgent[agentId] = { open, active: tabs.active, side };
       }
@@ -67,15 +61,9 @@ export function writeThreadTabs(tabs: ThreadTabsByServer, storage: ThreadTabsSto
   );
   try {
     storage.setItem(THREAD_TABS_STORAGE_KEY, JSON.stringify(stored));
-  } catch {
-    // A UI preference must not block navigation when browser storage is unavailable.
-  }
+  } catch {}
 }
 
-/**
- * Server id → agent id → the creation time of the newest side thread that this device has seen. A newer
- * thread, also one that started on another device while this one was off, gets a tab here.
- */
 type SeenThreadsByServer = Record<string, Record<string, string>>;
 
 const THREADS_SEEN_STORAGE_KEY = "openbot:thread-tabs-seen:v1";
@@ -96,7 +84,6 @@ function readSeenThreads(storage: ThreadTabsStorage): SeenThreadsByServer {
   }
 }
 
-/** The creation time of the newest side thread of the agent that this device has seen, if any. */
 export function readThreadsSeenThrough(
   serverId: string,
   agentId: string,
@@ -105,7 +92,6 @@ export function readThreadsSeenThrough(
   return readSeenThreads(storage)[serverId]?.[agentId];
 }
 
-/** Sets the time that `readThreadsSeenThrough` reads. `null` forgets it, for a deleted agent. */
 export function writeThreadsSeenThrough(
   serverId: string,
   agentId: string,
@@ -122,24 +108,18 @@ export function writeThreadsSeenThrough(
   if (Object.keys(agents).length === 0) delete next[serverId];
   try {
     storage.setItem(THREADS_SEEN_STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    // Without browser storage, a thread from another device gets a tab only while this window stays open.
-  }
+  } catch {}
 }
 
-/** A side thread that is archived and waits for the end of its Undo time before the delete. */
 export interface PendingThreadDelete {
   serverId: string;
   agentId: string;
   threadId: string;
-  /** Epoch milliseconds. After this time, any window of this device can finish the delete. */
   deadline: number;
-  /** The thread was not archived before the delete, so Undo restores it. */
   restore: boolean;
 }
 
 const THREAD_DELETES_STORAGE_KEY = "openbot:thread-deletes:v1";
-/** A device does not delete more threads than this in one Undo time. */
 const MAX_STORED_DELETES = 200;
 
 const pendingDeleteSchema = z.object({
@@ -163,9 +143,7 @@ export function readPendingThreadDeletes(storage: ThreadTabsStorage = window.loc
 function writePendingThreadDeletes(deletes: readonly PendingThreadDelete[], storage: ThreadTabsStorage): void {
   try {
     storage.setItem(THREAD_DELETES_STORAGE_KEY, JSON.stringify(deletes.slice(-MAX_STORED_DELETES)));
-  } catch {
-    // Without browser storage, a delete still runs at the end of its Undo time in this window.
-  }
+  } catch {}
 }
 
 const sameDelete = (a: PendingThreadDelete, b: Pick<PendingThreadDelete, "serverId" | "threadId">) =>
@@ -181,7 +159,6 @@ export function addPendingThreadDelete(
   );
 }
 
-/** Removes a stored delete. Returns false when another window removed it first. */
 export function takePendingThreadDelete(
   entry: Pick<PendingThreadDelete, "serverId" | "threadId">,
   storage: ThreadTabsStorage = window.localStorage,
@@ -193,7 +170,6 @@ export function takePendingThreadDelete(
   return true;
 }
 
-/** Removes the stored deletes of a deleted agent: its threads went with it. */
 export function forgetPendingThreadDeletes(
   serverId: string,
   agentId: string,

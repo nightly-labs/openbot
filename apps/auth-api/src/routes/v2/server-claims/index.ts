@@ -3,7 +3,6 @@ import { Effect } from "effect";
 import { runApiResponse } from "../../../server/effect-runtime";
 import { apiError, authErrorResponse, json, requestAuthService, requestUser } from "../../../server/request-auth";
 
-/** The signed-in user makes a one-time claim that signs a new server in to the same account. */
 export const Route = createFileRoute("/v2/server-claims/")({
   server: {
     handlers: {

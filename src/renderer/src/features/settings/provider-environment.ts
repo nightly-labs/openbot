@@ -10,14 +10,12 @@ import type { ProviderEnvironmentControl } from "@openbot/ui/features/settings/P
 import { useText } from "@openbot/ui/text";
 import { createHostSetting } from "./host-setting-state";
 
-/** The variable calls of one server's host. The desktop reaches them through main. */
 export type HostProviderEnvironmentCalls = Pick<
   OpenBotDesktopApi["hostAdmin"],
   "getProviderEnvironment" | "setProviderEnvironment"
 >;
 
 export interface HostProviderEnvironmentOptions {
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostProviderEnvironmentCalls;
 }
 
@@ -25,13 +23,6 @@ export interface ProviderEnvironmentSource extends HostProviderEnvironmentOption
   serverId: string;
 }
 
-/**
- * The Environment section of each provider page, for this computer or a joined server
- * (`provider-environment-v1`). The host checks the role again. Undefined while `source` is, and for a
- * provider that takes no variables.
- *
- * Each new value of `status` reads the variables again: the host sends a status event after a change.
- */
 export function createProviderEnvironment(
   source: () => ProviderEnvironmentSource | undefined,
   status: () => unknown,
@@ -39,7 +30,6 @@ export function createProviderEnvironment(
   const { t } = useText();
   const calls = (): HostProviderEnvironmentCalls => source()?.calls ?? window.openbot.hostAdmin;
 
-  /** Runs when a provider page opens, so its effects end when the page closes. */
   function open(provider: AgentProviderId): ProviderEnvironmentControl | undefined {
     if (!isProviderEnvironmentProvider(provider)) return undefined;
     const setting = createHostSetting<ProviderEnvironment, ProviderEnvironmentVariableInput[]>({

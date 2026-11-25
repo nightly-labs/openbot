@@ -161,6 +161,7 @@ export const messages = {
   "routine.card.webhookCreated": "Routine webhook créée",
   "routine.card.webhookSecretNote":
     "Pour obtenir le secret de signature, régénérez-le. L’agent ne reçoit pas le secret.",
+  "routine.card.webhookSecretAgentNote": "Pour obtenir le secret de signature, régénérez-le ou donnez-le à {name}.",
   "routine.card.webhookUpdated": "Routine webhook mise à jour",
   "routine.card.webhookChanged": "Modifications non enregistrées",
   "routine.card.webhookSaveFailed": "Impossible d’enregistrer les événements.",
@@ -321,7 +322,13 @@ export const messages = {
   "routine.webhook.senderSecretLabel": "Secret de l’expéditeur",
   "routine.webhook.senderSecretConfirm": "Utiliser",
   "routine.webhook.senderSecretFailed": "Impossible d’enregistrer le secret de l’expéditeur.",
-  "routine.webhook.statusFailed": "Impossible de vérifier si l’hôte est connecté au relais.",
+  "routine.webhook.giveSecret": "Donner le secret de signature à {name}",
+  "routine.webhook.giveSecretTitle": "Donner un nouveau secret de signature à {name} ?",
+  "routine.webhook.giveSecretDescription":
+    "Le secret actuel cesse de fonctionner immédiatement. {name} enregistre le nouveau secret comme clé API et peut l’ajouter chez l’expéditeur. Vous n’avez pas besoin de le copier.",
+  "routine.webhook.giveSecretConfirm": "Donner",
+  "routine.webhook.giveSecretFailed": "Impossible de donner le secret de signature à {name}.",
+  "routine.webhook.secretGiven": "{name} a le nouveau secret de signature.",
   "routine.settings.instruction": "Instruction",
   "routine.settings.instructionPlaceholderAgent": "Décrivez ce que cet agent doit faire.",
   "routine.settings.instructionPlaceholderChannel": "Décrivez ce que ce canal doit faire.",

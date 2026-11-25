@@ -1,36 +1,20 @@
-// Where a custom agent's command is on this computer, and whether it can start with its arguments.
-//
-// The command is text the user typed. It never goes into a shell: a bare name is looked up here, in
-// Node, in the `PATH` that a login shell reports through one fixed script (`loginSearchPath`). On Windows `where.exe`
-// takes the name as one argument. What comes back is the file that `spawn` runs.
-
-import { execFile } from "node:child_process";
 import { constants } from "node:fs";
 import { access, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { extname, isAbsolute, join } from "node:path";
-import { promisify } from "node:util";
 import { CUSTOM_AGENT_LIMITS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
-import { loginSearchPath } from "./cli";
+import { loginSearchPath, windowsWhere } from "./cli";
 import { pickWindowsExecutable } from "./mcp-provider-shapes";
 import { providerCall, providerFailure } from "./provider-client-effects";
 
-const execFileAsync = promisify(execFile);
-
-/** A command name with no path, no shell text and no option form. */
 const AGENT_COMMAND_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/;
 
-/**
- * What a `.cmd` or `.bat` argument may hold. Such a file runs only through `cmd.exe`, and
- * `cliSpawnTarget` gives it one command line, so any other character could start a second command.
- */
 const WINDOWS_SCRIPT_ARG_PATTERN = /^[A-Za-z0-9_.,:=@+/\\-]+$/;
 
 export type AgentCommandForm = "path" | "home" | "name";
 
-/** The form of the command text, or null when it is none of the three forms that are accepted. */
 export function agentCommandForm(
   command: string,
   platform: NodeJS.Platform = process.platform,
@@ -42,7 +26,6 @@ export function agentCommandForm(
   return AGENT_COMMAND_NAME_PATTERN.test(command) ? "name" : null;
 }
 
-/** Throws the reason when an argument list cannot be given to a process. */
 export function assertAgentArgs(args: readonly string[]): void {
   if (args.length > CUSTOM_AGENT_LIMITS.args) throw new Error(sourceText("error.provider.customAgentArgsInvalid"));
   for (const arg of args) {
@@ -52,10 +35,6 @@ export function assertAgentArgs(args: readonly string[]): void {
   }
 }
 
-/**
- * Throws when the resolved file is a Windows script and an argument could leave the one command line
- * that `cmd.exe` gets. Called with the resolved file, because a bare name can resolve to `x.cmd`.
- */
 export function assertWindowsScriptArgs(
   executable: string,
   args: readonly string[],
@@ -70,14 +49,9 @@ export function assertWindowsScriptArgs(
 export interface ResolveAgentCommandOptions {
   platform?: NodeJS.Platform;
   home?: string;
-  /** The folders to search for a bare name. The login shell's `PATH` and this process's when absent. */
   searchPath?: readonly string[];
 }
 
-/**
- * The file that a command starts, or null when there is none now. Throws for a command text that is
- * not an accepted form, so the form can say what is wrong rather than "not found".
- */
 export const resolveAgentCommand = Effect.fn("AcpAgentCommand.resolve")(function* (
   command: string,
   options: ResolveAgentCommandOptions = {},
@@ -101,8 +75,8 @@ export const resolveAgentCommand = Effect.fn("AcpAgentCommand.resolve")(function
 });
 
 const whereExe = Effect.fn("AcpAgentCommand.whereExe")((command: string) =>
-  providerCall(() => execFileAsync("where.exe", [command], { timeout: 5_000, maxBuffer: 64 * 1024 })).pipe(
-    Effect.map(({ stdout }) => pickWindowsExecutable(stdout, process.env.PATHEXT)),
+  providerCall(() => windowsWhere(command, null)).pipe(
+    Effect.map((stdout) => pickWindowsExecutable(stdout, process.env.PATHEXT)),
     Effect.catch(() => Effect.succeed(null)),
   ),
 );

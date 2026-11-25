@@ -14,10 +14,14 @@ export const messages = {
     "Narzędzie nie zostało uruchomione. tool_call nie może uruchomić openbot.tool_search ani openbot.tool_describe. Wywołaj je bezpośrednio z tymi samymi argumentami.",
   "error.agent.toolCallEnvelopeKeys":
     "Narzędzie nie zostało uruchomione. tool_call przyjmuje tylko name i arguments. Umieść argumenty narzędzia w arguments jako obiekt i wyślij wywołanie ponownie.",
+  "error.agent.toolCallMissingName":
+    "Narzędzie nie zostało uruchomione. tool_call nie ma name. Wpisz w name pełną nazwę z tool_search, na przykład openbot.history_read, i wyślij wywołanie ponownie.",
   "error.agent.toolCallUnknownTool":
     "Narzędzie nie zostało uruchomione. tool_call nie znalazł narzędzia o tej nazwie. Użyj dokładnej pełnej nazwy z tool_search, na przykład openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "Narzędzie nie zostało uruchomione. tool_call nie znalazł narzędzia o tej nazwie. Pełna nazwa to prawdopodobnie {name}. Jeśli tak, wyślij wywołanie ponownie z tą nazwą.",
+  "error.agent.toolCallNullValue":
+    "Narzędzie nie zostało uruchomione. {name} wymaga obiektu lub listy w {paths}, ale każdy z tych elementów listy dotarł jako null. Wyślij wywołanie ponownie i podaj każdy z tych elementów jako ciąg znaków z jego JSON.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe nie znalazł narzędzia OpenBot o nazwie {names}. Opisuje tylko narzędzia OpenBot i przeglądarki, które podaje openbot.tool_search, a nie narzędzia MCP.",
   "error.agent.toolDescribeDiscoveryNames":
@@ -51,6 +55,12 @@ export const messages = {
   "error.agent.modelUnavailable": "Wybrany model agenta jest niedostępny.",
   "error.agent.modelProviderNotConnected":
     "Wybrany model agenta „{model}” jest niedostępny: {provider} nie jest połączony.",
+  "error.agent.modelProviderSignInRequired":
+    "Wybrany model agenta „{model}” jest niedostępny: {provider} wymaga zalogowania. Zaloguj się do {provider} i spróbuj ponownie.",
+  "error.agent.modelProviderNotInstalled":
+    "Wybrany model agenta „{model}” jest niedostępny: {provider} nie jest zainstalowany.",
+  "error.agent.modelProviderOutdated":
+    "Wybrany model agenta „{model}” jest niedostępny: {provider} wymaga aktualizacji.",
   "error.agent.modelListEmpty":
     "Wybrany model agenta „{model}” jest niedostępny: {provider} nie zwrócił żadnych modeli. Ostatni błąd: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -122,6 +132,12 @@ export const messages = {
   "error.agent.deletionBusy": "Usuwanie agenta już trwa.",
   "error.agent.stopBeforeDelete": "Zatrzymaj agenta i anuluj wiadomości w kolejce, zanim go usuniesz.",
   "error.agent.deleteIncomplete": "Nie udało się całkowicie usunąć danych agenta. Spróbuj ponownie usunąć agenta.",
+  "error.agent.deleteFolderInUse":
+    "Praca innego agenta nadal używa folderu tego agenta. Usuń agenta ponownie, gdy ta praca się zakończy, lub po ponownym uruchomieniu OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Inny program nadal używa folderu tego agenta, na przykład program uruchomiony przez agenta. Zamknij ten program lub uruchom ponownie komputer, na którym działa ten agent, a potem usuń agenta ponownie.",
+  "error.agent.deleteWhenFolderFree":
+    "Praca innego agenta nadal używa folderu tego agenta. OpenBot usunie tego agenta, gdy ta praca się zakończy.",
   "error.agent.duplicationBusy": "Ten agent jest już duplikowany.",
   "error.agent.waitBeforeDuplicate": "Poczekaj, aż agent skończy i opróżni kolejkę, zanim go zduplikujesz.",
   "error.agent.saveOtherAgent": "Ten zapis należy do innego agenta.",
@@ -144,6 +160,8 @@ export const messages = {
   "error.agent.busyMessageModeLocalOnly":
     "Zachowanie wiadomości podczas pracy agenta można ustawić tylko na komputerze, na którym działa agent.",
   "error.agent.backupModelsLocalOnly": "Modele zapasowe można ustawić tylko na komputerze, na którym działa agent.",
+  "error.agent.backupModelsAtLimit":
+    "Żaden model zapasowy nie może teraz przejąć pracy: każdy osiągnął limit użycia lub niedawno zawiódł. Modele jednego konta mogą mieć wspólny limit. Aby kontynuować teraz, dodaj model zapasowy od innego dostawcy lub z innego konta albo poczekaj na odnowienie limitu.",
   "error.agent.taskLimitLocalOnly": "Limit zadań można ustawić tylko na komputerze, na którym działa agent.",
   "error.agent.localScriptsOff": "Ten agent nie zezwala na lokalne skrypty.",
   "error.agent.localScriptsRateLimited":
@@ -175,6 +193,8 @@ export const messages = {
     "Przechwytywanie ekranu nie działa w rozmowie w Slacku, Discordzie lub Telegramie, ponieważ jego pliki trafiają do innych osób.",
   "error.agent.screenCaptureDeclined":
     "Użytkownik nie zezwolił na to przechwycenie ekranu. Nic nie zostało przechwycone.",
+  "error.agent.creditMediaDeclined": "Użytkownik nie zezwolił na to generowanie. Nie wydano żadnych kredytów.",
+  "error.agent.creditMediaNotSaved": "Plik został utworzony, ale OpenBot nie mógł zapisać go w czacie.",
   "error.agent.mcpToolDeclined":
     "Użytkownik nie zezwolił na to wywołanie narzędzia MCP. Narzędzie nie zostało uruchomione.",
   "error.agent.screenCaptureWindowMissing":
@@ -185,6 +205,8 @@ export const messages = {
     "Obszar nie mieści się w jednym wyświetlaczu. Użyj punktów pulpitu w granicach jednego wyświetlacza z list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot nie ma uprawnienia do nagrywania ekranu. Poproś użytkownika, aby otworzył Ustawienia systemowe > Prywatność i ochrona > Nagrywanie ekranu i dźwięku systemowego, włączył OpenBot, a potem zamknął i ponownie otworzył OpenBot.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot nie ma jeszcze uprawnienia do nagrywania ekranu, więc nie może wyświetlić listy okien. Aby przechwycić ekran, wywołaj capture_screen z target screen. Użytkownik najpierw zatwierdza przechwycenie, a potem macOS może poprosić go o uprawnienie.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows zwrócił pusty obraz. Poproś użytkownika, aby odblokował komputer i zamknął chronione treści. Przechwytywanie ekranu może też blokować zasada organizacji.",
   "error.agent.screenCaptureFailed": "Przechwycenie ekranu nie powiodło się. Spróbuj ponownie.",

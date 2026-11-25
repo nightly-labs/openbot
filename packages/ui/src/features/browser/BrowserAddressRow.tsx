@@ -19,6 +19,7 @@ import {
   BrowserStopIcon,
 } from "@openbot/ui/features/conversation/ConversationIcons";
 import { useText } from "@openbot/ui/text";
+import type { JSX } from "@solidjs/web";
 import { createMemo, createStore, createUniqueId, flush, Show } from "solid-js";
 import { BrowserPageMenu } from "./BrowserPageMenu";
 import { BrowserProfileDot } from "./BrowserProfileColor";
@@ -57,27 +58,20 @@ function SuggestionIcon(props: { view: BrowserFullViewProps; row: BrowserSuggest
 
 interface AddressState {
   open: boolean;
-  /** The text that the user typed. The suggestions follow it. */
   typed: string;
-  /** The text in the field while it is edited; undefined shows the page address. */
   text: string | undefined;
-  /** The highlighted row, or -1. */
   active: number;
-  /** True when the field shows a completed address after the typed text. */
   completed: boolean;
 }
 
 const CLOSED_ADDRESS: AddressState = { open: false, typed: "", text: undefined, active: -1, completed: false };
 
-/**
- * Back, forward, reload, and the address with its suggestions: open tabs, history, and search hints.
- * The field completes a visited address as you type. Arrow keys move in the rows; Enter opens one.
- */
 export function BrowserAddressRow(props: {
   view: BrowserFullViewProps;
   ref: (input: HTMLInputElement) => void;
   narrow: boolean;
   onNewTab: () => void;
+  popover?: JSX.Element;
 }) {
   const { t } = useText();
   const listId = createUniqueId();
@@ -129,7 +123,6 @@ export function BrowserAddressRow(props: {
     input?.blur();
   };
 
-  /** The highlighted row is the selected option, so the list marks it for a screen reader. */
   const activeValue = createMemo(() => {
     const row = rows()[address.active];
     return row ? new Set([row.id]) : new Set<string>();
@@ -141,7 +134,6 @@ export function BrowserAddressRow(props: {
   };
 
   const onKeyDown = (event: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
-    // These keys choose and commit the text of an input method.
     if (event.isComposing || event.keyCode === 229) return;
     const list = rows();
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -198,7 +190,6 @@ export function BrowserAddressRow(props: {
       >
         <BrowserBackIcon />
       </Button>
-      {/* A narrow row keeps Back here; Forward and Reload go in the page menu. */}
       <Show when={!props.narrow}>
         <Button
           variant="ghost"
@@ -245,108 +236,108 @@ export function BrowserAddressRow(props: {
           </Button>
         </Show>
       </Show>
-      <form class="browser-full-capsule" onSubmit={(event) => event.preventDefault()}>
-        <Show when={acting()}>
-          {(control) => (
-            <span
-              class="browser-full-capsule-agent"
-              title={t("browser.tab.controlStatus", {
-                name: control().agent.name,
-                action: t(browserActionLabel(control().session)),
-              })}
-            >
-              <AgentAvatar agent={control().agent} class="browser-full-owner-avatar" />
-            </span>
-          )}
-        </Show>
-        <Input
-          ref={(element: HTMLInputElement) => {
-            input = element;
-            props.ref(element);
-          }}
-          class="browser-full-capsule-input"
-          type="text"
-          role="combobox"
-          autocomplete="off"
-          spellcheck={false}
-          maxlength={INPUT_LIMITS.browserUrl}
-          aria-label={t("browser.address.label")}
-          aria-keyshortcuts={browserAriaShortcut("address", props.view.shortcuts)}
-          aria-autocomplete="both"
-          aria-expanded={listOpen() ? "true" : "false"}
-          aria-controls={listOpen() ? listId : undefined}
-          aria-activedescendant={listOpen() && address.active >= 0 ? `${listId}-${address.active}` : undefined}
-          placeholder={t("browser.address.placeholder")}
-          value={address.text ?? tab()?.url ?? ""}
-          onInput={(event: InputEvent & { currentTarget: HTMLInputElement }) =>
-            edit(
-              event.currentTarget,
-              event.currentTarget.value,
-              // A completion selects text, which ends the text that an input method composes.
-              !event.isComposing && event.inputType.startsWith("insert"),
-            )
-          }
-          onKeyDown={onKeyDown}
-          onFocus={(event: FocusEvent & { currentTarget: HTMLInputElement }) => {
-            setAddress(() => ({ ...CLOSED_ADDRESS, open: true }));
-            flush();
-            event.currentTarget.select();
-          }}
-          // A click that focuses the field selects all of it, as in other browsers; a second click places the caret.
-          onPointerDown={(event: PointerEvent & { currentTarget: HTMLInputElement }) => {
-            selectOnPointerUp = document.activeElement !== event.currentTarget;
-          }}
-          onMouseUp={(event: MouseEvent) => {
-            if (selectOnPointerUp) event.preventDefault();
-            selectOnPointerUp = false;
-          }}
-          onBlur={() => setAddress(() => ({ ...CLOSED_ADDRESS }))}
-        />
-        <Show when={listOpen()}>
-          <Listbox.Root<BrowserSuggestion>
-            as="div"
-            id={listId}
-            aria-label={t("browser.address.suggestions")}
-            class="ui-popover-menu-surface browser-full-suggest"
-            options={rows()}
-            optionValue={(row) => row.id}
-            optionTextValue={(row) => row.title}
-            selectionMode="single"
-            disallowEmptySelection={true}
-            allowDuplicateSelectionEvents={true}
-            // The field keeps the focus; the list is a part of the combobox.
-            shouldUseVirtualFocus={true}
-            shouldSelectOnPressUp={true}
-            value={activeValue()}
-            onChange={(keys) => {
-              const key = keys.values().next().value;
-              const row = rows().find((candidate) => candidate.id === key);
-              if (row) choose(row);
+      <div class="browser-full-capsule-anchor">
+        <form class="browser-full-capsule" onSubmit={(event) => event.preventDefault()}>
+          <Show when={acting()}>
+            {(control) => (
+              <span
+                class="browser-full-capsule-agent"
+                title={t("browser.tab.controlStatus", {
+                  name: control().agent.name,
+                  action: t(browserActionLabel(control().session)),
+                })}
+              >
+                <AgentAvatar agent={control().agent} class="browser-full-owner-avatar" />
+              </span>
+            )}
+          </Show>
+          <Input
+            ref={(element: HTMLInputElement) => {
+              input = element;
+              props.ref(element);
             }}
-            renderItem={(item) => {
-              const row = item.rawValue;
-              const index = () => rows().findIndex((candidate) => candidate.id === item.key);
-              return (
-                <Listbox.Item
-                  item={item}
-                  id={`${listId}-${index()}`}
-                  class="browser-full-suggest-row"
-                  onPointerDown={(event: PointerEvent) => event.preventDefault()}
-                >
-                  <SuggestionIcon view={props.view} row={row} />
-                  <span class="browser-full-suggest-title">{row.title}</span>
-                  <span class="browser-full-suggest-detail">
-                    {row.detail ?? (row.kind === "url" ? "" : t("browser.address.search"))}
-                  </span>
-                  <Show when={row.kind === "tab"}>
-                    <span class="browser-full-suggest-switch">{t("browser.address.switchToTab")}</span>
-                  </Show>
-                </Listbox.Item>
-              );
+            class="browser-full-capsule-input"
+            type="text"
+            role="combobox"
+            autocomplete="off"
+            spellcheck={false}
+            maxlength={INPUT_LIMITS.browserUrl}
+            aria-label={t("browser.address.label")}
+            aria-keyshortcuts={browserAriaShortcut("address", props.view.shortcuts)}
+            aria-autocomplete="both"
+            aria-expanded={listOpen() ? "true" : "false"}
+            aria-controls={listOpen() ? listId : undefined}
+            aria-activedescendant={listOpen() && address.active >= 0 ? `${listId}-${address.active}` : undefined}
+            placeholder={t("browser.address.placeholder")}
+            value={address.text ?? tab()?.url ?? ""}
+            onInput={(event: InputEvent & { currentTarget: HTMLInputElement }) =>
+              edit(
+                event.currentTarget,
+                event.currentTarget.value,
+                !event.isComposing && event.inputType.startsWith("insert"),
+              )
+            }
+            onKeyDown={onKeyDown}
+            onFocus={(event: FocusEvent & { currentTarget: HTMLInputElement }) => {
+              setAddress(() => ({ ...CLOSED_ADDRESS, open: true }));
+              flush();
+              event.currentTarget.select();
             }}
+            onPointerDown={(event: PointerEvent & { currentTarget: HTMLInputElement }) => {
+              selectOnPointerUp = document.activeElement !== event.currentTarget;
+            }}
+            onMouseUp={(event: MouseEvent) => {
+              if (selectOnPointerUp) event.preventDefault();
+              selectOnPointerUp = false;
+            }}
+            onBlur={() => setAddress(() => ({ ...CLOSED_ADDRESS }))}
           />
-        </Show>
-      </form>
+          <Show when={listOpen()}>
+            <Listbox.Root<BrowserSuggestion>
+              as="div"
+              id={listId}
+              aria-label={t("browser.address.suggestions")}
+              class="ui-popover-menu-surface browser-full-suggest"
+              options={rows()}
+              optionValue={(row) => row.id}
+              optionTextValue={(row) => row.title}
+              selectionMode="single"
+              disallowEmptySelection={true}
+              allowDuplicateSelectionEvents={true}
+              shouldUseVirtualFocus={true}
+              shouldSelectOnPressUp={true}
+              value={activeValue()}
+              onChange={(keys) => {
+                const key = keys.values().next().value;
+                const row = rows().find((candidate) => candidate.id === key);
+                if (row) choose(row);
+              }}
+              renderItem={(item) => {
+                const row = item.rawValue;
+                const index = () => rows().findIndex((candidate) => candidate.id === item.key);
+                return (
+                  <Listbox.Item
+                    item={item}
+                    id={`${listId}-${index()}`}
+                    class="browser-full-suggest-row"
+                    onPointerDown={(event: PointerEvent) => event.preventDefault()}
+                  >
+                    <SuggestionIcon view={props.view} row={row} />
+                    <span class="browser-full-suggest-title">{row.title}</span>
+                    <span class="browser-full-suggest-detail">
+                      {row.detail ?? (row.kind === "url" ? "" : t("browser.address.search"))}
+                    </span>
+                    <Show when={row.kind === "tab"}>
+                      <span class="browser-full-suggest-switch">{t("browser.address.switchToTab")}</span>
+                    </Show>
+                  </Listbox.Item>
+                );
+              }}
+            />
+          </Show>
+        </form>
+        {props.popover}
+      </div>
       <Show when={profile()}>
         {(current) => (
           <span class="browser-profile-status" title={browserTabProfileLabel(t, current())}>

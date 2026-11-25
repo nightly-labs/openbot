@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/provider";
 
 export const messages = {
-  // Provider, provider runtime and custom endpoint errors.
   "error.provider.mcpConfig":
     "OpenBot 无法在 Codex 配置中注册 MCP 服务器。请确认 Codex 的 config.toml 有效且可写，然后重启 OpenBot。",
   "error.provider.computerUseConfig":
@@ -17,6 +16,8 @@ export const messages = {
   "error.provider.acpPlanUsedUp": "{provider} 提示你的套餐额度已用完。请选择其他模型，或升级你的 {provider} 套餐。",
   "error.provider.acpMcpNotLoaded":
     "{provider} 没有加载 OpenBot 的工具，因此此智能体无法使用这些工具，也无法联系队友。{provider} 的团队策略可能会阻止本地 MCP 服务器。请让团队管理员允许它们，然后重试。",
+  "error.provider.acpToolsNotLoaded":
+    "{provider} 在没有 OpenBot 工具的情况下处理了这条消息，因此智能体无法联系队友、使用浏览器或附加文件。请重试。",
   "error.provider.acpOwnMcpServerFailed":
     "{provider} 无法启动 MCP 服务器 {name}，因此回复已停止。此服务器位于你自己的 {provider} 设置中，而不在 OpenBot 中。请在那里移除或修复该服务器，然后开始新的聊天。",
   "error.provider.endpointsReadOnly":
@@ -79,6 +80,7 @@ export const messages = {
   "error.provider.runtimeUpdateIncomplete": "运行时更新未完成。",
   "error.provider.downloadHttp": "运行时下载失败，HTTP {status}。",
   "error.provider.downloadNoData": "运行时下载未返回任何数据。",
+  "error.provider.downloadStalled": "由于一分钟内没有收到数据，下载已停止。请检查网络连接，然后重试。",
   "error.provider.downloadSize": "运行时下载的大小异常。",
   "error.provider.downloadIntegrity": "运行时下载未通过完整性校验。",
   "error.provider.runtimeReplacing": "另一个实例正在替换该运行时，无法安装。",
@@ -127,6 +129,7 @@ export const messages = {
   "error.provider.keyInvalidCharacters": "服务商密钥中包含空格或密钥不允许的字符。",
   "error.provider.noModel": "所选服务商没有可用模型。",
   "error.provider.noModelNamed": "{provider} 没有可用模型。",
+  "error.provider.acpModelsNotLoaded": "{provider} 无法加载其模型。请重新发送消息。",
   "error.provider.acpNoModels": "ACP CLI 未公布任何 ACP 模型。OpenBot 不会猜测备用模型。",
   "error.provider.endpointRemoveBusy": "请等待当前对话与队列结束，再移除该端点。",
   "error.provider.codexOutdated": "Codex CLI {version} 版本过低。OpenBot 需要 0.156.0 或更高版本。",
@@ -154,9 +157,18 @@ export const messages = {
   "error.provider.cliNotReady": "{provider} CLI 尚未就绪或未登录。",
   "error.provider.cliTimedOut": "{provider} 未及时响应，电脑可能正忙。OpenBot 将重试。",
   "error.provider.cliTimedOutRefresh": "{provider} 未及时响应，电脑可能正忙。请刷新服务商以重试。",
+  "error.provider.stoppedBeforeStart": "{provider} 在此消息开始前停止了。请重新发送此消息。",
+  "error.provider.sessionStartTimedOut":
+    "{provider} 未能及时打开新对话，因此此消息没有开始。请在运行 OpenBot 的电脑上打开服务商，选择 {provider}，点击重启，然后重试。",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} 未能及时打开此对话，因此此消息没有开始。请在运行 OpenBot 的电脑上打开服务商，选择 {provider}，点击重启，然后重试。",
+  "error.provider.serviceUnreachable": "{provider} 无法连接到其服务。请检查网络连接。OpenBot 将重试。",
+  "error.provider.serviceUnreachableRefresh": "{provider} 无法连接到其服务。请检查网络连接，然后刷新服务商。",
   "error.provider.acpStartTimedOut": "{provider} 未在 {seconds} 秒内完成启动，电脑可能正忙。",
   "error.provider.acpModelsTimedOut": "{provider} 未在 {seconds} 秒内列出模型，电脑可能正忙。",
   "error.provider.startStopped": "{provider} 连续多次启动失败，OpenBot 已停止尝试。请刷新服务商以重试。",
+  "error.provider.startPaused":
+    "{provider} 连续多次启动失败。OpenBot 会在下一条消息或自动化任务时再试。要立即重试，请刷新服务商。",
   "error.provider.tempDiskSpace": "{provider} 启动至少需要 1 GB 可用磁盘空间。请清理空间后刷新服务商。",
   "error.provider.noCodeSignIn": "{provider} 不支持用验证码登录。",
   "error.provider.codeLoginNoLink": "服务商没有显示登录链接，请重试。",
@@ -192,14 +204,23 @@ export const messages = {
     "OpenCode 拒绝了这个免费模型。部分免费模型并非在所有国家/地区都可用。请选择其他带“免费”标签的模型，或在 OpenCode 设置中粘贴 OpenCode Go 密钥并选择 OpenCode Go 模型。",
   "error.provider.customEndpointKeyRefused":
     "端点“{provider}”拒绝了它的 API 密钥或请求头。请在“服务器设置 → 服务商”中重新输入，然后重试。",
+  "error.provider.customEndpointAccessRefused":
+    "端点“{provider}”拒绝了请求。它的 API 密钥或请求头可能有误，或者它的账户无法使用此模型。请在“服务器设置 → 服务商”中检查，或选择其他模型，然后重试。",
   "error.provider.customEndpointKeyMissing":
     "端点“{provider}”需要 API 密钥。请在“服务器设置 → 服务商”中添加密钥，然后重试。",
+  "error.provider.customEndpointEffortRefused":
+    "端点“{provider}”拒绝了此模型的推理强度。请在“服务器设置 → 服务商”中编辑“{provider}”。在“推理强度”中只保留此模型接受的强度，或选择“不推理”。然后重试。",
   "error.provider.opencodeKeyExpired":
     "你的 OpenCode API 密钥已过期。请在 OpenCode Console 中创建新密钥，粘贴到 OpenCode 设置中，然后重试。",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go 拒绝了你保存的 API 密钥。密钥可能已过期。请在 OpenCode Console 中创建新密钥，粘贴到 OpenCode 设置中，然后重试。",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode 没有使用你在 OpenBot 中保存的密钥，而是使用了 OpenCode 自己保存的另一个 OpenCode Go 密钥，OpenCode Go 拒绝了该密钥。要删除该密钥，请在运行该代理的电脑上的终端中运行 `opencode auth logout opencode-go`，然后选择该密钥。之后再试一次。",
+  "error.provider.opencodeGoRequestRefused":
+    "OpenCode Go 拒绝了该请求。新的 API 密钥无法解决此问题。你的 OpenCode Go 套餐可能未激活，或者 OpenCode Go 可能屏蔽了你的网络：某些服务会屏蔽 VPN、代理或某些国家/地区。请在 OpenCode Console 中确认套餐已激活，或关闭 VPN，然后重试。你也可以选择其他模型。",
   "error.provider.opencodeServiceFailure":
     "由于本地服务故障，OpenCode 无法完成本轮对话。请重试；若错误持续，请在设置中重新连接 OpenCode。",
+  "error.provider.opencodeStillStarting": "OpenCode 未能及时完成加载。OpenBot 会再试一次。",
   "error.provider.opencodeRateLimited":
     "由于触发速率限制，模型服务商拒绝了该请求。请等待几分钟或改用其他模型后重试。\n{detail}",
   "error.provider.opencodeBilling":
@@ -208,6 +229,8 @@ export const messages = {
     "OpenCode 的模型服务商报告上传请求无效。请改用其他模型继续；重新创建自动化任务前请先检查已保存的自动化任务。\n{detail}",
   "error.provider.opencodeUnreadableContent":
     "该模型无法读取该对话中的文件或图片。OpenBot 已使用聊天记录开始新的 OpenCode 会话。请去掉文件后重新发送消息，或选择能读取文件的模型。如果你将此模型添加到了自定义服务商，请在其设置的“接受”中取消勾选“图片”。",
+  "error.provider.opencodeOutOfMemory":
+    "模型服务器的内存不足以处理此聊天。请开始新的聊天，或以更小的上下文长度加载模型，并在 OpenBot 中该模型提供方的设置里填写相同的窗口。",
   "error.provider.opencodeContextTooSmall":
     "此聊天超出了模型的上下文窗口。请在 Ollama 或 LM Studio 中以更大的上下文长度加载模型，并在 OpenBot 中该模型提供方的设置里填写相同的窗口。或者选择更大的模型。",
   "error.provider.opencodeFreeLimit":
@@ -216,8 +239,15 @@ export const messages = {
     "模型服务商一侧发生故障，不是你的网络问题。请稍后重试或改用其他模型。\n{detail}",
   "error.provider.opencodeModelUnavailable": "你无法使用此模型。请为该助手改用其他模型。\n{detail}",
   "error.provider.opencodeIncompleteReply": "模型的回复中断了或无效。请重新发送消息，或改用其他模型。\n{detail}",
+  "error.provider.opencodeOutputLimit":
+    "模型的回复三次超出了输出上限，因此本轮已停止。请选择更低的强度或其他模型，然后重新发送消息。",
+  "error.provider.opencodeOutputLimitEndpoint":
+    "模型的回复三次超出了输出上限，因此本轮已停止。请在设置中打开自定义服务商，点击此端点的编辑，为该模型设置更大的最大输出。也可以选择更低的强度或其他模型。",
   "error.provider.opencodeReasoningOverlap":
     "OpenCode 无法在此推理强度下读取该模型的推理内容。请选择更低的推理强度或其他模型，然后重新发送消息。",
+  "error.provider.opencodeModelNotServed": "模型服务商目前不向你的账号提供此模型。请选择其他模型，然后重新发送消息。",
+  "error.provider.opencodeSafetyBlocked":
+    "模型服务商因其安全规则拦截了此消息。请换一种说法重新发送你的请求。如果后续消息也被拦截，请开始新的聊天或选择其他模型。",
   "error.provider.opencodeNetwork":
     "OpenCode 无法连接模型服务商。请检查运行 OpenBot 的电脑的网络连接后重试。\n{detail}",
   "error.provider.codexStateBusy": "ChatGPT 仍在为上一次启动准备本地历史记录。请等几分钟，然后重试。",
@@ -226,12 +256,28 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "由于 OpenBot 的实时 CPU 限制为 0，Linux 停止了该提供方。此限制来自你的系统。请安装并启动 rtkit（`rtkit-daemon`），运行 `systemctl --user restart xdg-desktop-portal`，然后重新启动 OpenBot。缺少 rtkit 时，仅重启 xdg-desktop-portal 没有作用。",
   "error.provider.cpuUnsupported": "这台电脑的处理器无法运行此服务商。请使用其他服务商。",
+  "error.provider.largeMemoryPages":
+    "此服务商无法在这个 Linux 内核上运行，因为该内核使用大于 4 KiB 的内存页（例如 Raspberry Pi 5 或 Asahi Linux）。请使用 4 KiB 页的内核，或使用其他服务商。",
+  "error.provider.ipv6Missing":
+    "此服务商需要 IPv6，但这台电脑上的 IPv6 已关闭。请开启 IPv6 后重试。在 WSL 中，请从 .wslconfig 中删除 ipv6.disable=1，然后运行 wsl --shutdown。",
+  "error.provider.windowsBlocked": "Windows 安全设置（例如智能应用控制）阻止了此服务商启动。请使用其他服务商。",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode 无法打开它的数据库，因为较新的 OpenCode 版本已更改了数据库。请把 OpenCode 更新到版本 2 或更高，然后重试。",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok 未能启动，因为其配置中的 allowed_models 设置不包含它的默认模型。请将默认模型添加到 allowed_models，或删除 allowed_models，然后重试。",
   "error.provider.opencodeNoAnswer": "OpenCode 模型结束本轮对话时没有给出回答。请重试或改用其他模型。",
   "error.provider.opencodeReasoningWithoutAnswer":
     "OpenCode 模型给出推理过程后结束本轮对话，但没有回答。请重试或改用其他模型。",
+  "error.provider.opencodeToolCallsAsText": "OpenCode 模型把操作写成了文字，没有实际执行。请重试或改用其他模型。",
   "error.provider.acpNoAnswer": "{provider} 结束本轮对话时没有给出回答。请重新发送消息，或开始新对话。",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} 收到了团队成员的结果，然后结束本轮对话时没有给出回答。请让助手继续。",
+  "error.provider.noAnswerAfterSteps":
+    "{provider} 执行了一些步骤后结束了本轮对话，但没有给出回答。再次发送相同请求之前，请先问问助手做了什么。",
+  "error.provider.acpRefusedNoReason": "{provider} 已停止，没有给出回答。请重新发送消息。",
+  "error.provider.channelNoAnswer":
+    "{provider} 结束本轮对话时没有给出回答。请在频道中点击“继续”再次运行任务，或点击“重新分配”将它交给其他成员。",
+  "error.provider.acpProcessStopped": "{provider} 在回答前停止了。请重新发送消息。",
   "error.provider.chatgptPageFailed": "OpenBot 无法打开 ChatGPT 连接页面。",
   "error.provider.noneReady": "没有可用的助手服务商。",
   "error.provider.claudeTurnActive": "请等待当前 Claude 对话结束，再刷新其上下文。",
@@ -259,12 +305,17 @@ export const messages = {
     "Google 未接受此请求的 Gemini 登录。请重新发送你的消息；若错误持续，请在设置中重新连接 Gemini。\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini 拒绝了此请求。请改用其他模型，然后重新发送消息。如果仍然失败，请开始新对话。\n{detail}",
+  "error.provider.antigravityNetwork": "Gemini 与 Google 的连接已断开。请重新发送消息。({cause})",
   "error.provider.antigravitySessionRejected":
     "Gemini 拒绝了此请求，但没有给出原因。聊天记录中的某一项可能导致这种情况，例如智能体打开的图片。OpenBot 已带着聊天记录开启新的 Gemini 会话，请重试。如果仍然报错，请换一个模型。",
   "error.provider.antigravityHistoryUnreadable":
     "Gemini 无法读取此聊天的已保存记录。OpenBot 已带着聊天记录开启新的 Gemini 会话。请重新发送你的消息。",
+  "error.provider.acpTurnStuck":
+    "{provider} 没有结束上一轮，因此没有接受这条消息。OpenBot 已带着聊天记录开启新的 {provider} 会话。请重新发送你的消息。",
   "error.provider.antigravityLocationUnsupported":
     "Google 不允许在运行此助手的电脑所在的网络位置使用 Gemini。请在其他电脑上使用 Gemini，或为此助手选择其他服务商。\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini 因出错而停止。请重新发送你的消息。如果再次停止，请选择其他模型或提供商。",
   "error.provider.antigravityConnectionLost": "Gemini 与其代理的连接已断开，已停止。请发送一条消息以继续。",
   "error.provider.grokServiceFailure": "Grok 服务繁忙或出错。请过几分钟再试，或选择其他模型。",
   "error.provider.grokConnectionFailed": "Grok 无法连接到其服务。请检查网络连接，然后重新发送消息。",
@@ -277,6 +328,10 @@ export const messages = {
   "error.provider.cursorNotStarted": "找到了 Cursor 助手，但无法读取其版本。",
   "error.provider.cursorVersionUnreadable": "无法读取 Cursor 助手版本。",
   "error.provider.cursorSignIn": "请使用 Cursor 登录，或设置 CURSOR_API_KEY 以使用 Cursor。",
+  "error.provider.cursorSignInUnusable":
+    "Cursor 无法使用你的登录信息连接到其服务器。请检查网络连接，然后重新登录 Cursor。",
+  "error.provider.cursorNoModels":
+    "Cursor 没有发送模型列表。请选择“连接”，重新登录 Cursor。如果此消息仍然存在，请确认你的 Cursor 套餐包含模型。",
   "error.provider.clineArchivePath": "Cline 压缩包中包含异常的路径。",
   "error.provider.clinePackageMismatch": "Cline 包与运行时目录不匹配。",
   "error.provider.clineChecksum": "Cline 运行时校验和不匹配。",
@@ -309,19 +364,34 @@ export const messages = {
     "Hermes 在处理这条消息时连接断开，因此不知道工作是否已完成。重新发送消息前，请先检查智能体做了什么。",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot 无法使用此模型：模型不接受其思考设置。请为此 Agent 选择其他模型，然后重新发送消息。",
+  "error.provider.copilotAnswerIncomplete": "模型在完成回答前停止了。请重新发送消息，或为此 Agent 选择其他模型。",
   "error.provider.usageLimitReached": "该账号已达到用量上限。",
   "error.provider.claudeContextFull":
     "此聊天对 Claude 来说已经太长。OpenBot 已带着聊天记录开启新的 Claude Code 会话，请重试。",
   "error.provider.claudeApiKeyNoCredit":
     "该 Anthropic API 密钥没有 API 额度。Claude 套餐不支付使用 API 密钥的请求。请在 Anthropic Console 中充值，或在设置中登录 Claude，并在智能体的模型菜单中选择 Claude 账号。",
+  "error.provider.claudeAccountNoCredit":
+    "你的 Claude 账户额度余额不足。部分请求（例如快速模式）即使在 Claude 套餐仍有用量时也会使用用量额度。请在你的 Claude 账户中添加用量额度，或在智能体的模型菜单中选择其他模型。",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code 将请求发送到 {host}，而不是 Anthropic：Claude Code 设置或环境变量中指定了这个 API 地址。{host} 因账户余额拒绝了请求，不是你的 Claude 套餐的问题。请为你的 {host} 账户充值，或在智能体的模型菜单中选择其他模型。\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Claude 服务拦截了这个请求。这通常是 Claude 方面的短暂问题，不是你的账号问题。请过几分钟再发送一次消息。",
   "error.provider.foreignReasoning":
     "此前的推理内容由另一个账号或 API 密钥接收，因此 {provider} 未接受它。OpenBot 已带着聊天记录开启新的 {provider} 会话，请重试。",
+  "error.provider.blankHistoryText":
+    "已保存的历史记录中有一条空消息，因此模型未接受此聊天。OpenBot 已带着聊天记录开启新的 {provider} 会话，请重试。",
   "error.provider.codexHistoryItemMissing":
     "Codex 保存的历史记录中缺少一项内容，因此无法继续此聊天。OpenBot 已带着聊天记录开启新的 Codex 会话，请重试。",
   "error.provider.codexRequestRefused":
     "{provider} 拒绝了此聊天的请求，但没有给出原因。在包含大量图片的长聊天中可能出现这种情况。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
+  "error.provider.codexSafetyBlocked":
+    "{provider} 因其安全规则拦截了此消息：{reason} 智能体现在看不到此消息，因此它不会阻止你后续的消息。请换一种说法重新发送你的请求。",
+  "error.provider.codexSafetyBlockedKept":
+    "{provider} 因其安全规则拦截了此消息：{reason} 如果 {provider} 也拦截你后续的消息，请开始新对话。",
+  "error.provider.codexAudioRefused":
+    "此模型无法收听音频，因此未接受此聊天中的声音。OpenBot 已使用聊天记录开始新的 Codex 会话。要继续，请重新发送你的请求，并让智能体在不使用声音的情况下工作。要检查声音，请在智能体的模型菜单中选择一个可以收听音频的模型。",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex 无法加载你的 ChatGPT 账户设置，因此助手已停止。请重试。如果它再次停止，请在“服务器设置 → 服务商”中为 ChatGPT 选择“重新连接”。",
   "error.provider.imageTooSmall":
     "图片太小，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.imageTooLarge":
@@ -334,6 +404,8 @@ export const messages = {
     "此聊天太大，无法发送给模型。这通常是聊天中的图片导致的。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.opencodeSessionRejected":
     "OpenCode 拒绝了这次请求，但没有给出原因。长对话或更换模型之后可能出现这种情况。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请换一个模型或调低推理强度。",
+  "error.provider.opencodeInputRefused":
+    "模型拒绝了这个聊天的内容，但没有给出原因。聊天中的文件（例如 PDF 或图片）可能导致这种情况。OpenBot 已带着聊天记录开启新的 OpenCode 会话。请去掉该文件后重新发送消息，或换一个模型。",
   "error.provider.opencodeCompactionFailed":
     "模型无法总结这段长对话，因此无法在上下文窗口中腾出空间。OpenBot 已带着聊天记录开启新的 OpenCode 会话，请重试。如果仍然报错，请选择更强的模型。",
   "error.provider.museMcpStartupFault":
@@ -341,8 +413,11 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code 找不到此聊天已保存的会话。OpenBot 已带着聊天记录开启新的 Claude Code 会话，请重试。",
   "error.provider.grokSignIn": "请运行 `grok login`，或设置 XAI_API_KEY 以使用 Grok。",
+  "error.provider.acpSignInNoStart": "服务商没有启动，所以无法开始登录。请重试，或重新启动 OpenBot。",
   "error.provider.acpSignInTimedOut": "登录超时。",
   "error.provider.acpSignInStopped": "登录在完成之前就停止了。",
+  "error.provider.geminiNoBrowserUseCode":
+    "这台电脑没有可用于 Google 登录的浏览器。请选择“用验证码登录”，在任意设备上打开链接，然后粘贴验证码。",
   "error.provider.geminiBrowserUnavailable":
     "Gemini 无法打开登录页面。请安装浏览器与 xdg-utils，然后在该主机的桌面会话中连接。没有桌面的服务器无法完成该登录。",
   "error.provider.geminiBrowserOpenFailed": "Gemini 无法在浏览器中打开登录页面。请检查默认浏览器，然后重新连接。",
@@ -423,6 +498,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "当前服务商会话不支持该设置。",
   "error.provider.sessionSettingInvalid": "该值不适用于该设置。",
   "error.provider.sessionSettingsBusy": "请等待当前对话结束后再更改会话设置。",
+  "error.provider.sessionSettingsTimedOut": "助手会话未及时响应。请重试。",
   "error.provider.piOutdated": "Pi {version} 版本过低。请安装 Pi 1.1.0 或更高版本以支持原生 RPC 与 MCP。",
   "error.provider.nativeMissing": "未安装 {provider} CLI。请在设置中下载。",
   "error.provider.nativeNotStarted":
@@ -432,11 +508,15 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "无法读取 {provider} CLI 版本。",
   "error.provider.piSessionBusy": "请等待当前 Pi 对话结束。",
   "error.provider.acpSessionBusy": "{provider} 仍在结束已停止的对话。请稍后再试。",
+  "error.provider.acpSettingsConflict": "OpenBot 应用设置时，{provider} 更改了此对话。请重试。",
+  "error.provider.acpSessionStale": "{provider} 无法加载此对话的最新版本。请重新发送你的消息。",
+  "error.provider.acpModelNotOffered": "{provider} 目前不提供 {model}。请为此智能体选择其他模型，然后重试。",
   "error.provider.piStopped": "Pi 未运行。请连接 Pi 后重试。",
   "error.provider.piSessionMissing": "该电脑上没有可用的 Pi 会话文件。",
   "error.provider.piResumeCancelled": "Pi 取消了会话恢复，请重试。",
   "error.provider.piSessionIdentity": "Pi 返回了另一个会话，已保存的会话未被替换。",
   "error.provider.piExtensionFailed": "Pi 无法加载某个扩展，因此已停止。请移除或更新该扩展，然后重试。{detail}",
+  "error.provider.piThreadStopped": "Pi 在完成本轮之前意外停止。发送一条消息以继续。",
   "error.provider.piModelInvalid": "请选择包含其服务商的 Pi 模型。",
   "error.provider.piToolInvalid": "工具返回了无效结果。",
   "error.provider.piSignIn": "请在主机电脑的 Pi 中使用 /login。登录完成后关闭 Pi。",
@@ -470,6 +550,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Muse 本轮对话失败。",
   "error.provider.museModelUnavailable":
     "Muse 无法使用此模型。Muse 可能在此智能体运行的国家或地区不可用，或者此账号无权访问该模型。请选择其他模型，然后重试。\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse 无法完成此请求。Muse 使用已保存的 Meta API 密钥，而不是你的登录。请更换该密钥，或在设置中移除它以使用你的登录。\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse 在无法使用外部工具时无法生成资料。请改用其他服务商生成资料，然后为该助手选择 Muse。",
   "error.provider.museAuthUnverified": "Muse 身份验证尚未确认。请在主机电脑上连接，或设置 Meta API 密钥。",

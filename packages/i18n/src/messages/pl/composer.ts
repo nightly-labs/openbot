@@ -7,6 +7,15 @@ export const messages = {
   "composer.feedbackFix.body":
     "Poprawiasz zgłoszenie #{number}. Wyślij prośbę albo anuluj, aby zostawić zgłoszenie bez zmian.",
   "composer.feedbackFix.cancel": "Anuluj",
+  "composer.browserTab.opened": "{name} otworzył(a) {title} w przeglądarce.",
+  "composer.browserTab.openedMany": {
+    one: "{name} otworzył(a) {count} stronę w przeglądarce.",
+    few: "{name} otworzył(a) {count} strony w przeglądarce.",
+    many: "{name} otworzył(a) {count} stron w przeglądarce.",
+    other: "{name} otworzył(a) {count} strony w przeglądarce.",
+  },
+  "composer.browserTab.open": "Otwórz stronę",
+  "composer.browserTab.hide": "Ukryj",
   "composer.providerWait.offlineTitle": "Brak połączenia z internetem",
   "composer.providerWait.offline": "{provider} nie może odpowiedzieć, dopóki ten komputer nie wróci do sieci.",
   "composer.providerWait.silent": "Czas bez aktualizacji od {provider}: {duration}.",
@@ -52,6 +61,7 @@ export const messages = {
   "composer.picker.noSkills": "Ten agent nie ma umiejętności.",
   "composer.picker.noSkillMatch": "Żadna umiejętność nie pasuje do „{query}”.",
   "composer.picker.skillsLoadFailed": "Nie udało się wczytać umiejętności.",
+  "composer.picker.skillProblem": "Umiejętność {name} jest niedostępna. {problem} Poproś agenta o naprawę.",
   "composer.token.attachment": "Otwórz załączony plik {name}",
   "composer.token.agent": "Agent {name}",
   "composer.token.skill": "Umiejętność {name}",
@@ -63,6 +73,7 @@ export const messages = {
   "composer.voice.stop": "Zatrzymaj nagrywanie głosu",
   "composer.voice.cancel": "Anuluj nagrywanie głosu",
   "composer.voice.preparing": "Pobieranie modelu głosowego",
+  "composer.voice.starting": "Uruchamianie nagrywania głosu",
   "composer.voice.requesting": "Prośba o dostęp do mikrofonu",
   "composer.voice.transcribing": "Transkrypcja promptu głosowego",
   "composer.voice.start": "Utwórz prompt głosem",
@@ -70,6 +81,8 @@ export const messages = {
     "Dostęp do mikrofonu jest zablokowany. Pozwól OpenBot używać mikrofonu w ustawieniach systemowych.",
   "composer.voice.noMicrophone": "Brak dostępnego mikrofonu.",
   "composer.voice.startFailed": "OpenBot nie mógł rozpocząć nagrywania głosu.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot nie mógł otworzyć mikrofonu. Zamknij inne aplikacje, które go używają, sprawdź, czy jest podłączony i dozwolony w ustawieniach systemowych, a potem spróbuj ponownie.",
   "composer.voice.transcribeFailed": "OpenBot nie mógł przetranskrybować tego nagrania.",
   "composer.reply.toYou": "Odpowiedź na twoją wiadomość",
   "composer.reply.toAgent": "Odpowiedź na wiadomość agenta",
@@ -99,7 +112,10 @@ export const messages = {
   "composer.voice.recording": "Nagrywanie głosu",
   "composer.voice.limitSoon": "Nagrywanie zatrzyma się za {seconds} sekund.",
   "composer.voice.limitReached":
-    "Nagrywanie zatrzymało się po osiągnięciu limitu 2 minut. Nagrana treść jest w wiadomości.",
+    "Nagrywanie zatrzymało się po osiągnięciu limitu 10 minut. Nagrana treść jest w wiadomości.",
+  "composer.voice.languageNotice":
+    "Dyktowanie zna 25 języków europejskich, na przykład angielski. Inne języki wymagają większego modelu ({size}), a tekst pojawia się po zatrzymaniu.",
+  "composer.voice.languageNotice.action": "Mówię w innym języku",
   "composer.send.saveQueued": "Zapisz wiadomość z kolejki",
   "composer.send.voice": "Wyślij wiadomość głosową",
   "composer.send.message": "Wyślij wiadomość",
@@ -130,6 +146,8 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Nie nagrano mowy.",
   "composer.voice.noSpeechDetected": "Nie wykryto mowy.",
   "composer.voice.readFailed": "Nie udało się przeczytać odpowiedzi na głos.",
+  "composer.voice.languageUnsupported":
+    "Nie udało się przeczytać odpowiedzi na głos. Ten język nie jest jeszcze dostępny.",
   "composer.error.saveEditTryAgain": "Nie udało się zapisać tej edycji na tym komputerze. Spróbuj ponownie.",
   "composer.error.saveUnconfirmed": "Zapis nie jest potwierdzony. Ponów zapis, aby sprawdzić wynik.",
   "composer.error.changeModel": "Nie udało się zmienić modelu. Spróbuj ponownie.",

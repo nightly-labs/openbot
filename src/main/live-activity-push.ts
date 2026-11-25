@@ -25,41 +25,30 @@ import type { PushNotificationSubject } from "./push-notifications";
 import type { TeamApiAgents } from "./team-api/dependencies";
 import type { markerExclusionsForCapabilities } from "./team-api/request-helpers";
 
-/** Events come in bursts, such as a streamed reply. One update covers each burst. */
 const EVENT_DELAY_MS = 1_000;
-/** iOS limits how often a Live Activity gets updates. A priority 5 change inside one state waits this long. */
 const SAME_MODE_INTERVAL_MS = 5_000;
-/** Content older than this looks out of date, as when this computer sleeps and sends nothing. */
 const STALE_AFTER_MS = 15 * 60 * 1000;
-/** An unchanged state is sent again before it becomes out of date. */
 const KEEPALIVE_MS = 10 * 60 * 1000;
-/** A failed send is tried again, first after this time, and then after double the time. */
 const RETRY_MS = 15_000;
 const RETRY_MAX_MS = 5 * 60 * 1000;
-/** iOS ends a Live Activity after 8 hours, and ignores updates after that. */
 const ACTIVITY_LIFETIME_MS = 8 * 60 * 60 * 1000;
-/** iOS removes an ended Live Activity from the Lock Screen 4 hours later. */
 const REGISTRATION_LIFETIME_MS = ACTIVITY_LIFETIME_MS + 4 * 60 * 60 * 1000;
 
-type LiveActivityPushAgents = Pick<TeamApiAgents, "on" | "off" | "getRuntimeSnapshot" | "listConversationReads">;
+type LiveActivityPushAgents = Pick<
+  TeamApiAgents,
+  "on" | "off" | "getRuntimeSnapshot" | "listConversationReads" | "listAgents"
+>;
 
 export interface LiveActivityPushOptions {
   agents: LiveActivityPushAgents;
-  /** Sends one update through the account service. `gone` means Apple refused the token. */
   send(push: LiveActivityRelayPush): Effect.Effect<"sent" | "gone", LiveActivitySendFailure>;
   now?: () => number;
   randomBytes(size: number): Uint8Array;
-  /** Whether the member is still a member and not disabled. A removed member gets no more updates. */
   memberActive(memberId: string): boolean;
-  /**
-   * The thread of the side thread of the agent that runs the turn, or null when the turn is of the
-   * agent's own chat. The link of a view that shows this work then opens that thread.
-   */
   sideThreadOfTurn?(agentId: string, turnId: string): string | null;
   logger?: { warn(message: string, ...values: unknown[]): void };
 }
 
-/** What the member can see. It reads the host state again for each update. */
 export interface LiveActivityPushViewer {
   memberId: string;
   hiddenAgentIds(): ReadonlySet<string>;
@@ -74,37 +63,17 @@ interface Registration {
   photos: Map<string, string>;
   coordinator: DynamicIslandCoordinator;
   expiresAt: number;
-  /** When this host first got the token. A host restart moves it later, so the start from the phone wins. */
   startedAt: number;
-  /** The next update lights up the screen and plays this sound, in place of a notification. */
   alert: LiveActivityRelayPush["alert"];
-  /** `false` after the connection of the session closed, as when iOS suspends the app. */
   connected: boolean;
   timer: { handle: ReturnType<typeof setTimeout>; at: number } | null;
-  /**
-   * The last update. `item` is the request, the failure or the reply that it showed, or `null`.
-   * `workers` are the agents that it showed at work, or `null` when it showed no work.
-   */
   sent: { key: string; mode: string | null; item: string | null; workers: string[] | null; at: number } | null;
-  /** The timestamp of the last update, in seconds. iOS drops an update that is not newer than the content it shows. */
   timestamp: number;
   sending: boolean;
-  /** Sends that failed in a row, for the time before the next attempt. */
   failures: number;
-  /** After a failed send, no update runs before this time, also for a new agent event. */
   retryAt: number;
 }
 
-/**
- * Keeps the iOS Live Activity of a member's phone current while iOS suspends the app. The phone
- * gives its push token and a secret over the Team API, and says when it goes away. iOS can suspend
- * it before that request goes out, so a closed connection of the session also counts as away.
- * While it is away, this reads the same state the phone would read, builds the same view with the
- * shared builder, seals it, and sends it through the account service to Apple.
- *
- * Registrations live in memory only: a restart forgets them, and the phone gives them again when
- * it connects. The account service and Apple see the token, the time, and sealed bytes only.
- */
 export class LiveActivityPushService {
   readonly #options: LiveActivityPushOptions;
   readonly #now: () => number;
@@ -128,8 +97,6 @@ export class LiveActivityPushService {
     if (previous) this.#clearTimer(previous);
     if (previous && !same) this.#stop(previous);
     const now = this.#now();
-    // A phone that signs in again gets a new session. The registration of the old session has the same
-    // token, so it would send each update to the same activity a second time.
     const others = [...this.#registrations.values()].filter(
       (other) => other.sessionId !== sessionId && other.value.token === value.token,
     );
@@ -144,14 +111,10 @@ export class LiveActivityPushService {
           ? previous.coordinator
           : new DynamicIslandCoordinator(() => liveActivityIslandText(phoneText(value.locale))),
       expiresAt: now + REGISTRATION_LIFETIME_MS,
-      // The same token is the same activity.
       startedAt: Math.min(same && previous ? previous.startedAt : now, ...others.map((other) => other.startedAt)),
-      // The phone shows its own state now, so an alert from before is old.
       alert: null,
-      // The request came over the connection of this session, so it is open.
       connected: true,
       timer: null,
-      // The phone showed its own state last. The next update is sent, also when it matches the last one.
       sent: null,
       timestamp: Math.max(same && previous ? previous.timestamp : 0, ...others.map((other) => other.timestamp)),
       sending: false,
@@ -164,7 +127,6 @@ export class LiveActivityPushService {
     this.#listen();
   }
 
-  /** The connection of the session closed. The phone can still come back on the same session. */
   disconnected(sessionId: string): void {
     const registration = this.#registrations.get(sessionId);
     if (!registration) return;
@@ -172,28 +134,16 @@ export class LiveActivityPushService {
     this.#schedule(registration, 0);
   }
 
-  /**
-   * The path of the session came back, as when the phone app runs again. The phone then updates the
-   * activity itself. A registration that says the phone is away still gets updates.
-   */
   reconnected(sessionId: string): void {
     const registration = this.#registrations.get(sessionId);
     if (!registration) return;
     registration.connected = true;
     if (away(registration)) return;
     this.#clearTimer(registration);
-    // As in `register`: the phone shows its own state now. The next update is sent, and an older alert is old.
     registration.sent = null;
     registration.alert = null;
   }
 
-  /**
-   * Whether the phone of the session shows an activity of this host that iOS still updates, and its
-   * next view shows the event, so the activity shows it in place of a notification. With `alert`, its
-   * next update lights up the screen and plays the sound. `startedAt` is the start that the phone
-   * gives, in milliseconds, or `null`. iOS does not tell when the user removes the activity, so until
-   * the app runs again an event can go to an activity that is gone.
-   */
   showsEvent(
     sessionId: string,
     subject: PushNotificationSubject,
@@ -202,10 +152,8 @@ export class LiveActivityPushService {
   ): boolean {
     const registration = this.#registrations.get(sessionId);
     if (!registration || !away(registration)) return false;
-    // An activity that does not get its updates shows old content.
     if (registration.failures > 0) return false;
     if (this.#now() >= (startedAt ?? registration.startedAt) + ACTIVITY_LIFETIME_MS) return false;
-    // The view shows one item: another agent that works or waits hides this event.
     if (!presentationShows(this.#read(registration).presentation, subject)) return false;
     if (alert) {
       registration.alert = alert;
@@ -214,7 +162,6 @@ export class LiveActivityPushService {
     return true;
   }
 
-  /** The phone turned Live Activities off, signed out, or chose another server. */
   remove(sessionId: string): void {
     const registration = this.#registrations.get(sessionId);
     if (registration) this.#stop(registration);
@@ -226,7 +173,6 @@ export class LiveActivityPushService {
     this.#scope = Scope.makeUnsafe();
   }, Effect.uninterruptible);
 
-  /** Runs an update after `delay`, or keeps an earlier one that is already planned. */
   #schedule(registration: Registration, delay: number): void {
     if (this.#registrations.get(registration.sessionId) !== registration || !away(registration)) return;
     const at = Math.max(this.#now() + delay, registration.retryAt);
@@ -249,13 +195,10 @@ export class LiveActivityPushService {
   #update = Effect.fn("LiveActivityPush.update")(function* (this: LiveActivityPushService, registration: Registration) {
     if (this.#registrations.get(registration.sessionId) !== registration || !away(registration)) return;
     const now = this.#now();
-    // Access can end while the phone is away: a removed or disabled member gets no more content.
     if (now >= registration.expiresAt || !this.#options.memberActive(registration.viewer.memberId)) {
       this.#stop(registration);
       return;
     }
-    // iOS ended the activity and ignores its updates. The registration stays until it expires, so the
-    // same token that the phone gives again keeps its start.
     if (now >= registration.startedAt + ACTIVITY_LIFETIME_MS) {
       this.#schedule(registration, registration.expiresAt - now);
       return;
@@ -264,7 +207,6 @@ export class LiveActivityPushService {
       this.#schedule(registration, EVENT_DELAY_MS);
       return;
     }
-    // A timer from before a failed send can fire early. `#schedule` moves the update to the retry time.
     if (now < registration.retryAt) {
       this.#schedule(registration, 0);
       return;
@@ -272,37 +214,24 @@ export class LiveActivityPushService {
     const view = this.#view(registration);
     const props = view.props;
     const mode = props?.mode ?? null;
-    // A view that shows nothing ends the activity, so it has no item and no work.
     const item = props ? view.item : null;
     const workers = props ? view.workers : null;
     const key = JSON.stringify(props);
     const sent = registration.sent;
-    // An alert goes at once, also when the view did not change.
     const alert = props ? registration.alert : null;
     if (!alert && sent && sent.key === key && now - sent.at < KEEPALIVE_MS) {
       if (props) this.#schedule(registration, sent.at + KEEPALIVE_MS - now);
       return;
     }
-    // iOS has a budget of priority 10 updates for each hour, and it can delay or drop
-    // the updates above the budget. Several agents change the state often. So priority 10 is only for
-    // the updates that the member must see at once: an alert, a new request, failure or reply, and an
-    // agent that finishes its work. Work that starts, a request that someone answered on another
-    // device, and a count or a text that changes have priority 5, which does not use the budget.
     const shownWorkers = sent?.workers ?? null;
-    // An agent that the last update showed at work is not in the work of this one.
     const finished = shownWorkers !== null && (workers === null || shownWorkers.some((id) => !workers.includes(id)));
-    // A phone that says that it goes away showed its own view a moment before, so the first update
-    // repeats that view. A phone whose connection closed can show an old view: iOS can suspend the app
-    // before it gets the last event.
     const repeats = !sent && registration.value.away && registration.connected;
-    // The first update after the phone went away can end an activity that still shows work.
     const urgent =
       alert !== null || (item !== null && !repeats && item !== sent?.item) || finished || (!props && !sent);
     if (!urgent && sent && sent.mode === mode && now - sent.at < SAME_MODE_INTERVAL_MS) {
       this.#schedule(registration, sent.at + SAME_MODE_INTERVAL_MS - now);
       return;
     }
-    // The phone updated the activity itself just before it went away, with its own clock.
     const timestamp = Math.max(registration.timestamp + 1, Math.ceil(now / 1000));
     registration.timestamp = timestamp;
     const push: LiveActivityRelayPush = {
@@ -323,14 +252,12 @@ export class LiveActivityPushService {
           registration.failures = 0;
           registration.retryAt = 0;
           if (registration.alert === alert) registration.alert = null;
-          // Apple refused the token: the activity ended, or the app was removed.
           if (result === "gone" || !props) this.#stop(registration);
           else this.#schedule(registration, KEEPALIVE_MS);
         }),
       ),
       Effect.catch((error) =>
         Effect.sync(() => {
-          // Preserve the existing backoff policy after an operational failure.
           registration.sent = sent;
           registration.failures += 1;
           registration.retryAt = this.#now() + Math.min(RETRY_MS * 2 ** (registration.failures - 1), RETRY_MAX_MS);
@@ -346,7 +273,6 @@ export class LiveActivityPushService {
     );
   });
 
-  /** Apple takes 4 KB for each update, so the lists and then the buttons go when the seal is too long. */
   #sealToFit(props: AgentLiveActivityProps, keys: LiveActivityKeys): string {
     let sealed = "";
     for (const candidate of liveActivityShorterProps(props)) {
@@ -356,7 +282,6 @@ export class LiveActivityPushService {
     return sealed;
   }
 
-  /** The island state of the host as this member sees it now. */
   #read(registration: Registration) {
     const { value, viewer, coordinator } = registration;
     const hidden = viewer.hiddenAgentIds();
@@ -375,14 +300,14 @@ export class LiveActivityPushService {
   #view(registration: Registration) {
     const { value } = registration;
     const { snapshot, counts, presentation } = this.#read(registration);
-    // An agent with its notifications off is not in the island, so it is not in the list.
     const unreadAgents: LiveActivityUnreadAgent[] = snapshot.agents.flatMap((agent) => {
       const count = counts.get(agent.id);
       return count && agent.notifications ? [{ ...agent, serverId: value.serverId, count }] : [];
     });
+    const colors = new Map(this.#options.agents.listAgents().map((agent) => [agent.id, agent.avatarColor ?? null]));
     const props = liveActivityView(presentation, {
       t: phoneText(value.locale),
-      agentColor: avatarHeadColor,
+      agentColor: (agent) => avatarHeadColor(agent.avatarSeed, agent.avatarHue, colors.get(agent.id) ?? null),
       avatar: (_serverId, agent, mood) =>
         registration.photos.get(agent.id) ?? liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood),
       unreadAgents,
@@ -397,7 +322,6 @@ export class LiveActivityPushService {
     };
   }
 
-  /** The thread that the links of the view open: the thread of its request, or the side thread that works. */
   #threadId(registration: Registration, presentation: DynamicIslandPresentation): string | null {
     const requestThread = registration.coordinator.requestThreadId(presentation);
     if (requestThread) return requestThread;
@@ -428,12 +352,6 @@ export class LiveActivityPushService {
   }
 }
 
-/**
- * Whether the island view shows the event that `subject` names, so a notification would repeat it.
- * The view shows the replies and the failed turn of the agent's own chat. The end of a turn in a side
- * thread is not one of them, so its notification goes out, also while the view shows an older reply
- * or failure of the same agent.
- */
 function presentationShows(
   presentation: DynamicIslandPresentation,
   { agentId, kind, sideThread }: PushNotificationSubject,
@@ -455,11 +373,6 @@ function presentationShows(
   }
 }
 
-/**
- * The request, the failure or the reply that the view shows, or `null` for work and for no view.
- * A new value is an event that the member must see at once. The same value with another text, another
- * count or another agent list is not.
- */
 function shownItem(presentation: DynamicIslandPresentation): string | null {
   switch (presentation.mode) {
     case "question":
@@ -475,7 +388,6 @@ function shownItem(presentation: DynamicIslandPresentation): string | null {
   }
 }
 
-/** While the phone runs, it updates the activity itself. */
 function away(registration: Registration): boolean {
   return registration.value.away || !registration.connected;
 }
@@ -496,7 +408,6 @@ function visibleSnapshot(snapshot: AgentRuntimeSnapshot, hidden: ReadonlySet<str
   };
 }
 
-/** The phone text. A language that this host does not have falls back to English. */
 function phoneText(locale: string) {
   return mobileTranslateFor(resolveLocale("system", locale));
 }

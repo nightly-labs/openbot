@@ -10,7 +10,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/** How many memories each agent of this computer can keep, read and set from a joined server. Frozen by `agent-memory-limit-v1`. */
 export async function routeAgentMemoryLimit(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -27,7 +26,6 @@ export async function routeAgentMemoryLimit(
   requireAdmin(member);
   const body = await readJson(request);
   if (url.pathname === AGENT_MEMORY_LIMIT_ROUTES.settings) return json(200, hostAgentMemoryLimit(setting.get()));
-  // The snapshot names every value this host permits, so only a malformed request sends another.
   if (!isAgentMemoryLimit(body.limit)) throw new HttpError(400, "Agent memory limit is required.");
   return json(200, hostAgentMemoryLimit(await runCauseEffect(setting.set({ limit: body.limit }))));
 }

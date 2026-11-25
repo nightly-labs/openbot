@@ -2,23 +2,10 @@ import type { JSX } from "@solidjs/web";
 import { createEffect } from "solid-js";
 import { ComposerNotice } from "./ComposerNotice";
 
-/**
- * The chat-scoped error banner. Every error that names an agent belongs here rather than in a
- * `toast.*`, which stays for global failures that name no agent.
- *
- * Errors are keyed by `composerDraftKey({ agentId, serverId })`, so switching chats shows only the
- * target chat's error and dismissing one never clears another. There is no auto-dismiss: the error
- * stands for its chat until the user closes it or a send succeeds.
- *
- * Sign-in and usage notices have their own components. Dismissing a usage reading does not clear
- * a provider error here. `tone` is `warning` for an error that a model change fixes; it defaults to
- * `danger`. `title` names the provider and model of the run that failed.
- */
 export function ComposerErrorBanner(props: {
   message: string;
   title?: string | undefined;
   tone?: "warning" | "danger";
-  /** The code of the failure behind the message. */
   reference?: string | null | undefined;
   onShown?: () => void;
   conversationKey?: string | null;

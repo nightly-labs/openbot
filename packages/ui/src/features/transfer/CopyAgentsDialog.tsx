@@ -6,6 +6,7 @@ import {
   Button,
   Checkbox,
   CircleCheck,
+  ConfirmDialog,
   Dialog,
   Input,
   Select,
@@ -38,42 +39,31 @@ export interface CopyAgentsServer {
 export type CopyAgentsPhase = "idle" | "copying" | "done";
 
 export interface CopyAgentsDialogProps {
-  /** The servers that the user can copy from and to. */
   servers: readonly CopyAgentsServer[];
   fromId: string;
   toId: string | null;
   onFromChange: (serverId: string) => void;
   onToChange: (serverId: string) => void;
-  /** The agents of each side, or null while they load. */
   fromAgents: readonly CopyAgentsAgent[] | null;
   toAgents: readonly CopyAgentsAgent[] | null;
-  /** The agents of a side could not be read. */
   loadError: string | null;
   phase: CopyAgentsPhase;
-  /** While `copying`: the bytes sent to a joined destination. Null before the first part, and for this computer. */
   progress?: TransferUploadState | null | undefined;
   result: InstanceTransferResult | null;
   error: string | null;
   onCopy: (agentIds: string[]) => void;
-  /** Opens the destination server. Absent when the app cannot open it from here. */
   onOpenServer?: (() => void) | undefined;
   onClose: () => void;
 }
 
-/** A search field shows when a server has more agents than this. */
 const SEARCH_FROM = 8;
 
-/**
- * Server settings > Transfer > Copy to another server. The source server and its agents are on the
- * left; the destination server and the agents it will have are on the right.
- */
 export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
   const { t } = useText();
   const id = `copy-agents-${createUniqueId()}`;
   const [mount, setMount] = createSignal<Element>();
   const [excluded, setExcluded] = createSignal<ReadonlySet<string>>(new Set());
   const [query, setQuery] = createSignal("");
-  // A new source starts with all of its agents selected.
   createEffect(
     () => props.fromId,
     () => {
@@ -88,9 +78,12 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
     return text ? agents().filter((agent) => agent.name.toLowerCase().includes(text)) : agents();
   });
   const takenNames = createMemo(() => new Set((props.toAgents ?? []).map((agent) => agent.name.toLowerCase())));
+  const duplicates = createMemo(() => selected().filter((agent) => takenNames().has(agent.name.toLowerCase())));
+  const [confirmingDuplicates, setConfirmingDuplicates] = createSignal(false);
+  const startCopy = () => props.onCopy(selected().map((agent) => agent.id));
+  const readingDestination = () => props.toAgents === null && !props.loadError;
   const busy = () => props.phase === "copying";
   const uploading = () => (busy() ? props.progress : null);
-  // After the last byte the server reads the file and then adds the agents: both are the copy.
   const sendingFile = () => {
     const progress = uploading();
     return progress ? progress.sent < progress.total : false;
@@ -105,11 +98,10 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
     setExcluded(next);
   };
   const allChecked = () => agents().length > 0 && selected().length === agents().length;
-  // Named functions, not ternaries in component props: a tracked read of such a prop halts Solid.
   const doneResult = () => (done() ? props.result : null);
   const doneVariant = () => (props.onOpenServer ? "ghost" : "default");
 
-  return (
+  const dialog = (
     <Dialog.Root
       open
       modal
@@ -264,12 +256,12 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
                     </Button>
                     <Button
                       type="button"
-                      disabled={!to() || selected().length === 0}
+                      disabled={!to() || selected().length === 0 || readingDestination()}
                       loading={busy()}
                       loadingLabel={t(
                         sendingFile() ? "settings.transfer.upload.sending" : "settings.transfer.copy.copying",
                       )}
-                      onClick={() => props.onCopy(selected().map((agent) => agent.id))}
+                      onClick={() => (duplicates().length > 0 ? setConfirmingDuplicates(true) : startCopy())}
                     >
                       {t("settings.transfer.copy.submit", { count: selected().length })}
                     </Button>
@@ -293,6 +285,30 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
       </Dialog.Portal>
     </Dialog.Root>
   );
+  return (
+    <>
+      {dialog}
+      <ConfirmDialog
+        open={confirmingDuplicates()}
+        tone="default"
+        initialFocus="cancel"
+        title={t("settings.transfer.copy.duplicatesTitle")}
+        description={t("settings.transfer.copy.duplicatesDescription", {
+          server: to()?.name ?? "",
+          names: duplicates()
+            .map((agent) => agent.name)
+            .join(", "),
+        })}
+        cancelLabel={t("common.cancel")}
+        confirmLabel={t("settings.transfer.copy.duplicatesConfirm")}
+        onCancel={() => setConfirmingDuplicates(false)}
+        onConfirm={() => {
+          setConfirmingDuplicates(false);
+          startCopy();
+        }}
+      />
+    </>
+  );
 }
 
 function ServerName(props: { server: CopyAgentsServer }) {
@@ -313,8 +329,6 @@ function ServerSelect(props: {
   mount: Element | undefined;
 }) {
   const { t } = useText();
-  // A new array only when a server changes: Kobalte loops on a new options array from each write,
-  // and the server list gets a new array on each status change.
   const key = createMemo(() =>
     props.servers.map((server) => `${server.id}\n${server.name}\n${server.logoUrl ?? ""}`).join("\n"),
   );

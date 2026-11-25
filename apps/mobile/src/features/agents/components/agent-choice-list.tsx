@@ -12,9 +12,6 @@ import { SettingsRow } from "@/features/settings/components/settings-content";
 import { MenuView } from "@/shared/components/menu-view";
 import { isAndroid } from "@/shared/lib/platform";
 
-// The row and the header menu of the agent search sheets: a channel's agents and a Vault item's agents.
-
-// No workspace/activity subscriptions, animation frames, or live agent avatars in this row.
 export const AgentChoiceRow = memo(function AgentChoiceRow({
   id,
   name,
@@ -58,10 +55,6 @@ export const AgentChoiceRow = memo(function AgentChoiceRow({
   );
 });
 
-/**
- * The header menu of the list: select or deselect all the agents that the search shows. The Android
- * header options change only when the menu looks different, so typing in the search does not rebuild it.
- */
 export function AgentSelectAllMenu({
   label,
   selectAll,
@@ -71,7 +64,6 @@ export function AgentSelectAllMenu({
   onSelectAll,
   onDeselectAll,
 }: {
-  /** The labels come from the area of the screen that shows the menu. */
   label: string;
   selectAll: string;
   deselectAll: string;

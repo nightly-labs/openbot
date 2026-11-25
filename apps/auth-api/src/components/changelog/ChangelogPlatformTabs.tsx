@@ -11,15 +11,9 @@ const platformSearch = (platform: ChangelogPlatform): ChangelogSearch => (platfo
 
 export interface ChangelogPlatformTabsProps {
   platform: ChangelogPlatform;
-  /** Runs before the router changes the address, while the old list is still in place. */
   onSelect: () => void;
 }
 
-/**
- * Links rather than tabs: each list has its own address, so a link to the mobile notes opens
- * them, and the page renders the right list on the server. The pill slides behind the open one,
- * as it does in the header menu. Until the pill is measured, the open link carries its own.
- */
 export function ChangelogPlatformTabs(props: ChangelogPlatformTabsProps) {
   let track: HTMLDivElement | undefined;
   const links = new Map<ChangelogPlatform, HTMLAnchorElement>();
@@ -33,7 +27,6 @@ export function ChangelogPlatformTabs(props: ChangelogPlatformTabsProps) {
 
   createEffect(() => props.platform, place);
 
-  // Measured again when the web font arrives and changes the width of the labels.
   onSettled(() => {
     if (!track) return;
     const element = track;
@@ -58,7 +51,6 @@ export function ChangelogPlatformTabs(props: ChangelogPlatformTabsProps) {
               replace
               resetScroll={false}
               onClick={(event: MouseEvent) => {
-                // A modified click opens a new tab, and this page stays as it is.
                 const plain =
                   event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
                 if (plain && platform !== props.platform) props.onSelect();

@@ -33,16 +33,6 @@ export interface HostedSiteEventLogOptions {
   core: DatabaseCore;
 }
 
-/**
- * The hosted-site publish operations a conversation is waiting on, and the terminal events whose
- * conversation marker has not been written yet.
- *
- * Owns both hosted-site aggregates in the orchestration event log — `hosted-site-operation` for a
- * running operation and `hosted-site-terminal` for a pending terminal event — and the validators
- * that refuse a payload the conversation marker could not be rebuilt from. Reads them back by
- * scanning the event log directly, so a pending event survives a restart with no projection table
- * behind it. The class never imports the facade.
- */
 export class HostedSiteEventLog {
   readonly #core: DatabaseCore;
 
@@ -150,8 +140,6 @@ function validateActiveHostedSiteConversationEvent(event: ActiveHostedSiteConver
 }
 
 function activeHostedSiteConversationEventValue(value: unknown): ActiveHostedSiteConversationEvent | null {
-  // Events written before the bot-to-agent rename spell the id `botId`; a rejected event is a publication
-  // that never reports back in the conversation, so both spellings are read. See `thread-replay.ts`.
   const agentId = isDynamicRecord(value) ? (value.agentId ?? value.botId) : null;
   if (
     !isDynamicRecord(value) ||
@@ -194,7 +182,6 @@ function activeHostedSiteConversationEventValue(value: unknown): ActiveHostedSit
 }
 
 function pendingHostedSiteTerminalEventValue(value: unknown): PendingHostedSiteTerminalEvent | null {
-  // Both spellings, for the same reason as the active event above.
   const agentId = isDynamicRecord(value) ? (value.agentId ?? value.botId) : null;
   if (
     !isDynamicRecord(value) ||

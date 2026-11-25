@@ -20,7 +20,6 @@ export type AgentSessionSettingOption = {
 export interface AgentSessionSettingsSnapshot {
   options: AgentSessionSettingOption[];
 }
-/** Saved values are scoped to a provider, including the identity of a custom ACP agent. */
 export type AgentSessionSettingOverrides = Record<string, Record<string, AgentSessionSettingValue>>;
 export interface AgentSessionSettings extends AgentSessionSettingsSnapshot {
   agentId: string;

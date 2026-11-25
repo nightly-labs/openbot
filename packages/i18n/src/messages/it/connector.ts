@@ -358,7 +358,7 @@ export const messages = {
   "connector.whatsapp.ownNumberNote":
     "La tua chat «Messaggio a te stesso» e le persone che autorizzi raggiungono OpenBot.",
   "connector.whatsapp.dedicatedNote":
-    "Le persone che autorizzi raggiungono OpenBot. Le altre ricevono un codice da darti.",
+    "La tua chat «Messaggio a te stesso» e le persone che autorizzi raggiungono OpenBot. Le altre ricevono un codice da darti.",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp ha rimosso questo computer dai dispositivi collegati. Collega di nuovo il numero.",
   "connector.whatsapp.helpLoggedOutHost":
@@ -384,7 +384,7 @@ export const messages = {
     "Possono scrivere solo la tua chat «Messaggio a te stesso» e le persone che autorizzi. Le altre non ricevono risposta. Quando è disattivato, OpenBot risponde alle persone sconosciute con un codice.",
   "connector.whatsapp.workingMessage": "Messaggio «Ci sto lavorando…»",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot lo invia mentre l’agente lavora, poi lo sostituisce con la risposta. Una richiesta che attende una richiesta precedente riceve anche un messaggio di attesa. Disattiva per inviare solo la risposta.",
+    "OpenBot lo invia mentre l’agente lavora, poi lo sostituisce con la risposta. Una richiesta che attende una richiesta precedente riceve anche un messaggio di attesa. Con un numero personale, solo la tua chat «Messaggio a te stesso» riceve questi messaggi. Disattiva per inviare solo la risposta.",
   "connector.whatsapp.statusReactions": "Reazioni di stato",
   "connector.whatsapp.statusReactionsDescription":
     "OpenBot reagisce con 👀 quando arriva un messaggio e con ✅ quando la risposta è pronta. Disattiva per non inviare reazioni.",
@@ -462,6 +462,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "Un numero può autorizzare al massimo {count} contatti e gruppi.",
   "connector.whatsapp.senderGroup": "Gruppo",
   "connector.whatsapp.removeSender": "Rimuovi",
+  "connector.whatsapp.senderAccess": "Accesso di {name}",
+  "connector.whatsapp.senderReplies": "Può dare compiti",
+  "connector.whatsapp.senderReadOnly": "Sola lettura",
   "connector.whatsapp.addContact": "Aggiungi contatto",
   "connector.whatsapp.addGroup": "Aggiungi gruppo",
   "connector.whatsapp.contactTitle": "Aggiungi un contatto",
@@ -470,7 +473,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Facoltativo. Se è vuoto, l'elenco mostra il numero di telefono.",
   "connector.whatsapp.add": "Aggiungi",
   "connector.whatsapp.groupTitle": "Aggiungi un gruppo",
-  "connector.whatsapp.groupDescription": "Le persone in questo gruppo possono affidare lavoro ai tuoi agenti.",
+  "connector.whatsapp.groupDescription":
+    "Le persone in questo gruppo possono affidare lavoro ai tuoi agenti quando menzionano il numero o rispondono ai suoi messaggi.",
   "connector.whatsapp.groupSearch": "Cerca gruppi",
   "connector.whatsapp.groupsLoading": "Lettura dei gruppi…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot non è riuscito a leggere i gruppi",
@@ -626,9 +630,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Gli agenti non possono accedere con le tue credenziali condivise finché non accedi di nuovo.",
   "connector.protonPass.reconnect": "Riconnetti",
-  "connector.protonPass.planTitle": "Proton Pass richiede un piano a pagamento",
+  "connector.protonPass.planTitle": "Proton Pass richiede un piano con Pass Plus",
   "connector.protonPass.planDescription":
-    "La CLI di Proton Pass funziona solo con un piano Proton a pagamento. Cambia piano, poi connetti di nuovo.",
+    "La CLI di Proton Pass richiede un piano Proton che includa Pass Plus. Altri piani a pagamento, come Mail Plus, non la includono. Cambia piano, poi connetti di nuovo.",
   "connector.protonPass.vaultTitle": "Cassaforte condivisa",
   "connector.protonPass.vaultDescription":
     "Gli agenti possono accedere con le credenziali di questa cassaforte. Spostaci una credenziale per condividerla.",

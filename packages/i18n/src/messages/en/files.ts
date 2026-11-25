@@ -68,6 +68,8 @@ export const messages = defineMessages("files", {
   "files.library.agents": "Agents",
   "files.library.allAgents": { one: "{count} agent", other: "All {count} agents" },
   "files.library.folders": "Folders",
+  "files.library.workflows": "Workflows",
+  "files.library.workflowsOf": "Workflows in {name}",
   "files.library.favorite": "Favorite {name}",
   "files.folder.new": "New folder",
   "files.folder.name": "Folder name",
@@ -144,7 +146,6 @@ export const messages = defineMessages("files", {
   "files.storage.updateServer": "Update OpenBot on this server to see its storage.",
   "files.storage.openFailed": "Could not open “{name}”",
   "files.storage.tryAgain": "Try again.",
-  // The machine part of Server settings > Storage: disk, memory and CPU of the computer that runs the server.
   "files.machine.title": "Machine",
   "files.machine.updates": "Updates every minute",
   "files.machine.disk": "Disk",
@@ -199,6 +200,8 @@ export const messages = defineMessages("files", {
   "files.conversation.title": "Files",
   "files.conversation.summary": "{files} · chat {size}",
   "files.conversation.close": "Close files",
+  "files.conversation.workspace": "Workspace folder",
+  "files.conversation.workspaces": "Workspace folders",
   "files.conversation.emptyTitle": "No files in this chat",
   "files.conversation.emptyDescription": "Files you attach and files the agent makes show here.",
 });

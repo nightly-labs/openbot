@@ -1,27 +1,31 @@
 import {
+  DEFAULT_PROVIDER_ACCOUNT_ID,
+  type ProviderAccountStatus,
   WORKFLOW_MEDIA_MODELS,
+  type WorkflowCatalogProvider,
   type WorkflowMediaCatalogModel,
   type WorkflowMediaModel,
+  type WorkflowMediaServiceAccount,
+  type WorkflowMediaUnavailableModel,
   workflowCatalogMediaModel,
+  workflowCatalogSource,
 } from "@openbot/contracts/ipc";
+import { Spinner } from "@openbot/ui";
 import { providerAvailability, providerTurnedOff } from "@openbot/ui/components/provider-model-options";
 import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
+import type { WorkflowAgentProgress } from "@openbot/ui/features/workflows/workflow-board";
 import {
   WORKFLOW_FEATURES_V1,
   type WorkflowCatalogs,
   type WorkflowFeatures,
 } from "@openbot/ui/features/workflows/workflow-model";
-import { currentText } from "@openbot/ui/text";
-import { createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
+import { currentText, useText } from "@openbot/ui/text";
+import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { mediaServiceAccountName, noteMediaStepEnded } from "./workflow-media-credits";
 import { createWorkflowsController, type WorkflowRequest } from "./workflows-controller";
 import type { WorkflowHost } from "./workflows-port";
 
-/**
- * The workflows of one host on a canvas. The desktop app and the browser app give the agents, models,
- * provider status and account name of that host. `admin`: an owner or admin of the server, who may
- * make a webhook secret. The host checks it again.
- */
 export function WorkflowsCanvas(props: {
   host: WorkflowHost;
   admin: boolean;
@@ -29,25 +33,40 @@ export function WorkflowsCanvas(props: {
   models: WorkflowCatalogs["models"];
   status: WorkflowCatalogs["status"];
   self?: WorkflowCatalogs["self"];
-  /** The workflow to open, such as the one of a clicked notification. Without it, the first one opens. */
+  preference?: WorkflowCatalogs["preference"];
   request?: WorkflowRequest | undefined;
-  /** The server of the host. The page shows the workflow of its last visit while it reads the host. */
   serverId?: string | undefined;
+  agentProgress?: ((agentId: string) => WorkflowAgentProgress | undefined) | undefined;
 }) {
-  // The keyed parent mounts a new canvas for each server, so the host does not change.
+  const { t } = useText();
   const workflows = createWorkflowsController(
     untrack(() => props.host),
     () => desktopAnalytics.scope(),
     untrack(() => props.request),
     untrack(() => props.serverId),
   );
-  // Sunra and Higgsfield make files on the host's sign-in of that service, which the person makes in
-  // Apps and finishes in the browser. The canvas reads them, and the live models of both, again when
-  // the window comes back to the front. A failed read keeps the last answer.
   const [sunra, setSunra] = createSignal(false);
   const [higgsfield, setHiggsfield] = createSignal(false);
+  const [openbot, setOpenbot] = createSignal(false);
+  const [serviceAccounts, setServiceAccounts] = createSignal<readonly WorkflowMediaServiceAccount[] | null>(null);
   const [catalog, setCatalog] = createSignal<readonly WorkflowMediaCatalogModel[]>([]);
+  const [providersRead, setProvidersRead] = createSignal(false);
+  const [catalogRead, setCatalogRead] = createSignal(false);
+  const [unavailable, setUnavailable] = createSignal<readonly WorkflowMediaUnavailableModel[]>([]);
+  const [creditBalance, setCreditBalance] = createSignal<number | null>(null);
   let disposed = false;
+  let balanceRequest = 0;
+  const readCreditBalance = () => {
+    if (!props.host.mediaSupported()) return;
+    balanceRequest += 1;
+    const sent = balanceRequest;
+    void props.host.workflows
+      .mediaCredits()
+      .then((answer) => {
+        if (!disposed && sent === balanceRequest) setCreditBalance(answer.openbot?.available ?? null);
+      })
+      .catch(() => undefined);
+  };
   const readMediaProviders = () => {
     if (!props.host.mediaSupported()) return;
     void props.host.workflows
@@ -56,20 +75,22 @@ export function WorkflowsCanvas(props: {
         if (disposed) return;
         setSunra(providers.sunra);
         setHiggsfield(providers.higgsfield);
+        setOpenbot(providers.openbot === true);
+        setServiceAccounts(providers.accounts);
+        setProvidersRead(true);
+        if (providers.openbot === true) readCreditBalance();
       })
       .catch(() => undefined);
     void props.host.workflows
       .mediaCatalog()
       .then((answer) => {
-        if (!disposed) setCatalog(answer.models);
+        if (disposed) return;
+        setCatalog(answer.models);
+        setUnavailable(answer.unavailable ?? []);
+        setCatalogRead(true);
       })
       .catch(() => undefined);
   };
-  /**
-   * The models of Sunra and Higgsfield: the live list of the host, then each fixed model that the live
-   * list does not have. An older host gives no live list. The host still runs a fixed model, so a step
-   * saved with one keeps its model.
-   */
   const serviceModels = (provider: "sunra" | "higgsfield"): readonly WorkflowMediaModel[] => {
     const live = catalog()
       .filter((entry) => entry.provider === provider)
@@ -77,7 +98,49 @@ export function WorkflowsCanvas(props: {
     const ids = new Set(live.map((model) => model.id));
     return [...live, ...WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === provider && !ids.has(model.id))];
   };
+  const serviceAccountRows = (provider: WorkflowCatalogProvider): readonly ProviderAccountStatus[] | undefined => {
+    const accounts = serviceAccounts()?.filter((account) => account.provider === provider) ?? [];
+    if (accounts.length < 2) return undefined;
+    return accounts.map((account, index) => ({
+      id: index === 0 ? DEFAULT_PROVIDER_ACCOUNT_ID : account.id,
+      label: mediaServiceAccountName(account),
+      email: null,
+      state: "connected",
+      message: null,
+    }));
+  };
   readMediaProviders();
+  let shown: { workflowId: string; since: string; ends: Set<string> } | null = null;
+  createEffect(
+    () => ({ view: workflows.props.runs, workflow: workflows.detail() }),
+    ({ view, workflow }) => {
+      if (!workflow) return;
+      const steps = [...view.runs.flatMap((run) => run.steps), ...view.soloSteps].filter(
+        (step) => step.workflowId === workflow.summary.id,
+      );
+      if (shown?.workflowId !== workflow.summary.id) {
+        const times = steps.flatMap((step) => [step.startedAt ?? "", step.endedAt ?? ""]);
+        shown = {
+          workflowId: workflow.summary.id,
+          since: times.reduce((a, b) => (b > a ? b : a), ""),
+          ends: new Set(),
+        };
+        return;
+      }
+      let ended = false;
+      for (const step of steps) {
+        if (step.endedAt === null || step.endedAt <= shown.since) continue;
+        const end = `${step.id}:${step.attempt}`;
+        if (shown.ends.has(end)) continue;
+        shown.ends.add(end);
+        const model = workflow.graph.nodes.find((node) => node.id === step.nodeId)?.fields.model;
+        if (typeof model === "string" && workflowCatalogSource(model)) ended = true;
+      }
+      if (!ended) return;
+      noteMediaStepEnded();
+      if (openbot()) readCreditBalance();
+    },
+  );
   window.addEventListener("focus", readMediaProviders);
   onCleanup(() => {
     disposed = true;
@@ -108,23 +171,16 @@ export function WorkflowsCanvas(props: {
     get channels() {
       return workflows.channels();
     },
-    // Only the models of a provider that is on and signed in now. The host makes the file with that
-    // subscription, or with the provider's API key when it uses one. Sunra and Higgsfield models need
-    // the host's sign-in of that service, and its credits pay for each file.
     get imageModels() {
       if (!props.host.mediaSupported()) return [];
       const fixed = WORKFLOW_MEDIA_MODELS.flatMap((model) => {
-        // Sunra and Higgsfield models come after, from the live list.
-        if (model.provider === "sunra" || model.provider === "higgsfield") return [];
+        if (model.provider === "sunra" || model.provider === "higgsfield" || model.provider === "openbot") return [];
         if (providerTurnedOff(props.status, model.provider)) return [];
         const status = providerAvailability(props.status, props.models, model.provider, currentText().t);
         if (status.state !== "available") return [];
-        // The picker lists each account of a provider that has more than one, when the host makes the
-        // file on the account of the step.
         const accounts = props.host.mediaAccountSupported()
           ? props.status.providers?.find((row) => row.id === model.provider)?.accounts
           : undefined;
-        // An older host ignores the background of a step, so its models make no transparent image.
         const { transparent, ...rest } = model;
         return [
           {
@@ -135,26 +191,61 @@ export function WorkflowsCanvas(props: {
           },
         ];
       });
-      // An older host ignores the background of a step, so its models make no transparent image.
-      const service = (provider: "sunra" | "higgsfield", on: boolean) =>
-        on
-          ? serviceModels(provider).map(({ transparent, ...rest }) =>
-              transparent && props.host.mediaTransparentSupported() ? { ...rest, transparent } : rest,
-            )
-          : [];
-      return [...fixed, ...service("sunra", sunra()), ...service("higgsfield", higgsfield())];
+      const service = (provider: WorkflowCatalogProvider, on: boolean) => {
+        if (!on) return [];
+        const accounts = serviceAccountRows(provider);
+        return serviceModels(provider).map(({ transparent, ...rest }) => ({
+          ...rest,
+          ...(transparent && props.host.mediaTransparentSupported() ? { transparent } : {}),
+          ...(accounts ? { accounts } : {}),
+        }));
+      };
+      const credit = openbot()
+        ? catalog()
+            .filter((entry) => entry.provider === "openbot")
+            .flatMap((entry) => workflowCatalogMediaModel(entry) ?? [])
+        : [];
+      return [...credit, ...fixed, ...service("sunra", sunra()), ...service("higgsfield", higgsfield())];
+    },
+    get imageModelsReady() {
+      return !props.host.mediaSupported() || (providersRead() && catalogRead());
+    },
+    get unavailableModels() {
+      if (!props.host.mediaSupported()) return [];
+      const hidden = openbot()
+        ? []
+        : catalog()
+            .filter((entry) => entry.provider === "openbot")
+            .map(({ id, name, kinds }) => ({ id, name, kinds }));
+      return [...unavailable(), ...hidden];
     },
     get mediaPrice() {
       return props.host.mediaSupported() ? props.host.workflows.mediaPrice : undefined;
     },
+    get creditBalance() {
+      return openbot() ? creditBalance() : null;
+    },
     get mediaSize() {
       return props.host.mediaSizeSupported();
+    },
+    get agentFiles() {
+      return props.host.agentFilesSupported();
+    },
+    get preference() {
+      return props.preference;
+    },
+    get answers() {
+      return props.host.answersSupported();
+    },
+    get stepSettings() {
+      return props.host.stepSettingsSupported() ? props.host.workflows.stepSettings : undefined;
     },
     get media() {
       return props.host.mediaSupported() ? props.host.mediaUrl : undefined;
     },
-    // The Library pictures that an asset step can use. A picture with no preview address, as the
-    // browser gets, reads its file only when the canvas shows it.
+    get mediaPreview() {
+      return props.host.mediaSupported() ? props.host.mediaPreviewUrl : undefined;
+    },
     get files() {
       return workflows.pictures().map((file) =>
         file.previewUrl
@@ -170,14 +261,13 @@ export function WorkflowsCanvas(props: {
     get upload() {
       return props.host.mediaSupported() ? workflows.uploadPicture : undefined;
     },
+    get download() {
+      return props.host.mediaSupported() ? workflows.downloadMedia : undefined;
+    },
     get self() {
       return props.self;
     },
   };
-  // A channel output needs a messaging place or an OpenBot channel. Without one, a new output posts a
-  // notification. Only an owner or admin adds a GitHub, Discord, Telegram or Slack step, on a host that
-  // runs them. The host port gives a joined server's places, channels, Telegram chats and Slack
-  // workspaces only to an owner or admin, and only this computer has Discord servers.
   const features = createMemo<WorkflowFeatures>(() => {
     const github = props.admin && props.host.githubSupported();
     const discord = props.admin && workflows.discord().length > 0;
@@ -185,7 +275,7 @@ export function WorkflowsCanvas(props: {
     const slack = props.admin && workflows.slack().length > 0;
     const outputs = [
       ...WORKFLOW_FEATURES_V1.outputs.filter((output) => output !== "channel" || workflows.places().length > 0),
-      ...(workflows.channels().length > 0 ? (["chat-channel"] as const) : []),
+      ...(props.admin && workflows.channels().length > 0 ? (["chat-channel"] as const) : []),
     ];
     const added = [
       ...(github ? (["github"] as const) : []),
@@ -196,16 +286,24 @@ export function WorkflowsCanvas(props: {
     const media = props.host.mediaSupported();
     return {
       ...WORKFLOW_FEATURES_V1,
-      // An asset step uses a picture of the host's Library, or one that the person sends to the host.
       kinds: media ? [...WORKFLOW_FEATURES_V1.kinds, "image", "asset"] : WORKFLOW_FEATURES_V1.kinds,
       uploads: media,
       triggers: [...WORKFLOW_FEATURES_V1.triggers, ...added],
       outputs: [...outputs, ...added],
+      format: workflows.detail()?.hostFormat ?? WORKFLOW_FEATURES_V1.format,
     };
   });
-  // The canvas is a direct child of the window page, which gives it the height of the pane.
   return (
-    <Show when={workflows.detail()}>
+    <Show
+      when={workflows.detail()}
+      fallback={
+        <main class="window-page workflows-notice">
+          <Show when={!workflows.failed()}>
+            <Spinner size="lg" label={t("workflow.canvas.opening")} />
+          </Show>
+        </main>
+      }
+    >
       {(workflow) => (
         <WorkflowCanvas
           workflow={workflow()}
@@ -213,7 +311,9 @@ export function WorkflowsCanvas(props: {
           catalogs={catalogs}
           github={workflows.github}
           frame="window"
+          server={props.serverId}
           readOnly={workflows.readOnly()}
+          agentProgress={props.agentProgress}
           {...workflows.props}
           onRotateWebhookSecret={props.admin ? workflows.props.onRotateWebhookSecret : undefined}
         />

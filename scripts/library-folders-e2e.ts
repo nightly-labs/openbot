@@ -1,21 +1,10 @@
-// Checks that an agent puts the files it attaches into a Library folder, reads its folders, and
-// organizes them. Runs the real agent service, attachment gateway, tool router, storage scan, Library
-// folders service and store on a temporary profile with a fake Codex app-server. The fake calls
-// `attach_files_to_response` as a direct tool, and `list_library_folders` and `organize_library`
-// through `tool_call`, as a model does, and logs each result.
-// The check asserts the folders file on disk after each call: a path makes each level; the same path
-// in a different letter case uses the same folders; a path that cannot be used, a full store and a
-// host with no store keep the attachment in no folder, with the reason; a repeated call makes one
-// message; an agent sees only its own folders and files; an agent makes, renames, moves and deletes
-// its folders and moves its files into and out of them, and cannot change those of a different agent.
-// `bun scripts/library-folders-e2e.ts`. Writes .openbot-build/library-folders-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, LIBRARY_FOLDER_LIMITS, libraryFolderPath } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS, LIBRARY_FOLDER_LIMITS, libraryFolderPath, STORAGE_LIMITS } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
@@ -27,7 +16,6 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -41,16 +29,11 @@ const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { StorageUsageScanner, StorageUsageService } = await import("../src/backend/storage-usage");
 const { LibraryFoldersService } = await import("../src/main/library-folders-service");
+type WorkflowFileOwner = import("../src/backend/workflows/workflow-file-owners").WorkflowFileOwner;
 
 const CALL_MARK = "LIBRARY-CALL";
 const PERSON = { id: "local", name: "Alex" };
 
-/**
- * A Codex app-server with the methods that the service calls. A turn whose input has
- * `LIBRARY-CALL <<ARGS{"__tool":"…",…}ARGS>>` calls `__tool` with the rest of that JSON, logs the
- * result, and ends. `__direct` calls the tool by its name; without it the call goes through
- * `tool_call`. `__twice` sends the call a second time with the same call id. Other turns answer "Done.".
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -62,7 +45,6 @@ const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", f
 let buffer = "";
 let threads = 0;
 let turns = 0;
-/** Tool request id -> the turn that waits for its result. */
 const waiting = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -100,7 +82,6 @@ const answer = (message) => {
       const match = calls.at(-1);
       if (!match) return setTimeout(() => finish(params.threadId, turnId), 20);
       const id = "tool-" + turnId;
-      // The packet carries the request as JSON text, so its quotes arrive escaped.
       const { __tool, __direct, __twice, ...args } = JSON.parse(match[1].replace(/\\\\"/g, '"'));
       const call = {
         method: "item/tool/call",
@@ -139,7 +120,6 @@ process.stdin.on("data", (chunk) => {
         waiting.delete(message.id);
         log({ turnId: turn.turnId, result: message.result ?? null, error: message.error ?? null });
         if (turn.again) {
-          // The same call a second time, as a provider does after a lost result.
           const id = message.id + "-again";
           waiting.set(id, { threadId: turn.threadId, turnId: turn.turnId, again: null });
           write({ id, ...turn.again });
@@ -151,7 +131,6 @@ process.stdin.on("data", (chunk) => {
 });
 `;
 
-/** The arguments the fake passes to a tool, valid or not. */
 interface LibraryToolArgs {
   paths?: string[];
   folder?: string | number;
@@ -178,6 +157,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -196,7 +176,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -250,10 +229,19 @@ const listingSchema = z.object({
       files: z.array(z.object({ id: z.string(), name: z.string(), path: z.string() })),
     })
     .optional(),
+  workflowFiles: z
+    .array(
+      z.object({
+        workflow: z.string(),
+        workflowFolder: z.string().nullable(),
+        fileCount: z.number(),
+        files: z.array(z.object({ id: z.string(), name: z.string(), path: z.string() })),
+      }),
+    )
+    .optional(),
   truncated: z.boolean(),
 });
 const refusalSchema = z.object({ error: z.string() });
-/** The result of each organize_library action, in one object: the action gives some of the fields. */
 const organizedSchema = z.object({
   folder: z.string().optional(),
   created: z.boolean().optional(),
@@ -273,7 +261,6 @@ const storedSchema = z.object({
   placement: z.record(z.string(), z.string()),
 });
 
-/** One profile: a database, the stores and an agent service, with or without Library folders. */
 async function startHost(directory: string, withFolders: boolean) {
   const database = new OpenBotDatabase(directory);
   const store = new AgentStore(directory, home, database);
@@ -281,7 +268,7 @@ async function startHost(directory: string, withFolders: boolean) {
   const foldersPath = join(directory, LIBRARY_FOLDERS_FILE);
   const libraryFolders = withFolders ? new LibraryFoldersStore(foldersPath) : null;
   if (libraryFolders) await runCauseEffect(libraryFolders.initialize());
-  // As in the app: the Library shows the files of the host scan, and the agent tools use the same scan.
+  const workflowOwners = new Map<string, WorkflowFileOwner>();
   const storageSources = {
     roots: {
       database: store.database.path,
@@ -294,12 +281,13 @@ async function startHost(directory: string, withFolders: boolean) {
     database: () => store.database.connection,
     mailbox,
     agents: () => agents.listAgents(),
+    workflowFiles: () => workflowOwners,
+    libraryFiles: () => new Set(libraryFolders ? Object.keys(libraryFolders.getSnapshot().placement) : []),
   };
   const storage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
   const foldersService = libraryFolders
     ? new LibraryFoldersService({ store: libraryFolders, storage, agents: () => agents.listAgents() })
     : null;
-  /** Each write of the folders: the app sends the new snapshot to each window and joined client. */
   let folderChanges = 0;
   libraryFolders?.onChanged(() => {
     folderChanges += 1;
@@ -315,7 +303,6 @@ async function startHost(directory: string, withFolders: boolean) {
   });
   await runCauseEffect(agents.initialize());
 
-  /** Waits until the agent's chat has no open delivery. */
   const idle = (agentId: string) =>
     waitFor("the chat turn to end", () =>
       agents
@@ -326,9 +313,10 @@ async function startHost(directory: string, withFolders: boolean) {
   return {
     agents,
     mailbox,
+    storage,
     libraryFolders,
+    workflowOwners,
     folderChanges: () => folderChanges,
-    /** The folders file as it is on disk. */
     stored: () => storedSchema.parse(JSON.parse(readFileSync(foldersPath, "utf8"))),
     hasFoldersFile: () => existsSync(foldersPath),
     async create(name: string) {
@@ -344,7 +332,6 @@ async function startHost(directory: string, withFolders: boolean) {
       await idle(agent.id);
       return agent;
     },
-    /** Sends the person's message that makes the fake call `tool`; answers each logged result. */
     async call(
       name: string,
       agentId: string,
@@ -414,7 +401,6 @@ try {
     if (!result) throw new Error(`${name}: no tool result.`);
     return { ...result, listing: result.success ? listingSchema.parse(JSON.parse(result.text)) : null };
   };
-  /** The stored folder with this path of names, for an agent. */
   const storedFolder = (agentId: string, ...names: string[]) => {
     const { folders } = host.stored();
     let parentId: string | undefined;
@@ -430,7 +416,6 @@ try {
   };
   const storedFileIds = () => new Set(host.mailbox.listStoredFiles().map((file) => file.attachment.id));
 
-  // 1. A path makes each level, and the file goes into the last one.
   pass("A host with no folder has no folders file", !host.hasFoldersFile());
   const first = await one(
     "attach with a new path",
@@ -466,7 +451,6 @@ try {
     JSON.stringify(firstStored),
   );
 
-  // 2. The same path in a different letter case uses the same folders.
   const second = await one(
     "attach with the path in a different case",
     maker.id,
@@ -486,7 +470,6 @@ try {
     second.text,
   );
 
-  // 3. A new folder in a folder that the agent has; a folder at the top level.
   const video = await one(
     "attach with one new level",
     maker.id,
@@ -513,7 +496,6 @@ try {
     `${video.text}\n${reports.text}`,
   );
 
-  // 4. A path that cannot be used keeps the attachment, in no folder.
   const beforeBad = host.stored();
   const tooDeep = await one(
     "attach with six levels",
@@ -556,7 +538,6 @@ try {
     JSON.stringify(host.stored()) === JSON.stringify(beforeBad),
   );
 
-  // 5. No folder argument: the result has no folder, as before this change.
   const plain = await one("attach with no folder", maker.id, await fileOf(maker.workspacePath, "plain.txt"));
   pass(
     "An attach call with no folder puts the file in no folder",
@@ -566,7 +547,6 @@ try {
     plain.text,
   );
 
-  // 6. A folder that is not text fails the call, and no file is attached.
   const filesBefore = storedFileIds().size;
   const notText = await one(
     "attach with a number as folder",
@@ -580,7 +560,6 @@ try {
     notText.text,
   );
 
-  // 7. The same call a second time makes one message and no second folder.
   const twice = await attach(
     "attach two times with one call id",
     maker.id,
@@ -605,7 +584,6 @@ try {
     twice.map((result) => result.text).join("\n"),
   );
 
-  // 8. list_library_folders answers the folders with their files, and the files in no folder.
   const all = await list("list the folders", maker.id);
   const listedImages = all.listing?.folders.find((folder) => folder.path === "Autumn campaign/Images");
   pass(
@@ -623,7 +601,6 @@ try {
       listedImages.files.every((file) => existsSync(file.path)),
     all.text,
   );
-  // deep.txt, long.txt, slash.txt and plain.txt.
   const plainId = plain.attached?.attachments[0]?.id ?? "";
   pass(
     "The list has the files in no folder, with the id of each",
@@ -648,7 +625,6 @@ try {
     missing.text,
   );
 
-  // 9. An agent sees and uses only its own folders.
   const empty = await list("list as an agent with no folder", other.id);
   pass(
     "An agent does not see the folders or files of a different agent",
@@ -671,9 +647,6 @@ try {
     sameName.text,
   );
 
-  // 9b. organize_library: an agent makes, renames, moves and deletes its folders, and moves its files
-  // into and out of them. No action changes a stored file. Each change is one write of the folders,
-  // which the app sends to each window and joined client.
   const organize = async (name: string, agentId: string, args: LibraryToolArgs) => {
     const [result] = await host.call(name, agentId, "organize_library", args);
     if (!result) throw new Error(`${name}: no tool result.`);
@@ -866,7 +839,6 @@ try {
     files: Object.values(host.stored().placement).filter((folderId) => folderId === folder.id).length,
   }));
 
-  // 10. A full store refuses a new folder: the file stays attached, in no folder.
   const store = host.libraryFolders;
   if (!store) throw new Error("The host has no Library folders store.");
   const context = { agentIds: new Set([maker.id]), fileAgent: () => undefined };
@@ -904,8 +876,6 @@ try {
     existing.text,
   );
 
-  // 10b. The start of the app removes the entry of a file that went on a path that does not tell the
-  // folders, such as the delete of a chat. The entries of the files that the host has stay.
   const reportsFolder = storedFolder(maker.id, "Reports");
   if (!reportsFolder) throw new Error("The agent has no Reports folder.");
   const goneFileId = randomUUID();
@@ -928,8 +898,6 @@ try {
     JSON.stringify({ keptBefore: keptBefore.length, after: Object.keys(placementAfter).length }),
   );
 
-  // 10c. The level limit does not depend on the sequence of the folders: Undo of a folder delete puts
-  // the folder back before its parent, and a parent that went to level 5 meanwhile makes it level 6.
   const fills = host.stored().folders.filter((folder) => folder.name.startsWith("Fill "));
   for (const fill of fills.slice(0, 6))
     await runCauseEffect(store.mutate({ type: "delete", folderId: fill.id }, context));
@@ -973,7 +941,137 @@ try {
     JSON.stringify({ parent: depthOf(parent), child: depthOf(child), childParent: restoredChild?.parentId ?? null }),
   );
 
-  // 11. A host with no Library folders store: the file is attached, and the result says so.
+  const madeBy = async (name: string) => {
+    const made = await runCauseEffect(
+      host.mailbox.storeGeneratedAttachment({
+        bytes: new TextEncoder().encode(name),
+        kind: "image",
+        name,
+        mimeType: "image/png",
+      }),
+    );
+    return made.id;
+  };
+  const weekly = { id: "workflow-weekly", name: "Weekly posts", folder: { id: "workflow-folder", name: "Marketing" } };
+  const madeShotId = await madeBy("weekly-shot.png");
+  host.workflowOwners.set(madeShotId, { workflow: weekly, createdAt: null });
+  const strayId = await madeBy("stray.png");
+  const workflowGroup = (listing: z.infer<typeof listingSchema> | null) =>
+    listing?.workflowFiles?.find((group) => group.workflow === weekly.name);
+  const seenByMaker = await list("list shows the files that workflows made", maker.id);
+  const makerGroup = workflowGroup(seenByMaker.listing);
+  pass(
+    "list_library_folders shows a workflow file by workflow and workflow folder, and not a generated file with no workflow",
+    makerGroup?.workflowFolder === "Marketing" &&
+      makerGroup.fileCount === 1 &&
+      makerGroup.files[0]?.id === madeShotId &&
+      !seenByMaker.text.includes(strayId),
+    seenByMaker.text,
+  );
+  for (const fill of fills.slice(6, 8))
+    await runCauseEffect(store.mutate({ type: "delete", folderId: fill.id }, context));
+  await organize("create a folder for workflow files", maker.id, { action: "create", folder: "Workflow picks" });
+  const picked = await organize("place a workflow file", maker.id, {
+    action: "place",
+    to: "Workflow picks",
+    files: [madeShotId],
+  });
+  const picks = storedFolder(maker.id, "Workflow picks");
+  const afterPick = await list("list after the workflow file is placed", maker.id);
+  pass(
+    "organize_library place moves a workflow file into a folder of the agent",
+    picked.success &&
+      picked.value?.filesPlaced === 1 &&
+      host.stored().placement[madeShotId] === picks?.id &&
+      afterPick.listing?.folders.some(
+        (folder) => folder.path === "Workflow picks" && folder.files.some((file) => file.id === madeShotId),
+      ) === true &&
+      workflowGroup(afterPick.listing) === undefined,
+    picked.text,
+  );
+  const seenByOther = await list("a different agent lists after the workflow file is placed", other.id);
+  pass(
+    "A workflow file in a folder of one agent is not listed for a different agent",
+    seenByOther.success && !seenByOther.text.includes(madeShotId),
+    seenByOther.text,
+  );
+  await refused(
+    "a different agent takes a workflow file from a folder of the agent",
+    other.id,
+    { action: "place", files: [madeShotId] },
+    "in a Library folder of another agent",
+  );
+  await refused(
+    "place a generated file with no workflow",
+    maker.id,
+    { action: "place", to: "Workflow picks", files: [strayId] },
+    "is not one of your Library files",
+  );
+  const unpicked = await organize("take a workflow file out of the folder", maker.id, {
+    action: "place",
+    files: [madeShotId],
+  });
+  const afterUnpick = await list("list after the workflow file is taken out", other.id);
+  pass(
+    "place with no to takes a workflow file out, and each agent sees it under its workflow again",
+    unpicked.success &&
+      host.stored().placement[madeShotId] === undefined &&
+      workflowGroup(afterUnpick.listing)?.files.some((file) => file.id === madeShotId) === true,
+    unpicked.text,
+  );
+
+  const crowded = await startHost(join(root, "user-data-crowded"), true);
+  hosts.push(crowded);
+  const keeper = await crowded.create("Keeper");
+  const largerBytes = new TextEncoder().encode("a larger stored file\n".repeat(8));
+  for (let index = 0; index < STORAGE_LIMITS.files; index += 1)
+    await runCauseEffect(
+      crowded.mailbox.storeGeneratedAttachment({
+        bytes: largerBytes,
+        name: `larger-${index}.txt`,
+        mimeType: "text/plain",
+        ownerAgentId: keeper.id,
+      }),
+    );
+  const notePath = join(keeper.workspacePath, "note.md");
+  await writeFile(notePath, "n\n");
+  const [noteResult] = await crowded.call(
+    "attach a small file on a host with more files than the storage list shows",
+    keeper.id,
+    "attach_files_to_response",
+    { paths: [notePath] },
+    { direct: true },
+  );
+  const noteId = noteResult?.success
+    ? (attachedSchema.parse(JSON.parse(noteResult.text)).attachments[0]?.id ?? "")
+    : "";
+  const [crowdedList] = await crowded.call("list on the crowded host", keeper.id, "list_library_folders", {});
+  const crowdedListing = crowdedList?.success ? listingSchema.parse(JSON.parse(crowdedList.text)) : null;
+  pass(
+    "On a host with more stored files than the storage list shows, list_library_folders counts a small new file",
+    noteId !== "" && crowdedListing?.unfiled?.fileCount === STORAGE_LIMITS.files + 1,
+    crowdedList?.text.slice(0, 400),
+  );
+  const [notePlaced] = await crowded.call("place the small file on the crowded host", keeper.id, "organize_library", {
+    action: "place",
+    to: "Notes",
+    files: [noteId],
+  });
+  const notesFolder = crowded
+    .stored()
+    .folders.find((folder) => folder.agentId === keeper.id && folder.name === "Notes");
+  pass(
+    "organize_library place puts a small new file in a folder on a host with more stored files than the storage list shows",
+    notePlaced?.success === true && notesFolder !== undefined && crowded.stored().placement[noteId] === notesFolder.id,
+    notePlaced?.text,
+  );
+  const crowdedRows = (await runCauseEffect(crowded.storage.usage({ scope: "host" }))).files;
+  pass(
+    "Right after the place, the cached host storage rows have the small file in a folder and stay at most the row limit",
+    crowdedRows.length === STORAGE_LIMITS.files && crowdedRows.some((file) => file.id === noteId),
+    JSON.stringify({ rows: crowdedRows.length, note: noteId }),
+  );
+
   const bare = await startHost(join(root, "user-data-bare"), false);
   hosts.push(bare);
   const solo = await bare.create("Solo");

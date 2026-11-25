@@ -16,86 +16,53 @@ import {
   isCustomProviderContextWindow,
   isCustomProviderMaxOutput,
   OPENCODE_RECOMMENDED_FREE_MODELS,
+  savedCustomModelId,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Clock, Effect, Result, Semaphore } from "effect";
-import { encodedModelId } from "../backend/encoded-model-id";
 import { isMissingFileError } from "../backend/file-errors";
 import { OPENCODE_CONFINED_ENV } from "../backend/process-confinement";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-/** A provider that lists this many models or fewer shows all of them until an admin changes the list. */
 const SHORT_LIST = 12;
-/**
- * How many of the newest model families a long list shows until an admin changes the list. Each
- * service, such as `anthropic` or `openrouter`, gets an equal part and at least
- * `NEWEST_FAMILIES_PER_SERVICE`, so a service with hundreds of models does not push out the others.
- */
 const NEWEST_FAMILIES = 12;
 const NEWEST_FAMILIES_PER_SERVICE = 4;
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** A family older than this, against the newest family of its service, is a past generation. */
 const FAMILY_AGE_LIMIT_MS = 120 * DAY_MS;
-/** The picker labels a model New for this long after its release date. */
 const NEW_MODEL_MS = 7 * DAY_MS;
 
 interface ModelRelease {
-  /** `YYYY-MM-DD`, so the text sorts as the date does. */
   date: string;
-  /** The models.dev family, such as `claude-sonnet`. Empty when the catalog names none. */
   family: string;
-  /**
-   * False for a model that an agent cannot work with: a deprecated model, a model that does not
-   * write text (image, audio and video models), or a model with no tool calls.
-   */
   agentReady: boolean;
 }
 
-/** The token limits of a model in the catalog. */
 interface ModelLimits {
   contextWindow: number;
-  /** Left out when the catalog has none, or has one that leaves no room for the prompt. */
   maxOutput?: number;
 }
 
 interface ReleaseLookup {
-  /** The release of a catalog key, `<service>/<model>`. */
   release(key: string): ModelRelease | undefined;
-  /** The release of a model name that services share, such as `gpt-6.1-sol` (see `modelName`). */
   releaseByName(name: string): ModelRelease | undefined;
-  /** True when the catalog lists the service, such as `openai`. */
   knowsService(service: string): boolean;
-  /** The limits of a model id of any service, such as a custom endpoint (see `catalogLimits`). */
   limits(modelId: string): ModelLimits | undefined;
 }
 
 interface Releases {
   models: Map<string, ModelRelease>;
-  /** By `modelName`, over all services: the first release date, and agent-ready when one service has it so. */
   names: Map<string, ModelRelease>;
   services: Set<string>;
-  /** By catalog key in lower case. */
   limits: Map<string, ModelLimits>;
-  /** By `modelName`: the limits that each service gives the model. */
   nameLimits: Map<string, ModelLimits[]>;
 }
 
-/**
- * The release dates of models.dev, read from the copy that OpenCode keeps in its cache. OpenCode
- * model ids are `<service>/<model>`, the keys of that file. A provider whose ids are not in it gets
- * no dates, and a long list with no dates shows all its models.
- *
- * The same file gives the token limits of a model that a custom endpoint lists by name only.
- *
- * Read again only when the file changes. A missing or bad file reads as no dates and no limits.
- */
 export class ModelReleaseCatalog {
   readonly #paths: readonly string[];
   #loaded: { path: string; modified: number; releases: Releases } | null = null;
 
   constructor(env: NodeJS.ProcessEnv = process.env, home = homedir()) {
     const cache = env.XDG_CACHE_HOME?.trim() || join(home, ".cache");
-    // A confined OpenCode process keeps a cache of its own, which can be the newer copy.
     const confined = OPENCODE_CONFINED_ENV.XDG_CACHE_HOME;
     this.#paths = [
       join(cache, "opencode", "models.json"),
@@ -117,8 +84,6 @@ export class ModelReleaseCatalog {
     const loaded = this.#loaded;
     if (loaded && loaded.path === newest.path && loaded.modified === newest.modified)
       return releaseLookup(loaded.releases);
-    // The parse is in the try: OpenCode can write the file during the read, and text that is not
-    // JSON then gives no releases, as a file that cannot be read does.
     const releases = yield* Effect.tryPromise(async () =>
       parseReleases(JSON.parse(await readFile(newest.path, "utf8"))),
     ).pipe(Effect.orElseSucceed(noReleases));
@@ -131,10 +96,6 @@ function noReleases(): Releases {
   return { models: new Map(), names: new Map(), services: new Set(), limits: new Map(), nameLimits: new Map() };
 }
 
-/**
- * The last part of a model id, with a dot read as a dash: `nous:anthropic/claude-opus-5.5` and the
- * catalog key `anthropic/claude-opus-5-5` both give `claude-opus-5-5`.
- */
 function modelName(id: string): string {
   return id
     .slice(id.lastIndexOf("/") + 1)
@@ -180,13 +141,11 @@ function parseReleases(value: unknown): Releases {
   return releases;
 }
 
-/** A model with no modalities in the catalog counts as a text model. */
 function writesText(modalities: unknown): boolean {
   if (!isDynamicRecord(modalities) || !Array.isArray(modalities.output)) return true;
   return modalities.output.includes("text");
 }
 
-/** The `limit` of a catalog model. A value that a custom model cannot store is left out. */
 function listedLimits(limit: unknown): ModelLimits | undefined {
   if (!isDynamicRecord(limit) || !isCustomProviderContextWindow(limit.context)) return undefined;
   const contextWindow = limit.context;
@@ -195,19 +154,12 @@ function listedLimits(limit: unknown): ModelLimits | undefined {
     : { contextWindow };
 }
 
-/** The value that most entries have. The smaller one wins a tie, so a model is not given too much. */
 function mostCommon(values: readonly number[]): number | undefined {
   const counts = new Map<number, number>();
   for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
   return [...counts].sort(([left, leftCount], [right, rightCount]) => rightCount - leftCount || left - right)[0]?.[0];
 }
 
-/**
- * The limits of a model that an endpoint lists by name only. An id that ends in a catalog key, as
- * `google/gemini-3.8-flash` and `relay/google/gemini-3.8-flash` do, gets the limits of that key: the
- * maker's own. Any other id is read by its model name, and gets the context window that most
- * services give that model, with the max output that most of those services give it.
- */
 function catalogLimits(modelId: string, releases: Releases): ModelLimits | undefined {
   const parts = modelId.toLowerCase().split("/");
   const exact = parts.length > 1 ? releases.limits.get(parts.slice(-2).join("/")) : undefined;
@@ -234,19 +186,11 @@ function releaseLookup(releases: Releases): ReleaseLookup {
 }
 
 interface CatalogMatch {
-  /** The service part of the id, such as `openai`, `nous` or `openai-codex`. */
   service: string;
-  /** The id without a reasoning variant. Each model with the same base shows or hides together. */
   base: string;
   release: ModelRelease | undefined;
 }
 
-/**
- * Finds a model in the catalog. OpenCode ids are catalog keys, `<service>/<model>`, and can add a
- * reasoning variant, `<service>/<model>/<effort>`. Kimi adds one as `<model>,thinking`. Hermes ids are `<service>:<model>`, where the model
- * can name its maker, as `nous:openai/gpt-6.1-sol` does. For a service that the catalog does not list,
- * the model name alone finds the release.
- */
 function matchCatalog(modelId: string, lookup: ReleaseLookup): CatalogMatch {
   const comma = modelId.indexOf(",");
   const key = (comma > 0 ? modelId.slice(0, comma) : modelId).replace(":", "/");
@@ -262,16 +206,6 @@ function matchCatalog(modelId: string, lookup: ReleaseLookup): CatalogMatch {
 
 type ModelMatch = { id: string; match: CatalogMatch };
 
-/**
- * The name of a model without its version, and the version. `claude-fable-5-2` gives the shape
- * `claude-fable-#` and the version `[5, 2]`; `gpt-6.1-sol` gives `gpt-#-sol` and `[6, 1]`, so
- * `gpt-6-sol` and `gpt-7-sol` have the same shape. A release stamp, such as the `20251001` of
- * `claude-haiku-4-5-20251001`, names a build of the model, not a version, and is left out.
- *
- * A version stands between separators, so the `1` of `deepseek-r1` and the `70` of `llama-3-1-70b`
- * are not part of one. Each part has at most three digits, so a date such as the `0528` of
- * `deepseek-r1-0528` is not a version either.
- */
 function versionedName(match: CatalogMatch): { shape: string; version: number[] } | null {
   const name = modelName(match.base).replace(/-\d{8}(?=-|$)/gu, "");
   const version = /(?<=^|-)\d{1,3}(?:-\d{1,3})*(?=-|$)/u.exec(name);
@@ -290,18 +224,6 @@ function compareVersions(left: readonly number[], right: readonly number[]): num
   return 0;
 }
 
-/**
- * Gives a model that the catalog does not have yet the family of the catalogued model that it is a
- * newer version of. models.dev adds a release some days after a CLI lists it, and until then a new
- * release such as `claude-fable-5-2`, `gpt-7-sol` or `grok-4.8` was folded under Older models while
- * the version before it led the list.
- *
- * Only an id with the same service and the same text around its version counts, and only when it is
- * newer than every catalogued model with that shape. The newest of these new versions is dated one
- * day after the newest model of the family, so it leads the family. Another new version takes the
- * date of the version before it, so it folds as an older version does. The family is agent-ready
- * when one of its catalogued models is.
- */
 function withNewerVersions(matches: readonly ModelMatch[]): ModelMatch[] {
   const named = matches.map((entry) => ({ entry, name: versionedName(entry.match) }));
   const shapes = new Map<string, { version: number[]; release: ModelRelease | undefined }[]>();
@@ -340,7 +262,6 @@ function withNewerVersions(matches: readonly ModelMatch[]): ModelMatch[] {
   });
 }
 
-/** Each model, less those that the list has a newer model of the same family and service for. */
 function newestOfEachFamily(matches: readonly ModelMatch[]): string[] {
   const newest = new Map<string, string>();
   for (const { match } of matches) {
@@ -357,20 +278,10 @@ function newestOfEachFamily(matches: readonly ModelMatch[]): string[] {
     .map(({ id }) => id);
 }
 
-/**
- * The models that the picker shows before an admin changes the list. A short list hides only a model
- * that the list has a newer model of the same family for, such as Claude Opus 5 next to Opus 5.5;
- * a model that the catalog does not have shows. A longer list shows, for each service, the newest model of each of its newest families, when that family is from
- * the current generation of the service (see `FAMILY_AGE_LIMIT_MS`). Only models that an agent
- * can work with count. A model that the catalog does not have shows only when no model of its
- * service is in the catalog, as with a custom endpoint: the user added it. So a `-fast` or `-flex`
- * service tier that OpenCode adds to a known service does not show.
- */
 function defaultShownModelIds(models: readonly { id: string }[], lookup: ReleaseLookup): string[] {
   const matches = withNewerVersions(models.map((model) => ({ id: model.id, match: matchCatalog(model.id, lookup) })));
   if (models.length <= SHORT_LIST) return newestOfEachFamily(matches);
   const catalogued = new Set(matches.filter(({ match }) => match.release).map(({ match }) => match.service));
-  // The newest model of each family, for each service.
   const services = new Map<string, Map<string, { base: string; date: string }>>();
   for (const { match } of matches) {
     const release = match.release;
@@ -397,11 +308,6 @@ function defaultShownModelIds(models: readonly { id: string }[], lookup: Release
     .map(({ id }) => id);
 }
 
-/**
- * The models that a provider's picker shows in the main list whatever their release date, because a new
- * agent of that provider starts on the first of them. OpenCode lists more than 100 models, and the
- * newest families can be other free models, so without this the default would fold under Older models.
- */
 const RECOMMENDED_MODELS: ReadonlyMap<string, readonly string[]> = new Map([
   ["opencode", OPENCODE_RECOMMENDED_FREE_MODELS],
 ]);
@@ -412,24 +318,19 @@ function modelKey(provider: string, model: string): ModelKey {
   return `${provider}\u0000${model}`;
 }
 
-/**
- * The models that the user saved on an endpoint, under the provider that runs it. The user chose
- * each one, so the catalogue age rules do not fold it. Before, when one model of an endpoint was in
- * the catalogue, such as a model of the `lmstudio` endpoint or a Claude model of a gateway, the
- * endpoint's other models were folded under Older models as models that the catalogue lacks (#7962).
- */
 function savedEndpointModels(endpoints: readonly CustomProviderSummary[]): Set<ModelKey> {
   return new Set(
     endpoints.flatMap((endpoint) =>
       endpoint.models.map((model) =>
-        // As the harness lists it: Pi encodes an id that the contract refuses, such as `@cf/...`.
-        modelKey(endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS, encodedModelId(`${endpoint.id}/`, model.id)),
+        modelKey(
+          endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
+          savedCustomModelId(endpoint.id, endpoint.harness, model.id),
+        ),
       ),
     ),
   );
 }
 
-/** Every model an agent is on, goes back to, moves to next, or keeps as a backup. */
 function modelsInUse(agents: readonly AgentSummary[]): Set<ModelKey> {
   const keys = new Set<ModelKey>();
   for (const agent of agents) {
@@ -440,44 +341,23 @@ function modelsInUse(agents: readonly AgentSummary[]): Set<ModelKey> {
   return keys;
 }
 
-/** How the picker shows each model of one provider. */
 interface ProviderPicker {
-  /** The models that the main list shows. The picker folds the others under Older models. */
   byDefault: ReadonlySet<string>;
-  /** The models that an admin turned off. The picker leaves them out. */
   hidden: ReadonlySet<string>;
-  /** The release date of each model that the catalog has, `YYYY-MM-DD`. */
   released: ReadonlyMap<string, string>;
 }
 
 export interface ModelVisibilityOptions {
-  /** `openbot-model-visibility-v1.json` in the user data folder. */
   path: string;
   catalog: ModelReleaseCatalog;
-  /** Every model the connected providers list. */
   listModels(): AgentModelOption[];
   listAgents(): AgentSummary[];
-  /** The user's saved endpoints. The models saved on them are in the main list (#7962). */
   customEndpoints(): readonly CustomProviderSummary[];
-  /** Tells each client to read the model list again. */
   modelsChanged(): void;
 }
 
-/**
- * Which models the model picker of this server shows, for each provider. Only the list that clients
- * read changes: agents, tools, automations and the backup model switch still reach every model.
- *
- * The file keeps only the models that an admin turned off, and the picker leaves them out. Every
- * other model shows: in the main list when `defaultShownModelIds` gives it, otherwise under Older
- * models. So a new release shows after an admin edits the list too. A model that an agent uses stays
- * in the picker, out of the fold, so its picker can show it.
- *
- * A file that is missing or unreadable as JSON reads as no changes. Writes are chained for the reason
- * `update-preference-store.ts` chains its own.
- */
 export class ModelVisibility {
   readonly #options: ModelVisibilityOptions;
-  /** The models that an admin turned off, for each provider. */
   #hidden = new Map<string, ReadonlySet<string>>();
   #writes = Semaphore.makeUnsafe(1);
 
@@ -503,15 +383,14 @@ export class ModelVisibility {
     return this.#set(change);
   }
 
-  /** The models that an admin turned off, for each provider, as a server transfer carries them. */
+  hiddenIn(provider: string): ReadonlySet<string> | undefined {
+    return this.#hidden.get(provider);
+  }
+
   hiddenModels(): { provider: string; hidden: string[] }[] {
     return [...this.#hidden].map(([provider, ids]) => ({ provider, hidden: [...ids] }));
   }
 
-  /**
-   * Replaces the turned-off models with those of a server transfer. Unlike `set`, it keeps the models
-   * that no provider lists now: on a new server the providers are often not signed in yet.
-   */
   replaceHidden(
     models: readonly { provider: string; hidden: readonly string[] }[],
   ): Effect.Effect<void, PreferenceFileFailure> {
@@ -538,24 +417,28 @@ export class ModelVisibility {
     this.#options.modelsChanged();
   });
 
-  /**
-   * The models of `models` that the picker lists, in the same order: less those that an admin turned
-   * off, and with `listing` set to `older` for those that the default hides and to `new` for a recent
-   * release in the main list.
-   */
   picker<Model extends { provider: string; id: string; listing?: AgentModelListing }>(
     models: readonly Model[],
   ): Effect.Effect<Model[]> {
     return this.#picker(models);
   }
 
-  /** The `listing` of each model that the provider list has one for, for a client that reads the released model list. */
   listings(): Effect.Effect<AgentModelListingEntry[]> {
     return this.#picker(this.#options.listModels()).pipe(
       Effect.map((models) =>
         models.flatMap((model) =>
-          model.listing ? [{ provider: model.provider, id: model.id, listing: model.listing }] : [],
+          model.listing && model.listing !== "kept"
+            ? [{ provider: model.provider, id: model.id, listing: model.listing }]
+            : [],
         ),
+      ),
+    );
+  }
+
+  kept(): Effect.Effect<{ provider: string; id: string }[]> {
+    return this.#picker(this.#options.listModels()).pipe(
+      Effect.map((models) =>
+        models.flatMap((model) => (model.listing === "kept" ? [{ provider: model.provider, id: model.id }] : [])),
       ),
     );
   }
@@ -593,7 +476,6 @@ export class ModelVisibility {
                 .map((model) => model.id),
             );
             const on = new Set(requested);
-            // A model that the provider does not list now, such as one of a signed-out service, keeps its choice.
             const hidden = new Set([...(this.#hidden.get(change.provider) ?? [])].filter((id) => !listed.has(id)));
             for (const id of listed) if (!on.has(id)) hidden.add(id);
             if (hidden.size > 0) next.set(change.provider, hidden);
@@ -624,17 +506,15 @@ export class ModelVisibility {
       pickers.set(provider, this.#providerPicker(provider, listed, lookup, saved));
     const inUse = modelsInUse(this.#options.listAgents());
     const now = yield* Clock.currentTimeMillis;
-    // The provider lists give no `listing` of their own.
     return models.flatMap((model): Model[] => {
       const picker = pickers.get(model.provider);
       if (!picker) return [model];
       const used = inUse.has(modelKey(model.provider, model.id));
-      if (picker.hidden.has(model.id) && !used) return [];
-      if (picker.byDefault.has(model.id)) {
-        const released = Date.parse(picker.released.get(model.id) ?? "");
-        return now - released < NEW_MODEL_MS ? [{ ...model, listing: "new" }] : [model];
-      }
-      return used ? [model] : [{ ...model, listing: "older" }];
+      if (picker.hidden.has(model.id)) return used ? [{ ...model, listing: "kept" }] : [];
+      if (model.listing === "older" || !picker.byDefault.has(model.id))
+        return used ? [{ ...model, listing: undefined }] : [{ ...model, listing: "older" }];
+      const released = Date.parse(picker.released.get(model.id) ?? "");
+      return now - released < NEW_MODEL_MS ? [{ ...model, listing: "new" }] : [model];
     });
   });
 
@@ -659,10 +539,6 @@ export class ModelVisibility {
   }
 }
 
-/**
- * `{ version: 1, providers: { <provider>: { hidden: [...] } } }`. A provider entry of another shape,
- * such as the full list that a development build of this file kept, reads as no change.
- */
 function decodeHidden(parsed: unknown): Map<string, ReadonlySet<string>> | null {
   if (!isDynamicRecord(parsed) || parsed.version !== 1 || !isDynamicRecord(parsed.providers)) return null;
   const hidden = new Map<string, ReadonlySet<string>>();

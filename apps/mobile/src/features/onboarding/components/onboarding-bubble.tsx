@@ -14,7 +14,6 @@ import {
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
 import { SPLASH_EASE_OUT } from "@/shared/lib/splash-motion";
 
-// The agent "types" for a moment before it speaks, as in a chat.
 export const TYPING_MS = 700;
 const DOT = {
   from: { opacity: 0.35, transform: [{ translateY: 0 }] },
@@ -45,11 +44,6 @@ function TypingDots({ color }: { color: string | undefined }) {
   );
 }
 
-/**
- * What the agent says. The bubble pops in, shows that the agent is typing, then its words. A text
- * that changes in place, such as a name being typed, grows the bubble instead of replacing it.
- * The bubble takes the agent's colour, with text that reads on it.
- */
 export function SpeechBubble({
   text,
   textKey = text,
@@ -59,13 +53,10 @@ export function SpeechBubble({
   color,
 }: {
   text: string;
-  /** The words fade to the new ones when this changes. Typing keeps one key. */
   textKey?: string;
   motion: OnboardingMotion;
-  /** Where the bubble points: down to the agent below it, or up to the agent in the header. */
   tail: "bottom" | "top";
   delay?: number;
-  /** The colour of the agent. Without one, the bubble is a plain surface. */
   color?: string;
 }) {
   const typing = motion === "full";
@@ -111,7 +102,6 @@ export function SpeechBubble({
   );
 }
 
-/** A small corner of the bubble that points at the agent. */
 function Tail({ placement, color }: { placement: "top" | "bottom"; color: string | undefined }) {
   return (
     <View

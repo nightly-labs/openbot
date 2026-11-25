@@ -1,14 +1,3 @@
-// Checks that a GitHub output keeps the files of the Discord mention that started its run. It runs the
-// real SQLite, the real workflow service and the real GitHub REST client on a temporary profile. Only
-// GitHub's API and Discord's CDN are stand-ins, so no Signal, provider, account or network is started.
-// The trigger step gives agents the files; a new issue links the files that the client copied to the
-// `openbot-attachments` branch (an orphan commit with `[skip ci]`), and a file that is too large or that
-// does not download keeps its Discord link; a second mention builds on the branch and tries once more
-// when another output moved it; a file that GitHub refuses keeps its Discord link, the other files still
-// copy, and the issue is still made; a mention with no files makes no Git call.
-//
-// Run: bun scripts/discord-github-files-e2e.ts
-// Writes .openbot-build/discord-github-files-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -44,7 +33,6 @@ interface GitCall {
 
 interface Report {
   checks: string[];
-  /** The Git and issue calls, without the file bytes. */
   calls: { method: string; path: string; status: number }[];
   issues: { title: string; body: string }[];
   passed: boolean;
@@ -57,7 +45,6 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
   report.checks.push(name);
 };
 
-// The fake Discord CDN: the bytes of each file it has. Another address does not download.
 const cdnFiles = new Map<string, Uint8Array>();
 const cdnFile = (name: string, mimeType: string, bytes: Uint8Array | null, size = bytes?.byteLength ?? 1) => {
   const id = `${200000000000000000n + BigInt(cdnFiles.size + 1)}`;
@@ -66,16 +53,12 @@ const cdnFile = (name: string, mimeType: string, bytes: Uint8Array | null, size 
   return { id, name, mimeType, size, url } satisfies InboundFile;
 };
 
-// The fake GitHub API: one repository with no `openbot-attachments` branch at the start.
 const calls: GitCall[] = [];
 const blobs = new Map<string, string>();
 const commits = new Map<string, { tree: string; message: string; parents: string[] }>();
 let branchHead: string | null = null;
 let nextSha = 0;
-/** The next branch update is refused, as when another output moved the branch first. */
 let refuseNextUpdate = false;
-/** Blobs are refused, as when the app lost access to the repository's contents. */
-/** The number of next blobs that GitHub refuses. */
 let refuseBlobs = 0;
 let issueNumber = 0;
 
@@ -134,7 +117,6 @@ function answer(method: string, path: string, body: DynamicRecord | null): Respo
     const next = String(body?.sha);
     if (refuseNextUpdate || !commits.get(next)?.parents.includes(branchHead ?? "")) {
       refuseNextUpdate = false;
-      // Another output moved the branch in between.
       const moved = sha("commit");
       commits.set(moved, { tree: sha("tree"), message: "another output", parents: branchHead ? [branchHead] : [] });
       branchHead = moved;
@@ -170,7 +152,6 @@ const node = (id: string, kind: WorkflowNode["kind"], fields: WorkflowNode["fiel
   at: { x, y: 0 },
   fields,
 });
-/** A Discord mention makes an issue with the text of a prompt step. */
 const SAY = "A person reported this in Discord.";
 const graph: WorkflowGraph = {
   nodes: [
@@ -217,7 +198,6 @@ const directory = await mkdtemp(join(tmpdir(), "openbot-discord-github-files-"))
 const database = new OpenBotDatabase(directory);
 let service: WorkflowsHandle | null = null;
 
-/** Waits for the newest run of a workflow to end. */
 async function runEnded(workflows: WorkflowsHandle, workflowId: string, after: string | null) {
   const deadline = Date.now() + WAIT_MS;
   for (;;) {
@@ -271,7 +251,6 @@ try {
   assert.ok(saved.ok);
   const workflowId = created.summary.id;
 
-  // 1. Two files copy; a large file and a file that does not download keep their Discord links.
   const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
   const log = new TextEncoder().encode("line 1\nline 2\n");
   const shot = cdnFile("screen shot [1].png", "image/png", png);
@@ -339,7 +318,6 @@ try {
     firstIssue,
   );
 
-  // 2. Another output moves the branch between the read and the update: the client builds on its commit.
   refuseNextUpdate = true;
   const second = mentionOf("bug: one more", [cdnFile("trace.log", "text/plain", new TextEncoder().encode("trace"))]);
   check("a second mention starts a run", (await runCauseEffect(workflows.receiveDiscord(second))) === "started");
@@ -365,7 +343,6 @@ try {
     report.issues[1],
   );
 
-  // 3. GitHub refuses one file: that file keeps its Discord link, and the other file still copies.
   refuseBlobs = 1;
   const refused = cdnFile("photo.jpg", "image/jpeg", new Uint8Array([0xff, 0xd8, 0xff]));
   const kept = cdnFile("steps.txt", "text/plain", new TextEncoder().encode("steps"));
@@ -387,7 +364,6 @@ try {
   );
   refuseBlobs = 0;
 
-  // 4. A mention with no files makes no Git call.
   const before = calls.length;
   check(
     "a mention with no files starts a run",

@@ -1,10 +1,3 @@
-// `storybook dev -p 6006` in a second worktree silently lands on 6007, prints
-// a URL nobody was watching, and leaves the developer looking at the first
-// worktree's stories - or, with `--exact-port`, fails outright. Neither is
-// useful when several worktrees are open, so this wrapper allocates through the
-// same registry `bun run dev` uses: the port it announces is one no sibling
-// will take, and `bun run dev:status` and `bun run dev:stop` can see it.
-
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -35,10 +28,6 @@ export interface StorybookInvocation {
   passthrough: string[];
 }
 
-// `--force` is this script's own; everything else goes to Storybook untouched,
-// so `bun run storybook --no-open --quiet` still works. `-p`/`--port` is
-// refused rather than passed on: the registry is what chooses the port, and a
-// port it did not hand out is one a sibling worktree can be told to take.
 export function parseStorybookInvocation(args: string[]): StorybookInvocation {
   const conflicting = args.find(
     (argument) => argument === "-p" || argument === "--port" || argument.startsWith("--port="),
@@ -107,9 +96,6 @@ async function main(): Promise<void> {
   });
 
   logger.info(`Storybook: http://localhost:${port}`);
-  // `--exact-port` because the port is already reserved and probed. Letting
-  // Storybook walk on its own would put it on a port the registry promised to
-  // another worktree, which is the collision this script exists to prevent.
   const target = cliSpawnTarget(executable, ["dev", "--port", String(port), "--exact-port", ...passthrough]);
   const child: ChildProcess = spawn(target.command, target.args, {
     cwd: projectRoot,

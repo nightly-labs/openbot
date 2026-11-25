@@ -4,6 +4,8 @@ import {
   Bell,
   CircleArrowDown,
   CreditCard,
+  Gift,
+  Keyboard,
   Mic,
   MousePointer2,
   Palette,
@@ -15,6 +17,7 @@ import {
   Smartphone,
   UserRound,
 } from "@openbot/ui";
+import { SHORTCUT_COMMANDS, SHORTCUT_TITLES } from "@openbot/ui/features/settings/keyboard-shortcuts";
 
 export type SettingsTab =
   | "general"
@@ -22,47 +25,36 @@ export type SettingsTab =
   | "app-behavior"
   | "notifications"
   | "voice"
+  | "keyboard"
   | "dynamic-island"
   | "agent-dock"
   | "computer-use"
   | "profile"
   | "billing"
+  | "referral"
   | "mobile-connect"
   | "updates"
   | "hosted-servers";
 
-/**
- * A row of a tab that the settings search finds. The title key is also the anchor of the row: the
- * row markup sets `data-settings-row` to this key, so a search result can move to the row.
- */
 type SettingsRow = {
   titleKey: AppTextKey;
   descriptionKey?: AppTextKey;
-  /** True: the row shows only on macOS. False: never on macOS. Missing: on each platform. */
   macOS?: boolean;
 };
 
-/** False for a row that this platform does not show, so the search does not find it. */
 export function settingsRowShown(row: { macOS?: boolean }, platform: AppInfo["platform"] | undefined): boolean {
   return row.macOS === undefined || row.macOS === (platform === "darwin");
 }
 
-/**
- * A tab holds the keys of its label and its header text, not the text itself. The list is read at
- * module level, before any component exists to translate it, and a label captured there would keep
- * the language the app started in. `rows` lists the rows of the tab in page order, for the search.
- */
 type SettingsNavItem = {
   value: SettingsTab;
   titleKey: AppTextKey;
   descriptionKey: AppTextKey;
   icon: typeof Settings;
-  /** The label of the group of the tab. The first tabs, which most users need, have no group. */
   group?: AppTextKey;
   rows: ReadonlyArray<SettingsRow>;
 };
 
-/** The tabs in the order of the section list. The tabs that most users need come first. */
 export const navItems: ReadonlyArray<SettingsNavItem> = [
   {
     value: "general",
@@ -102,6 +94,9 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       { titleKey: "settings.interfaceSize.title", descriptionKey: "settings.interfaceSize.description" },
       { titleKey: "settings.interfaceFont.title", descriptionKey: "settings.interfaceFont.description" },
       { titleKey: "settings.codeFont.title", descriptionKey: "settings.codeFont.description" },
+      { titleKey: "settings.backgroundBlur.title", descriptionKey: "settings.backgroundBlur.description" },
+      { titleKey: "settings.movingFaces.title", descriptionKey: "settings.movingFaces.description" },
+      { titleKey: "settings.startupAnimation.title", descriptionKey: "settings.startupAnimation.description" },
     ],
   },
   {
@@ -133,11 +128,19 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
       },
       { titleKey: "settings.voice.speech.voice.title" },
       { titleKey: "settings.voice.speech.speed.title" },
+      { titleKey: "settings.voice.talkKey.title", descriptionKey: "settings.voice.talkKey.description" },
       {
         titleKey: "settings.voice.speech.codexLive.title",
         descriptionKey: "settings.voice.speech.codexLive.description",
       },
     ],
+  },
+  {
+    value: "keyboard",
+    titleKey: "settings.tab.keyboard.title",
+    descriptionKey: "settings.tab.keyboard.description",
+    icon: Keyboard,
+    rows: SHORTCUT_COMMANDS.map((command) => ({ titleKey: SHORTCUT_TITLES[command] })),
   },
   {
     value: "profile",
@@ -155,6 +158,14 @@ export const navItems: ReadonlyArray<SettingsNavItem> = [
     titleKey: "settings.tab.billing.title",
     descriptionKey: "settings.tab.billing.description",
     icon: CreditCard,
+    group: "settings.sections.group.account",
+    rows: [],
+  },
+  {
+    value: "referral",
+    titleKey: "settings.tab.referral.title",
+    descriptionKey: "settings.tab.referral.description",
+    icon: Gift,
     group: "settings.sections.group.account",
     rows: [],
   },
@@ -266,10 +277,6 @@ export function navItem(tab: SettingsTab): SettingsNavItem {
   return found;
 }
 
-/**
- * Whether the settings panel and its search show the tab. Hosted servers opens from its own entry, not
- * from this panel. The Dynamic Island and the agent dock are macOS, Windows and Linux features of the main window.
- */
 export function settingsTabShown(
   tab: SettingsTab,
   window: { platform: AppInfo["platform"] | undefined; chatWindow: boolean },
@@ -280,10 +287,6 @@ export function settingsTabShown(
   return true;
 }
 
-/**
- * The Dynamic Island exists on macOS, Windows and Linux, and only the main window owns it: main rejects
- * its calls from a chat window.
- */
 export function dynamicIslandSettingsShown(platform: AppInfo["platform"] | undefined, chatWindow: boolean): boolean {
   return platform !== undefined && !chatWindow;
 }

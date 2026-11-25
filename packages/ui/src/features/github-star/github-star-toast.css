@@ -1,9 +1,7 @@
-/* Sonner gives an unstyled toast no width, so the host takes the toaster width. */
 .github-star-toast-host {
   width: var(--width);
 }
 
-/* The raised toast surface with the 1px ring only. */
 .github-star-toast {
   position: relative;
   display: grid;
@@ -18,12 +16,10 @@
   line-height: var(--openbot-leading-md);
 }
 
-/* The buttons sit 8px from the bottom edge. The thank-you state has no buttons and keeps even padding. */
 .github-star-toast:has(.github-star-toast-actions) {
   padding-bottom: var(--openbot-space-2);
 }
 
-/* The close control sits on the corner, mostly outside the card, so the title keeps a small space. */
 .github-star-toast-head {
   display: flex;
   align-items: center;
@@ -42,13 +38,11 @@
   flex: none;
 }
 
-/* A full star fill with a darker edge, so the star also reads on the light main button. */
 .github-star-toast-star {
   color: var(--openbot-star-edge);
   fill: var(--openbot-star);
 }
 
-/* The words start in one column after the mark, as in the shared toast. */
 .github-star-toast-body {
   margin: 0;
   padding-inline-start: calc(var(--openbot-icon-lg) + var(--openbot-space-2));
@@ -58,7 +52,6 @@
   text-wrap: pretty;
 }
 
-/* With the grid gap, the button row is 12px below the words. */
 .github-star-toast-actions {
   margin-top: var(--openbot-space-1);
 }
