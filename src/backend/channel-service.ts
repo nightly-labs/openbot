@@ -86,6 +86,7 @@ export interface ChannelHooks {
   schedule(agentId: string): void;
   awaitDrain?(agentId: string): Effect.Effect<void, ChannelOperationError> | undefined;
   interrupt(agentId: string, turnId: string, threadId: string): Effect.Effect<void, ChannelOperationError>;
+  settleUnconfirmedStart?(deliveryId: string): Effect.Effect<void>;
   busy(agentId: string, channelId: string): boolean;
   channelTurnLimit?(agentId: string): number;
   usageLimited?(agentId: string): boolean;
@@ -1020,9 +1021,34 @@ export class ChannelService {
     const result = yield* channelSync(() => this.store.update(channel, { tasks: updated }, operationId));
     this.publish(channel.id);
     yield* this.interruptTasks(channel.id, affected);
+    if (command.type !== "stop") yield* this.#settleUnconfirmedStarts(channel.id, affected);
     yield* this.wake(channel.id);
     return result;
   }).bind(this);
+
+  #settleUnconfirmedStarts(
+    channelId: string,
+    tasks: readonly ChannelTask[],
+  ): Effect.Effect<void, ChannelOperationError> {
+    const settle = this.hooks.settleUnconfirmedStart;
+    if (!settle) return Effect.void;
+    return channelSync(() => this.store.assignments(channelId)).pipe(
+      Effect.flatMap((assignments) =>
+        Effect.forEach(
+          assignments.flatMap((assignment) =>
+            assignment.deliveryId &&
+            !assignment.turnId &&
+            activeAssignment(assignment) &&
+            tasks.some((task) => task.id === assignment.taskId)
+              ? [assignment.deliveryId]
+              : [],
+          ),
+          (deliveryId) => settle(deliveryId),
+          { discard: true },
+        ),
+      ),
+    );
+  }
 
   readonly #applyHandoff = Effect.fn("ChannelService.applyHandoff")(function* (
     this: ChannelService,
