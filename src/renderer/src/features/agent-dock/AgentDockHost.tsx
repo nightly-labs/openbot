@@ -712,14 +712,14 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       if (agentTasks.available() && !agentTasks.snapshot(seat.id)) void agentTasks.loadTasks(seat.id);
       if (!openThread(seat.id) && !conversations[seat.id]?.messages?.length) void loadLatestAgentMessages(seat.id);
     },
-    showThread(agentId: string, id: string) {
+    showThread(agentId: string, id: string, started = false) {
+      if (started && draftShown(agentId)) agentThreads.close(agentId, DRAFT_THREAD_ID);
       agentThreads.open(agentId, id);
+      if (started && !agentTasks.snapshot(agentId)?.tasks.some((task) => task.id === id))
+        void agentTasks.loadTasks(agentId);
     },
     newThread(agentId: string) {
       agentThreads.startNew(agentId);
-    },
-    startThread(agentId: string, text: string): Promise<boolean> {
-      return agentThreads.sendDraft(agentId, text, []);
     },
     async sendToAgent(agentId: string, text: string): Promise<AgentDockSendResult> {
       if (draftShown(agentId)) {
@@ -1019,14 +1019,12 @@ function ScreenAgentDock(props: { serverId: string }) {
           dock.waitForReset(action.agentId);
           return;
         case "open-thread":
-          dock.showThread(action.agentId, action.threadId);
+          dock.showThread(action.agentId, action.threadId, action.started === true);
           return;
         case "new-thread":
           dock.newThread(action.agentId);
           return;
         case "start-thread":
-          void dock.startThread(action.agentId, action.text);
-          return;
         case "send":
           return;
       }

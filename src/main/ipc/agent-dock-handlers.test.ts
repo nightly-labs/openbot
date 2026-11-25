@@ -294,6 +294,7 @@ describe("agent dock handlers", () => {
     const threadSend: AgentDockAction = { ...SEND, taskId: "task-1" };
     const threadActions: AgentDockAction[] = [
       { type: "open-thread", serverId: "local", agentId: "agent-1", threadId: "main" },
+      { type: "open-thread", serverId: "local", agentId: "agent-1", threadId: "task-2", started: true },
       { type: "new-thread", serverId: "local", agentId: "agent-1" },
       {
         type: "start-thread",
@@ -328,6 +329,15 @@ describe("agent dock handlers", () => {
     expect(() => call("performAction", DOCK_ID, { ...SEND, taskId: "" })).toThrow("action is invalid");
     expect(() =>
       call("performAction", DOCK_ID, { type: "open-thread", serverId: "local", agentId: "agent-1", threadId: "" }),
+    ).toThrow("action is invalid");
+    expect(() =>
+      call("performAction", DOCK_ID, {
+        type: "open-thread",
+        serverId: "local",
+        agentId: "agent-1",
+        threadId: "task-2",
+        started: "yes",
+      }),
     ).toThrow("action is invalid");
     expect(() =>
       call("performAction", DOCK_ID, {

@@ -267,7 +267,7 @@ export type AgentDockAction =
       text: string;
       clientMessageId: string;
     }
-  | { type: "open-thread"; serverId: string; agentId: string; threadId: string }
+  | { type: "open-thread"; serverId: string; agentId: string; threadId: string; started?: boolean }
   | { type: "new-thread"; serverId: string; agentId: string }
   | { type: "start-thread"; serverId: string; agentId: string; text: string; clientMessageId: string }
   | { type: "open-agent"; serverId: string; agentId: string }
@@ -364,7 +364,11 @@ export function isAgentDockAction(value: unknown): value is AgentDockAction {
     case "new-thread":
       return isIdentifier(value.agentId);
     case "open-thread":
-      return isIdentifier(value.agentId) && isIdentifier(value.threadId);
+      return (
+        isIdentifier(value.agentId) &&
+        isIdentifier(value.threadId) &&
+        (value.started === undefined || isBoolean(value.started))
+      );
     case "start-thread":
       return (
         isIdentifier(value.agentId) &&

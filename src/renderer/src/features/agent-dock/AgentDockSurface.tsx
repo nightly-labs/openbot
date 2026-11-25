@@ -524,34 +524,32 @@ export function AgentDockSurface() {
             onSend={async (seat, text) => {
               const seatKey = agentDockSeatKey(seat);
               const shown = presentation()?.chats.find((chat) => agentDockSeatKey(chat.seat) === seatKey);
-              const taskId = shown?.thread?.taskId;
-              if (seat.kind === "agent" && shown?.threads?.activeId === DRAFT_THREAD_ID) {
-                const clientMessageId = crypto.randomUUID();
-                try {
-                  await perform({ type: "start-thread", serverId: server, agentId: seat.id, text, clientMessageId });
-                  return { messageId: clientMessageId };
-                } catch (error) {
-                  return { error: errorMessage(error, t("conversation.threads.error.start")) };
-                }
-              }
+              const draft = seat.kind === "agent" && shown?.threads?.activeId === DRAFT_THREAD_ID;
+              const taskId = draft ? DRAFT_THREAD_ID : shown?.thread?.taskId;
               const clientMessageId =
                 failed && failed.seatKey === seatKey && failed.taskId === taskId && failed.text === text
                   ? failed.clientMessageId
                   : crypto.randomUUID();
               try {
-                await perform({
-                  type: "send",
-                  serverId: server,
-                  seat: contractSeat(seat),
-                  ...(taskId ? { taskId } : {}),
-                  text,
-                  clientMessageId,
-                });
+                await perform(
+                  draft
+                    ? { type: "start-thread", serverId: server, agentId: seat.id, text, clientMessageId }
+                    : {
+                        type: "send",
+                        serverId: server,
+                        seat: contractSeat(seat),
+                        ...(taskId ? { taskId } : {}),
+                        text,
+                        clientMessageId,
+                      },
+                );
                 failed = null;
                 return { messageId: clientMessageId };
               } catch (error) {
                 failed = { seatKey, taskId, text, clientMessageId };
-                return { error: errorMessage(error, t("chat.errorStatus.send")) };
+                return {
+                  error: errorMessage(error, t(draft ? "conversation.threads.error.start" : "chat.errorStatus.send")),
+                };
               }
             }}
             onOpenInMain={(seat) =>

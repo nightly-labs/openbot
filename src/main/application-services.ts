@@ -418,7 +418,7 @@ import { PushNotificationStore } from "./push-notification-store";
 import { DESKTOP_USE_MS } from "./push-notifications";
 import { ReferralDesktopService } from "./referral-service";
 import { RelayedMessagingInstalls } from "./relayed-messaging-installs";
-import { decodeQueuedMessageReceipt } from "./remote-agent-decoding";
+import { decodeQueuedMessageReceipt, decodeRemoteAgentTask } from "./remote-agent-decoding";
 import { RemoteConnectTrace } from "./remote-connect-trace";
 import { createRemoteControlPolicyStore } from "./remote-control-policy-store";
 import { createRemoteControlQuestion } from "./remote-control-question";
@@ -1153,6 +1153,29 @@ export async function createApplicationServices({
           return Effect.fail(new AgentDockFailed({ cause: new Error(sourceText("error.app.notReady")) }));
         }
         const { agents, host, remoteServers } = criticalActionTargets;
+        if (action.type === "start-thread") {
+          const input = { agentId: action.agentId, text: action.text, clientMessageId: action.clientMessageId };
+          const started =
+            action.serverId === LOCAL_SERVER_ID
+              ? agents.startTask(input, host.conversationSender()).pipe(toAgentDockFailed)
+              : remoteServers
+                  .request(action.serverId, AGENT_TASKS_ROUTES.start, decodeRemoteAgentTask, {
+                    method: "POST",
+                    body: input,
+                  })
+                  .pipe(toAgentDockFailed);
+          return started.pipe(
+            Effect.flatMap((task) =>
+              agentDock.performAction(0, {
+                type: "open-thread",
+                serverId: action.serverId,
+                agentId: action.agentId,
+                threadId: task.id,
+                started: true,
+              }),
+            ),
+          );
+        }
         if (action.seat.kind === "channel") {
           const command: ChannelCommand = {
             type: "send",
