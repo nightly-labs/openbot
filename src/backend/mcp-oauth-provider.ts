@@ -156,6 +156,8 @@ const TOKEN_REFRESH_MARGIN_MS = 60_000;
 
 const MCP_REVOCATION_TIMEOUT_MS = 5_000;
 
+const MAX_NEEDED_SCOPE_LENGTH = 1_024;
+
 export type McpSignInOffer = "none" | "offered" | "refused";
 
 export interface McpSignIn {
@@ -268,7 +270,8 @@ export class McpOAuth implements McpOAuthAuthority {
     const key = mcpOAuthAccountKey(url);
     const stored = key === null ? null : yield* mcpSync(() => this.#options.storage.read(key));
     if (key === null || stored?.tokens?.access_token !== rejected) return;
-    const neededScope = scopeUnion(stored.neededScope, scope);
+    const union = scopeUnion(stored.neededScope, scope);
+    const neededScope = union.length <= MAX_NEEDED_SCOPE_LENGTH ? union : (stored.neededScope ?? "");
     if (neededScope !== stored.neededScope) yield* this.#options.storage.write(key, { ...stored, neededScope });
   }).bind(this);
 

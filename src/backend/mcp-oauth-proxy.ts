@@ -236,12 +236,12 @@ export class McpOAuthProxy {
     if (!target) return refuseRequests(response, method, read, sourceText("error.backend.mcpOAuthSignInNeeded"));
     const client = this.#options.client;
     const body = read && client ? yield* mcpSync(() => withClientInfo(read, request, client, agentKey)) : read;
-    const upstream = yield* this.#forward(target, request, method, body, controller);
+    const { answer: upstream, token } = yield* this.#forward(target, request, method, body, controller);
     if (upstream instanceof Response && upstream.status === 403) {
-      const scope = insufficientScope(upstream);
+      const scope = insufficientScopeChallenge(upstream.headers.get("www-authenticate") ?? "");
       if (scope !== undefined) {
         yield* discard(upstream);
-        yield* this.#options.scopeRefused(target.url, target.token, scope);
+        yield* this.#options.scopeRefused(target.url, token, scope);
         logger.warn("The MCP server asked for more access than the sign-in of this computer gives.");
         return refuseRequests(response, method, body, sourceText("error.backend.mcpOAuthScopeNeeded"));
       }
@@ -291,16 +291,16 @@ export class McpOAuthProxy {
     method: string,
     body: Buffer | null,
     controller: AbortController,
-  ): Effect.fn.Return<Response | UpstreamRefusal, McpOperationError> {
+  ): Effect.fn.Return<{ answer: Response | UpstreamRefusal; token: string }, McpOperationError> {
     const first = yield* send(target, target.token, request, method, body, controller);
-    if (first.status !== 401) return first;
+    if (first.status !== 401) return { answer: first, token: target.token };
     yield* discard(first);
     const renewed = yield* this.#options.refresh(target.url, target.token);
-    if (!renewed) return { challengeError: challengeError(first), renewed: false };
+    if (!renewed) return { answer: { challengeError: challengeError(first), renewed: false }, token: target.token };
     const second = yield* send(target, renewed, request, method, body, controller);
-    if (second.status !== 401) return second;
+    if (second.status !== 401) return { answer: second, token: renewed };
     yield* discard(second);
-    return { challengeError: challengeError(second), renewed: true };
+    return { answer: { challengeError: challengeError(second), renewed: true }, token: renewed };
   });
 }
 
@@ -514,10 +514,10 @@ function challengeError(answer: Response): string | null {
   return /\berror="?([\w.-]{1,64})/u.exec(answer.headers.get("www-authenticate") ?? "")?.[1] ?? null;
 }
 
-function insufficientScope(answer: Response): string | null | undefined {
-  const challenge = answer.headers.get("www-authenticate") ?? "";
-  if (!/(?:^|,)\s*bearer\b/iu.test(challenge) || challengeError(answer) !== "insufficient_scope") return undefined;
-  const scope = /\bscope=(?:"([^"]*)"|([^\s,]+))/u.exec(challenge);
+export function insufficientScopeChallenge(challenge: string): string | null | undefined {
+  if (!/(?:^|,)\s*bearer\b/iu.test(challenge) || !/\berror\s*=\s*"?insufficient_scope\b/iu.test(challenge))
+    return undefined;
+  const scope = /(?:^|[\s,])scope\s*=\s*(?:"([^"]{0,512})"|([^\s,"]{1,512})(?=[\s,]|$))/iu.exec(challenge);
   return (scope?.[1] ?? scope?.[2])?.trim() || null;
 }
 

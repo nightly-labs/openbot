@@ -398,7 +398,8 @@ export class McpGateway {
   ) {
     const github = config.id === GITHUB_CONNECTOR_MCP_SERVER_ID ? yield* this.#githubAuthorization() : null;
     const stored = this.#oauth;
-    return yield* callMcpServerTool(
+    const sent: { token: string | null } = { token: null };
+    const outcome = yield* callMcpServerTool(
       config,
       name,
       args,
@@ -406,9 +407,22 @@ export class McpGateway {
       config.id === GITHUB_CONNECTOR_MCP_SERVER_ID
         ? { accessToken: () => Effect.succeed(github) }
         : stored
-          ? { accessToken: (url) => stored.accessToken(url) }
+          ? {
+              accessToken: (url) =>
+                stored.accessToken(url).pipe(
+                  Effect.tap((token) =>
+                    Effect.sync(() => {
+                      sent.token = token;
+                    }),
+                  ),
+                ),
+            }
           : undefined,
     ).pipe(toMcpGatewayFailed);
+    const refusedScope = "refusedScope" in outcome ? outcome.refusedScope : undefined;
+    if (refusedScope === undefined || !stored || sent.token === null) return outcome;
+    yield* stored.recordScopeRefusal(config.url, sent.token, refusedScope).pipe(toMcpGatewayFailed);
+    return { error: sourceText("error.backend.mcpOAuthScopeNeeded") };
   });
 
   readonly signIn = Effect.fnUntraced(function* (

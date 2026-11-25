@@ -438,7 +438,7 @@ export const searchSignIns = Effect.fn("McpServerTools.searchSignIns")(function*
     (config) =>
       Effect.gen(function* () {
         const outcome = yield* servers.inspect(config);
-        if (outcome.needs !== "sign_in") return null;
+        if (outcome.needs !== "sign_in" && !(outcome.error === null && awaitsSignIn(servers, config))) return null;
         yield* requestSignIn(config);
         return {
           status: "needs_sign_in",
