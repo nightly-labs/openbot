@@ -474,6 +474,7 @@ export class DrainScheduler {
 
   channelTurnFull(agentId: string, channelId: string): boolean {
     const channelLanes = this.#lanesOf(agentId).filter((lane) => laneChannelId(lane.taskId) !== null);
+    for (const lane of channelLanes) if (!this.#mailbox.laneActive(agentId, lane.taskId)) this.#settleStaleTurn(lane);
     return (
       channelLanes.some((lane) => laneChannelId(lane.taskId) === channelId) ||
       channelLanes.length >= this.channelTurnLimit(agentId)
