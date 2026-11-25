@@ -534,8 +534,8 @@ export class CustomEndpoints {
       for (const agent of this.#store.list()) {
         if (providerForAgent(agent) !== provider) continue;
         const model = unlisted.get(agent.id);
-        if (model !== undefined && this.#unlistedAtLastStart.get(agent.id) === model) twice.add(agent.id);
-        if (model === undefined || twice.has(agent.id)) this.#unlistedAtLastStart.delete(agent.id);
+        if (model === undefined) this.#unlistedAtLastStart.delete(agent.id);
+        else if (this.#unlistedAtLastStart.get(agent.id) === model) twice.add(agent.id);
         else this.#unlistedAtLastStart.set(agent.id, model);
       }
       return twice.size ? this.moveAgentsOffUnlistedModels(provider, twice) : Effect.void;
