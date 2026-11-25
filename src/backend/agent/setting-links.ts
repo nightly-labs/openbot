@@ -1,3 +1,4 @@
+import { AGENT_PROVIDERS } from "@openbot/contracts/agent-providers";
 import {
   AGENT_PERMISSION_LEVELS,
   type AgentPermissionLevel,
@@ -428,18 +429,19 @@ const PHONE_SERVERS = "On the phone app: in Servers, touch and hold the server";
 export type ServerPlace = Omit<SettingLinkEntry, "words">;
 
 interface ServerPlaceEntry extends SettingLinkEntry {
-  matchesWithoutServerWord?: true;
+  answersProviderAccountQuestion?: true;
 }
 
+const PROVIDER_WORDS: readonly string[] = [
+  ...AGENT_PROVIDERS.filter((provider) => provider !== "acp"),
+  "anthropic",
+  "openai",
+  "chatgpt",
+  "gemini",
+];
+const ACCOUNT_WORDS = ["account", "subscription"];
+
 const SERVER_PLACES: readonly ServerPlaceEntry[] = [
-  {
-    title: "Provider accounts",
-    place: `On a computer: ${SERVER_SETTINGS} > Providers > the provider, such as Claude or ChatGPT > Accounts > Add account. On the phone app: Server settings > Providers > the provider > Add account; for some providers, the phone says to add the account on a computer.`,
-    about:
-      "Only the owner or an admin of the server. Signs in one more account of a provider, for example a second Claude or ChatGPT subscription, or adds an API key. Each agent uses one account: choose it in the agent's settings. Pool accounts lets the agents of a provider share its accounts.",
-    words: "account accounts subscription claude anthropic codex chatgpt openai gemini grok pool",
-    matchesWithoutServerWord: true,
-  },
   {
     title: "Add a server",
     place:
@@ -468,6 +470,14 @@ const SERVER_PLACES: readonly ServerPlaceEntry[] = [
     about:
       "Owners and admins move the agents, with their skills, routines, memories and files, to another computer: export a .zip file from the old server, then import it into the new server.",
     words: "move migrate migration copy new",
+  },
+  {
+    title: "Provider accounts",
+    place: `On a computer: ${SERVER_SETTINGS} > Providers > the provider, such as Claude or ChatGPT > Accounts > Add account. On the phone app: Server settings > Providers > the provider > Add account; for some providers, the phone says to add the account on a computer.`,
+    about:
+      "Only the owner or an admin of the server. Signs in one more account of a provider, for example a second Claude or ChatGPT subscription, or adds an API key. Each agent uses one account: choose it in the agent's settings. Pool accounts lets the agents of a provider share its accounts.",
+    words: ["account accounts subscription pool", ...PROVIDER_WORDS].join(" "),
+    answersProviderAccountQuestion: true,
   },
 ];
 
@@ -503,7 +513,11 @@ const SERVER_TERMS = ["server", "computer", "machine", "device", "laptop", "macb
 export function searchServerPlaces(query: string, limit = 2): ServerPlace[] {
   const queryTerms = terms(query);
   const namesServer = queryTerms.some((term) => hits(term, SERVER_TERMS));
-  const places = namesServer ? SERVER_PLACES : SERVER_PLACES.filter((entry) => entry.matchesWithoutServerWord);
+  const asksAboutProviderAccount =
+    queryTerms.some((term) => hits(term, ACCOUNT_WORDS)) && queryTerms.some((term) => hits(term, PROVIDER_WORDS));
+  const places = SERVER_PLACES.filter(
+    (entry) => namesServer || (asksAboutProviderAccount && entry.answersProviderAccountQuestion),
+  );
   const scored = queryTerms.filter((term) => !hits(term, SERVER_TERMS));
   return rank(places, (entry) => entry, scored, limit, false).map(({ title, place, about }) => ({
     title,

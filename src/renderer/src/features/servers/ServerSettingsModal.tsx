@@ -1,4 +1,3 @@
-import { AGENT_PROVIDERS, agentProviderName } from "@openbot/contracts/agent-providers";
 import type {
   AvatarImageInput,
   HostedSitesDesktopApi,
@@ -104,7 +103,7 @@ import { type ServerTransferOptions, ServerTransferPanel } from "./ServerTransfe
 import type { ServerTurnLimitsOptions } from "./ServerTurnLimitsSetting";
 import { type ServerUpdateOptions, ServerUpdatePanel } from "./ServerUpdatePanel";
 import type { ServerVoiceModelOptions } from "./ServerVoiceModelSetting";
-import { serverCanAdminister, serverRoleCanAdminister } from "./server-capabilities";
+import { PROVIDER_SEARCH_NAMES, serverCanAdminister, serverRoleCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
 export interface ServerSettingsModalProps {
@@ -451,7 +450,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     const needle = props.sectionQuery?.trim().toLocaleLowerCase();
     if (!needle) return true;
     const { title, description } = sections[value];
-    const names = value === "providers" ? AGENT_PROVIDERS.map(agentProviderName) : [];
+    const names = value === "providers" ? PROVIDER_SEARCH_NAMES : [];
     return [...[title, description, ...(SECTION_ROWS[value] ?? [])].map((key) => t(key)), ...names].some((words) =>
       words.toLocaleLowerCase().includes(needle),
     );

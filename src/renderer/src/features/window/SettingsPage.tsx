@@ -1,4 +1,3 @@
-import { AGENT_PROVIDERS, agentProviderName } from "@openbot/contracts/agent-providers";
 import type { AppTextKey } from "@openbot/i18n";
 import { Button, Server, Store } from "@openbot/ui";
 import { CONNECTOR_LISTINGS } from "@openbot/ui/features/connectors/connector-catalog";
@@ -13,6 +12,7 @@ import { canManageStorage, serverHasBackgroundProcesses } from "../files/storage
 import type { ServerSettingsSection } from "../servers/ServerSettingsModal";
 import {
   activeServerHasProviderSettings,
+  PROVIDER_SEARCH_NAMES,
   serverHasAgentDefaults,
   serverSupportsCapability,
 } from "../servers/server-capabilities";
@@ -60,7 +60,7 @@ const PROVIDERS_ROW: ServerRow = {
   titleKey: "server.settings.providersTitle",
   descriptionKey: "server.settings.providersDescription",
   searchKeys: ["provider.settings.accounts", "provider.account.add"],
-  searchNames: AGENT_PROVIDERS.map(agentProviderName),
+  searchNames: PROVIDER_SEARCH_NAMES,
 };
 
 const IMPORT_ROW: ServerRow = {
