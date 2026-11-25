@@ -2,7 +2,8 @@
 
 - Connect a NEAR Intents wallet in Server settings › Vault › Crypto, so agents can pay sites in crypto.
   You sign with a passkey, keep the backup and add funds. A bar shows the three setup steps. The Sign
-  step lists the three browser signatures and marks each one when it is done. When the browser stops
+  step lists the two browser signatures and marks each one when it is done. One signature makes the
+  wallet and lets your agents pay, so setup asks for your passkey only twice. When the browser stops
   a signature, the step shows which one, and "Try again" starts it again. The daily budget starts at $25, and all
   agents, also new agents, can pay. You can change the budget and the agents on the wallet page.
   Each payment waits for your approval in the chat. Select "Always allow" to let agents pay a site up

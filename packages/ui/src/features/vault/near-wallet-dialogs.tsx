@@ -127,7 +127,7 @@ export function NearSetupDialog(props: NearDialogProps) {
     () => props.status.signing?.action ?? null,
     (current) => {
       if (current === null) return;
-      const reached = SETUP_ACTIONS.indexOf(current);
+      const reached = Math.min(SETUP_ACTIONS.indexOf(current), SETUP_SIGNATURE_COUNT - 1);
       if (reached > signed()) setSigned(reached);
     },
   );

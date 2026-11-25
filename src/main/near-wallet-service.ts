@@ -562,11 +562,15 @@ export class NearWalletService implements NearWallet {
     }
     const gatewayOwner = this.#gatewayOwner(this.#store.read());
     if (!gatewayOwner) return yield* nearFailure(sourceText("error.connector.nearSignIn"));
+    const credential = createGrantCredential();
+    registerSecretValue(credential.token);
+    const expiresAt = new Date(this.#now() + GRANT_DAYS * DAY_MS).toISOString();
     const intent = yield* this.#generate({
       type: "agent_create",
       name: AGENT_NAME,
       owner,
       policy: createPolicy(dailyBudgetUsd),
+      grant: { label: AGENT_NAME, credential: credential.commitment, expires_at: expiresAt },
     });
     yield* this.#store.update((record) => ({
       ...record,
@@ -577,7 +581,13 @@ export class NearWalletService implements NearWallet {
         dailyBudgetUsd,
         ownerApproval: true,
         frozen: false,
-        grant: null,
+        grant: {
+          token: credential.token,
+          expiresAt,
+          grantId: null,
+          correlationId: intent.correlation_id,
+          active: false,
+        },
         gatewayOwner,
       },
     }));
@@ -592,6 +602,7 @@ export class NearWalletService implements NearWallet {
       return yield* signed.failure;
     }
     yield* this.#submit(intent, signed.success);
+    yield* this.#activateGrant(intent.correlation_id, credential.token, expiresAt);
     const agent = yield* nearCall((signal) => api.getAgent(intent.agent_id, { signal }));
     const accountId = agent.wallet?.near_account_id ?? null;
     if (!accountId) return yield* nearFailure(sourceText("error.connector.nearPolicyPending"));
@@ -607,7 +618,8 @@ export class NearWalletService implements NearWallet {
     if (!renew && current?.active) return;
     if (!renew && current && !current.active && current.correlationId) {
       const status = yield* this.#waitIntent(current.correlationId).pipe(Effect.orElseSucceed(() => "FAILED"));
-      if (status === "SUCCESS") return yield* this.#activateGrant(current.correlationId, current.token);
+      if (status === "SUCCESS") yield* this.#activateGrant(current.correlationId, current.token);
+      if (this.#store.read().wallet?.grant?.active) return;
     }
     const credential = createGrantCredential();
     registerSecretValue(credential.token);
@@ -647,7 +659,14 @@ export class NearWalletService implements NearWallet {
   ) {
     const api = yield* this.#partnerClient();
     const status = yield* nearCall((signal) => api.getStatus(correlationId, { signal }));
-    const grant = status.type === "grant_issue" ? status.details.grant : null;
+    const created = status.type === "agent_create" ? status.details : null;
+    if (created && created.grant_install !== "installed") {
+      yield* this.#store.update((record) =>
+        record.wallet ? { ...record, wallet: { ...record.wallet, grant: null } } : record,
+      );
+      return;
+    }
+    const issued = status.type === "grant_issue" ? status.details.grant : null;
     yield* this.#store.update((record) =>
       record.wallet
         ? {
@@ -657,11 +676,11 @@ export class NearWalletService implements NearWallet {
               grant: {
                 token,
                 expiresAt:
-                  grant?.expires_at ??
+                  issued?.expires_at ??
                   expiresAt ??
                   record.wallet.grant?.expiresAt ??
                   new Date(this.#now()).toISOString(),
-                grantId: grant?.grant_id ?? null,
+                grantId: issued?.grant_id ?? created?.grant?.grant_id ?? null,
                 correlationId: null,
                 active: true,
               },

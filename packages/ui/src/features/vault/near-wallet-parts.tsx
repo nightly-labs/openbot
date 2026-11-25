@@ -10,7 +10,6 @@ import {
   AlertContent,
   AlertDescription,
   AlertTitle,
-  Bot,
   Button,
   Check,
   Checkbox,
@@ -166,7 +165,6 @@ export function NearWalletDialog(props: {
 const SETUP_SIGNATURES = [
   { title: "vault.near.signature.register", detail: "vault.near.signature.registerDetail", icon: KeyRound },
   { title: "vault.near.signature.create", detail: "vault.near.signature.createDetail", icon: ShieldCheck },
-  { title: "vault.near.signature.grant", detail: "vault.near.signature.grantDetail", icon: Bot },
 ] as const;
 
 export const SETUP_SIGNATURE_COUNT = SETUP_SIGNATURES.length;

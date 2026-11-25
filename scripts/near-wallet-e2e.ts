@@ -226,64 +226,71 @@ async function main(): Promise<void> {
       assert.equal(status.state, "no-wallet");
     });
 
-    await scenario("create registers the passkey owner, makes the account and issues the grant", async (details) => {
-      const mark = api.requests.length;
-      const input = decoded(parseNearWalletCreateInput({ dailyBudgetUsd: "50" }), "setup");
-      await Effect.runPromise(wallet.service.create(input));
-      const status = await wallet.waitFor(
-        "create ends",
-        (current) =>
-          (current.state === "ready" && current.balances.length > 0 && current.signing === null) ||
-          current.error !== null,
-      );
-      await page.settle();
-      const record = wallet.store.read();
-      const actions = page.visits.map((visit) => visit.fragment.action);
-      details.set("status", {
-        state: status.state,
-        account: status.account,
-        balances: status.balances,
-        error: status.error,
-      });
-      details.set("signedActions", actions);
-      details.set("requests", sent(api, mark));
-      assert.equal(status.error, null);
-      assert.equal(status.state, "ready");
-      assert.equal(wallet.service.ready(), true);
-      assert.deepEqual(actions, ["register", "create", "grant"]);
-      assert.equal(record.owner?.credential_id, page.credentialId);
-      assert.equal(record.owner?.public_key, page.publicKey);
-      const agentId = record.wallet?.agentId ?? "";
-      const fakeAgent = api.agents.get(agentId);
-      assert.ok(fakeAgent, "the fake API has the agent account");
-      assert.equal(policyOf(fakeAgent).owner_approval, true);
-      assert.equal(policyOf(fakeAgent).budget.daily_usd, "50");
-      assert.equal(status.account?.accountId, agentId);
-      assert.equal(status.account?.dailyBudgetUsd, "50");
-      assert.equal(status.account?.ownerApproval, true);
-      assert.equal(status.allAgents, true);
-      assert.deepEqual(status.agentIds, []);
-      assert.equal(status.balances[0]?.amount, "1000");
-      const grant = record.wallet?.grant;
-      assert.equal(grant?.active, true);
-      assert.equal(grant?.grantId, fakeAgent.grants[0]?.grantId);
-      assert.match(grant?.token ?? "", /^ngt_[A-Za-z0-9_-]{43}$/u);
-      assert.equal(fakeAgent.grants[0]?.commitment, sha256Hex(grant?.token ?? ""), "the API got the token commitment");
-      const requests = api.requests.slice(mark);
-      assert.ok(
-        requests.every((request) => request.grantToken === null),
-        "no setup request carries the grant token",
-      );
-      const generated = requests.filter((request) => request.path === "/v1/generate-intent");
-      assert.deepEqual(
-        generated.map((request) => intentType(request.body)),
-        ["agent_create", "grant_issue"],
-      );
-      assert.ok(
-        generated.every((request) => request.idempotencyKey !== null),
-        "each generate-intent has an idempotency key",
-      );
-    });
+    await scenario(
+      "create registers the passkey owner, then one signature makes the account and its grant",
+      async (details) => {
+        const mark = api.requests.length;
+        const input = decoded(parseNearWalletCreateInput({ dailyBudgetUsd: "50" }), "setup");
+        await Effect.runPromise(wallet.service.create(input));
+        const status = await wallet.waitFor(
+          "create ends",
+          (current) =>
+            (current.state === "ready" && current.balances.length > 0 && current.signing === null) ||
+            current.error !== null,
+        );
+        await page.settle();
+        const record = wallet.store.read();
+        const actions = page.visits.map((visit) => visit.fragment.action);
+        details.set("status", {
+          state: status.state,
+          account: status.account,
+          balances: status.balances,
+          error: status.error,
+        });
+        details.set("signedActions", actions);
+        details.set("requests", sent(api, mark));
+        assert.equal(status.error, null);
+        assert.equal(status.state, "ready");
+        assert.equal(wallet.service.ready(), true);
+        assert.deepEqual(actions, ["register", "create"]);
+        assert.equal(record.owner?.credential_id, page.credentialId);
+        assert.equal(record.owner?.public_key, page.publicKey);
+        const agentId = record.wallet?.agentId ?? "";
+        const fakeAgent = api.agents.get(agentId);
+        assert.ok(fakeAgent, "the fake API has the agent account");
+        assert.equal(policyOf(fakeAgent).owner_approval, true);
+        assert.equal(policyOf(fakeAgent).budget.daily_usd, "50");
+        assert.equal(status.account?.accountId, agentId);
+        assert.equal(status.account?.dailyBudgetUsd, "50");
+        assert.equal(status.account?.ownerApproval, true);
+        assert.equal(status.allAgents, true);
+        assert.deepEqual(status.agentIds, []);
+        assert.equal(status.balances[0]?.amount, "1000");
+        const grant = record.wallet?.grant;
+        assert.equal(grant?.active, true);
+        assert.equal(grant?.grantId, fakeAgent.grants[0]?.grantId);
+        assert.match(grant?.token ?? "", /^ngt_[A-Za-z0-9_-]{43}$/u);
+        assert.equal(
+          fakeAgent.grants[0]?.commitment,
+          sha256Hex(grant?.token ?? ""),
+          "the API got the token commitment",
+        );
+        const requests = api.requests.slice(mark);
+        assert.ok(
+          requests.every((request) => request.grantToken === null),
+          "no setup request carries the grant token",
+        );
+        const generated = requests.filter((request) => request.path === "/v1/generate-intent");
+        assert.deepEqual(
+          generated.map((request) => intentType(request.body)),
+          ["agent_create"],
+        );
+        assert.ok(
+          generated.every((request) => request.idempotencyKey !== null),
+          "each generate-intent has an idempotency key",
+        );
+      },
+    );
 
     await scenario("the loopback listener answers the signing page", async (details) => {
       const returns = page.visits.flatMap((visit) => visit.returns);
@@ -627,6 +634,34 @@ async function main(): Promise<void> {
       await assert.rejects(stat(storePath), "the store file is removed");
       const refused = await wallet.prepare(payment("pay-after-disconnect"));
       assert.deepEqual(refused, { error: sourceText("error.connector.nearNoWallet") });
+    });
+
+    await scenario("a refused create grant falls back to a grant signature", async (details) => {
+      api.refuseCreateGrant = true;
+      const mark = api.requests.length;
+      const visits = page.visits.length;
+      const input = decoded(parseNearWalletCreateInput({ dailyBudgetUsd: "50" }), "setup");
+      await Effect.runPromise(wallet.service.create(input));
+      const status = await wallet.waitFor(
+        "create with a refused grant ends",
+        (current) => (current.state === "ready" && current.signing === null) || current.error !== null,
+      );
+      await page.settle();
+      const actions = page.visits.slice(visits).map((visit) => visit.fragment.action);
+      const generated = api.requests.slice(mark).filter((request) => request.path === "/v1/generate-intent");
+      details.set("signedActions", actions);
+      details.set("status", { state: status.state, error: status.error });
+      assert.equal(status.error, null);
+      assert.deepEqual(actions, ["register", "create", "grant"]);
+      assert.deepEqual(
+        generated.map((request) => intentType(request.body)),
+        ["agent_create", "grant_issue"],
+      );
+      const grant = wallet.store.read().wallet?.grant;
+      const fakeAgent = api.agents.get(wallet.store.read().wallet?.agentId ?? "");
+      assert.equal(grant?.active, true);
+      assert.equal(grant?.grantId, fakeAgent?.grants[0]?.grantId);
+      api.refuseCreateGrant = false;
     });
   } finally {
     await Effect.runPromise(wallet.service.dispose()).catch(() => undefined);

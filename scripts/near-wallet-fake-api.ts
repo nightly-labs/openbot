@@ -190,6 +190,7 @@ export interface FakeIntent {
   request: JsonObject;
   payload: WebAuthnPayload;
   status: "PENDING_SIGNATURE" | "SUCCESS";
+  createGrantId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -237,6 +238,7 @@ export class FakeAgentApi {
   readonly executionsByKey = new Map<string, string>();
   balanceRaw = 1_000n * 10n ** BigInt(USDC_DECIMALS);
   dropNextExecution = false;
+  refuseCreateGrant = false;
   #server: Server | null = null;
   port = 0;
   latencyMs: (method: string, path: string) => number = () => 0;
@@ -455,14 +457,15 @@ export class FakeAgentApi {
     if (intent.type === "agent_create") {
       agent.status = "ACTIVE";
       agent.revision = 1;
+      const grant = grantIssueSchema.optional().parse(intent.request.grant);
+      if (grant && this.refuseCreateGrant) intent.createGrantId = null;
+      if (grant && !this.refuseCreateGrant) {
+        const installed = this.#grantFrom(grant);
+        agent.grants.push(installed);
+        intent.createGrantId = installed.grantId;
+      }
     } else if (intent.type === "grant_issue") {
-      const request = grantIssueSchema.parse(intent.request);
-      agent.grants.push({
-        grantId: randomUUID(),
-        commitment: request.credential,
-        expiresAt: request.expires_at,
-        label: request.label,
-      });
+      agent.grants.push(this.#grantFrom(grantIssueSchema.parse(intent.request)));
     } else if (intent.type === "policy_update") {
       const request = policyUpdateSchema.parse(intent.request);
       if (request.expected_revision !== agent.revision) return "revision_conflict";
@@ -561,6 +564,28 @@ export class FakeAgentApi {
     if (agent) agent.spentCents += execution.usdCents;
   }
 
+  #grantFrom(request: z.infer<typeof grantIssueSchema>): FakeAgent["grants"][number] {
+    return {
+      grantId: randomUUID(),
+      commitment: request.credential,
+      expiresAt: request.expires_at,
+      label: request.label,
+    };
+  }
+
+  #createDetails(intent: FakeIntent, agent: FakeAgent | undefined): JsonObject {
+    const grant = agent?.grants.find((item) => item.grantId === intent.createGrantId);
+    const refused = intent.createGrantId === null ? "refused:grant_credential_reused" : null;
+    return {
+      revision: agent?.revision ?? null,
+      policy_hash: null,
+      transaction_hash: null,
+      agent_id: intent.agentId,
+      grant: grant ? { grant_id: grant.grantId, label: grant.label, credential_type: "token" } : null,
+      grant_install: grant ? "installed" : refused,
+    };
+  }
+
   #statusOf(correlationId: string): JsonObject | null {
     const intent = this.intents.get(correlationId);
     if (intent) {
@@ -594,7 +619,9 @@ export class FakeAgentApi {
                     }
                   : null,
               }
-            : { revision, policy_hash: null, transaction_hash: null },
+            : intent.type === "agent_create"
+              ? this.#createDetails(intent, agent)
+              : { revision, policy_hash: null, transaction_hash: null },
       };
     }
     const execution = this.executions.get(correlationId);

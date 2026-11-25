@@ -7657,23 +7657,6 @@
     "tr",
     "zh"
   ],
-  "vault.near.signature.grant": ["ar", "de", "es", "fr", "he", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
-  "vault.near.signature.grantDetail": [
-    "ar",
-    "de",
-    "es",
-    "fr",
-    "he",
-    "it",
-    "ja",
-    "ko",
-    "nl",
-    "pl",
-    "pt",
-    "ru",
-    "tr",
-    "zh"
-  ],
   "vault.near.signature.label": ["ar", "de", "es", "fr", "he", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "vault.near.signature.register": ["ar", "de", "es", "fr", "he", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "vault.near.signature.registerDetail": [
