@@ -3,7 +3,9 @@ import type { AppTextKey } from "@openbot/i18n";
 import type { AgentSettingLinkId } from "@openbot/ui/features/conversation/agent-setting-links";
 import { type SettingsTab, settingsTabShown } from "./settings-tabs";
 
-export type AppSettingLinkId = Exclude<SettingLinkId, AgentSettingLinkId>;
+type CreditsSettingLinkId = "credits.explainer";
+
+export type AppSettingLinkId = Exclude<SettingLinkId, AgentSettingLinkId | CreditsSettingLinkId>;
 
 export interface AppSettingLinkTarget {
   tab: SettingsTab;
@@ -44,6 +46,7 @@ const TARGETS: Record<Exclude<AppSettingLinkId, "island.show">, AppSettingLinkTa
   "app.keep-awake-on-battery": { tab: "app-behavior", row: "settings.keepAwakeOnBattery.title" },
   "dock.show": { tab: "agent-dock", row: "settings.agentDock.show.title" },
   "dock.agents": { tab: "agent-dock", row: "settings.agentDock.agents.title" },
+  "computer-use.permissions": { tab: "computer-use", row: "computerUse.permissions.title" },
   "updates.track": { tab: "updates", row: "settings.updates.track.title" },
   "updates.auto-install": { tab: "updates", row: "settings.updates.autoInstall.title" },
 };

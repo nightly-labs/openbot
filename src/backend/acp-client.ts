@@ -54,6 +54,7 @@ import {
   BACKGROUND_WAKE_NOTE,
   isTurnContextBlock,
   SELF_WAKE_NOTE,
+  SESSION_RELOAD_NOTE,
   withoutTurnContext,
 } from "./agent/developer-instructions";
 import type { GeneratedMediaKind } from "./agent/image-generation";
@@ -164,6 +165,8 @@ const ACP_MODEL_RETRY_GRACE = 1.2;
 
 const ACP_FIRST_UPDATE_MS = 3 * 60_000;
 
+const ACP_STEER_FIRST_UPDATE_WAIT_MS = 10_000;
+
 const MCP_TOOL_CALL_ANSWER_MARGIN_MS = 15_000;
 
 const SILENT_PROMPT = Symbol("silent prompt");
@@ -189,6 +192,8 @@ const ACP_STEER_ANSWER_MS = 3_000;
 
 const STEER_READ_UPDATES: ReadonlySet<string> = new Set(["agent_message_chunk", "agent_thought_chunk", "tool_call"]);
 
+const OWN_REPLY_UPDATES: ReadonlySet<string> = new Set([...STEER_READ_UPDATES, "plan"]);
+
 const ACP_MCP_LIST_MARGIN_MS = 1_000;
 
 const ACP_THROWAWAY_DELETE_MS = 3_000;
@@ -197,13 +202,28 @@ const ACP_BACKGROUND_POLL_MS = 2_000;
 
 const ACP_BACKGROUND_WATCH_MS = 30 * 60_000;
 
+const ACP_OWN_REPLY_WAIT_MS = 30_000;
+
+const ACP_OWN_REPLY_SETTLE_MS = 3_000;
+
+const ACP_OWN_REPLY_QUIET_MS = 2 * 60_000;
+
 const ACP_WORK_HOLD_POLL_MS = 60_000;
 
 const ACP_WORK_HOLD_MAX_MS = 4 * 60 * 60_000;
 
+const idleStoppedSessions = new Set<string>();
+
 const ACP_WORK_HOLD_QUIET_RELEASE_MS = 10 * 60_000;
 
 const ACP_BACKGROUND_TURN_QUIET_MS = 15_000;
+
+interface ShownTail {
+  readonly text: string;
+  readonly thought: string;
+}
+
+const EMPTY_SHOWN_TAIL: ShownTail = { text: "", thought: "" };
 
 const ACP_STOPPED_OUTPUT_MS = 30_000;
 
@@ -264,8 +284,12 @@ interface AcpTurn {
   lastActivityAt: number;
   modelRetries: number;
   answered: boolean;
+  answer: Deferred.Deferred<void>;
   retrying?: "agent" | "model";
   waitingOnUser: number;
+  openbotToolCalls: number;
+  awaitingCommands: boolean;
+  ownReply: "none" | "reported" | "open" | "ended";
   abandoned: boolean;
   reportedCost: number | null;
   unprompted: boolean;
@@ -302,6 +326,8 @@ interface AcpThread {
   currentModelId: string | null;
   mcp: LocalMcpSession;
   mcpListed: boolean;
+  mcpSentAt: number;
+  mcpDropped: boolean;
   relays: Effect.Effect<void>;
   relayed: RelayedMcpServers;
   activeTurn: AcpTurn | null;
@@ -315,6 +341,7 @@ interface AcpThread {
   idleSince: number;
   restore: AcpSessionRestore;
   shownIds: Set<string>;
+  shownTail: ShownTail;
   backgroundUntil: number;
   backgroundUpdatedAt: string | null;
   backgroundSkipUntil: number;
@@ -349,7 +376,7 @@ export interface AcpHistoryPersistence {
 
 const ACP_SESSION_IDLE_RELEASE_MS = 5 * 60_000;
 
-const ACP_SESSION_PROCESS_START_TIMEOUT_MS = 180_000;
+export const ACP_SESSION_PROCESS_START_TIMEOUT_MS = 180_000;
 
 const ACP_INSTRUCTIONS_REFRESH_PROMPTS = 10;
 
@@ -403,6 +430,27 @@ export function withStartModels(params: unknown): DynamicRecord {
   return { ...(isRecord(params) ? params : {}), [START_MODELS_PARAM]: true };
 }
 
+function ownReplyStep(update: SessionUpdate): "reported" | "open" | null {
+  if (update.sessionUpdate === "tool_call_update")
+    return update.status === "completed" || update.status === "failed" ? "reported" : null;
+  return OWN_REPLY_UPDATES.has(update.sessionUpdate) ? "open" : null;
+}
+
+function ownReplyQuiet(turn: AcpTurn): boolean {
+  const quietMs = turn.ownReply === "ended" ? ACP_OWN_REPLY_SETTLE_MS : ACP_OWN_REPLY_QUIET_MS;
+  if (turn.waitingOnUser > 0 || Date.now() - turn.lastActivityAt < quietMs) return false;
+  return [...turn.toolItems.values()].every((item) => item.toolKind === "execute");
+}
+
+function markAnswered(turn: AcpTurn): void {
+  turn.answered = true;
+  endAnswerWait(turn);
+}
+
+function endAnswerWait(turn: AcpTurn): void {
+  Deferred.doneUnsafe(turn.answer, Effect.void);
+}
+
 function asksForStartModels(params: unknown): boolean {
   return isRecord(params) && params[START_MODELS_PARAM] === true;
 }
@@ -427,6 +475,7 @@ export interface AcpProviderOptions {
   savedKey?: (modelId: string | null) => boolean;
   providerKeyStored?: (provider: string) => boolean;
   providerRefusalStatus?: (sessionId: string) => number | null;
+  savedKeyShadowed?: () => boolean;
   redactValues?: () => readonly string[];
   profileGeneration?: boolean;
   mediaGeneration?: boolean;
@@ -434,6 +483,7 @@ export interface AcpProviderOptions {
   env: Record<string, string>;
   extraEnv?: () => Record<string, string>;
   confine?(target: SpawnTarget): SpawnTarget;
+  causeLine?: AcpConnectionOptions["causeLine"];
   privateTemp?: AcpConnectionOptions["privateTemp"];
   signInMessage: string;
   servesModel?: ((modelId: string) => boolean) | undefined;
@@ -594,6 +644,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       modelSetUnsaved: options.flavor.modelSetUnsaved,
       modelConfigId: options.flavor.modelConfigId,
       configSetUnsaved: options.flavor.configSetUnsaved,
+      configConflict: options.flavor.configConflict,
       keepProbeSession: () => options.flavor.closeKeepsSession === true && this.#supportsSessionResume,
       probeCloseDelayMs: options.flavor.probeCloseDelayMs,
       deletesSessions: () => this.#deletesSessions,
@@ -611,6 +662,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       env: this.options.env,
       extraEnv: this.options.extraEnv,
       confine: this.options.confine,
+      causeLine: this.options.causeLine,
       privateTemp: this.options.privateTemp,
       label: () => this.#label,
       redact: (text) => this.#redact(text),
@@ -811,6 +863,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           for (const replay of this.#historyReplays.values()) this.#abortHistoryReplay(replay);
           this.#historyReplays.clear();
           const threads = this.#threads.clear();
+          for (const thread of threads) this.#noteIdleStop(thread);
           for (const thread of threads) thread.mcp.close();
           yield* Effect.forEach(threads, (thread) => thread.relays, { concurrency: "unbounded", discard: true });
           yield* Effect.forEach(
@@ -907,7 +960,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   #compacted(thread: AcpThread): void {
     if (thread.activeTurn) {
-      thread.activeTurn.answered = true;
+      markAnswered(thread.activeTurn);
       thread.activeTurn.showedPlanOrCompaction = true;
     }
     thread.instructionsSent = null;
@@ -954,6 +1007,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return false;
   }
 
+  runsTurn(externalThreadId: string, turnId: string): boolean {
+    return this.#openingTurns.has(externalThreadId) || this.#threads.get(externalThreadId)?.activeTurn?.id === turnId;
+  }
+
   callRelayedMcpTool(
     externalThreadId: string,
     config: McpServerConfig,
@@ -980,13 +1037,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#threads.forget(sessionId);
     this.#turnContext.forget(sessionId);
     const thread = this.#threads.get(sessionId);
-    if (!thread) return;
-    yield* this.#threads.close(thread).pipe(toProviderClientOperationError);
+    if (thread) yield* this.#threads.close(thread).pipe(toProviderClientOperationError);
+    idleStoppedSessions.delete(sessionId);
   });
 
   #forgetMissingSession(sessionId: string): void {
     this.#threads.forget(sessionId);
     this.#turnContext.forget(sessionId);
+    idleStoppedSessions.delete(sessionId);
     const thread = this.#threads.get(sessionId);
     if (!thread) return;
     this.#threads.detach(thread);
@@ -1001,6 +1059,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     thread: AcpThread,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     this.#markSessionClosed(thread.id);
+    this.#noteIdleStop(thread);
     this.#stopThreadSubagents(thread.id);
     thread.mcp.close();
     yield* thread.relays;
@@ -1009,6 +1068,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       this.#transport.connection?.closeSession({ sessionId: thread.id, ...this.#forcedClose }).catch(() => undefined),
     );
   });
+
+  #noteIdleStop(thread: AcpThread): void {
+    if (!this.#flavor.restartNoticeOnReload || thread.activeTurn) return;
+    if (thread.workHold !== null || thread.backgroundUntil !== 0 || this.#heldByBackgroundSubagent(thread)) return;
+    idleStoppedSessions.add(thread.id);
+  }
 
   #markSessionClosed(sessionId: string): void {
     const now = Date.now();
@@ -1277,14 +1342,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         const blocks = yield* promptBlocksEffect(params, this.#promptMedia);
         const thread = this.#threads.get(threadId);
         const turn = thread?.activeTurn;
-        if (
-          !thread ||
-          !turn ||
+        if (!thread || !turn) return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
+        const turnChanged = () =>
+          thread.activeTurn !== turn ||
           turn.id !== getString(params, "expectedTurnId") ||
           turn.stopped ||
           turn.completing ||
-          (!steer && (turn.unprompted || turn.waitingOnUser > 0 || !turn.answered))
-        )
+          (!steer && (turn.unprompted || turn.waitingOnUser > 0));
+        if (turnChanged()) return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
+        if (!steer && !turn.answered)
+          yield* Effect.raceFirst(
+            Deferred.await(turn.answer),
+            Effect.sleep(Math.min(this.options.firstUpdateMs ?? ACP_FIRST_UPDATE_MS, ACP_STEER_FIRST_UPDATE_WAIT_MS)),
+          );
+        if (turnChanged() || (!steer && !turn.answered))
           return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
         if (steer) yield* this.#steerSession(steer, thread, turn, getString(params, "clientUserMessageId"), blocks);
         else yield* turn.steerLock.withPermit(this.#steerByPrompt(thread, turn, blocks));
@@ -1294,14 +1365,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       case "turn/interrupt": {
         const threadId = yield* providerSync(() => requiredString(params, "threadId"));
-        if (this.#threads.isReleased(threadId)) return yield* providerSync(() => decoder({}));
+        const requestedTurnId = getString(params, "turnId");
+        const notRunning = requestedTurnId === null ? {} : { turnActive: false };
+        if (this.#threads.isReleased(threadId)) return yield* providerSync(() => decoder(notRunning));
         const thread = yield* providerSync(() => this.#requireThread(threadId));
         const turn = thread.activeTurn;
-        const requestedTurnId = getString(params, "turnId");
         if (!turn || (requestedTurnId !== null && requestedTurnId !== turn.id))
-          return yield* providerSync(() => decoder({}));
+          return yield* providerSync(() => decoder(notRunning));
         turn.stopped = true;
         turn.stop.abort();
+        endAnswerWait(turn);
         const cancel = providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id }));
         if (turn.unprompted) {
           turn.abandoned = true;
@@ -1405,13 +1478,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       let discovered = yield* Effect.result(this.#discoverModels(timeoutMs));
       if (Result.isFailure(discovered) && this.#signInUnusable(discovered.failure.cause))
         discovered = yield* Effect.result(this.#discoverModels(timeoutMs));
+      const noModelsAfterRetry = this.#flavor.noModelsAfterRetry;
+      if (noModelsAfterRetry && Result.isSuccess(discovered) && discovered.success.length === 0)
+        discovered = yield* Effect.result(this.#discoverModels(timeoutMs));
       this.#models = providerResult(discovered);
       if (this.#models.length === 0 && this.options.noModelsWhenSignedOut) {
         this.#signedIn = false;
         return;
       }
       if (this.#models.length === 0 && !this.options.allowNoModels) {
-        throw new Error(sourceText("error.provider.acpNoModels"));
+        throw new Error(noModelsAfterRetry?.() ?? sourceText("error.provider.acpNoModels"));
       }
       if (yield* this.options.savedSignInCheck?.refusedAtStart() ?? Effect.succeed(false)) {
         this.#models = [];
@@ -1609,6 +1685,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return (
       since !== undefined && typeof version === "string" && isVersion(version) && compareReleases(version, since) >= 0
     );
+  }
+
+  #openBotToolsDropped(thread: AcpThread): boolean {
+    const limit = this.#flavor.mcpConnectLimitMs;
+    if (limit === undefined || !this.#supportsSessionResume || Date.now() - thread.mcpSentAt < limit) return false;
+    if (thread.mcp.servers.length === 0 || thread.mcp.listedWithin(0, Number.POSITIVE_INFINITY)) return false;
+    if (thread.mcp.dropped(thread.mcpSentAt, limit)) thread.mcpDropped = true;
+    return thread.mcpDropped;
   }
 
   #listedInTime(mcp: LocalMcpSession, sentAt: number, waitedMs = 0): boolean {
@@ -1864,10 +1948,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               );
             const openedAt = Date.now();
             const connectLimit = this.#flavor.mcpConnectLimitMs;
+            let mcpSentAt = sentAt;
+            let mcpDropped = false;
             if (connectLimit !== undefined && this.#supportsSessionResume && mcp.dropped(sentAt, connectLimit)) {
               this.emit("diagnostic", `${this.#label} did not load OpenBot's tools in time. The session opens again.`);
               mcpServers = [...given, ...mcp.renew()];
               const retriedAt = Date.now();
+              mcpSentAt = retriedAt;
               const retry = this.#restoreSessionEffect(
                 connection,
                 { sessionId: id, cwd, ...directories, mcpServers, ...meta },
@@ -1876,7 +1963,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               const retried = yield* Effect.result(
                 sessionTransport ? retry : this.#whileProcessWrites(retry, "session/resume"),
               );
-              if (Result.isFailure(retried) || mcp.dropped(retriedAt, connectLimit))
+              mcpDropped = mcp.dropped(retriedAt, connectLimit);
+              if (Result.isFailure(retried) || mcpDropped)
                 this.emit("diagnostic", `${this.#label} still did not load OpenBot's tools.`);
             }
             if (this.#flavor.mcpServersLoadWithSession && !mcp.reached())
@@ -1894,6 +1982,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               currentModelId,
               mcp,
               mcpListed: this.#listedInTime(mcp, sentAt, openedAt - sentAt),
+              mcpSentAt,
+              mcpDropped,
               relays: closeRelays ?? Effect.void,
               relayed: relayedServers,
               activeTurn: null,
@@ -1907,6 +1997,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               idleSince: 0,
               restore: { cwd, ...directories, mcpServers, ...meta },
               shownIds: new Set(),
+              shownTail: EMPTY_SHOWN_TAIL,
               backgroundUntil: 0,
               backgroundUpdatedAt: null,
               backgroundSkipUntil: 0,
@@ -2412,6 +2503,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         (thread.contextUsed === null && thread.promptsSinceInstructions > ACP_INSTRUCTIONS_REFRESH_PROMPTS));
     if (sendInstructions) this.#turnContext.resend(thread.id);
     blocks.unshift(...this.#turnContext.take(thread.id, command).map((text) => ({ type: "text" as const, text })));
+    if (!command && idleStoppedSessions.delete(thread.id)) blocks.unshift({ type: "text", text: SESSION_RELOAD_NOTE });
     if (sendInstructions) {
       blocks.unshift({
         type: "text",
@@ -2531,7 +2623,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       lastActivityAt: Date.now(),
       modelRetries: 0,
       answered: false,
+      answer: Deferred.makeUnsafe(),
       waitingOnUser: 0,
+      openbotToolCalls: 0,
+      awaitingCommands: false,
+      ownReply: "none",
       abandoned: false,
       reportedCost: null,
       unprompted,
@@ -2641,10 +2737,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         }
         const running: string = response.stopReason === "end_turn" && !staleWake ? this.#backgroundCommands(turn) : "";
         if (!running) break;
+        turn.ownReply = "none";
+        turn.awaitingCommands = true;
         const wake = yield* this.#awaitSessionChange(thread, turn);
+        turn.awaitingCommands = false;
         if (thread.activeTurn !== turn || turn.completing) return;
         if (wake === "steered") continue;
         if (wake === "none") break;
+        if (wake === "replied") {
+          staleWake = this.#backgroundCommands(turn) === running;
+          promptedAgain = true;
+          continue;
+        }
         this.#reportPromptUsage(thread, turn, response);
         response = providerResult(
           yield* this.#sendPrompt(thread, turn, [{ type: "text", text: BACKGROUND_WAKE_NOTE }], params),
@@ -2726,16 +2830,24 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       if (!thread.mcpListed) thread.mcpListed = this.#listedInTime(thread.mcp, sentAt);
       if (
-        !thread.mcpListed &&
         !promptedAgain &&
         !turn.wake &&
         !turn.providerError &&
         !turn.stopped &&
-        response.stopReason === "end_turn"
+        response.stopReason === "end_turn" &&
+        (!thread.mcpListed || this.#openBotToolsDropped(thread))
       ) {
         turn.failureCause = "unknown";
         turn.providerError = sourceText("error.provider.acpToolsNotLoaded", { provider: this.#label });
         thread.needsResume = true;
+      }
+      const textToolCallFailure =
+        !turn.providerError && !turn.stopped && !turn.answerOptional && response.stopReason === "end_turn"
+          ? (this.#flavor.textToolCallFailure?.(turn.text) ?? null)
+          : null;
+      if (textToolCallFailure !== null) {
+        turn.failureCause = "empty_answer";
+        turn.providerError = textToolCallFailure;
       }
       const status =
         turn.stopped || response.stopReason === "cancelled"
@@ -2852,14 +2964,23 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ) {
     const until = Date.now() + ACP_BACKGROUND_WATCH_MS;
     let before: string | undefined;
+    let changedAt: number | null = null;
     while (Date.now() < until) {
       yield* Effect.sleep(ACP_BACKGROUND_POLL_MS);
       if (thread.activeTurn !== turn || turn.completing || turn.stopped) return "none";
       if (turn.steerReplies.length > 0) return "steered";
+      if (turn.ownReply !== "none") {
+        if (!ownReplyQuiet(turn)) continue;
+        return turn.ownReply === "reported" ? "changed" : "replied";
+      }
+      if (changedAt !== null) {
+        if (Date.now() - changedAt >= ACP_OWN_REPLY_WAIT_MS) return "changed";
+        continue;
+      }
       const read = yield* Effect.result(this.#sessionUpdatedAt(thread));
       if (Result.isFailure(read)) continue;
       if (read.success === null) return "none";
-      if (before !== undefined && read.success !== before) return "changed";
+      if (before !== undefined && read.success !== before) changedAt = Date.now();
       before = read.success;
     }
     return "none";
@@ -2948,6 +3069,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     );
     for (let attempt = 1; ; attempt += 1) {
       turn.answered = false;
+      if (Deferred.isDoneUnsafe(turn.answer)) turn.answer = Deferred.makeUnsafe();
       const outcome = yield* Effect.raceFirst(send, silent);
       if (outcome !== SILENT_PROMPT) return outcome;
       logger.warn("An ACP agent sent nothing for a prompt.", { provider: this.provider, attempt, silentMs: limit });
@@ -3234,6 +3356,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     if (update.sessionUpdate === "usage_update") {
+      if (active?.awaitingCommands && active.ownReply === "open") active.ownReply = "ended";
       if (thread.contextUsed !== null && update.used < thread.contextUsed * ACP_COMPACTION_CONTEXT_RATIO)
         this.#compacted(thread);
       thread.contextUsed = update.used;
@@ -3256,6 +3379,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     const turn = thread.activeTurn;
     if (!turn || turn.completing) return;
+    const step = turn.awaitingCommands ? ownReplyStep(update) : null;
+    if (step === "open" || (step === "reported" && turn.ownReply === "none")) turn.ownReply = step;
     if (turn.beforeWakeEcho) {
       if (update.sessionUpdate === "user_message_chunk" && update.content.type === "text") {
         if (isTurnContextBlock(update.content.text)) turn.beforeWakeEcho = null;
@@ -3263,7 +3388,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       if (SESSION_STATE_UPDATES.has(update.sessionUpdate) || update.sessionUpdate === "tool_call_update") return;
       if (update.sessionUpdate !== "tool_call") {
-        turn.answered = true;
+        markAnswered(turn);
         turn.beforeWakeEcho.push(update);
         return;
       }
@@ -3354,7 +3479,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #applyTurnUpdate(thread: AcpThread, turn: AcpTurn, update: SessionUpdate): void {
     if (STEER_READ_UPDATES.has(update.sessionUpdate))
       for (const [messageId, accepted] of turn.unreadSteers) if (accepted) turn.unreadSteers.delete(messageId);
-    if (!SESSION_STATE_UPDATES.has(update.sessionUpdate)) turn.answered = true;
+    if (!SESSION_STATE_UPDATES.has(update.sessionUpdate)) markAnswered(turn);
     const text =
       update.sessionUpdate === "agent_message_chunk" && update.content.type === "text" ? update.content.text : null;
     const attempt = text === null ? null : (this.#flavor.sdkHarness?.retryNotice?.(text) ?? null);
@@ -3376,7 +3501,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       } else this.#emitTurnProgress(thread, turn, sourceText("status.provider.modelRetryRecovered"));
     }
     if (this.#flavor.unsentBackgroundTurns) {
-      const id = shownEntryId(update);
+      const taskTurns = this.#flavor.unsentTaskTurns;
+      const id = shownEntryId(update, taskTurns?.toolCallKey);
+      if (taskTurns && !id) thread.shownTail = withShownText(thread.shownTail, update);
+      else if (id && taskTurns && !thread.shownIds.has(id)) thread.shownTail = EMPTY_SHOWN_TAIL;
       if (id) thread.shownIds.add(id);
     }
     if (update.sessionUpdate === "agent_message_chunk" && update.content.type === "text") {
@@ -3553,7 +3681,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turn.mediaKinds.delete(update.toolCallId);
         this.#countRepeatedFailure(thread, turn, reported === "failed" ? item : null);
       }
-      if (this.#flavor.unsentBackgroundTurns && update.status === "completed" && startsBackgroundTask(update.rawOutput))
+      if (
+        this.#flavor.unsentBackgroundTurns &&
+        ((update.status === "completed" && startsBackgroundTask(update.rawOutput)) ||
+          this.#flavor.unsentTaskTurns?.startsTask(update.toolCallId, update.rawInput))
+      )
         this.#watchBackground(thread);
       return;
     }
@@ -3739,8 +3871,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         continue;
       }
       const silentFor = Date.now() - turn.lastActivityAt;
-      if (silentFor < limit || turn.toolItems.size > 0 || turn.waitingOnUser > 0) {
-        yield* Effect.sleep(silentFor < limit ? limit - silentFor : limit);
+      const silenceLimit = this.#silenceLimit(turn, limit);
+      if (silentFor < silenceLimit) {
+        yield* Effect.sleep(Math.min(silenceLimit - silentFor, limit));
         continue;
       }
       this.emit("diagnostic", `${this.#label} sent nothing for ${silentFor} ms; ending turn ${turn.id}.`);
@@ -3757,6 +3890,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
   });
 
+  #silenceLimit(turn: AcpTurn, limit: number): number {
+    if (turn.waitingOnUser > 0) return Number.POSITIVE_INFINITY;
+    if (turn.toolItems.size === 0) return limit;
+    if (turn.openbotToolCalls > 0 || this.#flavor.openToolStallMs === undefined) return Number.POSITIVE_INFINITY;
+    return Math.max(limit, this.#flavor.openToolStallMs);
+  }
+
   readonly #endSilentTurn = Effect.fn("AcpAgentClient.endSilentTurn")(function* (
     this: AcpAgentClient,
     thread: AcpThread,
@@ -3764,7 +3904,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ) {
     const limit = this.#flavor.silentTurnLimitMs;
     const silentFor = Date.now() - turn.lastActivityAt;
-    if (limit === undefined || silentFor < limit || turn.toolItems.size > 0 || turn.waitingOnUser > 0) return false;
+    if (limit === undefined || turn.awaitingCommands || silentFor < this.#silenceLimit(turn, limit)) return false;
     if (thread.activeTurn !== turn || turn.completing || turn.stopped) return false;
     const sdkHarness = this.#flavor.sdkHarness;
     const logged = sdkHarness?.silentFailure?.(this.options.argv, thread.id, turn.startedAt) ?? null;
@@ -3993,13 +4133,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       );
   }
 
-  #applyBackgroundEntries(thread: AcpThread, updates: SessionUpdate[]): void {
-    const ids = updates.map(shownEntryId);
+  #applyBackgroundEntries(thread: AcpThread, loaded: SessionUpdate[]): void {
+    const taskTurns = this.#flavor.unsentTaskTurns;
+    const updates = taskTurns ? withLoadedMessageIds(loaded, taskTurns.toolCallKey) : loaded;
+    const ids = updates.map((update) => shownEntryId(update, taskTurns?.toolCallKey));
     const lastShown = ids.findLastIndex((id) => id !== null && thread.shownIds.has(id));
     if (lastShown < 0) return;
-    const fresh = new Set(ids.slice(lastShown + 1).filter((id) => id !== null && !thread.shownIds.has(id)));
+    const firstUnshown = taskTurns ? afterShownTail(updates, lastShown + 1, thread.shownTail) : lastShown + 1;
+    const fresh = new Set(ids.slice(firstUnshown).filter((id) => id !== null && !thread.shownIds.has(id)));
     if (Date.now() < thread.backgroundSkipUntil) {
       for (const id of fresh) if (id) thread.shownIds.add(id);
+      if (taskTurns && fresh.size > 0) thread.shownTail = EMPTY_SHOWN_TAIL;
       return;
     }
     const open = thread.activeTurn?.unprompted ? thread.activeTurn : null;
@@ -4017,7 +4161,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       });
     for (const [index, update] of updates.entries()) {
       const id = ids[index];
-      if (id && (fresh.has(id) || turn.toolItems.has(id))) this.#applyTurnUpdate(thread, turn, update);
+      const itemId =
+        update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update" ? update.toolCallId : id;
+      if (id && (fresh.has(id) || turn.toolItems.has(itemId ?? id))) this.#applyTurnUpdate(thread, turn, update);
     }
     turn.lastActivityAt = Date.now();
   }
@@ -4025,7 +4171,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #waitForUser<A, E>(turn: AcpTurn | null | undefined, request: Effect.Effect<A, E>): Effect.Effect<A, E> {
     if (!turn) return request;
     return Effect.suspend(() => {
-      turn.answered = true;
+      markAnswered(turn);
       turn.waitingOnUser += 1;
       return request;
     }).pipe(
@@ -4153,6 +4299,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (thread.activeTurn !== turn || turn.completing) return;
     this.#releaseBeforeWakeEcho(thread, turn);
     turn.completing = true;
+    endAnswerWait(turn);
     if (this.#flavor.childSessionUpdates) yield* Effect.promise(() => new Promise<void>((next) => setImmediate(next)));
     if (status === "failed") {
       thread.instructionsSent = null;
@@ -4211,6 +4358,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           (provider) => this.options.providerKeyStored?.(provider) ?? false,
           this.#label,
           () => this.options.providerRefusalStatus?.(thread.id) ?? null,
+          () => this.options.savedKeyShadowed?.() ?? false,
         ) ??
         detail;
       const verificationMessage = verification
@@ -4405,15 +4553,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         : ["edit", "delete", "move"].includes(toolKind ?? "")
           ? "file-change"
           : "permissions";
+    const namedToolCall = { ...toolCall, title: toolCall.title ?? turn?.toolNames.get(toolCallId) ?? null };
     if (
       thread &&
       turn &&
       !turn.stopped &&
       !turn.completing &&
       (((this.options.confine || this.#flavor.bridgeToolsWithoutCard) &&
-        callsBridgeTool(thread, toolCall, kind, this.#flavor.mcpCallInputNamesServer)) ||
+        callsBridgeTool(thread, namedToolCall, kind, this.#flavor.mcpCallInputNamesServer)) ||
         (this.options.confine && runsConfinedCommand(toolCall, kind, this.#flavor.mcpCallInputNamesServer)) ||
-        (kind === "permissions" && turn.quietNoUpdate && callsNoUpdateTool(thread, toolCall.title)))
+        (kind === "permissions" && turn.quietNoUpdate && callsNoUpdateTool(thread, namedToolCall.title)))
     ) {
       const option = params.options.find((candidate) => candidate.kind === "allow_once");
       if (option) return { outcome: { outcome: "selected", optionId: option.optionId } };
@@ -4570,7 +4719,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return { success: false, contentItems: [{ type: "inputText", text: "History replay cannot execute tools." }] };
     }
     const turn = this.#threads.get(params.threadId)?.activeTurn;
-    if (turn) turn.answered = true;
+    if (turn) markAnswered(turn);
     const deadlines =
       turn?.id === params.turnId
         ? [
@@ -4580,6 +4729,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             detachAfterMs,
           ].filter((ms) => ms !== undefined)
         : [];
+    const ownTurn = turn?.id === params.turnId ? turn : null;
+    if (ownTurn) ownTurn.openbotToolCalls += 1;
     const result = yield* this.#serverRequests
       .call(
         "item/tool/call",
@@ -4589,7 +4740,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         deadlines.length > 0 ? Math.min(...deadlines) : undefined,
         subagent,
       )
-      .pipe(toProviderClientOperationError);
+      .pipe(
+        toProviderClientOperationError,
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (!ownTurn) return;
+            ownTurn.openbotToolCalls -= 1;
+            ownTurn.lastActivityAt = Date.now();
+          }),
+        ),
+      );
     if (!isDynamicToolResult(result))
       return yield* providerFailure(new Error("OpenBot returned an invalid dynamic tool result."));
     if (turn?.id === params.turnId && params.tool === ROUTINE_NO_UPDATE_TOOL) turn.quietNoUpdate = endsQuiet(result);
@@ -4754,7 +4914,12 @@ function callsBridgeTool(
 }
 
 function namesBridgeTool(title: string, namespace: string, tool: string): boolean {
-  return [`${namespace}__${tool}`, `Run mcp_${namespace}_${tool}`, `mcp__${namespace}__${tool}`].includes(title);
+  return [
+    `${namespace}__${tool}`,
+    `Run mcp_${namespace}_${tool}`,
+    `mcp__${namespace}__${tool}`,
+    `mcp_${namespace}.${tool}`,
+  ].includes(title);
 }
 
 function runsConfinedCommand(
@@ -4819,11 +4984,65 @@ function contentMessageId(update: SessionNotification["update"]): string | null 
   return update.messageId;
 }
 
-function shownEntryId(update: SessionUpdate): string | null {
-  if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") return update.toolCallId;
+function shownEntryId(update: SessionUpdate, toolCallKey?: (toolCallId: string) => string): string | null {
+  if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update")
+    return toolCallKey ? toolCallKey(update.toolCallId) : update.toolCallId;
   if (update.sessionUpdate === "agent_message_chunk" || update.sessionUpdate === "agent_thought_chunk")
     return update.content.type === "text" && update.content.text ? contentMessageId(update) : null;
   return null;
+}
+
+function withShownText(tail: ShownTail, update: SessionUpdate): ShownTail {
+  if (update.sessionUpdate === "agent_message_chunk" && update.content.type === "text")
+    return { ...tail, text: tail.text + update.content.text };
+  if (update.sessionUpdate === "agent_thought_chunk" && update.content.type === "text")
+    return { ...tail, thought: tail.thought + update.content.text };
+  return tail;
+}
+
+function withLoadedMessageIds(
+  updates: readonly SessionUpdate[],
+  toolCallKey: (toolCallId: string) => string,
+): SessionUpdate[] {
+  let afterTool: string | null = null;
+  let chunks = 0;
+  return updates.map((update) => {
+    if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
+      afterTool = toolCallKey(update.toolCallId);
+      chunks = 0;
+      return update;
+    }
+    if (
+      afterTool === null ||
+      (update.sessionUpdate !== "agent_message_chunk" && update.sessionUpdate !== "agent_thought_chunk") ||
+      contentMessageId(update) !== null
+    )
+      return update;
+    chunks += 1;
+    return { ...update, messageId: `loaded:${afterTool}:${chunks}` };
+  });
+}
+
+function afterShownTail(updates: readonly SessionUpdate[], start: number, tail: ShownTail): number {
+  const shown = { text: compactText(tail.text), thought: compactText(tail.thought) };
+  const matched = { text: "", thought: "" };
+  for (const [offset, update] of updates.slice(start).entries()) {
+    if (matched.text.length >= shown.text.length && matched.thought.length >= shown.thought.length)
+      return start + offset;
+    if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") return start + offset;
+    const chunk =
+      update.sessionUpdate === "agent_message_chunk" || update.sessionUpdate === "agent_thought_chunk" ? update : null;
+    if (chunk?.content.type !== "text") continue;
+    const kind = chunk.sessionUpdate === "agent_message_chunk" ? "text" : "thought";
+    const next = matched[kind] + compactText(chunk.content.text);
+    if (!shown[kind].startsWith(next)) return start + offset;
+    matched[kind] = next;
+  }
+  return updates.length;
+}
+
+function compactText(text: string): string {
+  return text.replace(/\s+/gu, "");
 }
 
 function replayedText(updates: readonly SessionUpdate[], messageId: string): string {

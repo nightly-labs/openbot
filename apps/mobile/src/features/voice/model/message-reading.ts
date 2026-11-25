@@ -1,8 +1,10 @@
+import { router } from "expo-router";
 import { Alert } from "react-native";
 import { create } from "zustand";
 import { currentText } from "@/shared/lib/text";
-import { type ReplyReading, readReply, replyVoiceFailureText } from "./reply-voice";
+import { type ReplyReading, type ReplyVoiceFailure, readReply, replyVoiceFailureText } from "./reply-voice";
 import { speechNative } from "./speech-native";
+import { useVoiceSettings } from "./voice-settings";
 
 const useMessageReading = create<{ messageId: string | null }>(() => ({ messageId: null }));
 
@@ -12,6 +14,23 @@ export const canReadAloud = speechNative !== null;
 
 export function useReadingAloud(messageId: string): boolean {
   return useMessageReading((state) => state.messageId === messageId);
+}
+
+function showReadAloudFailure(failure: ReplyVoiceFailure, reason: string | null): void {
+  const { t } = currentText();
+  const title = t("mobile.chat.message.readAloudFailed");
+  if (failure !== "not-ready" && failure !== "language") {
+    Alert.alert(title, replyVoiceFailureText(failure, reason));
+    return;
+  }
+  const message =
+    failure === "not-ready" && useVoiceSettings.getState().engine === "supertonic"
+      ? t("mobile.chat.message.readAloudModelMissing")
+      : replyVoiceFailureText(failure, reason);
+  Alert.alert(title, message, [
+    { text: t("common.cancel"), style: "cancel" },
+    { text: t("mobile.chat.composer.voiceSettings"), onPress: () => router.push("/settings/voice") },
+  ]);
 }
 
 export function toggleReadAloud(messageId: string, markdown: string): void {
@@ -28,7 +47,7 @@ export function toggleReadAloud(messageId: string, markdown: string): void {
     onDone: finish,
     onError: (failure, reason) => {
       finish();
-      Alert.alert(currentText().t("mobile.chat.message.readAloudFailed"), replyVoiceFailureText(failure, reason));
+      showReadAloudFailure(failure, reason);
     },
   });
   reading = own;

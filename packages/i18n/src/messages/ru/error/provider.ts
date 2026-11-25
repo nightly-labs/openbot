@@ -240,6 +240,8 @@ export const messages = {
     "Срок действия API-ключа OpenCode истёк. Создайте новый ключ в OpenCode Console, вставьте его в настройках OpenCode, затем повторите попытку.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go отклонил сохранённый API-ключ. Возможно, срок действия ключа истёк. Создайте новый ключ в OpenCode Console, вставьте его в настройках OpenCode, затем повторите попытку.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode не использовал ключ, сохранённый в OpenBot. Он использовал другой ключ OpenCode Go, который OpenCode хранит сам, и OpenCode Go отклонил этот ключ. Чтобы удалить этот ключ, выполните `opencode auth logout opencode-go` в терминале на компьютере, где работает агент, и выберите ключ. Затем повторите попытку.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go отклонил запрос. Новый API-ключ это не исправит. Возможно, ваш план OpenCode Go не активен или OpenCode Go блокирует вашу сеть: некоторые сервисы блокируют VPN, прокси или некоторые страны. Проверьте в OpenCode Console, что план активен, или отключите VPN, затем повторите попытку. Также можно выбрать другую модель.",
   "error.provider.opencodeServiceFailure":
@@ -299,8 +301,12 @@ export const messages = {
     "Модель OpenCode завершила ход без ответа. Повторите попытку или выберите другую модель.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "Модель OpenCode завершила ход после рассуждения, без ответа. Повторите попытку или выберите другую модель.",
+  "error.provider.opencodeToolCallsAsText":
+    "Модель OpenCode записала свои действия текстом и не выполнила их. Повторите попытку или выберите другую модель.",
   "error.provider.acpNoAnswer":
     "{provider} завершил ход без ответа. Отправьте сообщение ещё раз или начните новый чат.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} получил результаты от коллег по команде, а затем завершил ход без ответа. Попросите агента продолжить.",
   "error.provider.noAnswerAfterSteps":
     "{provider} выполнил несколько шагов, а затем завершил ход без ответа. Прежде чем снова отправить тот же запрос, спросите агента, что он сделал.",
   "error.provider.acpRefusedNoReason": "{provider} остановился без ответа. Отправьте сообщение ещё раз.",
@@ -364,6 +370,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Войдите через Cursor или задайте CURSOR_API_KEY, чтобы использовать Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor не смог подключиться к своему серверу с вашим входом. Проверьте подключение к интернету, затем снова войдите в Cursor.",
+  "error.provider.cursorNoModels":
+    "Cursor не прислал список моделей. Выберите «Подключить», чтобы снова войти в Cursor. Если это сообщение не исчезает, проверьте, что ваш тариф Cursor включает модели.",
   "error.provider.clineArchivePath": "В архиве Cline неожиданный путь.",
   "error.provider.clinePackageMismatch": "Пакет Cline не соответствует каталогу сред выполнения.",
   "error.provider.clineChecksum": "Контрольная сумма среды выполнения Cline не совпадает.",
@@ -407,6 +415,8 @@ export const messages = {
     "На API-ключе Anthropic нет кредитов API. Тариф Claude не оплачивает запросы с API-ключом. Пополните кредиты в Anthropic Console или войдите в Claude в настройках и выберите аккаунт Claude в меню моделей агента.",
   "error.provider.claudeAccountNoCredit":
     "На аккаунте Claude слишком мало кредитов. Некоторые запросы, например в быстром режиме, расходуют кредиты использования, даже когда в тарифе Claude ещё есть лимит. Пополните кредиты использования в аккаунте Claude или выберите другую модель в меню моделей агента.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code отправляет запросы на {host}, а не в Anthropic: этот адрес API задан в настройках Claude Code или в переменных окружения. {host} отклонил запрос из-за баланса аккаунта, а не из-за тарифа Claude. Пополните баланс аккаунта {host} или выберите другую модель в меню моделей агента.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Сервис Claude заблокировал этот запрос. Обычно это короткий сбой на стороне Claude, а не проблема с вашим аккаунтом. Отправьте сообщение снова через несколько минут.",
   "error.provider.foreignReasoning":
@@ -423,6 +433,8 @@ export const messages = {
     "{provider} заблокировал это сообщение из-за своих правил безопасности: {reason} Если {provider} блокирует и ваши следующие сообщения, начните новый чат.",
   "error.provider.codexAudioRefused":
     "Эта модель не может слушать аудио, поэтому она не приняла звук в этом чате. OpenBot начал новый сеанс Codex с историей чата. Чтобы продолжить, отправьте запрос снова и попросите агента работать без звука. Чтобы проверить звук, выберите в меню моделей агента модель, которая может слушать аудио.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex не смог загрузить настройки вашего аккаунта ChatGPT, поэтому агент остановился. Повторите попытку. Если он снова остановится, выберите «Переподключить» для ChatGPT в разделе «Настройки сервера → Провайдеры».",
   "error.provider.imageTooSmall":
     "Модель не приняла изображение в этом чате, потому что изображение слишком маленькое. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
   "error.provider.imageTooLarge":
@@ -558,6 +570,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Не удалось прочитать версию CLI {provider}.",
   "error.provider.piSessionBusy": "Дождитесь окончания текущего хода Pi.",
   "error.provider.acpSessionBusy": "{provider} ещё завершает остановленный ход. Повторите попытку чуть позже.",
+  "error.provider.acpSettingsConflict":
+    "{provider} изменил этот чат, пока OpenBot применял его настройки. Повторите попытку.",
   "error.provider.acpSessionStale":
     "{provider} не удалось загрузить последнюю версию этого чата. Отправьте сообщение ещё раз.",
   "error.provider.acpModelNotOffered":

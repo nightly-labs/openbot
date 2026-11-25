@@ -381,7 +381,7 @@ export const messages = {
     "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Diğer kişiler yanıt almaz. Kapalıyken OpenBot tanımadığınız kişilere bir kodla yanıt verir.",
   "connector.whatsapp.workingMessage": "“Üzerinde çalışılıyor…” mesajı",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Önceki bir isteği bekleyen istek de bir bekleme mesajı alır. Yalnızca yanıtı göndermek için kapatın.",
+    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Önceki bir isteği bekleyen istek de bir bekleme mesajı alır. Kişisel numarada bu mesajları yalnızca “Kendine mesaj gönder” sohbetiniz alır. Yalnızca yanıtı göndermek için kapatın.",
   "connector.whatsapp.statusReactions": "Durum tepkileri",
   "connector.whatsapp.statusReactionsDescription":
     "OpenBot bir mesaj geldiğinde 👀, yanıt hazır olduğunda ✅ tepkisi verir. Hiç tepki göndermemek için kapatın.",

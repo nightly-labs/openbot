@@ -83,14 +83,17 @@ It also sends these events for a license: a Checkout starts, the license starts,
 users goes up or down, its renewal is cancelled or resumed, it ends, or its payment succeeds, fails,
 is refunded or is disputed.
 It also sends an event when your OpenBot credits change: a credits Checkout starts, is paid or
-expires, a refund or a lost dispute takes credits back, you move credits to or from a server, a
-license gives free monthly credits or they expire, or a workflow step that uses OpenBot credits
-starts, is charged or ends with no charge. A credits event has your account ID (for a server step
+expires, a refund or a lost dispute takes credits back, you move credits to or from a server, you
+redeem a credit code, a license gives free monthly credits or they expire, or a workflow step or an agent's image or video
+tool that uses OpenBot credits starts, is charged or ends with no charge. A credits event has your account ID (for a server step
 that no member started, or a server's free credits, the account ID of the server owner), whether
 the credits are personal or a server's, the number of credits, the currency and amount of a
 payment, and for a generation the model, its kind (image or video), the resolution, duration,
-number of results and audio setting that the step asked for, and the outcome. It does not have the
-prompt, the pictures, the result, the job, or the server ID.
+number of results and audio setting that the step asked for, and the outcome. Each try to redeem a
+credit code also sends an event with its result (for example redeemed, wrong code, ended, used, or
+too many tries), the limit that stopped it, whether the code is for one account or for more, and the
+campaign name that OpenBot gave the code. It does not have the prompt, the pictures, the result, the
+job, the credit code, your network address, or the server ID.
 Each event has your account ID and only fixed values: the action, whether it is a server plan or a
 license, the plan, the number of license users, the billing period, the currency, the amount that
 Stripe reports, the place in the app where the plans were opened, the server size, the start reason,
@@ -121,6 +124,10 @@ accounts and users. These totals have no account ID.
 The service stores payment facts and a delivery ledger in D1 to prevent duplicate revenue events.
 It does not send Stripe identifiers, server identifiers, or Checkout return tokens to OpenPanel.
 An account deletion clears its profile reference and stops pending account event delivery.
+Once a day, the account service sends OpenPanel the number of accounts that were active on the
+day before, with no account ID. It counts each account once, on all its computers, phones and
+servers. It does not count an account whose analytics answer is off, an account whose computer has
+analytics off, or a member who has not turned analytics on.
 The account service also sends an event when it makes a new account (with the app used to sign in)
 and when it saves the first website visit of an account. A payment event and a revenue event include
 that first visit when the account has one.
@@ -249,6 +256,18 @@ Mobile does not read the Android install referrer from Google Play. It never sen
 install-referrer URLs or route identifiers. It does not
 emit host lifecycle events again. Agent/host token and cost reports remain separate local data.
 
+The production Chrome extension records its install and update, side panel opens, sign-in and
+sign-out results, message sends from the side panel (to a chat, a thread or a channel), dictation
+results and lengths, the agents, channels and folders made in it, answers to agent questions, the
+steps of X replies (queued, sent, retried, dropped, notification opened), and shared-tab events
+(a site removed, and the kind of each question and your answer). It labels them
+as extension. It never sends message text, post text, X handles, addresses, sites, tab titles, or
+names. Its **Link analytics to my account** switch (server menu > **Settings**) works as on the web: on, events
+carry your account ID; off, only a random install ID kept in the extension's storage. When your account
+says off, for example after you turn it off on another device, the extension is off too. Else your
+choice in the extension wins; with no choice by your account, it follows your account's answer, and
+with no answer, the same region default as the web app. Development builds of the extension send no analytics.
+
 Analytics events do not contain message or direct-message text, prompts, replies, generated content,
 search queries, embedded-browser URLs, paths or page titles, file names, local paths, commands, raw
 error messages, or local identifiers for agents, threads, turns, messages, servers, and team members.
@@ -316,7 +335,7 @@ the device was offline or signed out goes to the account at the next sign-in, st
 refresh; the account keeps it only if it has no newer answer from another device. Disabling it
 drops pending mobile events; it does not remove previously received events or retract an in-flight
 request. There is no persistent offline analytics queue.
-When a user turns product analytics off on desktop, web or mobile, the app first sends one event
+When a user turns product analytics off on desktop, web, mobile or the Chrome extension, the app first sends one event
 that says analytics was turned off, with the account. After that, events go with the install ID only.
 Turning it on again sends no separate event.
 Development and preview mobile builds do not collect product analytics. Mobile sign-in uses the
@@ -447,6 +466,13 @@ The service stores:
   the desktop app is signed in, so the owner's phones and other computers can connect to it. Deleting
   that server removes its record;
 - remote memberships and invitations with roles, states, hashed invitation tokens, and lifecycle times;
+- for each day until its total is sent, the accounts that were active: the account ID and the day. A
+  host with analytics on sends the owner's account when a turn starts there, and the account of each
+  member who uses it; a host with analytics off sends nothing. The service keeps the owner's row unless
+  the owner's analytics answer is off, and a member's row only when the member's own analytics answer
+  is on. Turning analytics off deletes the account's rows. It deletes the rows of a day when analytics
+  accepts the daily total, usually in the first hour of the next day, and after 7 days in all cases.
+  Deleting an account removes its rows;
 - logical remote session records with the account, host, originating account-session hash, start,
   end, and expiration times;
 - the current account avatar file and its content type when the user uploads an avatar.
@@ -482,21 +508,30 @@ The service stores:
   without the ID of the deleted account. For each image or video that OpenBot credits pay for, the
   service keeps a hold record: the job ID, the account or server that pays, the account that started
   it, the model, the credits held and charged, the result (completed, failed, canceled, refused or
-  expired), the media generation processor and its job ID, and the times. It keeps no prompt, picture
-  or result file. Deleting the account removes the hold records of its own balance. For the free
+  expired), whether welcome credits paid for it, the media generation processor and its job ID, and
+  the times. It keeps no prompt, picture or result file. Deleting the account removes the hold records of its own balance. For the free
   monthly credits of a paid license, it keeps a grant record: the license, the account or server that
   has them, the credits given and left, and the start and end times. Deleting the account removes the
-  grant records of its own balance.
+  grant records of its own balance. The 10 welcome credits of each account have a grant record of the
+  same kind, without a license.
+  For credit codes, it keeps the SHA-256 hash of each code, never the code itself, with the credits,
+  the number of uses, the end date, and a campaign name and a note from OpenBot. For each redemption it
+  keeps the code, the account, the server that got the credits (when one is selected), the grant and
+  the time, and a grant record as for free monthly credits. To stop guessing and abuse, it counts the
+  tries and the wrong codes of each account and of each network address (an IPv6 address to its /64
+  network) in the current hour. With each count it keeps only a SHA-256 hash of the account ID or the
+  network address, never the address, and it deletes the counts when the hour ends. Deleting the
+  account removes its redemptions.
   Settings > Billing shows an account the ledger entries and holds of its own balance and of the
   servers where it is a member. The owner and the admins of a server see all of the server's entries,
   with the names of the accounts that acted. Other members see only the entries that they made. No
   email address is shown.
   The service also keeps a credit audit record for each credit change and each failed credit action:
   checkouts that open or expire, purchases, moves, reversals, free credits, holds, starts, charges and
-  releases, and refused checkouts, moves and generations. A record has the action, the result and the
+  releases, redemptions, and refused checkouts, moves, redemptions and generations. A record has the action, the result and the
   error code, the account or server, the account that acted, the credits, the model, the job, Checkout
   Session or Stripe object ID, and for a generation that the processor refused, the HTTP status and error
-  code of the processor. It keeps no prompt, picture, result file, card data or email address. The
+  code of the processor. It keeps no prompt, picture, result file, credit code, card data or email address. The
   service deletes a record after 400 days. Deleting the account removes the records of its own balance,
   and removes the account from the records of a server.
 - for the EU VAT limit: for each paid invoice of a consumer in an EU country other than Poland, the
@@ -606,8 +641,9 @@ the name with the sandbox.
 
 A new hosted server of each plan starts on a virtual server that OpenBot rents from
 [Leaseweb](https://www.leaseweb.com) when one is free at the purchase. For a purchase in euros or
-złotys, it is in Amsterdam, the Netherlands. For a purchase in US dollars or Brazilian reais, it is
-near Washington, D.C., in the United States, or in Amsterdam when none is free there. When no
+złotys, it is in Amsterdam, the Netherlands, or in Frankfurt, Germany, when none is free in
+Amsterdam. For a purchase in US dollars or Brazilian reais, it is near Washington, D.C., in the
+United States, or in Amsterdam or Frankfurt when none is free there. When no
 virtual server is free, the server starts in a boat sandbox. An operator can also move a
 server from boat to such a virtual server: the operator copies the server's disk over SSH, and
 deletes the copy after the move. The virtual server holds the server's
@@ -1252,6 +1288,59 @@ another device, the host sends the provider's sign-in link, and for Codex, Grok,
 one-time code, to that computer or browser, which shows them and opens the link only when the admin
 asks. The provider's CLI on the host receives the login; no token travels to the admin.
 
+## Browser extension
+
+The OpenBot browser extension (`apps/browser-extension`) signs in through openbot.run. It opens the
+web app in the browser's sign-in window; when you are signed in there and press **Allow**, the web
+app asks the account service for a one-time code and sends it only to the extension's own address,
+which the browser gives to that extension alone. The code lasts two minutes, works once, and works
+only with a secret that the extension kept, so a page that sees the code cannot use it. The extension
+can also sign in with an email code, as the phone app does. Either way, the session shows in your account's device list as "Chrome
+extension", and you can end it there or with **Sign out** in the extension. The extension keeps the
+session, a random id for this browser, the server you chose, the Team protocol of each server and
+the servers' public keys in the browser's extension storage, which only the extension can read.
+Sign-out removes the session and the chosen server. It keeps no chats, agents or files: it reads
+them from the server through the same encrypted connection as the web app each time the side panel
+opens, and they go when the panel closes.
+
+Dictation in the extension uses the microphone only while you record. The recording goes through the
+same encrypted connection to your server, and the server turns it into text with its own speech
+recognition (Settings → Voice on that server: a model on the server, or the voice service that its owner
+set up there). The server keeps no recording. The text goes into your draft, and nothing is sent until
+you press Send. The extension never sends the recording to OpenBot or to a speech service itself.
+
+On X (x.com and twitter.com), the extension runs a script on the page. It reads only the reply that
+you write. When the reply mentions @OpenBot_ and your server has the X agent, the reply button
+changes. When you click it, the script reads the post that you answer, the posts above it in the
+conversation and the rest of the author's thread (names, @handles, times, addresses, text and picture
+addresses), but not the replies of other people. X posts your reply at once, and the extension sends
+the post with your reply's words through the encrypted connection to your own server, as a message to X
+Desk. When your server does not answer, the extension keeps the post in the browser's extension storage
+on this computer, also over a browser restart, and tries again for up to 7 days (23 hours when an
+earlier attempt may have reached the server); then it deletes the post and tells you with a browser
+notification. Nothing goes to OpenBot,
+and nothing is sent when you do not click. To find the parts of the page, the extension
+asks openbot.run once an hour for the newest list of page selectors; that request carries only the hash
+of the list that it has. Except for shared tabs (below), the extension does not read your tabs or the
+pages you visit. The extension's product analytics, which "Product analytics" describes,
+go to OpenBot's self-hosted analytics and contain none of this content.
+
+Shared tabs are always on while you are signed in to the extension; to stop them, sign out. Your
+open tabs are shared only with your own agents, and an agent uses them only for a message that you
+send from the side panel; for a message in the OpenBot app, it uses its own browser. The extension tells
+your server the address, title and active state of your open web tabs (at most 50, the tab that you
+look at first), through the same encrypted connection, when they change and every 30 seconds. When an
+agent works in a tab, the tab joins a Chrome tab group named "OpenBot", unless it is in another group. When an agent acts on a site for the
+first time, the side panel asks you (Allow once, Always for this site, Deny); the sites that you allow
+always stay in the browser's extension storage until you remove them in the side panel's Settings. The extension
+always asks again before an agent types into a password or payment field, downloads a file, or acts
+on a page that signs in to an app or gives an app access. To read and use a tab, the extension uses
+Chrome's debugger on that tab, and Chrome shows its own bar while it does. What an agent reads goes
+to your server: the page text and the list of its buttons, links and fields (not the values of
+password or payment fields), screenshots of the visible page, and addresses. Text that an agent types
+goes from your server to the page. Nothing goes to OpenBot. Your server forgets the shared tabs at the
+latest 75 seconds after the extension stops.
+
 ## Other network connections
 
 Network traffic can also occur when:
@@ -1405,7 +1494,9 @@ Network traffic can also occur when:
   token to the central account service (`api.openbot.run`) about once an hour, and when you open the
   repository list. The service uses it
   only to ask GitHub which repositories you can push to, and gets back short-lived installation
-  tokens for those repositories. It does not store or log either token, and it gets no chats, files
+  tokens for those repositories. When you open the repository list, the service also gives the names
+  of the public repositories where the OpenBot GitHub App is installed, so the list shows public
+  repositories that you can read but have no own access to. It does not store or log either token, and it gets no chats, files
   or commands. Agents reach the GitHub MCP server through a local server on `127.0.0.1`, which adds
   the right token to each call;
 - the user approves a bug report or a feature idea that an agent wrote. Before the card, OpenBot
@@ -1586,15 +1677,25 @@ covers what Higgsfield keeps.
 A step with an OpenBot model uses OpenBot credits. When the computer is signed in to an OpenBot
 account, the credits of that account pay; a server pays with its own credits. The computer sends the
 prompt, the model, the size settings and the input pictures to the account service
-(`openbot.run`). The account service holds the credits, sends the same values to a media generation
-processor, and returns the result file to the computer, which keeps it. A processor can keep the
-input pictures for up to three days so that it can read them. The account service passes
-the prompt, the pictures and the file through in transit only: it does not store or log them. It
+(`openbot.run`). The account service holds the credits, sends the same values through OpenBot's
+media gateway service, which runs on Cloudflare too, to a media generation processor, and returns the
+result file to the computer, which keeps it. A processor can keep the input pictures for up to three
+days so that it can read them. The account service and the media gateway pass the prompt, the
+pictures and the file through in transit only: they do not store or log them. The account service
 keeps only the hold record above. A failed or refused generation spends no credits. A stop does not
 cancel a generation that was sent: when the run stops or the app closes, the job continues, and the
 computer gets the file when the job ends or at its next start. While the Canvas page is open, the computer also asks the account service for the OpenBot models, their
 prices in credits and the credit balance. Each member of a joined server who can use workflows can
 see them.
+
+An agent can make an image or a video with OpenBot credits through its `generate_image` and
+`generate_video` tools, and it can ask for the OpenBot models and their prices with
+`list_media_models`. The computer that runs the agent sends the prompt, the model, the size settings
+and the input pictures that the agent names to the account service, in the same way as a workflow
+step, and the same rules apply. It pays with the credits of the signed-in account, or a server pays
+with its own credits. When the price is more than the approval limit of the server (50 credits by
+default, and owners and administrators can change it), the agent asks the user first. The result
+file stays in the chat on that computer, and each member who can read the chat can see it.
 
 While the Canvas page is open, the computer also asks Sunra and Higgsfield for their model lists, and
 for the price of the model and the settings of an image or video step. A price request sends the
@@ -1936,10 +2037,12 @@ key; the data export lists it under `scope.excludes`.
 When you saved no key in OpenBot, OpenBot reads the Go quota with the key that the OpenCode CLI
 uses: an OpenCode Console connection in OpenCode's database (`opencode.db`), else the Go key. The Go
 key is the `opencode-go` key in OpenCode's `auth.json` (or `OPENCODE_AUTH_CONTENT`), or
-`OPENCODE_API_KEY` from the environment that started OpenBot when `auth.json` has none. OpenBot reads
+`OPENCODE_API_KEY` from the environment that started OpenBot when `auth.json` has none. Last, it
+uses the `opencode` key in `auth.json`, the key that older OpenCode versions keep only there, unless
+that key names a self-hosted Console. OpenBot reads
 these from OpenCode's data folder (`$XDG_DATA_HOME/opencode`, or `~/.local/share/opencode`) and sends
-the key only to `opencode.ai/zen/go/v1/usage`. When OpenCode rejects the Console key, OpenBot tries
-the Go key. OpenBot does not store, log, or show these keys. OpenBot does not copy OpenCode credentials or upload its session
+the key only to `opencode.ai/zen/go/v1/usage`. When OpenCode rejects a key, OpenBot tries
+the next one. OpenBot does not store, log, or show these keys. OpenBot does not copy OpenCode credentials or upload its session
 files. OpenCode manages its own login and resume state.
 
 ### Gemini

@@ -254,6 +254,7 @@ try {
     log: () => undefined,
     pollMs: 20,
     graceMs: 0,
+    automaticSpreadMs: 0,
   });
   const hostCheck = requiredUpdate(host, origin, (r) => requested.setRequired(r), answer({ minimumVersion: MINIMUM }));
   assert.equal(await run(hostCheck), "required");

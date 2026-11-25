@@ -12,6 +12,7 @@ import {
   type QuitGuard,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate, LayoutDirection } from "@openbot/i18n";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect } from "effect";
 import {
   app,
@@ -66,7 +67,9 @@ import { followAppearance, followWindowGlass, glassWindowOptions, windowBackgrou
 import { followWindowButtonSide, WINDOW_BUTTON_INSET } from "./window-buttons";
 
 const MAIN_WINDOW_DARK_BACKGROUND = "#0b0d0e";
+const logger = createOpenBotLogger("main-window");
 
+const FIRST_LOAD_ATTEMPTS = 3;
 const RENDERER_RELOAD_MAX = 3;
 const RENDERER_RELOAD_WINDOW_MS = 60_000;
 const RESTARTED_RENDERER_QUERY = "restarted";
@@ -123,6 +126,7 @@ export interface MainWindowContext {
   developmentProfile: string | null;
   developmentRemoteRole: "host" | "client" | null;
   developmentTestClientEnabled: boolean;
+  stopsFirstRenderer: boolean;
   isQuitting: () => boolean;
   keepRunningInBackground: () => boolean;
   getServices: () => MainWindowApplicationServices | null;
@@ -160,6 +164,7 @@ export function createMainWindowController({
   developmentProfile,
   developmentRemoteRole,
   developmentTestClientEnabled,
+  stopsFirstRenderer,
   isQuitting,
   keepRunningInBackground,
   getServices,
@@ -192,6 +197,8 @@ export function createMainWindowController({
       reportError,
     });
   let rendererReloadTimes: number[] = [];
+  let firstLoadPending = false;
+  let firstRendererStopped = false;
   let rendererStoppedDialogOpen = false;
   let closeConfirmationOpen = false;
   let closeConfirmed = false;
@@ -306,6 +313,7 @@ export function createMainWindowController({
         sandbox: true,
         nodeIntegration: false,
         webSecurity: true,
+        backgroundThrottling: !backgroundWindows,
       },
     });
     hideMenuBar(window);
@@ -320,7 +328,8 @@ export function createMainWindowController({
           testClientEnabled: developmentTestClientEnabled,
         })
       ) {
-        window.show();
+        if (backgroundWindows) window.showInactive();
+        else window.show();
       }
     });
     window.on("close", (event) => {
@@ -361,9 +370,11 @@ export function createMainWindowController({
     window.webContents.on("render-process-gone", onRendererGone);
     window.webContents.once("destroyed", onRendererGone);
     window.webContents.on("render-process-gone", (_event, details) => {
+      logger.warn("The main window renderer stopped.", { reason: details.reason, exitCode: details.exitCode });
       const now = Date.now();
       rendererReloadTimes = rendererReloadTimes.filter((time) => now - time < RENDERER_RELOAD_WINDOW_MS);
-      if (isQuitting() || window.isDestroyed() || !RELOADABLE_RENDERER_EXITS.has(details.reason)) return;
+      if (isQuitting() || window.isDestroyed() || firstLoadPending || !RELOADABLE_RENDERER_EXITS.has(details.reason))
+        return;
       if (rendererReloadTimes.length >= RENDERER_RELOAD_MAX) {
         askAfterRendererStopped(window);
         return;
@@ -477,7 +488,28 @@ export function createMainWindowController({
     return window;
   }
 
-  function loadRenderer(window: BrowserWindow, options: { restarted?: boolean } = {}): Promise<void> {
+  async function loadRenderer(window: BrowserWindow, options: { restarted?: boolean } = {}): Promise<void> {
+    if (options.restarted) return loadRendererOnce(window, options);
+    firstLoadPending = true;
+    try {
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          return await loadRendererOnce(window);
+        } catch (error) {
+          if (attempt >= FIRST_LOAD_ATTEMPTS || window.isDestroyed() || !isFailedLoad(error)) throw error;
+          logger.warn(
+            `The main window did not load (attempt ${attempt} of ${FIRST_LOAD_ATTEMPTS}). Loading it again.`,
+            toLogValue(error),
+          );
+        }
+      }
+    } finally {
+      firstLoadPending = false;
+    }
+  }
+
+  function loadRendererOnce(window: BrowserWindow, options: { restarted?: boolean } = {}): Promise<void> {
+    stopFirstRendererForTest(window);
     onRendererLoadStarted();
     const url = appRendererUrl(process.env.ELECTRON_RENDERER_URL);
     if (options.restarted) url.searchParams.set(RESTARTED_RENDERER_QUERY, "1");
@@ -485,6 +517,12 @@ export function createMainWindowController({
       if (!isReplacedLoad(error) || window.isDestroyed() || !window.webContents.isLoading()) throw error;
       return replacementLoad(window.webContents, error);
     });
+  }
+
+  function stopFirstRendererForTest(window: BrowserWindow): void {
+    if (!stopsFirstRenderer || firstRendererStopped) return;
+    firstRendererStopped = true;
+    window.webContents.once("did-navigate", () => window.webContents.forcefullyCrashRenderer());
   }
 
   async function ensureMainWindow(): Promise<BrowserWindow> {
@@ -826,10 +864,15 @@ function chatWindowKey(target: ChatWindowTarget): string {
   return JSON.stringify([target.serverId, target.agentId]);
 }
 
+const FAILED_LOAD_ERROR = -2;
 const REPLACED_LOAD_ERROR = -3;
 
 function isReplacedLoad(error: unknown): error is Error {
   return error instanceof Error && "errno" in error && error.errno === REPLACED_LOAD_ERROR;
+}
+
+function isFailedLoad(error: unknown): boolean {
+  return error instanceof Error && "errno" in error && error.errno === FAILED_LOAD_ERROR;
 }
 
 function replacementLoad(contents: WebContents, replaced: Error): Promise<void> {
@@ -917,6 +960,15 @@ export function sendComputerUseHighlightPlacement(
 }
 
 let windowsKeptHidden = false;
+let backgroundWindows = false;
+
+export function openWindowsInBackground(): void {
+  backgroundWindows = true;
+}
+
+export function windowsOpenInBackground(): boolean {
+  return backgroundWindows;
+}
 
 export function keepWindowsHidden(): void {
   windowsKeptHidden = true;

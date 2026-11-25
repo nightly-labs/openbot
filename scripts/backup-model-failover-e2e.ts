@@ -321,6 +321,11 @@ const answer = (request) => {
           if (!current.includes("usage-tool-only")) item({ type: "agentMessage", id: randomUUID(), phase: "commentary", text: "Checkpoint saved for " + caseId + ". Only the final step remains." });
         }
         if (current.includes("usage-wait")) return;
+        if (current.includes("capacity-")) {
+          const error = { message: "Reconnecting... 2/5", codexErrorInfo: { responseStreamDisconnected: { httpStatusCode: null } }, additionalDetails: "Selected model is at capacity. Please try a different model." };
+          write({ method: "error", params: { threadId: thread.id, turnId: turn.id, error, willRetry: true } });
+          if (current.includes("capacity-wait")) return;
+        }
         if (limited) {
           const error = current.includes("usage-spent")
             ? { message: "Your credit balance is too low to continue.", codexErrorInfo: "usageLimitExceeded" }
@@ -365,6 +370,11 @@ interface ClientEvents {
   exit: [error: Error];
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
+
+const TWO_EFFORTS = {
+  defaultReasoningEffort: "medium",
+  supportedReasoningEfforts: [{ reasoningEffort: "medium" }, { reasoningEffort: "low" }],
+};
 
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
@@ -424,8 +434,8 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
         return providerSync(() =>
           decoder({
             data: [
-              { model: PRIMARY, displayName: "Primary" },
-              { model: BACKUP, displayName: "Backup" },
+              { model: PRIMARY, displayName: "Primary", ...TWO_EFFORTS },
+              { model: BACKUP, displayName: "Backup", ...TWO_EFFORTS },
             ],
           }),
         );
@@ -778,6 +788,27 @@ try {
     return { model: setup.model, usageLimitReturn: setup.usageLimitReturn };
   });
 
+  const effortOnBackup = await (async () => {
+    const efforts = (model: AgentModelId) =>
+      service.listModels().find((option) => option.provider === "claude" && option.id === model)
+        ?.supportedReasoningEfforts ?? [];
+    const effort = efforts(PRIMARY).find(
+      (one) => one !== agentOf(mover.id).reasoningEffort && efforts(BACKUP).includes(one),
+    );
+    assert.ok(effort, "The own model and the backup share another effort.");
+    await check("an effort chosen on the backup model is the effort to go back with", async () => {
+      const update = await callTool("update_profile", { agentId: mover.id, reasoningEffort: effort });
+      assert.ok(update.success, update.text);
+      const agent = agentOf(mover.id);
+      assert.equal(agent.model, BACKUP, "The agent stays on the backup model.");
+      assert.equal(agent.reasoningEffort, effort, "The backup model takes the chosen effort.");
+      assert.equal(agent.usageLimitReturn?.model, PRIMARY, "The agent keeps its own model to go back to.");
+      assert.equal(agent.usageLimitReturn?.reasoningEffort, effort, "The own model goes back with the chosen effort.");
+      return { effort };
+    });
+    return effort;
+  })();
+
   await check("after a restart the agent goes back to its own model", async () => {
     await runCauseEffect(service.stop());
     failing([]);
@@ -795,6 +826,7 @@ try {
     );
     const agent = agentOf(mover.id);
     assert.equal(agent.model, PRIMARY, "The agent is back on its own model.");
+    assert.equal(agent.reasoningEffort, effortOnBackup, "The agent keeps the effort chosen on the backup.");
     assert.equal(agent.usageLimitReturn, undefined, "Nothing is left to go back to.");
     const notes = await markers(mover.id, MODEL_SWITCH_ITEM_TYPES["provider-error-ended"]);
     assert.deepEqual(notes, [sourceText("status.agent.modelReturnedAfterError", { model: modelName(PRIMARY) })]);
@@ -1171,6 +1203,42 @@ try {
       return { outcome, backups: backups.map((turn) => turn.model), checkpoint: mode };
     });
   }
+
+  await check("a Codex model at capacity moves to the backup model without waiting for its retries", async () => {
+    await restart();
+    const agent = await createCodex("Codex capacity", automaticBackups);
+    const since = events.length;
+    const beforeCodex = readLog<CodexTurn>(codexLog).length;
+    const beforeClaude = turns().length;
+    const outcome = await send(agent.id, "capacity-wait: answer the question.");
+    assert.equal(outcome.status, "completed", `The message completes on the backup: ${outcome.error}`);
+    assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1, "Codex gets the message once.");
+    assert.deepEqual(
+      turns()
+        .slice(beforeClaude)
+        .map((turn) => turn.model),
+      [PRIMARY],
+      "The first backup model runs the message.",
+    );
+    const moved = agentOf(agent.id);
+    assert.equal(moved.provider, "claude", "The agent is on its backup model.");
+    assert.equal(moved.usageLimitReturn?.provider, "codex", "The agent can go back to its own model.");
+    assert.deepEqual(errorsFor(agent.id, since), [], "No capacity notice or error shows.");
+    return { outcome, model: moved.model };
+  });
+
+  await check("a Codex turn that ends before the capacity hand-off keeps its answer and its model", async () => {
+    await restart();
+    const agent = await createCodex("Codex capacity race", automaticBackups);
+    const since = events.length;
+    const beforeClaude = turns().length;
+    const outcome = await send(agent.id, "capacity-race: answer the question.");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    assert.equal(turns().length, beforeClaude, "No backup model runs the message.");
+    assert.equal(agentOf(agent.id).provider, "codex", "The agent stays on its own model.");
+    assert.deepEqual(errorsFor(agent.id, since), [], "No capacity error shows.");
+    return outcome;
+  });
 
   await check("a spent balance names the model it left and what to do", async () => {
     await restart();

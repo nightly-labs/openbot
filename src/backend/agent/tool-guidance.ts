@@ -157,6 +157,10 @@ function openbotGuidance(namespace: string, tool: string): string {
         "OpenBot renders GitHub-flavored Markdown tables: a header row, a separator row with three or more dashes per column, and one or more data rows. A fenced ```mermaid block shows a diagram. A fenced ```html block shows a static page next to its code: inline CSS, inline SVG, and data: URLs only, with no scripts or network loads.",
         "When a chart, a table, a diagram, an image collage, or a mockup needs scripts or a CDN library, publish a self-contained page with openbot.html_render before your final answer. OpenBot shows it above the answer, so do not announce or repeat it; add only what it does not say.",
       ].join("\n");
+    case "list_media_models":
+    case "generate_image":
+    case "generate_video":
+      return "openbot.list_media_models (with tool_call) gives the model ids, options and prices; use them when the user names a model, an option or a price. Each call makes one file and spends credits: make no variants that the user did not ask for. To edit a picture, give its local path in images. When the user declines or skips, or the balance is too low, tell the user and do not try another model.";
     case "set_backdrop":
       return "Check the page with openbot.html_preview first when you can. Give matching bubbles colors unless the user wants the page only.";
     case "react_to_user_message":
@@ -170,7 +174,7 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "remove_mcp_server":
       return [
         "Add, change, turn on or off, or remove an MCP server only when the user asks. When a Marketplace app covers the service, use openbot.suggest_marketplace_app instead. A new server goes to every agent; the user selects its agents in Marketplace, Apps: say so in your answer. Call openbot.list_mcp_servers first for the names in use. Do not ask the user to confirm a requested change: OpenBot asks for approval when needed, and a declined change is final for the request.",
-        "openbot.save_mcp_server tests a server that is on before the save. On ready, give the user the tool names. On needs_sign_in, follow its next field: only the user sees the Sign in card. On needs_key, save again with the key in headers when the user gave it; else tell the user to enter it in Marketplace, Apps, then test again. Never put a key in a URL or repeat it. On error, report it and what to change. The new tools reach the agents from the next turn.",
+        "openbot.save_mcp_server tests a server that is on before the save. On ready, give the user the tool names. On needs_sign_in, follow its next field: only the user sees the Sign in card. On needs_key, save again with the key in headers when the user gave it; else tell the user to enter it in Marketplace, Apps, then test again. Keep URLs as given. Never repeat keys. On error, report it and what to change. The new tools reach the agents from the next turn.",
       ].join("\n");
     case "send_feedback":
       return "Use it for a problem in OpenBot itself, not the user's project, or for a wanted change. When the user complains about OpenBot, first help or give a workaround, then call it unasked. Call it once per problem; after Not now, if asked. Write the text yourself, plainly. Do not ask for versions, logs or settings: OpenBot adds them. Set surface Phone app for a phone app bug, also if told on a computer. Ask one question only when you do not know what went wrong, what they want or which app. Leave out secrets, private paths and other chat text. Never send a security problem: give https://github.com/nightly-labs/openbot/security/advisories/new. For a question or discussion, give https://github.com/nightly-labs/openbot/discussions. Say the issue is public, without their name. Then follow the result's next field. Never open an OpenBot issue with other tools";

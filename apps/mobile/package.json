@@ -1,7 +1,7 @@
 {
   "name": "@openbot/mobile",
   "main": "expo-router/entry",
-  "version": "1.4.12",
+  "version": "1.4.14",
   "expo": {
     "install": {
       "exclude": [
@@ -97,6 +97,7 @@
     "katex": "catalog:",
     "lucide-react-native": "^1.73.0",
     "marked": "catalog:",
+    "marked-cjk-friendly": "catalog:",
     "mermaid": "catalog:",
     "pdfjs-dist": "catalog:",
     "react": "19.3.0",

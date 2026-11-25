@@ -31,6 +31,8 @@ export const messages = {
   "error.voice.live.timedOut": "Codex 实时语音未能及时启动。请重试。",
   "error.voice.live.failed": "实时语音已停止：{reason}",
   "error.voice.live.disconnected": "实时语音已断开。",
+  "error.voice.live.startFailed":
+    "无法启动实时语音。请在运行该智能体的电脑上更新 Codex 并使用 ChatGPT 登录，然后重试。原因：{reason}",
   "error.voice.live.hostFailed":
     "服务器上的 Codex 无法启动实时语音。请让所有者更新那台电脑上的 Codex 并使用 ChatGPT 登录，然后重试。",
   "error.voice.live.signIn": "请用 ChatGPT 账号登录 Codex 以使用实时语音。",
@@ -38,4 +40,6 @@ export const messages = {
   "error.voice.live.unavailable": "OpenAI 无法启动实时语音。问题出在 OpenAI 一方。请稍后重试。",
   "error.voice.live.refused": "OpenAI 拒绝启动实时语音。请稍后重试，或在 设置 中关闭实时语音以用语音对话。",
   "error.voice.live.off": "Codex 实时语音已关闭。请在 设置 → 语音 中打开。",
+  "error.voice.server.modelUnsupported":
+    "{host} 无法使用 {model} 转写。请在 设置 → 语音 中为语音服务器选择其他听写模型。",
 } as const satisfies PartialTranslation<typeof source>;

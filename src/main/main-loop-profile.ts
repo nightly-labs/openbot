@@ -5,12 +5,14 @@ import { AnalyticsOperationFailure } from "./analytics-effects";
 export const PROFILE_STALL_MS = 2_000;
 const PROFILE_TOP_COUNT = 20;
 
-const SAMPLING_INTERVAL_US = 10_000;
+const SAMPLING_INTERVAL_US = 20_000;
 const STACK_DEPTH = 8;
 const MAX_NAME_LENGTH = 60;
 const EXTERNAL = "(external)";
 const ANONYMOUS = "(anonymous)";
 const ENGINE_NAMES = new Set(["(program)", "(garbage collector)", "(idle)", "(root)"]);
+const PROFILER_MODULE = "node:inspector";
+const PROFILER_POST = "post";
 const FUNCTION_NAME = /^[A-Za-z_$][\w$.]*$/;
 const FILE_NAME = /^[\w.-]+$/;
 const NODE_MODULE = /^node:(?:[a-z_]+|(?:internal|electron)\/[a-z0-9_/]+)$/;
@@ -119,6 +121,18 @@ export function summarizeCpuProfile(profile: CpuProfile, appRoot: string): MainL
     byId.set(node.id, node);
     for (const child of node.children ?? []) parent.set(child, node.id);
   }
+  const profilerOwn = new Map<number, boolean>();
+  const isProfilerOwn = (id: number): boolean => {
+    const known = profilerOwn.get(id);
+    if (known !== undefined) return known;
+    const frame = byId.get(id)?.callFrame;
+    const parentId = parent.get(id);
+    const own =
+      (frame?.url === PROFILER_MODULE && frame.functionName === PROFILER_POST) ||
+      (parentId !== undefined && isProfilerOwn(parentId));
+    profilerOwn.set(id, own);
+    return own;
+  };
   const labels = new Map<number, string>();
   const label = (id: number): string => {
     let value = labels.get(id);
@@ -134,6 +148,7 @@ export function summarizeCpuProfile(profile: CpuProfile, appRoot: string): MainL
   let idleUs = 0;
   const functions = new Map<string, { selfUs: number; heaviest: number; heaviestUs: number }>();
   for (const [id, us] of selfUs) {
+    if (isProfilerOwn(id)) continue;
     totalUs += us;
     const frame = label(id);
     if (frame === "(idle)") {

@@ -96,6 +96,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "מתחיל את ההתחברות ל-{name} ב-{host}…",
   "provider.codeLogin.pageOpening": "פותח את דף ההתחברות של {name} ב-{host}…",
   "provider.codeLogin.linkStep": "יש להתחבר ל-{name}. OpenBot ממשיך בעצמו.",
+  "provider.codeLogin.thisComputerDescription": "יש לפתוח את הקישור בדפדפן במחשב הזה. OpenBot ממתין כאן.",
+  "provider.codeLogin.copyLink": "העתקת קישור",
   "provider.codeLogin.chatgptDeviceSetting":
     "ב-ChatGPT במחשב, יש לפתוח את הגדרות האבטחה ולהפעיל התחברות עם קוד התקן עבור Codex. בחשבון עבודה, מנהל סביבת העבודה מפעיל אותה.",
   "provider.useApp.title": "חיבור {name} באפליקציית OpenBot",

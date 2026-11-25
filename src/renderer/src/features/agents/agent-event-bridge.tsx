@@ -46,6 +46,7 @@ import {
   agentErrorDetails,
   claimErrorToast,
   createTurnErrorBanners,
+  isRetryNotice,
   providerErrorTitle,
   readableAgentError,
   remoteAgentError,
@@ -260,6 +261,12 @@ export function AgentEventBridge() {
         return;
       case "conversation-delta":
         applyConversationDelta(event);
+        if (isMainThread(event.agentId, event.threadId))
+          errorBanners.clearAfterOutput(
+            composerDraftKey({ agentId: event.agentId, serverId: activeServerId() }),
+            setConversationErrors,
+            setConversationErrorRuns,
+          );
         return;
       case "turn-progress": {
         const detail = cleanAgentMessageText(event.detail);
@@ -483,11 +490,18 @@ export function AgentEventBridge() {
             provider && event.model ? currentText().t("agent.error.run", { provider, model: event.model }) : provider;
           const link = event.link;
           const details = agentErrorDetails(event.message, message);
+          const notice = isRetryNotice(event.message);
           setConversationErrorRuns((current) => {
-            if (run || link || details)
+            if (run || link || details || notice)
               return {
                 ...current,
-                [key]: { message, run, ...(link ? { link } : {}), ...(details ? { details } : {}) },
+                [key]: {
+                  message,
+                  run,
+                  ...(link ? { link } : {}),
+                  ...(details ? { details } : {}),
+                  ...(notice ? { notice } : {}),
+                },
               };
             if (!(key in current)) return current;
             const { [key]: _replaced, ...next } = current;
@@ -620,9 +634,9 @@ export function AgentEventBridge() {
       }
       flush(() => handleAgentEvent(event));
       if (event.type === "runtime-snapshot") snapshotReceived = true;
+      readDictatedReplies(event, activeServerId(), isMainThread);
       if (platform.chatWindow) return;
       playAgentEventSound(event);
-      readDictatedReplies(event, activeServerId());
     });
     void agentsPort()
       .agent.getRuntimeSnapshot()

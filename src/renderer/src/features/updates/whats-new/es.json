@@ -1,5 +1,38 @@
 [
   {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Actualiza también a esta versión cada servidor al que te has unido. Muchas de las correcciones de abajo solo funcionan en un servidor cuando el servidor tiene esta versión."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Usa la voz en los canales. Cuando dictas un mensaje a un canal, la app lee en voz alta la respuesta de un agente. También puedes iniciar una conversación de voz desde el cuadro de mensajes del canal.",
+          "Oculta un servidor de la barra de servidores. El servidor también queda oculto en tus otros equipos. Selecciónalo en la carpeta «Servidores ocultos» para volver a mostrarlo."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "La página Tareas ahora se llama Hilos, como en la app del teléfono y en el panel lateral del chat.",
+          "Las respuestas en streaming y los flujos de trabajo que se ejecutan al mismo tiempo usan menos CPU, y el cliente web abre un servidor más rápido."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "En un Mac, Conectar y Añadir cuenta para Claude ahora abren la página de inicio de sesión de Claude desde OpenBot.",
+          "Cuando la conexión con un servidor al que te has unido deja de enviar datos, la app vuelve a conectarse por sí sola.",
+          "Los canales largos de un servidor al que te has unido se abren y se actualizan más rápido.",
+          "Una salida de flujo de trabajo «Notificación» o un paso que espera una aprobación ahora envía una notificación al teléfono.",
+          "Un chat de Gemini sigue después de que Google rechace un resultado de herramienta. Antes, cada mensaje posterior fallaba."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.77.0",
     "date": "2026-11-23",
     "notices": [

@@ -1,0 +1,29 @@
+{
+  "support": {
+    "appVersion": "fixture-1.0.0",
+    "protocol": { "minimum": 1, "maximum": 10 },
+    "capabilities": ["agent-runtime-snapshots"],
+    "futureOptional": "ignored"
+  },
+  "event": {
+    "type": "conversation-invalidated",
+    "botId": "agent-1",
+    "revision": 7,
+    "futureOptional": "ignored"
+  },
+  "unknownEvent": { "type": "future-event", "payload": "ignored" },
+  "providerAwareRequest": { "provider": "future-provider", "model": "future/model" },
+  "providerAwareEvent": {
+    "type": "team-direct-typing",
+    "senderMemberId": "member-1",
+    "recipientMemberId": "member-2",
+    "typing": true,
+    "futureOptional": true
+  },
+  "malformedEvent": { "type": "conversation-invalidated", "botId": 7, "revision": 7 },
+  "v10": {
+    "capabilities": ["future-capability"],
+    "absent": ["agent-runtime-snapshots"],
+    "futureOptional": true
+  }
+}

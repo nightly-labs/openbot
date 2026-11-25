@@ -1,4 +1,6 @@
+import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import { readdir, readFile, rm } from "node:fs/promises";
 import { homedir, hostname, tmpdir } from "node:os";
@@ -11,6 +13,7 @@ import {
   type ManagedProviderId,
 } from "@openbot/contracts/agent-providers";
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
   AgentProviderStatus,
@@ -140,6 +143,7 @@ import {
   type WorkflowsHandle,
   workflowNoticeEvent,
 } from "../backend/workflows/workflows";
+import { ACCOUNT_ACTIVITY_PATH, HostAccountActivity } from "./account-activity-reporter";
 import { centralAuthApiUrl, createCentralAuthManager, safeStorageCipher } from "./account-service-access";
 import { type AcpRegistry, createAcpRegistry } from "./acp-registry";
 import { AGENT_ACCESS_FILE, AgentAccessStore } from "./agent-access-store";
@@ -213,6 +217,7 @@ import {
   claudeUserSetupControl,
   createClaudeUserSetupPreferenceStore,
 } from "./claude-user-setup-preference-store";
+import { ClientBrowserHub } from "./client-browser-hub";
 import { createComputerIdle } from "./computer-idle";
 import { ComputerUseDisplayAwake } from "./computer-use-display-awake";
 import { ComputerUseHighlightController } from "./computer-use-highlight-window";
@@ -372,6 +377,14 @@ import {
 } from "./mcp-oauth-redirect-server";
 import { McpOAuthStore } from "./mcp-oauth-store";
 import { MCP_SERVER_OWNERS_FILE, McpServerOwnersStore } from "./mcp-server-owners-store";
+import {
+  type CreditAsksControl,
+  createCreditAsksMutedStore,
+  createMediaApprovalCreditsPreferenceStore,
+  creditAsksControl,
+  type MediaApprovalCreditsControl,
+  mediaApprovalCreditsControl,
+} from "./media-approval-credits-preference-store";
 import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
 import { createModelReasoningSupport, MODEL_REASONING_RETRY_WAITS_MS } from "./model-reasoning-probe";
@@ -384,6 +397,7 @@ import { PasswordManagersService } from "./password-managers/password-managers-s
 import { managedProtonPassCli } from "./password-managers/proton-pass-cli-installer";
 import { ProtonPassDriver, protonPassRecordSchema } from "./password-managers/proton-pass-driver";
 import { PointerForwardingGate } from "./pointer-forwarding-gate";
+import { ProcessLauncher } from "./process-launcher";
 import { PromptCacheTtlPreferenceStore } from "./prompt-cache-ttl-preference-store";
 import { ProviderAccountsHost } from "./provider-accounts-host";
 import { ProviderCredentialStore } from "./provider-credential-store";
@@ -537,6 +551,8 @@ const SERVER_PERSONALITY_PREFERENCE_FILE = "openbot-server-personality-v1.json";
 const PROMPT_CACHE_TTL_PREFERENCE_FILE = "openbot-prompt-cache-ttl-v1.json";
 const CLAUDE_USER_SETUP_PREFERENCE_FILE = "openbot-claude-user-setup-v1.json";
 const CACHE_EXPIRY_COMPACTION_PREFERENCE_FILE = "openbot-cache-expiry-compaction-v1.json";
+const MEDIA_APPROVAL_CREDITS_PREFERENCE_FILE = "openbot-media-approval-credits-v1.json";
+const CREDIT_ASKS_MUTED_PREFERENCE_FILE = "openbot-credit-asks-muted-v1.json";
 const CRM_PREFERENCE_FILE = "openbot-crm-v1.json";
 const CLAUDE_COMPACT_WINDOW_PREFERENCE_FILE = "openbot-claude-compact-window-v1.json";
 const PROVIDER_ENVIRONMENT_PREFERENCE_FILE = "openbot-provider-environment-v1.json";
@@ -609,6 +625,7 @@ const TEARDOWN_ORDER = {
   hostEvents: 85.5,
   signalIngress: 86,
   host: 90,
+  clientBrowser: 98,
   browserEgress: 99,
   teamWebRtcBridge: 100,
   routineFlows: 103,
@@ -624,6 +641,7 @@ const TEARDOWN_ORDER = {
   automation: 108,
   storageUsage: 109,
   service: 110,
+  processLauncher: 110.25,
   cuaDriver: 110.5,
   mcpOAuth: 111,
   analytics: 112,
@@ -735,6 +753,8 @@ export interface ApplicationServices {
   promptCacheTtl: PromptCacheTtlPreferenceStore;
   claudeUserSetup: ClaudeUserSetupControl;
   cacheExpiryCompaction: CacheExpiryCompactionControl;
+  mediaApprovalCredits: MediaApprovalCreditsControl;
+  creditAsks: CreditAsksControl;
   claudeCompactWindow: ClaudeCompactWindowControl;
   providerEnvironment: ProviderEnvironmentControl;
   modelVisibility: ModelVisibility;
@@ -1309,6 +1329,8 @@ export async function createApplicationServices({
   );
   const browserEgress = new BrowserEgressHost(teamWebRtcBridge);
   teardown.push(TEARDOWN_ORDER.browserEgress, "the computer proxies of members", () => browserEgress.dispose());
+  const clientBrowser = new ClientBrowserHub();
+  teardown.push(TEARDOWN_ORDER.clientBrowser, "the shared Chrome tabs of members", () => clientBrowser.dispose());
   const hostMemory =
     hostedServer || serverModeEnvironment
       ? new ServerMemory({
@@ -1364,6 +1386,7 @@ export async function createApplicationServices({
   };
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
+    memoryCritical: () => hostMemory?.level() === "critical",
     ...(hostMemory ? { tabLimit: () => hostMemory.browserTabLimit() } : {}),
     browserProfile: (agentId) => {
       const agent = store.get(agentId);
@@ -1504,6 +1527,14 @@ export async function createApplicationServices({
   const cacheExpiryCompaction = createCacheExpiryCompactionPreferenceStore(
     join(app.getPath("userData"), CACHE_EXPIRY_COMPACTION_PREFERENCE_FILE),
   );
+  const mediaApprovalCredits = createMediaApprovalCreditsPreferenceStore(
+    join(app.getPath("userData"), MEDIA_APPROVAL_CREDITS_PREFERENCE_FILE),
+  );
+  const creditAsksMuted = createCreditAsksMutedStore(join(app.getPath("userData"), CREDIT_ASKS_MUTED_PREFERENCE_FILE));
+  const mediaApprovalCreditsSetting = mediaApprovalCreditsControl(mediaApprovalCredits, () =>
+    service.recheckCreditsHolds(),
+  );
+  const creditAsks = creditAsksControl(mediaApprovalCreditsSetting, creditAsksMuted);
   const crmPreference = createCrmPreferenceStore(join(app.getPath("userData"), CRM_PREFERENCE_FILE));
   const claudeCompactWindow = createClaudeCompactWindowPreferenceStore(
     join(app.getPath("userData"), CLAUDE_COMPACT_WINDOW_PREFERENCE_FILE),
@@ -1550,6 +1581,8 @@ export async function createApplicationServices({
       promptCacheTtl.load(),
       claudeUserSetup.load(),
       cacheExpiryCompaction.load(),
+      mediaApprovalCredits.load(),
+      creditAsksMuted.load(),
       crmPreference.load(),
       claudeCompactWindow.load(),
       providerEnvironment.load(),
@@ -1987,6 +2020,9 @@ export async function createApplicationServices({
     computerUsePermissionHelp.close();
   });
   const providerTempDirectory = join(app.getPath("userData"), "provider-temp");
+  const processLauncher = process.platform === "win32" ? new ProcessLauncher() : null;
+  if (processLauncher)
+    teardown.push(TEARDOWN_ORDER.processLauncher, "the process launcher", () => processLauncher.dispose());
   performance.mark("openbot:services.computer-use");
   if (process.platform === "win32") await Effect.runPromise(sweepProviderTemp(providerTempDirectory));
   const agentApiKeys = new AgentApiKeys(join(app.getPath("userData"), "agent-api-keys"), vault.items);
@@ -2013,6 +2049,7 @@ export async function createApplicationServices({
   const workflowRuns = new WorkflowRunStore({ database: store.database });
   const userData = app.getPath("userData");
   const storageSources = {
+    libraryFiles: () => new Set(Object.keys(libraryFolders.getSnapshot().placement)),
     roots: {
       database: store.database.path,
       downloads: store.downloadsRoot,
@@ -2063,6 +2100,8 @@ export async function createApplicationServices({
     browser,
     finishCheck: true,
     cacheExpiryCompaction: () => cacheExpiryCompaction.get().enabled,
+    mediaApprovalCredits: () => mediaApprovalCredits.get(),
+    creditAsks,
     visualPreview: new ChatVisualPreviewer(),
     avatarDecoder: (bytes) => !nativeImage.createFromBuffer(Buffer.from(bytes)).isEmpty(),
     setCommitCoAuthor: (enabled) => agentDefaultsSettings.update({ commitCoAuthor: enabled }),
@@ -2150,6 +2189,7 @@ export async function createApplicationServices({
     computerUseOnWayland: agentsShareDisplay && cuaDriverDrivesWayland(process.platform),
     computerUseInputRefused: () => agentsShareDisplay && cuaDriver.waylandInputRefused(),
     computerUseForegroundInput,
+    computerUseMissingPermissions: () => cuaDriver.missingPermissions(),
     requestTimeoutMs: 30_000,
     offProviders: providerUse.off(),
     providerAccounts,
@@ -2207,6 +2247,7 @@ export async function createApplicationServices({
       appVersion: app.getVersion(),
       providerStateDirectory: join(app.getPath("userData"), "provider-state"),
       ...(process.platform === "win32" ? { providerTempDirectory } : {}),
+      ...(processLauncher ? { launchProcess: processLauncher.launch } : {}),
       serverEnvironment,
       agentEnvironment: (inherited) => ({
         ...agentDisplayEnvironment(process.platform),
@@ -2229,6 +2270,7 @@ export async function createApplicationServices({
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
     browserProfiles: () => agentBrowserProfiles,
+    clientBrowser,
     crm: () => crmHandle,
     crmAgentVisibleToMembers: (agentId) => host.agentVisibleToMembers(agentId),
     personCanAdminister: (personId) => host.personCanAdminister(personId),
@@ -2241,6 +2283,8 @@ export async function createApplicationServices({
         mcpServerOwners.remove(mcpServerId).pipe(Effect.andThen(mcpAccessStore.remove(mcpServerId))),
     },
     reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
+    reviewSkillsFull: (agentId) =>
+      skills.lockedSkillIds(agentId).pipe(Effect.map((ids) => ids.length >= INPUT_LIMITS.agentSkills)),
     routineFlowTools: () => routineFlowRuntime,
     workflowTools: () => workflowRuntime,
     webhookRoutines: () => agentWebhookRoutineWriter(events),
@@ -2257,6 +2301,7 @@ export async function createApplicationServices({
     skillLearner: () => localSkillLearner(skills),
     responseStyle: () => serverPersonality.responseStyle(),
     timezone: () => serverTimezone.effective(),
+    chosenTimezone: () => serverTimezone.get().timezone,
     extraRoutineSources: () => (workflowTriggers ? [workflowTriggers] : []),
     channelPersonAgentLevel: (personId, agentId) => host.channelPersonAgentLevel(personId, agentId),
     channelRemotePerson: (personId) => host.channelPersonIsRemote(personId),
@@ -2317,6 +2362,7 @@ export async function createApplicationServices({
     updateAgent: (input) => service.updateAgent(input),
     clearAgentContext: (agentId) => service.clearAgentContext(agentId),
   });
+  await Effect.runPromise(automation.removeStaleFiles());
   service.on("event", (event) => {
     if (event.type === "agents-changed") Effect.runFork(automation.requestSync());
   });
@@ -2360,6 +2406,7 @@ export async function createApplicationServices({
     download: (url, maxBytes) => downloadDiscordAttachment(url, maxBytes),
   });
   const workflowGitHub = workflowGitHubDirectory(() => githubConnector.workflowCatalog(), githubRest);
+  const workflowNotices = new EventEmitter<{ notice: [WorkflowNotice] }>();
   const workflowRuntime = await Effect.runPromise(
     createWorkflows({
       store: workflowStore,
@@ -2423,7 +2470,10 @@ export async function createApplicationServices({
           Effect.map((kept) => (typeof kept === "string" ? kept : kept.id)),
           Effect.ensuring(Effect.sync(() => storageUsage.invalidate())),
         ),
-      notify: forwardWorkflowNotice,
+      notify: (notice) => {
+        workflowNotices.emit("notice", notice);
+        forwardWorkflowNotice(notice);
+      },
       connectionOn: (connectionId) => service.messaging.store.connection(connectionId)?.enabled === true,
       post: (connectionId, placeId, markdown) => service.messaging.deliver(connectionId, placeId, markdown),
       channelPost: (input) => service.channels.postNote(input),
@@ -2705,12 +2755,17 @@ export async function createApplicationServices({
     githubSkillSource((url, init) => fetch(url, init)),
   );
   const marketplaceAgents = new AgentMarketplaceService(marketplaceAuth, service, skills);
-  const agentTemplates = new AgentTemplateService(centralAuth, service, {
-    listTemplateSkills: (agentId) => skills.listTemplateSkills(agentId),
-    installVersion: (input) => skills.installVersion(input),
-    library: () => skills.requireLocalLibrary(),
-    installLocal: (input) => skills.installLocal(input),
-  });
+  const agentTemplates = new AgentTemplateService(
+    centralAuth,
+    service,
+    {
+      listTemplateSkills: (agentId) => skills.listTemplateSkills(agentId),
+      installVersion: (input) => skills.installVersion(input),
+      library: () => skills.requireLocalLibrary(),
+      installLocal: (input) => skills.installLocal(input),
+    },
+    marketplaceAuth,
+  );
   const teamStore = new TeamStore(
     join(app.getPath("userData"), TEAM_STORE_FILE),
     join(app.getPath("userData"), LEGACY_TEAM_STORE_FILE),
@@ -3084,6 +3139,10 @@ export async function createApplicationServices({
         get: () => cacheExpiryCompaction.get().enabled,
         set: (enabled) => cacheExpiryCompactionSetting.set(enabled),
       },
+      mediaApprovalCredits: {
+        get: () => mediaApprovalCredits.get(),
+        set: (setting) => mediaApprovalCreditsSetting.set(setting),
+      },
       claudeCompactWindow: {
         get: () => claudeCompactWindowSetting.get().tokens,
         set: (tokens) => claudeCompactWindowSetting.set(tokens),
@@ -3204,11 +3263,37 @@ export async function createApplicationServices({
   };
   const remoteDesktopRuntimeCredentials = { username: "openbot", password: randomBytes(32).toString("base64url") };
   const attachmentPreviews = new AttachmentPreviews(join(app.getPath("userData"), "attachment-previews"));
+  const resolveHostOwner = () => {
+    const state = centralAuth.getState();
+    if (state.status !== "signed_in") return null;
+    const storedOwner = teamStore.getOwnerAnalyticsIdentity();
+    if (storedOwner) return storedOwner.id === state.user.id ? storedOwner : null;
+    const ownerEmail = teamStore.getOwnerEmail();
+    return !teamStore.configured || ownerEmail?.trim().toLowerCase() === state.user.email.trim().toLowerCase()
+      ? state.user
+      : null;
+  };
+  const accountActivity = new HostAccountActivity({
+    analyticsOn: analyticsPreference.enabled,
+    resolveOwner: resolveHostOwner,
+    memberAccountId: (memberId) => teamStore.getMemberAccountId(memberId),
+    send: (accounts) =>
+      centralAuth.requestAuthorized(
+        ACCOUNT_ACTIVITY_PATH,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accounts }) },
+        (value) => value,
+      ),
+  });
+  service.on("event", (event) => {
+    if (event.type === "turn-started") accountActivity.turnStarted();
+  });
   const host = new HostService({
+    onMemberUse: (memberId) => accountActivity.memberUsed(memberId),
     appVersion: app.getVersion(),
     store: teamStore,
     agents: service,
     signInWaits: service.signInWaits,
+    workflowNotices,
     agentsReady: () => agentInitialization.awaitRoster(),
     events,
     skills,
@@ -3246,6 +3331,28 @@ export async function createApplicationServices({
       subscribe: (listener) => {
         service.on("liveVoice", listener);
         return () => service.off("liveVoice", listener);
+      },
+    },
+    clientBrowser,
+    voiceTranscription: {
+      transcribe: (audio) => {
+        if (voiceServer.dictates()) return voiceServer.transcribe(audio, voice.getSettings().language);
+        return voice.getModelStatus().pipe(
+          Effect.flatMap((status) => {
+            if (status.phase === "ready" && (isLocalVoiceModelId(status.modelId) || isGroqVoiceModelId(status.modelId)))
+              return voice.transcribe(audio);
+            const preparing =
+              isLocalVoiceModelId(status.modelId) && (status.phase === "missing" || status.phase === "downloading");
+            const refusal = Effect.fail(
+              new VoiceOperationError({
+                cause: new Error(sourceText(preparing ? "error.voice.host.preparing" : "error.voice.host.notSetUp")),
+              }),
+            );
+            return preparing && status.phase === "missing"
+              ? Effect.forkDetach(Effect.ignore(voice.prepareModel())).pipe(Effect.andThen(refusal))
+              : refusal;
+          }),
+        );
       },
     },
     hostedSites,
@@ -3314,7 +3421,7 @@ export async function createApplicationServices({
           }
         : {}),
       turnLimits: hostTurnLimits,
-      ...(serverModeEnvironment
+      ...(serverModeEnvironment || hostedServer
         ? {
             restart: {
               request: (memberId) => {
@@ -3333,6 +3440,8 @@ export async function createApplicationServices({
       promptCacheTtl,
       claudeUserSetup: claudeUserSetupSetting,
       cacheExpiryCompaction: cacheExpiryCompactionSetting,
+      mediaApprovalCredits: mediaApprovalCreditsSetting,
+      creditAsks,
       claudeCompactWindow: claudeCompactWindowSetting,
       providerEnvironment: providerEnvironmentSetting,
       providerDetection: { detection: providerDetection, settings: providerDetectionSettings },
@@ -3499,6 +3608,9 @@ export async function createApplicationServices({
     remoteDesktopStateDirectory: join(app.getPath("userData"), "remote-desktop-runtime"),
     getRemoteDesktopRuntimeCredentials: () => Effect.succeed(remoteDesktopRuntimeCredentials),
     remoteDesktopScreenLocked: () => powerMonitor.getSystemIdleState(1) === "locked",
+    wakeRemoteDesktopScreen: () => {
+      execFile("/usr/bin/caffeinate", ["-u", "-t", "5"], () => undefined).unref();
+    },
     getRemoteDesktopDisplays: () => {
       const primaryId = screen.getPrimaryDisplay().id;
       return screen.getAllDisplays().map((display, index) => ({
@@ -3587,16 +3699,7 @@ export async function createApplicationServices({
     installId: analyticsInstallId,
     appVersion: app.getVersion(),
     platform: analyticsPlatform,
-    resolveOwner: () => {
-      const state = centralAuth.getState();
-      if (state.status !== "signed_in") return null;
-      const storedOwner = teamStore.getOwnerAnalyticsIdentity();
-      if (storedOwner) return storedOwner.id === state.user.id ? storedOwner : null;
-      const ownerEmail = teamStore.getOwnerEmail();
-      return !teamStore.configured || ownerEmail?.trim().toLowerCase() === state.user.email.trim().toLowerCase()
-        ? state.user
-        : null;
-    },
+    resolveOwner: resolveHostOwner,
     resolveAgent: (agentId) => service.listAgents().find((agent) => agent.id === agentId) ?? null,
     resolveProviderAuth: (agent) =>
       providerAuthKind(agent, {
@@ -3647,7 +3750,10 @@ export async function createApplicationServices({
   const analyticsPreferences = new AnalyticsPreferenceService({
     path: analyticsPreferenceFile,
     account: centralAuth,
-    setTrackingEnabled: (enabled) => analytics.setTrackingEnabled(enabled),
+    setTrackingEnabled: (enabled) => {
+      accountActivity.setAnalyticsOn(enabled);
+      analytics.setTrackingEnabled(enabled);
+    },
     followed: (enabled) => {
       for (const window of BrowserWindow.getAllWindows())
         sendToRenderer(window, IPC_ENDPOINTS.app.analyticsPreference, { enabled });
@@ -3709,6 +3815,7 @@ export async function createApplicationServices({
           }),
       },
       accountReady: centralAuthInitialization,
+      headlessHost: Boolean(hostedServer || serverModeEnvironment),
       ...(hostedServer || serverModeEnvironment || localServerChild
         ? {}
         : {
@@ -3750,6 +3857,7 @@ export async function createApplicationServices({
           centralAuth.updateRemoteMember(hostId, membershipId, role, reactivate),
         removeMember: (hostId, membershipId) => centralAuth.removeRemoteMember(hostId, membershipId),
         removeOwnedHost: (hostId) => centralAuth.removeOwnedRemoteHost(hostId),
+        setHostHidden: (hostId, hidden) => centralAuth.setRemoteHostHidden(hostId, hidden),
         getPrincipalId: () => centralAuth.getSignedInUser().id,
         controlPlaneUrl: centralAuth.resolveApiUrl("/"),
         downloadHostLogo: (hostId, version) => centralAuth.downloadRemoteHostLogo(hostId, version),
@@ -3906,6 +4014,14 @@ export async function createApplicationServices({
       sendToRenderer(contents && BrowserWindow.fromWebContents(contents), IPC_ENDPOINTS.browser.liveViewEvent, event);
     },
     writeClipboard: (text) => clipboard.writeText(text),
+    frameSize: (owner) => {
+      const contents = webContents.fromId(owner);
+      const window = contents && BrowserWindow.fromWebContents(contents);
+      if (!window || window.isDestroyed()) return null;
+      const [width = 0, height = 0] = window.getContentSize();
+      const { scaleFactor } = screen.getDisplayMatching(window.getBounds());
+      return { width: width * scaleFactor, height: height * scaleFactor };
+    },
   });
   teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => runCauseEffect(browserView.stop()));
   const remoteDesktop = new RemoteDesktopManager({
@@ -4383,6 +4499,8 @@ export async function createApplicationServices({
     promptCacheTtl,
     claudeUserSetup: claudeUserSetupSetting,
     cacheExpiryCompaction: cacheExpiryCompactionSetting,
+    mediaApprovalCredits: mediaApprovalCreditsSetting,
+    creditAsks,
     claudeCompactWindow: claudeCompactWindowSetting,
     providerEnvironment: providerEnvironmentSetting,
     modelVisibility,

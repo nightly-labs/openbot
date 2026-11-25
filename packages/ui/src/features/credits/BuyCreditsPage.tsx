@@ -28,6 +28,7 @@ import {
   Button,
   Check,
   Confetti,
+  Gift,
   SliderField,
   Text,
   TriangleAlert,
@@ -51,6 +52,7 @@ import { type CreditTarget, CreditTargetSelect, creditTargets } from "./CreditTa
 import { type CreditsStore, creditsServer } from "./credits-store";
 import { MoveCreditsDialog } from "./MoveCreditsDialog";
 import { type CreditConsent, PayCreditsDialog } from "./PayCreditsDialog";
+import { RedeemCreditsDialog } from "./RedeemCreditsDialog";
 
 const TIER_LABEL = {
   basic: "billing.credits.tier.basic",
@@ -383,6 +385,7 @@ export function BuyCreditsPage(props: BuyCreditsPageProps): JSX.Element {
   const [bursts, setBursts] = createSignal<readonly number[]>([]);
   const [confirming, setConfirming] = createSignal<{ stop: CreditStop; button: HTMLElement | undefined } | null>(null);
   const [moving, setMoving] = createSignal(false);
+  const [redeeming, setRedeeming] = createSignal(false);
   const credits = () => props.store.state.credits;
   const targets = createMemo(() => creditTargets(credits(), t("billing.credits.you")));
   const target = createMemo(
@@ -458,6 +461,18 @@ export function BuyCreditsPage(props: BuyCreditsPageProps): JSX.Element {
         onBack={() => props.onClose()}
       >
         <div class="credit-header-actions">
+          <Show when={ready()}>
+            <Button
+              variant="outline"
+              size="sm"
+              class="credit-redeem-trigger"
+              disabled={props.store.state.pending !== null}
+              onClick={() => setRedeeming(true)}
+            >
+              <Gift aria-hidden="true" />
+              {t("billing.credits.redeem")}
+            </Button>
+          </Show>
           <Show when={ready() ? ownedServer() : null}>
             <Button
               variant="outline"
@@ -486,6 +501,7 @@ export function BuyCreditsPage(props: BuyCreditsPageProps): JSX.Element {
                 value={selected()}
                 onChange={(next) => {
                   setMoving(false);
+                  setRedeeming(false);
                   setServerId(next.serverId);
                 }}
               />
@@ -553,6 +569,9 @@ export function BuyCreditsPage(props: BuyCreditsPageProps): JSX.Element {
             onClose={() => setMoving(false)}
           />
         )}
+      </Show>
+      <Show when={redeeming() && ready() ? target() : undefined}>
+        {(where) => <RedeemCreditsDialog store={props.store} target={where()} onClose={() => setRedeeming(false)} />}
       </Show>
       <For each={bursts()}>{() => <Confetti origin={payButton()} />}</For>
     </section>

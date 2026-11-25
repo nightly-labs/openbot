@@ -196,7 +196,15 @@ function seedDevelopmentProfile(profile: string, environment: NodeJS.ProcessEnv)
   });
 }
 
-const DEVELOPMENT_OPTIONS = ["--dry-run", "--force", "--shared", "--isolated", "--hosting=test", "--slack"] as const;
+const DEVELOPMENT_OPTIONS = [
+  "--dry-run",
+  "--force",
+  "--shared",
+  "--isolated",
+  "--hosting=test",
+  "--slack",
+  "--foreground",
+] as const;
 const TEST_ACCOUNT_API_URL = "https://openbot-auth-api-test.internal9671.workers.dev";
 
 export interface DevelopmentInvocation {
@@ -206,6 +214,7 @@ export interface DevelopmentInvocation {
   shared: boolean;
   hostingTest: boolean;
   slack: boolean;
+  foreground: boolean;
 }
 
 export function parseDevelopmentTarget(args: string[]): DevelopmentInvocation {
@@ -227,6 +236,7 @@ export function parseDevelopmentTarget(args: string[]): DevelopmentInvocation {
     shared: args.includes("--shared"),
     hostingTest: args.includes("--hosting=test"),
     slack: args.includes("--slack"),
+    foreground: args.includes("--foreground"),
   };
 }
 
@@ -253,7 +263,9 @@ function prepareVoiceRuntime(): void {
 }
 
 async function main(): Promise<void> {
-  const { target, dryRun, force, shared, hostingTest, slack } = parseDevelopmentTarget(process.argv.slice(2));
+  const { target, dryRun, force, shared, hostingTest, slack, foreground } = parseDevelopmentTarget(
+    process.argv.slice(2),
+  );
   if (!dryRun && prepareDevelopmentEnvironment() === "created") {
     logger.info("Prepared local development state.");
   }
@@ -270,6 +282,8 @@ async function main(): Promise<void> {
     logger.info(`The app signs in to the test account Worker: ${TEST_ACCOUNT_API_URL}.`);
   }
   sharedEnvironment.OPENBOT_DEV_STACK_ID = String(process.pid);
+  if (foreground) sharedEnvironment.OPENBOT_DEV_WINDOW_FOCUS = "foreground";
+  else sharedEnvironment.OPENBOT_DEV_WINDOW_FOCUS ??= "background";
 
   const { specs, stack } = await withDevPortAllocation(async (records) => {
     const conflicts = conflictingDevStacks(records, { projectRoot, services });

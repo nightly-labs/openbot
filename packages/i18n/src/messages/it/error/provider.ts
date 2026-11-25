@@ -251,6 +251,8 @@ export const messages = {
     "La tua chiave API di OpenCode è scaduta. Crea una nuova chiave in OpenCode Console, incollala nelle impostazioni di OpenCode, poi riprova.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go ha rifiutato la tua chiave API salvata. La chiave potrebbe essere scaduta. Crea una nuova chiave in OpenCode Console, incollala nelle impostazioni di OpenCode, poi riprova.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode non ha usato la chiave che hai salvato in OpenBot. Ha usato un’altra chiave OpenCode Go che OpenCode conserva da sé, e OpenCode Go ha rifiutato quella chiave. Per rimuovere quella chiave, esegui `opencode auth logout opencode-go` in un terminale sul computer che esegue l’agente e scegli la chiave. Poi riprova.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go ha rifiutato la richiesta. Una nuova chiave API non risolve il problema. Il tuo piano OpenCode Go potrebbe non essere attivo, oppure OpenCode Go potrebbe bloccare la tua rete: alcuni servizi bloccano VPN, proxy o alcuni paesi. Verifica che il piano sia attivo in OpenCode Console o disattiva la VPN, poi riprova. Puoi anche scegliere un altro modello.",
   "error.provider.opencodeServiceFailure":
@@ -310,8 +312,12 @@ export const messages = {
     "Il modello OpenCode ha terminato il turno senza risposta. Riprova o scegli un altro modello.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "Il modello OpenCode ha terminato il turno dopo il ragionamento, senza risposta. Riprova o scegli un altro modello.",
+  "error.provider.opencodeToolCallsAsText":
+    "Il modello OpenCode ha scritto le sue azioni come testo e non le ha eseguite. Riprova o scegli un altro modello.",
   "error.provider.acpNoAnswer":
     "{provider} ha terminato il turno senza risposta. Invia di nuovo il messaggio o avvia una nuova chat.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} ha ricevuto i risultati dai compagni di squadra, poi ha terminato il turno senza risposta. Chiedi all'agente di continuare.",
   "error.provider.noAnswerAfterSteps":
     "{provider} ha eseguito alcuni passaggi, poi ha chiuso il turno senza risposta. Chiedi all'agente cosa ha fatto prima di inviare di nuovo la stessa richiesta.",
   "error.provider.acpRefusedNoReason": "{provider} si è fermato senza risposta. Invia di nuovo il messaggio.",
@@ -377,6 +383,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Accedi con Cursor o imposta CURSOR_API_KEY per usare Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor non è riuscito a connettersi al suo server con il tuo accesso. Controlla la connessione a Internet, poi accedi di nuovo a Cursor.",
+  "error.provider.cursorNoModels":
+    "Cursor non ha inviato l’elenco dei modelli. Scegli «Connetti» per accedere di nuovo a Cursor. Se questo messaggio resta, controlla che il tuo piano Cursor includa dei modelli.",
   "error.provider.clineArchivePath": "L'archivio di Cline ha un percorso inatteso.",
   "error.provider.clinePackageMismatch": "Il pacchetto di Cline non corrisponde al catalogo dei runtime.",
   "error.provider.clineChecksum": "Checksum del runtime di Cline non corrispondente.",
@@ -420,6 +428,8 @@ export const messages = {
     "La chiave API di Anthropic non ha credito API. Un piano Claude non paga le richieste fatte con una chiave API. Aggiungi credito nella Anthropic Console, oppure accedi a Claude nelle Impostazioni e seleziona l'account Claude nel menu dei modelli dell'agente.",
   "error.provider.claudeAccountNoCredit":
     "Il saldo crediti del tuo account Claude è troppo basso. Alcune richieste, come la modalità veloce, usano crediti di utilizzo anche se il tuo piano Claude non è esaurito. Aggiungi crediti nel tuo account Claude, oppure scegli un altro modello nel menu dei modelli dell'agente.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code invia le richieste a {host}, non ad Anthropic: le impostazioni di Claude Code o le variabili d'ambiente definiscono questo indirizzo API. {host} ha rifiutato la richiesta per il saldo dell'account, non per il tuo piano Claude. Aggiungi fondi al tuo account {host}, oppure scegli un altro modello nel menu dei modelli dell'agente.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Il servizio di Claude ha bloccato questa richiesta. Di solito è un breve problema di Claude, non del tuo account. Invia di nuovo il messaggio tra qualche minuto.",
   "error.provider.foreignReasoning":
@@ -436,6 +446,8 @@ export const messages = {
     "{provider} ha bloccato questo messaggio per le sue regole di sicurezza: {reason} Se {provider} blocca anche i tuoi prossimi messaggi, avvia una nuova chat.",
   "error.provider.codexAudioRefused":
     "Questo modello non può ascoltare l'audio, quindi non ha accettato il suono di questa chat. OpenBot ha avviato una nuova sessione Codex con la cronologia della chat. Per continuare, invia di nuovo la richiesta e chiedi all'agente di lavorare senza il suono. Per controllare il suono, scegli nel menu dei modelli dell'agente un modello che può ascoltare l'audio.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex non è riuscito a caricare le impostazioni del tuo account ChatGPT, quindi l’agente si è fermato. Riprova. Se si ferma di nuovo, seleziona Riconnetti per ChatGPT in Impostazioni server → Provider.",
   "error.provider.imageTooSmall":
     "Il modello non ha accettato un'immagine in questa chat perché l'immagine è troppo piccola. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.imageTooLarge":
@@ -571,6 +583,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Impossibile leggere la versione della CLI di {provider}.",
   "error.provider.piSessionBusy": "Attendi che il turno attuale di Pi finisca.",
   "error.provider.acpSessionBusy": "{provider} sta ancora finendo un turno interrotto. Riprova tra un attimo.",
+  "error.provider.acpSettingsConflict":
+    "{provider} ha modificato questa chat mentre OpenBot applicava le sue impostazioni. Riprova.",
   "error.provider.acpSessionStale":
     "{provider} non è riuscito a caricare la versione più recente di questa chat. Invia di nuovo il messaggio.",
   "error.provider.acpModelNotOffered":

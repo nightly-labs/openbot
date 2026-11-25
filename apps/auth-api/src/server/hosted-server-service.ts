@@ -3172,7 +3172,7 @@ function hostedPoolClaim(secret: string, serverId: string, hostId: string) {
 }
 
 function poolLocations(currency: BillingCurrency): readonly [string, ...string[]] {
-  return currency === "usd" || currency === "brl" ? ["WDC-02", "AMS-01"] : ["AMS-01"];
+  return currency === "usd" || currency === "brl" ? ["WDC-02", "AMS-01", "FRA-01"] : ["AMS-01", "FRA-01"];
 }
 
 function sandboxName(plan: BillingPlanId, email: string, serverId: string): string {

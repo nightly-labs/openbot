@@ -197,7 +197,11 @@ export async function routeAgents(
     const models = (await agents.listModels())
       .filter((model) => modelId.test(model.id))
       .map(({ steersTurns: _steersTurns, ...model }) => model);
-    if (!visibleModels) return json(200, models);
+    if (!visibleModels)
+      return json(
+        200,
+        models.map(({ listing: _listing, ...model }) => model),
+      );
     const listed = await runCauseEffect(visibleModels.picker(models));
     return json(
       200,

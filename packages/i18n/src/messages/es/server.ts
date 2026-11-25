@@ -229,6 +229,9 @@ export const messages = {
   "server.rail.delete": "Eliminar servidor",
   "server.rail.hide": "Ocultar servidor",
   "server.rail.showLocal": "Mostrar {name}",
+  "server.rail.hiddenServers": "Servidores ocultos",
+  "server.rail.hideFailed": "No se pudo ocultar {name}",
+  "server.rail.showFailed": "No se pudo mostrar {name}",
   "server.plan.daysLeft": {
     one: "{count} día",
     other: "{count} días",
@@ -355,6 +358,7 @@ export const messages = {
     "Muestra la página del CRM a propietarios y administradores, permite que los agentes lean el CRM y sincroniza Stripe. Al desactivarlo, los datos se conservan.",
   "server.settings.agentDefaultsTitle": "Predeterminados de agentes",
   "server.settings.threadsCard": "Hilos y zona horaria",
+  "server.settings.creditsCard": "Créditos",
   "server.settings.memoryTitle": "Memoria",
   "server.settings.memoryDescription": "Elige qué recuerdan y aprenden los agentes de este servidor.",
   "server.settings.memoriesCard": "Recuerdos",
@@ -430,6 +434,12 @@ export const messages = {
   "server.settings.agentTaskLimitDescription":
     "Cuántos hilos puede ejecutar a la vez cada agente que no tiene un límite propio.",
   "server.settings.agentTaskLimitDefault": "Predeterminado ({count})",
+  "server.settings.mediaApprovalCredits": "Preguntar antes de gastar más de",
+  "server.settings.mediaApprovalCreditsUnit": "créditos",
+  "server.settings.mediaApprovalCreditsLoadFailed":
+    "No se pudo cargar el límite de aprobación de créditos de este servidor.",
+  "server.settings.mediaApprovalAgents": "Los agentes pueden usar créditos",
+  "server.settings.mediaApprovalAsk": "Preguntar cuando se necesiten créditos",
   "server.settings.memoryLimit": "Recuerdos por agente",
   "server.settings.memoryLimitDescription": "Cuántos recuerdos puede guardar cada agente en este servidor.",
   "server.settings.memoryLimitLoadFailed": "No se pudo cargar el límite de recuerdos de este servidor.",

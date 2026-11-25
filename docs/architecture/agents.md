@@ -81,10 +81,11 @@ is never quiet.
 
 A teammate update ends quiet in the same way. It is a teammate's message with `expectsReply` false
 that does not reply to a message of the agent (`quietTeammateDelivery`), so nobody waits for the
-turn. Its prompt names `routine_no_update`, because a provider such as Claude Code makes the model
-write a visible answer, and without the tool each update put filler in the user's chat (#6821). A turn
-of only quiet routine runs and teammate updates settles as above, also on the empty-answer error
-path and in the history import. The desktop chat shows its quiet answers under the marker of the
+turn. A message with `expectsReply` false that replies to the agent's own answer is an update too,
+not a result for the agent (`MailboxStore.followsUpOwnAnswer`, #16136). The prompt of an update
+names `routine_no_update`, because a provider such as Claude Code makes the model write a visible
+answer, and without the tool each update put filler in the user's chat (#6821). A turn of only quiet routine runs and teammate
+updates settles as above, also on the empty-answer error path and in the history import. The desktop chat shows its quiet answers under the marker of the
 last update or request of the turn, which starts closed (`teammateTurnAnswers`).
 
 A teammate's answer to a request that a quiet routine run sent continues that run, so nobody waits
@@ -994,8 +995,9 @@ header with a secret name before it parses the call, so logs mask it, and a fail
 value. A key value needs the same source as `save_api_key`: never an external chat, in a channel only a
 key that the local user wrote in the request of the task, and elsewhere only a person's message. The
 approval names the headers that change. The tools never take an environment value and
-never return a header or environment value, and show an address without its query. The user can also
-enter a key with Edit on the server's page in Marketplace, Apps. An edit keeps the row's other headers
+never return a header or environment value, and show an address without its query. An agent saves an
+address as the user gave it, query included, because some servers take the key only there (#16362).
+The user can also enter a key with Edit on the server's page in Marketplace, Apps. An edit keeps the row's other headers
 and environment, and an edit that would send them to another transport, origin, command, arguments or
 folder is refused; headers that the same edit replaces do not count. The approval masks known secrets in the command line and names
 the folder a stdio server starts in. A sign-in shows an `mcp-sign-in:<id>` card in
@@ -1109,8 +1111,34 @@ a second `session/prompt` (`AcpFlavor.steerByPromptSince` for Antigravity 1.5.0 
 `steerByPromptCapability` for a Devin CLI that reports `cognition.ai/midTurnPrompts`, because Devin
 reports the version "0.0.0-dev"). While an approval or a question is open, the message waits in the
 queue, because a new prompt would close it. Devin answers each prompt of the run with the same usage,
-so `AcpFlavor.promptRun` reports it once. `scripts/antigravity-steer-e2e.ts` and
+so `AcpFlavor.promptRun` reports it once. A steer that comes before the first update of the running
+prompt waits for that update, or for the turn end or a stop, up to `ACP_STEER_FIRST_UPDATE_WAIT_MS`
+(10 s). A teammate message and a channel post wait for the steer result, so the limit is short. After
+the limit, the message waits in the queue. Before, it failed at once and the message waited for the end
+of the whole turn. `scripts/antigravity-steer-e2e.ts` and
 `scripts/devin-steer-e2e.ts` check these paths.
+
+Antigravity ends its prompt while a command that it moved to the background still runs
+(`AcpFlavor.wakesAfterPromptEnds`), and OpenBot keeps the turn open. When the command ends, a current
+CLI reports it and replies by itself, with no prompt open. That reply is the rest of the turn: it ends
+`ACP_OWN_REPLY_SETTLE_MS` (3 s) after its `usage_update`, or after `ACP_OWN_REPLY_QUIET_MS` (2 minutes)
+with no update. Only a command step can stay open: when the reply starts a new background command,
+the turn waits for that command in the same way.
+OpenBot sends the background wake prompt only when the session changed and no update came within
+`ACP_OWN_REPLY_WAIT_MS` (30 s), as an older CLI needs, or when the CLI reported the command end but did
+not reply within `ACP_OWN_REPLY_QUIET_MS`. Before, it always sent the prompt, and the CLI answered it
+again, so the chat showed the same answer twice in one message (#16149).
+`scripts/antigravity-steer-e2e.ts` checks a CLI that replies, a silent CLI, and a reply that starts a
+new command.
+
+A message that comes while a turn starts, before the provider gave the turn id, cannot steer yet and
+stays in the queue. When the mode is "steer" and a delivery of the same lane is starting,
+`AgentService` keeps its delivery id (`#steersAfterTurnStart`) and steers it at `turn-started` of the
+same thread if it is still queued. Before, it ran only after the whole turn. A message to an idle
+agent with a held queue is not kept, so it does not join the next turn. A Stop of a chat or task turn
+that fails or that does not stop the turn records the turn in `#failedStops`. The steers that follow
+then join the running turn. The stop mark stays, so a late interrupted end still counts as a stop.
+`scripts/steer-before-turn-id-e2e.ts` checks both.
 
 A custom agent (`acp`) uses the same extension (#4977). Its descriptor has `steer: "reported"`: each
 agent process reports at `initialize` whether it steers, so the provider alone does not tell.
@@ -1155,11 +1183,16 @@ starts a new turn with the steer. The aborted result does not list the steer's u
 (`untakenSteerIds`), so the client closes the open tool calls, aborts its open host tool calls
 (`hostToolCalls`, so the host removes their approval cards), and keeps the OpenBot turn open. The
 result of the steer's turn completes it. A stop from the person (`stopRequested`) still ends the turn
-as interrupted. While a question, an elicitation or a write approval waits for the person
-(`personRequests`), the steer has no priority: the open card stays the one that Claude waits for, and
-the steer arrives after the answer. A shell command that runs one script cannot change its plan: the
-steer reaches the model when the script is done. `scripts/claude-steer-now-e2e.ts` checks the turn
-with a stand-in CLI, `scripts/question-steer-order-e2e.ts` checks the order during a question, and
+as interrupted. While a question, an elicitation, a write approval, or a browser sign-in or secret card
+(`request_takeover`, `submit_secret`) waits for the person (`personRequests`), the steer has no
+priority: the open card stays the one that Claude waits for, and the steer arrives after the answer.
+Before, a message during a sign-in card stopped the call and cancelled the card (#15776). A message
+from another agent or a routine that the busy-message mode steers has no priority either
+(`waitsForRunningTools`, #15730): it waits until the running tool call ends, and does not stop the
+tools or subagents. A message that the person sends or steers from the queue still stops them. A shell
+command that runs one script cannot change its plan: the steer reaches the model when the script is
+done. `scripts/claude-steer-now-e2e.ts` checks the turn with a stand-in CLI, and with
+`--held=takeover` it checks that a sign-in card stays open, `scripts/question-steer-order-e2e.ts` checks the order during a question, and
 `scripts/steer-framing-bench.ts` measures the real CLIs.
 
 A message from another agent follows the recipient's busy-message mode, as a message from the person
@@ -1169,7 +1202,13 @@ message into that turn (`AgentService.#steerAgentMessage`). A request that joins
 its result separate from the answer to the person: the request text tells the recipient to send the
 result with `send_message`. The turn's answer is for the person or another request, so the turn end
 never relays it for a steered request, and sends no "no reply" note: Claude can still answer a late
-steer in a turn of its own (`moveSteerToTurn`). When the turn ends as interrupted before a reply (a
+steer in a turn of its own (`moveSteerToTurn`). Until a result or a `command_lifecycle` start lists a steer's uuid, `ClaudeAgentClient` keeps it in
+`unreadSteers`. A turn that ends with one waits for Claude's own turn (`awaitOwnTurn`), so the idle
+limit does not close the thread before Claude answers it (#16361). A result that lists no uuids, or a
+stop, clears the list. When the thread closes with a steer that is still unread, `restoreUnsteered` puts
+the message back in the queue: through `unreadSteers` of `turn/completed` when the closing turn holds the
+steer, so the failed turn does not mark it failed, otherwise through `openbot/unread-steers`.
+`scripts/claude-steer-idle-release-e2e.ts` checks both paths. When the turn ends as interrupted before a reply (a
 stop, or an exit of the provider process), the sender gets an OpenBot note (`MailboxStore.answerFailedRequest`), and does not wait for a result that
 never comes. Routine runs, channel work and messages from Slack, Telegram or
 WhatsApp do not steer automatically: each starts a turn of its own. A question back (a reply that

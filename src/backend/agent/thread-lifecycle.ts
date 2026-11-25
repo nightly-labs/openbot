@@ -123,11 +123,22 @@ const CODEX_TOOLS_CONFIG = {
   experimental_request_user_input: { enabled: false },
 } as const;
 
-export const CODEX_FEATURES_CONFIG = { "features.goals": false, "features.request_permissions_tool": false } as const;
+export const CODEX_FEATURES_CONFIG = {
+  "features.goals": false,
+  "features.request_permissions_tool": false,
+  "features.multi_agent_v2_dynamic_tools": true,
+} as const;
 
 const CODEX_COMPUTER_USE_PLUGINS_OFF = {
   "plugins.computer-use@openai-bundled.enabled": false,
   "plugins.unified-computer-use@openai-bundled.enabled": false,
+} as const;
+
+const CODEX_BROWSER_PLUGINS_OFF = {
+  "plugins.browser@openai-bundled.enabled": false,
+  "plugins.chrome@openai-bundled.enabled": false,
+  "plugins.chrome-dev@openai-bundled.enabled": false,
+  "plugins.chrome-internal@openai-bundled.enabled": false,
 } as const;
 
 const CODEX_MCP_STARTUP_GRACE_MS = 10_000;
@@ -826,13 +837,14 @@ export class ThreadLifecycle {
       config?: {
         mcp_servers?: Record<string, CodexMcpServer | CodexDisabledMcpServer>;
         tools: typeof CODEX_TOOLS_CONFIG;
+        model_reasoning_effort: AgentSummary["reasoningEffort"];
         project_doc_max_bytes: number;
         mcp_optional_startup_grace_ms: number;
-        "features.goals": false;
-        "features.request_permissions_tool": false;
         "features.code_mode.direct_only_tool_namespaces": string[];
         [variable: `shell_environment_policy.set.${string}`]: string;
-      } & CodexPromptSettings &
+      } & typeof CODEX_FEATURES_CONFIG &
+        CodexPromptSettings &
+        typeof CODEX_BROWSER_PLUGINS_OFF &
         Partial<typeof CODEX_COMPUTER_USE_PLUGINS_OFF> &
         ReturnType<typeof codexSandboxConfig>;
     },
@@ -849,8 +861,10 @@ export class ThreadLifecycle {
       config: {
         ...(Object.keys(mcpServers).length > 0 ? { mcp_servers: mcpServers } : {}),
         tools: CODEX_TOOLS_CONFIG,
+        model_reasoning_effort: agent.reasoningEffort,
         ...CODEX_FEATURES_CONFIG,
         ...codexPromptSettings(own.read),
+        ...CODEX_BROWSER_PLUGINS_OFF,
         ...(agentComputerUseEnabled(agent) ? {} : CODEX_COMPUTER_USE_PLUGINS_OFF),
         project_doc_max_bytes: AGENT_INSTRUCTIONS_FILE_BYTES,
         mcp_optional_startup_grace_ms: CODEX_MCP_STARTUP_GRACE_MS,

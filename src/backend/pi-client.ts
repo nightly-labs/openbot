@@ -16,7 +16,13 @@ import { secretElicitationField } from "./agent/prompts";
 import { isContextTooSmallFailure, isPiCompactionNoOp } from "./agent/provider-diagnostics";
 import { waitForSuccessfulProcess } from "./agent/provider-status";
 import { TurnContext } from "./agent/turn-context";
-import { type AgentClient, type DiagnosticOrigin, MissingPiSessionError, RequestTimeoutError } from "./agent-client";
+import {
+  type AgentClient,
+  type DiagnosticOrigin,
+  MissingPiSessionError,
+  ProviderTurnActiveError,
+  RequestTimeoutError,
+} from "./agent-client";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./cli";
 import { runCauseEffect } from "./effect-boundary";
 import { encodedModelId, providerModelValue } from "./encoded-model-id";
@@ -38,7 +44,7 @@ import type { CustomProviderSource } from "./opencode-config";
 import { PendingServerRequests } from "./pending-server-requests";
 import { createPiCustomEndpointExtension, piCustomEndpointSecrets } from "./pi-custom-endpoints";
 import { createPiKeyExtension } from "./pi-key-providers";
-import { createPiMcpExtension, type PiMcpExtension } from "./pi-mcp";
+import { createPiMcpExtension, type PiMcpExtension, piMcpServerKeys, piMcpStartFailures } from "./pi-mcp";
 import { piMessageItems, piPrompt, piShellCommand, piText } from "./pi-messages";
 import { PI_REQUEST_TIMEOUT_MS, PiProcessClosedError, PiRpc } from "./pi-rpc";
 import { piWindowsShellArguments } from "./pi-windows-shell";
@@ -167,6 +173,7 @@ interface PiTurn {
   waitingOnUser: number;
   compacting: boolean;
   stalled: string | null;
+  unprompted: boolean;
 }
 interface PiThread {
   id: string;
@@ -183,6 +190,7 @@ interface PiThread {
   configured: boolean;
   idleRelease: ReturnType<typeof setTimeout> | null;
   idleSince: number;
+  heldRecords: DynamicRecord[] | null;
 }
 interface ClientEvents {
   notification: [AppServerNotification];
@@ -679,8 +687,11 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       extension = yield* createPiMcpExtension(handoff.servers, mcp, this.options.providerStateDirectory, relay);
       for (const secret of extension.secrets) this.#secrets.add(secret);
       keyExtension = yield* this.#keyExtension();
+      const mcpServerKeys = piMcpServerKeys(handoff.servers);
       rpc.on("diagnostic", (text) => this.emit("diagnostic", text, { duringStop: thread?.closed ?? false }));
       rpc.on("record", (record) => {
+        if (record.type === "extension_ui_request" && record.method === "notify")
+          this.#reportMcpStartFailures(mcpServerKeys, getString(record, "message") ?? "");
         if (thread && !thread.closed) this.#record(thread, record);
         else if (
           record.type === "extension_ui_request" &&
@@ -756,6 +767,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         configured,
         idleRelease: null,
         idleSince: 0,
+        heldRecords: null,
       };
       yield* this.#configure(thread, params);
       this.#threads.set(id, thread);
@@ -824,31 +836,19 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     thread: PiThread,
     params: unknown,
   ) {
-    if (thread.turn) return yield* providerFailure(new Error(sourceText("error.provider.piSessionBusy")));
+    if (thread.turn) return yield* providerFailure(this.#turnActiveError(thread.turn));
     yield* this.#configure(thread, params);
     const prompt = yield* piPrompt(params);
     if (this.options.profileGeneration && prompt.images && !(yield* this.#modelReadsImages(thread)))
       return yield* providerFailure(new Error(sourceText("error.workflow.modelImageUnsupported")));
+    if (thread.turn) return yield* providerFailure(this.#turnActiveError(thread.turn));
     const context = this.#turnContext.take(thread.id, prompt.message.startsWith("/"));
     const message = context.length > 0 ? [...context, prompt.message].join("\n\n") : prompt.message;
-    const turn: PiTurn = {
-      id: getString(params, "clientTurnId") ?? getString(params, "clientUserMessageId") ?? randomUUID(),
-      startedAt: Date.now() / 1_000,
-      messageIndex: 0,
-      items: new Map(),
-      stopped: false,
-      failure: null,
-      failureCause: null,
-      finishing: false,
-      lastActivityAt: Date.now(),
-      openTools: new Set(),
-      waitingOnUser: 0,
-      compacting: false,
-      stalled: null,
-    };
+    const turn = this.#openTurn(
+      thread,
+      getString(params, "clientTurnId") ?? getString(params, "clientUserMessageId") ?? randomUUID(),
+    );
     this.#addUserMessage(turn, prompt.message);
-    thread.turn = turn;
-    this.#disarmIdle(thread);
     this.#notify("turn/started", thread, { turn: { id: turn.id, status: "inProgress" } });
     const fail = (failure: ProviderClientOperationError) =>
       thread.turn !== turn
@@ -896,6 +896,40 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     yield* Effect.forkIn(this.#watchStall(thread, turn), this.#scope);
     return { turn: { id: turn.id, status: "inProgress" }, turnId: turn.id };
   });
+
+  #turnActiveError(turn: PiTurn): Error {
+    return turn.unprompted
+      ? new ProviderTurnActiveError(agentProviderName(this.provider))
+      : new Error(sourceText("error.provider.piSessionBusy"));
+  }
+
+  #openTurn(thread: PiThread, id: string, unprompted = false): PiTurn {
+    const turn: PiTurn = {
+      id,
+      startedAt: Date.now() / 1_000,
+      messageIndex: 0,
+      items: new Map(),
+      stopped: false,
+      failure: null,
+      failureCause: null,
+      finishing: false,
+      lastActivityAt: Date.now(),
+      openTools: new Set(),
+      waitingOnUser: 0,
+      compacting: false,
+      stalled: null,
+      unprompted,
+    };
+    thread.turn = turn;
+    this.#disarmIdle(thread);
+    return turn;
+  }
+
+  #openSelfStartedTurn(thread: PiThread): void {
+    const turn = this.#openTurn(thread, randomUUID(), true);
+    this.#notify("turn/started", thread, { turn: { id: turn.id, status: "inProgress" }, unprompted: true });
+    this.#background(this.#watchStall(thread, turn));
+  }
 
   readonly #watchStall = Effect.fn("PiAgentClient.watchStall")(function* (
     this: PiAgentClient,
@@ -1017,17 +1051,37 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     ).catch(() => undefined);
   }
 
+  #reportMcpStartFailures(keys: ReadonlyMap<string, string>, message: string): void {
+    for (const failure of piMcpStartFailures(message, keys))
+      this.emit("notification", {
+        method: "mcpServer/startupStatus/updated",
+        params: { ...failure, error: this.#redact(failure.error) },
+      });
+  }
+
   #record(thread: PiThread, record: DynamicRecord): void {
     if (record.type === "extension_ui_request") {
       this.#background(this.#ui(thread, record));
       return;
     }
+    if (thread.heldRecords) {
+      thread.heldRecords.push(record);
+      return;
+    }
     if (record.type === "compaction_end") this.#turnContext.resend(thread.id);
+    if (record.type === "agent_start" && !this.options.profileGeneration && this.#threads.get(thread.id) === thread) {
+      if (thread.turn?.finishing) {
+        thread.heldRecords = [record];
+        return;
+      }
+      if (!thread.turn) this.#openSelfStartedTurn(thread);
+    }
     const turn = thread.turn;
     if (!turn || turn.finishing) return;
     turn.lastActivityAt = Date.now();
     if (record.type === "agent_settled") {
       const failure = turn.stalled ?? turn.failure;
+      thread.heldRecords ??= [];
       this.#background(
         this.#finish(
           thread,
@@ -1152,7 +1206,10 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     this.#notify("turn/completed", thread, {
       turn: { id: turn.id, status, ...(handledCommand ? { handledCommand } : {}) },
     });
-    this.#background(this.#markIdle(thread));
+    const held = thread.heldRecords ?? [];
+    thread.heldRecords = null;
+    for (const record of held) this.#record(thread, record);
+    if (!thread.turn) this.#background(this.#markIdle(thread));
   });
 
   readonly #ui = Effect.fn("PiAgentClient.userInput")(function* (
