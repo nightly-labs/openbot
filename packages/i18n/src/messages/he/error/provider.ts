@@ -436,6 +436,8 @@ export const messages = {
     "Muse לא הצליח להפעיל שרת MCP וחסם MCP בסשן הזה. OpenBot התחיל סשן חדש של Muse עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לכבות את שליטה במחשב או את שרת ה-MCP שנכשל עבור הסוכן הזה.",
   "error.provider.claudeSessionMissing":
     "Claude Code לא מצא את הסשן השמור של הצ'אט הזה. OpenBot התחיל סשן חדש של Claude Code עם היסטוריית הצ'אט. יש לנסות שוב.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode לא מצא את הסשן השמור של הצ'אט הזה. OpenBot התחיל סשן חדש של OpenCode עם היסטוריית הצ'אט. יש לנסות שוב.",
   "error.provider.grokSignIn": "יש להריץ `grok login` או להגדיר XAI_API_KEY כדי להשתמש ב-Grok.",
   "error.provider.acpSignInNoStart": "הספק לא הופעל, ולכן ההתחברות לא יכלה להתחיל. נסה שוב או הפעל מחדש את OpenBot.",
   "error.provider.acpSignInTimedOut": "זמן ההתחברות אזל.",
