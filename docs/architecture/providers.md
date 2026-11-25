@@ -695,7 +695,9 @@ Its process service (`@opencode/pty` 0.6.0) starts that alias only some of the t
 with error 5 while another process of the Store package runs (anomalyco/opencode#64803). When `pwsh` on
 the `PATH` is only that alias and `SHELL` is not set, `opencode-windows-shell.ts` sets `SHELL` to
 Windows PowerShell in `System32`. A `shell` in the OpenCode config comes before `SHELL`, so the
-user's choice still wins. Remove this when an OpenCode release ships anomalyco/opencode#64901.
+user's choice still wins. OpenCode has no variable of its own for the shell, so the commands and the
+stdio MCP servers of these agents also see this `SHELL`; GNU make on Windows reads it. Remove this
+when an OpenCode release ships anomalyco/opencode#64901.
 
 OpenCode adds its own system prompt, tools, skill listing and Code Mode catalog to each request of an
 agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does not use: the
