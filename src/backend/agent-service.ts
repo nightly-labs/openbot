@@ -1867,8 +1867,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),
         turnEnded: (turnId) => this.#turn.hasEnded(turnId),
-        staleTurnSettlement: (agentId, threadId, turnId) =>
-          this.#turnRunsNowhere(agentId, turnId) ? this.#settleStaleOwnTurn(agentId, threadId, turnId) : null,
+        staleTurnSettlement: (agentId, threadId, turnId, channelLaneId) =>
+          this.#turnRunsNowhere(agentId, turnId, channelLaneId)
+            ? this.#settleStaleTurn(agentId, threadId, turnId, channelLaneId)
+            : null,
         orphanedDeliveryRecovery: (agentId) =>
           this.#mayRecoverOrphanedDeliveries(agentId) ? this.#recoverOrphanedDeliveries(agentId) : null,
         turnRestarting: (turnId) => this.#turn.forgetEnded(turnId),
@@ -3974,14 +3976,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
-  #turnRunsNowhere(agentId: string, turnId: string): boolean {
+  #turnRunsNowhere(agentId: string, turnId: string, channelLaneId?: string): boolean {
     return (
       !this.#stopping &&
       this.#turn.hasEnded(turnId) &&
       this.#turn.turnStartedAt(turnId) === null &&
       !this.#turn.isCompleting(turnId) &&
       this.#mailbox.findDeliveriesByTurn(agentId, turnId).length === 0 &&
-      this.#mailbox.startingDeliveriesForAgent(agentId).length === 0 &&
+      this.#mailbox.startingDeliveriesForAgent(agentId, channelLaneId).length === 0 &&
       this.#turn.workingCodexChildren(agentId, turnId).length === 0
     );
   }
@@ -4008,13 +4010,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!this.#boot.hasOrphanedOwnChatDelivery(agentId)) this.#drain.scheduleDrain(agentId);
   });
 
-  readonly #settleStaleOwnTurn = Effect.fn("AgentService.settleStaleOwnTurn")(function* (
+  readonly #settleStaleTurn = Effect.fn("AgentService.settleStaleTurn")(function* (
     this: AgentService,
     agentId: string,
     threadId: string,
     turnId: string,
+    channelLaneId: string | undefined,
   ) {
-    if (!this.#turnRunsNowhere(agentId, turnId)) return;
+    if (!this.#turnRunsNowhere(agentId, turnId, channelLaneId)) return;
     logger.warn("A chat turn that no provider runs held the agent's queue. It ends as interrupted.", {
       agentId,
       turnId,
