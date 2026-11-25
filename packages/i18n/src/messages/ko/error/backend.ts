@@ -263,6 +263,8 @@ export const messages = {
     "로그인 서버가 아직 OpenBot을 앱으로 허용하지 않아요. 계정 문제가 아니에요. 로컬 MCP 서버처럼 다른 방법으로 연결하세요.",
   "error.backend.mcpRegistrationUnavailable":
     "로그인 서버가 OpenBot을 앱으로 등록할 수 없어요. 계정 문제가 아니에요. 연결하려면 마켓플레이스, 앱에서 이 서버를 저장한 다음 로그인 앱을 추가하세요.",
+  "error.backend.mcpSignInAppNeeded":
+    "로그인 서버가 OpenBot을 앱으로 등록할 수 없어요. 계정 문제가 아니에요. 연결하려면 마켓플레이스, 앱에서 이 서버를 열고 연결 테스트를 클릭한 다음 로그인 앱을 추가하세요.",
   "error.backend.mcpSignInAbandonedGeneric": "로그인이 중단되었어요.",
   "error.backend.mcpSignInForgotten": "MCP 로그인이 진행 중에 삭제되었어요.",
   "error.backend.mcpSignInAbandoned": "MCP 로그인이 중단되었어요.",

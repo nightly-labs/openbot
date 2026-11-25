@@ -281,6 +281,8 @@ export const messages = {
     "O servidor de login ainda não aceita o OpenBot como aplicativo. Sua conta não é a causa. Use outra forma de conexão, como um servidor MCP local.",
   "error.backend.mcpRegistrationUnavailable":
     "O servidor de login não consegue registrar o OpenBot como aplicativo. Sua conta não é a causa. Para conectar, salve este servidor na Loja, Apps, e depois adicione um app de login a ele.",
+  "error.backend.mcpSignInAppNeeded":
+    "O servidor de login não consegue registrar o OpenBot como aplicativo. Sua conta não é a causa. Para conectar, abra este servidor na Loja, Apps, clique em Testar conexão e depois adicione um app de login.",
   "error.backend.mcpSignInAbandonedGeneric": "O login foi abandonado.",
   "error.backend.mcpSignInForgotten": "O login MCP foi esquecido enquanto estava em andamento.",
   "error.backend.mcpSignInAbandoned": "O login MCP foi abandonado.",

@@ -242,6 +242,8 @@ export const messages = {
     "登录服务器尚未接受 OpenBot 作为应用，这与你的账号无关。请改用其他连接方式，例如本地 MCP 服务器。",
   "error.backend.mcpRegistrationUnavailable":
     "登录服务器无法将 OpenBot 注册为应用，这与你的账号无关。要连接，请在 市场、应用 中保存此服务器，然后为它添加登录应用。",
+  "error.backend.mcpSignInAppNeeded":
+    "登录服务器无法将 OpenBot 注册为应用，这与你的账号无关。要连接，请在 市场、应用 中打开此服务器，点击 测试连接，然后添加登录应用。",
   "error.backend.mcpSignInAbandonedGeneric": "登录已放弃。",
   "error.backend.mcpSignInForgotten": "MCP 登录在运行过程中被遗忘。",
   "error.backend.mcpSignInAbandoned": "MCP 登录已放弃。",

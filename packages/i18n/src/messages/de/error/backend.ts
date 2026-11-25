@@ -292,6 +292,8 @@ export const messages = {
     "Der Anmeldeserver akzeptiert OpenBot noch nicht als Anwendung. Dein Konto ist nicht die Ursache. Verwende eine andere Verbindungsmethode, etwa einen lokalen MCP-Server.",
   "error.backend.mcpRegistrationUnavailable":
     "Der Anmeldeserver kann OpenBot nicht als Anwendung registrieren. Dein Konto ist nicht die Ursache. Speichere zum Verbinden diesen Server unter Marketplace, Apps und füge ihm dann eine Anmelde-App hinzu.",
+  "error.backend.mcpSignInAppNeeded":
+    "Der Anmeldeserver kann OpenBot nicht als Anwendung registrieren. Dein Konto ist nicht die Ursache. Öffne zum Verbinden diesen Server unter Marketplace, Apps, klicke auf Verbindung testen und füge dann eine Anmelde-App hinzu.",
   "error.backend.mcpSignInAbandonedGeneric": "Die Anmeldung wurde abgebrochen.",
   "error.backend.mcpSignInForgotten": "Die MCP-Anmeldung wurde während ihrer Ausführung verworfen.",
   "error.backend.mcpSignInAbandoned": "Die MCP-Anmeldung wurde abgebrochen.",

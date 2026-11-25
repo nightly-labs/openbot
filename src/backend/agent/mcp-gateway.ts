@@ -309,7 +309,7 @@ export class McpGateway {
     const outcome = yield* this.#probeStoredSignIn(config, silent, options.signInPlace ?? null);
     yield* this.#refreshForTestedTools(config, outcome);
     const refused = outcome.error === null && (yield* this.signInOffer(config)) === "refused";
-    const error = refused ? sourceText("error.backend.mcpRegistrationUnavailable") : outcome.error;
+    const error = refused ? sourceText("error.backend.mcpSignInAppNeeded") : outcome.error;
     return { toolCount: outcome.toolCount, error };
   });
 

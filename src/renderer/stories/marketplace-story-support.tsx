@@ -14,6 +14,7 @@ import {
   type SkillCategory,
 } from "@openbot/contracts/ipc";
 import type { McpConnectFlow } from "@openbot/contracts/mcp-connect-flows";
+import { sourceText } from "@openbot/i18n";
 import { CONNECTOR_LISTINGS } from "@openbot/ui/features/connectors/connector-catalog";
 import { Marketplace } from "@openbot/ui/features/marketplace/Marketplace";
 import { AgentsDialog } from "@openbot/ui/features/marketplace/MarketplaceAgentsDialog";
@@ -246,6 +247,8 @@ function startSkills(agents: readonly ClientAgentSummary[]): Record<string, Inst
 
 type HeldState = "connected" | "signInNeeded";
 
+const STORY_SIGN_IN_CALLBACK = "http://127.0.0.1:47823/mcp/callback";
+
 export interface StoryProps {
   member?: boolean;
   blocked?: MarketplaceAppsBlock;
@@ -259,6 +262,7 @@ export interface StoryProps {
   catalog?: readonly string[];
   manyAgents?: boolean;
   noSkills?: boolean;
+  signInAppNeeded?: boolean;
   dialogSkill?: string;
   agentStates?: Readonly<Record<string, "added" | "update">>;
   xAgent?: boolean;
@@ -354,6 +358,7 @@ export function MarketplaceStory(props: StoryProps) {
     catalog = [],
     manyAgents,
     noSkills,
+    signInAppNeeded,
     dialogSkill,
     agentStates,
     xAgent,
@@ -410,12 +415,12 @@ export function MarketplaceStory(props: StoryProps) {
           ),
         };
       }),
-      ...STORY_MCP_SERVERS.slice(0, 1).map(
+      ...STORY_MCP_SERVERS.slice(signInAppNeeded ? 1 : 0, signInAppNeeded ? 2 : 1).map(
         (server): MarketplaceApp => ({
           kind: "custom",
           id: `custom:${server.id}`,
           name: server.name,
-          tagline: server.command,
+          tagline: server.transport === "stdio" ? server.command : server.url,
           status: "connected",
           server,
         }),
@@ -554,7 +559,10 @@ export function MarketplaceStory(props: StoryProps) {
       putServer(saved);
       return saved;
     },
-    test: async () => ({ toolCount: 3, error: null }),
+    test: async () => ({
+      toolCount: 3,
+      error: signInAppNeeded ? sourceText("error.backend.mcpSignInAppNeeded") : null,
+    }),
     setEnabled: async (id, enabled) => {
       const server = customServers().find((candidate) => candidate.id === id);
       if (server) putServer({ ...server, enabled });
@@ -569,6 +577,16 @@ export function MarketplaceStory(props: StoryProps) {
       signOut: async (id) => {
         setSignIns((held) => ({ ...held, [id]: { mcpServerId: id, signedIn: false } }));
       },
+      app: signInAppNeeded
+        ? {
+            load: async () => ({ redirectUrl: STORY_SIGN_IN_CALLBACK, app: null }),
+            save: async (input) => ({
+              redirectUrl: STORY_SIGN_IN_CALLBACK,
+              app: { clientId: input.clientId, secretSaved: Boolean(input.clientSecret), scope: input.scope },
+            }),
+            remove: async () => ({ redirectUrl: STORY_SIGN_IN_CALLBACK, app: null }),
+          }
+        : undefined,
     }),
     signInRequest: () => null,
     endSignInRequest: () => {},
