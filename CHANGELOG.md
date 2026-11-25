@@ -707,6 +707,11 @@ All notable changes to OpenBot will be documented here. The project follows
   text field, such as the eproc court portals. Before, the page emptied the password, and the site
   said that the password was wrong. When a page still does not keep the saved password, the agent
   stops before it sends the form, so that you can take over and sign in.
+- A task in a channel no longer waits until you restart OpenBot when the agent's earlier turn in that channel, or in another channel, has ended but is still marked as running. OpenBot now ends that turn as interrupted, and the task starts. Before, the task stayed queued and the agent showed "working".
+- Teams: "Waiting for replies" no longer shows a teammate request as "Working" after the teammate
+  replied to it. Before, a follow-up that the teammate took into its running work stayed "Working"
+  until that work ended, so one busy teammate looked like many running tasks.
+- When you open Your settings, Server settings or another full page, the agent list in the sidebar no longer shows through the page.
 
 ## [0.78.0] - 2026-11-24
 
