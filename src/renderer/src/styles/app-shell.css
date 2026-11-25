@@ -1127,10 +1127,22 @@ textarea {
 }
 
 .server-menu {
+  display: flex;
   min-width: 240px;
   max-width: 300px;
-  max-height: min(520px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 520px));
+  max-height: min(calc(100dvh - 16px), var(--kb-popper-content-available-height, 100dvh));
+  flex-direction: column;
+}
+
+.server-menu > * {
+  flex-shrink: 0;
+}
+
+.server-menu > .server-menu-list {
+  min-height: 0;
+  flex-shrink: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .server-submenu {
