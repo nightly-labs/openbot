@@ -451,6 +451,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "O proxy {name} recusou o início de sessão, por isso a página não abriu.",
   "error.backend.browserSystemProxyFailed":
     "O proxy nas configurações do computador que executa o OpenBot não responde ou recusou a conexão, por isso a página não abriu. Verifique as configurações de proxy desse computador.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "O site ou o proxy nas configurações do computador que executa o OpenBot fechou a conexão sem resposta, por isso a página não abriu. Se nenhum site abrir, verifique as configurações de proxy desse computador.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "O site ou o proxy deste perfil do navegador fechou a conexão sem resposta, por isso a página não abriu. Se nenhum site abrir, verifique o proxy do perfil.",
   "error.backend.browserProxyComputerUnreachable":
     "O computador que este perfil usa não responde, por isso a página não abriu.",
   "error.backend.browserProxyComputerLocalAddress":

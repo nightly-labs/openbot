@@ -414,6 +414,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "رفض الوكيل {name} تسجيل الدخول، لذلك لم تُفتح الصفحة.",
   "error.backend.browserSystemProxyFailed":
     "الوكيل في إعدادات الكمبيوتر الذي يشغّل OpenBot لا يستجيب أو رفض الاتصال، لذلك لم تُفتح الصفحة. تحقّق من إعدادات الوكيل في ذلك الكمبيوتر.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "أغلق الموقع أو الوكيل في إعدادات الكمبيوتر الذي يشغّل OpenBot الاتصال دون أي رد، لذلك لم تُفتح الصفحة. إذا لم يُفتح أي موقع، فتحقّق من إعدادات الوكيل في ذلك الكمبيوتر.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "أغلق الموقع أو وكيل ملف تعريف المتصفح هذا الاتصال دون أي رد، لذلك لم تُفتح الصفحة. إذا لم يُفتح أي موقع، فتحقّق من وكيل ملف التعريف.",
   "error.backend.browserProxyComputerUnreachable":
     "الكمبيوتر الذي يستخدمه هذا الملف الشخصي لا يستجيب، لذلك لم تُفتح الصفحة.",
   "error.backend.browserProxyComputerLocalAddress":

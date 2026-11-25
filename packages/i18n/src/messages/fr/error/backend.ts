@@ -456,6 +456,10 @@ export const messages = {
     "Le proxy {name} a refusé l’identification, la page ne s’est donc pas ouverte.",
   "error.backend.browserSystemProxyFailed":
     "Le proxy des réglages de l’ordinateur qui exécute OpenBot ne répond pas ou a refusé la connexion, la page ne s’est donc pas ouverte. Vérifiez les réglages de proxy de cet ordinateur.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "Le site ou le proxy des réglages de l’ordinateur qui exécute OpenBot a fermé la connexion sans réponse, la page ne s’est donc pas ouverte. Si aucun site ne s’ouvre, vérifiez les réglages de proxy de cet ordinateur.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "Le site ou le proxy de ce profil de navigateur a fermé la connexion sans réponse, la page ne s’est donc pas ouverte. Si aucun site ne s’ouvre, vérifiez le proxy du profil.",
   "error.backend.browserProxyComputerUnreachable":
     "L’ordinateur de ce profil ne répond pas, la page ne s’est donc pas ouverte.",
   "error.backend.browserProxyComputerLocalAddress":

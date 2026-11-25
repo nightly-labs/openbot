@@ -426,6 +426,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "{name} proxy'si oturum açmayı reddetti, bu yüzden sayfa açılmadı.",
   "error.backend.browserSystemProxyFailed":
     "OpenBot'u çalıştıran bilgisayarın ayarlarındaki proxy yanıt vermiyor veya bağlantıyı reddetti, bu yüzden sayfa açılmadı. O bilgisayarın proxy ayarlarını kontrol edin.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "Site veya OpenBot'u çalıştıran bilgisayarın ayarlarındaki proxy bağlantıyı yanıt vermeden kapattı, bu yüzden sayfa açılmadı. Hiçbir site açılmıyorsa o bilgisayarın proxy ayarlarını kontrol edin.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "Site veya bu tarayıcı profilinin proxy'si bağlantıyı yanıt vermeden kapattı, bu yüzden sayfa açılmadı. Hiçbir site açılmıyorsa profilin proxy'sini kontrol edin.",
   "error.backend.browserProxyComputerUnreachable":
     "Bu profilin kullandığı bilgisayar yanıt vermiyor, bu yüzden sayfa açılmadı.",
   "error.backend.browserProxyComputerLocalAddress":

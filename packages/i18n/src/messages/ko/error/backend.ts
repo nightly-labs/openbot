@@ -422,6 +422,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "프록시 {name}이(가) 로그인을 거부해 페이지를 열지 못했어요.",
   "error.backend.browserSystemProxyFailed":
     "OpenBot을 실행하는 컴퓨터 설정의 프록시가 응답하지 않거나 연결을 거부해 페이지를 열지 못했어요. 그 컴퓨터의 프록시 설정을 확인하세요.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "사이트 또는 OpenBot을 실행하는 컴퓨터 설정의 프록시가 응답 없이 연결을 닫아 페이지를 열지 못했어요. 어떤 사이트도 열리지 않으면 그 컴퓨터의 프록시 설정을 확인하세요.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "사이트 또는 이 브라우저 프로필의 프록시가 응답 없이 연결을 닫아 페이지를 열지 못했어요. 어떤 사이트도 열리지 않으면 프로필의 프록시를 확인하세요.",
   "error.backend.browserProxyComputerUnreachable":
     "이 프로필이 사용하는 컴퓨터가 응답하지 않아 페이지를 열지 못했어요.",
   "error.backend.browserProxyComputerLocalAddress":
