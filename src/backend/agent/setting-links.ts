@@ -462,6 +462,14 @@ const SERVER_PLACES: readonly ServerPlaceEntry[] = [
     words: "move migrate migration copy new",
   },
   {
+    title: "Import",
+    place: `On a computer: ${SERVER_SETTINGS} > Import. On the phone app: the server's Server settings > Import agents.`,
+    about:
+      "Any member copies agents from another app into this server: Grok Bot (an export agent there makes a .zip file) or Hermes Agent (its folder or an exported .zip file). Owners and admins also see Another OpenBot computer, which opens Transfer. The user sees every item before anything changes.",
+    words: "importing grok hermes bot bring",
+    foundWithoutServerWord: ["import", "hermes"],
+  },
+  {
     title: "Vault",
     place: `On a computer: ${SERVER_SETTINGS} > Vault. The API keys filter shows the saved keys; the menu of a key has Copy API key and Copy variable name.`,
     about:
