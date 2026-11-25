@@ -18,7 +18,7 @@ import { MCP_OAUTH_REDIRECT_PORT, startMcpOAuthRedirectServer } from "../src/mai
 const ROOT = resolve(import.meta.dirname, "..");
 const OUT = resolve(ROOT, ".openbot-build/mcp-sign-in-https-relay-e2e");
 const META_ADS_MCP_URL = "https://mcp.facebook.com/ads";
-const META_APP_ID = "1479376854168579";
+const META_APP_ID = "1139966428441871";
 const SAVED_APP_ID = "e2e-saved-meta-app";
 const LOOPBACK_REDIRECT_URL = `http://127.0.0.1:${MCP_OAUTH_REDIRECT_PORT}/mcp-auth`;
 

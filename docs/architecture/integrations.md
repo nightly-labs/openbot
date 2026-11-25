@@ -433,7 +433,9 @@ A server that registers only the clients it approved, and that approved OpenBot'
 address and the issuer that discovery finds. Both must match: any server can name an issuer in its
 metadata, and the token goes to the server that asked for it. Meta Ads (`https://www.facebook.com/ads`) is one: its registration endpoint answers
 "Dynamic registration is not available for this client", and it refuses every `http` redirect,
-loopback too. Its client is the OpenBot Meta app 1479376854168579, with no secret. Its redirect is
+loopback too. Its client is the OpenBot Meta app 1139966428441871 (Live, Facebook Login for
+Business, owned by the OpenBot business portfolio), with no secret. It replaces app 1479376854168579,
+which stayed in Development mode and which OpenBot does not control (#13492, #14884). Its redirect is
 `https://openbot.run/oauth/mcp-callback`
 ([`mcp-callback.ts`](../../apps/auth-api/src/routes/oauth/mcp-callback.ts)), which answers 302 to
 `http://127.0.0.1:28417/mcp-auth` with the query unchanged. So the grant still arrives at the MCP
@@ -442,9 +444,9 @@ listener of the computer where the browser runs, and a joined server uses the
 when another program holds that port, the sign-in cannot finish. A sign-in app that the admin saves
 replaces the built-in client, but it keeps the built-in client's redirect: Meta refuses the loopback
 address for every app (#13663). The "Sign-in app" section shows that redirect as its callback URL.
-The Meta app must list the relay address in "Valid OAuth Redirect URIs", and a user who has no role on the app can sign in only after Meta's
-App Review puts the app in Live mode. Until then, Marketplace does not list Meta Ads: every other
-account saw Meta's "App inactive" page and could not continue (#13492).
+The Meta app must list the relay address in "Valid OAuth Redirect URIs". A user who has no role on
+the app can sign in only after Meta's App Review grants Advanced access to each permission; before
+that, Meta shows "Feature unavailable". Until then, Marketplace does not list Meta Ads (#13492).
 `bun run test:mcp-sign-in-https-relay` checks the Meta page, the relay, and that another server that
 names Meta's issuer does not get the app.
 

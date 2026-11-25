@@ -65,7 +65,7 @@ const BUILT_IN_MCP_CLIENTS: readonly BuiltInMcpClient[] = [
   {
     resource: "https://mcp.facebook.com/ads",
     issuer: "https://www.facebook.com/ads",
-    clientId: "1479376854168579",
+    clientId: "1139966428441871",
     redirectUrl: MCP_OAUTH_RELAY_URL,
   },
 ];
