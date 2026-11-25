@@ -3152,7 +3152,7 @@ export class TurnLifecycle {
       !this.#mailbox.expectsReply(messageId) ||
       this.#mailbox.hasReplyFrom(agentId, messageId) ||
       this.#mailbox.heldByTask(agentId, messageId) ||
-      this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId, requestIds) ||
+      this.#mailbox.hasAgentReplyOrRequestFromTurnTo(agentId, turnId, recipientAgentId, requestIds) ||
       (text === undefined && this.#mailbox.hasRequestFromTurn(agentId, turnId)) ||
       this.#mailbox.steeredIntoOtherWork(delivery.id)
     );

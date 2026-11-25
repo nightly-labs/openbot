@@ -2551,10 +2551,35 @@ export class MailboxStore {
     recipientAgentId: string,
     turnRequestIds: ReadonlySet<string>,
   ): boolean {
+    return this.#agentMessageFromTurnTo(agentId, turnId, recipientAgentId, turnRequestIds, () => true);
+  }
+
+  hasAgentReplyOrRequestFromTurnTo(
+    agentId: string,
+    turnId: string,
+    recipientAgentId: string,
+    turnRequestIds: ReadonlySet<string>,
+  ): boolean {
+    return this.#agentMessageFromTurnTo(
+      agentId,
+      turnId,
+      recipientAgentId,
+      turnRequestIds,
+      (message) => message.replyToMessageId !== null || message.expectsReply !== false,
+    );
+  }
+
+  #agentMessageFromTurnTo(
+    agentId: string,
+    turnId: string,
+    recipientAgentId: string,
+    turnRequestIds: ReadonlySet<string>,
+    counts: (message: StoredMessage) => boolean,
+  ): boolean {
     const turnIds = this.#sourceTurnIds();
     return this.#state.messages.some((message) => {
       if (message.sender.kind !== "agent" || message.sender.agentId !== agentId) return false;
-      if (turnIds.get(message.id) !== turnId) return false;
+      if (turnIds.get(message.id) !== turnId || !counts(message)) return false;
       if (message.replyToMessageId !== null && turnRequestIds.has(message.replyToMessageId)) return false;
       return this.#state.deliveries.some(
         (delivery) => delivery.messageId === message.id && delivery.recipientAgentId === recipientAgentId,
