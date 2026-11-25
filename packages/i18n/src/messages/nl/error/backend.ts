@@ -119,6 +119,16 @@ export const messages = {
   "error.backend.channelLeadTimedOut": "De kanaalleider reageerde niet op tijd. Kies een lid of probeer het opnieuw.",
   "error.backend.channelLeadFailed":
     "De kanaalleider kon dit bericht niet doorsturen. Kies een lid of probeer het opnieuw.",
+  "error.backend.channelLeadBusy":
+    "Het model van de kanaalleider is nu bezet. Probeer het over een paar minuten opnieuw, of kies een lid.",
+  "error.backend.channelLeadOffline":
+    "Het model van de kanaalleider verloor de verbinding. Probeer het opnieuw, of kies een lid.",
+  "error.backend.channelLeadSignIn":
+    "De aanmelding bij de provider van de kanaalleider is verlopen. Meld je opnieuw aan, of kies een lid.",
+  "error.backend.channelLeadModelGone":
+    "Het model van de kanaalleider is niet beschikbaar. Kies een ander model voor de leider, of kies een lid.",
+  "error.backend.channelLeadRefused":
+    "Het model van de kanaalleider weigerde dit verzoek. Kies een lid, of een ander model voor de leider.",
   "error.backend.channelRequestMemberRequired": "Kies een lid voor dit verzoek.",
   "error.backend.channelDeliveryNotCreated": "De bezorging in het kanaal is niet gemaakt.",
   "error.backend.channelAssignmentStopped": "Deze kanaalopdracht is gestopt of vervangen.",

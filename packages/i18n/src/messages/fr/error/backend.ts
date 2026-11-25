@@ -123,6 +123,16 @@ export const messages = {
     "Le responsable du canal n'a pas répondu à temps. Choisissez un membre ou réessayez.",
   "error.backend.channelLeadFailed":
     "Le responsable du canal n'a pas pu router ce message. Choisissez un membre ou réessayez.",
+  "error.backend.channelLeadBusy":
+    "Le modèle du responsable est occupé. Réessayez dans quelques minutes ou choisissez un membre.",
+  "error.backend.channelLeadOffline":
+    "Le modèle du responsable a perdu la connexion. Réessayez ou choisissez un membre.",
+  "error.backend.channelLeadSignIn":
+    "La connexion au fournisseur du responsable a expiré. Reconnectez-vous ou choisissez un membre.",
+  "error.backend.channelLeadModelGone":
+    "Le modèle du responsable n'est pas disponible. Choisissez un autre modèle pour le responsable ou un membre.",
+  "error.backend.channelLeadRefused":
+    "Le modèle du responsable a refusé cette demande. Choisissez un membre ou un autre modèle pour le responsable.",
   "error.backend.channelRequestMemberRequired": "Choisissez un membre pour cette demande.",
   "error.backend.channelDeliveryNotCreated": "La distribution dans le canal n’a pas été créée.",
   "error.backend.channelAssignmentStopped": "Cette tâche de canal a été arrêtée ou remplacée.",

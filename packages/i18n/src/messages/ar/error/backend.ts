@@ -109,6 +109,13 @@ export const messages = {
   "error.backend.channelRoutingFailed": "فشل التوجيه. اختر عضوًا أو حاول مرة أخرى.",
   "error.backend.channelLeadTimedOut": "لم يُجب الوكيل الرئيسي للقناة في الوقت المحدد. اختر عضوًا أو حاول مرة أخرى.",
   "error.backend.channelLeadFailed": "تعذّر على الوكيل الرئيسي للقناة توجيه هذه الرسالة. اختر عضوًا أو حاول مرة أخرى.",
+  "error.backend.channelLeadBusy": "نموذج الوكيل الرئيسي مشغول الآن. حاول مرة أخرى بعد بضع دقائق، أو اختر عضوًا.",
+  "error.backend.channelLeadOffline": "فقد نموذج الوكيل الرئيسي الاتصال. حاول مرة أخرى، أو اختر عضوًا.",
+  "error.backend.channelLeadSignIn":
+    "انتهت صلاحية تسجيل الدخول لدى مزوّد الوكيل الرئيسي. سجّل الدخول مرة أخرى، أو اختر عضوًا.",
+  "error.backend.channelLeadModelGone": "نموذج الوكيل الرئيسي غير متاح. اختر نموذجًا آخر للوكيل الرئيسي، أو اختر عضوًا.",
+  "error.backend.channelLeadRefused":
+    "رفض نموذج الوكيل الرئيسي هذا الطلب. اختر عضوًا، أو اختر نموذجًا آخر للوكيل الرئيسي.",
   "error.backend.channelRequestMemberRequired": "اختر عضوًا لهذا الطلب.",
   "error.backend.channelDeliveryNotCreated": "لم يتم إنشاء تسليم القناة.",
   "error.backend.channelAssignmentStopped": "تم إيقاف تعيين القناة هذا أو استبداله.",

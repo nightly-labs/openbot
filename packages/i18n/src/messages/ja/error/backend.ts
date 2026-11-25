@@ -122,6 +122,16 @@ export const messages = {
     "チャンネルリードが時間内に応答しませんでした。メンバーを選択するか、もう一度お試しください。",
   "error.backend.channelLeadFailed":
     "チャンネルリードがこのメッセージをルーティングできませんでした。メンバーを選択するか、もう一度お試しください。",
+  "error.backend.channelLeadBusy":
+    "チャンネルリードのモデルは混み合っています。数分後にもう一度お試しいただくか、メンバーを選択してください。",
+  "error.backend.channelLeadOffline":
+    "チャンネルリードのモデルの接続が切れました。もう一度お試しいただくか、メンバーを選択してください。",
+  "error.backend.channelLeadSignIn":
+    "チャンネルリードのプロバイダーのサインインが期限切れです。もう一度サインインするか、メンバーを選択してください。",
+  "error.backend.channelLeadModelGone":
+    "チャンネルリードのモデルは利用できません。リードに別のモデルを選ぶか、メンバーを選択してください。",
+  "error.backend.channelLeadRefused":
+    "チャンネルリードのモデルがこのリクエストを拒否しました。メンバーを選択するか、リードに別のモデルを選んでください。",
   "error.backend.channelRequestMemberRequired": "この依頼のメンバーを選択してください。",
   "error.backend.channelDeliveryNotCreated": "チャンネルへの配信を作成できませんでした。",
   "error.backend.channelAssignmentStopped": "このチャンネルの割り当ては停止されたか、置き換えられました。",

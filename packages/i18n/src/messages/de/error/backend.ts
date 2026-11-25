@@ -123,6 +123,16 @@ export const messages = {
     "Die Kanalleitung hat nicht rechtzeitig geantwortet. Wähle ein Mitglied oder versuche es erneut.",
   "error.backend.channelLeadFailed":
     "Die Kanalleitung konnte diese Nachricht nicht zuweisen. Wähle ein Mitglied oder versuche es erneut.",
+  "error.backend.channelLeadBusy":
+    "Das Modell der Kanalleitung ist gerade ausgelastet. Versuche es in ein paar Minuten erneut, oder wähle ein Mitglied.",
+  "error.backend.channelLeadOffline":
+    "Das Modell der Kanalleitung hat die Verbindung verloren. Versuche es erneut, oder wähle ein Mitglied.",
+  "error.backend.channelLeadSignIn":
+    "Die Anmeldung beim Anbieter der Kanalleitung ist abgelaufen. Melde dich erneut an, oder wähle ein Mitglied.",
+  "error.backend.channelLeadModelGone":
+    "Das Modell der Kanalleitung ist nicht verfügbar. Wähle ein anderes Modell für die Leitung, oder wähle ein Mitglied.",
+  "error.backend.channelLeadRefused":
+    "Das Modell der Kanalleitung hat diese Anfrage abgelehnt. Wähle ein Mitglied oder ein anderes Modell für die Leitung.",
   "error.backend.channelRequestMemberRequired": "Wähle ein Mitglied für diese Anfrage.",
   "error.backend.channelDeliveryNotCreated": "Die Kanalzustellung wurde nicht erstellt.",
   "error.backend.channelAssignmentStopped": "Dieser Kanalauftrag wurde gestoppt oder ersetzt.",
