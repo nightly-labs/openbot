@@ -3504,7 +3504,17 @@ export class ChannelService {
       `${this.hooks.agents().find((item) => item.id === args.recipientAgentId)?.name ?? args.recipientAgentId}: ${args.task}`,
     );
     const [firstSourceMessageId] = sourceMessageIds;
-    if (firstSourceMessageId !== undefined) handoff.message.replyToMessageId = firstSourceMessageId;
+    const rootTaskIds = new Set(tasks.filter((item) => item.rootTaskId === root.id).map((item) => item.id));
+    const rootRepliedToSource =
+      firstSourceMessageId !== undefined &&
+      (yield* channelSync(() => this.store.messages(channelId))).some(
+        (message) =>
+          message.message.replyToMessageId === firstSourceMessageId &&
+          message.taskId !== null &&
+          rootTaskIds.has(message.taskId),
+      );
+    if (firstSourceMessageId !== undefined && !rootRepliedToSource)
+      handoff.message.replyToMessageId = firstSourceMessageId;
     yield* channelSync(() => this.store.update(channel, { tasks: changes, messages: [handoff] }, operationId));
     this.publish(channelId);
     yield* this.wake(channelId);
