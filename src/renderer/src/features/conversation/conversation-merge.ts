@@ -9,6 +9,10 @@ export function mergeConversationPage<Message extends { id: string }>(
 ): Message[] {
   if (merge === "replace") return [...page];
   const pageIds = new Set(page.map((message) => message.id));
+  if (merge === "latest") {
+    const firstShared = loaded.findIndex((message) => pageIds.has(message.id));
+    if (firstShared !== -1) return [...loaded.slice(0, firstShared), ...page];
+  }
   const kept = loaded.filter((message) => !pageIds.has(message.id));
   return merge === "older" ? [...page, ...kept] : [...kept, ...page];
 }

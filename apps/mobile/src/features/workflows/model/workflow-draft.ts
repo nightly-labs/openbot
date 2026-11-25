@@ -8,9 +8,9 @@ import type {
 } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { create } from "zustand";
+import { type AddKey, addFields, addKind } from "./workflow-add";
 import { type GraphPlace, insertAtPlace } from "./workflow-graph-edit";
 import {
-  type AddableKind,
   connectStep,
   type FlowList,
   graphWithOutline,
@@ -18,6 +18,7 @@ import {
   insertCondition,
   insertStep,
   moveStep,
+  outlineFits,
   outlineListOf,
   removeStep,
   type WorkflowEditMode,
@@ -38,15 +39,6 @@ export interface WorkflowDraft {
   branch: WorkflowBranch;
   triggerProblem: boolean;
 }
-
-const NEW_FIELDS: Record<AddableKind, Record<string, WorkflowFieldValue>> = {
-  agent: {},
-  llm: {},
-  condition: {},
-  approval: {},
-  prompt: {},
-  output: { target: "notify" },
-};
 
 const NEW_WORKFLOW_GRAPH: WorkflowGraph = {
   nodes: [{ id: "trigger-start", kind: "trigger", at: { x: 0, y: 0 }, fields: { trigger: "manual" } }],
@@ -99,8 +91,8 @@ interface DraftStore {
   setTriggerProblem: (problem: boolean) => void;
   setFields: (nodeId: string, fields: Record<string, WorkflowFieldValue | undefined>) => void;
   setSchedule: (nodeId: string, schedule: RoutineSchedule | undefined) => void;
-  add: (kind: AddableKind, list: FlowList, index: number) => string | null;
-  addAt: (kind: AddableKind, place: GraphPlace) => string | null;
+  add: (key: AddKey, list: FlowList, index: number) => string | null;
+  addAt: (key: AddKey, place: GraphPlace) => string | null;
   connect: (nodeId: string) => void;
   remove: (nodeId: string) => void;
   move: (nodeId: string, direction: -1 | 1) => boolean;
@@ -171,8 +163,9 @@ export const useWorkflowDraft = create<DraftStore>((set, get) => {
       });
       set({ draft: { ...draft, graph } });
     },
-    add: (kind, list, index) => {
-      const node = newNode(kind, NEW_FIELDS[kind]);
+    add: (key, list, index) => {
+      const kind = addKind(key);
+      const node = newNode(kind, addFields(key));
       const added = changeOutline((draft, outline) => {
         const next =
           kind === "condition"
@@ -185,11 +178,11 @@ export const useWorkflowDraft = create<DraftStore>((set, get) => {
       });
       return added ? node.id : null;
     },
-    addAt: (kind, place) => {
+    addAt: (key, place) => {
       const draft = get().draft;
       if (draft?.mode !== "fields") return null;
-      const node = newNode(kind, NEW_FIELDS[kind]);
-      const graph = insertAtPlace(draft.graph, place, kind, node, () => `edge-${Crypto.randomUUID()}`);
+      const node = newNode(addKind(key), addFields(key));
+      const graph = insertAtPlace(draft.graph, place, node, () => `edge-${Crypto.randomUUID()}`);
       if (!graph) return null;
       set({ draft: { ...draft, graph } });
       return node.id;
@@ -211,7 +204,10 @@ export const useWorkflowDraft = create<DraftStore>((set, get) => {
         ...(source.size ? { size: source.size } : {}),
       };
       const index = draft.outline[list].indexOf(nodeId) + 1;
-      const added = changeOutline((current, outline) => insertStep(current.graph, outline, list, index, copy));
+      const added = changeOutline((current, outline) => {
+        const next = insertStep(current.graph, outline, list, index, copy);
+        return outlineFits(next.graph, next.outline) ? next : null;
+      });
       return added ? copy.id : null;
     },
   };

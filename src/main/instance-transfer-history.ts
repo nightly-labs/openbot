@@ -6,6 +6,7 @@ import {
   type Channel,
   type ChannelMessage,
   type ConversationMessage,
+  fitAgentTaskTitle,
   isChannelMessage,
   isConversationMessage,
 } from "@openbot/contracts/ipc";
@@ -242,7 +243,7 @@ function decodeIndexValue(value: unknown, folder: string): { threads: IndexThrea
         main: item.main === true,
         title:
           typeof item.title === "string" && item.title.trim()
-            ? item.title.slice(0, 200)
+            ? fitAgentTaskTitle(item.title)
             : sourceText("status.agent.importedChatTitle"),
         titleSource,
         origin,

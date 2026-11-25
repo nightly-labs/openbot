@@ -266,7 +266,8 @@ async function signIn(page: Page): Promise<void> {
   await send.click();
   while (!(await notice.isVisible()) && Date.now() < deadline) {
     await notice.waitFor({ timeout: 5_000 }).catch(() => undefined);
-    if (!(await notice.isVisible()) && (await send.isEnabled())) await send.click();
+    const canRetry = (await send.isVisible().catch(() => false)) && (await send.isEnabled().catch(() => false));
+    if (!(await notice.isVisible()) && canRetry) await send.click();
   }
   await notice.waitFor({ timeout: 1_000 }).catch(async (error: unknown) => {
     mkdirSync(OUT, { recursive: true });

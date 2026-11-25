@@ -19,6 +19,10 @@ if (!root) {
 }
 
 performance.mark("openbot:renderer-start");
+if (__OPENBOT_PERF_PROBES__) {
+  const { installRendererPerfProbes } = await import("./perf-probes");
+  installRendererPerfProbes();
+}
 installPointerFocusGuard();
 syncAppearance({ windowGlass: true });
 syncLogoColor();

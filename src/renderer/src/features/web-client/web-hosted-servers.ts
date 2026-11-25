@@ -1,3 +1,4 @@
+import { parseCustomServerCheckout } from "@openbot/contracts/custom-server-plans";
 import {
   type HostedServerCheckout,
   type HostedServerSummary,
@@ -25,7 +26,7 @@ export function createWebHostedServerCalls(
     init: { method?: "POST" | "DELETE"; body?: string; headers?: Record<string, string> } = {},
   ): Promise<Response> {
     const post = init.body !== undefined;
-    const url = path === SERVER_CLAIMS_PATH ? `/api/browser/${path}` : `/api/browser/v2/hosting/${path}`;
+    const url = path.startsWith("v2/") ? `/api/browser/${path}` : `/api/browser/v2/hosting/${path}`;
     const response = await accountFetch(url, {
       method: init.method ?? (post ? "POST" : "GET"),
       credentials: "same-origin",
@@ -77,6 +78,15 @@ export function createWebHostedServerCalls(
           body: JSON.stringify(savedPromotionCode()),
         }),
       ),
+    async openCustomCheckout({ serverId, earlyStart }) {
+      const { checkoutUrl } = await request(
+        `v2/remote/hosts/${encodeURIComponent(serverId)}/checkout`,
+        parseCustomServerCheckout,
+        { body: JSON.stringify(earlyStart ? { earlyStart } : {}) },
+      );
+      if (checkoutUrl) navigate(checkoutUrl);
+      return { opened: checkoutUrl !== null };
+    },
     wake: (serverId) => request(serverPath(serverId, "wake"), parseHostedServerSummary, { body: "{}" }),
     restart: (serverId) => request(serverPath(serverId, "restart"), parseHostedServerSummary, { body: "{}" }),
     async delete({ serverId, confirmName }) {
@@ -96,13 +106,15 @@ function errorMessage(value: unknown): string {
 
 const WEB_APP_HOSTING_PARAM = "hosting";
 const WEB_APP_HOSTED_SERVER_PARAM = "hosted_server";
+const WEB_APP_CUSTOM_SERVER_RETURN = "custom";
 
 export function takeHostingReturn(): AddServerResume | null {
   const url = new URL(window.location.href);
-  if (url.searchParams.get(WEB_APP_HOSTING_PARAM) !== "checkout") return null;
+  const hosting = url.searchParams.get(WEB_APP_HOSTING_PARAM);
+  if (hosting !== "checkout" && hosting !== WEB_APP_CUSTOM_SERVER_RETURN) return null;
   const serverId = url.searchParams.get(WEB_APP_HOSTED_SERVER_PARAM);
   const paid = url.searchParams.get("cancelled") !== "1";
   for (const name of [WEB_APP_HOSTING_PARAM, WEB_APP_HOSTED_SERVER_PARAM, "cancelled"]) url.searchParams.delete(name);
   window.history.replaceState(window.history.state, "", url);
-  return serverId ? { serverId, paid } : null;
+  return hosting === "checkout" && serverId ? { serverId, paid } : null;
 }

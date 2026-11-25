@@ -21,6 +21,17 @@ A final SDK filter replaces properties to remove SDK-added Android referrers and
 The SDK's optional persistent queue and screen tracking are not enabled. Configuration, event
 semantics and native verification steps are in [the mobile README](../../apps/mobile/README.md#openpanel-product-analytics).
 
+## Chrome extension analytics
+
+`apps/browser-extension/src/analytics.ts` owns the extension's events, their allowlists and the
+link preference. The side panel and the background service worker call it; the offscreen page does
+not, because it has no `chrome.storage`. Each event posts straight to the OpenPanel `/track` route
+with the public client ID, with no SDK and no queue, so a send never blocks a UI action and a failed
+send is dropped. The build sets `VITE_OPENBOT_ANALYTICS_URL`: OpenPanel for a production build
+against `https://api.openbot.run`, the loopback `OPENBOT_ANALYTICS_CAPTURE_URL` when that is set,
+and empty (no sends) otherwise. `scripts/browser-extension-e2e.ts` builds with a capture server and
+checks the event names, the surface, the opt-out and that no user content is sent.
+
 ## Website analytics
 
 Public website tracking lives in `apps/auth-api/src/lib/analytics.ts`. It runs only on the
@@ -103,7 +114,14 @@ with no `exit` span and no dump was stopped from outside OpenBot (#2675).
 the single-instance lock. It writes `running` at the start, the time of the last sign of life once a
 minute and at sleep and wake, `quitting` with the reason in `recordExit`, `quit_timeout` before the
 shutdown deadline exit, and `clean` after `teardown.runAll()`. It adds no teardown step, so the
-ordinals do not change. The writes are synchronous, so a late write cannot replace a later state. At
+ordinals do not change. The heartbeat and the wake write the newest record asynchronously, through
+`openbot-run-marker-v1.json.pending`, so a slow disk, a file lock or an antivirus scan on Windows does
+not stop the main thread. One write runs at a time; records that come during a write are not written,
+only the newest one after it. The start, sleep, `shutdown` event, `quitting`, `quit_timeout` and
+`clean` writes are synchronous, because the process can stop right after them. An asynchronous write
+does not rename its file when a synchronous write came after its record. When its rename ends after a
+synchronous write, it writes the newest record again synchronously, so a late write cannot replace a
+later state. At
 the next start, `RunMarker.start` reads the file before it writes the new one. A `running`,
 `quitting` or `quit_timeout` file is an unclean exit, except a quit for `update` or `session_end`
 and a run that saw the `powerMonitor` `shutdown` event. It counts the `.dmp` files in
@@ -186,9 +204,11 @@ counted, task requests from before task metering, and requests from before migra
 count. The last request counts, also in a session from before migration 15. An update with no
 `last` or no turn ID establishes a baseline.
 Claude uses per-model query totals and a separate counter identity for each query process. ACP usage
-is optional. Missing fields remain unknown. ACP usage is a session total, with one counter for each
-session, except from Antigravity: from 1.4.3 it sends the tokens of one prompt, so each prompt result has its
-own counter, and its `thoughtTokens` count as output. Completed assistant messages exclude commentary and tool
+is optional. Missing fields remain unknown. Built-in ACP agents without their own rule book usage as a session
+total, with one counter for each session. Antigravity (from 1.4.3), OpenCode, Grok and custom agents send the
+tokens of one prompt, so each prompt result has its own counter. Antigravity's `thoughtTokens` count as output.
+The session cost of a custom agent stays cumulative in a separate counter, which keeps the ID of the old session
+counter, so a session that started before the per-prompt counters keeps its cost history. Completed assistant messages exclude commentary and tool
 output. Only post-install messages enter activity counts.
 
 `agent:get-analytics` and the capability-gated `GET /v1/agents/:agentId/analytics` return aggregates.

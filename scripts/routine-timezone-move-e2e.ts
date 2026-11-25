@@ -48,7 +48,13 @@ const scheduler = new RoutineScheduler({
   waits: new AgentWaits({
     store: new AgentWaitStore({ database }),
     mailbox,
-    hooks: { emit: () => {}, ownsRoutine: () => true, hasRoutine: () => true, requireKnownAgent: () => {} },
+    hooks: {
+      emit: () => {},
+      ownsRoutine: () => true,
+      hasRoutine: () => true,
+      requireKnownAgent: () => {},
+      isSideThread: () => false,
+    },
   }),
   timezone: () => "UTC",
   hooks: {
@@ -64,6 +70,8 @@ const scheduler = new RoutineScheduler({
     isRunning: () => false,
     usageLimited: () => false,
     routineThread: () => null,
+    waitThread: () => null,
+    queueHold: () => null,
     routineDeleted: () => Effect.void,
   },
 });

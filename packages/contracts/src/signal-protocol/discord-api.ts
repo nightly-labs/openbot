@@ -141,7 +141,14 @@ export type DiscordApiRequest =
   | { op: "listChannels"; guildId: string }
   | { op: "listRoles"; guildId: string }
   | { op: "interactionReply"; guildId: string; interactionId: string; content: string }
-  | { op: "upload"; guildId: string; channelId: string; replyTo: string | null; filename: string };
+  | {
+      op: "upload";
+      guildId: string;
+      channelId: string;
+      replyTo: string | null;
+      filename: string;
+      content?: string | undefined;
+    };
 
 export interface DiscordHistoryMessage {
   id: string;

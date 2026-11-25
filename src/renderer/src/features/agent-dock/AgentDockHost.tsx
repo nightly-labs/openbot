@@ -24,6 +24,7 @@ import {
   type ChannelPage,
   type ChannelSummary,
   isAttachmentSummary,
+  LOCAL_SERVER_ID,
   sameAgentModelChoice,
   withOpenBotSource,
 } from "@openbot/contracts/ipc";
@@ -41,7 +42,7 @@ import {
   type AgentDockSeat as AgentDockUiSeat,
   agentDockSeatKey,
 } from "@openbot/ui/features/agent-dock/AgentDock";
-import { isDockMessage } from "@openbot/ui/features/agent-dock/AgentDockChat";
+import { isDockMessage, isDockVisualReply } from "@openbot/ui/features/agent-dock/AgentDockChat";
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { threadLists } from "@openbot/ui/features/conversation/threads/thread-items";
@@ -74,7 +75,9 @@ import {
 import { useChannels } from "../channels/channels-context";
 import { browserSecretVault } from "../conversation/browser-secret-vault";
 import { useConversation } from "../conversation/conversation-context";
+import { useConversationController } from "../conversation/conversation-controller-context";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
+import { useDesktopMediaApproval } from "../conversation/desktop-media-approval";
 import { createAgentMessageDeleteAccess, desktopAgentMessageDeleteAccess } from "../conversation/message-delete-access";
 import { narrationRows, placeTurnRowsByTime } from "../conversation/narration-rows";
 import { usageLimitAskFrom } from "../conversation/usage-limit-ask";
@@ -107,6 +110,14 @@ export function useAgentDockPlacement(): () => AgentDockPlacement | null {
   };
 }
 
+function useTakeoverPageOpener(mainTabOf: (agentId: string) => string | undefined) {
+  const { selectAgent } = useNavigation();
+  const { setBrowserTakeoverPageRequest } = useConversationController();
+  return (agentId: string, tabId: string) => {
+    if (selectAgent(agentId, mainTabOf(agentId))) setBrowserTakeoverPageRequest({ agentId, tabId });
+  };
+}
+
 export function AgentDockHost() {
   const { activeServerId } = useServers();
   const placement = useAgentDockPlacement();
@@ -120,7 +131,7 @@ export function AgentDockHost() {
       if (info?.platform !== "linux") return undefined;
       return {
         on: preference().shown && preference().placement === "screen",
-        onWayland: info.aboveAppsSupport !== undefined,
+        onWayland: info.aboveAppsSupport !== undefined && info.aboveAppsSupport !== "no-compositor",
       };
     },
     (state) => {
@@ -211,7 +222,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   const auth = useAuth();
   const { activeServer } = useServers();
   const { browserTabs } = useBrowserTabs();
-  const { t, errorMessage } = useText();
+  const { t, errorMessage, sourceText } = useText();
   const preference = useAgentDockPreference();
   const seatRefs = createMemo(
     () =>
@@ -386,7 +397,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     const page = channelId ? channelPage(channelId) : null;
     if (!page) return [];
     return withStepAnswers(
-      channelConversationRows(page.messages.filter(channelMessageHasContent), page.tasks).map(asOwn),
+      channelConversationRows(page.messages.filter(channelMessageHasContent), page.tasks, sourceText).map(asOwn),
       new Set(channelWorkingTurns(page, new Set())),
       (row) => agentList().find((agent) => agent.id === row.senderAgentId)?.provider,
     );
@@ -829,15 +840,20 @@ function WindowAgentDock(props: { serverId: string }) {
   const channels = useChannels();
   const { openAppSettings } = useSettings();
   const dock = createServerDock(props.serverId, { readWhenHidden: false });
+  const media = useDesktopMediaApproval();
   const voice = createAgentDockVoice(() => props.serverId);
+  const openTakeoverPage = useTakeoverPageOpener((agentId) => dock.mainTabOf(agentId));
   const answers: AgentDockChatAnswers = {
     approval: (approval, decision) => dock.respondToApproval(approval.agentId, approval.requestId, decision),
     prompt: (prompt, values) => dock.answerPrompt(prompt.agentId, prompt.threadId, prompt.requestId, values),
     takeover: ({ request }, decision) =>
       dock.respondToTakeover(request.agentId, request.threadId, request.requestId, decision),
+    takeoverDone: ({ request }) => props.serverId === LOCAL_SERVER_ID || request.reason !== "sign-in-blocked",
+    openTakeover: ({ request }) => openTakeoverPage(request.agentId, request.tabId),
     secret: (_takeover, input) => agentDockPort().agent.respondToBrowserSecret(input, props.serverId),
     usageLimitSend: (limit, option, remember) => dock.sendOnBackup(limit.agentId, option.key, remember),
     usageLimitWait: (limit) => dock.waitForReset(limit.agentId),
+    media,
   };
 
   return (
@@ -881,6 +897,7 @@ function ScreenAgentDock(props: { serverId: string }) {
   const { openAppSettings } = useSettings();
   const preference = useAgentDockPreference();
   const dock = createServerDock(props.serverId, { readWhenHidden: true });
+  const openTakeoverPage = useTakeoverPageOpener((agentId) => dock.mainTabOf(agentId));
 
   const presentation = createMemo(
     (): AgentDockPresentation => ({
@@ -974,6 +991,9 @@ function ScreenAgentDock(props: { serverId: string }) {
           return;
         case "open-agent":
           selectAgent(action.agentId, dock.mainTabOf(action.agentId));
+          return;
+        case "open-browser-takeover":
+          openTakeoverPage(action.agentId, action.tabId);
           return;
         case "open-channel":
           void channels.open(action.channelId);
@@ -1156,6 +1176,18 @@ function dockThreadChoice(thread: ThreadItem): AgentDockThreadChoice {
 }
 
 function dockMessage(message: AgentMessage): AgentDockMessage {
+  const attachments = (message.attachments ?? [])
+    .filter(isAttachmentSummary)
+    .slice(0, INPUT_LIMITS.attachments)
+    .map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      size: attachment.size,
+      kind: attachment.kind,
+      mimeType: attachment.mimeType,
+      previewKind: attachment.previewKind,
+      previewUrl: attachment.previewUrl,
+    }));
   return {
     id: message.id.slice(0, INPUT_LIMITS.identifier),
     author: message.author,
@@ -1163,18 +1195,8 @@ function dockMessage(message: AgentMessage): AgentDockMessage {
     senderMember: message.senderMember ? { id: message.senderMember.id, name: message.senderMember.name } : null,
     kind: message.kind === "error" ? "error" : "text",
     body: message.body.slice(0, INPUT_LIMITS.messageText),
-    attachments: (message.attachments ?? [])
-      .filter(isAttachmentSummary)
-      .slice(0, INPUT_LIMITS.attachments)
-      .map((attachment) => ({
-        id: attachment.id,
-        name: attachment.name,
-        size: attachment.size,
-        kind: attachment.kind,
-        mimeType: attachment.mimeType,
-        previewKind: attachment.previewKind,
-        previewUrl: attachment.previewUrl,
-      })),
+    attachments,
+    ...(isDockVisualReply({ ...message, attachments }) ? { visual: true } : {}),
   };
 }
 

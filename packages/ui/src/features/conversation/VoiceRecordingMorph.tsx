@@ -11,9 +11,9 @@ export type VoicePhase = "idle" | "preparing" | "requesting" | "recording" | "tr
 export const VOICE_LIMIT_COUNTDOWN_SECONDS = 15;
 export const VOICE_LIMIT_WARNING_SECONDS = 10;
 
-export function voiceButtonLabel(phase: VoicePhase): AppTextKey {
+export function voiceButtonLabel(phase: VoicePhase, modelProgress: number | null): AppTextKey {
   if (phase === "recording") return "composer.voice.stop";
-  if (phase === "preparing") return "composer.voice.preparing";
+  if (phase === "preparing") return modelProgress === null ? "composer.voice.starting" : "composer.voice.preparing";
   if (phase === "requesting") return "composer.voice.requesting";
   if (phase === "transcribing") return "composer.voice.transcribing";
   return "composer.voice.start";
@@ -152,7 +152,7 @@ export function ComposerVoiceControls(props: {
   const { t } = useText();
   return (
     <>
-      <Show when={props.phase === "preparing"}>
+      <Show when={props.phase === "preparing" && props.modelProgress !== null}>
         <span class="voice-model-progress" role="status">
           {t("composer.voice.progress", { progress: props.modelProgress ?? 0 })}
         </span>
@@ -170,7 +170,7 @@ export function ComposerVoiceControls(props: {
           variant="ghost"
           type="button"
           class="dictation-button"
-          aria-label={t(voiceButtonLabel(props.phase))}
+          aria-label={t(voiceButtonLabel(props.phase, props.modelProgress))}
           disabled={props.blocked || props.phase !== "idle"}
           onClick={() => props.onStart()}
         >

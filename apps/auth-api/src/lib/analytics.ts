@@ -45,8 +45,13 @@ export interface ArticleReference {
   slug: string;
 }
 
-export type BillingReturnKind = "plan" | "license" | "portal";
-export const BILLING_RETURN_KINDS = ["plan", "license", "portal"] as const satisfies readonly BillingReturnKind[];
+export type BillingReturnKind = "plan" | "license" | "portal" | "credits";
+export const BILLING_RETURN_KINDS = [
+  "plan",
+  "license",
+  "portal",
+  "credits",
+] as const satisfies readonly BillingReturnKind[];
 type BillingReturnOutcome = "completed" | "cancelled";
 
 type ContactTopicId = (typeof CONTACT_TOPICS)[number]["id"];

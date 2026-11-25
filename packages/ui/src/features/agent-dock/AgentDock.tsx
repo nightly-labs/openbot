@@ -24,7 +24,7 @@ import {
   Show,
   untrack,
 } from "solid-js";
-import { AmbientMotion } from "../../ambient-motion";
+import { AmbientMotion, useAmbientMotion } from "../../ambient-motion";
 import type { AvatarMood } from "../../bloub-avatar";
 import { createMenuSearch } from "../../components/createMenuSearch";
 import { createScrollFades } from "../../components/createScrollFades";
@@ -57,7 +57,7 @@ import {
   type AgentDockPendingMessage,
   pendingMessageDelivered,
 } from "./AgentDockChat";
-import { AgentDockShelf, type AgentDockShelfResult } from "./AgentDockShelf";
+import { AgentDockShelf, type AgentDockShelfItem, type AgentDockShelfResult } from "./AgentDockShelf";
 import {
   addCenterY,
   DOCK_LEFT,
@@ -224,8 +224,59 @@ interface DockState {
 
 let pendingKey = 0;
 
+interface ShelfCard extends AgentDockShelfItem {
+  height: number;
+  y: Spring;
+  placed: boolean;
+}
+
+interface ShelfBlock {
+  top: number;
+  height: number;
+  members: { index: number; offset: number }[];
+}
+
+function spreadShelf(wants: readonly number[], heights: readonly number[]): number[] {
+  const want = (index: number) => wants[index] ?? 0;
+  const height = (index: number) => heights[index] ?? 0;
+  const settle = (block: ShelfBlock) => {
+    const sum = block.members.reduce(
+      (total, member) => total + want(member.index) - height(member.index) / 2 - member.offset,
+      0,
+    );
+    block.top = Math.min(Math.max(0, sum / block.members.length), PANEL_HEIGHT - block.height);
+    return block;
+  };
+  const blocks: ShelfBlock[] = [];
+  const order = wants.map((_, index) => index).sort((a, b) => want(a) - want(b) || a - b);
+  for (const index of order) {
+    let block = settle({ top: 0, height: height(index), members: [{ index, offset: 0 }] });
+    let previous = blocks.at(-1);
+    while (previous && previous.top + previous.height + SHELF_ITEM_GAP > block.top) {
+      blocks.pop();
+      const shift = previous.height + SHELF_ITEM_GAP;
+      block = settle({
+        top: 0,
+        height: shift + block.height,
+        members: [
+          ...previous.members,
+          ...block.members.map((member) => ({ ...member, offset: member.offset + shift })),
+        ],
+      });
+      previous = blocks.at(-1);
+    }
+    blocks.push(block);
+  }
+  const centers = wants.map(() => 0);
+  for (const block of blocks) {
+    for (const member of block.members) centers[member.index] = block.top + member.offset + height(member.index) / 2;
+  }
+  return centers;
+}
+
 const SEAT_LAG = 0.3;
 const SHELF_GAP = 12;
+const SHELF_ITEM_GAP = 8;
 const SEAT_FADE = 24;
 const ADD_SEARCH_MIN = 9;
 const ADD_MORPH_MS = 200;
@@ -255,6 +306,10 @@ export function AgentDock(props: AgentDockProps) {
     return next;
   });
   const seatFor = (id: string) => seatProps().get(id);
+  const firstTemporaryAfterSaved = createMemo(() => {
+    const index = state.seats.findIndex((id) => seatFor(id)?.temporary === true);
+    return index > 0 ? state.seats[index] : undefined;
+  });
   const seatAgent = (agentId: string) => {
     const seat = seatFor(agentDockSeatKey({ kind: "agent", id: agentId }));
     return seat?.kind === "agent" ? seat.agent : undefined;
@@ -275,6 +330,10 @@ export function AgentDock(props: AgentDockProps) {
   let handleArc!: SVGPathElement;
   let handleHit!: SVGPathElement;
   let shelf: HTMLUListElement | undefined;
+  let shelfShown = false;
+  let shelfCards: ShelfCard[] = [];
+  let shelfSeats: readonly string[] = initialSeats;
+  let shelfResize: ResizeObserver | undefined;
   let seatScroll!: HTMLDivElement;
   let seatList!: HTMLDivElement;
   const seatElements = new Map<string, HTMLElement>();
@@ -305,7 +364,8 @@ export function AgentDock(props: AgentDockProps) {
   const tuck = motion.spring(untrack(() => props.tucked) ? TUCK_DISTANCE : 0, TUCK);
   const [dragging, setDragging] = createSignal(false);
   const [pointerOn, setPointerOn] = createSignal(false);
-  const ambientMotion = () => pointerOn() || dragging() || state.open !== null;
+  const windowMotion = useAmbientMotion();
+  const ambientMotion = () => windowMotion() && (pointerOn() || dragging() || state.open !== null);
   const seatMotion = new Map<string, { y: Spring; scale: Spring }>();
 
   function seatSprings(id: string, y = PANEL_HEIGHT / 2) {
@@ -336,6 +396,80 @@ export function AgentDock(props: AgentDockProps) {
     return Math.min(last, Math.max(first, seatCenterY(seats.indexOf(id), count) - scroll));
   }
 
+  function shelfCenters(seats: readonly string[]) {
+    const anchor = addCenterY(seats.length) - SEAT / 2;
+    const wants = shelfCards.map((card) => {
+      const id = card.agentId === null ? null : agentDockSeatKey({ kind: "agent", id: card.agentId });
+      return id !== null && seats.includes(id) && !leaving.has(id) ? seatY(id, seats) : anchor - card.height / 2;
+    });
+    const tops = shelfCards.flatMap((card, index) =>
+      card.agentId === null ? [] : [(wants[index] ?? anchor) - card.height / 2],
+    );
+    if (tops.length > 0) {
+      const top = Math.min(...tops);
+      shelfCards.forEach((card, index) => {
+        if (card.agentId === null) wants[index] = top - SHELF_ITEM_GAP - card.height / 2;
+      });
+    }
+    return spreadShelf(
+      wants,
+      shelfCards.map((card) => card.height),
+    );
+  }
+
+  function placeShelf(instant = false) {
+    if (!shelfShown || shelfCards.length === 0) return;
+    const centers = shelfCenters(shelfSeats);
+    let moved = false;
+    shelfCards.forEach((card, index) => {
+      const center = centers[index] ?? card.y.target;
+      if (instant || !card.placed) {
+        card.y.jump(center);
+        card.placed = card.height > 0;
+      } else if (card.y.target !== center) {
+        card.y.to(center);
+        moved = true;
+      }
+    });
+    drawShelf();
+    if (moved) motion.kick();
+  }
+
+  function drawShelf() {
+    const lag = stretch.value * SEAT_LAG;
+    for (const card of shelfCards) card.element.style.top = `${card.y.value - card.height / 2 - lag}px`;
+  }
+
+  function measureShelf() {
+    for (const card of shelfCards) {
+      const height = card.element.offsetHeight;
+      if (height > 0) card.height = height;
+    }
+  }
+
+  function updateShelf(items: readonly AgentDockShelfItem[], shown: boolean) {
+    const appeared = shown && !shelfShown;
+    shelfShown = shown;
+    const previous = new Map(shelfCards.map((card) => [card.key, card]));
+    shelfCards = items.map((item) => {
+      const known = previous.get(item.key);
+      previous.delete(item.key);
+      if (known?.element === item.element) return known;
+      if (known) forgetShelfCard(known);
+      shelfResize?.observe(item.element);
+      return { ...item, height: 0, y: motion.spring(0, WOBBLY), placed: false };
+    });
+    for (const card of previous.values()) forgetShelfCard(card);
+    measureShelf();
+    placeShelf(appeared);
+    reportShape();
+  }
+
+  function forgetShelfCard(card: ShelfCard) {
+    shelfResize?.unobserve(card.element);
+    motion.drop(card.y);
+  }
+
   function revealScroll(index: number) {
     const count = state.seats.length;
     const top = SEAT_VIEW_INSET + index * SEAT_PITCH;
@@ -352,6 +486,7 @@ export function AgentDock(props: AgentDockProps) {
 
   function followScroll() {
     seatFades.measure();
+    placeShelf();
     const open = state.open;
     if (!open) return;
     neckY.to(seatY(open));
@@ -371,7 +506,7 @@ export function AgentDock(props: AgentDockProps) {
     seatScroll.style.top = `${seatViewTop(height) - pull * SEAT_LAG}px`;
     seatScroll.style.height = `${Math.max(0, height - DOCK_PAD * 2 - SEAT + SEAT_VIEW_INSET)}px`;
     seatList.style.height = `${Math.max(0, listH.value)}px`;
-    if (shelf) shelf.style.bottom = `${PANEL_HEIGHT - (addY.value - SEAT / 2 - pull * SEAT_LAG)}px`;
+    drawShelf();
     const arc = dockHandlePath(height, pull);
     handleArc.setAttribute("d", arc);
     handleHit.setAttribute("d", arc);
@@ -435,7 +570,7 @@ export function AgentDock(props: AgentDockProps) {
     if (moving) return report(null);
     const parts: Element[] = [dockEdge, ...(props.onDrag ? [handleHit] : [])];
     if (panelOpen.value > 0.001) parts.push(panelEdge);
-    if (shelf && !shelf.hidden) parts.push(shelf);
+    if (shelf && !shelf.hidden) parts.push(...shelfCards.map((card) => card.element));
     report(
       parts
         .map((element) => element.getBoundingClientRect())
@@ -587,6 +722,8 @@ export function AgentDock(props: AgentDockProps) {
     const move = (spring: Spring, value: number) => (instant ? spring.jump(value) : spring.to(value));
     move(dockH, dockHeight(count));
     move(addY, addCenterY(count));
+    shelfSeats = seats;
+    placeShelf(instant);
     const listHeight = SEAT_VIEW_INSET + seatsHeight(count);
     if (listHeight > listH.value) listH.jump(listHeight);
     else move(listH, listHeight);
@@ -795,7 +932,8 @@ export function AgentDock(props: AgentDockProps) {
     if (!props.onMove || event.button !== 0 || endSeatDrag || leaving.has(id) || !state.seats.includes(id)) return;
     const element = event.currentTarget;
     const pointerId = event.pointerId;
-    const startY = event.clientY;
+    const stageTop = () => stage.getBoundingClientRect().top;
+    const startY = event.clientY - stageTop();
     const springs = seatSprings(id);
     const initial = [...state.seats];
     let order = initial;
@@ -821,8 +959,9 @@ export function AgentDock(props: AgentDockProps) {
     };
     const scroll = () => {
       const view = seatScroll.getBoundingClientRect();
-      const above = view.top + SEAT_FADE - pointerY;
-      const below = pointerY - (view.bottom - SEAT_FADE);
+      const top = stageTop();
+      const above = view.top - top + SEAT_FADE - pointerY;
+      const below = pointerY - (view.bottom - top - SEAT_FADE);
       const step = above > 0 ? -above : below > 0 ? below : 0;
       const before = seatScroll.scrollTop;
       if (step !== 0) seatScroll.scrollTop = before + step * SEAT_DRAG_SCROLL;
@@ -840,7 +979,7 @@ export function AgentDock(props: AgentDockProps) {
     };
     const move = (moved: PointerEvent) => {
       if (moved.pointerId !== pointerId) return;
-      pointerY = moved.clientY;
+      pointerY = moved.clientY - stageTop();
       if (!started && Math.abs(pointerY - startY) < SEAT_DRAG_START) return;
       if (!started) start();
       follow();
@@ -1006,11 +1145,17 @@ export function AgentDock(props: AgentDockProps) {
   onSettled(() => {
     render();
     reportShape();
-    const resized = new ResizeObserver(() => reportShape());
-    if (shelf) resized.observe(shelf);
+    const resized = new ResizeObserver(() => {
+      measureShelf();
+      placeShelf();
+      reportShape();
+    });
+    shelfResize = resized;
+    for (const card of shelfCards) resized.observe(card.element);
     window.addEventListener("resize", reportShape);
     return () => {
       motion.stop();
+      shelfResize = undefined;
       resized.disconnect();
       window.removeEventListener("resize", reportShape);
     };
@@ -1119,6 +1264,7 @@ export function AgentDock(props: AgentDockProps) {
                     }}
                     style={{ left: `${DOCK_PAD}px` }}
                     data-dragging={draggedSeat() === id ? "" : undefined}
+                    data-temporary-start={firstTemporaryAfterSaved() === id ? "" : undefined}
                   >
                     <Show when={seatFor(id)}>
                       {(seat) => (
@@ -1311,6 +1457,7 @@ export function AgentDock(props: AgentDockProps) {
           stage={() => stage}
           onOpen={(agentId) => openChat(agentDockSeatKey({ kind: "agent", id: agentId }))}
           onShownChange={(shown) => props.onShelfChange?.(shown)}
+          onItemsChange={updateShelf}
           ref={(element) => {
             shelf = element;
             element.style.right = `${STAGE_WIDTH - DOCK_LEFT + SHELF_GAP}px`;
@@ -1367,6 +1514,12 @@ export function AgentDock(props: AgentDockProps) {
                     onOpenInMain={() => {
                       closeChat(false);
                       props.onOpenInMain(refOfKey(id));
+                    }}
+                    onOpenTakeover={(takeover) => {
+                      closeChat(false);
+                      const openTakeover = props.answers?.openTakeover;
+                      if (openTakeover) openTakeover(takeover);
+                      else props.onOpenInMain(refOfKey(id));
                     }}
                     onOpenWindow={openWindowFor(id)}
                     onOpenThread={

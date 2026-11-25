@@ -14,6 +14,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} heeft geen tegoed meer. Overgeschakeld naar {model}. Voeg tegoed toe en selecteer het daarna om het weer te gebruiken.",
   "status.agent.modelReturnedAfterError": "Teruggeschakeld naar {model} na de fout bij de aanbieder.",
+  "status.agent.modelSwitchedForRemovedModel": "{previous} is niet meer beschikbaar. Overgeschakeld naar {model}.",
   "status.agent.marketplaceSuggested": "Een app uit de marktplaats voorgesteld: {app}.",
   "status.agent.settingShown": "Een instelling getoond: {setting}.",
   "status.agent.channelMemberAdded": "{agent} heeft {member} aan het kanaal toegevoegd. {person} vroeg erom.",
@@ -27,6 +28,12 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Het hoofdscherm vastleggen en de afbeelding naar het model van de agent sturen.",
   "status.agent.screenCaptureChannel":
     "De afbeelding verschijnt in het kanaal {channel}, en elk lid van deze server dat het kanaal leest, kan haar zien.",
+  "status.agent.creditImageApproval": "Een afbeelding maken met {model}. Dit kost {credits} credits.",
+  "status.agent.creditVideoApproval": "Een video maken met {model}. Dit kost {credits} credits.",
+  "status.agent.creditMediaChannel":
+    "Het resultaat verschijnt in het kanaal {channel}, en elk lid van deze server dat het kanaal leest, kan het zien.",
+  "status.agent.creditsHoldBalance": "Dit gebruikt {credits} credits en het saldo is {balance} credits.",
+  "status.agent.creditsHoldAgentsOff": "Agents op deze server kunnen geen credits gebruiken.",
   "status.agent.screenCapturePermissionNext": "macOS kan je daarna vragen om schermopname toe te staan voor OpenBot.",
   "status.agent.screenCaptureDisplay":
     "Het beeldscherm {name} vastleggen en de afbeelding naar het model van de agent sturen.",
@@ -133,6 +140,10 @@ export const messages = {
   "status.agent.apiKeyScope.label": "Opslaan voor",
   "status.agent.apiKeyScope.vault": "Alle agents (Kluis)",
   "status.agent.apiKeyScope.agent": "Alleen deze agent",
+  "status.agent.location.field": "Je locatie",
+  "status.agent.location.placeholder": "Stad, adres of plaats",
+  "status.agent.location.submit": "Delen",
+  "status.agent.location.shared": "Locatie gedeeld",
   "status.agent.vaultExpiryHint": "MM/JJ",
   "status.agent.vaultField.website": "Website",
   "status.agent.vaultField.username": "Gebruikersnaam of e-mail",
@@ -151,10 +162,11 @@ export const messages = {
   "status.agent.vaultField.country": "Landcode",
   "status.agent.vaultField.phone": "Telefoon",
   "status.agent.vaultField.email": "E-mailadres",
-  "status.agent.finishCheckContinues": "Het verzoek is nog niet klaar. De agent gaat verder ({current} van {limit}).",
   "status.agent.nextStepContinues": "De agent stopte vóór de volgende stap en gaat verder ({current} van {limit}).",
   "status.agent.planContinues": "Het plan heeft open stappen. De agent gaat verder ({current} van {limit}).",
   "status.agent.planStopped": "De agent is gestopt met open stappen in het plan. Stuur een bericht om verder te gaan.",
+  "status.agent.continuationLimitReached":
+    "De agent is gestopt voordat de aanvraag klaar was. Hij kan niet nog een keer zelf verdergaan. Stuur een bericht om verder te gaan.",
   "status.agent.compactionContinues":
     "De verbinding viel weg terwijl de agent zijn context comprimeerde. De agent gaat verder.",
   "status.agent.providerExitContinues": "De agent stopte voordat zijn antwoord klaar was. De agent gaat verder.",

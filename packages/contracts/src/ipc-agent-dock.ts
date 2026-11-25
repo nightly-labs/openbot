@@ -97,6 +97,7 @@ export interface AgentDockMessage {
   kind: "text" | "error";
   body: string;
   attachments: AttachmentSummary[];
+  visual?: boolean;
 }
 
 export interface AgentDockApproval {
@@ -270,6 +271,7 @@ export type AgentDockAction =
   | { type: "new-thread"; serverId: string; agentId: string }
   | { type: "start-thread"; serverId: string; agentId: string; text: string; clientMessageId: string }
   | { type: "open-agent"; serverId: string; agentId: string }
+  | { type: "open-browser-takeover"; serverId: string; agentId: string; tabId: string }
   | { type: "open-channel"; serverId: string; channelId: string }
   | { type: "open-window"; serverId: string; agentId: string }
   | {
@@ -301,7 +303,7 @@ export type AgentDockAction =
   | { type: "open-settings" }
   | { type: "hide" };
 
-export type AboveAppsSupport = "restart" | "unsupported";
+export type AboveAppsSupport = "restart" | "unsupported" | "no-compositor";
 
 export interface SetAgentDockXWaylandInput {
   enabled: boolean;
@@ -317,6 +319,12 @@ export interface AgentDockInputRect {
   y: number;
   width: number;
   height: number;
+}
+
+export interface AgentDockExtent {
+  inward: number;
+  above: number;
+  below: number;
 }
 
 export function isAgentDockPresentation(value: unknown): value is AgentDockPresentation {
@@ -364,6 +372,8 @@ export function isAgentDockAction(value: unknown): value is AgentDockAction {
         value.text.trim().length > 0 &&
         isIdentifier(value.clientMessageId)
       );
+    case "open-browser-takeover":
+      return isIdentifier(value.agentId) && isIdentifier(value.tabId);
     case "open-channel":
       return isIdentifier(value.channelId);
     case "respond-approval":
@@ -418,6 +428,16 @@ export function isAgentDockInteractive(value: unknown): value is SetAgentDockInt
 
 export function isAgentDockXWayland(value: unknown): value is SetAgentDockXWaylandInput {
   return isDynamicRecord(value) && isBoolean(value.enabled);
+}
+
+export function isAgentDockExtent(value: unknown): value is AgentDockExtent | null {
+  return (
+    value === null ||
+    (isDynamicRecord(value) &&
+      integerInRange(value.inward, 0, AGENT_DOCK_LIMITS.inputExtent) &&
+      integerInRange(value.above, 0, AGENT_DOCK_LIMITS.inputExtent) &&
+      integerInRange(value.below, 0, AGENT_DOCK_LIMITS.inputExtent))
+  );
 }
 
 export function isAgentDockInputRegion(value: unknown): value is AgentDockInputRect[] {
@@ -674,7 +694,8 @@ function isMessage(value: unknown): value is AgentDockMessage {
     (value.senderMember === null || isConversationMessageSender(value.senderMember)) &&
     isOneOf(["text", "error"] as const, value.kind) &&
     isBoundedString(value.body, INPUT_LIMITS.messageText) &&
-    isList(value.attachments, INPUT_LIMITS.attachments, isAttachmentSummary)
+    isList(value.attachments, INPUT_LIMITS.attachments, isAttachmentSummary) &&
+    (value.visual === undefined || isBoolean(value.visual))
   );
 }
 

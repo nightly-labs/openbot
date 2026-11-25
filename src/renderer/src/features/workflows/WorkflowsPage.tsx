@@ -1,12 +1,16 @@
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
+import { Spinner } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
+import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
+import { useSetup } from "../onboarding/onboarding-context";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
 import { useUsage } from "../usage/usage-context";
 import { WorkflowsCanvas } from "./WorkflowsCanvas";
+import { workflowAgentProgress } from "./workflow-agent-progress";
 import { desktopWorkflowHost, type WorkflowHost } from "./workflows-port";
 
 export function WorkflowsPage(props: { serverId: string }) {
@@ -26,8 +30,8 @@ export function WorkflowsPage(props: { serverId: string }) {
       when={supported() ? props.serverId : null}
       keyed
       fallback={
-        <main class="window-page diagram-view diagram-flows-notice">
-          <Show when={!checking()}>
+        <main class="window-page workflows-notice">
+          <Show when={!checking()} fallback={<Spinner size="lg" label={t("common.loading")} />}>
             <p>{t("error.workflow.serverTooOld")}</p>
           </Show>
         </main>
@@ -45,8 +49,10 @@ export function WorkflowsPage(props: { serverId: string }) {
 }
 
 function DesktopWorkflowsCanvas(props: { serverId: string; host: WorkflowHost; admin: boolean }) {
-  const { agentList, agentStatus, modelOptions } = useAgents();
+  const { agentList, agentStatus, modelOptions, serverSetupChoice } = useAgents();
+  const { setupState } = useSetup();
   const { signedInAccount } = useAuth();
+  const { turnProgress, turnStepLines } = useTurns();
   const usage = useUsage();
   const request = {
     workflowId: () => {
@@ -64,7 +70,9 @@ function DesktopWorkflowsCanvas(props: { serverId: string; host: WorkflowHost; a
       models={modelOptions()}
       status={agentStatus()}
       self={signedInAccount()?.name ?? undefined}
+      preference={serverSetupChoice() ?? setupState()}
       request={request}
+      agentProgress={(agentId) => workflowAgentProgress(agentId, turnProgress()[agentId], turnStepLines())}
     />
   );
 }

@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "Não foi possível sair de {name}",
   "mobile.server.drawer.removeFailed": "Não foi possível remover {name}",
   "mobile.server.drawer.deleteFailed": "Não foi possível excluir {name}",
+  "mobile.server.drawer.hide": "Ocultar servidor",
+  "mobile.server.drawer.show": "Mostrar servidor",
+  "mobile.server.drawer.hiddenServers": "Servidores ocultos",
+  "mobile.server.drawer.hideFailed": "Não foi possível ocultar {name}",
+  "mobile.server.drawer.showFailed": "Não foi possível mostrar {name}",
   "mobile.server.drawer.actionFailed": "O OpenBot não conseguiu concluir esta ação. Tente novamente.",
   "mobile.server.drawer.moveUp": "Mover para cima",
   "mobile.server.drawer.moveDown": "Mover para baixo",
@@ -99,14 +104,17 @@ export const messages = {
   "mobile.server.hosted.intro.description":
     "Um servidor na nuvem executa seus agentes e rotinas quando o computador está desligado. O OpenBot configura e mantém o servidor funcionando.",
   "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
-  "mobile.server.hosted.computer.title": "No seu computador",
+  "mobile.server.hosted.steps.title": "Adicione no seu computador",
+  "mobile.server.hosted.steps.open": "Abra o OpenBot no seu computador.",
+  "mobile.server.hosted.steps.settings": "Vá em Configurações → Servidores hospedados.",
+  "mobile.server.hosted.steps.add": "Selecione Adicionar servidor e escolha um plano.",
+  "mobile.server.hosted.plansToggle": "O que cada plano inclui",
   "mobile.server.hosted.computer.add": "Adicionar um servidor na nuvem",
   "mobile.server.hosted.computer.addHint":
     "No OpenBot, abra Configurações → Servidores hospedados e selecione Adicionar servidor.",
   "mobile.server.hosted.computer.change": "Mudar de plano",
   "mobile.server.hosted.computer.changeHint": "No OpenBot, abra Configurações → Cobrança.",
   "mobile.server.hosted.yourServers": "Seus servidores",
-  "mobile.server.hosted.plans": "Planos",
   "mobile.server.hosted.currentPlan": "Seu plano",
   "mobile.server.hosted.soldOut": "Esgotado",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
@@ -229,6 +237,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Em espera. O host executa tantos turnos quanto a memória permite.",
   "mobile.server.threads.hold.agentBusy": "Aguardando outro trabalho deste agente terminar.",
   "mobile.server.threads.hold.oneTurn": "Em espera. O provedor deste agente executa um turno por vez.",
+  "mobile.server.threads.hold.signIn": "Em espera. O provedor deste agente precisa de login.",
   "mobile.server.threads.offline": "Conecte-se a este servidor para ver os tópicos dele.",
   "mobile.server.threads.loading": "Carregando tópicos…",
   "mobile.server.threads.loadFailed": "Não foi possível carregar os tópicos de alguns agentes.",
@@ -268,6 +277,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Isto remove o servidor do serviço de contas para todos os membros. Os arquivos e chats no computador dele continuam. Para usá-lo de novo, registre-o naquele computador.",
   "mobile.server.settings.remove": "Remover servidor",
+  "mobile.server.settings.hide": "Ocultar servidor",
+  "mobile.server.settings.show": "Mostrar servidor",
   "mobile.server.settings.deleteTitle": "Excluir {name}?",
   "mobile.server.settings.deleteBody":
     "O OpenBot para o servidor no computador dele e move os agentes, conversas e arquivos para a lixeira desse computador. O servidor sai da lista de servidores em todos os seus dispositivos.",
@@ -336,8 +347,10 @@ export const messages = {
   "mobile.server.route.invite": "Convidar pessoas",
   "mobile.server.route.member": "Membro",
   "mobile.server.route.timezone": "Fuso horário",
+  "mobile.server.route.signalHome": "Servidor do Signal",
   "mobile.server.route.personality": "Personalidade do agente",
   "mobile.server.route.agents": "Agentes",
+  "mobile.server.route.voiceModel": "Reconhecimento de fala",
   "mobile.server.settings.storage": "Armazenamento",
   "mobile.server.route.storage": "Armazenamento",
   "mobile.server.route.storageFiles": "Todos os arquivos",
@@ -465,6 +478,44 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Conecte-se a este servidor como proprietário ou admin para alterar o fuso horário.",
   "mobile.server.settings.timezoneUnsupported": "Atualize o OpenBot neste servidor para alterar o fuso horário aqui.",
+  "mobile.server.settings.signalHomeAutomatic": "Automático",
+  "mobile.server.settings.signalHomeNearest": "O servidor do Signal mais próximo",
+  "mobile.server.settings.signalHomeInUse": "Em uso: {name}",
+  "mobile.server.settings.signalHomeLoading": "Medindo os servidores do Signal…",
+  "mobile.server.settings.signalHomeSaveFailed": "Não foi possível mudar o servidor do Signal. Tente novamente.",
+  "mobile.server.settings.signalHomeUnavailable":
+    "Conecte-se a este servidor como proprietário ou administrador para mudar o servidor do Signal dele.",
+  "mobile.server.settings.signalHomeUnsupported":
+    "Atualize o OpenBot neste servidor para mudar aqui o servidor do Signal dele.",
+  "mobile.server.settings.signalHomeDescription":
+    "Os membros se conectam a este servidor por meio deste servidor do Signal. Um servidor do Signal com menor latência dá conexões mais rápidas.",
+  "mobile.server.settings.signalHomeFallback":
+    "{chosen} não responde. O servidor usa {name} até que {chosen} responda novamente.",
+  "mobile.server.settings.signalHomeMoving":
+    "O servidor muda para {name}. Os membros se conectam novamente em alguns segundos.",
+  "mobile.server.settings.signalHomeLoadFailed": "Não foi possível carregar os servidores do Signal.",
+  "mobile.server.settings.signalHomeLatency": "{latency} ms",
+  "mobile.server.settings.signalHomeNoAnswer": "Sem resposta",
+  "mobile.server.settings.signalHomePlaceHelsinki1": "Helsinque 1",
+  "mobile.server.settings.signalHomePlaceHelsinki2": "Helsinque 2",
+  "mobile.server.settings.signalHomePlaceSanJose": "San José",
+  "mobile.server.settings.signalHomePlaceSydney": "Sydney",
+  "mobile.server.settings.signalHomePlaceSingapore": "Singapura",
+  "mobile.server.settings.voiceModelDescription":
+    "Os agentes deste servidor usam este modelo para transcrever o som de vídeos que não têm legendas.",
+  "mobile.server.settings.voiceModelLoading": "Carregando o reconhecimento de fala…",
+  "mobile.server.settings.voiceModelLoadFailed":
+    "Não foi possível carregar o modelo de reconhecimento de fala do servidor.",
+  "mobile.server.settings.voiceModelSaveFailed":
+    "Não foi possível alterar o modelo de reconhecimento de fala. Tente de novo.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Atualize o OpenBot neste servidor para alterar o reconhecimento de fala aqui.",
+  "mobile.server.settings.voiceModelReady": "Pronto",
+  "mobile.server.settings.voiceModelDownloading": "Baixando: {percent}",
+  "mobile.server.settings.voiceModelSize": "Download de {size}",
+  "mobile.server.settings.voiceModelDownload": "Baixar",
+  "mobile.server.settings.voiceModelCancel": "Parar download",
+  "mobile.server.settings.voiceModelRemove": "Remover",
   "mobile.server.settings.keySection": "Chave do servidor",
   "mobile.server.settings.keyChanged": "Última alteração",
   "mobile.server.settings.keyChange": "Alterar chave",
@@ -483,12 +534,40 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Não foi possível alterar a chave do servidor. Tente de novo.",
   "mobile.server.settings.keyOwnerOnly": "Só o proprietário pode alterar a chave do servidor.",
   "mobile.server.settings.keyUnsupported": "Atualize o OpenBot neste servidor para alterar a chave dele aqui.",
+  "mobile.server.settings.turnLimit": "Tópicos ao mesmo tempo",
+  "mobile.server.settings.turnLimitDescription":
+    "Quantos tópicos de agentes podem ser executados ao mesmo tempo neste servidor. Mais tópicos usam mais memória.",
+  "mobile.server.settings.turnLimitAutomatic": "Automático ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Automático (sem limite)",
+  "mobile.server.settings.turnLimitUnlimited": "Sem limite",
+  "mobile.server.settings.turnLimitsLoadFailed": "Não foi possível carregar os limites de tópicos deste servidor.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Não foi possível salvar o limite de tópicos. Tente de novo.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Atualize o OpenBot neste servidor para alterar o limite de tópicos aqui.",
+  "mobile.server.settings.agentTaskLimit": "Tópicos em paralelo por agente",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Quantos tópicos cada agente sem limite próprio pode executar ao mesmo tempo.",
+  "mobile.server.settings.agentTaskLimitDefault": "Padrão ({count})",
   "mobile.server.settings.memoryLimit": "Memórias por agente",
   "mobile.server.settings.memoryLimitDescription": "Quantas memórias cada agente neste servidor pode manter.",
   "mobile.server.settings.memoryLimitLoadFailed": "Não foi possível carregar o limite de memórias deste servidor.",
   "mobile.server.settings.memoryLimitSaveFailed": "Não foi possível salvar o limite de memórias. Tente de novo.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Atualize o OpenBot neste servidor para alterar o limite de memórias aqui.",
+  "mobile.server.settings.mediaApprovalCredits": "Perguntar antes de gastar mais de",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "créditos",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed":
+    "Não foi possível carregar o limite de aprovação de créditos deste servidor.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed":
+    "Não foi possível salvar o limite de aprovação de créditos. Tente de novo.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "Atualize o OpenBot neste servidor para alterar aqui o limite de aprovação de créditos.",
+  "mobile.server.settings.mediaApprovalAgents": "Os agentes podem usar créditos",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed":
+    "Não foi possível alterar o uso de créditos pelos agentes. Tente de novo.",
+  "mobile.server.settings.mediaApprovalAsk": "Perguntar quando precisar de créditos",
+  "mobile.server.settings.mediaApprovalAskSaveFailed":
+    "Não foi possível alterar os pedidos de créditos. Tente de novo.",
   "mobile.server.settings.memoryReview": "Revisão de memórias",
   "mobile.server.settings.memoryReviewDescription":
     "Com que frequência os agentes deste servidor guardam em segundo plano fatos duradouros das conversas.",
@@ -549,6 +628,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Adicionar agentes",
   "mobile.server.browserProfiles.agentsHint":
     "Um toque dá este perfil ao agente ou o devolve ao perfil compartilhado. Uma alteração fecha as abas abertas do agente.",
+  "mobile.server.browserProfiles.movedNote":
+    "Os logins nos sites ficam no perfil antigo. Um agente movido precisa entrar nesses sites novamente.",
   "mobile.server.browserProfiles.clear": "Apagar dados",
   "mobile.server.browserProfiles.clearTitle": "Apagar os dados de {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -907,7 +988,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "Seu chat “Mensagem para você mesmo” e as pessoas que você permitir falam com o OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "As pessoas que você permitir falam com o OpenBot. Outras pessoas recebem um código para passar a você.",
+    "Seu chat “Mensagem para você mesmo” e as pessoas que você permitir falam com o OpenBot. Outras pessoas recebem um código para passar a você.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "O WhatsApp removeu este servidor dos dispositivos conectados. Vincule o número novamente.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -922,7 +1003,7 @@ export const messages = {
     "Só o seu chat “Mensagem para você mesmo” e as pessoas que você permitir podem escrever. Outras pessoas não recebem resposta. Quando desativado, o OpenBot responde a pessoas desconhecidas com um código.",
   "mobile.server.connectors.whatsapp.workingMessage": "Mensagem “Trabalhando nisso…”",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "O OpenBot a envia enquanto o agente trabalha e depois a substitui pela resposta. Uma solicitação que espera outra anterior também recebe uma mensagem de espera. Desative para enviar só a resposta.",
+    "O OpenBot a envia enquanto o agente trabalha e depois a substitui pela resposta. Uma solicitação que espera outra anterior também recebe uma mensagem de espera. Em um número pessoal, só o seu chat “Mensagem para você mesmo” recebe essas mensagens. Desative para enviar só a resposta.",
   "mobile.server.connectors.whatsapp.statusReactions": "Reações de status",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "O OpenBot reage com 👀 quando uma mensagem chega e com ✅ quando a resposta está pronta. Desative para não enviar reações.",
@@ -988,6 +1069,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "Um número pode permitir até {count} contatos e grupos.",
   "mobile.server.connectors.whatsapp.senderGroup": "Grupo",
   "mobile.server.connectors.whatsapp.removeSender": "Remover",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · Somente leitura",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "Tornar somente leitura",
+  "mobile.server.connectors.whatsapp.allowWork": "Permitir dar tarefas",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "Somente leitura: os agentes podem ler este chat, e o OpenBot nunca escreve nele.",
   "mobile.server.connectors.whatsapp.addContact": "Adicionar contato",
   "mobile.server.connectors.whatsapp.addGroup": "Adicionar grupo",
   "mobile.server.connectors.whatsapp.contactTitle": "Adicionar um contato",
@@ -1149,11 +1235,16 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Não foi possível alterar os modelos. Tente novamente.",
   "mobile.server.providers.promptCache": "Cache de prompts",
   "mobile.server.providers.promptCacheHint":
-    "Quanto tempo o Claude mantém o contexto de um agente em cache entre turnos. A alteração vale quando o Claude reiniciar.",
-  "mobile.server.providers.promptCacheDefault": "Padrão do Claude Code",
+    "Por quanto tempo Claude e Pi mantêm o contexto de um agente no cache entre turnos. A mudança vale quando o provedor iniciar de novo.",
+  "mobile.server.providers.promptCacheDefault": "Padrão do provedor",
   "mobile.server.providers.promptCacheHour": "1 hora",
   "mobile.server.providers.promptCacheLoadFailed":
     "Não foi possível carregar o tempo de cache de prompts deste servidor.",
+  "mobile.server.providers.cacheExpiryCompaction": "Compactar antes de o cache expirar",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Quando um chat com 200K ou mais tokens de contexto fica ocioso com um cache de 1 hora, o agente compacta o contexto antes de o cache expirar. Assim a próxima mensagem não lê todo o contexto de novo sem cache.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "Não foi possível carregar a configuração de compactação deste servidor.",
   "mobile.server.providers.compactWindow": "Compactar chats em",
   "mobile.server.providers.compactWindowHint":
     "O Claude Code resume os turnos antigos de um chat quando o chat atinge este tamanho. Menor mantém os turnos rápidos e baratos. Maior mantém mais detalhes. Um modelo com uma janela menor compacta no próprio limite.",
@@ -1209,6 +1300,8 @@ export const messages = {
     "O ChatGPT usa esta chave, não o seu plano do ChatGPT. A OpenAI cobra cada solicitação na chave. O uso do plano não é exibido.",
   "mobile.server.providers.codexKeyAlternative":
     "Ou entre com uma chave de API da OpenAI. A OpenAI cobra cada solicitação na chave.",
+  "mobile.server.providers.museKeyInUse":
+    "O Muse usa esta chave, não o seu login. Para usar o seu login, remova a chave.",
   "mobile.server.providers.sectionUse": "Uso",
   "mobile.server.providers.unused": "Nenhum agente o usa",
   "mobile.server.providers.usedByCount": { one: "1 agente o usa", other: "{count} agentes o usam" },
@@ -1327,6 +1420,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 horas",
   "mobile.server.planLimits.window.hours": { one: "{count} hora", other: "{count} horas" },
   "mobile.server.planLimits.window.minutes": "{minutes} min",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Atualizações",
   "mobile.server.settings.updateAvailable": "Atualização disponível",
   "mobile.server.route.updates": "Atualizações",
@@ -1377,7 +1471,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "Aguardando {reasons}.",
   "mobile.server.update.disabledTitle": "As atualizações remotas estão desativadas",
   "mobile.server.update.disabledDescription":
-    "O usuário de {name} desativou as atualizações por membros do servidor. Peça que atualize o OpenBot ou ative a opção.",
+    "O usuário de {name} desativou as atualizações por membros do servidor. Peça que atualize o OpenBot ou que abra Configurações > Atualizações nesse computador e ative “Permitir atualizações por membros do servidor”.",
   "mobile.server.update.managedTitle": "Um Host Manager controla as atualizações",
   "mobile.server.update.managedDescription":
     "O OpenBot Host Manager atualiza {name}. Entre em contato com o administrador do computador anfitrião.",
@@ -1701,4 +1795,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "Não foi possível aceitar a transferência",
   "mobile.server.ownerTransfer.declineFailed": "Não foi possível recusar a transferência",
   "mobile.server.ownerTransfer.tryAgain": "Tente novamente mais tarde.",
+  "mobile.server.providers.updateAll": "Atualizar tudo",
+  "mobile.server.providers.updateAllFailed": "Algumas atualizações não começaram. Tente novamente.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -342,8 +342,6 @@ export function quotedSkillMarkdown(skillFile: Uint8Array): Uint8Array | null {
 
 const rejectLinks = Effect.fn("LocalSkill.rejectLinks")(function* (root: string, path: string) {
   let current = root;
-  if ((yield* localIO(() => lstat(root))).isSymbolicLink())
-    return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.pathSymlink")) });
   for (const part of relative(root, path).split(sep).filter(Boolean)) {
     current = join(current, part);
     if ((yield* localIO(() => lstat(current))).isSymbolicLink())

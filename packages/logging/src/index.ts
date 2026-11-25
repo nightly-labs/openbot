@@ -103,17 +103,51 @@ export function redactText(value: string): string {
 }
 
 export function redactSecrets(value: string): string {
-  return redact(value, false, true);
+  return redact(value, false, "keepPastScanBound");
+}
+
+export function containsSecret(value: string): boolean {
+  return redact(value, true, "keep") !== value;
 }
 
 export function redactPostText(value: string): string {
-  return redact(value, false);
+  return maskWholeRegisteredSecrets(applyKeyFormatRules(value));
 }
 
-function redact(value: string, emails: boolean, keepUnscanned = false): string {
+const POST_TOKEN_CHARACTER = /[\p{L}\p{N}._~+@%-]/u;
+const POST_TOKEN_TAIL = /^[\p{L}\p{N}._~+@-]*/u;
+const PERCENT_ESCAPE_BEFORE = /%[0-9A-Fa-f]{2}$/u;
+const SENTENCE_DOTS = /^\.*$/u;
+
+function maskWholeRegisteredSecrets(value: string): string {
+  const pattern = registeredSecretPattern;
+  if (!pattern) return value;
+  return value.replace(pattern, (secret: string, offset: number) =>
+    isWholeToken(value, offset, offset + secret.length) ? "[redacted]" : secret,
+  );
+}
+
+function endsWithPercentEscape(value: string, end: number): boolean {
+  return PERCENT_ESCAPE_BEFORE.test(value.slice(Math.max(0, end - 3), end));
+}
+
+function isLinkUser(value: string, start: number, end: number): boolean {
+  return value.charAt(end) === "@" && value.slice(Math.max(0, start - 3), start) === "://";
+}
+
+function isWholeToken(value: string, start: number, end: number): boolean {
+  if (isLinkUser(value, start, end)) return true;
+  if (start > 0 && POST_TOKEN_CHARACTER.test(value.charAt(start - 1)) && !endsWithPercentEscape(value, start))
+    return false;
+  return SENTENCE_DOTS.test(POST_TOKEN_TAIL.exec(value.slice(end))?.[0] ?? "");
+}
+
+type UnscannedText = "drop" | "keepPastScanBound" | "keep";
+
+function redact(value: string, emails: boolean, unscanned: UnscannedText = "drop"): string {
   const marked = markRegisteredSecrets(value);
   const redacted =
-    redactSerializedJson(marked, emails) ?? applyTextRules(redactEmbeddedJson(marked, emails, keepUnscanned), emails);
+    redactSerializedJson(marked, emails) ?? applyTextRules(redactEmbeddedJson(marked, emails, unscanned), emails);
   return marked === value ? redacted : redacted.replace(MARKERS, "[redacted]");
 }
 
@@ -162,19 +196,32 @@ function urlHosts(value: string): Uint8Array {
   return flags;
 }
 
-function applyTextRules(value: string, emails: boolean): string {
-  const redacted = value
+function applyKeyFormatRules(value: string): string {
+  return redactKeyFormatsAfterLabels(redactKeyFormatsBeforeLabels(value));
+}
+
+function redactKeyFormatsBeforeLabels(value: string): string {
+  return value
     .replace(PEM_PRIVATE_KEY, "[redacted]")
     .replace(COOKIE_HEADER, "$1[redacted]")
     .replace(AUTH_HEADER_SECRET, "$1[redacted]")
-    .replace(BEARER_SECRET, "[redacted]")
-    .replace(CREDENTIAL_ASSIGNMENT, redactAssignedValue)
-    .replace(JSON_BARE_KEY, redactAssignedValue)
-    .replace(QUERY_SECRET, "$1[redacted]")
+    .replace(BEARER_SECRET, "[redacted]");
+}
+
+function redactKeyFormatsAfterLabels(value: string): string {
+  return value
     .replace(URL_PASSWORD, "$1[redacted]")
     .replace(WEBHOOK_URL_SECRET, "$1[redacted]")
     .replace(KNOWN_SECRET_PREFIXES, "[redacted]")
     .replace(JSON_WEB_TOKEN, "[redacted]");
+}
+
+function applyTextRules(value: string, emails: boolean): string {
+  const labeled = redactKeyFormatsBeforeLabels(value)
+    .replace(CREDENTIAL_ASSIGNMENT, redactAssignedValue)
+    .replace(JSON_BARE_KEY, redactAssignedValue)
+    .replace(QUERY_SECRET, "$1[redacted]");
+  const redacted = redactKeyFormatsAfterLabels(labeled);
   return emails ? redacted.replace(EMAIL, "[redacted-email]") : redacted;
 }
 
@@ -182,7 +229,31 @@ const MAX_EMBEDDED_SCANS = 16;
 
 const UNSCANNED = "[redacted-unscanned]";
 
-function redactEmbeddedJson(value: string, emails: boolean, keepUnscanned: boolean): string {
+const JSON_ONLY_SECRET_SHAPE = new RegExp(
+  String.raw`"headers"\s*:|"(?:name|key)"\s*:\s*"(?:${SECRET_LABEL}|keys?)"|(?<![A-Za-z0-9_.-])(?:["']?(?:${SECRET_LABEL})["']?|"keys?")\s*[=:]\s*[{[]`,
+  "iu",
+);
+
+const JSON_ESCAPE = /\\(?:u([0-9A-Fa-f]{4})|(["\\/bfnrt]))/gu;
+
+const JSON_ESCAPED_CHARACTERS: Record<string, string> = { b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" };
+
+function jsonUnescaped(text: string): string {
+  return text.replace(JSON_ESCAPE, (_escape: string, code: string | undefined, character: string) =>
+    code ? String.fromCharCode(Number.parseInt(code, 16)) : (JSON_ESCAPED_CHARACTERS[character] ?? character),
+  );
+}
+
+function hidesSecret(text: string, emails: boolean): boolean {
+  const decoded = jsonUnescaped(text);
+  return JSON_ONLY_SECRET_SHAPE.test(decoded) || (decoded !== text && applyTextRules(decoded, emails) !== decoded);
+}
+
+function keptOrUnscanned(text: string, emails: boolean): string {
+  return hidesSecret(text, emails) ? UNSCANNED : text;
+}
+
+function redactEmbeddedJson(value: string, emails: boolean, unscanned: UnscannedText): string {
   let result = "";
   let index = 0;
   let scans = 0;
@@ -190,18 +261,22 @@ function redactEmbeddedJson(value: string, emails: boolean, keepUnscanned: boole
     const start = findPayloadStart(value, index);
     if (start < 0) break;
     if (scans >= MAX_EMBEDDED_SCANS) {
-      if (keepUnscanned) return result + value.slice(index);
+      if (unscanned === "keepPastScanBound") return result + value.slice(index);
+      if (unscanned === "keep") return result + value.slice(index, start) + keptOrUnscanned(value.slice(start), emails);
       return `${result + value.slice(index, start)}${UNSCANNED}`;
     }
     scans += 1;
     const end = findBalancedEnd(value, start);
     if (end < 0 && startsLikeJson(value, start)) {
-      return `${result + value.slice(index, start)}${UNSCANNED}`;
+      if (unscanned !== "keep" || hidesSecret(value.slice(start), emails))
+        return `${result + value.slice(index, start)}${UNSCANNED}`;
     }
     const parsed = end < 0 ? null : parseRedacted(value.slice(start, end), emails);
     if (parsed === null) {
       if (end >= 0 && startsLikeJson(value, start)) {
-        result += value.slice(index, start) + UNSCANNED;
+        result +=
+          value.slice(index, start) +
+          (unscanned === "keep" ? keptOrUnscanned(value.slice(start, end), emails) : UNSCANNED);
         index = end;
         continue;
       }
@@ -220,7 +295,7 @@ function redactEmbeddedJson(value: string, emails: boolean, keepUnscanned: boole
 function parseRedacted(candidate: string, emails: boolean): string | null {
   try {
     const parsed = JSON.parse(candidate);
-    const converted = convertValue(parsed, new Set<object>(), emails);
+    const converted = convertValue(parsed, new Set<object>(), { emails, unscanned: "drop" });
     if (unchangedKeyCount(parsed, converted) === writtenKeyCount(candidate)) return candidate;
     return JSON.stringify(converted) ?? null;
   } catch {
@@ -318,12 +393,20 @@ export function toLogValue(value: unknown): LogValue {
 }
 
 export function toSecretSafeValue(value: unknown): LogValue {
-  return convertSafely(value, false);
+  return convertSafely(value, CHAT_RULES);
 }
 
-function convertSafely<T>(value: T, emails = true): LogValue {
+interface ConversionRules {
+  emails: boolean;
+  unscanned: UnscannedText;
+}
+
+const LOG_RULES: ConversionRules = { emails: true, unscanned: "drop" };
+const CHAT_RULES: ConversionRules = { emails: false, unscanned: "keep" };
+
+function convertSafely<T>(value: T, rules = LOG_RULES): LogValue {
   try {
-    return convertValue(value, new Set<object>(), emails);
+    return convertValue(value, new Set<object>(), rules);
   } catch {
     return UNSERIALIZABLE;
   }
@@ -331,25 +414,26 @@ function convertSafely<T>(value: T, emails = true): LogValue {
 
 const MAX_CONVERSION_DEPTH = 32;
 
-function convertValue<T>(value: T, seen: Set<object>, emails: boolean, depth = 0): LogValue {
-  if (typeof value === "string") return redact(value, emails);
+function convertValue<T>(value: T, seen: Set<object>, rules: ConversionRules, depth = 0): LogValue {
+  const text = (input: string) => redact(input, rules.emails, rules.unscanned);
+  if (typeof value === "string") return text(value);
   if (value === null) return null;
   if (value === undefined) return undefined;
   if (typeof value === "number" || typeof value === "boolean") return value;
   if (typeof value === "bigint") return `${value.toString()}n`;
   if (value instanceof Error) {
     const converted: { [key: string]: LogValue } = {
-      name: redact(value.name, emails),
-      message: redact(value.message, emails),
+      name: text(value.name),
+      message: text(value.message),
     };
-    if (typeof value.stack === "string") converted.stack = redact(value.stack, emails);
+    if (typeof value.stack === "string") converted.stack = text(value.stack);
     return converted;
   }
   if (Array.isArray(value)) {
     if (seen.has(value)) return "[circular]";
     if (depth >= MAX_CONVERSION_DEPTH) return "[too deep]";
     seen.add(value);
-    return value.map((entry: LogValue) => convertValue(entry, seen, emails, depth + 1));
+    return value.map((entry: LogValue) => convertValue(entry, seen, rules, depth + 1));
   }
   if (typeof value === "object") {
     if (seen.has(value)) return "[circular]";
@@ -366,21 +450,21 @@ function convertValue<T>(value: T, seen: Set<object>, emails: boolean, depth = 0
     );
     return Object.fromEntries(
       entries.map(([key, entry]): [string, LogValue] => [
-        redact(key, emails),
-        secretPair && key === "value" ? "[redacted]" : convertEntry(key, entry, seen, emails, depth),
+        text(key),
+        secretPair && key === "value" ? "[redacted]" : convertEntry(key, entry, seen, rules, depth),
       ]),
     );
   }
   try {
-    return redact(String(value), emails);
+    return text(String(value));
   } catch {
     return UNSERIALIZABLE;
   }
 }
 
-function convertEntry(key: string, entry: unknown, seen: Set<object>, emails: boolean, depth: number): LogValue {
+function convertEntry(key: string, entry: unknown, seen: Set<object>, rules: ConversionRules, depth: number): LogValue {
   if (SECRET_KEY.test(key)) return "[redacted]";
-  const converted = convertValue(entry, seen, emails, depth + 1);
+  const converted = convertValue(entry, seen, rules, depth + 1);
   if (!HEADER_KEY.test(key) || entry === null || typeof entry !== "object") return converted;
   return redactHeaderStrings(converted);
 }

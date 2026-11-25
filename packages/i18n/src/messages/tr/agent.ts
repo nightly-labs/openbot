@@ -60,6 +60,7 @@ export const messages = {
   "agent.dock.closeOnLeave": "Dışarı tıklayınca kapat",
   "agent.dock.openInMain": "Ana pencerede aç",
   "agent.dock.openWindow": "Yeni pencerede aç",
+  "agent.dock.openPage": "{title} sayfasını aç",
   "agent.dock.remove": "Yuvadan kaldır",
   "agent.dock.send": "Gönder",
   "agent.dock.working": "Çalışıyor…",

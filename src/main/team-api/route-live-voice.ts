@@ -9,7 +9,7 @@ import {
   LIVE_VOICE_TRANSCRIPT_LIMIT,
   type LiveVoiceEvent,
 } from "@openbot/contracts/team-protocol/live-voice-v1";
-import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
+import { isFixedSourceText, sourceText, sourceTextValues } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { TeamApiAgents, TeamApiLiveVoice } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -69,6 +69,10 @@ export function voiceLiveEventFromWire(event: LiveVoiceEvent): VoiceLiveEvent {
     : { type: "ended", sessionId: event.sessionId, error: event.error };
 }
 
+function isUserStartFailure(message: string): boolean {
+  return isFixedSourceText(message) || sourceTextValues(message, "error.voice.live.startFailed") !== null;
+}
+
 export interface LiveVoiceRouteOptions {
   liveVoice: TeamApiLiveVoice | undefined;
   agents: Pick<TeamApiAgents, "listAgents">;
@@ -122,7 +126,7 @@ export async function routeLiveVoice(
       ),
     );
   } catch (error) {
-    if (error instanceof Error && isFixedSourceText(error.message)) throw new HttpError(409, error.message);
+    if (error instanceof Error && isUserStartFailure(error.message)) throw new HttpError(409, error.message);
     throw error;
   }
   if (!options.hasEventConnection(sessionId, member.id)) {

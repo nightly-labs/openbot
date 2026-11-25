@@ -54,6 +54,7 @@ import {
 import { InstallServerOverlay } from "./features/servers/InstallServerOverlay";
 import { mcpToolRuntimeNote } from "./features/servers/mcp-servers";
 import { OwnerTransferPrompt } from "./features/servers/OwnerTransferPrompt";
+import { ServerPlanReminder } from "./features/servers/ServerPlanReminder";
 import type { ServerCopyOptions } from "./features/servers/ServerTransferPanel";
 import { useServerActions } from "./features/servers/server-actions";
 import {
@@ -112,6 +113,7 @@ export function WorkspaceOverlays(props: AccountProps) {
       <CreateLocalServer />
       <InstallServer />
       <HostedUpsell account={props.account} />
+      <PlanReminder />
       <LeaveServer />
       <RestartServer />
       <ServerSettings />
@@ -218,6 +220,20 @@ export function SkillsMarketplace() {
       onMcpSignInRequestHandled={() => setPendingMcpSignIn(null)}
       onMcpSignIns={(serverId, states) => setMcpSignIns({ serverId, states })}
     />
+  );
+}
+
+function PlanReminder() {
+  const platform = usePlatform();
+  const { allServers, callbacks } = useServerActions();
+  return (
+    <Show when={platform.chatWindow === null}>
+      <ServerPlanReminder
+        servers={allServers()}
+        planDeletesAt={callbacks.planDeletesAt}
+        onRenew={callbacks.onRenewPlan}
+      />
+    </Show>
   );
 }
 
@@ -894,7 +910,10 @@ function ServerSettings() {
           }
           hostUpdate={{}}
           hostTimezone={{}}
+          hostVoiceModel={{}}
+          hostSignalHome={{}}
           hostTurnLimits={{}}
+          mediaApprovalCredits={{}}
           hostPersonality={{}}
           hostMemoryLimit={{}}
           memoryReview={{}}
@@ -992,12 +1011,26 @@ function AppSettings(props: AccountProps) {
   });
   const codexLiveAccess = () =>
     activeServer()?.kind === "local" ? codexLiveAccessOf(agentStatus().providers) : undefined;
+  const { providerAccounts } = useProviders();
+  const liveVoiceAccount = () => {
+    const choose = providerAccounts()?.setLiveVoiceAccount;
+    const codex = agentStatus().providers?.find((row) => row.id === "codex");
+    if (!choose || !codex?.accounts) return undefined;
+    return {
+      accounts: codex.accounts,
+      accountId: codex.liveVoiceAccount ?? null,
+      defaultUsesKey: codex.apiKeyInUse === true,
+      choose,
+    };
+  };
   const {
     appSettingsOpen,
     notificationFocusRequest,
     setAppSettingsOpen,
     appSettingsTab,
     hostedServerDeleteRequest,
+    mobileInstallRequest,
+    clearMobileInstallRequest,
     generalSettings,
     builtInDisplayGeometry,
     updateGeneralSettings,
@@ -1034,6 +1067,7 @@ function AppSettings(props: AccountProps) {
         onCancelScheduledRestart={updates.cancelScheduledRestart}
         onRestartWhenIdle={updates.restartWhenIdle}
         onCancelIdleRestart={updates.cancelIdleRestart}
+        onRestartNow={updates.restartNow}
         account={props.account()}
         onUpdateAccountName={auth.updateAccountName}
         onUpdateAccountAvatar={auth.updateAccountAvatar}
@@ -1053,6 +1087,9 @@ function AppSettings(props: AccountProps) {
         billingApi={appPort().billing}
         referralApi={appPort().referral}
         licenseApi={appPort().license}
+        creditsApi={appPort().credits}
+        onCreditsChange={windowPage.adoptCredits}
+        onBuyCredits={(serverId) => windowPage.openCredits(serverId)}
         onContactUs={() => void appPort().openExternal("hosted-server-contact")}
         hostedServersApi={appPort().hostedServers}
         onAddHostedServer={() => {
@@ -1060,6 +1097,7 @@ function AppSettings(props: AccountProps) {
           setAddServerOpen(true, "settings_billing");
         }}
         codexLiveAccess={codexLiveAccess()}
+        liveVoiceAccount={liveVoiceAccount()}
         onConnectCodex={() => {
           setAppSettingsOpen(false);
           openServerSettings(LOCAL_SERVER_ID, null, "providers");
@@ -1072,6 +1110,8 @@ function AppSettings(props: AccountProps) {
         restoreFocusTarget={appSettingsRestoreTarget()}
         openTab={appSettingsTab()}
         hostedServerDeleteRequest={hostedServerDeleteRequest()}
+        mobileInstallRequest={mobileInstallRequest()}
+        onMobileInstallRequestHandled={clearMobileInstallRequest}
       />
     </Loading>
   );

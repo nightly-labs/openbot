@@ -1,4 +1,4 @@
-import { agentProviderName } from "@openbot/contracts/agent-providers";
+import { type AgentProviderId, agentProviderName } from "@openbot/contracts/agent-providers";
 import type {
   AgentEvent,
   AgentRuntimeSnapshot,
@@ -48,6 +48,29 @@ export function notificationForUsageLimit(
       : translate("notification.usageLimit.body", { count }),
     agentId: event.agentId,
     threadId: agents.find((agent) => agent.id === event.agentId)?.threadId ?? null,
+  };
+}
+
+export interface ProviderSignInWaitNotice {
+  type: "provider-sign-in-wait";
+  agentId: string;
+  provider: AgentProviderId;
+}
+
+export function notificationForSignInWait(
+  notice: ProviderSignInWaitNotice,
+  agents: ClientAgentSummary[],
+  translate: AppTranslate,
+  level: ServerNotificationLevel,
+): AgentNotificationContent | null {
+  if (level === "nothing") return null;
+  const agent = agents.find((candidate) => candidate.id === notice.agentId);
+  if (!agent?.notifications) return null;
+  return {
+    title: agent.name,
+    body: translate("notification.waitsForSignIn", { provider: agentProviderName(notice.provider) }),
+    agentId: agent.id,
+    threadId: agent.threadId ?? null,
   };
 }
 

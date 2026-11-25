@@ -242,6 +242,36 @@
   line-height: 1;
 }
 
+.credit-rail-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.credit-rail-icon .credit-icon {
+  transition:
+    rotate var(--openbot-duration-overlay) var(--openbot-ease-out),
+    scale var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .credit-rail-icon:hover .credit-icon {
+    rotate: 90deg;
+    scale: 1.12;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .credit-rail-icon .credit-icon {
+    transition: none;
+  }
+
+  .credit-rail-icon:hover .credit-icon {
+    rotate: none;
+    scale: none;
+  }
+}
+
 .window-rail-credits-count[data-usage-tone="warning"] {
   color: var(--openbot-warning-text);
 }

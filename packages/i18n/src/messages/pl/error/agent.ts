@@ -20,6 +20,8 @@ export const messages = {
     "Narzędzie nie zostało uruchomione. tool_call nie znalazł narzędzia o tej nazwie. Użyj dokładnej pełnej nazwy z tool_search, na przykład openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "Narzędzie nie zostało uruchomione. tool_call nie znalazł narzędzia o tej nazwie. Pełna nazwa to prawdopodobnie {name}. Jeśli tak, wyślij wywołanie ponownie z tą nazwą.",
+  "error.agent.toolCallNullValue":
+    "Narzędzie nie zostało uruchomione. {name} wymaga obiektu lub listy w {paths}, ale każdy z tych elementów listy dotarł jako null. Wyślij wywołanie ponownie i podaj każdy z tych elementów jako ciąg znaków z jego JSON.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe nie znalazł narzędzia OpenBot o nazwie {names}. Opisuje tylko narzędzia OpenBot i przeglądarki, które podaje openbot.tool_search, a nie narzędzia MCP.",
   "error.agent.toolDescribeDiscoveryNames":
@@ -53,6 +55,12 @@ export const messages = {
   "error.agent.modelUnavailable": "Wybrany model agenta jest niedostępny.",
   "error.agent.modelProviderNotConnected":
     "Wybrany model agenta „{model}” jest niedostępny: {provider} nie jest połączony.",
+  "error.agent.modelProviderSignInRequired":
+    "Wybrany model agenta „{model}” jest niedostępny: {provider} wymaga zalogowania. Zaloguj się do {provider} i spróbuj ponownie.",
+  "error.agent.modelProviderNotInstalled":
+    "Wybrany model agenta „{model}” jest niedostępny: {provider} nie jest zainstalowany.",
+  "error.agent.modelProviderOutdated":
+    "Wybrany model agenta „{model}” jest niedostępny: {provider} wymaga aktualizacji.",
   "error.agent.modelListEmpty":
     "Wybrany model agenta „{model}” jest niedostępny: {provider} nie zwrócił żadnych modeli. Ostatni błąd: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -152,6 +160,8 @@ export const messages = {
   "error.agent.busyMessageModeLocalOnly":
     "Zachowanie wiadomości podczas pracy agenta można ustawić tylko na komputerze, na którym działa agent.",
   "error.agent.backupModelsLocalOnly": "Modele zapasowe można ustawić tylko na komputerze, na którym działa agent.",
+  "error.agent.backupModelsAtLimit":
+    "Żaden model zapasowy nie może teraz przejąć pracy: każdy osiągnął limit użycia lub niedawno zawiódł. Modele jednego konta mogą mieć wspólny limit. Aby kontynuować teraz, dodaj model zapasowy od innego dostawcy lub z innego konta albo poczekaj na odnowienie limitu.",
   "error.agent.taskLimitLocalOnly": "Limit zadań można ustawić tylko na komputerze, na którym działa agent.",
   "error.agent.localScriptsOff": "Ten agent nie zezwala na lokalne skrypty.",
   "error.agent.localScriptsRateLimited":
@@ -183,6 +193,8 @@ export const messages = {
     "Przechwytywanie ekranu nie działa w rozmowie w Slacku, Discordzie lub Telegramie, ponieważ jego pliki trafiają do innych osób.",
   "error.agent.screenCaptureDeclined":
     "Użytkownik nie zezwolił na to przechwycenie ekranu. Nic nie zostało przechwycone.",
+  "error.agent.creditMediaDeclined": "Użytkownik nie zezwolił na to generowanie. Nie wydano żadnych kredytów.",
+  "error.agent.creditMediaNotSaved": "Plik został utworzony, ale OpenBot nie mógł zapisać go w czacie.",
   "error.agent.mcpToolDeclined":
     "Użytkownik nie zezwolił na to wywołanie narzędzia MCP. Narzędzie nie zostało uruchomione.",
   "error.agent.screenCaptureWindowMissing":

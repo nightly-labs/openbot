@@ -7,6 +7,7 @@ import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { projectChannelMessages } from "@/features/chat/model/chat-messages";
+import { appendComposerDraft } from "@/features/chat/model/composer-drafts";
 import { type TurnStepsSummary, unansweredChannelTurnSummaries } from "@/features/chat/model/turn-thinking";
 import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
 import { useChatPullPreference } from "@/features/settings/model/chat-swipe";
@@ -25,12 +26,31 @@ import { channelTaskActivities, channelTasksNeedingAction } from "../model/chann
 import { firstUnreadChannelMessageId } from "../model/channel-unread";
 
 export function ChannelChatScreen() {
-  const { channelId, serverId } = useLocalSearchParams<{ channelId: string; serverId: string }>();
-  return <ChannelChat key={`${serverId}:${channelId}`} channelId={channelId} serverId={serverId} />;
+  const { channelId, serverId, questionAgentId } = useLocalSearchParams<{
+    channelId: string;
+    serverId: string;
+    questionAgentId?: string;
+  }>();
+  return (
+    <ChannelChat
+      key={`${serverId}:${channelId}`}
+      channelId={channelId}
+      serverId={serverId}
+      questionAgentId={questionAgentId || null}
+    />
+  );
 }
 
-function ChannelChat({ channelId, serverId }: { channelId: string; serverId: string }) {
-  const { t } = useText();
+function ChannelChat({
+  channelId,
+  serverId,
+  questionAgentId,
+}: {
+  channelId: string;
+  serverId: string;
+  questionAgentId: string | null;
+}) {
+  const { t, sourceText } = useText();
   const leaveChat = useLeaveChat();
   const agents = useMobileWorkspaceSelector((current) => current.agents, sameAgentsApartFromMessage);
   const server = useMobileWorkspaceSelector((current) => current.servers.find((item) => item.id === serverId));
@@ -48,8 +68,14 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
   const progressUpdates = useProgressUpdates(serverId, serverAgents);
   const messages = useMemo(
     () =>
-      projectChannelMessages(page?.messages ?? [], page?.tasks ?? [], server?.membershipId ?? null, progressUpdates),
-    [page?.messages, page?.tasks, server?.membershipId, progressUpdates],
+      projectChannelMessages(
+        page?.messages ?? [],
+        page?.tasks ?? [],
+        server?.membershipId ?? null,
+        sourceText,
+        progressUpdates,
+      ),
+    [page?.messages, page?.tasks, server?.membershipId, sourceText, progressUpdates],
   );
   const threadIds = useMemo(
     () => (summary?.threads?.length ? new Set(summary.threads.map((thread) => thread.threadId)) : null),
@@ -201,9 +227,9 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     const start = unreadLineMessageId ? entries.findIndex((entry) => entry.id === unreadLineMessageId) : -1;
     return start < 0 ? null : new Set(entries.slice(start).map((entry) => entry.id));
   }, [unreadLineMessageId, page?.messages]);
-  const [unreadOpening, setUnreadOpening] = useState<"pending" | "done">("pending");
-  const placeUnreadLine = useCallback(() => setUnreadOpening("done"), []);
-  const opensAtUnread = unreadOpening === "pending" && online && (readsPage || unreadLineMessageIds !== null);
+  const [opening, setOpening] = useState<"pending" | "done">("pending");
+  const placeOpening = useCallback(() => setOpening("done"), []);
+  const opensAtUnread = opening === "pending" && online && (readsPage || unreadLineMessageIds !== null);
   const [olderLoading, setOlderLoading] = useState(false);
   const [olderError, setOlderError] = useState(false);
   const readThrough = useRef(0);
@@ -234,21 +260,43 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
   const [selectedPromptId, selectPrompt] = useState<string | null>(null);
   const pendingPrompts = shownMessages.filter((message) => message.kind === "question" && !message.prompt.resolution);
   const activePrompt = pendingPrompts.find((message) => message.id === selectedPromptId) ?? pendingPrompts[0];
-  const savedAuthor = page?.messages.find((message) => message.id === activePrompt?.id)?.author;
-  const promptAgentId = savedAuthor
-    ? savedAuthor.kind === "agent"
-      ? savedAuthor.id
-      : ""
-    : (liveQuestions.find((question) => question.message.id === activePrompt?.id)?.agentId ?? "");
+  const promptAgentOf = (messageId: string | undefined) => {
+    const savedAuthor = page?.messages.find((message) => message.id === messageId)?.author;
+    if (savedAuthor) return savedAuthor.kind === "agent" ? savedAuthor.id : "";
+    return liveQuestions.find((question) => question.message.id === messageId)?.agentId ?? "";
+  };
+  const promptAgentId = promptAgentOf(activePrompt?.id);
+  const [questionMessageId, setQuestionMessageId] = useState<string | null | undefined>(
+    questionAgentId ? undefined : null,
+  );
+  const waitingQuestionId =
+    questionMessageId === undefined
+      ? (pendingPrompts.findLast((message) => promptAgentOf(message.id) === questionAgentId)?.id ?? null)
+      : null;
+  if (questionMessageId === undefined && unreadLine !== null) {
+    setQuestionMessageId(waitingQuestionId);
+    if (waitingQuestionId) selectPrompt(waitingQuestionId);
+  }
+  const opensAtQuestion =
+    opening === "pending" &&
+    online &&
+    (questionMessageId === undefined
+      ? waitingQuestionId !== null
+      : questionMessageId !== null && shownMessages.some((message) => message.id === questionMessageId));
   const respondToPrompt = useCallback(
     (agentId: string, input: RespondToPromptInput) => store.respondToPrompt(serverId, channelId, agentId, input),
     [store, serverId, channelId],
+  );
+  const returnUnsentPreview = useCallback(
+    (text: string) => appendComposerDraft({ kind: "channel", serverId, id: channelId }, text),
+    [serverId, channelId],
   );
   const questionForm = useQuestionPrompt(
     promptAgentId,
     activePrompt?.kind === "question" ? activePrompt : undefined,
     showsOnline(server) && canSend,
     respondToPrompt,
+    returnUnsentPreview,
   );
   const liveChannel = useMemo(
     () => ({ messages: page?.messages ?? [], tasks: page?.tasks ?? [], leadAgentId: channel?.leadAgentId ?? null }),
@@ -295,10 +343,16 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       approvals={approvals}
       channelThreadIds={threadIds}
       unreadLineMessageIds={unreadLineMessageIds}
-      focusMessageId={opensAtUnread && unreadLineMessageIds ? unreadLineMessageId : null}
-      focusUnread
-      holdOpening={opensAtUnread}
-      onFocusPlaced={placeUnreadLine}
+      focusMessageId={
+        opensAtQuestion
+          ? (questionMessageId ?? waitingQuestionId)
+          : opensAtUnread && unreadLineMessageIds
+            ? unreadLineMessageId
+            : null
+      }
+      focusUnread={!opensAtQuestion}
+      holdOpening={opensAtQuestion || opensAtUnread}
+      onFocusPlaced={placeOpening}
       readBoundary={throughSequence ? String(throughSequence) : null}
       markRead={markRead}
       fetchHistory={fetchHistory}

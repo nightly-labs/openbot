@@ -59,6 +59,7 @@ export const messages = {
   "agent.dock.closeOnLeave": "Fechar ao clicar fora",
   "agent.dock.openInMain": "Abrir na janela principal",
   "agent.dock.openWindow": "Abrir em nova janela",
+  "agent.dock.openPage": "Abrir {title}",
   "agent.dock.remove": "Remover do dock",
   "agent.dock.send": "Enviar",
   "agent.dock.working": "Trabalhando…",

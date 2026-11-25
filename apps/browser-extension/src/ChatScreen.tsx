@@ -1,0 +1,287 @@
+import type { ClientAgentSummary } from "@openbot/contracts/ipc";
+import { ArrowLeft, Check, ChevronDown, Plus, Settings } from "@openbot/ui";
+import { QuestionPromptBubble } from "@openbot/ui/components/QuestionPromptBubble";
+import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
+import { toAgentProfile } from "@openbot/ui/features/agents/agent-profile";
+import { AgentActivityIndicator, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
+import { AttachmentCards } from "@openbot/ui/features/conversation/AttachmentCards";
+import { MarkdownMessageText } from "@openbot/ui/features/conversation/MarkdownMessageText";
+import { safeBrowserUrl } from "@openbot/ui/features/conversation/RichMessageText";
+import { useText } from "@openbot/ui/text";
+import { createEffect, createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { avatarAgent, bubbleColors, composerAgents } from "./agent-look";
+import { ChatComposer } from "./ChatComposer";
+import { createMenuPresence } from "./menu-presence";
+import { stickToBottom } from "./stick-to-bottom";
+import { isChatMessage, type OpenChat, type Workspace } from "./workspace";
+
+const SLIDE_MS = 340;
+const ROWS_WHILE_SLIDING = 12;
+
+interface ChatScreenProps {
+  workspace: Workspace;
+  onBack: () => void;
+  onOpenSettings: (agentId: string) => void;
+  onOpen: (agentId: string, taskId: string | null) => void;
+}
+
+export function ChatScreen(props: ChatScreenProps) {
+  const chat = () => props.workspace.state.chat;
+  const agent = createMemo(() => props.workspace.state.agents.find((entry) => entry.id === chat()?.agentId));
+  return (
+    <Show when={chat()}>
+      {(current) => <Show when={agent()}>{(found) => <ChatView {...props} chat={current()} agent={found()} />}</Show>}
+    </Show>
+  );
+}
+
+function ChatView(props: ChatScreenProps & { chat: OpenChat; agent: ClientAgentSummary }) {
+  const { t } = useText();
+  const [menuOpen, setMenuOpen] = createSignal(false);
+  const menu = createMenuPresence(menuOpen);
+  let list: HTMLDivElement | undefined;
+  let focusField: () => void = () => undefined;
+  const state = () => props.workspace.state;
+  const color = () => state().colors[props.agent.id];
+  const messages = createMemo(() => props.chat.messages.filter(isChatMessage));
+  const prompts = createMemo(() =>
+    state().prompts.filter((prompt) => prompt.agentId === props.agent.id && prompt.threadId === props.chat.threadId),
+  );
+  const [slid, setSlid] = createSignal(false);
+  const shownMessages = createMemo(() => (slid() ? messages() : messages().slice(-ROWS_WHILE_SLIDING)));
+  const threads = createMemo(() =>
+    (state().threads[props.agent.id] ?? []).filter((task) => task.state !== "closed").slice(0, 6),
+  );
+  const thread = createMemo(() =>
+    props.chat.taskId === null
+      ? null
+      : (state().threads[props.agent.id] ?? []).find((task) => task.id === props.chat.taskId),
+  );
+  const subtitle = () =>
+    props.chat.draftThread
+      ? t("extension.chat.newThread")
+      : props.chat.taskId === null
+        ? null
+        : (thread()?.title ?? null);
+  const answering = () => {
+    if (props.chat.activeTurnId === null && !props.chat.sending) return false;
+    const last = props.chat.messages.at(-1);
+    return !(last && last.author !== "user" && last.status === "streaming");
+  };
+  const profile = createMemo(() => toAgentProfile({ ...props.agent, avatarColor: color() ?? null }));
+  const activityLabel = createMemo(() => {
+    void props.chat.activeTurnId;
+    return nextAgentActivityLabel();
+  });
+  const mentionAgents = createMemo(() => composerAgents(state().agents, state().colors));
+  function openLink(url: string) {
+    const safe = safeBrowserUrl(url);
+    if (safe) window.open(safe, "_blank", "noopener");
+  }
+
+  createEffect(
+    () => [messages().length, messages().at(-1)?.text.length, answering()] as const,
+    () => {
+      if (list) list.scrollTop = list.scrollHeight;
+    },
+  );
+  onSettled(() => (list ? stickToBottom(list) : undefined));
+  onSettled(() => {
+    const timer = setTimeout(() => setSlid(true), SLIDE_MS);
+    return () => clearTimeout(timer);
+  });
+  onSettled(() => {
+    const close = (event: PointerEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest(".ext-chat-menu, .ch-title")) setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  });
+
+  return (
+    <div class="ch-chat" style={bubbleColors(props.agent, color())}>
+      <header class="ch-topbar">
+        <button
+          type="button"
+          class="ch-back"
+          aria-label={t("common.back")}
+          onClick={() => {
+            setMenuOpen(false);
+            props.onBack();
+          }}
+        >
+          <ArrowLeft size={16} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class="ch-title"
+          aria-haspopup={props.workspace.threadsAvailable() ? "menu" : undefined}
+          aria-expanded={props.workspace.threadsAvailable() ? (menuOpen() ? "true" : "false") : undefined}
+          aria-label={t("extension.chat.threadsMenu", { name: props.agent.name })}
+          disabled={!props.workspace.threadsAvailable()}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <AgentAvatar agent={avatarAgent(props.agent, color())} motion="idle" class="ch-title-mark" />
+          <span class="ch-title-name" dir="auto">
+            {props.agent.name}
+          </span>
+          <Show when={subtitle()}>
+            {(text) => (
+              <span class="ch-title-sub" dir="auto">
+                {text()}
+              </span>
+            )}
+          </Show>
+          <Show when={props.workspace.threadsAvailable()}>
+            <ChevronDown size={14} aria-hidden="true" class="ch-title-chevron ext-menu-chevron" />
+          </Show>
+        </button>
+        <button
+          type="button"
+          class="ph-create ch-settings"
+          aria-label={t("conversation.header.settings")}
+          onClick={() => {
+            setMenuOpen(false);
+            props.onOpenSettings(props.agent.id);
+          }}
+        >
+          <Settings size={16} aria-hidden="true" />
+        </button>
+      </header>
+      <Show when={menu.mounted()}>
+        <div class="ext-menu ext-chat-menu" role="menu" data-closing={menu.closing() ? "" : undefined}>
+          <button
+            type="button"
+            role="menuitem"
+            class="ext-menu-item"
+            onClick={() => {
+              setMenuOpen(false);
+              props.onOpen(props.agent.id, null);
+            }}
+          >
+            <span>{t("extension.chat.mainChat")}</span>
+            <Show when={props.chat.taskId === null && !props.chat.draftThread}>
+              <Check size={16} aria-hidden="true" />
+            </Show>
+          </button>
+          <Show when={threads().length > 0}>
+            <hr class="ext-menu-separator" />
+            <p class="ext-menu-label">{t("extension.chat.threads")}</p>
+            <For each={threads()}>
+              {(task) => (
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="ext-menu-item"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    props.onOpen(props.agent.id, task.id);
+                  }}
+                >
+                  <span>{task.title}</span>
+                  <Show when={task.id === props.chat.taskId}>
+                    <Check size={16} aria-hidden="true" />
+                  </Show>
+                </button>
+              )}
+            </For>
+          </Show>
+          <hr class="ext-menu-separator" />
+          <button
+            type="button"
+            role="menuitem"
+            class="ext-menu-item"
+            onClick={() => {
+              setMenuOpen(false);
+              props.workspace.newThread(props.agent.id);
+              focusField();
+            }}
+          >
+            <span>{t("extension.chat.newThread")}</span>
+            <Plus size={16} aria-hidden="true" />
+          </button>
+        </div>
+      </Show>
+      <div class="ch-list" ref={list} aria-live="polite">
+        <Show
+          when={messages().length > 0 || props.chat.status !== "ready"}
+          fallback={
+            <div class="ch-empty">
+              <AgentAvatar
+                agent={avatarAgent(props.agent, color())}
+                motion="hover"
+                style={{ width: "72px", height: "72px" }}
+              />
+              <strong>{props.chat.draftThread ? t("extension.chat.newThread") : props.agent.name}</strong>
+              <span>{t("extension.chat.empty", { name: props.agent.name })}</span>
+            </div>
+          }
+        >
+          <For each={shownMessages()} keyed={(message) => message.id}>
+            {(message) => (
+              <>
+                <Show when={message().attachments?.length ? message().attachments : undefined}>
+                  {(files) => (
+                    <div class={message().author === "user" ? "ch-files ch-files-user" : "ch-files"}>
+                      <AttachmentCards
+                        attachments={files()}
+                        mediaSource={props.workspace.media}
+                        onPreview={(attachment) => {
+                          const url = props.workspace.media.url(attachment.id);
+                          if (url) window.open(url, "_blank", "noopener");
+                          else void props.workspace.media.save(attachment).catch(() => undefined);
+                        }}
+                        onAction={(attachment) => void props.workspace.media.save(attachment).catch(() => undefined)}
+                      />
+                    </div>
+                  )}
+                </Show>
+                <Show when={message().text.trim()}>
+                  <Show
+                    when={message().author !== "user"}
+                    fallback={<div class="ch-bubble ch-user">{message().text}</div>}
+                  >
+                    <div class="ch-bubble ch-agent message-markdown">
+                      <MarkdownMessageText
+                        body={message().text}
+                        streaming={message().status === "streaming"}
+                        agents={mentionAgents()}
+                        attachments={message().attachments}
+                        onSelectAgent={(agentId) => props.onOpen(agentId, null)}
+                        onOpenLink={openLink}
+                      />
+                    </div>
+                  </Show>
+                </Show>
+              </>
+            )}
+          </For>
+        </Show>
+        <Show when={answering()}>
+          <AgentActivityIndicator agent={profile()} label={activityLabel()} />
+        </Show>
+        <For each={prompts()} keyed={(prompt) => String(prompt.requestId)}>
+          {(prompt) => (
+            <QuestionPromptBubble
+              questions={prompt().questions}
+              onSubmit={(answers) => props.workspace.answerPrompt(prompt().requestId, answers)}
+              onOpenLink={openLink}
+            />
+          )}
+        </For>
+      </div>
+      <ChatComposer
+        placeholder={t("extension.chat.ask", { name: props.agent.name })}
+        error={props.chat.error}
+        conversationKey={`${props.chat.agentId}:${props.chat.taskId ?? ""}`}
+        onDismissError={() => props.workspace.clearChatError()}
+        sending={props.chat.sending}
+        transcribe={props.workspace.transcribe}
+        onSend={(text) => props.workspace.send(text)}
+        onFocusReady={(focus) => {
+          focusField = focus;
+        }}
+      />
+    </div>
+  );
+}

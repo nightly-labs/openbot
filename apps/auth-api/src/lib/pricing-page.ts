@@ -1,4 +1,4 @@
-import { BILLING_PLANS, type BillingPlanId, billingListPrices } from "@openbot/contracts/billing";
+import { BILLING_PLANS, type BillingPlanId, billingListPrices, storageTierGb } from "@openbot/contracts/billing";
 import type { HostedServerCatalogPlan } from "@openbot/contracts/hosted-servers";
 
 export const PRICING_ROUTE = "/pricing";
@@ -54,7 +54,7 @@ export const LIST_PRICE_PLANS: readonly HostedServerCatalogPlan[] = BILLING_PLAN
   const year = billingListPrices(plan.id, "year");
   const entry: HostedServerCatalogPlan = {
     id: plan.id,
-    diskGb: plan.storageGb,
+    diskGb: storageTierGb(plan.id, 0),
     memberLimit: plan.memberLimit,
     relativeSpeed: plan.relativeSpeed,
     prices: {

@@ -3,13 +3,28 @@ import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-command-v1";
+import { WORKSPACE_DIRECTORY_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-directory-v1";
 import { classifyFailure } from "@openbot/telemetry";
 import { PanelResizer } from "@openbot/ui/components/PanelResizer";
 import { settingsPanelMaxWidth } from "@openbot/ui/components/SettingsPanel";
-import { BROWSER_NEW_TAB_URL } from "@openbot/ui/features/browser/browser-suggestions";
-import { SidePanelHeader, SidePanelLauncher, type SidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
+import {
+  BrowserPageCover,
+  type BrowserPageMenu,
+  type CoverBrowserPage,
+} from "@openbot/ui/features/browser/browser-page-cover";
+import { BROWSER_NEW_TAB_URL, browserDisplayUrl } from "@openbot/ui/features/browser/browser-suggestions";
+import {
+  type SidePanelBrowsers,
+  SidePanelHeader,
+  SidePanelLauncher,
+  type SidePanelMove,
+  type SidePanelPane,
+  type SidePanelPaneBadge,
+  SidePanelToggle,
+} from "@openbot/ui/features/conversation/SidePanel";
 import { SideQuestionPanel } from "@openbot/ui/features/conversation/SideQuestionPanel";
 import { SubagentPanel } from "@openbot/ui/features/conversation/Subagents";
+import { ThreadsPane } from "@openbot/ui/features/conversation/threads/ThreadsPane";
 import { VoicePill } from "@openbot/ui/features/conversation/VoicePill";
 import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPage";
 import { useText } from "@openbot/ui/text";
@@ -25,6 +40,7 @@ import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { type AgentTemplatePublishCalls, agentTemplatesPort } from "../agent-templates/agent-templates-port";
 import { createPublishAgent } from "../agent-templates/PublishAgent";
 import { desktopBrowserProfileCalls } from "../browser/browser-profiles-port";
+import { moveBrowserTab, orderedBrowserTabs } from "../browser/browser-tab-session";
 import type { AgentFilesOptions } from "../files/AgentFilesSettings";
 import type { ChatFilesSource } from "../files/ChatFilesPanel";
 import { canManageStorage, serverHasChannelStorage, serverHasStorage } from "../files/storage-usage";
@@ -32,16 +48,29 @@ import { serverCanAdminister, serverCanManageMcp, serverSupportsCapability } fro
 import { codexLiveAccess } from "../speech/codex-live-access";
 import { speechPort } from "../speech/speech-port";
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
+import { openedAttachmentUrl } from "./attachment-preview";
 import { ConversationSideThread } from "./ConversationSideThread";
 import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
-import { htmlAttachmentPageHtml, htmlAttachmentPageUrl } from "./chat-visual-url";
+import { htmlAttachmentPageUrl, htmlFilePageHtml } from "./chat-visual-url";
 import { useConversationController } from "./conversation-controller-context";
 import { type AgentNotificationLevelCalls, conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import { agentSkillsMode } from "./installed-skills-source";
 import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
 import type { RoutineResultsCalls } from "./routines-port";
+import { pageTabsShown, showPageTabs } from "./side-panel-page-tabs";
+import { useSidePanelToggle } from "./side-panel-toggle";
+import {
+  lowerSplitShare,
+  SIDE_MAIN_GROUP_MIN,
+  SIDE_SPLIT_MIN,
+  saveSideSplitLayout,
+  setLowerSplitShare,
+  setSideSplitShare,
+  sideSplitShare,
+} from "./side-split-layout";
 import { type CodexLivePort, createCodexLiveConversation } from "./stores/codex-live-conversation-store";
+import { MAX_SIDE_SPLITS } from "./stores/panels-store";
 import type { VoiceConversationKind } from "./stores/voice-session-store";
 import { useVoiceTalkKey } from "./voice-talk-key";
 import { setVoiceTalkMode, useVoiceTalkMode } from "./voice-talk-mode";
@@ -50,7 +79,7 @@ const loadAgentSettingsPanel = () => import("./AgentSettingsPanel");
 
 import { type HostFolderPick, HostFolderPicker } from "@openbot/ui/features/conversation/HostFolderPicker";
 import { Portal } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, Loading, lazy, onSettled, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Loading, lazy, onSettled, Show, untrack } from "solid-js";
 import {
   agentFolderCalls,
   agentInstructionsCalls,
@@ -59,11 +88,16 @@ import {
   remoteAgentFolderCalls,
 } from "./agent-folders-port";
 import { conversationPort } from "./conversation-port";
+import { conversationOwnerId } from "./stores/composer-store";
 
 function VoiceConversationPane(pill: VoicePillPresence) {
   const controller = useConversationController();
-  const { props } = useConversationViewScope();
-  const running = untrack(() => (props.agent ? controller.voiceSessions.running(props.agent.id) : null));
+  const { props, channel } = useConversationViewScope();
+  const running = untrack(() => {
+    const ownerId = conversationOwnerId(props);
+    return ownerId ? controller.voiceSessions.running(ownerId) : null;
+  });
+  if (channel) return <VoiceConversation kind={running ?? "transcribed"} open={pill.open} onClosed={pill.onClosed} />;
   const runtimeLive = untrack(() => props.runtime?.liveVoice);
   if (runtimeLive) {
     const liveKind: VoiceConversationKind = running ?? "codex-live";
@@ -96,8 +130,8 @@ interface VoicePillPresence {
 
 function VoiceConversation(paneProps: VoicePillPresence & { kind: VoiceConversationKind; port?: CodexLivePort }) {
   const controller = useConversationController();
-  const { props, startVoiceConversation, endVoiceConversation } = useConversationViewScope();
-  const agentId = untrack(() => props.agent?.id);
+  const { props, channel, startVoiceConversation, endVoiceConversation } = useConversationViewScope();
+  const agentId = untrack(() => conversationOwnerId(props));
   if (!agentId) return null;
   const serverId = untrack(() => props.server?.id ?? LOCAL_SERVER_ID);
   const kind = untrack(() => paneProps.kind);
@@ -113,8 +147,9 @@ function VoiceConversation(paneProps: VoicePillPresence & { kind: VoiceConversat
   const transcribed = kind === "transcribed";
   const replySpeed = () => (transcribed ? speechSpeed() : undefined);
   const cycleSpeed = transcribed ? cycleSpeechSpeed : undefined;
+  const pillAgent = () => (channel ? channel.voiceAgent() : props.agent);
   return (
-    <Show when={props.agent}>
+    <Show when={pillAgent()}>
       {(agent) => (
         <VoicePill
           agent={agent()}
@@ -122,6 +157,7 @@ function VoiceConversation(paneProps: VoicePillPresence & { kind: VoiceConversat
           muted={conversation.muted()}
           levels={conversation.levels()}
           error={conversation.error()}
+          downloadProgress={conversation.downloadProgress()}
           onToggleMute={conversation.toggleMute}
           talkMode={talkMode()}
           onTalkModeChange={setVoiceTalkMode}
@@ -149,9 +185,13 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     agentReady,
     activateBrowserTab,
     activeBrowserTab,
+    allBrowserTabs,
     agentActivity,
     browserSidebarOpen,
     browserExpandedOpen,
+    browserWindowShown,
+    browserCanDetach,
+    openBrowserWindow,
     browserTabs,
     closeShownSidePanelFile,
     closeBrowserTab,
@@ -159,7 +199,6 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     revealSidebarFile,
     conversationPanelElement,
     filePreviewOpen,
-    filesOpen,
     openBrowserAddress,
     openExternalMessageUrl,
     openRoutineRunMessage,
@@ -172,8 +211,8 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     previewFileKey,
     previewWorkspaceAgentId,
     quoteSelection,
-    addPageText,
-    setPageContext,
+    addPreviewPageText,
+    setPreviewPageContext,
     sidebarFileBack,
     openSidebarFileBack,
     props,
@@ -184,6 +223,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     sidebarFilePreview,
     settingsOpen,
     skillSettingsRequest,
+    clearSkillSettingsRequest,
     instructionsSettingsRequest,
     agentSettingRowRequest,
     handleAgentSettingRowRequest,
@@ -200,6 +240,9 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     pasteMessageLinkRelay,
     cancelMessageLinkRelay,
     activeRightPanel,
+    sideSplits,
+    paneSplit,
+    moveSidePanelPane,
     sidePanel,
     sidePanelOpen,
     setSidePanelMaximized,
@@ -221,12 +264,18 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     openPanelThread,
     closePanelThread,
     movePanelThreadToChat,
+    moveThreadToPanel,
+    startNewThread,
     channel,
     replyJump,
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
-  const chatAgentKey = () => (props.agent ? `${props.server?.id ?? "local"}:${props.agent.id}` : null);
-  const voiceKey = () => (voiceConversationOpen() && !channel && chatAgentKey()) || null;
+  const sidePanelToggle = useSidePanelToggle();
+  const chatAgentKey = () => {
+    const ownerId = conversationOwnerId(props);
+    return ownerId ? `${props.server?.id ?? "local"}:${ownerId}` : null;
+  };
+  const voiceKey = () => (voiceConversationOpen() && chatAgentKey()) || null;
   const [voicePill, setVoicePill] = createSignal<{ key: string } | null>(null);
   const [voicePillClosing, setVoicePillClosing] = createSignal(false);
   createEffect(
@@ -404,6 +453,13 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     return serverHasStorage(server) ? server : undefined;
   };
   const filesTitle = () => channel?.name() ?? props.agent?.name ?? "this chat";
+  const workspaceAgents = createMemo(() => {
+    if (!serverSupportsCapability(props.server, WORKSPACE_DIRECTORY_CAPABILITY)) return [];
+    if (!channel) return props.agent ? [props.agent] : [];
+    const agentIds = channel.memberAgentIds();
+    return props.agents.filter((agent) => agentIds.has(agent.id));
+  });
+  const openAgentWorkspace = (agentId: string) => openWorkspaceFolder(".", agentId, "tab");
   function showFileMessage(messageId: string) {
     if (channel) void replyJump.reveal(messageId, undefined, undefined);
     else void props.onOpenSearchMessage?.(messageId);
@@ -412,15 +468,22 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   const sidePanelPanes = createMemo((): SidePanelPane[] => [
     ...(props.browserEnabled !== false && channelBrowserPane() ? (["browser"] as const) : []),
     ...(filesServer() && filesSource() ? (["files"] as const) : []),
+    ...(props.agent && !channel && props.threads ? (["threads"] as const) : []),
     ...(props.agent || channel ? (["settings"] as const) : []),
   ]);
   const panelSubagent = createMemo(() => {
     const subagentId = panelSubagentId();
     if (!subagentId) return undefined;
-    for (let index = props.messages.length - 1; index >= 0; index -= 1) {
-      const found = props.messages[index]?.subagents?.find((subagent) => subagent.id === subagentId);
-      if (found) return found;
-    }
+    const threads = props.threads;
+    const sideMessages = (threads?.side.tabs ?? []).map(
+      (tab) => threads?.side.thread(tab.id)?.conversation?.messages ?? [],
+    );
+    const openThreadMessages = threads?.conversation?.messages ?? [];
+    for (const messages of [props.messages, openThreadMessages, ...sideMessages])
+      for (let index = messages.length - 1; index >= 0; index -= 1) {
+        const found = messages[index]?.subagents?.find((subagent) => subagent.id === subagentId);
+        if (found) return found;
+      }
     return undefined;
   });
   const sidePanelMaxWidth = () => settingsPanelMaxWidth(conversationPanelElement());
@@ -466,6 +529,45 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     if (open && previous === false) onSettled(() => browserPreviewTrigger?.focus());
   });
   const selectedPane = () => (activeRightPanel() === "side-panel" ? null : sidePanel().selected);
+  const [pageCovers, setPageCovers] = createSignal<readonly { menu: BrowserPageMenu | undefined }[]>([]);
+  const coverBrowserPage: CoverBrowserPage = (menu) => {
+    const entry = { menu };
+    setPageCovers((entries) => [...entries, entry]);
+    return () => setPageCovers((entries) => entries.filter((current) => current !== entry));
+  };
+  const browserServerId = () => props.server?.id ?? "";
+  const pageTabs = createMemo(() => orderedBrowserTabs(browserServerId(), browserTabs()));
+  const movePageTab = (tabId: string, index: number) => {
+    const full = orderedBrowserTabs(browserServerId(), allBrowserTabs());
+    const rest = pageTabs().filter((tab) => tab.id !== tabId);
+    const without = full.filter((tab) => tab.id !== tabId);
+    const next = rest[index];
+    const last = rest.at(-1);
+    const at = next
+      ? without.findIndex((tab) => tab.id === next.id)
+      : without.findIndex((tab) => tab.id === last?.id) + 1;
+    moveBrowserTab(browserServerId(), full, tabId, at);
+  };
+  const browserPages = (browserSelected: () => boolean): SidePanelBrowsers => ({
+    items: pageTabs().map((tab) => ({
+      id: tab.id,
+      title:
+        tab.loading && !tab.title
+          ? t("common.loading")
+          : tab.title || browserDisplayUrl(tab.url) || t("browser.preview.pageFallback"),
+      loading: tab.loading,
+    })),
+    selectedId: browserSelected() ? (activeBrowserTab()?.id ?? null) : null,
+    onSelect: (tabId) => {
+      openSidePanelPane("browser");
+      if (activeBrowserTab()?.id !== tabId) activateBrowserTab(tabId);
+    },
+    onClose: (tabId) => {
+      if (pageTabs().every((tab) => tab.id === tabId)) closeSidePanelPane("browser");
+      void closeBrowserTab(tabId);
+    },
+    onMove: movePageTab,
+  });
   const shownThread = () => (activeRightPanel() === "thread" ? shownPanelThreadId() : null);
   const busyBrowserTabIds = createMemo(
     () => new Set(props.browserControlState.sessions.flatMap((session) => (session.tabId ? [session.tabId] : []))),
@@ -499,212 +601,196 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   );
   const sideThreadTabs = () => props.threads?.side.tabs ?? [];
   const moveSideThread = (id: string, index: number) => props.threads?.side.onMove(id, index);
-  return (
-    <>
-      <HostFolderPicker request={folderPick()} browse={browsePickFolders} onDone={finishFolderPick} />
-      <Show when={sidePanelOpen()}>
-        <SidePanelHeader
-          panes={sidePanel().panes}
-          selected={selectedPane()}
-          available={sidePanelPanes()}
-          maximized={sidePanel().maximized}
-          settingsLabel={channel ? t("channel.settings.title") : undefined}
-          onSelect={openSidePanelPane}
-          onClose={closeSidePanelPane}
-          threads={{
-            items: sideThreadTabs(),
-            selectedId: shownThread(),
-            onSelect: openPanelThread,
-            onClose: closePanelThread,
-            onMove: moveSideThread,
-            onToChat: movePanelThreadToChat,
-          }}
-          files={{
-            items: sidePanel().files,
-            selectedKey: shownFile(),
-            onSelect: openSidePanelFile,
-            onClose: closeSidePanelFile,
-            onMove: moveSidePanelFile,
-          }}
-          onToggleMaximized={() => setSidePanelMaximized(!sidePanel().maximized)}
-          onCollapse={toggleSidePanel}
-          onNewBrowserTab={() => {
-            openSidePanelPane("browser");
-            void openBrowserAddress(BROWSER_NEW_TAB_URL, true);
-          }}
-        />
-      </Show>
-
-      <Show when={launcherShown()}>
-        <aside
-          id="side-panel-launcher"
-          class="browser-panel side-panel-empty"
-          aria-label={t("conversation.sidePanel.label")}
-        >
-          {sidePanelResizer("side-panel-launcher")}
-          <SidePanelLauncher
-            available={sidePanelPanes()}
-            settingsLabel={channel ? t("channel.settings.title") : undefined}
-            onOpen={openSidePanelPane}
-          />
-        </aside>
-      </Show>
-
-      <Show when={filePreviewOpen() && sidebarFilePreview()}>
-        {(file) => {
-          const attached = () => {
-            const source = file().source;
-            return source.kind === "attachment" ? source.attachment : null;
-          };
-          return (
+  const sideThreadIds = createMemo(() => sideThreadTabs().map((thread) => thread.id));
+  const listedThreads = createMemo(() => {
+    const header = props.threads?.header;
+    if (!header) return [];
+    return [...header.tabs.filter((thread) => thread.kind === "draft"), ...header.threads];
+  });
+  const sidePanelBadges = createMemo((): Partial<Record<SidePanelPane, SidePanelPaneBadge>> => {
+    const waiting = listedThreads().filter((thread) => thread.status.kind === "waiting").length;
+    return waiting > 0
+      ? { threads: { count: waiting, label: t("conversation.threads.waitingCount", { count: waiting }) } }
+      : {};
+  });
+  const openListedThread = (id: string) => {
+    if (sideThreadIds().includes(id)) movePanelThreadToChat(id);
+    else props.threads?.header.onOpen(id);
+  };
+  const toggleListedThreadBeside = (id: string) => {
+    if (sideThreadIds().includes(id)) movePanelThreadToChat(id);
+    else moveThreadToPanel(id);
+  };
+  const keepPaneWidth = () => {};
+  const mainPanes = () => sidePanelPanes().filter((pane) => !paneSplit(pane));
+  const paneWidthChange = (split: boolean) => (split ? keepPaneWidth : setSidePanelWidth);
+  const paneResizer = (split: boolean, controls: string) => (split ? undefined : sidePanelResizer(controls));
+  const splitsShown = () => sidePanelOpen() && sideSplits().length > 0;
+  const splitColumnHeight = () => {
+    const element = conversationPanelElement();
+    const header = element?.querySelector(":scope > .side-panel-header")?.getBoundingClientRect().height ?? 0;
+    return Math.max(0, (element?.getBoundingClientRect().height ?? 0) - header);
+  };
+  const splitShare = () => {
+    const count = sideSplits().length;
+    return sideSplitShare(count) ?? count / (count + 1);
+  };
+  const splitAreaHeight = () => Math.round(splitShare() * splitColumnHeight());
+  const splitAreaMax = () => splitColumnHeight() - SIDE_MAIN_GROUP_MIN;
+  const shareOf = (height: number, whole: number) => Math.min(0.99, Math.max(0.01, height / whole));
+  const resizeSplitArea = (height: number) => {
+    const column = splitColumnHeight();
+    if (column > 0) setSideSplitShare(sideSplits().length, shareOf(height, column));
+  };
+  const lowerGroupHeight = () => Math.round((lowerSplitShare() ?? 0.5) * splitAreaHeight());
+  const resizeLowerGroup = (height: number) => {
+    const area = splitAreaHeight();
+    if (area > 0) setLowerSplitShare(shareOf(height, area));
+  };
+  const saveSplitResize = (resize: (height: number) => void) => (height: number) => {
+    resize(height);
+    saveSideSplitLayout();
+  };
+  const groupMoves = (group: number, tabCount: number): SidePanelMove[] => {
+    const moves: SidePanelMove[] = [];
+    if (tabCount > 1 && sideSplits().length < MAX_SIDE_SPLITS) moves.push("split");
+    if (group >= 0) moves.push("up");
+    if (group < sideSplits().length - 1) moves.push("down");
+    return moves;
+  };
+  const moveFromGroup = (group: number) => (pane: SidePanelPane, move: SidePanelMove) =>
+    moveSidePanelPane(
+      pane,
+      move === "split" ? { newGroupAt: group + 1 } : { group: move === "up" ? group - 1 : group + 1 },
+    );
+  const mainTabCount = () => sidePanel().panes.length + sidePanel().files.length + sideThreadTabs().length;
+  const closeSplitGroup = (group: number) => {
+    for (const pane of [...(sideSplits()[group]?.panes ?? [])]) closeSidePanelPane(pane);
+  };
+  const paneWindows = (): Partial<Record<SidePanelPane, () => void>> =>
+    browserCanDetach()
+      ? {
+          browser: () => {
+            openBrowserWindow();
+            closeSidePanelPane("browser");
+          },
+        }
+      : {};
+  const filesPane = (split: boolean) => (
+    <Show when={filesServer()}>
+      {(server) => (
+        <Show when={filesSource()}>
+          {(source) => (
             <Loading>
-              <FilePreviewPanel
-                allowExternalOpen={!props.runtime}
-                macWindowControls={props.platform === "darwin"}
-                preview={file().preview}
-                directory={file().directory ?? null}
-                agents={props.agents}
-                maxWidth={sidePanelMaxWidth}
-                onWidthChange={setSidePanelWidth}
-                onOpenLink={(url) => void openExternalMessageUrl(url)}
-                onOpenSharedFile={(path) => openSharedFile(path, "here")}
-                onOpenWorkspaceFile={previewWorkspaceAgentId() ? openWorkspaceFolderEntry : undefined}
-                onOpenWorkspaceFolder={openWorkspaceFolder}
-                onBack={sidebarFileBack() === null ? undefined : openSidebarFileBack}
-                sourceUrl={attached()?.previewUrl ?? null}
-                pageUrl={htmlAttachmentPageUrl(attached()) ?? file().preview?.pageUrl}
-                pageHtml={props.runtime?.visualPage ? htmlAttachmentPageHtml(attached(), file().preview) : undefined}
-                fileKey={previewFileKey()}
-                selectionQuoteId={previewQuoteId()}
-                onPageQuote={(text) => {
-                  const quoteId = previewQuoteId();
-                  if (quoteId) quoteSelection(quoteId, text);
-                }}
-                onPageContext={(text) => {
-                  const id = attached()?.id;
-                  const message = id && props.messages.find((item) => item.attachments?.some((file) => file.id === id));
-                  if (message) setPageContext(message, text);
-                }}
-                onPageMessage={addPageText}
-                isPageAppShortcut={isChatVisualAppShortcut}
-                quoteShortcut={deviceQuoteShortcut(props.platform)}
-                onOpenExternally={openSidebarFileExternally}
-                onDownload={downloadSidebarFile}
-                onReveal={props.runtime ? undefined : revealSidebarFile}
-                onClose={closeShownSidePanelFile}
+              <ChatFilesPanel
+                serverId={server().id}
+                source={source()}
+                conversationTitle={filesTitle()}
+                canManage={canManageStorage(server())}
+                onClose={() => closeSidePanelPane("files")}
+                onPreviewFile={(file) => void previewAttachment(file)}
+                onShowMessage={showFileMessage}
+                calls={props.runtime?.storageCalls}
+                workspaceAgents={workspaceAgents()}
+                onOpenWorkspace={openAgentWorkspace}
+                resizer={paneResizer(split, "conversation-files-panel")}
               />
             </Loading>
-          );
-        }}
-      </Show>
-
-      <Show when={filesOpen() && filesServer()}>
-        {(server) => (
-          <Show when={filesSource()}>
-            {(source) => (
-              <Loading>
-                <ChatFilesPanel
-                  serverId={server().id}
-                  source={source()}
-                  conversationTitle={filesTitle()}
-                  canManage={canManageStorage(server())}
-                  onClose={() => closeSidePanelPane("files")}
-                  onPreviewFile={(file) => void previewAttachment(file)}
-                  onShowMessage={showFileMessage}
-                  calls={props.runtime?.storageCalls}
-                />
-              </Loading>
-            )}
-          </Show>
-        )}
-      </Show>
-
-      <Show when={activeRightPanel() === "question" && props.agent}>
-        {(agent) => (
-          <SideQuestionPanel
-            agent={agent()}
-            bubbleStyle={bubbleStyle()}
-            agents={props.agents}
-            exchanges={sideQuestion().exchanges}
-            skills={installedSkills()}
-            skillsLoadFailed={installedSkillsLoadFailed()}
-            mcpServers={mcpServers()}
-            error={sideQuestion().error}
-            draft={sideQuestion().draft}
-            focusRequest={sideQuestion().focusRequest}
-            onDraftChange={setSideQuestionDraft}
-            onAsk={askSideQuestion}
-            onClosePanel={() => closeSidePanelPane("question")}
-            resizer={sidePanelResizer("side-question-panel")}
-            onOpenLink={(url) => void openExternalMessageUrl(url)}
-            macWindowControls={props.platform === "darwin"}
-          />
-        )}
-      </Show>
-
-      <Show when={voicePill()} keyed>
-        {(shown) => (
-          <VoiceConversationPane
-            open={!voicePillClosing()}
-            onClosed={() => {
-              if (voicePill() !== shown) return;
-              setVoicePill(null);
-              setVoicePillClosing(false);
-            }}
-          />
-        )}
-      </Show>
-
-      <Show when={shownThread()} keyed>
-        {(threadId) => <ConversationSideThread threadId={threadId} resizer={sidePanelResizer("side-thread-panel")} />}
-      </Show>
-
-      <Show when={activeRightPanel() === "subagent"}>
-        <SubagentPanel
-          subagent={panelSubagent()}
-          agentName={props.agent?.name ?? ""}
-          onClosePanel={() => closeSidePanelPane("subagent")}
-          resizer={sidePanelResizer("subagent-panel")}
-        />
-      </Show>
-
-      <Show when={browserSidebarOpen() || browserExpandedOpen()}>
-        <BrowserPreviewSidebar
-          tabs={browserTabs()}
-          busyTabIds={busyBrowserTabIds()}
-          hidden={browserExpandedOpen()}
-          suspended={props.browserVisibilitySuspended || props.globalOverlayOpen || props.remoteDesktopVisible}
-          contextKey={`${props.server?.id ?? "local"}:${props.agent?.id ?? ""}`}
-          maxWidth={sidePanelMaxWidth}
-          onWidthChange={setSidePanelWidth}
-          capturePreview={props.runtime?.browser.capturePreview}
-          onOpenTab={(tabId, trigger) => {
-            browserPreviewTrigger = trigger;
-            if (activeBrowserTab()?.id !== tabId) activateBrowserTab(tabId);
-            setActiveRightPanel("browser-expanded");
-          }}
-          onCloseTab={(tabId) => void closeBrowserTab(tabId)}
-          onNewTab={() => void openBrowserAddress(BROWSER_NEW_TAB_URL, true)}
-        />
-      </Show>
-
-      <Show when={browserSidebarOpen() || browserExpandedOpen()}>
-        <Portal>
-          <div class="ui-dialog-overlay browser-expanded-backdrop" hidden={!browserExpandedOpen()} aria-hidden="true" />
-          <BrowserFullViewAdapter />
-        </Portal>
-      </Show>
-
-      {channel ? (
-        <Show when={settingsOpen()}>
-          <channel.SettingsPane
-            maxWidth={sidePanelMaxWidth}
-            onWidthChange={setSidePanelWidth}
-            onClose={() => closeSidePanelPane("settings")}
-          />
+          )}
         </Show>
+      )}
+    </Show>
+  );
+  const questionPane = (split: boolean) => (
+    <Show when={props.agent}>
+      {(agent) => (
+        <SideQuestionPanel
+          agent={agent()}
+          bubbleStyle={bubbleStyle()}
+          agents={props.agents}
+          exchanges={sideQuestion().exchanges}
+          skills={installedSkills()}
+          skillsLoadFailed={installedSkillsLoadFailed()}
+          mcpServers={mcpServers()}
+          error={sideQuestion().error}
+          draft={sideQuestion().draft}
+          focusRequest={sideQuestion().focusRequest}
+          onDraftChange={setSideQuestionDraft}
+          onAsk={askSideQuestion}
+          onClosePanel={() => closeSidePanelPane("question")}
+          resizer={paneResizer(split, "side-question-panel")}
+          onOpenLink={(url) => void openExternalMessageUrl(url)}
+          macWindowControls={props.platform === "darwin"}
+        />
+      )}
+    </Show>
+  );
+  const threadsPane = (split: boolean) => (
+    <Show when={sidePanelPanes().includes("threads")}>
+      <ThreadsPane
+        threads={listedThreads()}
+        activeId={props.threads?.header.activeId ?? ""}
+        besideIds={sideThreadIds()}
+        canStartNew={props.threads?.header.canStartNew ?? false}
+        resizer={paneResizer(split, "threads-panel")}
+        onOpen={openListedThread}
+        onToggleBeside={toggleListedThreadBeside}
+        onNew={startNewThread}
+      />
+    </Show>
+  );
+  const subagentPane = (split: boolean) => (
+    <SubagentPanel
+      subagent={panelSubagent()}
+      agentName={props.agent?.name ?? ""}
+      onClosePanel={() => closeSidePanelPane("subagent")}
+      resizer={paneResizer(split, "subagent-panel")}
+    />
+  );
+  const shownPages = (browserSelected: () => boolean) => (pageTabsShown() ? browserPages(browserSelected) : undefined);
+  const pageTabsChoice = {
+    get shown() {
+      return pageTabsShown();
+    },
+    onChange: showPageTabs,
+  };
+  const browserPane = (split: boolean) => (
+    <BrowserPreviewSidebar
+      tabs={browserTabs()}
+      busyTabIds={busyBrowserTabIds()}
+      hidden={browserExpandedOpen()}
+      suspended={props.browserVisibilitySuspended || props.globalOverlayOpen || props.remoteDesktopVisible}
+      contextKey={`${props.server?.id ?? "local"}:${props.agent?.id ?? ""}`}
+      maxWidth={sidePanelMaxWidth}
+      onWidthChange={paneWidthChange(split)}
+      capturePreview={props.runtime?.browser.capturePreview}
+      onOpenTab={(tabId, trigger) => {
+        browserPreviewTrigger = trigger;
+        if (activeBrowserTab()?.id !== tabId) activateBrowserTab(tabId);
+        setActiveRightPanel("browser-expanded");
+      }}
+      onCloseTab={(tabId) => void closeBrowserTab(tabId)}
+      onNewTab={() => void openBrowserAddress(BROWSER_NEW_TAB_URL, true)}
+      pageShown={pageTabsShown() && browserTabs().length > 0 && !browserWindowShown()}
+    >
+      <BrowserFullViewAdapter
+        pane={{
+          open: browserSidebarOpen() && !browserExpandedOpen(),
+          coveringMenus: pageCovers().map((entry) => entry.menu),
+        }}
+      />
+    </BrowserPreviewSidebar>
+  );
+  const settingsPane = (split: boolean) => (
+    <>
+      {channel ? (
+        <channel.SettingsPane
+          maxWidth={sidePanelMaxWidth}
+          onWidthChange={paneWidthChange(split)}
+          onClose={() => closeSidePanelPane("settings")}
+        />
       ) : null}
-      <Show when={settingsOpen() && props.agent}>
+      <Show when={props.agent}>
         {(agent) => (
           <Loading>
             <AgentSettingsPanel
@@ -731,7 +817,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               skillsMode={agentSkillsMode(props.server, props.runtime)}
               skillsServerId={props.server?.id}
               previewWorkspaceFile={(path) =>
-                conversationRuntime(props).agent.previewWorkspaceFile({ agentId: agent().id, path })
+                conversationRuntime(props).agent.previewWorkspaceFile({ agentId: agent().id, path, exactPath: true })
               }
               tablesVisible={
                 (!props.runtime || props.runtime.admin !== undefined) &&
@@ -748,6 +834,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               busyMessageDefaultIsHost={props.server?.kind === "remote"}
               newChatEditable={props.server?.kind === "local" || props.remoteNewChatLoaded === true}
               quickAcknowledgementEditable={props.server?.kind === "local" || props.remotePlanCardLoaded === true}
+              builtinMemoryEditable={props.server?.kind === "local" || props.remoteBuiltinMemoryLoaded === true}
               fastMode={fastMode()}
               ultrafast={ultrafast()}
               onFastModeChange={fastModeChange()}
@@ -760,6 +847,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               agents={props.agents}
               onStartNewChat={props.onClearAgentContext}
               onDeleteHistory={props.onDeleteAgentHistory}
+              onDeleteAgent={props.onDeleteAgent}
               onCreateSkill={
                 serverCanAdminister(props.server, "skills-admin-v1") &&
                 agentReady() &&
@@ -817,11 +905,12 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               working={agentActivity() === "Working"}
               maxWidth={sidePanelMaxWidth}
               onClose={() => closeSidePanelPane("settings")}
-              onWidthChange={setSidePanelWidth}
+              onWidthChange={paneWidthChange(split)}
               onUpdateAgent={props.onUpdateAgent}
               onUpdateRuntimeSettings={updateRuntimeSettings}
               onSetAgentAvatar={props.onSetAgentAvatar}
               skillSelectionRequest={skillSettingsRequest()?.agentId === agent().id ? skillSettingsRequest() : null}
+              onSkillsClosed={() => clearSkillSettingsRequest(agent().id)}
               instructionsRequest={
                 instructionsSettingsRequest()?.agentId === agent().id ? instructionsSettingsRequest() : null
               }
@@ -840,6 +929,253 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
             />
           </Loading>
         )}
+      </Show>
+    </>
+  );
+  const splitPane = (pane: SidePanelPane) => {
+    if (pane === "files") return filesPane(true);
+    if (pane === "question") return questionPane(true);
+    if (pane === "threads") return threadsPane(true);
+    if (pane === "subagent") return subagentPane(true);
+    if (pane === "settings") return settingsPane(true);
+    return <Show when={browserSidebarOpen()}>{browserPane(true)}</Show>;
+  };
+  return (
+    <>
+      <HostFolderPicker request={folderPick()} browse={browsePickFolders} onDone={finishFolderPick} />
+      <Show when={sidePanelOpen()}>
+        <BrowserPageCover value={coverBrowserPage}>
+          <SidePanelHeader
+            panes={sidePanel().panes}
+            selected={selectedPane()}
+            available={mainPanes()}
+            badges={sidePanelBadges()}
+            maximized={sidePanel().maximized}
+            settingsLabel={channel ? t("channel.settings.title") : undefined}
+            onSelect={openSidePanelPane}
+            onClose={closeSidePanelPane}
+            threads={{
+              items: sideThreadTabs(),
+              selectedId: shownThread(),
+              onSelect: openPanelThread,
+              onClose: closePanelThread,
+              onMove: moveSideThread,
+              onToChat: movePanelThreadToChat,
+              onArchive: props.threads?.header.onArchive,
+              onDelete: props.threads?.header.onDelete,
+            }}
+            files={{
+              items: sidePanel().files,
+              selectedKey: shownFile(),
+              onSelect: openSidePanelFile,
+              onClose: closeSidePanelFile,
+              onMove: moveSidePanelFile,
+            }}
+            browsers={shownPages(() => selectedPane() === "browser")}
+            pageTabs={pageTabsChoice}
+            onToggleMaximized={() => setSidePanelMaximized(!sidePanel().maximized)}
+            onCollapse={toggleSidePanel}
+            outerToggle={sidePanelToggle() !== undefined}
+            moves={groupMoves(-1, mainTabCount())}
+            onMove={moveFromGroup(-1)}
+            windows={paneWindows()}
+            onNewBrowserTab={() => {
+              openSidePanelPane("browser");
+              void openBrowserAddress(BROWSER_NEW_TAB_URL, true);
+            }}
+          />
+        </BrowserPageCover>
+      </Show>
+
+      <Show when={sidePanelToggle()}>
+        {(toggle) => (
+          <div class="side-panel-toggle-slot no-drag">
+            <SidePanelToggle {...toggle()} />
+          </div>
+        )}
+      </Show>
+
+      <Show when={launcherShown()}>
+        <aside
+          id="side-panel-launcher"
+          class="browser-panel side-panel-empty"
+          aria-label={t("conversation.sidePanel.label")}
+        >
+          {sidePanelResizer("side-panel-launcher")}
+          <SidePanelLauncher
+            available={mainPanes()}
+            badges={sidePanelBadges()}
+            settingsLabel={channel ? t("channel.settings.title") : undefined}
+            onOpen={openSidePanelPane}
+          />
+        </aside>
+      </Show>
+
+      <Show when={filePreviewOpen() && sidebarFilePreview()}>
+        {(file) => {
+          const attached = () => {
+            const source = file().source;
+            return source.kind === "attachment" ? source.attachment : null;
+          };
+          return (
+            <Loading>
+              <FilePreviewPanel
+                allowExternalOpen={!props.runtime}
+                macWindowControls={props.platform === "darwin"}
+                preview={file().preview}
+                directory={file().directory ?? null}
+                agents={props.agents}
+                maxWidth={sidePanelMaxWidth}
+                onWidthChange={setSidePanelWidth}
+                onOpenLink={(url) => void openExternalMessageUrl(url)}
+                onOpenSharedFile={(path) => openSharedFile(path, "here")}
+                onOpenWorkspaceFile={previewWorkspaceAgentId() ? openWorkspaceFolderEntry : undefined}
+                onOpenWorkspaceFolder={openWorkspaceFolder}
+                onBack={sidebarFileBack() === null ? undefined : openSidebarFileBack}
+                sourceUrl={openedAttachmentUrl(attached()?.previewUrl)}
+                pageUrl={htmlAttachmentPageUrl(attached()) ?? file().preview?.pageUrl}
+                pageHtml={props.runtime?.visualPage ? htmlFilePageHtml(attached(), file().preview) : undefined}
+                fileKey={previewFileKey()}
+                selectionQuoteId={previewQuoteId()}
+                onPageQuote={(text) => {
+                  const quoteId = previewQuoteId();
+                  if (quoteId) quoteSelection(quoteId, text);
+                }}
+                onPageContext={(text) => {
+                  const id = attached()?.id;
+                  if (id) setPreviewPageContext(id, text);
+                }}
+                onPageMessage={addPreviewPageText}
+                isPageAppShortcut={isChatVisualAppShortcut}
+                quoteShortcut={deviceQuoteShortcut(props.platform)}
+                onOpenExternally={openSidebarFileExternally}
+                onDownload={downloadSidebarFile}
+                onReveal={props.runtime ? undefined : revealSidebarFile}
+                onClose={closeShownSidePanelFile}
+              />
+            </Loading>
+          );
+        }}
+      </Show>
+
+      <Show when={activeRightPanel() === "files"}>{filesPane(false)}</Show>
+
+      <Show when={activeRightPanel() === "question"}>{questionPane(false)}</Show>
+
+      <Show when={voicePill()} keyed>
+        {(shown) => (
+          <VoiceConversationPane
+            open={!voicePillClosing()}
+            onClosed={() => {
+              if (voicePill() !== shown) return;
+              setVoicePill(null);
+              setVoicePillClosing(false);
+            }}
+          />
+        )}
+      </Show>
+
+      <Show when={shownThread()} keyed>
+        {(threadId) => <ConversationSideThread threadId={threadId} resizer={sidePanelResizer("side-thread-panel")} />}
+      </Show>
+
+      <Show when={activeRightPanel() === "threads"}>{threadsPane(false)}</Show>
+
+      <Show when={activeRightPanel() === "subagent"}>{subagentPane(false)}</Show>
+
+      <Show
+        when={
+          (activeRightPanel() === "browser" && browserSidebarOpen()) || (browserExpandedOpen() && !paneSplit("browser"))
+        }
+      >
+        {browserPane(false)}
+      </Show>
+
+      <Show when={browserSidebarOpen() || browserExpandedOpen()}>
+        <Portal>
+          <div class="ui-dialog-overlay browser-expanded-backdrop" hidden={!browserExpandedOpen()} aria-hidden="true" />
+          <BrowserFullViewAdapter />
+        </Portal>
+      </Show>
+
+      <Show when={browserWindowShown()}>
+        <BrowserWindowBridge />
+      </Show>
+
+      <Show when={activeRightPanel() === "settings"}>{settingsPane(false)}</Show>
+
+      <Show when={splitsShown()}>
+        <BrowserPageCover value={coverBrowserPage}>
+          <section id="side-splits" class="side-splits" data-side-split aria-label={t("conversation.sidePanel.groups")}>
+            <PanelResizer
+              class="side-splits-resizer"
+              label={t("conversation.sidePanel.resizeGroups")}
+              controls="side-splits"
+              direction="bottom"
+              value={splitAreaHeight()}
+              defaultValue={splitAreaHeight()}
+              min={SIDE_SPLIT_MIN * sideSplits().length}
+              max={splitAreaMax}
+              onResize={resizeSplitArea}
+              onResizeEnd={saveSplitResize(resizeSplitArea)}
+              onReset={() => {
+                setSideSplitShare(sideSplits().length, null);
+                saveSideSplitLayout();
+              }}
+            />
+            <For each={sideSplits()} keyed={false}>
+              {(group, index) => (
+                <div class="side-split" id={`side-split-${index + 2}`}>
+                  <Show when={index === 1}>
+                    <PanelResizer
+                      class="side-splits-resizer"
+                      label={t("conversation.sidePanel.resizeGroup", { number: index + 2 })}
+                      controls={`side-split-${index + 2}`}
+                      direction="bottom"
+                      value={lowerGroupHeight()}
+                      defaultValue={Math.round(splitAreaHeight() / 2)}
+                      min={SIDE_SPLIT_MIN}
+                      max={() => splitAreaHeight() - SIDE_SPLIT_MIN}
+                      onResize={resizeLowerGroup}
+                      onResizeEnd={saveSplitResize(resizeLowerGroup)}
+                      onReset={() => {
+                        setLowerSplitShare(null);
+                        saveSideSplitLayout();
+                      }}
+                    />
+                  </Show>
+                  <SidePanelHeader
+                    split
+                    label={t("conversation.sidePanel.group", { number: index + 2 })}
+                    panes={group().panes}
+                    selected={group().selected}
+                    available={sidePanelPanes()}
+                    badges={sidePanelBadges()}
+                    maximized={false}
+                    settingsLabel={channel ? t("channel.settings.title") : undefined}
+                    onSelect={(pane) =>
+                      group().panes.includes(pane) ? openSidePanelPane(pane) : moveSidePanelPane(pane, { group: index })
+                    }
+                    onClose={closeSidePanelPane}
+                    onToggleMaximized={keepPaneWidth}
+                    onCollapse={() => closeSplitGroup(index)}
+                    moves={groupMoves(index, group().panes.length)}
+                    onMove={moveFromGroup(index)}
+                    windows={paneWindows()}
+                    onCloseGroup={() => closeSplitGroup(index)}
+                    browsers={shownPages(() => group().selected === "browser")}
+                    pageTabs={pageTabsChoice}
+                  />
+                  <div class="side-split-body">
+                    <Show when={group().selected} keyed>
+                      {(pane) => splitPane(pane)}
+                    </Show>
+                  </div>
+                </div>
+              )}
+            </For>
+          </section>
+        </BrowserPageCover>
       </Show>
 
       {publishAgent.dialog()}
@@ -861,6 +1197,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
 
 const AgentSettingsPanel = lazy(loadAgentSettingsPanel);
 const BrowserFullViewAdapter = lazy(() => import("./BrowserFullViewAdapter"));
+const BrowserWindowBridge = lazy(() => import("./BrowserWindowBridge"));
 const FilePreviewPanel = lazy(() => import("./FilePreviewPanel"));
 const ChatFilesPanel = lazy(() => import("../files/ChatFilesPanel"));
 

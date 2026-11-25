@@ -19,6 +19,7 @@ export interface ProviderAccountActions {
   connectKey?: ((provider: AgentProviderId, accountId: string | null, key: string) => Promise<void>) | undefined;
   connectWithCode?: ((provider: AgentProviderId, accountId: string | null) => Promise<void>) | undefined;
   pasteCodeSignIn?: boolean | undefined;
+  windowsCodeSignIn?: boolean | undefined;
   cancel: (provider: AgentProviderId, accountId: string) => Promise<void>;
   rename: (provider: AgentProviderId, accountId: string, label: string | null) => Promise<void>;
   remove: (provider: AgentProviderId, accountId: string) => Promise<void>;
@@ -26,6 +27,8 @@ export interface ProviderAccountActions {
   resetUsage?: ((provider: AgentProviderId, accountId: string) => Promise<ProviderUsageResetOutcome>) | undefined;
   signOut?: ((provider: AgentProviderId) => Promise<void>) | undefined;
   setPool?: ((provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) => Promise<void>) | undefined;
+  setLiveVoiceAccount?: ((accountId: string | null) => Promise<void>) | undefined;
+  maxAccounts?: number | undefined;
   local?: boolean | undefined;
 }
 
@@ -63,8 +66,13 @@ export function hasKeyAccounts(provider: string): boolean {
 
 export function accountCodeSignInOffered(provider: string, actions: ProviderAccountActions | undefined): boolean {
   if (!actions?.connectWithCode || !isAgentProvider(provider)) return false;
-  const codeSignIn = agentProviderDescriptor(provider).accountCodeSignIn;
-  return codeSignIn === "device" || (codeSignIn === "paste" && actions.pasteCodeSignIn === true);
+  const descriptor = agentProviderDescriptor(provider);
+  const codeSignIn = descriptor.accountCodeSignIn;
+  return (
+    codeSignIn === "device" ||
+    (codeSignIn === "paste" && actions.pasteCodeSignIn === true) ||
+    (descriptor.windowsCodeSignIn === "paste" && actions.windowsCodeSignIn === true)
+  );
 }
 
 export function isProviderKeyAccount(provider: string, accountId: string): boolean {

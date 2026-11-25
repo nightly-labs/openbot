@@ -65,6 +65,7 @@ type McpServerService = Pick<
   | "signInMcpServer"
   | "cancelMcpSignIn"
   | "mcpSignInLink"
+  | "receiveMcpSignInAddress"
   | "signOutMcpServer"
   | "listMcpSignIns"
   | "mcpSignInApp"
@@ -306,8 +307,10 @@ export function mcpServerIpcHandlers({
         remote: (parsed, serverId) => relay.open(remotePageKey(serverId, parsed.url)),
       }),
       completeMcpSignInRelay: scopedHandler(parseCompleteMcpSignInRelay, {
-        local: () => {
-          throw new Error(sourceText("error.mcp.relayEnded"));
+        local: (parsed) => {
+          const outcome = service.receiveMcpSignInAddress(parsed);
+          if (outcome === "ended") throw new Error(sourceText("error.mcp.relayEnded"));
+          if (outcome === "invalid") throw new Error(sourceText("error.mcp.relayAddressInvalid"));
         },
         remote: (parsed, serverId) => relay.paste(remotePageKey(serverId, parsed.url), parsed.address),
       }),

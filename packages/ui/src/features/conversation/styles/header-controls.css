@@ -741,6 +741,27 @@
   background: var(--ui-menu-item-hover);
 }
 
+.provider-model-effort-limited {
+  width: 240px;
+}
+
+.provider-model-effort-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-1);
+}
+
+.provider-model-effort-lock {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  color: var(--openbot-text-muted);
+}
+
+.provider-model-effort-note {
+  display: block;
+  padding: var(--openbot-space-1) var(--ui-menu-inset);
+}
+
 .provider-model-speed-content {
   width: 300px;
 }

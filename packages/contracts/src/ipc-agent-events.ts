@@ -78,8 +78,11 @@ export type AgentEvent =
   | { type: "crm-changed" }
   | { type: "vault-changed" }
   | { type: "browser-profiles-changed" }
+  | { type: "host-turn-limits-changed" }
   | { type: "library-folders-changed" }
+  | { type: "workflow-folders-changed" }
   | { type: "usage-credits-changed" }
+  | { type: "openbot-credits-changed" }
   | { type: "agent-session-settings-changed"; agentId: string }
   | { type: "message-pins-changed"; agentId: string }
   | { type: "channel-memories-changed"; channelId: string }
@@ -222,8 +225,11 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
     case "crm-changed":
     case "vault-changed":
     case "browser-profiles-changed":
+    case "host-turn-limits-changed":
     case "library-folders-changed":
+    case "workflow-folders-changed":
     case "usage-credits-changed":
+    case "openbot-credits-changed":
       return true;
     case "channel-memories-changed":
     case "channel-routines-changed":

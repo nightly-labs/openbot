@@ -307,6 +307,18 @@ describe("agent dock decoding", () => {
     );
   });
 
+  it("keeps a visual reply mark and rejects one that is not a boolean", () => {
+    const chat = PRESENTATION.chats[0];
+    const message = chat?.messages[0];
+    if (!chat || !message) throw new Error("The presentation fixture has no agent message.");
+    const visual = { ...chat, messages: [{ ...message, visual: true }] };
+    expect(decodeAgentDockPresentation({ ...PRESENTATION, chats: [visual] })?.chats[0]).toEqual(visual);
+    const wrong = { ...chat, messages: [{ ...message, visual: "yes" }] };
+    expect(() => decodeAgentDockPresentation({ ...PRESENTATION, chats: [wrong] })).toThrow(
+      "Invalid agent dock presentation.",
+    );
+  });
+
   it("keeps a chat question, takeover and usage limit, and rejects one that is not whole", () => {
     const chat = PRESENTATION.chats[1];
     if (!chat) throw new Error("The presentation fixture has no channel chat.");
@@ -442,6 +454,12 @@ describe("agent dock decoding", () => {
     expect(() => decodeAgentDockAction({ type: "open-window", serverId: "local", agentId: "" })).toThrow(
       "Invalid agent dock action.",
     );
+    const openTakeover = { type: "open-browser-takeover", serverId: "local", agentId: "agent-1", tabId: "tab-1" };
+    expect(decodeAgentDockAction(openTakeover)).toEqual(openTakeover);
+    for (const tabId of [undefined, "", "t".repeat(INPUT_LIMITS.identifier + 1)]) {
+      expect(() => decodeAgentDockAction({ ...openTakeover, tabId })).toThrow("Invalid agent dock action.");
+    }
+    expect(() => decodeAgentDockAction({ ...openTakeover, agentId: "" })).toThrow("Invalid agent dock action.");
     expect(() => decodeAgentDockAction({ type: "open-link", url: "" })).toThrow("Invalid agent dock action.");
     expect(() => decodeAgentDockAction({ type: "add", serverId: "", seat: { kind: "agent", id: "agent-1" } })).toThrow(
       "Invalid agent dock action.",

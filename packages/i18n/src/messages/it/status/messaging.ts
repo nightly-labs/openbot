@@ -36,9 +36,11 @@ export const messages = {
   "status.messaging.signInReceived": "OpenBot ha ricevuto l'installazione di Slack. Puoi chiudere questa scheda.",
   "status.messaging.signInUnknown": "OpenBot non ha avviato questa installazione di Slack. Riavviala in OpenBot.",
   "status.messaging.telegramNoAgent":
-    "Nessun agente può ancora rispondere qui. Aggiungi il Telegram Orchestrator in OpenBot.",
+    "Nessun agente può ancora rispondere qui. In OpenBot, apri Marketplace > App > Telegram e fai clic su Aggiungi agente.",
   "status.messaging.telegramLinked":
     "OpenBot è collegato a questa chat. Menziona {bot} o rispondi a un messaggio di OpenBot per interpellare gli agenti.",
+  "status.messaging.telegramNotLinked":
+    "OpenBot non è collegato a questa chat. Per collegarlo, apri l’app OpenBot, vai su Marketplace → App → Telegram e seleziona «Aggiungi a un gruppo» o «Apri una chat diretta».",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Risponde su Telegram e consulta il team",
   "status.messaging.whatsappNoAgent":

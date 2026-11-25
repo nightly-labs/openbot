@@ -61,6 +61,7 @@ export const STORY_CONNECTOR_DETAILS: readonly ConnectorDetail[] = [
       loadGroups: fn(async () => []),
       onAddSender: fn(),
       onRemoveSender: fn(),
+      onSetSenderReadOnly: fn(),
       onAnswerRequest: fn(),
     },
   },

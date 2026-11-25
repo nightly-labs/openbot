@@ -41,6 +41,7 @@ import type { AwaitingReplyItem } from "@openbot/ui/features/conversation/Awaiti
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import type { ChatMessageAuthor } from "@openbot/ui/features/conversation/ChatMessageRow";
 import type { UnloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
+import type { MediaApprovalControls } from "@openbot/ui/features/conversation/MediaApprovalCard";
 import type { SidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import type { AgentThreadOlderMessages } from "@openbot/ui/features/conversation/threads/AgentThreadView";
 import type { ThreadHeaderProps, ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
@@ -48,6 +49,7 @@ import type { SidebarAgentWait } from "@openbot/ui/features/sidebar/sidebar-agen
 import type { JSX } from "@solidjs/web";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
 import type { AppSettingLinkId } from "../settings/setting-link-targets";
+import type { ChannelReplyView } from "../speech/speech-replies";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { ServerInstallWatch } from "./ServerInstallChatCard";
 import type { TurnStepLines } from "./turn-step-lines";
@@ -82,11 +84,14 @@ export interface ConversationChannelSource {
   ownMessage: (message: AgentMessage) => boolean;
   workers: () => ChannelWorker[];
   memberThreadIds: () => ReadonlySet<string>;
+  memberAgentIds: () => ReadonlySet<string>;
   browserOwner: () => { agentId: string; threadId: string } | null;
   workingTurns: () => readonly string[];
   interactionAgentName: () => string | undefined;
   awaitingReplies: () => readonly AwaitingReplyItem[];
   stopAwaitingReply?: ((taskId: string) => void) | undefined;
+  replyView: () => ChannelReplyView;
+  voiceAgent: () => AgentProfile | undefined;
   HeaderTitle: (props: { onOpenSettings: () => void }) => JSX.Element;
   SettingsPane: (props: ConversationChannelSettingsPaneProps) => JSX.Element;
   AboveComposer: () => JSX.Element;
@@ -218,9 +223,11 @@ export interface ConversationProps {
   onPromptResolutionPresented?: ((agentId: string, turnId: string, requestId: string | number) => void) | undefined;
   onRespondToApproval: (decision: "accept" | "decline") => Promise<boolean>;
   onAlwaysAllowApproval?: (() => Promise<boolean>) | undefined;
+  mediaApproval?: MediaApprovalControls | undefined;
   agentAutoApproves?: boolean | undefined;
   remoteBackupModelsLoaded?: boolean | undefined;
   remotePlanCardLoaded?: boolean | undefined;
+  remoteBuiltinMemoryLoaded?: boolean | undefined;
   remoteComputerUseLoaded?: boolean | undefined;
   remoteNewChatLoaded?: boolean | undefined;
   remoteBusyMessageModeLoaded?: boolean | undefined;
@@ -230,9 +237,10 @@ export interface ConversationProps {
   onUpdateAgentPermissions?: ((input: UpdateAgentAdminSettingsInput) => Promise<void>) | undefined;
   onClearAgentContext?: (() => Promise<void>) | undefined;
   onDeleteAgentHistory?: (() => Promise<void>) | undefined;
+  onDeleteAgent?: ((agentId: string) => Promise<void>) | undefined;
   onCompactAgentContext?: (() => Promise<void>) | undefined;
   onRespondToBrowserTakeover: (decision: "complete" | "cancel", options?: PromptAnswerOptions) => Promise<boolean>;
-  onCancelQueuedMessage: (deliveryId: string) => void;
+  onCancelQueuedMessage: (deliveryId: string, recipientAgentId?: string) => void;
   onCancelWait?: ((waitId: string) => void) | undefined;
   onSteerQueuedMessage: (deliveryId: string) => void;
   onSendQueuedMessageNow?: ((deliveryId: string) => void) | undefined;
@@ -264,9 +272,16 @@ type SidebarFilePreviewSource =
   | { kind: "attachment"; attachment: AttachmentSummary };
 
 export type SidebarFilePreview =
-  | { ownerAgentId: string; source: SidebarFilePreviewSource; preview: FilePreview; directory?: undefined }
   | {
       ownerAgentId: string;
+      threadId?: string | undefined;
+      source: SidebarFilePreviewSource;
+      preview: FilePreview;
+      directory?: undefined;
+    }
+  | {
+      ownerAgentId: string;
+      threadId?: string | undefined;
       source: { kind: "workspace-folder"; agentId: string; path: string };
       preview: null;
       directory: WorkspaceDirectory;

@@ -1,11 +1,13 @@
 import type { GlobalSearchPage } from "@openbot/ui/components/GlobalSearch";
 import type { AgentMessage } from "@openbot/ui/data";
+import { DRAFT_THREAD_ID, MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, onSettled, untrack } from "solid-js";
 import { desktopAnalytics } from "./analytics";
 import { toAgentMessage } from "./app-message-projection";
 import { appPort } from "./app-port";
 import { type ChatHistoryEntry, chatHistoryShortcut, createChatHistory } from "./chat-history";
+import { useAgentTasks } from "./features/agent-tasks/agent-tasks-context";
 import { useAgentThreads } from "./features/agent-threads/agent-threads-context";
 import { useAgents } from "./features/agents/agents-context";
 import { useChannels } from "./features/channels/channels-context";
@@ -40,6 +42,7 @@ const Navigation = createSimpleContext({
     } = useAgents();
     const { activeDirectMember, setDirectTyping, clearDirectSelection, openDirectConversation } = useDirectMessages();
     const channels = useChannels();
+    const agentTasks = useAgentTasks();
     const agentThreads = useAgentThreads();
     const windowPage = useWindowPage();
     const scopeIsCurrent = createScopeGuard();
@@ -192,8 +195,15 @@ const Navigation = createSimpleContext({
       }
     }
 
+    const threadShown = (agentId: string, thread: string | undefined): boolean => {
+      if (thread === undefined || thread === MAIN_THREAD_ID) return true;
+      if (thread === DRAFT_THREAD_ID) return agentThreads.hasDraft(agentId);
+      return agentThreads.openIds(agentId).includes(thread);
+    };
     const history = createChatHistory((entry) => {
-      if (entry.kind === "agent") return agentList().some((agent) => agent.id === entry.id);
+      if (entry.kind === "agent") {
+        return agentList().some((agent) => agent.id === entry.id) && threadShown(entry.id, entry.thread);
+      }
       if (entry.kind === "channel") {
         return (
           channels.supported() &&
@@ -204,19 +214,23 @@ const Navigation = createSimpleContext({
     });
     let historyTarget: number | null = null;
 
-    const openChat = (): ChatHistoryEntry | null => {
-      if (windowPage.page() !== "agents" || agentSetupOpen()) return null;
+    const currentChat = (): ChatHistoryEntry | null => {
+      if (agentSetupOpen()) return null;
       const channelId = channels.state.selectedId;
       if (channelId) return { kind: "channel", id: channelId };
       const member = activeDirectMember();
       if (member) return { kind: "person", id: member.id };
       const agent = activeAgent();
-      return agent ? { kind: "agent", id: agent.id } : null;
+      if (!agent) return null;
+      if (!agentTasks.snapshot(agent.id)) return { kind: "agent", id: agent.id };
+      return { kind: "agent", id: agent.id, thread: agentThreads.activeId(agent.id) };
     };
+    const openChat = (): ChatHistoryEntry | null => (windowPage.page() === "agents" ? currentChat() : null);
+    const chatUnderPage = (): ChatHistoryEntry | null => (windowPage.page() === "agents" ? null : currentChat());
     createEffect(
       () => {
         const entry = openChat();
-        return entry ? `${entry.kind}:${entry.id}` : null;
+        return entry ? `${entry.kind}:${entry.id}:${entry.thread ?? ""}` : null;
       },
       () =>
         untrack(() => {
@@ -232,13 +246,14 @@ const Navigation = createSimpleContext({
       const entry = history.entryAt(index);
       if (!entry) return;
       historyTarget = index;
-      if (entry.kind === "agent") selectAgent(entry.id);
+      if (entry.kind === "agent") selectAgent(entry.id, entry.thread);
       else if (entry.kind === "channel") void channels.open(entry.id);
       else void selectDirectMember(entry.id);
     }
     const goBack = () => {
       const pageBack = windowPage.pageBack();
       if (pageBack) pageBack.back();
+      else if (chatUnderPage()) windowPage.showAgents();
       else goInHistory(-1);
     };
     const goForward = () => goInHistory(1);
@@ -251,7 +266,7 @@ const Navigation = createSimpleContext({
     onSettled(() => {
       const onKeyDown = (event: KeyboardEvent) => {
         if (handledElsewhere(event)) return;
-        const command = chatHistoryShortcut(event, platform.appInfo()?.platform === "darwin");
+        const command = chatHistoryShortcut(event);
         if (!command) return;
         event.preventDefault();
         if (command === "back") goBack();
@@ -281,7 +296,14 @@ const Navigation = createSimpleContext({
       globalSearchOpener: () => globalSearchOpener,
       searchGlobalMessages,
       selectGlobalSearchMessage,
-      chatHistory: { previous: history.previous, next: history.next, pageBack: windowPage.pageBack, goBack, goForward },
+      chatHistory: {
+        previous: history.previous,
+        next: history.next,
+        pageBack: windowPage.pageBack,
+        chatUnderPage,
+        goBack,
+        goForward,
+      },
     };
   },
 });

@@ -8,6 +8,7 @@ export const messages = {
   "queue.hold.named": "Oczekiwanie – {name} pracuje w kanale {channel}",
   "queue.hold.unnamed": "Oczekiwanie – ten agent pracuje w kanale {channel}",
   "queue.hold.providerRestart": "Oczekiwanie – {provider} uruchomi się ponownie po zakończeniu bieżących zadań",
+  "queue.hold.signIn": "Oczekiwanie – {provider} wymaga zalogowania",
   "queue.item.label": "Wiadomość w kolejce {position}: {preview}",
   "queue.item.labelEditing": "Wiadomość w kolejce {position}, edycja: {preview}",
   "queue.item.editing": "Edycja",

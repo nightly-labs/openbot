@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { isAgentModel, savedCustomModelId } from "@openbot/contracts/ipc";
 import type { AgentClient } from "../src/backend/agent-client";
 import { resolvePiCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -24,6 +25,7 @@ const FAILING_MODEL = "fake-broken";
 const EFFORT_MODEL = "fake-thinker";
 const SAVED_EFFORTS = ["none", "low", "max"] as const;
 const VISION_MODEL = "fake-vision";
+const VENDOR_MODEL = "@cf/openai/gpt-oss-120b";
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
   "base64",
@@ -145,6 +147,7 @@ try {
       { id: FAILING_MODEL, name: "Fake broken" },
       { id: EFFORT_MODEL, name: "Fake thinker", reasoningEfforts: [...SAVED_EFFORTS] },
       { id: VISION_MODEL, name: "Fake vision", inputs: ["image", "pdf"] },
+      { id: VENDOR_MODEL, name: VENDOR_MODEL },
     ],
     harness: "pi",
   };
@@ -219,6 +222,16 @@ try {
   assert.equal(sent.header, HEADER_VALUE, "Pi must send the header literally.");
   assert.equal(sent.budget, 12_000, "Pi must ask for the saved output limit.");
   assert.equal(sent.reasoningEffort, null, "A model with no saved efforts must not send an effort.");
+
+  const vendorModel = savedCustomModelId("spark-e2e", "pi", VENDOR_MODEL);
+  assert.ok(isAgentModel(vendorModel), `${vendorModel} must be a valid model id.`);
+  assert.ok(report.models.includes(vendorModel), `Pi must list ${VENDOR_MODEL} as ${vendorModel}.`);
+  const vendorTurn = await runTurn(client, thread, { model: vendorModel, text: "Say pong.", timeoutMs: 60_000 });
+  assert.equal(vendorTurn.error, null, `The turn on ${vendorModel} failed: ${vendorTurn.error}`);
+  assert.ok(
+    report.requests.some((request) => request.model === VENDOR_MODEL),
+    "A turn must send the vendor's own model id.",
+  );
 
   for (const effort of ["max", "none"] as const) {
     const effortTurn = await runTurn(client, thread, {

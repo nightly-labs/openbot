@@ -20,6 +20,8 @@ export const messages = {
     "Araç çalışmadı. tool_call bu adla bir araç bulamadı. tool_search'ün verdiği tam nitelikli adı kullanın, örneğin openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "Araç çalışmadı. tool_call bu adla bir araç bulamadı. Nitelikli ad büyük olasılıkla {name}. Öyleyse çağrıyı bu adla yeniden gönderin.",
+  "error.agent.toolCallNullValue":
+    "Araç çalışmadı. {name}, {paths} konumunda bir nesne veya liste bekliyor, ancak bu liste öğelerinin her biri null olarak geldi. Çağrıyı yeniden gönderin ve bu öğelerin her birini JSON'unu içeren bir dize olarak verin.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe, {names} adında bir OpenBot aracı bulamadı. Yalnızca openbot.tool_search'ün listelediği OpenBot ve tarayıcı araçlarını açıklar, MCP araçlarını açıklamaz.",
   "error.agent.toolDescribeDiscoveryNames":
@@ -53,6 +55,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "Ajan kurulumu başarısız oldu ve tamamlanmamış ajan kaldırılamadı.",
   "error.agent.modelUnavailable": "Seçilen ajan modeli kullanılamıyor.",
   "error.agent.modelProviderNotConnected": 'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} bağlı değil.',
+  "error.agent.modelProviderSignInRequired":
+    'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} oturum açmayı gerektiriyor. {provider} hesabında oturum açıp yeniden dene.',
+  "error.agent.modelProviderNotInstalled": 'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} yüklü değil.',
+  "error.agent.modelProviderOutdated": 'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} güncellenmeli.',
   "error.agent.modelListEmpty":
     'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} hiç model listelemedi. Son hata: {detail}',
   "error.agent.modelListEmptyNoError":
@@ -149,6 +155,8 @@ export const messages = {
   "error.agent.busyMessageModeLocalOnly":
     "Ajan çalışırken mesajların ne yapacağı yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
   "error.agent.backupModelsLocalOnly": "Yedek modeller yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
+  "error.agent.backupModelsAtLimit":
+    "Şu anda hiçbir yedek model devralamaz: her biri kullanım sınırına ulaştı ya da kısa süre önce başarısız oldu. Bir hesabın modelleri tek bir sınırı paylaşabilir. Şimdi devam etmek için başka bir sağlayıcıdan veya başka bir hesaptan yedek model ekleyin ya da sınırın sıfırlanmasını bekleyin.",
   "error.agent.taskLimitLocalOnly": "Görev limiti yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
   "error.agent.localScriptsOff": "Bu ajan yerel betiklere izin vermiyor.",
   "error.agent.localScriptsRateLimited":
@@ -179,6 +187,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "Ekran yakalama bir Slack, Discord ya da Telegram konuşmasında çalışmaz, çünkü dosyalarını başka kişiler de alır.",
   "error.agent.screenCaptureDeclined": "Kullanıcı bu ekran yakalamaya izin vermedi. Hiçbir şey yakalanmadı.",
+  "error.agent.creditMediaDeclined": "Kullanıcı bu oluşturmaya izin vermedi. Hiç kredi harcanmadı.",
+  "error.agent.creditMediaNotSaved": "Dosya oluşturuldu, ancak OpenBot onu sohbete kaydedemedi.",
   "error.agent.mcpToolDeclined": "Kullanıcı bu MCP aracı çağrısına izin vermedi. Araç çalışmadı.",
   "error.agent.screenCaptureWindowMissing":
     "Bu pencere şu anda açık değil. Geçerli pencere kimliklerini almak için list_capture_sources çağırın.",

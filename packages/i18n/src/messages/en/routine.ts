@@ -325,7 +325,6 @@ export const messages = defineMessages("routine", {
   "routine.webhook.giveSecretConfirm": "Give secret",
   "routine.webhook.giveSecretFailed": "Could not give the signing secret to {name}.",
   "routine.webhook.secretGiven": "{name} has the new signing secret.",
-  "routine.webhook.statusFailed": "Could not check whether the host is connected to the relay.",
   "routine.webhook.stepDone": "Done",
   "routine.webhook.stepUrl": "Copy the endpoint into the sending service",
   "routine.webhook.stepUrlHint": "The sender makes a POST request with a JSON body of at most 64 KiB.",

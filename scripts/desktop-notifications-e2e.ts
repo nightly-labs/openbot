@@ -35,6 +35,7 @@ interface RecordedNotification {
   body: string;
   closed: boolean;
   click: () => void;
+  timeOut: () => void;
 }
 
 const shown: RecordedNotification[] = [];
@@ -46,20 +47,22 @@ plugin({
     class Inert {}
     class RecordingNotification {
       readonly #record: RecordedNotification;
-      readonly #listeners = new Map<string, (() => void)[]>();
+      readonly #listeners = new Map<string, ((details: { reason?: string }) => void)[]>();
       constructor(options: { title: string; body: string }) {
         this.#record = {
           ...options,
           closed: false,
-          click: () => {
-            for (const listener of this.#listeners.get("click") ?? []) listener();
-          },
+          click: () => this.#emit("click", {}),
+          timeOut: () => this.#emit("close", { reason: "timedOut" }),
         };
+      }
+      #emit(event: string, details: { reason?: string }) {
+        for (const listener of this.#listeners.get(event) ?? []) listener(details);
       }
       static isSupported() {
         return true;
       }
-      on(event: string, listener: () => void) {
+      on(event: string, listener: (details: { reason?: string }) => void) {
         this.#listeners.set(event, [...(this.#listeners.get(event) ?? []), listener]);
         return this;
       }
@@ -68,7 +71,7 @@ plugin({
       }
       close() {
         this.#record.closed = true;
-        for (const listener of this.#listeners.get("close") ?? []) listener();
+        this.#emit("close", {});
       }
     }
     build.module("electron", () => ({
@@ -161,6 +164,7 @@ const userData = join(root, "user-data");
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -224,7 +228,7 @@ const phone = new PushNotificationService({
   memberActive: () => true,
   lastUseElsewhere: () => null,
   atHostComputer: (memberId, event) =>
-    memberId === OWNER_ID && desktopShowsAgentEvent(event, localServer(), true, ownLevels),
+    memberId === OWNER_ID && event !== null && desktopShowsAgentEvent(event, localServer(), true, ownLevels),
   memberLevels: (memberId) =>
     memberId === OWNER_ID ? { server: ownServerLevel, agents: ownLevels } : { server: null, agents: new Map() },
   liveActivityShows: () => false,
@@ -287,6 +291,7 @@ try {
   const forwarders = createRendererForwarders({
     getMainWindow: () => mainWindow,
     getChatWindows: () => [],
+    chatWindowTarget: () => null,
     getAgentService: () => agents ?? null,
     getHostService: () => null,
     getHostAnalytics: () => null,
@@ -402,6 +407,22 @@ try {
     assert.equal(shown[from + 1]?.closed, false);
     return { replaced: shown[from]?.closed };
   });
+
+  await step(
+    "A question whose banner timed out into the notification center still leaves when it is answered",
+    async () => {
+      const from = shown.length;
+      desktop(prompt(5));
+      const question = shown[from];
+      assert.ok(question);
+      assert.equal(question.body, english("notification.needsInput"));
+      question.timeOut();
+      assert.equal(question.closed, false);
+      desktop({ type: "agent-input-resolved", kind: "prompt", requestId: 5, agentId });
+      assert.equal(question.closed, true, "The answered question stayed in the notification center.");
+      return { closed: question.closed };
+    },
+  );
 
   await step("Muted or Nothing: no desktop notification", async () => {
     const from = shown.length;

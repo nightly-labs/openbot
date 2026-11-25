@@ -24,6 +24,7 @@ import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useProviders } from "../../providers";
+import { withoutSideThreadTurns } from "../../queue-reconciliation";
 import { quitShortcutHintShown } from "../../quit-shortcut-hint";
 import { createScopeGuard } from "../../scope-lifetime";
 import { useTurns } from "../../turns";
@@ -32,6 +33,7 @@ import { useAuth } from "../account/account-context";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
 import { conversationThreads } from "../agent-threads/conversation-threads";
+import { useAgentActions } from "../agents/agent-actions";
 import { attentionKey } from "../agents/agent-runtime-snapshot";
 import { agentTakeoverTabIds, agentThreadAttention } from "../agents/agent-thread-attention";
 import { useAgents } from "../agents/agents-context";
@@ -45,15 +47,19 @@ import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { useCustomProviders } from "../custom-providers/custom-providers-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import { useServerActions } from "../servers/server-actions";
-import { remoteMcpSignIn, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import {
+  remoteMcpSignIn,
+  serverCanAdminister,
+  serverRoleCanAdminister,
+  serverSupportsCapability,
+} from "../servers/server-capabilities";
 import { createServerResponseStyle } from "../servers/server-personality";
 import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { serversPort } from "../servers/servers-port";
-import { appSettingLinkTarget } from "../settings/setting-link-targets";
+import { appSettingRowOpener } from "../settings/setting-link-targets";
 import { useSettings } from "../settings/settings-context";
-import { settingsTabShown } from "../settings/settings-tabs";
 import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
 import { useUsage } from "../usage/usage-context";
@@ -64,6 +70,7 @@ import { useConversation } from "./conversation-context";
 import { useConversationController } from "./conversation-controller-context";
 import { messagePromptRequestKey, promptRequestKey } from "./conversation-keys";
 import type { ConversationThreads } from "./conversation-types";
+import { useDesktopMediaApproval } from "./desktop-media-approval";
 import {
   createAgentMessageDeleteAccess,
   desktopAgentMessageDeleteAccess,
@@ -156,6 +163,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     failedModels,
     queues,
   } = useTurns();
+
   const {
     activeMessages,
     conversations,
@@ -185,6 +193,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const panelAgentStatus = () => (remoteLoading() ? { ...agentStatus(), phase: "starting" as const } : agentStatus());
   const usage = useUsage();
   const windowPage = useWindowPage();
+  const mediaApproval = useDesktopMediaApproval();
   const auth = useAuth();
   const { teamPresence, readerMemberId } = usePresence();
   const { selectAgent, openAgentMessage, messageFocusRequest, globalSearchOpen } = useNavigation();
@@ -249,6 +258,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     };
   });
 
+  const { deleteAgent } = useAgentActions();
+  const deleteAgentAllowed = () => !platform.chatWindow && serverRoleCanAdminister(activeServer());
+
   const compactActiveAgentContext = createMemo(() => {
     const agent = activeAgent();
     const server = activeServer();
@@ -271,6 +283,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     const backupModels = remoteAgentAdmin.backupModels();
     const usageLimitReturn = remoteAgentAdmin.usageLimitReturn();
     const quickAcknowledgement = remoteAgentAdmin.quickAcknowledgement();
+    const memory = remoteAgentAdmin.memory();
     const fastMode = remoteAgentAdmin.fastMode();
     const ultrafast = remoteAgentAdmin.ultrafast();
     const computerUse = remoteAgentAdmin.computerUse();
@@ -284,6 +297,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           ...(activeServer()?.kind === "remote" && backupModels ? { backupModels } : {}),
           ...(activeServer()?.kind === "remote" && usageLimitReturn ? { usageLimitReturn } : {}),
           ...(activeServer()?.kind === "remote" && quickAcknowledgement !== undefined ? { quickAcknowledgement } : {}),
+          ...(activeServer()?.kind === "remote" && memory !== undefined ? { memory } : {}),
           ...(activeServer()?.kind === "remote" && typeof fastMode === "boolean" ? { fastMode, ultrafast } : {}),
           ...(activeServer()?.kind === "remote" && computerUse !== undefined ? { computerUse } : {}),
           ...(activeServer()?.kind === "remote" && allowNewChat !== undefined ? { allowNewChat } : {}),
@@ -389,6 +403,11 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const { t } = useText();
   const agentTasks = useAgentTasks();
   const agentThreads = useAgentThreads();
+  const mainQueue = createMemo(() => {
+    const agent = activeAgent();
+    const queue = activeQueue();
+    return agent && queue ? withoutSideThreadTurns(queue, agentTasks.snapshot(agent.id)?.tasks ?? []) : queue;
+  });
   const threads = createMemo((): ConversationThreads | undefined => {
     const agent = activeAgent();
     if (!agent || !agentTasks.available()) return undefined;
@@ -472,14 +491,10 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           setPendingPluginSlug(request.appId);
           setSkillsMarketplaceOpen(true);
         }}
-        appSettingOpener={(settingId) => {
-          const target = appSettingLinkTarget(settingId, platform.appInfo()?.platform);
-          const shown = settingsTabShown(target.tab, {
-            platform: platform.appInfo()?.platform,
-            chatWindow: platform.chatWindow !== null,
-          });
-          return shown ? () => openAppSettingRow(target.tab, target.row) : undefined;
-        }}
+        appSettingOpener={appSettingRowOpener(
+          () => ({ platform: platform.appInfo()?.platform, chatWindow: platform.chatWindow !== null }),
+          openAppSettingRow,
+        )}
         onOpenMcpSignIn={(() => {
           const server = activeServer();
           if (!server || (server.kind === "remote" && !remoteMcpSignIn(server))) return undefined;
@@ -543,7 +558,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         discontinuous={activeAgent() ? conversations[activeAgent()?.id ?? ""]?.windowMode === "around" : false}
         loadingOlder={activeAgent() ? conversations[activeAgent()?.id ?? ""]?.olderLoading === true : false}
         olderError={activeAgent() ? (conversations[activeAgent()?.id ?? ""]?.olderError ?? null) : null}
-        queue={activeQueue()}
+        queue={mainQueue()}
         browserTabs={browserTabs()}
         activeBrowserTabId={activeBrowserTabId()}
         browserVisibilitySuspended={browserVisibilitySuspended()}
@@ -629,9 +644,11 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         onPromptResolutionPresented={presentPromptResolution}
         onRespondToApproval={respondToApproval}
         onAlwaysAllowApproval={alwaysAllowApproval()}
+        mediaApproval={mediaApproval}
         agentAutoApproves={activeAgentAutoApproves()}
         remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
         remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
+        remoteBuiltinMemoryLoaded={remoteAgentAdmin.memory() !== undefined}
         remoteComputerUseLoaded={remoteAgentAdmin.computerUse() !== undefined}
         remoteNewChatLoaded={remoteAgentAdmin.allowNewChat() !== undefined}
         remoteBusyMessageModeLoaded={remoteAgentAdmin.busyMessageMode() !== undefined}
@@ -645,6 +662,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         agentMemoryLimit={generalSettings().agentMemoryLimit}
         onClearAgentContext={clearActiveAgentContext()}
         onDeleteAgentHistory={deleteActiveAgentHistory()}
+        onDeleteAgent={deleteAgentAllowed() ? (agentId) => deleteAgent(agentId) : undefined}
         onCompactAgentContext={compactActiveAgentContext()}
         onRespondToBrowserTakeover={(decision, options) => respondToBrowserTakeover(decision, openThreadId(), options)}
         onCancelQueuedMessage={cancelQueuedMessage}

@@ -3,6 +3,8 @@ import { createContext, useContext } from "solid-js";
 
 const AmbientMotionContext = createContext<() => boolean>(() => true);
 
+export const AMBIENT_MOTION_PAUSED_ATTRIBUTE = "data-openbot-ambient-motion-paused";
+
 export function AmbientMotion(props: { when: boolean; children: JSX.Element }): JSX.Element {
   return <AmbientMotionContext value={() => props.when}>{props.children}</AmbientMotionContext>;
 }

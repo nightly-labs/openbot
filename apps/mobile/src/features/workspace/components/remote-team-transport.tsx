@@ -1,5 +1,7 @@
+import { BROWSER_SECRET_RESPONSE_PATH } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { BROWSER_SECRET_VAULT_ROUTES } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import {
   INSTANCE_TRANSFER_REMOTE_BYTES,
   INSTANCE_TRANSFER_ROUTES,
@@ -61,6 +63,7 @@ export interface RemoteTeamTransportRef {
   connect(hostId: string, hostPublicKey: string): Promise<{ kept: boolean }>;
   disconnect(): Promise<void>;
   networkChanged(): void;
+  newPage(): void;
   request<T>(
     method: string,
     path: string,
@@ -97,6 +100,7 @@ interface RemoteTeamTransportProps {
   active: boolean;
   directory: RemoteTeamDirectoryClient;
   onConnectionUpdate: (update: RemoteTeamConnectionUpdate) => void;
+  onDiagnostic?: (step: RemoteTeamDiagnostic["step"], detail: string | undefined) => void;
   onMembershipChanged?: () => Promise<void>;
   onNetworkRestored?: () => void;
   onTeamEvent: (hostId: string, event: RemoteTeamEvent) => void;
@@ -115,10 +119,43 @@ type RemoteTeamCommandInput =
       downloadSize?: number;
     };
 
+const partialFile = (uri: string) => new File(`${uri}.part`);
+
+function removePartialFile(uri: string) {
+  try {
+    const part = partialFile(uri);
+    if (part.exists) part.delete();
+  } catch {}
+}
+
+async function keepDownloadedFile(uri: string, size: number) {
+  const file = new File(uri);
+  if (file.exists && file.size === size) return removePartialFile(uri);
+  try {
+    const part = partialFile(uri);
+    if (part.size !== size) throw new Error(sourceText("error.remote.downloadIncompleteRetry"));
+    await part.move(file, { overwrite: true });
+  } catch (error) {
+    removePartialFile(uri);
+    throw error;
+  }
+}
+
+function savedTo(result: RemoteTeamCommandResult, uri: string) {
+  const file = isDynamicRecord(result.body) ? result.body.file : undefined;
+  return result.ok && isDynamicRecord(file) && file.ref === uri;
+}
+
 function liveVoiceErrorText(path: string, status: number, body: unknown): string | null {
   if (path === LIVE_VOICE_ROUTES.start && status >= 500) return sourceText("error.voice.live.hostFailed");
   if (path !== LIVE_VOICE_ROUTES.start && path !== LIVE_VOICE_ROUTES.stop) return null;
   return isDynamicRecord(body) && isString(body.error) && body.error ? body.error : null;
+}
+
+function liveVoiceHostFailure(path: string, reference: string | undefined): string | null {
+  return path === LIVE_VOICE_ROUTES.start && reference?.startsWith("host/500/")
+    ? sourceText("error.voice.live.hostFailed")
+    : null;
 }
 
 const BRIDGE_DOM: DOMProps = {
@@ -136,6 +173,8 @@ const BRIDGE_DOM: DOMProps = {
   scrollEnabled: false,
   style: { flex: 0, height: 1, width: 1 },
 };
+
+const GATHERING_STALLS_BEFORE_NEW_BRIDGE = 2;
 
 export const RemoteTeamTransport = memo(
   forwardRef<RemoteTeamTransportRef, RemoteTeamTransportProps>(function RemoteTeamTransport(props, ref) {
@@ -178,9 +217,18 @@ export const RemoteTeamTransport = memo(
       return true;
     }, []);
 
+    const [bridgeKey, setBridgeKey] = useState(0);
+    const gatheringStalls = useRef(0);
+    const newPage = useCallback((reason: string) => {
+      gatheringStalls.current = 0;
+      supportLog.add("warn", "connection", `${latest.current.props.hostId} new page ${reason}`);
+      setBridgeKey((key) => key + 1);
+    }, []);
+
     const uploadListeners = useRef(new Map<string, (fraction: number) => void>());
     const downloadListeners = useRef(new Map<string, (received: number, total: number) => void>());
     const uploadFiles = useRef(new Map<string, number>());
+    const downloadFiles = useRef(new Set<string>());
     const enqueue = useCallback(
       (
         next: RemoteTeamCommandInput,
@@ -209,13 +257,33 @@ export const RemoteTeamTransport = memo(
                 }
               : { id, type: "disconnect" };
         const fileRef = command.type === "request" ? command.upload?.file?.ref : undefined;
-        if (!onUploadProgress && !onDownloadProgress && !fileRef) return mailbox.send(command);
+        const saved = command.type === "request" ? command.largeDownload : undefined;
+        const savedFile = saved?.file;
+        if (!onUploadProgress && !onDownloadProgress && !fileRef && !savedFile) return mailbox.send(command);
         if (onUploadProgress) uploadListeners.current.set(id, onUploadProgress);
         if (onDownloadProgress) downloadListeners.current.set(id, onDownloadProgress);
         if (fileRef) uploadFiles.current.set(fileRef, (uploadFiles.current.get(fileRef) ?? 0) + 1);
-        return mailbox.send(command).finally(() => {
+        if (savedFile) downloadFiles.current.add(savedFile);
+        const sent =
+          saved && savedFile
+            ? mailbox.send(command).then(
+                async (result) => {
+                  downloadFiles.current.delete(savedFile);
+                  if (savedTo(result, savedFile)) await keepDownloadedFile(savedFile, saved.maxBytes);
+                  else removePartialFile(savedFile);
+                  return result;
+                },
+                (error: unknown) => {
+                  downloadFiles.current.delete(savedFile);
+                  removePartialFile(savedFile);
+                  throw error;
+                },
+              )
+            : mailbox.send(command);
+        return sent.finally(() => {
           uploadListeners.current.delete(id);
           downloadListeners.current.delete(id);
+          if (savedFile) downloadFiles.current.delete(savedFile);
           if (!fileRef) return;
           const count = (uploadFiles.current.get(fileRef) ?? 1) - 1;
           if (count > 0) uploadFiles.current.set(fileRef, count);
@@ -242,6 +310,7 @@ export const RemoteTeamTransport = memo(
           const networkChanged = bridge.current?.networkChanged;
           if (typeof networkChanged === "function") networkChanged(null);
         },
+        newPage: () => newPage("on refresh"),
         disconnect: async () => {
           const result = await enqueue({ type: "disconnect" });
           if (!result.ok)
@@ -283,7 +352,12 @@ export const RemoteTeamTransport = memo(
               `${request} -> ${result.status ?? "no status"} ${time}`,
             );
           if (!result.ok)
-            throw referencedError(result.error ?? sourceText("error.remote.serverRequestFailed"), result.reference);
+            throw referencedError(
+              liveVoiceHostFailure(path, result.reference) ??
+                result.error ??
+                sourceText("error.remote.serverRequestFailed"),
+              result.reference,
+            );
           if (result.status === 409 && isQueueEditRoute(method, path))
             throw new QueueEditRejectedError(currentText().t("mobile.workspace.error.queueEditRejected"));
           if (
@@ -296,6 +370,12 @@ export const RemoteTeamTransport = memo(
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.approvalInactive"));
           if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.prompt)
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.formUnavailable"));
+          if (
+            result.status === 409 &&
+            method === "POST" &&
+            (path === BROWSER_SECRET_RESPONSE_PATH || path === BROWSER_SECRET_VAULT_ROUTES.respond)
+          )
+            throw new InactiveRequestError(currentText().t("mobile.chat.browserSecret.ended"));
           if (result.status !== undefined && result.status >= 400)
             throw referencedError(
               liveVoiceErrorText(path, result.status, result.body) ?? sourceText("error.remote.serverRequestFailed"),
@@ -348,7 +428,7 @@ export const RemoteTeamTransport = memo(
           };
         },
       }),
-      [enqueue, sendViewCommand, sendDesktopCommand, backgroundLane],
+      [enqueue, sendViewCommand, sendDesktopCommand, backgroundLane, newPage],
     );
 
     const pageLoads = useRef(0);
@@ -395,6 +475,10 @@ export const RemoteTeamTransport = memo(
     };
     const [actions] = useState(() => ({
       digestUploadFile: async (ref: string) => uploadFile(ref).digest("SHA-256"),
+      writeDownloadFile: async ({ ref, base64, append }: { ref: string; base64: string; append: boolean }) => {
+        if (!downloadFiles.current.has(ref)) throw new Error("The file is not part of a download.");
+        await partialFile(ref).write(base64, { encoding: "base64", append });
+      },
       readUploadFile: async ({ ref, offset, length }: { ref: string; offset: number; length: number }) => {
         const handle = uploadFile(ref).open(FileMode.ReadOnly);
         try {
@@ -439,20 +523,43 @@ export const RemoteTeamTransport = memo(
       },
       onAccountServersChanged: async () => latest.current.props.onMembershipChanged?.(),
       onConnectionUpdate: async (update: RemoteTeamConnectionUpdate) => latest.current.props.onConnectionUpdate(update),
-      onDiagnostic: async ({ hostId, step, detail }: RemoteTeamDiagnostic) =>
+      onDiagnostic: async ({ hostId, step, detail }: RemoteTeamDiagnostic) => {
         supportLog.add(
-          step === "failed" || step === "stalled" || step === "signal-error" || step === "ice-candidate-error"
+          step === "failed" ||
+            step === "stalled" ||
+            step === "signal-error" ||
+            step === "ice-candidate-error" ||
+            step === "ice-gathering-stalled"
             ? "warn"
             : "info",
           "connection",
           `${hostId} peer ${step}${detail ? `: ${detail}` : ""}`,
-        ),
+        );
+        if (step === "authenticated") gatheringStalls.current = 0;
+        if (step === "ice-gathering-stalled") {
+          gatheringStalls.current += 1;
+          if (gatheringStalls.current >= GATHERING_STALLS_BEFORE_NEW_BRIDGE) newPage("after ICE gathering stalls");
+        }
+        latest.current.props.onDiagnostic?.(step, detail);
+      },
       onNetworkRestored: async () => latest.current.props.onNetworkRestored?.(),
-      onTeamEvent: async (hostId: string, event: RemoteTeamEvent) => latest.current.props.onTeamEvent(hostId, event),
+      onTeamEvents: async (hostId: string, events: RemoteTeamEvent[]) => {
+        const { onTeamEvent } = latest.current.props;
+        let failure: { error: unknown } | null = null;
+        for (const event of events) {
+          try {
+            onTeamEvent(hostId, event);
+          } catch (error) {
+            failure ??= { error };
+          }
+        }
+        if (failure) throw failure.error;
+      },
     }));
 
     return (
       <RemoteTeamBridge
+        key={bridgeKey}
         ref={bridge}
         active={props.active}
         dom={BRIDGE_DOM}

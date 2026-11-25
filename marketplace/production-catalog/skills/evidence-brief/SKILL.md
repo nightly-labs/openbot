@@ -16,8 +16,8 @@ description: "Answer a research question with sourced, dated claims. Each claim 
 1. **The question.** If it is vague, ask once with `ask_user`: "Which decision does this answer feed?" Give 2 to 3
    options from the context.
 2. **Tool path.** Call `openbot_browser.list_tabs`, then open a new tab. Use a search page to find sources and open
-   each source page. For the user's own documents, search the `openbot` namespace with `tool_search` for an
-   installed plugin such as Notion or Atlassian.
+   each source page. For the user's own documents, use the tools of an installed plugin such as
+   Notion or Atlassian; `openbot.tool_search` does not list them.
 3. **Paste path.** Documents, files or site addresses that the user gives. Read each one in full before you cite it.
 4. **Cut-off date.** Use the "as of" date that the user names. Else use today.
 

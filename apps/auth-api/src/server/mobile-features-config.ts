@@ -2,18 +2,18 @@ import type { MobileFeatureConfig, MobileLatestVersions } from "@openbot/contrac
 
 export const MOBILE_FEATURE_CONFIG: MobileFeatureConfig = {
   cloudServers: {
-    ios: { upTo: "1.4.12" },
-    android: { upTo: "1.4.12" },
+    ios: { upTo: "1.4.13" },
+    android: { upTo: "1.4.13" },
   },
   browser: {
-    ios: { upTo: "1.4.12" },
-    android: { upTo: "1.4.12" },
+    ios: { upTo: "1.4.13" },
+    android: { upTo: "1.4.13" },
   },
 };
 
 export const MOBILE_LATEST_VERSIONS: MobileLatestVersions = {
-  ios: "1.4.12",
-  android: "1.4.12",
+  ios: "1.4.13",
+  android: "1.4.13",
 };
 
 export const ANDROID_APK_FIRST_VERSION: string | null = "1.4.11";

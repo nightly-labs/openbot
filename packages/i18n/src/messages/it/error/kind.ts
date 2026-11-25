@@ -17,6 +17,8 @@ export const messages = {
   "error.kind.permission": "Non hai il permesso di completare questa azione. Chiedi l'accesso al proprietario.",
   "error.kind.rateLimit": "Troppe richieste. Attendi un momento, poi riprova.",
   "error.kind.service": "Il servizio non è disponibile. Attendi un momento, poi riprova.",
+  "error.kind.clock":
+    "La connessione sicura non è riuscita perché la data o l’ora del computer su cui gira OpenBot è probabilmente sbagliata. Correggi data e ora, poi riprova.",
   "error.kind.interrupted":
     "La connessione si è chiusa prima che la risposta fosse terminata. Invia di nuovo il messaggio.",
 } as const satisfies PartialTranslation<typeof source>;

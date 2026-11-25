@@ -8,7 +8,7 @@ export function remoteServerSummaries(
   servers: readonly StoredRemoteServerView[],
   activeServerId: string,
   statusFor: (serverId: string) => RemoteServerConnectionStatus,
-  localMemberLimit: number | null = null,
+  localMemberLimit: Pick<ServerSummary, "memberLimit" | "licenseRaisesMemberLimit"> = {},
   isThisComputer: (serverId: string) => boolean = () => false,
   keyChangedAt: (serverId: string) => number | undefined = () => undefined,
 ): ServerSummary[] {
@@ -27,7 +27,7 @@ export function remoteServerSummaries(
       logoUrl: null,
       role: null,
       active: activeServerId === LOCAL_SERVER_ID,
-      ...(localMemberLimit === null ? {} : { memberLimit: localMemberLimit }),
+      ...localMemberLimit,
       ...(localKeyChangedAt === undefined ? {} : { keyChangedAt: localKeyChangedAt }),
       compatibility: null,
       issue: null,
@@ -50,9 +50,14 @@ export function remoteServerSummaries(
         role: server.role,
         active: activeServerId === server.id,
         ...(server.memberLimit === undefined ? {} : { memberLimit: server.memberLimit }),
+        ...(server.licenseRaisesMemberLimit === undefined
+          ? {}
+          : { licenseRaisesMemberLimit: server.licenseRaisesMemberLimit }),
         ...(server.hosted === undefined ? {} : { hosted: server.hosted }),
         ...(server.restartAvailable === undefined ? {} : { restartAvailable: server.restartAvailable }),
         ...(server.storageGb === undefined ? {} : { storageGb: server.storageGb }),
+        ...(server.paymentRequired ? { paymentRequired: true as const } : {}),
+        ...(server.customPlan ? { customPlan: server.customPlan } : {}),
         ...(changedAt === undefined ? {} : { keyChangedAt: changedAt }),
         ...(isThisComputer(server.id) ? { thisComputer: true as const } : {}),
         compatibility: status.compatibility,

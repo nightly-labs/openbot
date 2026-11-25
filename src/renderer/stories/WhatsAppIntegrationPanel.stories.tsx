@@ -60,8 +60,8 @@ const PERSONAL: WhatsAppAccount = {
   workingMessage: true,
   statusReactions: true,
   allowedSenders: [
-    { id: "447700900456", kind: "contact", name: "Charles Babbage" },
-    { id: "120363000000000001@g.us", kind: "group", name: "Family" },
+    { id: "447700900456", kind: "contact", name: "Charles Babbage", readOnly: false },
+    { id: "120363000000000001@g.us", kind: "group", name: "Family", readOnly: true },
   ],
   pendingRequests: [],
 };
@@ -102,6 +102,7 @@ const args = (connections: MessagingConnection[], accounts: WhatsAppAccount[], l
   ]),
   onAddSender: fn(),
   onRemoveSender: fn(),
+  onSetSenderReadOnly: fn(),
   onAnswerRequest: fn(),
 });
 

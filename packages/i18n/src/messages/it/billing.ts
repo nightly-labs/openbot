@@ -214,4 +214,28 @@ export const messages = {
   "billing.details.vatIdInvalid": "Non è una partita IVA del paese scelto.",
   "billing.details.countryMissing": "Scegli il paese di fatturazione.",
   "billing.details.saveFailed": "Impossibile salvare i dati di fatturazione",
+  "billing.credits.explainer.title": "Cosa sono i crediti?",
+  "billing.credits.explainer.page": "{page} di {total}",
+  "billing.credits.explainer.pages": "Pagine",
+  "billing.credits.explainer.mediaTitle": "I crediti pagano i contenuti multimediali",
+  "billing.credits.explainer.mediaText": "Quando un agente crea un’immagine, un video o una voce, usa crediti.",
+  "billing.credits.explainer.chatTitle": "Le chat restano gratuite",
+  "billing.credits.explainer.chatText":
+    "Le chat usano il tuo provider di IA. Parlare con i tuoi agenti non usa crediti.",
+  "billing.credits.explainer.chatFree": "0 crediti",
+  "billing.credits.explainer.modelsTitle": "Ogni modello ha un prezzo",
+  "billing.credits.explainer.modelsText":
+    "I modelli migliori costano di più. Un’immagine usa {pictureMin}–{pictureMax} crediti, un video da {seconds} s {videoMin}–{videoMax}.",
+  "billing.credits.explainer.perPicture": "/ immagine",
+  "billing.credits.explainer.perClip": "/ video da {seconds} s",
+  "billing.credits.explainer.getTitle": "Ottieni crediti",
+  "billing.credits.explainer.getText":
+    "Acquista un pacchetto quando te ne servono altri. I pacchetti più grandi danno un prezzo migliore per credito.",
+  "billing.credits.explainer.freeEnd": "I crediti gratuiti mensili hanno una data di scadenza",
+  "billing.credits.explainer.welcome": "I nuovi account ricevono {amount} crediti gratuiti per provare alcuni modelli",
+  "billing.credits.welcomeIncluded": "Crediti gratuiti: {amount}",
+  "billing.credits.explainer.allPrices": "Tutti i {count} modelli",
+  "billing.credits.explainer.next": "Avanti",
+  "billing.credits.explainer.gotIt": "Ho capito",
+  "billing.credits.explainer.place": "OpenBot",
 } as const satisfies PartialTranslation<typeof source>;

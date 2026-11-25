@@ -20,6 +20,8 @@ export const messages = {
     "ツールは実行されませんでした。tool_call はこの名前のツールを見つけられませんでした。tool_search が返す正確な完全修飾名（例: openbot_browser.snapshot）を使ってください。",
   "error.agent.toolCallUnknownToolSuggest":
     "ツールは実行されませんでした。tool_call はこの名前のツールを見つけられませんでした。完全修飾名は {name} の可能性があります。その場合は、その名前でもう一度呼び出してください。",
+  "error.agent.toolCallNullValue":
+    "ツールは実行されませんでした。{name} は {paths} にオブジェクトまたはリストを必要としますが、これらのリスト項目はすべて null として届きました。もう一度呼び出し、それぞれの項目をその JSON を含む文字列として渡してください。",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe は {names} という名前の OpenBot ツールを見つけられませんでした。openbot.tool_search が一覧にする OpenBot とブラウザーのツールだけを説明し、MCP ツールは説明しません。",
   "error.agent.toolDescribeDiscoveryNames":
@@ -56,6 +58,12 @@ export const messages = {
   "error.agent.modelUnavailable": "選択したエージェントのモデルを使用できません。",
   "error.agent.modelProviderNotConnected":
     "選択したエージェントのモデル「{model}」を使用できません: {provider} が接続されていません。",
+  "error.agent.modelProviderSignInRequired":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} へのサインインが必要です。{provider} にサインインしてから、もう一度お試しください。",
+  "error.agent.modelProviderNotInstalled":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} がインストールされていません。",
+  "error.agent.modelProviderOutdated":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} の更新が必要です。",
   "error.agent.modelListEmpty":
     "選択したエージェントのモデル「{model}」を使用できません: {provider} はモデルを 1 つも返しませんでした。最後のエラー: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -164,6 +172,8 @@ export const messages = {
     "エージェントの作業中のメッセージの扱いは、エージェントを実行しているコンピューターでのみ設定できます。",
   "error.agent.backupModelsLocalOnly":
     "バックアップモデルは、エージェントを実行しているコンピューターでのみ設定できます。",
+  "error.agent.backupModelsAtLimit":
+    "今は引き継げる予備モデルがありません。どの予備モデルも利用上限に達したか、少し前に失敗しました。同じアカウントのモデルは上限を共有することがあります。今すぐ続けるには、別のプロバイダーまたは別のアカウントの予備モデルを追加するか、上限のリセットを待ってください。",
   "error.agent.taskLimitLocalOnly": "タスクの上限は、エージェントを実行しているコンピューターでのみ設定できます。",
   "error.agent.localScriptsOff": "このエージェントはローカルスクリプトを許可していません。",
   "error.agent.localScriptsRateLimited":
@@ -195,6 +205,8 @@ export const messages = {
     "画面キャプチャは Slack、Discord、Telegram の会話では使えません。ほかの人がそのファイルを受け取るためです。",
   "error.agent.screenCaptureDeclined":
     "ユーザーはこの画面キャプチャを許可しませんでした。何もキャプチャされていません。",
+  "error.agent.creditMediaDeclined": "ユーザーはこの生成を許可しませんでした。クレジットは使われていません。",
+  "error.agent.creditMediaNotSaved": "ファイルは作成されましたが、OpenBot はチャットに保存できませんでした。",
   "error.agent.mcpToolDeclined":
     "ユーザーはこの MCP ツールの呼び出しを許可しませんでした。ツールは実行されていません。",
   "error.agent.screenCaptureWindowMissing":

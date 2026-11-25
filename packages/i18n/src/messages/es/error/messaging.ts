@@ -25,6 +25,7 @@ export const messages = {
   "error.messaging.whatsappTooManySenders": "Un número de WhatsApp puede permitir hasta 200 contactos y grupos.",
   "error.messaging.whatsappNumberNotFound":
     "Este número no tiene cuenta de WhatsApp. Escríbelo con el código de país, como +44 7700 900123.",
+  "error.messaging.whatsappSenderNotFound": "Este contacto o grupo ya no está en la lista.",
   "error.messaging.whatsappRequestEnded":
     "Esta solicitud terminó. Pide a la persona que vuelva a escribir para obtener un código nuevo.",
   "error.messaging.memoryLimit":

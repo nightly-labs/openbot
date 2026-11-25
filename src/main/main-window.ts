@@ -46,6 +46,7 @@ import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
+import { desktopLayoutZoomFactor, onTilingLinuxDesktop, windowMinimumSize } from "./linux-tiling-desktop";
 import { usesX11Windows } from "./linux-wayland-output";
 import { hidePanelFromWindowSwitchers, keepPanelThroughAppHide, preventPanelActivation } from "./mac-panel-activation";
 import {
@@ -140,6 +141,8 @@ export interface MainWindowContext {
 export interface MainWindowController {
   getMainWindow: () => BrowserWindow | null;
   getChatWindows: () => BrowserWindow[];
+  applyInterfaceSize: (zoomFactor: number) => void;
+  chatWindowTarget: (window: BrowserWindow) => ChatWindowTarget | null;
   chatWindowTargets: () => ChatWindowTarget[];
   openChatWindow: (target: ChatWindowTarget) => void;
   openMainWindow: () => BrowserWindow;
@@ -266,19 +269,26 @@ export function createMainWindowController({
       });
   }
 
+  function applyMainWindowZoom(window: BrowserWindow): void {
+    const interfaceSize = getServices()?.interfaceSize;
+    if (!interfaceSize || window.isDestroyed()) return;
+    const zoom = desktopLayoutZoomFactor(window.getContentBounds().width, interfaceSize.zoomFactor);
+    if (window.webContents.getZoomFactor() !== zoom) window.webContents.setZoomFactor(zoom);
+  }
+
   function createWindow(): BrowserWindow {
     const cursor = screen.getCursorScreenPoint();
+    const minimumSize = windowMinimumSize({ minWidth: 960, minHeight: 640 });
     const bounds = resolveMainWindowBounds(
       currentMainWindowBounds(),
       screen.getAllDisplays().map((display) => display.workArea),
       screen.getDisplayNearestPoint(cursor).workArea,
       { width: 1200, height: 820 },
-      { width: 960, height: 640 },
+      { width: minimumSize.minWidth, height: minimumSize.minHeight },
     );
     const window = new BrowserWindow({
       ...bounds,
-      minWidth: 960,
-      minHeight: 640,
+      ...minimumSize,
       show: false,
       ...glassWindowOptions(MAIN_WINDOW_DARK_BACKGROUND),
       title:
@@ -296,6 +306,7 @@ export function createMainWindowController({
         sandbox: true,
         nodeIntegration: false,
         webSecurity: true,
+        backgroundThrottling: !backgroundWindows,
       },
     });
     hideMenuBar(window);
@@ -310,7 +321,8 @@ export function createMainWindowController({
           testClientEnabled: developmentTestClientEnabled,
         })
       ) {
-        window.show();
+        if (backgroundWindows) window.showInactive();
+        else window.show();
       }
     });
     window.on("close", (event) => {
@@ -339,14 +351,15 @@ export function createMainWindowController({
       for (const chat of chatWindows.values()) chat.window.close();
     });
     window.on("move", () => rememberMainWindowBounds(window.getNormalBounds()));
-    window.on("resize", () => rememberMainWindowBounds(window.getNormalBounds()));
+    window.on("resize", () => {
+      rememberMainWindowBounds(window.getNormalBounds());
+      applyMainWindowZoom(window);
+    });
 
+    if (onTilingLinuxDesktop) window.webContents.setZoomMode("isolated");
     window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     window.webContents.on("did-navigate", onRendererLoadStarted);
-    window.webContents.on("did-navigate", () => {
-      const interfaceSize = getServices()?.interfaceSize;
-      if (interfaceSize) window.webContents.setZoomFactor(interfaceSize.zoomFactor);
-    });
+    window.webContents.on("did-navigate", () => applyMainWindowZoom(window));
     window.webContents.on("render-process-gone", onRendererGone);
     window.webContents.once("destroyed", onRendererGone);
     window.webContents.on("render-process-gone", (_event, details) => {
@@ -410,8 +423,7 @@ export function createMainWindowController({
     const window = new BrowserWindow({
       width: 560,
       height: 760,
-      minWidth: 380,
-      minHeight: 480,
+      ...windowMinimumSize({ minWidth: 380, minHeight: 480 }),
       show: false,
       ...glassWindowOptions(MAIN_WINDOW_DARK_BACKGROUND),
       title: getTranslate()("window.localHostTitle"),
@@ -499,6 +511,13 @@ export function createMainWindowController({
     getMainWindow: () => holder.current,
     getChatWindows: () =>
       [...chatWindows.values()].map((chat) => chat.window).filter((window) => !window.isDestroyed()),
+    applyInterfaceSize: (zoomFactor: number) => {
+      if (holder.current) applyMainWindowZoom(holder.current);
+      for (const chat of chatWindows.values())
+        if (!chat.window.isDestroyed()) chat.window.webContents.setZoomFactor(zoomFactor);
+    },
+    chatWindowTarget: (window: BrowserWindow) =>
+      [...chatWindows.values()].find((chat) => chat.window === window)?.target ?? null,
     chatWindowTargets,
     openChatWindow,
     openMainWindow,
@@ -900,6 +919,15 @@ export function sendComputerUseHighlightPlacement(
 }
 
 let windowsKeptHidden = false;
+let backgroundWindows = false;
+
+export function openWindowsInBackground(): void {
+  backgroundWindows = true;
+}
+
+export function windowsOpenInBackground(): boolean {
+  return backgroundWindows;
+}
 
 export function keepWindowsHidden(): void {
   windowsKeptHidden = true;
@@ -935,6 +963,13 @@ export function loadDynamicIslandRenderer(window: BrowserWindow, display: Displa
     url.searchParams.set("notch-height", String(notch.height));
   }
   return window.loadURL(url.toString());
+}
+
+function closeFocusedDevTools(): void {
+  webContents
+    .getAllWebContents()
+    .find((contents) => !contents.isDestroyed() && contents.isDevToolsFocused())
+    ?.closeDevTools();
 }
 
 function zoomFocusedContents(interfaceSize: InterfaceSizeService, step: InterfaceSizeStep): void {
@@ -1055,6 +1090,12 @@ export function configureApplicationMenu(
           { role: "reload" },
           { role: "forceReload" },
           { role: "toggleDevTools" },
+          {
+            label: translate("menu.closeDeveloperTools"),
+            accelerator: "F12",
+            visible: false,
+            click: closeFocusedDevTools,
+          },
           { type: "separator" },
           {
             label: translate("menu.actualSize"),

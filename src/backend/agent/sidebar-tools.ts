@@ -18,6 +18,14 @@ export const assignAgentSectionToolSchema = z
   })
   .strict();
 
+export const SIDEBAR_TOOL_NAMES: ReadonlySet<string> = new Set([
+  "list_sections",
+  "create_section",
+  "rename_section",
+  "delete_section",
+  "assign_agent_section",
+]);
+
 export type AgentSidebar = Pick<SidebarLayoutStore, "getSnapshot" | "mutate" | "withProfileAssignment" | "removeAgent">;
 
 export const handleSidebarTool = Effect.fn("SidebarTools.handle")(function* (
@@ -54,6 +62,11 @@ export const handleSidebarTool = Effect.fn("SidebarTools.handle")(function* (
       return null;
   }
   if (!sidebar) return yield* new ToolOperationFailed({ cause: new Error("Sidebar sections are unavailable.") });
+  const targetSectionId = action && "sectionId" in action ? action.sectionId : null;
+  if (targetSectionId !== null && !sidebar.getSnapshot().sections.some((section) => section.id === targetSectionId))
+    return openBotToolFailure(
+      `Unknown sidebar section "${targetSectionId}". Use a sectionId from openbot.list_sections, not a section name.`,
+    );
   const layout = action
     ? yield* sidebar.mutate(action, new Set([...agentIds(), ...channelIds()])).pipe(toToolOperationFailed)
     : sidebar.getSnapshot();

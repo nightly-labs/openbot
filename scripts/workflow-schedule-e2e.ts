@@ -379,6 +379,63 @@ try {
   );
   report.triggerOutputs = [quarterOutput ?? "", manualOutput ?? ""];
 
+  const held = await runCauseEffect(app.workflows.create({ title: "Paused copy", paused: true }));
+  check("a workflow can be made paused", held.summary.paused === true, held.summary);
+  assert.ok(
+    (
+      await runCauseEffect(
+        app.workflows.saveGraph({
+          workflowId: held.summary.id,
+          baseRevision: held.revision,
+          graph: graphOf(EVERY_15, "notify"),
+        }),
+      )
+    ).ok,
+  );
+  check(
+    "a save keeps the workflow paused",
+    (await runCauseEffect(app.workflows.get(held.summary.id))).summary.paused === true,
+  );
+  check(
+    "the list shows the paused workflow",
+    (await runCauseEffect(app.workflows.list())).some((entry) => entry.id === held.summary.id && entry.paused === true),
+  );
+  check("a paused schedule keeps its plan", (await app.nextDueAt(held.summary.id)) === "2026-10-24T12:45:00.000Z");
+  clock = new Date("2026-10-24T12:45:00.000Z");
+  await app.fire();
+  check("a paused schedule starts no run", (await app.runsOf(held.summary.id)).length === 0);
+  check(
+    "a paused schedule moves past the skipped occurrence",
+    (await app.nextDueAt(held.summary.id)) === "2026-10-24T13:00:00.000Z",
+  );
+  const heldManual = await runCauseEffect(
+    app.workflows.startRun({ workflowId: held.summary.id, requestId: "manual-paused" }),
+  );
+  await runCauseEffect(app.workflows.sweep());
+  check(
+    "a paused workflow still runs by hand",
+    (await app.runsOf(held.summary.id)).some((run) => run.id === heldManual.run.id && run.status === "done"),
+  );
+  const resumed = await runCauseEffect(app.workflows.setPaused({ workflowId: held.summary.id, paused: false }));
+  check("resume clears the paused state", resumed.paused === undefined, resumed);
+  clock = new Date("2026-10-24T13:00:00.000Z");
+  await app.fire();
+  const heldRuns = await app.runsOf(held.summary.id);
+  check(
+    "a resumed schedule starts the next occurrence and not the skipped one",
+    heldRuns.length === 2 &&
+      heldRuns[0]?.source === "schedule" &&
+      heldRuns[0].scheduledFor === "2026-10-24T13:00:00.000Z",
+    heldRuns,
+  );
+  const repaused = await runCauseEffect(app.workflows.setPaused({ workflowId: held.summary.id, paused: true }));
+  check("pause sets the paused state", repaused.paused === true, repaused);
+  const missingPause = await runCauseEffect(app.workflows.setPaused({ workflowId: "missing", paused: true })).then(
+    () => null,
+    (error: unknown) => (error instanceof Error ? error.message : String(error)),
+  );
+  check("pause of a missing workflow fails", missingPause !== null, missingPause);
+
   report.runs = [];
   for (const [workflow, id] of [
     ["quarter", quarterId],

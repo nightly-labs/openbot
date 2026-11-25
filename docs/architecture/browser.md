@@ -116,6 +116,14 @@ the extension list for a host without it.
 `browser-tools.ts` defines provider schemas and parses each call into a typed tool and its arguments.
 `browser-tool-actions.ts` maps input tools to CDP operations. It does not own tabs or import the host.
 `BrowserHost` owns tab access checks, operation queues, focus, deadlines, and persistent browser state.
+The main chat and each side thread of an agent can use the tabs that the main chat, a side thread
+of that agent, or no chat opened. `list_tabs` and `status` give each tab its `chat` (`this chat`,
+`main chat`, a side thread with its title and `taskId`, `another conversation`, or `none`). They
+set `otherChatWorking` when another chat has a browser call on the tab or used it in the last 2
+minutes. It is a hint to the agent, not a lock. A channel or messaging thread uses only its own
+tabs, and its tabs stay out of the other chats. Any chat also uses the tabs that a person tags
+with @ in it (`sharedThreadIds`).
+`request_takeover`, `submit_secret` and `list_logins` use the same check (`toolCanUseTab`).
 Targeted typing checks that the target still holds focus before the End key, the text, and the
 Enter key. A page focus or input handler that moves focus stops it with an error that says if the
 text is already in the field. The check also reads each frame element that holds the target,
@@ -127,7 +135,13 @@ tokens. They keep the installed Chromium major version and host platform, and gi
 parts as `0.0.0` (`Chrome/156.0.0.0`), as Chrome does: some bot checks refuse the full version that
 Electron sends. The `Accept-Language` header adds the base language of each regional language
 (`en-GB,en;q=0.9`), also as Chrome does. The session sets it, not the request hook, so a value that
-a page sets on its own request stays: a site can sign that header. Requests to `accounts.google.com`
+a page sets on its own request stays: a site can sign that header. The header leaves out a system
+language that is not a valid language tag. On Linux, Electron gives `c` for the `C.UTF-8` locale and
+`posix` for `POSIX`, and adds them to `navigator.languages` of each page, where `Intl` throws on them.
+When the system list has such a value, the main process sets `LANGUAGE` at `ready`, before the
+first window, to the valid languages of the list, or to the app locale (`en_US`) when none is valid.
+A `C.UTF-8` server then gives pages `["en-US","en"]`. A list with only valid languages stays as it
+is. Child processes inherit the new `LANGUAGE`. Requests to `accounts.google.com`
 keep the `Electron/` token because Google rejects the account identifier step without it. This
 exception does not change the page identity or the identity sent to other sites.
 Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and
@@ -445,10 +459,11 @@ task takes fewer turns.
 
 `run_script` takes JavaScript that awaits helpers named after the action tools (`navigate`, `click`,
 `type`, `press`, `hover`, `scroll`, `selectOption`, `setChecked`, `waitFor`, `evaluate`, and
-`snapshot`), or `step({ action, ...fields })` with the fields of that tool and no `tabId`. Each
-helper sends one step to the host. The script returns a JSON value of at most 64 KB. An `evaluate`
-step gives its value to the script, not to the model, so it can return up to 1 MB, such as the whole
-text of a page.
+`snapshot`), or `step({ action, ...fields })` with the fields of that tool and no `tabId`. `action`
+is the name of a helper in snake_case, such as `select_option`, or `sleep`. Other tools, such as
+`screenshot`, do not work in a script. Each helper sends one step to the host. The script returns
+a JSON value of at most 64 KB. An `evaluate` step gives its value to the script, not to the model,
+so it can return up to 1 MB, such as the whole text of a page.
 
 An earlier `run_steps` tool took a fixed list of steps. A benchmark with Claude Haiku 5.5 on 10 public
 site tasks (3 repeats) gave `run_script` 118k median input tokens and 30 of 30 correct answers, and
@@ -616,9 +631,10 @@ refusal in `AgentService` stays beside it rather than being folded in: it also c
 | Turn succeeds | Stay open unless the agent called `close_tab`. |
 | Cancelled, interrupted, or failed | Stay open. Completion clears the control session only. |
 | Retry | Same thread and agent, so the same tabs are still reachable. |
-| Restart | Restored from the browser's own state file. |
+| Restart | Restored from the browser's own state file. A tab loads its page only when a person shows it or an agent uses it, the selected tab too. |
+| Not shown and idle 2 min | Stays open and loaded, but its page is frozen with `Page.setWebLifecycleState`: timers, animation and scripts stop. The next use (agent call, preview, live view, takeover or recording) makes it active again first. A tab with an open dialog or a pending restore is not frozen. |
 | Idle 15 min (5 min when memory is low) | Stays open, but its page unloads and its renderer process ends. The next use loads the page again. |
-| More than 3 idle tabs loaded | The least recently used ones beyond 3 sleep as above once they are idle for 2 min. A tab in use (shown, busy, held, recording, playing audio, or with a secret) does not count. |
+| More than 3 idle tabs loaded | The least recently used ones beyond 3 sleep as above once they are idle for 2 min. A tab in use (shown to a person, busy, held, recording, playing audio, or with a secret) does not count. |
 | Agent deleted | That agent's tabs are closed, including a legacy tab holding only its thread id. Its own browser session is cleared. |
 | Browser profile changed | That agent's tabs are closed. Its next tab opens in the profile it chose. Both profiles keep their data. |
 | Profile cleared or deleted | Every tab in that profile is closed, then its data is cleared. |
@@ -643,9 +659,14 @@ again, because a reload could send a form again or lose the work of the person.
 
 ### Page dialogs
 
-A page `alert` or `confirm` that an agent action opens goes to that agent; every other dialog stays in
-Electron's native box for a person. `runTabAction` watches for a dialog only while the agent's own
-input action runs (`BrowserDialogTurn` names the thread and turn), and until the page settles after it.
+A page `alert` or `confirm` that an agent action opens goes to that agent. An `alert` that the page
+opens by itself in a tab that an agent runs (not a person's tab, a takeover, person control or a
+sign-in) gets OK at once, and its redacted text goes to the agent as a `console` warning in the next
+snapshot. An alert in the 5 s after a person presses the mouse or a key in the tab stays for the
+person: the engine counts that input only while no agent command holds the debugger, because CDP
+input also fires `before-mouse-event`. Electron shows that box on the main window, so it would block the whole app. Every other
+dialog stays in Electron's native box for a person. `runTabAction` watches for a dialog only while
+the agent's own input action runs (`BrowserDialogTurn` names the thread and turn), and until the page settles after it.
 The engine then sends `Page.enable` on its own debugger and keeps the debugger attached while a watch
 runs, so it also sees a dialog that a page load or a timer opens with no command in flight. A tab
 queue drain ends the watch. `Page.javascriptDialogOpening` ends the action with the dialog:
@@ -658,18 +679,22 @@ Electron shows its own box for the same dialog, after the CDP event. After the C
 emits Electron's internal `-cancel-dialogs` on the tab, which aborts the box without its callback. The
 agent gets a dialog only when the engine owns the debugger and Electron has a `-cancel-dialogs`
 listener. Otherwise, for example under an external debugger, the result says that a person must answer.
+For a page's own `alert` with no watch, the engine calls the reply callback of Electron's internal
+`-run-dialog` event with OK, then emits `-cancel-dialogs`, so it needs no debugger.
 `scripts/browser-dialogs-e2e.ts` fails if an Electron upgrade changes these internal events.
 
 | Event | Dialog |
 | --- | --- |
-| Person's click, or a tool that is not an input action | Native box. The agent is not told. |
+| Page's own `alert` in an agent tab, with no agent action and no person input in the last 5 s | OK at once. The agent gets the text in its next snapshot. |
+| Person's click, or a `confirm` from a tool that is not an input action, or any dialog in a person's tab | Native box. The agent is not told. |
 | Turn ends | Handed off: the box stays for a person, and the agent can no longer answer it. |
 | Person answers first | `handle_dialog` fails with "This dialog is closed". |
 | Tab closed or browser destroyed | The engine detaches its debugger, so the tab queue drains. Then it cancels every box of the tab, a person's box too, also a box that shows after the close: Electron keeps a box open after its page closes. |
 | `prompt()` or `beforeunload` | Electron answers `prompt` with no box, and `will-prevent-unload` handles `beforeunload`. Not intercepted. |
 
-The agent never gets a dialog that an `evaluate`, `wait_for`, or `fill_fields` call opens, or one in a
-cross-origin frame: those dialogs stay native.
+The agent never gets a dialog id for a dialog that an `evaluate`, `wait_for`, or `fill_fields` call opens,
+or one in a cross-origin frame. A `confirm` there stays native. An `alert` there in an agent tab gets
+OK at once, as above, and the agent gets its text in the next snapshot.
 
 A member on a remote server cannot see the host's tab, because the tab is a native view on the host's
 own screen. `browser-view-gateway.ts` answers that with a session and a websocket: `BrowserHost`

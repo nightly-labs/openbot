@@ -17,8 +17,8 @@ description: "Compare products or vendors against criteria chosen from the decis
    `ask_user`: "What decision does this comparison feed?"
 2. **The options.** 2 to 6 products. If the user names none, propose up to 4 from a search and ask them to confirm.
 3. **Tool path.** Call `openbot_browser.list_tabs`, then use a new tab. Read each vendor's product pages, pricing
-   page, documentation, changelog and status or limits pages. Search the `openbot` namespace with `tool_search`
-   for an installed plugin that holds the user's notes (Notion, Airtable).
+   page, documentation, changelog and status or limits pages. Use the tools of an installed plugin that
+   holds the user's notes (Notion, Airtable); `openbot.tool_search` does not list them.
 4. **Paste path.** Trial notes, sales calls, spreadsheets or screenshots that the user gives.
 
 ## Steps

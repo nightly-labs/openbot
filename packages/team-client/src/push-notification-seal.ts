@@ -8,7 +8,7 @@ export interface PushNotificationKeys {
   tag: Uint8Array;
 }
 
-export type PushNotificationKind = "reply" | "failed" | "input" | "approval" | "browser";
+export type PushNotificationKind = "reply" | "failed" | "input" | "approval" | "browser" | "sign-in" | "workflow";
 
 export interface PushNotificationContent {
   serverId: string;

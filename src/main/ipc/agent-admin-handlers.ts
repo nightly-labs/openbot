@@ -8,6 +8,7 @@ import {
   decodeAgentAdminSettings,
   decodeAgentBackupModelSettings,
   decodeAgentBrowserProfile,
+  decodeAgentBuiltinMemorySettings,
   decodeAgentDefaultsOverview,
   decodeAgentPlanCardSettings,
   decodeAgentSpeedSettings,
@@ -32,6 +33,7 @@ import {
   parseUpdateAgentAdminSettingsInput,
   parseUpdateAgentBackupModelsInput,
   parseUpdateAgentBrowserProfileInput,
+  parseUpdateAgentBuiltinMemoryInput,
   parseUpdateAgentDefaultsInput,
   parseUpdateAgentFastModeInput,
   parseUpdateAgentHostSettingsInput,
@@ -45,6 +47,10 @@ import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import {
+  AGENT_BUILTIN_MEMORY_CAPABILITY,
+  AGENT_BUILTIN_MEMORY_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
 import { AGENT_DEFAULTS_CAPABILITY, AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
@@ -209,6 +215,14 @@ export function agentAdminIpcHandlers({
       updateAgentPlanCard: scopedHandler(parseUpdateAgentPlanCardInput, {
         local: (input) => runCauseEffect(hostSettings.updatePlanCard(input)),
         remote: (input, serverId) => remotePlanCard(serverId, AGENT_PLAN_CARD_ROUTES.update, input),
+      }),
+      getAgentBuiltinMemory: scopedHandler((value) => requireString(value, "agentId"), {
+        local: (agentId) => hostSettings.readBuiltinMemory(agentId),
+        remote: (agentId, serverId) => remoteBuiltinMemory(serverId, AGENT_BUILTIN_MEMORY_ROUTES.settings, { agentId }),
+      }),
+      updateAgentBuiltinMemory: scopedHandler(parseUpdateAgentBuiltinMemoryInput, {
+        local: (input) => runCauseEffect(hostSettings.updateBuiltinMemory(input)),
+        remote: (input, serverId) => remoteBuiltinMemory(serverId, AGENT_BUILTIN_MEMORY_ROUTES.update, input),
       }),
       getAgentFastMode: scopedHandler((value) => requireString(value, "agentId"), {
         local: (agentId) => hostSettings.readFastMode(agentId),
@@ -422,6 +436,14 @@ export function agentAdminIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, AGENT_PLAN_CARD_CAPABILITY))
       throw new Error(sourceText("error.team.agentSettingsUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, path, decodeAgentPlanCardSettings, { method: "POST", body }));
+  }
+
+  function remoteBuiltinMemory(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, AGENT_BUILTIN_MEMORY_CAPABILITY))
+      throw new Error(sourceText("error.team.agentSettingsUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, path, decodeAgentBuiltinMemorySettings, { method: "POST", body }),
+    );
   }
 
   function remoteNewChat(serverId: string, path: string, body: unknown) {

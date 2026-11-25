@@ -10,6 +10,7 @@ import type {
   AgentColors,
   AgentEvent,
   AgentNotificationLevelsSnapshot,
+  AgentRuntimePrompt,
   AgentStatus,
   AgentWaitsSnapshot,
   AttachmentSummary,
@@ -31,21 +32,24 @@ import type {
   ConversationReadState,
   ConversationSearchPage,
   CreateAgentInput,
+  CreditsHold,
   DuplicateAgentResult,
   EditQueuedMessageInput,
   HiddenAgentsSnapshot,
   InvitePreview,
   LocalBrowserSecretResponse,
+  MediaApprovalRead,
   PinnedMessagesSnapshot,
   ProviderModelSourceEntry,
   QueueSnapshot,
+  ReadMediaApprovalInput,
   ReadPendingApprovalInput,
   ReorderQueueInput,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
+  RespondToCreditsHoldInput,
+  RespondToMediaApprovalInput,
   RespondToPromptInput,
-  Routine,
-  RoutineRun,
   ServerNotificationLevel,
   SetAgentHiddenInput,
   SetAgentNotificationLevelInput,
@@ -60,10 +64,8 @@ import type {
   TeamInviteSummary,
   TeamMemberSummary,
   TeamRealtimeEvent,
-  TestRoutineInput,
   UpdateAgentInput,
   UpdateQueuedMessageInput,
-  UpdateRoutineInput,
   WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import {
@@ -72,6 +74,7 @@ import {
   decodeAgentFastModels,
   decodeAgentModelListings,
   decodeAgentSteeringModels,
+  decodeCreditsAskMuted,
   decodeProviderModelSources,
   decodeUsageCredits,
   decodeWorkspaceDirectory,
@@ -88,6 +91,7 @@ import {
   isSidebarLayoutSnapshot,
   isTeamPresenceSnapshot,
   withFastServiceTiers,
+  withKeptModels,
   withModelListings,
   withModelSources,
   withSteeringModels,
@@ -97,7 +101,7 @@ import {
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import type { AcceptedOwnerTransfer, OwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { TEAM_API_ROUTES, WORKSPACE_FILE_EXACT_PATH_QUERY } from "@openbot/contracts/team-api-routes";
 import {
   AGENT_ACTIVE_QUEUES_ROUTES,
   type AgentActiveQueues,
@@ -144,6 +148,7 @@ import {
   decodeBrowserViewInputValue,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY,
   TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
@@ -168,6 +173,12 @@ import {
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY, TEAM_WEB_CLIENT_PROTOCOL } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
+import {
+  decodeCreditsHoldResponse,
+  decodeMediaApprovalReadResponse,
+  MEDIA_APPROVAL_CHOICE_CAPABILITY,
+  MEDIA_APPROVAL_CHOICE_ROUTES,
+} from "@openbot/contracts/team-protocol/media-approval-choice-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
   decodeMessagePinsResponse,
@@ -175,6 +186,10 @@ import {
   MESSAGE_PINS_ROUTES,
 } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
+import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -184,16 +199,16 @@ import {
   PENDING_APPROVAL_CAPABILITY,
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
+import {
+  decodePendingPromptsResponse,
+  PENDING_PROMPTS_CAPABILITY,
+  PENDING_PROMPTS_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-prompts-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import {
   PROVIDER_MODEL_SOURCE_CAPABILITY,
   PROVIDER_MODEL_SOURCE_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-model-source-v1";
-import {
-  ROUTINE_FLOW_STOP_CAPABILITY,
-  ROUTINE_FLOW_STOP_ROUTES,
-} from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
-import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import {
   decodeServerSafeModeReason,
@@ -266,10 +281,7 @@ import {
   steerQueuedMessage,
   type TeamApiRequest,
   type TeamChannelsApi,
-  type TeamRoutineFlowsApi,
-  teamAgentRoutinesApi,
   teamChannelsApi,
-  teamRoutineFlowsApi,
   updateQueuedMessage,
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
@@ -361,6 +373,7 @@ export interface WebWorkspaceRuntime {
   listHosts(): Promise<RemoteTeamHost[]>;
   leaveHost(hostId: string, membershipId: string): Promise<void>;
   removeOwnedHost?: (hostId: string) => Promise<void>;
+  setHostHidden?: (hostId: string, hidden: boolean) => Promise<void>;
   ownerTransfers?: WebOwnerTransfers;
   previewInvite(url: string): Promise<InvitePreview>;
   acceptInvite(url: string): Promise<RemoteTeamHost>;
@@ -382,6 +395,12 @@ export interface WebWorkspaceRuntime {
   setMessagePinned?: (input: SetMessagePinnedInput) => Promise<PinnedMessagesSnapshot>;
   cancelWait?: (agentId: string, waitId: string) => Promise<void>;
   readPendingApproval?: (input: ReadPendingApprovalInput) => Promise<AgentApproval | null>;
+  readMediaApproval?: (input: ReadMediaApprovalInput) => Promise<MediaApprovalRead>;
+  respondToMediaApproval?: (input: RespondToMediaApprovalInput) => Promise<void>;
+  respondToCreditsHold?: (input: RespondToCreditsHoldInput) => Promise<CreditsHold | null>;
+  setCreditsAskMuted?: (input: { muted: boolean }) => Promise<void>;
+  readCreditsAskMuted?: () => Promise<{ muted: boolean }>;
+  listPendingPrompts?: () => Promise<AgentRuntimePrompt[]>;
   focusUse(): Promise<void>;
   send(
     agentId: string,
@@ -407,11 +426,8 @@ export interface WebWorkspaceRuntime {
   download(attachmentId: string): Promise<WebFile>;
   downloadPreview(attachmentId: string): Promise<WebFile>;
   sharedFile(path: string): Promise<WebFile>;
-  workspaceFile(agentId: string, path: string): Promise<WebFile>;
+  workspaceFile(agentId: string, path: string, options?: { exactPath?: boolean }): Promise<WebFile>;
   workspaceDirectory(agentId: string, path: string): Promise<WorkspaceDirectory>;
-  routineFlows?: TeamRoutineFlowsApi;
-  updateRoutine?: (input: UpdateRoutineInput) => Promise<Routine>;
-  testRoutine?: (input: TestRoutineInput) => Promise<RoutineRun>;
   listHiddenAgents?: () => Promise<HiddenAgentsSnapshot>;
   setAgentHidden?: (input: SetAgentHiddenInput) => Promise<HiddenAgentsSnapshot>;
   listAgentColors?: () => Promise<AgentColors>;
@@ -458,6 +474,7 @@ export interface WebRuntimeEvents {
   accessDenied?(hostId: string, error: WebHostConnectionError): void;
   event(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
   accountChanged(): Promise<void>;
+  serversChanged?(): Promise<void>;
   hostState?(hostId: string, state: WebHostState): void;
   hostSessionRevoked?(): void;
   hostTaken?(hostId: string): void;
@@ -612,6 +629,7 @@ export function createWebWorkspaceRuntime(
     onHostStreamData: (data) => browserView.receive(data),
     onTeamEvent: async (id, event) => events.event(id, event),
     onAccountProfileChanged: events.accountChanged,
+    onAccountServersChanged: async () => events.serversChanged?.(),
   };
   const hostProtocols = {
     get: (id: string) => savedHostProtocol(accountId, id),
@@ -971,20 +989,6 @@ export function createWebWorkspaceRuntime(
       });
     return listed;
   }
-  async function routineFlowsRequest<T>(
-    method: string,
-    path: string,
-    decode: (value: unknown) => T,
-    body?: TeamProtocolV2Json,
-  ): Promise<T> {
-    if (!capabilities.includes(ROUTINE_FLOWS_CAPABILITY))
-      throw new Error(currentText().t("error.team.routineFlowsUnsupported"));
-    if (path === ROUTINE_FLOW_STOP_ROUTES.stopRun && !capabilities.includes(ROUTINE_FLOW_STOP_CAPABILITY))
-      throw new Error(currentText().t("error.team.routineFlowStopUnsupported"));
-    return teamApi(method, path, decode, body);
-  }
-  const routineFlows = teamRoutineFlowsApi(routineFlowsRequest);
-  const agentRoutines = teamAgentRoutinesApi(teamApi, undefined, routinesOnce);
   const browserView = createRemoteBrowserView(
     (data) => peer.sendHostStreamData(data),
     request,
@@ -995,6 +999,9 @@ export function createWebWorkspaceRuntime(
       contextMenu: false,
       viewport: null,
       pageCopy: capabilities.includes(TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY),
+      frameSize: capabilities.includes(TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY)
+        ? { width: window.innerWidth * window.devicePixelRatio, height: window.innerHeight * window.devicePixelRatio }
+        : null,
     }),
   );
   let liveView: RemoteBrowserView | null = null;
@@ -1302,6 +1309,7 @@ export function createWebWorkspaceRuntime(
       Effect.runPromise(respondToBrowserTakeover(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     listHosts: () => runTeamEffect(directory.listHosts()),
     leaveHost: (hostId, membershipId) => runTeamEffect(directory.leaveHost(hostId, membershipId)),
+    setHostHidden: (hostId, hidden) => runTeamEffect(directory.setHostHidden(hostId, hidden)),
     ownerTransfers: {
       pending: (hostId) => runTeamEffect(directory.pendingOwnerTransfer(hostId)),
       start: (hostId, email) => runTeamEffect(directory.startOwnerTransfer(hostId, email)),
@@ -1450,6 +1458,34 @@ export function createWebWorkspaceRuntime(
       if (!capabilities.includes(PENDING_APPROVAL_CAPABILITY)) return null;
       return decodePendingApprovalResponse(await request("POST", PENDING_APPROVAL_ROUTES.read, { ...input }));
     },
+    async readMediaApproval(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY)) return { media: null, hold: null };
+      return decodeMediaApprovalReadResponse(await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.read, { ...input }));
+    },
+    async respondToMediaApproval(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.respond, { ...input, choice: { ...input.choice } });
+    },
+    async respondToCreditsHold(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      return decodeCreditsHoldResponse(await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.hold, { ...input }));
+    },
+    async setCreditsAskMuted(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.muted, { muted: input.muted });
+    },
+    async readCreditsAskMuted() {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      return decodeCreditsAskMuted(await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.mutedRead, {}));
+    },
+    async listPendingPrompts() {
+      if (!capabilities.includes(PENDING_PROMPTS_CAPABILITY)) return [];
+      return decodePendingPromptsResponse(await request("POST", PENDING_PROMPTS_ROUTES.list, {}));
+    },
     async cancelWait(agentId, waitId) {
       if (!capabilities.includes(AGENT_WAITS_CAPABILITY))
         throw new Error(currentText().t("error.team.agentWaitsUnsupported"));
@@ -1593,8 +1629,9 @@ export function createWebWorkspaceRuntime(
         await request("GET", `${TEAM_API_ROUTES.sharedFiles}?${query}`, {}, undefined, WEB_FILE_DOWNLOAD),
       );
     },
-    async workspaceFile(agentId, path) {
+    async workspaceFile(agentId, path, options) {
       const query = new URLSearchParams({ botId: agentId, path });
+      if (options?.exactPath) query.set(WORKSPACE_FILE_EXACT_PATH_QUERY, "1");
       return decodeWebFile(
         await request("GET", `${TEAM_API_ROUTES.workspaceFiles}?${query}`, {}, undefined, WEB_FILE_DOWNLOAD),
       );
@@ -1604,9 +1641,6 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("error.team.workspaceDirectoryUnsupported"));
       return decodeWorkspaceDirectory(await request("POST", WORKSPACE_DIRECTORY_ROUTES.list, { agentId, path }));
     },
-    routineFlows,
-    updateRoutine: agentRoutines.updateRoutine,
-    testRoutine: agentRoutines.testRoutine,
     listHiddenAgents: () => runTeamEffect(listHiddenAgents(teamApi).pipe(Effect.mapError((error) => error.cause))),
     setAgentHidden: (input) =>
       runTeamEffect(setAgentHidden(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
@@ -1669,7 +1703,7 @@ export function createWebWorkspaceRuntime(
         isClientAgentModelOption,
         "models",
       )(await request("GET", TEAM_API_ROUTES.agents.models));
-      const [fast, listings, steering] = await Promise.all([
+      const [fast, listings, steering, kept] = await Promise.all([
         capabilities.includes(AGENT_SPEED_CAPABILITY)
           ? request("POST", AGENT_SPEED_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
           : capabilities.includes(AGENT_FAST_MODE_CAPABILITY)
@@ -1681,9 +1715,15 @@ export function createWebWorkspaceRuntime(
         capabilities.includes(MODEL_STEERING_CAPABILITY)
           ? request("POST", MODEL_STEERING_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
           : [],
+        capabilities.includes(MODEL_VISIBILITY_KEPT_CAPABILITY)
+          ? request("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
+          : [],
       ]);
       return withWorkspaceOnlyLimit(
-        withSteeringModels(withModelListings(withFastServiceTiers(models, fast), listings), steering),
+        withSteeringModels(
+          withKeptModels(withModelListings(withFastServiceTiers(models, fast), listings), kept),
+          steering,
+        ),
         capabilities.includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
       );
     },

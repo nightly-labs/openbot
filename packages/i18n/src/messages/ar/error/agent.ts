@@ -19,6 +19,8 @@ export const messages = {
     "لم تعمل الأداة. لم يجد tool_call أداة بهذا الاسم. استخدم الاسم المؤهل الدقيق الذي يعطيه tool_search، مثل openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "لم تعمل الأداة. لم يجد tool_call أداة بهذا الاسم. قد يكون الاسم المؤهل {name}. إذا كان كذلك، فأرسل الاستدعاء مرة أخرى بهذا الاسم.",
+  "error.agent.toolCallNullValue":
+    "لم تعمل الأداة. تحتاج {name} إلى كائن أو قائمة في {paths}، لكن كل عنصر من عناصر القائمة هذه وصل بقيمة null. أرسل الاستدعاء مرة أخرى وأعطِ كل عنصر منها كنص يحتوي على JSON الخاص به.",
   "error.agent.toolDescribeUnknownNames":
     "لم يعثر tool_describe على أداة OpenBot باسم {names}. يصف فقط أدوات OpenBot والمتصفح التي يسردها openbot.tool_search، وليس أدوات MCP.",
   "error.agent.toolDescribeDiscoveryNames": "استدعِ {names} مباشرةً. لا يصف tool_describe أدوات البحث.",
@@ -48,6 +50,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "فشل إعداد الوكيل وتعذّرت إزالة الوكيل غير المكتمل.",
   "error.agent.modelUnavailable": "نموذج الوكيل المحدد غير متاح.",
   "error.agent.modelProviderNotConnected": "نموذج الوكيل المحدد «{model}» غير متاح: {provider} غير متصل.",
+  "error.agent.modelProviderSignInRequired":
+    "نموذج الوكيل المحدد «{model}» غير متاح: {provider} يحتاج إلى تسجيل الدخول. سجّل الدخول إلى {provider} ثم حاول مرة أخرى.",
+  "error.agent.modelProviderNotInstalled": "نموذج الوكيل المحدد «{model}» غير متاح: {provider} غير مثبّت.",
+  "error.agent.modelProviderOutdated": "نموذج الوكيل المحدد «{model}» غير متاح: {provider} يحتاج إلى تحديث.",
   "error.agent.modelListEmpty":
     "نموذج الوكيل المحدد «{model}» غير متاح: لم يُدرج {provider} أي نماذج. آخر خطأ: {detail}",
   "error.agent.modelListEmptyNoError": "نموذج الوكيل المحدد «{model}» غير متاح: لم يُدرج {provider} أي نماذج.",
@@ -139,6 +145,8 @@ export const messages = {
   "error.agent.busyMessageModeLocalOnly":
     "لا يمكن تحديد ما تفعله الرسائل أثناء عمل الوكيل إلا على الحاسوب الذي يشغّل الوكيل.",
   "error.agent.backupModelsLocalOnly": "لا يمكن تعيين النماذج الاحتياطية إلا على الحاسوب الذي يشغّل الوكيل.",
+  "error.agent.backupModelsAtLimit":
+    "لا يمكن لأي نموذج احتياطي أن يتولى العمل الآن: كل نموذج بلغ حد الاستخدام أو فشل قبل قليل. قد تتشارك نماذج الحساب الواحد حدًا واحدًا. للمتابعة الآن، أضف نموذجًا احتياطيًا من مزوّد آخر أو حساب آخر، أو انتظر إعادة تعيين الحد.",
   "error.agent.taskLimitLocalOnly": "لا يمكن تعيين حد المهام إلا على الحاسوب الذي يشغّل الوكيل.",
   "error.agent.localScriptsOff": "لا يسمح هذا الوكيل بالسكربتات المحلية.",
   "error.agent.localScriptsRateLimited":
@@ -168,6 +176,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "لا يعمل التقاط الشاشة في محادثة Slack أو Discord أو Telegram، لأن أشخاصًا آخرين يتلقون ملفاته.",
   "error.agent.screenCaptureDeclined": "لم يسمح المستخدم بالتقاط الشاشة هذا. لم يُلتقط شيء.",
+  "error.agent.creditMediaDeclined": "لم يسمح المستخدم بعملية الإنشاء هذه. لم يُنفق أي رصيد.",
+  "error.agent.creditMediaNotSaved": "تم إنشاء الملف، لكن OpenBot لم يتمكن من حفظه في الدردشة.",
   "error.agent.mcpServerDeclined": "لم يسمح المستخدم بتغيير خادم MCP هذا. لم يتغير شيء.",
   "error.agent.mcpToolDeclined": "لم يسمح المستخدم باستدعاء أداة MCP هذه. لم تعمل الأداة.",
   "error.agent.mcpServerNotSaved": "لم يستجب خادم MCP، لذا لم يُحفظ. {error}",
