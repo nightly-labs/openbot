@@ -756,6 +756,10 @@
     visibility: hidden;
   }
 
+  .app-frame-edge:not([data-window-page-kind="agents"]) > .sidebar .ui-sliding-tabs-content[data-selected] {
+    visibility: hidden;
+  }
+
   .app-frame-edge:not([data-window-page-kind="agents"]) > .sidebar :is(.sidebar-new-button, .sidebar-filter-button) {
     display: none;
   }
