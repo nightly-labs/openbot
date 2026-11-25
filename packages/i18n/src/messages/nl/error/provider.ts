@@ -419,6 +419,8 @@ export const messages = {
     "De Anthropic-API-sleutel heeft geen API-tegoed. Een Claude-abonnement betaalt geen verzoeken met een API-sleutel. Voeg tegoed toe in de Anthropic Console, of log bij Instellingen in bij Claude en kies het Claude-account in het modelmenu van de agent.",
   "error.provider.claudeAccountNoCredit":
     "Het tegoed van je Claude-account is te laag. Sommige verzoeken, zoals de snelle modus, gebruiken gebruikstegoed, ook als je Claude-abonnement nog gebruik over heeft. Voeg gebruikstegoed toe in je Claude-account, of kies een ander model in het modelmenu van de agent.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code stuurt verzoeken naar {host}, niet naar Anthropic: de Claude Code-instellingen of de omgevingsvariabelen geven dit API-adres op. {host} weigerde het verzoek vanwege het tegoed van het account, niet vanwege je Claude-abonnement. Voeg tegoed toe aan je {host}-account, of kies een ander model in het modelmenu van de agent.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "De Claude-dienst heeft dit verzoek geblokkeerd. Meestal is dit een kort probleem bij Claude, geen probleem met je account. Stuur het bericht over een paar minuten opnieuw.",
   "error.provider.foreignReasoning":

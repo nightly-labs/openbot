@@ -422,6 +422,8 @@ export const messages = {
     "Anthropic API anahtarında API kredisi yok. Claude planı, API anahtarıyla yapılan istekleri ödemez. Anthropic Console'da kredi ekleyin ya da Ayarlar'da Claude'da oturum açıp ajanın model menüsünde Claude hesabını seçin.",
   "error.provider.claudeAccountNoCredit":
     "Claude hesabınızın kredi bakiyesi çok düşük. Hızlı mod gibi bazı istekler, Claude planınızda kullanım kalsa da kullanım kredisi harcar. Claude hesabınıza kullanım kredisi ekleyin ya da ajanın model menüsünde başka bir model seçin.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code istekleri Anthropic'e değil, {host} adresine gönderiyor: bu API adresini Claude Code ayarları veya ortam değişkenleri belirliyor. {host}, isteği Claude planınız yüzünden değil, hesap bakiyesi yüzünden reddetti. {host} hesabınıza bakiye ekleyin ya da ajanın model menüsünde başka bir model seçin.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Claude hizmeti bu isteği engelledi. Bu genellikle Claude tarafında kısa süreli bir sorundur, hesabınızla ilgili değildir. Mesajı birkaç dakika sonra yeniden gönderin.",
   "error.provider.foreignReasoning":

@@ -424,6 +424,8 @@ export const messages = {
     "La chiave API di Anthropic non ha credito API. Un piano Claude non paga le richieste fatte con una chiave API. Aggiungi credito nella Anthropic Console, oppure accedi a Claude nelle Impostazioni e seleziona l'account Claude nel menu dei modelli dell'agente.",
   "error.provider.claudeAccountNoCredit":
     "Il saldo crediti del tuo account Claude è troppo basso. Alcune richieste, come la modalità veloce, usano crediti di utilizzo anche se il tuo piano Claude non è esaurito. Aggiungi crediti nel tuo account Claude, oppure scegli un altro modello nel menu dei modelli dell'agente.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code invia le richieste a {host}, non ad Anthropic: le impostazioni di Claude Code o le variabili d'ambiente definiscono questo indirizzo API. {host} ha rifiutato la richiesta per il saldo dell'account, non per il tuo piano Claude. Aggiungi fondi al tuo account {host}, oppure scegli un altro modello nel menu dei modelli dell'agente.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Il servizio di Claude ha bloccato questa richiesta. Di solito è un breve problema di Claude, non del tuo account. Invia di nuovo il messaggio tra qualche minuto.",
   "error.provider.foreignReasoning":
