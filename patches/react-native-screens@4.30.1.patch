@@ -44,7 +44,7 @@ index 2f2133bf28c8e7e0fe0d63f71ba34c6b070ae06e..85f0778d3d661bb269c81be0184c4718
  
                  if (child is ScreenStackHeaderConfig) {
 diff --git a/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt b/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt
-index 6f935c145068b68e0233faa668cc70f8c411169f..d1ed60ae06147b72d5e6a265bf399cd7d0e7e69a 100644
+index 6f935c145068b68e0233faa668cc70f8c411169f..66ef4375c64ed2239976c9b439dc371144d53fa7 100644
 --- a/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt
 +++ b/android/src/main/java/com/swmansion/rnscreens/ScreenContainer.kt
 @@ -13,6 +13,7 @@ import androidx.fragment.app.FragmentManager
@@ -65,7 +65,7 @@ index 6f935c145068b68e0233faa668cc70f8c411169f..d1ed60ae06147b72d5e6a265bf399cd7
      override fun shouldDelayChildPressedState(): Boolean = false
  
      override fun onLayout(
-@@ -72,9 +76,18 @@ open class ScreenContainer(
+@@ -72,9 +76,20 @@ open class ScreenContainer(
              (context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
                  .hideSoftInputFromWindow(windowToken, InputMethodManager.HIDE_NOT_ALWAYS)
          }
@@ -73,19 +73,21 @@ index 6f935c145068b68e0233faa668cc70f8c411169f..d1ed60ae06147b72d5e6a265bf399cd7
 +        try {
 +            super.removeView(view)
 +        } catch (e: IndexOutOfBoundsException) {
-+            if (fragmentManager?.isDestroyed != true || !e.isThrownByViewGroupRemoveFromArray()) {
++            if (!isHostActivityDestroyed() || !e.isThrownByViewGroupRemoveFromArray()) {
 +                throw e
 +            }
 +        }
      }
  
++    private fun isHostActivityDestroyed(): Boolean = (context as? ReactContext)?.currentActivity?.isDestroyed == true
++
 +    private fun IndexOutOfBoundsException.isThrownByViewGroupRemoveFromArray(): Boolean =
 +        stackTrace.firstOrNull { it.className == VIEW_GROUP_CLASS_NAME }?.methodName == REMOVE_FROM_ARRAY_METHOD_NAME
 +
      override fun requestLayout() {
          super.requestLayout()
          @Suppress("SENSELESS_COMPARISON") // mLayoutCallback can be null here since this method can be called in init
-@@ -278,6 +291,8 @@ open class ScreenContainer(
+@@ -278,6 +293,8 @@ open class ScreenContainer(
      override fun onAttachedToWindow() {
          super.onAttachedToWindow()
          isAttached = true
@@ -94,7 +96,7 @@ index 6f935c145068b68e0233faa668cc70f8c411169f..d1ed60ae06147b72d5e6a265bf399cd7
          setupFragmentManager()
      }
  
-@@ -315,8 +330,7 @@ open class ScreenContainer(
+@@ -315,8 +332,7 @@ open class ScreenContainer(
          // attempt to reattach previously registered fragments that are not removed
          fragmentManager?.let {
              if (!it.isDestroyed) {
@@ -104,7 +106,7 @@ index 6f935c145068b68e0233faa668cc70f8c411169f..d1ed60ae06147b72d5e6a265bf399cd7
              }
          }
  
-@@ -342,6 +356,37 @@ open class ScreenContainer(
+@@ -342,6 +358,37 @@ open class ScreenContainer(
          }
      }
  
@@ -142,7 +144,7 @@ index 6f935c145068b68e0233faa668cc70f8c411169f..d1ed60ae06147b72d5e6a265bf399cd7
      override fun onMeasure(
          widthMeasureSpec: Int,
          heightMeasureSpec: Int,
-@@ -380,7 +425,12 @@ open class ScreenContainer(
+@@ -380,7 +427,12 @@ open class ScreenContainer(
      }
  
      fun performUpdates() {
@@ -156,7 +158,7 @@ index 6f935c145068b68e0233faa668cc70f8c411169f..d1ed60ae06147b72d5e6a265bf399cd7
              return
          }
          needsUpdate = false
-@@ -456,4 +506,10 @@ open class ScreenContainer(
+@@ -456,4 +508,10 @@ open class ScreenContainer(
      protected open fun notifyContainerUpdate() {
          topScreen?.fragmentWrapper?.onContainerUpdate()
      }
