@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type {
   McpServerConfig,
   McpSignInAppInput,
@@ -11,7 +12,7 @@ import type {
   TestMcpServerInput,
 } from "@openbot/contracts/ipc";
 import { GITHUB_CONNECTOR_MCP_SERVER_ID, mcpConfigErrors, normalizeMcpConfig } from "@openbot/contracts/ipc";
-import { mcpAccountFragment, withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
+import { mcpAccountFragment, mcpAccountUrl, withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { type Logger, redactSecrets, toLogValue } from "@openbot/logging";
 import { Effect, Exit, Result, Schema, Scope } from "effect";
@@ -51,6 +52,12 @@ import { providerLabel } from "./thread-items";
 import type { RuntimeRefreshTiming } from "./thread-lifecycle";
 
 const SIGN_IN_FAILURE_CHECK_MS = 5_000;
+
+/** The address of a row without any fragment. The fragment names an account, not a place. */
+function mcpAccountAddress(url: string): string {
+  const index = url.indexOf("#");
+  return index < 0 ? url : url.slice(0, index);
+}
 
 export interface TestMcpServerOptions {
   interactive?: boolean;
@@ -227,11 +234,31 @@ export class McpGateway {
   readonly save = Effect.fn("McpGateway.save")(function* (this: McpGateway, input: SaveMcpServerInput) {
     const added = !this.#servers.list().some((config) => config.id === input.config.id);
     yield* Effect.try({
-      try: () => this.#servers.save(input.config),
+      try: () => this.#servers.save(this.#accountConfig(input.config)),
       catch: (cause) => new McpGatewayFailed({ cause }),
     });
     return yield* this.changed(added ? "after-background-work" : "now");
   }, Effect.uninterruptible);
+
+  /**
+   * A row is an account of its server. One address keeps one sign-in, so a row that would take
+   * the account of another row gets an account fragment of its own. An edit keeps the account of
+   * the row, unless the row moves to an address another row already uses. The fragment names no
+   * person and never leaves the computer: the gateway drops it before the request goes out.
+   */
+  #accountConfig(config: McpServerConfig): McpServerConfig {
+    if (config.transport !== "http" || !config.url) return config;
+    const key = mcpOAuthAccountKey(config.url);
+    if (key === null) return config;
+    const rows = this.#servers.list();
+    const existing = rows.find((row) => row.id === config.id);
+    if (existing && mcpOAuthAccountKey(existing.url) === key) return config;
+    const taken = rows.some(
+      (row) => row.id !== config.id && row.transport === "http" && mcpOAuthAccountKey(row.url) === key,
+    );
+    if (!taken) return config;
+    return { ...config, url: mcpAccountUrl(mcpAccountAddress(config.url), randomUUID()) };
+  }
 
   readonly remove = Effect.fn("McpGateway.remove")(function* (this: McpGateway, input: RemoveMcpServerInput) {
     const removed = this.#servers.list().find((config) => config.id === input.mcpServerId);

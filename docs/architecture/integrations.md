@@ -74,12 +74,15 @@ message tags the account with `@<row name>`.
 | Part | Rule |
 | --- | --- |
 | Address | The first account keeps the listing URL and name, so a released client still finds it. Add account adds `#account-<id>` to the URL ([`mcp-accounts.ts`](../../packages/contracts/src/mcp-accounts.ts)). A row from before accounts has no fragment and keeps its sign-in. |
+| Row | A row added on an address another row already uses gets an account fragment of its own, so each row signs in on its own. An edit keeps the account of the row, unless the row moves to an address another row already uses. A row that shares its address with another row keeps its sign-in until the user removes one of them. |
 | Sign-in | `McpOAuth` keeps one record for each address with its fragment (`mcpOAuthAccountKey`). Discovery, registration, tokens and revocation use the address without the fragment, so the fragment never leaves the computer. |
 | Provider | `McpGateway.endpoint` removes the fragment. The proxy target keeps it, so a token refresh reads the sign-in of that account, and the proxy removes it before each request. The proxy route is a digest of the row id and its URL, so each account has its own route. |
 | Catalog | `isPluginAppConfig` gives each row with an account fragment to the catalog app, whatever its name. A row with no fragment needs the catalog name, so it has no Rename. Disconnect removes all accounts of the app. |
 | Joined server | The client offers Add account only when the host sends `mcp-accounts-v1`. An older host keys sign-ins by the address without the fragment, so two accounts would share one sign-in. |
 
-Run `bun scripts/mcp-oauth-store-e2e.ts` to check that two accounts keep separate sign-ins.
+Run `bun scripts/mcp-oauth-store-e2e.ts` to check that two accounts keep separate sign-ins. Run
+`bun scripts/mcp-server-account-row-e2e.ts` to check that a row on a used address gets its own
+account.
 
 ### Members and the MCP servers of a joined server
 
