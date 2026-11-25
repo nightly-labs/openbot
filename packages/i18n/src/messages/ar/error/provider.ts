@@ -287,6 +287,8 @@ export const messages = {
   "error.provider.opencodeToolCallsAsText":
     "كتب نموذج OpenCode إجراءاته كنص ولم ينفّذها. أعد المحاولة، أو اختر نموذجًا آخر.",
   "error.provider.acpNoAnswer": "أنهى {provider} الدور بدون إجابة. أرسل الرسالة مرة أخرى، أو ابدأ دردشة جديدة.",
+  "error.provider.teammateResultsNoAnswer":
+    "تلقى {provider} النتائج من زملائه، ثم أنهى الدور بدون إجابة. اطلب من الوكيل أن يتابع.",
   "error.provider.noAnswerAfterSteps":
     "نفّذ {provider} بعض الخطوات، ثم أنهى الدور بدون إجابة. اسأل الوكيل عمّا فعله قبل أن ترسل الطلب نفسه مرة أخرى.",
   "error.provider.acpRefusedNoReason": "توقف {provider} بدون إجابة. أرسل الرسالة مرة أخرى.",

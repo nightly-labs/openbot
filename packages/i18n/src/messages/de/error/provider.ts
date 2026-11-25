@@ -322,6 +322,8 @@ export const messages = {
     "Das OpenCode-Modell hat seine Aktionen als Text geschrieben und nicht ausgeführt. Versuche es erneut oder wähle ein anderes Modell.",
   "error.provider.acpNoAnswer":
     "{provider} hat den Durchlauf ohne Antwort beendet. Sende die Nachricht erneut oder starte einen neuen Chat.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} hat die Ergebnisse seiner Teammitglieder erhalten und dann den Durchlauf ohne Antwort beendet. Bitte den Agenten, weiterzumachen.",
   "error.provider.noAnswerAfterSteps":
     "{provider} hat einige Schritte ausgeführt und den Durchgang dann ohne Antwort beendet. Frag den Agenten, was er getan hat, bevor du dieselbe Anfrage noch einmal sendest.",
   "error.provider.acpRefusedNoReason": "{provider} hat ohne Antwort aufgehört. Sende die Nachricht erneut.",

@@ -316,6 +316,8 @@ export const messages = {
     "Il modello OpenCode ha scritto le sue azioni come testo e non le ha eseguite. Riprova o scegli un altro modello.",
   "error.provider.acpNoAnswer":
     "{provider} ha terminato il turno senza risposta. Invia di nuovo il messaggio o avvia una nuova chat.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} ha ricevuto i risultati dai compagni di squadra, poi ha terminato il turno senza risposta. Chiedi all'agente di continuare.",
   "error.provider.noAnswerAfterSteps":
     "{provider} ha eseguito alcuni passaggi, poi ha chiuso il turno senza risposta. Chiedi all'agente cosa ha fatto prima di inviare di nuovo la stessa richiesta.",
   "error.provider.acpRefusedNoReason": "{provider} si è fermato senza risposta. Invia di nuovo il messaggio.",

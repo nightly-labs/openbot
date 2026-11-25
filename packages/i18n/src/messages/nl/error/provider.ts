@@ -312,6 +312,8 @@ export const messages = {
     "Het OpenCode-model schreef zijn acties als tekst en voerde ze niet uit. Probeer het opnieuw, of kies een ander model.",
   "error.provider.acpNoAnswer":
     "{provider} beëindigde de beurt zonder antwoord. Stuur het bericht opnieuw, of begin een nieuwe chat.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} kreeg de resultaten van zijn teamgenoten en beëindigde daarna de beurt zonder antwoord. Vraag de agent om verder te gaan.",
   "error.provider.noAnswerAfterSteps":
     "{provider} voerde enkele stappen uit en beëindigde de beurt daarna zonder antwoord. Vraag de agent wat hij deed voordat je hetzelfde verzoek opnieuw stuurt.",
   "error.provider.acpRefusedNoReason": "{provider} stopte zonder antwoord. Stuur het bericht opnieuw.",
