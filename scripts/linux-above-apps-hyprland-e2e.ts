@@ -26,6 +26,7 @@ const decodeRecord = Schema.decodeUnknownSync(
     Schema.Struct({
       role: Schema.Literals(["parent", "child"]),
       pid: Schema.optional(Schema.Number),
+      overrideKept: Schema.optional(Schema.Boolean),
       restarted: Schema.optional(Schema.Boolean),
       reason: Schema.optional(Schema.String),
       platform: Schema.String,
@@ -81,7 +82,12 @@ async function restartScenario(
     electronPath(),
     [bundle, `--user-data-dir=${userData}`, "--no-sandbox", "--ozone-platform=wayland"],
     {
-      env: { ...environment, OPENBOT_E2E_SCENARIO: "restart", OPENBOT_E2E_REPORT: report },
+      env: {
+        ...environment,
+        XDG_SESSION_TYPE: "wayland",
+        OPENBOT_E2E_SCENARIO: "restart",
+        OPENBOT_E2E_REPORT: report,
+      },
       stdio: "ignore",
     },
   );
@@ -181,6 +187,7 @@ async function main(): Promise<void> {
     assert.equal(parent?.restarted, true, "the Restart choice starts OpenBot again on XWayland");
     assert.equal(child?.reason, "above-apps");
     assert.equal(child?.platform, "x11", "the new start runs on XWayland");
+    assert.equal(child?.overrideKept, true, "turning the island on again on XWayland keeps the Restart choice");
     assert.equal(
       child?.argv?.filter((argument) => argument.startsWith("--ozone-platform=")).join(" "),
       "--ozone-platform=wayland",

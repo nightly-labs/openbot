@@ -197,7 +197,11 @@ export const keepAboveAppsXWayland = Effect.fn("keepAboveAppsXWayland")(function
 ) {
   if (process.platform !== "linux" || !onXWayland()) return;
   yield* Effect.tryPromise({
-    try: () => writeFile(join(userDataPath, ABOVE_APPS_XWAYLAND_FILES[feature]), ""),
+    try: async () => {
+      await writeFile(join(userDataPath, ABOVE_APPS_XWAYLAND_FILES[feature]), "");
+      if (launcherPlatform(process.argv) === "wayland")
+        await writeFile(join(userDataPath, ABOVE_APPS_OVER_LAUNCHER_FILE), "");
+    },
     catch: (cause) => new AboveAppsXWaylandFailure({ cause }),
   });
 });

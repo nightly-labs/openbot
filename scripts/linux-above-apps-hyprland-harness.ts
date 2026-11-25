@@ -1,9 +1,14 @@
-import { appendFileSync } from "node:fs";
+import { appendFileSync, existsSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { Effect } from "effect";
 import { app, BrowserWindow } from "electron";
 import { keepOverlayOnAllHyprlandWorkspaces } from "../src/main/linux-hyprland-overlay";
-import { restartOnXWaylandForAboveApps, takeXWaylandRestartMarker } from "../src/main/linux-wayland-output";
+import {
+  keepAboveAppsXWayland,
+  restartOnXWaylandForAboveApps,
+  takeXWaylandRestartMarker,
+} from "../src/main/linux-wayland-output";
 
 const reportFile = process.env.OPENBOT_E2E_REPORT ?? "";
 
@@ -15,7 +20,11 @@ const restartedFor = takeXWaylandRestartMarker(process.env, process.argv);
 
 async function checkRestart(): Promise<void> {
   if (restartedFor !== null) {
+    const override = join(app.getPath("userData"), "above-apps-xwayland-over-launcher");
+    rmSync(override, { force: true });
+    await Effect.runPromise(keepAboveAppsXWayland(app.getPath("userData"), "dynamic-island"));
     record({
+      overrideKept: existsSync(override),
       role: "child",
       pid: process.pid,
       reason: restartedFor,
