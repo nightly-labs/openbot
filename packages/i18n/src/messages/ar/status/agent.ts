@@ -26,6 +26,12 @@ export const messages = {
   "status.agent.screenCaptureScreen": "التقاط الشاشة الرئيسية وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.screenCaptureChannel":
     "تظهر الصورة في القناة {channel}، ويمكن لكل عضو في هذا الخادم يقرأ القناة رؤيتها.",
+  "status.agent.creditImageApproval": "إنشاء صورة باستخدام {model}. يستهلك ذلك {credits} من الأرصدة.",
+  "status.agent.creditVideoApproval": "إنشاء فيديو باستخدام {model}. يستهلك ذلك {credits} من الأرصدة.",
+  "status.agent.creditMediaChannel":
+    "تظهر النتيجة في القناة {channel}، ويمكن لكل عضو في هذا الخادم يقرأ القناة رؤيتها.",
+  "status.agent.creditsHoldBalance": "يستهلك ذلك {credits} من الأرصدة، والرصيد الحالي {balance} من الأرصدة.",
+  "status.agent.creditsHoldAgentsOff": "لا يمكن للوكلاء على هذا الخادم استخدام الأرصدة.",
   "status.agent.screenCapturePermissionNext": "قد يطلب منك macOS بعد ذلك السماح لـ OpenBot بـ «تسجيل الشاشة».",
   "status.agent.screenCaptureDisplay": "التقاط الشاشة {name} وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.screenCaptureWindow": "التقاط النافذة {name} وإرسال الصورة إلى نموذج الوكيل.",
@@ -133,6 +139,10 @@ export const messages = {
   "status.agent.apiKeyScope.label": "الحفظ لـ",
   "status.agent.apiKeyScope.vault": "كل الوكلاء (الخزنة)",
   "status.agent.apiKeyScope.agent": "هذا الوكيل فقط",
+  "status.agent.location.field": "موقعك",
+  "status.agent.location.placeholder": "مدينة أو عنوان أو مكان",
+  "status.agent.location.submit": "مشاركة",
+  "status.agent.location.shared": "تمت مشاركة الموقع",
   "status.agent.vaultExpiryHint": "MM/YY",
   "status.agent.vaultField.website": "موقع الويب",
   "status.agent.vaultField.username": "اسم المستخدم أو البريد الإلكتروني",
@@ -159,8 +169,4 @@ export const messages = {
   "status.agent.compactionContinues": "توقف الاتصال أثناء ضغط الوكيل لسياقه. يتابع الوكيل.",
   "status.agent.providerExitContinues": "توقف الوكيل قبل أن يكمل إجابته. يتابع الوكيل.",
   "status.agent.branchTitle": "دردشة متفرعة",
-  "status.agent.location.field": "موقعك",
-  "status.agent.location.placeholder": "مدينة أو عنوان أو مكان",
-  "status.agent.location.submit": "مشاركة",
-  "status.agent.location.shared": "تمت مشاركة الموقع",
 } as const satisfies PartialTranslation<typeof source>;

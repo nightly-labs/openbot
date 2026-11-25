@@ -27,6 +27,12 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Capturar la pantalla principal y enviar la imagen al modelo del agente.",
   "status.agent.screenCaptureChannel":
     "La imagen aparece en el canal {channel}, y cada miembro de este servidor que lee el canal puede verla.",
+  "status.agent.creditImageApproval": "Generar una imagen con {model}. Cuesta {credits} créditos.",
+  "status.agent.creditVideoApproval": "Generar un vídeo con {model}. Cuesta {credits} créditos.",
+  "status.agent.creditMediaChannel":
+    "El resultado se muestra en el canal {channel}, y cada miembro de este servidor que lea el canal puede verlo.",
+  "status.agent.creditsHoldBalance": "Esto usa {credits} créditos y el saldo es de {balance} créditos.",
+  "status.agent.creditsHoldAgentsOff": "Los agentes de este servidor no pueden usar créditos.",
   "status.agent.screenCapturePermissionNext":
     "Después, macOS puede pedirte que permitas a OpenBot la grabación de pantalla.",
   "status.agent.screenCaptureDisplay": "Capturar la pantalla {name} y enviar la imagen al modelo del agente.",
@@ -114,6 +120,10 @@ export const messages = {
     "Recuerdos: {saved} guardados, {updated} actualizados, {forgotten} olvidados, {notChanged} sin cambios porque otro hilo los cambió antes.",
   "status.agent.mcpToolCall": "Ejecutar la herramienta {tool} del servidor MCP {name}.",
   "status.agent.uiBlockClosedByMessage": "Cerrado por un mensaje nuevo",
+  "status.agent.location.field": "Tu ubicación",
+  "status.agent.location.placeholder": "Ciudad, dirección o lugar",
+  "status.agent.location.submit": "Compartir",
+  "status.agent.location.shared": "Ubicación compartida",
   "status.agent.nextStepContinues": "El agente se detuvo antes del siguiente paso. Continúa ({current} de {limit}).",
   "status.agent.planContinues": "El plan tiene pasos pendientes. El agente continúa ({current} de {limit}).",
   "status.agent.planStopped": "El agente se detuvo con pasos pendientes en su plan. Envía un mensaje para continuar.",
@@ -123,8 +133,4 @@ export const messages = {
     "La conexión se detuvo mientras el agente compactaba su contexto. El agente continúa.",
   "status.agent.providerExitContinues": "El agente se detuvo antes de terminar su respuesta. El agente continúa.",
   "status.agent.branchTitle": "Chat ramificado",
-  "status.agent.location.field": "Tu ubicación",
-  "status.agent.location.placeholder": "Ciudad, dirección o lugar",
-  "status.agent.location.submit": "Compartir",
-  "status.agent.location.shared": "Ubicación compartida",
 } as const satisfies PartialTranslation<typeof source>;

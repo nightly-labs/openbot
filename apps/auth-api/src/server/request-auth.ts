@@ -48,7 +48,7 @@ import {
   type MarketplaceMutationKind,
   MarketplaceRateLimitError,
 } from "./marketplace-request-policy";
-import { mediaUpstreamsFromBindings } from "./media-upstream-bindings";
+import { mediaGatewayFromBinding } from "./media-gateway";
 import { Referrals } from "./referrals";
 import {
   deliverPendingRemoteAuthEvents,
@@ -163,7 +163,7 @@ export function requestCreditMedia(): CreditMediaService {
   const bindings = requireWorkerBindings(env);
   return new CreditMediaService({
     database: bindings.DB,
-    upstreams: mediaUpstreamsFromBindings(bindings),
+    gateway: mediaGatewayFromBinding(bindings.MEDIA_GATEWAY),
     now: () => Date.now(),
     analytics: accountAnalytics(bindings),
   });

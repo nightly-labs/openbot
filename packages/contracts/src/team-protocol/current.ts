@@ -137,6 +137,8 @@ import { MCP_ACCESS_CAPABILITY } from "./mcp-access-v1";
 import { MCP_MANY_SERVERS_CAPABILITY } from "./mcp-many-servers-v1";
 import { MCP_SIGN_IN_APP_CAPABILITY } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "./mcp-sign-in-v1";
+import { MEDIA_APPROVAL_CHOICE_CAPABILITY } from "./media-approval-choice-v1";
+import { MEDIA_APPROVAL_CREDITS_CAPABILITY } from "./media-approval-credits-v1";
 import { TEAM_MEMORY_CHANGES_CAPABILITY } from "./memory-changes-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "./memory-review-v1";
 import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "./message-client-id-v1";
@@ -147,6 +149,7 @@ import { MODEL_STEERING_CAPABILITY } from "./model-steering-v1";
 import { MODEL_VISIBILITY_KEPT_CAPABILITY } from "./model-visibility-kept-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
+import { OPENBOT_CREDITS_EVENTS_CAPABILITY } from "./openbot-credits-events-v1";
 import { OWNER_TRANSFER_CAPABILITY } from "./owner-transfer-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
@@ -411,12 +414,15 @@ export {
   MCP_SERVERS_CAPABILITY,
   MCP_SIGN_IN_APP_CAPABILITY,
   MCP_SIGN_IN_CAPABILITY,
+  MEDIA_APPROVAL_CHOICE_CAPABILITY,
+  MEDIA_APPROVAL_CREDITS_CAPABILITY,
   MEMORY_REVIEW_CAPABILITY,
   MESSAGE_DELETE_CAPABILITY,
   MESSAGE_PINS_CAPABILITY,
   MODEL_STEERING_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
+  OPENBOT_CREDITS_EVENTS_CAPABILITY,
   PASSWORD_MANAGERS_CAPABILITY,
   PENDING_APPROVAL_CAPABILITY,
   PHONE_FEEDBACK_CAPABILITY,
@@ -851,6 +857,9 @@ const TEAM_CAPABILITY_REGISTRY = [
   [PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY, V10],
   [TEAM_PROMPT_DETAIL_CAPABILITY, V10],
   [HOST_TURN_LIMITS_EVENTS_CAPABILITY, V10],
+  [MEDIA_APPROVAL_CREDITS_CAPABILITY, V10],
+  [MEDIA_APPROVAL_CHOICE_CAPABILITY, V10],
+  [OPENBOT_CREDITS_EVENTS_CAPABILITY, V10],
   [TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 

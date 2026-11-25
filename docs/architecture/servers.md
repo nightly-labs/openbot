@@ -1172,6 +1172,9 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `machine-resources-v1` | Read the disk, memory and CPU use of the host machine; read and set the alert levels and the owner or admin who gets the `machine-alert` event | `storage`, `hostAdmin` |
 | `prompt-cache-ttl-v1` | Read and set how long Claude keeps the prompt cache of the host's agents | `hostAdmin` |
 | `claude-compact-window-v1` | Read and set the size at which Claude Code compacts the chats of the host's agents. Protocol 9 only | `hostAdmin` |
+| `media-approval-credits-v1` | Read and set the OpenBot credits that one `generate_image` or `generate_video` call of the host's agents can spend before the user must approve it, and the default image and video model. Protocol 10 only | `hostAdmin` |
+| `media-approval-choice-v1` | Read the model offer of a pending media approval and allow it with another model, aspect, resolution, duration or sound. Protocol 10 only | `agent` |
+| `openbot-credits-events-v1` | The event `openbot-credits-changed`, with no data. The host sends it when a credits image or video job of an agent or a workflow ends, so the desktop and the web client read the Credits rail balance again. No route and no balance travel. Protocol 10 only | none: an event only |
 | `provider-environment-v1` | Read and set the environment variables that each process of the host's Claude, Codex and Gemini starts with. Protocol 9 only | `hostAdmin` |
 | `provider-account-models-v1` | Read the models that each account after the first of the host's providers serves and the provider's own sign-in does not, for the model picker of that account. Protocol 9 only | `hostAdmin` |
 | `model-visibility-v1` | Read every model of one provider of the host, and set which of them the model picker shows. Every member reads which models the picker folds under Older models or labels New. Protocol 9 only | `hostAdmin` |
@@ -1430,6 +1433,45 @@ and the environment of the host still apply. An environment value of the agent s
 compaction stays on. A change applies to the next Claude process, not to a running one. The Context
 section of the Claude page in Server settings → Providers sets it for this computer, for a joined
 server, on the web client and in the mobile app.
+
+`media-approval-credits-v1` reads and sets the credit approval limit of the host's agents
+(`openbot-media-approval-credits-v1.json`; `credits` is a whole number from 0 to 100,000, default 50).
+When one `generate_image` or `generate_video` call of an agent costs more OpenBot credits than this
+limit, the user must approve it. With 0 the user approves each paid call. A change applies
+to the next call. The same file keeps `imageModel` and `videoModel`: the model that a call uses when
+the agent names none (without them, `gpt-image-2.6` and `seedance-2.5`), `agents` and `askWhenBlocked` (both default true; a file without them reads as
+true). When `agents` is false, or the balance is less than the price, the call holds and the chat shows
+a credits hold card: the agent waits until the user buys credits, turns `agents` on, skips, or selects
+"Don't ask again". The card continues by itself when the balance becomes enough. All held calls of one
+turn share one card. When `askWhenBlocked` is false, or the member who started the turn muted the
+asks (`openbot-credit-asks-muted-v1.json`), the call does not hold and the agent says that it skipped
+the step. "Don't ask again" from an owner or an admin sets `askWhenBlocked` to false; the "Ask when
+credits are needed" switch in Server settings → Agents, on desktop, the web client and mobile, sets
+it again. From a member it mutes only that member. The button tooltip and the toast after the click
+name the scope; the owner or admin toast names the switch, and both toasts have Undo. The hover card of
+the Credits rail item also has the "Ask when credits are needed" switch on desktop and the web client:
+for an owner or an admin it sets `askWhenBlocked`, for a member it sets that member's mute
+(`media/muted/read` and `media/muted`). It shows only when the host has `media-approval-choice-v1`. The "Agents can use credits" switch in
+Server settings → Agents and in the hover card of the Credits rail item sets it; the rail item turns
+grey while it is off. The Credits card of Server settings → Agents sets the limit for this computer,
+for a joined server and on the web client; Server settings → Agents of the mobile app sets it too. An
+owner or an admin sets a default model with "Set as default" in the approval card. An instance
+transfer moves the file with the other server preferences; it does not move the muted members file.
+The desktop and web chat, channels, agent thread views and tasks view, the in-window dock chat and the
+browser island in the chat show the hold card; after Turn on, the Credits rail item reads the new
+`agents` value without a reload. The Credits rail item shows the wallet that the agents of the
+active server pay from (`creditsRailWallet`): the wallet of the joined server, the server wallet of
+this computer when this computer is a shared server, and else the personal wallet. The hold card shows
+the same balance. Buy opens the credits page for that wallet. When the user owns the server of
+that wallet (the joined server, or the server wallet of this computer), the hover card has "Move
+credits", which opens the move dialog between the personal wallet and the server wallet. The screen dock and the browser island overlay run in the helper
+window, which has no credits balance, so they show the generic approval card. The mobile app shows a credits hold as a plain approval card: Allow continues when the balance is
+enough, and Decline skips.
+
+`media-approval-choice-v1` lets the approval card of the desktop and the web client show the request
+of a media approval: the model picker with prices, and chips for aspect, resolution, duration and
+sound. Each member who can chat with the agent can change them before Allow. The mobile app shows the
+plain Allow card.
 
 `provider-environment-v1` reads and sets the variables of one provider of the host (see
 [Provider variables](providers.md#provider-variables)): names and plain values in

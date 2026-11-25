@@ -187,7 +187,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
           await followAccountCodeSignIn(provider, accountCode, account.accountId, generation);
           return;
         }
-        showCode(account.start);
+        showCode(provider, account.start);
         codeLoginExpiry = window.setTimeout(
           () => {
             if (generation !== codeLoginGeneration) return;
@@ -208,7 +208,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
         endProviderCodeLogin(provider, { kind: "connected", accountLabel: row?.email ?? null });
         return;
       }
-      showCode(started);
+      showCode(provider, started);
       codeLoginExpiry = window.setTimeout(
         () => {
           if (generation !== codeLoginGeneration) return;
@@ -232,20 +232,27 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
     }
   }
 
-  function showCode(started: Exclude<ProviderCodeLoginStart, { kind: "connected" }>): void {
+  function showCode(provider: AgentProviderId, started: Exclude<ProviderCodeLoginStart, { kind: "connected" }>): void {
     flush(() =>
       setCodeLoginState(
-        started.kind === "paste" || started.kind === "link"
-          ? { phase: started.kind, verificationUrl: started.verificationUrl, expiresAt: started.expiresAt }
-          : {
-              phase: "waiting",
-              userCode: started.userCode,
+        started.kind === "link"
+          ? {
+              phase: "link",
               verificationUrl: started.verificationUrl,
-              ...(started.verificationUrlComplete === undefined
-                ? {}
-                : { verificationUrlComplete: started.verificationUrlComplete }),
               expiresAt: started.expiresAt,
-            },
+              ...(agentProviderDescriptor(provider).windowsCodeSignIn === "link" ? { onThisComputer: true } : {}),
+            }
+          : started.kind === "paste"
+            ? { phase: "paste", verificationUrl: started.verificationUrl, expiresAt: started.expiresAt }
+            : {
+                phase: "waiting",
+                userCode: started.userCode,
+                verificationUrl: started.verificationUrl,
+                ...(started.verificationUrlComplete === undefined
+                  ? {}
+                  : { verificationUrlComplete: started.verificationUrlComplete }),
+                expiresAt: started.expiresAt,
+              },
       ),
     );
   }

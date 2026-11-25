@@ -114,7 +114,14 @@ with no `exit` span and no dump was stopped from outside OpenBot (#2675).
 the single-instance lock. It writes `running` at the start, the time of the last sign of life once a
 minute and at sleep and wake, `quitting` with the reason in `recordExit`, `quit_timeout` before the
 shutdown deadline exit, and `clean` after `teardown.runAll()`. It adds no teardown step, so the
-ordinals do not change. The writes are synchronous, so a late write cannot replace a later state. At
+ordinals do not change. The heartbeat and the wake write the newest record asynchronously, through
+`openbot-run-marker-v1.json.pending`, so a slow disk, a file lock or an antivirus scan on Windows does
+not stop the main thread. One write runs at a time; records that come during a write are not written,
+only the newest one after it. The start, sleep, `shutdown` event, `quitting`, `quit_timeout` and
+`clean` writes are synchronous, because the process can stop right after them. An asynchronous write
+does not rename its file when a synchronous write came after its record. When its rename ends after a
+synchronous write, it writes the newest record again synchronously, so a late write cannot replace a
+later state. At
 the next start, `RunMarker.start` reads the file before it writes the new one. A `running`,
 `quitting` or `quit_timeout` file is an unclean exit, except a quit for `update` or `session_end`
 and a run that saw the `powerMonitor` `shutdown` event. It counts the `.dmp` files in

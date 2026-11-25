@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "このホストではイベントを利用できません。",
   "error.backend.databaseIntegrity": "OpenBot のデータベースが整合性チェックに失敗しました。",
+  "error.backend.creditsHoldAdminOnly":
+    "エージェントのクレジット使用を許可できるのは、このサーバーのオーナーまたは管理者のみです。",
+  "error.backend.creditsHoldShort": "クレジットがまだ足りません。",
   "error.backend.webhookRouteLimit": "1 つのホストの Webhook ルーティンは最大 {limit} 個です。",
   "error.backend.webhookSettingsInvalid": "Webhook の設定を確認して、もう一度お試しください。",
   "error.backend.webhookSenderSecretInvalid":

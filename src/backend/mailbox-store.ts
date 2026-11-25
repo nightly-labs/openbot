@@ -3605,6 +3605,12 @@ export class MailboxStore {
     return this.#fileRecords().find((record) => record.id === attachmentId && !record.deletedAt)?.sha256 ?? null;
   }
 
+  attachmentPath(attachmentId: string): string | null {
+    const staged = this.#stagedGeneratedAttachments.get(attachmentId);
+    if (staged) return staged.path;
+    return this.#fileRecords().find((record) => record.id === attachmentId && !record.deletedAt)?.path ?? null;
+  }
+
   storeGeneratedAttachment = Effect.fn("MailboxStore.storeGeneratedAttachment")(function* (
     this: MailboxStore,
     input: {

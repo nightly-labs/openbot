@@ -5,10 +5,11 @@ import { sourceText } from "@openbot/i18n/source";
 import type { BillingDetailsCalls } from "@openbot/ui/features/billing/BillingDetailsFields";
 import { BuyCreditsPage } from "@openbot/ui/features/credits/BuyCreditsPage";
 import { CreditActivitySection } from "@openbot/ui/features/credits/CreditActivitySection";
+import { CreditsExplainerDialog } from "@openbot/ui/features/credits/CreditsExplainerDialog";
 import { CreditsSection } from "@openbot/ui/features/credits/CreditsSection";
 import { type CreditsCalls, createCreditsStore } from "@openbot/ui/features/credits/credits-store";
 import { RedeemCreditsDialog } from "@openbot/ui/features/credits/RedeemCreditsDialog";
-import { untrack } from "solid-js";
+import { createSignal, untrack } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { createMockCredits } from "../src/preview/mock-credits";
 
@@ -52,6 +53,11 @@ function SectionStory(props: { calls: CreditsCalls }) {
       <CreditActivitySection store={store} />
     </main>
   );
+}
+
+function ExplainerStory() {
+  const [open, setOpen] = createSignal(true);
+  return <CreditsExplainerDialog open={open()} onOpenChange={setOpen} onOpenPrices={() => undefined} />;
 }
 
 function fixedCalls(state: CreditsState): CreditsCalls {
@@ -107,3 +113,5 @@ export const BuyLoadError: Story = {
 export const RedeemCode: Story = { render: () => <RedeemStory /> };
 
 export const BillingSection: Story = { render: () => <SectionStory calls={createMockCredits()} /> };
+
+export const Explainer: Story = { render: () => <ExplainerStory /> };

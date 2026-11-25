@@ -377,6 +377,14 @@ import {
 } from "./mcp-oauth-redirect-server";
 import { McpOAuthStore } from "./mcp-oauth-store";
 import { MCP_SERVER_OWNERS_FILE, McpServerOwnersStore } from "./mcp-server-owners-store";
+import {
+  type CreditAsksControl,
+  createCreditAsksMutedStore,
+  createMediaApprovalCreditsPreferenceStore,
+  creditAsksControl,
+  type MediaApprovalCreditsControl,
+  mediaApprovalCreditsControl,
+} from "./media-approval-credits-preference-store";
 import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
 import { createModelReasoningSupport, MODEL_REASONING_RETRY_WAITS_MS } from "./model-reasoning-probe";
@@ -389,6 +397,7 @@ import { PasswordManagersService } from "./password-managers/password-managers-s
 import { managedProtonPassCli } from "./password-managers/proton-pass-cli-installer";
 import { ProtonPassDriver, protonPassRecordSchema } from "./password-managers/proton-pass-driver";
 import { PointerForwardingGate } from "./pointer-forwarding-gate";
+import { ProcessLauncher } from "./process-launcher";
 import { PromptCacheTtlPreferenceStore } from "./prompt-cache-ttl-preference-store";
 import { ProviderAccountsHost } from "./provider-accounts-host";
 import { ProviderCredentialStore } from "./provider-credential-store";
@@ -542,6 +551,8 @@ const SERVER_PERSONALITY_PREFERENCE_FILE = "openbot-server-personality-v1.json";
 const PROMPT_CACHE_TTL_PREFERENCE_FILE = "openbot-prompt-cache-ttl-v1.json";
 const CLAUDE_USER_SETUP_PREFERENCE_FILE = "openbot-claude-user-setup-v1.json";
 const CACHE_EXPIRY_COMPACTION_PREFERENCE_FILE = "openbot-cache-expiry-compaction-v1.json";
+const MEDIA_APPROVAL_CREDITS_PREFERENCE_FILE = "openbot-media-approval-credits-v1.json";
+const CREDIT_ASKS_MUTED_PREFERENCE_FILE = "openbot-credit-asks-muted-v1.json";
 const CRM_PREFERENCE_FILE = "openbot-crm-v1.json";
 const CLAUDE_COMPACT_WINDOW_PREFERENCE_FILE = "openbot-claude-compact-window-v1.json";
 const PROVIDER_ENVIRONMENT_PREFERENCE_FILE = "openbot-provider-environment-v1.json";
@@ -630,6 +641,7 @@ const TEARDOWN_ORDER = {
   automation: 108,
   storageUsage: 109,
   service: 110,
+  processLauncher: 110.25,
   cuaDriver: 110.5,
   mcpOAuth: 111,
   analytics: 112,
@@ -741,6 +753,8 @@ export interface ApplicationServices {
   promptCacheTtl: PromptCacheTtlPreferenceStore;
   claudeUserSetup: ClaudeUserSetupControl;
   cacheExpiryCompaction: CacheExpiryCompactionControl;
+  mediaApprovalCredits: MediaApprovalCreditsControl;
+  creditAsks: CreditAsksControl;
   claudeCompactWindow: ClaudeCompactWindowControl;
   providerEnvironment: ProviderEnvironmentControl;
   modelVisibility: ModelVisibility;
@@ -1513,6 +1527,14 @@ export async function createApplicationServices({
   const cacheExpiryCompaction = createCacheExpiryCompactionPreferenceStore(
     join(app.getPath("userData"), CACHE_EXPIRY_COMPACTION_PREFERENCE_FILE),
   );
+  const mediaApprovalCredits = createMediaApprovalCreditsPreferenceStore(
+    join(app.getPath("userData"), MEDIA_APPROVAL_CREDITS_PREFERENCE_FILE),
+  );
+  const creditAsksMuted = createCreditAsksMutedStore(join(app.getPath("userData"), CREDIT_ASKS_MUTED_PREFERENCE_FILE));
+  const mediaApprovalCreditsSetting = mediaApprovalCreditsControl(mediaApprovalCredits, () =>
+    service.recheckCreditsHolds(),
+  );
+  const creditAsks = creditAsksControl(mediaApprovalCreditsSetting, creditAsksMuted);
   const crmPreference = createCrmPreferenceStore(join(app.getPath("userData"), CRM_PREFERENCE_FILE));
   const claudeCompactWindow = createClaudeCompactWindowPreferenceStore(
     join(app.getPath("userData"), CLAUDE_COMPACT_WINDOW_PREFERENCE_FILE),
@@ -1559,6 +1581,8 @@ export async function createApplicationServices({
       promptCacheTtl.load(),
       claudeUserSetup.load(),
       cacheExpiryCompaction.load(),
+      mediaApprovalCredits.load(),
+      creditAsksMuted.load(),
       crmPreference.load(),
       claudeCompactWindow.load(),
       providerEnvironment.load(),
@@ -1992,6 +2016,9 @@ export async function createApplicationServices({
     computerUsePermissionHelp.close();
   });
   const providerTempDirectory = join(app.getPath("userData"), "provider-temp");
+  const processLauncher = process.platform === "win32" ? new ProcessLauncher() : null;
+  if (processLauncher)
+    teardown.push(TEARDOWN_ORDER.processLauncher, "the process launcher", () => processLauncher.dispose());
   performance.mark("openbot:services.computer-use");
   if (process.platform === "win32") await Effect.runPromise(sweepProviderTemp(providerTempDirectory));
   const agentApiKeys = new AgentApiKeys(join(app.getPath("userData"), "agent-api-keys"), vault.items);
@@ -2069,6 +2096,8 @@ export async function createApplicationServices({
     browser,
     finishCheck: true,
     cacheExpiryCompaction: () => cacheExpiryCompaction.get().enabled,
+    mediaApprovalCredits: () => mediaApprovalCredits.get(),
+    creditAsks,
     visualPreview: new ChatVisualPreviewer(),
     avatarDecoder: (bytes) => !nativeImage.createFromBuffer(Buffer.from(bytes)).isEmpty(),
     setCommitCoAuthor: (enabled) => agentDefaultsSettings.update({ commitCoAuthor: enabled }),
@@ -2213,6 +2242,7 @@ export async function createApplicationServices({
       appVersion: app.getVersion(),
       providerStateDirectory: join(app.getPath("userData"), "provider-state"),
       ...(process.platform === "win32" ? { providerTempDirectory } : {}),
+      ...(processLauncher ? { launchProcess: processLauncher.launch } : {}),
       serverEnvironment,
       agentEnvironment: (inherited) => ({
         ...agentDisplayEnvironment(process.platform),
@@ -3103,6 +3133,10 @@ export async function createApplicationServices({
         get: () => cacheExpiryCompaction.get().enabled,
         set: (enabled) => cacheExpiryCompactionSetting.set(enabled),
       },
+      mediaApprovalCredits: {
+        get: () => mediaApprovalCredits.get(),
+        set: (setting) => mediaApprovalCreditsSetting.set(setting),
+      },
       claudeCompactWindow: {
         get: () => claudeCompactWindowSetting.get().tokens,
         set: (tokens) => claudeCompactWindowSetting.set(tokens),
@@ -3400,6 +3434,8 @@ export async function createApplicationServices({
       promptCacheTtl,
       claudeUserSetup: claudeUserSetupSetting,
       cacheExpiryCompaction: cacheExpiryCompactionSetting,
+      mediaApprovalCredits: mediaApprovalCreditsSetting,
+      creditAsks,
       claudeCompactWindow: claudeCompactWindowSetting,
       providerEnvironment: providerEnvironmentSetting,
       providerDetection: { detection: providerDetection, settings: providerDetectionSettings },
@@ -4457,6 +4493,8 @@ export async function createApplicationServices({
     promptCacheTtl,
     claudeUserSetup: claudeUserSetupSetting,
     cacheExpiryCompaction: cacheExpiryCompactionSetting,
+    mediaApprovalCredits: mediaApprovalCreditsSetting,
+    creditAsks,
     claudeCompactWindow: claudeCompactWindowSetting,
     providerEnvironment: providerEnvironmentSetting,
     modelVisibility,

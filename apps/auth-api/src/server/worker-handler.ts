@@ -17,7 +17,7 @@ import { readHostedPool } from "./hosted-pool-snapshot";
 import type { HostedServerBindings } from "./hosted-server-service";
 import { HostedSiteService } from "./hosted-site-service";
 import { enforceMarketplaceIngress, MarketplaceRateLimitError } from "./marketplace-request-policy";
-import { type MediaUpstreamBindings, mediaUpstreamsFromBindings } from "./media-upstream-bindings";
+import { mediaGatewayFromBinding } from "./media-gateway";
 import { observedD1 } from "./observed-d1";
 import { pageMarkdownResponse } from "./page-markdown";
 import {
@@ -231,13 +231,13 @@ function tickAnalytics(bindings: AnalyticsBindings) {
 }
 
 const tickCreditHolds = Effect.fn("CreditHolds.tick")(function* (
-  bindings: AnalyticsBindings & MediaUpstreamBindings,
+  bindings: AnalyticsBindings & { MEDIA_GATEWAY?: Fetcher | undefined },
   now: number,
 ) {
   const { analytics, flush } = tickAnalytics(bindings);
   const result = yield* new CreditMediaService({
     database: bindings.DB,
-    upstreams: mediaUpstreamsFromBindings(bindings),
+    gateway: mediaGatewayFromBinding(bindings.MEDIA_GATEWAY),
     now: () => now,
     analytics,
   })
