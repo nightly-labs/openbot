@@ -78,13 +78,15 @@ export function useChatQueue(
     retry: false,
   });
   const canReadUsageLimits = useMobileWorkspaceSelector((current) => current.canReadAgentUsageLimits(serverId));
+  const readsUsageLimits = online && canReadUsageLimits && (query.data?.deliveries.length ?? 0) > 0;
   const usageLimits = useQuery({
     queryKey: queryKeys.agentUsageLimits(queryScope, serverId),
     queryFn: () => workspace().loadAgentUsageLimits(serverId),
-    enabled: online && canReadUsageLimits && (query.data?.deliveries.length ?? 0) > 0,
+    enabled: readsUsageLimits,
     retry: false,
   });
-  const usageLimit = usageLimits.data?.usageLimits.find((limit) => limit.agentId === agentId) ?? null;
+  const usageLimit =
+    (readsUsageLimits && usageLimits.data?.usageLimits.find((limit) => limit.agentId === agentId)) || null;
   const [error, setError] = useState<string | null>(null);
   const activeTurnRef = useRef(activeTurnId);
   activeTurnRef.current = activeTurnId;

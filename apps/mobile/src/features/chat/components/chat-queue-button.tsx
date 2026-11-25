@@ -279,7 +279,7 @@ function ChatQueueCard({
 
 function usageLimitLabel(limit: { resetsAt: number | null }, { t, format }: MobileText): string {
   const date = planLimitResetDate(limit);
-  return date
+  return date && date.getTime() > Date.now()
     ? t("mobile.chat.queue.usageLimitResets", { time: format.date(date, PLAN_LIMIT_RESET_FORMAT) })
     : t("mobile.chat.queue.usageLimit");
 }
