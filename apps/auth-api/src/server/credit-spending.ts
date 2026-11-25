@@ -18,7 +18,7 @@ const SWEEP_BATCH = 50;
 
 export type CreditWallet = { userId: string } | { serverId: string };
 type CreditHoldStatus = "held" | "charged" | "released";
-export type CreditHoldFunding = "paid" | "welcome";
+type CreditHoldFunding = "paid" | "welcome";
 export type CreditHoldOutcome = "completed" | "failed" | "canceled" | "refused" | "abandoned" | "expired";
 export type CreditJobResult =
   | { outcome: "completed"; charged?: number }

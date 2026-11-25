@@ -14,7 +14,7 @@ const JOB_STATUSES: readonly CreditMediaJobStatus[] = ["queued", "processing", "
 const UPSTREAM_NAME = /^[a-z0-9_-]{1,40}$/;
 
 export const LEGACY_MEDIA_UPSTREAM = "router";
-export const MEDIA_GATEWAY_REQUEST_PART = "request";
+const MEDIA_GATEWAY_REQUEST_PART = "request";
 
 export class MediaGatewayError extends Schema.TaggedError<MediaGatewayError>()("MediaGatewayError", {
   status: Schema.Number,
