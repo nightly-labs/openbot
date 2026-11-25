@@ -41,6 +41,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
+    imageCopies,
     openThreadFile,
     installedSkills,
     installedSkillsLoadFailed,
@@ -269,6 +270,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             voice={threadVoice(draftKey())}
             focusRequest={focusRequest()}
             mediaSource={view.runtime?.attachmentMedia}
+            imageCopies={imageCopies()}
             downloads={attachmentDownloads}
             onSend={(text) => sendSide(current().thread, text)}
             onStop={() => current().thread.onStop()}
