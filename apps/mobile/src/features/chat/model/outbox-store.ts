@@ -1,3 +1,4 @@
+import { sourceText } from "@openbot/i18n/source";
 import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
 import type { ChatAttachment } from "../components/use-chat-attachments";
 import {
@@ -86,6 +87,8 @@ export class OutboxStore {
   private storing: ReadonlySet<string> = new Set();
   private readonly cancelRequests = new Set<string>();
   private readonly holds = new Set<string>();
+  private readonly notSentAttempts = new Map<string, number>();
+  private readonly notSentTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private editing: ReadonlySet<string> = new Set();
   private online: ReadonlySet<string> = new Set();
   private storageFailed = false;
@@ -164,6 +167,8 @@ export class OutboxStore {
   setOnline(serverIds: ReadonlySet<string>): void {
     const reconnected = new Set([...serverIds].filter((id) => !this.online.has(id)));
     this.online = serverIds;
+    for (const message of this.messages)
+      if (reconnected.has(message.target.serverId)) this.clearNotSentRetry(message.clientMessageId);
     if (reconnected.size) {
       const now = this.now();
       this.messages = this.messages.map((message) =>
@@ -326,6 +331,7 @@ export class OutboxStore {
   private take(clientMessageId: string): OutboxMessage | null {
     const message = this.find(clientMessageId);
     if (!message || !removable(message)) return null;
+    this.clearNotSentRetry(clientMessageId);
     this.messages = this.messages.filter((item) => item !== message);
     if (this.editing.has(clientMessageId))
       this.editing = new Set([...this.editing].filter((id) => id !== clientMessageId));
@@ -414,6 +420,7 @@ export class OutboxStore {
       if (
         current?.state === "waiting" &&
         !this.holds.has(current.clientMessageId) &&
+        !this.notSentTimers.has(current.clientMessageId) &&
         this.online.has(current.target.serverId)
       )
         void this.start(current);
@@ -457,6 +464,7 @@ export class OutboxStore {
       return;
     }
     this.finishUpload(clientMessageId);
+    this.notSentAttempts.delete(clientMessageId);
     if (result.messageId !== null) {
       this.update(clientMessageId, { state: "sent", messageId: result.messageId });
     } else {
@@ -478,12 +486,36 @@ export class OutboxStore {
       this.update(clientMessageId, { state: "failed", repeatSafe: false, error: null });
     } else if (!this.online.has(message.target.serverId)) {
       this.update(clientMessageId, { state: "waiting", error: null });
+    } else if (stoppedBeforeSend(error) && this.retryNotSentLater(clientMessageId)) {
+      this.update(clientMessageId, { state: "waiting", error: null });
     } else {
+      this.notSentAttempts.delete(clientMessageId);
       this.options.reportFailure?.(error, message);
       this.update(clientMessageId, { state: "failed", error: this.options.describeError(error) });
     }
     void this.persist();
     this.pump();
+  }
+
+  private retryNotSentLater(clientMessageId: string): boolean {
+    const attempt = this.notSentAttempts.get(clientMessageId) ?? 0;
+    if (attempt >= NOT_SENT_RETRY_LIMIT) return false;
+    this.notSentAttempts.set(clientMessageId, attempt + 1);
+    clearTimeout(this.notSentTimers.get(clientMessageId));
+    this.notSentTimers.set(
+      clientMessageId,
+      setTimeout(() => {
+        this.notSentTimers.delete(clientMessageId);
+        this.pump();
+      }, notSentRetryDelay(attempt)),
+    );
+    return true;
+  }
+
+  private clearNotSentRetry(clientMessageId: string): void {
+    clearTimeout(this.notSentTimers.get(clientMessageId));
+    this.notSentTimers.delete(clientMessageId);
+    this.notSentAttempts.delete(clientMessageId);
   }
 
   private setUpload(clientMessageId: string, upload: OutboxUpload): void {
@@ -514,6 +546,18 @@ export class OutboxStore {
     };
     for (const listener of this.listeners) listener();
   }
+}
+
+const NOT_SENT_RETRY_FIRST_MS = 1_000;
+const NOT_SENT_RETRY_MAX_MS = 16_000;
+const NOT_SENT_RETRY_LIMIT = 6;
+
+function notSentRetryDelay(attempt: number): number {
+  return Math.min(NOT_SENT_RETRY_FIRST_MS * 2 ** attempt, NOT_SENT_RETRY_MAX_MS);
+}
+
+function stoppedBeforeSend(error: unknown): boolean {
+  return error instanceof Error && error.message === sourceText("error.remote.selectedServerOffline");
 }
 
 function removable(message: OutboxMessage): boolean {
