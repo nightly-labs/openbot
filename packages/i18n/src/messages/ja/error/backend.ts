@@ -301,6 +301,8 @@ export const messages = {
     "サインインサーバーはまだ OpenBot をアプリとして受け付けていません。原因はお使いのアカウントではありません。ローカル MCP サーバーなど、別の方法で接続してください。",
   "error.backend.mcpRegistrationUnavailable":
     "サインインサーバーは OpenBot をアプリとして登録できません。原因はお使いのアカウントではありません。接続するには、マーケットプレイス、アプリでこのサーバーを保存してから、サインインアプリを追加してください。",
+  "error.backend.mcpSignInAppNeeded":
+    "サインインサーバーは OpenBot をアプリとして登録できません。原因はお使いのアカウントではありません。接続するには、マーケットプレイス、アプリでこのサーバーを開き、接続をテストをクリックしてから、サインインアプリを追加してください。",
   "error.backend.mcpSignInAbandonedGeneric": "サインインは中止されました。",
   "error.backend.mcpSignInForgotten": "MCP のサインインは実行中に破棄されました。",
   "error.backend.mcpSignInAbandoned": "MCP のサインインは中止されました。",

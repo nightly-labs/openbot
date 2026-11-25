@@ -304,6 +304,8 @@ export const messages = {
     "Le serveur de connexion n’accepte pas encore OpenBot comme application. Votre compte n’en est pas la cause. Utilisez un autre moyen de connexion, par exemple un serveur MCP local.",
   "error.backend.mcpRegistrationUnavailable":
     "Le serveur de connexion ne peut pas enregistrer OpenBot comme application. Votre compte n’en est pas la cause. Pour vous connecter, enregistrez ce serveur dans Marketplace, Apps, puis ajoutez-lui une app de connexion.",
+  "error.backend.mcpSignInAppNeeded":
+    "Le serveur de connexion ne peut pas enregistrer OpenBot comme application. Votre compte n’en est pas la cause. Pour vous connecter, ouvrez ce serveur dans Marketplace, Apps, cliquez sur Tester la connexion, puis ajoutez une app de connexion.",
   "error.backend.mcpSignInAbandonedGeneric": "La connexion a été abandonnée.",
   "error.backend.mcpSignInForgotten": "La connexion MCP a été oubliée pendant son exécution.",
   "error.backend.mcpSignInAbandoned": "La connexion MCP a été abandonnée.",
