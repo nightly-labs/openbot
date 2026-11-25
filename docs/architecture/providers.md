@@ -240,7 +240,11 @@ must fire (a correction of how the agent does a class of task, a technique that 
 worked, or a listed skill that was wrong), an update of a covering skill comes before a new skill,
 a new skill has a class-level name, and environment failures, claims that a tool does not work,
 errors that went away, tasks done once and attempts that never worked are not skills. The review
-suggests at most one skill, and only when a signal fired.
+suggests at most one skill, and only when a signal fired. Main also passes `reviewSkillsFull`: true
+when the agent's skill lock holds `INPUT_LIMITS.agentSkills` skills, so the install of a new skill
+would fail. Then the prompt forbids `create` and the review drops a `create` answer, which an idea
+from the OpenClaw skill workshop (MIT) suggested: check a limit when the review proposes, not when
+the save fails. Update suggestions stay. When the read fails, the review can still suggest `create`.
 
 Skill learning is a setting of the server that runs the agents: Server settings > Memory >
 Skill learning, with Automatic (the default), Ask first, or Off. An owner or admin of a joined server

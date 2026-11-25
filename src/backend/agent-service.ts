@@ -467,6 +467,7 @@ export interface AgentServiceOptions {
   saveInstalledCliChoice?: (provider: AgentProvider, installed: boolean) => Effect.Effect<void, AgentLifecycleFailed>;
   localSkillTools?: (() => LocalSkillTools) | undefined;
   reviewSkills?: ((agentId: string) => Effect.Effect<readonly ReviewSkill[], unknown>) | undefined;
+  reviewSkillsFull?: ((agentId: string) => Effect.Effect<boolean, unknown>) | undefined;
   skillLearning?: (() => SkillLearningMode) | undefined;
   userBrowsing?: Pick<UserBrowsingLog, "pending" | "reviewed" | "forgetAgent"> | undefined;
   skillLearner?: (() => SkillLearner) | undefined;
@@ -785,6 +786,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.agentMemoryLimit ? { limit: options.agentMemoryLimit } : {}),
     });
     const reviewSkills = options.reviewSkills;
+    const reviewSkillsFull = options.reviewSkillsFull;
     const skillLearner = options.skillLearner;
     this.#memoryReview = new MemoryReview({
       memories: this.#memories,
@@ -821,6 +823,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           ? this.#appendSideThreadSystemMessage(agentId, sideThreadId, message, "thread.memory-reviewed")
           : this.#appendSystemMessage(agentId, message, "thread.memory-reviewed"),
       ...(reviewSkills ? { skills: reviewSkills } : {}),
+      ...(reviewSkillsFull ? { skillsFull: reviewSkillsFull } : {}),
       ...(options.skillLearning ? { skillLearning: options.skillLearning } : {}),
       ...(options.userBrowsing ? { browsing: options.userBrowsing } : {}),
       ...(skillLearner
