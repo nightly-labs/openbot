@@ -74,7 +74,7 @@ function templateDetail(id: string, updatedAt: string, markdown: string[]): Agen
     routines: [],
     skills: markdown.map((text) => {
       const name = text.match(/^name: "?([^"\n]+)"?$/mu)?.[1] ?? "";
-      return { kind: "embedded", slug: name, name, markdown: text };
+      return { kind: "embedded", slug: name.toLowerCase().replaceAll(" ", "-"), name, markdown: text };
     }),
   };
 }
@@ -248,7 +248,7 @@ async function templateScenarios(
       copyId = copy.id;
       assert.equal(copy.name, `${HELPER} 2`);
       assert.equal(copy.instructions, "The template's steps.");
-      assert.equal(await Effect.runPromise(library.templateOrigin(copy.id)), TEMPLATE_ALPHA);
+      assert.equal(await Effect.runPromise(library.templateOrigin(copy.id)), `${TEMPLATE_ALPHA}:${HELPER}`);
       assert.equal(await Effect.runPromise(library.templateOrigin(own.id)), null);
       assert.deepEqual((await installedSlugs(agentId)).toSorted(), [
         [`${HELPER}-2`, copy.id, "installed"],
@@ -268,6 +268,18 @@ async function templateScenarios(
       assert.deepEqual(await installedSlugs("mine"), [[HELPER, own.id, "installed"]]);
     });
 
+    await scenario("a template skill named like an earlier copy does not change that copy", async () => {
+      const other = "---\nname: helper 2\ndescription: Help with another task.\n---\nA different skill.\n";
+      templates.set(TEMPLATE_ALPHA, templateDetail(TEMPLATE_ALPHA, "2026-11-25T01:30:00.000Z", [other]));
+      assert.equal((await install(TEMPLATE_ALPHA)).status, 200);
+      assert.deepEqual((await Effect.runPromise(library.revisions(copyId))).toSorted(), [1, 2]);
+      assert.equal((await Effect.runPromise(library.get(copyId))).instructions, "The template's new steps.");
+      const separate = await bySlug(`${HELPER}-2-2`);
+      assert.ok(separate);
+      assert.equal(separate.instructions, "A different skill.");
+      assert.equal(await Effect.runPromise(library.templateOrigin(separate.id)), `${TEMPLATE_ALPHA}:${HELPER}-2`);
+    });
+
     await scenario("a different template with the same skill name adds a separate copy", async () => {
       templates.set(
         TEMPLATE_BRAVO,
@@ -280,7 +292,7 @@ async function templateScenarios(
       assert.ok(copy);
       assert.equal(copy.name, `${HELPER} 3`);
       assert.equal(copy.instructions, "Another author's steps.");
-      assert.equal(await Effect.runPromise(library.templateOrigin(copy.id)), TEMPLATE_BRAVO);
+      assert.equal(await Effect.runPromise(library.templateOrigin(copy.id)), `${TEMPLATE_BRAVO}:${HELPER}`);
       assert.deepEqual((await Effect.runPromise(library.revisions(copyId))).toSorted(), [1, 2]);
       assert.deepEqual(await Effect.runPromise(library.revisions(own.id)), [1]);
     });
