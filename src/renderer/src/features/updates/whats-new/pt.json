@@ -1,5 +1,41 @@
 [
   {
+    "version": "0.79.0",
+    "date": "2026-11-25",
+    "notices": [
+      "Atualize também para esta versão cada servidor em que você entrou. As ferramentas de imagem e vídeo com créditos, os pedidos de localização e muitas das correções abaixo funcionam em um servidor só quando o servidor tem esta versão."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Os agentes podem criar imagens e vídeos com créditos do OpenBot e editar suas imagens. O cartão de aprovação mostra o modelo, o preço e o prompt. Você pode escolher outro modelo antes de permitir. O item Credits na barra da esquerda mostra seu saldo. Um proprietário ou administrador pode ativar ou desativar “Os agentes podem usar créditos”.",
+          "Cada conta recebe 10 créditos grátis de boas-vindas. Você também pode resgatar um código de crédito na página Credits com Redeem code.",
+          "A aba do navegador de um agente pode pedir sua localização. O chat pergunta primeiro, e você escolhe Bloquear, Permitir sempre ou Permitir. Antes, o navegador sempre bloqueava o pedido.",
+          "A barra lateral tem abas acima da lista de chats: Todos, Não lidas e as pastas que você escolher. Cada aba mostra os chats não lidos dela."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Uma nova etapa de fluxo de trabalho agora começa com um modelo que pode rodar. Uma etapa de texto usa seu modelo preferido, ou o modelo habitual de um provedor conectado.",
+          "Quando você tem só créditos grátis, a lista de modelos de um cartão de aprovação marca com “Créditos grátis” os modelos pagos pelos créditos grátis.",
+          "O painel lateral pode se dividir em até três grupos, um acima do outro. Arraste a linha entre dois grupos para mudar a altura deles."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "O app trava menos, principalmente no Windows. Ele guarda os resultados de verificações lentas por um curto tempo e faz o trabalho lento em segundo plano.",
+          "Quando um agente do Claude termina um plano no modo de planejamento, o chat agora mostra o plano com Aprovar e Stop planning. Antes, nenhuma aprovação aparecia e o agente começava a construir.",
+          "Uma mensagem de outro agente ou de uma rotina não para mais o trabalho de um agente do Claude ocupado.",
+          "Um alerta de um site na aba do navegador de um agente não cobre mais a janela do OpenBot até você clicar em OK. O alerta fecha sozinho e o agente recebe o texto dele.",
+          "Em um desktop Linux X11, digitar no OpenBot não para mais depois que um agente usa Uso do computador em outro app. Se a digitação já tinha parado, saia e entre na sessão de novo uma vez."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.78.0",
     "date": "2026-11-24",
     "notices": [

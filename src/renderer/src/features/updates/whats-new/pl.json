@@ -1,5 +1,41 @@
 [
   {
+    "version": "0.79.0",
+    "date": "2026-11-25",
+    "notices": [
+      "Zaktualizuj także do tej wersji każdy dołączony serwer. Narzędzia do obrazów i wideo za kredyty, prośby o lokalizację oraz wiele poprawek poniżej działają na serwerze tylko wtedy, gdy serwer ma tę wersję."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agenci mogą tworzyć obrazy i filmy za kredyty OpenBot oraz edytować twoje zdjęcia. Karta zatwierdzenia pokazuje model, cenę i prompt. Zanim zezwolisz, możesz wybrać inny model. Pozycja Credits w lewym pasku pokazuje twoje saldo. Właściciel lub administrator może włączyć albo wyłączyć opcję „Agenci mogą używać kredytów”.",
+          "Każde konto dostaje 10 darmowych kredytów powitalnych. Na stronie Credits możesz też zrealizować kod kredytowy przyciskiem Redeem code.",
+          "Karta przeglądarki agenta może poprosić o twoją lokalizację. Czat najpierw cię pyta, a ty wybierasz Blokuj, Zawsze zezwalaj albo Zezwól. Wcześniej przeglądarka zawsze blokowała prośbę.",
+          "Pasek boczny ma karty nad listą czatów: Wszystkie, Nieprzeczytane oraz foldery, które wybierzesz. Każda karta pokazuje swoje nieprzeczytane czaty."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Nowy krok przepływu pracy zaczyna się teraz od modelu, który może działać. Krok tekstowy używa twojego ulubionego modelu albo zwykłego modelu połączonego dostawcy.",
+          "Gdy masz tylko darmowe kredyty, lista modeli na karcie zatwierdzenia oznacza modele, za które płacą darmowe kredyty, znacznikiem „Darmowe kredyty”.",
+          "Panel boczny może podzielić się na do trzech grup, jedna nad drugą. Przeciągnij linię między dwiema grupami, aby zmienić ich wysokość."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Aplikacja zamarza rzadziej, głównie w Windows. Przez krótki czas zachowuje wyniki wolnych sprawdzeń i wykonuje wolną pracę w tle.",
+          "Gdy agent Claude kończy plan w trybie planowania, czat pokazuje teraz plan z przyciskami Zatwierdź i Stop planning. Wcześniej nie pojawiało się zatwierdzenie i agent zaczynał budować.",
+          "Wiadomość od innego agenta lub rutyny nie zatrzymuje już pracy zajętego agenta Claude.",
+          "Alert ze strony w karcie przeglądarki agenta nie zasłania już okna OpenBot, dopóki nie klikniesz OK. Alert zamyka się sam, a agent dostaje jego tekst.",
+          "Na pulpicie Linux X11 pisanie w OpenBot nie zatrzymuje się już po tym, jak agent użyje Sterowania komputerem w innej aplikacji. Jeśli pisanie już się zatrzymało, wyloguj się i zaloguj ponownie."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.78.0",
     "date": "2026-11-24",
     "notices": [
