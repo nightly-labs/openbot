@@ -82,6 +82,8 @@ export const messages = {
   "prompt.mediaApproval.setDefault": "기본값으로 설정",
   "prompt.mediaApproval.perImage": "이미지당",
   "prompt.mediaApproval.forSeconds": "{count}초",
+  "prompt.mediaApproval.freeCredits": "무료 크레딧",
+  "prompt.mediaApproval.paidOnly": "유료 크레딧 전용",
   "prompt.mediaApproval.defaultFailed": "기본 모델을 저장하지 못했습니다. 다시 시도하세요.",
   "prompt.creditsHold.needMore": "크레딧이 더 필요해요",
   "prompt.creditsHold.cannotUse": "크레딧을 사용할 수 없어요",

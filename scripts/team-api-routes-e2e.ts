@@ -1436,7 +1436,11 @@ const fakeMediaOffer: MediaApprovalOffer = {
   choice: { model: "gpt-image-2", aspect: "1:1", resolution: null, duration: null, audio: false },
   defaultModel: null,
   canSetDefault: true,
-  models: [fakeMediaModel("gpt-image-2", "GPT Image 2", 12), fakeMediaModel("nano-banana-2", "Nano Banana 2", 8)],
+  models: [
+    fakeMediaModel("gpt-image-2", "GPT Image 2", 12),
+    { ...fakeMediaModel("nano-banana-2", "Nano Banana 2", 8), welcome: true },
+  ],
+  balance: { available: 10, welcome: 10 },
 };
 
 const fakeAgents: TeamApiAgents = {
@@ -10380,6 +10384,18 @@ try {
         MEDIA_APPROVAL_CHOICE_CODECS.get(route.read)?.response(200, memberRead.body) !== undefined &&
         isDeepStrictEqual(other.body, { media: null, hold: null }),
       [summary(memberRead), summary(adminRead), summary(other)],
+    );
+    const wireOffer = decodeMediaApprovalReadResponse(
+      MEDIA_APPROVAL_CHOICE_CODECS.get(route.read)?.response(200, memberRead.body) ?? {},
+    ).media;
+    check(
+      "the media offer keeps the free-credit models and the payer's paid and free credits on the wire, so the picker can mark the paid-only models",
+      isDeepStrictEqual(wireOffer?.balance, { available: 10, welcome: 10 }) &&
+        isDeepStrictEqual(
+          wireOffer?.models.map((model) => model.welcome === true),
+          [false, true],
+        ),
+      [summary(memberRead), JSON.stringify(wireOffer?.balance ?? null)],
     );
     const choice = { model: "nano-banana-2", aspect: "16:9", resolution: null, duration: null, audio: false };
     const allowed = await call("POST", route.respond, {

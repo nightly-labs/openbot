@@ -3,6 +3,7 @@ import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import {
   CREDIT_MEDIA_PROMPT_LIMIT,
   CREDIT_MEDIA_REFERENCE_LIMIT,
+  type CreditMediaBalance,
   type CreditMediaGenerationKind,
   type CreditMediaInputRole,
   type CreditMediaJobRequest,
@@ -457,6 +458,7 @@ function approvalOffer(
   kind: CreditMediaGenerationKind,
   planned: PlannedJob,
   defaultModel: string | null,
+  balance: CreditMediaBalance | null,
 ): MediaApprovalOffer {
   const others = models.filter(
     (model) => model.kind === kind && model.id !== planned.model.id && inputProblem(model, planned.inputs) === null,
@@ -470,6 +472,7 @@ function approvalOffer(
     defaultModel: offered.some((model) => model.id === defaultModel) ? defaultModel : null,
     canSetDefault: true,
     models: offered,
+    ...(balance ? { balance: { available: balance.available, welcome: balance.welcome ?? 0 } } : {}),
   };
 }
 
@@ -663,7 +666,8 @@ export class CreditMediaTools {
         kind === "image"
           ? sourceText("status.agent.creditImageApproval", { model: name, credits: first.cost })
           : sourceText("status.agent.creditVideoApproval", { model: name, credits: first.cost });
-      const approval = yield* call.approve(reason, approvalOffer(models, kind, first, defaultModel));
+      const balance = yield* media.balance();
+      const approval = yield* call.approve(reason, approvalOffer(models, kind, first, defaultModel, balance));
       run.facts.approval = {
         accepted: approval.accepted,
         via: approval.via,

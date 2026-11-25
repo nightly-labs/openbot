@@ -28,6 +28,12 @@ export interface MediaApprovalOffer {
   defaultModel: string | null;
   canSetDefault: boolean;
   models: CreditMediaModel[];
+  balance?: MediaApprovalBalance;
+}
+
+export interface MediaApprovalBalance {
+  available: number;
+  welcome: number;
 }
 
 export interface ReadMediaApprovalInput {
@@ -72,6 +78,7 @@ export function parseMediaApprovalOffer(value: unknown): MediaApprovalOffer | nu
     .map(parseCreditMediaModel)
     .filter((model): model is CreditMediaModel => model !== null && model.kind === kind);
   if (!models.some((model) => model.id === choice.model)) return null;
+  const balance = parseMediaApprovalBalance(value.balance);
   return {
     kind,
     prompt: value.prompt,
@@ -80,7 +87,14 @@ export function parseMediaApprovalOffer(value: unknown): MediaApprovalOffer | nu
     defaultModel: value.defaultModel,
     canSetDefault: value.canSetDefault,
     models,
+    ...(balance ? { balance } : {}),
   };
+}
+
+function parseMediaApprovalBalance(value: unknown): MediaApprovalBalance | null {
+  if (!isDynamicRecord(value) || !isCreditsHoldAmount(value.available) || !isCreditsHoldAmount(value.welcome))
+    return null;
+  return { available: value.available, welcome: Math.min(value.welcome, value.available) };
 }
 
 export function parseReadMediaApprovalInput(value: unknown): ReadMediaApprovalInput {

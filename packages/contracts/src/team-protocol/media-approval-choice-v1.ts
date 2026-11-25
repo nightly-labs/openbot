@@ -78,6 +78,11 @@ const calls: AdminDecoder = (value) => {
   return value;
 };
 
+const welcomeModel: AdminDecoder = (value) => {
+  if (value !== true) throw new Error("Invalid media model.");
+  return value;
+};
+
 const hold = fields({
   reason: oneOf(...CREDITS_HOLD_REASONS),
   images: calls,
@@ -94,25 +99,28 @@ const price = fields({
   silentCredits: nullable(credits),
 });
 
-const model = fields({
-  id: modelId,
-  kind: oneOf("image", "video"),
-  name: string(120),
-  maker: string(80),
-  variant: nullable(string(40)),
-  aspects: list(spec, 40),
-  defaultAspect: nullable(spec),
-  resolutions: list(spec, 40),
-  defaultResolution: nullable(spec),
-  durations: list(seconds, 100),
-  defaultDuration: nullable(seconds),
-  frames: count,
-  references: count,
-  audio: boolean,
-  maxCount: count,
-  promptRequired: boolean,
-  prices: list(price, 40),
-});
+const model = fields(
+  {
+    id: modelId,
+    kind: oneOf("image", "video"),
+    name: string(120),
+    maker: string(80),
+    variant: nullable(string(40)),
+    aspects: list(spec, 40),
+    defaultAspect: nullable(spec),
+    resolutions: list(spec, 40),
+    defaultResolution: nullable(spec),
+    durations: list(seconds, 100),
+    defaultDuration: nullable(seconds),
+    frames: count,
+    references: count,
+    audio: boolean,
+    maxCount: count,
+    promptRequired: boolean,
+    prices: list(price, 40),
+  },
+  { welcome: welcomeModel },
+);
 
 const choice = fields({
   model: modelId,
@@ -122,15 +130,18 @@ const choice = fields({
   audio: boolean,
 });
 
-const offer = fields({
-  kind: oneOf("image", "video"),
-  prompt: string(CREDIT_MEDIA_PROMPT_LIMIT),
-  agentModel: modelId,
-  choice,
-  defaultModel: nullable(modelId),
-  canSetDefault: boolean,
-  models: list(model, MEDIA_APPROVAL_MODEL_LIMIT),
-});
+const offer = fields(
+  {
+    kind: oneOf("image", "video"),
+    prompt: string(CREDIT_MEDIA_PROMPT_LIMIT),
+    agentModel: modelId,
+    choice,
+    defaultModel: nullable(modelId),
+    canSetDefault: boolean,
+    models: list(model, MEDIA_APPROVAL_MODEL_LIMIT),
+  },
+  { balance: fields({ available: amount, welcome: amount }) },
+);
 
 export const MEDIA_APPROVAL_CHOICE_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   [

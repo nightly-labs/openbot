@@ -832,6 +832,20 @@ async function freeFlow() {
     { data: image.data, request: image.submitted?.request, reports: image.reports },
   );
 
+  approvalCredits = 0;
+  const asked = await call("generate_image", { prompt: "A green kite" });
+  approvalCredits = DEFAULT_MEDIA_APPROVAL_CREDITS;
+  const freeOffer = asked.offers[0];
+  check(
+    "the approval of a free-credit job sends the payer's paid and free credits and marks the free models, so the picker can lock the paid-only ones",
+    asked.result.success &&
+      freeOffer?.agentModel === "image-free" &&
+      JSON.stringify(freeOffer.balance) === JSON.stringify({ available: 10, welcome: 10 }) &&
+      freeOffer.models.find((entry) => entry.id === "image-free")?.welcome === true &&
+      freeOffer.models.some((entry) => entry.id === "image-text" && entry.welcome !== true),
+    freeOffer,
+  );
+
   const video = await call("generate_video", { prompt: "A slow river" });
   check(
     "with no model, a video takes the longest free setting that fits the free credits",

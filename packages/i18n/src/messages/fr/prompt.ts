@@ -82,6 +82,8 @@ export const messages = {
   "prompt.mediaApproval.setDefault": "Définir par défaut",
   "prompt.mediaApproval.perImage": "par image",
   "prompt.mediaApproval.forSeconds": "pour {count} s",
+  "prompt.mediaApproval.freeCredits": "Crédits gratuits",
+  "prompt.mediaApproval.paidOnly": "Crédits payants uniquement",
   "prompt.mediaApproval.defaultFailed": "Impossible d'enregistrer le modèle par défaut. Réessayez.",
   "prompt.creditsHold.needMore": "J'ai besoin de plus de crédits",
   "prompt.creditsHold.cannotUse": "Je ne peux pas utiliser de crédits",
