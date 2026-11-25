@@ -264,7 +264,7 @@ export interface WorkflowCanvasProps {
   onRestoreVersion: (versionId: string) => void;
   onPreviewVersion?: ((versionId: string | null) => void) | undefined;
   onSelect: (workflowId: string) => void;
-  onCreate: (input: { title: string; graph?: WorkflowGraph; paused?: true }) => Promise<void>;
+  onCreate: (input: { title: string; graph?: WorkflowGraph; paused?: true }) => Promise<boolean>;
   onRename: (workflowId: string, title: string) => void;
   onSetPaused?: ((workflowId: string, paused: boolean) => void) | undefined;
   onExport?: ((workflowId: string) => Promise<WorkflowFileSaveResult>) | undefined;
@@ -1204,23 +1204,18 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         : { id: workflow.id, title: workflow.title, steps: workflow.steps, paused: workflow.paused === true },
     );
   };
-  const reportCreate = (cause: unknown) => {
-    toast.error(errorMessage(cause, t("workflow.page.failed")));
-  };
   const onSwitcher = (action: SwitcherAction) => {
     if (action.startsWith("version:")) return openVersion(action.slice("version:".length));
     if (action === "live") return closeVersion();
     if (action !== "rename") closeVersion();
-    if (action === "new") props.onCreate({ title: t("workflow.canvas.untitled") }).catch(reportCreate);
+    if (action === "new") void props.onCreate({ title: t("workflow.canvas.untitled") });
     else if (action === "rename") startRename();
     else if (action === "duplicate")
-      props
-        .onCreate({
-          title: t("workflow.canvas.copyOf", { name: name() }),
-          graph: liveCanvas ? graphFromSnapshot(liveCanvas) : graph(),
-          ...(props.onSetPaused ? { paused: true } : {}),
-        })
-        .catch(reportCreate);
+      void props.onCreate({
+        title: t("workflow.canvas.copyOf", { name: name() }),
+        graph: liveCanvas ? graphFromSnapshot(liveCanvas) : graph(),
+        ...(props.onSetPaused ? { paused: true } : {}),
+      });
     else if (action === "pause" || action === "resume") props.onSetPaused?.(openId(), action === "pause");
     else if (action === "export") exportWorkflow();
     else if (action === "import") importInput?.click();
@@ -1263,8 +1258,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     );
   };
   const finishImport = async (input: { title: string; graph: WorkflowGraph }) => {
-    await props.onCreate({ ...input, ...(props.onSetPaused ? { paused: true } : {}) });
-    setImporting(undefined);
+    if (await props.onCreate({ ...input, ...(props.onSetPaused ? { paused: true } : {}) })) setImporting(undefined);
   };
   const startRename = () => {
     setFolderEdit(undefined);
