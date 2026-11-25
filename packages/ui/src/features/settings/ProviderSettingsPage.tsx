@@ -106,6 +106,16 @@ import { toast } from "../../toast";
 import { AccountUsageWindowList } from "../account/AccountUsageDetails";
 import type { AccountUsageProviderRow, AccountUsageWindowRow } from "../account/account-usage-view";
 import { providerUpdateAvailable, providerVersionLabel } from "../provider-updates/provider-update";
+import {
+  BEDROCK_AUTH_METHODS,
+  BEDROCK_FIELDS,
+  type BedrockAuthMethod,
+  type BedrockDraft,
+  type BedrockField,
+  bedrockDraft,
+  bedrockMissingFields,
+  bedrockVariables,
+} from "./claude-bedrock";
 import { DangerZone, DetailHeader, type IntegrationStatus } from "./IntegrationLayout";
 import { type KeyDialogText, OpenCodeKeyDialog, type ProviderKeyApi } from "./OpenCodeKeyDialog";
 
@@ -630,6 +640,16 @@ function ProviderPage(props: PageProps) {
           {(setup) => <ClaudeUserSetupSection setup={setup()} disabled={props.disabled} />}
         </Show>
         <Show when={models()}>{(control) => <ModelsSection control={control()} />}</Show>
+        <Show when={props.option.id === "claude" && environment()}>
+          {(control) => (
+            <BedrockSection
+              control={control()}
+              name={props.option.name}
+              disabled={props.disabled}
+              menuMount={props.menuMount}
+            />
+          )}
+        </Show>
         <Show when={isProviderEnvironmentProvider(props.option.id) && environment()}>
           {(control) => (
             <EnvironmentSection
@@ -1973,6 +1993,223 @@ function ClaudeUserSetupSection(props: { setup: ProviderClaudeUserSetup; disable
             </ItemActions>
           </Show>
         </Item>
+      </ItemGroup>
+    </SettingsSection>
+  );
+}
+
+const BEDROCK_FIELD_LABELS: Readonly<Record<BedrockField, AppTextKey>> = {
+  region: "provider.settings.bedrockRegion",
+  apiKey: "provider.settings.bedrockApiKey",
+  accessKeyId: "provider.settings.bedrockAccessKeyId",
+  secretAccessKey: "provider.settings.bedrockSecretAccessKey",
+  sessionToken: "provider.settings.bedrockSessionToken",
+  profile: "provider.settings.bedrockProfile",
+  opusModel: "provider.settings.bedrockOpusModel",
+  sonnetModel: "provider.settings.bedrockSonnetModel",
+  haikuModel: "provider.settings.bedrockHaikuModel",
+};
+
+const BEDROCK_AUTH_LABELS: Readonly<Record<BedrockAuthMethod, AppTextKey>> = {
+  apiKey: "provider.settings.bedrockAuthApiKey",
+  accessKeys: "provider.settings.bedrockAuthAccessKeys",
+  profile: "provider.settings.bedrockAuthProfile",
+};
+
+const BEDROCK_AUTH_INPUTS: Readonly<Record<BedrockAuthMethod, readonly BedrockField[]>> = {
+  apiKey: ["apiKey"],
+  accessKeys: ["accessKeyId", "secretAccessKey", "sessionToken"],
+  profile: ["profile"],
+};
+
+const BEDROCK_MODEL_INPUTS: readonly BedrockField[] = ["opusModel", "sonnetModel", "haikuModel"];
+
+const BEDROCK_PLACEHOLDERS: Partial<Record<BedrockField, AppTextKey>> = {
+  region: "provider.settings.bedrockRegionPlaceholder",
+  profile: "provider.settings.bedrockProfilePlaceholder",
+};
+
+function BedrockSection(props: {
+  control: ProviderEnvironmentControl;
+  name: string;
+  disabled: boolean | undefined;
+  menuMount: HTMLElement | undefined;
+}) {
+  const { t } = useText();
+  const [draft, setDraft] = createSignal<BedrockDraft>(bedrockDraft([]));
+  const [baseline, setBaseline] = createSignal<string>(JSON.stringify(bedrockDraft([])));
+  const [saved, setSaved] = createSignal(false);
+  const dirty = () => JSON.stringify(draft()) !== baseline();
+  const reset = (environment: ProviderEnvironment | null) => {
+    const next = bedrockDraft(environment?.variables ?? []);
+    setDraft(next);
+    setBaseline(JSON.stringify(next));
+  };
+  createEffect(
+    () => props.control.value,
+    (environment) => {
+      const keep = untrack(() => dirty() && !(saved() && !props.control.error));
+      if (keep) return;
+      reset(environment);
+    },
+  );
+  const busy = () => Boolean(props.disabled || props.control.pending || props.control.value === null);
+  const missing = () => bedrockMissingFields(draft());
+  const setField = (field: BedrockField, value: string) => {
+    setSaved(false);
+    setDraft((current) => ({
+      ...current,
+      fields: { ...current.fields, [field]: { value, stored: current.fields[field].stored } },
+    }));
+  };
+  const save = () => {
+    setSaved(true);
+    props.control.onSave(bedrockVariables(props.control.value?.variables ?? [], draft()));
+  };
+  const fieldInput = (field: BedrockField) => {
+    const sensitive = BEDROCK_FIELDS[field].sensitive;
+    const placeholderKey = BEDROCK_PLACEHOLDERS[field];
+    return (
+      <Item class="settings-modal-row provider-environment-row">
+        <div class="provider-environment-fields">
+          <ItemTitle>{t(BEDROCK_FIELD_LABELS[field])}</ItemTitle>
+          <Input
+            size="sm"
+            class="provider-environment-mono"
+            type={sensitive ? "password" : "text"}
+            spellcheck={false}
+            autocomplete="off"
+            aria-label={t(BEDROCK_FIELD_LABELS[field])}
+            placeholder={
+              draft().fields[field].stored
+                ? t("provider.settings.bedrockSaved")
+                : placeholderKey
+                  ? t(placeholderKey)
+                  : BEDROCK_FIELDS[field].name
+            }
+            disabled={busy()}
+            value={draft().fields[field].value}
+            onValueChange={(value) => setField(field, value)}
+          />
+        </div>
+      </Item>
+    );
+  };
+  return (
+    <SettingsSection title={t("provider.settings.bedrock")}>
+      <ItemGroup class="settings-modal-card">
+        <Item class="settings-modal-row">
+          <ItemContent>
+            <ItemTitle id="provider-settings-bedrock-label">{t("provider.settings.bedrockUse")}</ItemTitle>
+            <Show
+              when={props.control.error}
+              fallback={<ItemDescription>{t("provider.settings.bedrockDescription")}</ItemDescription>}
+            >
+              {(message) => (
+                <ItemDescription class="provider-settings-error" role="alert">
+                  {message()}
+                </ItemDescription>
+              )}
+            </Show>
+          </ItemContent>
+          <ItemActions>
+            <Switch
+              checked={draft().enabled}
+              disabled={busy()}
+              aria-label={t("provider.settings.bedrockUse")}
+              onChange={(on: boolean) => {
+                setSaved(false);
+                setDraft((current) => ({ ...current, enabled: on }));
+              }}
+            />
+          </ItemActions>
+        </Item>
+        <Show when={draft().enabled}>
+          {fieldInput("region")}
+          <Item class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle id="provider-settings-bedrock-auth-label">{t("provider.settings.bedrockAuth")}</ItemTitle>
+            </ItemContent>
+            <ItemActions>
+              <Select<BedrockAuthMethod>
+                options={[...BEDROCK_AUTH_METHODS]}
+                value={draft().auth}
+                disabled={busy()}
+                placement="bottom-end"
+                onChange={(auth) => {
+                  if (!auth) return;
+                  setSaved(false);
+                  setDraft((current) => ({ ...current, auth }));
+                }}
+                itemComponent={(item) => (
+                  <SelectItem item={item.item}>{t(BEDROCK_AUTH_LABELS[item.item.rawValue])}</SelectItem>
+                )}
+              >
+                <SelectTrigger size="sm" aria-labelledby="provider-settings-bedrock-auth-label">
+                  <SelectValue<BedrockAuthMethod>>
+                    {(state) => {
+                      const selected = state.selectedOption();
+                      return selected ? t(BEDROCK_AUTH_LABELS[selected]) : "";
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent mount={props.menuMount} />
+              </Select>
+            </ItemActions>
+          </Item>
+          <For each={BEDROCK_AUTH_INPUTS[draft().auth]}>{(field) => fieldInput(field)}</For>
+          <Item class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{t("provider.settings.bedrockModels")}</ItemTitle>
+              <ItemDescription>{t("provider.settings.bedrockModelsDescription")}</ItemDescription>
+            </ItemContent>
+          </Item>
+          <For each={BEDROCK_MODEL_INPUTS}>{(field) => fieldInput(field)}</For>
+        </Show>
+        <Show when={dirty() || (saved() && !props.control.pending && !props.control.error)}>
+          <Item class="settings-modal-row">
+            <ItemContent>
+              <Show
+                when={dirty() && missing()[0]}
+                fallback={
+                  <ItemDescription>
+                    {dirty()
+                      ? t("provider.settings.environmentPending", { name: props.name })
+                      : t("provider.settings.environmentDone", { name: props.name })}
+                  </ItemDescription>
+                }
+              >
+                {(field) => (
+                  <ItemDescription class="provider-settings-error">
+                    {t("provider.settings.bedrockRequired", { field: t(BEDROCK_FIELD_LABELS[field()]) })}
+                  </ItemDescription>
+                )}
+              </Show>
+            </ItemContent>
+            <Show when={dirty()}>
+              <ItemActions>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={props.control.pending}
+                  onClick={() => reset(props.control.value)}
+                >
+                  {t("provider.settings.environmentDiscard")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  loading={props.control.pending}
+                  disabled={busy() || missing().length > 0}
+                  onClick={save}
+                >
+                  {t("provider.settings.environmentSave")}
+                </Button>
+              </ItemActions>
+            </Show>
+          </Item>
+        </Show>
       </ItemGroup>
     </SettingsSection>
   );
