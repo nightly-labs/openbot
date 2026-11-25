@@ -579,7 +579,10 @@ export const messages = {
   "error.provider.piOutdated":
     "Pi {version} è troppo vecchio. Installa Pi 1.1.0 o successivo per il supporto nativo a RPC e MCP.",
   "error.provider.nativeMissing": "La CLI di {provider} non è installata. Scaricala in Impostazioni.",
-  "error.provider.nativeNotStarted": "Impossibile avviare la CLI di {provider}.",
+  "error.provider.nativeNotStarted":
+    "OpenBot ha trovato il {provider} che hai installato, ma non si è avviato. Aggiorna o reinstalla {provider}, poi riprova.",
+  "error.provider.nativeManagedNotStarted":
+    "{provider} non si è avviato sul computer che esegue questo server. Riavvia OpenBot su quel computer. Se ancora non si avvia, scegli Aiuto > Segnala un problema.",
   "error.provider.nativeVersionUnreadable": "Impossibile leggere la versione della CLI di {provider}.",
   "error.provider.piSessionBusy": "Attendi che il turno attuale di Pi finisca.",
   "error.provider.acpSessionBusy": "{provider} sta ancora finendo un turno interrotto. Riprova tra un attimo.",
