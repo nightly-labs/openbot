@@ -141,11 +141,17 @@ kill from outside (no dump) do not count and keep the count. A new version start
 the desktop shows `start-recovery-window.ts` before the start continues. The window has its own
 in-memory session, no preload and no IPC: the page is a `data:` URL whose links go to fixed
 `https://openbot.invalid/recovery/<action>` URLs, and `will-navigate` stops each navigation and runs
-only an exact action URL. After a failed start, macOS gets the in-memory default
+only an exact action URL. The page needs a renderer, and a renderer that security software stops at
+launch cannot show it. When the renderer of the window stops, its page does not load, or it does not
+show in 15 seconds, the window stays hidden and a native message box shows the same text and choices.
+A second launch during recovery brings the window to the front.
+The first load of the main window is tried 3 times when it fails with `ERR_FAILED (-2)`, and each
+renderer exit of the main window writes its reason and exit code to `main.log`. After a failed start, macOS gets the in-memory default
 `ApplePersistenceIgnoreState`: else AppKit asks with a modal alert, before `ready`, whether to reopen
 the windows, and the start waits for that answer. A server or a hosted server shows no window; it
 logs the loop and starts as before. `scripts/start-recovery-e2e.ts` forces crashes and a hang with
-`OPENBOT_E2E_FORCE_START_FAILURE`, which a packaged app ignores.
+`OPENBOT_E2E_FORCE_START_FAILURE`, and stops a renderer with `OPENBOT_E2E_STOP_RENDERER`
+(`first-load` or `recovery`). A packaged app ignores both.
 
 The pure part (`resource-summary.ts`) keeps each day as sparse histograms with two significant digits,
 peaks and counters, so p95 stays exact enough without a sample list. The summary file holds the
