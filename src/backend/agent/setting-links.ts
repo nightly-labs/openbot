@@ -514,7 +514,7 @@ export function searchServerPlaces(query: string, limit = 2): ServerPlace[] {
   const queryTerms = terms(query);
   const namesServer = queryTerms.some((term) => hits(term, SERVER_TERMS));
   const asksAboutProviderAccount =
-    queryTerms.some((term) => hits(term, ACCOUNT_WORDS)) && queryTerms.some((term) => hits(term, PROVIDER_WORDS));
+    queryTerms.some((term) => hits(term, ACCOUNT_WORDS)) && queryTerms.some((term) => PROVIDER_WORDS.includes(term));
   const places = SERVER_PLACES.filter(
     (entry) => namesServer || (asksAboutProviderAccount && entry.answersProviderAccountQuestion),
   );
