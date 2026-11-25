@@ -225,3 +225,30 @@ export const MemberCannotSetDefault: Story = {
 export const OlderServer: Story = {
   args: { media: controls(null) },
 };
+
+function freeCreditsOffer(): MediaApprovalOffer {
+  const models = MODELS.filter((model) => model.kind === "image").map((model) =>
+    model.id === "nano-banana-pro" ? { ...model, welcome: true as const } : model,
+  );
+  const pick = models.find((model) => model.id === "nano-banana-pro");
+  if (!pick) throw new Error("No free story model.");
+  return offer("image", {
+    agentModel: pick.id,
+    choice: {
+      model: pick.id,
+      aspect: pick.defaultAspect,
+      resolution: pick.defaultResolution,
+      duration: null,
+      audio: false,
+    },
+    models: [pick, ...models.filter((model) => model !== pick)],
+    balance: { available: 10, welcome: 10 },
+  });
+}
+
+export const FreeCreditsOnly: Story = {
+  args: {
+    approval: { ...approval, reason: "Generate an image with Nano Banana Pro. This uses 4.5 credits." },
+    media: controls(freeCreditsOffer()),
+  },
+};

@@ -82,6 +82,8 @@ export const messages = {
   "prompt.mediaApproval.setDefault": "Сделать по умолчанию",
   "prompt.mediaApproval.perImage": "за изображение",
   "prompt.mediaApproval.forSeconds": "за {count} с",
+  "prompt.mediaApproval.freeCredits": "Бесплатные кредиты",
+  "prompt.mediaApproval.paidOnly": "Только платные кредиты",
   "prompt.mediaApproval.defaultFailed": "Не удалось сохранить модель по умолчанию. Повторите попытку.",
   "prompt.creditsHold.needMore": "Мне нужно больше кредитов",
   "prompt.creditsHold.cannotUse": "Я не могу использовать кредиты",

@@ -82,6 +82,8 @@ export const messages = {
   "prompt.mediaApproval.setDefault": "デフォルトに設定",
   "prompt.mediaApproval.perImage": "1 枚あたり",
   "prompt.mediaApproval.forSeconds": "{count} 秒",
+  "prompt.mediaApproval.freeCredits": "無料クレジット",
+  "prompt.mediaApproval.paidOnly": "有料クレジットのみ",
   "prompt.mediaApproval.defaultFailed": "デフォルトのモデルを保存できませんでした。もう一度お試しください。",
   "prompt.creditsHold.needMore": "クレジットがもっと必要です",
   "prompt.creditsHold.cannotUse": "クレジットを使えません",
