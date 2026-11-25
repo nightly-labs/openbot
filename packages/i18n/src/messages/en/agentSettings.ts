@@ -46,6 +46,7 @@ export const messages = defineMessages("agentSettings", {
     other: "You can add at most {count} folders",
   },
   "agentSettings.folders.browse.places": "Go to",
+  "agentSettings.folders.browse.path": "Folder path",
   "agentSettings.folders.browse.home": "Home folder",
   "agentSettings.folders.browse.parent": "Up to {folder}",
   "agentSettings.folders.browse.failed": "Could not open this folder.",

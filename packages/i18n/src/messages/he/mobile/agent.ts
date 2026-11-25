@@ -692,6 +692,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "ביטול ההחרגה",
   "mobile.agent.folders.browseTitle": "בחירת תיקייה",
   "mobile.agent.folders.places": "מעבר אל",
+  "mobile.agent.folders.path": "נתיב התיקייה",
   "mobile.agent.folders.home": "תיקיית הבית",
   "mobile.agent.folders.parent": "למעלה אל {folder}",
   "mobile.agent.folders.browseFailed": "לא ניתן לפתוח את התיקייה הזאת.",

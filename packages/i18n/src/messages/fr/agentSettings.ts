@@ -50,6 +50,7 @@ export const messages = {
     other: "Vous pouvez ajouter {count} dossiers au maximum",
   },
   "agentSettings.folders.browse.places": "Aller à",
+  "agentSettings.folders.browse.path": "Chemin du dossier",
   "agentSettings.folders.browse.home": "Dossier personnel",
   "agentSettings.folders.browse.parent": "Remonter à {folder}",
   "agentSettings.folders.browse.failed": "Impossible d’ouvrir ce dossier.",

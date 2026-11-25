@@ -62,6 +62,7 @@ export const messages = {
     other: "Можно добавить не больше {count} папки",
   },
   "agentSettings.folders.browse.places": "Перейти",
+  "agentSettings.folders.browse.path": "Путь к папке",
   "agentSettings.folders.browse.home": "Домашняя папка",
   "agentSettings.folders.browse.parent": "Вверх: {folder}",
   "agentSettings.folders.browse.failed": "Не удалось открыть эту папку.",

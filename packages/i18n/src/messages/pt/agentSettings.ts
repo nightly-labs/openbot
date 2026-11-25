@@ -49,6 +49,7 @@ export const messages = {
     other: "Você pode adicionar no máximo {count} pastas",
   },
   "agentSettings.folders.browse.places": "Ir para",
+  "agentSettings.folders.browse.path": "Caminho da pasta",
   "agentSettings.folders.browse.home": "Pasta pessoal",
   "agentSettings.folders.browse.parent": "Subir para {folder}",
   "agentSettings.folders.browse.failed": "Não foi possível abrir esta pasta.",

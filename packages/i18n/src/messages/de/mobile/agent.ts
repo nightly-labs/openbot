@@ -703,6 +703,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Nicht ausschließen",
   "mobile.agent.folders.browseTitle": "Ordner wählen",
   "mobile.agent.folders.places": "Gehe zu",
+  "mobile.agent.folders.path": "Ordnerpfad",
   "mobile.agent.folders.home": "Benutzerordner",
   "mobile.agent.folders.parent": "Nach oben: {folder}",
   "mobile.agent.folders.browseFailed": "Dieser Ordner kann nicht geöffnet werden.",

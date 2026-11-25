@@ -695,6 +695,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Non escludere",
   "mobile.agent.folders.browseTitle": "Scegli cartella",
   "mobile.agent.folders.places": "Vai a",
+  "mobile.agent.folders.path": "Percorso della cartella",
   "mobile.agent.folders.home": "Cartella Inizio",
   "mobile.agent.folders.parent": "Su a {folder}",
   "mobile.agent.folders.browseFailed": "Impossibile aprire questa cartella.",

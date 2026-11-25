@@ -677,6 +677,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "제외 해제",
   "mobile.agent.folders.browseTitle": "폴더 선택",
   "mobile.agent.folders.places": "이동",
+  "mobile.agent.folders.path": "폴더 경로",
   "mobile.agent.folders.home": "홈 폴더",
   "mobile.agent.folders.parent": "상위 폴더: {folder}",
   "mobile.agent.folders.browseFailed": "이 폴더를 열 수 없어요.",

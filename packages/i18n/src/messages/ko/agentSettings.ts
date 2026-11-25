@@ -47,6 +47,7 @@ export const messages = {
   "agentSettings.folders.missing": "{folder}은(는) 이 컴퓨터의 폴더가 아니에요",
   "agentSettings.folders.limit": { other: "폴더는 최대 {count}개까지 추가할 수 있어요" },
   "agentSettings.folders.browse.places": "이동",
+  "agentSettings.folders.browse.path": "폴더 경로",
   "agentSettings.folders.browse.home": "홈 폴더",
   "agentSettings.folders.browse.parent": "상위 폴더: {folder}",
   "agentSettings.folders.browse.failed": "이 폴더를 열 수 없어요.",

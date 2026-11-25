@@ -703,6 +703,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Parar de excluir",
   "mobile.agent.folders.browseTitle": "Escolher pasta",
   "mobile.agent.folders.places": "Ir para",
+  "mobile.agent.folders.path": "Caminho da pasta",
   "mobile.agent.folders.home": "Pasta pessoal",
   "mobile.agent.folders.parent": "Subir para {folder}",
   "mobile.agent.folders.browseFailed": "Não foi possível abrir esta pasta.",
