@@ -5,8 +5,8 @@ import { writesInOrder } from "@/shared/lib/writes-in-order";
 
 const key = "openbot.mobile.chatOrder.v1";
 
-export const useChatOrderPreference = create<{ order: MobileChatOrder; ready: boolean }>(() => ({
-  order: "unread-group",
+export const useChatOrderPreference = create<{ order: MobileChatOrder | null; ready: boolean }>(() => ({
+  order: null,
   ready: false,
 }));
 

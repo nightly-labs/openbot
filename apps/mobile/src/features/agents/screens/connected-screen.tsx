@@ -449,7 +449,9 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   }, [activeAgents, pinnedAgentIds]);
   const sidebar = sidebarByServer[activeServer.id];
   const waitingAgentIds = useWaitingAgentIds();
-  const chatOrder = useChatOrderPreference((state) => state.order);
+  const chosenChatOrder = useChatOrderPreference((state) => state.order);
+  const hasFolders = (sidebar?.layout?.sections.length ?? 0) > 0;
+  const chatOrder: MobileChatOrder = chosenChatOrder ?? (hasFolders ? "unread-first" : "unread-group");
   const unreadChatIds = useMemo(
     () =>
       chatOrder === "manual" || chatOrder === "recent"
