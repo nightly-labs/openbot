@@ -507,6 +507,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.history.connecting": "Connecting to server",
   "mobile.chat.history.loading": "Loading chat history",
   "mobile.chat.history.waiting": "Waiting for connection",
+  "mobile.chat.history.syncing": "Checking for new messages",
   "mobile.chat.history.loadFailed": "Could not load chat history",
   "mobile.chat.scrollToLatest": "Scroll to latest message",
   "mobile.chat.agentUnavailable.title": "Agent unavailable",

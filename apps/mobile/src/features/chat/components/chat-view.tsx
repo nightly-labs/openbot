@@ -30,6 +30,7 @@ import { ChatEndPullRing, useChatEndPull } from "@/features/chat/components/chat
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
+import { ChatSyncStatus } from "@/features/chat/components/chat-sync-status";
 import type { ChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
 import type { ComposerContextMeter } from "@/features/chat/components/composer-context-ring";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
@@ -1272,6 +1273,7 @@ export function ChatView({
                         : null
                     }
                   />
+                  <ChatSyncStatus syncing={ready && serverOnline && (server?.resuming === true || catchingUp)} />
                 </View>
                 {showBrowserRequests
                   ? chatBrowserRequests

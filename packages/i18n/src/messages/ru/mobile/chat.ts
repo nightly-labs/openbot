@@ -602,6 +602,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Подключение к серверу",
   "mobile.chat.history.loading": "Загрузка истории чата",
   "mobile.chat.history.waiting": "Ожидание подключения",
+  "mobile.chat.history.syncing": "Проверка новых сообщений",
   "mobile.chat.history.loadFailed": "Не удалось загрузить историю чата",
   "mobile.chat.scrollToLatest": "К последнему сообщению",
   "mobile.chat.agentUnavailable.title": "Агент недоступен",

@@ -487,6 +487,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Verbinden met server",
   "mobile.chat.history.loading": "Chatgeschiedenis laden",
   "mobile.chat.history.waiting": "Wachten op verbinding",
+  "mobile.chat.history.syncing": "Zoeken naar nieuwe berichten",
   "mobile.chat.history.loadFailed": "Kan chatgeschiedenis niet laden",
   "mobile.chat.scrollToLatest": "Scroll naar nieuwste bericht",
   "mobile.chat.agentUnavailable.title": "Agent niet beschikbaar",

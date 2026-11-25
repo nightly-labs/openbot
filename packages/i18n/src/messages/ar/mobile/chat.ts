@@ -627,6 +627,7 @@ export const messages = {
   "mobile.chat.history.connecting": "جارٍ الاتصال بالخادم",
   "mobile.chat.history.loading": "جارٍ تحميل سجل الدردشة",
   "mobile.chat.history.waiting": "في انتظار الاتصال",
+  "mobile.chat.history.syncing": "جارٍ البحث عن رسائل جديدة",
   "mobile.chat.history.loadFailed": "تعذّر تحميل سجل الدردشة",
   "mobile.chat.scrollToLatest": "التمرير إلى أحدث رسالة",
   "mobile.chat.agentUnavailable.title": "الوكيل غير متاح",
