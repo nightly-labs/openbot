@@ -1000,7 +1000,6 @@ const hasUnexpectedSkillFiles = Effect.fn("SkillMarketplace.checkFiles")(functio
   root: string,
   expected: Record<string, string>,
 ) {
-  const paths = Object.keys(expected);
   const visit = (directory: string): Effect.Effect<boolean, SkillMarketplaceFailure> =>
     Effect.gen(function* () {
       for (const entry of yield* skillIO(() => readdir(directory, { withFileTypes: true }))) {
@@ -1009,7 +1008,7 @@ const hasUnexpectedSkillFiles = Effect.fn("SkillMarketplace.checkFiles")(functio
         if (entry.isSymbolicLink()) return true;
         if (entry.isDirectory()) {
           if (isRuntimeCacheFolder(entry.name)) continue;
-          if (!paths.some((expectedPath) => expectedPath.startsWith(`${name}/`)) || (yield* visit(path))) return true;
+          if (yield* visit(path)) return true;
         } else if (!entry.isFile() || (!(name in expected) && entry.name !== FINDER_METADATA_FILE)) return true;
       }
       return false;
