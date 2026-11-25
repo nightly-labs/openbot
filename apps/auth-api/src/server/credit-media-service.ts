@@ -37,6 +37,7 @@ import { CreditGrants, welcomeTenthsSql } from "./credit-grants";
 import {
   availableTenthsSql,
   type CreditHold,
+  type CreditHoldInput,
   type CreditHoldOutcome,
   type CreditJobCheck,
   type CreditJobChecker,
@@ -161,10 +162,16 @@ function walletOf(payer: CreditMediaPayer): CreditWallet {
   return payer.wallet === "personal" ? { userId: payer.userId } : { serverId: payer.serverId };
 }
 
+type HoldRequest = Omit<CreditHoldInput, "wallet" | "welcome" | "viaServerId">;
+
 function owns(payer: CreditMediaPayer, hold: CreditHold): boolean {
-  return payer.wallet === "personal"
-    ? hold.userId === payer.userId && hold.serverId === null
-    : hold.serverId === payer.serverId && hold.userId === null;
+  if (payer.wallet === "personal")
+    return hold.userId === payer.userId && hold.serverId === null && hold.viaServerId === null;
+  return hold.viaServerId === payer.serverId || (hold.serverId === payer.serverId && hold.userId === null);
+}
+
+function notEnoughCredits(error: Failure): error is BillingError {
+  return error instanceof BillingError && error.code === "credits_spend_not_enough";
 }
 
 function resumable(hold: CreditHold | null): boolean {
@@ -371,6 +378,15 @@ export class CreditMediaService {
     );
   }
 
+  #serverOwner(serverId: string): Effect.Effect<string | null, Failure> {
+    return billingCall(() =>
+      this.#database
+        .prepare("SELECT owner_user_id FROM remote_hosts WHERE host_id = ?1")
+        .bind(serverId)
+        .first<{ owner_user_id: string }>(),
+    ).pipe(Effect.map((row) => row?.owner_user_id ?? null));
+  }
+
   #gatewayOrFail(): Effect.Effect<MediaGateway, BillingError> {
     return this.#gateway ? Effect.succeed(this.#gateway) : Effect.fail(unavailable());
   }
@@ -403,17 +419,22 @@ export class CreditMediaService {
     yield* this.#issueWelcome(payer);
     const column = payer.wallet === "personal" ? "user_id" : "server_id";
     const id = payer.wallet === "personal" ? payer.userId : payer.serverId;
+    const owner = payer.wallet === "server" ? yield* this.#serverOwner(payer.serverId) : null;
+    if (owner) yield* this.#issueWelcome({ wallet: "personal", userId: owner });
     const row = yield* billingCall(() =>
       this.#database
         .prepare(
           `SELECT ${availableTenthsSql(column, "?1")} AS available_tenths,
-                  ${welcomeTenthsSql(column, "?1")} AS welcome_tenths`,
+                  ${welcomeTenthsSql(column, "?1")} AS welcome_tenths,
+                  ${welcomeTenthsSql("user_id", "?2")} AS owner_welcome_tenths`,
         )
-        .bind(id)
-        .first<{ available_tenths: number; welcome_tenths: number }>(),
+        .bind(id, owner)
+        .first<{ available_tenths: number; welcome_tenths: number; owner_welcome_tenths: number }>(),
     );
-    const availableTenths = Math.max(0, row?.available_tenths ?? 0);
-    const welcomeTenths = Math.min(availableTenths, Math.max(0, row?.welcome_tenths ?? 0));
+    const ownTenths = Math.max(0, row?.available_tenths ?? 0);
+    const ownerWelcomeTenths = Math.max(0, row?.owner_welcome_tenths ?? 0);
+    const availableTenths = ownTenths + ownerWelcomeTenths;
+    const welcomeTenths = Math.min(ownTenths, Math.max(0, row?.welcome_tenths ?? 0)) + ownerWelcomeTenths;
     const balance: CreditMediaBalance = { wallet: payer.wallet, available: creditsFromTenths(availableTenths) };
     if (welcomeTenths > 0) balance.welcome = creditsFromTenths(welcomeTenths);
     return balance;
@@ -484,16 +505,12 @@ export class CreditMediaService {
     const credits = creditMediaCost(stored.model, request);
     if (credits === null) return yield* unavailable();
     quote.credits = credits;
-    const welcome = payer.wallet === "personal" ? stored.welcome : null;
-    if (welcome) yield* this.#issueWelcome(payer);
-    const hold = yield* this.#spending.hold({
-      jobId: request.jobId,
-      wallet: walletOf(payer),
-      actorUserId,
-      modelId: stored.model.id,
-      credits,
-      welcome: welcome !== null,
-    });
+    const hold = yield* this.#hold(
+      payer,
+      { jobId: request.jobId, actorUserId, modelId: stored.model.id, credits },
+      stored.welcome !== null,
+      earlier,
+    );
     if (hold.status === "released") return this.#releasedView(hold);
     if (hold.status === "charged" || hold.providerJobId) return yield* this.#job(payer, hold.jobId, trace);
     const target = yield* this.#spending.claimSubmit(
@@ -527,6 +544,43 @@ export class CreditMediaService {
     };
     const started = (yield* this.#spending.start(hold.jobId, job.id, details, job.upstream)) ?? hold;
     return this.#view(started, job.status, job.pollAfterSeconds, []);
+  }).bind(this);
+
+  readonly #hold = Effect.fn("CreditMedia.hold")(function* (
+    this: CreditMediaService,
+    payer: CreditMediaPayer,
+    request: HoldRequest,
+    welcome: boolean,
+    earlier: CreditHold | null,
+  ): Effect.fn.Return<CreditHold, Failure> {
+    if (payer.wallet === "personal") {
+      if (welcome) yield* this.#issueWelcome(payer);
+      return yield* this.#spending.hold({ ...request, wallet: walletOf(payer), welcome });
+    }
+    if (earlier?.viaServerId === payer.serverId && earlier.userId !== null)
+      return yield* this.#spending.hold({
+        ...request,
+        wallet: { userId: earlier.userId },
+        welcome: true,
+        viaServerId: payer.serverId,
+      });
+    const serverHold = this.#spending.hold({ ...request, wallet: walletOf(payer) });
+    if (!welcome || earlier) return yield* serverHold;
+    return yield* serverHold.pipe(
+      Effect.catchIf(notEnoughCredits, (error) => this.#ownerWelcomeHold(payer.serverId, request, error)),
+    );
+  }).bind(this);
+
+  readonly #ownerWelcomeHold = Effect.fn("CreditMedia.ownerWelcomeHold")(function* (
+    this: CreditMediaService,
+    serverId: string,
+    request: HoldRequest,
+    serverShort: BillingError,
+  ): Effect.fn.Return<CreditHold, Failure> {
+    const owner = yield* this.#serverOwner(serverId);
+    if (!owner || (request.actorUserId !== null && request.actorUserId !== owner)) return yield* serverShort;
+    yield* this.#issueWelcome({ wallet: "personal", userId: owner });
+    return yield* this.#spending.hold({ ...request, wallet: { userId: owner }, welcome: true, viaServerId: serverId });
   }).bind(this);
 
   #ownedHold(payer: CreditMediaPayer, jobId: string): Effect.Effect<CreditHold | null, Failure> {

@@ -40,6 +40,7 @@ export interface CreditHoldInput {
   modelId: string;
   credits: number;
   welcome?: boolean;
+  viaServerId?: string;
 }
 
 export interface CreditHold {
@@ -55,6 +56,7 @@ export interface CreditHold {
   providerJobId: string | null;
   upstream: string | null;
   funding: CreditHoldFunding;
+  viaServerId: string | null;
 }
 
 export interface CreditSubmitTarget {
@@ -114,6 +116,7 @@ interface HoldRow {
   provider_job_id: string | null;
   upstream: string | null;
   funding: string;
+  via_server_id: string | null;
 }
 
 interface DueRow {
@@ -153,10 +156,24 @@ function walletIds(wallet: CreditWallet): { userId: string | null; serverId: str
   return "userId" in wallet ? { userId: wallet.userId, serverId: null } : { userId: null, serverId: wallet.serverId };
 }
 
-function spenderSql(wallet: CreditWallet): string {
-  if ("userId" in wallet) return "?4 IS NOT NULL AND ?4 = ?2 AND EXISTS (SELECT 1 FROM users WHERE id = ?2)";
-  return `EXISTS (SELECT 1 FROM remote_hosts WHERE host_id = ?3) AND (?4 IS NULL OR EXISTS (
-    SELECT 1 FROM remote_memberships m WHERE m.host_id = ?3 AND m.user_id = ?4 AND m.status = 'active'
+interface SpenderParams {
+  user: string;
+  server: string;
+  actor: string;
+  via: string;
+}
+
+const HOLD_SPENDER: SpenderParams = { user: "?2", server: "?3", actor: "?4", via: "?12" };
+const CHECK_SPENDER: SpenderParams = { user: "?1", server: "?2", actor: "?3", via: "?4" };
+
+function spenderSql(wallet: CreditWallet, { user, server, actor, via }: SpenderParams): string {
+  if ("userId" in wallet)
+    return `EXISTS (SELECT 1 FROM users WHERE id = ${user}) AND CASE
+      WHEN ${via} IS NULL THEN ${actor} IS NOT NULL AND ${actor} = ${user}
+      ELSE (${actor} IS NULL OR ${actor} = ${user}) AND EXISTS (SELECT 1 FROM remote_hosts WHERE host_id = ${via} AND owner_user_id = ${user})
+    END`;
+  return `${via} IS NULL AND EXISTS (SELECT 1 FROM remote_hosts WHERE host_id = ${server}) AND (${actor} IS NULL OR EXISTS (
+    SELECT 1 FROM remote_memberships m WHERE m.host_id = ${server} AND m.user_id = ${actor} AND m.status = 'active'
   ))`;
 }
 
@@ -174,6 +191,7 @@ function toHold(row: HoldRow): CreditHold {
     providerJobId: row.provider_job_id,
     upstream: row.upstream,
     funding: isOneOf(HOLD_FUNDINGS, row.funding) ? row.funding : "paid",
+    viaServerId: row.via_server_id,
   };
 }
 
@@ -183,6 +201,7 @@ function sameRequest(hold: CreditHold, input: CreditHoldInput): boolean {
     hold.userId === ids.userId &&
     hold.serverId === ids.serverId &&
     hold.actorUserId === input.actorUserId &&
+    hold.viaServerId === (input.viaServerId ?? null) &&
     hold.modelId === input.modelId &&
     creditTenths(hold.credits) === creditTenths(input.credits)
   );
@@ -243,16 +262,18 @@ export class CreditSpending {
     const column: WalletColumn = ids.userId === null ? "server_id" : "user_id";
     const now = this.#now();
     const welcome = `(?11 = 1 AND ${welcomeTenthsSql(column, "?10")} >= ?6)`;
+    const viaServerId = "userId" in input.wallet ? (input.viaServerId ?? null) : null;
     yield* billingCall(() =>
       this.#database
         .prepare(
           `INSERT INTO credit_holds(
              job_id, user_id, server_id, actor_user_id, model_id, credits_tenths, created_at, check_at, expires_at,
-             funding
+             funding, via_server_id
            )
-           SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, CASE WHEN ${welcome} THEN 'welcome' ELSE 'paid' END
-            WHERE ${spenderSql(input.wallet)}
-              AND (${welcome} OR ${paidTenthsSql(column, "?10")} - ${overdueGrantTenthsSql(column, "?10", "?7")} >= ?6)
+           SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, CASE WHEN ${welcome} THEN 'welcome' ELSE 'paid' END, ?12
+            WHERE ${spenderSql(input.wallet, HOLD_SPENDER)}
+              AND (${welcome} OR (?12 IS NULL
+                AND ${paidTenthsSql(column, "?10")} - ${overdueGrantTenthsSql(column, "?10", "?7")} >= ?6))
            ON CONFLICT(job_id) DO NOTHING`,
         )
         .bind(
@@ -267,6 +288,7 @@ export class CreditSpending {
           now + CREDIT_HOLD_LIMIT_MS,
           ids.userId ?? ids.serverId,
           input.welcome === true ? 1 : 0,
+          viaServerId,
         )
         .run(),
     );
@@ -277,8 +299,8 @@ export class CreditSpending {
     }
     const allowed = yield* billingCall(() =>
       this.#database
-        .prepare(`SELECT 1 AS allowed WHERE ${spenderSql(input.wallet)}`)
-        .bind(null, ids.userId, ids.serverId, input.actorUserId)
+        .prepare(`SELECT 1 AS allowed WHERE ${spenderSql(input.wallet, CHECK_SPENDER)}`)
+        .bind(ids.userId, ids.serverId, input.actorUserId, viaServerId)
         .first<{ allowed: number }>(),
     );
     if (!allowed)
@@ -417,7 +439,7 @@ export class CreditSpending {
       this.#database
         .prepare(
           `SELECT job_id, user_id, server_id, actor_user_id, model_id, credits_tenths, status, outcome, charged_tenths,
-                  provider_job_id, upstream, funding
+                  provider_job_id, upstream, funding, via_server_id
              FROM credit_holds WHERE job_id = ?`,
         )
         .bind(jobId)
