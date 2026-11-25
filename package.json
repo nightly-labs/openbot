@@ -352,7 +352,7 @@
     "test:provider-image-mime": "bun scripts/provider-image-mime-e2e.ts",
     "test:workflow-step-settings": "bun scripts/workflow-step-settings-e2e.ts",
     "test:workflow-team-api": "bun scripts/workflow-team-api-e2e.ts",
-    "test:instance-transfer": "bun scripts/instance-transfer-everything-e2e.ts",
+    "test:instance-transfer": "bun scripts/instance-transfer-everything-e2e.ts && bun scripts/instance-transfer-mcp-address-e2e.ts",
     "test:discord-github-files": "bun scripts/discord-github-files-e2e.ts",
     "test:antigravity-accounts": "bun scripts/antigravity-accounts-e2e.ts",
     "test:antigravity-usage-metering": "bun scripts/antigravity-usage-metering-e2e.ts",

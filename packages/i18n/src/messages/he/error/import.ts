@@ -93,6 +93,8 @@ export const messages = {
   "error.import.transferAgentEnv": "{name}: יש להזין שוב את הערכים של {names} בהגדרות.",
   "error.import.transferMcpValues":
     "{name}: שרת ה-MCP נוסף במצב כבוי. יש לבדוק את הפקודה שלו, להזין שוב את הערכים והכתובת המלאה שלו, ולהפעיל אותו בחנות, אפליקציות.",
+  "error.import.transferMcpSignIn":
+    "{name}: האפליקציה נוספה במצב כבוי. יש לחבר אותה שוב ולהפעיל אותה בחנות, אפליקציות.",
   "error.import.transferValuesCleared":
     "{name}: ערכים שעשויים להכיל סוד הוסרו מהארגומנטים או מהכתובת שלו. יש להזין אותם שוב בהגדרות.",
   "error.import.transferSharedKept": "{number} קבצים בתיקייה Shared כבר נמצאים כאן, ולכן הם נשמרים כפי שהם.",
