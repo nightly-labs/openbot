@@ -38,7 +38,7 @@ interface Scenario {
   outsideEdit: string | null;
   shellWrite?: string;
   failedEdit?: boolean;
-  shellRead?: boolean;
+  readCommands?: string[];
   expectedBefore: string;
 }
 
@@ -72,10 +72,10 @@ const SCENARIOS: Scenario[] = [
     expectedBefore: OUTSIDE_EDIT,
   },
   {
-    name: "outside edit, then an agent shell read",
+    name: "outside edit, then an agent shell read and backup",
     approvals: "automatic",
     outsideEdit: OUTSIDE_EDIT,
-    shellRead: true,
+    readCommands: ["cat {file}", "cp {file} {file}.bak"],
     expectedBefore: OUTSIDE_EDIT,
   },
 ];
@@ -127,7 +127,7 @@ async function run(scenario: Scenario, index: number): Promise<ScenarioResult> {
       outsideEdit: scenario.outsideEdit,
       shellWrite: scenario.shellWrite ?? null,
       failedEdit: scenario.failedEdit === true,
-      shellRead: scenario.shellRead === true,
+      readCommands: scenario.readCommands ?? [],
       goFile: join(folder, "go"),
       writes: [AGENT_FIRST, AGENT_SECOND],
     }),

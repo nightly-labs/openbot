@@ -1433,7 +1433,7 @@ export class TurnLifecycle {
         if (notification.method === "item/completed" && item.status === "completed" && workspace) {
           const written = writesFiles(item) ? getArray(params, "filePaths").filter(isString) : [];
           if (written.length > 0) yield* this.#instructions.agentWrote(agentId, workspace, written);
-          else if (runsCommand(item) && writesInstructionFile(commandLine(item)))
+          else if (runsCommand(item) && writesInstructionFile(commandLine(item), workspace))
             yield* this.#instructions.agentRanCommand(agentId, workspace);
         }
         this.fileHistory.record(

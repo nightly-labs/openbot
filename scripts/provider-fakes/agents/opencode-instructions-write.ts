@@ -11,7 +11,10 @@ const plan = JSON.parse(readFileSync(process.env.FAKE_PLAN ?? "", "utf8"));
 const outsideEdit = isDynamicRecord(plan) && typeof plan.outsideEdit === "string" ? plan.outsideEdit : null;
 const shellWrite = isDynamicRecord(plan) && typeof plan.shellWrite === "string" ? plan.shellWrite : null;
 const failedEdit = isDynamicRecord(plan) && plan.failedEdit === true;
-const shellRead = isDynamicRecord(plan) && plan.shellRead === true;
+const readCommands =
+  isDynamicRecord(plan) && Array.isArray(plan.readCommands)
+    ? plan.readCommands.filter((value): value is string => typeof value === "string")
+    : [];
 const writes =
   isDynamicRecord(plan) && Array.isArray(plan.writes)
     ? plan.writes.filter((value): value is string => typeof value === "string")
@@ -101,9 +104,9 @@ async function failEdit(peer: AcpPeer, sessionId: string, file: string) {
   peer.update(sessionId, { sessionUpdate: "tool_call_update", toolCallId, status: "failed" });
 }
 
-function readWithShell(peer: AcpPeer, sessionId: string, file: string) {
-  const toolCallId = "shell-read";
-  const rawInput = { command: `cat ${file}` };
+function readWithShell(peer: AcpPeer, sessionId: string, file: string, command: string, index: number) {
+  const toolCallId = `shell-read-${index}`;
+  const rawInput = { command: command.replaceAll("{file}", file) };
   peer.update(sessionId, {
     sessionUpdate: "tool_call",
     toolCallId,
@@ -158,7 +161,7 @@ serveFakeAcpAgent({
     if (outsideEdit !== null) writeFileSync(file, outsideEdit);
     if (shellWrite !== null) writeWithShell(peer, sessionId, file, shellWrite);
     if (failedEdit) await failEdit(peer, sessionId, file);
-    if (shellRead) readWithShell(peer, sessionId, file);
+    for (const [index, command] of readCommands.entries()) readWithShell(peer, sessionId, file, command, index + 1);
     for (const [index, content] of writes.entries()) await writeInstructions(peer, sessionId, file, content, index + 1);
     peer.say(sessionId, "done");
     peer.reply(request, { stopReason: "end_turn" });

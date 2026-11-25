@@ -1,5 +1,5 @@
 import { realpath } from "node:fs/promises";
-import { basename, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_INSTRUCTION_FILE_NAMES,
@@ -42,17 +42,23 @@ const IN_PLACE_EDIT =
   /(?:^|\s)(?:sed|perl)\s(?:.*\s)?-(?:[A-Za-z]*i|-in-place)|(?:^|\s)(?:tee|Set-Content|Add-Content|Out-File)\s/iu;
 const MOVE_OR_COPY = /(?:^|\s)(?:mv|cp|Move-Item|Copy-Item)\s/iu;
 
-const mentionsInstructionFile = (text: string) =>
-  AGENT_INSTRUCTION_FILE_NAMES.some((name) => text.toLowerCase().includes(name.toLowerCase()));
+const unquote = (word: string) => word.replace(/^["']|["']$/gu, "");
 
-const partWritesInstructionFile = (part: string) => {
-  if ([...part.matchAll(REDIRECT_TARGET)].some((target) => mentionsInstructionFile(target[1] ?? ""))) return true;
-  const command = part.split(">", 1)[0] ?? "";
-  if (IN_PLACE_EDIT.test(command)) return mentionsInstructionFile(command);
-  return MOVE_OR_COPY.test(command) && mentionsInstructionFile(command.trim().split(/\s+/u).at(-1) ?? "");
+const instructionPathTest = (workspace: string) => {
+  const files = new Set(AGENT_INSTRUCTION_FILE_NAMES.map((name) => comparablePath(join(workspace, name))));
+  return (word: string) => word.length > 0 && files.has(comparablePath(resolve(workspace, unquote(word))));
 };
 
-export const writesInstructionFile = (command: string) => command.split(COMMAND_PARTS).some(partWritesInstructionFile);
+export const writesInstructionFile = (line: string, workspace: string) => {
+  const isInstructionFile = instructionPathTest(workspace);
+  return line.split(COMMAND_PARTS).some((part) => {
+    if ([...part.matchAll(REDIRECT_TARGET)].some((target) => isInstructionFile(target[1] ?? ""))) return true;
+    const words = (part.split(">", 1)[0] ?? "").trim().split(/\s+/u);
+    const command = words.join(" ");
+    if (IN_PLACE_EDIT.test(command)) return words.some(isInstructionFile);
+    return MOVE_OR_COPY.test(command) && isInstructionFile(words.at(-1) ?? "");
+  });
+};
 
 const targetsInstructionFile = Effect.fn("InstructionsChanges.targetsFile")(function* (
   workspace: string,
