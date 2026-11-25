@@ -16,10 +16,10 @@ export function openCodeWindowsShellEnv(
     .split(win32.delimiter)
     .map((folder) => folder.trim().replace(/^"(.*)"$/u, "$1"))
     .filter(Boolean);
+  if (!folders.some(isStorePowerShellAlias)) return {};
   const extensions = (variable(environment, "PATHEXT") || DEFAULT_PATH_EXTENSIONS).split(";").filter(Boolean);
   if (folders.some((folder) => extensions.some((extension) => isFile(win32.join(folder, `pwsh${extension}`)))))
     return {};
-  if (!folders.some(isStorePowerShellAlias)) return {};
   const windowsPowerShell = win32.join(
     variable(environment, "SystemRoot") || "C:\\Windows",
     "System32",
