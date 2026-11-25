@@ -281,6 +281,9 @@ const API_KEY_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 const VAULT_ITEM_TOOLS: ReadonlySet<string> = new Set([
+  "list_logins",
+  "submit_secret",
+  "request_takeover",
   "list_vault_items",
   "request_vault_item",
   "save_vault_item",
@@ -885,12 +888,12 @@ export class OpenBotToolRouter {
               client.respond(toolRequest.id, this.#withBrowserPrimer(toolRequest.params.threadId, result));
               return;
             }
+            if (this.#vaultItems && VAULT_ITEM_TOOLS.has(toolRequest.params.tool)) yield* this.#vaultItems.reload();
             if (toolRequest.params.tool === "request_takeover" || toolRequest.params.tool === "submit_secret") {
               const result = yield* this.#attention.surfaceBrowserTakeover(client, toolRequest);
               if (client.running) client.respond(toolRequest.id, result);
               return;
             }
-            if (this.#vaultItems && VAULT_ITEM_TOOLS.has(toolRequest.params.tool)) yield* this.#vaultItems.reload();
             if (toolRequest.params.tool === "request_vault_item") {
               const result = yield* this.#attention.requestVaultItem(client, toolRequest, {
                 ...toolRequest.params,

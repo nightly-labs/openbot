@@ -1598,6 +1598,7 @@ export class AttentionRegistry {
     const vault = this.#vaultItems;
     const agentId = params.ownerAgentId;
     if (!vault || !agentId) return browserTakeoverError(VAULT_UNAVAILABLE);
+    if (!vault.ready()) return browserTakeoverError(vaultClosedText(vault.status()));
     const change = vaultChange(call.args);
     if (typeof change === "string") return browserTakeoverError(change);
     const agent = this.#vaultAgent(agentId);
@@ -1656,6 +1657,7 @@ export class AttentionRegistry {
     const vault = this.#vaultItems;
     const agentId = params.ownerAgentId;
     if (!vault || !agentId) return browserTakeoverError(VAULT_UNAVAILABLE);
+    if (!vault.ready()) return browserTakeoverError(vaultClosedText(vault.status()));
     const deleted = yield* Effect.result(vault.delete(call.args.id, agentId));
     if (Result.isFailure(deleted)) return vaultFailure("delete", deleted.failure);
     if (deleted.success === null) return browserTakeoverError("No Vault item has this id. Call list_vault_items.");

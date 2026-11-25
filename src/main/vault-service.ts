@@ -319,7 +319,8 @@ export class VaultService {
 
   readonly load = Effect.fn("VaultService.load")(function* (this: VaultService) {
     if (!this.#canPersist()) {
-      logger.warn("The secret storage of this computer is not available, so the Vault is closed.");
+      if (this.#status !== "unavailable")
+        logger.warn("The secret storage of this computer is not available, so the Vault is closed.");
       this.#status = "unavailable";
       return this.#status;
     }
@@ -332,8 +333,9 @@ export class VaultService {
   readonly reload = Effect.fn("VaultService.reload")(function* (this: VaultService) {
     yield* this.#loading.withPermit(
       Effect.gen({ self: this }, function* () {
-        if (this.#status === "ready") return;
-        if ((yield* this.load()) === "ready") this.#emit();
+        const before = this.#status;
+        if (before === "ready") return;
+        if ((yield* this.load()) !== before) this.#emit();
       }),
     );
     return this.state();
