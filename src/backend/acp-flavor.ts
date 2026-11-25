@@ -437,7 +437,7 @@ function hermesSessionNotFound(error: RequestError): boolean | null {
 
 const HERMES_MCP_SERVER_LIMIT = 16;
 
-const HERMES_SESSION_MCP_SINCE = "0.22.1";
+const HERMES_SESSION_MCP_SINCE = "0.22.3";
 
 export const HERMES_ACP_FLAVOR: AcpFlavor = {
   loadInsteadOfResume: { missing: (response) => response.modes == null },
