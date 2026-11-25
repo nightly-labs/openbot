@@ -32,7 +32,7 @@ const AGENT_DOCK_WINDOW_SIZE = { width: 502, height: 640 } as const;
 const DOCK_REOPEN_MAX = 3;
 const DOCK_REOPEN_WINDOW_MS = 60_000;
 
-export type AgentDockSendAction = Extract<AgentDockAction, { type: "send" }>;
+export type AgentDockSendAction = Extract<AgentDockAction, { type: "send" | "start-thread" }>;
 
 export class AgentDockFailed extends Schema.TaggedError<AgentDockFailed>()("AgentDockFailed", {
   cause: Schema.Defect(),
@@ -304,7 +304,7 @@ export class AgentDockWindowController {
 
   performAction(rendererId: number, action: AgentDockAction): Effect.Effect<void, AgentDockFailed> {
     return Effect.suspend(() => {
-      if (action.type === "send") return this.#send(action);
+      if (action.type === "send" || action.type === "start-thread") return this.#send(action);
       if (action.type === "open-chat") {
         if (action.seat === null && this.#chatOwner !== rendererId) return Effect.void;
         const previous = this.#liveWindows().find((entry) => entry.rendererId === this.#chatOwner);
@@ -333,7 +333,8 @@ export class AgentDockWindowController {
   }
 
   #send(action: AgentDockSendAction): Effect.Effect<void, AgentDockFailed> {
-    const key = [action.serverId, action.seat.kind, action.seat.id, action.clientMessageId].join("\u0000");
+    const target = action.type === "send" ? [action.seat.kind, action.seat.id] : ["agent", action.agentId];
+    const key = [action.serverId, ...target, action.clientMessageId].join("\u0000");
     const existing = this.#sends.get(key);
     if (existing) return Deferred.await(existing);
     const done = Deferred.makeUnsafe<void, AgentDockFailed>();

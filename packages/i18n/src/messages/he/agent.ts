@@ -53,6 +53,8 @@ export const messages = {
   "agent.dock.add": "הוספה למעגן",
   "agent.dock.allAdded": "כל הסוכנים והערוצים שלך כבר במעגן",
   "agent.dock.more": "עוד",
+  "agent.dock.mainChat": "הצ׳אט הראשי",
+  "agent.dock.changeChat": "החלפת צ׳אט",
   "agent.dock.keepOpen": "להשאיר פתוח",
   "agent.dock.closeOnLeave": "לסגור בלחיצה בחוץ",
   "agent.dock.openInMain": "פתיחה בחלון הראשי",
