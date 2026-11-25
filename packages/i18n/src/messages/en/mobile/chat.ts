@@ -222,7 +222,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.liveVoice.offline": "The server is not connected. The conversation continues when it connects again.",
   "mobile.chat.liveVoice.speakFailed": "The reply could not be read aloud.",
   "mobile.chat.liveVoice.voiceNotReady": "Choose a reply voice in Settings > Voice.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 cannot read this language.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 cannot read this language. Choose another reply voice in Settings > Voice.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs did not accept the API key.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "The ElevenLabs key is missing a permission. Check it in Settings > Voice.",

@@ -226,7 +226,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "Il server non è connesso. La conversazione riprende quando si riconnette.",
   "mobile.chat.liveVoice.speakFailed": "Non è stato possibile leggere la risposta ad alta voce.",
   "mobile.chat.liveVoice.voiceNotReady": "Scegli una voce in Impostazioni > Voce.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 non legge questa lingua.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 non legge questa lingua. Scegli un'altra voce in Impostazioni > Voce.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs non ha accettato la chiave API.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "Alla chiave ElevenLabs manca un permesso. Controllalo in Impostazioni > Voce.",

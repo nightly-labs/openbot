@@ -228,7 +228,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "השרת לא מחובר. השיחה תימשך כשהוא יתחבר שוב.",
   "mobile.chat.liveVoice.speakFailed": "לא ניתן היה להקריא את התשובה.",
   "mobile.chat.liveVoice.voiceNotReady": "יש לבחור קול תשובה בהגדרות > קול.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 לא יכול לקרוא את השפה הזו.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 לא יכול לקרוא את השפה הזו. יש לבחור קול תשובה אחר בהגדרות > קול.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs לא קיבל את מפתח ה-API.",
   "mobile.chat.liveVoice.elevenLabsPermission": "במפתח של ElevenLabs חסרה הרשאה. יש לבדוק אותו בהגדרות > קול.",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs דורש חיבור לרשת.",
