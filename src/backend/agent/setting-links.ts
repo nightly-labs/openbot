@@ -429,6 +429,7 @@ const PHONE_SERVERS = "On the phone app: in Servers, touch and hold the server";
 export type ServerPlace = Omit<SettingLinkEntry, "words">;
 
 interface ServerPlaceEntry extends SettingLinkEntry {
+  foundWithoutServerWord?: readonly string[];
   answersProviderAccountQuestion?: true;
 }
 
@@ -472,6 +473,30 @@ const SERVER_PLACES: readonly ServerPlaceEntry[] = [
     words: "move migrate migration copy new",
   },
   {
+    title: "Import",
+    place: `On a computer: ${SERVER_SETTINGS} > Import. On the phone app: the server's Server settings > Import agents.`,
+    about:
+      "Any member copies agents from another app into this server: Grok Bot (an export agent there makes a .zip file) or Hermes Agent (its folder or an exported .zip file). Owners and admins also see Another OpenBot computer, which opens Transfer. The user sees every item before anything changes.",
+    words: "importing grok hermes bot bring",
+    foundWithoutServerWord: ["import", "hermes"],
+  },
+  {
+    title: "Vault",
+    place: `On a computer: ${SERVER_SETTINGS} > Vault. The API keys filter shows the saved keys; the menu of a key has Copy API key and Copy variable name.`,
+    about:
+      "Only the owner or an admin. The saved logins, cards, contact info and API keys that agents use, also the keys that an agent saved with save_api_key. A Marketplace app does not read the Vault: to use a saved key in an app, copy it here, then open Marketplace, open the app, and paste it where the app asks for its key (Change key when the app is connected). A member asks the owner.",
+    words: "vault api key keys token tokens secret secrets password passwords credential credentials",
+    foundWithoutServerWord: ["vault", "api", "key", "keys", "token", "secret", "credential", "password"],
+  },
+  {
+    title: "Use my Claude Code setup",
+    place: `On a computer: ${SERVER_SETTINGS} > Providers > Claude > Use my Claude Code setup.`,
+    about:
+      "Only the owner or an admin. On: Claude agents load the CLAUDE.md, skills, agents, hooks and plugins from ~/.claude on that server. Off, the default: each turn sends a shorter prompt. Workspace files load either way. A member asks the owner.",
+    words: "claude code claude.md home user own personal setup config hooks plugins skills load",
+    foundWithoutServerWord: ["claude"],
+  },
+  {
     title: "Provider accounts",
     place: `On a computer: ${SERVER_SETTINGS} > Providers > the provider, such as Claude or ChatGPT > Accounts > Add account. On the phone app: Server settings > Providers > the provider > Add account; for some providers, the phone says to add the account on a computer.`,
     about:
@@ -512,12 +537,16 @@ const SERVER_TERMS = ["server", "computer", "machine", "device", "laptop", "macb
 
 export function searchServerPlaces(query: string, limit = 2): ServerPlace[] {
   const queryTerms = terms(query);
-  const namesServer = queryTerms.some((term) => hits(term, SERVER_TERMS));
   const asksAboutProviderAccount =
     queryTerms.some((term) => hits(term, ACCOUNT_WORDS)) && queryTerms.some((term) => PROVIDER_WORDS.includes(term));
-  const places = SERVER_PLACES.filter(
-    (entry) => namesServer || (asksAboutProviderAccount && entry.answersProviderAccountQuestion),
-  );
+  const places = queryTerms.some((term) => hits(term, SERVER_TERMS))
+    ? SERVER_PLACES
+    : SERVER_PLACES.filter(
+        ({ foundWithoutServerWord, answersProviderAccountQuestion }) =>
+          (foundWithoutServerWord && queryTerms.some((term) => hits(term, foundWithoutServerWord))) ||
+          (answersProviderAccountQuestion && asksAboutProviderAccount),
+      );
+  if (places.length === 0) return [];
   const scored = queryTerms.filter((term) => !hits(term, SERVER_TERMS));
   return rank(places, (entry) => entry, scored, limit, false).map(({ title, place, about }) => ({
     title,

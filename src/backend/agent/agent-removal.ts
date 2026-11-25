@@ -23,6 +23,7 @@ export interface AgentRemovalHooks {
   emit(event: AgentEvent): void;
   listAgents(): AgentSummary[];
   deleteTasks(agentId: string): Effect.Effect<void, AgentRemovalFailed>;
+  clearChannelContexts(agentId: string): Effect.Effect<void, AgentRemovalFailed>;
   cancelMemoryReview(agentId: string): Effect.Effect<void>;
   stopAgentProcess(agentId: string): Effect.Effect<boolean, AgentRemovalFailed>;
   releaseFolderHolders(agentId: string): Effect.Effect<boolean, AgentRemovalFailed>;
@@ -54,6 +55,8 @@ export interface AgentRemovalOptions {
   logger: Logger;
   hooks: AgentRemovalHooks;
 }
+
+const WORK_SETTLE_WAIT_MS = 30_000;
 
 export class AgentRemoval {
   readonly #deleting = new Set<string>();
@@ -122,8 +125,7 @@ export class AgentRemoval {
       }),
       ({ wasPending }) =>
         Effect.gen({ self: this }, function* () {
-          yield* this.#drain.taskFor(agentId)?.pipe(Effect.ignore) ?? Effect.void;
-          yield* this.#hooks.settleModelMoves(agentId);
+          yield* this.#settleWork(agentId);
           const current = yield* removalStep(() => {
             this.#assertIdle(agentId);
             return this.#store.list().find((entry) => entry.id === agentId) ?? agent;
@@ -161,6 +163,21 @@ export class AgentRemoval {
           else this.#heldFolders.delete(agentId);
         }),
       ),
+    );
+  }
+
+  #settleWork(agentId: string): Effect.Effect<void, AgentRemovalFailed> {
+    return Effect.interruptible(
+      Effect.andThen(
+        this.#drain.taskFor(agentId)?.pipe(Effect.ignore) ?? Effect.void,
+        this.#hooks.settleModelMoves(agentId),
+      ),
+    ).pipe(
+      Effect.timeoutOrElse({
+        duration: WORK_SETTLE_WAIT_MS,
+        orElse: () =>
+          Effect.fail(new AgentRemovalFailed({ cause: new Error(sourceText("error.agent.stopBeforeDelete")) })),
+      }),
     );
   }
 
@@ -227,6 +244,8 @@ export class AgentRemoval {
       yield* this.#mailbox
         .deleteAgentData(agent.id, this.#channels.store.allContextThreads())
         .pipe(toAgentRemovalFailed);
+      stage = "channel-contexts";
+      yield* this.#hooks.clearChannelContexts(agent.id);
       stage = "api-keys";
       if (this.#apiKeys) yield* this.#apiKeys.removeAgent(agent.id).pipe(toAgentRemovalFailed);
       const stopped = yield* Effect.result(this.#hooks.stopAgentProcess(agent.id));

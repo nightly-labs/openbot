@@ -101,6 +101,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "החלק הבא",
   "mobile.chat.preview.pdfFailed": "לא ניתן להציג את ה-PDF הזה.",
   "mobile.chat.preview.spreadsheetFailed": "לא ניתן לקרוא את הגיליון הזה.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "הגיליון גדול מדי לתצוגה מקדימה. אפשר לשתף אותו כדי לפתוח אותו באפליקציה אחרת.",
   "mobile.chat.preview.spreadsheetTruncated":
     "התצוגה המקדימה מוגבלת ל-{rows} השורות הראשונות ול-{columns} העמודות הראשונות.",
   "mobile.chat.copyFailedMessage": "יש לנסות שוב.",
@@ -228,7 +230,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "השרת לא מחובר. השיחה תימשך כשהוא יתחבר שוב.",
   "mobile.chat.liveVoice.speakFailed": "לא ניתן היה להקריא את התשובה.",
   "mobile.chat.liveVoice.voiceNotReady": "יש לבחור קול תשובה בהגדרות > קול.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 לא יכול לקרוא את השפה הזו.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 לא יכול לקרוא את השפה הזו. יש לבחור קול תשובה אחר בהגדרות > קול.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs לא קיבל את מפתח ה-API.",
   "mobile.chat.liveVoice.elevenLabsPermission": "במפתח של ElevenLabs חסרה הרשאה. יש לבדוק אותו בהגדרות > קול.",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs דורש חיבור לרשת.",
@@ -514,6 +517,7 @@ export const messages = {
   "mobile.chat.history.connecting": "מתחבר לשרת",
   "mobile.chat.history.loading": "טוען את היסטוריית הצ'אט",
   "mobile.chat.history.waiting": "ממתין לחיבור",
+  "mobile.chat.history.syncing": "בודק אם יש הודעות חדשות",
   "mobile.chat.history.loadFailed": "לא ניתן לטעון את היסטוריית הצ'אט",
   "mobile.chat.scrollToLatest": "גלילה להודעה האחרונה",
   "mobile.chat.agentUnavailable.title": "הסוכן אינו זמין",

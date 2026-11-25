@@ -305,6 +305,8 @@ export const messages = {
     "O servidor parou antes de responder. Execute o comando em um terminal para ver o erro.",
   "error.backend.mcpServerExitedWithOutput": "O servidor parou antes de responder. Ele escreveu: {detail}",
   "error.backend.mcpServerFailedToStart": "O servidor não iniciou: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "O OpenBot não conseguiu iniciar o servidor MCP {name}, porque o programa dele não está instalado no computador que executa o OpenBot. Instale o app que fornece {name} nesse computador, ou desative {name} na Loja, Apps.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} parou de esperar antes de o servidor iniciar, por isso os agentes dele não recebem as ferramentas deste servidor.",
   "error.backend.mcpServerStoppedDuringCall": "O servidor MCP parou antes de responder a esta chamada.",

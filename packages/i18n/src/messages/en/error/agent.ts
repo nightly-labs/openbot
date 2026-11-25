@@ -19,6 +19,8 @@ export const messages = defineMessages("error.agent", {
     "The tool did not run. tool_call found no tool with this name. Use the exact qualified name that tool_search gives, such as openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "The tool did not run. tool_call found no tool with this name. The qualified name is possibly {name}. If it is, send the call again with that name.",
+  "error.agent.toolCallNullValue":
+    "The tool did not run. {name} needs an object or a list at {paths}, but each of these list items arrived as null. Send the call again and give each of these items as a string that holds its JSON.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe found no OpenBot tool named {names}. It describes only the OpenBot and browser tools that openbot.tool_search lists, not MCP tools.",
   "error.agent.toolDescribeDiscoveryNames":

@@ -371,6 +371,11 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
+const TWO_EFFORTS = {
+  defaultReasoningEffort: "medium",
+  supportedReasoningEfforts: [{ reasoningEffort: "medium" }, { reasoningEffort: "low" }],
+};
+
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
   readonly contextCompaction = "native";
@@ -429,8 +434,8 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
         return providerSync(() =>
           decoder({
             data: [
-              { model: PRIMARY, displayName: "Primary" },
-              { model: BACKUP, displayName: "Backup" },
+              { model: PRIMARY, displayName: "Primary", ...TWO_EFFORTS },
+              { model: BACKUP, displayName: "Backup", ...TWO_EFFORTS },
             ],
           }),
         );
@@ -783,6 +788,27 @@ try {
     return { model: setup.model, usageLimitReturn: setup.usageLimitReturn };
   });
 
+  const effortOnBackup = await (async () => {
+    const efforts = (model: AgentModelId) =>
+      service.listModels().find((option) => option.provider === "claude" && option.id === model)
+        ?.supportedReasoningEfforts ?? [];
+    const effort = efforts(PRIMARY).find(
+      (one) => one !== agentOf(mover.id).reasoningEffort && efforts(BACKUP).includes(one),
+    );
+    assert.ok(effort, "The own model and the backup share another effort.");
+    await check("an effort chosen on the backup model is the effort to go back with", async () => {
+      const update = await callTool("update_profile", { agentId: mover.id, reasoningEffort: effort });
+      assert.ok(update.success, update.text);
+      const agent = agentOf(mover.id);
+      assert.equal(agent.model, BACKUP, "The agent stays on the backup model.");
+      assert.equal(agent.reasoningEffort, effort, "The backup model takes the chosen effort.");
+      assert.equal(agent.usageLimitReturn?.model, PRIMARY, "The agent keeps its own model to go back to.");
+      assert.equal(agent.usageLimitReturn?.reasoningEffort, effort, "The own model goes back with the chosen effort.");
+      return { effort };
+    });
+    return effort;
+  })();
+
   await check("after a restart the agent goes back to its own model", async () => {
     await runCauseEffect(service.stop());
     failing([]);
@@ -800,6 +826,7 @@ try {
     );
     const agent = agentOf(mover.id);
     assert.equal(agent.model, PRIMARY, "The agent is back on its own model.");
+    assert.equal(agent.reasoningEffort, effortOnBackup, "The agent keeps the effort chosen on the backup.");
     assert.equal(agent.usageLimitReturn, undefined, "Nothing is left to go back to.");
     const notes = await markers(mover.id, MODEL_SWITCH_ITEM_TYPES["provider-error-ended"]);
     assert.deepEqual(notes, [sourceText("status.agent.modelReturnedAfterError", { model: modelName(PRIMARY) })]);

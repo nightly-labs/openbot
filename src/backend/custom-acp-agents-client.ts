@@ -53,6 +53,10 @@ export type CustomAgentChildFactory = (
 const MODEL_LIST_TIMEOUT_MS = 5_000;
 
 const WRITE_DENIED = /\bEPERM\b|operation not permitted|attempt to write a readonly database/iu;
+export function isDeniedWriteLine(message: string): boolean {
+  return WRITE_DENIED.test(message);
+}
+
 const WORKSPACE_ONLY_HINT = sourceText("error.provider.customAgentWorkspaceOnly", { reason: "" });
 
 function withWorkspaceOnlyHint(message: string): string {

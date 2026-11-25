@@ -116,7 +116,6 @@ import { defaultUsageModel, ownApiKeyNotice, ProviderAccountFailed, ProviderAcco
 import {
   createAcpRequestEchoReader,
   isAcpHandlerDiagnostic,
-  isGitSpawnDiagnostic,
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
   isMcpSessionClosingDiagnostic,
@@ -150,6 +149,8 @@ const logger = createOpenBotLogger("provider-runtime");
 const stderrLogger = createOpenBotLogger("provider-stderr");
 
 const ACCOUNT_USAGE_READ_TIMEOUT_MS = 30_000;
+const START_ACCOUNT_READ_TIMEOUT_MS = 5_000;
+const CODEX_START_ACCOUNT_READ_TIMEOUT_MS = 20_000;
 const CUSTOM_AGENT_USAGE_REUSE_MS = 60_000;
 const CUSTOM_AGENT_USAGE_WAKE_MS = 60 * 60_000;
 const USAGE_RESET_PROVIDERS: ReadonlySet<AgentProvider> = new Set(["codex"]);
@@ -3728,7 +3729,9 @@ export class ProviderRuntime implements ProviderPort {
               "account/read",
               { refreshToken: false },
               accountReadDecoder(provider),
-              providerCheckTimeoutMs(5_000),
+              providerCheckTimeoutMs(
+                provider === "codex" ? CODEX_START_ACCOUNT_READ_TIMEOUT_MS : START_ACCOUNT_READ_TIMEOUT_MS,
+              ),
             )
             .pipe(toProviderOperationFailed);
           if (!account.account) {
@@ -3985,10 +3988,6 @@ export class ProviderRuntime implements ProviderPort {
         stderrLogger.warn("A provider reported a failed usage reading.", { provider: client.provider, message });
         return;
       }
-      if (client.provider === "grok" && isGitSpawnDiagnostic(message)) {
-        stderrLogger.warn("A provider could not start git.", { provider: client.provider, message });
-        return;
-      }
       if (isAcpHandlerDiagnostic(message)) {
         stderrLogger.warn("A provider logged a request that it answered with an error.", {
           provider: client.provider,
@@ -4008,6 +4007,10 @@ export class ProviderRuntime implements ProviderPort {
       }
       if (client.provider === "codex") {
         stderrLogger.warn("Codex logged a diagnostic.", { provider: client.provider, message });
+        return;
+      }
+      if (client.provider === "grok") {
+        stderrLogger.warn("Grok logged a diagnostic.", { provider: client.provider, message });
         return;
       }
       if (client.provider === "hermes") {

@@ -307,6 +307,8 @@ export const messages = {
     "サーバーは応答する前に停止しました。ターミナルでコマンドを実行してエラーを確認してください。",
   "error.backend.mcpServerExitedWithOutput": "サーバーは応答する前に停止しました。出力: {detail}",
   "error.backend.mcpServerFailedToStart": "サーバーが起動しませんでした: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "MCP サーバー {name} のプログラムが OpenBot を実行しているコンピューターにインストールされていないため、OpenBot は起動できませんでした。そのコンピューターに {name} を提供するアプリをインストールするか、マーケットプレイス、アプリで {name} をオフにしてください。",
   "error.backend.mcpServerStartAbandoned":
     "サーバーが起動する前に {provider} が待つのをやめたため、{provider} のエージェントはこのサーバーのツールを使えません。",
   "error.backend.mcpServerStoppedDuringCall": "MCP サーバーがこの呼び出しに応答する前に停止しました。",

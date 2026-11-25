@@ -81,10 +81,11 @@ is never quiet.
 
 A teammate update ends quiet in the same way. It is a teammate's message with `expectsReply` false
 that does not reply to a message of the agent (`quietTeammateDelivery`), so nobody waits for the
-turn. Its prompt names `routine_no_update`, because a provider such as Claude Code makes the model
-write a visible answer, and without the tool each update put filler in the user's chat (#6821). A turn
-of only quiet routine runs and teammate updates settles as above, also on the empty-answer error
-path and in the history import. The desktop chat shows its quiet answers under the marker of the
+turn. A message with `expectsReply` false that replies to the agent's own answer is an update too,
+not a result for the agent (`MailboxStore.followsUpOwnAnswer`, #16136). The prompt of an update
+names `routine_no_update`, because a provider such as Claude Code makes the model write a visible
+answer, and without the tool each update put filler in the user's chat (#6821). A turn of only quiet routine runs and teammate
+updates settles as above, also on the empty-answer error path and in the history import. The desktop chat shows its quiet answers under the marker of the
 last update or request of the turn, which starts closed (`teammateTurnAnswers`).
 
 A teammate's answer to a request that a quiet routine run sent continues that run, so nobody waits
@@ -1115,6 +1116,19 @@ prompt waits for that update, or for the turn end or a stop, up to `ACP_STEER_FI
 the limit, the message waits in the queue. Before, it failed at once and the message waited for the end
 of the whole turn. `scripts/antigravity-steer-e2e.ts` and
 `scripts/devin-steer-e2e.ts` check these paths.
+
+Antigravity ends its prompt while a command that it moved to the background still runs
+(`AcpFlavor.wakesAfterPromptEnds`), and OpenBot keeps the turn open. When the command ends, a current
+CLI reports it and replies by itself, with no prompt open. That reply is the rest of the turn: it ends
+`ACP_OWN_REPLY_SETTLE_MS` (3 s) after its `usage_update`, or after `ACP_OWN_REPLY_QUIET_MS` (2 minutes)
+with no update. Only a command step can stay open: when the reply starts a new background command,
+the turn waits for that command in the same way.
+OpenBot sends the background wake prompt only when the session changed and no update came within
+`ACP_OWN_REPLY_WAIT_MS` (30 s), as an older CLI needs, or when the CLI reported the command end but did
+not reply within `ACP_OWN_REPLY_QUIET_MS`. Before, it always sent the prompt, and the CLI answered it
+again, so the chat showed the same answer twice in one message (#16149).
+`scripts/antigravity-steer-e2e.ts` checks a CLI that replies, a silent CLI, and a reply that starts a
+new command.
 
 A message that comes while a turn starts, before the provider gave the turn id, cannot steer yet and
 stays in the queue. When the mode is "steer" and a delivery of the same lane is starting,

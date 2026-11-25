@@ -455,6 +455,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   },
   promptOpenForBackgroundTasks: true,
   silentTurnLimitMs: 15 * 60_000,
+  openToolStallMs: 30 * 60_000,
   wakesAfterPromptEnds: true,
   restartNoticeOnReload: true,
   selfWakeTools: /\b(?:start|invoke)_subagent\b|^(?:Run(?:ning)? )?schedule\??$/u,
