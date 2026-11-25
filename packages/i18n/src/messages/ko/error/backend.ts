@@ -291,6 +291,8 @@ export const messages = {
   "error.backend.mcpServerExited": "서버가 응답하기 전에 중지되었어요. 터미널에서 명령을 실행해 오류를 확인하세요.",
   "error.backend.mcpServerExitedWithOutput": "서버가 응답하기 전에 중지되었어요. 출력: {detail}",
   "error.backend.mcpServerFailedToStart": "서버가 시작되지 않았어요: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot을 실행하는 컴퓨터에 MCP 서버 {name}의 프로그램이 설치되어 있지 않아서 OpenBot이 시작할 수 없었어요. 그 컴퓨터에 {name}을(를) 제공하는 앱을 설치하거나, 마켓플레이스, 앱에서 {name}을(를) 끄세요.",
   "error.backend.mcpServerStartAbandoned":
     "서버가 시작되기 전에 {provider}가 기다리기를 멈췄어요. 그래서 {provider} 에이전트는 이 서버의 도구를 받지 못해요.",
   "error.backend.mcpServerStoppedDuringCall": "MCP 서버가 이 호출에 응답하기 전에 멈췄어요.",
@@ -415,6 +417,8 @@ export const messages = {
   "error.backend.browserCertificateUntrusted": "이 사이트의 보안 인증서를 신뢰할 수 없어 페이지를 열지 못했어요.",
   "error.backend.browserLowMemory":
     "이 서버의 메모리가 부족해서 브라우저에서 탭을 더 열 수 없어요. 탭을 닫거나 다른 에이전트가 끝날 때까지 기다리세요.",
+  "error.backend.browserNoMemory":
+    "이 서버의 메모리가 거의 없어서 지금은 브라우저에서 탭을 열 수 없어요. 다른 에이전트가 끝난 뒤 다시 시도하세요.",
   "error.backend.browserOpenFailed": "{url}을(를) 열 수 없어요: {reason}",
   "error.backend.popupSecureInput":
     "보안 입력 중에는 팝업이 차단돼요. 보안 입력을 마치거나 취소한 후 페이지에서 다시 시도하세요.",

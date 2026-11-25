@@ -38,10 +38,17 @@ interface Report {
   slowEndpoint?: { status: string | null; reply: string; elapsedMs: number };
   slowFlavor?: { quietStatus: string | null; hangStatus: string | null; hangElapsedMs: number };
   tool?: { status: string | null; elapsedMs: number };
+  openTool?: { longToolStatus: string | null; hangStatus: string | null; error: string | null; elapsedMs: number };
   stop?: { status: string | null; elapsedMs: number; next: string | null };
   stream?: { deltaBeforeCompletion: boolean; reply: string };
   antigravity?: { stalled: boolean; stopStatus: string | null };
   antigravitySilent?: { status: string | null; error: string | null; elapsedMs: number };
+  antigravityOpenStep?: {
+    longStepStatus: string | null;
+    hangStatus: string | null;
+    error: string | null;
+    elapsedMs: number;
+  };
   antigravityLogged?: { status: string | null; error: string | null; elapsedMs: number };
   lostPrompt?: { status: string | null; reply: string; prompts: number; cancels: number; resumes: number };
   lostTwice?: { status: string | null; error: string | null; elapsedMs: number; next: string | null };
@@ -246,6 +253,29 @@ try {
   assert.equal(tool.value.status, "completed", "A long tool call does not stall the turn.");
   assert.ok(tool.elapsedMs >= TOOL_MS, "The tool call ran for its whole time.");
 
+  const openToolLog = join(root, "opencode-open-tool.jsonl");
+  const openToolClient = await open("opencode", { ...OPENCODE_ACP_FLAVOR, openToolStallMs: TOOL_MS * 2 }, openToolLog);
+  const openToolThread = await startThread(openToolClient, { cwd: workspace });
+  const longTool = await runTurn(openToolClient, openToolThread, { text: "tool" });
+  const openTool = await timed(() =>
+    runTurn(openToolClient, openToolThread, { text: "tool-hang", timeoutMs: TOOL_MS * 10 }),
+  );
+  report.openTool = {
+    longToolStatus: longTool.status,
+    hangStatus: openTool.value.status,
+    error: openTool.value.error,
+    elapsedMs: openTool.elapsedMs,
+  };
+  assert.equal(longTool.status, "completed", "A tool call shorter than the open tool limit still completes.");
+  assert.equal(openTool.value.status, "failed", "A tool call that never ends fails the turn.");
+  assert.equal(
+    openTool.value.error,
+    sourceText("error.agent.turnStalled", { provider: "OpenCode" }),
+    "A tool call that never ends names the stall.",
+  );
+  assert.ok(openTool.elapsedMs >= TOOL_MS * 2, "The open tool call was ended at the open tool limit, not before.");
+  assert.ok(openTool.elapsedMs < TOOL_MS * 6, "The open tool call did not hold the turn much past its limit.");
+
   const stopThread = await startThread(client, { cwd: workspace });
   const stopping = timed(() => runTurn(client, stopThread, { text: "hang", timeoutMs: 30_000 }));
   await waitForEntry(
@@ -301,6 +331,29 @@ try {
   };
   assert.equal(silentTurn.value.status, "failed", "A silent Antigravity prompt ends at its silent limit.");
   assert.ok(silentTurn.elapsedMs >= STALL_MS * 2, "The silent prompt is not ended before its silent limit.");
+
+  const openStepFlavor: AcpFlavor = { ...silentFlavor, openToolStallMs: TOOL_MS * 2 };
+  const openStep = await open("antigravity", openStepFlavor, join(root, "antigravity-open-step.jsonl"));
+  const openStepThread = await startThread(openStep, { cwd: workspace });
+  const longStep = await runTurn(openStep, openStepThread, { text: "tool" });
+  const hungStep = await timed(() => runTurn(openStep, openStepThread, { text: "tool-hang", timeoutMs: TOOL_MS * 10 }));
+  report.antigravityOpenStep = {
+    longStepStatus: longStep.status,
+    hangStatus: hungStep.value.status,
+    error: hungStep.value.error,
+    elapsedMs: hungStep.elapsedMs,
+  };
+  assert.equal(longStep.status, "completed", "An Antigravity step longer than the silent limit still completes.");
+  assert.equal(hungStep.value.status, "failed", "An Antigravity step that never ends fails the turn.");
+  assert.equal(
+    hungStep.value.error,
+    sourceText("error.agent.turnStalled", { provider: "Gemini" }),
+    "An Antigravity step that never ends names the stall.",
+  );
+  assert.ok(
+    hungStep.elapsedMs >= TOOL_MS * 2,
+    "The open Antigravity step was ended at the open tool limit, not before.",
+  );
 
   const geminiDir = join(root, "gemini");
   const agyLogs = join(geminiDir, "antigravity-acp", "log");

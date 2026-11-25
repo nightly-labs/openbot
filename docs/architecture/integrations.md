@@ -762,6 +762,11 @@ There are three parts:
   click (or Cmd/Ctrl+Enter) is stopped in the capture phase. The script reads the post, the posts above
   it and the author's next posts (no replies by other people), gives them to the worker, and clicks the
   button again with `data-openbot-x-pass`, so X posts the reply at once.
+  Each part has selectors for the earlier X web app (`data-testid`) and for the X web app of November
+  2026, which has no test ids: its text box is a `textarea`, so the script reads its value. That app
+  shows no `<time datetime>`, so the time comes from the status ID in the post link (an X ID holds its
+  creation time). In the reply dialog the post has no link; the script then takes the ID from
+  `in_reply_to` in the page address when the address has one.
 - **Worker** (`src/background.ts`). It answers the selectors, and keeps each post in a queue
   (`src/x-outbox.ts`, `chrome.storage.local`) until the server has it. Each post keeps one
   `clientMessageId`, and the host answers a repeated id with the first receipt for a day, so a retry
@@ -787,7 +792,8 @@ There are three parts:
   other.
 
 The E2E (`scripts/browser-extension-e2e.ts`, step 7) uses a local copy of an X post page whose reply
-button has a test id that only the served selectors know.
+button has a test id that only the served selectors know, then a local page in the markup of the new X
+web app that only the new selectors find.
 
 ## Agents on the member's Chrome (host side)
 
@@ -823,33 +829,33 @@ The extension is a remote client, so no new data channel is necessary:
 
 ### The extension side
 
-The extension (`apps/browser-extension`) shares the user's open web tabs while the user is signed in,
-until the user stops sharing. A tab that an agent works in joins the Chrome tab group "OpenBot" of its
+The extension (`apps/browser-extension`) shares the user's open web tabs while the user is signed in.
+There is no switch to stop it. A tab that an agent works in joins the Chrome tab group "OpenBot" of its
 window.
 
 - **Worker** (`src/client-browser-worker.ts`). Only the worker can use `chrome.debugger`, so it owns the
-  group, the approvals and the commands. Sharing is on unless `openbot.client-browser.sharing.v1`
-  holds `{ off: true }`, which "Stop sharing" stores; "Share tabs with agents" clears it. The worker
+  group, the approvals and the commands. Sharing is always on; `openbot.client-browser.sharing.v1` keeps
+  only the ID of the OpenBot group, and the worker ignores an `{ off: true }` that an older version
+  stored. The worker
   answers the presence (the open web tabs, the active tab first, at most 50), and tells the page with
   the connection when a tab opens, closes or changes. A command groups its tab on attach, unless the tab
-  is in another group. Stop sharing ungroups the tabs, denies the cards that wait and detaches.
+  is in another group.
 - **Connection** (`src/client-browser-link.ts`). The page that holds the server connection (the side
   panel, else the offscreen page) sends the presence when it changes (at most once in 5 s, and an
   unchanged presence only every 30 s) and at once after a reconnection. It passes each `client-browser-command` event to the worker and posts the worker's
-  answer to `/v1/client-browser/result`. While the user shares, the offscreen page does not close when
-  it is idle, and the worker opens it when the last panel closes or the browser starts.
+  answer to `/v1/client-browser/result`. The offscreen page does not close when it is idle, and the
+  worker opens it when the last panel closes or the browser starts.
 - **Commands** (`src/client-browser-executor.ts`). CDP 1.3 on any open web tab: it attaches on demand,
   puts the tab into the OpenBot group of its window, and detaches after 30 s with no command. Page
   scripts run in one isolated world per tab, made again after a navigation. `snapshot` keeps a map from
-  each `ref` to its element in that world, where page scripts cannot change it. A command gets `not-shared` while sharing is off, and `not-found` for
-  a closed tab. The X agent's chat of each post is kept for its notification (`openbot.x-chats.v1`,
+  each `ref` to its element in that world, where page scripts cannot change it. A command gets `not-found` for a closed tab. The X agent's chat of each post is kept for its notification (`openbot.x-chats.v1`,
   the newest 20), and becomes the chat to open only when the user clicks that notification.
 - **Approvals.** Before a command, the worker checks the site (origin) of the tab or address. A site
   that is not in `openbot.client-browser.sites.v1` gets a card in the side panel (Allow once / Always
   for this site / Deny), or a notification when no panel is open. The card waits 100 s, then the
   command fails with `timeout`. A command also has a deadline 10 s before the host gives up on it
   (120 s from its arrival): after the deadline it does not act, so the agent is never told "timeout"
-  for an action that then runs. "Stop sharing" ends the waiting cards with `not-shared`, not a denial. These ask every time, also on an allowed site, and have no "Always":
+  for an action that then runs. These ask every time, also on an allowed site, and have no "Always":
   typing into a password field, a field with `autocomplete="cc-*"`, or a field inside a frame or a closed shadow root, which the extension cannot see into (card and login fields are often there); fields in an open shadow root are checked as usual; a download; and a click, key,
   `navigate` or `open` on an address whose path has `oauth` or `authorize` and that has a `client_id`
   parameter. `chrome.debugger` cannot stop downloads (`Page.setDownloadBehavior` is a browser-level

@@ -97,6 +97,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "次のパート",
   "mobile.chat.preview.pdfFailed": "この PDF を表示できませんでした。",
   "mobile.chat.preview.spreadsheetFailed": "このスプレッドシートを読み込めませんでした。",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "このスプレッドシートは大きすぎてプレビューできません。共有して別のアプリで開いてください。",
   "mobile.chat.preview.spreadsheetTruncated": "プレビューは最初の {rows} 行と {columns} 列までです。",
   "mobile.chat.copyFailedMessage": "もう一度お試しください。",
   "mobile.chat.message.copyFailed": "メッセージをコピーできませんでした",
@@ -188,6 +190,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "添付ファイルが破損しています。もう一度選択してください。",
   "mobile.chat.attachment.tooLarge": "{name} は {limit} を超えています。",
   "mobile.chat.attachment.cameraPermission": "写真を撮るには、設定でカメラへのアクセスを許可してください。",
+  "mobile.chat.attachment.photoNotLoaded":
+    "写真を読み込めませんでした。写真アプリで完全に表示されるまで開いてから、もう一度お試しください。",
   "mobile.chat.composer.send": "メッセージを送信",
   "mobile.chat.composer.stop": "{name} を停止",
   "mobile.chat.composer.dictate": "メッセージを音声入力",
@@ -223,7 +227,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "サーバーに接続していません。再接続すると会話を続けます。",
   "mobile.chat.liveVoice.speakFailed": "返信を読み上げられませんでした。",
   "mobile.chat.liveVoice.voiceNotReady": "設定 > 音声 で返信の声を選んでください。",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 はこの言語を読み上げられません。",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 はこの言語を読み上げられません。設定 > 音声 で別の返信の声を選んでください。",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs が API キーを受け付けませんでした。",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "ElevenLabs のキーに権限が不足しています。設定 > 音声 で確認してください。",
@@ -244,6 +249,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "写真を撮れませんでした。もう一度お試しください。",
   "mobile.chat.camera.startFailed": "カメラを起動できませんでした。カメラを閉じて、もう一度お試しください。",
   "mobile.chat.camera.close": "カメラを閉じる",
+  "mobile.chat.camera.fullScreenTipTitle": "もっと大きく見たいですか？",
+  "mobile.chat.camera.fullScreenTipBody":
+    "ズームとすべてのレンズを使える全画面カメラを使いましょう。「設定 > 会話」で変更できます。",
+  "mobile.chat.camera.fullScreenTipUse": "全画面を使う",
+  "mobile.chat.camera.fullScreenTipDismiss": "ヒントを隠す",
   "mobile.chat.camera.takePhoto": "写真を撮る",
   "mobile.chat.camera.switch": "カメラを切り替え",
   "mobile.chat.header.info": "{name} の情報",
@@ -313,6 +323,8 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "再生速度：{speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "メッセージを読み上げられませんでした",
+  "mobile.chat.message.readAloudModelMissing":
+    "メッセージを聞くには、設定 > 音声 で音声モデルをダウンロードしてください。",
   "mobile.chat.message.selectText": "テキストを選択",
   "mobile.chat.message.copyImage": "画像をコピー",
   "mobile.chat.message.copyText": "テキストをコピー",
@@ -505,6 +517,7 @@ export const messages = {
   "mobile.chat.history.connecting": "サーバーに接続中",
   "mobile.chat.history.loading": "チャット履歴を読み込み中",
   "mobile.chat.history.waiting": "接続を待っています",
+  "mobile.chat.history.syncing": "新しいメッセージを確認中",
   "mobile.chat.history.loadFailed": "チャット履歴を読み込めませんでした",
   "mobile.chat.scrollToLatest": "最新のメッセージへ移動",
   "mobile.chat.agentUnavailable.title": "エージェントを利用できません",
@@ -546,6 +559,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "キューにメッセージはありません",
   "mobile.chat.queue.emptyBody": "エージェントの作業中は、新しいメッセージがキューに入ります。",
   "mobile.chat.queue.noLongerQueued": "このメッセージはキューにありません。",
+  "mobile.chat.queue.routine": "ルーティン：{name}",
   "mobile.chat.queue.position": "{position} 番目 · {date}",
   "mobile.chat.queue.attachments": "添付ファイル",
   "mobile.chat.queue.steer": "方向を指示",

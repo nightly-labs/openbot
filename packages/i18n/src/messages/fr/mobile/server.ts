@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "Impossible de quitter {name}",
   "mobile.server.drawer.removeFailed": "Impossible de supprimer {name}",
   "mobile.server.drawer.deleteFailed": "Impossible de supprimer {name}",
+  "mobile.server.drawer.hide": "Masquer le serveur",
+  "mobile.server.drawer.show": "Afficher le serveur",
+  "mobile.server.drawer.hiddenServers": "Serveurs masqués",
+  "mobile.server.drawer.hideFailed": "Impossible de masquer {name}",
+  "mobile.server.drawer.showFailed": "Impossible d’afficher {name}",
   "mobile.server.drawer.actionFailed": "OpenBot n’a pas pu terminer cette action. Réessayez.",
   "mobile.server.drawer.moveUp": "Monter",
   "mobile.server.drawer.moveDown": "Descendre",
@@ -274,6 +279,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Le serveur est supprimé du service de comptes pour tous les membres. Les fichiers et les discussions sur son ordinateur restent. Pour le réutiliser, enregistrez-le depuis cet ordinateur.",
   "mobile.server.settings.remove": "Supprimer le serveur",
+  "mobile.server.settings.hide": "Masquer le serveur",
+  "mobile.server.settings.show": "Afficher le serveur",
   "mobile.server.settings.deleteTitle": "Supprimer {name} ?",
   "mobile.server.settings.deleteBody":
     "OpenBot arrête le serveur sur son ordinateur et déplace ses agents, discussions et fichiers dans la corbeille de cet ordinateur. Le serveur quitte la liste des serveurs sur tous vos appareils.",
@@ -528,6 +535,20 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Impossible de changer la clé du serveur. Réessayez.",
   "mobile.server.settings.keyOwnerOnly": "Seul le propriétaire peut changer la clé du serveur.",
   "mobile.server.settings.keyUnsupported": "Mettez à jour OpenBot sur ce serveur pour changer sa clé ici.",
+  "mobile.server.settings.turnLimit": "Fils en même temps",
+  "mobile.server.settings.turnLimitDescription":
+    "Le nombre de fils d’agents qui peuvent s’exécuter en même temps sur ce serveur. Plus de fils utilisent plus de mémoire.",
+  "mobile.server.settings.turnLimitAutomatic": "Automatique ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Automatique (sans limite)",
+  "mobile.server.settings.turnLimitUnlimited": "Sans limite",
+  "mobile.server.settings.turnLimitsLoadFailed": "Impossible de charger les limites de fils de ce serveur.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Impossible d’enregistrer la limite de fils. Réessayez.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Mettez à jour OpenBot sur ce serveur pour changer sa limite de fils ici.",
+  "mobile.server.settings.agentTaskLimit": "Fils en parallèle par agent",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Le nombre de fils que chaque agent sans limite propre peut exécuter en même temps.",
+  "mobile.server.settings.agentTaskLimitDefault": "Par défaut ({count})",
   "mobile.server.settings.memoryLimit": "Souvenirs par agent",
   "mobile.server.settings.memoryLimitDescription": "Nombre de souvenirs que chaque agent de ce serveur peut conserver.",
   "mobile.server.settings.memoryLimitLoadFailed": "Impossible de charger la limite de souvenirs de ce serveur.",

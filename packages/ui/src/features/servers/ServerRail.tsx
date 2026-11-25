@@ -3,9 +3,11 @@ import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   BellOff,
   buttonVariants,
+  ChevronRight,
   ContextMenu,
   DropdownMenu,
   Eye,
+  Folder,
   Plus,
   Server,
   ServerPlushLogo,
@@ -64,9 +66,106 @@ export function ServerSleepDot(props: { server: Pick<ServerSummary, "hostedSleep
   );
 }
 
-export interface HiddenLocalServer {
-  name: string;
+export interface HiddenServer extends Pick<ServerSummary, "id" | "name" | "logoUrl" | "appearance"> {
   show: () => void;
+}
+
+const HIDDEN_FOLDER_PREVIEW_COUNT = 4;
+
+function HiddenServerShowItem(props: { server: HiddenServer }) {
+  const { t } = useText();
+  return (
+    <DropdownMenu.Item
+      class="server-menu-row server-menu-hidden-row"
+      aria-label={t("server.rail.showLocal", { name: props.server.name })}
+      onSelectAfterClose={props.server.show}
+    >
+      <span class="server-menu-mark" aria-hidden="true">
+        <ServerMark server={props.server} />
+      </span>
+      <span class="server-menu-name">{props.server.name}</span>
+      <Eye class="server-menu-hidden-show size-4" aria-hidden="true" />
+    </DropdownMenu.Item>
+  );
+}
+
+function HiddenServerShowItems(props: { servers: HiddenServer[] }) {
+  return <For each={props.servers}>{(server) => <HiddenServerShowItem server={server} />}</For>;
+}
+
+export function HiddenServerFolderItem(props: { servers: HiddenServer[] }) {
+  const { t } = useText();
+  return (
+    <Show when={props.servers.length > 0}>
+      <DropdownMenu.Sub>
+        <DropdownMenu.SubTrigger class="server-menu-row server-menu-hidden-folder">
+          <span class="server-menu-hidden-folder-icon" aria-hidden="true">
+            <Folder class="size-4" />
+          </span>
+          <span class="server-menu-name">{t("server.rail.hiddenServers")}</span>
+          <span class="server-menu-hidden-count">{props.servers.length}</span>
+          <ChevronRight class="agent-context-submenu-chevron size-4" aria-hidden="true" />
+        </DropdownMenu.SubTrigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.SubContent
+            class="ui-action-menu agent-context-menu"
+            aria-label={t("server.rail.hiddenServers")}
+          >
+            <HiddenServerShowItems servers={props.servers} />
+          </DropdownMenu.SubContent>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Sub>
+    </Show>
+  );
+}
+
+function HiddenServerFolder(props: { servers: HiddenServer[] }) {
+  const { t } = useText();
+  const [tooltipOpen, setTooltipOpen] = createSignal(false);
+  const [menuOpen, setMenuOpen] = createSignal(false);
+  return (
+    <Tooltip.Root
+      open={tooltipOpen() && !menuOpen()}
+      onOpenChange={setTooltipOpen}
+      placement="right"
+      gutter={10}
+      openDelay={SERVER_RAIL_TOOLTIP_OPEN_DELAY}
+      closeDelay={0}
+      skipDelayDuration={300}
+    >
+      <Tooltip.Trigger as="div" class="server-rail-tooltip-trigger">
+        <DropdownMenu.Root placement="right-start" gutter={10} onOpenChange={setMenuOpen}>
+          <DropdownMenu.Trigger
+            class={buttonVariants({ variant: "ghost", class: "server-rail-button server-rail-folder" })}
+            aria-label={t("server.rail.hiddenServers")}
+            data-cuelume-open=""
+            data-cuelume-emphasis="subtle"
+          >
+            <span class="server-rail-folder-grid" aria-hidden="true">
+              <For each={props.servers.slice(0, HIDDEN_FOLDER_PREVIEW_COUNT)}>
+                {(server) => (
+                  <span class="server-rail-folder-mark">
+                    <ServerMark server={server} />
+                  </span>
+                )}
+              </For>
+            </span>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content class="agent-context-menu" aria-label={t("server.rail.hiddenServers")}>
+              <div class="ui-menu-label" aria-hidden="true">
+                {t("server.rail.hiddenServers")}
+              </div>
+              <HiddenServerShowItems servers={props.servers} />
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content class="server-rail-tooltip">{t("server.rail.hiddenServers")}</Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  );
 }
 
 interface ServerRailProps extends ServerActionCallbacks {
@@ -77,7 +176,7 @@ interface ServerRailProps extends ServerActionCallbacks {
   addCreatesServer?: boolean | undefined;
   onCreateLocal?: (() => void) | undefined;
   onInstallServer?: (() => void) | undefined;
-  hiddenLocal?: HiddenLocalServer | undefined;
+  hiddenServers?: HiddenServer[] | undefined;
 }
 
 interface DragSlot {
@@ -356,9 +455,12 @@ export function ServerRail(props: ServerRailProps) {
             </For>
           </ul>
         </Show>
+        <Show when={props.hiddenServers?.length ? props.hiddenServers : null}>
+          {(hiddenServers) => <HiddenServerFolder servers={hiddenServers()} />}
+        </Show>
         <Show when={props.onAdd}>
           <Show
-            when={props.onCreateLocal || props.onInstallServer || props.hiddenLocal}
+            when={props.onCreateLocal || props.onInstallServer}
             fallback={
               <Tooltip.Root
                 placement="right"
@@ -388,7 +490,6 @@ export function ServerRail(props: ServerRailProps) {
               onAdd={() => props.onAdd?.()}
               onCreateLocal={props.onCreateLocal}
               onInstallServer={props.onInstallServer}
-              hiddenLocal={props.hiddenLocal}
             />
           </Show>
         </Show>
@@ -405,7 +506,6 @@ function ServerRailAddMenu(props: {
   onAdd: () => void;
   onCreateLocal?: (() => void) | undefined;
   onInstallServer?: (() => void) | undefined;
-  hiddenLocal?: HiddenLocalServer | undefined;
 }) {
   const { t } = useText();
   const [tooltipOpen, setTooltipOpen] = createSignal(false);
@@ -455,16 +555,6 @@ function ServerRailAddMenu(props: {
                       <Server />
                     </span>
                     <span>{t("server.install.title")}</span>
-                  </DropdownMenu.Item>
-                )}
-              </Show>
-              <Show when={props.hiddenLocal}>
-                {(hiddenLocal) => (
-                  <DropdownMenu.Item class="server-menu-add" onSelectAfterClose={hiddenLocal().show}>
-                    <span class="server-menu-add-circle" aria-hidden="true">
-                      <Eye />
-                    </span>
-                    <span>{t("server.rail.showLocal", { name: hiddenLocal().name })}</span>
                   </DropdownMenu.Item>
                 )}
               </Show>

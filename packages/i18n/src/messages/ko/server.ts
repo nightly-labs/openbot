@@ -235,6 +235,9 @@ export const messages = {
   "server.rail.delete": "서버 삭제",
   "server.rail.hide": "서버 숨기기",
   "server.rail.showLocal": "{name} 표시",
+  "server.rail.hiddenServers": "숨긴 서버",
+  "server.rail.hideFailed": "{name}을(를) 숨길 수 없습니다",
+  "server.rail.showFailed": "{name}을(를) 표시할 수 없습니다",
   "server.plan.daysLeft": {
     other: "{count}일",
   },

@@ -266,6 +266,8 @@ export const messages = {
   "error.backend.mcpServerExited": "服务器在响应之前就停止了。请在终端中运行该命令以查看错误。",
   "error.backend.mcpServerExitedWithOutput": "服务器在响应之前就停止了。它输出了：{detail}",
   "error.backend.mcpServerFailedToStart": "服务器没有启动：{reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot 无法启动 MCP 服务器 {name}，因为运行 OpenBot 的电脑上没有安装它的程序。请在那台电脑上安装提供 {name} 的应用，或在 市场、应用 中关闭 {name}。",
   "error.backend.mcpServerStartAbandoned": "服务器启动前 {provider} 已停止等待，因此其智能体无法获得此服务器的工具。",
   "error.backend.mcpServerStoppedDuringCall": "MCP 服务器在响应此次调用前停止了。",
   "error.backend.mcpToolSchemaRefused":
@@ -384,6 +386,7 @@ export const messages = {
     "此配置文件使用的计算机只打开公共网站。它不打开本地网络上的地址，因此页面没有打开。",
   "error.backend.browserCertificateUntrusted": "此网站的安全证书不受信任，因此页面没有打开。",
   "error.backend.browserLowMemory": "该服务器内存不足，浏览器无法再打开标签页。请关闭一个标签页，或等其他助手结束。",
+  "error.backend.browserNoMemory": "该服务器内存几乎耗尽，浏览器现在无法打开标签页。请等其他助手结束后再试。",
   "error.backend.browserOpenFailed": "无法打开 {url}：{reason}",
   "error.backend.popupSecureInput": "安全输入期间弹窗被阻止。请完成或取消安全输入，再从页面重试。",
   "error.backend.popupUnsupportedType": "不支持该类弹窗。请使用页面上的普通链接或登录按钮。",

@@ -4,7 +4,7 @@ import { useWindowDimensions, View } from "react-native";
 import { useTextScale } from "@/features/settings/model/text-size-store";
 import { typeScale } from "@/shared/lib/type-scale";
 
-export const CHAT_ROW_AVATAR_SIZE = 62;
+export const CHAT_ROW_AVATAR_SIZE = 60;
 export const PINNED_AVATAR_SIZE = 70;
 const TITLE_MIN_WIDTH = 64;
 const NAME_TITLE_GAP = 6;

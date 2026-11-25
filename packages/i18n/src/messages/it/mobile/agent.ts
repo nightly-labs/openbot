@@ -377,6 +377,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Rimuovi {model}",
   "mobile.agent.backupModels.unavailable": "Non disponibile ora · saltato",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Se un limite di utilizzo ferma {name} dopo l'inizio del lavoro, {name} continua lo stesso lavoro con il primo modello disponibile nell'ordine. Torna a {model} quando il limite termina, o 10 minuti dopo un errore del provider.",
   "mobile.agent.busyMessage.label": "Durante il lavoro",
@@ -528,6 +529,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Raccolta iniziata {started}. Aggiornata {updated}.",
   "mobile.agent.usage.never": "mai",
   "mobile.agent.record.time": "Ora",
+  "mobile.agent.record.date": "Data",
   "mobile.agent.section.changeFailed": "Impossibile modificare la cartella",
   "mobile.agent.section.tryAgain": "Riprova.",
   "mobile.agent.section.moveUp": "Sposta su",

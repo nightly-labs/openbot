@@ -119,6 +119,7 @@ import {
   HOST_RESTART_CAPABILITY,
   HOST_TIMEZONE_CAPABILITY,
   HOST_TURN_LIMITS_CAPABILITY,
+  HOST_TURN_LIMITS_EVENTS_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
@@ -253,6 +254,10 @@ import { MODEL_STEERING_CAPABILITY } from "@openbot/contracts/team-protocol/mode
 import { MODEL_VISIBILITY_KEPT_CAPABILITY } from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
+import {
+  TEAM_PROMPT_DETAIL_CAPABILITY,
+  withPromptQuestionDetails,
+} from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -1662,9 +1667,12 @@ export class TeamApiServer {
       const withLocation = capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)
         ? withUiBlockLocationRequests(withVault, visible)
         : withVault;
-      return capabilities.has(SKILL_LEARNING_CAPABILITY)
+      const withSkills = capabilities.has(SKILL_LEARNING_CAPABILITY)
         ? withSkillSuggestionNames(withLocation, visible)
         : withLocation;
+      return capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)
+        ? withPromptQuestionDetails(withSkills, visible)
+        : withSkills;
     }
     return encodeTeamProtocolV1CurrentEvent(visible, options);
   }
@@ -1960,7 +1968,7 @@ export class TeamApiServer {
           !connection.capabilities.has("hosted-site-event-markers") ||
           event.snapshot.messages.some((message) => !markerSupported(message.itemType, connection.capabilities)))
       ) {
-        const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
+        const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
         let filtered = filteredConversationPayloads.get(key);
         if (!filtered) {
           filtered = encodeEvent(
@@ -2511,9 +2519,12 @@ export class TeamApiServer {
     const withLocation = route.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)
       ? withUiBlockLocationRequests(withVault, effortValue)
       : withVault;
-    const body = route.capabilities.has(SKILL_LEARNING_CAPABILITY)
+    const withSkills = route.capabilities.has(SKILL_LEARNING_CAPABILITY)
       ? withSkillSuggestionNames(withLocation, effortValue)
       : withLocation;
+    const body = route.capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)
+      ? withPromptQuestionDetails(withSkills, effortValue)
+      : withSkills;
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     response.end(`${body}\n`);
     return "handled";
@@ -2871,7 +2882,8 @@ export class TeamApiServer {
         if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
         if (capability === HOST_VOICE_MODEL_CAPABILITY) return this.#options.admin?.voiceModel !== undefined;
         if (capability === HOST_SIGNAL_HOME_CAPABILITY) return this.#options.admin?.signalHome !== undefined;
-        if (capability === HOST_TURN_LIMITS_CAPABILITY) return this.#options.admin?.turnLimits !== undefined;
+        if (capability === HOST_TURN_LIMITS_CAPABILITY || capability === HOST_TURN_LIMITS_EVENTS_CAPABILITY)
+          return this.#options.admin?.turnLimits !== undefined;
         if (capability === HOST_RESTART_CAPABILITY) return this.#options.admin?.restart !== undefined;
         if (capability === OWNER_TRANSFER_CAPABILITY) return this.#options.admin?.ownerTransfer === true;
         if (capability === HOST_PERSONALITY_CAPABILITY) return this.#options.admin?.personality !== undefined;
@@ -3110,6 +3122,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   TEAM_UI_BLOCK_LOCATION_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
   QUEUE_HOLD_CAPABILITY,
   QUEUE_HOLD_SIGN_IN_CAPABILITY,
 ];
@@ -3157,6 +3170,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   if (event.type === "crm-changed") return CRM_CAPABILITY;
   if (event.type === "vault-changed") return VAULT_CAPABILITY;
   if (event.type === "browser-profiles-changed") return BROWSER_PROFILES_EVENTS_CAPABILITY;
+  if (event.type === "host-turn-limits-changed") return HOST_TURN_LIMITS_EVENTS_CAPABILITY;
   if (event.type === "library-folders-changed") return LIBRARY_FOLDERS_EVENTS_CAPABILITY;
   if (event.type === "usage-credits-changed") return USAGE_CREDITS_CAPABILITY;
   if (event.type === "turn-progress") return TEAM_AGENT_ACTIVITY_CAPABILITY;

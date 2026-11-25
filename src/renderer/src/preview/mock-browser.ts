@@ -76,6 +76,7 @@ export function createMockBrowser(
     activate: async (tabId) => {
       activeBrowserTabId = tabId;
       emit(browserDisplayListeners, { tabs: browserTabs, activeTabId: activeBrowserTabId });
+      emitAgentEvent({ type: "browser-changed", tabs: browserTabs, activeTabId: activeBrowserTabId });
     },
     navigate: async (input) => {
       if (!("url" in input)) return;

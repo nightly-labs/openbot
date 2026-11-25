@@ -8,6 +8,7 @@ import {
   teamCapabilityLists,
 } from "@openbot/contracts/team-protocol/current";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
+import { addPromptQuestionDetails } from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import {
@@ -108,6 +109,7 @@ interface TeamWebRtcClientTransportOptions {
   ) => Effect.Effect<void, CentralAuthOperationError>;
   removeMember: (hostId: string, membershipId: string) => Effect.Effect<void, CentralAuthOperationError>;
   removeOwnedHost: (hostId: string) => Effect.Effect<void, CentralAuthOperationError>;
+  setHostHidden: (hostId: string, hidden: boolean) => Effect.Effect<void, CentralAuthOperationError>;
   getPrincipalId: () => string;
   controlPlaneUrl: string;
   downloadHostLogo: (
@@ -348,6 +350,14 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         yield* this.#options.removeOwnedHost(hostId).pipe(toRemoteWorkflowError);
       }),
     );
+  }).bind(this);
+
+  readonly setHostHidden = Effect.fn("TeamWebRtcClient.setHostHidden")(function* (
+    this: TeamWebRtcClientTransport,
+    hostId: string,
+    hidden: boolean,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
+    return yield* this.#owned(this.#options.setHostHidden(hostId, hidden).pipe(toRemoteWorkflowError));
   }).bind(this);
 
   readonly sendDesktop = Effect.fn("TeamWebRtcClient.sendDesktop")(function* (
@@ -599,7 +609,10 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                   }),
               ),
             );
-        if (this.#sendsSkillSuggestionNames(hostId)) addSkillSuggestionNames(body, envelope.body);
+        if (this.#sendsWireExtensions(hostId)) {
+          addSkillSuggestionNames(body, envelope.body);
+          addPromptQuestionDetails(body, envelope.body);
+        }
         if (method === "GET" && path === "/v1/compatibility" && status === 200) {
           const support = yield* remoteDecode(() => decodeTeamProtocolSupportExpanded(body));
           this.#hostProtocols.set(hostId, Math.min(support.protocol.maximum, LOCAL_TEAM_PROTOCOL.maximum));
@@ -1461,7 +1474,10 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         return;
       }
       if (decoded.status === "known") {
-        if (this.#sendsSkillSuggestionNames(hostId)) addSkillSuggestionNames(decoded.event, frame.payload);
+        if (this.#sendsWireExtensions(hostId)) {
+          addSkillSuggestionNames(decoded.event, frame.payload);
+          addPromptQuestionDetails(decoded.event, frame.payload);
+        }
         this.emit("event", hostId, decoded.event);
       }
       this.#lastEventSequence.set(hostId, frame.sequence);
@@ -1489,7 +1505,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.#eventAckTimers.set(hostId, timer);
   }
 
-  #sendsSkillSuggestionNames(hostId: string): boolean {
+  #sendsWireExtensions(hostId: string): boolean {
     return (this.#hostProtocols.get(hostId) ?? 0) >= TEAM_PROTOCOL_V9;
   }
 

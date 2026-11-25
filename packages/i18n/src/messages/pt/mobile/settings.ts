@@ -301,6 +301,9 @@ export const messages = {
   "mobile.settings.conversations.fullQualityPhotos": "Enviar fotos em qualidade máxima",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Quando desativado, o app envia uma cópia menor de cada foto, com até 2048 pixels no lado maior. Ela chega mais rápido em uma conexão lenta. Ative para enviar a foto original.",
+  "mobile.settings.conversations.fullScreenCamera": "Usar a câmera em tela cheia",
+  "mobile.settings.conversations.fullScreenCameraFooter":
+    "Quando ativado, Câmera abre a câmera do sistema, com zoom e todas as lentes. Quando desativado, uma câmera pequena abre no chat.",
   "mobile.settings.profile.nameUnsafe": "Remova quebras de linha e caracteres de controle do seu nome.",
   "mobile.settings.profile.nameLength": "Use de 3 a 20 caracteres no nome de exibição.",
   "mobile.settings.profile.saveFailed": "Não foi possível salvar as alterações. Tente novamente.",

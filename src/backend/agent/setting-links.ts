@@ -427,7 +427,20 @@ const PHONE_SERVERS = "On the phone app: in Servers, touch and hold the server";
 
 export type ServerPlace = Omit<SettingLinkEntry, "words">;
 
-const SERVER_PLACES: readonly SettingLinkEntry[] = [
+interface ServerPlaceEntry extends SettingLinkEntry {
+  foundWithoutServerWord?: readonly string[];
+}
+
+const SERVER_PLACES: readonly ServerPlaceEntry[] = [
+  {
+    title: "Add a server",
+    place:
+      "On a computer: the server button at the bottom of the narrow bar on the left, below Settings (Open server menu for <server name>) > Add a server, or Add remote server when no plans show. In the Server rail layout, use the + button at the bottom of the server list instead; with plans, it opens Add a server directly. Add a server opens Run OpenBot 24/7 on an external server, with hosted server plans. In it, Other options > New server on another computer gives one install command for a Linux computer or VPS that the user owns (Ubuntu 24.04 or 26.04). When no plans show, New server on another computer is in that menu itself. New server on another computer is only in the desktop app, not in the browser at openbot.run/app. On the phone app: Servers > Add a server, for a hosted server.",
+    about:
+      "A server that runs 24/7 on another computer, so that agents, routines and chat apps such as WhatsApp keep working while this computer is off. The user runs the install command as root on that computer, then opens the new server and connects a provider and apps there. When the user gives the SSH address, create_server_install_command makes the same command for you to run over SSH.",
+    words:
+      "24 add new another install setup create always online run running keep alive offline off away cloud hosted hosting headless linux ubuntu external own",
+  },
   {
     title: "Remove server",
     place: `${SERVER_LIST} > Remove server, or ${SERVER_SETTINGS} > General > Remove server. ${PHONE_SERVERS} > Remove server.`,
@@ -447,6 +460,30 @@ const SERVER_PLACES: readonly SettingLinkEntry[] = [
     about:
       "Owners and admins move the agents, with their skills, routines, memories and files, to another computer: export a .zip file from the old server, then import it into the new server.",
     words: "move migrate migration copy new",
+  },
+  {
+    title: "Import",
+    place: `On a computer: ${SERVER_SETTINGS} > Import. On the phone app: the server's Server settings > Import agents.`,
+    about:
+      "Any member copies agents from another app into this server: Grok Bot (an export agent there makes a .zip file) or Hermes Agent (its folder or an exported .zip file). Owners and admins also see Another OpenBot computer, which opens Transfer. The user sees every item before anything changes.",
+    words: "importing grok hermes bot bring",
+    foundWithoutServerWord: ["import", "hermes"],
+  },
+  {
+    title: "Vault",
+    place: `On a computer: ${SERVER_SETTINGS} > Vault. The API keys filter shows the saved keys; the menu of a key has Copy API key and Copy variable name.`,
+    about:
+      "Only the owner or an admin. The saved logins, cards, contact info and API keys that agents use, also the keys that an agent saved with save_api_key. A Marketplace app does not read the Vault: to use a saved key in an app, copy it here, then open Marketplace, open the app, and paste it where the app asks for its key (Change key when the app is connected). A member asks the owner.",
+    words: "vault api key keys token tokens secret secrets password passwords credential credentials",
+    foundWithoutServerWord: ["vault", "api", "key", "keys", "token", "secret", "credential", "password"],
+  },
+  {
+    title: "Use my Claude Code setup",
+    place: `On a computer: ${SERVER_SETTINGS} > Providers > Claude > Use my Claude Code setup.`,
+    about:
+      "Only the owner or an admin. On: Claude agents load the CLAUDE.md, skills, agents, hooks and plugins from ~/.claude on that server. Off, the default: each turn sends a shorter prompt. Workspace files load either way. A member asks the owner.",
+    words: "claude code claude.md home user own personal setup config hooks plugins skills load",
+    foundWithoutServerWord: ["claude"],
   },
 ];
 
@@ -477,13 +514,19 @@ export function searchChatPlaces(query: string, limit = 1): ServerPlace[] {
   }));
 }
 
-const SERVER_TERMS = ["server", "computer", "machine", "device", "laptop", "macbook", "imac", "mac", "pc"];
+const SERVER_TERMS = ["server", "computer", "machine", "device", "laptop", "macbook", "imac", "mac", "pc", "vps"];
 
 export function searchServerPlaces(query: string, limit = 2): ServerPlace[] {
   const queryTerms = terms(query);
-  if (!queryTerms.some((term) => hits(term, SERVER_TERMS))) return [];
+  const places = queryTerms.some((term) => hits(term, SERVER_TERMS))
+    ? SERVER_PLACES
+    : SERVER_PLACES.filter(
+        ({ foundWithoutServerWord }) =>
+          foundWithoutServerWord && queryTerms.some((term) => hits(term, foundWithoutServerWord)),
+      );
+  if (places.length === 0) return [];
   const scored = queryTerms.filter((term) => !hits(term, SERVER_TERMS));
-  return rank(SERVER_PLACES, (entry) => entry, scored, limit, false).map(({ title, place, about }) => ({
+  return rank(places, (entry) => entry, scored, limit, false).map(({ title, place, about }) => ({
     title,
     place,
     about,

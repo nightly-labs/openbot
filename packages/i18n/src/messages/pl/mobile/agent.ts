@@ -405,6 +405,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Usuń {model}",
   "mobile.agent.backupModels.unavailable": "Chwilowo niedostępny · pominięto",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Gdy limit użycia zatrzyma agenta {name} po rozpoczęciu pracy, {name} kontynuuje tę samą pracę na pierwszym dostępnym modelu z kolejności. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
   "mobile.agent.busyMessage.label": "Podczas pracy",
@@ -565,6 +566,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Zbieranie rozpoczęto {started}. Zaktualizowano {updated}.",
   "mobile.agent.usage.never": "nigdy",
   "mobile.agent.record.time": "Godzina",
+  "mobile.agent.record.date": "Data",
   "mobile.agent.section.changeFailed": "Nie udało się zmienić folderu",
   "mobile.agent.section.tryAgain": "Spróbuj ponownie.",
   "mobile.agent.section.moveUp": "Przenieś w górę",

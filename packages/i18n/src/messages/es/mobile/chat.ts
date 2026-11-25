@@ -98,6 +98,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Parte siguiente",
   "mobile.chat.preview.pdfFailed": "No se pudo mostrar este PDF.",
   "mobile.chat.preview.spreadsheetFailed": "No se pudo leer esta hoja de cálculo.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Esta hoja de cálculo es demasiado grande para la vista previa. Compártela para abrirla en otra app.",
   "mobile.chat.preview.spreadsheetTruncated": "Vista previa limitada a las primeras {rows} filas y {columns} columnas.",
   "mobile.chat.copyFailedMessage": "Vuelve a intentarlo.",
   "mobile.chat.message.copyFailed": "No se pudo copiar el mensaje",
@@ -190,6 +192,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "El archivo adjunto está dañado. Vuelve a seleccionarlo.",
   "mobile.chat.attachment.tooLarge": "{name} ocupa más de {limit}.",
   "mobile.chat.attachment.cameraPermission": "Permite el acceso a la cámara en Ajustes para hacer una foto.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "La foto no se cargó. Ábrela en la app Fotos hasta que se vea completa y vuelve a intentarlo.",
   "mobile.chat.composer.send": "Enviar mensaje",
   "mobile.chat.composer.stop": "Detener a {name}",
   "mobile.chat.composer.dictate": "Dictar mensaje",
@@ -225,7 +229,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "El servidor no está conectado. La conversación sigue cuando se vuelva a conectar.",
   "mobile.chat.liveVoice.speakFailed": "No se pudo leer la respuesta en voz alta.",
   "mobile.chat.liveVoice.voiceNotReady": "Elige una voz de respuesta en Ajustes > Voz.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 no puede leer este idioma.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 no puede leer este idioma. Elige otra voz de respuesta en Ajustes > Voz.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs no aceptó la clave de API.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "A la clave de ElevenLabs le falta un permiso. Revísalo en Ajustes > Voz.",
@@ -245,6 +250,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "No se pudo hacer la foto. Vuelve a intentarlo.",
   "mobile.chat.camera.startFailed": "No se pudo iniciar la cámara. Ciérrala y vuelve a intentarlo.",
   "mobile.chat.camera.close": "Cerrar cámara",
+  "mobile.chat.camera.fullScreenTipTitle": "¿Necesitas ver más grande?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "Usa la cámara a pantalla completa, con zoom y todos los objetivos. Puedes cambiarlo en Ajustes > Conversaciones.",
+  "mobile.chat.camera.fullScreenTipUse": "Usar pantalla completa",
+  "mobile.chat.camera.fullScreenTipDismiss": "Ocultar consejo",
   "mobile.chat.camera.takePhoto": "Hacer foto",
   "mobile.chat.camera.switch": "Cambiar de cámara",
   "mobile.chat.header.info": "Información de {name}",
@@ -314,6 +324,7 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "Velocidad de reproducción: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "No se pudo leer el mensaje en voz alta",
+  "mobile.chat.message.readAloudModelMissing": "Para escuchar mensajes, descarga el modelo de voz en Ajustes > Voz.",
   "mobile.chat.message.selectText": "Seleccionar texto",
   "mobile.chat.message.copyImage": "Copiar imagen",
   "mobile.chat.message.copyText": "Copiar texto",
@@ -515,6 +526,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Conectando con el servidor",
   "mobile.chat.history.loading": "Cargando el historial del chat",
   "mobile.chat.history.waiting": "Esperando conexión",
+  "mobile.chat.history.syncing": "Buscando mensajes nuevos",
   "mobile.chat.history.loadFailed": "No se pudo cargar el historial del chat",
   "mobile.chat.scrollToLatest": "Ir al último mensaje",
   "mobile.chat.agentUnavailable.title": "Agente no disponible",
@@ -557,6 +569,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "No hay mensajes en cola",
   "mobile.chat.queue.emptyBody": "Los mensajes nuevos se añaden a la cola mientras el agente trabaja.",
   "mobile.chat.queue.noLongerQueued": "Este mensaje ya no está en la cola.",
+  "mobile.chat.queue.routine": "Rutina: {name}",
   "mobile.chat.queue.position": "Posición {position} · {date}",
   "mobile.chat.queue.attachments": "Archivos adjuntos",
   "mobile.chat.queue.steer": "Orientar",

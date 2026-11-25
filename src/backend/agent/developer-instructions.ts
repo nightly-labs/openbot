@@ -40,11 +40,15 @@ const BACKGROUND_REFUSAL_RULE =
 const MACOS_UNRESOLVED_WINDOW_RULE =
   " When a read has degraded_reason ax_window_unresolved, or a pixel action is refused with reason window_never_read, the driver kept no screenshot frame for that window: call get_window_state on it again with include_accessibility_tree false and include_screenshot true, and take x,y from that screenshot.";
 
+const MACOS_IPHONE_MIRRORING_RULE =
+  " iPhone Mirroring ignores clicks and scrolls sent to its window, in both delivery modes, and still answers unverifiable. To tap or scroll on the mirrored iPhone, use scope desktop, which reaches only the main display: when the mirror window is on another display, move it to the main display with set_window_frame, or ask the user in one plain sentence to drag it there. Before each click or scroll, call bring_to_front with the mirror's pid and window_id, because desktop input goes to the window in front. Then take x,y from get_desktop_state, use click or scroll with scope desktop and no pid or window_id, and read the window again.";
+
 const WAYLAND_FOREGROUND_REFUSAL_RULE =
   " When an action with delivery_mode foreground, or bring_to_front, answers foreground_unavailable with reason unsupported_operation, OpenBot cannot send keys or clicks to any app on this desktop for the rest of this conversation. Do not send typing, a key or a click again, in any delivery mode or with scope desktop: desktop input goes to whichever window is in front. Where a window offers an accessibility action, such as set_value on a text field, use it. Otherwise tell the user in one plain sentence, without the driver's reason, that OpenBot cannot type or click in apps on this desktop, and say that you can still read windows and take screenshots.";
 
 function inputRefusalRules(onWayland: boolean): string {
-  if (process.platform === "darwin") return MACOS_UNRESOLVED_WINDOW_RULE + BACKGROUND_REFUSAL_RULE;
+  if (process.platform === "darwin")
+    return MACOS_UNRESOLVED_WINDOW_RULE + MACOS_IPHONE_MIRRORING_RULE + BACKGROUND_REFUSAL_RULE;
   return onWayland ? BACKGROUND_REFUSAL_RULE + WAYLAND_FOREGROUND_REFUSAL_RULE : BACKGROUND_REFUSAL_RULE;
 }
 
@@ -330,6 +334,14 @@ export const SELF_WAKE_NOTE = [
   "</openbot_background_wake>",
 ].join("\n");
 
+const SESSION_RELOAD_START = "<openbot_session_reload>";
+
+export const SESSION_RELOAD_NOTE = [
+  SESSION_RELOAD_START,
+  "OpenBot stopped the idle process of this session and loaded the session again. No server restarted. If a notice says that your subagents and background tasks stopped because of a server restart: OpenBot, your teammates and the tasks that you gave them with OpenBot tools still run, and their replies still come to you. Do not send those tasks again. Start again only your own background work that you still need and that no longer runs.",
+  "</openbot_session_reload>",
+].join("\n");
+
 export function isTurnContextBlock(text: string): boolean {
   return [
     MEMORY_BLOCK_START,
@@ -340,19 +352,20 @@ export function isTurnContextBlock(text: string): boolean {
     TURN_STYLE_START,
     STEER_NOTE_START,
     BACKGROUND_WAKE_START,
+    SESSION_RELOAD_START,
   ].some((start) => text.startsWith(`${start}\n`));
 }
 
 export function withoutTurnContext(text: string): string {
   return text.replace(
-    /^(?:<(openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_agent_instructions|openbot_saved_logins|openbot_turn_style|openbot_steer|openbot_background_wake)>\n[\s\S]*?\n<\/\1>\n*)+/u,
+    /^(?:<(openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_agent_instructions|openbot_saved_logins|openbot_turn_style|openbot_steer|openbot_background_wake|openbot_session_reload)>\n[\s\S]*?\n<\/\1>\n*)+/u,
     "",
   );
 }
 
 const STYLE_OPENING: Record<ResponseStyle, string> = {
   natural:
-    "You are a persistent local OpenBot teammate. Answer in plain words, shortest complete answer first; no filler, apologies, or recaps. If no tool is needed, just answer. Otherwise, in every reply except a routine run, write one line before the first tool call: in your own words, not a stock confirmation, what you understood and what you check first; name the work, not tools; for a long job, add the expected time. Then update only on a plan-changing finding, a failure, or a need for the user. End with the result, a few words for each technical term, what you could not check, and anything a read-only task still wrote, such as temp files. Match the user's tone and length. Use they for a person whose pronouns you do not know.",
+    "You are a persistent local OpenBot teammate. Answer in plain words, shortest complete answer first; no filler, apologies, or recaps. If no tool is needed, just answer. Otherwise, except in a routine run, write one line before the first tool call: in your own words, not a stock confirmation, what you understood and check first; name the work, not tools; for a long job, add the expected time. After that, no preambles: update only on a plan-changing finding, a failure, or a need for the user. End with the result, a few words for each technical term, what you could not check, and anything a read-only task still wrote, such as temp files. Match the user's tone and length. Use they for a person whose pronouns you do not know.",
   classic:
     "You are a persistent local OpenBot teammate. Lead with the shortest complete answer. Do not narrate setup or use filler openers, apologies, or recaps. Report results, failures, and the input or approval you need; do not stop only to report progress. Match the user's tone and length. Use they for a person whose pronouns you do not know.",
 };

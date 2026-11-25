@@ -295,6 +295,8 @@ export const messages = {
     "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
   "error.backend.mcpServerExitedWithOutput": "Sunucu yanıt vermeden durdu. Yazdığı: {detail}",
   "error.backend.mcpServerFailedToStart": "Sunucu başlamadı: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot, {name} MCP sunucusunu başlatamadı, çünkü programı OpenBot'un çalıştığı bilgisayarda yüklü değil. {name} sağlayan uygulamayı o bilgisayara yükleyin veya Pazaryeri, Uygulamalar bölümünde {name} öğesini kapatın.",
   "error.backend.mcpServerStartAbandoned":
     "{provider}, sunucu başlamadan beklemeyi bıraktı. Bu yüzden ajanları bu sunucunun araçlarını almıyor.",
   "error.backend.mcpServerStoppedDuringCall": "MCP sunucusu bu çağrıya yanıt vermeden durdu.",
@@ -418,6 +420,8 @@ export const messages = {
     "Bu sitenin güvenlik sertifikasına güvenilmiyor, bu yüzden sayfa açılmadı.",
   "error.backend.browserLowMemory":
     "Bu sunucunun belleği azaldı, bu nedenle tarayıcı başka bir sekme açamıyor. Bir sekmeyi kapatın veya diğer ajanların bitmesini bekleyin.",
+  "error.backend.browserNoMemory":
+    "Bu sunucunun belleği neredeyse doldu, bu nedenle tarayıcı şu anda sekme açamıyor. Diğer ajanların bitmesini bekleyin, sonra tekrar deneyin.",
   "error.backend.browserOpenFailed": "{url} açılamadı: {reason}",
   "error.backend.popupSecureInput":
     "Güvenli giriş sırasında açılır pencereler engellenir. Güvenli girişi tamamlayın veya iptal edin, ardından sayfadan tekrar deneyin.",

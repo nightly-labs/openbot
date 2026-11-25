@@ -1,6 +1,6 @@
 import type { ChannelSummary, ClientAgentSummary } from "@openbot/contracts/ipc";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
-import { AppWindow, Bot, Check, ChevronDown, ChevronRight, FolderPlus, Hash, LogOut, Plus, Search } from "@openbot/ui";
+import { Bot, Check, ChevronDown, ChevronRight, FolderPlus, Hash, LogOut, Plus, Search, Settings } from "@openbot/ui";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { ChannelAvatar } from "@openbot/ui/features/channels/ChannelAvatar";
 import { ServerPlushLogo } from "@openbot/ui/server-plush-logo";
@@ -23,10 +23,9 @@ interface HomeScreenProps {
   onStartThread: (agentId: string, text: string) => void;
   onSelectHost: (hostId: string) => void;
   onSignOut: () => void;
+  onOpenSettings: () => void;
   sharing: boolean;
   canShare: boolean;
-  onShareTabs: () => void;
-  onManageSharing: () => void;
 }
 
 type ChatItem = { kind: "agent"; agent: ClientAgentSummary } | { kind: "channel"; channel: ChannelSummary };
@@ -167,34 +166,18 @@ export function HomeScreen(props: HomeScreenProps) {
               )}
             </For>
             <hr class="ext-menu-separator" />
-            <Show when={props.canShare && !props.sharing}>
-              <button
-                type="button"
-                role="menuitem"
-                class="ext-menu-item"
-                onClick={() => {
-                  setMenuOpen(false);
-                  props.onShareTabs();
-                }}
-              >
-                <span>{t("extension.browser.share")}</span>
-                <AppWindow size={16} aria-hidden="true" />
-              </button>
-            </Show>
-            <Show when={props.sharing}>
-              <button
-                type="button"
-                role="menuitem"
-                class="ext-menu-item"
-                onClick={() => {
-                  setMenuOpen(false);
-                  props.onManageSharing();
-                }}
-              >
-                <span>{t("extension.browser.title")}</span>
-                <AppWindow size={16} aria-hidden="true" />
-              </button>
-            </Show>
+            <button
+              type="button"
+              role="menuitem"
+              class="ext-menu-item"
+              onClick={() => {
+                setMenuOpen(false);
+                props.onOpenSettings();
+              }}
+            >
+              <span>{t("extension.home.settings")}</span>
+              <Settings size={16} aria-hidden="true" />
+            </button>
             <button
               type="button"
               role="menuitem"

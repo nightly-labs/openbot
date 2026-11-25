@@ -63,6 +63,7 @@ import {
   cliSpawnTarget,
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
+import { CUSTOM_AGENT_MODELS_LISTED } from "./../custom-acp-agents-client";
 import { DISK_RESTORE_WAIT_MS, diskRestoring, providerCheckTimeoutMs } from "../disk-restore";
 import { causeHelpers } from "../effect-boundary";
 import { isPythonKimiCli, type SignInRegion } from "../kimi-region";
@@ -115,7 +116,6 @@ import { defaultUsageModel, ownApiKeyNotice, ProviderAccountFailed, ProviderAcco
 import {
   createAcpRequestEchoReader,
   isAcpHandlerDiagnostic,
-  isGitSpawnDiagnostic,
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
   isMcpSessionClosingDiagnostic,
@@ -149,6 +149,8 @@ const logger = createOpenBotLogger("provider-runtime");
 const stderrLogger = createOpenBotLogger("provider-stderr");
 
 const ACCOUNT_USAGE_READ_TIMEOUT_MS = 30_000;
+const START_ACCOUNT_READ_TIMEOUT_MS = 5_000;
+const CODEX_START_ACCOUNT_READ_TIMEOUT_MS = 20_000;
 const CUSTOM_AGENT_USAGE_REUSE_MS = 60_000;
 const CUSTOM_AGENT_USAGE_WAKE_MS = 60 * 60_000;
 const USAGE_RESET_PROVIDERS: ReadonlySet<AgentProvider> = new Set(["codex"]);
@@ -299,6 +301,7 @@ export interface ProviderHooks {
   onProviderResumed(provider: AgentProvider): void;
   onProviderHeld?(provider: AgentProvider): void;
   releasePersonWaits?(provider: AgentProvider): void;
+  endDroppedTurns?(provider: AgentProvider): Effect.Effect<void>;
   onProviderActivated(provider: AgentProvider, configRevision: number): Effect.Effect<void, ProviderOperationFailed>;
   onModelsRelisted?(provider: AgentProvider, configRevision: number): void;
   onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
@@ -375,6 +378,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #lastErrors = new Map<AgentProvider, { message: string; at: number; serial: number }>();
   #errorSerial = 0;
   readonly #relisting = new Set<AgentProvider>();
+  readonly #lateRelists = new Set<AgentProvider>();
   readonly #heldListTimeouts = new Map<AgentProvider, unknown>();
   #modelsReadAt = 0;
   readonly #relistedAfterFailure = new WeakSet<AgentClient>();
@@ -2415,10 +2419,8 @@ export class ProviderRuntime implements ProviderPort {
       if (busy) {
         if (!this.#updatesWhenIdle.has(provider)) {
           this.#updatesWhenIdle.add(provider);
-          this.#hooks.onProviderHeld?.(provider);
           recordRestartActivity();
         }
-        this.#hooks.releasePersonWaits?.(provider);
       } else if (this.#updatesWhenIdle.delete(provider)) this.#hooks.onProviderResumed(provider);
       yield* Effect.sleep(PROVIDER_RESTART_POLL_MS);
     }
@@ -2440,12 +2442,6 @@ export class ProviderRuntime implements ProviderPort {
   ) {
     const start = this.#providerStarts.get(provider);
     if (start) yield* Deferred.await(start);
-    const busy = yield* providerStep(() => {
-      if ((provider === "codex" && this.#codexLogin.pending) || this.#cliLogin.has(provider))
-        throw new Error(sourceText("error.provider.cliSigningIn", { provider: providerLabel(provider) }));
-      return this.#hooks.isProviderBusy(provider);
-    });
-    if (busy) return null;
     const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
     const stoppedByLimit = this.#status.providers?.find((row) => row.id === provider)?.message === realtimeLimitZero;
     if (stoppedByLimit && (yield* providerStep(hasZeroRealtimeLimit)))
@@ -2457,15 +2453,21 @@ export class ProviderRuntime implements ProviderPort {
     );
     const wasAvailable = this.#status.providers?.find((row) => row.id === provider)?.state === "available";
     let installed = false;
-    yield* Effect.acquireUseRelease(
+    const replaced = yield* Effect.acquireUseRelease(
       providerStep(() => {
+        if ((provider === "codex" && this.#codexLogin.pending) || this.#cliLogin.has(provider))
+          throw new Error(sourceText("error.provider.cliSigningIn", { provider: providerLabel(provider) }));
+        if (this.#hooks.isProviderBusy(provider)) return false;
         this.#updatesWhenIdle.delete(provider);
         this.#setProviderConnectionState(provider, "connecting", false);
         this.#replacingCli.add(provider);
+        this.#hooks.onProviderHeld?.(provider);
         recordRestartActivity();
+        return true;
       }),
-      () =>
+      (idle) =>
         Effect.gen({ self: this }, function* () {
+          if (!idle) return false;
           const executable = yield* install();
           installed = true;
           this.#bundledExecutables[provider] = executable;
@@ -2483,6 +2485,7 @@ export class ProviderRuntime implements ProviderPort {
             yield* this.#saveInstalledChoice(provider, false).pipe(
               Effect.catch(() => Effect.sync(() => logger.warn("The provider CLI choice did not save.", { provider }))),
             );
+          return true;
         }).pipe(
           Effect.mapError((error) => {
             const installedIsOnlyCopy = installed && firstInstall;
@@ -2511,16 +2514,18 @@ export class ProviderRuntime implements ProviderPort {
             return new ProviderOperationFailed({ cause: failure });
           }),
         ),
-      () =>
+      (idle) =>
         Effect.sync(() => {
+          if (!idle) return;
           this.#replacingCli.delete(provider);
           this.#hooks.onProviderResumed(provider);
         }),
     );
+    if (!replaced) return null;
     for (const driver of BUILT_IN_PROVIDER_DRIVERS) {
       if (driver.cliProvider !== provider || this.#off.has(driver.id)) continue;
       yield* (
-        this.#clients.has(driver.id) ? this.restartProviderWhenIdle(driver.id) : this.#reprobeProvider(driver.id)
+        this.#clients.has(driver.id) ? this.#restartWhenIdle(driver.id, false) : this.#reprobeProvider(driver.id)
       ).pipe(Effect.ignore);
     }
     return this.status();
@@ -2764,8 +2769,7 @@ export class ProviderRuntime implements ProviderPort {
   isReplacingCli(provider: AgentProvider): boolean {
     return (
       this.#replacingCli.has(provider) ||
-      (this.#restartsWhenIdle.has(provider) && !this.#restartsKeepingTurns.has(provider)) ||
-      this.#updatesWhenIdle.has(provider)
+      (this.#restartsWhenIdle.has(provider) && !this.#restartsKeepingTurns.has(provider))
     );
   }
 
@@ -2863,8 +2867,11 @@ export class ProviderRuntime implements ProviderPort {
       this.#cliLogin.has(provider) ||
       (provider === "codex" && this.#codexLogin.pending);
     if (waiting) {
-      if (this.#hooks.isProviderBusy(provider) && !this.#restartsKeepingTurns.has(provider))
+      if (this.#hooks.isProviderBusy(provider) && !this.#restartsKeepingTurns.has(provider)) {
         this.#hooks.releasePersonWaits?.(provider);
+        yield* this.#hooks.endDroppedTurns?.(provider) ?? Effect.void;
+        if (!this.#restartsWhenIdle.has(provider)) return;
+      }
       const timer = setTimeout(
         () => Effect.runFork(this.#checkRestartWhenIdle(provider).pipe(Effect.forkIn(this.#scope))),
         PROVIDER_RESTART_POLL_MS,
@@ -3722,7 +3729,9 @@ export class ProviderRuntime implements ProviderPort {
               "account/read",
               { refreshToken: false },
               accountReadDecoder(provider),
-              providerCheckTimeoutMs(5_000),
+              providerCheckTimeoutMs(
+                provider === "codex" ? CODEX_START_ACCOUNT_READ_TIMEOUT_MS : START_ACCOUNT_READ_TIMEOUT_MS,
+              ),
             )
             .pipe(toProviderOperationFailed);
           if (!account.account) {
@@ -3979,10 +3988,6 @@ export class ProviderRuntime implements ProviderPort {
         stderrLogger.warn("A provider reported a failed usage reading.", { provider: client.provider, message });
         return;
       }
-      if (client.provider === "grok" && isGitSpawnDiagnostic(message)) {
-        stderrLogger.warn("A provider could not start git.", { provider: client.provider, message });
-        return;
-      }
       if (isAcpHandlerDiagnostic(message)) {
         stderrLogger.warn("A provider logged a request that it answered with an error.", {
           provider: client.provider,
@@ -4002,6 +4007,10 @@ export class ProviderRuntime implements ProviderPort {
       }
       if (client.provider === "codex") {
         stderrLogger.warn("Codex logged a diagnostic.", { provider: client.provider, message });
+        return;
+      }
+      if (client.provider === "grok") {
+        stderrLogger.warn("Grok logged a diagnostic.", { provider: client.provider, message });
         return;
       }
       if (client.provider === "hermes") {
@@ -4036,6 +4045,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#reportMcpStartupStatus(client, notification.params);
       }
       if (notification.method === "error") this.#reportTurnSignedOut(client, notification.params);
+      if (notification.method === CUSTOM_AGENT_MODELS_LISTED) this.#relistLateModels(client);
     });
     client.once("exit", (error) => this.#handleExit(client, error));
   }
@@ -4430,9 +4440,27 @@ export class ProviderRuntime implements ProviderPort {
     if (changed) this.#setStatus({});
   });
 
+  #relistLateModels(client: AgentClient): void {
+    const provider = client.provider;
+    if (this.#clients.get(provider) !== client) return;
+    if (this.#relisting.has(provider)) {
+      this.#lateRelists.add(provider);
+      return;
+    }
+    this.#relisting.add(provider);
+    Effect.runFork(
+      this.#relistModels(provider).pipe(
+        Effect.ensuring(Effect.sync(() => this.#releaseRelisting(provider))),
+        Effect.forkIn(this.#scope),
+      ),
+    );
+  }
+
   #releaseRelisting(provider: AgentProvider): void {
     this.#relisting.delete(provider);
     this.#heldListTimeouts.delete(provider);
+    const client = this.#clients.get(provider);
+    if (this.#lateRelists.delete(provider) && client) this.#relistLateModels(client);
   }
 
   #emitProviderError(provider: AgentProvider, kind: string, error: unknown, agentId?: string): void {

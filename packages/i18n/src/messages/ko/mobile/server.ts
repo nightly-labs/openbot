@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "{name}에서 나가지 못했어요",
   "mobile.server.drawer.removeFailed": "{name}을(를) 삭제하지 못했어요",
   "mobile.server.drawer.deleteFailed": "{name}을(를) 삭제할 수 없습니다",
+  "mobile.server.drawer.hide": "서버 숨기기",
+  "mobile.server.drawer.show": "서버 표시",
+  "mobile.server.drawer.hiddenServers": "숨긴 서버",
+  "mobile.server.drawer.hideFailed": "{name}을(를) 숨길 수 없습니다",
+  "mobile.server.drawer.showFailed": "{name}을(를) 표시할 수 없습니다",
   "mobile.server.drawer.actionFailed": "OpenBot에서 이 작업을 완료하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.drawer.moveUp": "위로 이동",
   "mobile.server.drawer.moveDown": "아래로 이동",
@@ -265,6 +270,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "모든 멤버의 계정 서비스에서 이 서버가 삭제돼요. 해당 컴퓨터의 파일과 채팅은 그대로 유지돼요. 다시 사용하려면 그 컴퓨터에서 서버를 등록하세요.",
   "mobile.server.settings.remove": "서버 삭제",
+  "mobile.server.settings.hide": "서버 숨기기",
+  "mobile.server.settings.show": "서버 표시",
   "mobile.server.settings.deleteTitle": "{name}을(를) 삭제할까요?",
   "mobile.server.settings.deleteBody":
     "OpenBot이 해당 컴퓨터에서 서버를 중지하고 에이전트, 채팅, 파일을 그 컴퓨터의 휴지통으로 옮깁니다. 서버는 모든 기기의 서버 목록에서 사라집니다.",
@@ -501,6 +508,20 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "서버 키를 변경하지 못했어요. 다시 시도하세요.",
   "mobile.server.settings.keyOwnerOnly": "서버 키는 소유자만 변경할 수 있어요.",
   "mobile.server.settings.keyUnsupported": "여기에서 키를 변경하려면 이 서버의 OpenBot을 업데이트하세요.",
+  "mobile.server.settings.turnLimit": "동시 실행 스레드",
+  "mobile.server.settings.turnLimitDescription":
+    "이 서버에서 동시에 실행할 수 있는 에이전트 스레드 수입니다. 스레드가 많을수록 메모리를 더 사용합니다.",
+  "mobile.server.settings.turnLimitAutomatic": "자동({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "자동(제한 없음)",
+  "mobile.server.settings.turnLimitUnlimited": "제한 없음",
+  "mobile.server.settings.turnLimitsLoadFailed": "이 서버의 스레드 제한을 불러올 수 없습니다.",
+  "mobile.server.settings.turnLimitsSaveFailed": "스레드 제한을 저장하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "여기에서 스레드 제한을 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.agentTaskLimit": "에이전트별 병렬 스레드",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "자체 제한이 없는 각 에이전트가 동시에 실행할 수 있는 스레드 수입니다.",
+  "mobile.server.settings.agentTaskLimitDefault": "기본값({count})",
   "mobile.server.settings.memoryLimit": "에이전트당 메모리 수",
   "mobile.server.settings.memoryLimitDescription": "이 서버의 각 에이전트가 보관할 수 있는 메모리 수예요.",
   "mobile.server.settings.memoryLimitLoadFailed": "이 서버의 메모리 한도를 불러오지 못했어요.",

@@ -379,6 +379,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "{model} verwijderen",
   "mobile.agent.backupModels.unavailable": "Nu niet beschikbaar · overgeslagen",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Als een gebruikslimiet {name} stopt nadat het werk is begonnen, gaat {name} met hetzelfde werk verder op het eerste beschikbare model in de volgorde. Het gaat terug naar {model} als de limiet afloopt, of 10 minuten na een fout van de aanbieder.",
   "mobile.agent.busyMessage.label": "Tijdens werk",
@@ -530,6 +531,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Verzamelen gestart {started}. Bijgewerkt {updated}.",
   "mobile.agent.usage.never": "nooit",
   "mobile.agent.record.time": "Tijd",
+  "mobile.agent.record.date": "Datum",
   "mobile.agent.section.changeFailed": "Kan map niet wijzigen",
   "mobile.agent.section.tryAgain": "Probeer het opnieuw.",
   "mobile.agent.section.moveUp": "Omhoog",

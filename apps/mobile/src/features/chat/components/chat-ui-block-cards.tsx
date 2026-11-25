@@ -90,6 +90,11 @@ export function QuestionText({ question, variant }: { question: string; variant:
   );
 }
 
+export function QuestionDetail({ detail }: { detail: string }) {
+  const secondaryColor = useCSSVariable("--openbot-text-secondary");
+  return <ChatMarkdown body={detail} color={String(secondaryColor)} compact finished />;
+}
+
 export function PromptStatus({ controller, canSend }: { controller: QuestionPromptController; canSend: boolean }) {
   const { t } = useText();
   const { pending, failedAnswers, disabled, submit } = controller;
@@ -336,7 +341,7 @@ export function ChatConfirmPrompt({
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
       <View
-        className={`max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] ${card.fillClass} px-4 py-3`}
+        className={`w-full max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] ${card.fillClass} px-4 py-3`}
         style={card.style}
       >
         <View className="min-w-0 flex-1 pt-1">

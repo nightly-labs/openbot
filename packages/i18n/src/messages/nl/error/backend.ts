@@ -310,6 +310,8 @@ export const messages = {
     "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
   "error.backend.mcpServerExitedWithOutput": "De server is gestopt voordat hij antwoordde. Hij schreef: {detail}",
   "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot kon de MCP-server {name} niet starten, omdat het programma ervan niet is geïnstalleerd op de computer waarop OpenBot draait. Installeer de app die {name} levert op die computer, of zet {name} uit in Marktplaats, Apps.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} stopte met wachten voordat de server was gestart, dus de agents ervan krijgen de tools van deze server niet.",
   "error.backend.mcpServerStoppedDuringCall": "De MCP-server stopte voordat hij op deze aanroep antwoordde.",
@@ -441,6 +443,8 @@ export const messages = {
     "Het beveiligingscertificaat van deze site wordt niet vertrouwd, dus de pagina is niet geopend.",
   "error.backend.browserLowMemory":
     "Deze server heeft weinig geheugen, dus de browser kan geen tabblad meer openen. Sluit een tabblad, of wacht tot andere agents klaar zijn.",
+  "error.backend.browserNoMemory":
+    "Deze server heeft bijna geen geheugen meer, dus de browser kan nu geen tabblad openen. Wacht tot andere agents klaar zijn en probeer het dan opnieuw.",
   "error.backend.browserOpenFailed": "Kan {url} niet openen: {reason}",
   "error.backend.popupSecureInput":
     "Pop-ups worden geblokkeerd tijdens beveiligde invoer. Rond de beveiligde invoer af of annuleer deze, en probeer het opnieuw vanaf de pagina.",

@@ -126,6 +126,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "بلغ حد الاستخدام · تم التخطي",
   "agentSettings.backupModels.unavailable": "غير متاح الآن · تم التخطي",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "عندما يوقف حدّ الاستخدام {name} بعد أن يبدأ العمل، يتابع {name} العمل نفسه على أول نموذج متاح في الترتيب. ويعود إلى {model} عند انتهاء الحد، أو بعد 10 دقائق من خطأ المزوّد.",
   "agentSettings.groups.brain": "العقل",

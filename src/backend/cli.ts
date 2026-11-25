@@ -716,6 +716,7 @@ const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
   let found = false;
   let outdated: CodexCliError | undefined;
   for (const candidate of candidates) {
+    if (provider === "muse" && isWindowsLauncherScript(candidate.executable)) continue;
     if (!(yield* isExecutable(candidate.executable))) continue;
     found = true;
     const attempt = yield* Effect.result(
@@ -998,11 +999,17 @@ function withWindowsPath(environment: NodeJS.ProcessEnv, path: string): NodeJS.P
 
 const DEFAULT_PATHEXT = ".COM;.EXE;.BAT;.CMD";
 
+export function windowsPathExtensions(pathext: string | undefined): string[] {
+  return (pathext?.trim() || DEFAULT_PATHEXT)
+    .split(";")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0);
+}
+
 export function isWindowsRunnable(path: string, pathext: string | undefined): boolean {
   const dot = path.lastIndexOf(".");
   if (dot <= Math.max(path.lastIndexOf("\\"), path.lastIndexOf("/"))) return false;
-  const extension = path.slice(dot).toLowerCase();
-  return (pathext?.trim() || DEFAULT_PATHEXT).split(";").some((entry) => entry.trim().toLowerCase() === extension);
+  return windowsPathExtensions(pathext).includes(path.slice(dot).toLowerCase());
 }
 
 function windowsFallbackPaths(
@@ -1215,12 +1222,16 @@ function batchArgument(argument: string): string {
   return `${quoted}${"\\".repeat(backslashes)}"`;
 }
 
+function isWindowsLauncherScript(executable: string, platform: NodeJS.Platform = process.platform): boolean {
+  return platform === "win32" && [".bat", ".cmd"].includes(extname(executable).toLowerCase());
+}
+
 export function cliSpawnTarget(
   executable: string,
   argv: readonly string[],
   platform: NodeJS.Platform = process.platform,
 ): { command: string; args: string[]; windowsVerbatimArguments: boolean } {
-  if (platform !== "win32" || ![".bat", ".cmd"].includes(extname(executable).toLowerCase())) {
+  if (!isWindowsLauncherScript(executable, platform)) {
     return { command: executable, args: [...argv], windowsVerbatimArguments: false };
   }
 
@@ -1248,7 +1259,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
 ) {
   const launchPath = yield* cliLaunchPath(candidate, source);
   const launch = launchPath ? { launchPath } : {};
-  const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
+  const target = isWindowsLauncherScript(candidate);
   const slow = slowVersionReads.has(candidate);
   const firstTimeout = provider === "antigravity" ? ANTIGRAVITY_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS;
   const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : firstTimeout);

@@ -1,5 +1,38 @@
 [
   {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Mettez aussi à jour vers cette version chaque serveur que vous avez rejoint. Plusieurs des corrections ci-dessous ne fonctionnent sur un serveur que si le serveur a cette version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Utilisez la voix dans les canaux. Quand vous dictez un message dans un canal, l’application lit à voix haute la réponse d’un agent. Vous pouvez aussi démarrer une conversation vocale depuis la zone de saisie du canal.",
+          "Masquez un serveur de la barre des serveurs. Le serveur est aussi masqué sur vos autres ordinateurs. Sélectionnez-le dans le dossier « Serveurs masqués » pour le réafficher."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "La page Tâches s’appelle maintenant Fils, comme dans l’application mobile et dans le panneau latéral de la discussion.",
+          "Les réponses diffusées en continu et les workflows qui s’exécutent en même temps utilisent moins de processeur, et le client web ouvre un serveur plus vite."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Sur Mac, Connecter et Ajouter un compte pour Claude ouvrent maintenant la page de connexion de Claude depuis OpenBot.",
+          "Quand la connexion à un serveur que vous avez rejoint cesse d’envoyer des données, l’application se reconnecte toute seule.",
+          "Les longs canaux d’un serveur que vous avez rejoint s’ouvrent et se mettent à jour plus vite.",
+          "Une sortie de workflow « Notification » ou une étape qui attend une approbation envoie maintenant une notification sur le téléphone.",
+          "Une discussion Gemini continue après que Google a refusé un résultat d’outil. Avant, chaque message suivant échouait."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.77.0",
     "date": "2026-11-23",
     "notices": [

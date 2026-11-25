@@ -13,16 +13,16 @@ import {
   syncBrowserTabOrder,
   takeClosedBrowserTab,
 } from "../browser/browser-tab-session";
-import { createBrowserTabProfiles, readTabProfilesWithProxies } from "../browser/stores/browser-tab-profiles";
+import { browserTabProfilesSource, createBrowserTabProfiles } from "../browser/stores/browser-tab-profiles";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { useConversationViewScope } from "./conversation-scope";
 
 export function desktopTabProfilesReader(server: ServerSummary | undefined) {
   if (!server || !serverSupportsCapability(server, BROWSER_PROFILES_CAPABILITY)) return undefined;
-  const calls = desktopBrowserProfileCalls(server.id);
-  return serverRoleCanAdminister(server) && serverSupportsCapability(server, BROWSER_PROXIES_CAPABILITY)
-    ? readTabProfilesWithProxies(calls)
-    : calls.tabProfiles;
+  return browserTabProfilesSource(
+    desktopBrowserProfileCalls(server.id),
+    serverRoleCanAdminister(server) && serverSupportsCapability(server, BROWSER_PROXIES_CAPABILITY),
+  );
 }
 
 export function followBrowserTabSession(serverId: () => string, allBrowserTabs: () => readonly BrowserTab[]) {
@@ -56,7 +56,7 @@ export function createBrowserFullViewControls() {
   const readTabProfiles = createMemo(() => {
     if (!props.runtime) return desktopTabProfilesReader(props.server);
     const calls = props.runtime.browserProfiles;
-    return calls && readTabProfilesWithProxies(calls);
+    return calls && browserTabProfilesSource(calls, true);
   });
   const profileForTab = createBrowserTabProfiles(readTabProfiles, allBrowserTabs);
   followBrowserTabSession(serverId, allBrowserTabs);

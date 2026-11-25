@@ -141,6 +141,7 @@ import { Route as V1BrowserExtensionXRulesRouteImport } from './routes/v1/browse
 import { Route as V1FeedbackSimilarRouteImport } from './routes/v1/feedback/similar'
 import { Route as V1FeedbackWithdrawRouteImport } from './routes/v1/feedback/withdraw'
 import { Route as V1GithubInstallationTokensRouteImport } from './routes/v1/github/installation-tokens'
+import { Route as V1GithubPublicRepositoriesRouteImport } from './routes/v1/github/public-repositories'
 import { Route as V1MeAnalyticsRouteImport } from './routes/v1/me/analytics'
 import { Route as V1MeAvatarRouteImport } from './routes/v1/me/avatar'
 import { Route as V1MeChatColorRouteImport } from './routes/v1/me/chat-color'
@@ -195,6 +196,7 @@ import { Route as V1MeBillingStorageRouteImport } from './routes/v1/me/billing/s
 import { Route as V1MeCreditsIndexRouteImport } from './routes/v1/me/credits/index'
 import { Route as V1MeCreditsActivityRouteImport } from './routes/v1/me/credits/activity'
 import { Route as V1MeCreditsCheckoutRouteImport } from './routes/v1/me/credits/checkout'
+import { Route as V1MeCreditsRedeemRouteImport } from './routes/v1/me/credits/redeem'
 import { Route as V1MeCreditsTransferRouteImport } from './routes/v1/me/credits/transfer'
 import { Route as V1MeLicenseIndexRouteImport } from './routes/v1/me/license/index'
 import { Route as V1MeLicenseCheckoutRouteImport } from './routes/v1/me/license/checkout'
@@ -258,6 +260,7 @@ import { Route as V2RemoteHostsHostIdCheckoutRouteImport } from './routes/v2/rem
 import { Route as V2RemoteHostsHostIdDiscordDisconnectRouteImport } from './routes/v2/remote/hosts/$hostId/discord-disconnect'
 import { Route as V2RemoteHostsHostIdDiscordRouteRouteImport } from './routes/v2/remote/hosts/$hostId/discord-route'
 import { Route as V2RemoteHostsHostIdGithubRouteRouteImport } from './routes/v2/remote/hosts/$hostId/github-route'
+import { Route as V2RemoteHostsHostIdHiddenRouteImport } from './routes/v2/remote/hosts/$hostId/hidden'
 import { Route as V2RemoteHostsHostIdInvitesRouteImport } from './routes/v2/remote/hosts/$hostId/invites'
 import { Route as V2RemoteHostsHostIdKeyHandoverRouteImport } from './routes/v2/remote/hosts/$hostId/key-handover'
 import { Route as V2RemoteHostsHostIdLiveActivityRouteImport } from './routes/v2/remote/hosts/$hostId/live-activity'
@@ -952,6 +955,12 @@ const V1GithubInstallationTokensRoute =
     path: '/v1/github/installation-tokens',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V1GithubPublicRepositoriesRoute =
+  V1GithubPublicRepositoriesRouteImport.update({
+    id: '/v1/github/public-repositories',
+    path: '/v1/github/public-repositories',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V1MeAnalyticsRoute = V1MeAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
@@ -1224,6 +1233,11 @@ const V1MeCreditsActivityRoute = V1MeCreditsActivityRouteImport.update({
 const V1MeCreditsCheckoutRoute = V1MeCreditsCheckoutRouteImport.update({
   id: '/credits/checkout',
   path: '/credits/checkout',
+  getParentRoute: () => V1MeRoute,
+} as any)
+const V1MeCreditsRedeemRoute = V1MeCreditsRedeemRouteImport.update({
+  id: '/credits/redeem',
+  path: '/credits/redeem',
   getParentRoute: () => V1MeRoute,
 } as any)
 const V1MeCreditsTransferRoute = V1MeCreditsTransferRouteImport.update({
@@ -1578,6 +1592,12 @@ const V2RemoteHostsHostIdGithubRouteRoute =
     path: '/v2/remote/hosts/$hostId/github-route',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2RemoteHostsHostIdHiddenRoute =
+  V2RemoteHostsHostIdHiddenRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/hidden',
+    path: '/v2/remote/hosts/$hostId/hidden',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2RemoteHostsHostIdInvitesRoute =
   V2RemoteHostsHostIdInvitesRouteImport.update({
     id: '/v2/remote/hosts/$hostId/invites',
@@ -1891,6 +1911,7 @@ export interface FileRoutesByFullPath {
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
   '/v1/feedback/withdraw': typeof V1FeedbackWithdrawRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
+  '/v1/github/public-repositories': typeof V1GithubPublicRepositoriesRoute
   '/v1/me/analytics': typeof V1MeAnalyticsRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
   '/v1/me/chat-color': typeof V1MeChatColorRoute
@@ -1943,6 +1964,7 @@ export interface FileRoutesByFullPath {
   '/v1/me/billing/storage': typeof V1MeBillingStorageRoute
   '/v1/me/credits/activity': typeof V1MeCreditsActivityRoute
   '/v1/me/credits/checkout': typeof V1MeCreditsCheckoutRoute
+  '/v1/me/credits/redeem': typeof V1MeCreditsRedeemRoute
   '/v1/me/credits/transfer': typeof V1MeCreditsTransferRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
   '/v1/me/license/plan': typeof V1MeLicensePlanRoute
@@ -2007,6 +2029,7 @@ export interface FileRoutesByFullPath {
   '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
+  '/v2/remote/hosts/$hostId/hidden': typeof V2RemoteHostsHostIdHiddenRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/key-handover': typeof V2RemoteHostsHostIdKeyHandoverRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -2169,6 +2192,7 @@ export interface FileRoutesByTo {
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
   '/v1/feedback/withdraw': typeof V1FeedbackWithdrawRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
+  '/v1/github/public-repositories': typeof V1GithubPublicRepositoriesRoute
   '/v1/me/analytics': typeof V1MeAnalyticsRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
   '/v1/me/chat-color': typeof V1MeChatColorRoute
@@ -2221,6 +2245,7 @@ export interface FileRoutesByTo {
   '/v1/me/billing/storage': typeof V1MeBillingStorageRoute
   '/v1/me/credits/activity': typeof V1MeCreditsActivityRoute
   '/v1/me/credits/checkout': typeof V1MeCreditsCheckoutRoute
+  '/v1/me/credits/redeem': typeof V1MeCreditsRedeemRoute
   '/v1/me/credits/transfer': typeof V1MeCreditsTransferRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
   '/v1/me/license/plan': typeof V1MeLicensePlanRoute
@@ -2285,6 +2310,7 @@ export interface FileRoutesByTo {
   '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
+  '/v2/remote/hosts/$hostId/hidden': typeof V2RemoteHostsHostIdHiddenRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/key-handover': typeof V2RemoteHostsHostIdKeyHandoverRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -2452,6 +2478,7 @@ export interface FileRoutesById {
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
   '/v1/feedback/withdraw': typeof V1FeedbackWithdrawRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
+  '/v1/github/public-repositories': typeof V1GithubPublicRepositoriesRoute
   '/v1/me/analytics': typeof V1MeAnalyticsRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
   '/v1/me/chat-color': typeof V1MeChatColorRoute
@@ -2504,6 +2531,7 @@ export interface FileRoutesById {
   '/v1/me/billing/storage': typeof V1MeBillingStorageRoute
   '/v1/me/credits/activity': typeof V1MeCreditsActivityRoute
   '/v1/me/credits/checkout': typeof V1MeCreditsCheckoutRoute
+  '/v1/me/credits/redeem': typeof V1MeCreditsRedeemRoute
   '/v1/me/credits/transfer': typeof V1MeCreditsTransferRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
   '/v1/me/license/plan': typeof V1MeLicensePlanRoute
@@ -2568,6 +2596,7 @@ export interface FileRoutesById {
   '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
+  '/v2/remote/hosts/$hostId/hidden': typeof V2RemoteHostsHostIdHiddenRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/key-handover': typeof V2RemoteHostsHostIdKeyHandoverRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -2732,6 +2761,7 @@ export interface FileRouteTypes {
     | '/v1/feedback/similar'
     | '/v1/feedback/withdraw'
     | '/v1/github/installation-tokens'
+    | '/v1/github/public-repositories'
     | '/v1/me/analytics'
     | '/v1/me/avatar'
     | '/v1/me/chat-color'
@@ -2784,6 +2814,7 @@ export interface FileRouteTypes {
     | '/v1/me/billing/storage'
     | '/v1/me/credits/activity'
     | '/v1/me/credits/checkout'
+    | '/v1/me/credits/redeem'
     | '/v1/me/credits/transfer'
     | '/v1/me/license/checkout'
     | '/v1/me/license/plan'
@@ -2848,6 +2879,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/discord-disconnect'
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
+    | '/v2/remote/hosts/$hostId/hidden'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/key-handover'
     | '/v2/remote/hosts/$hostId/live-activity'
@@ -3010,6 +3042,7 @@ export interface FileRouteTypes {
     | '/v1/feedback/similar'
     | '/v1/feedback/withdraw'
     | '/v1/github/installation-tokens'
+    | '/v1/github/public-repositories'
     | '/v1/me/analytics'
     | '/v1/me/avatar'
     | '/v1/me/chat-color'
@@ -3062,6 +3095,7 @@ export interface FileRouteTypes {
     | '/v1/me/billing/storage'
     | '/v1/me/credits/activity'
     | '/v1/me/credits/checkout'
+    | '/v1/me/credits/redeem'
     | '/v1/me/credits/transfer'
     | '/v1/me/license/checkout'
     | '/v1/me/license/plan'
@@ -3126,6 +3160,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/discord-disconnect'
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
+    | '/v2/remote/hosts/$hostId/hidden'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/key-handover'
     | '/v2/remote/hosts/$hostId/live-activity'
@@ -3292,6 +3327,7 @@ export interface FileRouteTypes {
     | '/v1/feedback/similar'
     | '/v1/feedback/withdraw'
     | '/v1/github/installation-tokens'
+    | '/v1/github/public-repositories'
     | '/v1/me/analytics'
     | '/v1/me/avatar'
     | '/v1/me/chat-color'
@@ -3344,6 +3380,7 @@ export interface FileRouteTypes {
     | '/v1/me/billing/storage'
     | '/v1/me/credits/activity'
     | '/v1/me/credits/checkout'
+    | '/v1/me/credits/redeem'
     | '/v1/me/credits/transfer'
     | '/v1/me/license/checkout'
     | '/v1/me/license/plan'
@@ -3408,6 +3445,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/discord-disconnect'
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
+    | '/v2/remote/hosts/$hostId/hidden'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/key-handover'
     | '/v2/remote/hosts/$hostId/live-activity'
@@ -3513,6 +3551,7 @@ export interface RootRouteChildren {
   V1AvatarsUserIdRoute: typeof V1AvatarsUserIdRoute
   V1BrowserExtensionXRulesRoute: typeof V1BrowserExtensionXRulesRoute
   V1GithubInstallationTokensRoute: typeof V1GithubInstallationTokensRoute
+  V1GithubPublicRepositoriesRoute: typeof V1GithubPublicRepositoriesRoute
   V1MediaBalanceRoute: typeof V1MediaBalanceRoute
   V1MediaModelsRoute: typeof V1MediaModelsRoute
   V1MobileAuthDevicesRoute: typeof V1MobileAuthDevicesRouteWithChildren
@@ -3598,6 +3637,7 @@ export interface RootRouteChildren {
   V2RemoteHostsHostIdDiscordDisconnectRoute: typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   V2RemoteHostsHostIdDiscordRouteRoute: typeof V2RemoteHostsHostIdDiscordRouteRoute
   V2RemoteHostsHostIdGithubRouteRoute: typeof V2RemoteHostsHostIdGithubRouteRoute
+  V2RemoteHostsHostIdHiddenRoute: typeof V2RemoteHostsHostIdHiddenRoute
   V2RemoteHostsHostIdInvitesRoute: typeof V2RemoteHostsHostIdInvitesRoute
   V2RemoteHostsHostIdKeyHandoverRoute: typeof V2RemoteHostsHostIdKeyHandoverRoute
   V2RemoteHostsHostIdLiveActivityRoute: typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -4558,6 +4598,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V1GithubInstallationTokensRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v1/github/public-repositories': {
+      id: '/v1/github/public-repositories'
+      path: '/v1/github/public-repositories'
+      fullPath: '/v1/github/public-repositories'
+      preLoaderRoute: typeof V1GithubPublicRepositoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/me/analytics': {
       id: '/v1/me/analytics'
       path: '/analytics'
@@ -4934,6 +4981,13 @@ declare module '@tanstack/solid-router' {
       path: '/credits/checkout'
       fullPath: '/v1/me/credits/checkout'
       preLoaderRoute: typeof V1MeCreditsCheckoutRouteImport
+      parentRoute: typeof V1MeRoute
+    }
+    '/v1/me/credits/redeem': {
+      id: '/v1/me/credits/redeem'
+      path: '/credits/redeem'
+      fullPath: '/v1/me/credits/redeem'
+      preLoaderRoute: typeof V1MeCreditsRedeemRouteImport
       parentRoute: typeof V1MeRoute
     }
     '/v1/me/credits/transfer': {
@@ -5377,6 +5431,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2RemoteHostsHostIdGithubRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/remote/hosts/$hostId/hidden': {
+      id: '/v2/remote/hosts/$hostId/hidden'
+      path: '/v2/remote/hosts/$hostId/hidden'
+      fullPath: '/v2/remote/hosts/$hostId/hidden'
+      preLoaderRoute: typeof V2RemoteHostsHostIdHiddenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/remote/hosts/$hostId/invites': {
       id: '/v2/remote/hosts/$hostId/invites'
       path: '/v2/remote/hosts/$hostId/invites'
@@ -5776,6 +5837,7 @@ interface V1MeRouteChildren {
   V1MeBillingStorageRoute: typeof V1MeBillingStorageRoute
   V1MeCreditsActivityRoute: typeof V1MeCreditsActivityRoute
   V1MeCreditsCheckoutRoute: typeof V1MeCreditsCheckoutRoute
+  V1MeCreditsRedeemRoute: typeof V1MeCreditsRedeemRoute
   V1MeCreditsTransferRoute: typeof V1MeCreditsTransferRoute
   V1MeLicenseCheckoutRoute: typeof V1MeLicenseCheckoutRoute
   V1MeLicensePlanRoute: typeof V1MeLicensePlanRoute
@@ -5797,6 +5859,7 @@ const V1MeRouteChildren: V1MeRouteChildren = {
   V1MeBillingStorageRoute: V1MeBillingStorageRoute,
   V1MeCreditsActivityRoute: V1MeCreditsActivityRoute,
   V1MeCreditsCheckoutRoute: V1MeCreditsCheckoutRoute,
+  V1MeCreditsRedeemRoute: V1MeCreditsRedeemRoute,
   V1MeCreditsTransferRoute: V1MeCreditsTransferRoute,
   V1MeLicenseCheckoutRoute: V1MeLicenseCheckoutRoute,
   V1MeLicensePlanRoute: V1MeLicensePlanRoute,
@@ -5996,6 +6059,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1AvatarsUserIdRoute: V1AvatarsUserIdRoute,
   V1BrowserExtensionXRulesRoute: V1BrowserExtensionXRulesRoute,
   V1GithubInstallationTokensRoute: V1GithubInstallationTokensRoute,
+  V1GithubPublicRepositoriesRoute: V1GithubPublicRepositoriesRoute,
   V1MediaBalanceRoute: V1MediaBalanceRoute,
   V1MediaModelsRoute: V1MediaModelsRoute,
   V1MobileAuthDevicesRoute: V1MobileAuthDevicesRouteWithChildren,
@@ -6085,6 +6149,7 @@ const rootRouteChildren: RootRouteChildren = {
     V2RemoteHostsHostIdDiscordDisconnectRoute,
   V2RemoteHostsHostIdDiscordRouteRoute: V2RemoteHostsHostIdDiscordRouteRoute,
   V2RemoteHostsHostIdGithubRouteRoute: V2RemoteHostsHostIdGithubRouteRoute,
+  V2RemoteHostsHostIdHiddenRoute: V2RemoteHostsHostIdHiddenRoute,
   V2RemoteHostsHostIdInvitesRoute: V2RemoteHostsHostIdInvitesRoute,
   V2RemoteHostsHostIdKeyHandoverRoute: V2RemoteHostsHostIdKeyHandoverRoute,
   V2RemoteHostsHostIdLiveActivityRoute: V2RemoteHostsHostIdLiveActivityRoute,

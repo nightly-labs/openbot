@@ -140,6 +140,7 @@
         "@openbot/contracts": "workspace:*",
         "@openbot/i18n": "workspace:*",
         "@openbot/team-client": "workspace:*",
+        "@openbot/telemetry": "workspace:*",
         "@openbot/ui": "workspace:*",
         "@solidjs/signals": "catalog:",
         "@solidjs/web": "catalog:",
@@ -154,7 +155,7 @@
     },
     "apps/mobile": {
       "name": "@openbot/mobile",
-      "version": "1.4.13",
+      "version": "1.4.14",
       "dependencies": {
         "@config-plugins/react-native-webrtc": "15.0.2",
         "@expo/metro-runtime": "~58.0.17",

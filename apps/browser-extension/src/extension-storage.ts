@@ -1,5 +1,5 @@
 import type { CentralAuthUser } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { isBoolean, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { PRESENCE_KEY, type PresenceAck } from "./client-browser-messages";
 
 const SESSION_KEY = "openbot.session.v1";
@@ -31,7 +31,7 @@ export function decodeUser(value: unknown): CentralAuthUser | null {
     email: value.email,
     name: isString(value.name) ? value.name : null,
     avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
-    analyticsEnabled: null,
+    analyticsEnabled: isBoolean(value.analyticsEnabled) ? value.analyticsEnabled : null,
     chatColor: null,
   };
 }

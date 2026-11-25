@@ -460,6 +460,7 @@ export class BootRecovery {
             },
             requestAnswered: (deliveryId) =>
               this.#mailbox.hasOwnReplyFrom(deliveryId) || this.#mailbox.hasSentResultFor(deliveryId),
+            followsUpOwnAnswer: (delivery) => this.#mailbox.followsUpOwnAnswer(delivery),
           }).pipe(toBootRecoveryFailed);
           yield* recoveryStep(() => this.#refreshBackfilledConversation(agent.id, publicThreadId));
         }).pipe(

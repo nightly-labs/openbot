@@ -283,6 +283,8 @@ export const messages = {
   "error.backend.mcpServerExited": "توقف الخادم قبل أن يُجيب. شغّل الأمر في الطرفية لرؤية الخطأ.",
   "error.backend.mcpServerExitedWithOutput": "توقف الخادم قبل أن يُجيب. كتب: {detail}",
   "error.backend.mcpServerFailedToStart": "لم يبدأ الخادم: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "تعذّر على OpenBot تشغيل خادم MCP {name}، لأن برنامجه غير مثبّت على الكمبيوتر الذي يشغّل OpenBot. ثبّت التطبيق الذي يوفّر {name} على ذلك الكمبيوتر، أو أوقف {name} في المتجر، التطبيقات.",
   "error.backend.mcpServerStartAbandoned":
     "توقف {provider} عن الانتظار قبل أن يبدأ الخادم، لذلك لا يحصل وكلاؤه على أدوات هذا الخادم.",
   "error.backend.mcpServerStoppedDuringCall": "توقف خادم MCP قبل أن يرد على هذا الاستدعاء.",
@@ -408,6 +410,8 @@ export const messages = {
   "error.backend.browserCertificateUntrusted": "شهادة الأمان لهذا الموقع غير موثوقة، لذلك لم تُفتح الصفحة.",
   "error.backend.browserLowMemory":
     "ذاكرة هذا الخادم منخفضة، لذا لا يمكن للمتصفح فتح علامة تبويب أخرى. أغلق علامة تبويب، أو انتظر حتى ينتهي الوكلاء الآخرون.",
+  "error.backend.browserNoMemory":
+    "ذاكرة هذا الخادم شبه ممتلئة، لذا لا يمكن للمتصفح فتح علامة تبويب الآن. انتظر حتى ينتهي الوكلاء الآخرون، ثم حاول مرة أخرى.",
   "error.backend.browserOpenFailed": "تعذّر فتح {url}: {reason}",
   "error.backend.popupSecureInput":
     "النوافذ المنبثقة محظورة أثناء الإدخال الآمن. أكمل الإدخال الآمن أو ألغه، ثم أعد المحاولة من الصفحة.",

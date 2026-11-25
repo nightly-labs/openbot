@@ -388,6 +388,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Retirer {model}",
   "mobile.agent.backupModels.unavailable": "Indisponible pour le moment · ignoré",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Si une limite d’utilisation arrête {name} après le début du travail, {name} poursuit le même travail avec le premier modèle disponible dans l’ordre. Il revient à {model} quand la limite prend fin, ou 10 minutes après une erreur du fournisseur.",
   "mobile.agent.busyMessage.label": "Pendant le travail",
@@ -541,6 +542,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Collecte commencée {started}. Mise à jour {updated}.",
   "mobile.agent.usage.never": "jamais",
   "mobile.agent.record.time": "Heure",
+  "mobile.agent.record.date": "Date",
   "mobile.agent.section.changeFailed": "Impossible de modifier le dossier",
   "mobile.agent.section.tryAgain": "Veuillez réessayer.",
   "mobile.agent.section.moveUp": "Monter",

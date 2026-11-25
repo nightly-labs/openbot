@@ -12,6 +12,7 @@ const ALLOWED_DIRECTORIES = [
   "apps/auth-api/content-art/",
   "apps/auth-api/src/content/guides/media/",
   "scripts/hosting/desktop/",
+  "docs/store-assets/",
 ] as const;
 
 const IMAGE_FILE = /\.(avif|bmp|gif|heic|icns|ico|jpe?g|mov|mp4|png|svg|tiff?|webm|webp)$/i;

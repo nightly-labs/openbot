@@ -35,6 +35,7 @@ import {
   ServerPersonalityRow,
   ServerSkillLearningRow,
 } from "@/features/servers/components/server-learning-rows";
+import { ServerTurnLimitsRows } from "@/features/servers/components/server-turn-limits-rows";
 import { ServerVoiceModelRow } from "@/features/servers/components/server-voice-model-row";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import { SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
@@ -244,7 +245,7 @@ export function ServerConnectionSection({
 }) {
   const { t } = useText();
   const serverId = server.id;
-  const { refreshServer, hostedServerStarting, canRestartServerItself, restartServerItself } = useMobileWorkspace();
+  const { reconnectServer, hostedServerStarting, canRestartServerItself, restartServerItself } = useMobileWorkspace();
   const { session } = useMobileSession();
   const action = useLockedAction();
   const { busy, error } = action;
@@ -262,7 +263,7 @@ export function ServerConnectionSection({
         leading={<RowIcon icon={RefreshCcw} tone="accent" />}
         disclosure={false}
         disabled={busy}
-        onPress={() => void perform(() => refreshServer(serverId))}
+        onPress={() => void perform(() => reconnectServer(serverId))}
       >
         <Typography.Paragraph className="text-accent">
           {busy && !restarting ? t("mobile.server.settings.refreshing") : t("mobile.server.settings.refresh")}
@@ -318,6 +319,7 @@ export function ServerConnectionSection({
 
 function permitsAgentSettings(checks: ServerChecks, serverId: string): boolean {
   return (
+    checks.canManageServerTurnLimits(serverId) ||
     checks.canManageServerPersonality(serverId) ||
     checks.canManageAgentMemoryLimit(serverId) ||
     checks.canManageMemoryReview(serverId) ||
@@ -413,6 +415,7 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
 
 export function ServerAgentsSection({ serverId }: { serverId: string }) {
   const {
+    canManageServerTurnLimits,
     canManageServerPersonality,
     canManageAgentMemoryLimit,
     canManageMemoryReview,
@@ -422,6 +425,7 @@ export function ServerAgentsSection({ serverId }: { serverId: string }) {
   } = useMobileWorkspace();
   return (
     <>
+      {canManageServerTurnLimits(serverId) ? <ServerTurnLimitsRows serverId={serverId} /> : null}
       {canManageServerPersonality(serverId) ? <ServerPersonalityRow serverId={serverId} /> : null}
       {canManageAgentMemoryLimit(serverId) ? <ServerMemoryLimitRow serverId={serverId} /> : null}
       {canManageMemoryReview(serverId) ? <ServerMemoryReviewRow serverId={serverId} /> : null}

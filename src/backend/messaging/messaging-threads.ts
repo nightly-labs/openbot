@@ -779,7 +779,8 @@ export class MessagingThreads {
           followUp = origin !== null;
         }
         const deliveryIds = active.map((context) => context.delivery.id);
-        const teammateRequest = active.length > 0 && active.every(({ delivery }) => isTeammateMessage(delivery));
+        const teammateRequest =
+          active.length > 0 && active.every(({ delivery }) => isTeammateMessage(delivery, this.#mailbox));
         this.#turnOrigins.set(event.turnId, { deliveryIds, origin, followUp, teammateRequest });
         this.#publish({ type: "started", link, turnId: event.turnId, origin, followUp, teammateRequest });
         let stopped = false;
@@ -906,7 +907,7 @@ export class MessagingThreads {
       status,
       origin,
       followUp: delivery?.sender.kind === "agent",
-      teammateRequest: delivery !== undefined && isTeammateMessage(delivery),
+      teammateRequest: delivery !== undefined && isTeammateMessage(delivery, this.#mailbox),
       answer,
       files: [],
       reason,
@@ -1031,11 +1032,11 @@ export class MessagingThreads {
   }
 }
 
-function isTeammateMessage(delivery: DeliveryContext["delivery"]): boolean {
+function isTeammateMessage(delivery: DeliveryContext["delivery"], mailbox: MailboxStore): boolean {
   return (
     delivery.sender.kind === "agent" &&
     delivery.sender.agentId !== delivery.recipientAgentId &&
-    !delivery.replyToMessageId
+    (!delivery.replyToMessageId || mailbox.followsUpOwnAnswer(delivery))
   );
 }
 

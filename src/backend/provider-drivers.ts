@@ -70,7 +70,12 @@ import {
 } from "./cli";
 import { clineFreeModels } from "./cline-free-models";
 import { checkCursorApiKey, readCursorUsage } from "./cursor-usage";
-import { CustomAcpAgentsClient, type CustomAgentConfig, type CustomAgentSource } from "./custom-acp-agents-client";
+import {
+  CustomAcpAgentsClient,
+  type CustomAgentConfig,
+  type CustomAgentSource,
+  isDeniedWriteLine,
+} from "./custom-acp-agents-client";
 import { isMissingFileError } from "./file-errors";
 import { GrokAgentClient } from "./grok-client";
 import { hermesSettingsEnvironment } from "./hermes-settings";
@@ -85,14 +90,21 @@ import { openCodeAgentDefaultsEnv } from "./opencode-agent-defaults";
 import {
   CUSTOM_ENDPOINT_SILENCE_MS,
   type CustomProviderSource,
+  clearedInheritedOpenCodeKeyEnv,
   customProvidersOn,
   OPENCODE_AGENT_CONFIG,
+  OPENCODE_GO_PROVIDER,
   OPENCODE_PROFILE_CONFIG,
   openCodeConfigEnv,
   openCodeModelName,
   openCodeSignInMessage,
 } from "./opencode-config";
-import { hasOpenCodeProviderKey, readOpenCodeGoUsage, readOpenCodeRefusalStatus } from "./opencode-usage";
+import {
+  hasOpenCodeProviderKey,
+  readOpenCodeGoUsage,
+  readOpenCodeRefusalStatus,
+  readOpenCodeStoredKey,
+} from "./opencode-usage";
 import { PiAgentClient } from "./pi-client";
 import {
   antigravityStatePaths,
@@ -856,8 +868,10 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
               context.providerStateDirectory,
               { ...process.env, ...agentEnvironment },
               cli.version,
+              confinement ? "confined" : "provider-asks",
             ),
             ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
+            ...clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode")),
             ...(confinement ? OPENCODE_CONFINED_ENV : {}),
           };
         },
@@ -883,6 +897,12 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           Effect.runSync(hasOpenCodeProviderKey(provider, { ...process.env, ...context.agentEnvironment?.() })),
         providerRefusalStatus: (sessionId) =>
           Effect.runSync(readOpenCodeRefusalStatus(sessionId, { ...process.env, ...context.agentEnvironment?.() })),
+        savedKeyShadowed: () => {
+          const ownKey = Effect.runSync(
+            readOpenCodeStoredKey(OPENCODE_GO_PROVIDER, { ...process.env, ...context.agentEnvironment?.() }),
+          );
+          return ownKey !== null && ownKey !== context.apiKey("opencode");
+        },
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
         fitImage: context.fitImage,
@@ -907,6 +927,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         extraEnv: () => ({
           ...opencodeEnv(cli),
           ...openCodeConfigEnv(OPENCODE_PROFILE_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
+          ...clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode")),
         }),
         signInMessage: openCodeSignInMessage(openCodeEndpoints(context)().length),
         modelName: (id, name) => openCodeModelName(id, name, openCodeEndpoints(context)),
@@ -1441,7 +1462,12 @@ function customAgentChild(
     env,
     ...(profileGeneration ? { profileGeneration: true } : {}),
     history: profileGeneration ? undefined : history,
-    ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, customAgentStatePaths()) } : {}),
+    ...(confinement
+      ? {
+          confine: (target) => confineSpawnTarget(target, confinement, customAgentStatePaths()),
+          causeLine: isDeniedWriteLine,
+        }
+      : {}),
     signInMessage: sourceText("error.provider.customAgentSignIn"),
     servesModel: () => savedCustomAgents(context).some((saved) => saved.id === config.id),
     steer: steerAcpSession,
