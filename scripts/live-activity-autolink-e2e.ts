@@ -159,6 +159,7 @@ async function runCase(fixture: (typeof CASES)[number]): Promise<CaseResult> {
           result.cleanup.listenerRemoves += 1;
           events.off(event, listener);
         },
+        listAgents: () => [],
         getRuntimeSnapshot: () => {
           result.snapshotReads += 1;
           return runtime;
