@@ -313,7 +313,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #hostRestartAway = new Map<string, number>();
   readonly #webrtcTransport: TeamWebRtcClientTransport | null;
   readonly #getLocalHostId: () => string | null;
-  #localMemberLimit: number | null = null;
+  #localMemberLimit: Pick<ServerSummary, "memberLimit" | "licenseRaisesMemberLimit"> = {};
   #keyChangedAt = new Map<string, number>();
   #accountHidden: ReadonlyMap<string, boolean> = new Map();
   #thisComputerServers: ReadonlySet<string> = new Set();
@@ -2663,7 +2663,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     const hosts = yield* transport.listHosts();
     const email = yield* remoteDecode(() => this.#centralAccount.getEmail());
     const localHostId = this.#getLocalHostId();
-    this.#localMemberLimit = hosts.find((host) => host.hostId === localHostId)?.memberLimit ?? null;
+    const localHost = hosts.find((host) => host.hostId === localHostId);
+    this.#localMemberLimit = {
+      ...(localHost?.memberLimit === undefined ? {} : { memberLimit: localHost.memberLimit }),
+      ...(localHost?.licenseRaisesMemberLimit === undefined
+        ? {}
+        : { licenseRaisesMemberLimit: localHost.licenseRaisesMemberLimit }),
+    };
     const followedHandovers = yield* followedHostKeyHandovers({
       hosts,
       servers: this.#store.servers,

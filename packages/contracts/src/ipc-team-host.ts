@@ -87,6 +87,7 @@ export interface ServerSummary {
   role: TeamRole | null;
   active: boolean;
   memberLimit?: number;
+  licenseRaisesMemberLimit?: boolean;
   hosted?: boolean;
   restartAvailable?: boolean;
   storageGb?: number;
