@@ -202,6 +202,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.videoGenerationFailed": "Video generation failed.",
   "error.backend.videoGenerationNoVideo": "Video generation did not return a video.",
   "error.backend.videoGenerationInterrupted": "Video generation was interrupted.",
+  "error.backend.grokVideoNoQuota": "Your Grok account cannot make videos. Generate the video with credits instead.",
   "error.backend.attachmentNotRegularFile": "Only regular files can be attached: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot could not copy {name}.",
   "error.backend.routineNameRequired": "A routine name is required.",

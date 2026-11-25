@@ -194,6 +194,8 @@ export const messages = {
   "error.backend.videoGenerationFailed": "فشل إنشاء الفيديو.",
   "error.backend.videoGenerationNoVideo": "لم يُرجع إنشاء الفيديو أي فيديو.",
   "error.backend.videoGenerationInterrupted": "تمت مقاطعة إنشاء الفيديو.",
+  "error.backend.grokVideoNoQuota":
+    "لا يمكن لحساب Grok الخاص بك إنشاء مقاطع فيديو. أنشئ الفيديو باستخدام الأرصدة بدلًا من ذلك.",
   "error.backend.attachmentNotRegularFile": "يمكن إرفاق الملفات العادية فقط: {name}",
   "error.backend.attachmentCopyFailed": "تعذّر على OpenBot نسخ {name}.",
   "error.backend.routineNameRequired": "يلزم اسم للمهمة الدورية.",
