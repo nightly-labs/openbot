@@ -195,8 +195,8 @@ export class ChannelStore {
   readonly #completedMessageChanges = new Map<string, number>();
   readonly #unreadCounts = new Map<string, Map<string, number>>();
   readonly #taskCounts = new Map<string, TaskCounts>();
-  #unreadCountsConnection: DatabaseSync | null = null;
-  #unreadCountsDataVersion: unknown = null;
+  #countsConnection: DatabaseSync | null = null;
+  #countsDataVersion: unknown = null;
 
   #memberFolders: { connection: DatabaseSync; folders: ReadonlyMap<string, readonly string[]> } | null = null;
 
@@ -252,11 +252,11 @@ export class ChannelStore {
     const db = this.database.connection;
     if (db.isTransaction) return false;
     const dataVersion = databaseRow(cachedStatement(db, "PRAGMA data_version").get())?.data_version;
-    if (db !== this.#unreadCountsConnection || dataVersion !== this.#unreadCountsDataVersion) {
+    if (db !== this.#countsConnection || dataVersion !== this.#countsDataVersion) {
       this.#unreadCounts.clear();
       this.#taskCounts.clear();
-      this.#unreadCountsConnection = db;
-      this.#unreadCountsDataVersion = dataVersion;
+      this.#countsConnection = db;
+      this.#countsDataVersion = dataVersion;
     }
     return true;
   }
