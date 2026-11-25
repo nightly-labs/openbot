@@ -21,14 +21,14 @@ export function compactScreenshot(png: Buffer): Buffer | null {
   if (png.length < 24 || !png.subarray(0, 8).equals(PNG_SIGNATURE)) return null;
   if (png.readUInt32BE(16) * png.readUInt32BE(20) > MAX_PIXELS) return null;
   const image = nativeImage.createFromBuffer(png);
-  if (image.isEmpty() || hasClearPixels(image.toBitmap())) return null;
+  if (image.isEmpty() || hasNoVisiblePixel(image.toBitmap())) return null;
   const jpeg = image.toJPEG(SCREENSHOT_JPEG_QUALITY);
   return jpeg.length > 0 && jpeg.length < png.length ? jpeg : null;
 }
 
-export function hasClearPixels(bitmap: Buffer): boolean {
-  for (let index = 3; index < bitmap.length; index += 4) if ((bitmap[index] ?? 255) < 255) return true;
-  return false;
+function hasNoVisiblePixel(bitmap: Buffer): boolean {
+  for (let index = 3; index < bitmap.length; index += 4) if (bitmap[index] !== 0) return false;
+  return true;
 }
 
 export function fitImageForAgent(bytes: Uint8Array): ImageFitResult {

@@ -5,7 +5,7 @@ import { ATTACHMENT_PREVIEW_EDGE } from "@openbot/contracts/team-protocol/attach
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Deferred, Effect } from "effect";
 import { nativeImage } from "electron";
-import { hasClearPixels, jpegFacts, PNG_SIGNATURE, upright } from "./agent-image-fit";
+import { jpegFacts, PNG_SIGNATURE, upright } from "./agent-image-fit";
 
 const PREVIEW_FORMAT = `v1-${ATTACHMENT_PREVIEW_EDGE}`;
 const PREVIEW_CACHE_BYTES = 512 * 1024 * 1024;
@@ -53,6 +53,11 @@ function previewImage(bytes: Uint8Array, edge: number): Encoded | null {
       ? { bytes: fitted.toPNG(), mimeType: "image/png" }
       : { bytes: fitted.toJPEG(JPEG_QUALITY), mimeType: "image/jpeg" };
   return encoded.bytes.length > 0 && encoded.bytes.length < file.length ? encoded : null;
+}
+
+function hasClearPixels(bitmap: Buffer): boolean {
+  for (let index = 3; index < bitmap.length; index += 4) if ((bitmap[index] ?? 255) < 255) return true;
+  return false;
 }
 
 function hash(value: string): string {
