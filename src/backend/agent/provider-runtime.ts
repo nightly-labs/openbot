@@ -61,6 +61,7 @@ import {
   chooseInstalledFirst,
   cliPathEnvironment,
   cliSpawnTarget,
+  forgetWindowsLookups,
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
 import { CUSTOM_AGENT_MODELS_LISTED } from "./../custom-acp-agents-client";
@@ -1554,7 +1555,10 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
     options: { automatic: boolean },
   ) {
-    if (!options.automatic) this.#startFailures.clear();
+    if (!options.automatic) {
+      this.#startFailures.clear();
+      forgetWindowsLookups();
+    }
     if (
       options.automatic &&
       (this.#codexLogin.pending || this.#cliLogin.size > 0 || this.#providerConnectionCommands.size > 0)
@@ -2437,6 +2441,7 @@ export class ProviderRuntime implements ProviderPort {
           if (!idle) return false;
           const executable = yield* install();
           installed = true;
+          forgetWindowsLookups();
           this.#bundledExecutables[provider] = executable;
           const cli = yield* this.#resolveProviderCli(provider, { preferInstalled: false });
           if (cli.source !== "managed" || cli.executable !== executable)

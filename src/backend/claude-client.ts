@@ -131,6 +131,7 @@ import {
 } from "./mcp-provider-shapes";
 import { MAX_RUNS, untakenRunId } from "./message-run-ids";
 import { PendingServerRequests } from "./pending-server-requests";
+import type { ProcessLaunch } from "./process-launch";
 import {
   type AccountRateLimitsReadResult,
   type AccountRateLimitWindowResult,
@@ -696,6 +697,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #agentEnvironment: ((inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>>) | undefined;
   readonly #fallbackApiKey: (() => string | null) | undefined;
   readonly #userSetup: () => boolean;
+  readonly #launchProcess: ProcessLaunch | undefined;
   #onApiKey = false;
   #cliApiKey = false;
   #accountRead = false;
@@ -734,6 +736,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     historyIndexDirectory?: string,
     fallbackApiKey?: () => string | null,
     userSetup: () => boolean = () => false,
+    launchProcess?: ProcessLaunch,
   ) {
     super();
     this.#cli = cli;
@@ -749,6 +752,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#agentEnvironment = agentEnvironment;
     this.#fallbackApiKey = fallbackApiKey;
     this.#userSetup = userSetup;
+    this.#launchProcess = launchProcess;
     const historyEnvironment = agentEnvironment?.();
     const resolvedHistoryIndexDirectory = historyIndexDirectory ?? stateDirectory;
     const historyOptions: ClaudeHistoryOptions = {
@@ -767,6 +771,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 
   get running(): boolean {
     return this.#running;
+  }
+
+  #claudeProcessSpawner(stderr: ClaudeStderrTail): Pick<ClaudeSdkLaunch, "spawnClaudeCodeProcess"> {
+    if (this.#sdkLaunch.spawnClaudeCodeProcess) return {};
+    if (PROVIDER_PROCESS_GROUP)
+      return { spawnClaudeCodeProcess: (options: SpawnOptions) => spawnClaudeProcessGroup(options, stderr) };
+    const launchProcess = this.#launchProcess;
+    if (!launchProcess) return {};
+    return {
+      spawnClaudeCodeProcess: (options: SpawnOptions) => spawnClaudeThroughLauncher(options, stderr, launchProcess),
+    };
   }
 
   start(): void {
@@ -1632,9 +1647,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         options: {
           cwd: config.cwd,
           ...this.#sdkLaunch,
-          ...(this.#sdkLaunch.spawnClaudeCodeProcess || !PROVIDER_PROCESS_GROUP
-            ? {}
-            : { spawnClaudeCodeProcess: (options: SpawnOptions) => spawnClaudeProcessGroup(options, stderr) }),
+          ...this.#claudeProcessSpawner(stderr),
           ...(config.model ? { model: this.#sdkModel(config.model) } : {}),
           ...(appliedEffort ? { effort: appliedEffort } : {}),
           ...(resume ? { resume: threadId } : { sessionId: threadId, title: CLAUDE_SESSION_TITLE }),
@@ -3381,6 +3394,22 @@ function spawnClaudeProcessGroup(
   endProcessGroupOnExit(child);
   child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
   child.stderr.on("error", () => {});
+  const abort = () => child.kill();
+  const release = () => signal.removeEventListener("abort", abort);
+  signal.addEventListener("abort", abort, { once: true });
+  child.once("exit", release);
+  child.once("error", release);
+  if (signal.aborted) abort();
+  return child;
+}
+
+function spawnClaudeThroughLauncher(
+  { command, args, cwd, env, signal }: SpawnOptions,
+  stderr: ClaudeStderrTail,
+  launchProcess: ProcessLaunch,
+): SpawnedProcess {
+  const child = launchProcess({ command, args, cwd, env });
+  child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
   const abort = () => child.kill();
   const release = () => signal.removeEventListener("abort", abort);
   signal.addEventListener("abort", abort, { once: true });

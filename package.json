@@ -251,6 +251,7 @@
     "test:acp-directories": "bun scripts/acp-additional-directories-e2e.ts",
     "test:acp-flavors": "bun scripts/acp-flavor-e2e.ts",
     "test:acp-subagents": "bun scripts/acp-subagents-e2e.ts",
+    "test:process-launcher": "bun scripts/process-launcher-e2e.ts",
     "test:memory-changes-wire": "bun scripts/memory-changes-e2e.ts",
     "test:sign-in-relay-paste": "bun scripts/sign-in-relay-paste-e2e.ts",
     "test:mcp-many-servers": "bun scripts/mcp-many-servers-e2e.ts",
