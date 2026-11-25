@@ -74,8 +74,10 @@ const readOwnKeys = Effect.fn("OpenCode.readOwnKeys")(function* () {
       try: () => readFile(join(dataDirectory, "auth.json"), "utf8"),
       catch: (cause) => new OpenCodeUsageFailed({ cause }),
     }).pipe(Effect.orElseSucceed(() => "")));
-  const goKey = (authFileGoKey(authText) ?? env.OPENCODE_API_KEY)?.trim();
-  const consoleFileKey = authFileConsoleKey(authText)?.trim();
+  const authFile = Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(AuthFile))(authText));
+  const goKey = (authFileApiKey(authFile, "opencode-go")?.key ?? env.OPENCODE_API_KEY)?.trim();
+  const consoleFile = authFileApiKey(authFile, "opencode");
+  const consoleFileKey = consoleFile?.servedByConsole ? consoleFile.key.trim() : undefined;
   const databasePath = openCodeDatabasePath(env);
   const consoleKey = inlineAuth || !databasePath ? undefined : yield* readConsoleKey(databasePath);
   return [...new Set([consoleKey, goKey, consoleFileKey].filter((key): key is string => Boolean(key)))];
@@ -146,25 +148,17 @@ interface AuthFileApiKey {
   readonly servedByConsole: boolean;
 }
 
-function authFileApiKey(text: string, integration: "opencode" | "opencode-go"): AuthFileApiKey | undefined {
-  const file = Schema.decodeUnknownOption(Schema.fromJsonString(AuthFile))(text);
-  if (Option.isNone(file)) return undefined;
-  const entry = file.value[integration];
+function authFileApiKey(
+  file: typeof AuthFile.Type | undefined,
+  integration: "opencode" | "opencode-go",
+): AuthFileApiKey | undefined {
+  const entry = file?.[integration];
   const decoded = Schema.decodeUnknownOption(AuthFileKey)(entry);
   if (Option.isNone(decoded)) return undefined;
   return {
     key: decoded.value.key,
     servedByConsole: servedByOpenCodeConsole(getRecord(entry, "metadata")?.server),
   };
-}
-
-function authFileGoKey(text: string): string | undefined {
-  return authFileApiKey(text, "opencode-go")?.key;
-}
-
-function authFileConsoleKey(text: string): string | undefined {
-  const entry = authFileApiKey(text, "opencode");
-  return entry?.servedByConsole ? entry.key : undefined;
 }
 
 function servedByOpenCodeConsole(server: unknown): boolean {

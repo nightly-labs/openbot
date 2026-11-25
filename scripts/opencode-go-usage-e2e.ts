@@ -26,6 +26,8 @@ interface Report {
   authFileConsoleKey?: UsageCase;
   selfHostedAuthFileConsole?: UsageCase;
   authFileGoKeyFirst?: UsageCase;
+  authFileGoKeyRefused?: UsageCase;
+  inlineAuthConsole?: UsageCase;
   consoleKey?: UsageCase;
   consoleKeyRejected?: UsageCase;
   selfHostedConsole?: UsageCase;
@@ -147,6 +149,20 @@ try {
   const goKeyFirst = await readUsage(null, ["fake-auth-file", "fake-auth-console"]);
   report.authFileGoKeyFirst = goKeyFirst;
   assert.deepEqual(goKeyFirst.sent, ["fake-auth-file"], "the opencode-go key comes before the OpenCode key");
+  const goKeyRefused = await readUsage(null, ["fake-auth-console"]);
+  report.authFileGoKeyRefused = goKeyRefused;
+  assert.deepEqual(
+    goKeyRefused.sent,
+    ["fake-auth-file", "fake-auth-console"],
+    "a refused Go key tries the OpenCode key",
+  );
+  assert.deepEqual(goKeyRefused.reading.rateLimits, goReading);
+
+  process.env.OPENCODE_AUTH_CONTENT = JSON.stringify({ opencode: { type: "api", key: "fake-inline-console" } });
+  const inlineConsole = await readUsage(null, ["fake-inline-console"]);
+  report.inlineAuthConsole = inlineConsole;
+  assert.deepEqual(inlineConsole.sent, ["fake-inline-console"], "the OpenCode key of OPENCODE_AUTH_CONTENT is read");
+  delete process.env.OPENCODE_AUTH_CONTENT;
 
   process.env.OPENCODE_API_KEY = "fake-env";
   await writeFile(
