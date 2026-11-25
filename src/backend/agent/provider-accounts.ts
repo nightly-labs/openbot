@@ -703,6 +703,8 @@ export class ProviderAccounts {
           ),
         );
       if (limit) limits.push(limit);
+      else if (homeSupport(provider)?.usageLeavesSession)
+        limits.push({ id: provider, accountId: account.id, primary: null, secondary: null, readFailed: true });
     }
     return limits;
   }).bind(this);
