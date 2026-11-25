@@ -13,11 +13,23 @@ import { useText } from "@openbot/ui/text";
 import { createSignal, Show } from "solid-js";
 import { usePlatform } from "../../platform";
 import { openCreditPrices } from "../servers/credit-prices";
+import { serverRoleCanAdminister } from "../servers/server-capabilities";
 import { appSettingLinkTarget } from "../settings/setting-link-targets";
 import { navItem } from "../settings/settings-tabs";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
+
+const ADMIN_ONLY_REMOTE_AGENT_SETTINGS: ReadonlySet<AgentSettingLinkId> = new Set([
+  "agent.access",
+  "agent.computer-use",
+  "agent.local-scripts",
+  "agent.busy-message",
+  "agent.starts-new-chats",
+  "agent.plan-card",
+  "agent.builtin-memory",
+  "agent.backup-models",
+]);
 
 export interface SettingLinkChatCardProps {
   settingId: SettingLinkId;
@@ -58,6 +70,7 @@ export function SettingLinkChatCard(props: SettingLinkChatCardProps) {
 function SettingRowChatCard(props: SettingLinkChatCardProps) {
   const { t } = useText();
   const platform = usePlatform();
+  const view = useConversationViewScope();
   const card = () => {
     const settingId = props.settingId;
     if (isAgentSettingLinkId(settingId)) {
@@ -65,11 +78,16 @@ function SettingRowChatCard(props: SettingLinkChatCardProps) {
       const agent = props.agent;
       const path = [agent?.name ?? "", t("agentSettings.title")].filter(Boolean);
       if (row.page) path.push(t(AGENT_SETTINGS_PAGE_TITLE[row.page]));
+      const server = view.props.server;
+      const adminOnly =
+        server?.kind === "remote" &&
+        !serverRoleCanAdminister(server) &&
+        ADMIN_ONLY_REMOTE_AGENT_SETTINGS.has(settingId);
       return {
         title: t(row.title),
         path,
-        open: agent ? () => props.onOpenAgentSetting(agent.id, settingId) : undefined,
-        note: agent ? undefined : t("chat.settingLink.agentChatOnly"),
+        open: agent && !adminOnly ? () => props.onOpenAgentSetting(agent.id, settingId) : undefined,
+        note: !agent ? t("chat.settingLink.agentChatOnly") : adminOnly ? t("chat.settingLink.adminOnly") : undefined,
       };
     }
     if (settingId === "credits.explainer") return { title: "", path: [], open: undefined, note: undefined };
