@@ -4,6 +4,7 @@ import { sourceText } from "@openbot/i18n/source";
 
 export const PLAN_APPROVE = sourceText("status.messaging.approve");
 export const PLAN_STOP = sourceText("status.agent.planStop");
+export const PLAN_MODE_OFF = "Plan mode is off. Do not edit files until the user approves the plan.";
 export const PLAN_STOPPED =
   "The user stopped planning, so plan mode is off. Do not edit files yet. Wait for the user's next message.";
 export const PLAN_UNANSWERED =
