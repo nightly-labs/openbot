@@ -37,11 +37,17 @@ export function desktopAgentEventLevel(
 export const RETAINED_NOTIFICATION_LIMIT = 50;
 const retained = new Set<Notification>();
 
-export function showRetainedNotification(notification: Notification): void {
-  const release = () => retained.delete(notification);
+export function releaseWhenNotificationGone(notification: Notification, release: () => void): void {
   notification.on("click", release);
-  notification.on("close", release);
   notification.on("failed", release);
+  notification.on("close", (details) => {
+    const movedToNotificationCenter = details.reason === "timedOut";
+    if (!movedToNotificationCenter) release();
+  });
+}
+
+export function showRetainedNotification(notification: Notification): void {
+  releaseWhenNotificationGone(notification, () => retained.delete(notification));
   retained.add(notification);
   for (const oldest of retained) {
     if (retained.size <= RETAINED_NOTIFICATION_LIMIT) break;

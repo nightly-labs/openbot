@@ -18,7 +18,7 @@ import { playbackTime } from "../model/playback-time";
 import { shareTypeOptions } from "../model/share-file-type";
 import { knownImageDimensions, rememberImageDimensions, showFileFailure } from "./attachment-preview";
 import { useListSettled } from "./use-list-settled";
-import { useMediaDownloadedBytes, useMediaFile } from "./use-media-file";
+import { mediaFileErrorText, useMediaDownloadedBytes, useMediaFile } from "./use-media-file";
 import { VideoDownloadRing } from "./video-download-ring";
 import { VideoViewer } from "./video-viewer";
 
@@ -165,7 +165,7 @@ export function ChatVideoAttachment({
   unknownRatio?: number;
 }) {
   const text = useText();
-  const { t, format, sourceText } = text;
+  const { t, format } = text;
   const muted = useThemeColor("muted");
   const { width } = useWindowDimensions();
   const settled = useListSettled();
@@ -188,9 +188,11 @@ export function ChatVideoAttachment({
   const live = useMediaDownloadedBytes(serverId, attachment.id);
   const [lastReceived, setLastReceived] = useState<number | null>(null);
   if (live !== null && live !== lastReceived) setLastReceived(live);
+  else if (live === null && failed && lastReceived !== null) setLastReceived(null);
   const received = live ?? (uri || failed ? null : lastReceived);
   const downloads = lastReceived !== null;
-  const loading = !uri && !failed && received !== null;
+  const waiting = !uri && !failed;
+  const loading = waiting && received !== null;
   const progress = uri ? 1 : received !== null && attachment.size > 0 ? Math.min(1, received / attachment.size) : 0;
   const percent = Math.floor(progress * 100);
   const finishing = loading && received !== null && received >= attachment.size;
@@ -237,7 +239,7 @@ export function ChatVideoAttachment({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
-            loading
+            waiting
               ? t("mobile.chat.video.loading", { name: attachment.name })
               : t("mobile.chat.video.play", { name: attachment.name })
           }
@@ -260,7 +262,7 @@ export function ChatVideoAttachment({
             <View className="items-center justify-center gap-2 p-3" style={FILL}>
               <VideoOff size={24} color={String(muted)} />
               <Typography.Paragraph type="body-xs" align="center" className="text-muted">
-                {query.error ? sourceText(query.error.message) : t("mobile.chat.attachment.unavailable")}
+                {query.error ? mediaFileErrorText(query.error, text) : t("mobile.chat.attachment.unavailable")}
               </Typography.Paragraph>
             </View>
           ) : (
@@ -287,19 +289,19 @@ export function ChatVideoAttachment({
               <View pointerEvents="none" className="items-center justify-center" style={FILL}>
                 <Animated.View
                   className="absolute size-14 items-center justify-center rounded-full bg-black/50"
-                  style={{ opacity: loading ? 1 : 0, transform: [{ scale: swapScale(loading) }], ...SWAP_OUT }}
+                  style={{ opacity: waiting ? 1 : 0, transform: [{ scale: swapScale(waiting) }], ...SWAP_OUT }}
                 >
-                  {finishing ? (
-                    <ActivityIndicator color="white" />
-                  ) : (
+                  {loading && !finishing ? (
                     <Typography.Paragraph type="body-sm" className="font-semibold text-white" style={TABULAR}>
                       {format.percent(percent / 100)}
                     </Typography.Paragraph>
+                  ) : (
+                    <ActivityIndicator color="white" />
                   )}
                 </Animated.View>
                 <Animated.View
                   className="size-14 items-center justify-center rounded-full bg-black/50"
-                  style={{ opacity: loading ? 0 : 1, transform: [{ scale: swapScale(!loading) }], ...SWAP_IN }}
+                  style={{ opacity: waiting ? 0 : 1, transform: [{ scale: swapScale(!waiting) }], ...SWAP_IN }}
                 >
                   <Play size={26} color="white" fill="white" style={PLAY_OFFSET} />
                 </Animated.View>

@@ -133,7 +133,7 @@ function decodeCachedServer(value: unknown): CachedServer {
 function decodeCachedHost(value: unknown): RemoteTeamHost {
   if (!isDynamicRecord(value)) throw new Error("The cached server list is invalid.");
   const { hostId, name, logoKey, devicePublicKey, membershipId, role, memberLimit, hosted, keyChangedAt } = value;
-  const { restartAvailable, storageGb, appearance } = value;
+  const { restartAvailable, storageGb, appearance, hidden } = value;
   if (
     !isString(hostId) ||
     !isString(name) ||
@@ -156,6 +156,7 @@ function decodeCachedHost(value: unknown): RemoteTeamHost {
     role,
     ...(memberLimit === undefined ? {} : { memberLimit }),
     ...(hosted === undefined ? {} : { hosted }),
+    ...(hidden === true ? { hidden } : {}),
     ...(isBoolean(restartAvailable) ? { restartAvailable } : {}),
     ...(isStorageGb(storageGb) ? { storageGb } : {}),
     ...optionalServerAppearanceField(appearance),

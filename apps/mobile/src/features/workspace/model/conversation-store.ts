@@ -23,7 +23,7 @@ export class MobileConversationStore {
   #deltas = new Map<string, Delta[]>();
   #cancelFrame: (() => void) | null = null;
   #olderLoads = new Map<string, symbol>();
-  #loads = new Map<string, { promise: Promise<ConversationPage>; dirty: boolean; attach: boolean }>();
+  #loads = new Map<string, { promise: Promise<ConversationPage>; dirty: boolean; stale: boolean; attach: boolean }>();
   #latestPages = new Map<string, { firstId: string; pageInfo: ConversationPage["pageInfo"] }>();
   #upToDate = new Set<string>();
   #missedLatest = new Set<string>();
@@ -67,6 +67,8 @@ export class MobileConversationStore {
   invalidate(agentId: string) {
     if (this.isObserved(agentId)) return true;
     this.#upToDate.delete(agentId);
+    const pending = this.#loads.get(agentId);
+    if (pending) pending.stale = true;
     return false;
   }
 
@@ -276,14 +278,16 @@ export class MobileConversationStore {
       return pending.promise;
     }
     const serial = ++this.#latestLoads;
-    const load: { promise: Promise<ConversationPage>; dirty: boolean; attach: boolean } = {
+    const load: { promise: Promise<ConversationPage>; dirty: boolean; stale: boolean; attach: boolean } = {
       dirty: false,
+      stale: false,
       attach,
       promise: Promise.resolve()
         .then(async () => {
           let page: ConversationPage;
           do {
             load.dirty = false;
+            load.stale = false;
             page = await read();
             if (page.agentId !== agentId) throw new Error("The server returned a page for another conversation.");
             if (!isCurrent() || this.#loads.get(agentId) !== load) {
@@ -291,7 +295,8 @@ export class MobileConversationStore {
               return page;
             }
             this.applyPage(page, undefined, load.attach);
-          } while (load.dirty);
+          } while (load.dirty || (load.stale && this.isObserved(agentId)));
+          if (load.stale) return page;
           this.#upToDate.add(agentId);
           this.#missedLatest.delete(agentId);
           this.#latestReads.set(agentId, serial);

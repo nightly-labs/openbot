@@ -1,5 +1,116 @@
 [
   {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Aşağıdaki düzeltmelerin çoğu bir sunucuda yalnızca sunucu bu sürümdeyse çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kanallarda ses kullanın. Bir kanala sesle ileti dikte ettiğinizde uygulama bir ajanın yanıtını sesli okur. Kanalın ileti kutusundan sesli bir konuşma da başlatabilirsiniz.",
+          "Bir sunucuyu sunucu çubuğundan gizleyin. Sunucu diğer bilgisayarlarınızda da gizli olur. Yeniden göstermek için \"Gizli sunucular\" klasöründe seçin."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Görevler sayfası artık Mesaj dizileri olarak adlandırılıyor; telefon uygulamasında ve sohbet yan panelinde olduğu gibi.",
+          "Akış halindeki yanıtlar ve aynı anda çalışan iş akışları daha az CPU kullanır; web istemcisi bir sunucuyu daha hızlı açar."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "macOS'te Claude için Bağlan ve Hesap ekle artık OpenBot'tan Claude oturum açma sayfasını açar.",
+          "Katıldığınız bir sunucuyla bağlantı veri göndermeyi durdurduğunda uygulama artık kendiliğinden yeniden bağlanır.",
+          "Katıldığınız bir sunucuda uzun kanallar daha hızlı açılır ve güncellenir.",
+          "Bir iş akışının \"Bildirim\" çıktısı veya onay bekleyen bir adım artık telefona bildirim gönderir.",
+          "Bir Gemini sohbeti, Google bir araç sonucunu reddettikten sonra devam eder. Önceden sonraki her ileti başarısız oluyordu."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.77.0",
+    "date": "2026-11-23",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuda, OpenBot kredi modelleri, duraklatılmış ve dışa aktarılmış iş akışları, WhatsApp salt okunur sohbetleri, konum istekleri ve Signal sunucu seçimi yalnızca sunucu bu sürümdeyse çalışır.",
+      "Bu güncellemeden sonra OpenBot'un eski bir sürümü verilerinizi açamaz."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kendiniz veya bir sunucu için OpenBot kredisi satın alın. Sayfa çubuğundaki \"Credits\" düğmesini veya Ayarlar → Faturalandırma bölümünü kullanın. Ücretli lisans ayrıca her ay ücretsiz kredi verir.",
+          "İş akışındaki resim ve video adımları, kredilerinizin karşıladığı OpenBot modellerini başka bir oturum açma olmadan kullanabilir. Bir adımda Adet ayarını yapın; aynı anda en fazla 4 sonuç alın.",
+          "İş akışı menüsünden bir iş akışını duraklatın. Ayrıca bir iş akışını dosyaya aktarabilir ve başka bir bilgisayarda veya sunucuda içe aktarabilirsiniz.",
+          "Önceki bir adımdan alan eklemek için bir iş akışı adımına {{ yazın. Zamanlama, GitHub, Discord, Telegram ve Slack tetikleyicileri artık alan da verir.",
+          "Bir istek buna ihtiyaç duyduğunda, örneğin \"yakınımdaki restoranlar\" gibi, ajan konumunuzu isteyebilir. Siz yanıt verene kadar hiçbir şey gönderilmez.",
+          "İzin verilen bir WhatsApp kişisini veya grubunu salt okunur yapın. Ajanlarınız sohbeti okuyabilir, OpenBot ise sohbete hiçbir zaman yazmaz."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Bağlamı 200K veya daha fazla token olan boşta bir Claude veya Pi sohbeti, 1 saatlik istem önbelleği dolmadan önce kendini sıkıştırır. Bu, tüm bağlamı yeniden okumaktan daha az maliyetlidir. Bunu Sunucu ayarları → Sağlayıcılar bölümünden kapatın.",
+          "Bir sunucunun Signal sunucusunu Sunucu ayarları → Genel bölümünden seçin. \"Otomatik\" en yakın olanı tutar.",
+          "\"Tam erişim\" ile çalışan Gemini ajanları, bellek, tarayıcı ve kanallar gibi OpenBot araçlarını onay kartı olmadan kullanır."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Bir Claude ajanı çalışırken ona gönderdiğiniz ileti artık hemen ajana ulaşır; alt ajan veya uzun bir araç çalışırken de.",
+          "\"Önce sor\" olarak ayarlanmış bir ChatGPT (Codex) ajanı, artık bir komut çalıştırmadan veya bir dosyayı değiştirmeden önce size sorar.",
+          "Yanıt vermeyi bırakan barındırılan veya kendi kendine barındırılan bir sunucu artık 10 dakika sonra kendiliğinden yeniden başlar.",
+          "macOS'te ajan yuvası artık OpenBot'u ve tüm bilgisayarı yavaşlatmaz.",
+          "Uzun sohbetler yumuşak kayar. Önceden 100'den fazla iletisi olan bir sohbet, kaydırırken takılıyordu."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuda, aynı anda çalışan görevler, canlı ses hesabı, OpenBot bellek anahtarı, iş akışı klasörleri, türü tanımlı iş akışı yanıtları ve bir sağlayıcının 10'dan fazla hesabı yalnızca sunucu bu sürümdeyse çalışır.",
+      "Bu güncellemeden sonra OpenBot'un eski bir sürümü verilerinizi açamaz."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Bir ajan, birbirinden bağımsız işleri aynı anda çalışan görevlere ayırabilir. Her sonuç ana sohbete geri döner ve ajan sonuçları sizin için birleştirir.",
+          "Yan panelin yeni Mesaj dizileri sekmesinde bir ajanın açık tüm mesaj dizilerini görün. Sekme, sizi bekleyen mesaj dizilerinin sayısını gösterir.",
+          "Kısayollarınızı Ayarlar'ın yeni Klavye sekmesinde değiştirin. Yeni kısayollar yeni bir mesaj dizisi başlatır ve sonraki ile önceki mesaj dizisine geçer.",
+          "İş akışları sekmelerde açılır ve iş akışı adımları türü tanımlı yanıt verebilir. Bir yanıtı sonraki bir adımda kullanmak için {{name}} yazın.",
+          "Ayarlar > Görünüm bölümünden pencere arka planı olarak MP4 veya WebM videosu yükleyin.",
+          "Ayarlar > Ses bölümünden GPT canlı sesinin kullandığı ChatGPT hesabını seçin."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Bir sağlayıcı 20 hesaba kadar tutar. Önceden sınır 10'du.",
+          "Dikte en fazla 10 dakika kaydeder. Önceden 2 dakikada duruyordu.",
+          "Yukarı kaydırdığınızda bir mesaj dizisi eski mesajları yükler. Bir düğmeye tıklamanız gerekmez."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Zamanlanmış bir rutin, bir çalıştırmanın bildirecek bir şeyi olmadığında artık sessizce kendini kapatmaz.",
+          "Uzun bir sohbet, bir yanıt akarken tüm mesajlarını doğru sırada tutar.",
+          "Bağlı bir WhatsApp numarası hâlâ \"Bağlandı\" yazarken mesaj almayı artık durdurmaz.",
+          "Windows'ta OpenCode ajanları komutları yeniden çalıştırır. Önceden sık sık \"opencode-pty request timed out\" hatasıyla başarısız oluyordu.",
+          "Sessize aldığınız bir ajan, bir kanalda yanıt verdiğinde artık size bildirim göndermez."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.75.0",
     "date": "2026-11-20",
     "notices": [

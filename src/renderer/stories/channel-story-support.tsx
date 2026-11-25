@@ -107,10 +107,13 @@ export function StoryChannelConversation(props: ChannelStoryProps) {
     ownMessage: (message) => message.author === "you",
     workers: () => props.workers ?? [],
     memberThreadIds: () => new Set(),
+    memberAgentIds: () => new Set(),
     browserOwner: () => null,
     workingTurns: () => [],
     interactionAgentName: () => undefined,
     awaitingReplies: () => props.awaiting ?? [],
+    replyView: () => ({ messages: [], tasks: [] }),
+    voiceAgent: () => CHANNEL_STORY_CHIEF,
     HeaderTitle: () => (
       <Button variant="ghost" size="sm" class="conversation-title channel-title no-drag" aria-label="Channel settings">
         <ChannelAvatar members={members} agents={STORY_AGENTS} />

@@ -21,6 +21,7 @@ export interface McpConnectDialogProps {
   signInHostName?: string | undefined;
   onCancelSignIn?: (() => void) | undefined;
   onCopySignInLink?: (() => Promise<void>) | undefined;
+  onPasteSignInAddress?: ((address: string) => Promise<void>) | undefined;
   signInExtra?: JSX.Element;
 }
 
@@ -71,6 +72,7 @@ export function McpConnectDialog(props: McpConnectDialogProps) {
           hostName={props.signInHostName}
           onCancelSignIn={props.onCancelSignIn}
           onCopySignInLink={props.onCopySignInLink}
+          onPasteSignInAddress={props.onPasteSignInAddress}
           alternative={alternative()}
         />
         {props.signInExtra}

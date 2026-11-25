@@ -1,5 +1,5 @@
-import type { LibraryFolder } from "@openbot/contracts/ipc";
-import { Button, ChevronRight, Folder } from "@openbot/ui";
+import type { LibraryFolder, StoredFileWorkflowFolder } from "@openbot/contracts/ipc";
+import { Button, ChevronRight, Folder, Waypoints } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
 import type { JSX } from "@solidjs/web";
 import { For, Show } from "solid-js";
@@ -12,6 +12,7 @@ interface LibraryPathHeadProps {
   title: string;
   agent: AgentProfile | undefined;
   parents: readonly LibraryFolder[];
+  workflowFolder?: StoredFileWorkflowFolder | null | undefined;
   onGo: (place: LibraryLocation) => void;
   dropMark: (agentId: string, folderId: string | null) => LibraryDropMark | undefined;
   children: JSX.Element;
@@ -67,12 +68,33 @@ export function LibraryPathHead(props: LibraryPathHeadProps) {
             </>
           )}
         </For>
+        <Show when={props.place.kind === "workflow" ? props.workflowFolder : undefined} keyed>
+          {(folder) => (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                class="library-crumb"
+                onClick={() => props.onGo({ kind: "workflowFolder", folderId: folder.id })}
+              >
+                <span class="library-truncate" dir="auto">
+                  {folder.name}
+                </span>
+              </Button>
+              <ChevronRight class="library-path-rule" aria-hidden="true" />
+            </>
+          )}
+        </Show>
         <h2 class="library-path-current">
           <Show when={headAgent()} keyed>
             {(agent) => <AgentAvatar agent={agent} class="library-path-avatar" />}
           </Show>
-          <Show when={props.place.kind === "folder"}>
+          <Show when={props.place.kind === "folder" || props.place.kind === "workflowFolder"}>
             <Folder aria-hidden="true" />
+          </Show>
+          <Show when={props.place.kind === "workflow"}>
+            <Waypoints aria-hidden="true" />
           </Show>
           <span class="library-truncate" dir="auto">
             {props.title}

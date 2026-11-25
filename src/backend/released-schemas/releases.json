@@ -896,6 +896,22 @@
       "tag": "v0.75.0",
       "newInstall": { "migrations": [[0, 58], 66], "objects": [[0, 125], "81ee12c73702e2a7", [126, 193]] },
       "upgraded": { "migrations": [[0, 61], 66], "objects": [[0, 125], "81ee12c73702e2a7", [126, 193]] }
+    },
+    {
+      "tag": "v0.76.0",
+      "newInstall": { "migrations": [[0, 59], 67], "objects": [[0, 193], "b2f29215dfd3bef2"] },
+      "upgraded": { "migrations": [[0, 62], 67], "objects": [[0, 193], "b2f29215dfd3bef2"] }
+    },
+    {
+      "tag": "v0.77.0",
+      "newInstall": {
+        "migrations": [[0, 60], 68, 69],
+        "objects": [[0, 112], "b0ac97aba24eb3f3", [113, 144], "a50ebfbcdfcbfa27", [145, 194]]
+      },
+      "upgraded": {
+        "migrations": [[0, 63], 68, 69],
+        "objects": [[0, 112], "b0ac97aba24eb3f3", [113, 144], "a50ebfbcdfcbfa27", [145, 194]]
+      }
     }
   ],
   "statements": {
@@ -1054,6 +1070,7 @@
     "a16bc095d275006e": "CREATE INDEX routine_result_deliveries_status\n    ON routine_result_deliveries(status, next_attempt_at)",
     "a2c83eebd805be00": "CREATE INDEX routine_runs_routine\n    ON projection_routine_runs(routine_id, created_at DESC, run_id)",
     "a363599c4127c6bf": "CREATE INDEX routine_flow_steps_updated ON routine_flow_steps(updated_at)",
+    "a50ebfbcdfcbfa27": "CREATE TABLE projection_messaging_allowed_senders (\n    connection_id TEXT NOT NULL REFERENCES projection_messaging_connections(connection_id),\n    sender_id TEXT NOT NULL,\n    kind TEXT NOT NULL CHECK(kind IN ('contact', 'group')),\n    name TEXT NOT NULL,\n    created_at TEXT NOT NULL, mode TEXT NOT NULL DEFAULT 'reply' CHECK(mode IN ('reply', 'read')),\n    PRIMARY KEY (connection_id, sender_id)\n  )",
     "a53ccfcbc2ea583f": "CREATE INDEX workflow_triggers_due\n    ON workflow_triggers(next_due_at) WHERE next_due_at IS NOT NULL",
     "a771c3ca93157387": "CREATE TABLE crm_customer_tags (\n    customer_id TEXT NOT NULL REFERENCES crm_customers(customer_id) ON DELETE CASCADE,\n    tag_id TEXT NOT NULL REFERENCES crm_tags(tag_id) ON DELETE CASCADE,\n    PRIMARY KEY (customer_id, tag_id)\n  ) WITHOUT ROWID",
     "a86dea9968869cef": "CREATE TABLE projection_agent_tasks (\n    task_id TEXT PRIMARY KEY,\n    agent_id TEXT NOT NULL,\n    thread_id TEXT NOT NULL UNIQUE REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n    origin TEXT NOT NULL CHECK(origin IN ('user', 'agent')),\n    title TEXT NOT NULL,\n    outcome TEXT CHECK(outcome IS NULL OR outcome IN ('completed', 'failed', 'interrupted')),\n    error TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    closed_at TEXT,\n    last_event_sequence INTEGER NOT NULL\n  )",
@@ -1067,8 +1084,10 @@
     "aeb25f3c9cf6436f": "CREATE TABLE projection_reactions (\n    agent_id TEXT NOT NULL,\n    message_id TEXT NOT NULL,\n    emoji TEXT NOT NULL,\n    actor_kind TEXT NOT NULL CHECK(actor_kind IN ('user', 'agent')),\n    actor_agent_id TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    last_event_sequence INTEGER NOT NULL,\n    PRIMARY KEY(agent_id, message_id, actor_kind, actor_agent_id)\n  )",
     "aef3c078d5d2b584": "CREATE TABLE projection_webhook_receipts (\n    receipt_id TEXT PRIMARY KEY,\n    owner_kind TEXT NOT NULL CHECK(owner_kind IN ('agent', 'channel')),\n    routine_id TEXT NOT NULL,\n    delivery_id TEXT NOT NULL,\n    event_type TEXT NOT NULL,\n    status TEXT NOT NULL CHECK(status IN ('started', 'ignored')),\n    reason TEXT CHECK(reason IS NULL OR reason IN ('event-type', 'filter', 'inactive')),\n    run_id TEXT,\n    received_at TEXT NOT NULL,\n    UNIQUE(owner_kind, routine_id, delivery_id)\n  )",
     "b05036f9c71064ee": "CREATE TABLE projection_messaging_threads (\n    link_id TEXT PRIMARY KEY,\n    connection_id TEXT NOT NULL REFERENCES projection_messaging_connections(connection_id),\n    agent_id TEXT NOT NULL,\n    platform_channel_id TEXT NOT NULL,\n    thread_key TEXT NOT NULL,\n    is_direct INTEGER NOT NULL CHECK(is_direct IN (0, 1)),\n    thread_id TEXT NOT NULL UNIQUE REFERENCES projection_threads(thread_id),\n    title TEXT NOT NULL,\n    history_cursor TEXT,\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL,\n    UNIQUE(connection_id, platform_channel_id, thread_key)\n  )",
+    "b0ac97aba24eb3f3": "CREATE TABLE workflows (\n    workflow_id TEXT PRIMARY KEY,\n    title TEXT NOT NULL CHECK(length(title) BETWEEN 1 AND 160),\n    graph_revision INTEGER NOT NULL DEFAULT 0 CHECK(graph_revision >= 0),\n    strokes_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(strokes_json)),\n    next_run_number INTEGER NOT NULL DEFAULT 1 CHECK(next_run_number >= 1),\n    created_at TEXT NOT NULL,\n    updated_at TEXT NOT NULL\n  , paused INTEGER NOT NULL DEFAULT 0 CHECK(paused IN (0, 1)))",
     "b24b0afc2223a397": "CREATE INDEX crm_proposals_pending ON crm_proposals(created_at DESC, proposal_id DESC)\n    WHERE state = 'pending'",
     "b2936bde871c0b7d": "CREATE TABLE workflow_runs (\n    run_id TEXT PRIMARY KEY,\n    workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id) ON DELETE CASCADE,\n    number INTEGER NOT NULL CHECK(number >= 1),\n    trigger_node_id TEXT,\n    from_node_id TEXT,\n    source TEXT NOT NULL CHECK(source IN ('manual', 'schedule', 'webhook', 'github', 'discord', 'telegram', 'slack')),\n    scheduled_for TEXT,\n    idempotency_key TEXT NOT NULL,\n    graph_revision INTEGER NOT NULL CHECK(graph_revision >= 0),\n    graph_json TEXT NOT NULL CHECK(json_valid(graph_json)),\n    payload TEXT,\n    status TEXT NOT NULL CHECK(status IN ('running', 'approval', 'stopping', 'done', 'failed', 'stopped')),\n    error TEXT,\n    started_at TEXT NOT NULL,\n    ended_at TEXT,\n    updated_at TEXT NOT NULL,\n    UNIQUE(workflow_id, number),\n    UNIQUE(workflow_id, idempotency_key)\n  )",
+    "b2f29215dfd3bef2": "CREATE INDEX thread_messages_ordinal ON projection_thread_messages(thread_id, ordinal)",
     "b3b1654a1ae23760": "CREATE INDEX thread_messages_turn ON projection_thread_messages(thread_id, turn_id)",
     "b3ff6bf1df3cbe51": "CREATE TABLE crm_agent_access (\n    agent_id TEXT NOT NULL PRIMARY KEY CHECK(length(agent_id) BETWEEN 1 AND 255),\n    granted_at TEXT NOT NULL\n  )",
     "b5f403404a29c59f": "CREATE TABLE \"projection_provider_sessions\" (\n      id TEXT PRIMARY KEY,\n      thread_id TEXT NOT NULL REFERENCES projection_threads(thread_id) ON DELETE CASCADE,\n      provider TEXT NOT NULL CHECK(provider IN ('codex', 'claude', 'grok', 'opencode', 'antigravity', 'acp', 'cursor')),\n      external_session_id TEXT NOT NULL,\n      model TEXT NOT NULL,\n      effort TEXT NOT NULL,\n      state TEXT NOT NULL CHECK(state IN ('active', 'inactive', 'failed')),\n      created_at TEXT NOT NULL,\n      updated_at TEXT NOT NULL,\n      resume_cursor TEXT,\n      last_event_sequence INTEGER NOT NULL,\n      UNIQUE(provider, external_session_id)\n    )",

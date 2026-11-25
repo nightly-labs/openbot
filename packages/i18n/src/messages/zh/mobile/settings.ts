@@ -281,6 +281,9 @@ export const messages = {
   "mobile.settings.conversations.fullQualityPhotos": "以原始画质发送照片",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "关闭时，应用会发送每张照片的较小副本，长边最多 2048 像素，在慢速连接上更快送达。打开后发送原始照片。",
+  "mobile.settings.conversations.fullScreenCamera": "使用全屏相机",
+  "mobile.settings.conversations.fullScreenCameraFooter":
+    "开启后，“相机”会打开系统相机，可使用变焦和所有镜头。关闭后，会在聊天中打开一个小相机。",
   "mobile.settings.profile.nameUnsafe": "请去掉名称中的换行和控制字符。",
   "mobile.settings.profile.nameLength": "显示名称请使用 3–20 个字符。",
   "mobile.settings.profile.saveFailed": "无法保存更改，请重试。",
@@ -435,6 +438,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "服务器",
   "mobile.settings.voice.gptLive.serversFooter":
     "点按需要登录的服务器，即可将 Codex 连接到 ChatGPT 账户。只有所有者或管理员能看到服务器的登录状态。",
+  "mobile.settings.voice.gptLive.account": "GPT 实时语音账号",
   "mobile.settings.voice.gptLive.status.ready": "就绪",
   "mobile.settings.voice.gptLive.status.supported": "支持",
   "mobile.settings.voice.gptLive.status.offline": "离线",

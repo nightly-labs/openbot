@@ -5,6 +5,9 @@ import type {
   BrowserLiveViewEvent,
   BrowserPictureInPictureEvent,
   BrowserTab,
+  BrowserTabAgent,
+  BrowserWindowEvent,
+  BrowserWindowModel,
 } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import {
@@ -15,6 +18,8 @@ import {
   decodeBrowserPictureInPictureEvent,
   decodeBrowserTab,
   decodeBrowserTabs,
+  decodeBrowserWindowEvent,
+  decodeBrowserWindowModel,
 } from "./browser-decoding";
 
 const tab = {
@@ -79,6 +84,36 @@ const frame = {
   image: new Uint8Array([255, 216, 255]),
 } satisfies BrowserLiveViewEvent;
 
+const agent: BrowserTabAgent = {
+  id: "agent-1",
+  name: "Chief",
+  avatarSeed: "chief",
+  avatarHue: 215,
+  avatarColor: null,
+  avatarUrl: null,
+};
+
+const windowModel = {
+  tabs: [tab, fullTab],
+  activeTabId: "tab-1",
+  details: [
+    {
+      tabId: "tab-1",
+      control: controlState.sessions[1],
+      controller: agent,
+      owner: agent,
+      profile: { tabId: "tab-1", name: "Work", hue: 30, proxy: "proxy.example.test:8080" },
+    },
+    { tabId: "tab-0" },
+  ],
+  history: [{ url: "https://example.test", title: "", visits: 3 }],
+  canReopen: true,
+  canCloseTabs: true,
+  liveViewTabId: null,
+  liveViewClipboard: false,
+  shortcuts: "mac",
+} satisfies BrowserWindowModel;
+
 describe("browser decoders", () => {
   it.each([
     ["browser tab", decodeBrowserTab, tab],
@@ -106,6 +141,22 @@ describe("browser decoders", () => {
       "picture-in-picture dock",
       decodeBrowserPictureInPictureEvent,
       { type: "dock" } satisfies BrowserPictureInPictureEvent,
+    ],
+    ["browser window model", decodeBrowserWindowModel, windowModel],
+    ["missing browser window model", decodeBrowserWindowModel, null],
+    ["browser window move", decodeBrowserWindowEvent, { type: "bounds-changed", bounds } satisfies BrowserWindowEvent],
+    [
+      "browser window tab close",
+      decodeBrowserWindowEvent,
+      { type: "action", action: { type: "close", tabIds: ["tab-1", "tab-0"] } } satisfies BrowserWindowEvent,
+    ],
+    [
+      "browser window address",
+      decodeBrowserWindowEvent,
+      {
+        type: "action",
+        action: { type: "open-address", url: "example.test", tabId: "tab-1" },
+      } satisfies BrowserWindowEvent,
     ],
   ] as const)("keeps a valid %s", (_name, decode: (value: unknown) => unknown, value) => {
     expect(decode(value)).toEqual(value);
@@ -136,6 +187,23 @@ describe("browser decoders", () => {
     ["live view event of an unknown type", decodeBrowserLiveViewEvent, { type: "paused", tabId: "tab-1" }],
     ["picture-in-picture move without bounds", decodeBrowserPictureInPictureEvent, { type: "bounds-changed" }],
     ["picture-in-picture event of an unknown type", decodeBrowserPictureInPictureEvent, { type: "grow" }],
+    [
+      "browser window model with an unknown avatar hue",
+      decodeBrowserWindowModel,
+      { ...windowModel, details: [{ tabId: "tab-1", owner: { ...agent, avatarHue: 17 } }] },
+    ],
+    ["browser window model with unknown shortcuts", decodeBrowserWindowModel, { ...windowModel, shortcuts: "linux" }],
+    ["browser window model without history", decodeBrowserWindowModel, { ...windowModel, history: undefined }],
+    [
+      "browser window action of an unknown type",
+      decodeBrowserWindowEvent,
+      { type: "action", action: { type: "print" } },
+    ],
+    [
+      "browser window navigation in an unknown direction",
+      decodeBrowserWindowEvent,
+      { type: "action", action: { type: "navigate", tabId: "tab-1", direction: "up" } },
+    ],
   ] as const)("rejects a %s", (_name, decode: (value: unknown) => unknown, value) => {
     expect(() => decode(value)).toThrow(/^Invalid /);
   });

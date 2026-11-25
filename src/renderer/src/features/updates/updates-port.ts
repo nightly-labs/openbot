@@ -11,6 +11,7 @@ export interface UpdatesPort {
     | "cancelScheduledRestart"
     | "restartWhenIdle"
     | "cancelIdleRestart"
+    | "restartNow"
   >;
 }
 

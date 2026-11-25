@@ -6,9 +6,10 @@ import ExternalLink from "lucide-react-native/icons/external-link";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import X from "lucide-react-native/icons/x";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Linking, View } from "react-native";
+import { Linking } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { PasteButton } from "@/features/servers/components/paste-button";
+import { SignInSteps } from "@/features/servers/components/sign-in-steps";
 import { type ProviderAdmin, relayPage } from "@/features/servers/model/provider-admin";
 import { useRefreshProviderAccounts, useServerProviders } from "@/features/servers/model/use-server-providers";
 import {
@@ -516,21 +517,6 @@ function SignInSection({
         </SettingsSection>
       )}
     </>
-  );
-}
-
-function SignInSteps({ steps }: { steps: readonly string[] }) {
-  return (
-    <View className="gap-3 px-4 py-3">
-      {steps.map((step, index) => (
-        <View key={step} className="flex-row gap-3">
-          <View className="size-6 items-center justify-center rounded-full bg-control">
-            <Typography.Paragraph type="body-xs">{index + 1}</Typography.Paragraph>
-          </View>
-          <Typography.Paragraph className="min-w-0 flex-1">{step}</Typography.Paragraph>
-        </View>
-      ))}
-    </View>
   );
 }
 

@@ -26,12 +26,18 @@ export interface AppPort {
   setAppLogoColorPreference: OpenBotDesktopApi["setAppLogoColorPreference"];
   agent: Pick<
     OpenBotDesktopApi["agent"],
-    "readConversationPage" | "searchConversationMessages" | "searchConversationFiles" | "listRoutines" | "listAgents"
+    | "readConversationPage"
+    | "searchConversationMessages"
+    | "searchConversationFiles"
+    | "listRoutines"
+    | "listAgents"
+    | "onScopedEvent"
   >;
   agentTemplates: Pick<OpenBotDesktopApi["agentTemplates"], "onOpenLink" | "takePendingLink">;
   acpRegistry: OpenBotDesktopApi["acpRegistry"];
   hostedSites: OpenBotDesktopApi["hostedSites"];
   billing: OpenBotDesktopApi["billing"];
+  credits: OpenBotDesktopApi["credits"];
   referral: OpenBotDesktopApi["referral"];
   license: OpenBotDesktopApi["license"];
   auth: CompanySignInCalls &

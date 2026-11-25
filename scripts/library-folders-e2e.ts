@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, LIBRARY_FOLDER_LIMITS, libraryFolderPath } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS, LIBRARY_FOLDER_LIMITS, libraryFolderPath, STORAGE_LIMITS } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
@@ -29,6 +29,7 @@ const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { StorageUsageScanner, StorageUsageService } = await import("../src/backend/storage-usage");
 const { LibraryFoldersService } = await import("../src/main/library-folders-service");
+type WorkflowFileOwner = import("../src/backend/workflows/workflow-file-owners").WorkflowFileOwner;
 
 const CALL_MARK = "LIBRARY-CALL";
 const PERSON = { id: "local", name: "Alex" };
@@ -228,6 +229,16 @@ const listingSchema = z.object({
       files: z.array(z.object({ id: z.string(), name: z.string(), path: z.string() })),
     })
     .optional(),
+  workflowFiles: z
+    .array(
+      z.object({
+        workflow: z.string(),
+        workflowFolder: z.string().nullable(),
+        fileCount: z.number(),
+        files: z.array(z.object({ id: z.string(), name: z.string(), path: z.string() })),
+      }),
+    )
+    .optional(),
   truncated: z.boolean(),
 });
 const refusalSchema = z.object({ error: z.string() });
@@ -257,6 +268,7 @@ async function startHost(directory: string, withFolders: boolean) {
   const foldersPath = join(directory, LIBRARY_FOLDERS_FILE);
   const libraryFolders = withFolders ? new LibraryFoldersStore(foldersPath) : null;
   if (libraryFolders) await runCauseEffect(libraryFolders.initialize());
+  const workflowOwners = new Map<string, WorkflowFileOwner>();
   const storageSources = {
     roots: {
       database: store.database.path,
@@ -269,6 +281,8 @@ async function startHost(directory: string, withFolders: boolean) {
     database: () => store.database.connection,
     mailbox,
     agents: () => agents.listAgents(),
+    workflowFiles: () => workflowOwners,
+    libraryFiles: () => new Set(libraryFolders ? Object.keys(libraryFolders.getSnapshot().placement) : []),
   };
   const storage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
   const foldersService = libraryFolders
@@ -299,7 +313,9 @@ async function startHost(directory: string, withFolders: boolean) {
   return {
     agents,
     mailbox,
+    storage,
     libraryFolders,
+    workflowOwners,
     folderChanges: () => folderChanges,
     stored: () => storedSchema.parse(JSON.parse(readFileSync(foldersPath, "utf8"))),
     hasFoldersFile: () => existsSync(foldersPath),
@@ -923,6 +939,137 @@ try {
       restoredChild.parentId === undefined &&
       restoredFolders.every((folder) => depthOf(folder.id) <= LIBRARY_FOLDER_LIMITS.levels),
     JSON.stringify({ parent: depthOf(parent), child: depthOf(child), childParent: restoredChild?.parentId ?? null }),
+  );
+
+  const madeBy = async (name: string) => {
+    const made = await runCauseEffect(
+      host.mailbox.storeGeneratedAttachment({
+        bytes: new TextEncoder().encode(name),
+        kind: "image",
+        name,
+        mimeType: "image/png",
+      }),
+    );
+    return made.id;
+  };
+  const weekly = { id: "workflow-weekly", name: "Weekly posts", folder: { id: "workflow-folder", name: "Marketing" } };
+  const madeShotId = await madeBy("weekly-shot.png");
+  host.workflowOwners.set(madeShotId, { workflow: weekly, createdAt: null });
+  const strayId = await madeBy("stray.png");
+  const workflowGroup = (listing: z.infer<typeof listingSchema> | null) =>
+    listing?.workflowFiles?.find((group) => group.workflow === weekly.name);
+  const seenByMaker = await list("list shows the files that workflows made", maker.id);
+  const makerGroup = workflowGroup(seenByMaker.listing);
+  pass(
+    "list_library_folders shows a workflow file by workflow and workflow folder, and not a generated file with no workflow",
+    makerGroup?.workflowFolder === "Marketing" &&
+      makerGroup.fileCount === 1 &&
+      makerGroup.files[0]?.id === madeShotId &&
+      !seenByMaker.text.includes(strayId),
+    seenByMaker.text,
+  );
+  for (const fill of fills.slice(6, 8))
+    await runCauseEffect(store.mutate({ type: "delete", folderId: fill.id }, context));
+  await organize("create a folder for workflow files", maker.id, { action: "create", folder: "Workflow picks" });
+  const picked = await organize("place a workflow file", maker.id, {
+    action: "place",
+    to: "Workflow picks",
+    files: [madeShotId],
+  });
+  const picks = storedFolder(maker.id, "Workflow picks");
+  const afterPick = await list("list after the workflow file is placed", maker.id);
+  pass(
+    "organize_library place moves a workflow file into a folder of the agent",
+    picked.success &&
+      picked.value?.filesPlaced === 1 &&
+      host.stored().placement[madeShotId] === picks?.id &&
+      afterPick.listing?.folders.some(
+        (folder) => folder.path === "Workflow picks" && folder.files.some((file) => file.id === madeShotId),
+      ) === true &&
+      workflowGroup(afterPick.listing) === undefined,
+    picked.text,
+  );
+  const seenByOther = await list("a different agent lists after the workflow file is placed", other.id);
+  pass(
+    "A workflow file in a folder of one agent is not listed for a different agent",
+    seenByOther.success && !seenByOther.text.includes(madeShotId),
+    seenByOther.text,
+  );
+  await refused(
+    "a different agent takes a workflow file from a folder of the agent",
+    other.id,
+    { action: "place", files: [madeShotId] },
+    "in a Library folder of another agent",
+  );
+  await refused(
+    "place a generated file with no workflow",
+    maker.id,
+    { action: "place", to: "Workflow picks", files: [strayId] },
+    "is not one of your Library files",
+  );
+  const unpicked = await organize("take a workflow file out of the folder", maker.id, {
+    action: "place",
+    files: [madeShotId],
+  });
+  const afterUnpick = await list("list after the workflow file is taken out", other.id);
+  pass(
+    "place with no to takes a workflow file out, and each agent sees it under its workflow again",
+    unpicked.success &&
+      host.stored().placement[madeShotId] === undefined &&
+      workflowGroup(afterUnpick.listing)?.files.some((file) => file.id === madeShotId) === true,
+    unpicked.text,
+  );
+
+  const crowded = await startHost(join(root, "user-data-crowded"), true);
+  hosts.push(crowded);
+  const keeper = await crowded.create("Keeper");
+  const largerBytes = new TextEncoder().encode("a larger stored file\n".repeat(8));
+  for (let index = 0; index < STORAGE_LIMITS.files; index += 1)
+    await runCauseEffect(
+      crowded.mailbox.storeGeneratedAttachment({
+        bytes: largerBytes,
+        name: `larger-${index}.txt`,
+        mimeType: "text/plain",
+        ownerAgentId: keeper.id,
+      }),
+    );
+  const notePath = join(keeper.workspacePath, "note.md");
+  await writeFile(notePath, "n\n");
+  const [noteResult] = await crowded.call(
+    "attach a small file on a host with more files than the storage list shows",
+    keeper.id,
+    "attach_files_to_response",
+    { paths: [notePath] },
+    { direct: true },
+  );
+  const noteId = noteResult?.success
+    ? (attachedSchema.parse(JSON.parse(noteResult.text)).attachments[0]?.id ?? "")
+    : "";
+  const [crowdedList] = await crowded.call("list on the crowded host", keeper.id, "list_library_folders", {});
+  const crowdedListing = crowdedList?.success ? listingSchema.parse(JSON.parse(crowdedList.text)) : null;
+  pass(
+    "On a host with more stored files than the storage list shows, list_library_folders counts a small new file",
+    noteId !== "" && crowdedListing?.unfiled?.fileCount === STORAGE_LIMITS.files + 1,
+    crowdedList?.text.slice(0, 400),
+  );
+  const [notePlaced] = await crowded.call("place the small file on the crowded host", keeper.id, "organize_library", {
+    action: "place",
+    to: "Notes",
+    files: [noteId],
+  });
+  const notesFolder = crowded
+    .stored()
+    .folders.find((folder) => folder.agentId === keeper.id && folder.name === "Notes");
+  pass(
+    "organize_library place puts a small new file in a folder on a host with more stored files than the storage list shows",
+    notePlaced?.success === true && notesFolder !== undefined && crowded.stored().placement[noteId] === notesFolder.id,
+    notePlaced?.text,
+  );
+  const crowdedRows = (await runCauseEffect(crowded.storage.usage({ scope: "host" }))).files;
+  pass(
+    "Right after the place, the cached host storage rows have the small file in a folder and stay at most the row limit",
+    crowdedRows.length === STORAGE_LIMITS.files && crowdedRows.some((file) => file.id === noteId),
+    JSON.stringify({ rows: crowdedRows.length, note: noteId }),
   );
 
   const bare = await startHost(join(root, "user-data-bare"), false);

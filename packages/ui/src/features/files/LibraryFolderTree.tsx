@@ -21,6 +21,7 @@ import {
   StarOff,
   Trash2,
   UsersRound,
+  Waypoints,
 } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
 import { useText } from "@openbot/ui/text";
@@ -37,10 +38,15 @@ import {
   canHoldFolder,
   FAVORITES_SECTION,
   type LibraryLocation,
+  type LibraryWorkflowFolderRow,
+  type LibraryWorkflowRow,
+  type LibraryWorkflowTree,
   RECENT_FILES,
   REMOVED_AGENTS,
   sameLocation,
   UNSORTED_FILES,
+  WORKFLOWS_SECTION,
+  workflowFolderKey,
 } from "./library-folders-view";
 
 export interface LibraryCounts {
@@ -80,6 +86,7 @@ interface LibraryFolderTreeProps {
   canCreate: boolean;
   canOrganize: (agentId: string) => boolean;
   removedFiles: boolean;
+  workflows: LibraryWorkflowTree;
   onSearch: (search: string) => void;
   onGo: (place: LibraryLocation) => void;
   onOpenChange: (key: string, open: boolean) => void;
@@ -162,6 +169,7 @@ function SideRow(props: {
   count?: number | undefined;
   current: boolean;
   branch?: string | undefined;
+  toggleLabel?: string | undefined;
   onGo: () => void;
   onOpenChange?: ((open: boolean) => void) | undefined;
   collapsed?: boolean;
@@ -227,7 +235,7 @@ function SideRow(props: {
               variant="ghost"
               size="icon-sm"
               class="library-row-toggle"
-              aria-label={t("files.folder.listOf", { name: props.label })}
+              aria-label={props.toggleLabel ?? t("files.folder.listOf", { name: props.label })}
               aria-expanded={expanded()}
               aria-controls={branchId(branch())}
               onClick={() => props.onOpenChange?.(props.collapsed === true)}
@@ -535,6 +543,81 @@ function FavoriteRow(props: { rows: TreeRows; favorite: LibraryFavorite }) {
   );
 }
 
+function WorkflowRow(props: { rows: TreeRows; workflow: LibraryWorkflowRow; depth: number }) {
+  const { t } = useText();
+  const tree = () => props.rows.props;
+  const place = () => ({ kind: "workflow", workflowId: props.workflow.id }) satisfies LibraryLocation;
+  return (
+    <li>
+      <SideRow
+        depth={props.depth}
+        icon={<Waypoints aria-hidden="true" />}
+        label={props.workflow.name || t("workflow.canvas.untitled")}
+        count={props.workflow.count}
+        off={tree().dropOff(undefined)}
+        current={props.rows.current(place())}
+        onGo={() => tree().onGo(place())}
+      />
+    </li>
+  );
+}
+
+function WorkflowFolderBranch(props: { rows: TreeRows; folder: LibraryWorkflowFolderRow }) {
+  const { t } = useText();
+  const tree = () => props.rows.props;
+  const key = () => workflowFolderKey(props.folder.id);
+  const place = () => ({ kind: "workflowFolder", folderId: props.folder.id }) satisfies LibraryLocation;
+  const collapsed = () => tree().isCollapsed(key());
+  const current = () => props.rows.current(place());
+  const workflowsLabel = () => t("files.library.workflowsOf", { name: props.folder.name });
+  return (
+    <li>
+      <SideRow
+        icon={current() || !collapsed() ? <FolderOpen aria-hidden="true" /> : <Folder aria-hidden="true" />}
+        label={props.folder.name}
+        count={props.folder.count}
+        off={tree().dropOff(undefined)}
+        current={current()}
+        branch={key()}
+        toggleLabel={workflowsLabel()}
+        collapsed={collapsed()}
+        onOpenChange={(open) => tree().onOpenChange(key(), open)}
+        onGo={() => props.rows.go(place(), key())}
+      />
+      <div
+        class="library-collapse"
+        id={branchId(key())}
+        data-collapsed={collapsed() ? "" : undefined}
+        aria-hidden={collapsed() ? "true" : undefined}
+        inert={collapsed()}
+      >
+        <ul class="library-branch" style={{ "--library-depth": "1" }} aria-label={workflowsLabel()}>
+          <For each={props.folder.workflows} keyed={(workflow) => workflow.id}>
+            {(workflow) => <WorkflowRow rows={props.rows} workflow={workflow()} depth={1} />}
+          </For>
+        </ul>
+      </div>
+    </li>
+  );
+}
+
+function WorkflowSection(props: { rows: TreeRows }) {
+  const { t } = useText();
+  const tree = () => props.rows.props;
+  return (
+    <SideSection rows={props.rows} key={WORKFLOWS_SECTION} title={t("files.library.workflows")}>
+      <ul class="library-side-list">
+        <For each={tree().workflows.folders} keyed={(folder) => folder.id}>
+          {(folder) => <WorkflowFolderBranch rows={props.rows} folder={folder()} />}
+        </For>
+        <For each={tree().workflows.loose} keyed={(workflow) => workflow.id}>
+          {(workflow) => <WorkflowRow rows={props.rows} workflow={workflow()} depth={0} />}
+        </For>
+      </ul>
+    </SideSection>
+  );
+}
+
 export function LibraryFolderTree(props: LibraryFolderTreeProps) {
   const { t } = useText();
   const byParent = createMemo(() => {
@@ -684,6 +767,9 @@ export function LibraryFolderTree(props: LibraryFolderTreeProps) {
               </AgentPicker>
             </Show>
           </SideSection>
+        </Show>
+        <Show when={props.workflows.count > 0}>
+          <WorkflowSection rows={rows} />
         </Show>
         <Show when={props.removedFiles}>
           <ul class="library-side-list">

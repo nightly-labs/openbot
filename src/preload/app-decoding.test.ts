@@ -27,6 +27,7 @@ import {
   decodeCustomAgentResult,
   decodeCustomAgents,
   decodeCustomAgentUsage,
+  decodeCustomServerCheckoutResult,
   decodeDetectedModelServers,
   decodeDiscoverModelsResult,
   decodeHostedServer,
@@ -113,6 +114,8 @@ const voiceServer = {
 };
 
 const valid: [string, (value: unknown) => unknown, unknown][] = [
+  ["an opened custom server checkout", decodeCustomServerCheckoutResult, { opened: true }],
+  ["a custom server checkout with no link", decodeCustomServerCheckoutResult, { opened: false }],
   [
     "app behavior with a quit guard",
     decodeAppBehaviorPreference,
@@ -177,6 +180,17 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
       platform: "darwin",
       variant: "production",
       hourCycle: "h23",
+    } satisfies AppInfo,
+  ],
+  [
+    "app info on an X11 desktop with no compositor",
+    decodeAppInfo,
+    {
+      name: "OpenBot",
+      version: "1.0.0",
+      platform: "linux",
+      variant: "production",
+      aboveAppsSupport: "no-compositor",
     } satisfies AppInfo,
   ],
   [
@@ -383,6 +397,8 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
 ];
 
 const malformed: [string, (value: unknown) => unknown, unknown][] = [
+  ["a custom server checkout without a result", decodeCustomServerCheckoutResult, {}],
+  ["a custom server checkout with a text result", decodeCustomServerCheckoutResult, { opened: "yes" }],
   [
     "an unknown quit guard",
     decodeAppBehaviorPreference,
@@ -414,6 +430,11 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     "app info with an unknown hour cycle",
     decodeAppInfo,
     { name: "OpenBot", version: "1.0.0", platform: "darwin", variant: "production", hourCycle: "h24" },
+  ],
+  [
+    "app info with an unknown agent dock screen support",
+    decodeAppInfo,
+    { name: "OpenBot", version: "1.0.0", platform: "linux", variant: "production", aboveAppsSupport: "no-composer" },
   ],
   [
     "app info with a Dynamic Island availability that is not a boolean",

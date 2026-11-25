@@ -32,11 +32,16 @@ import {
   type BitwardenConnectorStatus,
   type BitwardenHostConnectInput,
   type BrowseAgentFoldersInput,
+  type BrowseChannelFoldersInput,
   type BrowserProfileList,
   type BrowserProfileSummary,
   type BrowserProxyList,
   type BrowserProxySummary,
+  type CacheExpiryCompactionSetting,
   type CancelMcpSignInInput,
+  type ChannelFolderChange,
+  type ChannelFolderInput,
+  type ChannelFolderList,
   type ChatColors,
   type ClaudeCompactWindowSetting,
   type ClearBrowserDataInput,
@@ -64,6 +69,8 @@ import {
   decodeBrowserProfileSummary,
   decodeBrowserProxyList,
   decodeBrowserProxySummary,
+  decodeChannelFolderChangeFromMain,
+  decodeChannelFolderListFromMain,
   decodeChannelStorageUsage,
   decodeCustomAgentResult,
   decodeCustomAgentSummaries,
@@ -89,12 +96,15 @@ import {
   decodeHostProviderAccounts,
   decodeHostProviderAccountUsage,
   decodeHostReleaseStatus,
+  decodeHostSignalHomeSettings,
   decodeHostSkillLearning,
   decodeHostTimezoneSettings,
+  decodeHostTurnLimits,
   decodeHostUpdateStatus,
   decodeHostVaultCodes,
   decodeHostVaultImport,
   decodeHostVaultState,
+  decodeHostVoiceModel,
   decodeHostWhatsAppLinkState,
   decodeHostWhatsAppOverview,
   decodeInstalledSkills,
@@ -140,10 +150,15 @@ import {
   type HostReleaseStatus,
   type HostSetDiscordAccessInput,
   type HostSetMessagingEnabledInput,
+  type HostSignalHomeSettings,
   type HostSkillLearning,
   type HostTimezoneSettings,
+  type HostTurnLimits,
+  type HostTurnLimitsInput,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
+  type HostVoiceModel,
+  type HostVoiceModelChange,
   type InstallAgentTemplateInput,
   type InstalledSkill,
   type InstallMarketplaceAgentInput,
@@ -161,6 +176,7 @@ import {
   isSharedTable,
   isSidebarPinsSnapshot,
   isWhatsAppGroupList,
+  isWhatsAppReadOnlyList,
   isWhatsAppStatusReactionsList,
   isWhatsAppWorkingMessageList,
   type McpAccessSnapshot,
@@ -170,6 +186,8 @@ import {
   type McpSignInState,
   type McpSignInStatus,
   type McpTestResult,
+  type MediaApprovalCreditsSetting,
+  type MediaApprovalCreditsUpdate,
   type MessagingOverview,
   type MessagingWorkspaceInput,
   type OnePasswordConnectorStatus,
@@ -215,6 +233,7 @@ import {
   type SetAgentSessionSettingInput,
   type SetBrowserProfileProxyInput,
   type SetEnabledSkillInput,
+  type SetLiveVoiceAccountInput,
   type SetMcpAccessInput,
   type SetMcpServerEnabledInput,
   type SetMessagingEnabledInput,
@@ -223,6 +242,7 @@ import {
   type SetProviderApiKeyInput,
   type SetRoutineResultDestinationInput,
   type SetWhatsAppOwnNumberInput,
+  type SetWhatsAppSenderReadOnlyInput,
   type SetWhatsAppStatusReactionsInput,
   type SetWhatsAppWorkingMessageInput,
   type SharedTable,
@@ -248,6 +268,7 @@ import {
   type WhatsAppGroupList,
   type WhatsAppLinkState,
   type WhatsAppOverview,
+  type WhatsAppReadOnlyList,
   type WhatsAppSenderInput,
   type WhatsAppStatusReactionsList,
   type WhatsAppWorkingMessageList,
@@ -304,6 +325,11 @@ import { BITWARDEN_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/bit
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import {
+  CACHE_EXPIRY_COMPACTION_ROUTES,
+  decodeCacheExpiryCompactionResponse,
+} from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
+import { CHANNEL_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import {
   CLAUDE_COMPACT_WINDOW_ROUTES,
@@ -324,14 +350,25 @@ import { HOST_MEMBER_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host
 import { HOST_PERSONALITY_ROUTES } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-restart-v1";
+import { HOST_SIGNAL_HOME_ROUTES } from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
+import { HOST_TURN_LIMITS_ROUTES } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
+import { HOST_VOICE_MODEL_ROUTES } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
+import {
+  decodeLiveVoiceAccount,
+  LIVE_VOICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/live-voice-account-v1";
 import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MCP_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_SIGN_IN_APP_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
+import {
+  decodeMediaApprovalCreditsResponse,
+  MEDIA_APPROVAL_CREDITS_ROUTES,
+} from "@openbot/contracts/team-protocol/media-approval-credits-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
@@ -390,6 +427,7 @@ import { WEBHOOK_AGENT_SECRET_ROUTES } from "@openbot/contracts/team-protocol/we
 import { WEBHOOK_SENDER_SECRET_ROUTES } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_READ_ONLY_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { Effect, Schema } from "effect";
@@ -799,6 +837,43 @@ export function setHostTimezone(
   return adminCall(() => request("POST", HOST_TIMEZONE_ROUTES.update, decodeHostTimezoneSettings, { timezone }));
 }
 
+export function getHostTurnLimits(request: TeamApiRequest): Effect.Effect<HostTurnLimits, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_TURN_LIMITS_ROUTES.settings, decodeHostTurnLimits, {}));
+}
+
+export function setHostTurnLimits(
+  request: TeamApiRequest,
+  { turnLimit, agentTaskLimit }: HostTurnLimitsInput,
+): Effect.Effect<HostTurnLimits, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", HOST_TURN_LIMITS_ROUTES.update, decodeHostTurnLimits, { turnLimit, agentTaskLimit }),
+  );
+}
+
+export function getHostVoiceModel(request: TeamApiRequest): Effect.Effect<HostVoiceModel, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_VOICE_MODEL_ROUTES.settings, decodeHostVoiceModel, {}));
+}
+
+export function getHostSignalHome(
+  request: TeamApiRequest,
+): Effect.Effect<HostSignalHomeSettings, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_SIGNAL_HOME_ROUTES.settings, decodeHostSignalHomeSettings, {}));
+}
+
+export function setHostSignalHome(
+  request: TeamApiRequest,
+  home: string | null,
+): Effect.Effect<HostSignalHomeSettings, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_SIGNAL_HOME_ROUTES.update, decodeHostSignalHomeSettings, { home }));
+}
+
+export function changeHostVoiceModel(
+  request: TeamApiRequest,
+  { action, modelId }: HostVoiceModelChange,
+): Effect.Effect<HostVoiceModel, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_VOICE_MODEL_ROUTES.change, decodeHostVoiceModel, { action, modelId }));
+}
+
 export function requestHostRestart(request: TeamApiRequest): Effect.Effect<void, TeamAdminRequestError> {
   return adminCall(() => request("POST", HOST_RESTART_ROUTES.restart, ignoreResponse, {}));
 }
@@ -986,6 +1061,40 @@ export function setHostPromptCacheTtl(
   ttl: PromptCacheTtl,
 ): Effect.Effect<PromptCacheTtlSetting, TeamAdminRequestError> {
   return adminCall(() => request("POST", PROMPT_CACHE_TTL_ROUTES.update, decodePromptCacheTtlSetting, { ttl }));
+}
+
+export function getHostCacheExpiryCompaction(
+  request: TeamApiRequest,
+): Effect.Effect<CacheExpiryCompactionSetting, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", CACHE_EXPIRY_COMPACTION_ROUTES.settings, decodeCacheExpiryCompactionResponse, {}),
+  );
+}
+
+export function setHostCacheExpiryCompaction(
+  request: TeamApiRequest,
+  enabled: boolean,
+): Effect.Effect<CacheExpiryCompactionSetting, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, decodeCacheExpiryCompactionResponse, { enabled }),
+  );
+}
+
+export function getHostMediaApprovalCredits(
+  request: TeamApiRequest,
+): Effect.Effect<MediaApprovalCreditsSetting, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", MEDIA_APPROVAL_CREDITS_ROUTES.settings, decodeMediaApprovalCreditsResponse, {}),
+  );
+}
+
+export function setHostMediaApprovalCredits(
+  request: TeamApiRequest,
+  update: MediaApprovalCreditsUpdate,
+): Effect.Effect<MediaApprovalCreditsSetting, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", MEDIA_APPROVAL_CREDITS_ROUTES.update, decodeMediaApprovalCreditsResponse, update),
+  );
 }
 
 export function getHostClaudeCompactWindow(
@@ -1374,8 +1483,9 @@ export function listProviderAccountsWithModels(
   request: TeamApiRequest,
   withModels: boolean,
   withPools: boolean,
+  withLiveVoice = false,
 ): Effect.Effect<HostProviderAccounts, TeamAdminRequestError> {
-  if (!withModels && !withPools) return listProviderAccounts(request);
+  if (!withModels && !withPools && !withLiveVoice) return listProviderAccounts(request);
   return Effect.all(
     [
       listProviderAccounts(request),
@@ -1389,12 +1499,19 @@ export function listProviderAccountsWithModels(
             Effect.orElseSucceed(() => null),
           )
         : Effect.succeed(null),
+      withLiveVoice
+        ? adminCall(() => request("POST", LIVE_VOICE_ACCOUNT_ROUTES.settings, decodeLiveVoiceAccount, {})).pipe(
+            Effect.map((accountId) => ({ accountId })),
+            Effect.orElseSucceed(() => null),
+          )
+        : Effect.succeed(null),
     ],
     { concurrency: "unbounded" },
   ).pipe(
-    Effect.map(([accounts, models, pools]) => {
+    Effect.map(([accounts, models, pools, liveVoice]) => {
       const withAccountModels = models ? withHostProviderAccountModels(accounts, models) : accounts;
-      return pools ? { ...withAccountModels, pools } : withAccountModels;
+      const withPools = pools ? { ...withAccountModels, pools } : withAccountModels;
+      return liveVoice ? { ...withPools, liveVoiceAccount: liveVoice.accountId } : withPools;
     }),
   );
 }
@@ -1443,6 +1560,13 @@ export function setProviderAccountPool(
   input: SetProviderAccountPoolInput,
 ): Effect.Effect<void, TeamAdminRequestError> {
   return adminCall(() => request("POST", PROVIDER_ACCOUNT_POOL_ROUTES.update, ignoreResponse, { ...input }));
+}
+
+export function setLiveVoiceAccount(
+  request: TeamApiRequest,
+  input: SetLiveVoiceAccountInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", LIVE_VOICE_ACCOUNT_ROUTES.update, ignoreResponse, { ...input }));
 }
 
 export function providerAccountUsage(request: TeamApiRequest): Effect.Effect<AccountUsage, TeamAdminRequestError> {
@@ -1769,6 +1893,33 @@ export function browseAgentFolders(
   input: BrowseAgentFoldersInput,
 ): Effect.Effect<AgentFolderBrowse, TeamAdminRequestError> {
   return adminCall(() => request("POST", AGENT_FOLDERS_ROUTES.browse, decodeAgentFolderBrowse, { ...input }));
+}
+
+export function readChannelFolders(
+  request: TeamApiRequest,
+  channelId: string,
+): Effect.Effect<ChannelFolderList, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CHANNEL_FOLDERS_ROUTES.read, decodeChannelFolderListFromMain, { channelId }));
+}
+export function addChannelFolder(
+  request: TeamApiRequest,
+  input: ChannelFolderInput,
+): Effect.Effect<ChannelFolderChange, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CHANNEL_FOLDERS_ROUTES.add, decodeChannelFolderChangeFromMain, { ...input }));
+}
+export function removeChannelFolder(
+  request: TeamApiRequest,
+  input: ChannelFolderInput,
+): Effect.Effect<ChannelFolderChange, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", CHANNEL_FOLDERS_ROUTES.remove, decodeChannelFolderChangeFromMain, { ...input }),
+  );
+}
+export function browseChannelFolders(
+  request: TeamApiRequest,
+  input: BrowseChannelFoldersInput,
+): Effect.Effect<AgentFolderBrowse, TeamAdminRequestError> {
+  return adminCall(() => request("POST", CHANNEL_FOLDERS_ROUTES.browse, decodeAgentFolderBrowse, { ...input }));
 }
 
 function decodeHiddenAgents(value: unknown): HiddenAgentsSnapshot {
@@ -2346,4 +2497,27 @@ export function whatsappConnectorSetStatusReactions(
   input: SetWhatsAppStatusReactionsInput,
 ): Effect.Effect<void, TeamAdminRequestError> {
   return adminCall(() => request("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, ignoreResponse, { ...input }));
+}
+
+export function whatsappConnectorReadOnly(
+  request: TeamApiRequest,
+): Effect.Effect<WhatsAppReadOnlyList, TeamAdminRequestError> {
+  return adminCall(() =>
+    request(
+      "POST",
+      WHATSAPP_READ_ONLY_ROUTES.list,
+      (value) => {
+        if (!isWhatsAppReadOnlyList(value)) throw new Error("Invalid WhatsApp read-only response.");
+        return value;
+      },
+      {},
+    ),
+  );
+}
+
+export function whatsappConnectorSetSenderReadOnly(
+  request: TeamApiRequest,
+  input: SetWhatsAppSenderReadOnlyInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", WHATSAPP_READ_ONLY_ROUTES.update, ignoreResponse, { ...input }));
 }

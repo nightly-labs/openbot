@@ -12,6 +12,9 @@ export const messages = {
   "error.voice.prepareRequired":
     "Lokale spraaktranscriptie is niet beschikbaar. Voer `bun run voice:prepare` uit en start OpenBot opnieuw.",
   "error.voice.transcriptionFailed": "OpenBot kon deze opname niet transcriberen.",
+  "error.voice.videoModelMissing": "Er is geen spraakherkenningsmodel voor opnamen ingesteld in Instellingen → Spraak.",
+  "error.voice.videoModelMissingServer":
+    "Er is geen spraakherkenningsmodel ingesteld op deze server. Een eigenaar of beheerder kan een model instellen in de serverinstellingen, bij Spraakherkenning.",
   "error.voice.cloud.keyRequired": "Voeg je {provider}-API-sleutel toe in Instellingen → Spraak.",
   "error.voice.cloud.keyRejected":
     "{provider} heeft de API-sleutel niet geaccepteerd. Controleer de sleutel in Instellingen → Spraak.",
@@ -26,16 +29,23 @@ export const messages = {
   "error.voice.speech.modelRequired": "Download het spraakuitvoermodel in Instellingen → Spraak.",
   "error.voice.speech.timedOut": "Het voorlezen van het antwoord duurde te lang.",
   "error.voice.speech.failed": "OpenBot kon het antwoord niet voorlezen.",
+  "error.voice.speech.providerRefused": "{provider} weigerde de audio te maken: {reason}",
   "error.voice.recordingNotKept": "OpenBot kon de spraakopname niet bewaren.",
   "error.voice.live.timedOut": "Codex live spraak is niet op tijd gestart. Probeer het opnieuw.",
   "error.voice.live.failed": "Live spraak is gestopt: {reason}",
   "error.voice.live.disconnected": "Live spraak is verbroken.",
+  "error.voice.live.startFailed":
+    "Live spraak kon niet starten. Werk Codex bij en log in met ChatGPT op de computer waarop de agent draait, en probeer het dan opnieuw. Reden: {reason}",
   "error.voice.live.hostFailed":
     "Codex op de server kon live spraak niet starten. Vraag de eigenaar om Codex op die computer bij te werken en in te loggen met ChatGPT, en probeer het dan opnieuw.",
   "error.voice.live.signIn": "Meld je met je ChatGPT-account aan bij Codex om live spraak te gebruiken.",
+  "error.voice.live.chooseAccount":
+    "Dit ChatGPT-account kan geen live spraak gebruiken. Kies in Instellingen → Spraak een account waarvan het abonnement spraak bevat.",
   "error.voice.live.unavailable":
     "OpenAI kon live spraak niet starten. Het probleem ligt bij OpenAI. Probeer het later opnieuw.",
   "error.voice.live.refused":
     "OpenAI weigerde live spraak te starten. Probeer het later opnieuw, of zet live spraak uit in Instellingen om met je stem te praten.",
   "error.voice.live.off": "Codex live spraak staat uit. Zet het aan in Instellingen → Spraak.",
+  "error.voice.server.modelUnsupported":
+    "{host} kan niet transcriberen met {model}. Kies in Instellingen een ander dicteermodel voor de spraakserver.",
 } as const satisfies PartialTranslation<typeof source>;

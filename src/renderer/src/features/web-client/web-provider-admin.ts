@@ -1,4 +1,5 @@
 import { isKeyOnlyProvider, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
+import { providerCliSource } from "@openbot/contracts/cli-version";
 import { bugReportFormUrl } from "@openbot/contracts/feedback";
 import type {
   AgentProviderId,
@@ -26,6 +27,7 @@ import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { LIVE_VOICE_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-account-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -43,6 +45,11 @@ import {
   PROVIDER_DETECTION_CAPABILITY,
   PROVIDER_DETECTION_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-detection-v1";
+import {
+  PROVIDER_FROZEN_ACCOUNTS_LIMIT,
+  PROVIDER_MANY_ACCOUNTS_CAPABILITY,
+  PROVIDER_MANY_ACCOUNTS_LIMIT,
+} from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { providerSignInRelay } from "@openbot/contracts/team-protocol/provider-sign-in-relays";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
@@ -94,6 +101,7 @@ import {
   saveCustomAgent,
   saveCustomProvider,
   setHostProviderDefault,
+  setLiveVoiceAccount,
   setProviderAccountPool,
   setProviderApiKey,
   setProviderUse,
@@ -169,6 +177,7 @@ function webProviderAdmin(
   accountRelay: () => ProviderAccountRelay | null,
   accountModels: () => boolean,
   accountPools: () => boolean,
+  liveVoiceAccount: () => boolean,
   providerRelay: (provider: AgentProviderId) => ReturnType<typeof providerSignInRelay>,
 ): ProviderAdminDesktopApi {
   return {
@@ -257,7 +266,7 @@ function webProviderAdmin(
       ),
     accounts: async (serverId) =>
       runTeamEffect(
-        listProviderAccountsWithModels(request(serverId), accountModels(), accountPools()).pipe(
+        listProviderAccountsWithModels(request(serverId), accountModels(), accountPools(), liveVoiceAccount()).pipe(
           Effect.mapError((error) => error.cause),
         ),
       ),
@@ -297,6 +306,8 @@ function webProviderAdmin(
       runTeamEffect(removeProviderAccount(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
     setAccountPool: async (input, serverId) =>
       runTeamEffect(setProviderAccountPool(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    setLiveVoiceAccount: async (input, serverId) =>
+      runTeamEffect(setLiveVoiceAccount(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
     hostDefaultProvider: async (serverId) =>
       knownHostDefault(
         await runTeamEffect(getHostProviderDefault(request(serverId)).pipe(Effect.mapError((error) => error.cause))),
@@ -405,6 +416,7 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
     accountRelayOfServer,
     () => serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_MODELS_CAPABILITY),
     () => serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_POOL_CAPABILITY),
+    () => serverSupportsCapability(options.server(), LIVE_VOICE_ACCOUNT_CAPABILITY),
     (provider) => providerSignInRelay(provider, (capability) => serverSupportsCapability(options.server(), capability)),
   );
   const serverId = createMemo(() => remoteAdminServer(options.server(), "providers-v1")?.id);
@@ -414,9 +426,9 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
       return id ? remoteProviderRuntimes(() => admin, id) : undefined;
     }),
     {
-      systemCliVersion: (provider) => {
+      systemCliVersion: (provider, runtime) => {
         const row = options.status().providers?.find((candidate) => candidate.id === provider);
-        return row?.cliSource === "system" ? (row.version ?? null) : null;
+        return row && providerCliSource(row, runtime) === "system" ? row.version : null;
       },
       isLocalServer: () => false,
       managesRuntimes: () => serverId() !== undefined,
@@ -597,6 +609,9 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
       },
       rename: (provider, accountId, label) => changed(admin.renameAccount({ provider, accountId, label }, id)),
       remove: (provider, accountId) => changed(admin.removeAccount({ provider, accountId }, id)),
+      maxAccounts: serverSupportsCapability(options.server(), PROVIDER_MANY_ACCOUNTS_CAPABILITY)
+        ? PROVIDER_MANY_ACCOUNTS_LIMIT
+        : PROVIDER_FROZEN_ACCOUNTS_LIMIT,
       ...(remoteAdminServer(options.server(), PROVIDER_USAGE_RESET_CAPABILITY)?.id === id
         ? {
             usageResets: (provider: AgentProviderId) => admin.usageResets(provider, id),
@@ -614,6 +629,11 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
         ? {
             setPool: (provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) =>
               changed(admin.setAccountPool({ provider, enabled, leftOut: [...leftOut] }, id)),
+          }
+        : {}),
+      ...(remoteAdminServer(options.server(), LIVE_VOICE_ACCOUNT_CAPABILITY)?.id === id
+        ? {
+            setLiveVoiceAccount: (accountId: string | null) => changed(admin.setLiveVoiceAccount({ accountId }, id)),
           }
         : {}),
       ...(accountCodeServerId() === id

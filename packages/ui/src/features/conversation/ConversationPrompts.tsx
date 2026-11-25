@@ -4,6 +4,8 @@ import type {
   BrowserTab,
   BrowserTakeoverRequest,
   LocalBrowserSecretResponse,
+  MediaApprovalChoice,
+  MediaApprovalRead,
 } from "@openbot/contracts/ipc";
 import { type FeedbackApproval, feedbackApproval } from "@openbot/team-client/feedback-approval";
 import { approvalIsCut } from "@openbot/team-client/runtime-attention";
@@ -12,8 +14,14 @@ import { Button, LogIn, Maximize2, Monitor, toast } from "@openbot/ui";
 import { StandingApprovalConfirmation } from "@openbot/ui/components/StandingApprovalConfirmation";
 import { BrowserSecretCard, type BrowserSecretVault } from "@openbot/ui/features/conversation/BrowserSecretCard";
 import { BrowserTakeoverPreview } from "@openbot/ui/features/conversation/BrowserTakeoverPreview";
+import {
+  MediaApprovalCard,
+  type MediaApprovalControls,
+  mediaApprovalCandidate,
+} from "@openbot/ui/features/conversation/MediaApprovalCard";
 import { type TextValue, useText } from "@openbot/ui/text";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, untrack } from "solid-js";
+import { CreditsHoldCard } from "./CreditsHoldCard";
 import { UiBlockCard } from "./ui-blocks/UiBlockCard";
 
 export function ApprovalCard(props: {
@@ -23,6 +31,7 @@ export function ApprovalCard(props: {
   onAlwaysAllow?: (() => Promise<boolean>) | undefined;
   agentName?: string | undefined;
   sending?: boolean | undefined;
+  media?: MediaApprovalControls | undefined;
 }) {
   const { t, errorMessage, sourceText } = useText();
   const [submitting, setSubmitting] = createSignal(false);
@@ -31,12 +40,58 @@ export function ApprovalCard(props: {
   let alwaysAllowButton: HTMLButtonElement | undefined;
   const report = createMemo(() => feedbackApproval(props.approval));
   const cut = () => approvalIsCut(props.approval);
-  const submit = async (decision: "accept" | "decline") => {
+  const mediaSource = () => {
+    const media = props.media;
+    const approval = props.approval;
+    return media && mediaApprovalCandidate(approval) && !approvalIsCut(approval)
+      ? { read: media.read, approval: { ...approval } }
+      : null;
+  };
+  const [mediaRead, setMediaRead] = createSignal<MediaApprovalRead | null | undefined>(
+    untrack(() => (mediaSource() ? undefined : null)),
+  );
+  createEffect(mediaSource, (source) => {
+    if (!source) {
+      setMediaRead(null);
+      return;
+    }
+    let live = true;
+    void source.read(source.approval).then(
+      (read) => {
+        if (live) setMediaRead(read);
+      },
+      () => {
+        if (live) setMediaRead(null);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  });
+  const mediaOffer = () => mediaRead()?.media ?? null;
+  const creditsHold = () => {
+    const hold = mediaRead()?.hold;
+    const controls = props.media?.hold;
+    return hold && controls ? { hold, controls } : null;
+  };
+  const genericCard = () => mediaRead() !== undefined && !mediaOffer() && !creditsHold();
+  const setMediaDefault = () => {
+    const save = props.media?.setDefault;
+    const kind = mediaOffer()?.kind;
+    if (!save || !kind) return undefined;
+    return (model: string | null) => save(kind, model);
+  };
+  const submit = async (decision: "accept" | "decline", choice?: MediaApprovalChoice) => {
     if (submitting()) return;
     setSubmitting(true);
     setAccepting(decision === "accept");
+    const allowMedia = props.media?.allow;
     try {
-      const completed = await (decision === "accept" ? props.onApprove() : props.onReject());
+      const completed = await (decision === "decline"
+        ? props.onReject()
+        : choice && allowMedia
+          ? allowMedia(props.approval, choice)
+          : props.onApprove());
       if (!completed) setSubmitting(false);
     } catch (error) {
       toast.error(errorMessage(error, t("prompt.approval.answerFailed")), {
@@ -66,82 +121,101 @@ export function ApprovalCard(props: {
       when={report()}
       fallback={
         <>
-          <UiBlockCard
-            class="approval-card"
-            status="pending"
-            title={t(approvalTitle(props.approval))}
-            subtitle={props.approval.reason ? sourceText(props.approval.reason) : undefined}
-            busy={submitting()}
-            waiting
-            actions={
-              <>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  type="button"
-                  disabled={submitting()}
-                  data-cuelume-tap="close"
-                  data-cuelume-emphasis="normal"
-                  onClick={() => void submit("decline")}
-                >
-                  {t("prompt.approval.deny")}
-                </Button>
-                <Show when={props.onAlwaysAllow && !cut()}>
+          <Show when={creditsHold()}>
+            {(credits) => (
+              <CreditsHoldCard approval={props.approval} hold={credits().hold} controls={credits().controls} />
+            )}
+          </Show>
+          <Show when={mediaOffer()}>
+            {(offer) => (
+              <MediaApprovalCard
+                offer={offer()}
+                agentName={props.agentName}
+                submitting={submitting()}
+                onDeny={() => void submit("decline")}
+                onAllow={(choice) => void submit("accept", choice)}
+                onSetDefault={setMediaDefault()}
+              />
+            )}
+          </Show>
+          <Show when={genericCard()}>
+            <UiBlockCard
+              class="approval-card"
+              status="pending"
+              title={t(approvalTitle(props.approval))}
+              subtitle={props.approval.reason ? sourceText(props.approval.reason) : undefined}
+              busy={submitting()}
+              waiting
+              actions={
+                <>
                   <Button
-                    ref={alwaysAllowButton}
                     variant="secondary"
                     size="sm"
                     type="button"
                     disabled={submitting()}
-                    onClick={() => setConfirmingAlways(true)}
+                    data-cuelume-tap="close"
+                    data-cuelume-emphasis="normal"
+                    onClick={() => void submit("decline")}
                   >
-                    {t("prompt.approval.alwaysAllow")}
+                    {t("prompt.approval.deny")}
                   </Button>
-                </Show>
-                <Show when={!cut()}>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    type="button"
-                    disabled={submitting()}
-                    onClick={() => void submit("accept")}
-                  >
-                    {t("prompt.approval.allow")}
-                  </Button>
-                </Show>
-              </>
-            }
-          >
-            <Show when={props.approval.command}>
-              {(command) => (
-                <div class="approval-command-block">
-                  <Show when={props.approval.cwd}>
-                    <div class="approval-cwd">{props.approval.cwd}</div>
+                  <Show when={props.onAlwaysAllow && !cut()}>
+                    <Button
+                      ref={alwaysAllowButton}
+                      variant="secondary"
+                      size="sm"
+                      type="button"
+                      disabled={submitting()}
+                      onClick={() => setConfirmingAlways(true)}
+                    >
+                      {t("prompt.approval.alwaysAllow")}
+                    </Button>
                   </Show>
-                  <code>{command()}</code>
+                  <Show when={!cut()}>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      type="button"
+                      disabled={submitting()}
+                      onClick={() => void submit("accept")}
+                    >
+                      {t("prompt.approval.allow")}
+                    </Button>
+                  </Show>
+                </>
+              }
+            >
+              <Show when={props.approval.command}>
+                {(command) => (
+                  <div class="approval-command-block">
+                    <Show when={props.approval.cwd}>
+                      <div class="approval-cwd">{props.approval.cwd}</div>
+                    </Show>
+                    <code>{command()}</code>
+                  </div>
+                )}
+              </Show>
+              <Show when={props.approval.kind === "file-change"}>
+                <div class="approval-detail-row">
+                  <span class="approval-detail-label">{t("prompt.approval.files")}</span>
+                  <strong>{props.approval.grantRoot ?? t("prompt.approval.agentWorkspace")}</strong>
                 </div>
-              )}
-            </Show>
-            <Show when={props.approval.kind === "file-change"}>
-              <div class="approval-detail-row">
-                <span class="approval-detail-label">{t("prompt.approval.files")}</span>
-                <strong>{props.approval.grantRoot ?? t("prompt.approval.agentWorkspace")}</strong>
-              </div>
-            </Show>
-            <Show when={props.approval.kind === "permissions"}>
-              <PermissionDetails permissions={props.approval.permissions} />
-            </Show>
-            <Show when={cut()}>
-              <p class="approval-cut-note">{t("prompt.approval.cut")}</p>
-            </Show>
-          </UiBlockCard>
-          <StandingApprovalConfirmation
-            open={confirmingAlways()}
-            agentName={props.agentName}
-            onCancel={() => setConfirmingAlways(false)}
-            onConfirm={() => void alwaysAllow()}
-            restoreFocusTarget={alwaysAllowButton}
-          />
+              </Show>
+              <Show when={props.approval.kind === "permissions"}>
+                <PermissionDetails permissions={props.approval.permissions} />
+              </Show>
+              <Show when={cut()}>
+                <p class="approval-cut-note">{t("prompt.approval.cut")}</p>
+              </Show>
+            </UiBlockCard>
+            <StandingApprovalConfirmation
+              open={confirmingAlways()}
+              agentName={props.agentName}
+              onCancel={() => setConfirmingAlways(false)}
+              onConfirm={() => void alwaysAllow()}
+              restoreFocusTarget={alwaysAllowButton}
+            />
+          </Show>
         </>
       }
     >

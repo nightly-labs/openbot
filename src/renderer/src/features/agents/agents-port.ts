@@ -15,6 +15,8 @@ export interface AgentsPort {
     | "updateAgentNewChat"
     | "getAgentPlanCard"
     | "updateAgentPlanCard"
+    | "getAgentBuiltinMemory"
+    | "updateAgentBuiltinMemory"
     | "getAgentFastMode"
     | "updateAgentFastMode"
     | "listAgents"

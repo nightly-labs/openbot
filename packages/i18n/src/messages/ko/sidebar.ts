@@ -152,9 +152,9 @@ export const messages = {
   "sidebar.announce.movedPinned": "고정된 채팅을 {total}개 중 {position}번째로 이동했어요.",
   "sidebar.announce.personFallback": "사람",
   "sidebar.announce.chatFallback": "채팅",
-  "sidebar.mobileApp.title": "모바일용 OpenBot",
-  "sidebar.mobileApp.body": "이제 iPhone과 Android에서 앱을 사용할 수 있어요.",
-  "sidebar.mobileApp.howToInstall": "설치 방법",
+  "sidebar.mobileApp.pocketTitle": "내 에이전트를 주머니 속에",
+  "sidebar.mobileApp.iphone": "iPhone",
+  "sidebar.mobileApp.android": "Android",
   "sidebar.mobileApp.dismiss": "모바일 앱 공지 닫기",
   "sidebar.storage.lowTitle": "저장 공간이 거의 찼어요",
   "sidebar.storage.fullTitle": "저장 공간이 가득 찼어요",
@@ -162,6 +162,10 @@ export const messages = {
   "sidebar.storage.fullBody":
     "{server}에서 {total} 중 {used}를 사용 중이에요. 에이전트가 파일을 저장하지 못할 수 있어요.",
   "sidebar.storage.meterLabel": "{server}의 사용 중인 저장 공간",
+  "sidebar.storage.bodyThisComputer": "이 컴퓨터에서 {total} 중 {used}를 사용 중이에요.",
+  "sidebar.storage.fullBodyThisComputer":
+    "이 컴퓨터에서 {total} 중 {used}를 사용 중이에요. 에이전트가 파일을 저장하지 못할 수 있어요.",
+  "sidebar.storage.meterLabelThisComputer": "이 컴퓨터의 사용 중인 저장 공간",
   "sidebar.storage.used": "{percent} 사용 중",
   "sidebar.storage.freeUpSpace": "공간 확보",
   "sidebar.storage.dismiss": "저장 공간이 가득 찰 때까지 숨기기",

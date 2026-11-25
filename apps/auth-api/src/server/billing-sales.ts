@@ -1068,6 +1068,12 @@ export function paymentReversal(event: StripeEvent): PaymentReversal | null {
   };
 }
 
+export function isDisputeInquiry(event: StripeEvent): boolean {
+  return (
+    event.type === "charge.dispute.created" && stringValue(event.data.object.status)?.startsWith("warning_") === true
+  );
+}
+
 export function withoutTax(amount: number, total: unknown, totalExcludingTax: unknown): number {
   if (!isBillingAmount(total) || total === 0 || !isBillingAmount(totalExcludingTax) || totalExcludingTax >= total)
     return amount;

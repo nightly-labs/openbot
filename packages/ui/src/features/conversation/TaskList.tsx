@@ -95,11 +95,13 @@ export interface TaskListHeaderProps {
   active?: { id: string; label: string } | undefined;
   summary: string;
   count?: string;
+  mark?: TaskMarkState | undefined;
 }
 
 export function TaskListHeader(props: TaskListHeaderProps) {
   const { t } = useText();
   const complete = () => props.total > 0 && props.done === props.total;
+  const mark = () => props.mark ?? (complete() ? "done" : undefined);
   let lastActive: { id: string; label: string } | undefined;
   const headerTask = createMemo(() => {
     lastActive = props.active ?? lastActive;
@@ -118,7 +120,7 @@ export function TaskListHeader(props: TaskListHeaderProps) {
     >
       <span class="task-list-summary-glyph" aria-hidden="true">
         <Show
-          when={complete()}
+          when={mark()}
           fallback={
             <svg viewBox="0 0 16 16" fill="none" class="task-list-donut" aria-hidden="true">
               <circle class="task-list-donut-track" cx="8" cy="8" r={RING_RADIUS} />
@@ -134,7 +136,7 @@ export function TaskListHeader(props: TaskListHeaderProps) {
             </svg>
           }
         >
-          <TaskMark state="done" />
+          {(state) => <TaskMark state={state()} />}
         </Show>
       </span>
       <span class="task-list-title" data-showing={showTask() ? "task" : "title"}>

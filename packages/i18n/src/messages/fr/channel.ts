@@ -22,6 +22,12 @@ export const messages = {
   "channel.panel.close": "Fermer le panneau du canal",
   "channel.settings.title": "Réglages du canal",
   "channel.settings.memories": "Souvenirs",
+  "channel.settings.folders.title": "Dossiers",
+  "channel.settings.folders.description":
+    "Tous les membres de {channel} peuvent modifier des fichiers et exécuter des commandes dans ces dossiers.",
+  "channel.settings.folders.toastAdded":
+    "Les membres de {channel} peuvent maintenant modifier les fichiers de {folder}",
+  "channel.settings.folders.toastRemoved": "Les membres de {channel} ne peuvent plus modifier les fichiers de {folder}",
   "channel.settings.isolated": "Garder les souvenirs dans ce canal",
   "channel.settings.isolatedDescription":
     "Les agents enregistrent ce qu’ils apprennent ici comme souvenirs du canal. Leurs autres discussions ne les voient pas.",

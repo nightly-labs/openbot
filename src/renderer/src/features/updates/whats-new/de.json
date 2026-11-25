@@ -1,5 +1,116 @@
 [
   {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Viele der Korrekturen unten funktionieren auf einem Server nur, wenn der Server diese Version hat."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Nutze Sprache in Kanälen. Wenn du einem Kanal eine Nachricht diktierst, liest die App die Antwort eines Agenten laut vor. Du kannst auch ein Sprachgespräch über das Eingabefeld des Kanals starten.",
+          "Blende einen Server in der Serverleiste aus. Der Server ist auch auf deinen anderen Computern ausgeblendet. Wähle ihn im Ordner „Ausgeblendete Server“ aus, um ihn wieder anzuzeigen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Die Seite Aufgaben heißt jetzt Threads, wie in der Handy-App und in der Seitenleiste des Chats.",
+          "Gestreamte Antworten und Workflows, die gleichzeitig laufen, brauchen weniger Prozessorleistung, und der Web-Client öffnet einen Server schneller."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Auf dem Mac öffnen „Verbinden“ und „Konto hinzufügen“ für Claude jetzt die Anmeldeseite von Claude in OpenBot.",
+          "Wenn die Verbindung zu einem verbundenen Server keine Daten mehr sendet, verbindet sich die App jetzt von selbst neu.",
+          "Lange Kanäle auf einem verbundenen Server öffnen und aktualisieren sich schneller.",
+          "Eine Workflow-Ausgabe „Benachrichtigung“ oder ein Schritt, der auf eine Freigabe wartet, sendet jetzt eine Benachrichtigung aufs Handy.",
+          "Ein Gemini-Chat läuft weiter, nachdem Google ein Werkzeugergebnis abgelehnt hat. Vorher schlug jede spätere Nachricht fehl."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.77.0",
+    "date": "2026-11-23",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren Modelle mit OpenBot-Credits, pausierte und exportierte Workflows, schreibgeschützte WhatsApp-Chats, Standortanfragen und die Wahl des Signal-Servers nur, wenn der Server diese Version hat.",
+      "Nach diesem Update kann eine ältere Version von OpenBot deine Daten nicht öffnen."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kaufe OpenBot-Credits für dich selbst oder für einen Server über die Schaltfläche „Credits“ in der Fensterleiste oder unter Einstellungen → Abrechnung. Eine bezahlte Lizenz gibt außerdem jeden Monat kostenlose Credits.",
+          "Bild- und Videoschritte in einem Workflow können OpenBot-Modelle nutzen, die deine Credits bezahlen, ohne eine weitere Anmeldung. Stelle bei einem Schritt „Anzahl“ ein, um bis zu 4 Ergebnisse gleichzeitig zu erzeugen.",
+          "Pausiere einen Workflow über das Workflow-Menü. Du kannst einen Workflow auch in eine Datei exportieren und auf einem anderen Computer oder Server importieren.",
+          "Tippe {{ in einem Workflow-Schritt, um ein Feld aus einem früheren Schritt einzufügen. Auslöser für Zeitplan, GitHub, Discord, Telegram und Slack liefern jetzt ebenfalls Felder.",
+          "Ein Agent kann nach deinem Standort fragen, wenn eine Anfrage ihn braucht, zum Beispiel „Restaurants in meiner Nähe“. Es wird nichts gesendet, bis du antwortest.",
+          "Mache einen erlaubten WhatsApp-Kontakt oder eine erlaubte Gruppe schreibgeschützt. Deine Agenten können den Chat lesen, und OpenBot schreibt nie darin."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Ein Claude- oder Pi-Chat im Leerlauf mit 200K oder mehr Tokens Kontext verdichtet sich selbst, bevor sein 1-Stunden-Prompt-Cache abläuft. Das kostet weniger, als den vollen Kontext erneut zu lesen. Schalte es unter Servereinstellungen → Anbieter aus.",
+          "Wähle den Signal-Server eines Servers unter Servereinstellungen → Allgemein. „Automatisch“ behält den nächstgelegenen.",
+          "Gemini-Agenten mit „Voller Zugriff“ nutzen OpenBot-Werkzeuge wie Gedächtnis, Browser und Kanäle, ohne Genehmigungskarte."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Eine Nachricht, die du an einen Claude-Agenten sendest, während er arbeitet, erreicht ihn jetzt sofort, auch während er einen Subagenten oder ein langes Werkzeug ausführt.",
+          "Ein ChatGPT-(Codex)-Agent, der auf „Erst fragen“ eingestellt ist, fragt dich jetzt, bevor er einen Befehl ausführt oder eine Datei ändert.",
+          "Ein gehosteter oder selbst gehosteter Server, der nicht mehr antwortet, startet nach 10 Minuten von selbst wieder.",
+          "Unter macOS verlangsamt das Agenten-Dock OpenBot und den ganzen Computer nicht mehr.",
+          "Lange Chats scrollen flüssig. Vorher ruckelte ein Chat mit mehr als 100 Nachrichten beim Scrollen."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Auf einem Server funktionieren Aufgaben, die gleichzeitig laufen, das Konto für Live-Sprache, der Schalter für das Gedächtnis von OpenBot, Workflow-Ordner, typisierte Workflow-Antworten und mehr als 10 Konten eines Anbieters nur, wenn der Server diese Version hat.",
+      "Nach diesem Update kann eine ältere Version von OpenBot deine Daten nicht öffnen."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ein Agent kann unabhängige Arbeit in Aufgaben aufteilen, die gleichzeitig laufen. Jedes Ergebnis kommt in den Hauptchat zurück, und der Agent fasst die Ergebnisse für dich zusammen.",
+          "Sieh alle offenen Threads eines Agenten im neuen Tab Threads der Seitenleiste. Der Tab zeigt die Anzahl der Threads, die auf dich warten.",
+          "Ändere deine Tastenkürzel im neuen Tab Tastatur der Einstellungen. Neue Tastenkürzel starten einen Thread und wechseln zum nächsten und zum vorherigen Thread.",
+          "Workflows öffnen sich in Tabs, und Workflow-Schritte können typisierte Antworten geben. Schreibe {{name}}, um eine Antwort in einem späteren Schritt zu verwenden.",
+          "Lade ein MP4- oder WebM-Video als Fensterhintergrund in Einstellungen > Darstellung hoch.",
+          "Wähle das ChatGPT-Konto, das die Live-Sprache von GPT verwendet, in Einstellungen > Diktat."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Ein Anbieter behält bis zu 20 Konten. Vorher lag die Grenze bei 10.",
+          "Diktat nimmt bis zu 10 Minuten auf. Vorher hörte es nach 2 Minuten auf.",
+          "Ein Thread lädt ältere Nachrichten, wenn du nahe an den oberen Rand scrollst. Du musst keine Schaltfläche anklicken."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Eine geplante Routine schaltet sich nicht mehr stillschweigend aus, wenn ein Lauf nichts zu melden hat.",
+          "Ein langer Chat behält alle seine Nachrichten in der richtigen Reihenfolge, während eine Antwort Stück für Stück erscheint.",
+          "Eine verknüpfte WhatsApp-Nummer hört nicht mehr auf, Nachrichten zu empfangen, während sie noch „Verbunden“ anzeigt.",
+          "Unter Windows führen OpenCode-Agenten Befehle wieder aus. Vorher scheiterten sie oft mit „opencode-pty request timed out“.",
+          "Ein Agent, den du stummgeschaltet hast, schickt dir keine Benachrichtigung mehr, wenn er in einem Kanal antwortet."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.75.0",
     "date": "2026-11-20",
     "notices": [

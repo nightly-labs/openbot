@@ -15,6 +15,7 @@ import {
   agentFolderCoverage,
   folderInside,
 } from "@openbot/contracts/ipc";
+import { effectiveAgentFolders } from "../backend/agent/workspace-sandbox";
 import type { AgentService } from "../backend/agent-service";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { oneAtATimePerKey } from "./ipc/one-at-a-time";
@@ -24,11 +25,11 @@ export interface AgentFoldersDependencies {
   userDataPath: string;
 }
 
-async function isDirectory(path: string): Promise<boolean> {
+export async function isDirectory(path: string): Promise<boolean> {
   return (await stat(path).catch(() => null))?.isDirectory() === true;
 }
 
-async function realFolder(path: string): Promise<string> {
+export async function realFolder(path: string): Promise<string> {
   return realpath(path).catch(() => resolve(path));
 }
 
@@ -83,6 +84,21 @@ async function volumes(): Promise<AgentFolderBrowseEntry[]> {
 
 const VOLUMES_TTL_MS = 30_000;
 
+export async function isProtectedFolder(
+  path: string,
+  roots: readonly string[],
+  sharedRoot: string,
+  userDataPath: string,
+): Promise<boolean> {
+  const [openbot, userData] = await Promise.all([realFolder(dirname(sharedRoot)), realFolder(userDataPath)]);
+  return (
+    parse(path).root === path ||
+    folderInside(userData, path) ||
+    folderInside(openbot, path) ||
+    [openbot, userData, ...roots].some((root) => folderInside(path, root))
+  );
+}
+
 export function createAgentFolders({ service, userDataPath }: AgentFoldersDependencies) {
   let disks: { at: number; list: Promise<AgentFolderBrowseEntry[]> } | null = null;
   function currentVolumes(): Promise<AgentFolderBrowseEntry[]> {
@@ -121,14 +137,8 @@ export function createAgentFolders({ service, userDataPath }: AgentFoldersDepend
     return list(await runCauseEffect(service.updateAgent({ agentId: agent.id, excludedFolders: excluded })));
   }
 
-  async function isProtected(path: string, roots: readonly string[]): Promise<boolean> {
-    const [openbot, userData] = await Promise.all([realFolder(dirname(service.sharedRoot)), realFolder(userDataPath)]);
-    return (
-      parse(path).root === path ||
-      folderInside(userData, path) ||
-      folderInside(openbot, path) ||
-      [openbot, userData, ...roots].some((root) => folderInside(path, root))
-    );
+  function isProtected(path: string, roots: readonly string[]): Promise<boolean> {
+    return isProtectedFolder(path, roots, service.sharedRoot, userDataPath);
   }
 
   async function addNow(agentId: string, picked: string, replace?: string): Promise<AgentFolderChange> {
@@ -161,7 +171,7 @@ export function createAgentFolders({ service, userDataPath }: AgentFoldersDepend
       return { outcome: "refused", path: picked, refusal: "missing", list: await list(agent) };
     const path = await realFolder(picked);
     const current = await list(agent);
-    const roots = [current.workspace, current.shared, ...current.folders.map((folder) => folder.path)];
+    const roots = [current.workspace, current.shared, ...effectiveAgentFolders(agent)];
     if (roots.includes(path)) return { outcome: "refused", path, refusal: "root", list: current };
     if (!roots.some((root) => folderInside(root, path)))
       return { outcome: "refused", path, refusal: "outside", list: current };

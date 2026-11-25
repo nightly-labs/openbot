@@ -1,6 +1,7 @@
 import { type ChildProcess, type ExecFileException, execFile } from "node:child_process";
+import { win32 } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Fiber, Schema } from "effect";
+import { Deferred, Effect, Fiber, Schema } from "effect";
 
 class ProcessTreeFailed extends Schema.TaggedError<ProcessTreeFailed>()("ProcessTreeFailed", {
   cause: Schema.Defect(),
@@ -8,11 +9,20 @@ class ProcessTreeFailed extends Schema.TaggedError<ProcessTreeFailed>()("Process
 
 const logger = createOpenBotLogger("windows-process-tree");
 
+const TASKKILL_PROCESS_NOT_FOUND_EXIT_CODE = 128;
+
+const stoppingTrees = new WeakMap<ChildProcess, Deferred.Deferred<void, ProcessTreeFailed>>();
+
 const taskkillTree = (pid: number) =>
   Effect.tryPromise({
     try: () =>
       new Promise<ExecFileException | null>((resolve) =>
-        execFile("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true }, (error) => resolve(error)),
+        execFile(
+          win32.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "taskkill.exe"),
+          ["/pid", String(pid), "/T", "/F"],
+          { windowsHide: true },
+          (error) => resolve(error),
+        ),
       ),
     catch: (cause) => new ProcessTreeFailed({ cause }),
   });
@@ -20,6 +30,21 @@ const taskkillTree = (pid: number) =>
 export const stopWindowsProcessTree = Effect.fn("WindowsProcessTree.stop")(function* (child: ChildProcess) {
   const pid = child.pid;
   if (pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
+  const running = stoppingTrees.get(child);
+  if (running) return yield* Deferred.await(running);
+  const done = Deferred.makeUnsafe<void, ProcessTreeFailed>();
+  stoppingTrees.set(child, done);
+  yield* stopTree(child, pid).pipe(
+    Effect.onExit((exit) =>
+      Effect.andThen(
+        Effect.sync(() => stoppingTrees.delete(child)),
+        Deferred.done(done, exit),
+      ),
+    ),
+  );
+}, Effect.uninterruptible);
+
+const stopTree = Effect.fn("WindowsProcessTree.stopTree")(function* (child: ChildProcess, pid: number) {
   const exited = yield* Effect.forkChild(
     Effect.callback<void>((resume) => {
       const onExit = () => {
@@ -32,7 +57,12 @@ export const stopWindowsProcessTree = Effect.fn("WindowsProcessTree.stop")(funct
     { startImmediately: true },
   );
   const failure = yield* taskkillTree(pid);
-  if (failure && child.exitCode === null && child.signalCode === null) {
+  if (
+    failure &&
+    failure.code !== TASKKILL_PROCESS_NOT_FOUND_EXIT_CODE &&
+    child.exitCode === null &&
+    child.signalCode === null
+  ) {
     const again = yield* taskkillTree(pid);
     if (again && child.exitCode === null && child.signalCode === null)
       logger.warn("taskkill did not stop a process tree.", { pid, code: again.code ?? null });
@@ -44,7 +74,7 @@ export const stopWindowsProcessTree = Effect.fn("WindowsProcessTree.stop")(funct
     catch: (cause) => new ProcessTreeFailed({ cause }),
   });
   yield* Fiber.join(exited);
-}, Effect.uninterruptible);
+});
 
 export const endProcessTree = Effect.fn("ProcessTree.end")(function* (child: ChildProcess) {
   if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;

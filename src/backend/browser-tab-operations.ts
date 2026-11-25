@@ -23,6 +23,8 @@ import { TimeoutError, withTimeout } from "./with-timeout";
 const ACTION_POST_DISPATCH_TIMEOUT_MS = 10_000;
 const OPERATION_UNWIND_GRACE_MS = 1_000;
 const OPERATION_DEADLINE_BACKSTOP_MS = 250;
+const SILENT_PAGE_ADVICE =
+  "The page does not answer because a script on it keeps running. Reload the tab with navigate direction=reload, which ends the stuck page first, or close the tab.";
 
 export const BrowserToolHold = Context.Reference<(tabId: string) => boolean>("openbot/BrowserToolHold", {
   defaultValue: () => () => false,
@@ -352,12 +354,16 @@ export const boundEngineOperation = Effect.fn("BrowserTab.boundOperation")(funct
         keepQueueBlocked(Fiber.await(completion));
       }),
     ),
-    Effect.catch((error) => {
-      if (isTimeoutError(error instanceof TimeoutError ? error : error.cause)) {
+    Effect.catch((error) =>
+      Effect.gen(function* () {
+        if (!isTimeoutError(error instanceof TimeoutError ? error : error.cause))
+          return yield* Effect.fail(error instanceof TimeoutError ? browserFailure(error) : error);
         keepQueueBlocked(unwindStalledOperation(tab, completion));
-      }
-      return Effect.fail(error instanceof TimeoutError ? browserFailure(error) : error);
-    }),
+        const answers = yield* tab.engine.pageAnswers().pipe(Effect.orElseSucceed(() => true));
+        if (!answers) return yield* browserFailure(new Error(`${timeoutMessage} ${SILENT_PAGE_ADVICE}`));
+        return yield* Effect.fail(error instanceof TimeoutError ? browserFailure(error) : error);
+      }),
+    ),
   );
 });
 

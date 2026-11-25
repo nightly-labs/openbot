@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { agentSteersTurns } from "@openbot/contracts/agent-providers";
+import { Effect } from "effect";
+import { ModelCatalog } from "../src/backend/agent/model-catalog";
 import type { AgentClient } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type AppServerNotification, getRecord, getString, isRecord } from "../src/backend/protocol";
@@ -22,8 +25,15 @@ interface LogEntry {
   content?: string[];
 }
 
+interface CatalogSteering {
+  models: { id: string; steersTurns: boolean }[];
+  listedModel: boolean;
+  unlistedModel: boolean;
+}
+
 interface Report {
   passed: boolean;
+  catalog?: { withMethod: CatalogSteering; withoutMethod: CatalogSteering };
   steered?: { turnId: string; reply: string; status: string | null; steering: LogEntry };
   wrongTurn?: { refused: string; requests: number };
   afterTurn?: { refused: string; requests: number };
@@ -122,6 +132,23 @@ async function refusal(operation: Promise<string | null>): Promise<string> {
   return outcome;
 }
 
+async function catalogSteering(client: AgentClient): Promise<CatalogSteering> {
+  const catalog = new ModelCatalog({
+    client: () => client,
+    isSignedOut: () => false,
+    requestTimeoutMs: 10_000,
+    recordProviderError: () => undefined,
+    startSettingsChanged: () => Effect.void,
+  });
+  const { models } = await runCauseEffect(catalog.read(client, requireProviderDriver("opencode").catalog, 10_000));
+  assert.ok(models.length > 0, "The catalog must list an OpenCode model.");
+  return {
+    models: models.map((model) => ({ id: model.id, steersTurns: model.steersTurns === true })),
+    listedModel: agentSteersTurns({ provider: "opencode", model: models[0]?.id ?? "" }, models),
+    unlistedModel: agentSteersTurns({ provider: "opencode", model: "openai/not-listed" }, models),
+  };
+}
+
 const requests = async (log: string) =>
   (await readJsonl<LogEntry>(log)).filter((entry) => entry.event === "steering").length;
 
@@ -135,6 +162,9 @@ try {
   await writeFile(image, PNG);
 
   const { client, log } = await open("native", {});
+  const withMethod = await catalogSteering(client);
+  assert.equal(withMethod.listedModel, true, "An OpenCode with the request must steer.");
+  assert.equal(withMethod.unlistedModel, true, "Each model of an OpenCode with the request must steer.");
   const thread = await startThread(client, { cwd: root });
 
   const turn = await startWork(client, thread, log);
@@ -186,14 +216,18 @@ try {
   };
 
   const old = await open("without-method", { FAKE_NO_STEERING: "1" }, "2.2.6");
+  const withoutMethod = await catalogSteering(old.client);
+  assert.equal(withoutMethod.listedModel, false, "An OpenCode without the request must not steer.");
+  assert.equal(withoutMethod.unlistedModel, false, "An OpenCode without the request must not steer.");
+  report.catalog = { withMethod, withoutMethod };
   const oldThread = await startThread(old.client, { cwd: root });
   const oldTurn = await startWork(old.client, oldThread, old.log);
-  const withoutMethod = await refusal(steer(old.client, oldThread, oldTurn.id, [{ type: "text", text: "steer" }]));
+  const oldRefusal = await refusal(steer(old.client, oldThread, oldTurn.id, [{ type: "text", text: "steer" }]));
   const oldEntries = await readJsonl<LogEntry>(old.log);
   const cancelSent = oldEntries.some((entry) => entry.event === "cancel");
   assert.equal(await requests(old.log), 0, "An OpenCode without the request must not get it.");
   assert.equal(cancelSent, false);
-  report.withoutMethod = { refused: withoutMethod, requests: await requests(old.log), cancelSent };
+  report.withoutMethod = { refused: oldRefusal, requests: await requests(old.log), cancelSent };
   await stop(old.client, oldThread, oldTurn);
 
   report.passed = true;

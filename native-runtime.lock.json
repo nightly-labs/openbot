@@ -1892,58 +1892,58 @@
     }
   },
   "devin": {
-    "version": "3000.11.234",
+    "version": "3000.14.30821",
     "license": "Proprietary",
     "licenseUrl": "https://cognition.com/legal/platform-terms-of-service",
     "artifacts": {
       "darwin-arm64": {
-        "url": "https://static.devin.ai/cli/3000.11.234/devin-3000.11.234-aarch64-apple-darwin.tar.gz",
-        "assetSha256": "35f17a21e53a49435e42fb9627731726aa8ef7fa63e5c3d9d43d0cc5ca43edaf",
-        "downloadBytes": 66339270,
-        "installedBytes": 195170062,
+        "url": "https://static.devin.ai/cli/3000.14.30821/devin-3000.14.30821-aarch64-apple-darwin.tar.gz",
+        "assetSha256": "46ef1a75d8bd851665179e136b7e39ad597d3d7913b95d67fd2b88e9c8af0061",
+        "downloadBytes": 80496229,
+        "installedBytes": 231967827,
         "executable": "devin",
         "files": {
-          "bin/devin": "cd6a8c9d7d95d8a46fb3fb5504e29ffbf3f392fbc772a25e619091cbd64124a2"
+          "bin/devin": "985a79f99180f081e13781ac88993a10dfe133d4ba415ffb4c95b22dde037935"
         }
       },
       "darwin-x64": {
-        "url": "https://static.devin.ai/cli/3000.11.234/devin-3000.11.234-x86_64-apple-darwin.tar.gz",
-        "assetSha256": "55ef4f2d2b2c82b5258b7516eb1126549e6f10d6b418035676237bcc18e93e46",
-        "downloadBytes": 72567510,
-        "installedBytes": 206371518,
+        "url": "https://static.devin.ai/cli/3000.14.30821/devin-3000.14.30821-x86_64-apple-darwin.tar.gz",
+        "assetSha256": "e0ffc5fb0bc367270f20f15686bba74a2851959e782a37c016c68b91229ec0db",
+        "downloadBytes": 87867075,
+        "installedBytes": 244950355,
         "executable": "devin",
         "files": {
-          "bin/devin": "0cb525bdcfe811f36f198e672f48e03182c4c9d3fe6f6d6aa747c68dee8fa449"
+          "bin/devin": "963f86fbcab7a49a373b469935264a3c4823afc4fb6eae092e86dc58a61cffc0"
         }
       },
       "linux-x64": {
-        "url": "https://static.devin.ai/cli/3000.11.234/devin-3000.11.234-x86_64-unknown-linux.tar.gz",
-        "assetSha256": "201370cddd2924294e3ca6b46fd8ece49b5763953b644a1dd823fce5490cb41a",
-        "downloadBytes": 73715879,
-        "installedBytes": 218112262,
+        "url": "https://static.devin.ai/cli/3000.14.30821/devin-3000.14.30821-x86_64-unknown-linux.tar.gz",
+        "assetSha256": "4dc43e3e4388bace60fe2aa8010cbb399402e724892d7175845b1cdef00e7ddb",
+        "downloadBytes": 88661435,
+        "installedBytes": 257669195,
         "executable": "devin",
         "files": {
-          "bin/devin": "9be67fc1ec19bc29e95f7329b21dc3b678ddc595bc943fd11ee05d0cd94d2d82"
+          "bin/devin": "b855dafc39ab228c7394cf1d16d60df583fdc75c613a544afff5cd9dd5583f24"
         }
       },
       "linux-arm64": {
-        "url": "https://static.devin.ai/cli/3000.11.234/devin-3000.11.234-aarch64-unknown-linux.tar.gz",
-        "assetSha256": "438ca7f8280b3ef0747afc406e827d9e182156000277a1660358ac4fbd04156e",
-        "downloadBytes": 68561126,
-        "installedBytes": 195837886,
+        "url": "https://static.devin.ai/cli/3000.14.30821/devin-3000.14.30821-aarch64-unknown-linux.tar.gz",
+        "assetSha256": "3deb8af6b026060e975ed371936e139818020e5dc5abbcba07cde039f473a5a5",
+        "downloadBytes": 82712471,
+        "installedBytes": 231307971,
         "executable": "devin",
         "files": {
-          "bin/devin": "e8bf5931b36843ddc11ec8b818afc8f913299d66a78468c10e46d41c596753ef"
+          "bin/devin": "02b5ca13f932d5d6537435bbe09acbf836b227e1aded7a875cfa773223b5e23d"
         }
       },
       "win32-x64": {
-        "url": "https://static.devin.ai/cli/3000.11.234/devin-3000.11.234-x86_64-pc-windows.zip",
-        "assetSha256": "de01a37364c3c09389e20b699e993962296e5b8e1bea60aa48c95cc57dd228e3",
-        "downloadBytes": 72549950,
-        "installedBytes": 214219358,
+        "url": "https://static.devin.ai/cli/3000.14.30821/devin-3000.14.30821-x86_64-pc-windows.zip",
+        "assetSha256": "23e723a68f4bebe4c5f57f42e0f9d8b069c91407d62584afefa05e246c51cf4d",
+        "downloadBytes": 87687963,
+        "installedBytes": 254202139,
         "executable": "devin.exe",
         "files": {
-          "bin/devin.exe": "7b05e174855313e31a4f48fc97b71f383821bb34eb563d5769515092ecef3b8e"
+          "bin/devin.exe": "de9a5783b74c7a66a8d400557efc0a343e8feadfac2736793969c642a5bc1c9c"
         }
       }
     }

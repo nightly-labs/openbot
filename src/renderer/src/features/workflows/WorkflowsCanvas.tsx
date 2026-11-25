@@ -6,9 +6,11 @@ import {
   type WorkflowMediaCatalogModel,
   type WorkflowMediaModel,
   type WorkflowMediaServiceAccount,
+  type WorkflowMediaUnavailableModel,
   workflowCatalogMediaModel,
-  workflowCatalogProvider,
+  workflowCatalogSource,
 } from "@openbot/contracts/ipc";
+import { Spinner } from "@openbot/ui";
 import { providerAvailability, providerTurnedOff } from "@openbot/ui/components/provider-model-options";
 import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
 import type { WorkflowAgentProgress } from "@openbot/ui/features/workflows/workflow-board";
@@ -17,7 +19,7 @@ import {
   type WorkflowCatalogs,
   type WorkflowFeatures,
 } from "@openbot/ui/features/workflows/workflow-model";
-import { currentText } from "@openbot/ui/text";
+import { currentText, useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { mediaServiceAccountName, noteMediaStepEnded } from "./workflow-media-credits";
@@ -31,10 +33,12 @@ export function WorkflowsCanvas(props: {
   models: WorkflowCatalogs["models"];
   status: WorkflowCatalogs["status"];
   self?: WorkflowCatalogs["self"];
+  preference?: WorkflowCatalogs["preference"];
   request?: WorkflowRequest | undefined;
   serverId?: string | undefined;
   agentProgress?: ((agentId: string) => WorkflowAgentProgress | undefined) | undefined;
 }) {
+  const { t } = useText();
   const workflows = createWorkflowsController(
     untrack(() => props.host),
     () => desktopAnalytics.scope(),
@@ -43,9 +47,26 @@ export function WorkflowsCanvas(props: {
   );
   const [sunra, setSunra] = createSignal(false);
   const [higgsfield, setHiggsfield] = createSignal(false);
+  const [openbot, setOpenbot] = createSignal(false);
   const [serviceAccounts, setServiceAccounts] = createSignal<readonly WorkflowMediaServiceAccount[] | null>(null);
   const [catalog, setCatalog] = createSignal<readonly WorkflowMediaCatalogModel[]>([]);
+  const [providersRead, setProvidersRead] = createSignal(false);
+  const [catalogRead, setCatalogRead] = createSignal(false);
+  const [unavailable, setUnavailable] = createSignal<readonly WorkflowMediaUnavailableModel[]>([]);
+  const [creditBalance, setCreditBalance] = createSignal<number | null>(null);
   let disposed = false;
+  let balanceRequest = 0;
+  const readCreditBalance = () => {
+    if (!props.host.mediaSupported()) return;
+    balanceRequest += 1;
+    const sent = balanceRequest;
+    void props.host.workflows
+      .mediaCredits()
+      .then((answer) => {
+        if (!disposed && sent === balanceRequest) setCreditBalance(answer.openbot?.available ?? null);
+      })
+      .catch(() => undefined);
+  };
   const readMediaProviders = () => {
     if (!props.host.mediaSupported()) return;
     void props.host.workflows
@@ -54,13 +75,19 @@ export function WorkflowsCanvas(props: {
         if (disposed) return;
         setSunra(providers.sunra);
         setHiggsfield(providers.higgsfield);
+        setOpenbot(providers.openbot === true);
         setServiceAccounts(providers.accounts);
+        setProvidersRead(true);
+        if (providers.openbot === true) readCreditBalance();
       })
       .catch(() => undefined);
     void props.host.workflows
       .mediaCatalog()
       .then((answer) => {
-        if (!disposed) setCatalog(answer.models);
+        if (disposed) return;
+        setCatalog(answer.models);
+        setUnavailable(answer.unavailable ?? []);
+        setCatalogRead(true);
       })
       .catch(() => undefined);
   };
@@ -107,9 +134,11 @@ export function WorkflowsCanvas(props: {
         if (shown.ends.has(end)) continue;
         shown.ends.add(end);
         const model = workflow.graph.nodes.find((node) => node.id === step.nodeId)?.fields.model;
-        if (typeof model === "string" && workflowCatalogProvider(model)) ended = true;
+        if (typeof model === "string" && workflowCatalogSource(model)) ended = true;
       }
-      if (ended) noteMediaStepEnded();
+      if (!ended) return;
+      noteMediaStepEnded();
+      if (openbot()) readCreditBalance();
     },
   );
   window.addEventListener("focus", readMediaProviders);
@@ -145,7 +174,7 @@ export function WorkflowsCanvas(props: {
     get imageModels() {
       if (!props.host.mediaSupported()) return [];
       const fixed = WORKFLOW_MEDIA_MODELS.flatMap((model) => {
-        if (model.provider === "sunra" || model.provider === "higgsfield") return [];
+        if (model.provider === "sunra" || model.provider === "higgsfield" || model.provider === "openbot") return [];
         if (providerTurnedOff(props.status, model.provider)) return [];
         const status = providerAvailability(props.status, props.models, model.provider, currentText().t);
         if (status.state !== "available") return [];
@@ -171,16 +200,42 @@ export function WorkflowsCanvas(props: {
           ...(accounts ? { accounts } : {}),
         }));
       };
-      return [...fixed, ...service("sunra", sunra()), ...service("higgsfield", higgsfield())];
+      const credit = openbot()
+        ? catalog()
+            .filter((entry) => entry.provider === "openbot")
+            .flatMap((entry) => workflowCatalogMediaModel(entry) ?? [])
+        : [];
+      return [...credit, ...fixed, ...service("sunra", sunra()), ...service("higgsfield", higgsfield())];
+    },
+    get imageModelsReady() {
+      return !props.host.mediaSupported() || (providersRead() && catalogRead());
+    },
+    get unavailableModels() {
+      if (!props.host.mediaSupported()) return [];
+      const hidden = openbot()
+        ? []
+        : catalog()
+            .filter((entry) => entry.provider === "openbot")
+            .map(({ id, name, kinds }) => ({ id, name, kinds }));
+      return [...unavailable(), ...hidden];
     },
     get mediaPrice() {
       return props.host.mediaSupported() ? props.host.workflows.mediaPrice : undefined;
+    },
+    get creditBalance() {
+      return openbot() ? creditBalance() : null;
     },
     get mediaSize() {
       return props.host.mediaSizeSupported();
     },
     get agentFiles() {
       return props.host.agentFilesSupported();
+    },
+    get preference() {
+      return props.preference;
+    },
+    get answers() {
+      return props.host.answersSupported();
     },
     get stepSettings() {
       return props.host.stepSettingsSupported() ? props.host.workflows.stepSettings : undefined;
@@ -206,6 +261,9 @@ export function WorkflowsCanvas(props: {
     get upload() {
       return props.host.mediaSupported() ? workflows.uploadPicture : undefined;
     },
+    get download() {
+      return props.host.mediaSupported() ? workflows.downloadMedia : undefined;
+    },
     get self() {
       return props.self;
     },
@@ -217,7 +275,7 @@ export function WorkflowsCanvas(props: {
     const slack = props.admin && workflows.slack().length > 0;
     const outputs = [
       ...WORKFLOW_FEATURES_V1.outputs.filter((output) => output !== "channel" || workflows.places().length > 0),
-      ...(workflows.channels().length > 0 ? (["chat-channel"] as const) : []),
+      ...(props.admin && workflows.channels().length > 0 ? (["chat-channel"] as const) : []),
     ];
     const added = [
       ...(github ? (["github"] as const) : []),
@@ -232,10 +290,20 @@ export function WorkflowsCanvas(props: {
       uploads: media,
       triggers: [...WORKFLOW_FEATURES_V1.triggers, ...added],
       outputs: [...outputs, ...added],
+      format: workflows.detail()?.hostFormat ?? WORKFLOW_FEATURES_V1.format,
     };
   });
   return (
-    <Show when={workflows.detail()}>
+    <Show
+      when={workflows.detail()}
+      fallback={
+        <main class="window-page workflows-notice">
+          <Show when={!workflows.failed()}>
+            <Spinner size="lg" label={t("workflow.canvas.opening")} />
+          </Show>
+        </main>
+      }
+    >
       {(workflow) => (
         <WorkflowCanvas
           workflow={workflow()}
@@ -243,6 +311,7 @@ export function WorkflowsCanvas(props: {
           catalogs={catalogs}
           github={workflows.github}
           frame="window"
+          server={props.serverId}
           readOnly={workflows.readOnly()}
           agentProgress={props.agentProgress}
           {...workflows.props}

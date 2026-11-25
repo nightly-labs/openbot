@@ -308,6 +308,9 @@ export const messages = {
   "mobile.settings.conversations.fullQualityPhotos": "Wysyłaj zdjęcia w pełnej jakości",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Gdy to jest wyłączone, aplikacja wysyła mniejszą kopię każdego zdjęcia, do 2048 pikseli na dłuższym boku. Dociera szybciej przy wolnym połączeniu. Włącz, aby wysyłać oryginalne zdjęcie.",
+  "mobile.settings.conversations.fullScreenCamera": "Używaj aparatu na pełnym ekranie",
+  "mobile.settings.conversations.fullScreenCameraFooter":
+    "Gdy ta opcja jest włączona, Aparat otwiera aparat systemowy z zoomem i wszystkimi obiektywami. Gdy jest wyłączona, w czacie otwiera się mały aparat.",
   "mobile.settings.profile.nameUnsafe": "Usuń z imienia podziały wierszy i znaki sterujące.",
   "mobile.settings.profile.nameLength": "Wyświetlana nazwa musi mieć 3–20 znaków.",
   "mobile.settings.profile.saveFailed": "Nie udało się zapisać zmian. Spróbuj ponownie.",
@@ -484,6 +487,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "Serwery",
   "mobile.settings.voice.gptLive.serversFooter":
     "Dotknij serwera, który wymaga logowania, aby połączyć Codex z kontem ChatGPT. Logowanie serwera widzi tylko właściciel lub administrator.",
+  "mobile.settings.voice.gptLive.account": "Konto głosu na żywo GPT",
   "mobile.settings.voice.gptLive.status.ready": "Gotowe",
   "mobile.settings.voice.gptLive.status.supported": "Obsługiwane",
   "mobile.settings.voice.gptLive.status.offline": "Offline",

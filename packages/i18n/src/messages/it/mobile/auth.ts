@@ -31,7 +31,7 @@ export const messages = {
   "mobile.auth.signIn.helpTitle": "Dov'è il codice QR?",
   "mobile.auth.signIn.helpStep1": "1. Apri OpenBot sul tuo computer.",
   "mobile.auth.signIn.helpStep2": "2. Vai in Impostazioni → Mobile Connect.",
-  "mobile.auth.signIn.helpStep3": "3. Scegli «Genera codice QR», poi scansionalo qui.",
+  "mobile.auth.signIn.helpStep3": "3. Scegli «Aggiungi telefono» → «Sì, accedi», poi scansiona il codice qui.",
   "mobile.auth.signIn.emailButton": "Continua con l'email",
   "mobile.auth.done.title": "Connesso",
   "mobile.auth.done.body": "Hai effettuato l'accesso.",

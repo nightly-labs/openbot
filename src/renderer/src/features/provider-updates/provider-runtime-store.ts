@@ -49,6 +49,9 @@ const DOWNLOAD_FAILURE_CODES: Readonly<Record<string, string>> = {
   "error.provider.installRecordMismatch": "checksum_failed",
   "error.provider.unexpectedVersion": "version_mismatch",
   "error.provider.cpuUnsupported": "cpu_unsupported",
+  "error.provider.largeMemoryPages": "large_memory_pages",
+  "error.provider.ipv6Missing": "ipv6_missing",
+  "error.provider.windowsBlocked": "windows_blocked",
   "error.provider.cliUpdateFailed": "cli_update_failed",
   "error.provider.cliActivateFailed": "cli_activate_failed",
   "error.provider.cliNewVersionNotStarted": "cli_activate_failed",
@@ -70,7 +73,7 @@ export function hostConnection(server: ServerSummary | undefined): number | unde
 }
 
 export interface ProviderCliOwners {
-  systemCliVersion?: (provider: AgentProviderId) => string | null;
+  systemCliVersion?: (provider: AgentProviderId, runtime: ProviderRuntimeStatus) => string | null;
   isLocalServer?: () => boolean;
   managesRuntimes?: () => boolean;
   hostConnection?: () => number | undefined;
@@ -93,7 +96,7 @@ export function createProviderRuntimeStore(
   function providerUpdate(provider: AgentProviderId, snapshot = providerRuntimeSnapshot()): ProviderUpdate {
     if (!isManagedRuntimeProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
     const runtime = snapshot.providers[provider];
-    const systemVersion = owners.systemCliVersion?.(provider) ?? null;
+    const systemVersion = owners.systemCliVersion?.(provider, runtime) ?? null;
     const availableVersion = runtime.availableVersion ?? null;
     return {
       provider,
