@@ -59,6 +59,8 @@ export const messages = {
     "이 WhatsApp 번호에 다른 OpenBot도 연결되어 있어 답변이 두 개 올 수 있습니다. 해결하려면 휴대폰의 WhatsApp에서 ‘연결된 기기’를 열고 사용하지 않는 OpenBot을 로그아웃하세요.",
   "status.messaging.whatsappPaused":
     "짧은 시간에 메시지가 너무 많이 와서 OpenBot이 10분 동안 여기서 답변을 멈췄습니다. 이 번호에 다른 OpenBot도 연결되어 있다면 휴대폰의 WhatsApp에서 ‘연결된 기기’를 열고 사용하지 않는 OpenBot을 로그아웃하세요.",
+  "status.messaging.whatsappNotDelivered": "WhatsApp이 이 답변을 받지 않아 상대방에게 전달되지 않았습니다.",
+  "status.messaging.whatsappPartlyDelivered": "WhatsApp이 이 답변의 일부를 받지 않아 상대방에게 일부만 전달되었습니다.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "WhatsApp에서 답변하고 팀에 요청해요",
 } as const satisfies PartialTranslation<typeof source>;
