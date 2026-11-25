@@ -200,7 +200,7 @@ export function createMainWindowController({
     });
   let rendererReloadTimes: number[] = [];
   let firstLoadPending = false;
-  let firstLoadRendererBlocked = false;
+  let firstLoadRendererExits: boolean[] = [];
   let firstRendererStopped = false;
   let rendererStoppedDialogOpen = false;
   let closeConfirmationOpen = false;
@@ -374,7 +374,7 @@ export function createMainWindowController({
     window.webContents.once("destroyed", onRendererGone);
     window.webContents.on("render-process-gone", (_event, details) => {
       logger.warn("The main window renderer stopped.", { reason: details.reason, exitCode: details.exitCode });
-      if (firstLoadPending) firstLoadRendererBlocked = isBlockedSandboxedRenderer(details);
+      if (firstLoadPending) firstLoadRendererExits.push(isBlockedSandboxedRenderer(details));
       const now = Date.now();
       rendererReloadTimes = rendererReloadTimes.filter((time) => now - time < RENDERER_RELOAD_WINDOW_MS);
       if (isQuitting() || window.isDestroyed() || firstLoadPending || !RELOADABLE_RENDERER_EXITS.has(details.reason))
@@ -495,16 +495,20 @@ export function createMainWindowController({
   async function loadRenderer(window: BrowserWindow, options: { restarted?: boolean } = {}): Promise<void> {
     if (options.restarted) return loadRendererOnce(window, options);
     firstLoadPending = true;
-    firstLoadRendererBlocked = false;
+    firstLoadRendererExits = [];
     try {
       for (let attempt = 1; ; attempt += 1) {
         try {
           return await loadRendererOnce(window);
         } catch (error) {
           if (attempt >= FIRST_LOAD_ATTEMPTS || window.isDestroyed() || !isFailedLoad(error)) {
-            throw firstLoadRendererBlocked && isFailedLoad(error)
-              ? new Error(sourceText("error.app.windowBlockedBySecuritySoftware"), { cause: error })
-              : error;
+            if (!isFailedLoad(error) || !firstLoadRendererExits.length || !firstLoadRendererExits.every(Boolean))
+              throw error;
+            logger.warn(
+              "The main window did not load, because its renderer was blocked at each start.",
+              toLogValue(error),
+            );
+            throw new Error(sourceText("error.app.windowBlockedBySecuritySoftware"), { cause: error });
           }
           logger.warn(
             `The main window did not load (attempt ${attempt} of ${FIRST_LOAD_ATTEMPTS}). Loading it again.`,
