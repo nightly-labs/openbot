@@ -544,6 +544,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "ממתין לתשובות",
   "mobile.chat.queue.providerRestart": "ממתין להפעלה מחדש של {provider}",
   "mobile.chat.queue.signIn": "ממתין להתחברות ל-{provider}",
+  "mobile.chat.queue.usageLimit": "הגעת למגבלת השימוש",
+  "mobile.chat.queue.usageLimitResets": "הגעת למגבלת השימוש · מתאפס {time}",
   "mobile.chat.providerSignIn.title": "אין התחברות ל-{provider}",
   "mobile.chat.providerSignIn.action": "התחברות",
   "mobile.chat.providerSignIn.open": "{label}. פתיחת הגדרות הספק",

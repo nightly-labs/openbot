@@ -633,6 +633,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "Ожидание ответов",
   "mobile.chat.queue.providerRestart": "Ожидание перезапуска {provider}",
   "mobile.chat.queue.signIn": "Ожидание входа в {provider}",
+  "mobile.chat.queue.usageLimit": "Лимит использования исчерпан",
+  "mobile.chat.queue.usageLimitResets": "Лимит использования исчерпан · Сброс: {time}",
   "mobile.chat.providerSignIn.title": "Вход в {provider} не выполнен",
   "mobile.chat.providerSignIn.action": "Войти",
   "mobile.chat.providerSignIn.open": "{label}. Открыть настройки провайдера",

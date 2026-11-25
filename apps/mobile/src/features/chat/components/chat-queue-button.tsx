@@ -15,9 +15,10 @@ import { Alert, Pressable, View, type ViewStyle } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCSSVariable } from "uniwind";
+import { PLAN_LIMIT_RESET_FORMAT, planLimitResetDate } from "@/features/servers/model/plan-limits";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
-import { useText } from "@/shared/lib/text";
+import { type MobileText, useText } from "@/shared/lib/text";
 import { lineDirectionStyle, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import type { QueuedUpload } from "../context/queued-messages-context";
 import { queuedMessageLocks, queuedMessagePreview } from "../model/queued-message-view";
@@ -114,7 +115,8 @@ function ChatQueueCard({
   liquidGlassAvailable,
   fallbackBackground,
 }: ChatQueueCardProps) {
-  const { t } = useText();
+  const text = useText();
+  const { t } = text;
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
   const muted = String(useThemeColor("muted"));
@@ -128,7 +130,9 @@ function ChatQueueCard({
     ? t("mobile.chat.queue.providerRestart", { provider: providerDisplayName(queue.restartingProvider) })
     : queue.signInProvider
       ? t("mobile.chat.queue.signIn", { provider: providerDisplayName(queue.signInProvider) })
-      : null;
+      : queue.usageLimit
+        ? usageLimitLabel(queue.usageLimit, text)
+        : null;
   const more = rest > 0 || waiting || holdLabel !== null;
   const moreLabel =
     holdLabel ??
@@ -271,6 +275,13 @@ function ChatQueueCard({
       </Animated.View>
     </View>
   );
+}
+
+function usageLimitLabel(limit: { resetsAt: number | null }, { t, format }: MobileText): string {
+  const date = planLimitResetDate(limit);
+  return date
+    ? t("mobile.chat.queue.usageLimitResets", { time: format.date(date, PLAN_LIMIT_RESET_FORMAT) })
+    : t("mobile.chat.queue.usageLimit");
 }
 
 function CardAction({

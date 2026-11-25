@@ -77,6 +77,14 @@ export function useChatQueue(
     refetchOnMount: "always",
     retry: false,
   });
+  const canReadUsageLimits = useMobileWorkspaceSelector((current) => current.canReadAgentUsageLimits(serverId));
+  const usageLimits = useQuery({
+    queryKey: queryKeys.agentUsageLimits(queryScope, serverId),
+    queryFn: () => workspace().loadAgentUsageLimits(serverId),
+    enabled: online && canReadUsageLimits && (query.data?.deliveries.length ?? 0) > 0,
+    retry: false,
+  });
+  const usageLimit = usageLimits.data?.usageLimits.find((limit) => limit.agentId === agentId) ?? null;
   const [error, setError] = useState<string | null>(null);
   const activeTurnRef = useRef(activeTurnId);
   activeTurnRef.current = activeTurnId;
@@ -367,6 +375,7 @@ export function useChatQueue(
       deliveries: query.data?.deliveries ?? EMPTY_DELIVERIES,
       restartingProvider: query.data?.hold?.reason === "provider-restart" ? query.data.hold.provider : null,
       signInProvider: query.data?.hold?.reason === "sign-in" ? query.data.hold.provider : null,
+      usageLimit,
       edit,
       confirmed,
       busy,
@@ -464,6 +473,7 @@ export function useChatQueue(
       hideReplies,
       editUnavailable,
       query.data,
+      usageLimit,
       edit,
       confirmed,
       busy,

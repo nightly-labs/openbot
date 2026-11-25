@@ -545,6 +545,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "Yanıtlar bekleniyor",
   "mobile.chat.queue.providerRestart": "{provider} yeniden başlatılması bekleniyor",
   "mobile.chat.queue.signIn": "{provider} oturumu bekleniyor",
+  "mobile.chat.queue.usageLimit": "Kullanım sınırına ulaşıldı",
+  "mobile.chat.queue.usageLimitResets": "Kullanım sınırına ulaşıldı · {time} tarihinde sıfırlanır",
   "mobile.chat.providerSignIn.title": "{provider} oturumu açık değil",
   "mobile.chat.providerSignIn.action": "Oturum aç",
   "mobile.chat.providerSignIn.open": "{label}. Sağlayıcı ayarlarını aç",

@@ -59,6 +59,9 @@ export function syncEventQueries(
     void applyMobileQueueEvent(queryClient, serverId, event);
   }
   applyTaskEvent(queryClient, scope, serverId, event);
+  if (event.type === "runtime-snapshot") {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.agentUsageLimits(scope, serverId) });
+  }
   if (event.type === "usage-changed") {
     queryClient.setQueryData<PlanLimits>(queryKeys.planLimits(scope, serverId), (current) =>
       current ? { ...current, usage: withUsageEvent(current.usage, event.usage) } : current,

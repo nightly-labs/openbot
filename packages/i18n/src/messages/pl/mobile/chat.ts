@@ -636,6 +636,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "Oczekiwanie na odpowiedzi",
   "mobile.chat.queue.providerRestart": "Oczekiwanie na ponowne uruchomienie {provider}",
   "mobile.chat.queue.signIn": "Oczekiwanie na zalogowanie do {provider}",
+  "mobile.chat.queue.usageLimit": "Osiągnięto limit użycia",
+  "mobile.chat.queue.usageLimitResets": "Osiągnięto limit użycia · Reset {time}",
   "mobile.chat.providerSignIn.title": "{provider} nie jest zalogowany",
   "mobile.chat.providerSignIn.action": "Zaloguj się",
   "mobile.chat.providerSignIn.open": "{label}. Otwórz ustawienia dostawcy",

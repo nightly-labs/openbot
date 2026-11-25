@@ -515,6 +515,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "Wachten op antwoorden",
   "mobile.chat.queue.providerRestart": "Wachten tot {provider} herstart",
   "mobile.chat.queue.signIn": "Wacht op aanmelding bij {provider}",
+  "mobile.chat.queue.usageLimit": "Gebruikslimiet bereikt",
+  "mobile.chat.queue.usageLimitResets": "Gebruikslimiet bereikt · Reset op {time}",
   "mobile.chat.providerSignIn.title": "{provider} is niet aangemeld",
   "mobile.chat.providerSignIn.action": "Aanmelden",
   "mobile.chat.providerSignIn.open": "{label}. Providerinstellingen openen",

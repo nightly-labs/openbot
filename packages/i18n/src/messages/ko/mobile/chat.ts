@@ -536,6 +536,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "답변 대기 중",
   "mobile.chat.queue.providerRestart": "{provider} 재시작을 기다리는 중",
   "mobile.chat.queue.signIn": "{provider} 로그인을 기다리는 중",
+  "mobile.chat.queue.usageLimit": "사용 한도에 도달했어요",
+  "mobile.chat.queue.usageLimitResets": "사용 한도에 도달했어요 · {time} 초기화",
   "mobile.chat.providerSignIn.title": "{provider}에 로그인되어 있지 않습니다",
   "mobile.chat.providerSignIn.action": "로그인",
   "mobile.chat.providerSignIn.open": "{label}. 제공자 설정 열기",
