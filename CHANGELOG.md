@@ -730,6 +730,14 @@ All notable changes to OpenBot will be documented here. The project follows
 - A new API key that you save for a provider is used in your next message, also when the provider could not
   start again at once after the save. Before, the provider kept the previous key for up to 10 minutes, and each
   message failed with an error that said that your saved key was refused.
+- A busy server with many routines no longer stops for seconds at a time. Before, each finished
+  turn read 7 days of routine runs, and each message update wrote all the duplicate-send keys again
+  and read the full chat of each agent again. Chats, prompts and connected apps were slow to respond.
+- The usage report is about 40% faster, and it now runs in a separate thread. While it loads,
+  chats, prompts and connected apps keep working. While the usage page or the profile activity is
+  open, the report reloads at most once in 15 seconds, not after each finished turn.
+- When you take over a browser tab of a server and its page has stopped answering, OpenBot now loads the page again and shows it. Before, the takeover window stayed on "Connecting to the page on the server…" and you could not sign in. The server must also be on this version.
+- On Windows, the agent dock and the Dynamic Island now come back above other apps when Windows puts them behind normal windows, for example after Show desktop (Win+D). Before, they stayed behind other apps and showed only on the desktop until OpenBot restarted.
 
 ## [0.78.0] - 2026-11-24
 
