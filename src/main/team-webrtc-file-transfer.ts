@@ -13,6 +13,7 @@ import {
   encodeTeamProtocolV2Frame,
   TEAM_PROTOCOL_V2_MAX_FILE_BYTES,
   TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES,
+  type TeamProtocolV2FileControlFrame,
 } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Result, Semaphore } from "effect";
@@ -27,6 +28,7 @@ const TRANSFER_RESUME_MILLISECONDS = 10 * 60_000;
 const STOPPED_WATCH_MILLISECONDS = 60_000;
 
 type BridgeEvents = TeamWebRtcBridge extends EventEmitter<infer Events> ? Events : never;
+type FileOpenFrame = Extract<TeamProtocolV2FileControlFrame, { type: "file-open" }>;
 type FileTransferBridge = Pick<EventEmitter<BridgeEvents>, "on" | "off"> &
   Pick<TeamWebRtcBridge, "send" | "disconnectPeer">;
 
@@ -94,6 +96,7 @@ export class TeamWebRtcFileTransfer {
   readonly #outgoing = new Map<string, OutgoingTransfer>();
   readonly #writing = new Set<{ peerId: string; size: number }>();
   readonly #completed = new Map<string, ReceivedWebRtcFile>();
+  readonly #waitingOpens = new Map<string, { peerId: string; frame: FileOpenFrame }>();
   readonly #watches = new Set<IncomingWatch>();
   readonly #expirationTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #waiters = new Map<
@@ -131,7 +134,7 @@ export class TeamWebRtcFileTransfer {
   }
 
   hasActiveTransfers(): boolean {
-    return this.#incoming.size > 0 || this.#outgoing.size > 0 || this.#writing.size > 0;
+    return this.#incoming.size > 0 || this.#outgoing.size > 0 || this.#writing.size > 0 || this.#waitingOpens.size > 0;
   }
 
   readonly send = Effect.fn("TeamFileTransfer.send")(function* (
@@ -382,6 +385,7 @@ export class TeamWebRtcFileTransfer {
             const key = transferKey(peerId, transferId);
             this.#clearExpiration(key);
             this.#completed.delete(key);
+            this.#admitWaitingOpensLater();
             yield* remoteCall(() => rm(file.path, { force: true }));
           }),
         );
@@ -409,6 +413,7 @@ export class TeamWebRtcFileTransfer {
       waiter.reject(new Error(sourceText("error.remote.fileTransportStopped")));
     }
     this.#waiters.clear();
+    this.#waitingOpens.clear();
     this.#notifyStateChange();
     this.#bridge.off("data", this.#onData);
     this.#bridge.off("disconnected", this.#onDisconnected);
@@ -488,6 +493,11 @@ export class TeamWebRtcFileTransfer {
           );
           return;
         }
+        if (this.#waitingOpens.has(key)) {
+          this.#waitingOpens.set(key, { peerId, frame });
+          this.#scheduleExpiration(key);
+          return;
+        }
         const watch = [...this.#watches].find(
           (item) => item.peerId === peerId && item.transferId === null && item.size === frame.size,
         );
@@ -495,43 +505,17 @@ export class TeamWebRtcFileTransfer {
           this.#watches.delete(watch);
           return yield* this.#refuse(peerId, frame.transferId, new Error(sourceText("error.remote.downloadStopped")));
         }
-        const activeBytes = [...this.#incoming.values(), ...this.#completed.values()]
-          .filter((item) => item.peerId === peerId)
-          .reduce((sum, item) => sum + item.size, 0);
-        if (activeBytes + frame.size > TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES)
-          return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.fileSetTooLarge")) });
-        yield* remoteCall(() => mkdir(this.#directory, { recursive: true, mode: 0o700 }));
-        const path = join(this.#directory, `${frame.transferId}.part`);
-        const file = yield* remoteCall(() => open(path, "w", 0o600));
-        recordRestartActivity();
-        this.#incoming.set(key, {
-          peerId,
-          transferId: frame.transferId,
-          name: frame.name,
-          mimeType: frame.mimeType,
-          size: frame.size,
-          sha256: frame.sha256,
-          path,
-          file,
-          received: 0,
-          lastAcknowledged: 0,
-        });
-        this.#scheduleExpiration(key);
         if (watch) {
           watch.transferId = frame.transferId;
           watch.taken.push(frame.transferId);
           watch.onProgress(0, frame.size);
         }
-        yield* this.#bridge.send(
-          peerId,
-          "files",
-          encodeTeamProtocolV2Frame({
-            version: 2,
-            type: "file-ack",
-            transferId: frame.transferId,
-            receivedThrough: 0,
-          }),
-        );
+        if (!this.#hasIncomingRoom(peerId, frame.size)) {
+          this.#waitingOpens.set(key, { peerId, frame });
+          this.#scheduleExpiration(key);
+          return;
+        }
+        yield* this.#startIncoming(peerId, frame);
       } else if (frame.type === "file-ack") {
         const outgoing = this.#outgoing.get(key);
         if (!outgoing || frame.receivedThrough < outgoing.acknowledged || frame.receivedThrough > outgoing.size) return;
@@ -626,12 +610,69 @@ export class TeamWebRtcFileTransfer {
     }
   });
 
+  #hasIncomingRoom(peerId: string, size: number): boolean {
+    const activeBytes = [...this.#incoming.values(), ...this.#completed.values()]
+      .filter((item) => item.peerId === peerId)
+      .reduce((sum, item) => sum + item.size, 0);
+    return activeBytes + size <= TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES;
+  }
+
+  readonly #startIncoming = Effect.fn("TeamFileTransfer.startIncoming")(function* (
+    this: TeamWebRtcFileTransfer,
+    peerId: string,
+    frame: FileOpenFrame,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
+    const key = transferKey(peerId, frame.transferId);
+    yield* remoteCall(() => mkdir(this.#directory, { recursive: true, mode: 0o700 }));
+    const path = join(this.#directory, `${frame.transferId}.part`);
+    const file = yield* remoteCall(() => open(path, "w", 0o600));
+    recordRestartActivity();
+    this.#incoming.set(key, {
+      peerId,
+      transferId: frame.transferId,
+      name: frame.name,
+      mimeType: frame.mimeType,
+      size: frame.size,
+      sha256: frame.sha256,
+      path,
+      file,
+      received: 0,
+      lastAcknowledged: 0,
+    });
+    this.#scheduleExpiration(key);
+    yield* this.#bridge.send(
+      peerId,
+      "files",
+      encodeTeamProtocolV2Frame({ version: 2, type: "file-ack", transferId: frame.transferId, receivedThrough: 0 }),
+    );
+  });
+
+  #admitWaitingOpensLater(): void {
+    if (this.#waitingOpens.size === 0 || this.#stopped) return;
+    void Effect.runPromise(this.#owned(this.#frames.withPermit(this.#admitWaitingOpens()))).catch(() => undefined);
+  }
+
+  readonly #admitWaitingOpens = Effect.fn("TeamFileTransfer.admitWaitingOpens")(function* (
+    this: TeamWebRtcFileTransfer,
+  ) {
+    for (const [key, { peerId, frame }] of this.#waitingOpens) {
+      if (this.#stopped) return;
+      if (!this.#hasIncomingRoom(peerId, frame.size)) continue;
+      this.#waitingOpens.delete(key);
+      yield* this.#startIncoming(peerId, frame).pipe(
+        Effect.catch((error) => this.#failFrame(peerId, frame.transferId, error.cause)),
+        Effect.catch(() => Effect.void),
+      );
+    }
+  });
+
   readonly #cancelEffect = Effect.fn("TeamFileTransfer.cancel")(function* (
     this: TeamWebRtcFileTransfer,
     key: string,
     error: Error,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
     this.#clearExpiration(key);
+    this.#waitingOpens.delete(key);
     const transfer = this.#incoming.get(key);
     if (transfer) {
       this.#incoming.delete(key);
@@ -649,6 +690,7 @@ export class TeamWebRtcFileTransfer {
       this.#waiters.delete(key);
       waiter.reject(error);
     }
+    this.#admitWaitingOpensLater();
   });
 
   readonly #refuse = Effect.fn("TeamFileTransfer.refuse")(function* (
@@ -836,6 +878,7 @@ export class TeamWebRtcFileTransfer {
     key: string,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
     const error = new Error(sourceText("error.remote.fileResumeExpired"));
+    this.#waitingOpens.delete(key);
     const transfer = this.#incoming.get(key);
     if (transfer) {
       this.#incoming.delete(key);
@@ -853,6 +896,7 @@ export class TeamWebRtcFileTransfer {
       this.#waiters.delete(key);
       waiter.reject(error);
     }
+    this.#admitWaitingOpensLater();
   });
 }
 
