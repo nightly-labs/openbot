@@ -63,6 +63,9 @@ export const messages = {
   "error.backend.browserSignInReadFailed": "O OpenBot não conseguiu ler o login da janela.",
   "error.backend.browserStopUnsupported":
     "Este computador anfitrião remoto não consegue parar o carregamento de uma página.",
+  "error.backend.browserLocationFailed": "Não foi possível definir a localização da página.",
+  "error.backend.browserPermissionsUnsupported": "Este host remoto não pode responder a pedidos de localização.",
+  "error.backend.browserLocationRequired": "Envie a localização do dispositivo para permitir o pedido.",
   "error.backend.sharedDataLocalOnly":
     "Os dados compartilhados são gerenciados no computador que executa estes agentes.",
   "error.backend.browserUrlProtocol": "Somente URLs HTTP(S) são permitidas no navegador.",

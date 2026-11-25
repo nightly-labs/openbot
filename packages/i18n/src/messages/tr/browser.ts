@@ -246,4 +246,11 @@ export const messages = {
   },
   "browser.proxies.changeTitle": "{name} profilinin proxy'si değiştirilsin mi?",
   "browser.proxies.change": "Proxy'yi değiştir",
+  "browser.location.title": "{site} konumunuzu öğrenmek istiyor",
+  "browser.location.description": "Yalnızca güvendiğiniz sitelere izin verin.",
+  "browser.location.block": "Engelle",
+  "browser.location.allow": "İzin ver",
+  "browser.location.allowAlways": "Her zaman izin ver",
+  "browser.location.unavailable": "Bu cihazın konumu alınamadı.",
+  "browser.location.answerFailed": "Konum isteği yanıtlanamadı.",
 } as const satisfies PartialTranslation<typeof source>;

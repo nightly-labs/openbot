@@ -16,6 +16,7 @@ import {
   ownsBrowserTab,
   browserControlForTab as sharedBrowserControlForTab,
 } from "../../browser/browser-window-model";
+import { answerLocationRequest } from "../../browser/device-location";
 import { serverSupportsCapability } from "../../servers/server-capabilities";
 import { conversationPort } from "../conversation-port";
 import { conversationRuntime } from "../conversation-runtime";
@@ -606,6 +607,29 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     }
   }
 
+  const [permissionAnswerPending, setPermissionAnswerPending] = createSignal(false);
+
+  async function answerBrowserPermission(tabId: string, requestId: string, allow: boolean, always = false) {
+    if (!browserInteractionAvailable() || permissionAnswerPending()) return;
+    const agentId = deps.props.agent?.id;
+    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
+    const browser = conversationRuntime(deps.props).browser;
+    setPermissionAnswerPending(true);
+    try {
+      const result = await answerLocationRequest(browser, deps.props.server?.kind === "remote", {
+        tabId,
+        requestId,
+        allow,
+        ...(allow && always ? { always: true } : {}),
+      });
+      if (result === "unavailable") deps.setComposerError(currentText().t("browser.location.unavailable"), target);
+    } catch (error) {
+      deps.setComposerError(currentText().t("browser.location.answerFailed"), target, error);
+    } finally {
+      setPermissionAnswerPending(false);
+    }
+  }
+
   async function stopBrowserTab(tabId: string) {
     if (
       !browserInteractionAvailable() ||
@@ -846,6 +870,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     browserTabOwner,
     reloadBrowserTab,
     stopBrowserTab,
+    answerBrowserPermission,
+    permissionAnswerPending,
     navigateBrowserTab,
     takeBrowserControl,
     releaseBrowserControl,

@@ -249,4 +249,11 @@ export const messages = defineMessages("browser", {
   },
   "browser.proxies.changeTitle": "Change the proxy of {name}?",
   "browser.proxies.change": "Change proxy",
+  "browser.location.title": "{site} wants to know your location",
+  "browser.location.description": "Allow only for sites that you trust.",
+  "browser.location.block": "Block",
+  "browser.location.allow": "Allow",
+  "browser.location.allowAlways": "Allow always",
+  "browser.location.unavailable": "Could not get the location of this device.",
+  "browser.location.answerFailed": "Could not answer the location request.",
 });

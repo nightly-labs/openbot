@@ -657,6 +657,32 @@ again, because a reload could send a form again or lose the work of the person.
 `bun run test:browser-steps` covers the crash, the settle wait and the bot check, and writes
 `.openbot-build/browser-steps-e2e/report.json`.
 
+### Location requests
+
+A page that asks for the location (`geolocation`) waits for a person. `BrowserLocationRequests`
+(`src/backend/browser-location.ts`) keeps one pending request for each tab, and `BrowserTab`
+carries it as `permissionRequest` (`{ id, origin, permission: "geolocation" }`). The chat of the
+agent that owns the tab, and the phone (browser screen and chat), show "<site> wants to know your
+location" with Block, Allow always and Allow. The browser panel and the detached browser window do not show it, and
+the web client does not show it. A tab that no agent or thread owns gets Block at once, because no
+chat can show its request. The answer holds for the tab while it stays on the same origin. A load of another origin, a
+close or a sleep of the tab blocks the pending request and forgets the answer. A secret tab, a
+private session tab, a closing tab and a page that is not `http` or `https` get Block at once. A tab
+with a pending request does not sleep.
+
+Allow always also grants the origin in every other tab that an agent or thread owns, and answers the
+pending requests of that origin in the other tabs. The host keeps these origins in memory only, so a
+restart of the app or the server forgets them. A remote Allow always also keeps the location of the
+member's device for the origin, and the host sets that location on each tab that the origin asks from.
+
+An answer from the computer that runs the browser lets Chromium read the location of that computer.
+An answer from a joined server (desktop or phone) sends the location of the member's
+device. The host sets it on the tab with `Emulation.setGeolocationOverride` before it grants the
+request, and keeps the debugger attached while the override is set. If the debugger detaches, the
+host attaches again and sets the override again. A load of another origin clears the override. A
+remote Allow without a location gets HTTP 400, so a page on a server never gets the location of the
+server. If the host cannot set the override, the request gets Block.
+
 ### Page dialogs
 
 A page `alert` or `confirm` that an agent action opens goes to that agent. An `alert` that the page

@@ -60,6 +60,9 @@ export const messages = {
     "OpenBot konnte die Seite im Anmeldefenster nicht laden. Prüfe die Internetverbindung und öffne das Anmeldefenster dann erneut.",
   "error.backend.browserSignInReadFailed": "OpenBot konnte die Anmeldung im Fenster nicht lesen.",
   "error.backend.browserStopUnsupported": "Dieser entfernte Host kann das Laden einer Seite nicht stoppen.",
+  "error.backend.browserLocationFailed": "Der Standort für die Seite konnte nicht festgelegt werden.",
+  "error.backend.browserPermissionsUnsupported": "Dieser entfernte Host kann Standortanfragen nicht beantworten.",
+  "error.backend.browserLocationRequired": "Sende den Gerätestandort, um die Anfrage zu erlauben.",
   "error.backend.sharedDataLocalOnly":
     "Geteilte Daten werden auf dem Computer verwaltet, auf dem diese Agenten laufen.",
   "error.backend.browserUrlProtocol": "Im Browser sind nur HTTP(S)-URLs erlaubt.",

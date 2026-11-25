@@ -84,4 +84,11 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Devolver el control",
   "mobile.browser.help.handBack.body":
     "Cuando un agente te pida que tomes el control, elige «He terminado» en el menú ···. Después, el agente continúa en esta pestaña.",
+  "mobile.browser.location.title": "{site} quiere saber tu ubicación",
+  "mobile.browser.location.description": "Permítelo solo en sitios de confianza.",
+  "mobile.browser.location.block": "Bloquear",
+  "mobile.browser.location.allow": "Permitir",
+  "mobile.browser.location.allowAlways": "Permitir siempre",
+  "mobile.browser.location.unavailable": "No se pudo obtener la ubicación de este dispositivo.",
+  "mobile.browser.location.answerFailed": "No se pudo responder a la solicitud de ubicación.",
 } as const satisfies PartialTranslation<typeof source>;

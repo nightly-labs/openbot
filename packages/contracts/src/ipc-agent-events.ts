@@ -166,6 +166,10 @@ export type AgentEvent =
       tabs: { tabId: string; canGoBack: boolean; canGoForward: boolean }[];
     }
   | {
+      type: "browser-permissions-changed";
+      requests: { tabId: string; id: string; origin: string; permission: "geolocation" }[];
+    }
+  | {
       type: "error";
       agentId?: string;
       code: string;
@@ -370,6 +374,18 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         value.tabs.every(
           (tab) =>
             isDynamicRecord(tab) && isString(tab.tabId) && isBoolean(tab.canGoBack) && isBoolean(tab.canGoForward),
+        )
+      );
+    case "browser-permissions-changed":
+      return (
+        Array.isArray(value.requests) &&
+        value.requests.every(
+          (request) =>
+            isDynamicRecord(request) &&
+            isString(request.tabId) &&
+            isString(request.id) &&
+            isString(request.origin) &&
+            request.permission === "geolocation",
         )
       );
     case "error":

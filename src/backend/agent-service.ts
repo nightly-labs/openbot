@@ -1291,6 +1291,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     let userControlTabIds = "";
     let browserPageStates = "";
+    let browserPermissions = "[]";
     this.#browser.onChanged((tabs, activeTabId) => {
       this.#attention.cancelTakeoversForMissingTabs(tabs);
       Effect.runFork(this.#browserUploads.retainTabs(tabs).pipe(Effect.forkIn(this.#scope)));
@@ -1304,6 +1305,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (pageStateKey !== browserPageStates) {
         browserPageStates = pageStateKey;
         this.#emit({ type: "browser-page-state-changed", tabs: pageStates });
+      }
+      const permissionRequests = tabs.flatMap((tab) =>
+        tab.permissionRequest ? [{ tabId: tab.id, ...tab.permissionRequest }] : [],
+      );
+      const permissionKey = JSON.stringify(permissionRequests);
+      if (permissionKey !== browserPermissions) {
+        browserPermissions = permissionKey;
+        this.#emit({ type: "browser-permissions-changed", requests: permissionRequests });
       }
       const held = tabs.filter((tab) => tab.userControl).map((tab) => tab.id);
       if (held.join("\n") === userControlTabIds) return;

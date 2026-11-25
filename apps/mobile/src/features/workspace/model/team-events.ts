@@ -42,6 +42,8 @@ export function applyBrowserEvent(liveState: LiveWorkspaceStore, serverId: strin
       ...current,
       [serverId]: { tabs, activeTabId: event.activeTabId },
     }));
+  } else if (event.type === "browser-permissions-changed") {
+    liveState.update("browserPermissions", (current) => ({ ...current, [serverId]: event.requests }));
   }
 }
 

@@ -160,6 +160,15 @@ history. The server does not store the location or the typed place in the SQLite
 keeps only that the location was shared or not. The agent's reply, which can name the place, is stored
 like any other message. The phone does not store the location, follow it in the background, or send it
 to the account service or analytics.
+A page in the OpenBot browser can ask for the location. The browser asks the person first, and a page
+gets nothing until the person selects **Allow**. On the computer that runs the browser, Allow lets the
+page read the location of that computer. On a joined server, Allow reads the location of the member's
+own device (latitude, longitude and accuracy) one time and sends it to the server, which gives it to
+that tab only. The page can then send it to its site, as in any browser. The answer holds while the
+tab stays on the same site. **Allow always** holds for that site in all agent tabs until OpenBot or the
+server restarts; on a joined server, the server keeps the location that the member sent in memory for
+that time and gives it to the site again. OpenBot does not store the location or the answer in the SQLite database,
+and does not send it to the account service or analytics.
 Channel history keeps its existing membership and task checks. Messaging history stays within its
 current link. The full conversation stays in local SQLite storage. No history text is sent to the
 account service or analytics by these tools.
