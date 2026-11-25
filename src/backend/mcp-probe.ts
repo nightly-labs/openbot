@@ -36,6 +36,7 @@ import {
   normalizeResource,
   secureOAuthFetch,
 } from "./mcp-oauth-provider";
+import { insufficientScopeChallenge } from "./mcp-oauth-proxy";
 import {
   clearMcpCommandCache,
   type McpShapeFailed,
@@ -129,7 +130,7 @@ export const callMcpServerTool = Effect.fnUntraced(function* (
   args: McpToolArguments,
   tools: McpToolRuntimes,
   oauth?: Pick<McpOAuthAuthority, "accessToken">,
-): Effect.fn.Return<{ result: McpToolCallResult } | { error: string }, McpShapeFailed> {
+): Effect.fn.Return<{ result: McpToolCallResult } | { error: string; refusedScope?: string | null }, McpShapeFailed> {
   const server = yield* usableMcpServer(
     config,
     tools,
@@ -142,12 +143,15 @@ export const callMcpServerTool = Effect.fnUntraced(function* (
   );
   if (server.error !== undefined) return { error: boundedError(server.error) };
   const timeoutMs = probeTimeoutMs(config);
+  const seen: { challenge: McpChallenge | null } = { challenge: null };
   const called = yield* Effect.result(
     Effect.acquireUseRelease(
       Effect.try({
         try: () => ({
           client: new Client({ name: "openbot", version: "1" }, { capabilities: {} }),
-          transport: createTransport(server, null, () => undefined),
+          transport: createTransport(server, null, (challenge) => {
+            seen.challenge = challenge;
+          }),
         }),
         catch: (cause) => new McpProbeFailure({ cause }),
       }),
@@ -168,7 +172,9 @@ export const callMcpServerTool = Effect.fnUntraced(function* (
   );
   if (Result.isSuccess(called)) return { result: called.success };
   const described = describeMcpError(called.failure.cause, config);
-  return { error: boundedError(redactMcpValues(described, probeSecrets(server, null))) };
+  const error = boundedError(redactMcpValues(described, probeSecrets(server, null)));
+  const scope = seen.challenge?.scope;
+  return scope === undefined ? { error } : { error, refusedScope: scope };
 });
 
 interface McpChallenge {
@@ -177,6 +183,7 @@ interface McpChallenge {
   resourceMetadata: boolean;
   keyOnly?: boolean;
   insufficientScope?: boolean;
+  scope?: string | null;
   url: string;
 }
 
@@ -530,12 +537,13 @@ function challengeRecordingFetch(onChallenge: (challenge: McpChallenge) => void)
     if (response.status === 401 || response.status === 403) {
       const challenge = response.headers.get("www-authenticate") ?? "";
       const bearer = /(?:^|,)\s*bearer\b/iu.test(challenge);
-      const insufficientScope =
-        response.status === 403 && bearer && /\berror\s*=\s*"?insufficient_scope\b/iu.test(challenge);
+      const scope = response.status === 403 ? insufficientScopeChallenge(challenge) : undefined;
+      const insufficientScope = scope !== undefined;
       onChallenge({
         status: response.status,
         bearer: (response.status === 401 && bearer) || insufficientScope,
         insufficientScope,
+        ...(scope !== undefined ? { scope } : {}),
         resourceMetadata: /\bresource_metadata\s*=/iu.test(challenge),
         url: response.url || input.toString(),
       });
