@@ -1,4 +1,4 @@
-import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
+import { type ChildProcess, type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { agentProviderName } from "@openbot/contracts/ipc";
@@ -130,7 +130,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   #stallCheck: { timer: ReturnType<typeof setInterval>; at: number } | null = null;
   #threadWork = 0;
   readonly #sandboxWarnings = new Map<string, string>();
-  #linuxSandboxFailure: Fiber.Fiber<string | null> | null = null;
+  #linuxSandboxFailure: Fiber.Fiber<string | null | undefined> | null = null;
   #process: ChildProcessWithoutNullStreams | null = null;
   #ending: Fiber.Fiber<void> | null = null;
   #nextId = 1;
@@ -235,6 +235,9 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       return;
     }
     this.#stopping = true;
+    const sandboxProbe = this.#linuxSandboxFailure;
+    this.#linuxSandboxFailure = null;
+    if (sandboxProbe) yield* Fiber.interrupt(sandboxProbe);
     this.#cancelToolRequests();
     this.#process = null;
     this.#resendOpenTurns();
@@ -549,15 +552,19 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   }
 
   #checkLinuxSandbox(threadId: string, turnId: string, cwd: string): void {
+    const child = this.#process;
+    const turnKey = JSON.stringify([threadId, turnId]);
     this.#linuxSandboxFailure ??= Effect.runFork(
       linuxSandboxFailure(this.#executable, codexEnvironment(this.#extraEnv), cwd),
     );
+    const probe = this.#linuxSandboxFailure;
     Effect.runFork(
-      Fiber.join(this.#linuxSandboxFailure).pipe(
+      Fiber.join(probe).pipe(
         Effect.tap((failure) =>
           Effect.sync(() => {
-            if (failure === null || this.#sandboxWarnings.get(threadId) === turnId) return;
-            this.#warnSandboxUnavailable(threadId, turnId);
+            if (failure === undefined && this.#linuxSandboxFailure === probe) this.#linuxSandboxFailure = null;
+            if (typeof failure !== "string" || this.#process !== child || !this.#liveTurns.has(turnKey)) return;
+            if (this.#sandboxWarnings.get(threadId) !== turnId) this.#warnSandboxUnavailable(threadId, turnId);
           }),
         ),
       ),
@@ -951,23 +958,26 @@ const linuxSandboxFailure = Effect.fn("CodexAppServer.linuxSandboxFailure")(func
   cwd: string,
 ) {
   const target = cliSpawnTarget(executable, ["sandbox", "--", "/bin/true"]);
-  const output = yield* Effect.callback<string>((resume) => {
-    const child = spawn(target.command, target.args, {
-      stdio: ["ignore", "ignore", "pipe"],
-      env,
-      cwd,
-      windowsHide: true,
-    });
+  const output = yield* Effect.callback<string | undefined>((resume) => {
+    let child: ChildProcess;
+    try {
+      child = spawn(target.command, target.args, { stdio: ["ignore", "ignore", "pipe"], env, cwd, windowsHide: true });
+    } catch {
+      resume(Effect.succeed(undefined));
+      return;
+    }
+    registerProviderProcess(child, "codex");
     let stderr = "";
-    child.stderr.on("data", (chunk: Buffer) => {
+    child.stderr?.on("data", (chunk: Buffer) => {
       if (stderr.length < LINUX_SANDBOX_PROBE_OUTPUT_LIMIT) stderr += chunk.toString("utf8");
     });
-    child.once("error", () => resume(Effect.succeed("")));
+    child.once("error", () => resume(Effect.succeed(undefined)));
     child.once("close", () => resume(Effect.succeed(stderr)));
     return Effect.sync(() => {
       if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
     });
-  }).pipe(Effect.timeoutOrElse({ duration: LINUX_SANDBOX_PROBE_TIMEOUT_MS, orElse: () => Effect.succeed("") }));
+  }).pipe(Effect.timeoutOrElse({ duration: LINUX_SANDBOX_PROBE_TIMEOUT_MS, orElse: () => Effect.succeed(undefined) }));
+  if (output === undefined) return undefined;
   const failure = output.split("\n").find((line) => LINUX_SANDBOX_FAILURE.test(line)) ?? null;
   if (failure !== null) logger.warn("The Codex sandbox cannot start on this computer.", { detail: failure.trim() });
   return failure;
