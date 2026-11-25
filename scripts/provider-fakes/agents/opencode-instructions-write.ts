@@ -11,6 +11,7 @@ const plan = JSON.parse(readFileSync(process.env.FAKE_PLAN ?? "", "utf8"));
 const outsideEdit = isDynamicRecord(plan) && typeof plan.outsideEdit === "string" ? plan.outsideEdit : null;
 const shellWrite = isDynamicRecord(plan) && typeof plan.shellWrite === "string" ? plan.shellWrite : null;
 const failedEdit = isDynamicRecord(plan) && plan.failedEdit === true;
+const shellRead = isDynamicRecord(plan) && plan.shellRead === true;
 const writes =
   isDynamicRecord(plan) && Array.isArray(plan.writes)
     ? plan.writes.filter((value): value is string => typeof value === "string")
@@ -100,6 +101,20 @@ async function failEdit(peer: AcpPeer, sessionId: string, file: string) {
   peer.update(sessionId, { sessionUpdate: "tool_call_update", toolCallId, status: "failed" });
 }
 
+function readWithShell(peer: AcpPeer, sessionId: string, file: string) {
+  const toolCallId = "shell-read";
+  const rawInput = { command: `cat ${file}` };
+  peer.update(sessionId, {
+    sessionUpdate: "tool_call",
+    toolCallId,
+    title: "bash",
+    kind: "execute",
+    status: "in_progress",
+    rawInput,
+  });
+  peer.update(sessionId, { sessionUpdate: "tool_call_update", toolCallId, status: "completed" });
+}
+
 function writeWithShell(peer: AcpPeer, sessionId: string, file: string, content: string) {
   const toolCallId = "shell-1";
   const rawInput = { command: `sed -i 's/old-place/shell-place/' ${file}` };
@@ -143,6 +158,7 @@ serveFakeAcpAgent({
     if (outsideEdit !== null) writeFileSync(file, outsideEdit);
     if (shellWrite !== null) writeWithShell(peer, sessionId, file, shellWrite);
     if (failedEdit) await failEdit(peer, sessionId, file);
+    if (shellRead) readWithShell(peer, sessionId, file);
     for (const [index, content] of writes.entries()) await writeInstructions(peer, sessionId, file, content, index + 1);
     peer.say(sessionId, "done");
     peer.reply(request, { stopReason: "end_turn" });

@@ -36,8 +36,23 @@ const realPath = (path: string) =>
 const namesInstructionFile = (path: string) =>
   AGENT_INSTRUCTION_FILE_NAMES.some((name) => name.toLowerCase() === basename(path).toLowerCase());
 
-export const mentionsInstructionFile = (text: string) =>
+const COMMAND_PARTS = /&&|\|\||[;|\n]/u;
+const REDIRECT_TARGET = />{1,2}\s*([^\s;&|]+)/gu;
+const IN_PLACE_EDIT =
+  /(?:^|\s)(?:sed|perl)\s(?:.*\s)?-(?:[A-Za-z]*i|-in-place)|(?:^|\s)(?:tee|Set-Content|Add-Content|Out-File)\s/iu;
+const MOVE_OR_COPY = /(?:^|\s)(?:mv|cp|Move-Item|Copy-Item)\s/iu;
+
+const mentionsInstructionFile = (text: string) =>
   AGENT_INSTRUCTION_FILE_NAMES.some((name) => text.toLowerCase().includes(name.toLowerCase()));
+
+const partWritesInstructionFile = (part: string) => {
+  if ([...part.matchAll(REDIRECT_TARGET)].some((target) => mentionsInstructionFile(target[1] ?? ""))) return true;
+  const command = part.split(">", 1)[0] ?? "";
+  if (IN_PLACE_EDIT.test(command)) return mentionsInstructionFile(command);
+  return MOVE_OR_COPY.test(command) && mentionsInstructionFile(command.trim().split(/\s+/u).at(-1) ?? "");
+};
+
+export const writesInstructionFile = (command: string) => command.split(COMMAND_PARTS).some(partWritesInstructionFile);
 
 const targetsInstructionFile = Effect.fn("InstructionsChanges.targetsFile")(function* (
   workspace: string,
