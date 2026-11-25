@@ -253,7 +253,7 @@ const runMarketplaceAppStatus = Effect.fn("McpServerTools.marketplaceAppStatus")
       next: "The app is installed and turned off. Tell the user to turn it on in Marketplace, Apps, or call openbot.set_mcp_server_enabled when the user asks.",
     });
   const outcome = yield* servers.inspect(config);
-  if (outcome.error === null)
+  if (outcome.error === null && !awaitsSignIn(servers, config))
     return openBotToolResult({
       status: "ready",
       server,
@@ -261,7 +261,7 @@ const runMarketplaceAppStatus = Effect.fn("McpServerTools.marketplaceAppStatus")
       tools: outcome.tools,
       next: "The app answers. Use these tools when your tool search finds them. Otherwise they reach you from your next turn: ask the user to send the request again.",
     });
-  if (outcome.needs === null && setupSteps.length > 0)
+  if (outcome.error !== null && outcome.needs === null && setupSteps.length > 0)
     return openBotToolResult({
       status: "not_running",
       server,
@@ -460,7 +460,7 @@ const report = Effect.fnUntraced(function* (
 ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
   const saved = servers.list().find((candidate) => candidate.name === config.name) ?? config;
   const server = describeServer(saved, servers.signIns());
-  if (outcome.error === null)
+  if (outcome.error === null && !awaitsSignIn(servers, saved))
     return openBotToolResult({
       status: "ready",
       server,
@@ -468,8 +468,7 @@ const report = Effect.fnUntraced(function* (
       tools: outcome.tools,
       ...(justSaved ? { appliesFrom: "the next turn of each agent" } : {}),
     });
-  const error = servers.redact(outcome.error);
-  if (outcome.needs === "sign_in") {
+  if (outcome.error === null || outcome.needs === "sign_in") {
     yield* call.requestSignIn(saved);
     return openBotToolResult({
       status: "needs_sign_in",
@@ -477,6 +476,7 @@ const report = Effect.fnUntraced(function* (
       ...signInNeeded(servers, saved),
     });
   }
+  const error = servers.redact(outcome.error);
   if (outcome.needs === "key")
     return openBotToolResult({
       status: "needs_key",
@@ -486,6 +486,10 @@ const report = Effect.fnUntraced(function* (
     });
   return openBotToolResult({ status: "error", server, error });
 });
+
+function awaitsSignIn(servers: AgentMcpServers, config: McpServerConfig): boolean {
+  return servers.signIns().some((state) => state.mcpServerId === config.id && state.needsSignIn === true);
+}
 
 function mergeServer(existing: McpServerConfig | undefined, input: z.infer<typeof saveMcpServerToolSchema>) {
   const base: McpServerConfig = existing ?? {

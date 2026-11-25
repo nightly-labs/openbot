@@ -50,6 +50,7 @@ export interface McpOAuthProxyOptions {
   settings: McpOAuthProxySettingsStore | null;
   target: (route: string) => Effect.Effect<McpOAuthProxyTarget | null, McpOperationError>;
   refresh: (url: string, rejected: string) => Effect.Effect<string | null, McpOperationError>;
+  scopeRefused: (url: string, rejected: string, scope: string | null) => Effect.Effect<void, McpOperationError>;
   signInEnded: (url: string) => boolean;
   client?: McpOAuthProxyClient;
 }
@@ -236,6 +237,15 @@ export class McpOAuthProxy {
     const client = this.#options.client;
     const body = read && client ? yield* mcpSync(() => withClientInfo(read, request, client, agentKey)) : read;
     const upstream = yield* this.#forward(target, request, method, body, controller);
+    if (upstream instanceof Response && upstream.status === 403) {
+      const scope = insufficientScope(upstream);
+      if (scope !== undefined) {
+        yield* discard(upstream);
+        yield* this.#options.scopeRefused(target.url, target.token, scope);
+        logger.warn("The MCP server asked for more access than the sign-in of this computer gives.");
+        return refuseRequests(response, method, body, sourceText("error.backend.mcpOAuthScopeNeeded"));
+      }
+    }
     if (!(upstream instanceof Response)) {
       const ended = this.#options.signInEnded(target.url);
       logger.warn("The MCP server refused a request with the sign-in of this computer.", {
@@ -502,6 +512,13 @@ interface UpstreamRefusal {
 
 function challengeError(answer: Response): string | null {
   return /\berror="?([\w.-]{1,64})/u.exec(answer.headers.get("www-authenticate") ?? "")?.[1] ?? null;
+}
+
+function insufficientScope(answer: Response): string | null | undefined {
+  const challenge = answer.headers.get("www-authenticate") ?? "";
+  if (!/(?:^|,)\s*bearer\b/iu.test(challenge) || challengeError(answer) !== "insufficient_scope") return undefined;
+  const scope = /\bscope=(?:"([^"]*)"|([^\s,]+))/u.exec(challenge);
+  return (scope?.[1] ?? scope?.[2])?.trim() || null;
 }
 
 function refuseRequests(response: ServerResponse, method: string, body: Buffer | null, message: string): void {
