@@ -1150,7 +1150,7 @@ textarea {
 }
 
 .server-menu-list + .scroll-edge-blur {
-  --scroll-edge-blur-size: calc(var(--openbot-space-1) * 6);
+  --scroll-edge-blur-size: calc(var(--openbot-space-1) * 5);
 }
 
 .server-submenu {

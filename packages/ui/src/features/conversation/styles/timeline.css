@@ -8,7 +8,7 @@
 }
 
 .conversation-scroll + .scroll-edge-blur {
-  --scroll-edge-blur-size: calc(var(--openbot-space-4) * 4);
+  --scroll-edge-blur-size: calc(var(--openbot-space-1) * 10);
 }
 
 .virtual-chat-list {

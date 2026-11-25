@@ -218,7 +218,7 @@
 }
 
 .browser-live-view-dialog-message + .scroll-edge-blur {
-  --scroll-edge-blur-size: calc(var(--openbot-space-1) * 6);
+  --scroll-edge-blur-size: calc(var(--openbot-space-1) * 5);
 }
 
 .browser-live-view-dialog-actions {

@@ -1,6 +1,6 @@
 import { For } from "solid-js";
 
-const BLUR_LAYERS = [1, 2, 3, 4, 5] as const;
+const BLUR_LAYERS = [1, 2, 3] as const;
 
 export interface ScrollEdgeBlurState {
   top: () => boolean;
