@@ -101,6 +101,7 @@ import { normalizePastedCode } from "../../backend/agent/cli-code-login";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { CustomProviderChanges, PeerCustomProviderChanges } from "../custom-provider-changes";
+import type { LocalSignInPages } from "../local-sign-in-pages";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import {
@@ -170,6 +171,7 @@ interface ProviderAdminIpcDependencies {
   customProviders: PeerCustomProviderChanges & Pick<CustomProviderChanges, "update">;
   remoteServers: ProviderAdminRemoteServers;
   relay: Pick<SignInRelayClient, "run" | "page" | "open" | "paste">;
+  signInPages: Pick<LocalSignInPages, "paste">;
 }
 
 interface RelayedSignIn {
@@ -186,6 +188,7 @@ export function providerAdminIpcHandlers({
   customProviders,
   remoteServers,
   relay,
+  signInPages,
 }: ProviderAdminIpcDependencies): Pick<IpcGroupHandlers, "providerAdmin"> {
   function remote<T>(serverId: string, path: string, body: unknown, decoder: ResponseDecoder<T>): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, PROVIDERS_ADMIN_CAPABILITY))
@@ -572,9 +575,10 @@ export function providerAdminIpcHandlers({
         return { page: running.result ? null : relay.page(key), result: running.result };
       }),
       openRelaySignIn: relaySignIn(parseProviderId, (provider, serverId) => relay.open(relayKey(serverId, provider))),
-      pasteRelaySignIn: relaySignIn(parsePasteRelaySignInInput, ({ provider, address }, serverId) =>
-        relay.paste(relayKey(serverId, provider), address),
-      ),
+      pasteRelaySignIn: scopedHandler(parsePasteRelaySignInInput, {
+        local: ({ provider, address }) => runCauseEffect(signInPages.paste(provider, address)),
+        remote: ({ provider, address }, serverId) => relay.paste(relayKey(serverId, provider), address),
+      }),
       cancelRelaySignIn: relaySignIn(parseProviderId, async (provider, serverId) => {
         await stopRelay(relayKey(serverId, provider));
         return runCauseEffect(readRemoteAgentStatus(remoteServers, serverId));

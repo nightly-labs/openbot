@@ -70,6 +70,7 @@ export const messages = {
   "provider.aria.install": "{name} installieren",
   "provider.aria.signIn": "Bei {name} anmelden",
   "provider.aria.codeFallback": "Mit Code bei {name} anmelden",
+  "provider.aria.addressFallback": "Anmeldeadresse für {name} einfügen",
   "provider.aria.moreActions": "Weitere Aktionen für {name}",
   "provider.aria.use": "{name} in OpenBot verwenden",
   "provider.use.inUseOne": "{agent} verwendet {name}. Ändere das Modell dieses Agenten und deaktiviere dann {name}.",
@@ -97,6 +98,8 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "Warten auf dich. Diese Anmeldung endet in {time}.",
   "provider.codeLogin.linkTitle": "Auf einem anderen Gerät bei {name} anmelden",
   "provider.codeLogin.pageTitle": "Bei {name} anmelden",
+  "provider.codeLogin.addressDescription":
+    "Schließe die Anmeldung im Browser ab. Dieses Fenster schließt sich, wenn die Anmeldung fertig ist.",
   "provider.codeLogin.pageDescription": "Diese Seite ist im Browser auf {host} geöffnet. Melde dich hier an.",
   "provider.codeLogin.relayStarting": "Die Anmeldung bei {name} wird auf {host} gestartet…",
   "provider.codeLogin.pageOpening": "Die Anmeldeseite von {name} wird auf {host} geöffnet…",
