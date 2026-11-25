@@ -53,6 +53,7 @@
 .sidebar-name-tooltip-heading {
   display: flex;
   min-width: 0;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--openbot-space-2);
 }
