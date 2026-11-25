@@ -31,6 +31,8 @@ interface Report {
   passed: boolean;
   stall?: { status: string | null; error: string | null; elapsedMs: number; cancelSent: boolean };
   afterStall?: { status: string | null; sessionRestored: boolean };
+  answerAfterCancel?: { status: string | null; reply: string; error: string | null };
+  confirmedCancel?: { status: string | null; error: string | null; elapsedMs: number };
   retry?: { status: string | null; reply: string; elapsedMs: number };
   retryForever?: { status: string | null; error: string | null; elapsedMs: number };
   rateLimitRetry?: { status: string | null; reply: string; elapsedMs: number };
@@ -143,6 +145,25 @@ try {
   report.afterStall = { status: afterStall.status, sessionRestored };
   assert.equal(afterStall.status, "completed", "A turn after a stall completes.");
   assert.equal(sessionRestored, true, "A turn after a stall opens the session again.");
+
+  const answered = await runTurn(client, thread, { text: "answer-after-cancel", timeoutMs: STALL_MS * 10 });
+  report.answerAfterCancel = { status: answered.status, reply: answered.reply, error: answered.error };
+  assert.equal(answered.status, "completed", "An answer that arrives after a stall cancel completes the turn.");
+  assert.equal(answered.reply, "late answer", "The answer that arrives after a stall cancel is kept.");
+
+  const confirmed = await timed(() => runTurn(client, thread, { text: "confirm-cancel", timeoutMs: STALL_MS * 10 }));
+  report.confirmedCancel = {
+    status: confirmed.value.status,
+    error: confirmed.value.error,
+    elapsedMs: confirmed.elapsedMs,
+  };
+  assert.equal(confirmed.value.status, "failed", "A stalled turn that the agent cancels still fails.");
+  assert.equal(
+    confirmed.value.error,
+    sourceText("error.agent.turnStalled", { provider: "OpenCode" }),
+    "A stalled turn that the agent cancels names the stall.",
+  );
+  assert.ok(confirmed.elapsedMs < STALL_MS * 2, "A confirmed cancel ends the stalled turn without the full wait.");
 
   const retrying = await open(
     "opencode",

@@ -1,5 +1,11 @@
 import { type AcpParams, type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
+interface HeldPrompt {
+  request: AcpRequest;
+  peer: AcpPeer;
+  onCancel: "answer" | "confirm";
+}
+
 const MODELS = [{ modelId: "fake-alpha", name: "Fake Alpha" }];
 const toolMs = Number(process.env.FAKE_TOOL_MS ?? 0);
 const chunkGapMs = Number(process.env.FAKE_CHUNK_GAP_MS ?? 0);
@@ -10,6 +16,7 @@ const loadSession = process.env.FAKE_NO_LOAD !== "1";
 const silentNew = process.env.FAKE_SILENT_NEW === "1";
 const sessionCapabilities = process.env.FAKE_RESUME === "1" ? { sessionCapabilities: { resume: {} } } : {};
 const resumed = new Set<string>();
+const held = new Map<string, HeldPrompt>();
 let count = 0;
 
 function retryNotice(
@@ -75,6 +82,10 @@ serveFakeAcpAgent(
       const text = promptText(request.params).trim();
       logEntry({ event: "prompt", sessionId, text });
       if (text === "hang") return;
+      if (text === "answer-after-cancel" || text === "confirm-cancel") {
+        held.set(sessionId, { request, peer, onCancel: text === "confirm-cancel" ? "confirm" : "answer" });
+        return;
+      }
       if (text === "hang-once" && !resumed.has(sessionId)) {
         peer.update(sessionId, { sessionUpdate: "available_commands_update", availableCommands: [] });
         return;
@@ -162,7 +173,18 @@ serveFakeAcpAgent(
   },
   {
     onNotification: (method, params) => {
-      if (method === "session/cancel") logEntry({ event: "cancel", sessionId: params.sessionId ?? "" });
+      if (method !== "session/cancel") return;
+      const sessionId = params.sessionId ?? "";
+      logEntry({ event: "cancel", sessionId });
+      const prompt = held.get(sessionId);
+      if (!prompt) return;
+      held.delete(sessionId);
+      if (prompt.onCancel === "confirm") {
+        prompt.peer.reply(prompt.request, { stopReason: "cancelled" });
+        return;
+      }
+      prompt.peer.say(sessionId, "late answer");
+      prompt.peer.reply(prompt.request, { stopReason: "end_turn" });
     },
   },
 );
