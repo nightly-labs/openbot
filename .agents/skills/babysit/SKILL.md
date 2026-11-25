@@ -124,7 +124,7 @@ Ask for one review only. Each extra request is a full review run.
    comment posted since the last review.
 2. With no fixes to push: add `/norbiai review` to the rebuttal comment.
    That phrase asks for a recheck.
-3. Do not also apply the `norbiai` label. The label asks for a full
+3. Do not write `/norbiai full review`. That phrase asks for a full
    review of the whole PR.
 4. Wait for the new `<!-- norbiai-review -->` comment and the new
    `NorbiAI review` status on the new head SHA. Poll with `gh api` at

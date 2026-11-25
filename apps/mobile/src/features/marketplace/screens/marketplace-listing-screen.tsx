@@ -8,7 +8,6 @@ import { Button, Spinner, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowRight from "lucide-react-native/icons/arrow-right";
 import CalendarClock from "lucide-react-native/icons/calendar-clock";
-import X from "lucide-react-native/icons/x";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Linking, View } from "react-native";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
@@ -20,10 +19,9 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
-import { AndroidHeaderButton } from "@/shared/components/android-header-button";
+import { SheetCloseAction } from "@/shared/components/sheet-close-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
-import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { loadMarketplaceAgent, loadMarketplaceSkill } from "../api/marketplace-catalog";
@@ -49,11 +47,6 @@ import { useMarketplaceInstalled } from "../model/use-marketplace";
 import { usePluginConnect } from "../model/use-plugin-connect";
 import { useTryInChat } from "../model/use-try-in-chat";
 
-/**
- * The page of one listing, as a sheet over the Marketplace. It shows what the listing is, as the
- * desktop page does; the `+` in the header installs it. A skill and an app that asks for a key or a
- * sign-in open the next page of the same sheet for that step.
- */
 export function MarketplaceListingScreen() {
   const { t, errorMessage } = useText();
   const { serverId, kind, id, name } = useLocalSearchParams<{
@@ -78,7 +71,6 @@ export function MarketplaceListingScreen() {
   });
   const app = apiUrl && kind === "app" ? appListings(apiUrl).find((item) => item.id === id) : undefined;
   const [busy, setBusy] = useState(false);
-  // The host may already install it. The sheet stays until the request settles.
   usePreventRemove(busy, () => undefined);
   const close = () => {
     if (router.canGoBack()) router.back();
@@ -119,28 +111,8 @@ export function MarketplaceListingScreen() {
       contentContainerClassName="gap-6 px-5 pb-safe-offset-5 pt-5"
       contentInsetAdjustmentBehavior="automatic"
     >
-      {/* The name from the row, from the first frame; the loaded listing sets the same title. */}
       <Stack.Screen options={{ title: name ?? "" }} />
-      {isAndroid ? (
-        <AndroidHeaderButton
-          placement="left"
-          icon={X}
-          accessibilityLabel={t("common.close")}
-          disabled={busy}
-          onPress={close}
-        />
-      ) : (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button
-            icon={isIOS ? "xmark" : undefined}
-            accessibilityLabel={t("common.close")}
-            disabled={busy}
-            onPress={close}
-          >
-            {isIOS ? t("common.close") : "×"}
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
-      )}
+      <SheetCloseAction disabled={busy} onPress={close} />
       {body}
     </SheetScrollView>
   );
@@ -154,7 +126,6 @@ function ErrorText({ error }: { error: string | null }) {
   ) : null;
 }
 
-/** Why the user cannot install here: a member, or a server that is offline or too old for the route. */
 function useInstallBlock(serverId: string, allowed: boolean): string | null {
   const { t } = useText();
   const role = useMobileWorkspaceSelector((workspace) => workspace.servers.find((item) => item.id === serverId)?.role);
@@ -164,7 +135,6 @@ function useInstallBlock(serverId: string, allowed: boolean): string | null {
     : t("mobile.marketplace.permission.admin");
 }
 
-/** The properties of a catalog listing, as the desktop page lists them beside its content. */
 function useCatalogFacts(listing: MarketplaceListing, version: number, updatedAt: string, installs: number) {
   const { t, format } = useText();
   return [
@@ -195,8 +165,6 @@ function AgentPage({
   const installed = useMarketplaceInstalled(serverId);
   const canUpdate = useMobileWorkspaceSelector((workspace) => workspace.canUpdateMarketplaceAgents(serverId));
   const added = installed.agentFor(detail.id);
-  // The agent that this page added or updated, before the refreshed agent list shows it. Without it,
-  // the `+` comes back in that time, and a second tap adds a second agent.
   const [finished, setFinished] = useState<string | null>(null);
   const addedId = added?.id ?? finished;
   const updatable =
@@ -227,7 +195,6 @@ function AgentPage({
               listingId: detail.id,
               ...(added ? { agentId: added.id } : {}),
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-              // Counts one install, however often a retry sends it.
               receiptId: Crypto.randomUUID(),
             },
             serverId,
@@ -235,7 +202,6 @@ function AgentPage({
       );
       setFinished(result.id);
       void haptics.notification("success");
-      // The chat list shows the new agent; a failed refresh does not make the install fail.
       void refreshServer(serverId).catch(() => undefined);
     } catch (cause) {
       void haptics.notification("error");
@@ -271,11 +237,10 @@ function AgentPage({
         </SettingsNote>
       ) : null}
       {addedId ? (
-        // The app's own black or white action, not the accent; the scale feedback has no tinted flash.
         <Button
           className="bg-action"
           feedbackVariant="scale"
-          onPress={() => router.replace({ pathname: "/chat/[agentId]", params: { agentId: addedId } })}
+          onPress={() => router.replace({ pathname: "/chat/[agentId]", params: { agentId: addedId, serverId } })}
         >
           <Button.Label className="text-action-foreground">{t("mobile.marketplace.agent.openChat")}</Button.Label>
         </Button>
@@ -325,7 +290,6 @@ function AgentPage({
   );
 }
 
-/** The SKILL.md body without its first heading, when that heading only repeats the name, as on the desktop. */
 function skillInstructions(skill: Pick<MarketplaceSkillDetail, "name" | "description" | "instructions">): string {
   const instructions = skill.instructions || skill.description;
   const [first, ...rest] = instructions.split(/\r?\n/u);
@@ -355,7 +319,6 @@ function SkillPage({
   const tryInChat = useTryInChat(serverId);
   const usable = installed.usableSkillAgentIds(detail.id, detail.version);
   const example = detail.examplePrompt?.trim() || t("mobile.marketplace.skill.examplePrompt");
-  // As on the desktop: the skill's marker, then the example, so the agent knows which skill to use.
   const request = `${serializeChatTagReference("skill", detail.name, detail.id)} ${example}`;
   const targets = {
     agents: installed.agents.filter((agent) => usable.includes(agent.id)),
@@ -427,7 +390,6 @@ function AppPage({
   const macUnavailable = useMobileWorkspaceSelector((workspace) => workspace.macAppsUnavailable(serverId));
   const installed = useMarketplaceInstalled(serverId);
   const app = plugin.apps[0] ?? null;
-  // An app that drives Apple apps does not run on a host that is not a Mac, so it is not offered there.
   const needsMac = macUnavailable && plugin.apps.some((entry) => entry.needsMac);
   const block = useInstallBlock(serverId, canManage) ?? (needsMac ? t("mobile.marketplace.app.needsMac") : null);
   const method = app ? pluginConnectMethod(app, canRelay) : null;
@@ -441,8 +403,6 @@ function AppPage({
   const [first, ...more] = plugin.prompts;
   const [muted] = useThemeColor(["muted"]);
   const tryInChat = useTryInChat(serverId);
-  // An app's tools reach every agent of the server, so any agent can try it once it is connected.
-  // The request is the question alone, as on the desktop: there is no marker to point at.
   const targetsFor = (text: string) => ({
     agents: connected ? installed.agents : [],
     onTry: (agentId: string) => tryInChat(agentId, text),
@@ -472,7 +432,6 @@ function AppPage({
   ];
 
   function add() {
-    // An app that asks for nothing connects from here; a key or a sign-in has its own page.
     if (method?.kind === "none") void connect.connect();
     else router.push({ pathname: "/marketplace-listing/connect", params: { serverId, slug: plugin.slug } });
   }
@@ -504,7 +463,6 @@ function AppPage({
       {connected ? (
         <SettingsSection footer={t("mobile.marketplace.app.connectedHint")}>
           <SettingsRow
-            // The app's own MCP page. Right after a connect, the row waits until the server list has the app.
             onPress={
               connectedServerId
                 ? () =>

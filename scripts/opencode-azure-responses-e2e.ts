@@ -1,13 +1,3 @@
-// Checks that a custom provider on an Azure OpenAI or Foundry v1 endpoint calls the Responses API
-// (#3460). Builds the OpenCode config layer with `openCodeConfigEnv` for each endpoint, then runs the
-// real OpenCode CLI with that layer against a fake Azure server on loopback (only the base URL
-// changes), and reads the requests that OpenCode sends. `--standalone` (OpenCode 2) keeps each run
-// off the shared background service. Cases: Azure OpenAI and Foundry hosts, which must use the OpenAI
-// adapter and reach `/openai/v1/responses` with the endpoint key and `store: false`; an Azure host
-// with no key and another host, which keep the OpenAI-compatible adapter and `/chat/completions`.
-// No request may carry the `OPENAI_API_KEY` of the OpenCode environment.
-// `bun scripts/opencode-azure-responses-e2e.ts [<opencode binary>]`. Without an argument it uses
-// `OPENBOT_OPENCODE_PATH`. Writes .openbot-build/opencode-azure-responses-e2e/report.json.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -25,14 +15,12 @@ const binary: string = binaryArgument;
 const MODEL = "gpt-6-luna";
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-azure-"));
 
-/** In the OpenCode environment, as a user's shell can have it. No request may carry it. */
 const ENV_OPENAI_KEY = "openai-env-key";
 
 interface CapturedRequest {
   readonly path: string;
   readonly status: number;
   readonly authorization: string | null;
-  /** The Responses `store` flag. `false` keeps the conversation off the provider's servers. */
   readonly store: unknown;
 }
 const requests: CapturedRequest[] = [];
@@ -113,7 +101,6 @@ const address = server.address();
 assert.ok(address && typeof address === "object", "the fake server has no port");
 const local = `http://127.0.0.1:${address.port}/openai/v1`;
 
-/** The layer OpenBot sends for one endpoint, with only the base URL moved to the fake server. */
 function configFor(
   baseUrl: string,
   apiKey: string | null,
@@ -203,6 +190,20 @@ try {
     {
       name: "azure-no-key",
       baseUrl: "https://example-resource.openai.azure.com/openai/v1",
+      apiKey: null,
+      npm: "@ai-sdk/openai-compatible",
+      path: "/openai/v1/chat/completions",
+    },
+    {
+      name: "openai-v1",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "openai-test-key",
+      npm: "@ai-sdk/openai",
+      path: "/openai/v1/responses",
+    },
+    {
+      name: "openai-no-key",
+      baseUrl: "https://api.openai.com/v1",
       apiKey: null,
       npm: "@ai-sdk/openai-compatible",
       path: "/openai/v1/chat/completions",

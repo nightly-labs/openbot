@@ -1,16 +1,6 @@
-/**
- * Removes the flat background colour of a generated picture, for a model that cannot make clear
- * pixels itself (Grok Imagine). The step asks the model for one solid colour around the subject; the
- * colour of the picture's edge is that colour.
- */
-
-/** Below this distance from the background colour a pixel is background. */
 const CLEAR_DISTANCE = 48;
-/** Above this distance a pixel is subject. Between the two, the pixel is part of each. */
 const SOLID_DISTANCE = 120;
-/** How many of the edge pixels must have the background colour for a picture to have a flat background. */
 const FLAT_EDGE_SHARE = 0.85;
-/** How far from the background a subject pixel can still have a tint of the background colour. */
 const SPILL_REACH = 2;
 
 function distance(pixels: Uint8Array, offset: number, key: readonly number[]): number {
@@ -25,18 +15,6 @@ function median(values: number[]): number {
   return values[Math.floor(values.length / 2)] ?? 0;
 }
 
-/**
- * Makes the background of `pixels` clear, in place. `pixels` holds four bytes for each pixel with the
- * alpha last; the order of the three colour bytes does not matter. The background grows from the edge
- * and from each pixel within `CLEAR_DISTANCE` of the edge colour, so a hole between an arm and the body
- * clears too. A subject part of nearly the key colour clears with it: the step asks the model for a key
- * colour that the subject does not have. A pixel at the
- * border of the subject gets part alpha, and the background colour is taken out of its colour. The
- * result is premultiplied, as Skia's bitmaps hold it.
- *
- * Returns false and changes nothing when the picture already has clear pixels, or when its edge is not
- * one flat colour.
- */
 export function clearFlatBackground(pixels: Uint8Array, width: number, height: number): boolean {
   const count = width * height;
   if (width < 3 || height < 3 || pixels.length < count * 4) return false;
@@ -50,8 +28,6 @@ export function clearFlatBackground(pixels: Uint8Array, width: number, height: n
   const flat = edge.filter((pixel) => distance(pixels, pixel * 4, key) < CLEAR_DISTANCE).length;
   if (flat < edge.length * FLAT_EDGE_SHARE) return false;
 
-  // The background grows from the edge and from each pixel near the key colour, through the pixels
-  // that are not clearly subject.
   const reached = new Uint8Array(count);
   const queue = new Int32Array(count);
   let tail = 0;
@@ -81,7 +57,6 @@ export function clearFlatBackground(pixels: Uint8Array, width: number, height: n
     );
     for (let part = 0; part < 3; part += 1) {
       const colour = pixels[offset + part] ?? 0;
-      // The colour without the background in it, then premultiplied: colour - (1 - alpha) × key.
       const own = alpha === 0 ? 0 : (colour - (1 - alpha) * (key[part] ?? 0)) / alpha;
       pixels[offset + part] = Math.round(Math.min(255, Math.max(0, own)) * alpha);
     }
@@ -91,13 +66,6 @@ export function clearFlatBackground(pixels: Uint8Array, width: number, height: n
   return true;
 }
 
-/**
- * A subject pixel at the border of the background mixes the subject with the background colour. When it
- * is too far from that colour to clear, it keeps a tint of it: a green line around a subject on green.
- * For each pixel within `SPILL_REACH` pixels of the background, the strong channels of the background
- * colour come down to the level of its weak channels. The values are premultiplied, so a scale of a
- * pixel's channels does not change the result.
- */
 function removeSpill(
   pixels: Uint8Array,
   width: number,

@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about Canva here is taken from canva.dev and canva.com. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const CANVA_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

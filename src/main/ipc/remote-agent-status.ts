@@ -11,7 +11,6 @@ import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 
-/** The part of the remote server manager that reads a joined server's status. */
 export interface RemoteStatusServers {
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
   request<T>(
@@ -22,14 +21,6 @@ export interface RemoteStatusServers {
   ): Effect.Effect<T, RemoteWorkflowError>;
 }
 
-/**
- * A joined server's status, as the local `AgentStatus`. Every remote status read uses it, so a
- * provider change on a joined server returns the same rows that `agent.getStatus` gives.
- *
- * `provider-model-source-v1` says where a provider's models come from, such as the Ollama models of a
- * Codex that its settings point to Ollama (#9956). A host without it, or a failed read, leaves the rows
- * as they are: the picker then shows no source.
- */
 export const readRemoteAgentStatus = Effect.fn("RemoteAgentStatus.read")(function* (
   remoteServers: RemoteStatusServers,
   serverId: string,

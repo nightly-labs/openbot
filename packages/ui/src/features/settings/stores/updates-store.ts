@@ -9,17 +9,12 @@ interface UpdatesStoreProps {
   appInfo: AppInfo | null;
   updateStatus: UpdateStatus;
   onUpdateAction: () => Promise<void>;
-  /** Removes a restart that a server admin asked for. */
   onCancelScheduledRestart?: () => Promise<void>;
-  /** Restarts OpenBot, or installs the downloaded update, when no work runs. Absent: no such action. */
   onRestartWhenIdle?: () => Promise<void>;
   onCancelIdleRestart?: () => Promise<void>;
+  onRestartNow?: () => Promise<void>;
 }
 
-/**
- * The Updates tab's view of the updater. Every value but `error` is derived from the live
- * `updateStatus` prop, so the store holds one signal: what the last action call threw.
- */
 export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
   const [error, setError] = createSignal<string | null>(null);
 
@@ -30,10 +25,6 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
     props.updateStatus.availableVersion
       ? `OpenBot v${props.updateStatus.availableVersion}`
       : currentText().t("settings.updates.target.latest");
-  /**
-   * Host phases arrive mapped onto the shared update phases, so the managed wording says what the
-   * host is doing rather than asking a tenant to restart an application the host replaces.
-   */
   const hostMessage = () => {
     const { t, errorMessage } = currentText();
     switch (props.updateStatus.phase) {
@@ -72,7 +63,7 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
               progress: format.percent(Math.round(props.updateStatus.progress) / 100),
             });
       case "ready":
-        return t("settings.updates.status.ready", { target: targetUpdate() });
+        return errorMessage(props.updateStatus.message, t("settings.updates.status.ready", { target: targetUpdate() }));
       case "installing":
         return t("settings.updates.status.installing", { target: targetUpdate() });
       case "up-to-date":
@@ -107,7 +98,6 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
   }
 
   const [cancelling, setCancelling] = createSignal(false);
-  /** A restart that a server admin asked for, while it has not started. */
   const scheduledRestart = () =>
     props.updateStatus.phase === "installing" ? undefined : props.updateStatus.scheduledRestart;
 
@@ -126,9 +116,7 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
   }
 
   const [idleRestartBusy, setIdleRestartBusy] = createSignal(false);
-  /** A restart that the user asked for, while it waits or after it did not start. */
   const idleRestart = () => (props.updateStatus.phase === "installing" ? undefined : props.updateStatus.idleRestart);
-  /** The restart installs the downloaded update when there is one. */
   const idleRestartInstalls = () => props.updateStatus.phase === "ready" && !presentation().managed;
   const idleRestartOffered = () => Boolean(props.onRestartWhenIdle) && props.updateStatus.phase !== "installing";
 
@@ -162,6 +150,8 @@ export function createSettingsUpdatesStore(props: UpdatesStoreProps) {
     targetUpdate,
     restartWhenIdle: () => changeIdleRestart(props.onRestartWhenIdle, "update.idleRestart.requestFailed"),
     cancelIdleRestart: () => changeIdleRestart(props.onCancelIdleRestart, "update.idleRestart.cancelFailed"),
+    restartNowOffered: () => Boolean(props.onRestartNow),
+    restartNow: () => changeIdleRestart(props.onRestartNow, "update.idleRestart.failedTitle"),
   };
 }
 

@@ -14,6 +14,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} hat kein Guthaben mehr. Zu {model} gewechselt. Um es wieder zu nutzen, lade Guthaben auf und wähle es dann aus.",
   "status.agent.modelReturnedAfterError": "Nach dem Anbieterfehler zurück zu {model} gewechselt.",
+  "status.agent.modelSwitchedForRemovedModel": "{previous} ist nicht mehr verfügbar. Zu {model} gewechselt.",
   "status.agent.marketplaceSuggested": "Eine Marketplace-App wurde vorgeschlagen: {app}.",
   "status.agent.settingShown": "Eine Einstellung wurde gezeigt: {setting}.",
   "status.agent.channelMemberAdded": "{agent} hat {member} zum Kanal hinzugefügt. {person} hat darum gebeten.",
@@ -28,6 +29,14 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Den Hauptbildschirm aufnehmen und das Bild an das Modell des Agenten senden.",
   "status.agent.screenCaptureChannel":
     "Das Bild erscheint im Kanal {channel}, und jedes Mitglied dieses Servers, das den Kanal liest, kann es sehen.",
+  "status.agent.creditImageApproval": "Ein Bild mit {model} erstellen. Das kostet {credits} Credits.",
+  "status.agent.creditVideoApproval": "Ein Video mit {model} erstellen. Das kostet {credits} Credits.",
+  "status.agent.creditMediaChannel":
+    "Das Ergebnis erscheint im Kanal {channel}, und jedes Mitglied dieses Servers, das den Kanal liest, kann es sehen.",
+  "status.agent.creditsHoldBalance": "Das kostet {credits} Credits, und das Guthaben beträgt {balance} Credits.",
+  "status.agent.creditsHoldAgentsOff": "Agenten auf diesem Server können keine Credits verwenden.",
+  "status.agent.screenCapturePermissionNext":
+    "macOS kann dich danach bitten, OpenBot die Bildschirmaufnahme zu erlauben.",
   "status.agent.screenCaptureDisplay": "Den Bildschirm {name} aufnehmen und das Bild an das Modell des Agenten senden.",
   "status.agent.screenCaptureWindow": "Das Fenster {name} aufnehmen und das Bild an das Modell des Agenten senden.",
   "status.agent.screenCaptureRegion":
@@ -71,6 +80,7 @@ export const messages = {
   "status.agent.browserActing": "Webseite wird bedient…",
   "status.agent.browserReviewing": "Webseite wird geprüft…",
   "status.agent.memoriesSearching": "Erinnerungen werden durchsucht…",
+  "status.agent.chatsSearching": "Frühere Chats werden durchsucht…",
   "status.agent.memoriesSearched": {
     one: "Erinnerungen durchsucht: {count} gefunden",
     other: "Erinnerungen durchsucht: {count} gefunden",
@@ -112,9 +122,17 @@ export const messages = {
     "Erinnerungen: {saved} gespeichert, {updated} aktualisiert, {forgotten} vergessen, {notChanged} nicht geändert, weil ein anderer Thread sie zuerst geändert hat.",
   "status.agent.mcpToolCall": "Das Tool {tool} des MCP-Servers {name} ausführen.",
   "status.agent.uiBlockClosedByMessage": "Durch neue Nachricht geschlossen",
+  "status.agent.location.field": "Dein Standort",
+  "status.agent.location.placeholder": "Stadt, Adresse oder Ort",
+  "status.agent.location.submit": "Teilen",
+  "status.agent.location.shared": "Standort geteilt",
   "status.agent.nextStepContinues":
     "Der Agent hat vor dem nächsten Schritt angehalten. Er macht weiter ({current} von {limit}).",
   "status.agent.planContinues": "Der Plan hat offene Schritte. Der Agent macht weiter ({current} von {limit}).",
+  "status.agent.planStopped":
+    "Der Agent hat mit offenen Schritten im Plan aufgehört. Sende eine Nachricht, damit er weitermacht.",
+  "status.agent.continuationLimitReached":
+    "Der Agent hat aufgehört, bevor die Anfrage fertig war. Er kann nicht noch einmal selbst weitermachen. Sende eine Nachricht, damit er weitermacht.",
   "status.agent.compactionContinues":
     "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Der Agent macht weiter.",
   "status.agent.providerExitContinues":

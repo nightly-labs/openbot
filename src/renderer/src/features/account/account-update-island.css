@@ -61,9 +61,6 @@
     filter var(--panel-open-dur) var(--panel-ease);
 }
 
-/* The island only enters the DOM once there is an update to announce, so it is
-   already `data-open="true"` on its first frame and the closed rule above never
-   applies. This gives that first frame something to slide in from. */
 @starting-style {
   .account-update-island.t-panel-slide[data-open="true"] {
     transform: translateY(var(--panel-translate-y));
@@ -128,8 +125,7 @@
 .account-update-island__action-shell {
   position: relative;
   display: grid;
-  /* A floor, not a fixed width: translated labels such as "Uruchom ponownie" are wider than the
-     English ones, and the button grows to hold them while the status text gives way. */
+
   min-width: calc(
     var(--openbot-control-xl) +
     var(--openbot-control-xl) +
@@ -188,7 +184,6 @@
   display: inline-grid;
   align-items: baseline;
   grid-template-columns: 3ch max-content;
-  /* "45%" in every page direction, as the percent of the locale. */
   direction: ltr;
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-semibold);
@@ -328,14 +323,13 @@
   }
 }
 
-/* In the sidebar there is no account box to come out of: the island is in the flow at the end of
- * the sidebar, with four round corners and the same space above and below its button. */
 .sidebar-update-island > .account-update-island {
   position: relative;
   inset: auto;
   min-height: 0;
-  margin: var(--openbot-space-2) var(--openbot-space-3) var(--openbot-space-3);
+  margin: var(--openbot-space-2);
   border-radius: var(--openbot-radius-lg);
+  box-shadow: inset 0 0 0 1px var(--openbot-accent-soft);
   padding-block: var(--openbot-space-1-5);
   padding-inline: var(--openbot-space-3) var(--openbot-space-1-5);
 }

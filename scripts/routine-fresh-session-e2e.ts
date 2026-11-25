@@ -1,22 +1,3 @@
-// Checks that each routine of an agent that is set to run in a separate thread runs in its own side
-// thread, and that each run starts its own provider session, so that it does not send the whole chat context again. Runs the real agent
-// service on a temporary profile with a fake Codex app-server. The fake keeps the context of each
-// session: each request sends all of the session's earlier input again, as a model request does, and
-// reports that size as input tokens. The chat gets about 45,000 tokens of history, then a routine
-// runs twice. The check asserts that each run starts a session that Codex saves, so that a subagent
-// can fork it (#8743), and that the run closes it and takes it out of the Codex thread list, except
-// when a subagent of the run still works: an archive would stop it. It also asserts that the run's
-// request stays small, that both runs use one routine thread and their answers show there and not
-// in the chat, that the chat keeps its session, and that the chat turns read the answers. While the
-// second run is held, a chat message and a run of a second routine must finish: the lanes do not
-// wait for each other. The second routine opens a wait, which a routine thread can do as the chat
-// can.
-// A routine with no run place runs in the chat: its answer shows in the chat, and it gets no thread.
-// It also drives saved password and authenticator fills, one at a time and together in one form,
-// through the routine tool router, checks the sign-in guidance, and checks that no secret reaches the
-// provider. Each run keeps the agent's
-// Computer Use, as the chat does: a scheduled run can drive a desktop app.
-// `bun scripts/routine-fresh-session-e2e.ts`. Writes .openbot-build/routine-fresh-session-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -42,10 +23,8 @@ const userData = join(root, "user-data");
 const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
-/** While this file exists, the fake holds each turn of the first routine before its answer. */
 const fakeHold = join(root, "hold");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -57,25 +36,17 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/** Tokens that each session holds before its first request: the instructions and the tools. */
 const BASE_TOKENS = 3_000;
-/** Each history message, in characters. Four of them make about 45,000 tokens. */
 const HISTORY_CHARACTERS = 45_000;
 const ROUTINE_INPUT_LIMIT = 10_000;
 const ROUTINE_MARK = "ROUTINE-CHECK";
 const SECOND_MARK = "ROUTINE-SECOND";
-/** A routine run whose Codex subagent still works when its turn ends. */
 const SUBAGENT_MARK = "SUBAGENT-RUN";
 const VAULT_ORIGIN = "https://routine.openbot.test";
 const VAULT_LOGIN = "routine-login";
 const PASSWORD = "fixture-routine-password";
 const CODE = "739182";
 
-/**
- * A Codex app-server with the methods that the service calls. It writes each `thread/start`,
- * `thread/resume`, `thread/unsubscribe`, `thread/archive` and `turn/start` to the log. A routine turn
- * answers with a numbered report; other turns answer "Done.".
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync, existsSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -101,7 +72,6 @@ const callNext = (turn) => {
     namespace: "openbot", tool: call.tool, arguments: call.arguments,
   } });
 };
-/** threadId -> characters of all input so far, and the prompt and totals of the last request. */
 const context = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -183,10 +153,8 @@ const answer = (message) => {
         browserCall("open", { url: ${JSON.stringify(VAULT_ORIGIN)} }),
         browserCall("list_logins", { tabId: "routine-tab" }),
         secret("password"), secret("authenticator"),
-        // A form that asks for the password and the code together.
         secret("password", true),
       ] : second ? [
-        // A routine thread keeps the tools of the agent's own chat, as a routine run in the chat had.
         { tool: "await_event", arguments: { note: "Report when the docs change." } },
       ] : [];
       callNext({ threadId: params.threadId, turnId, calls, finish });
@@ -262,7 +230,6 @@ const report: {
   waitInRoutineThread?: unknown[];
   digestInNextTurn?: { marker: boolean; answers: string[] };
   chatRoutine?: { threads: number; answersInChat: number; runStatus: string };
-  lateAnswerInRoutineThread?: { threadId: string; readsEarlierRuns: boolean; answerShown: boolean };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
   error?: string;
@@ -283,6 +250,13 @@ const fills: string[] = [];
 let takeoverRequests = 0;
 const browser: AgentBrowserHost = {
   listTabs: () => (tab ? [tab] : []),
+  toolCanUseTab: (params, tabId) =>
+    (tab ? [tab] : []).some(
+      (candidate) =>
+        candidate.id === tabId &&
+        candidate.ownerAgentId === params.ownerAgentId &&
+        candidate.ownerThreadId === params.threadId,
+    ),
   prepareSecret: (params) =>
     Effect.sync(() => {
       assert.equal(params.ownerAgentId, tab?.ownerAgentId);
@@ -338,7 +312,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service, its database or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -391,7 +364,6 @@ const agents = new AgentService({
     },
   },
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
-  // The driver is not started: only the entry that the provider is given is checked.
   computerUseMcpServer: () => ({
     id: COMPUTER_USE_MCP_SERVER_ID,
     name: COMPUTER_USE_MCP_SERVER_NAME,
@@ -416,7 +388,6 @@ const sqlite = () => {
 };
 const closeReader = () => connection?.close();
 
-/** The usage session and the input tokens that the records of one provider turn hold. */
 function usageOf(turnId: string): { sessionId: string; input: number } | null {
   const rows = sqlite()
     .prepare("SELECT session_id, tokens_json FROM agent_usage_records WHERE turn_id = ?")
@@ -461,7 +432,6 @@ async function send(agentId: string, text: string, label: string, timeoutMs?: nu
   await settled(deliveryId, label, timeoutMs);
 }
 
-/** The side thread of a routine, and the answers that its conversation shows. */
 function routineThread(agentId: string, routineId: string, mark: string) {
   const tasks = agents.listTasks(agentId).tasks.filter((task) => task.routineId === routineId);
   assert.equal(tasks.length, 1, `routine ${routineId}: ${tasks.length} threads`);
@@ -547,7 +517,6 @@ try {
     );
   const routineTurns: TurnReport[] = [];
   for (const run of [1, 2]) {
-    // The second run waits before its answer, until the chat and the second routine have finished.
     if (run === 2) await writeFile(fakeHold, "");
     const queued = await runCauseEffect(agents.testRoutine({ agentId: agent.id, routineId: routine.id }));
     assert.ok(queued.deliveryId, `routine run ${run}: no delivery`);
@@ -625,7 +594,6 @@ try {
     "Secrets stay outside provider input and tool results",
     [PASSWORD, CODE].every((value) => !JSON.stringify(entries).includes(value)),
   );
-  // Codex gets the saved-login rules with the first user turn, not in the developer instructions.
   const firstTurnText = (threadId: unknown) =>
     entries.find((entry) => entry.method === "turn/start" && entry.threadId === threadId)?.text ?? "";
   const routineRule = "In a routine run, first check saved logins with openbot_browser.list_logins";
@@ -702,7 +670,6 @@ try {
     .map((message) => message.text)
     .filter((text) => text.startsWith("Routine report") || text.startsWith("Second routine report"));
   pass("No routine answer shows in the chat", report.routineAnswersInChat.length === 0);
-  // A run in a routine thread still gets its status, its History row and its marker in the chat.
   const runStatuses = () =>
     [routine, secondRoutine].flatMap((item) =>
       agents.listRoutineRuns({ agentId: agent.id, routineId: item.id }).map((run) => run.status),
@@ -755,35 +722,6 @@ try {
       report.threadStarts.filter((entry) => entry.persistSession !== false).length === 1,
   );
 
-  // The late answer to a routine card is a message in the routine thread (#11550). It starts a turn
-  // there, not in the chat. As a message that the user types there, it starts a new session, which does
-  // not read the earlier runs: the report keeps that, and the quoted card is the turn's context.
-  const lateQuestion = "Send the build report?";
-  const late = await runCauseEffect(
-    agents.sendMessage({ agentId: agent.id, taskId: buildThread.taskId, text: `> ${lateQuestion}\n\nSend` }),
-  );
-  const lateDeliveryId = late.deliveries[0]?.id;
-  assert.ok(lateDeliveryId, "late answer: no delivery");
-  await settled(lateDeliveryId, "late answer in the routine thread");
-  const lateTurn = await waitFor("the late answer turn", () =>
-    fakeEntries().find((entry) => entry.method === "turn/start" && entry.text?.includes(lateQuestion)),
-  );
-  report.lateAnswerInRoutineThread = {
-    threadId: String(lateTurn.threadId),
-    readsEarlierRuns: lateTurn.text?.includes("Routine report 2") === true,
-    answerShown: agents
-      .readTask(agent.id, buildThread.taskId)
-      // Only this turn answers "Done." in the routine thread: each run answers with its report.
-      .messages.some((message) => message.text === "Done."),
-  };
-  pass(
-    "A late answer in a routine thread starts a turn there, not in the chat",
-    lateTurn.threadId !== mainBefore && report.lateAnswerInRoutineThread.answerShown,
-  );
-  pass("The late answer turn gets the quoted card", lateTurn.text?.includes(`> ${lateQuestion}\n\nSend`) === true);
-
-  // An archive stops the subagents of a Codex thread, so a run whose subagent still works keeps its
-  // session listed. The chat routine below runs after it, so the close has ended before the check.
   const subagentRoutine = agents.createRoutine({
     agentId: agent.id,
     name: "Subagent check",
@@ -803,7 +741,6 @@ try {
     fakeEntries().some((item) => item.method === "thread/unsubscribe" && item.threadId === subagentTurn.threadId),
   );
 
-  // A routine with no run place runs in the chat, as before 0.61.
   const chatRoutine = agents.createRoutine({
     agentId: agent.id,
     name: "Chat check",

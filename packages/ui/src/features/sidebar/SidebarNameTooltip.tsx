@@ -1,27 +1,16 @@
-/**
- * The name of a chat in a tooltip at its row. The compact sidebar shows only the avatars, so the
- * tooltip shows what the full row shows: the name of the agent, channel or person, its title and
- * its last message. The full sidebar shows these in the row, so it has no tooltip there.
- */
-
 import { Badge } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { Show } from "solid-js";
 import { SidebarRowTooltip } from "./SidebarRowTooltip";
 import { useSidebarScope } from "./sidebar-scope";
 
-/** The delay of the server rail. After the first tooltip, the next rows open theirs at once. */
 const SIDEBAR_NAME_TOOLTIP_OPEN_DELAY = 150;
 
 export function SidebarNameTooltip(tooltipProps: {
   name: string;
-  /** The title of the agent or channel, such as its role. */
   title?: string | undefined;
-  /** The last message, or what the row shows in its place. */
   preview?: string | undefined;
-  /** The state, such as a running routine. */
   detail?: string | undefined;
-  /** The row's context menu is open. */
   menuOpen?: boolean;
   children: JSX.Element;
 }) {

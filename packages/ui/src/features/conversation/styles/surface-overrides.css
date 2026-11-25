@@ -46,7 +46,6 @@
   transform: scale(0.97);
 }
 
-/* A filled field with no border, in the menu item shape. */
 .provider-model-search {
   height: var(--openbot-control-md);
   flex-shrink: 0;
@@ -62,7 +61,6 @@
   border-color: var(--ui-menu-edge);
 }
 
-/* A short list fills the panel, so the effort row stays at the bottom, as high as the provider rail. */
 .provider-model-scroll {
   flex: 1 1 auto;
   min-height: 0;

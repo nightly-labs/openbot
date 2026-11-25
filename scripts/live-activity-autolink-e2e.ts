@@ -1,6 +1,3 @@
-// Runs the real Live Activity push service with synthetic unread replies and a local relay adapter.
-// Run: bun scripts/live-activity-autolink-e2e.ts --phase=before
-// Phase selects only the report folder. A lost URL always fails, including on the unfixed source.
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
@@ -162,6 +159,7 @@ async function runCase(fixture: (typeof CASES)[number]): Promise<CaseResult> {
           result.cleanup.listenerRemoves += 1;
           events.off(event, listener);
         },
+        listAgents: () => [],
         getRuntimeSnapshot: () => {
           result.snapshotReads += 1;
           return runtime;
@@ -182,7 +180,6 @@ async function runCase(fixture: (typeof CASES)[number]): Promise<CaseResult> {
       memberActive: (memberId) => memberId === "fixture-member",
       randomBytes,
     });
-    // The connected registration must not send. Disconnect starts the real service update timer.
     service.register(
       "fixture-session",
       {
@@ -234,14 +231,12 @@ async function runCase(fixture: (typeof CASES)[number]): Promise<CaseResult> {
     result.stage = "complete";
     result.passed = true;
   } catch {
-    // Stage and synthetic observations describe the failure without exporting errors or push data.
     result.passed = false;
   } finally {
     if (deadline !== undefined) clearTimeout(deadline);
     result.cleanup.deadlineCleared = true;
     try {
       if (service) {
-        // dispose closes the send scope and clears the registration's retry/keepalive timer.
         await Effect.runPromise(service.dispose());
         result.cleanup.disposeCompleted = true;
         result.cleanup.registrationRemoved = !service.showsEvent(

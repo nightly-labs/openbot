@@ -7,6 +7,13 @@ export const messages = {
   "composer.feedbackFix.body":
     "Corrigiendo el informe #{number}. Envía la solicitud o cancela para dejar el informe como está.",
   "composer.feedbackFix.cancel": "Cancelar",
+  "composer.browserTab.opened": "{name} abrió {title} en el navegador.",
+  "composer.browserTab.openedMany": {
+    one: "{name} abrió {count} página en el navegador.",
+    other: "{name} abrió {count} páginas en el navegador.",
+  },
+  "composer.browserTab.open": "Abrir página",
+  "composer.browserTab.hide": "Ocultar",
   "composer.providerWait.offlineTitle": "Sin conexión a internet",
   "composer.providerWait.offline": "{provider} no puede responder hasta que este equipo vuelva a estar en línea.",
   "composer.providerWait.silent": "{provider} no ha enviado nada en {duration}.",
@@ -52,6 +59,7 @@ export const messages = {
   "composer.picker.noSkills": "Este agente no tiene habilidades.",
   "composer.picker.noSkillMatch": "Ninguna habilidad coincide con «{query}».",
   "composer.picker.skillsLoadFailed": "No se cargaron las habilidades.",
+  "composer.picker.skillProblem": "{name} no está disponible. {problem} Pide al agente que lo corrija.",
   "composer.token.attachment": "Abrir archivo adjunto {name}",
   "composer.token.agent": "Agente {name}",
   "composer.token.skill": "Habilidad {name}",
@@ -63,6 +71,7 @@ export const messages = {
   "composer.voice.stop": "Detener grabación de voz",
   "composer.voice.cancel": "Cancelar grabación de voz",
   "composer.voice.preparing": "Descargando modelo de voz",
+  "composer.voice.starting": "Iniciando la grabación de voz",
   "composer.voice.requesting": "Solicitando acceso al micrófono",
   "composer.voice.transcribing": "Transcribiendo instrucción de voz",
   "composer.voice.start": "Crear instrucción con la voz",
@@ -70,6 +79,8 @@ export const messages = {
     "El acceso al micrófono está bloqueado. Permite que OpenBot use el micrófono en los ajustes del sistema.",
   "composer.voice.noMicrophone": "No hay ningún micrófono disponible.",
   "composer.voice.startFailed": "OpenBot no pudo iniciar la grabación de voz.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot no pudo abrir el micrófono. Cierra otras apps que lo usen, comprueba que esté conectado y permitido en los ajustes del sistema, y vuelve a intentarlo.",
   "composer.voice.transcribeFailed": "OpenBot no pudo transcribir esta grabación.",
   "composer.reply.toYou": "Respondiendo a tu mensaje",
   "composer.reply.toAgent": "Respondiendo al agente",
@@ -99,7 +110,10 @@ export const messages = {
   "composer.voice.recording": "Grabación de voz",
   "composer.voice.limitSoon": "La grabación se detiene en {seconds} segundos.",
   "composer.voice.limitReached":
-    "La grabación se detuvo al llegar al límite de 2 minutos. Lo que dijiste está en el mensaje.",
+    "La grabación se detuvo al llegar al límite de 10 minutos. Lo que dijiste está en el mensaje.",
+  "composer.voice.languageNotice":
+    "El dictado conoce 25 idiomas europeos, como el inglés. Otros idiomas necesitan un modelo más grande ({size}), y el texto aparece cuando te detienes.",
+  "composer.voice.languageNotice.action": "Hablo otro idioma",
   "composer.send.saveQueued": "Guardar mensaje en cola",
   "composer.send.voice": "Enviar mensaje de voz",
   "composer.send.message": "Enviar mensaje",
@@ -131,6 +145,7 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "No se grabó ninguna voz.",
   "composer.voice.noSpeechDetected": "No se detectó ninguna voz.",
   "composer.voice.readFailed": "No se pudo leer la respuesta en voz alta.",
+  "composer.voice.languageUnsupported": "No se pudo leer la respuesta en voz alta. Este idioma aún no está disponible.",
   "composer.error.saveEditTryAgain": "No se pudo guardar esta edición en este equipo. Vuelve a intentarlo.",
   "composer.error.saveUnconfirmed":
     "No se ha confirmado que se haya guardado. Vuelve a pulsar Guardar para comprobar el resultado.",

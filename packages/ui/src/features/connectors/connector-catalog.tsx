@@ -15,15 +15,11 @@ import type { ConnectorId } from "./connectors";
 
 export interface ConnectorListing {
   title: AppTextKey;
-  /** The line under the name on a Marketplace card. */
   tagline: AppTextKey;
-  /** The Marketplace category. */
   category: SkillCategory;
-  /** The app icon: the brand color fills the square, as the icon of a catalog app does. */
   Mark: () => JSX.Element;
 }
 
-/** What each connector is called and how it looks, on every screen that lists it. */
 export const CONNECTOR_LISTINGS: Readonly<Record<ConnectorId, ConnectorListing>> = {
   slack: {
     title: "connector.slack.title",

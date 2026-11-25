@@ -1,13 +1,4 @@
-/**
- * The pinned strip above the sections. It stays mounted while `emptyPinnedDropVisible()` is on
- * even with nothing pinned, because that empty row is the drop target that lets a first chat be
- * pinned at all.
- *
- * A tile holds an agent or a channel: both are chats the user pins, so the tile, its drag source
- * and its keyboard reorder are shared, and only the avatar, the name row and the menu ask which
- * kind they have.
- */
-
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import { Badge, buttonVariants, ContextMenu } from "@openbot/ui";
 import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
@@ -28,6 +19,7 @@ export function SidebarPinnedGroup() {
     dragOffset,
     dragOverPinnedKey,
     draggedPinnedKey,
+    listFiltered,
     movePinnedItem,
     pinnedDropActive,
     props,
@@ -35,7 +27,7 @@ export function SidebarPinnedGroup() {
     startNativeItemDragging,
     stopSidebarDragging,
   } = useSidebarScope();
-  const { t, format } = useText();
+  const { t, format, sourceText } = useText();
   const chatName = (chat: SidebarChatItem) => (chat.kind === "agent" ? chat.agent.name : chat.channel.name);
   const chatIsActive = (chat: SidebarChatItem) =>
     chat.kind === "agent" ? props.activeAgentId === chat.id : props.activeChannelId === chat.id;
@@ -65,17 +57,13 @@ export function SidebarPinnedGroup() {
               const name = () => chatName(item.chat);
               const active = () => chatIsActive(item.chat);
               const [menuOpen, setMenuOpen] = createSignal(false);
-              /* The compact tooltip shows the last message, as the row in a section does. A channel
-               * from a saved frame has no last message until the list loads, so it shows none. */
               const pinnedPreview = () => {
                 if (item.chat.kind === "agent") return item.chat.agent.preview;
                 const lastMessage = item.chat.channel.lastMessage;
-                if (lastMessage) return lastMessage.text;
+                if (lastMessage) return coordinatorText(lastMessage.author, lastMessage.text, sourceText);
                 return props.channelPreviewsPending === true ? undefined : t("sidebar.channel.noMessages");
               };
-              // A pinned chat that waits stays in its tile, so the tile says what it waits for.
               const channelWait = () => (item.chat.kind === "channel" ? props.channelWaits?.[item.chat.id] : undefined);
-              /* A pinned channel shows its unread count as a pinned agent does. */
               const channelBadge = createMemo(() =>
                 item.chat.kind === "channel"
                   ? sidebarUnreadBadge(item.chat.channel.unreadCount, channelWait())
@@ -108,7 +96,7 @@ export function SidebarPinnedGroup() {
                   ]}
                   style={`--sidebar-drag-x: ${dragOffset(key()).x}px; --sidebar-drag-y: ${dragOffset(key()).y}px;`}
                   data-pinned-key={key()}
-                  draggable="true"
+                  draggable={listFiltered() ? "false" : "true"}
                   onDragStart={(event) => {
                     startNativeItemDragging(event, {
                       className: "sidebar-pinned-drag-preview",

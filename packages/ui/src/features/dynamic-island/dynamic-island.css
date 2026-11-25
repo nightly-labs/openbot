@@ -77,7 +77,6 @@
   padding-top: var(--dynamic-island-notch-height);
 }
 
-/* The body and two shoulders reproduce the concave top corners of a physical MacBook notch. */
 .dynamic-island-silhouette {
   position: absolute;
   z-index: 0;
@@ -122,9 +121,7 @@
   width: min(var(--dynamic-island-compact-width), calc(100vw - var(--openbot-space-6)));
   height: var(--dynamic-island-notch-height);
   display: grid;
-  /* The ears share the width that is left: a fixed floor here pushed the trailing ear out of a
-     narrow island. The width limits keep each ear wide enough for its content. The middle track
-     takes the safe zone's width, so a resize can move the zone on the surface's spring. */
+
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   border: 0;
@@ -136,8 +133,7 @@
   font: inherit;
   outline: none;
   transform: translateX(-50%);
-  /* The compact ears and shoulders are placed by physical side and measured by the motion script, so
-     the compact bar keeps one layout in every language. The expanded panel mirrors. */
+
   direction: ltr;
 }
 
@@ -193,8 +189,6 @@
     transform var(--openbot-duration-island-content) cubic-bezier(0.22, 1.08, 0.36, 1);
 }
 
-/* The compact content blurs a little while it moves with the surface, as much as the move is large.
-   The blur bridges the old and the new place, and a transition keeps it interruptible. */
 .dynamic-island-shell[data-compact-resize] .dynamic-island-ear-content {
   filter: blur(calc(0.4px * var(--dynamic-island-compact-motion, 1)));
 }
@@ -252,7 +246,6 @@
   transform-origin: right center;
 }
 
-/* The hidden badge moves onto the end of a panel row, so it must not take a press from a row button. */
 .dynamic-island[data-layout-state="expanded"] .dynamic-island-trailing-compact {
   pointer-events: none;
   opacity: 0;
@@ -292,13 +285,18 @@
   transform-origin: top center;
 }
 
-/* The shell and content use separate, asymmetric springs. */
 .dynamic-island[data-shared-leading="true"] .dynamic-island-ear-leading .dynamic-island-ear-content {
   opacity: 1;
   filter: none;
   transition:
     color var(--openbot-duration-normal) var(--openbot-ease-out),
     opacity var(--openbot-duration-island-content-exit) var(--dynamic-island-shared-ease);
+}
+
+.dynamic-island[data-shared-leading="true"][data-layout-state="expanded"]
+  .dynamic-island-ear-leading
+  .dynamic-island-ear-content {
+  pointer-events: none;
 }
 
 .dynamic-island:not([data-shared-leading="true"])[data-layout-state="expanded"]
@@ -353,8 +351,6 @@
   transition: none;
 }
 
-/* Beside a notch, the logo and the greeting keep the same inset from the outer edges. Only the
-   space between them changes with the island width. */
 .dynamic-island.dynamic-island-idle:not(.dynamic-island-external) .dynamic-island-ear-leading {
   justify-content: flex-start;
   padding-right: 0;
@@ -372,12 +368,7 @@
   top: calc(-1 * var(--dynamic-island-hover-hit-top));
   left: 50%;
   display: none;
-  /* Acquiring the island takes no more room than the island shows: an ear reads as part of the
-     notch, so a wider zone would only take the menu bar beside it away from the mouse. The band
-     below is `--dynamic-island-hover-hit-bottom`, which stays inside the menu bar - taller than the
-     notch on every notched MacBook - rather than reaching into the window under it. The retention
-     zone below is the generous one, and it only applies once the pointer is already on the
-     island. */
+
   width: min(var(--dynamic-island-compact-width), calc(100vw - var(--openbot-space-6)));
   height: calc(
     var(--dynamic-island-notch-height) +
@@ -450,7 +441,6 @@
   padding-bottom: 14px;
 }
 
-/* External displays use a detached capsule because there is no physical notch to join. */
 .dynamic-island-external {
   --dynamic-island-notch-width: 16px;
   --dynamic-island-compact-width: 212px;
@@ -476,8 +466,6 @@
   border-radius: var(--dynamic-island-external-expanded-radius);
 }
 
-/* Keyboard focus on the toggle draws the shared focus ring on the island outline. The shell clips
-   its content, so the ring is inset: a ring outside the outline would be cut off. */
 .dynamic-island-shell:has(.dynamic-island-toggle:focus-visible) .dynamic-island-silhouette-body,
 .dynamic-island-external .dynamic-island-shell:has(.dynamic-island-toggle:focus-visible) .dynamic-island-silhouette {
   box-shadow:

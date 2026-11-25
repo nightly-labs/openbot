@@ -1,19 +1,3 @@
-// Runs the real membership change of the account server on a local D1 (workerd through Wrangler) with
-// the real migrations. It checks the race between two admins: admin A removes a member while admin B
-// changes that member's role from a read made before the removal. B's change must fail with 409
-// `membership_changed`, and the member must stay removed, with no auth epoch, events or ended sessions
-// from B. A role change with no race succeeds, and two removals of the same member, one from a read
-// made before the other, both succeed and keep the time of the first removal. A removal from a read
-// made before another admin's role change also succeeds: a role change cannot stop a removal.
-//
-// The race cannot be timed from outside, so the script orders it: a D1 wrapper runs admin A's whole
-// removal when admin B's change starts its write batch. Then all of B's reads come before A's removal,
-// and B's writes come after it.
-//
-// Run: bun apps/auth-api/scripts/remote-membership-race-e2e.ts
-// It writes .openbot-build/remote-membership-race-e2e/report.json and exits non-zero on a failure.
-// The local D1 lives in a temporary directory, so the worktree's own local D1 stays as it is. The
-// control plane has no webhook URLs and a fetch stub, so it uses no network.
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -42,7 +26,6 @@ function check(name: string, passed: boolean, detail?: unknown) {
   steps.push({ name, passed, ...(detail === undefined ? {} : { detail }) });
 }
 
-/** The error code and HTTP status of an operation, or null codes when it succeeds. */
 async function outcome<A, E extends object>(operation: Effect.Effect<A, E>) {
   const result = await Effect.runPromise(Effect.result(operation));
   if (result._tag === "Success") return { code: null, status: null };
@@ -52,10 +35,6 @@ async function outcome<A, E extends object>(operation: Effect.Effect<A, E>) {
   };
 }
 
-/**
- * The D1 binding, except that `beforeNextBatch(hook)` runs `hook` to its end before the next batch
- * starts. The returned object holds the result of the hook once it ran.
- */
 function interleavedDatabase(database: D1Database) {
   let pending: (() => Promise<void>) | null = null;
   const wrapped: D1Database = {
@@ -106,7 +85,6 @@ await run(WRANGLER, ["d1", "migrations", "apply", "openbot-auth", "--local", "--
   cwd: work,
   env,
 });
-// Wrangler keeps local state under `<persist-to>/v3`; the platform proxy takes that directory itself.
 const proxy = await getPlatformProxy<{ DB: D1Database }>({
   configPath: config,
   persist: { path: join(state, "v3") },
@@ -122,7 +100,6 @@ const publicJwk = await crypto.subtle.exportKey("jwk", publicKey);
 const privateJwk = await crypto.subtle.exportKey("jwk", privateKey);
 
 let clock = Date.now();
-/** Moves the clock of the control plane, so that each change has its own time. */
 const tick = () => {
   clock += 1000;
 };
@@ -145,7 +122,6 @@ const plane = new RemoteControlPlane(
   },
 );
 
-/** A host with an owner, admins A and B and member M, all active, with room for more members. */
 async function seed(hostId: string) {
   const now = clock;
   const user = (name: string) => `${hostId}-${name}`;
@@ -224,14 +200,12 @@ async function seed(hostId: string) {
 async function staleRoleChangeCannotBringBackARemovedMember() {
   const host = await seed("host-race");
   const removal = interleave.beforeNextBatch(async () => {
-    // Admin B's change has made all its reads and is about to write.
     const seenByB = await host.read();
     tick();
     const revoke = await outcome(
       plane.changeMembership(host.adminA, { hostId: host.hostId, membershipId: host.memberId, revoke: true }),
     );
     const removed = await host.read();
-    // A session row that is open after A's removal shows whether B's refused change still ends sessions.
     const session = await host.openSession();
     return { seenByB, revoke, removed, session, epoch: await host.epoch(), events: await host.events() };
   });
@@ -301,13 +275,11 @@ async function twoRemovalsBothSucceed() {
     return { seenByB, revoke, removed: await host.read() };
   });
   tick();
-  // Admin B removes the member from a read made before admin A's removal.
   const raced = await outcome(
     plane.changeMembership(host.adminB, { hostId: host.hostId, membershipId: host.memberId, revoke: true }),
   );
   const afterRaced = await host.read();
   tick();
-  // Admin B removes the member again, from a read made after the removal.
   const again = await outcome(
     plane.changeMembership(host.adminB, { hostId: host.hostId, membershipId: host.memberId, revoke: true }),
   );
@@ -347,7 +319,6 @@ async function removalWinsOverAConcurrentRoleChange() {
     return { seenByB, change, promoted: await host.read(), epoch: await host.epoch() };
   });
   tick();
-  // Admin B removes the member from a read made before admin A made the member an admin.
   const removal = await outcome(
     plane.changeMembership(host.adminB, { hostId: host.hostId, membershipId: host.memberId, revoke: true }),
   );

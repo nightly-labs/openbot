@@ -1,4 +1,3 @@
-/** Extract a large native text insertion without copying the surrounding draft into the file. */
 export function largePastedText(before: string, after: string): { text: string; draft: string } | null {
   if (after.length <= 4_000) return null;
   let start = 0;

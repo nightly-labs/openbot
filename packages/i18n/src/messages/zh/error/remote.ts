@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/remote";
 
 export const messages = {
-  // Errors from remote servers, WebRTC transport, remote desktop, and the team client.
   "error.remote.desktopSetupClientUpdate": "请更新客户端以使用远程桌面配置。",
   "error.remote.desktopSetupUnavailable": "远程桌面配置不可用。",
   "error.remote.desktopTestUnavailable": "远程桌面测试不可用。",
@@ -23,6 +22,12 @@ export const messages = {
   "error.remote.screenRecordingDenied": "主机未允许 OpenBot 录制屏幕。请在主机上授予屏幕录制权限后重试。",
   "error.remote.windowsSessionDisconnected":
     "主机上的 Windows 会话已断开，没有可共享的屏幕。请在主机的屏幕上登录 Windows，然后重试。",
+  "error.remote.windowsCaptureDenied":
+    "主机上的 Windows 不允许 OpenBot 录制屏幕。请在主机的屏幕上解锁 Windows 并关闭所有管理员提示，然后重试。如果问题仍然存在，请重启主机。",
+  "error.remote.macScreenLocked": "Mac 已锁定，无法共享屏幕。请在 Mac 的屏幕上解锁，然后重试。",
+  "error.remote.streamTooSlowLowerQuality": "与主机的连接太慢，无法显示画面。请重试：下一次连接将使用较低的画质。",
+  "error.remote.streamTooSlow": "与主机的连接太慢，无法显示画面。请使用更快的网络，然后重试。",
+  "error.remote.noPictureSwitchEncoder": "主机没有发送画面。请重试：下一次连接会使用适用于更多电脑的视频设置。",
   "error.remote.teamSessionExpired": "团队会话已过期。",
   "error.remote.finishTestBeforeSwitch": "切换显示器前请先结束远程桌面测试。",
   "error.remote.displayNotFound": "未找到远程显示器。",
@@ -75,10 +80,16 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "只有所有者可以移除该服务器。",
   "error.remote.requestTimeout": "远程请求超时。",
   "error.remote.requestFailed": "远程请求失败。",
-  "error.remote.pinnedKeyMissing": "远程主机没有固定的设备密钥。",
-  "error.remote.hostDidNotConnect": "WebRTC 主机未连接。",
+  "error.remote.hostKeyMissing":
+    "此服务器的安全密钥缺失或已更改，OpenBot 无法验证此服务器。请让服务器所有者检查服务器。",
+  "error.remote.connectionNotStarted": "OpenBot 无法开始连接此服务器。如果问题持续，请退出 OpenBot 并重新打开。",
+  "error.remote.connectionServiceUnreachable":
+    "此电脑无法连接 OpenBot 连接服务。请检查网络连接。OpenBot 会自动重新连接。",
+  "error.remote.serverAnswerTimeout": "服务器未及时响应。OpenBot 会自动重新连接。",
+  "error.remote.signInConnectionClosed":
+    "登录时与服务器的连接已关闭。如果反复出现，请确认服务器和此设备的日期和时间正确。",
   "error.remote.connectionCancelled": "远程连接已取消。",
-  "error.remote.hostDisconnected": "WebRTC 主机已断开。",
+  "error.remote.hostDisconnected": "与服务器的连接已断开。请确认该操作是否已完成，然后重试。",
   "error.remote.eventGap": "主机事件序列存在断档。",
   "error.remote.malformedKnownEvent": "主机返回了格式错误的已知事件。",
   "error.remote.fileTransportIsStopped": "WebRTC 文件传输已停止。",
@@ -161,7 +172,6 @@ export const messages = {
   "error.remote.signalFrameUnreadable": "Signal 发送了对端无法读取的数据帧。",
   "error.remote.webRtcCommandFailed": "WebRTC 命令执行失败。",
   "error.remote.dataChannelFailed": "{kind} 通道失败。",
-  // Signal refusals, by the code in the Signal error frame. The client maps the code, not the text.
   "error.remote.hostBusy": "主机正忙于其他连接，请稍后重试。",
   "error.remote.signalPermissionDenied": "你的账号无权访问该主机，请向所有者申请权限。",
   "error.remote.signalRateLimited": "连接尝试过于频繁，OpenBot 将在 {seconds} 秒后重试。",
@@ -169,10 +179,10 @@ export const messages = {
   "error.remote.signalRefused": "Signal 拒绝了该连接。",
   "error.remote.signalClosed": "在主机响应之前，与 Signal 的连接已关闭。",
   "error.remote.relayUnavailable": "Signal 没有为这次连接提供中继服务器，请稍后重试。",
-  // How a direct (WebRTC) connection ended.
   "error.remote.iceFailed": "无法与主机建立直连。防火墙、VPN 或代理可能阻断了连接。",
   "error.remote.iceDisconnected": "与主机的直连已断开。",
-  // Account service (control plane) refusals, by their error code.
+  "error.remote.webrtcBlocked":
+    "此设备阻止了 OpenBot 所需的连接。如果已打开锁定模式，请在“设置”>“隐私与安全性”>“锁定模式”中为 OpenBot 关闭它。",
   "error.remote.directoryUnreachable": "OpenBot 无法连接 OpenBot 服务，请检查网络连接。",
   "error.remote.directoryTimeout": "OpenBot 服务未及时响应，请重试。",
   "error.remote.inviteAlreadyUsed": "该邀请已被使用，请申请新的邀请。",
@@ -186,14 +196,19 @@ export const messages = {
   "error.remote.hostOtherAccount": "该主机属于另一个账号。",
   "error.remote.remoteNotConfigured": "该 OpenBot 服务未配置远程连接。",
   "error.remote.hostRefused": "主机拒绝了该请求（{status}）。",
-  // Channel actions on mobile.
   "error.remote.formUnavailable": "该表单已不可用。",
   "error.remote.hostedServerRemoval": "请使用账单页面删除托管服务器。",
   "error.remote.hostRemoved": "所有者已将该服务器从账户中移除。",
+  "error.remote.ownerTransferSelf": "你已经是该服务器的所有者。请输入新所有者的邮箱。",
+  "error.remote.ownerTransferHosted": "由 OpenBot 托管的服务器无法更换所有者。",
+  "error.remote.ownerTransferInvalid": "此所有权转移已失效。请让所有者重新发送。",
   "error.remote.channelsUnsupported": "请更新这台桌面服务器以使用频道。",
   "error.remote.channelDeleteUnsupported": "请更新这台桌面服务器以删除频道。",
   "error.remote.historyRefreshFailed": "消息已发送，但无法刷新对话历史。",
   "error.remote.taskHistoryRefreshFailed": "任务已更改，但无法刷新对话历史。",
+  "error.remote.serverNotLoaded": "OpenBot 无法加载该服务器。请重试。",
+  "error.remote.localServerNotStarted":
+    "这台电脑上的服务器没有启动。请重试。如果仍未启动，请在这台电脑上重启 OpenBot。",
   "error.remote.localServerAccountRemovalFailed":
     "服务器已在其电脑上删除，但账户中仍列出它。请再次删除以将其从账户中移除。",
 } as const satisfies PartialTranslation<typeof source>;

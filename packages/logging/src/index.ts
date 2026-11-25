@@ -4,9 +4,6 @@ export { maskIdentifiers } from "./identifiers";
 export type { Logger };
 export { dummyLogger };
 
-// The values a log call can carry. A recursive domain type instead of
-// `unknown`: redaction branches on it without assertions, and callers keep
-// their own types because every JSON-shaped value already fits.
 export type LogValue = string | number | boolean | bigint | null | undefined | LogValue[] | { [key: string]: LogValue };
 
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "silent";
@@ -14,135 +11,66 @@ export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "silent";
 const LEVEL_RANK: Record<LogLevel, number> = { trace: 10, debug: 20, info: 30, warn: 40, error: 50, silent: 60 };
 const LOG_LEVELS: LogLevel[] = ["trace", "debug", "info", "warn", "error", "silent"];
 
-// A label whose value is a secret, used both for `key: value` shapes inside a
-// string and for object keys. Prefix and suffix let `machineToken`,
-// `refresh_token` and `X-Api-Key` all match; bare `key` is handled separately
-// because `monkey` and `keyboard` are not secrets.
-// The affix runs are bounded rather than open: with `*` on both sides, every
-// position in a long payload retried the whole keyword list, and redacting a
-// 200 KB body took tens of seconds. No real label approaches 64 characters.
 const SECRET_LABEL = `[A-Za-z0-9_.-]{0,64}(?:password|passwd|passphrase|secret|token|credential|authorization|cookie|api[_-]?key|private[_-]?key|signing[_-]?key)[A-Za-z0-9_.-]{0,64}`;
 
-// A scheme word carries the secret after it, so the assignment rule below
-// cannot see it: its value stops at the space.
-// `Bearer` is unambiguous enough to match anywhere - no English sentence puts
-// a 8+ character token after it. `Basic`, `Digest` and `Token` are ordinary
-// words, so they only count inside an `Authorization` header: without that
-// context `Token validation failed` became `[redacted] failed` and
-// `Basic authentication unavailable` lost its subject.
 const BEARER_SECRET = /Bearer\s+[A-Za-z0-9._~+/=-]{8,}/giu;
-const AUTH_HEADER_SECRET = /(authorization["']?\s*[=:]+\s*)(?:Bearer|Basic|Digest|Token)\s+[A-Za-z0-9._~+/=-]{8,}/giu;
-// Quotes are optional on both sides and around the separator, so a serialized
-// payload (`{"apiKey":"…"}`) redacts the same as a shell line (`apiKey=…`).
-// A quoted value is consumed whole; an unquoted one stops at the first
-// delimiter.
-// The separator has to be an explicit `=` or `:`. Accepting bare whitespace as
-// well turned prose into an assignment - `SKILLS_ADMIN_TOKEN is missing` lost
-// the "is" - and a secret written without a separator is prose, not a
-// key-value pair. `Bearer`-style values are the one real exception and the
-// rule above owns them.
+const AUTH_HEADER_SECRET = /(authorization["']?\s*[=:]+\s*)[A-Za-z][A-Za-z0-9_-]{0,31}\s+[A-Za-z0-9._~+/=-]{8,}/giu;
 const CREDENTIAL_ASSIGNMENT = new RegExp(
   String.raw`(["']?(?:${SECRET_LABEL})["']?\s*[=:]+\s*)(\[redacted\]|"[^"]*"|'[^']*'|[^\s,;)}\]]+)`,
   "giu",
 );
-// The prefix has to start a token: without the boundary, `sk-` matched inside
-// ordinary words and `risk-register` came out as `ri[redacted]`, erasing the
-// part of a diagnostic that names what failed.
-// `npm_`, `hf_` and `gsk_` also start ordinary names such as `npm_config_user_agent`, so their
-// value must be one long alphanumeric run, as the vendors issue them. `ASIA` is a word, so only the
-// exact shape of an AWS key ID counts.
 const KNOWN_SECRET_PREFIXES =
-  /(?<![A-Za-z0-9_-])(?:(?:sk-ant|sk-|sk_|xai-|ghp_|gho_|ghu_|ghr_|ghs_|github_pat_|AKIA|xox[abeoprs]-|xapp-|glpat-|rk_live_|rk_test_)[A-Za-z0-9._-]{8,}|whsec_[A-Za-z0-9+/=._-]{8,}|AIza[A-Za-z0-9_-]{30,}|(?:npm|hf|gsk)_[A-Za-z0-9]{30,}|ASIA[A-Z0-9]{16}(?![A-Za-z0-9]))/g;
-// A JSON Web Token: a header and a payload that both start as a JSON object, then the signature.
+  /(?<![A-Za-z0-9_-])(?:(?:sk-ant|sk-|sk_|xai-|ghp_|gho_|ghu_|ghr_|ghs_|github_pat_|AKIA|xox[abeoprs]-|xapp-|glpat-|rk_live_|rk_test_)[A-Za-z0-9._-]{8,}|whsec_[A-Za-z0-9+/=._-]{8,}|AIza[A-Za-z0-9_-]{30,}|(?:npm|hf|gsk)_[A-Za-z0-9]{30,}|ASIA[A-Z0-9]{16}(?![A-Za-z0-9])|ya29\.[A-Za-z0-9_-]{20,}|GOCSPX-[A-Za-z0-9_-]{20,}|(?:bot)?\d{6,12}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-]))/g;
+const WEBHOOK_URL_SECRET =
+  /(https:\/\/(?:hooks\.slack\.com\/(?:services|workflows|triggers)\/|(?:(?:canary|ptb)\.)?discord(?:app)?\.com\/api\/(?:v\d+\/)?webhooks\/))(?!\[redacted\])[^\s"'<>?#)\]]+/giu;
 const JSON_WEB_TOKEN = /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*/g;
-// A PEM private key, with its body. A key that the text cuts off before its END line is removed to
-// the end of the text, but only when a body follows the BEGIN line: prose that names the marker
-// stays. The search for the END line is bounded, far past the size of a real key, so a line of
-// repeated BEGIN markers cannot make each one scan the rest of the text.
 const PEM_PRIVATE_KEY =
   /-----BEGIN [A-Z0-9 ]{0,40}PRIVATE KEY-----(?:[\s\S]{0,16384}?-----END [A-Z0-9 ]{0,40}PRIVATE KEY-----|(?:\\[rn]|\s)*[A-Za-z0-9+/=]{16,}[\s\S]*$)/gu;
-// Every cookie in a `Cookie:` or `Set-Cookie:` header. The assignment rule stops at the first `;`
-// and kept every later cookie. The value must start with `name=`, so prose such as
-// `cookie: missing` is left to the assignment rule. The value also takes an escaped quote, as in a
-// JSON string, and a quoted cookie value that ends at a `;` or at the end of the line. The name is
-// bounded: a line of repeated `cookie:` with no `=` must not scan the rest of the line once each.
 const COOKIE_HEADER =
   /(\bcookie["']?\s*:\s*["']?)[^\s=;,"'\\]{1,256}=(?:\\.|"[^"\r\n\\]{0,4096}"(?=;|[ \t]*(?:[\r\n]|$))|[^\r\n"'\\])*/giu;
-// URL query values that carry a credential under a name too common to be a secret label: an API
-// key, an OAuth code, a login ticket, a signature. Only a `?` or `&` before the name makes it a
-// query parameter. The value must hold a digit, so a placeholder such as `YOUR_API_KEY` in a skill
-// or a template is not taken for a secret. The search for the digit is bounded, so a line of
-// repeated `?key=` with no digit does not scan the rest of the line once each.
 const QUERY_SECRET = /([?&](?:key|code|ticket|sig)=)(?!\[redacted\])(?=[^&#\s"'<>)\]]{0,256}\d)[^&#\s"'<>)\]]{8,}/giu;
-// Bounded for the same reason as the label above, and more sharply: with `+`
-// on the local part, every character of a long payload consumed the rest of
-// the run looking for an `@` and then backtracked over all of it.
+const URL_PASSWORD = /(\b[a-z][a-z0-9+.-]{0,31}:\/\/[^\s:/?#@[\]"'<>]{0,256}:)[^\s/?#@"'<>]{1,256}(?=@)/giu;
 const EMAIL = /[A-Z0-9._%+-]{1,64}@[A-Z0-9.-]{1,255}\.[A-Z]{2,24}/giu;
 const SECRET_KEY = new RegExp(`^(?:${SECRET_LABEL}|keys?)$`, "iu");
 
-// `key` and `keys` are too common in prose to redact on their own, but as a
-// quoted JSON label they are a key-value pair like any other. This is the
-// fallback for a payload too malformed to reparse, where `SECRET_KEY` - which
-// does accept a bare `key` - never gets to see it.
 const JSON_BARE_KEY = /("keys?"\s*:\s*)(\[redacted\]|"[^"]*"|'[^']*'|[^\s,;)}\]]+)/giu;
 
-// A credential sits under `X-Api-Token` as often as under `apiKey`, and a header name is chosen by
-// whoever owns the endpoint, so no label list can cover one. Below a `headers` object every string
-// is treated as the credential it might be - including the names in a `{ name, value }` list, which
-// is the shape a custom provider is described in. Only an object matches: `headers: "none"` in prose
-// is not a key-value pair.
 const HEADER_KEY = /^headers$/iu;
 
 const MAX_PARAM_LENGTH = 2_000;
 
-// What a value becomes when reading it is itself the failure. A constant
-// rather than the thrown message: that message comes from the same
-// caller-controlled getter and would leak what redaction just refused to read.
 const UNSERIALIZABLE = "[unserializable]";
 
-// A value the owner knows is secret: a saved provider key, an MCP header. No rule above can
-// recognise `x7Kq…` as a credential, so each one is masked by its exact text. Short values are
-// refused because masking `true` or `8080` would erase ordinary diagnostics. Nothing leaves the set:
-// a process started with a replaced key can still print it until it stops. The set grows only by
-// the secrets the user saves while the app runs.
-//
-// Every value is masked before the rules run, in one pass, so no rule can cut one and leave a part
-// of it in the log. A match grows to the whole token around it: a longer credential that starts or
-// ends with a registered value, such as `Bearer abc…` after `Bearer abc` was saved, must not keep
-// its unregistered part once the marker has hidden the part a rule would have matched. The token is
-// replaced by a marker the rules read as one value. A token that holds a word the rules read, such
-// as `password` or `Authorization`, may be the label or header name that hides the next value, so
-// its marker is itself a secret label that ends in `authorization`.
 const MIN_REGISTERED_SECRET_LENGTH = 8;
 const RULE_WORD =
   /password|passwd|passphrase|secret|token|credential|authorization|cookie|api[_-]?key|private[_-]?key|signing[_-]?key|bearer|basic|digest|headers|keys?/iu;
-// The characters of a credential, a URL path or an email address. Not `=`, `:` or quotes, so the
-// label before a value stays readable.
 const TOKEN_CHARACTER = /[A-Za-z0-9._~+/@%-]/u;
-// The host of an http or https address, after its optional user part. A host is public: it is not
-// masked, and a token does not grow into it or into the `@` before it. Before, a saved password such
-// as the name of the user's company made every link to the company's site `https:[redacted]` in a
-// chat post. The user part, the path and the query stay masked, because a credential can be there.
-// Other schemes, such as an app's own `myapp://`, can carry a credential after `//`, so they keep
-// the rule.
 const URL_HOST = /(?<![A-Za-z0-9+.-])(https?:\/\/(?:[^\s/?#@]*@)?)([\p{L}\p{N}.-]+)/giu;
 const VALUE_MARKER = "__openbot_registered_value__";
 const LABEL_MARKER = "__openbot_registered_secret_authorization";
 const MARKERS = new RegExp(`${VALUE_MARKER}|${LABEL_MARKER}`, "gu");
 const registeredSecrets = new Set<string>();
-// One alternation, longest first, so a secret that contains another one is masked whole.
 let registeredSecretPattern: RegExp | null = null;
+const publicValues = new Set<string>();
 
-/**
- * Masks `value` in every later log line, export and trace, in its raw, JSON-escaped and
- * URL-encoded forms. `allowShort` is for known passwords and one-time codes; ordinary callers
- * keep the length limit so values such as port numbers stay readable.
- */
+export function registerPublicValues(values: Iterable<string>): void {
+  for (const value of values) if (value) publicValues.add(value);
+}
+
+function isPublicValueAround(candidate: string, secret: string): boolean {
+  return candidate.length > secret.length && candidate.includes(secret) && publicValues.has(candidate);
+}
+
+function isPublicToken(token: string, secret: string): boolean {
+  if (publicValues.size === 0) return false;
+  if (isPublicValueAround(token, secret)) return true;
+  return token.endsWith(".") && isPublicValueAround(token.replace(/\.+$/u, ""), secret);
+}
+
 export function registerSecretValue(value: string, options: { allowShort?: boolean } = {}): void {
   registerSecretValues([value], options);
 }
 
-/** `registerSecretValue` for many values, such as an imported password list, with one pattern rebuild. */
 export function registerSecretValues(values: Iterable<string>, options: { allowShort?: boolean } = {}): void {
   const size = registeredSecrets.size;
   for (const value of values) {
@@ -158,8 +86,6 @@ export function registerSecretValues(values: Iterable<string>, options: { allowS
   registeredSecretPattern = new RegExp(alternatives.join("|"), "gu");
 }
 
-// A lone surrogate cannot be URL-encoded. Such a value cannot appear in a URL either, and a
-// stored configuration that holds one must stay readable.
 function uriEncoded(value: string): string | null {
   try {
     return encodeURIComponent(value);
@@ -168,7 +94,6 @@ function uriEncoded(value: string): string | null {
   }
 }
 
-/** Whether a key or variable name labels a secret, by the same rule the key redaction uses. */
 export function isSecretName(name: string): boolean {
   return SECRET_KEY.test(name);
 }
@@ -177,25 +102,55 @@ export function redactText(value: string): string {
   return redact(value, true);
 }
 
-/**
- * `redactText` without the email rule, for text that goes back to the agent that the user gave it
- * to: its memories and its own chat history. An address there is user data that the agent needs to
- * do its task, not a secret, and the provider already received it with the original message. Logs,
- * diagnostics, and text sent to other people or services, such as chat apps, keep `redactText`.
- */
 export function redactSecrets(value: string): string {
-  return redact(value, false, true);
+  return redact(value, false, "keepPastScanBound");
 }
 
-function redact(value: string, emails: boolean, keepUnscanned = false): string {
+export function containsSecret(value: string): boolean {
+  return redact(value, true, "keep") !== value;
+}
+
+export function redactPostText(value: string): string {
+  return maskWholeRegisteredSecrets(applyKeyFormatRules(value));
+}
+
+const POST_TOKEN_CHARACTER = /[\p{L}\p{N}._~+@%-]/u;
+const POST_TOKEN_TAIL = /^[\p{L}\p{N}._~+@-]*/u;
+const PERCENT_ESCAPE_BEFORE = /%[0-9A-Fa-f]{2}$/u;
+const SENTENCE_DOTS = /^\.*$/u;
+
+function maskWholeRegisteredSecrets(value: string): string {
+  const pattern = registeredSecretPattern;
+  if (!pattern) return value;
+  return value.replace(pattern, (secret: string, offset: number) =>
+    isWholeToken(value, offset, offset + secret.length) ? "[redacted]" : secret,
+  );
+}
+
+function endsWithPercentEscape(value: string, end: number): boolean {
+  return PERCENT_ESCAPE_BEFORE.test(value.slice(Math.max(0, end - 3), end));
+}
+
+function isLinkUser(value: string, start: number, end: number): boolean {
+  return value.charAt(end) === "@" && value.slice(Math.max(0, start - 3), start) === "://";
+}
+
+function isWholeToken(value: string, start: number, end: number): boolean {
+  if (isLinkUser(value, start, end)) return true;
+  if (start > 0 && POST_TOKEN_CHARACTER.test(value.charAt(start - 1)) && !endsWithPercentEscape(value, start))
+    return false;
+  return SENTENCE_DOTS.test(POST_TOKEN_TAIL.exec(value.slice(end))?.[0] ?? "");
+}
+
+type UnscannedText = "drop" | "keepPastScanBound" | "keep";
+
+function redact(value: string, emails: boolean, unscanned: UnscannedText = "drop"): string {
   const marked = markRegisteredSecrets(value);
   const redacted =
-    redactSerializedJson(marked, emails) ?? applyTextRules(redactEmbeddedJson(marked, emails, keepUnscanned), emails);
+    redactSerializedJson(marked, emails) ?? applyTextRules(redactEmbeddedJson(marked, emails, unscanned), emails);
   return marked === value ? redacted : redacted.replace(MARKERS, "[redacted]");
 }
 
-// Every exact match is found before any grows, so a match inside the token an earlier one grew to
-// still extends the range past it. Ranges that overlap or touch become one token.
 function markRegisteredSecrets(value: string): string {
   const pattern = registeredSecretPattern;
   if (!pattern) return value;
@@ -212,6 +167,7 @@ function markRegisteredSecrets(value: string): string {
     while (start > floor && !hosts?.[start - 1] && TOKEN_CHARACTER.test(value.charAt(start - 1))) start -= 1;
     if (previous && end <= previous.end) continue;
     while (end < value.length && !hosts?.[end] && TOKEN_CHARACTER.test(value.charAt(end))) end += 1;
+    if (isPublicToken(value.slice(start, end), match[0])) continue;
     if (previous && start <= previous.end) previous.end = end;
     else ranges.push({ start, end });
   }
@@ -229,7 +185,6 @@ function markRegisteredSecrets(value: string): string {
 const HOST = 1;
 const HOST_SEPARATOR = 2;
 
-/** One flag for each character of `value`: `HOST`, the `@` before a host, or 0 elsewhere. */
 function urlHosts(value: string): Uint8Array {
   const flags = new Uint8Array(value.length);
   for (const match of value.matchAll(URL_HOST)) {
@@ -241,44 +196,64 @@ function urlHosts(value: string): Uint8Array {
   return flags;
 }
 
-function applyTextRules(value: string, emails: boolean): string {
-  const redacted = value
+function applyKeyFormatRules(value: string): string {
+  return redactKeyFormatsAfterLabels(redactKeyFormatsBeforeLabels(value));
+}
+
+function redactKeyFormatsBeforeLabels(value: string): string {
+  return value
     .replace(PEM_PRIVATE_KEY, "[redacted]")
     .replace(COOKIE_HEADER, "$1[redacted]")
     .replace(AUTH_HEADER_SECRET, "$1[redacted]")
-    .replace(BEARER_SECRET, "[redacted]")
-    .replace(CREDENTIAL_ASSIGNMENT, redactAssignedValue)
-    .replace(JSON_BARE_KEY, redactAssignedValue)
-    // After the assignment rule: its value runs over `&`, and a query value redacted first would
-    // leave a `]` behind it.
-    .replace(QUERY_SECRET, "$1[redacted]")
+    .replace(BEARER_SECRET, "[redacted]");
+}
+
+function redactKeyFormatsAfterLabels(value: string): string {
+  return value
+    .replace(URL_PASSWORD, "$1[redacted]")
+    .replace(WEBHOOK_URL_SECRET, "$1[redacted]")
     .replace(KNOWN_SECRET_PREFIXES, "[redacted]")
     .replace(JSON_WEB_TOKEN, "[redacted]");
+}
+
+function applyTextRules(value: string, emails: boolean): string {
+  const labeled = redactKeyFormatsBeforeLabels(value)
+    .replace(CREDENTIAL_ASSIGNMENT, redactAssignedValue)
+    .replace(JSON_BARE_KEY, redactAssignedValue)
+    .replace(QUERY_SECRET, "$1[redacted]");
+  const redacted = redactKeyFormatsAfterLabels(labeled);
   return emails ? redacted.replace(EMAIL, "[redacted-email]") : redacted;
 }
 
-/**
- * How many runs one line may be *tried*, whether or not they parse.
- *
- * Counting only the successes would not bound anything: `"{".repeat(65536)` gives a failed attempt
- * at every position, each scanning the rest of the line, and this function is synchronous on the
- * path that carries provider stderr. Past the bound the rest of the line is
- * dropped rather than shown unread, because the regex rules match no header name.
- */
 const MAX_EMBEDDED_SCANS = 16;
 
-/** What is left of a line whose payloads went past the scan bound. */
 const UNSCANNED = "[redacted-unscanned]";
 
-/**
- * A payload that sits inside a longer line, rather than being the whole of it.
- *
- * A provider writes `ERROR request failed: {"headers":{"X-Tenant":"…"}}` on one stderr line, so the
- * text does not parse as JSON and the key rules above never see the header. Every balanced `{…}` or
- * `[…]` run that does parse gets the same treatment as a structured param: `headers` values go,
- * secret-named keys go, prose stays. A run that no rule changes stays as it was written.
- */
-function redactEmbeddedJson(value: string, emails: boolean, keepUnscanned: boolean): string {
+const JSON_ONLY_SECRET_SHAPE = new RegExp(
+  String.raw`"headers"\s*:|"(?:name|key)"\s*:\s*"(?:${SECRET_LABEL}|keys?)"|(?<![A-Za-z0-9_.-])(?:["']?(?:${SECRET_LABEL})["']?|"keys?")\s*[=:]\s*[{[]`,
+  "iu",
+);
+
+const JSON_ESCAPE = /\\(?:u([0-9A-Fa-f]{4})|(["\\/bfnrt]))/gu;
+
+const JSON_ESCAPED_CHARACTERS: Record<string, string> = { b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" };
+
+function jsonUnescaped(text: string): string {
+  return text.replace(JSON_ESCAPE, (_escape: string, code: string | undefined, character: string) =>
+    code ? String.fromCharCode(Number.parseInt(code, 16)) : (JSON_ESCAPED_CHARACTERS[character] ?? character),
+  );
+}
+
+function hidesSecret(text: string, emails: boolean): boolean {
+  const decoded = jsonUnescaped(text);
+  return JSON_ONLY_SECRET_SHAPE.test(decoded) || (decoded !== text && applyTextRules(decoded, emails) !== decoded);
+}
+
+function keptOrUnscanned(text: string, emails: boolean): string {
+  return hidesSecret(text, emails) ? UNSCANNED : text;
+}
+
+function redactEmbeddedJson(value: string, emails: boolean, unscanned: UnscannedText): string {
   let result = "";
   let index = 0;
   let scans = 0;
@@ -286,36 +261,25 @@ function redactEmbeddedJson(value: string, emails: boolean, keepUnscanned: boole
     const start = findPayloadStart(value, index);
     if (start < 0) break;
     if (scans >= MAX_EMBEDDED_SCANS) {
-      // `redactSecrets` text goes back to the agent that wrote or received it, and its provider
-      // already has it. Code or a list of links has far more than 16 bracket runs, and a cut reply
-      // made the agent send broken code again (#10122). The tail stays: registered secrets were
-      // already masked in it, and the text rules still run on it.
-      if (keepUnscanned) return result + value.slice(index);
-      // The bound was reached with a payload still ahead. The tail cannot be read, so it cannot be
-      // shown either: text before the bound is kept, and everything from the unread payload on is
-      // dropped. A truncated line is a smaller loss than a credential that survived the limit.
+      if (unscanned === "keepPastScanBound") return result + value.slice(index);
+      if (unscanned === "keep") return result + value.slice(index, start) + keptOrUnscanned(value.slice(start), emails);
       return `${result + value.slice(index, start)}${UNSCANNED}`;
     }
     scans += 1;
     const end = findBalancedEnd(value, start);
     if (end < 0 && startsLikeJson(value, start)) {
-      // A payload that never closes, because a caller redacts each stderr chunk on its own and a
-      // chunk ends wherever the pipe filled up. `ERROR {"headers":{"X-Tenant":"…` carries the
-      // credential with no closing brace to parse, so the run is dropped rather than passed on.
-      return `${result + value.slice(index, start)}${UNSCANNED}`;
+      if (unscanned !== "keep" || hidesSecret(value.slice(start), emails))
+        return `${result + value.slice(index, start)}${UNSCANNED}`;
     }
     const parsed = end < 0 ? null : parseRedacted(value.slice(start, end), emails);
     if (parsed === null) {
       if (end >= 0 && startsLikeJson(value, start)) {
-        // A run a serializer wrote that does not parse: a trailing comma, a value cut short. Going on
-        // into it would read `{"X-Tenant":"…"}` without the `headers` name above it, which is the
-        // name that redacts what is under it, so the whole run goes instead.
-        result += value.slice(index, start) + UNSCANNED;
+        result +=
+          value.slice(index, start) +
+          (unscanned === "keep" ? keptOrUnscanned(value.slice(start, end), emails) : UNSCANNED);
         index = end;
         continue;
       }
-      // No quote follows the opening brackets, so none of them opens a record. They are passed at once,
-      // so `{{name}}` costs one scan against the bound and not two.
       let next = start + 1;
       while (value[next] === "{" || value[next] === "[") next += 1;
       result += value.slice(index, next);
@@ -328,18 +292,10 @@ function redactEmbeddedJson(value: string, emails: boolean, keepUnscanned: boole
   return result + value.slice(index);
 }
 
-/**
- * The redacted form of a JSON payload, or the payload as written when no rule changed it.
- *
- * Writing an unchanged payload again is not neutral: `JSON.parse` rounds an integer past 2^53, so a
- * 19-digit ID in a skill example reached the agent with other digits, and the spacing went too
- * (#7760). The original is kept only when the parse lost no key: with a key written twice, the parse
- * keeps the last value, and the first could hold a secret that no rule then read.
- */
 function parseRedacted(candidate: string, emails: boolean): string | null {
   try {
     const parsed = JSON.parse(candidate);
-    const converted = convertValue(parsed, new Set<object>(), emails);
+    const converted = convertValue(parsed, new Set<object>(), { emails, unscanned: "drop" });
     if (unchangedKeyCount(parsed, converted) === writtenKeyCount(candidate)) return candidate;
     return JSON.stringify(converted) ?? null;
   } catch {
@@ -347,10 +303,6 @@ function parseRedacted(candidate: string, emails: boolean): string | null {
   }
 }
 
-/**
- * The keys of a parsed payload when its redacted form is the same value, or -1 when a rule changed it.
- * The redacted form ends in "[too deep]" at the conversion depth bound, so the walk stops there too.
- */
 function unchangedKeyCount(parsed: unknown, converted: unknown): number {
   if (parsed === null || typeof parsed !== "object") return parsed === converted ? 0 : -1;
   if (converted === null || typeof converted !== "object" || Array.isArray(parsed) !== Array.isArray(converted))
@@ -368,7 +320,6 @@ function unchangedKeyCount(parsed: unknown, converted: unknown): number {
   return count;
 }
 
-/** The keys a JSON text writes: each string that a `:` follows. */
 function writtenKeyCount(text: string) {
   let count = 0;
   for (let index = 0; index < text.length; index += 1) {
@@ -382,17 +333,6 @@ function writtenKeyCount(text: string) {
   return count;
 }
 
-/**
- * Whether the bracket at `start` opens what a serializer wrote, rather than a brace in prose.
- *
- * `{ and the run never closes` is a sentence; `{"headers":…` is a record. Only the second is worth
- * dropping when it does not close, because prose loses nothing by staying and a record can hold a
- * credential under a header name no rule can predict.
- *
- * Only an object key names what is under it, and a serializer opens an object with a quoted key, so
- * the first character after the opening brackets must be a quote. A template placeholder such as
- * `{{name}}` or a link such as `[[Page]]` has none, and an agent's text keeps it as written (#6437).
- */
 function startsLikeJson(value: string, start: number): boolean {
   for (let index = start + 1; index < value.length; index += 1) {
     const char = value[index];
@@ -410,8 +350,6 @@ function findPayloadStart(value: string, from: number): number {
   return -1;
 }
 
-// The index one past the run that closes the bracket at `start`, or -1 when nothing closes it. Text
-// inside a JSON string is skipped, so a brace in a header value cannot end the run early.
 function findBalancedEnd(value: string, start: number): number {
   let depth = 0;
   let inString = false;
@@ -440,130 +378,97 @@ function redactAssignedValue(_match: string, label: string, value: string): stri
   return `${label}${quote}[redacted]${quote}`;
 }
 
-// A payload logged as one string is the shape secrets escape in most often -
-// an echoed response body, a spawn argument list, a serialized request. Once
-// it parses, the key rules apply to it exactly as they would to a structured
-// param, so `{"apiKey":"…"}` cannot pass as prose.
 function redactSerializedJson(value: string, emails: boolean): string | null {
   const trimmed = value.trim();
-  // No size cap: a long payload is exactly where a secret hides, and the
-  // truncation that follows keeps only the first characters - which would be
-  // the unredacted ones.
   if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
-  // Neither a parse failure nor a conversion failure may become the failure
-  // the caller was trying to report: `null` falls back to the regex rules,
-  // which scan the text without recursing.
   return parseRedacted(trimmed, emails);
 }
 
-// The `typeof` checks below narrow caller-provided unions rather than
-// already-known domain types. Conversion is cycle-safe: a revisited object
-// becomes "[circular]" instead of overflowing, so logging a rejection value can
-// never hide the failure it reports.
 export function redactValue(value: LogValue): LogValue {
   return convertSafely(value);
 }
 
-// Converts anything a catch block or an external boundary hands over into a
-// redaction-safe value. Errors keep name, message and stack; bigints keep
-// their `n` suffix because JSON cannot carry them; anything else falls back
-// to its string form rather than leaking through unredacted.
 export function toLogValue(value: unknown): LogValue {
   return convertSafely(value);
 }
 
-/**
- * `toLogValue` without the email rule, as `redactSecrets` is for text: for a record that the
- * agent's own chat shows to the user who gave it the text, such as an answer or a history item.
- */
 export function toSecretSafeValue(value: unknown): LogValue {
-  return convertSafely(value, false);
+  return convertSafely(value, CHAT_RULES);
 }
 
-// The last line of defence for both public entry points: whatever a caller
-// hands over, converting it must never become the exception that hides the one
-// being logged.
-function convertSafely<T>(value: T, emails = true): LogValue {
+interface ConversionRules {
+  emails: boolean;
+  unscanned: UnscannedText;
+}
+
+const LOG_RULES: ConversionRules = { emails: true, unscanned: "drop" };
+const CHAT_RULES: ConversionRules = { emails: false, unscanned: "keep" };
+
+function convertSafely<T>(value: T, rules = LOG_RULES): LogValue {
   try {
-    return convertValue(value, new Set<object>(), emails);
+    return convertValue(value, new Set<object>(), rules);
   } catch {
     return UNSERIALIZABLE;
   }
 }
 
-// A cycle-free but very deep value - a nested array from an external payload -
-// would otherwise recurse until the stack gives out, and the overflow would
-// replace the failure the caller was reporting. The bound is far past any
-// shape worth reading in a log line.
 const MAX_CONVERSION_DEPTH = 32;
 
-function convertValue<T>(value: T, seen: Set<object>, emails: boolean, depth = 0): LogValue {
-  if (typeof value === "string") return redact(value, emails);
+function convertValue<T>(value: T, seen: Set<object>, rules: ConversionRules, depth = 0): LogValue {
+  const text = (input: string) => redact(input, rules.emails, rules.unscanned);
+  if (typeof value === "string") return text(value);
   if (value === null) return null;
   if (value === undefined) return undefined;
   if (typeof value === "number" || typeof value === "boolean") return value;
   if (typeof value === "bigint") return `${value.toString()}n`;
   if (value instanceof Error) {
-    // The name is caller-controlled too - `new Error()` with a custom `name`,
-    // or a class named after the header it failed on - so it is no safer than
-    // the message.
     const converted: { [key: string]: LogValue } = {
-      name: redact(value.name, emails),
-      message: redact(value.message, emails),
+      name: text(value.name),
+      message: text(value.message),
     };
-    if (typeof value.stack === "string") converted.stack = redact(value.stack, emails);
+    if (typeof value.stack === "string") converted.stack = text(value.stack);
     return converted;
   }
   if (Array.isArray(value)) {
     if (seen.has(value)) return "[circular]";
     if (depth >= MAX_CONVERSION_DEPTH) return "[too deep]";
     seen.add(value);
-    return value.map((entry: LogValue) => convertValue(entry, seen, emails, depth + 1));
+    return value.map((entry: LogValue) => convertValue(entry, seen, rules, depth + 1));
   }
   if (typeof value === "object") {
     if (seen.has(value)) return "[circular]";
     if (depth >= MAX_CONVERSION_DEPTH) return "[too deep]";
     seen.add(value);
-    // `Object.entries` runs enumerable getters and proxy traps, so a rejection
-    // value like `{ get detail() { throw … } }` would throw from inside the
-    // logger and replace the failure the caller was reporting.
     let entries: [string, unknown][];
     try {
       entries = Object.entries(value);
     } catch {
       return UNSERIALIZABLE;
     }
+    const secretPair = entries.some(
+      ([key, entry]) => (key === "name" || key === "key") && typeof entry === "string" && SECRET_KEY.test(entry),
+    );
     return Object.fromEntries(
       entries.map(([key, entry]): [string, LogValue] => [
-        // A key is as caller-controlled as a value: a payload keyed by an
-        // email address, or by the header that failed, leaks through a rule
-        // that only looks at values.
-        redact(key, emails),
-        convertEntry(key, entry, seen, emails, depth),
+        text(key),
+        secretPair && key === "value" ? "[redacted]" : convertEntry(key, entry, seen, rules, depth),
       ]),
     );
   }
-  // A symbol description or a `toString` of a foreign object is text of
-  // unknown origin, so it goes through the same rules as any other string -
-  // and `String()` itself can throw for a null-prototype object or a
-  // throwing `toString`.
   try {
-    return redact(String(value), emails);
+    return text(String(value));
   } catch {
     return UNSERIALIZABLE;
   }
 }
 
-function convertEntry(key: string, entry: unknown, seen: Set<object>, emails: boolean, depth: number): LogValue {
+function convertEntry(key: string, entry: unknown, seen: Set<object>, rules: ConversionRules, depth: number): LogValue {
   if (SECRET_KEY.test(key)) return "[redacted]";
-  const converted = convertValue(entry, seen, emails, depth + 1);
+  const converted = convertValue(entry, seen, rules, depth + 1);
   if (!HEADER_KEY.test(key) || entry === null || typeof entry !== "object") return converted;
   return redactHeaderStrings(converted);
 }
 
-// The conversion above runs first, so this walks plain values only: no cycles, no getters and no
-// depth left to overflow. It keeps the shape, because which headers were set is diagnostic and only
-// their text is a secret.
 function redactHeaderStrings(value: LogValue): LogValue {
   if (typeof value === "string") return "[redacted]";
   if (Array.isArray(value)) return value.map(redactHeaderStrings);
@@ -588,10 +493,6 @@ function formatLine(level: string, prefix: string, message: LogValue, params: Lo
   return `${new Date().toISOString()} ${level} [${prefix}]${head ? ` ${head}` : ""}${tail ? ` ${tail}` : ""}`;
 }
 
-// `info` by default, so a `debug` call added for one investigation does not
-// keep writing on every user's machine. `OPENBOT_LOG_LEVEL` raises or lowers
-// it without a rebuild; an unknown value is ignored rather than silencing the
-// log.
 export function resolveLogLevel(raw: string | undefined, fallback: LogLevel = "info"): LogLevel {
   for (const level of LOG_LEVELS) {
     if (level === raw) return level;
@@ -599,15 +500,8 @@ export function resolveLogLevel(raw: string | undefined, fallback: LogLevel = "i
   return fallback;
 }
 
-// Sinks that also receive the lines of some loggers, such as a log file the app keeps for one area.
-// A logger reads this set at each write, so a module that created its logger at import time is
-// covered by a tee added later.
 const tees = new Set<{ prefixes: ReadonlySet<string>; sink: (line: string) => void }>();
 
-/**
- * Sends each line that a logger with one of `prefixes` writes to `sink` as well, redacted and below
- * the same level threshold. A sink that throws loses its line and nothing else. Returns the removal.
- */
 export function teeLogLines(prefixes: readonly string[], sink: (line: string) => void): () => void {
   const tee = { prefixes: new Set(prefixes), sink };
   tees.add(tee);
@@ -621,9 +515,7 @@ function writeTees(prefix: string, line: string): void {
     if (!tee.prefixes.has(prefix)) continue;
     try {
       tee.sink(line);
-    } catch {
-      // A log file must not become the failure it would have recorded.
-    }
+    } catch {}
   }
 }
 

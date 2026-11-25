@@ -12,6 +12,7 @@ export const messages = {
   "status.messaging.stopped": "Zatrzymano.",
   "status.messaging.stop": "Zatrzymaj",
   "status.messaging.approvalTitle": "OpenBot prosi o zatwierdzenie, aby kontynuować.",
+  "status.messaging.approvalTitleTeammate": "Członek zespołu {agent} prosi o zatwierdzenie, aby kontynuować.",
   "status.messaging.approvalCommand": "Uruchomienie polecenia",
   "status.messaging.approvalFileChange": "Zmiana plików",
   "status.messaging.approvalPermissions": "Dodatkowe uprawnienia",
@@ -34,9 +35,11 @@ export const messages = {
   "status.messaging.signInReceived": "OpenBot otrzymał instalację Slack. Możesz zamknąć tę kartę.",
   "status.messaging.signInUnknown": "OpenBot nie rozpoczął tej instalacji Slack. Rozpocznij ją ponownie w OpenBot.",
   "status.messaging.telegramNoAgent":
-    "Żaden agent nie może tu jeszcze odpowiadać. Dodaj Telegram Orchestrator w OpenBot.",
+    "Żaden agent nie może tu jeszcze odpowiadać. W OpenBot otwórz Marketplace > Aplikacje > Telegram i kliknij Dodaj agenta.",
   "status.messaging.telegramLinked":
     "OpenBot jest połączony z tym czatem. Oznacz {bot} lub odpowiedz na wiadomość OpenBot, aby zapytać agentów.",
+  "status.messaging.telegramNotLinked":
+    "OpenBot nie jest połączony z tym czatem. Aby go połączyć, otwórz aplikację OpenBot, przejdź do Marketplace → Aplikacje → Telegram i wybierz „Dodaj do grupy” lub „Otwórz czat prywatny”.",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Odpowiada w Telegramie i pyta zespół",
   "status.messaging.whatsappNoAgent":
@@ -55,6 +58,9 @@ export const messages = {
     "Z tym numerem WhatsApp jest połączony inny OpenBot, więc możesz dostać dwie odpowiedzi. Aby to naprawić, otwórz Połączone urządzenia w WhatsAppie na telefonie i wyloguj OpenBot, którego nie używasz.",
   "status.messaging.whatsappPaused":
     "OpenBot przestał tu odpowiadać na 10 minut: w krótkim czasie przyszło za dużo wiadomości. Jeśli z tym numerem jest połączony inny OpenBot, otwórz Połączone urządzenia w WhatsAppie na telefonie i wyloguj OpenBot, którego nie używasz.",
+  "status.messaging.whatsappNotDelivered": "WhatsApp nie przyjął tej odpowiedzi, więc ta osoba jej nie dostała.",
+  "status.messaging.whatsappPartlyDelivered":
+    "WhatsApp nie przyjął całej tej odpowiedzi, więc ta osoba dostała tylko jej część.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Odpowiada w WhatsApp i pyta zespół",
 } as const satisfies PartialTranslation<typeof source>;

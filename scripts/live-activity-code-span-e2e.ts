@@ -1,7 +1,3 @@
-// Runs the real Live Activity push service with synthetic unread replies and a local relay adapter.
-// Run: bun scripts/live-activity-code-span-e2e.ts --phase=before
-// Phase selects only the report folder. A cut code span with a lone UTF-16 surrogate always fails,
-// including on the unfixed source. The widget gets the detail as UTF-8, so a lone surrogate shows as U+FFFD.
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
@@ -23,8 +19,6 @@ import { LiveActivityPushService } from "../src/main/live-activity-push";
 const ROOT = resolve(import.meta.dirname, "..");
 const DEADLINE_MS = 10_000;
 const EMOJI = "\u{1F600}";
-// The runtime snapshot holds at most 240 UTF-16 units of a message, and the detail shows 180
-// characters. So each long case mixes ASCII and emoji to pass the snapshot and still be cut.
 const CASES = [
   {
     name: "emoji-code-span-cut",
@@ -173,6 +167,7 @@ async function runCase(fixture: (typeof CASES)[number]): Promise<CaseResult> {
           result.cleanup.listenerRemoves += 1;
           events.off(event, listener);
         },
+        listAgents: () => [],
         getRuntimeSnapshot: () => {
           result.snapshotReads += 1;
           return runtime;
@@ -193,7 +188,6 @@ async function runCase(fixture: (typeof CASES)[number]): Promise<CaseResult> {
       memberActive: (memberId) => memberId === "fixture-member",
       randomBytes,
     });
-    // The connected registration must not send. Disconnect starts the real service update timer.
     service.register(
       "fixture-session",
       {
@@ -241,21 +235,18 @@ async function runCase(fixture: (typeof CASES)[number]): Promise<CaseResult> {
     assert.equal(props.detailMarkdown, true);
     result.observedDetail = props.detail;
     result.stage = "displayed-detail";
-    // With the `u` flag, this range matches only a surrogate that is not part of a pair.
     assert.ok(!/[\uD800-\uDFFF]/u.test(props.detail), "The decrypted display detail must have no lone surrogate.");
     assert.ok(!props.detail.includes("\uFFFD"), "The decrypted display detail must have no replacement character.");
     assert.equal(props.detail, fixture.expected, "The decrypted display detail must keep the expected text.");
     result.stage = "complete";
     result.passed = true;
   } catch {
-    // Stage and synthetic observations describe the failure without exporting errors or push data.
     result.passed = false;
   } finally {
     if (deadline !== undefined) clearTimeout(deadline);
     result.cleanup.deadlineCleared = true;
     try {
       if (service) {
-        // dispose closes the send scope and clears the registration's retry/keepalive timer.
         await Effect.runPromise(service.dispose());
         result.cleanup.disposeCompleted = true;
         result.cleanup.registrationRemoved = !service.showsEvent(

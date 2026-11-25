@@ -147,7 +147,6 @@ export const messages = {
     "Lisans {date} tarihine kadar etkin kalır. Ardından sona erer. Sunucularınız etkilenmez.",
   "billing.license.cancel.descriptionNow": "Lisans, ödenen dönemin sonunda sona erer. Sunucularınız etkilenmez.",
   "billing.license.cancel.keep": "Lisansı koru",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "Faturalandırma dönemi",
   "billing.order.currency": "Para birimi",
   "billing.order.monthly": "Aylık",
@@ -214,4 +213,28 @@ export const messages = {
   "billing.details.vatIdInvalid": "Bu, seçilen ülkenin KDV numarası değil.",
   "billing.details.countryMissing": "Fatura ülkenizi seçin.",
   "billing.details.saveFailed": "Fatura bilgileri kaydedilemedi",
+  "billing.credits.explainer.title": "Kredi nedir?",
+  "billing.credits.explainer.page": "{page} / {total}",
+  "billing.credits.explainer.pages": "Sayfalar",
+  "billing.credits.explainer.mediaTitle": "Krediler medya için ödeme yapar",
+  "billing.credits.explainer.mediaText": "Bir ajan resim, video veya ses oluşturduğunda kredi kullanır.",
+  "billing.credits.explainer.chatTitle": "Sohbetler ücretsiz kalır",
+  "billing.credits.explainer.chatText":
+    "Sohbetler kendi yapay zekâ sağlayıcınızı kullanır. Ajanlarınızla konuşmak kredi harcamaz.",
+  "billing.credits.explainer.chatFree": "0 kredi",
+  "billing.credits.explainer.modelsTitle": "Her modelin bir fiyatı var",
+  "billing.credits.explainer.modelsText":
+    "Daha iyi modeller daha pahalıdır. Bir resim {pictureMin}–{pictureMax} kredi, {seconds} sn’lik bir video {videoMin}–{videoMax} kredi kullanır.",
+  "billing.credits.explainer.perPicture": "/ resim",
+  "billing.credits.explainer.perClip": "/ {seconds} sn video",
+  "billing.credits.explainer.getTitle": "Kredi al",
+  "billing.credits.explainer.getText":
+    "Daha fazlasına ihtiyacınız olduğunda paket satın alın. Büyük paketler kredi başına daha iyi fiyat sunar.",
+  "billing.credits.explainer.freeEnd": "Aylık ücretsiz kredilerin bitiş tarihi vardır",
+  "billing.credits.explainer.welcome": "Yeni hesaplar bazı modelleri denemek için {amount} ücretsiz kredi alır",
+  "billing.credits.welcomeIncluded": "Ücretsiz kredi: {amount}",
+  "billing.credits.explainer.allPrices": "{count} modelin tümü",
+  "billing.credits.explainer.next": "İleri",
+  "billing.credits.explainer.gotIt": "Anladım",
+  "billing.credits.explainer.place": "OpenBot",
 } as const satisfies PartialTranslation<typeof source>;

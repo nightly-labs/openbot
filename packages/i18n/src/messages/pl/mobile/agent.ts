@@ -239,6 +239,13 @@ export const messages = {
   "mobile.agent.webhook.rotateBody": "Obecny sekret przestanie działać. Host odrzuci żądania, które go używają.",
   "mobile.agent.webhook.rotateConfirm": "Wygeneruj",
   "mobile.agent.webhook.rotateFailed": "Nie udało się wygenerować nowego sekretu. Spróbuj ponownie.",
+  "mobile.agent.webhook.giveToAgent": "Przekaż sekret podpisu agentowi {name}",
+  "mobile.agent.webhook.giveTitle": "Przekazać nowy sekret podpisu agentowi {name}?",
+  "mobile.agent.webhook.giveBody":
+    "Obecny sekret przestanie działać. Agent {name} zapisze nowy sekret jako klucz API i może dodać go u nadawcy.",
+  "mobile.agent.webhook.giveConfirm": "Przekaż",
+  "mobile.agent.webhook.giveFailed": "Nie udało się przekazać sekretu podpisu agentowi. Spróbuj ponownie.",
+  "mobile.agent.webhook.given": "Agent {name} ma nowy sekret podpisu.",
   "mobile.agent.webhook.activity": "Aktywność",
   "mobile.agent.webhook.activityFailed": "Nie udało się wczytać aktywności. Spróbuj ponownie.",
   "mobile.agent.webhook.activity.ignored": "Zignorowano",
@@ -338,6 +345,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Brak dostępnych modeli dla tego dostawcy.",
   "mobile.agent.runtime.searchModels": "Szukaj modeli",
   "mobile.agent.runtime.noMatches": "Żaden model nie pasuje do wyszukiwania.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Żaden model nie pasuje do wyszukiwania. Twoje ustawienia prywatności, dostawców i zabezpieczeń (guardrails) w openrouter.ai mogą ukrywać modele na tej liście.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Ten dostawca nie działa z opcją „Tylko obszar roboczy” w systemach Windows i Linux. Aby go użyć, najpierw zmień „Uprawnienia”.",
   "mobile.agent.runtime.usageLimit": "Osiągnięto limit użycia",
@@ -396,6 +405,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Usuń {model}",
   "mobile.agent.backupModels.unavailable": "Chwilowo niedostępny · pominięto",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Gdy limit użycia zatrzyma agenta {name} po rozpoczęciu pracy, {name} kontynuuje tę samą pracę na pierwszym dostępnym modelu z kolejności. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
   "mobile.agent.busyMessage.label": "Podczas pracy",
@@ -419,10 +429,15 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Zarządzaj profilami",
   "mobile.agent.browserProfile.footer":
     "Każdy profil ma własne logowania i pliki cookie. Zmiana zamyka otwarte karty agenta.",
+  "mobile.agent.browserProfile.movedNote":
+    "Logowania do witryn zostają w starym profilu. Agent musi ponownie zalogować się na tych witrynach.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot nie mógł zmienić profilu przeglądarki agenta.",
   "mobile.agent.planCard.label": "Pokaż plan przed długimi zadaniami",
   "mobile.agent.planCard.footer":
     "Przed długim zadaniem agent pokazuje swój plan. Zaczyna po 10 s lub po naciśnięciu Start.",
+  "mobile.agent.builtinMemory.label": "Pamięć OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "Agent zapisuje i czyta własne wspomnienia. Wyłącz, aby używać tylko aplikacji pamięci, takiej jak Mem0. Zapisane wspomnienia zostają.",
   "mobile.agent.workspace.title": "Folder obszaru roboczego",
   "mobile.agent.workspace.footer": "Folder tego agenta na komputerze hosta.",
   "mobile.agent.advanced.behavior": "Zachowanie",
@@ -439,10 +454,11 @@ export const messages = {
     "Ten serwer nie może zapisać twojego poziomu powiadomień dla agenta. Zaktualizuj OpenBot na komputerze, na którym działa.",
   "mobile.agent.newChat.title": "Nowy czat",
   "mobile.agent.newChat.starting": "Rozpoczynanie nowego czatu…",
-  "mobile.agent.newChat.footer": "Agent zapomni ten czat. Jego konfiguracja zostanie.",
+  "mobile.agent.newChat.footer":
+    "Agent zacznie od nowa, ale w razie potrzeby przeszuka ten czat. Jego konfiguracja zostanie.",
   "mobile.agent.newChat.confirmTitle": "Rozpocząć nowy czat z agentem {name}?",
   "mobile.agent.newChat.confirmBody":
-    "Agent zapomni ten czat. Wiadomości pozostaną widoczne nad separatorem. Instrukcje, model, narzędzia, wspomnienia, obszar roboczy i przeglądarka się nie zmienią.",
+    "Agent zacznie od nowa, ale w razie potrzeby przeszuka ten czat. Wiadomości pozostaną widoczne nad separatorem. Instrukcje, model, narzędzia, wspomnienia, obszar roboczy i przeglądarka się nie zmienią.",
   "mobile.agent.newChat.confirm": "Rozpocznij nowy czat",
   "mobile.agent.newChat.failed": "Nie udało się rozpocząć nowego czatu",
   "mobile.agent.newChat.failedBody": "Host nie mógł rozpocząć nowego czatu.",
@@ -515,6 +531,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Ten host nie może publikować agentów ze zdalnego urządzenia.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Tokeny bez odczytów z pamięci podręcznej",
   "mobile.agent.usage.estimatedCost": "Szacowany koszt",
+  "mobile.agent.usage.noCostEstimate": "Brak szacunku kosztu",
   "mobile.agent.usage.daily": "Dzienne użycie",
   "mobile.agent.usage.tokens": "Tokeny",
   "mobile.agent.usage.cost": "Koszt",
@@ -549,6 +566,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Zbieranie rozpoczęto {started}. Zaktualizowano {updated}.",
   "mobile.agent.usage.never": "nigdy",
   "mobile.agent.record.time": "Godzina",
+  "mobile.agent.record.date": "Data",
   "mobile.agent.section.changeFailed": "Nie udało się zmienić folderu",
   "mobile.agent.section.tryAgain": "Spróbuj ponownie.",
   "mobile.agent.section.moveUp": "Przenieś w górę",
@@ -649,13 +667,13 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Nie udało się wczytać serwerów",
   "mobile.agent.home.serversFailedBody": "Sprawdź, czy aplikacja na komputer działa, i spróbuj ponownie.",
   "mobile.agent.home.noServers": "Brak dostępnych serwerów",
-  "mobile.agent.home.noServersBody": "Połącz ponownie aplikację na komputer lub dołącz do zdalnego serwera.",
+  "mobile.agent.home.noServersBody":
+    "Otwórz OpenBot na komputerze na tym koncie i włącz Opublikuj ten serwer w Ustawienia serwera → Członkowie. Możesz też dołączyć do zdalnego serwera.",
   "mobile.agent.home.chooseServer": "Wybierz serwer",
   "mobile.agent.home.openServers": "Otwórz serwery",
   "mobile.agent.home.noChatOpen": "Brak otwartego czatu",
   "mobile.agent.home.noChatOpenBody": "Wybierz czat z listy.",
   "mobile.agent.home.chatListWidth": "Szerokość listy czatów",
-  "mobile.agent.home.serverTitle": "{name}, otwórz serwery",
   "mobile.agent.home.waiting": "Oczekiwanie na połączenie",
   "mobile.agent.home.waitingBody": "Lista agentów wczyta się po połączeniu z tym serwerem.",
   "mobile.agent.home.noAgents": "Brak agentów na tym serwerze",
@@ -741,6 +759,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Nie wykluczaj",
   "mobile.agent.folders.browseTitle": "Wybierz folder",
   "mobile.agent.folders.places": "Przejdź do",
+  "mobile.agent.folders.path": "Ścieżka folderu",
   "mobile.agent.folders.home": "Folder domowy",
   "mobile.agent.folders.parent": "W górę: {folder}",
   "mobile.agent.folders.browseFailed": "Nie można otworzyć tego folderu.",

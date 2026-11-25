@@ -18,7 +18,6 @@ export const STAGE_LABELS: Record<Stage, string> = {
   completed: "Completed",
 };
 
-// Fixed to UTC, so every reader sees the same times as the incident issues.
 const TIME_FORMAT = new Intl.DateTimeFormat("en-US", {
   hour: "2-digit",
   minute: "2-digit",
@@ -45,7 +44,6 @@ export const formatDayTime = (iso: string) => `${formatDay(iso)}, ${formatTime(i
 
 export const formatUptime = (percent: number | null) => {
   if (percent === null) return "No data";
-  // At most 2 decimals and no trailing zeros, so 100% and 75% use one format.
   return `${Number(percent.toFixed(2))}%`;
 };
 

@@ -1,12 +1,3 @@
-/**
- * The optional OpenCode Go key.
- *
- * OpenCode's free models run with no account, so this dialog is an addition and never a gate: it
- * says so first, and it opens from a provider row that is already usable. A saved key is reported
- * as a fact and never read back into the input -- main has no getter for it, and a renderer that
- * could show a key would carry it into every screenshot and crash report that follows.
- */
-
 import { isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
 import type {
   AgentProviderId,
@@ -30,10 +21,6 @@ import {
 import { createSignal, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
 
-/**
- * The text of each provider whose key this dialog saves. Muse, Gemini, Claude and Codex also sign in
- * without a key. Codex keeps its key in its own login, not in OpenBot's store.
- */
 const KEY_TEXT = {
   opencode: {
     name: "OpenCode Go",
@@ -90,7 +77,6 @@ const KEY_TEXT = {
   },
 } as const satisfies Record<string, KeyDialogText>;
 
-/** The text of one key: `descriptionHost` is for a key that goes to the host of a joined server. */
 export interface KeyDialogText {
   name: string;
   title: AppTextKey;
@@ -99,27 +85,15 @@ export interface KeyDialogText {
   label: AppTextKey;
 }
 
-/** A provider whose API key this dialog saves. */
 export type KeyDialogProvider = keyof typeof KEY_TEXT;
 
-/** Whether `provider` has a key in this dialog. */
 export function isKeyDialogProvider(provider: AgentProviderId): provider is KeyDialogProvider {
   return Object.hasOwn(KEY_TEXT, provider);
 }
 
-/** The provider-key half of the desktop API, narrowed so a test can pass four functions. */
 export interface ProviderKeyApi {
-  /**
-   * Whether the host gives a saved Claude key to the Claude CLI: this computer, or a joined server
-   * with `claude-api-key-v1`. An older host stores the key and never reads it.
-   */
   readsClaudeKey?: boolean | undefined;
-  /**
-   * Whether the host logs Codex in with a pasted OpenAI key: this computer, or a joined server with
-   * `codex-api-key-v1`. An older host stores the key and never reads it.
-   */
   readsCodexKey?: boolean | undefined;
-  /** Whether the key goes to the host of a joined server, not to this computer. */
   onHost?: boolean | undefined;
   getProviderApiKeyState: (provider: AgentProviderId) => Promise<ProviderApiKeyState>;
   setProviderApiKey: (input: { provider: AgentProviderId; key: string }) => Promise<unknown>;
@@ -130,17 +104,8 @@ export interface ProviderKeyApi {
 export interface OpenCodeKeyDialogProps {
   api: ProviderKeyApi;
   provider?: KeyDialogProvider;
-  /**
-   * The text of a key that is not the one saved key of `provider`, such as the key of one more
-   * account. The `api` then saves that key.
-   */
   text?: KeyDialogText | undefined;
   onClose: () => void;
-  /**
-   * Retries the connection without touching credentials. Without it a failed free provider with
-   * no stored key could never retry from here: saving needs a key, removing needs one saved,
-   * and closing answers nothing.
-   */
   onReconnect?: (() => void | Promise<void>) | undefined;
 }
 
@@ -150,7 +115,6 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
   const { t, errorMessage } = useText();
   const provider = () => props.provider ?? "opencode";
   const text = (): KeyDialogText => props.text ?? KEY_TEXT[provider()];
-  // The key is saved where the provider runs, which for a joined server is the host.
   const description = (): AppTextKey => {
     const entry = text();
     return (props.api.onHost ? entry.descriptionHost : undefined) ?? entry.description;
@@ -166,7 +130,6 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
   });
 
   async function readState(): Promise<void> {
-    // Codex keeps its key in its own login, so OpenBot's store has no state for it. Disconnect removes it.
     if (provider() === "codex") {
       setPhase("idle");
       return;
@@ -188,8 +151,6 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
     setError(null);
     try {
       await props.api.setProviderApiKey({ provider: provider(), key: value });
-      // The typed key is dropped rather than kept as a draft: OpenCode has restarted with it, and
-      // the dialog keeps no copy of a secret it no longer needs.
       setKey("");
       props.onClose();
     } catch (cause) {
@@ -232,8 +193,6 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
           <Dialog.Content class="opencode-key-dialog" as="section">
             <header class="opencode-key-header">
               <Dialog.Title class="opencode-key-title">{t(text().title)}</Dialog.Title>
-              {/* One line that is always the dialog's whole message: the default pitch, the saved
-                  fact, or the unreadable warning. A second text block would repeat it. */}
               <Dialog.Description class="opencode-key-description">
                 <Show
                   when={stored() === "saved"}
@@ -286,10 +245,6 @@ export function OpenCodeKeyDialog(props: OpenCodeKeyDialogProps) {
                 <Button type="button" variant="ghost" disabled={busy()} onClick={props.onClose}>
                   {t("common.cancel")}
                 </Button>
-                {/* Gemini's and Claude's reconnect is an account sign-in, which a saved key
-                    overrides. The row's Connect offers it once the key is removed. Codex's is the
-                    ChatGPT sign-in, which replaces the key. A key-only provider, such as Inception,
-                    has nothing to reconnect with until a key is saved. */}
                 <Show
                   when={
                     props.onReconnect &&

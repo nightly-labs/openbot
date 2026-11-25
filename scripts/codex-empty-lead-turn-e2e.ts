@@ -1,26 +1,5 @@
-// Checks that a Codex turn that ends with no answer and no tool step does not stop a team (#7225).
-// Runs the real agent service, tool router and mailbox on a temporary profile with a fake Codex
-// app-server. A lead asks two teammates with `send_message`; their results start one lead turn. The
-// fake ends a lead turn with only its reasoning when the turn's mode says so. Checks:
-//   1. With no backup model, an empty lead turn that started with teammate results runs once more
-//      on the same model, and its answer ends the request. No error shows.
-//   2. A second empty run of the same results shows a plain error, and the results fail.
-//   3. A person's message that gets an empty turn shows the error and does not run again.
-//   4. With backup models, an empty lead turn runs again on the backup model, with no error.
-//   5. A teammate update that wants no answer can end empty: it completes with no error.
-//   6. In a thread, an empty lead turn of a teammate result runs once more too, and its answer ends
-//      the thread's turn (#8503). A second empty run shows the error in the thread.
-//   7. In a WhatsApp conversation, an empty orchestrator turn of a teammate result runs once more too,
-//      and the conversation gets the answer with no "Stopped." end before it (#8573). A second empty
-//      run ends the conversation's request as failed.
-//   8. In a thread, a person's turn that ran a step and wrote its last words as narration, then an
-//      empty answer, shows that narration as its answer (#8837). With narration only before the
-//      step, the turn ends as before: completed, once, with the narration still a step. A teammate's
-//      such turn still sends the note of its work to the agent that asked (#8214).
-//   9. In the agent's own chat, the same turn shows that narration as its answer too, in the
-//      published chat and in the stored page that a reload or a joined client reads (#9422).
-// `bun run test:codex-empty-lead-turn`. Writes .openbot-build/codex-empty-lead-turn-e2e/report.json.
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -44,11 +23,20 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 const countsFile = join(root, "empty-counts.json");
+const releaseFile = join(root, "release-held-teammate");
 const PRIMARY = defaultProviderModel("codex");
 const BACKUP = `${PRIMARY}-backup`;
 const NO_ANSWER = sourceText("error.provider.acpNoAnswer", { provider: agentProviderDescriptor("codex").displayName });
+const CHANNEL_NO_ANSWER = sourceText("error.provider.channelNoAnswer", {
+  provider: agentProviderDescriptor("codex").displayName,
+});
+const NO_ANSWER_AFTER_STEPS = sourceText("error.provider.noAnswerAfterSteps", {
+  provider: agentProviderDescriptor("codex").displayName,
+});
+const TEAMMATE_NO_ANSWER = sourceText("error.provider.teammateResultsNoAnswer", {
+  provider: agentProviderDescriptor("codex").displayName,
+});
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -62,23 +50,11 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
 interface FakeCall {
   tool: "send_message";
-  arguments: { recipientAgentIds: string[]; text: string; expectsReply: boolean };
+  arguments: { recipientAgentIds: string[]; text: string; expectsReply: boolean; replyToMessageId?: string };
 }
 
 const calls = (...items: FakeCall[]) => `<<CALLS${JSON.stringify(items)}CALLS>>`;
 
-/**
- * A Codex app-server with the methods that the service calls. Each turn input decides the turn:
- * - `TEAM-RESULT mode:<mode>`: a lead turn with teammate results. It answers "Team done.", or ends
- *   with only its reasoning: always for `empty-always` and `thread-empty-always`, on the first run
- *   for `empty-once` and `thread-empty-once`, and on the primary model for `empty-on-primary`.
- * - `<<CALLS[...]CALLS>>`: calls the named OpenBot tools one at a time, then answers "Asked.".
- * - `TEAM-QUESTION mode:<mode>`: a teammate answers `TEAM-RESULT mode:<mode>`.
- * - `EMPTY-TURN`: ends with only its reasoning.
- * - `NARRATION-AFTER-STEP` / `NARRATION-BEFORE-STEP`: runs one command, writes narration after or
- *   before it, then sends an empty answer.
- * Each turn is logged with its model and whether it ended empty.
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync, existsSync, readFileSync, writeFileSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -87,6 +63,7 @@ if (process.argv.includes("--version")) {
 }
 const LOG = ${JSON.stringify(fakeLog)};
 const COUNTS = ${JSON.stringify(countsFile)};
+const RELEASE = ${JSON.stringify(releaseFile)};
 const PRIMARY = ${JSON.stringify(PRIMARY)};
 const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
 let buffer = "";
@@ -98,7 +75,6 @@ process.stdout.on("error", (error) => {
   throw error;
 });
 const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
-/** Counts the result turns of each mode, across Codex processes. */
 const nextRun = (mode) => {
   const counts = existsSync(COUNTS) ? JSON.parse(readFileSync(COUNTS, "utf8")) : {};
   const run = (counts[mode] ?? 0) + 1;
@@ -114,6 +90,7 @@ const narrate = (threadId, turnId, id, text) => {
 };
 const finish = (turn) => {
   const { threadId, turnId } = turn;
+  if (turn.hold && !existsSync(RELEASE)) return setTimeout(() => finish(turn), 25);
   if (turn.kind === "narration") {
     const hex = Buffer.from(turnId).toString("hex");
     if (!turn.after) narrate(threadId, turnId, "msg_" + hex + "01", "Let me check the folder.");
@@ -126,6 +103,10 @@ const finish = (turn) => {
     write({ method: "item/completed", params: { threadId, turnId, item: answer } });
     write({ method: "turn/completed", params: { threadId, turn: { id: turnId, status: "completed" } } });
     return;
+  }
+  if (turn.step) {
+    const item = { type: "commandExecution", id: "command-" + turnId, command: "ls", cwd: "/", status: "completed", aggregatedOutput: "", exitCode: 0 };
+    write({ method: "item/completed", params: { threadId, turnId, item } });
   }
   if (turn.empty) {
     const item = { type: "reasoning", id: "reasoning-" + turnId, summary: ["Reading the results."], content: [] };
@@ -152,15 +133,16 @@ const decide = (text, model) => {
   if (result) {
     const mode = result[1];
     const run = nextRun(mode);
-    const empty = mode === "empty-always" || mode === "thread-empty-always" || mode === "chat-empty-always" || ((mode === "empty-once" || mode === "thread-empty-once" || mode === "chat-empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY);
-    return { kind: "result", mode, calls: [], empty, reply: "Team done." };
+    const empty = mode === "empty-always" || mode === "pending-empty" || mode === "repeat-new" || (mode === "repeat" && run > 1) || mode === "thread-empty-always" || mode === "chat-empty-always" || mode === "channel-empty-always" || ((mode === "empty-once" || mode === "thread-empty-once" || mode === "chat-empty-once" || mode === "channel-empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY) || (mode === "restart-replay" && run > 1);
+    return { kind: "result", mode, calls: [], empty, crash: mode === "restart-replay" && run === 1, reply: "Team done." };
   }
   const named = /<<CALLS([\\s\\S]*?)CALLS>>/.exec(text);
   if (named) return { kind: "calls", calls: JSON.parse(named[1]), empty: false, reply: "Asked." };
   const question = /TEAM-QUESTION mode:([a-z-]+)/.exec(text);
-  if (question) return { kind: "question", mode: question[1], calls: [], empty: false, reply: "TEAM-RESULT mode:" + question[1] };
+  if (question) return { kind: "question", mode: question[1], calls: [], empty: false, hold: question[1] === "pending-hold", reply: "TEAM-RESULT mode:" + question[1] };
   const narration = /NARRATION-(AFTER|BEFORE)-STEP/.exec(text);
   if (narration) return { kind: "narration", after: narration[1] === "AFTER", calls: [], empty: false, reply: "" };
+  if (text.includes("STEP-THEN-EMPTY")) return { kind: "step-empty", calls: [], empty: true, step: true, reply: "" };
   if (text.includes("EMPTY-TURN")) return { kind: "empty", calls: [], empty: true, reply: "" };
   return { kind: "chat", calls: [], empty: false, reply: "All good." };
 };
@@ -187,6 +169,10 @@ const answer = (message) => {
       appendFileSync(LOG, JSON.stringify({ turnId, model: params.model, kind: turn.kind, mode: turn.mode ?? null, empty: turn.empty }) + "\\n");
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
+      if (turn.crash) {
+        write({ method: "item/completed", params: { threadId: params.threadId, turnId, item: { type: "commandExecution", id: "command-" + turnId, command: "ls", cwd: "/", status: "completed", aggregatedOutput: "", exitCode: 0 } } });
+        return setTimeout(() => process.exit(1), 50);
+      }
       return callNext(turn);
     }
     case "turn/interrupt": {
@@ -221,7 +207,7 @@ process.stdin.on("data", (chunk) => {
 interface FakeTurn {
   turnId: string;
   model: string;
-  kind: "result" | "calls" | "question" | "empty" | "chat" | "narration";
+  kind: "result" | "calls" | "question" | "empty" | "step-empty" | "chat" | "narration";
   mode: string | null;
   empty: boolean;
 }
@@ -238,6 +224,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -256,7 +243,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service, its database or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -325,7 +311,6 @@ async function createAgent(name: string) {
   return agent;
 }
 
-/** The teammate results that reached this agent after the given deliveries. */
 function newResults(agentId: string, before: ReadonlySet<string>): QueueDelivery[] {
   return agents
     .listQueue(agentId)
@@ -334,10 +319,6 @@ function newResults(agentId: string, before: ReadonlySet<string>): QueueDelivery
     );
 }
 
-/**
- * The lead asks both teammates with a request that wants an answer. Returns when the lead's turns
- * for the results have ended: the results ended and no turn of the lead runs.
- */
 async function askTeam(leadId: string, teammateIds: string[], mode: string) {
   const before = new Set(agents.listQueue(leadId).deliveries.map((delivery) => delivery.id));
   const since = events.length;
@@ -365,10 +346,6 @@ async function askTeam(leadId: string, teammateIds: string[], mode: string) {
   };
 }
 
-/**
- * The lead asks one teammate from a new thread. Returns when the thread's turn of the result ended
- * with an answer or a failure, not with a run again.
- */
 async function askTeammateInThread(leadId: string, teammateId: string, mode: string) {
   const since = events.length;
   const task = await runCauseEffect(
@@ -402,10 +379,6 @@ async function askTeammateInThread(leadId: string, teammateId: string, mode: str
   return { turns: turns(), outcome: ended.outcome, error: ended.error, answer, errors: errorsFor(leadId, since) };
 }
 
-/**
- * A WhatsApp message asks the orchestrator, which asks one teammate. Returns when the conversation's
- * request for the teammate's result ended, with each end that the conversation was told of.
- */
 async function askTeammateFromWhatsApp(leadId: string, teammateId: string, mode: string) {
   const since = events.length;
   const ends: { status: string; followUp: boolean; answer: string | null }[] = [];
@@ -452,6 +425,51 @@ async function askTeammateFromWhatsApp(leadId: string, teammateId: string, mode:
   }
 }
 
+async function askInChannel(leadId: string, mode: string) {
+  const person = { id: "local", name: "Alex" };
+  const channelId = randomUUID();
+  await runCauseEffect(
+    agents.channels.command(
+      {
+        type: "save",
+        operationId: randomUUID(),
+        channelId,
+        draft: { name: mode, title: "", instructions: "", members: [{ agentId: leadId }], leadAgentId: leadId },
+      },
+      person,
+    ),
+  );
+  await runCauseEffect(
+    agents.channels.command(
+      {
+        type: "send",
+        operationId: randomUUID(),
+        channelId,
+        text: `TEAM-RESULT mode:${mode}`,
+        recipientAgentId: leadId,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      },
+      person,
+    ),
+  );
+  const task = await waitFor(`the ${mode} channel task to end`, () =>
+    agents.channels.store
+      .tasks(channelId)
+      .find((item) => item.state === "completed" || item.state === "failed" || item.state === "paused"),
+  );
+  await waitFor("the lead to be idle", () => agents.listQueue(leadId).deliveries.every((d) => ended(d.status)));
+  const reply = agents.channels.store
+    .messages(channelId)
+    .findLast((entry) => entry.author.kind === "agent" && entry.message.itemType !== "commentary");
+  return {
+    turns: fakeTurns().filter((turn) => turn.kind === "result" && turn.mode === mode),
+    state: task.state,
+    error: task.error,
+    reply: reply?.message.text,
+  };
+}
+
 async function lastAnswer(agentId: string): Promise<string | undefined> {
   const snapshot = await runCauseEffect(agents.readConversation(agentId));
   return snapshot.messages.findLast((message) => message.author === "assistant" && message.itemType !== "commentary")
@@ -490,8 +508,106 @@ try {
       outcome.results.map((result) => result.status),
       ["failed", "failed"],
     );
-    assert.deepEqual(outcome.errors, [NO_ANSWER]);
+    assert.deepEqual(outcome.errors, [TEAMMATE_NO_ANSWER]);
     return outcome;
+  });
+
+  await check("an empty lead turn for a teammate result ends quietly while another teammate still works", async () => {
+    const before = new Set(agents.listQueue(lead.id).deliveries.map((delivery) => delivery.id));
+    const since = events.length;
+    await runCauseEffect(
+      agents.sendMessage({
+        agentId: lead.id,
+        text: `Ask the team. ${calls(
+          {
+            tool: "send_message",
+            arguments: { recipientAgentIds: [alpha.id], text: "TEAM-QUESTION mode:pending-empty", expectsReply: true },
+          },
+          {
+            tool: "send_message",
+            arguments: { recipientAgentIds: [beta.id], text: "TEAM-QUESTION mode:pending-hold", expectsReply: true },
+          },
+        )}`,
+      }),
+    );
+    const [early] = await waitFor("the first result to end", () => {
+      const found = newResults(lead.id, before);
+      return found.length === 1 && found.every((delivery) => ended(delivery.status)) ? found : null;
+    });
+    await waitFor("the lead to be idle", () => agents.listQueue(lead.id).deliveries.every((d) => ended(d.status)));
+    const emptyTurns = fakeTurns().filter((turn) => turn.kind === "result" && turn.mode === "pending-empty");
+    assert.deepEqual(
+      emptyTurns.map((turn) => turn.empty),
+      [true],
+      `The result does not run again: ${JSON.stringify(emptyTurns)}`,
+    );
+    assert.equal(early?.status, "completed");
+    assert.deepEqual(errorsFor(lead.id, since), [], "No error shows while a teammate still works.");
+    writeFileSync(releaseFile, "");
+    const results = await waitFor("the held teammate's result to end", () => {
+      const found = newResults(lead.id, before);
+      return found.length === 2 && found.every((delivery) => ended(delivery.status)) ? found : null;
+    });
+    await waitFor("the lead to be idle", () => agents.listQueue(lead.id).deliveries.every((d) => ended(d.status)));
+    assert.equal(await lastAnswer(lead.id), "Team done.", "The held teammate's result wakes the lead.");
+    assert.deepEqual(errorsFor(lead.id, since), []);
+    return { results: results.map((delivery) => delivery.status), emptyTurns };
+  });
+
+  async function resendResult(text: string) {
+    const requestId = agents
+      .listQueue(lead.id)
+      .deliveries.findLast(
+        (delivery) =>
+          delivery.sender.kind === "agent" && delivery.sender.agentId === alpha.id && delivery.replyToMessageId,
+      )?.replyToMessageId;
+    assert.ok(requestId);
+    const before = new Set(agents.listQueue(lead.id).deliveries.map((delivery) => delivery.id));
+    const since = events.length;
+    await runCauseEffect(
+      agents.sendMessage({
+        agentId: alpha.id,
+        text: `Send the result again. ${calls({
+          tool: "send_message",
+          arguments: { recipientAgentIds: [lead.id], text, replyToMessageId: requestId, expectsReply: false },
+        }).replace("TEAM-RESULT", "TEAM\\u002dRESULT")}`,
+      }),
+    );
+    const [resent] = await waitFor("the resent result to end", () => {
+      const found = newResults(lead.id, before);
+      return found.length === 1 && found.every((delivery) => ended(delivery.status)) ? found : null;
+    });
+    await waitFor("the lead to be idle", () => agents.listQueue(lead.id).deliveries.every((d) => ended(d.status)));
+    return { status: resent?.status, errors: errorsFor(lead.id, since) };
+  }
+
+  await check("an empty lead turn for a repeated teammate result ends quietly and does not run again", async () => {
+    const first = await askTeam(lead.id, [alpha.id], "repeat");
+    assert.deepEqual(first.errors, [], JSON.stringify(first));
+    assert.equal(await lastAnswer(lead.id), "Team done.");
+    const outcome = await resendResult("TEAM-RESULT mode:repeat");
+    const turns = fakeTurns().filter((turn) => turn.kind === "result" && turn.mode === "repeat");
+    assert.deepEqual(
+      turns.map((turn) => turn.empty),
+      [false, true],
+      `The repeated result does not run again: ${JSON.stringify(turns)}`,
+    );
+    assert.equal(outcome.status, "completed");
+    assert.deepEqual(outcome.errors, [], "No error shows for a result that the lead already took.");
+    return { ...outcome, turns };
+  });
+
+  await check("an empty lead turn for a new result to a request that the lead already took ends quietly", async () => {
+    const outcome = await resendResult("TEAM-RESULT mode:repeat-new");
+    const turns = fakeTurns().filter((turn) => turn.kind === "result" && turn.mode === "repeat-new");
+    assert.deepEqual(
+      turns.map((turn) => turn.empty),
+      [true],
+      `The new result does not run again: ${JSON.stringify(turns)}`,
+    );
+    assert.equal(outcome.status, "completed");
+    assert.deepEqual(outcome.errors, [], "No error shows for a result to a request that the lead already took.");
+    return { ...outcome, turns };
   });
 
   await check("a person's message that gets an empty turn shows the error and does not run again", async () => {
@@ -508,6 +624,22 @@ try {
     assert.equal(fakeTurns().filter((turn) => turn.kind === "empty").length, before + 1);
     assert.deepEqual(errorsFor(lead.id, since), [NO_ANSWER]);
     return { status: delivery.status, error: delivery.error };
+  });
+
+  await check("a person's message that gets a step and no answer completes and shows a notice", async () => {
+    const since = events.length;
+    const before = fakeTurns().filter((turn) => turn.kind === "step-empty").length;
+    const receipt = await runCauseEffect(agents.sendMessage({ agentId: lead.id, text: "STEP-THEN-EMPTY" }));
+    const deliveryId = receipt.deliveries[0]?.id;
+    assert.ok(deliveryId);
+    const delivery = await waitFor("the message to end", () => {
+      const found = mailbox.getDelivery(deliveryId)?.delivery;
+      return ended(found?.status) ? found : null;
+    });
+    assert.equal(delivery.status, "completed", "The turn keeps its work.");
+    assert.equal(fakeTurns().filter((turn) => turn.kind === "step-empty").length, before + 1, "It does not run again.");
+    assert.deepEqual(errorsFor(lead.id, since), [NO_ANSWER_AFTER_STEPS]);
+    return { status: delivery.status, errors: errorsFor(lead.id, since) };
   });
 
   await check("with backup models, an empty lead turn runs again on the backup model", async () => {
@@ -585,7 +717,7 @@ try {
     const outcome = await askTeammateInThread(lead.id, alpha.id, "thread-empty-always");
     assert.equal(outcome.turns.length, 2, `The result runs again only once: ${JSON.stringify(outcome)}`);
     assert.equal(outcome.outcome, "failed");
-    assert.equal(outcome.error, NO_ANSWER);
+    assert.equal(outcome.error, TEAMMATE_NO_ANSWER);
     return outcome;
   });
 
@@ -615,11 +747,10 @@ try {
       outcome.ends.filter((end) => end.followUp),
       [{ status: "failed", followUp: true, answer: null }],
     );
-    assert.deepEqual(outcome.errors, [NO_ANSWER]);
+    assert.deepEqual(outcome.errors, [TEAMMATE_NO_ANSWER]);
     return outcome;
   });
 
-  /** A person's message in a new thread. Returns when the thread's turn ended and the thread is idle. */
   const personInThread = async (text: string) => {
     const since = events.length;
     const before = fakeTurns().length;
@@ -720,6 +851,51 @@ try {
     assert.match(result.text, /Tool steps in the turn: 1/u);
     return { status: result.status, text: result.text };
   });
+
+  await check("in a channel, an empty lead turn runs once more and its answer completes the task", async () => {
+    const outcome = await askInChannel(lead.id, "channel-empty-once");
+    assert.deepEqual(
+      outcome.turns.map((turn) => [turn.model, turn.empty]),
+      [
+        [PRIMARY, true],
+        [PRIMARY, false],
+      ],
+      JSON.stringify(outcome),
+    );
+    assert.equal(outcome.state, "completed", JSON.stringify(outcome));
+    assert.equal(outcome.error, null);
+    assert.equal(outcome.reply, "Team done.");
+    return outcome;
+  });
+
+  await check("in a channel, a second empty run fails the task with the channel's text", async () => {
+    const outcome = await askInChannel(lead.id, "channel-empty-always");
+    assert.equal(outcome.turns.length, 2, `The task runs again only once: ${JSON.stringify(outcome)}`);
+    assert.equal(outcome.state, "failed");
+    assert.equal(outcome.error, CHANNEL_NO_ANSWER);
+    return outcome;
+  });
+
+  await check(
+    "an empty turn for a teammate result that a restart gave again after its turn started ends quietly",
+    async () => {
+      const outcome = await askTeam(lead.id, [alpha.id], "restart-replay");
+      assert.deepEqual(
+        outcome.turns.map((turn) => turn.empty),
+        [false, true],
+        `The result runs again once after the restart and not after its empty turn: ${JSON.stringify(outcome)}`,
+      );
+      assert.deepEqual(
+        outcome.results.map((result) => result.status),
+        ["completed"],
+      );
+      assert.ok(
+        !outcome.errors.includes(TEAMMATE_NO_ANSWER),
+        `No error shows for the replayed result: ${JSON.stringify(outcome)}`,
+      );
+      return outcome;
+    },
+  );
 
   report.passed = true;
 } catch (error) {

@@ -5,7 +5,7 @@ import Foundation
   internal import OpenBotShortcuts
 #endif
 
-// The shortcuts of OpenBot: List Agents and Send Message.
+// The shortcuts of OpenBot: List Agents, Send Message and Open Agent.
 //
 // They run without the JavaScript of the app. iOS runs a shortcut in the background, also when the
 // app is not in memory, and there the app has no window and React Native does not run. List Agents
@@ -36,7 +36,9 @@ enum ShortcutNotice: String {
 @available(iOS 26.0, *)
 struct ListAgentsIntent: AppIntent {
   static let title: LocalizedStringResource = "List Agents"
-  static let description = IntentDescription("Shows your OpenBot agents. A tap on an agent opens its chat.")
+  static let description = IntentDescription(
+    "Shows your OpenBot agents. A tap on an agent opens its chat. The message button sends a message, and the app does not open."
+  )
   static let supportedModes: IntentModes = .background
   static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
@@ -78,16 +80,80 @@ struct SendMessageIntent: AppIntent {
     }
     let text = message.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { throw $message.needsValueError("What should it say?") }
-    // The intent returns when the server has the message. iOS suspends the app soon after an
-    // intent returns, so a send that continued after it would not end.
-    guard let directory, let agent = directory.agent,
-      let server = directory.server(of: agent),
-      let session = ShortcutSession.read(for: directory)
-    else {
-      return .result(snippetIntent: ShortcutCardSnippetIntent(outcome: .failed, message: text))
+    guard let directory, let agent = directory.agent else {
+      return .result(snippetIntent: ShortcutCardSnippetIntent(notice: .noAgent))
     }
-    let outcome = await ShortcutMessageSender.send(text: text, to: agent, on: server, session: session)
-    return .result(snippetIntent: ShortcutCardSnippetIntent(outcome: outcome, message: text))
+    return .result(snippetIntent: await ShortcutCardSnippetIntent.sending(text, to: agent, in: directory))
+  }
+}
+
+@available(iOS 26.0, *)
+struct MessageAgentIntent: AppIntent {
+  static let title: LocalizedStringResource = "Message Agent"
+  static let isDiscoverable = false
+  static let supportedModes: IntentModes = .background
+  static let authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
+
+  @Parameter(title: "Agent")
+  var agentId: String?
+
+  @Parameter(title: "Server")
+  var serverId: String?
+
+  @Parameter(
+    title: "Message",
+    inputOptions: String.IntentInputOptions(keyboardType: .default, multiline: true)
+  )
+  var message: String?
+
+  init() {}
+
+  init(agent: ShortcutDirectory.Agent) {
+    self.agentId = agent.id
+    self.serverId = agent.serverId
+  }
+
+  func perform() async throws -> some IntentResult & ShowsSnippetIntent {
+    guard let directory = ShortcutDirectory.read() else {
+      return .result(snippetIntent: ShortcutCardSnippetIntent(notice: .setUp))
+    }
+    if directory.locked {
+      return .result(snippetIntent: ShortcutCardSnippetIntent(notice: .locked))
+    }
+    guard let agentId, let serverId, let agent = directory.agent(id: agentId, serverId: serverId) else {
+      return .result(snippetIntent: AgentListSnippetIntent())
+    }
+    let prompt = ShortcutText.text("mobile.settings.shortcuts.card.messagePrompt", in: directory, name: agent.name)
+    var text = message?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    if text.isEmpty {
+      text = try await $message.requestValue("\(prompt)").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    guard !text.isEmpty else { throw $message.needsValueError("\(prompt)") }
+    return .result(snippetIntent: await ShortcutCardSnippetIntent.sending(text, to: agent, in: directory))
+  }
+}
+
+/// Opens the chat of the agent that the user chose in Settings > Shortcuts. With no agent, it opens
+/// Settings > Shortcuts, and with no data from the app, the home screen. A locked app asks for the
+/// lock before the chat shows.
+@available(iOS 26.0, *)
+struct OpenAgentIntent: AppIntent {
+  static let title: LocalizedStringResource = "Open Agent"
+  static let description = IntentDescription(
+    "Opens the chat of the agent that you chose in OpenBot Settings > Shortcuts."
+  )
+  static let supportedModes: IntentModes = .foreground(.immediate)
+
+  func perform() async throws -> some IntentResult {
+    let directory = ShortcutDirectory.read()
+    var payload = ["screen": "home"]
+    if let agent = directory?.agent {
+      payload = ["screen": "chat", "agentId": agent.id]
+    } else if directory != nil {
+      payload = ["screen": "settings"]
+    }
+    ShortcutBridge.shared.open(shortcutPayload(payload))
+    return .result()
   }
 }
 
@@ -156,6 +222,12 @@ struct OpenBotAppShortcuts: AppShortcutsProvider {
       phrases: ["Send a message with \(.applicationName)", "Message my agent in \(.applicationName)"],
       shortTitle: "Send Message",
       systemImageName: "paperplane"
+    )
+    AppShortcut(
+      intent: OpenAgentIntent(),
+      phrases: ["Open my agent in \(.applicationName)", "Open \(.applicationName) agent"],
+      shortTitle: "Open Agent",
+      systemImageName: "bubble.left.and.bubble.right"
     )
   }
 }

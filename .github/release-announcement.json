@@ -1,10 +1,10 @@
 {
-  "version": "0.72.0",
+  "version": "0.78.0",
   "highlights": [
-    "Update your joined servers to this version too, so that the CRM, Add account with code and agent backdrops work there.",
-    "Play an animated backdrop behind the whole window, or ask an agent to make one for you.",
-    "Try the experimental CRM in Server settings > Experimental, with a Stripe import and agent proposals that you approve.",
-    "Answer an agent in the agent dock chat without the main window.",
-    "A chat that loses its saved session recovers by itself, and more agents move to their backup model at a usage limit."
+    "Update your joined servers to this version too, so that channel voice, hidden servers, workflow phone notifications and the connection fixes work there.",
+    "Use voice in channels: dictate a message and hear the agent's answer, or start a voice conversation from the channel's message box.",
+    "Hide a server from the server rail. It stays hidden on your other computers, and the \"Hidden servers\" folder shows it again.",
+    "Streamed replies and parallel workflows use less CPU, and long channels on a joined server open faster.",
+    "A workflow \"Notification\" output or a step that waits for approval now sends a phone notification."
   ]
 }

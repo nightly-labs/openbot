@@ -7,6 +7,7 @@ import {
   canAdministerServer,
   decodeAgentAdminSettings,
   decodeAgentBackupModelSettings,
+  decodeAgentBuiltinMemorySettings,
   decodeAgentDefaultsOverview,
   decodeAgentFastModels,
   decodeAgentFastModeSettings,
@@ -35,16 +36,19 @@ import {
   LEGACY_RESPONSE_STYLE,
   MCP_SERVERS_CAPABILITY,
   type RoutineCalendarOwner,
+  type RoutineFields,
   type SetAgentHiddenInput,
   STORAGE_CAPABILITY,
   type TeamRole,
   withFastServiceTiers,
+  withKeptModels,
   withSteeringModels,
+  withWhatsAppReadOnly,
   withWhatsAppStatusReactions,
   withWhatsAppWorkingMessages,
   withWorkspaceOnlyLimit,
 } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { AGENT_ADMIN_CAPABILITY, AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
@@ -52,6 +56,10 @@ import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import {
+  AGENT_BUILTIN_MEMORY_CAPABILITY,
+  AGENT_BUILTIN_MEMORY_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
 import {
   AGENT_COLORS_CAPABILITY,
   AGENT_COLORS_ROUTES,
@@ -110,6 +118,7 @@ import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSING_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import { CHANNEL_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
 import { CONNECTORS_CAPABILITY } from "@openbot/contracts/team-protocol/connectors-v1";
@@ -141,8 +150,11 @@ import { HOST_MEMBER_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { HOST_PERSONALITY_CAPABILITY } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
+import { HOST_SIGNAL_HOME_CAPABILITY } from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
+import { HOST_TURN_LIMITS_CAPABILITY } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
+import { HOST_VOICE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import {
@@ -156,10 +168,15 @@ import {
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
+import { MEDIA_APPROVAL_CREDITS_CAPABILITY } from "@openbot/contracts/team-protocol/media-approval-credits-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
+import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -169,8 +186,14 @@ import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/pro
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "@openbot/contracts/team-protocol/routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
+import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { SERVER_AUDIT_CAPABILITY } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/shared-tables-v1";
+import {
+  decodeSideQuestionResponse,
+  SIDE_QUESTION_CAPABILITY,
+  SIDE_QUESTION_ROUTES,
+} from "@openbot/contracts/team-protocol/side-question-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
@@ -190,10 +213,14 @@ import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { VAULT_V4_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v4";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_READ_ONLY_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-v1";
+import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
+import { WORKFLOWS_MEDIA_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-v1";
+import { WORKFLOWS_PAUSE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-pause-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
 import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
@@ -203,11 +230,23 @@ import { readPlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteDownloadWatch, RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import {
+  createOnceAgentRoutine,
+  isOnceSchedule,
+  listOnceAgentRoutines,
+  listOnceChannelRoutines,
+  type RoutinesOncePost,
+  requireReleasedScheduleOn,
+  updateAgentRoutineOnce,
+} from "@openbot/team-client/routines-once";
+import {
   addAgentFolder,
+  addChannelFolder,
   bitwardenConnectorRequest,
   browseAgentFolders,
+  browseChannelFolders,
   cancelHostUpdate,
   cancelSignInRelay,
+  changeHostVoiceModel,
   checkHostForUpdate,
   checkHostRelease,
   clearHostBrowserData,
@@ -227,15 +266,20 @@ import {
   getHostAuditLog,
   getHostBrowsingMemory,
   getHostMcpAccess,
+  getHostMediaApprovalCredits,
   getHostMemoryReview,
   getHostPersonality,
   getHostReleaseStatus,
+  getHostSignalHome,
   getHostSkillLearning,
   getHostTimezone,
+  getHostTurnLimits,
   getHostUpdateStatus,
+  getHostVoiceModel,
   getRoutineResultDestination,
   githubConnectorRepositories,
   githubConnectorRequest,
+  giveEventRoutineSecretToAgent,
   importHostVaultCsv,
   includeAgentFolder,
   installAgentSkill,
@@ -270,7 +314,9 @@ import {
   publishAgentTemplate,
   readAgentFolders,
   readAgentSessionSettings,
+  readChannelFolders,
   removeAgentFolder,
+  removeChannelFolder,
   removeMcpServer,
   requestHostRestart,
   resetAgentSessionSetting,
@@ -289,10 +335,13 @@ import {
   setHostBrowserProfileProxy,
   setHostBrowsingMemory,
   setHostMcpAccess,
+  setHostMediaApprovalCredits,
   setHostMemoryReview,
   setHostPersonality,
+  setHostSignalHome,
   setHostSkillLearning,
   setHostTimezone,
+  setHostTurnLimits,
   setHostUpdateSettings,
   setMcpServerEnabled,
   setOwnServerNotificationLevel,
@@ -315,10 +364,12 @@ import {
   whatsappConnectorGroups,
   whatsappConnectorLinkState,
   whatsappConnectorOverview,
+  whatsappConnectorReadOnly,
   whatsappConnectorReconnect,
   whatsappConnectorRemoveSender,
   whatsappConnectorSetEnabled,
   whatsappConnectorSetOwnNumber,
+  whatsappConnectorSetSenderReadOnly,
   whatsappConnectorSetStatusReactions,
   whatsappConnectorSetWorkingMessage,
   whatsappConnectorStartLink,
@@ -366,6 +417,7 @@ import { createProviderAdmin } from "@/features/servers/model/provider-admin";
 import { saveAgentAvatar, savedAgentAvatar } from "@/features/workspace/model/agent-avatar-cache";
 import { decodeConversationSearchPage } from "@/features/workspace/model/conversation";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
+import { attachmentDownloadKey, type DownloadQueue } from "@/features/workspace/model/request-lanes";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
 import {
   hasCapability,
@@ -381,7 +433,6 @@ import type {
   ServerUpdateAccess,
 } from "@/features/workspace/model/workspace-types";
 
-/** Sends one Team API request to a server; without a server ID it uses the active server. */
 export type WorkspaceRequest = <T>(
   method: string,
   path: string,
@@ -394,8 +445,6 @@ export type WorkspaceRequest = <T>(
   download?: RemoteDownloadWatch,
 ) => Promise<T>;
 
-/** The capability checks that only read what a host advertised. */
-/** The host shares its screen through Sunshine and Moonlight Web. */
 const REMOTE_DESKTOP_CAPABILITY = "remote-desktop" satisfies TeamProtocolV1Capability;
 
 export type HostRequestChecks = Pick<
@@ -416,6 +465,7 @@ type HostRequestActions = Pick<
   | "loadAgentMemorySelection"
   | "setAgentMemoryInclusion"
   | "loadAgentRoutines"
+  | "loadOnceAgentRoutines"
   | "loadRoutineCalendar"
   | "listEventRoutines"
   | "saveEventRoutine"
@@ -425,6 +475,7 @@ type HostRequestActions = Pick<
   | "deleteEventRoutine"
   | "testEventRoutine"
   | "rotateEventRoutineSecret"
+  | "giveEventRoutineSecretToAgent"
   | "listEventActivity"
   | "loadHostAnalytics"
   | "searchMessages"
@@ -442,6 +493,7 @@ type HostRequestActions = Pick<
   | "markAgentThreadRead"
   | "loadMessagePins"
   | "setMessagePinned"
+  | "askSideQuestion"
   | "respondToTaskPrompt"
   | "loadAgentSkills"
   | "installAgentSkill"
@@ -466,6 +518,8 @@ type HostRequestActions = Pick<
   | "updateAgentNewChat"
   | "loadAgentPlanCard"
   | "updateAgentPlanCard"
+  | "loadAgentBuiltinMemory"
+  | "updateAgentBuiltinMemory"
   | "loadAgentDefaults"
   | "updateAgentDefaults"
   | "setAgentDefaultChoice"
@@ -490,11 +544,23 @@ type HostRequestActions = Pick<
   | "excludeAgentFolder"
   | "includeAgentFolder"
   | "browseAgentFolders"
+  | "loadChannelFolders"
+  | "addChannelFolder"
+  | "removeChannelFolder"
+  | "browseChannelFolders"
   | "restartServerItself"
   | "loadServerTimezone"
   | "setServerTimezone"
+  | "loadServerTurnLimits"
+  | "setServerTurnLimits"
+  | "loadServerVoiceModel"
+  | "changeServerVoiceModel"
+  | "loadServerSignalHome"
+  | "setServerSignalHome"
   | "loadAgentMemoryLimit"
   | "setAgentMemoryLimit"
+  | "loadMediaApprovalCredits"
+  | "setMediaApprovalCredits"
   | "loadMemoryReview"
   | "setMemoryReview"
   | "loadSkillLearning"
@@ -568,6 +634,7 @@ type HostRequestActions = Pick<
   | "setWhatsAppOwnNumber"
   | "setWhatsAppWorkingMessage"
   | "setWhatsAppStatusReactions"
+  | "setWhatsAppSenderReadOnly"
   | "loadServerUpdate"
   | "checkServerUpdate"
   | "startServerUpdate"
@@ -606,30 +673,29 @@ type HostRequestActions = Pick<
   | "setMessageReaction"
   | "deleteMessage"
   | "downloadAttachment"
+  | "prioritizeAttachmentDownload"
   | "downloadMessageFile"
 >;
 
-/** A file that the host sends, such as an attachment or a workspace file. */
-function decodeHostFile(value: unknown): RemoteFileUpload {
+function decodeHostFile(value: unknown, savedFile?: string): RemoteFileUpload {
   if (!isDynamicRecord(value) || !isString(value.name) || !isString(value.mimeType) || !isString(value.base64))
     throw new Error("The host returned an invalid file.");
-  return { name: value.name, mimeType: value.mimeType, base64: value.base64 };
+  const file = value.file;
+  const saved =
+    savedFile !== undefined && isDynamicRecord(file) && file.ref === savedFile && isNumber(file.size)
+      ? { ref: savedFile, size: file.size }
+      : null;
+  return { name: value.name, mimeType: value.mimeType, base64: value.base64, ...(saved ? { file: saved } : {}) };
 }
 
-/** A host that serves `agent-hidden-v1` owns the hidden agents of its members. */
 function hidesAgentsOnHost(capabilities: readonly string[] | undefined): boolean {
   return capabilities?.includes(AGENT_HIDDEN_CAPABILITY) ?? false;
 }
 
-/**
- * An owner or an admin hides on the host. The host refuses a member, so a member hides on this phone
- * only, as on a host without the capability.
- */
 export function hostOwnsHide(capabilities: readonly string[] | undefined, role: TeamRole | undefined): boolean {
   return hidesAgentsOnHost(capabilities) && canAdministerServer(role);
 }
 
-/** The hidden agents of a host that serves `agent-hidden-v1`, or null for an older host. */
 export async function readHostHiddenAgents(
   request: TeamApiRequest,
   capabilities: readonly string[],
@@ -638,7 +704,6 @@ export async function readHostHiddenAgents(
   return (await runTeamRequest(listHiddenAgents(request))).agents;
 }
 
-/** Hides or restores one agent on the host. The host answers with its whole hidden list. */
 export async function writeHostAgentHidden(
   request: TeamApiRequest,
   input: SetAgentHiddenInput,
@@ -646,12 +711,10 @@ export async function writeHostAgentHidden(
   return (await runTeamRequest(setAgentHidden(request, input))).agents;
 }
 
-/** A host that serves `agent-colors-v1` keeps an exact colour beside the hue of each agent. */
 export function hostKeepsAgentColors(capabilities: readonly string[] | undefined): boolean {
   return capabilities?.includes(AGENT_COLORS_CAPABILITY) ?? false;
 }
 
-/** The agents with a colour on a host that serves `agent-colors-v1`, or null for an older host. */
 export async function readHostAgentColors(
   request: TeamApiRequest,
   capabilities: readonly string[],
@@ -660,10 +723,6 @@ export async function readHostAgentColors(
   return (await request("POST", AGENT_COLORS_ROUTES.read, decodeAgentColorsSnapshot, {})).agents;
 }
 
-/**
- * Sets or removes (`null`) the colour of one agent. The host also sets the nearest hue, and answers
- * with all of its colours.
- */
 export async function writeHostAgentColor(
   request: TeamApiRequest,
   agentId: string,
@@ -672,19 +731,18 @@ export async function writeHostAgentColor(
   return (await request("POST", AGENT_COLORS_ROUTES.set, decodeAgentColorsSnapshot, { agentId, color })).agents;
 }
 
-/** The checks of the capabilities that each server advertised. */
 export function createHostRequestChecks(capabilities: ServerCapabilities): HostRequestChecks {
   const has = (serverId: string, capability: string) => hasCapability(capabilities, serverId, capability);
   return {
     canSearchFiles: (serverId) => has(serverId, CONVERSATION_FILE_SEARCH_CAPABILITY),
     canUseTasks: (serverId) => has(serverId, AGENT_TASKS_CAPABILITY),
-    // The host grants `agent-tasks-v1` with it, and the phone opens the new thread through those routes.
     canRunQueuedMessageAsTask: (serverId) =>
       has(serverId, AGENT_QUEUE_TASK_CAPABILITY) && has(serverId, AGENT_TASKS_CAPABILITY),
     canEditThreads: (serverId) => has(serverId, AGENT_THREADS_CAPABILITY),
     canReadThreads: (serverId) => has(serverId, AGENT_THREAD_READS_CAPABILITY),
     canAttachThreadFiles: (serverId) => has(serverId, AGENT_THREAD_FILES_CAPABILITY),
     canPinMessages: (serverId) => has(serverId, MESSAGE_PINS_CAPABILITY),
+    canAskSideQuestion: (serverId) => has(serverId, SIDE_QUESTION_CAPABILITY),
     canBranchThreads: (serverId) => has(serverId, AGENT_THREAD_BRANCHES_CAPABILITY),
     canUseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY),
     canUseWorkflowGitHub: (serverId) =>
@@ -693,8 +751,17 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
       has(serverId, WORKFLOWS_CAPABILITY) &&
       has(serverId, WORKFLOWS_CHATS_CAPABILITY) &&
       has(serverId, ROUTINE_RESULTS_CAPABILITY),
+    canUseWorkflowMedia: (serverId) => has(serverId, WORKFLOWS_CAPABILITY) && has(serverId, WORKFLOWS_MEDIA_CAPABILITY),
+    canUseWorkflowMediaSize: (serverId) =>
+      has(serverId, WORKFLOWS_CAPABILITY) &&
+      has(serverId, WORKFLOWS_MEDIA_CAPABILITY) &&
+      has(serverId, WORKFLOWS_MEDIA_SIZE_CAPABILITY),
+    canUseWorkflowAssets: (serverId) =>
+      has(serverId, WORKFLOWS_CAPABILITY) &&
+      has(serverId, WORKFLOWS_MEDIA_CAPABILITY) &&
+      has(serverId, STORAGE_CAPABILITY),
+    canPauseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY) && has(serverId, WORKFLOWS_PAUSE_CAPABILITY),
     canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
-    // The folders lay out the files of the storage scan, so the Library needs both.
     canOrganizeLibrary: (serverId) => has(serverId, STORAGE_CAPABILITY) && has(serverId, LIBRARY_FOLDERS_CAPABILITY),
     canControlComputer: (serverId) => has(serverId, REMOTE_DESKTOP_CAPABILITY),
     canSetAgentNotificationLevel: (serverId) => has(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY),
@@ -723,7 +790,6 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
   };
 }
 
-/** Workspace actions that only send host requests and read advertised capabilities. */
 export function createHostRequestActions({
   request,
   teamApi,
@@ -736,15 +802,12 @@ export function createHostRequestActions({
   request: WorkspaceRequest;
   teamApi: (serverId: string, onUploadProgress?: (fraction: number) => void) => TeamApiRequest;
   queryClient: QueryClient;
-  /** The API URL, user ID and session scope that start each account query key. */
   queryScope: QueryScope;
   capabilities: ServerCapabilities;
-  attachmentDownloads: { current: Promise<void> };
-  /** The lane of the files above the attachment limit, one at a time. */
-  largeAttachmentDownloads: { current: Promise<void> };
+  attachmentDownloads: DownloadQueue;
+  largeAttachmentDownloads: DownloadQueue;
 }): { checks: HostRequestChecks; actions: HostRequestActions } {
   const has = (serverId: string, capability: string) => hasCapability(capabilities, serverId, capability);
-  /** The Team API of a server that serves `capability`, for an optional admin route set. */
   function capabilityApi(
     serverId: string,
     capability: string,
@@ -754,80 +817,78 @@ export function createHostRequestActions({
     requireCapability(capabilities, serverId, capability, unsupported);
     return teamApi(serverId, onUploadProgress);
   }
-  /** The shared admin requests, sent to one server that serves `skills-admin-v1`. */
   const skillsAdmin = (serverId: string) =>
     capabilityApi(serverId, SKILLS_ADMIN_CAPABILITY, "mobile.agent.skill.manageUnsupported");
-  /** The shared tables are an optional admin route set. */
   const sharedTablesAdmin = (serverId: string) =>
     capabilityApi(serverId, SHARED_TABLES_CAPABILITY, "mobile.agent.tables.unsupported");
-  /** Publishing is an optional admin route set. */
   const publishAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_PUBLISH_CAPABILITY, "mobile.agent.publish.unsupported");
-  /** The event admin routes are optional and reject members on the host. */
   const eventsAdmin = (serverId: string) =>
     capabilityApi(serverId, EVENTS_CAPABILITY, "mobile.agent.record.eventsUnsupported");
-  /** A host with `routine-recovery-v1` answers the event routine list and save with `missedPolicy`. */
   const recovery = (serverId: string) => has(serverId, ROUTINE_RECOVERY_CAPABILITY);
+  const onceRoutines = (serverId: string) => has(serverId, ROUTINES_ONCE_CAPABILITY);
+  const oncePost =
+    (serverId: string): RoutinesOncePost =>
+    (path, decode, body) =>
+      teamApi(serverId)("POST", path, decode, body);
   const routineResultsAdmin = (serverId: string) =>
     capabilityApi(serverId, ROUTINE_RESULTS_CAPABILITY, "mobile.agent.record.resultDestinationUnsupported");
   const sessionSettingsAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_SESSION_SETTINGS_CAPABILITY, "mobile.agent.session.unsupported");
   const foldersAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_FOLDERS_CAPABILITY, "mobile.agent.folders.unsupported");
-  /** The tasks are an optional route set. Any member who can message the agent can use them. */
+  const channelFoldersAdmin = (serverId: string) =>
+    capabilityApi(serverId, CHANNEL_FOLDERS_CAPABILITY, "error.team.channelFoldersUnsupported");
   const tasksApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_TASKS_CAPABILITY, "mobile.server.threads.unsupported");
-  /** "Run in new thread" on a queued message is an optional route beside the tasks. */
   const queueTaskApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_QUEUE_TASK_CAPABILITY, "mobile.server.threads.unsupported");
-  /** Rename and delete of a thread are an optional route set beside the tasks. */
   const threadsApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_THREADS_CAPABILITY, "mobile.chat.threads.unsupported");
-  /** Files in a thread are an optional route set beside the tasks. A message without files uses the tasks. */
   const threadMessageApi = (serverId: string, attachmentDraftIds: readonly string[] | undefined) =>
     attachmentDraftIds?.length
       ? capabilityApi(serverId, AGENT_THREAD_FILES_CAPABILITY, "mobile.chat.threads.filesUnsupported")
       : tasksApi(serverId);
-  /** The read marks of the threads are an optional route set beside the tasks. */
   const threadReadsApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_THREAD_READS_CAPABILITY, "mobile.chat.threads.unsupported");
-  /** The pins of an agent's chats are an optional route set. Any member who can message the agent can use it. */
   const messagePinsApi = (serverId: string) =>
     capabilityApi(serverId, MESSAGE_PINS_CAPABILITY, "mobile.chat.pins.unsupported");
-  /** The branches of a chat are an optional route set beside the tasks. */
   const threadBranchesApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_THREAD_BRANCHES_CAPABILITY, "mobile.chat.threads.unsupported");
-  /** A self-hosted server restarts itself through an optional admin route. */
   const restartAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_RESTART_CAPABILITY, "mobile.server.settings.restartUnsupported");
-  /** The server timezone and the agent memory limit are optional admin route sets. */
   const timezoneAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_TIMEZONE_CAPABILITY, "mobile.server.settings.timezoneUnsupported");
+  const turnLimitsAdmin = (serverId: string) =>
+    capabilityApi(serverId, HOST_TURN_LIMITS_CAPABILITY, "mobile.server.settings.turnLimitsUnsupported");
+  const signalHomeAdmin = (serverId: string) =>
+    capabilityApi(serverId, HOST_SIGNAL_HOME_CAPABILITY, "mobile.server.settings.signalHomeUnsupported");
+  const voiceModelAdmin = (serverId: string) =>
+    capabilityApi(serverId, HOST_VOICE_MODEL_CAPABILITY, "mobile.server.settings.voiceModelUnsupported");
   const memoryLimitAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_MEMORY_LIMIT_CAPABILITY, "mobile.server.settings.memoryLimitUnsupported");
-  /** How the agents learn from their chats and browsing are optional admin route sets. */
+  const mediaApprovalCreditsAdmin = (serverId: string) =>
+    capabilityApi(
+      serverId,
+      MEDIA_APPROVAL_CREDITS_CAPABILITY,
+      "mobile.server.settings.mediaApprovalCreditsUnsupported",
+    );
   const memoryReviewAdmin = (serverId: string) =>
     capabilityApi(serverId, MEMORY_REVIEW_CAPABILITY, "mobile.server.settings.learningUnsupported");
   const skillLearningAdmin = (serverId: string) =>
     capabilityApi(serverId, SKILL_LEARNING_CAPABILITY, "mobile.server.settings.learningUnsupported");
   const browsingMemoryAdmin = (serverId: string) =>
     capabilityApi(serverId, BROWSING_MEMORY_CAPABILITY, "mobile.server.settings.learningUnsupported");
-  /** Any member reads the personality; the host lets only an owner or admin set it. */
   const personalityApi = (serverId: string) =>
     capabilityApi(serverId, HOST_PERSONALITY_CAPABILITY, "mobile.server.settings.personalityUnsupported");
-  /** The roles that set the agents of each member are an optional admin route set. */
   const rolesAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_ACCESS_CAPABILITY, "mobile.server.roles.unsupported");
-  /** Who gets each MCP server is an optional admin route set. */
   const mcpAccessAdmin = (serverId: string) =>
     capabilityApi(serverId, MCP_ACCESS_CAPABILITY, "mobile.server.mcp.accessUnsupported");
-  /** The audit log of the access changes is an optional admin route set. */
   const auditAdmin = (serverId: string) =>
     capabilityApi(serverId, SERVER_AUDIT_CAPABILITY, "mobile.server.audit.unsupported");
-  /** Each member reads and sets only their own levels, so the host does not check a role. */
   const notificationLevelsApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY, "mobile.agent.notificationLevel.unsupported");
-  /** The connectors are optional admin route sets. */
   const connectorsAdmin = (serverId: string) =>
     capabilityApi(serverId, CONNECTORS_CAPABILITY, "mobile.server.connectors.unsupported");
   const onePasswordAdmin = (serverId: string) =>
@@ -849,19 +910,15 @@ export function createHostRequestActions({
           : 1;
   const vaultImportAdmin = (serverId: string) =>
     capabilityApi(serverId, VAULT_IMPORT_CAPABILITY, "mobile.server.vault.unsupported");
-  /** Any member imports agents. The host keeps each export under a token that only its sender uses. */
   const agentImportApi = (serverId: string, onUploadProgress?: (fraction: number) => void) =>
     capabilityApi(serverId, AGENT_IMPORT_CAPABILITY, "mobile.server.import.unsupported", onUploadProgress);
-  /** The transfer of the whole server is an optional admin route set. */
   const transferAdmin = (serverId: string, onUploadProgress?: (fraction: number) => void) =>
     capabilityApi(serverId, INSTANCE_TRANSFER_CAPABILITY, "mobile.server.transfer.unsupported", onUploadProgress);
-  /** The zone of this phone. The host uses its own when the zone is not valid there. */
   const phoneTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
   const browserProfilesAdmin = (serverId: string) =>
     capabilityApi(serverId, BROWSER_PROFILES_CAPABILITY, "mobile.server.browserProfiles.unsupported");
   const browserProxiesAdmin = (serverId: string) =>
     capabilityApi(serverId, BROWSER_PROXIES_CAPABILITY, "mobile.server.browserProxies.unsupported");
-  /** The OpenBot update of the host: the admin route set, or the member set that only checks and starts. */
   const updateApi = (serverId: string, access: ServerUpdateAccess) =>
     capabilityApi(
       serverId,
@@ -871,10 +928,8 @@ export function createHostRequestActions({
   const updateAdmin = (serverId: string) => updateApi(serverId, "admin");
   const releaseApi = (serverId: string) =>
     capabilityApi(serverId, HOST_RELEASE_CAPABILITY, "mobile.server.update.unavailable");
-  /** The sites are an optional route set. Every member lists them; the host deletes for an owner or admin only. */
   const sitesApi = (serverId: string) =>
     capabilityApi(serverId, HOSTED_SITES_CAPABILITY, "mobile.server.sites.unsupported");
-  /** The MCP servers are an optional admin route set. */
   const mcpAdmin = (serverId: string) =>
     capabilityApi(serverId, MCP_SERVERS_CAPABILITY, "mobile.server.mcp.unsupported");
   function memoryRequest(serverId: string): AgentMemoriesRequest<TeamRequestError> {
@@ -886,13 +941,23 @@ export function createHostRequestActions({
   }
   const checks = createHostRequestChecks(capabilities);
   const actions: HostRequestActions = {
-    // Async, so a host without the capability rejects the promise and does not throw at the call.
     restartServerItself: async (serverId) => runTeamRequest(requestHostRestart(restartAdmin(serverId))),
     loadServerTimezone: async (serverId) => runTeamRequest(getHostTimezone(timezoneAdmin(serverId))),
     setServerTimezone: async (timezone, serverId) => runTeamRequest(setHostTimezone(timezoneAdmin(serverId), timezone)),
+    loadServerTurnLimits: async (serverId) => runTeamRequest(getHostTurnLimits(turnLimitsAdmin(serverId))),
+    setServerTurnLimits: async (input, serverId) => runTeamRequest(setHostTurnLimits(turnLimitsAdmin(serverId), input)),
+    loadServerVoiceModel: async (serverId) => runTeamRequest(getHostVoiceModel(voiceModelAdmin(serverId))),
+    loadServerSignalHome: async (serverId) => runTeamRequest(getHostSignalHome(signalHomeAdmin(serverId))),
+    setServerSignalHome: async (home, serverId) => runTeamRequest(setHostSignalHome(signalHomeAdmin(serverId), home)),
+    changeServerVoiceModel: async (change, serverId) =>
+      runTeamRequest(changeHostVoiceModel(voiceModelAdmin(serverId), change)),
     loadAgentMemoryLimit: async (serverId) => runTeamRequest(getHostAgentMemoryLimit(memoryLimitAdmin(serverId))),
     setAgentMemoryLimit: async (limit, serverId) =>
       runTeamRequest(setHostAgentMemoryLimit(memoryLimitAdmin(serverId), limit)),
+    loadMediaApprovalCredits: async (serverId) =>
+      runTeamRequest(getHostMediaApprovalCredits(mediaApprovalCreditsAdmin(serverId))),
+    setMediaApprovalCredits: async (update, serverId) =>
+      runTeamRequest(setHostMediaApprovalCredits(mediaApprovalCreditsAdmin(serverId), update)),
     loadMemoryReview: async (serverId) => runTeamRequest(getHostMemoryReview(memoryReviewAdmin(serverId))),
     setMemoryReview: async (interval, serverId) =>
       runTeamRequest(setHostMemoryReview(memoryReviewAdmin(serverId), interval)),
@@ -902,7 +967,6 @@ export function createHostRequestActions({
     loadBrowsingMemory: async (serverId) => runTeamRequest(getHostBrowsingMemory(browsingMemoryAdmin(serverId))),
     setBrowsingMemory: async (enabled, serverId) =>
       runTeamRequest(setHostBrowsingMemory(browsingMemoryAdmin(serverId), enabled)),
-    // A host before host-personality-v1 uses the classic prompt, as the desktop and the web client read it.
     loadServerPersonality: async (serverId) =>
       has(serverId, HOST_PERSONALITY_CAPABILITY)
         ? runTeamRequest(getHostPersonality(personalityApi(serverId)))
@@ -941,7 +1005,6 @@ export function createHostRequestActions({
     disconnectPasswordManager: async (manager, serverId) =>
       runTeamRequest(passwordManagerRequest(passwordManagersAdmin(serverId), "disconnect", manager)),
     loadVault: async (serverId) => runTeamRequest(listHostVault(vaultAdmin(serverId), vaultVersion(serverId))),
-    // A host without `vault-v3` keeps no two-step keys, so it has no codes.
     loadVaultCodes: async (serverId) =>
       has(serverId, VAULT_V3_CAPABILITY) ? runTeamRequest(listHostVaultCodes(vaultAdmin(serverId))) : { codes: [] },
     saveVaultItem: async (input, serverId) =>
@@ -955,7 +1018,6 @@ export function createHostRequestActions({
     },
     stageAgentImport: async (file, serverId, onProgress) => {
       if (has(serverId, AGENT_IMPORT_V2_CAPABILITY)) {
-        // The progress of each part's upload, as a fraction of the whole export.
         let part = { offset: 0, length: 0 };
         const request = agentImportApi(serverId, (fraction) =>
           onProgress?.((part.offset + fraction * part.length) / file.size),
@@ -1016,8 +1078,6 @@ export function createHostRequestActions({
       runTeamRequest(messagingConnectorSetEnabled(connectorsAdmin(serverId), input)),
     addMessagingOrchestrator: async (input, serverId) =>
       runTeamRequest(messagingConnectorAddOrchestrator(connectorsAdmin(serverId), input)),
-    // `whatsapp-connector-v1` is frozen without the "Working on it…" setting: a second request reads
-    // it. The numbers of an older host carry no setting, and the page then shows no switch.
     loadWhatsAppConnector: async (serverId) => {
       const api = whatsappAdmin(serverId);
       return runTeamRequest(
@@ -1030,11 +1090,15 @@ export function createHostRequestActions({
             has(serverId, WHATSAPP_STATUS_REACTIONS_CAPABILITY)
               ? whatsappConnectorStatusReactions(api)
               : Effect.succeed(null),
+            has(serverId, WHATSAPP_READ_ONLY_CAPABILITY) ? whatsappConnectorReadOnly(api) : Effect.succeed(null),
           ],
           { concurrency: "unbounded" },
         ).pipe(
-          Effect.map(([overview, workingMessages, statusReactions]) =>
-            withWhatsAppStatusReactions(withWhatsAppWorkingMessages(overview, workingMessages), statusReactions),
+          Effect.map(([overview, workingMessages, statusReactions, readOnly]) =>
+            withWhatsAppReadOnly(
+              withWhatsAppStatusReactions(withWhatsAppWorkingMessages(overview, workingMessages), statusReactions),
+              readOnly,
+            ),
           ),
         ),
       );
@@ -1075,6 +1139,13 @@ export function createHostRequestActions({
           input,
         ),
       ),
+    setWhatsAppSenderReadOnly: async (input, serverId) =>
+      runTeamRequest(
+        whatsappConnectorSetSenderReadOnly(
+          capabilityApi(serverId, WHATSAPP_READ_ONLY_CAPABILITY, "mobile.server.connectors.unsupported"),
+          input,
+        ),
+      ),
     loadServerUpdate: async (serverId, access) =>
       runTeamRequest(getHostUpdateStatus(updateApi(serverId, access), access === "member")),
     checkServerUpdate: async (serverId, access) =>
@@ -1100,7 +1171,6 @@ export function createHostRequestActions({
     setMcpServerEnabled: async (mcpServerId, enabled, serverId) =>
       runTeamRequest(setMcpServerEnabled(mcpAdmin(serverId), { mcpServerId, enabled })),
     testMcpServer: async (config, serverId) => runTeamRequest(testMcpServer(mcpAdmin(serverId), { config })),
-    // An older host keeps no sign-ins that a client can read.
     listMcpSignIns: async (serverId) =>
       has(serverId, MCP_SIGN_IN_CAPABILITY) ? runTeamRequest(listMcpSignIns(teamApi(serverId))) : [],
     signOutMcpServer: async (mcpServerId, serverId) =>
@@ -1122,6 +1192,13 @@ export function createHostRequestActions({
     includeAgentFolder: async (input, serverId) => runTeamRequest(includeAgentFolder(foldersAdmin(serverId), input)),
     browseAgentFolders: async (agentId, path, serverId) =>
       runTeamRequest(browseAgentFolders(foldersAdmin(serverId), { agentId, path })),
+    loadChannelFolders: async (channelId, serverId) =>
+      runTeamRequest(readChannelFolders(channelFoldersAdmin(serverId), channelId)),
+    addChannelFolder: async (input, serverId) => runTeamRequest(addChannelFolder(channelFoldersAdmin(serverId), input)),
+    removeChannelFolder: async (input, serverId) =>
+      runTeamRequest(removeChannelFolder(channelFoldersAdmin(serverId), input)),
+    browseChannelFolders: async (channelId, path, serverId) =>
+      runTeamRequest(browseChannelFolders(channelFoldersAdmin(serverId), { channelId, path })),
     setAgentSessionSetting: async (input, serverId) =>
       runTeamRequest(setAgentSessionSetting(sessionSettingsAdmin(serverId), input)),
     resetAgentSessionSetting: async (input, serverId) =>
@@ -1129,7 +1206,7 @@ export function createHostRequestActions({
     listEventRoutines: (owner, serverId) =>
       runTeamRequest(listEventRoutines(eventsAdmin(serverId), { owner }, recovery(serverId))),
     saveEventRoutine: (input, serverId) =>
-      runTeamRequest(saveEventRoutine(eventsAdmin(serverId), input, recovery(serverId))),
+      runTeamRequest(saveEventRoutine(eventsAdmin(serverId), input, recovery(serverId), false, onceRoutines(serverId))),
     loadRoutineResultOptions: (serverId) => runTeamRequest(listRoutineResultOptions(routineResultsAdmin(serverId))),
     loadRoutineResultDestination: (input, serverId) =>
       runTeamRequest(getRoutineResultDestination(routineResultsAdmin(serverId), input)),
@@ -1139,6 +1216,8 @@ export function createHostRequestActions({
     testEventRoutine: (input, serverId) => runTeamRequest(testEventRoutine(eventsAdmin(serverId), input)),
     rotateEventRoutineSecret: (input, serverId) =>
       runTeamRequest(rotateEventRoutineSecret(eventsAdmin(serverId), input)),
+    giveEventRoutineSecretToAgent: (input, serverId) =>
+      runTeamRequest(giveEventRoutineSecretToAgent(eventsAdmin(serverId), input)),
     listEventActivity: (input, serverId) => runTeamRequest(listEventActivity(eventsAdmin(serverId), input)),
     saveAgentMemory: async (agentId, text, serverId, memoryId) => {
       await saveAgentRecord(queryClient, queryKeys.agentRecord(queryScope, serverId, agentId, "memories"), () =>
@@ -1159,6 +1238,20 @@ export function createHostRequestActions({
       await request("DELETE", TEAM_API_ROUTES.agent.memory(agentId, memoryId), ignoreResponse, undefined, serverId);
     },
     createAgentRoutine: async (input, serverId) => {
+      const fields = {
+        name: input.name,
+        instruction: input.instruction,
+        active: input.active,
+        timezone: input.timezone,
+        schedule: input.schedule,
+      };
+      if (isOnceSchedule(input.schedule)) {
+        requireReleasedScheduleOn(input.schedule, onceRoutines(serverId));
+        await saveAgentRecord(queryClient, queryKeys.agentOnceRoutines(queryScope, serverId, input.agentId), () =>
+          createOnceAgentRoutine(oncePost(serverId), { agentId: input.agentId, ...fields }),
+        );
+        return;
+      }
       await saveAgentRecord(queryClient, queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines"), () =>
         request(
           "POST",
@@ -1168,37 +1261,53 @@ export function createHostRequestActions({
               throw new Error("The host returned an invalid saved record.");
             return value;
           },
-          {
-            name: input.name,
-            instruction: input.instruction,
-            active: input.active,
-            timezone: input.timezone,
-            schedule: input.schedule,
-          },
+          fields,
           serverId,
         ),
       );
     },
     updateAgentRoutine: async (input, serverId) => {
-      await saveAgentRecord(queryClient, queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines"), () =>
-        request(
-          "PATCH",
-          TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
-          (value) => {
-            if (!isRoutine(value) || value.agentId !== input.agentId || value.id !== input.routineId)
-              throw new Error("The host returned an invalid saved record.");
-            return value;
-          },
-          {
-            ...(input.name === undefined ? {} : { name: input.name }),
-            ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
-            ...(input.active === undefined ? {} : { active: input.active }),
-            ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
-          },
-          serverId,
-        ),
+      const changes = {
+        ...(input.name === undefined ? {} : { name: input.name }),
+        ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
+        ...(input.active === undefined ? {} : { active: input.active }),
+        ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+      };
+      const savedRoutine = (value: unknown) => {
+        if (!isRoutine(value) || value.agentId !== input.agentId || value.id !== input.routineId)
+          throw new Error("The host returned an invalid saved record.");
+        return value;
+      };
+      const releasedKey = queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines");
+      if (!onceRoutines(serverId)) {
+        await saveAgentRecord(queryClient, releasedKey, () =>
+          request(
+            "PATCH",
+            TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
+            savedRoutine,
+            changes,
+            serverId,
+          ),
+        );
+        return;
+      }
+      const saved = savedRoutine(
+        await updateAgentRoutineOnce(oncePost(serverId), {
+          agentId: input.agentId,
+          routineId: input.routineId,
+          ...changes,
+        }),
+      );
+      await saveAgentRecord(
+        queryClient,
+        isOnceSchedule(saved.trigger.schedule)
+          ? queryKeys.agentOnceRoutines(queryScope, serverId, input.agentId)
+          : releasedKey,
+        async () => saved,
       );
     },
+    loadOnceAgentRoutines: async (agentId, serverId) =>
+      onceRoutines(serverId) ? listOnceAgentRoutines(oncePost(serverId), agentId) : [],
     deleteAgentRoutine: async (agentId, routineId, serverId) => {
       await request("DELETE", TEAM_API_ROUTES.agent.routine(agentId, routineId), ignoreResponse, undefined, serverId);
     },
@@ -1212,7 +1321,6 @@ export function createHostRequestActions({
         (value) => {
           if (!Array.isArray(value) || !value.every(isClientAgentModelOption))
             throw new Error("The host returned invalid models.");
-          // A model of a provider that this build does not know cannot be chosen here.
           return value.flatMap((option) => {
             const provider = option.provider;
             return isKnownAgentProvider(provider) ? [{ ...option, provider }] : [];
@@ -1221,26 +1329,23 @@ export function createHostRequestActions({
         undefined,
         serverId,
       );
-      // The released model list drops the fast tiers, so a host with `agent-speed-v1` (or the older
-      // `agent-fast-mode-v1`) gives them on its own route, as for desktop. Only `agent-speed-v1` lists
-      // Ultrafast tiers and Claude models. The tiers are optional: when that route fails, the models
-      // show with no Speed choice.
       const fastRoute = has(serverId, AGENT_SPEED_CAPABILITY)
         ? AGENT_SPEED_ROUTES.models
         : has(serverId, AGENT_FAST_MODE_CAPABILITY)
           ? AGENT_FAST_MODE_ROUTES.models
           : null;
-      // `model-steering-v1` marks the models of a custom agent that steers, as for desktop. It is
-      // optional: when the route fails, a custom agent shows Send now.
-      const [options, fast, steering] = await Promise.all([
+      const [options, fast, steering, kept] = await Promise.all([
         models,
         fastRoute ? request("POST", fastRoute, decodeAgentFastModels, {}, serverId).catch(() => []) : [],
         has(serverId, MODEL_STEERING_CAPABILITY)
           ? request("POST", MODEL_STEERING_ROUTES.list, decodeAgentSteeringModels, {}, serverId).catch(() => [])
           : [],
+        has(serverId, MODEL_VISIBILITY_KEPT_CAPABILITY)
+          ? request("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, decodeAgentSteeringModels, {}, serverId).catch(() => [])
+          : [],
       ]);
       return withWorkspaceOnlyLimit(
-        withSteeringModels(withFastServiceTiers(options, fast), steering),
+        withSteeringModels(withKeptModels(withFastServiceTiers(options, fast), kept), steering),
         has(serverId, WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
       );
     },
@@ -1255,7 +1360,6 @@ export function createHostRequestActions({
         queryClient.setQueryData(key, state);
         return state;
       } catch (cause) {
-        // A concurrent update can reject this revision. Refresh it before the next attempt.
         void queryClient.invalidateQueries({ queryKey: key });
         throw cause;
       }
@@ -1282,6 +1386,7 @@ export function createHostRequestActions({
           routineCalendarSource(
             teamApi(serverId),
             capabilities.get(serverId)?.includes(CHANNEL_CHATS_CAPABILITY) ?? false,
+            capabilities.get(serverId)?.includes(ROUTINES_ONCE_CAPABILITY) ?? false,
             owners,
           ),
         ),
@@ -1291,7 +1396,6 @@ export function createHostRequestActions({
     searchMessages: (query, serverId, cursor) =>
       request(
         "GET",
-        // A query parameter never reaches the JSON adapters, so every released host reads it as sent.
         `${TEAM_API_ROUTES.messages.search}?${new URLSearchParams({ q: query, limit: "50", ...(cursor ? { cursor } : {}) })}`,
         decodeConversationSearchPage,
         undefined,
@@ -1307,9 +1411,6 @@ export function createHostRequestActions({
         serverId,
       );
     },
-    // Async, so a host without the capability rejects the promise and does not throw at the call.
-    // A host with `agent-thread-branches-v1` also gives the branch links, read after the tasks so that
-    // each listed branch has its link, as on desktop.
     loadAgentTasks: async (agentId, serverId) => {
       const snapshot = await runTeamRequest(listAgentTasks(tasksApi(serverId), agentId));
       if (!has(serverId, AGENT_THREAD_BRANCHES_CAPABILITY)) return snapshot;
@@ -1334,6 +1435,17 @@ export function createHostRequestActions({
       runTeamRequest(markAgentThreadRead(threadReadsApi(serverId), input)),
     loadMessagePins: async (agentId, serverId) => runTeamRequest(listMessagePins(messagePinsApi(serverId), agentId)),
     setMessagePinned: async (input, serverId) => runTeamRequest(setMessagePinned(messagePinsApi(serverId), input)),
+    askSideQuestion: async (input, serverId) =>
+      capabilityApi(serverId, SIDE_QUESTION_CAPABILITY, "mobile.chat.sideQuestion.unsupported")(
+        "POST",
+        SIDE_QUESTION_ROUTES.ask,
+        decodeSideQuestionResponse,
+        {
+          agentId: input.agentId,
+          question: input.question,
+          earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
+        },
+      ),
     respondToTaskPrompt: async (input, serverId) => {
       await request(
         "POST",
@@ -1343,7 +1455,6 @@ export function createHostRequestActions({
         serverId,
       );
     },
-    // A host too old to know the route answers 404, so ask its advertised capabilities first.
     loadAgentSkills: async (agentId, serverId, manage = false) => {
       if (manage) return runTeamRequest(listAgentSkills(skillsAdmin(serverId), agentId));
       return has(serverId, TEAM_SEMANTIC_TAGS_CAPABILITY)
@@ -1430,7 +1541,6 @@ export function createHostRequestActions({
         : null,
     updateAgentBackupModels: async (input, serverId) => {
       requireCapability(capabilities, serverId, AGENT_BACKUP_MODELS_CAPABILITY, "mobile.agent.host.unsupported");
-      // The wire body copies each field, as the request takes JSON values and not the IPC interfaces.
       const backupModels = input.backupModels && {
         automatic: input.backupModels.automatic,
         order: input.backupModels.order.map(({ provider, model, providerAccountId }) => ({
@@ -1470,6 +1580,20 @@ export function createHostRequestActions({
     updateAgentPlanCard: async (input, serverId) => {
       requireCapability(capabilities, serverId, AGENT_PLAN_CARD_CAPABILITY, "mobile.agent.host.unsupported");
       return request("POST", AGENT_PLAN_CARD_ROUTES.update, decodeAgentPlanCardSettings, { ...input }, serverId);
+    },
+    loadAgentBuiltinMemory: async (agentId, serverId) =>
+      has(serverId, AGENT_BUILTIN_MEMORY_CAPABILITY)
+        ? request("POST", AGENT_BUILTIN_MEMORY_ROUTES.settings, decodeAgentBuiltinMemorySettings, { agentId }, serverId)
+        : null,
+    updateAgentBuiltinMemory: async (input, serverId) => {
+      requireCapability(capabilities, serverId, AGENT_BUILTIN_MEMORY_CAPABILITY, "mobile.agent.host.unsupported");
+      return request(
+        "POST",
+        AGENT_BUILTIN_MEMORY_ROUTES.update,
+        decodeAgentBuiltinMemorySettings,
+        { ...input },
+        serverId,
+      );
     },
     loadAgentDefaults: async (serverId) =>
       has(serverId, AGENT_DEFAULTS_CAPABILITY)
@@ -1513,7 +1637,6 @@ export function createHostRequestActions({
     updateAgentSpeed: async ({ agentId, speed }, serverId) => {
       if (has(serverId, AGENT_SPEED_CAPABILITY))
         return request("POST", AGENT_SPEED_ROUTES.update, decodeAgentSpeedSettings, { agentId, speed }, serverId);
-      // An older host has only Fast: `agent-fast-mode-v1` cannot carry Ultrafast.
       if (speed === "ultrafast")
         requireCapability(capabilities, serverId, AGENT_SPEED_CAPABILITY, "mobile.agent.host.unsupported");
       requireCapability(capabilities, serverId, AGENT_FAST_MODE_CAPABILITY, "mobile.agent.host.unsupported");
@@ -1578,7 +1701,6 @@ export function createHostRequestActions({
       await runTeamRequest(setAgentProviderAccount(teamApi(serverId), input));
     },
     startNewChat: async (agentId, serverId) => {
-      // A host too old to know the route answers 404, so refuse before the request.
       requireCapability(capabilities, serverId, CONTEXT_RESET_CAPABILITY, "mobile.agent.newChat.unsupported");
       await runTeamRequest(clearAgentContext(teamApi(serverId), agentId));
     },
@@ -1603,12 +1725,10 @@ export function createHostRequestActions({
       requireCapability(capabilities, serverId, CHAT_HISTORY_CAPABILITY, "error.team.historyDeleteUnsupported");
       await request("POST", CHAT_HISTORY_ROUTES.agentDelete, ignoreResponse, { agentId }, serverId);
     },
-    // Async, so a host without the capability rejects the promise and does not throw at the call.
     listSharedTables: async (serverId) => runTeamRequest(listSharedTables(sharedTablesAdmin(serverId))),
     deleteSharedTable: async (name, serverId) => runTeamRequest(deleteSharedTable(sharedTablesAdmin(serverId), name)),
     loadAgentTemplatePreview: async (agentId, serverId) =>
       runTeamRequest(previewAgentTemplate(publishAdmin(serverId), agentId)),
-    // A phone cannot draw the share card, and the host publishes without one.
     publishAgentTemplate: async (agentId, serverId) =>
       runTeamRequest(publishAgentTemplate(publishAdmin(serverId), { agentId, card: null })),
     unpublishAgentTemplate: async (agentId, serverId) =>
@@ -1618,13 +1738,10 @@ export function createHostRequestActions({
       await request("POST", STORAGE_ROUTES.deleteFile, ignoreResponse, { fileId }, serverId);
     },
     installAgentTemplate: async (input, serverId) => {
-      // A host too old to know the route answers 404, so refuse before the request.
       requireCapability(capabilities, serverId, AGENT_INSTALL_CAPABILITY, "mobile.link.template.error.unsupported");
       return runTeamRequest(installAgentTemplate(teamApi(serverId), input));
     },
     installMarketplaceAgent: async (input, serverId) => {
-      // A host too old to know the route answers 404, so refuse before the request. An update goes
-      // to the `agent-update-v1` route, as on the desktop.
       if (input.agentId)
         requireCapability(
           capabilities,
@@ -1707,31 +1824,29 @@ export function createHostRequestActions({
         await request("POST", MESSAGE_DELETE_ROUTES.agent, ignoreResponse, body, serverId);
       }
     },
-    downloadAttachment: (serverId, attachmentId, largeDownload, progress) => {
+    downloadAttachment: (serverId, attachmentId, largeDownload, progress, tapped, wanted) => {
       const download = () =>
-        request(
-          "GET",
-          TEAM_API_ROUTES.attachment(attachmentId),
-          decodeHostFile,
-          undefined,
-          serverId,
-          undefined,
-          undefined,
-          largeDownload,
-          progress,
-        );
-      // Limit native/DOM copies when a message contains several large images. A file above the
-      // attachment limit has its own lane: the images of the chat do not wait behind it, and two
-      // such files never download at the same time.
-      const lane = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
-      const result = lane.current.then(download);
-      lane.current = result.then(
-        () => {},
-        () => {},
-      );
-      return result;
+        wanted?.() === false
+          ? Promise.reject(new Error(sourceText("error.remote.downloadStopped")))
+          : request(
+              "GET",
+              TEAM_API_ROUTES.attachment(attachmentId),
+              (value) => decodeHostFile(value, largeDownload?.file),
+              undefined,
+              serverId,
+              undefined,
+              undefined,
+              largeDownload,
+              progress,
+            );
+      const queue = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
+      return queue.run(attachmentDownloadKey(serverId, attachmentId), download, tapped);
     },
-    // The user waits for this one file, so it does not wait behind the images of the chat.
+    prioritizeAttachmentDownload: (serverId, attachmentId) => {
+      const key = attachmentDownloadKey(serverId, attachmentId);
+      attachmentDownloads.prioritize(key);
+      largeAttachmentDownloads.prioritize(key);
+    },
     downloadMessageFile: (serverId, file) =>
       request(
         "GET",
@@ -1747,13 +1862,12 @@ export function createHostRequestActions({
   return { checks, actions };
 }
 
-/** The routes that the desktop calendar reads from a remote host, so both place the same runs. */
 function routineCalendarSource(
   request: TeamApiRequest,
   channels: boolean,
+  once: boolean,
   knownOwners?: readonly RoutineCalendarOwner[],
 ): RoutineCalendarSource<TeamRequestError> {
-  /** One request to this server as an Effect. */
   const send = <T>(method: string, path: string, decode: (value: unknown) => T, body?: TeamProtocolV2Json) =>
     Effect.tryPromise({
       try: () => request(method, path, decode, body),
@@ -1764,7 +1878,6 @@ function routineCalendarSource(
       knownOwners
         ? Effect.succeed([...knownOwners])
         : Effect.gen(function* () {
-            // A host from before channels rejects the channel routes; its agents still have routines.
             const [agents, channelList] = yield* Effect.all(
               [
                 send("GET", TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
@@ -1779,14 +1892,28 @@ function routineCalendarSource(
                 .map((channel): RoutineCalendarOwner => ({ kind: "channel", channelId: channel.id })),
             ];
           }),
-    routines: (owner) =>
-      owner.kind === "agent"
-        ? send("GET", TEAM_API_ROUTES.agent.routines(owner.agentId), (value) => {
-            if (!Array.isArray(value) || !value.every(isRoutine))
-              throw new Error("The host returned invalid routines.");
-            return value;
-          })
-        : send("POST", CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId: owner.channelId }),
+    routines: (owner) => {
+      const released: Effect.Effect<RoutineFields[], TeamRequestError> =
+        owner.kind === "agent"
+          ? send("GET", TEAM_API_ROUTES.agent.routines(owner.agentId), (value) => {
+              if (!Array.isArray(value) || !value.every(isRoutine))
+                throw new Error("The host returned invalid routines.");
+              return value;
+            })
+          : send("POST", CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId: owner.channelId });
+      if (!once) return released;
+      const oncePost: RoutinesOncePost = (path, decode, body) => request("POST", path, decode, body);
+      const onceRoutines = Effect.tryPromise({
+        try: (): Promise<RoutineFields[]> =>
+          owner.kind === "agent"
+            ? listOnceAgentRoutines(oncePost, owner.agentId)
+            : listOnceChannelRoutines(oncePost, owner.channelId),
+        catch: (cause) => new TeamRequestError({ cause }),
+      });
+      return Effect.all([released, onceRoutines], { concurrency: "unbounded" }).pipe(
+        Effect.map(([list, extra]) => [...list, ...extra]),
+      );
+    },
     runs: (owner, routineId, limit) =>
       owner.kind === "agent"
         ? send("GET", `${TEAM_API_ROUTES.agent.routineRuns(owner.agentId, routineId)}?limit=${limit}`, (value) => {
@@ -1802,10 +1929,6 @@ function routineCalendarSource(
   };
 }
 
-/**
- * The agent photo as a `file://` URI, or as a data URL when the phone cannot save it. A photo that
- * this phone has saved needs no request. The Live Activity reads it too, outside the workspace value.
- */
 export async function requestAgentAvatar(
   request: WorkspaceRequest,
   agentId: string,

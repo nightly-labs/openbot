@@ -1,9 +1,3 @@
-/**
- * The story data of the workflows: the catalogs that the host gives the nodes, the results that a
- * story run records, the field values that the stories open with, and the example workflows with
- * their runs and versions. The nodes have no data of their own.
- */
-
 import {
   type RoutineSchedule,
   WORKFLOW_MEDIA_MODELS,
@@ -17,15 +11,65 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { EMPTY_GITHUB_HISTORY, type WorkflowGitHubCanvas } from "@openbot/ui/features/workflows/workflow-github";
-import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
+import type { WorkflowCatalogs, WorkflowImageModel } from "@openbot/ui/features/workflows/workflow-model";
 import type { WorkflowRunView } from "@openbot/ui/features/workflows/workflow-run-view";
 import { FILES_ROWS } from "./files-fixtures";
 import { STORY_AGENT_STATUS, STORY_AGENTS, STORY_MODELS, STORY_TEAM_MEMBERS } from "./fixtures";
 
-/** The images of the story files. An image step draws them in turn. */
 export const STORY_IMAGES = FILES_ROWS.filter((file) => file.previewKind === "image" && file.previewUrl);
 
 const STORY_CONNECTION = "story-team";
+
+const STORY_VIDEO_OPTIONS = {
+  aspects: ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"],
+  options: [{ name: "generate_audio", kind: "switch", values: ["off", "on"], default: "on" }],
+  inputs: ["frames", "references"],
+} as const satisfies Partial<WorkflowImageModel>;
+
+const storySeconds = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, index) => from + index);
+
+const STORY_SEEDANCE = {
+  durations: storySeconds(4, 15),
+  resolutions: ["480p", "720p", "1080p", "4K"],
+  options: [
+    { name: "mode", kind: "choice", values: ["std", "fast"], default: "std" },
+    {
+      name: "genre",
+      kind: "choice",
+      values: ["auto", "action", "horror", "comedy", "noir", "drama", "epic"],
+      default: "auto",
+    },
+    { name: "generate_audio", kind: "switch", values: ["off", "on"], default: "on" },
+  ],
+  inputs: ["frames", "references", "videos", "audios"],
+} as const satisfies Partial<WorkflowImageModel>;
+
+const STORY_KLING = {
+  aspects: ["1:1", "16:9", "9:16", "21:9"],
+  durations: storySeconds(3, 30),
+  options: [
+    {
+      name: "mode",
+      kind: "choice",
+      values: ["text-to-video", "image-to-video", "reference-to-video"],
+      default: "text-to-video",
+    },
+  ],
+  inputs: ["frames", "references", "videos"],
+  modes: [
+    { value: "text-to-video", inputs: [] },
+    { value: "image-to-video", inputs: ["frames"] },
+    { value: "reference-to-video", inputs: ["references", "videos"] },
+  ],
+} as const satisfies Partial<WorkflowImageModel>;
+
+type StoryLiveSettings = Partial<
+  Pick<WorkflowImageModel, "aspects" | "durations" | "resolutions" | "options" | "inputs" | "modes">
+>;
+const STORY_LIVE_MODELS: Readonly<Record<string, StoryLiveSettings>> = {
+  "higgsfield-seedance_2_0": STORY_SEEDANCE,
+  "higgsfield-kling4_0": STORY_KLING,
+};
 
 export const STORY_CATALOGS: WorkflowCatalogs = {
   agents: STORY_AGENTS,
@@ -44,8 +88,11 @@ export const STORY_CATALOGS: WorkflowCatalogs = {
     { id: "story-channel-support", name: "support" },
   ],
   mediaSize: true,
-  // A fixed quote for the Sunra and Higgsfield steps: a video costs per second.
-  mediaPrice: async (request) => ({ credits: request.kind === "video" ? request.duration * 2.5 : 1.5 }),
+  agentFiles: true,
+  mediaPrice: async (request) => {
+    const silent = request.options?.some((option) => option.name === "generate_audio" && option.value === "off");
+    return { credits: request.kind === "video" ? request.duration * (silent ? 2 : 2.5) : 1.5 };
+  },
   imageModels: [
     {
       id: "gpt-image",
@@ -55,7 +102,6 @@ export const STORY_CATALOGS: WorkflowCatalogs = {
       subscription: "ChatGPT",
       kinds: ["image"],
       voices: false,
-      // Two ChatGPT plans: the picker has a tab for each one.
       accounts: [
         { id: "default", label: "Personal", email: "ada@example.com", state: "connected", message: null },
         { id: "a0123456789abcdef", label: "Work", email: "ada@northwind.example", state: "connected", message: null },
@@ -79,14 +125,16 @@ export const STORY_CATALOGS: WorkflowCatalogs = {
       kinds: ["image", "video"],
       voices: true,
     },
-    // The host is signed in to Sunra and Higgsfield in Apps.
-    ...WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === "sunra" || model.provider === "higgsfield"),
+    ...WORKFLOW_MEDIA_MODELS.flatMap((model) => {
+      if (model.provider !== "sunra" && model.provider !== "higgsfield") return [];
+      if (model.provider !== "higgsfield" || !model.kinds.includes("video")) return [model];
+      return [{ ...model, ...STORY_VIDEO_OPTIONS, ...STORY_LIVE_MODELS[model.id] }];
+    }),
   ],
   files: FILES_ROWS,
   self: STORY_TEAM_MEMBERS.find((member) => member.id === "member-self")?.name ?? undefined,
 };
 
-/** A time today, as an ISO string, for the results that a story opens with. */
 export function todayAt(hours: number, minutes: number): string {
   const time = new Date();
   time.setHours(hours, minutes, 0, 0);
@@ -99,10 +147,6 @@ export const AGENT_RESULT =
 export const LLM_RESULT =
   "Atlas: agent workspace for small teams. Launched 22 Oct. From €12 a seat. Adds a Slack connector. Watch: price is under ours for teams of 3–10.";
 
-/**
- * What a story run of each kind of step records. An image step records the next story image, and an
- * approval step records the answer of the user.
- */
 export const STEP_ANSWER: Partial<Record<string, string>> = {
   agent: AGENT_RESULT,
   llm: LLM_RESULT,
@@ -112,11 +156,9 @@ export const STEP_ANSWER: Partial<Record<string, string>> = {
   output: "Posted to #market at 09:14.",
 };
 
-/** The field values that the stories open with, as the user typed them. */
 export const STORY_SEED = {
   agentId: "research",
   schedule: { kind: "weekdays", time: "09:00" } satisfies RoutineSchedule,
-  /** The next run of the schedule: Monday 26 October, 09:00. */
   nextRun: new Date(2026, 9, 26, 9, 0).toISOString(),
   rule: "The report names a new competitor",
   question: "Post the report to #market?",
@@ -124,39 +166,26 @@ export const STORY_SEED = {
   title: "Competitor watch",
 };
 
-/** A placeholder webhook address: the stories have no webhook service. */
 export const storyWebhook = (id: string) => `https://hooks.openbot.run/wf/${id}`;
 
-/* ------------------------------------------------------------ Workflows */
-
-/** A saved version of a story workflow, with the graph that its preview shows. */
 interface StoryVersion {
   version: WorkflowVersion;
   graph: WorkflowGraph;
 }
 
-/** A workflow that a canvas story opens with. */
 export interface StoryWorkflow {
   id: string;
   title: string;
   graph: WorkflowGraph;
-  /** Runs from before the story. The story host shows them; the preview mock does not know them. */
   runs?: WorkflowRunView;
-  /** Versions from before the story, newest first. */
   versions?: readonly StoryVersion[];
-  /** GitHub events from before the story, and the items of the fixture runs that they started. */
   github?: WorkflowGitHubHistory;
 }
 
 const COLUMN = 460;
 
-/** A story time in October 2026, as an ISO string. */
 const octoberAt = (day: number, hours: number, minutes: number) => new Date(2026, 9, day, hours, minutes).toISOString();
 
-/**
- * Competitor watch, with every node type: the inputs on the left, an agent that does the research,
- * two direct model calls that write, an image step, and an agent that posts the result.
- */
 const COMPETITOR_WATCH: WorkflowGraph = {
   nodes: [
     { kind: "text", id: "h-inputs", at: { x: 0, y: -96 }, fields: { text: "INPUTS", size: "lg", bold: true } },
@@ -238,7 +267,6 @@ const COMPETITOR_WATCH: WorkflowGraph = {
   strokes: [],
 };
 
-/** New competitor alert: a branch on what the research found, and an approval before the post. */
 const NEW_COMPETITOR_ALERT: WorkflowGraph = {
   nodes: [
     {
@@ -286,10 +314,6 @@ const NEW_COMPETITOR_ALERT: WorkflowGraph = {
   strokes: [],
 };
 
-/**
- * When each step of Competitor watch starts and ends, as parts of the run's duration. The inputs end
- * at once; the steps after them wait for their inputs.
- */
 const COMPETITOR_WATCH_TIMING: Record<string, readonly [start: number, end: number]> = {
   start: [0, 0],
   brief: [0, 0],
@@ -302,7 +326,6 @@ const COMPETITOR_WATCH_TIMING: Record<string, readonly [start: number, end: numb
   publish: [0.92, 1],
 };
 
-/** What each step of Competitor watch answers in a new run. Prompt and asset steps answer nothing. */
 const COMPETITOR_WATCH_ANSWERS = {
   start: STEP_ANSWER.trigger ?? "",
   research: AGENT_RESULT,
@@ -312,7 +335,6 @@ const COMPETITOR_WATCH_ANSWERS = {
   publish: "Posted to #market at 09:14. 3 people reacted.",
 };
 
-/** One step of a story run. A step that ran alone has no run. */
 function storyStep(
   graph: WorkflowGraph,
   workflowId: string,
@@ -339,7 +361,6 @@ function storyStep(
   };
 }
 
-/** A story run of Competitor watch that ended. Each node in `results` ran; its value is its output or a failure. */
 function competitorWatchRun(input: {
   workflowId: string;
   number: number;
@@ -382,7 +403,6 @@ function competitorWatchRun(input: {
   };
 }
 
-/** The steps of Competitor watch that the user ran alone after run 2: the cover three times, the headline once. */
 const COMPETITOR_WATCH_TRIES: Record<string, readonly { at: string; value: string }[]> = {
   cover: [
     { at: octoberAt(21, 9, 40), value: "launch-timeline.png" },
@@ -392,10 +412,6 @@ const COMPETITOR_WATCH_TRIES: Record<string, readonly { at: string; value: strin
   headline: [{ at: octoberAt(21, 9, 35), value: "Atlas undercuts us for small teams" }],
 };
 
-/**
- * The run history of Competitor watch: two scheduled runs and the steps that ran alone after them.
- * With `last`, a third run ended just now, with each step done or with the summary failed.
- */
 function competitorWatchRuns(workflowId: string, last?: "done" | "failed"): WorkflowRunView {
   const runs = [
     competitorWatchRun({
@@ -450,7 +466,6 @@ function competitorWatchRuns(workflowId: string, last?: "done" | "failed"): Work
           summary: failed ? { error: sourceText("error.workflow.modelFailed") } : COMPETITOR_WATCH_ANSWERS.summary,
           headline: COMPETITOR_WATCH_ANSWERS.headline,
           cover: COMPETITOR_WATCH_ANSWERS.cover,
-          // Publish does not start without the summary.
           ...(failed ? {} : { publish: COMPETITOR_WATCH_ANSWERS.publish }),
         },
       }),
@@ -477,7 +492,6 @@ function competitorWatchRuns(workflowId: string, last?: "done" | "failed"): Work
   };
 }
 
-/** The graph without some nodes and their connections. */
 function withoutNodes(graph: WorkflowGraph, ids: readonly string[]): WorkflowGraph {
   const gone = new Set(ids);
   return {
@@ -487,11 +501,9 @@ function withoutNodes(graph: WorkflowGraph, ids: readonly string[]): WorkflowGra
   };
 }
 
-/** A time today, but not after now, so that a story version is never newer than a version the story saves. */
 const earlierToday = (hours: number, minutes: number) =>
   new Date(Math.min(Date.parse(todayAt(hours, minutes)), Date.now() - 60_000)).toISOString();
 
-/** The auto-saved versions of Competitor watch, newest first. The column headings came last, one column at a time. */
 function competitorWatchVersions(): StoryVersion[] {
   return [
     { at: earlierToday(11, 30), without: ["h-publish"] },
@@ -503,7 +515,6 @@ function competitorWatchVersions(): StoryVersion[] {
   }));
 }
 
-/** Competitor watch with its run history and versions. `last` adds a run that ended just now. */
 export function competitorWatch(last?: "done" | "failed"): StoryWorkflow {
   const id = "competitor-watch";
   return {
@@ -515,18 +526,38 @@ export function competitorWatch(last?: "done" | "failed"): StoryWorkflow {
   };
 }
 
-/** New competitor alert, which never ran. */
 export const newCompetitorAlert = (): StoryWorkflow => ({
   id: "new-competitor-alert",
   title: "New competitor alert",
   graph: NEW_COMPETITOR_ALERT,
 });
 
-/* ------------------------------------------------------------ GitHub */
+export const higgsfieldVideo = (): StoryWorkflow => ({
+  id: "launch-teaser",
+  title: "Launch teaser",
+  graph: {
+    nodes: [
+      {
+        kind: "image",
+        id: "teaser",
+        at: { x: 0, y: 0 },
+        fields: {
+          media: "video",
+          model: "higgsfield-seedance_2_0",
+          prompt: "A slow push-in on the product window at dusk, soft city sounds",
+          aspect: "21:9",
+          duration: 5,
+          resolution: "720p",
+        },
+      },
+    ],
+    edges: [],
+    strokes: [],
+  },
+});
 
 const TRIAGE_REPOSITORY = "openbot-preview/app";
 
-/** Issue help: a new comment on an issue goes to an agent, which answers on the issue and labels it. */
 const GITHUB_TRIAGE: WorkflowGraph = {
   nodes: [
     {
@@ -565,7 +596,6 @@ const GITHUB_TRIAGE: WorkflowGraph = {
   strokes: [],
 };
 
-/** A run of Issue help that a comment started. An open run has its trigger done and its agent at work. */
 function triageRun(
   workflowId: string,
   number: number,
@@ -604,10 +634,6 @@ function triageRun(
   };
 }
 
-/**
- * Issue help with two runs open at the same time, one for each of two issues. A second comment on one
- * of them waits until the run of its issue ends. An earlier run ended.
- */
 export function githubTriage(): StoryWorkflow {
   const id = "github-triage";
   const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
@@ -661,10 +687,6 @@ export function githubTriage(): StoryWorkflow {
   };
 }
 
-/**
- * The GitHub of the node stories: connected, with repositories of two owners. The bot can change some,
- * can only read one, and GitHub sends no events from one. The buttons do nothing.
- */
 export const STORY_GITHUB: WorkflowGitHubCanvas = {
   catalog: () => ({
     connected: true,

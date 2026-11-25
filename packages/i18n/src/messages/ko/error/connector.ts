@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/connector";
 
 export const messages = {
-  // The built-in GitHub connection: the device flow, the token refresh and the stored file.
   "error.connector.githubUnavailable": "이 OpenBot 빌드에는 GitHub App이 없어요.",
   "error.connector.githubDenied": "GitHub 로그인이 거부됐어요.",
   "error.connector.githubCodeExpired": "GitHub 코드가 만료됐어요. GitHub를 다시 연결해 주세요.",
@@ -10,10 +9,11 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub가 이 GitHub App의 Client ID를 알지 못해요.",
   "error.connector.githubUnexpected": "GitHub가 예상하지 못한 응답을 보냈어요: {detail}",
   "error.connector.githubUnreachable": "OpenBot이 GitHub에 연결할 수 없어요: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot이 GitHub에 연결할 수 없어요. OpenBot을 실행하는 컴퓨터나 서버의 인터넷 연결과 DNS 설정을 확인한 후 다시 시도해 주세요.",
   "error.connector.githubExpired": "GitHub 연결이 만료됐어요. GitHub를 다시 연결해 주세요.",
   "error.connector.githubFileUnreadable": "GitHub 연결 파일을 읽을 수 없어요.",
   "error.connector.githubFileTooLarge": "GitHub 연결 파일이 너무 커요.",
-  // The 1Password connection: the CLI that creates the service account, the token and the stored file.
   "error.connector.onePasswordCliMissing":
     "OpenBot이 1Password CLI를 찾을 수 없어요. CLI를 설치하고 1Password 앱에서 연동을 켜거나, 서비스 계정 토큰을 사용해 주세요.",
   "error.connector.onePasswordCliInstallFailed":
@@ -32,6 +32,8 @@ export const messages = {
   "error.connector.onePasswordRateLimited": "1Password에 요청이 너무 많아요. 몇 분 기다린 후 다시 시도해 주세요.",
   "error.connector.onePasswordNoVault":
     "서비스 계정이 볼트를 읽을 수 없어요. 볼트에 대한 접근 권한을 부여한 후 다시 시도해 주세요.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot이 1Password의 로그인 정보를 읽을 수 없어요. 1Password 연결을 해제한 후 다시 연결해 주세요.",
   "error.connector.onePasswordFileUnreadable": "1Password 연결 파일을 읽을 수 없어요.",
   "error.connector.onePasswordFileTooLarge": "1Password 연결 파일이 너무 커요.",
   "error.connector.bitwardenFailed":
@@ -44,6 +46,10 @@ export const messages = {
     "HTTPS 서버 주소, API 키의 client_id와 client_secret, 마스터 비밀번호를 입력해 주세요.",
   "error.connector.bitwardenHostFailed":
     "이 서버에서 Bitwarden을 열 수 없어요. 서버 주소, API 키, 마스터 비밀번호를 확인하고 Shared with OpenBot이라는 폴더가 하나 있는지 확인해 주세요. 그런 다음 다시 연결해 주세요.",
+  "error.connector.bitwardenHostSignInFailed":
+    "이 서버에서 Bitwarden에 로그인할 수 없어요. 서버 주소와 API 키를 확인한 후 다시 연결해 주세요.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "이 서버에서 Bitwarden 잠금을 해제할 수 없어요. 마스터 비밀번호를 확인한 후 다시 연결해 주세요.",
   "error.connector.bitwardenCliInstallFailed":
     "이 서버에 Bitwarden CLI를 설치하지 못했어요. 서버의 네트워크 연결을 확인한 후 다시 연결해 주세요.",
   "error.connector.bitwardenFileUnreadable": "Bitwarden 연결 파일을 읽을 수 없어요.",
@@ -55,6 +61,8 @@ export const messages = {
     "Proton Pass CLI를 설치하지 못했습니다. 네트워크 연결을 확인한 후 다시 연결하세요.",
   "error.connector.protonPassPlan":
     "사용 중인 Proton 요금제에서는 Proton Pass CLI를 사용할 수 없습니다. 요금제를 변경한 후 다시 연결하세요.",
+  "error.connector.protonPassPlanMissing":
+    "사용 중인 Proton 요금제에는 Proton Pass CLI가 포함되지 않습니다. Pass Plus가 포함된 Proton 요금제가 필요합니다. 요금제를 변경한 후 다시 연결하세요.",
   "error.connector.protonPassExpired": "Proton Pass 액세스가 종료되었습니다. 다시 연결하세요.",
   "error.connector.protonPassKeyInvalid": "pst_로 시작하는 Proton Pass 액세스 키를 입력하세요.",
   "error.connector.protonPassExtraPassword": "추가 비밀번호가 올바르지 않습니다. 다시 입력하세요.",

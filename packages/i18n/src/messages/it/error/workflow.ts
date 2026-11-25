@@ -6,22 +6,44 @@ export const messages = {
   "error.workflow.versionMissing": "Questa versione del workflow non esiste più.",
   "error.workflow.annotation": "Testi, note e forme non possono avere connessioni.",
   "error.workflow.port": "Un passaggio non può ricevere questo tipo di input.",
+  "error.workflow.unknownValue":
+    "Questo OpenBot non conosce un’impostazione di un passaggio. Aggiorna OpenBot, poi riprova.",
   "error.workflow.branch": "Solo una condizione può avere connessioni sì e no.",
   "error.workflow.conditionBranch": "Ogni connessione da una condizione deve essere sì o no.",
   "error.workflow.duplicateEdge": "Questi due passaggi hanno già questa connessione.",
   "error.workflow.serverTooOld": "Questo server non supporta i workflow. Aggiorna OpenBot sul computer che lo esegue.",
+  "error.workflow.newerSteps":
+    "Questo flusso di lavoro ha passaggi di una versione più recente di OpenBot. Aggiorna OpenBot per modificarlo.",
   "error.workflow.nodeUnsupported":
     "Questa versione di OpenBot non può ancora eseguire passaggi di immagine, file e messaggio.",
   "error.workflow.interrupted": "OpenBot si è fermato durante questo passaggio. Eseguilo di nuovo.",
   "error.workflow.agentMissing": "Scegli un agente per questo passaggio.",
   "error.workflow.handoffFailed": "OpenBot non è riuscito a inviare questo passaggio al suo agente.",
   "error.workflow.agentStepEnded": "Il messaggio all’agente è stato rimosso prima della sua risposta.",
+  "error.workflow.agentStepStopped":
+    "L’agente si è fermato prima di rispondere a questo passaggio. Esegui di nuovo il passaggio.",
   "error.workflow.conditionUnclear": "Il modello non ha risposto sì o no.",
+  "error.workflow.answerInvalid":
+    "La risposta non conteneva i campi richiesti da questo passaggio: {fields}. Esegui di nuovo il passaggio.",
+  "error.workflow.answerSetup":
+    "I campi di risposta di questo workflow hanno un problema qui: {fields}. Correggi il workflow, poi esegui di nuovo il passaggio.",
+  "error.workflow.answerSourceEnded":
+    "Questi campi non hanno un valore perché il passaggio che li fornisce non è terminato: {fields}. Esegui prima di nuovo quel passaggio.",
+  "error.workflow.runInputInvalid":
+    "L’input dell’esecuzione non corrisponde ai campi di risposta dell’attivatore: {fields}. Invia un oggetto JSON con questi campi.",
+  "error.workflow.sourceNotDone":
+    "Un passaggio precedente non è riuscito o è stato fermato l’ultima volta che è stato eseguito. Esegui prima di nuovo quel passaggio.",
+  "error.workflow.checkInvalid":
+    "Il controllo di questo passaggio non è valido. Correggilo, poi esegui di nuovo il passaggio.",
   "error.workflow.modelFailed": "Il modello non ha potuto rispondere. Esegui di nuovo il passaggio.",
   "error.workflow.modelTimedOut":
     "Il modello non ha risposto in tempo. Scegli un impegno più basso o un modello più veloce per questo passaggio, poi eseguilo di nuovo.",
   "error.workflow.modelToolUse":
     "Il modello ha provato a usare uno strumento, ma questo passaggio può rispondere solo con testo. Esegui di nuovo il passaggio o scegli un altro modello.",
+  "error.workflow.modelImageUnsupported":
+    "Il modello di questo passaggio non può leggere le immagini. Scegli un modello che può farlo, oppure rimuovi il collegamento dell’immagine.",
+  "error.workflow.modelImageType":
+    "Un passaggio di modello può leggere solo immagini PNG, JPEG, GIF e WebP. Collega un’immagine di uno di questi tipi.",
   "error.workflow.modelUnavailable":
     "Il modello di questo passaggio non è disponibile. Scegli un altro modello per questo passaggio.",
   "error.workflow.providerBusy": "Il provider è occupato. Attendi qualche minuto, poi esegui di nuovo il passaggio.",
@@ -29,6 +51,7 @@ export const messages = {
     "OpenBot non è riuscito a raggiungere il provider. Controlla la connessione a internet, poi esegui di nuovo il passaggio.",
   "error.workflow.modelBusy": "È in corso un’altra richiesta al modello. Esegui di nuovo il passaggio tra poco.",
   "error.workflow.mediaFailed": "Il modello non ha potuto creare l’immagine o il video. Esegui di nuovo il passaggio.",
+  "error.workflow.mediaNotMade": "Il modello non ha creato l’immagine o il video. Ha risposto: {answer}",
   "error.workflow.pictureMissing": "L’immagine non è più sul server. Inviala di nuovo.",
   "error.workflow.pictureType": "Usa un’immagine PNG, JPEG o WebP.",
   "error.workflow.mediaInputMissing":
@@ -37,6 +60,8 @@ export const messages = {
     "Scrivi una descrizione o esegui i passaggi precedenti, così arriva un testo o un’immagine.",
   "error.workflow.mediaInputNotImage":
     "Questo passaggio accetta solo immagini, non video. Rimuovi il collegamento dal video.",
+  "error.workflow.mediaInputNotClip":
+    "Questo ingresso accetta solo video e file audio. Rimuovi il collegamento dal file.",
   "error.workflow.stepMissing": "Questo passaggio non esiste più.",
   "error.workflow.nodeMissing": "Questo passaggio non è nel flusso di lavoro.",
   "error.workflow.runMissing": "Questa esecuzione non esiste più.",

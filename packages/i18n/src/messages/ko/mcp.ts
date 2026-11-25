@@ -28,6 +28,10 @@ export const messages = {
   "mcp.signIn.waiting": "브라우저를 기다리는 중…",
   "mcp.signIn.continue": "{name}(으)로 계속",
   "mcp.signIn.pageDescription": "이 페이지는 {host}의 브라우저에서 열려 있어요. 여기에서 로그인하세요.",
+  "mcp.signIn.copyHint": "페이지가 열리지 않으면 링크를 복사해 다른 브라우저에서 여세요.",
+  "mcp.signIn.copyLink": "링크 복사",
+  "mcp.signIn.pasteHint":
+    "다른 기기에서 로그인했다면 마지막에 그 브라우저에 표시된 주소를 복사해 여기에 붙여 넣으세요.",
   "mcp.test.connected": { other: "연결됨 · 도구 {count}개" },
   "mcp.status.testing": "테스트 중…",
   "mcp.status.failed": "실패",
@@ -36,6 +40,7 @@ export const messages = {
   "mcp.status.signedIn": "로그인됨",
   "mcp.status.signingIn": "로그인 중…",
   "mcp.status.signInNeeded": "로그인 필요",
+  "mcp.status.signInAppNeeded": "로그인 앱 필요",
   "mcp.status.refused": "거부됨",
   "mcp.status.checkUrl": "URL을 확인하세요",
   "mcp.status.noAnswer": "응답 없음",
@@ -96,6 +101,7 @@ export const messages = {
   "mcp.panel.signIn": "로그인",
   "mcp.panel.signOut": "로그아웃",
   "mcp.panel.cancelSignIn": "로그인 취소",
+  "mcp.panel.useAddress": "이 주소 사용",
   "mcp.panel.signInTo": "{name}에 로그인",
   "mcp.panel.signInWaiting": {
     other: "브라우저에서 로그인을 완료하세요. OpenBot은 {count}분 후 대기를 중지해요.",

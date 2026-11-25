@@ -41,7 +41,8 @@ export const messages = {
   "error.skill.publishNeedsRepair": "توجد تغييرات محلية في {name} أو يحتاج إلى إصلاح قبل النشر.",
   "error.skill.publishUntracked": "تم تثبيت {name} قبل تتبّع النسخ الدقيقة. حدّثه أو أصلحه قبل النشر.",
   "error.skill.tooManySkills": "يمكن أن يكون للوكيل {limit} مهارة كحد أقصى.",
-  "error.skill.unmanagedExists": "توجد مهارة غير مُدارة بالفعل في {path}.",
+  "error.skill.ownSkillExists":
+    "لدى هذا الوكيل بالفعل مهارة خاصة به باسم {slug}. اطلب من الوكيل إعادة تسمية تلك المهارة أو حذفها، ثم أضف هذه المهارة مرة أخرى.",
   "error.skill.managedSlug": "يمنح OpenBot كل وكيل مهارة {slug} خاصة به. أعطِ هذه المهارة اسمًا مختلفًا.",
   "error.skill.templateMarkdownTooLarge": "{name}: حجم SKILL.md أكبر من 64 KB. اختصره قبل النشر.",
   "error.skill.localNoRevisions": "لا توجد مراجعات منشورة للمهارة المحلية.",

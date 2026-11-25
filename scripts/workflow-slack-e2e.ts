@@ -1,13 +1,3 @@
-// Checks Slack triggers and outputs of workflows on the real SQLite and the real workflow service, on a
-// temporary profile. The Slack connection is a row in the real table; only the send to Slack is a
-// stand-in, as is the model step's answer, so no Signal, provider, account or network is started. A mention starts the matching
-// workflow; a reply goes to the mention's thread; a reaction acts on the mention with its Slack name; a
-// post goes to the chosen channel; a reply does not post the trigger's raw event; the same message
-// timestamp in another channel is another mention; a webhook payload that copies a mention's event
-// cannot make an output reply to or react on a Slack message.
-//
-// Run: bun scripts/workflow-slack-e2e.ts
-// Writes .openbot-build/workflow-slack-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -35,7 +25,6 @@ const WAIT_MS = 5_000;
 
 interface Report {
   checks: string[];
-  /** The sends without their text: the action, the channel, the thread or message, and the emoji. */
   sends: { connectionId: string; action: string; channelId: string; target: string | null; emoji?: string }[];
   passed: boolean;
   failure?: string;
@@ -48,7 +37,6 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
   report.checks.push(name);
 };
 
-/** `hang` keeps the next sends open, so that their run stays open. */
 let answer: "posted" | "hang" = "posted";
 
 const node = (id: string, kind: WorkflowNode["kind"], fields: WorkflowNode["fields"], x: number): WorkflowNode => ({
@@ -58,10 +46,6 @@ const node = (id: string, kind: WorkflowNode["kind"], fields: WorkflowNode["fiel
   fields,
 });
 const ANSWER_TEXT = "Deploy started.";
-/**
- * A trigger with a reply of a model step, a reply of the trigger's event, a reaction and a post in another
- * channel.
- */
 const graphOf = (trigger: WorkflowNode): WorkflowGraph => ({
   nodes: [
     trigger,
@@ -123,7 +107,6 @@ async function open() {
       turnAnswer: () => null,
       sendHandoff: () => Effect.fail({ cause: new Error("No agent step runs in this test.") }),
       stopDelivery: () => Effect.void,
-      // The model step answers with fixed text, so no provider starts.
       generateText: () => Effect.succeed(ANSWER_TEXT),
       notify: () => {},
       connectionOn: (connectionId) =>
@@ -167,7 +150,6 @@ async function workflowWith(workflows: WorkflowsHandle, title: string, graph: Wo
   return created.summary.id;
 }
 
-/** Waits for the newest run of a workflow to reach a state. */
 async function newestRun(
   workflows: WorkflowsHandle,
   workflowId: string,
@@ -253,7 +235,6 @@ try {
     (detail) => detail.run.id !== firstRun.run.id && ended(detail),
   );
 
-  // The sends do not answer, so the run stays open.
   answer = "hang";
   const repeated = mentionOf("deploy again");
   check("a third mention starts a run", (await runCauseEffect(workflows.receiveSlack(repeated))) === "started");
@@ -273,7 +254,6 @@ try {
   answer = "posted";
 
   const hook = await workflowWith(workflows, "Hook", graphOf(webhookTrigger));
-  /** The replies and reactions on the first mention; only the first run made them. */
   const onFirst = () =>
     sends.filter(
       (send) =>

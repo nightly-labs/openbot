@@ -156,6 +156,7 @@ export const messages = {
   "routine.card.webhookCreated": "Webhook ルーティンを作成しました",
   "routine.card.webhookSecretNote":
     "署名シークレットを取得するには、再生成してください。エージェントはシークレットを受け取りません。",
+  "routine.card.webhookSecretAgentNote": "署名シークレットを取得するには、再生成するか、{name} に渡してください。",
   "routine.card.webhookUpdated": "Webhook ルーティンを更新しました",
   "routine.card.webhookChanged": "変更は保存されていません",
   "routine.card.webhookSaveFailed": "イベントを保存できませんでした。",
@@ -309,7 +310,13 @@ export const messages = {
   "routine.webhook.senderSecretLabel": "送信元のシークレット",
   "routine.webhook.senderSecretConfirm": "使用",
   "routine.webhook.senderSecretFailed": "送信元のシークレットを保存できませんでした。",
-  "routine.webhook.statusFailed": "ホストがリレーに接続しているか確認できませんでした。",
+  "routine.webhook.giveSecret": "署名シークレットを {name} に渡す",
+  "routine.webhook.giveSecretTitle": "新しい署名シークレットを {name} に渡しますか？",
+  "routine.webhook.giveSecretDescription":
+    "現在のシークレットはすぐに使えなくなります。{name} は新しいシークレットを API キーとして保存し、送信元に追加できます。コピーする必要はありません。",
+  "routine.webhook.giveSecretConfirm": "渡す",
+  "routine.webhook.giveSecretFailed": "署名シークレットを {name} に渡せませんでした。",
+  "routine.webhook.secretGiven": "{name} が新しい署名シークレットを受け取りました。",
   "routine.settings.instruction": "指示",
   "routine.settings.instructionPlaceholderAgent": "このエージェントが行うことを説明してください。",
   "routine.settings.instructionPlaceholderChannel": "このチャンネルが行うことを説明してください。",

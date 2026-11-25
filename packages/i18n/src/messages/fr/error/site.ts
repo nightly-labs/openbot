@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/site";
 
 export const messages = {
-  // Hosted site errors.
   "error.site.absolutePath": "Choisissez un chemin absolu pour le dossier du site.",
   "error.site.rootSymlink": "Les liens symboliques ne sont pas autorisés dans les sites hébergés.",
   "error.site.notDirectory": "La source du site doit être un dossier.",

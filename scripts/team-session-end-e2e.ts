@@ -1,7 +1,3 @@
-// Checks that an HTTPS sign-out and an admin's session end close every part of that team session,
-// the live browser view too (plan 009). Runs the real Team API `routeTeam` handler with recording
-// stand-ins for the store, the remote screen and the browser view, on real Node request objects.
-// `bun scripts/team-session-end-e2e.ts`. Writes .openbot-build/team-session-end-e2e/report.json.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
@@ -39,7 +35,6 @@ const SESSION_B: TeamSessionSummary = {
   expiresAt: "2026-10-18T00:00:00.000Z",
 };
 
-/** The calls that each stand-in got, by name. */
 function recorder() {
   const calls: Record<string, string[]> = {};
   const record = (name: string, value: string) => {
@@ -69,7 +64,6 @@ function recorder() {
   return { calls, store, remoteScreen, browserView };
 }
 
-/** Runs one request through `routeTeam` as the owner on session A, and returns the status it answered. */
 async function send(method: string, path: string, dependencies: TeamRouteDependencies) {
   const request = new IncomingMessage(new Socket());
   const response = new ServerResponse(request);
@@ -86,6 +80,7 @@ async function send(method: string, path: string, dependencies: TeamRouteDepende
     agentLevel: () => "manage",
     sessionId: "session-a",
     sessionExpiresAt: "2026-10-18T00:00:00.000Z",
+    fromChrome: false,
     json: (status) => {
       statuses.push(status);
       return "handled";

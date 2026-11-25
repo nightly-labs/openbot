@@ -1,12 +1,3 @@
-// Checks that a remote client can read the queue of an agent with a long history (#2368). Runs the
-// real mailbox store and SQLite on a temporary profile, and the real Team API queue route behind a
-// local HTTP server. The client sends the capabilities and the protocol header that a current phone,
-// web client or desktop sends, then the response goes through the V7 WebRTC encoder and the RPC
-// frame encoder that the host peer uses. A frame larger than the WebRTC JSON limit throws there, as
-// it does on a real host. No app, provider, account or network is started.
-//
-// Run: bun scripts/queue-window-e2e.ts
-// Writes .openbot-build/queue-window-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -48,18 +39,15 @@ import { type AgentQueueRouteDependencies, routeAgentQueue } from "../src/main/t
 const OUT = resolve(import.meta.dirname, "../.openbot-build/queue-window-e2e");
 const HISTORY_AGENT = "agent-history";
 const MIXED_AGENT = "agent-mixed";
-/** 700 finished deliveries of about 4 KB: about 2.8 MB, more than one 2 MiB WebRTC frame. */
 const HISTORY = 700;
 const HISTORY_TEXT_BYTES = 4_000;
 const LONG_AGENT = "agent-long";
-/** 40 finished deliveries of about 90 KB: fewer than the count limit, but more than one frame. */
 const LONG = 40;
 const LONG_TEXT_BYTES = 90_000;
 const QUEUED = 3;
 const FAILED = 2;
 const FAILURE_REASON = "The provider stopped the turn.";
 const OLD_FAILURE_AGENT = "agent-old-failure";
-/** More completed deliveries than the count limit, after one old failed and one old interrupted. */
 const LATER_COMPLETED = 150;
 
 interface ReadResult {
@@ -67,9 +55,7 @@ interface ReadResult {
   queueWindow: boolean;
   status: number;
   httpBodyBytes: number;
-  /** The RPC response frame that the host peer sends. */
   frameBytes: number;
-  /** Whether the frame is within the WebRTC JSON frame limit. */
   fits: boolean;
   deliveries: number;
 }
@@ -113,11 +99,9 @@ function unused(name: string): never {
   throw new Error(`${name} is not part of this check.`);
 }
 
-/** The agent service methods the queue route calls, on the real mailbox store. */
 function queueAgents(mailbox: MailboxStore): AgentQueueRouteDependencies["agents"] {
   return {
     listQueue: (agentId) => mailbox.listQueue(agentId),
-    // The `begin` step of `QueueControls.edit`: lock the queued message, then answer the snapshot.
     editQueuedMessage: (agentId, input) =>
       Effect.sync(() => {
         assert.equal(input.action, "begin");
@@ -134,7 +118,6 @@ function queueAgents(mailbox: MailboxStore): AgentQueueRouteDependencies["agents
   };
 }
 
-/** The request context `TeamApiServer` builds, with the response encoded by the negotiated protocol. */
 function requestContext(request: IncomingMessage, response: ServerResponse, url: URL): TeamApiRequestContext {
   const method = request.method ?? "GET";
   const protocol = requestProtocol(request);
@@ -151,6 +134,7 @@ function requestContext(request: IncomingMessage, response: ServerResponse, url:
     agentLevel: () => "manage",
     sessionId: "session",
     sessionExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+    fromChrome: false,
     json: (status, value) => {
       const body = teamHttpCodec(protocol).encodeResponse(method, url.pathname, status, value, {
         preserveSemanticTags: supportsTeamSemanticTags(capabilities),
@@ -193,10 +177,6 @@ async function startHost(agents: AgentQueueRouteDependencies["agents"]): Promise
   return { origin: `http://127.0.0.1:${address.port}`, close: () => server.close() };
 }
 
-/**
- * One queue read as a remote client makes it over WebRTC: the host peer forwards it to the local Team
- * API, encodes the answer again for V7 and puts it in one RPC frame. The client decodes the frame.
- */
 async function read(
   origin: string,
   name: string,
@@ -225,7 +205,6 @@ async function read(
   assert.equal(response.status, 200, `${name}: ${text.slice(0, 200)}`);
   const body = JSON.parse(text);
   const webRtc = input.protocol >= 7 ? V7_WEBRTC : V6_WEBRTC;
-  // What the host peer sends: the local answer encoded again for the peer's protocol, in one RPC frame.
   const frame = {
     version: 2,
     type: "response",
@@ -294,7 +273,6 @@ async function seedHistory(
   return ids;
 }
 
-/** An old failure keeps its reason after more completed deliveries than the count limit. */
 async function checkOldFailure(origin: string, mailbox: MailboxStore): Promise<void> {
   const failed = await enqueue(mailbox, OLD_FAILURE_AGENT, "old failed");
   await finish(mailbox, failed, "failed", FAILURE_REASON);
@@ -323,7 +301,6 @@ async function checkOldFailure(origin: string, mailbox: MailboxStore): Promise<v
   );
 }
 
-/** Long messages: the frame budget, not the count limit, ends the window. */
 async function checkLongMessages(origin: string, mailbox: MailboxStore): Promise<void> {
   const history = await seedHistory(mailbox, LONG_AGENT, LONG, LONG_TEXT_BYTES);
   const path = `/v1/agents/${LONG_AGENT}/queue`;

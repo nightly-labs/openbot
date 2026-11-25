@@ -1,4 +1,3 @@
-// The support log lines of a public bug report must not point to one user.
 import { describe, expect, it } from "vitest";
 import { maskIdentifiers, redactText } from "./index";
 
@@ -12,7 +11,6 @@ describe("maskIdentifiers", () => {
       "[ipv6], [ipv6], [ipv6]",
     );
     expect(maskIdentifiers("http://192.168.1.5:8080/v1/me")).toBe("http://[private-ip]:8080/v1/me");
-    // Not an address.
     expect(maskIdentifiers("OpenBot 1.4.0 (212), 999.1.1.1")).toBe("OpenBot 1.4.0 (212), 999.1.1.1");
   });
 

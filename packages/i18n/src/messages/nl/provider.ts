@@ -61,6 +61,7 @@ export const messages = {
   "provider.aria.install": "{name} installeren",
   "provider.aria.signIn": "Inloggen bij {name}",
   "provider.aria.codeFallback": "Inloggen bij {name} met een code",
+  "provider.aria.addressFallback": "Plak het aanmeldadres voor {name}",
   "provider.aria.moreActions": "Meer acties voor {name}",
   "provider.aria.use": "{name} gebruiken in OpenBot",
   "provider.use.inUseOne": "{agent} gebruikt {name}. Wijzig het model van deze agent en zet {name} daarna uit.",
@@ -87,10 +88,14 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "Wacht op jou. Deze inlogpoging stopt over {time}.",
   "provider.codeLogin.linkTitle": "Inloggen bij {name} op een ander apparaat",
   "provider.codeLogin.pageTitle": "Inloggen bij {name}",
+  "provider.codeLogin.addressDescription":
+    "Rond de aanmelding af in je browser. Dit venster sluit wanneer de aanmelding klaar is.",
   "provider.codeLogin.pageDescription": "Deze pagina is geopend in de browser op {host}. Log hier in.",
   "provider.codeLogin.relayStarting": "Inloggen bij {name} starten op {host}…",
   "provider.codeLogin.pageOpening": "Inlogpagina van {name} openen op {host}…",
   "provider.codeLogin.linkStep": "Log in bij {name}. OpenBot gaat vanzelf verder.",
+  "provider.codeLogin.thisComputerDescription": "Open deze link in een browser op deze computer. OpenBot wacht hier.",
+  "provider.codeLogin.copyLink": "Link kopiëren",
   "provider.codeLogin.chatgptDeviceSetting":
     "Open in ChatGPT op een computer de beveiligingsinstellingen en zet inloggen met apparaatcode voor Codex aan. Bij een werkaccount zet de beheerder van je workspace dit aan.",
   "provider.useApp.title": "Verbind {name} in de OpenBot-app",
@@ -111,11 +116,14 @@ export const messages = {
   "provider.picker.download": "Download van {name}",
   "provider.picker.search": "Modellen zoeken",
   "provider.picker.noMatches": "Geen modellen gevonden.",
+  "provider.picker.openrouterNoMatches":
+    "Geen modellen gevonden. Je instellingen voor privacy, providers en guardrails op openrouter.ai kunnen modellen uit deze lijst verbergen.",
   "provider.picker.workspaceOnlyUnavailable":
     "Deze modellen werken niet met ‘Alleen werkruimte’ op Windows en Linux. Wijzig ‘Machtigingen’ in de agentinstellingen om ze te gebruiken.",
   "provider.picker.olderModels": "Oudere modellen",
   "provider.picker.olderModelsList": "Oudere {name}-modellen",
-  "provider.picker.noModels": "{name} heeft geen modellen beschikbaar.",
+  "provider.picker.noModels":
+    "Hier staan geen modellen van {name}. Als ze uitstaan, kan een beheerder ze aanzetten in Serverinstellingen > Aanbieders > {name} > Modellen.",
   "provider.picker.endpointModelsInCustom":
     "{name} draait je eigen endpoints. Hun modellen staan op het tabblad Eigen.",
   "provider.picker.showCustomModels": "Modellen tonen",
@@ -136,6 +144,7 @@ export const messages = {
   "provider.picker.effort": "Denkniveau",
   "provider.picker.effortLabel": "Redeneerniveau van de agent",
   "provider.picker.effortFixed": "{effort}, vastgezet door {provider}",
+  "provider.picker.effortLimited": "Je Claude-instellingen of je organisatie beperken de inspanning tot {effort}.",
   "provider.picker.fast": "Snel",
   "provider.picker.fastText": "Snellere antwoorden, meer verbruik",
   "provider.picker.speed": "Snelheid",
@@ -218,6 +227,7 @@ export const messages = {
   "provider.account.apiKey": "API-sleutel",
   "provider.account.listLabel": "Accounts van {name}",
   "provider.account.usedBy": "Gebruikt door {agents}",
+  "provider.account.sameEmail": "Zelfde e-mail als {name}",
   "provider.account.failed": "Inloggen mislukt",
   "provider.account.moreActions": "Meer acties voor {name}",
   "provider.account.renameLabel": "Naam van {name}",
@@ -296,6 +306,8 @@ export const messages = {
     "Een opgeslagen Gemini API-sleutel wordt gebruikt in plaats van een Google-aanmelding. Verwijder de sleutel om een Google-abonnement en de modellen ervan te gebruiken.",
   "provider.settings.claudeKeyInUse":
     "Anthropic brengt het API-tegoed van de sleutel in rekening, niet je Claude-abonnement. Kies het API-sleutelaccount in het modelmenu van een agent. Als Claude niet is ingelogd, gebruiken alle agents de sleutel.",
+  "provider.settings.museKeyInUse":
+    "Muse gebruikt deze sleutel, niet je login. Verwijder de sleutel om je login te gebruiken.",
   "provider.settings.addKey": "Sleutel toevoegen",
   "provider.settings.changeKey": "Sleutel wijzigen",
   "provider.settings.runtime": "Runtime",
@@ -305,6 +317,8 @@ export const messages = {
   "provider.settings.versionDownloaded": "{version} · gedownload door OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Niet in gebruik: {version} · door jou geïnstalleerd",
   "provider.settings.otherVersionDownloaded": "Niet in gebruik: {version} · gedownload door OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "Sommige modellen hebben een onderdeel nodig dat deze versie niet heeft. Download de versie van OpenBot om ze te gebruiken.",
   "provider.settings.useInstalledVersion": "Geïnstalleerde gebruiken",
   "provider.settings.useDownloadedVersion": "Versie van OpenBot gebruiken",
   "provider.settings.update": "Updaten",
@@ -313,10 +327,15 @@ export const messages = {
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Promptcache",
   "provider.settings.promptCacheDescription":
-    "Hoelang Claude de context van een agent tussen beurten in de cache bewaart.",
+    "Hoe lang Claude en Pi de context van een agent tussen beurten in de cache houden.",
   "provider.settings.promptCacheHour": "1 uur",
-  "provider.settings.promptCacheDefault": "Standaard van Claude Code",
+  "provider.settings.promptCacheDefault": "Standaard van de provider",
   "provider.settings.promptCacheLoadFailed": "Kan de promptcachetijd van deze server niet laden.",
+  "provider.settings.cacheExpiryCompaction": "Comprimeren voordat de cache verloopt",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Als een chat met 200K of meer tokens context inactief is met een cache van 1 uur, comprimeert de agent de context voordat de cache verloopt. Dan leest het volgende bericht niet de hele context opnieuw zonder cache.",
+  "provider.settings.cacheExpiryCompactionLoadFailed":
+    "De compressie-instelling van deze server kon niet worden geladen.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Mijn Claude Code-configuratie gebruiken",
   "provider.settings.claudeUserSetupDescription":
@@ -383,4 +402,5 @@ export const messages = {
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} modellen" },
   "provider.settings.disconnectLocalOnly":
     "OpenBot meldt {provider} af op deze computer. De {provider}-CLI in je terminal blijft aangemeld.",
+  "provider.settings.updateAll": "Alles updaten",
 } as const satisfies PartialTranslation<typeof source>;
