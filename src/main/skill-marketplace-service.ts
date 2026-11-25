@@ -1231,7 +1231,23 @@ function isSkillsLock(value: unknown): value is SkillsLock {
   );
 }
 
+const symlinkPathFailure = () =>
+  new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.installPathSymlink")) });
+
+const assertWorkspaceRoot = Effect.fn("SkillMarketplace.checkWorkspaceRoot")(function* (workspace: string) {
+  const root = yield* Effect.result(skillIO(() => lstat(workspace)));
+  if (Result.isFailure(root)) {
+    const error = root.failure.cause;
+    if (isDynamicRecord(error) && error.code === "ENOENT") return;
+    return yield* root.failure;
+  }
+  if (!root.success.isSymbolicLink()) return;
+  const target = yield* Effect.result(skillIO(() => stat(workspace)));
+  if (Result.isFailure(target) || !target.success.isDirectory()) return yield* symlinkPathFailure();
+});
+
 const assertSkillPaths = Effect.fn("SkillMarketplace.checkPaths")(function* (workspace: string, slug: string) {
+  yield* assertWorkspaceRoot(resolve(workspace));
   for (const target of [
     ...targetDirectories(workspace, slug),
     disabledDirectory(workspace, slug),
@@ -1239,7 +1255,7 @@ const assertSkillPaths = Effect.fn("SkillMarketplace.checkPaths")(function* (wor
   ]) {
     let current = resolve(workspace);
     const parts = relative(current, target).split(/[\\/]/u);
-    for (const part of ["", ...parts]) {
+    for (const part of parts) {
       current = join(current, part);
       const entry = yield* Effect.result(skillIO(() => lstat(current)));
       if (Result.isFailure(entry)) {
@@ -1247,8 +1263,7 @@ const assertSkillPaths = Effect.fn("SkillMarketplace.checkPaths")(function* (wor
         if (isDynamicRecord(error) && error.code === "ENOENT") break;
         return yield* entry.failure;
       }
-      if (entry.success.isSymbolicLink())
-        return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.installPathSymlink")) });
+      if (entry.success.isSymbolicLink()) return yield* symlinkPathFailure();
     }
   }
 });
