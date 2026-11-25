@@ -668,7 +668,7 @@ try {
     healthPrompt,
   );
   const routineLanguageLine =
-    "in the language that the routine task names, else the language that your instructions name";
+    "in the language that the routine task names, else the language that your instructions name, else the language of the user's chat messages";
   pass(
     "The routine prompt names the routine task as the language of the user-facing lines, before the task",
     healthPrompt?.includes(routineLanguageLine) === true &&
