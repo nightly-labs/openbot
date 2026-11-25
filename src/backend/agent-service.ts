@@ -198,7 +198,7 @@ import { ContextCompactRefusedError } from "@openbot/contracts/team-protocol/con
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, redactText } from "@openbot/logging";
+import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { workflowMediaCreditsOf, workflowMediaProvidersOf } from "@openbot/team-client/workflow-decoding";
 import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { Cause, Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
@@ -2330,7 +2330,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const workerPath = this.#usageReportWorkerPath;
     if (!workerPath) return yield* readOnMain;
     return yield* readUsageReportInWorker({ databasePath: this.#store.database.path, workerPath }, input).pipe(
-      Effect.catch(() => readOnMain),
+      Effect.catch((failure) =>
+        Effect.sync(() =>
+          logger.warn("The usage report worker failed. The report runs on the main thread.", toLogValue(failure.cause)),
+        ).pipe(Effect.andThen(readOnMain)),
+      ),
     );
   }).bind(this);
 
