@@ -27,9 +27,8 @@ interface WebExtensionConnectProps {
 export function WebExtensionConnect(props: WebExtensionConnectProps) {
   const { t, sourceText } = useText();
   const [pending, setPending] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
+  const [error, setError] = createSignal<{ text: string; canRetry: boolean } | null>(null);
   const [done, setDone] = createSignal(false);
-  const [extensionNotListed, setExtensionNotListed] = createSignal(false);
 
   async function allow() {
     setPending(true);
@@ -45,8 +44,10 @@ export function WebExtensionConnect(props: WebExtensionConnectProps) {
       const value = await response.json().catch(() => null);
       if (!response.ok || !isDynamicRecord(value) || !isString(value.code)) {
         const failure = isDynamicRecord(value) && isDynamicRecord(value.error) ? value.error : null;
-        setError(failure && isString(failure.message) ? sourceText(failure.message) : t("webClient.extension.failed"));
-        setExtensionNotListed(failure?.code === EXTENSION_NOT_LISTED);
+        setError({
+          text: failure && isString(failure.message) ? sourceText(failure.message) : t("webClient.extension.failed"),
+          canRetry: failure?.code !== EXTENSION_NOT_LISTED,
+        });
         setPending(false);
         return;
       }
@@ -58,11 +59,11 @@ export function WebExtensionConnect(props: WebExtensionConnectProps) {
       }
       if (await answerExtensionTab(props.request, { code: value.code })) setDone(true);
       else {
-        setError(t("webClient.extension.failed"));
+        setError({ text: t("webClient.extension.failed"), canRetry: true });
         setPending(false);
       }
     } catch {
-      setError(t("webClient.extension.failed"));
+      setError({ text: t("webClient.extension.failed"), canRetry: true });
       setPending(false);
     }
   }
@@ -117,13 +118,13 @@ export function WebExtensionConnect(props: WebExtensionConnectProps) {
           >
             <div class="account-login-form">
               <Show when={error()}>
-                {(text) => (
+                {(failure) => (
                   <p class="account-login-error" role="alert">
-                    {text()}
+                    {failure().text}
                   </p>
                 )}
               </Show>
-              <Show when={!extensionNotListed()}>
+              <Show when={error()?.canRetry !== false}>
                 <Button
                   variant="default"
                   type="button"
