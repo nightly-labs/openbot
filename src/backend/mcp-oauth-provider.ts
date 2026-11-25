@@ -1456,9 +1456,10 @@ function scopeUnion(...scopes: ReadonlyArray<string | null | undefined>): string
 }
 
 function withNeededScope(authorizationUrl: URL, needed: string | undefined, granted: string | undefined): URL {
-  if (!needed) return authorizationUrl;
+  const base = authorizationUrl.searchParams.get("scope") || granted;
+  if (!needed || !base) return authorizationUrl;
   const url = new URL(authorizationUrl);
-  url.searchParams.set("scope", scopeUnion(authorizationUrl.searchParams.get("scope") ?? granted, needed));
+  url.searchParams.set("scope", scopeUnion(base, needed));
   return url;
 }
 
