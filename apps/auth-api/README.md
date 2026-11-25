@@ -80,7 +80,9 @@ Without `--apply` the script makes no change. `--local` (the default) and `--tes
 Each account gets 10 welcome credits once, with no end date. They pay only for the models that the
 media gateway gives a welcome route. The Worker reaches the media generation processor only through
 the private Worker `openbot-media-gateway` (service binding `MEDIA_GATEWAY`, production only). D1 keeps
-the models, prices, holds and ledger; the gateway keeps the adapters, routes and keys. Without the
+the models, prices, holds and ledger; the gateway keeps the adapters, routes and keys. Its source is
+in the private repository [`nightly-labs/openbot-media-gateway`](https://github.com/nightly-labs/openbot-media-gateway):
+change processors, routes and welcome routes there, then deploy that Worker. Without the
 binding, as in local development, every credits model is unavailable. `bun run test:credit-media`
 checks the service against a fake gateway.
 
