@@ -512,9 +512,22 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     else this.#incompleteSystemClis.delete(provider);
     if (version) this.#systemVersions.set(provider, version);
     else this.#systemVersions.delete(provider);
+    if (version && !flagged) this.#clearFailureCoveredBySystemCli(provider, version);
     this.#revision += 1;
     this.emit("status", this.getStatus());
     return previous !== null && version === null;
+  }
+
+  #clearFailureCoveredBySystemCli(provider: ManagedProviderId, systemVersion: string): void {
+    const target = this.#target;
+    if (!target || this.#stopping || this.#tasks.has(provider)) return;
+    if (this.#statuses[provider].phase !== "download-error") return;
+    if (olderVersion(systemVersion, this.#targetSpec(provider, target).version)) return;
+    const reinspect = Effect.gen({ self: this }, function* () {
+      if (this.#tasks.has(provider) || this.#statuses[provider].phase !== "download-error") return;
+      this.#setStatus(provider, yield* this.#inspectEffect(provider));
+    }).pipe(Effect.ignore);
+    void runCauseEffect(Effect.forkIn(reinspect, this.#scope)).catch(() => undefined);
   }
 
   providerUseChanged(): Effect.Effect<void> {
