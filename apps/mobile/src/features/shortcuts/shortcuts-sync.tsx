@@ -14,6 +14,7 @@ import {
   type ShortcutDirectoryAgent,
   writeShortcutDirectory,
 } from "./model/shortcut-directory";
+import { ShortcutSendHandler } from "./shortcut-send";
 import { shortcutsSupported } from "./shortcuts-native";
 
 interface ShortcutsSyncProps {
@@ -26,7 +27,12 @@ interface ShortcutsSyncProps {
 }
 
 export function ShortcutsSync(props: ShortcutsSyncProps): ReactNode {
-  return shortcutsSupported ? <ShortcutsDirectorySync {...props} /> : null;
+  return shortcutsSupported ? (
+    <>
+      <ShortcutsDirectorySync {...props} />
+      <ShortcutSendHandler />
+    </>
+  ) : null;
 }
 
 function ShortcutsDirectorySync({

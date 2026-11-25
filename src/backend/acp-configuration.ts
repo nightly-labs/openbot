@@ -10,7 +10,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Fiber, Schedule, type Scope, Semaphore } from "effect";
 import type { AcpConnection } from "./acp-connection";
-import { type AgentProvider, ProviderModelNotOfferedError } from "./agent-client";
+import { type AgentProvider, ProviderModelNotOfferedError, ProviderSettingsConflictError } from "./agent-client";
 import { isRecord } from "./protocol";
 import {
   type ProviderClientOperationError,
@@ -30,6 +30,10 @@ const MODEL_REASONING_CLEANUP_MS = 1_000;
 const MODEL_DISCOVERY_RETURN_MS = 250;
 
 const PROBE_START_RETRY_MS = 1_000;
+
+const CONFIG_CONFLICT_RETRIES = 2;
+
+const CONFIG_CONFLICT_RETRY_MS = 250;
 
 export interface AcpModel {
   id: string;
@@ -62,10 +66,12 @@ export interface AcpConfigurationOptions {
   modelSetUnsaved?: ((error: RequestError) => boolean) | undefined;
   modelConfigId?: string | undefined;
   configSetUnsaved?: ((error: RequestError) => boolean) | undefined;
+  configConflict?: ((error: unknown) => boolean) | undefined;
   keepProbeSession?: () => boolean;
   probeCloseDelayMs?: number | undefined;
   effortCategories?: readonly string[] | undefined;
   deletesSessions?: () => boolean;
+  discarded?: (sessionId: string) => void;
   stillStarting?: ((error: unknown) => boolean) | undefined;
 }
 
@@ -96,6 +102,12 @@ export class AcpConfiguration {
     this.#effortCategories = options.effortCategories ?? EFFORT_CATEGORIES;
   }
 
+  takeKeptProbe(): string | null {
+    const sessionId = this.#probe?.sessionId ?? null;
+    this.#probe = null;
+    return sessionId;
+  }
+
   sessionSettings(options: SessionConfigOption[]): AgentSessionSettingsSnapshot {
     return sessionSettingsSnapshot(options, this.#effortCategories);
   }
@@ -118,6 +130,8 @@ export class AcpConfiguration {
       (probe) =>
         this.options.keepProbeSession?.()
           ? Effect.sync(() => {
+              if (this.#probe && this.#probe.sessionId !== probe.sessionId)
+                this.options.discarded?.(this.#probe.sessionId);
               this.#probe = { connection, sessionId: probe.sessionId };
             })
           : Effect.forkIn(
@@ -154,7 +168,10 @@ export class AcpConfiguration {
 
   #releaseProbe(connection: ClientSideConnection, sessionId: string): Effect.Effect<void> {
     const close = providerCall(() => connection.closeSession({ sessionId })).pipe(Effect.ignore);
-    if (!this.options.deletesSessions?.()) return close;
+    if (!this.options.deletesSessions?.()) {
+      this.options.discarded?.(sessionId);
+      return close;
+    }
     return providerCall(() => connection.deleteSession({ sessionId })).pipe(
       Effect.asVoid,
       Effect.catch(() => close),
@@ -187,12 +204,13 @@ export class AcpConfiguration {
     const kept = this.#probe?.connection === connection ? this.#probe.sessionId : null;
     if (!kept || !this.options.keepProbeSession?.()) return opened;
     this.#probe = null;
+    const replaced = Effect.sync(() => this.options.discarded?.(kept)).pipe(Effect.andThen(opened));
     return providerCall(() => connection.resumeSession({ sessionId: kept, cwd, mcpServers: [] })).pipe(
       Effect.flatMap((response) => {
         const probe = { ...response, sessionId: kept };
-        return modelsFromSessionSetup(probe).length > 0 ? Effect.succeed(probe) : opened;
+        return modelsFromSessionSetup(probe).length > 0 ? Effect.succeed(probe) : replaced;
       }),
-      Effect.catch(() => opened),
+      Effect.catch(() => replaced),
     );
   }
 
@@ -533,7 +551,22 @@ export class AcpConfiguration {
   }
 
   #timed<T>(method: string, request: () => Promise<T>): Effect.Effect<T, ProviderClientOperationError> {
-    return providerCall(request).pipe(
+    const conflict = this.options.configConflict;
+    const call = conflict
+      ? providerCall(request).pipe(
+          Effect.retry({
+            times: CONFIG_CONFLICT_RETRIES,
+            while: (failure) => conflict(failure.cause),
+            schedule: Schedule.spaced(CONFIG_CONFLICT_RETRY_MS),
+          }),
+          Effect.mapError((failure) =>
+            conflict(failure.cause)
+              ? providerFailure(new ProviderSettingsConflictError(this.options.label()))
+              : failure,
+          ),
+        )
+      : providerCall(request);
+    return call.pipe(
       Effect.timeoutOrElse({
         duration: this.options.requestTimeoutMs,
         orElse: () => {

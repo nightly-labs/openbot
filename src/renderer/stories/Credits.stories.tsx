@@ -1,11 +1,14 @@
 import type { BillingDetails } from "@openbot/contracts/billing-details";
 import type { CreditsState } from "@openbot/contracts/credits";
 import { CREDITS_UNAVAILABLE_STATE, EMPTY_CREDIT_ACTIVITY } from "@openbot/contracts/credits";
+import { sourceText } from "@openbot/i18n/source";
 import type { BillingDetailsCalls } from "@openbot/ui/features/billing/BillingDetailsFields";
 import { BuyCreditsPage } from "@openbot/ui/features/credits/BuyCreditsPage";
 import { CreditActivitySection } from "@openbot/ui/features/credits/CreditActivitySection";
 import { CreditsSection } from "@openbot/ui/features/credits/CreditsSection";
 import { type CreditsCalls, createCreditsStore } from "@openbot/ui/features/credits/credits-store";
+import { RedeemCreditsDialog } from "@openbot/ui/features/credits/RedeemCreditsDialog";
+import { untrack } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { createMockCredits } from "../src/preview/mock-credits";
 
@@ -24,8 +27,9 @@ const NEW_BUYER: BillingDetails = { country: null, vatId: null, suggestedCountry
 const KNOWN_BUYER: BillingDetails = { country: "US", vatId: null };
 
 function BuyStory(props: { calls: CreditsCalls; details?: BillingDetails; serverId?: string }) {
+  const calls = untrack(() => props.calls);
   const store = createCreditsStore(
-    () => props.calls,
+    () => calls,
     () => true,
   );
   const details = detailsCalls(props.details ?? KNOWN_BUYER);
@@ -35,8 +39,9 @@ function BuyStory(props: { calls: CreditsCalls; details?: BillingDetails; server
 }
 
 function SectionStory(props: { calls: CreditsCalls }) {
+  const calls = untrack(() => props.calls);
   const store = createCreditsStore(
-    () => props.calls,
+    () => calls,
     () => true,
     undefined,
     { activity: true },
@@ -55,7 +60,23 @@ function fixedCalls(state: CreditsState): CreditsCalls {
     getActivity: async () => EMPTY_CREDIT_ACTIVITY,
     openCheckout: async () => undefined,
     transfer: async () => state,
+    redeem: () => Promise.reject(new Error(sourceText("error.billing.creditCodeInvalid"))),
   };
+}
+
+function RedeemStory() {
+  const calls = createMockCredits();
+  const store = createCreditsStore(
+    () => calls,
+    () => true,
+  );
+  return (
+    <RedeemCreditsDialog
+      store={store}
+      target={{ serverId: null, name: "You", role: null, balance: 640.5 }}
+      onClose={() => undefined}
+    />
+  );
 }
 
 const meta = {
@@ -82,5 +103,7 @@ export const BuyLoadError: Story = {
     />
   ),
 };
+
+export const RedeemCode: Story = { render: () => <RedeemStory /> };
 
 export const BillingSection: Story = { render: () => <SectionStory calls={createMockCredits()} /> };

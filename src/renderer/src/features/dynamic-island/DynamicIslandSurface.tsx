@@ -5,6 +5,7 @@ import type {
   DynamicIslandPresentation,
 } from "@openbot/contracts/ipc";
 import { DEFAULT_DYNAMIC_ISLAND_PREFERENCE, IDLE_DYNAMIC_ISLAND_PRESENTATION } from "@openbot/contracts/ipc";
+import { presentationPriority } from "@openbot/team-client/dynamic-island-presentation";
 import type { DynamicIslandNotchSize, DynamicIslandStateChangeReason, DynamicIslandViewState } from "@openbot/ui";
 import { OpenBotDynamicIsland } from "@openbot/ui/features/dynamic-island/OpenBotDynamicIsland";
 import { useText } from "@openbot/ui/text";
@@ -127,6 +128,7 @@ export function DynamicIslandSurface() {
       queuedPresentation = next;
       return;
     }
+    queuedPresentation = undefined;
     commitPresentation(next);
   }
 
@@ -350,7 +352,12 @@ function interactionLocksPresentation(
   typing: boolean,
 ): boolean {
   if (!interacting || !(typing || isCriticalPresentation(current))) return false;
+  if (isCriticalPresentation(current) && heldRequestEnded(current, next)) return false;
   return presentationIdentity(current) !== presentationIdentity(next);
+}
+
+function heldRequestEnded(current: DynamicIslandPresentation, next: DynamicIslandPresentation): boolean {
+  return presentationPriority(next.mode) > presentationPriority(current.mode);
 }
 
 function isCriticalPresentation(presentation: DynamicIslandPresentation): boolean {

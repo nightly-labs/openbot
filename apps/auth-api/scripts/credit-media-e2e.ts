@@ -32,6 +32,7 @@ const ARTIFACTS = "https://cdn.upstream.test";
 const API_KEY = "media-key-e2e-secret";
 const TASKS_API = "https://api.tasks.test";
 const TASKS_FILES = "https://files.tasks.test";
+const TASKS_RETENTION_DAYS = ["3", "7", "15", "30"];
 const TASKS_KEY = "tasks-key-e2e-secret";
 const OWNER = "owner";
 const OUTSIDER = "outsider";
@@ -119,6 +120,8 @@ function addModels(database: DatabaseSync) {
            ('video-one', '1080p', 'second', 15.5, 8, 1),
            ('video-off', '', 'second', 1, NULL, 1),
            ('video-frames', '', 'second', 1, NULL, 1);
+    INSERT INTO credit_media_routes(model_id, upstream, upstream_id, upstream_params, updated_at)
+    SELECT model_id, 'router', upstream_id, upstream_params, updated_at FROM credit_media_models;
   `);
 }
 
@@ -289,6 +292,7 @@ async function fakeUpstreamFlow() {
       catalog.models[1]?.prices.length === 2 &&
       catalog.models[1]?.prices.every((price) => price.silentCredits !== null) === true &&
       catalog.models[0]?.prices[0]?.silentCredits === null &&
+      catalog.unavailable?.length === 0 &&
       !JSON.stringify(catalog).includes("up-"),
     catalog,
   );
@@ -828,7 +832,7 @@ function fakeTasksUpstream() {
       return Response.json({ error: { code: 401, message: "bad key", type: "authentication_error" } }, { status: 401 });
     if (url.pathname === "/v1/uploads/images" && init?.method === "POST" && init.body instanceof FormData) {
       const file = init.body.get("file");
-      if (!(file instanceof File))
+      if (!(file instanceof File) || !TASKS_RETENTION_DAYS.includes(url.searchParams.get("retention_days") ?? ""))
         return Response.json({ error: { code: 400, type: "invalid_request" } }, { status: 400 });
       uploads.push({
         name: file.name,
@@ -946,12 +950,25 @@ async function tasksUpstreamFlow() {
   const studio: CreditMediaPayer = { wallet: "server", serverId: SERVER_ID };
   const holdUpstream = (jobId: string) =>
     database.prepare("SELECT upstream FROM credit_holds WHERE job_id = ?").get(jobId)?.upstream ?? null;
-  const switchModel = (model: string, upstream: string, upstreamId: string) =>
+  const addRoute = (
+    model: string,
+    upstream: string,
+    upstreamId: string,
+    fields: DynamicRecord = {},
+    specs: DynamicRecord = {},
+  ) =>
     database
       .prepare(
-        "UPDATE credit_media_models SET upstream = ?2, upstream_id = ?3, upstream_params = '{}' WHERE model_id = ?1",
+        `INSERT INTO credit_media_routes(model_id, upstream, upstream_id, upstream_fields, specs, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, 1)
+         ON CONFLICT(model_id, upstream) DO UPDATE SET upstream_id = excluded.upstream_id,
+           upstream_fields = excluded.upstream_fields, specs = excluded.specs`,
       )
-      .run(model, upstream, upstreamId);
+      .run(model, upstream, upstreamId, JSON.stringify(fields), JSON.stringify(specs));
+  const removeRoute = (model: string, upstream: string) =>
+    database.prepare("DELETE FROM credit_media_routes WHERE model_id = ?1 AND upstream = ?2").run(model, upstream);
+  const switchAll = (upstream: string) =>
+    database.prepare("UPDATE credit_media_settings SET upstream = ?1 WHERE id = 1").run(upstream);
+  const holdCount = () => database.prepare("SELECT COUNT(*) AS count FROM credit_holds").get()?.count;
   const configured = mediaUpstreamsFromBindings({
     MEDIA_API_URL: UPSTREAM,
     MEDIA_API_KEY: API_KEY,
@@ -975,16 +992,49 @@ async function tasksUpstreamFlow() {
     { routerJob, upstream: holdUpstream(routerJob.jobId) },
   );
 
-  switchModel("image-one", TASKS_MEDIA_UPSTREAM, "tasks-image-1");
+  addRoute("image-one", TASKS_MEDIA_UPSTREAM, "tasks-image-1");
+  const beforeSwitch = await run(both.catalog());
+  check(
+    "a route on a processor that is not active changes nothing",
+    beforeSwitch.models.map((model) => model.id).join(",") === "image-one,video-one,video-frames" &&
+      router.submits.length === 1,
+    beforeSwitch.models.map((model) => model.id),
+  );
+  switchAll(TASKS_MEDIA_UPSTREAM);
   const hiddenCatalog = await run(routerOnly.catalog());
   const fullCatalog = await run(both.catalog());
   check(
-    "after a D1 switch, the catalog lists the model only where its upstream is set, with no upstream name or id",
-    !hiddenCatalog.models.some((model) => model.id === "image-one") &&
-      fullCatalog.models.map((model) => model.id).join(",") === "image-one,video-one,video-frames" &&
+    "after the D1 switch, the catalog lists only models with a route on the active processor, with no upstream name or id",
+    hiddenCatalog.models.length === 0 &&
+      fullCatalog.models.map((model) => model.id).join(",") === "image-one" &&
       !JSON.stringify(fullCatalog).includes("tasks") &&
       !JSON.stringify(fullCatalog).includes("router"),
     { hidden: hiddenCatalog.models.map((model) => model.id), full: fullCatalog.models.map((model) => model.id) },
+  );
+  check(
+    "a model with no route on the active processor stays in the catalog by name only, as unavailable",
+    fullCatalog.unavailable?.map((model) => model.id).join(",") === "video-one,video-frames" &&
+      fullCatalog.unavailable.every(
+        (model) => Object.keys(model).sort().join(",") === "id,kind,name,variant" && model.name.length > 0,
+      ) &&
+      hiddenCatalog.unavailable?.length === 3,
+    { unavailable: fullCatalog.unavailable },
+  );
+  const holdsBeforeUnrouted = holdCount();
+  const unrouted = await failure(
+    both.submit(
+      owner,
+      OWNER,
+      submission("video-frames", { duration: 5 }, [{ role: "first", bytes: PNG, mimeType: "image/png" }]),
+    ),
+  );
+  check(
+    "a model with no route on the active processor is unavailable, holds nothing and reaches no processor",
+    unrouted.code === "media_model_unavailable" &&
+      holdCount() === holdsBeforeUnrouted &&
+      router.submits.length === 1 &&
+      tasks.submits.length === 0,
+    unrouted,
   );
   const unconfigured = await failure(routerOnly.submit(owner, OWNER, submission("image-one")));
   check(
@@ -1007,7 +1057,7 @@ async function tasksUpstreamFlow() {
       tasks.uploads.length === 1 &&
       tasks.uploads[0]?.type === "image/png" &&
       tasks.uploads[0]?.size === PNG.length &&
-      tasks.uploads[0]?.retention === "1" &&
+      tasks.uploads[0]?.retention === "3" &&
       imageSubmit?.kind === "image" &&
       imageSubmit.body.model === "tasks-image-1" &&
       imageSubmit.body.n === 2 &&
@@ -1052,7 +1102,7 @@ async function tasksUpstreamFlow() {
     { headers: Object.fromEntries(output.headers), download: tasks.downloads.at(-1) },
   );
 
-  switchModel("video-one", TASKS_MEDIA_UPSTREAM, "tasks-video-1");
+  addRoute("video-one", TASKS_MEDIA_UPSTREAM, "tasks-video-1");
   const video = await run(
     both.submit(
       owner,
@@ -1089,19 +1139,7 @@ async function tasksUpstreamFlow() {
     failed,
   );
 
-  const firstOnly = await run(
-    both.submit(
-      owner,
-      OWNER,
-      submission("video-frames", { duration: 5 }, [{ role: "first", bytes: PNG, mimeType: "image/png" }]),
-    ),
-  );
-  check(
-    "a video with one first frame stays on its current upstream until D1 switches it",
-    firstOnly.status === "queued" && holdUpstream(firstOnly.jobId) === "router",
-    firstOnly,
-  );
-  switchModel("video-frames", TASKS_MEDIA_UPSTREAM, "tasks-video-2");
+  addRoute("video-frames", TASKS_MEDIA_UPSTREAM, "tasks-video-2");
   await run(
     both.submit(
       owner,
@@ -1115,6 +1153,103 @@ async function tasksUpstreamFlow() {
       tasks.submits.at(-1)?.body.image_with_roles === undefined &&
       tasks.submits.at(-1)?.body.generate_audio === undefined,
     tasks.submits.at(-1)?.body,
+  );
+  addRoute("video-one", TASKS_MEDIA_UPSTREAM, "tasks-video-1", {
+    size: { name: "aspect_ratio" },
+    resolution: { values: { "1080p": "1080P" } },
+    duration: { values: { "10": "10s" } },
+    generate_audio: { name: null },
+    image_with_roles: { roles: { first_frame: "first_frame_url", last_frame: "tail_url" } },
+  });
+  await run(
+    both.submit(
+      owner,
+      OWNER,
+      submission("video-one", { resolution: "1080p", duration: 10, audio: true }, [
+        { role: "first", bytes: PNG, mimeType: "image/png" },
+        { role: "last", bytes: PNG, mimeType: "image/png" },
+      ]),
+    ),
+  );
+  const renamed = tasks.submits.at(-1)?.body;
+  addRoute("video-frames", TASKS_MEDIA_UPSTREAM, "tasks-video-2", { image_urls: { name: "image", single: true } });
+  await run(
+    both.submit(
+      owner,
+      OWNER,
+      submission("video-frames", { duration: 5 }, [{ role: "first", bytes: PNG, mimeType: "image/png" }]),
+    ),
+  );
+  const single = tasks.submits.at(-1)?.body;
+  check(
+    "the route field map of the active processor renames, maps, drops and splits the request fields",
+    JSON.stringify(renamed) ===
+      JSON.stringify({
+        model: "tasks-video-1",
+        prompt: "A red lighthouse on a cliff at dawn",
+        aspect_ratio: "16:9",
+        resolution: "1080P",
+        duration: "10s",
+        first_frame_url: `${TASKS_FILES}/uploads/5.png`,
+        tail_url: `${TASKS_FILES}/uploads/6.png`,
+      }) &&
+      single?.image === `${TASKS_FILES}/uploads/7.png` &&
+      single.image_urls === undefined,
+    { renamed, single },
+  );
+  addRoute("video-frames", TASKS_MEDIA_UPSTREAM, "tasks-video-2", {
+    image_urls: { name: "image_with_roles", role: "first_frame" },
+  });
+  await run(
+    both.submit(
+      owner,
+      OWNER,
+      submission("video-frames", { duration: 5 }, [{ role: "first", bytes: PNG, mimeType: "image/png" }]),
+    ),
+  );
+  const wrapped = tasks.submits.at(-1)?.body;
+  addRoute(
+    "video-one",
+    TASKS_MEDIA_UPSTREAM,
+    "tasks-video-1",
+    { image_with_roles: { roles: { first_frame: "image_urls", last_frame: "image_urls" } } },
+    { resolutions: ["720p"], defaultResolution: "720p" },
+  );
+  await run(
+    both.submit(
+      owner,
+      OWNER,
+      submission("video-one", { duration: 5 }, [
+        { role: "first", bytes: PNG, mimeType: "image/png" },
+        { role: "last", bytes: PNG, mimeType: "image/png" },
+      ]),
+    ),
+  );
+  const listed = tasks.submits.at(-1)?.body;
+  check(
+    "a route field map can send a first frame as a role object, and first and last frames as one list",
+    JSON.stringify(wrapped?.image_with_roles) ===
+      JSON.stringify([{ url: `${TASKS_FILES}/uploads/8.png`, role: "first_frame" }]) &&
+      wrapped?.image_urls === undefined &&
+      JSON.stringify(listed?.image_urls) ===
+        JSON.stringify([`${TASKS_FILES}/uploads/9.png`, `${TASKS_FILES}/uploads/10.png`]) &&
+      listed?.image_with_roles === undefined,
+    { wrapped, listed },
+  );
+  const narrowed = (await run(both.catalog())).models.find((model) => model.id === "video-one");
+  const submitsBeforeNarrowed = tasks.submits.length;
+  const holdsBeforeNarrowed = holdCount();
+  const notOffered = await failure(
+    both.submit(owner, OWNER, submission("video-one", { resolution: "1080p", duration: 5 })),
+  );
+  check(
+    "route specs narrow the options and prices of the catalog, and a job outside them is invalid and holds nothing",
+    JSON.stringify(narrowed?.resolutions) === JSON.stringify(["720p"]) &&
+      narrowed?.prices.map((price) => price.resolution).join(",") === "720p" &&
+      notOffered.code === "media_request_invalid" &&
+      tasks.submits.length === submitsBeforeNarrowed &&
+      holdCount() === holdsBeforeNarrowed,
+    { narrowed, notOffered },
   );
 
   tasks.setSubmitStatus(402);
@@ -1187,12 +1322,14 @@ async function tasksUpstreamFlow() {
     { secondSubmit, firstDone, submits: tasks.submits.length - submitsBefore, sameDone },
   );
 
-  switchModel("image-one", ROUTER_MEDIA_UPSTREAM, "up-image-1");
+  switchAll(ROUTER_MEDIA_UPSTREAM);
   const lostReply = submission("image-one");
+  const unroutedReply = submission("video-one", { duration: 5 });
   router.setSubmitStatus(502);
   const lostFirst = await failure(both.submit(owner, OWNER, lostReply));
+  const unroutedFirst = await failure(both.submit(owner, OWNER, unroutedReply));
   router.setSubmitStatus(200);
-  switchModel("image-one", TASKS_MEDIA_UPSTREAM, "tasks-image-1");
+  switchAll(TASKS_MEDIA_UPSTREAM);
   const tasksBeforeRetry = tasks.submits.length;
   const retried = await run(both.submit(owner, OWNER, lostReply));
   const retrySubmit = router.submits.at(-1);
@@ -1209,6 +1346,47 @@ async function tasksUpstreamFlow() {
       router.submits.filter((entry) => entry.idempotencyKey === lostReply.request.jobId).length === 2 &&
       retriedDone.status === "completed",
     { lostFirst, retried, retrySubmit, retriedDone },
+  );
+  removeRoute("video-one", TASKS_MEDIA_UPSTREAM);
+  const unroutedRetry = await run(both.submit(owner, OWNER, unroutedReply));
+  const unroutedSubmit = router.submits.at(-1);
+  const newJob = await failure(both.submit(owner, OWNER, submission("video-one", { duration: 5 })));
+  check(
+    "a retry of a job that reached a processor before the switch still goes there when the model has no route on the new one",
+    unroutedFirst.code === "media_busy" &&
+      unroutedRetry.status === "queued" &&
+      unroutedSubmit?.idempotencyKey === unroutedReply.request.jobId &&
+      unroutedSubmit.body.model === "up-video-1" &&
+      newJob.code === "media_model_unavailable",
+    { unroutedFirst, unroutedRetry, body: unroutedSubmit?.body, newJob },
+  );
+
+  switchAll(ROUTER_MEDIA_UPSTREAM);
+  const narrowedReply = submission("video-one", { resolution: "1080p", duration: 10 });
+  router.setSubmitStatus(502);
+  const narrowedFirst = await failure(both.submit(owner, OWNER, narrowedReply));
+  router.setSubmitStatus(200);
+  addRoute(
+    "video-one",
+    TASKS_MEDIA_UPSTREAM,
+    "tasks-video-1",
+    {},
+    { resolutions: ["720p"], defaultResolution: "720p", durations: [5], defaultDuration: 5 },
+  );
+  switchAll(TASKS_MEDIA_UPSTREAM);
+  const narrowedRetry = await run(both.submit(owner, OWNER, narrowedReply));
+  const narrowedSubmit = router.submits.at(-1);
+  const narrowedNew = await failure(
+    both.submit(owner, OWNER, submission("video-one", { resolution: "1080p", duration: 10 })),
+  );
+  check(
+    "a retry of a job pinned before the switch is checked against the pinned route, not a new route that narrows the options",
+    narrowedFirst.code === "media_busy" &&
+      narrowedRetry.status === "queued" &&
+      narrowedSubmit?.idempotencyKey === narrowedReply.request.jobId &&
+      narrowedSubmit.body.model === "up-video-1" &&
+      narrowedNew.code === "media_request_invalid",
+    { narrowedFirst, narrowedRetry, body: narrowedSubmit?.body, narrowedNew },
   );
 
   check(
@@ -1244,13 +1422,16 @@ async function liveTasksFlow() {
   };
   database
     .prepare(
-      `INSERT INTO credit_media_models(model_id, upstream, upstream_id, kind, name, maker, variant, position, enabled, specs, upstream_params, updated_at)
-       VALUES ('live-image', 'tasks', ?1, 'image', 'Live Image', 'Maker', NULL, 1, 1, ?2, '{}', 1)`,
+      `INSERT INTO credit_media_models(model_id, upstream_id, kind, name, maker, variant, position, enabled, specs, upstream_params, updated_at)
+       VALUES ('live-image', ?1, 'image', 'Live Image', 'Maker', NULL, 1, 1, ?2, '{}', 1)`,
     )
     .run(model, JSON.stringify(specs));
-  database.exec(
-    "INSERT INTO credit_media_prices(model_id, resolution, unit, credits, updated_at) VALUES ('live-image', '', 'item', 0.5, 1)",
-  );
+  database.exec(`
+    INSERT INTO credit_media_prices(model_id, resolution, unit, credits, updated_at) VALUES ('live-image', '', 'item', 0.5, 1);
+    INSERT INTO credit_media_routes(model_id, upstream, upstream_id, updated_at)
+    SELECT model_id, 'tasks', upstream_id, 1 FROM credit_media_models WHERE model_id = 'live-image';
+    UPDATE credit_media_settings SET upstream = 'tasks' WHERE id = 1;
+  `);
   const service = new CreditMediaService({ database: sqliteD1(database), upstreams, now: () => Date.now() });
   const owner: CreditMediaPayer = { wallet: "personal", userId: OWNER };
   const request = submission("live-image", { prompt: "A small blue paper boat on calm water, studio light" });
@@ -1306,7 +1487,8 @@ async function liveFlow() {
     )
     .run(JSON.stringify(specs));
   database.exec(
-    "INSERT INTO credit_media_prices(model_id, resolution, unit, credits, updated_at) VALUES ('z-image-turbo', '', 'item', 0.5, 1)",
+    `INSERT INTO credit_media_prices(model_id, resolution, unit, credits, updated_at) VALUES ('z-image-turbo', '', 'item', 0.5, 1);
+     INSERT INTO credit_media_routes(model_id, upstream, upstream_id, updated_at) VALUES ('z-image-turbo', 'router', 'z-image', 1);`,
   );
   const service = new CreditMediaService({ database: sqliteD1(database), upstreams, now: () => Date.now() });
   const owner: CreditMediaPayer = { wallet: "personal", userId: OWNER };

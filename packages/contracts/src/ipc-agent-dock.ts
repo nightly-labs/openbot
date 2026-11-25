@@ -233,6 +233,7 @@ export type AgentDockAction =
   | { type: "move"; serverId: string; seat: AgentDockSeatRef; before: AgentDockSeatRef | null }
   | { type: "send"; serverId: string; seat: AgentDockSeatRef; text: string; clientMessageId: string }
   | { type: "open-agent"; serverId: string; agentId: string }
+  | { type: "open-browser-takeover"; serverId: string; agentId: string; tabId: string }
   | { type: "open-channel"; serverId: string; channelId: string }
   | { type: "open-window"; serverId: string; agentId: string }
   | {
@@ -323,6 +324,8 @@ export function isAgentDockAction(value: unknown): value is AgentDockAction {
     case "open-agent":
     case "open-window":
       return isIdentifier(value.agentId);
+    case "open-browser-takeover":
+      return isIdentifier(value.agentId) && isIdentifier(value.tabId);
     case "open-channel":
       return isIdentifier(value.channelId);
     case "respond-approval":

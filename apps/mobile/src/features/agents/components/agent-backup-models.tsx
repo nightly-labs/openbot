@@ -106,13 +106,18 @@ function choiceKey(choice: AgentModelChoice): string {
 function useBackupModelOptions(models: readonly AgentModelOption[] | undefined, accounts: HostProviderAccounts | null) {
   const { t } = useText();
   const accountName = useProviderAccountName();
-  const option = (choice: AgentModelChoice): BackupModelOption => {
+  const option = (choice: AgentModelChoice, namesProvider: boolean): BackupModelOption => {
     const accountId = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
     const providerAccounts = accounts?.providers.find((entry) => entry.provider === choice.provider)?.accounts;
     const accountIndex = providerAccounts?.findIndex((candidate) => candidate.id === accountId) ?? -1;
     const account = providerAccounts?.[accountIndex];
     const model = models?.find((candidate) => candidate.provider === choice.provider && candidate.id === choice.model);
-    const modelName = model?.name ?? choice.model;
+    const modelName = namesProvider
+      ? t("mobile.agent.backupModels.withProvider", {
+          model: model?.name ?? choice.model,
+          provider: agentProviderName(choice.provider),
+        })
+      : (model?.name ?? choice.model);
     const showsAccount = providerAccounts !== undefined && providerAccounts.length > 1;
     return {
       key: choiceKey(choice),
@@ -142,7 +147,7 @@ function useBackupModelOptions(models: readonly AgentModelOption[] | undefined, 
           model: model.id,
           ...(accountId === DEFAULT_PROVIDER_ACCOUNT_ID ? {} : { providerAccountId: accountId }),
         };
-        return exclude.some((other) => sameAgentModelChoice(other, choice)) ? [] : [option(choice)];
+        return exclude.some((other) => sameAgentModelChoice(other, choice)) ? [] : [option(choice, false)];
       });
     });
   return { option, all };
@@ -189,7 +194,7 @@ function useBackupModelEditor(props: BackupModelsProps) {
       automatic,
       order,
       ownModel,
-      entries: order.map(option),
+      entries: order.map((choice) => option(choice, true)),
       addable: all(own ? [own, ...order] : order).filter(
         (candidate) =>
           candidate.ready &&

@@ -1127,6 +1127,7 @@ function publicHold(reason: string | null): AgentTaskHold | null {
       return "task-limit";
     case "agent-client-changing":
     case "provider-cli-replaced":
+    case "endpoint-reload":
       return "agent-restarting";
     case "usage-limit":
       return "usage-limit";

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  containsSecret,
   createOpenBotLogger,
   type LogValue,
   redactPostText,
@@ -290,6 +291,46 @@ describe("redactText", () => {
     expect(redactSecrets(code)).toBe(code);
     expect(redactSecrets(`${code}\ntoken = Bearer abcdef123456`)).toBe(`${code}\ntoken = [redacted]`);
     expect(redactSecrets(`${code}\n{"apiKey":"abcdef123456"}`)).toBe(`${code}\n{"apiKey":"[redacted]"}`);
+  });
+
+  it("finds no secret in code that the scan does not read", () => {
+    const code = Array.from({ length: 20 }, (_, index) => `function f${index}() { return [${index}]; }`).join("\n");
+    const links = Array.from({ length: 17 }, (_, index) => `- [Step ${index}](https://example.com/${index})`).join(
+      "\n",
+    );
+    expect(containsSecret(code)).toBe(false);
+    expect(containsSecret(links)).toBe(false);
+    expect(containsSecret('const headers = {"Content-Type": type};')).toBe(false);
+    expect(containsSecret('const body = {"name": "demo"')).toBe(false);
+    expect(
+      containsSecret(
+        `${code}\nconst line = {"text": "a\\nb\\t\\u00e9 \\"quoted\\" https:\\/\\/example.com\\/x", next};`,
+      ),
+    ).toBe(false);
+  });
+
+  it("finds a secret or an email past the scan bound and in a payload that does not parse", () => {
+    const code = Array.from({ length: 20 }, (_, index) => `function f${index}() { return [${index}]; }`).join("\n");
+    expect(containsSecret(`${code}\nconst key = "sk-ant-abcdefgh12345678";`)).toBe(true);
+    expect(containsSecret(`${code}\n{"apiKey":"abcdef123456"}`)).toBe(true);
+    expect(containsSecret(`${code}\nmail owner@example.com`)).toBe(true);
+    expect(containsSecret('const auth = {"password": "hunter2-real", retry};')).toBe(true);
+    expect(containsSecret(`${code}\n{"headers": {"X-Custom": "abc123zz"}}`)).toBe(true);
+    expect(containsSecret(`${code}\n{"name": "API_TOKEN", "value": "abc123zz"}`)).toBe(true);
+    expect(containsSecret(`${code}\n{"pass\\u0077ord": "hunter2x"}`)).toBe(true);
+    expect(containsSecret('x {"pass\\u0077ord": "hunter2x", retry}')).toBe(true);
+    expect(containsSecret('const body = {"name": "demo"\nlater {"headers": {"X-Custom": "abc123zz"}}')).toBe(true);
+    expect(
+      containsSecret('const body = {"name": "demo"\nlater {"auth": {"user": "a", "pwd": "x"}, "apiKey": "abc123zz"}'),
+    ).toBe(true);
+    expect(containsSecret(`${code}\n{"body": "{\\"apiKey\\":\\"abcdef123456\\"}"}`)).toBe(true);
+    expect(containsSecret(`${code}\n{"body": "{\\"headers\\":{\\"X-Custom\\":\\"abc123zz\\"}}"}`)).toBe(true);
+    expect(containsSecret(`${code}\n{"hook":"https:\\/\\/hooks.slack.com\\/services\\/T0\\/B0\\/abcdefgh"}`)).toBe(
+      true,
+    );
+    expect(containsSecret(`${code}\n{"auth": "Bearer\\tabcdef123456", retry}`)).toBe(true);
+    registerSecretValue("saved-skill-secret-value");
+    expect(containsSecret(`${code}\nuse saved-skill-secret-value here`)).toBe(true);
   });
 
   it("bounds the work a line of open braces can cause", () => {

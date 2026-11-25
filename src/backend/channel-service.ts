@@ -86,6 +86,7 @@ export interface ChannelHooks {
   schedule(agentId: string): void;
   awaitDrain?(agentId: string): Effect.Effect<void, ChannelOperationError> | undefined;
   interrupt(agentId: string, turnId: string, threadId: string): Effect.Effect<void, ChannelOperationError>;
+  settleUnconfirmedStart?(deliveryId: string): Effect.Effect<void>;
   busy(agentId: string, channelId: string): boolean;
   channelTurnLimit?(agentId: string): number;
   usageLimited?(agentId: string): boolean;
@@ -160,6 +161,7 @@ interface ChannelHandoffCommand {
   recipientAgentIds: string[];
   sourcePaths: string[];
   senderAgentId: string;
+  senderTaskId?: string;
 }
 
 type ChannelServiceCommand = ChannelCommand | ChannelHandoffCommand;
@@ -177,6 +179,12 @@ function channelHandoffAuthorId(agentId: string): string {
 export function channelHandoffSenderAgentId(request: ChannelMessage): string | null {
   return request.author.kind === "member" && request.author.id.startsWith(CHANNEL_HANDOFF_AUTHOR_PREFIX)
     ? request.author.id.slice(CHANNEL_HANDOFF_AUTHOR_PREFIX.length) || null
+    : null;
+}
+
+export function channelHandoffSenderTaskId(request: ChannelMessage): string | null {
+  return "senderTaskId" in request && isString(request.senderTaskId) && request.senderTaskId
+    ? request.senderTaskId
     : null;
 }
 
@@ -274,6 +282,7 @@ export class ChannelService {
       text: string;
       recipientAgentIds: string[];
       sourcePaths: string[];
+      senderTaskId?: string;
     },
   ) {
     const command: ChannelHandoffCommand = {
@@ -284,6 +293,7 @@ export class ChannelService {
       recipientAgentIds: [...new Set(input.recipientAgentIds)],
       sourcePaths: input.sourcePaths,
       senderAgentId: input.senderAgentId,
+      ...(input.senderTaskId ? { senderTaskId: input.senderTaskId } : {}),
     };
     const actor = this.agentActor(input.senderAgentId);
     return yield* this.#serialize(
@@ -984,7 +994,10 @@ export class ChannelService {
     if (command.type === "cancel") {
       if (selected.state !== "paused" && selected.state !== "failed")
         return yield* channelFailure(new Error(sourceText("error.backend.channelTaskNotStopped")));
-      return yield* this.#cancelTasks(channel, descendants(tasks, selected.rootTaskId), operationId);
+      const cancelled = descendants(tasks, selected.rootTaskId);
+      const result = yield* this.#cancelTasks(channel, cancelled, operationId);
+      yield* this.#settleUnconfirmedStarts(channel.id, cancelled);
+      return result;
     }
     if (command.type === "reassign") {
       if (!command.recipientAgentId)
@@ -1011,9 +1024,34 @@ export class ChannelService {
     const result = yield* channelSync(() => this.store.update(channel, { tasks: updated }, operationId));
     this.publish(channel.id);
     yield* this.interruptTasks(channel.id, affected);
+    if (command.type !== "stop") yield* this.#settleUnconfirmedStarts(channel.id, affected);
     yield* this.wake(channel.id);
     return result;
   }).bind(this);
+
+  #settleUnconfirmedStarts(
+    channelId: string,
+    tasks: readonly ChannelTask[],
+  ): Effect.Effect<void, ChannelOperationError> {
+    const settle = this.hooks.settleUnconfirmedStart;
+    if (!settle) return Effect.void;
+    return channelSync(() => this.store.assignments(channelId)).pipe(
+      Effect.flatMap((assignments) =>
+        Effect.forEach(
+          assignments.flatMap((assignment) =>
+            assignment.deliveryId &&
+            !assignment.turnId &&
+            activeAssignment(assignment) &&
+            tasks.some((task) => task.id === assignment.taskId)
+              ? [assignment.deliveryId]
+              : [],
+          ),
+          (deliveryId) => settle(deliveryId),
+          { discard: true },
+        ),
+      ),
+    );
+  }
 
   readonly #applyHandoff = Effect.fn("ChannelService.applyHandoff")(function* (
     this: ChannelService,
@@ -1057,8 +1095,9 @@ export class ChannelService {
       const others = rest.map((agentId) => this.newTask(current.id, id, text, agentId));
       const message = this.message(current.id, task.id, { kind: "member", ...actor }, text, id);
       if (committed) message.message.attachments = committed.attachments;
+      const request = command.senderTaskId ? { ...message, senderTaskId: command.senderTaskId } : message;
       return yield* channelSync(() =>
-        this.store.update(current, { messages: [message], tasks: [task, ...others] }, operationId),
+        this.store.update(current, { messages: [request], tasks: [task, ...others] }, operationId),
       );
     }).pipe(
       Effect.onExit((exit) =>
@@ -3494,7 +3533,17 @@ export class ChannelService {
       `${this.hooks.agents().find((item) => item.id === args.recipientAgentId)?.name ?? args.recipientAgentId}: ${args.task}`,
     );
     const [firstSourceMessageId] = sourceMessageIds;
-    if (firstSourceMessageId !== undefined) handoff.message.replyToMessageId = firstSourceMessageId;
+    const rootTaskIds = new Set(tasks.filter((item) => item.rootTaskId === root.id).map((item) => item.id));
+    const rootRepliedToSource =
+      firstSourceMessageId !== undefined &&
+      (yield* channelSync(() => this.store.messages(channelId))).some(
+        (message) =>
+          message.message.replyToMessageId === firstSourceMessageId &&
+          message.taskId !== null &&
+          rootTaskIds.has(message.taskId),
+      );
+    if (firstSourceMessageId !== undefined && !rootRepliedToSource)
+      handoff.message.replyToMessageId = firstSourceMessageId;
     yield* channelSync(() => this.store.update(channel, { tasks: changes, messages: [handoff] }, operationId));
     this.publish(channelId);
     yield* this.wake(channelId);

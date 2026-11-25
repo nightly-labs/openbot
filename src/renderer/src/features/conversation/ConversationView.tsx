@@ -16,6 +16,7 @@ import { ConversationThread } from "./ConversationThread";
 import { ConversationTimeline } from "./ConversationTimeline";
 import { ConversationViewScopeContext, createConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
+import { lowerSplitShare, sideSplitShare } from "./side-split-layout";
 import { conversationOwnerId } from "./stores/composer-store";
 
 function isDragLeavingConversation(currentTarget: HTMLElement, relatedTarget: EventTarget | null): boolean {
@@ -32,6 +33,7 @@ export function ConversationView(props: ConversationProps) {
     activeRightPanel,
     sidePanel,
     sidePanelOpen,
+    sideSplits,
     handleChatSearchShortcut,
     sendMessageSelection,
     quoteSelection,
@@ -55,6 +57,13 @@ export function ConversationView(props: ConversationProps) {
     if (mode === "browser") return browserSidebarOpen();
     if (mode === "file-preview") return filePreviewOpen();
     return sidePanelOpen();
+  };
+  const sideSplitsShown = () => sidePanelOpen() && sideSplits().length > 0;
+  const sideSplitStyle = () => {
+    const count = sideSplits().length;
+    const share = sideSplitShare(count);
+    const lower = lowerSplitShare();
+    return `; --side-split-count: ${count}${share === null ? "" : `; --side-split-share: ${share}`}${lower === null ? "" : `; --side-split-lower: ${lower}`}`;
   };
   const folderCalls = agentFolderCalls();
   function folderDropAgent() {
@@ -90,9 +99,10 @@ export function ConversationView(props: ConversationProps) {
             "browser-panel-active": sidePanelUsesBrowserWidth(),
             "side-panel-docked": sidePanelOpen(),
             "side-panel-maximized": sidePanelOpen() && sidePanel().maximized,
+            "side-panel-split": sideSplitsShown(),
           },
         ]}
-        style={`--settings-panel-width: ${sidePanelWidth()}px; --browser-panel-width: ${sidePanelWidth()}px; --side-panel-width: ${sidePanelWidth()}px`}
+        style={`--settings-panel-width: ${sidePanelWidth()}px; --browser-panel-width: ${sidePanelWidth()}px; --side-panel-width: ${sidePanelWidth()}px${sideSplitStyle()}`}
         onDragEnter={(event) => {
           if (!props.globalOverlayOpen && event.dataTransfer?.types.includes("Files")) setDropActive(true);
         }}

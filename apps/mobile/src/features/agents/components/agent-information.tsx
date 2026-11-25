@@ -149,13 +149,26 @@ export function AgentInformation({
     available && (section === "routines" || section === "routine"),
     queryKeys.agentEventRoutines(queryScope, agent.serverId, agent.id),
   );
+  const onceRoutinesEnabled = available && section === "routine" && Boolean(recordId);
+  const onceRoutines = useQuery({
+    ...options,
+    enabled: onceRoutinesEnabled,
+    queryKey: queryKeys.agentOnceRoutines(queryScope, agent.serverId, agent.id),
+    queryFn: () => workspace.loadOnceAgentRoutines(agent.id, agent.serverId),
+  });
   const allRoutines = [...(routines.data ?? []), ...webhookRoutines];
+  const shownRoutines = [...allRoutines, ...(onceRoutinesEnabled ? (onceRoutines.data ?? []) : [])];
+  const onceNeeded =
+    onceRoutinesEnabled &&
+    !allRoutines.some((item) => item.id === recordId) &&
+    !eventRoutines.data?.some((item) => item.id === recordId);
   const routineLoad = {
-    pending: routines.isPending || (eventsEnabled && eventRoutines.isPending),
-    failed: routines.isError || (eventsEnabled && eventRoutines.isError),
+    pending: routines.isPending || (eventsEnabled && eventRoutines.isPending) || (onceNeeded && onceRoutines.isPending),
+    failed: routines.isError || (eventsEnabled && eventRoutines.isError) || (onceNeeded && onceRoutines.isError),
     retry: () => {
       void routines.refetch();
       if (eventsEnabled) void eventRoutines.refetch();
+      if (onceNeeded) void onceRoutines.refetch();
     },
   };
   const manageSkills = useMobileWorkspaceSelector((current) => current.canManageAgentSkills(agent.serverId));
@@ -347,14 +360,14 @@ export function AgentInformation({
           <RoutineEditor agent={agent} available={available} />
         ) : (
           <RecordSection kind="routine" available={available} {...routineLoad}>
-            {allRoutines.some((item) => item.id === recordId) ? (
+            {shownRoutines.some((item) => item.id === recordId) ? (
               <RoutineEditor
                 key={recordId}
                 agent={agent}
                 available={available && !routines.isError && !(eventsEnabled && eventRoutines.isError)}
                 routine={
                   eventRoutines.data?.find((item) => item.id === recordId) ??
-                  allRoutines.find((item) => item.id === recordId)
+                  shownRoutines.find((item) => item.id === recordId)
                 }
               />
             ) : (

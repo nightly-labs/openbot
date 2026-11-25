@@ -23,7 +23,7 @@ export class SpeechParts {
     const length = first
       ? FIRST_PART_LENGTH
       : Math.min(PART_LENGTH, Math.max(FIRST_PART_LENGTH, Math.floor(last.length * this.#growth)));
-    const limit = Math.min(length, budget);
+    const limit = Math.min(length, Math.max(budget, FIRST_PART_LENGTH));
     let part = "";
     for (let sentence = this.#sentences[0]; sentence !== undefined; sentence = this.#sentences[0]) {
       const piece = sentence.length > length ? firstPiece(sentence, length) : sentence;

@@ -48,6 +48,7 @@ export const messages = {
     other: "אפשר להוסיף {count} תיקיות לכל היותר",
   },
   "agentSettings.folders.browse.places": "מעבר אל",
+  "agentSettings.folders.browse.path": "נתיב התיקייה",
   "agentSettings.folders.browse.home": "תיקיית הבית",
   "agentSettings.folders.browse.parent": "למעלה אל {folder}",
   "agentSettings.folders.browse.failed": "לא ניתן לפתוח את התיקייה הזו.",
@@ -100,6 +101,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "מגבלת השימוש הושגה · מדולג",
   "agentSettings.backupModels.unavailable": "אינו זמין כעת · מדולג",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "כשמגבלת שימוש עוצרת את {name} אחרי שהתחיל לעבוד, {name} ממשיך באותה עבודה במודל הזמין הראשון לפי הסדר. הוא חוזר ל-{model} כשהמגבלה מסתיימת, או 10 דקות אחרי שגיאת ספק.",
   "agentSettings.groups.brain": "מוח",

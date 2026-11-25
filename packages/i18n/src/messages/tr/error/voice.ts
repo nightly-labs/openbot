@@ -33,6 +33,8 @@ export const messages = {
   "error.voice.live.timedOut": "Codex canlı ses zamanında başlamadı. Tekrar dene.",
   "error.voice.live.failed": "Canlı ses durdu: {reason}",
   "error.voice.live.disconnected": "Canlı ses bağlantısı kesildi.",
+  "error.voice.live.startFailed":
+    "Canlı ses başlatılamadı. Aracıyı çalıştıran bilgisayarda Codex'i güncelleyin ve ChatGPT ile oturum açın, sonra yeniden deneyin. Neden: {reason}",
   "error.voice.live.hostFailed":
     "Sunucudaki Codex canlı sesi başlatamadı. Sahibinden o bilgisayardaki Codex'i güncellemesini ve ChatGPT ile oturum açmasını isteyin, sonra yeniden deneyin.",
   "error.voice.live.signIn": "Canlı sesi kullanmak için ChatGPT hesabınızla Codex'e giriş yapın.",
@@ -42,4 +44,6 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI canlı sesi başlatmayı reddetti. Daha sonra yeniden deneyin veya sesle konuşmak için Ayarlar'dan canlı sesi kapatın.",
   "error.voice.live.off": "Codex canlı ses kapalı. Ayarlar → Ses bölümünden açın.",
+  "error.voice.server.modelUnsupported":
+    "{host}, {model} ile yazıya dökemiyor. Ayarlar → Ses bölümünde ses sunucusu için başka bir dikte modeli seçin.",
 } as const satisfies PartialTranslation<typeof source>;

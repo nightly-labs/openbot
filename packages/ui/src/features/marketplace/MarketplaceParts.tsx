@@ -19,6 +19,7 @@ import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { CONNECTOR_LISTINGS } from "../connectors/connector-catalog";
+import { XTile } from "../settings/brand-marks";
 import { LogoTile } from "../settings/IntegrationLayout";
 import type { MarketplaceListing } from "./marketplace-listing";
 import type { MarketplaceApp, MarketplaceModel } from "./marketplace-model";
@@ -139,6 +140,9 @@ export function AppMark(props: { app: MarketplaceApp }) {
       </Match>
       <Match when={props.app.kind === "custom"}>
         <Plug aria-hidden="true" />
+      </Match>
+      <Match when={props.app.kind === "x"}>
+        <XTile />
       </Match>
     </Switch>
   );

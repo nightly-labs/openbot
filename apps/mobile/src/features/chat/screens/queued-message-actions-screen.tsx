@@ -88,7 +88,7 @@ export function QueuedMessageActionsScreen() {
         })}
       >
         <SettingsRow>
-          <Typography>{queuedMessagePreview(delivery)}</Typography>
+          <Typography>{queuedMessagePreview(delivery, t)}</Typography>
         </SettingsRow>
       </SettingsSection>
 

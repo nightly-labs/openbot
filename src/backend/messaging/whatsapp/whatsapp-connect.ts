@@ -135,7 +135,7 @@ export class WhatsAppConnect implements WhatsAppPolicy {
 
   rules(workspaceId: string): WhatsAppSenderRules {
     const record = this.#store.connectionForWorkspace("whatsapp", workspaceId);
-    if (!record) return { ownNumber: true, contacts: new Map(), groups: new Set() };
+    if (!record) return { ownNumber: true, contacts: new Map(), groups: new Set(), readOnly: new Set() };
     const senders = this.#store.allowedSenders(record.connectionId);
     return {
       ownNumber: this.#ownNumber(record.connectionId),
@@ -143,6 +143,7 @@ export class WhatsAppConnect implements WhatsAppPolicy {
         senders.filter((sender) => sender.kind === "contact").map((sender) => [sender.id, savedName(sender.name)]),
       ),
       groups: new Set(senders.filter((sender) => sender.kind === "group").map((sender) => sender.id)),
+      readOnly: new Set(senders.filter((sender) => sender.readOnly).map((sender) => sender.id)),
     };
   }
 
@@ -222,6 +223,17 @@ export class WhatsAppConnect implements WhatsAppPolicy {
   ) {
     const connectionId = yield* this.#connectionId(workspaceId);
     this.#store.removeAllowedSender(connectionId, senderId);
+  });
+
+  readonly setSenderReadOnly = Effect.fn("WhatsAppConnect.setSenderReadOnly")(function* (
+    this: WhatsAppConnect,
+    workspaceId: string,
+    senderId: string,
+    readOnly: boolean,
+  ) {
+    const connectionId = yield* this.#connectionId(workspaceId);
+    if (!this.#store.setAllowedSenderReadOnly(connectionId, senderId, readOnly))
+      return yield* failure("error.messaging.whatsappSenderNotFound");
   });
 
   readonly answerRequest = Effect.fn("WhatsAppConnect.answerRequest")(function* (
@@ -404,6 +416,7 @@ type WhatsAppErrorKey =
   | "error.messaging.whatsappNotConnected"
   | "error.messaging.whatsappTooManySenders"
   | "error.messaging.whatsappNumberNotFound"
+  | "error.messaging.whatsappSenderNotFound"
   | "error.messaging.whatsappRequestEnded";
 
 function failureError(key: WhatsAppErrorKey): WhatsAppConnectFailed {

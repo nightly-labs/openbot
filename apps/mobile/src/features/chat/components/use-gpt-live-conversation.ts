@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { type SharedValue, useSharedValue, withTiming } from "react-native-reanimated";
 import type { MediaStream, MediaStreamTrack, RTCPeerConnection } from "react-native-webrtc";
 import { scheduleOnRN } from "react-native-worklets";
+import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { liveVoiceWebRtc } from "@/features/voice/model/live-voice-webrtc";
 import { speechNative } from "@/features/voice/model/speech-native";
@@ -199,9 +200,21 @@ function createController({
     update({ muted: true, error: message, caption: "" });
   }
 
+  function failWithAlert(title: string, caption: string, detail: string, error: unknown): void {
+    fail(caption);
+    if (detail === caption) return;
+    void haptics.notification("error");
+    showFailureAlert(error, "voice", title, detail);
+  }
+
   function failEnded(error: string | null): void {
     const text = currentText();
-    fail(error ? text.sourceText(error) : text.t("mobile.chat.liveVoice.gptEnded"));
+    const caption = text.t("mobile.chat.liveVoice.gptEnded");
+    if (!error) {
+      fail(caption);
+      return;
+    }
+    failWithAlert(text.t("mobile.chat.liveVoice.gptEndedTitle"), caption, text.sourceText(error), error);
   }
 
   function modelEvent(data: unknown): void {
@@ -349,7 +362,8 @@ function createController({
         failure_code: "connection_failed",
       });
       const text = currentText();
-      fail(text.errorMessage(error, text.t("mobile.chat.liveVoice.gptFailed")));
+      const caption = text.t("mobile.chat.liveVoice.gptFailed");
+      failWithAlert(text.t("mobile.chat.liveVoice.gptFailedTitle"), caption, text.errorMessage(error, caption), error);
     }
   }
 

@@ -44,6 +44,7 @@ const TARGETS: Record<Exclude<AppSettingLinkId, "island.show">, AppSettingLinkTa
   "app.keep-awake-on-battery": { tab: "app-behavior", row: "settings.keepAwakeOnBattery.title" },
   "dock.show": { tab: "agent-dock", row: "settings.agentDock.show.title" },
   "dock.agents": { tab: "agent-dock", row: "settings.agentDock.agents.title" },
+  "computer-use.permissions": { tab: "computer-use", row: "computerUse.permissions.title" },
   "updates.track": { tab: "updates", row: "settings.updates.track.title" },
   "updates.auto-install": { tab: "updates", row: "settings.updates.autoInstall.title" },
 };

@@ -76,13 +76,14 @@ import {
   isRecord,
   type RequestId,
 } from "../protocol";
-import type {
-  VaultAgent,
-  VaultAgentChange,
-  VaultAgentResult,
-  VaultEnteredItem,
-  VaultItems,
-  VaultTypedLogin,
+import {
+  type VaultAgent,
+  type VaultAgentChange,
+  type VaultAgentResult,
+  type VaultEnteredItem,
+  type VaultItems,
+  type VaultTypedLogin,
+  vaultClosedText,
 } from "../vault-items";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION, shouldAutoApprove } from "./approval-automation";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -217,6 +218,8 @@ const TAKEOVER_TAB_OF_OTHER_CHAT =
 const USER_ANSWER_LIMIT_MS = 10 * 60_000;
 const TAKEOVER_ALREADY_WAITING = "A takeover of this tab already waits for the user. Wait for it to return.";
 const VAULT_UNAVAILABLE = "No Vault is available on this computer. Ask the user.";
+const ROUTINE_SAVED_LOGIN_NOT_FILLED =
+  "This is a routine run, so nobody can answer a password card. When this text says how to correct the call, correct it and call submit_secret again with the loginId. Else stop the sign-in and say in your report that the user must sign in, and why OpenBot did not fill the saved login. Do not call submit_secret without loginId or request_takeover.";
 const NO_LOGIN_FOR_SITE =
   "No saved login is for the site of this page. A login fits only the site of a website saved in it, with its subdomains, and a sign-in page can be on a different site than the service. When the user says that a login for this account is saved, tell them what to check. In a password manager: add the address of this sign-in page as a website of the login, and keep the login where they share logins with OpenBot; the page of each password manager in Marketplace shows where. In the OpenBot Vault, a login has one website: save a second login for the address of this sign-in page in Server settings > Vault, and let this agent use the login under Agents. Until then, continue as for a site with no saved login.";
 const VAULT_LOGIN_ADD_FIELDS =
@@ -444,6 +447,7 @@ export interface HostedSiteApprovals {
 export interface RoutineAttention {
   markNeedsAttention(turnId: string | null): void;
   markRunningForTurn(turnId: string | null): void;
+  runsTurn(turnId: string): boolean;
 }
 
 export interface AttentionBrowserHost {
@@ -998,6 +1002,16 @@ export class AttentionRegistry {
         this.#resolveBrowserTakeover(input.requestId, pending, "complete", vault);
         return;
       }
+      if (pending.vaultLoginId !== undefined && this.#routines.runsTurn(pending.request.turnId)) {
+        const reason = pending.secureInputFailed ? ` ${pending.secureInputFailed}` : "";
+        pending.resolve(
+          browserTakeoverError(
+            `OpenBot could not finish filling saved login ${pending.vaultLoginId}.${reason} ${ROUTINE_SAVED_LOGIN_NOT_FILLED}`,
+          ),
+        );
+        this.#resolveBrowserTakeover(input.requestId, pending, "cancel");
+        return;
+      }
     }
     secret.cancel();
     delete pending.secret;
@@ -1304,6 +1318,13 @@ export class AttentionRegistry {
           if (this.#messagingRequestTurn(agentId, turnId)) {
             pending.resolve(browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED));
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (getString(args, "loginId") && this.#routines.runsTurn(turnId)) {
+            pending.resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped ?? "OpenBot did not fill a saved login: no password manager is connected."} ${ROUTINE_SAVED_LOGIN_NOT_FILLED}`,
+              ),
+            );
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
           } else if (pending.secret?.withCode) {
             pending.resolve(
               browserTakeoverError(
@@ -1415,7 +1436,7 @@ export class AttentionRegistry {
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault list request.") });
     const agentId = params.ownerAgentId;
     if (this.#vaultItems && !this.#vaultItems.ready())
-      return browserTakeoverError("The Vault could not be read. Ask the user, or use request_takeover.");
+      return browserTakeoverError(`${vaultClosedText(this.#vaultItems.status())} Or use request_takeover.`);
     const listed = yield* Effect.result(
       attentionStep(() => (agentId ? (this.#vaultItems?.listForAgent(agentId) ?? null) : null)),
     );
@@ -1596,6 +1617,7 @@ export class AttentionRegistry {
     const vault = this.#vaultItems;
     const agentId = params.ownerAgentId;
     if (!vault || !agentId) return browserTakeoverError(VAULT_UNAVAILABLE);
+    if (!vault.ready()) return browserTakeoverError(vaultClosedText(vault.status()));
     const change = vaultChange(call.args);
     if (typeof change === "string") return browserTakeoverError(change);
     const agent = this.#vaultAgent(agentId);
@@ -1633,7 +1655,7 @@ export class AttentionRegistry {
     const call = yield* attentionStep(() => parseBrowserToolCall("request_vault_item", params.arguments));
     if (call.tool !== "request_vault_item")
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault request.") });
-    if (!this.#vaultItems?.ready()) return browserTakeoverError(VAULT_UNAVAILABLE);
+    if (!this.#vaultItems?.ready()) return browserTakeoverError(vaultClosedText(this.#vaultItems?.status()));
     if (this.#messagingThread(params.threadId))
       return browserTakeoverError(
         "request_vault_item does not work in a Slack, Discord or Telegram chat. Ask the user to add the item in Server settings > Vault.",
@@ -1654,6 +1676,7 @@ export class AttentionRegistry {
     const vault = this.#vaultItems;
     const agentId = params.ownerAgentId;
     if (!vault || !agentId) return browserTakeoverError(VAULT_UNAVAILABLE);
+    if (!vault.ready()) return browserTakeoverError(vaultClosedText(vault.status()));
     const deleted = yield* Effect.result(vault.delete(call.args.id, agentId));
     if (Result.isFailure(deleted)) return vaultFailure("delete", deleted.failure);
     if (deleted.success === null) return browserTakeoverError("No Vault item has this id. Call list_vault_items.");
@@ -1786,7 +1809,7 @@ export class AttentionRegistry {
     }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
-    this.#expireDetachedInChat(agentId, publicThreadId);
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
     const pending: PendingPrompt = {
       client,
       id: request.id,
@@ -1860,7 +1883,7 @@ export class AttentionRegistry {
     }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions, uiBlock);
-    this.#expireDetachedInChat(agentId, publicThreadId);
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
     let autoAnswerTimer: PendingPrompt["autoAnswer"];
     if (auto && autoAnswer) {
       const timer = setTimeout(() => this.#answerAutomatically(request.id), autoAnswer.afterMs);
@@ -1929,7 +1952,7 @@ export class AttentionRegistry {
       return;
     }
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
-    this.#expireDetachedInChat(agentId, publicThreadId);
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
     const pending: PendingPrompt = {
       client,
       id: request.id,
@@ -2001,7 +2024,7 @@ export class AttentionRegistry {
     }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
-    this.#expireDetachedInChat(agentId, publicThreadId);
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
     this.#prompts.set(request.id, {
       client,
       id: request.id,
@@ -2093,11 +2116,13 @@ export class AttentionRegistry {
     return true;
   }
 
-  #expireDetachedInChat(agentId: string, publicThreadId: string): void {
+  #expireDetachedInChat(agentId: string, publicThreadId: string, turnId: string): void {
+    const routineQuestion = this.#routines.runsTurn(turnId);
     let changed = false;
     for (const [requestId, pending] of this.#prompts) {
       if (!pending.detached || pending.saving) continue;
       if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId) continue;
+      if (routineQuestion && !this.#routines.runsTurn(pending.turnId)) continue;
       this.#expirePrompt(requestId, pending);
       changed = true;
     }
@@ -2153,7 +2178,8 @@ export class AttentionRegistry {
         !takeover.detached &&
         !takeover.released
       ) {
-        this.#resolveBrowserTakeover(key, takeover, "cancel");
+        if (providerStoppedWaiting) this.#releaseBrowserTakeover(key, takeover);
+        else this.#resolveBrowserTakeover(key, takeover, "cancel");
       }
     }
     if (changed) this.#emitRuntimeSnapshot();

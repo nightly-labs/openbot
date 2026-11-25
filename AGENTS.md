@@ -164,8 +164,7 @@ commit message, the PR description or `docs/`.
 Only these remain, because a tool reads them: license headers, shebangs, `/// <reference>`,
 `@vitest-environment`, `@ts-expect-error`, `biome-ignore`, `#__PURE__`, `# shellcheck`,
 `# syntax=`, JSDoc types in plain `.js` files, file headers that a generator writes, the
-`// scope:` line of each GritQL rule, the `// flag` markers of lint fixtures, the help text of
-`scripts/install-server.sh`, and the `# openbot-boat-pre-stop:` marker. Comments that are data
+`// scope:` line of each GritQL rule, the `// flag` markers of lint fixtures, and the `# openbot-boat-pre-stop:` marker. Comments that are data
 in a string stay too, such as a sample file or a task for a model.
 
 These files keep their comments: vendored code, fixtures, released schemas, released migrations
@@ -275,6 +274,13 @@ Never take a VPS that has a reference, also `pool`. The reference scheme is in
 [Leaseweb references](docs/hosted-servers.md#leaseweb-references). To set up a VPS as the server of one
 customer, use the [custom-server](.agents/skills/custom-server/SKILL.md) skill. The customer is the
 owner, through a server claim; never sign the server in to an operator account.
+
+The VPS with the reference `internal-store-review` is the server of the app store reviewers (Chrome
+Web Store, Google Play and App Store). The review account owns it. That account signs in with the
+email `STORE_REVIEW_EMAIL` and the fixed code `STORE_REVIEW_CODE`: Worker secrets, also encrypted in
+`apps/auth-api/.env.production`. Do not take, reinstall, erase or move this VPS, and do not sign it
+in to another account. When you change the review email or code, also change the test instructions
+in each store. Tests use the `pool-test-<NN>` machines.
 
 ### Local processes
 

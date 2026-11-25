@@ -12,9 +12,9 @@ import {
 } from "@openbot/contracts/ipc";
 import type { VoicePhase, VoiceTalkMode } from "@openbot/ui/features/conversation/VoicePill";
 import { currentText } from "@openbot/ui/text";
+import { encodePcm16, recordingToSamples, recordingToWav } from "@openbot/ui/voice-recording";
 import { createEffect, createStore, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
-import { encodePcm16, recordingToSamples, recordingToWav } from "../../../voice-recording";
 import { holdSpeech, releaseSpeech, SPEECH_LEVEL_COUNT, speechReading } from "../../speech/speech-playback";
 import { speechPort } from "../../speech/speech-port";
 import {
@@ -88,6 +88,8 @@ export interface VoiceConversationDeps {
   ) => Promise<boolean>;
   serverOnline: () => boolean;
   progressUpdate: (message: ConversationMessage) => boolean;
+  keepsRecording: boolean;
+  inChannel: boolean;
 }
 
 interface Recording {
@@ -676,7 +678,11 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         discardRecording(recordingId);
         return;
       }
-      noteDictatedMessage(target, text, { always: true, progressUpdate: deps.progressUpdate });
+      noteDictatedMessage(target, text, {
+        always: true,
+        progressUpdate: deps.progressUpdate,
+        channel: deps.inChannel,
+      });
       delivered = await deps.submit({ ...EMPTY_DRAFT, text }, target, EMPTY_DRAFT, {
         recordingDraftId: recordingId,
         onFailed: notSent,
@@ -701,7 +707,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   }
 
   async function keepRecording(recording: Blob): Promise<string | undefined> {
-    if (deps.serverId !== LOCAL_SERVER_ID || !recording.type.startsWith("audio/webm")) return undefined;
+    if (!deps.keepsRecording || deps.serverId !== LOCAL_SERVER_ID || !recording.type.startsWith("audio/webm"))
+      return undefined;
     if (recording.size > VOICE_AUDIO_LIMITS.maximumRecordingBytes) return undefined;
     try {
       return (await speechPort().voice.keepRecording({ audio: new Uint8Array(await recording.arrayBuffer()) })).id;

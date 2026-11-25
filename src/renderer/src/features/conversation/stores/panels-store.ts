@@ -62,10 +62,20 @@ export interface SidePanelState {
   maximized: boolean;
 }
 
+export interface SideSplitState {
+  panes: readonly SidePanelPane[];
+  selected: SidePanelPane | null;
+}
+
+export type SidePanelTarget = { group: number } | { newGroupAt: number };
+
+export const MAX_SIDE_SPLITS = 2;
+
 type FileTabPlace = "tab" | "here" | "open";
 
 export interface SidePanelsState {
   side: Record<string, SidePanelState>;
+  splits: Record<string, readonly SideSplitState[]>;
   subagents: Record<string, string>;
   threads: Record<string, string>;
 }
@@ -83,6 +93,7 @@ export function isSidePanelMode(mode: RightPanelMode | undefined): boolean {
 }
 
 const SIDE_PANEL_EMPTY: SidePanelState = { panes: [], selected: null, files: [], file: null, maximized: false };
+const NO_SPLITS: readonly SideSplitState[] = [];
 
 export interface PanelsStoreDeps {
   props: ConversationProps;
@@ -203,8 +214,99 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       return { ...state, files };
     });
   }
-  const settingsOpen = () => activeRightPanel() === "settings";
-  const filesOpen = () => activeRightPanel() === "files";
+  const sideSplits = (): readonly SideSplitState[] => {
+    const agentId = conversationOwnerId(deps.props);
+    return (agentId && !channel?.readOnly() && panels.splits[agentId]) || NO_SPLITS;
+  };
+  const paneSplit = (pane: SidePanelPane) => sideSplits().some((group) => group.panes.includes(pane));
+  const paneShown = (pane: SidePanelPane) =>
+    activeRightPanel() === pane || (sidePanelOpen() && sideSplits().some((group) => group.selected === pane));
+  function splitIndex(agentId: string, pane: SidePanelPane): number {
+    return (panels.splits[agentId] ?? NO_SPLITS).findIndex((group) => group.panes.includes(pane));
+  }
+  function splitShows(agentId: string, pane: SidePanelPane): boolean {
+    return (panels.splits[agentId] ?? NO_SPLITS).some((group) => group.selected === pane);
+  }
+  function updateSplits(agentId: string, update: (groups: SideSplitState[]) => SideSplitState[]) {
+    setPanels((draft) => {
+      const groups = (draft.splits[agentId] ?? NO_SPLITS).map((group) => ({
+        panes: [...group.panes],
+        selected: group.selected,
+      }));
+      draft.splits[agentId] = update(groups).filter((group) => group.panes.length > 0);
+    });
+  }
+  function withoutPane(group: SideSplitState, pane: SidePanelPane): SideSplitState {
+    const index = group.panes.indexOf(pane);
+    if (index < 0) return group;
+    const panes = group.panes.filter((item) => item !== pane);
+    const selected = group.selected === pane ? (panes[Math.min(index, panes.length - 1)] ?? null) : group.selected;
+    return { panes, selected };
+  }
+  const splitReturn: Record<string, RightPanelMode> = {};
+  function mainGroupMode(agentId: string): RightPanelMode {
+    const state = panels.side[agentId] ?? SIDE_PANEL_EMPTY;
+    return state.selected && state.panes.includes(state.selected) ? state.selected : "side-panel";
+  }
+  function returnFromBrowserScreen(agentId: string, pane: SidePanelPane) {
+    const current = deps.rightPanels()[agentId] ?? "none";
+    if (pane !== "browser" || !isBrowserScreenMode(current)) return;
+    const back = splitReturn[agentId] ?? "none";
+    delete splitReturn[agentId];
+    showInMainGroup(isSidePanelMode(back) ? back : mainGroupMode(agentId), agentId);
+  }
+  function selectSplitPane(agentId: string, pane: SidePanelPane) {
+    const index = splitIndex(agentId, pane);
+    if (index < 0) return;
+    if (panels.splits[agentId]?.[index]?.selected === "settings" && pane !== "settings") clearSettingsRequests(agentId);
+    updateSplits(agentId, (groups) =>
+      groups.map((group, position) => (position === index ? { ...group, selected: pane } : group)),
+    );
+    const current = deps.rightPanels()[agentId] ?? "none";
+    if (pane === "browser" && isBrowserScreenMode(current)) returnFromBrowserScreen(agentId, pane);
+    else if (!isSidePanelMode(current)) showInMainGroup(mainGroupMode(agentId), agentId, pane === "settings");
+  }
+  function removeSplitPane(pane: SidePanelPane, agentId = conversationOwnerId(deps.props)): void {
+    if (!agentId) return;
+    if (pane === "settings") clearSettingsRequests(agentId);
+    updateSplits(agentId, (groups) => groups.map((group) => withoutPane(group, pane)));
+    returnFromBrowserScreen(agentId, pane);
+  }
+  function takeFromMainGroup(agentId: string, pane: SidePanelPane): () => void {
+    const shownInMain = deps.rightPanels()[agentId] === pane;
+    const next = removeSidePanelPane(pane);
+    return () => {
+      if (shownInMain) showInMainGroup(next ?? "side-panel", agentId, pane === "settings");
+    };
+  }
+  function moveSidePanelPane(pane: SidePanelPane, target: SidePanelTarget) {
+    const agentId = conversationOwnerId(deps.props);
+    if (!agentId) return;
+    const groups = panels.splits[agentId] ?? NO_SPLITS;
+    const from = splitIndex(agentId, pane);
+    if ("group" in target) {
+      if (target.group === from || target.group >= groups.length) return;
+      if (target.group < 0) {
+        removeSplitPane(pane, agentId);
+        deps.invalidateFilePreviewGeneration();
+        showInMainGroup(pane, agentId);
+        return;
+      }
+    } else if (groups.length >= MAX_SIDE_SPLITS) return;
+    const reshowMain = from < 0 ? takeFromMainGroup(agentId, pane) : undefined;
+    updateSplits(agentId, (current) => {
+      const next = current.map((group) => withoutPane(group, pane));
+      if ("newGroupAt" in target) next.splice(target.newGroupAt, 0, { panes: [pane], selected: pane });
+      else {
+        const group = next[target.group];
+        if (group) next[target.group] = { panes: [...group.panes, pane], selected: pane };
+      }
+      return next;
+    });
+    reshowMain?.();
+  }
+  const settingsOpen = () => paneShown("settings");
+  const filesOpen = () => paneShown("files");
   const panelSubagentId = (): string | null => {
     const agentId = conversationOwnerId(deps.props);
     return agentId ? (panels.subagents[agentId] ?? null) : null;
@@ -229,12 +331,20 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     if (!agentId) return;
     if (mode === "browser-pip") deps.setBrowserWindowOpen(false);
     if (mode !== "file-preview") deps.invalidateFilePreviewGeneration();
-    if (mode !== "settings") {
-      setSkillSettingsRequest(null);
-      setInstructionsSettingsRequest(null);
-      setAgentSettingRowRequest(null);
-      setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
+    if (isSidePanelPane(mode) && splitIndex(agentId, mode) >= 0) {
+      selectSplitPane(agentId, mode);
+      return;
     }
+    showInMainGroup(mode, agentId);
+  }
+
+  function showInMainGroup(mode: RightPanelMode, agentId: string, keepSettingsRequests = false) {
+    if (isBrowserScreenMode(mode) && splitIndex(agentId, "browser") >= 0) {
+      const current = deps.rightPanels()[agentId] ?? "none";
+      if (!isBrowserScreenMode(current)) splitReturn[agentId] = current;
+    }
+    if (mode !== "settings" && !keepSettingsRequests && !splitShows(agentId, "settings"))
+      clearSettingsRequests(agentId);
     deps.setRightPanels((current) => (current[agentId] === mode ? current : { ...current, [agentId]: mode }));
     if (isSidePanelPane(mode))
       updateSidePanel(agentId, (state) => ({
@@ -248,6 +358,13 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     else if (mode === "none" && panels.side[agentId]?.maximized) {
       updateSidePanel(agentId, (state) => ({ ...state, maximized: false }));
     }
+  }
+
+  function clearSettingsRequests(agentId: string) {
+    setSkillSettingsRequest(null);
+    setInstructionsSettingsRequest(null);
+    setAgentSettingRowRequest(null);
+    setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
   }
 
   function openSubagentPanel(subagentId: string): void {
@@ -761,6 +878,11 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     activeRightPanel,
     settingsOpen,
     filesOpen,
+    sideSplits,
+    paneSplit,
+    paneShown,
+    removeSplitPane,
+    moveSidePanelPane,
     panelSubagentId,
     openSubagentPanel,
     panelThreadId,

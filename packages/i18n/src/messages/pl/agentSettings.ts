@@ -61,6 +61,7 @@ export const messages = {
     other: "Możesz dodać maksymalnie {count} folderu",
   },
   "agentSettings.folders.browse.places": "Przejdź do",
+  "agentSettings.folders.browse.path": "Ścieżka folderu",
   "agentSettings.folders.browse.home": "Folder domowy",
   "agentSettings.folders.browse.parent": "W górę: {folder}",
   "agentSettings.folders.browse.failed": "Nie można otworzyć tego folderu.",
@@ -116,6 +117,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Osiągnięto limit użycia · pominięto",
   "agentSettings.backupModels.unavailable": "Chwilowo niedostępny · pominięto",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Gdy limit użycia zatrzyma agenta {name} po rozpoczęciu pracy, {name} kontynuuje tę samą pracę na pierwszym dostępnym modelu z kolejności. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
   "agentSettings.groups.brain": "Mózg",

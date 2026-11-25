@@ -91,7 +91,7 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
       errorText={errorText()}
       nextRunLabel={nextRunLabel(routine(), text)}
       timeZoneLabel={routineTimeZoneLabel(routine(), text)}
-      pausedLabel={routinePausedByRunLabel(routine(), text)}
+      pausedLabel={pausedLabel(routine(), text)}
       onChange={(next) => {
         pending = next;
         setDraft(next);
@@ -118,6 +118,14 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
 
 function sameSchedule(left: RoutineSchedule, right: RoutineSchedule): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function pausedLabel(routine: RoutineFields, text: Pick<TextValue, "t" | "format">): string | undefined {
+  if (routine.active) return undefined;
+  const pausedByRun = routinePausedByRunLabel(routine, text);
+  if (pausedByRun) return pausedByRun;
+  if (routineOnceCompleted({ ...routine, schedule: routine.trigger.schedule })) return undefined;
+  return text.t("routine.settings.paused");
 }
 
 function nextRunLabel(routine: RoutineFields, text: Pick<TextValue, "t" | "format">): string | undefined {

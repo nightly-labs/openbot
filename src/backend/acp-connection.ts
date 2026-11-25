@@ -36,9 +36,11 @@ export interface AcpConnectionOptions {
   env: Record<string, string>;
   extraEnv?: (() => Record<string, string>) | undefined;
   confine?: ((target: SpawnTarget) => SpawnTarget) | undefined;
+  causeLine?: ((message: string) => boolean) | undefined;
   privateTemp?: Omit<ProviderTempOptions, "provider"> | undefined;
   label(): string;
   redact(text: string): string;
+  peek?: ((message: unknown) => void) | undefined;
   diagnostic(message: string, origin: DiagnosticOrigin): void;
   exit(error: Error): void;
   client(): Client;
@@ -115,20 +117,36 @@ export class AcpConnection {
         return error;
       }),
     );
-    const stream = ndJsonStream(
+    const lines = ndJsonStream(
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: Node and DOM declare the same Web Stream ABI with incompatible generic variance.
       Writable.toWeb(child.stdin) as unknown as WritableStream<Uint8Array>,
       // biome-ignore lint/nursery/noUnsafeTypeAssertion: Node and DOM declare the same Web Stream ABI with incompatible generic variance.
       Readable.toWeb(stdout) as unknown as ReadableStream<Uint8Array>,
     );
+    const peek = this.options.peek;
+    const stream = peek
+      ? {
+          writable: lines.writable,
+          readable: lines.readable.pipeThrough(
+            new TransformStream({
+              transform(message, controller) {
+                peek(message);
+                controller.enqueue(message);
+              },
+            }),
+          ),
+        }
+      : lines;
     this.#connection = new ClientSideConnection(() => this.options.client(), stream);
     let lastDiagnostic: string | null = null;
     let crashDiagnostic: string | null = null;
+    let causeDiagnostic: string | null = null;
     const diagnostics = createDiagnosticStream({
       redact: (text) => this.options.redact(text),
       emit: (message) => {
         lastDiagnostic = message;
         if (crashDiagnostic === null && CRASH_LINE.test(message)) crashDiagnostic = message;
+        if (causeDiagnostic === null && this.options.causeLine?.(message)) causeDiagnostic = message;
         this.options.diagnostic(message, { duringStop: this.#stoppedProcesses.has(child), stderr: true });
       },
     });
@@ -142,7 +160,7 @@ export class AcpConnection {
         ended,
         Effect.succeed({
           ending: signal ? `signal ${signal}` : `exit code ${code ?? "unknown"}`,
-          detail: crashDiagnostic ?? lastDiagnostic,
+          detail: crashDiagnostic ?? causeDiagnostic ?? lastDiagnostic,
         }),
       );
     });

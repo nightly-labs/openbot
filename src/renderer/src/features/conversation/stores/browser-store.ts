@@ -77,6 +77,7 @@ function canonicalBrowserUrl(url: string): string {
 
 interface BrowserPanels {
   activeRightPanel: () => RightPanelMode;
+  paneShown: (pane: "browser") => boolean;
   setActiveRightPanel: (mode: RightPanelMode, agentId?: string) => void;
   reattachBrowserWindow: () => void;
   closeBrowserPane: () => void;
@@ -106,7 +107,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   const browserInteractionAvailable = createMemo(
     () => deps.props.browserEnabled !== false && !deps.props.browserVisibilitySuspended,
   );
-  const browserSidebarOpen = () => browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser";
+  const browserSidebarOpen = () => browserInteractionAvailable() && deps.panels.paneShown("browser");
   const browserExpandedOpen = () =>
     browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser-expanded";
   const browserPipOpen = () => browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser-pip";
@@ -279,7 +280,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       previousBrowserTabs = { owner, count };
       if (!enabled || previous.owner !== owner || previous.count === 0 || count > 0) return;
       const mode = untrack(deps.panels.activeRightPanel);
-      if (mode === "browser" || mode === "browser-expanded" || mode === "browser-pip")
+      if (untrack(() => deps.panels.paneShown("browser")) || mode === "browser-expanded" || mode === "browser-pip")
         untrack(deps.panels.closeBrowserPane);
     },
   );

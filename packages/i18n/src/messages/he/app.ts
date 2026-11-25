@@ -51,7 +51,7 @@ export const messages = {
   "app.rail.website": "אתר OpenBot",
   "app.rail.agents": "סוכנים",
   "app.rail.schedule": "לוח זמנים",
-  "app.rail.tasks": "משימות",
+  "app.rail.tasks": "שרשורים",
   "app.rail.workflows": "תהליכי עבודה",
   "app.rail.usage": "שימוש",
   "app.rail.library": "ספרייה",

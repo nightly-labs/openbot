@@ -76,6 +76,7 @@ export function WhatsAppConnectorPage({
     setWhatsAppOwnNumber,
     setWhatsAppWorkingMessage,
     setWhatsAppStatusReactions,
+    setWhatsAppSenderReadOnly,
     addWhatsAppOrchestrator,
     removeWhatsAppSender,
     answerWhatsAppRequest,
@@ -121,12 +122,27 @@ export function WhatsAppConnectorPage({
       },
     ]);
   };
-  const removeSender = (workspaceId: string, sender: WhatsAppSender, name: string) =>
-    Alert.alert(name, undefined, [
-      { text: t("common.cancel"), style: "cancel" },
+  const senderOptions = (workspaceId: string, sender: WhatsAppSender, name: string) =>
+    Alert.alert(name, sender.readOnly ? t("mobile.server.connectors.whatsapp.readOnlyDetail") : undefined, [
+      { text: t("common.cancel"), style: "cancel" as const },
+      ...(sender.readOnly === undefined
+        ? []
+        : [
+            {
+              text: t(
+                sender.readOnly
+                  ? "mobile.server.connectors.whatsapp.allowWork"
+                  : "mobile.server.connectors.whatsapp.makeReadOnly",
+              ),
+              onPress: () =>
+                run(() =>
+                  setWhatsAppSenderReadOnly({ workspaceId, senderId: sender.id, readOnly: !sender.readOnly }, serverId),
+                ),
+            },
+          ]),
       {
         text: t("mobile.server.connectors.whatsapp.removeSender"),
-        style: "destructive",
+        style: "destructive" as const,
         onPress: () => run(() => removeWhatsAppSender({ workspaceId, senderId: sender.id }, serverId)),
       },
     ]);
@@ -354,24 +370,32 @@ export function WhatsAppConnectorPage({
               {senders.map((sender) => {
                 const name = sender.name || whatsappPhoneNumber(sender.id);
                 const Icon = sender.kind === "group" ? UsersRound : UserRound;
+                const kind =
+                  sender.kind === "group"
+                    ? t("mobile.server.connectors.whatsapp.senderGroup")
+                    : whatsappPhoneNumber(sender.id);
                 return (
                   <SettingsRow
                     key={sender.id}
-                    disclosure={false}
+                    disclosure={sender.readOnly !== undefined}
                     disabled={action.busy}
-                    accessibilityLabel={rowLabel(t("mobile.server.connectors.whatsapp.removeSender"), name)}
+                    accessibilityLabel={
+                      sender.readOnly === undefined
+                        ? rowLabel(t("mobile.server.connectors.whatsapp.removeSender"), name)
+                        : name
+                    }
                     leading={<Icon size={ICON_SIZE} color={muted} strokeWidth={1.75} />}
                     supportingText={
-                      sender.kind === "group"
-                        ? t("mobile.server.connectors.whatsapp.senderGroup")
-                        : whatsappPhoneNumber(sender.id)
+                      sender.readOnly ? t("mobile.server.connectors.whatsapp.senderReadOnlyRow", { kind }) : kind
                     }
                     trailing={
-                      <Typography.Paragraph type="body-xs" className="text-danger-text">
-                        {t("mobile.server.connectors.whatsapp.removeSender")}
-                      </Typography.Paragraph>
+                      sender.readOnly === undefined ? (
+                        <Typography.Paragraph type="body-xs" className="text-danger-text">
+                          {t("mobile.server.connectors.whatsapp.removeSender")}
+                        </Typography.Paragraph>
+                      ) : undefined
                     }
-                    onPress={() => removeSender(workspaceId, sender, name)}
+                    onPress={() => senderOptions(workspaceId, sender, name)}
                   >
                     <Typography.Paragraph>{name}</Typography.Paragraph>
                   </SettingsRow>

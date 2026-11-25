@@ -39,6 +39,11 @@ import {
 import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/current-agent-keys";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import {
+  addPromptQuestionDetails,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
+  withPromptQuestionDetails,
+} from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { PROVIDER_MANY_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
 import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
@@ -150,7 +155,7 @@ export interface TeamWebRtcHostPeerOptions {
   transferDirectory: string;
   closeSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
   pathChanged?: (sessionId: string, lost: boolean) => void;
-  unknownMemberConnected?: (membershipId: string) => void;
+  memberConnected?: (membershipId: string, role: IncomingConnection["role"]) => void;
   peerMemberChanged?: (peerId: string, membershipId: string | null) => void;
   verifyClientTicket?:
     | ((ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>)
@@ -186,7 +191,7 @@ export class TeamWebRtcHostPeer {
   readonly #files: TeamWebRtcFileTransfer;
   readonly #closeSession: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
   readonly #pathChanged: (sessionId: string, lost: boolean) => void;
-  readonly #unknownMemberConnected: (membershipId: string) => void;
+  readonly #memberConnected: (membershipId: string, role: IncomingConnection["role"]) => void;
   readonly #peerMemberChanged: (peerId: string, membershipId: string | null) => void;
   #sessionMembershipId: string | null = null;
   readonly #verifyClientTicket:
@@ -250,7 +255,7 @@ export class TeamWebRtcHostPeer {
     );
     this.#closeSession = options.closeSession ?? (() => Effect.void);
     this.#pathChanged = options.pathChanged ?? (() => undefined);
-    this.#unknownMemberConnected = options.unknownMemberConnected ?? (() => undefined);
+    this.#memberConnected = options.memberConnected ?? (() => undefined);
     this.#peerMemberChanged = options.peerMemberChanged ?? (() => undefined);
     this.#verifyClientTicket = options.verifyClientTicket ?? null;
     this.#bridge.on("connected", this.#onConnected);
@@ -369,7 +374,7 @@ export class TeamWebRtcHostPeer {
     this.#localSessionId = connection.sessionId;
     this.#sessionMembershipId = connection.membershipId;
     this.#scheduleSessionExpiration(expiresAt);
-    if (!this.#store.getMember(connection.membershipId)) this.#unknownMemberConnected(connection.membershipId);
+    this.#memberConnected(connection.membershipId, connection.role);
   });
 
   #scheduleSessionExpiration(expiresAt: number): void {
@@ -947,6 +952,7 @@ export class TeamWebRtcHostPeer {
         if (this.#peerCapabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY))
           frame = withUiBlockLocationRequests(frame, event);
         if (this.#peerCapabilities.has(SKILL_LEARNING_CAPABILITY)) frame = withSkillSuggestionNames(frame, event);
+        if (this.#peerCapabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)) frame = withPromptQuestionDetails(frame, event);
       } catch {
         return;
       }
@@ -1313,5 +1319,6 @@ function withBlockExtensions(
   if (capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)) addUiBlockVaultRequests(encoded, source);
   if (capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)) addUiBlockLocationRequests(encoded, source);
   if (capabilities.has(SKILL_LEARNING_CAPABILITY)) addSkillSuggestionNames(encoded, source);
+  if (capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)) addPromptQuestionDetails(encoded, source);
   return encoded;
 }
