@@ -208,10 +208,11 @@ function apply(id: string, status: HostUpdateStatus, stored: Flow | undefined = 
   if (!stored || stored.result) return;
   const runtime = runtimes.get(id);
   if (runtime) note({ serverId: id, name: stored.name, canManage: stored.canManage, calls: runtime.calls }, status);
+  const backFromRestart = stored.restarting && restartEnded(status);
   const flow: Flow = {
     ...stored,
     status,
-    version: stored.wentDown ? stored.version : (status.availableVersion ?? stored.version),
+    version: stored.wentDown || backFromRestart ? stored.version : (status.availableVersion ?? stored.version),
   };
   if (flow.wentDown && status.restart && status.phase !== "installing") {
     flow.wentDown = false;
@@ -224,7 +225,7 @@ function apply(id: string, status: HostUpdateStatus, stored: Flow | undefined = 
       if (current) current.wentDown = false;
     });
   }
-  if (flow.wentDown) {
+  if (flow.wentDown || backFromRestart) {
     setFlows((draft) => {
       const current = draft[id];
       if (current) current.status = status;
@@ -255,6 +256,10 @@ function apply(id: string, status: HostUpdateStatus, stored: Flow | undefined = 
   if (running(flow)) startClock(id);
   else stopClock(id);
   schedulePoll(id, flow);
+}
+
+function restartEnded(status: HostUpdateStatus): boolean {
+  return status.restart === null && status.phase !== "installing" && status.errorCode !== "install_failed";
 }
 
 function schedulePoll(id: string, flow: Flow | undefined = flows[id], delay?: number): void {
@@ -348,6 +353,7 @@ function finish(id: string, result: "online" | "failed", failure: ServerUpdateFa
     current.result = result;
     current.failure = failure;
     current.busy = null;
+    if (result === "online") current.error = null;
   });
   if (openId() === id) return;
   const name = flow.name;
@@ -483,7 +489,8 @@ async function act(id: string, busy: ServerUpdateBusy, call: (runtime: Runtime) 
       const current = draft[id];
       if (!current) return;
       current.busy = null;
-      current.error = errorMessage(error, t("server.settings.actionFailed"));
+      if (!current.restarting && !current.wentDown)
+        current.error = errorMessage(error, t("server.settings.actionFailed"));
     });
   }
 }
@@ -512,12 +519,14 @@ function follow(hosts: readonly HostRestartView[]): void {
       end(id);
       continue;
     }
-    const active = flow.startedAt !== null || flow.status.restart !== null;
-    if (host.restart === "restarting" && !flow.restarting) {
+    const restarting = flow.restarting || host.restart === "restarting";
+    const active = flow.startedAt !== null || flow.status.restart !== null || restarting;
+    if (restarting && !flow.restarting) {
       setFlows((draft) => {
         const current = draft[id];
         if (current) current.restarting = true;
       });
+      startClock(id);
       startRestartLimit(id);
     }
     if (!host.online && active && !flow.wentDown) {
