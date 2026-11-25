@@ -416,7 +416,13 @@ export class OutboxStore {
     const blocked = new Set<string>();
     for (const message of this.messages) {
       const key = outboxTargetKey(message.target);
-      if (blocked.has(key) || message.state === "sent" || this.editing.has(message.clientMessageId)) continue;
+      if (
+        blocked.has(key) ||
+        message.state === "sent" ||
+        message.state === "failed" ||
+        this.editing.has(message.clientMessageId)
+      )
+        continue;
       blocked.add(key);
       const current = this.find(message.clientMessageId);
       if (
@@ -434,6 +440,7 @@ export class OutboxStore {
     if (!outboxRetrySafe(queued, this.now())) {
       this.update(clientMessageId, { state: "failed", repeatSafe: false, error: null });
       void this.persist();
+      this.pump();
       return;
     }
     const sending = this.update(clientMessageId, { state: "sending", error: null });
