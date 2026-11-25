@@ -2,6 +2,7 @@ import { MOBILE_COMPANY_SIGN_IN_RETURN } from "@openbot/contracts/company-sign-i
 import { isAvatarColor } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { isValidHostname, normalizeEmailAddress } from "@openbot/contracts/validation";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
 import { createRemoteJWKSet, customFetch, jwtVerify } from "jose";
 import { decodeBase64Url, deriveSecret, encodeBase64Url, hmacSha256, randomToken, sha256 } from "./crypto";
@@ -745,7 +746,7 @@ export class CompanySignInService {
       return yield* new CompanySignInError(
         403,
         "browser_extension_not_allowed",
-        "This browser extension cannot sign in to OpenBot.",
+        sourceText("error.auth.browserExtensionNotListed"),
       );
     }
     if (!TOKEN_PATTERN.test(input.clientChallenge)) {

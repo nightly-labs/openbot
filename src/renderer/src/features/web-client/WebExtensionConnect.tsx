@@ -14,6 +14,7 @@ import {
 } from "./web-extension-connect";
 
 const PRODUCT_NAME = "OpenBot";
+const EXTENSION_NOT_LISTED = "browser_extension_not_allowed";
 
 interface WebExtensionConnectProps {
   variant: AppVariant;
@@ -28,6 +29,7 @@ export function WebExtensionConnect(props: WebExtensionConnectProps) {
   const [pending, setPending] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [done, setDone] = createSignal(false);
+  const [extensionNotListed, setExtensionNotListed] = createSignal(false);
 
   async function allow() {
     setPending(true);
@@ -42,11 +44,9 @@ export function WebExtensionConnect(props: WebExtensionConnectProps) {
       });
       const value = await response.json().catch(() => null);
       if (!response.ok || !isDynamicRecord(value) || !isString(value.code)) {
-        const refusal =
-          isDynamicRecord(value) && isDynamicRecord(value.error) && isString(value.error.message)
-            ? sourceText(value.error.message)
-            : t("webClient.extension.failed");
-        setError(refusal);
+        const failure = isDynamicRecord(value) && isDynamicRecord(value.error) ? value.error : null;
+        setError(failure && isString(failure.message) ? sourceText(failure.message) : t("webClient.extension.failed"));
+        setExtensionNotListed(failure?.code === EXTENSION_NOT_LISTED);
         setPending(false);
         return;
       }
@@ -123,15 +123,17 @@ export function WebExtensionConnect(props: WebExtensionConnectProps) {
                   </p>
                 )}
               </Show>
-              <Button
-                variant="default"
-                type="button"
-                class="account-login-primary"
-                disabled={pending()}
-                onClick={() => void allow()}
-              >
-                {t("webClient.extension.allow")}
-              </Button>
+              <Show when={!extensionNotListed()}>
+                <Button
+                  variant="default"
+                  type="button"
+                  class="account-login-primary"
+                  disabled={pending()}
+                  onClick={() => void allow()}
+                >
+                  {t("webClient.extension.allow")}
+                </Button>
+              </Show>
               <Button variant="ghost" type="button" disabled={pending()} onClick={cancel}>
                 {t("common.cancel")}
               </Button>
