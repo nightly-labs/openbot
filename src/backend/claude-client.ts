@@ -2212,14 +2212,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       !runtime.activeTurn &&
       runtime.nextTurnId === null &&
       message.parent_tool_use_id === null &&
-      !message.resume_reason
+      !message.resume_reason &&
+      isString(message.session_id)
     ) {
       const apiMessageId = claudeReplyMessageId(message);
-      if (apiMessageId)
-        runtime.nextTurnId = claudeWakeTurnId(
-          isString(message.session_id) ? message.session_id : runtime.id,
-          apiMessageId,
-        );
+      if (apiMessageId) runtime.nextTurnId = claudeWakeTurnId(message.session_id, apiMessageId);
     }
     if (message.type === "stream_event" && message.parent_tool_use_id === null) {
       const event = message.event;
@@ -3698,7 +3695,8 @@ function takePrompt(runtime: ThreadRuntime, uuid: string): void {
 }
 
 function claudeReplyMessageId(message: ClaudeStreamMessage): string | null {
-  if (message.type === "assistant") return getString(message.message, "id");
+  if (message.type === "assistant")
+    return isClaudeNoResponsePlaceholder(message.message) ? null : getString(message.message, "id");
   if (message.type === "stream_event" && isRecord(message.event) && message.event.type === "message_start")
     return getString(message.event.message, "id");
   return null;
