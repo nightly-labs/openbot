@@ -3,7 +3,7 @@ import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { base64ToBytes, bytesToBase64 } from "@openbot/team-client/base64";
 import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
-import { createSignal } from "solid-js";
+import { createEffect, createRoot, createSignal } from "solid-js";
 import { createDownloadLimit } from "./web-download-limit";
 import type { WebFile, WebWorkspaceRuntime } from "./web-runtime";
 
@@ -58,7 +58,7 @@ export function createWebAttachmentMedia(
     create: (blob) => URL.createObjectURL(blob),
     revoke: (url) => URL.revokeObjectURL(url),
   },
-  copies?: () => boolean,
+  copies?: () => boolean | undefined,
 ): WebAttachmentMedia {
   const entries = new Map<string, Entry>();
   const [shown, setShown] = createSignal<ReadonlyMap<string, string>>(new Map());
@@ -144,8 +144,33 @@ export function createWebAttachmentMedia(
   const copyKey = (host: string, attachmentId: string) => `${host}:copy:${attachmentId}`;
   const shownUrl = (key: string) => (disposed ? undefined : shown().get(key));
 
+  let copiesKnown: Promise<void> | null = null;
+  let stopWaiting: (() => void) | null = null;
+  const whenCopiesKnown = () => {
+    copiesKnown ??= new Promise<void>((resolve) => {
+      createRoot((dispose) => {
+        stopWaiting = () => {
+          copiesKnown = null;
+          stopWaiting = null;
+          dispose();
+          resolve();
+        };
+        createEffect(
+          () => copies?.() !== undefined,
+          (known) => {
+            if (known) stopWaiting?.();
+          },
+        );
+      });
+    });
+    return copiesKnown;
+  };
   const fullUrl = (id: string) => shownUrl(`${hostId()}:${id}`);
-  const load = (attachment: AttachmentSummary, size: "thumbnail" | "generated" = "thumbnail", copied = false) => {
+  const load = (
+    attachment: AttachmentSummary,
+    size: "thumbnail" | "generated" = "thumbnail",
+    copied = false,
+  ): Promise<boolean> => {
     const host = currentHost();
     const key = `${host}:${attachment.id}`;
     const type = mediaType(attachment);
@@ -153,7 +178,11 @@ export function createWebAttachmentMedia(
     const limit = limitFor(type, size);
     if (attachment.size > limit) return Promise.resolve(false);
     const whole = () => loadOnce(key, () => download(attachment, type, limit, key));
-    if (!copied || size !== "thumbnail" || !remote.downloadPreview || copies?.() !== true) return whole();
+    if (!copied || size !== "thumbnail" || !remote.downloadPreview || !copies) return whole();
+    const supported = copies();
+    if (supported === undefined)
+      return whenCopiesKnown().then(() => (disposed ? false : load(attachment, size, copied)));
+    if (!supported) return whole();
     if (entries.has(key) || playableMediaKind(type) || type === SVG_TYPE) return whole();
     const copy = copyKey(host, attachment.id);
     const started = generation;
@@ -194,6 +223,7 @@ export function createWebAttachmentMedia(
     },
     dispose() {
       disposed = true;
+      stopWaiting?.();
       clear();
     },
   };

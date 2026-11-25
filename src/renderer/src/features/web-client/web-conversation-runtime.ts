@@ -14,7 +14,6 @@ import {
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
-import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import {
   decodeFeedbackWithdrawResult,
   FEEDBACK_WITHDRAW_CAPABILITY,
@@ -177,18 +176,14 @@ export function createWebConversationRuntime(
   canAdminister?: (capability: string) => boolean,
   storageCalls?: () => FilesPort,
   skillCatalog?: () => SkillCatalogCalls,
+  imageCopiesSupported?: () => boolean | undefined,
 ): ConversationRuntime {
   const routinesOnceEnabled = () => hasCapability?.(ROUTINES_ONCE_CAPABILITY) === true;
   const routinePauseReasonsEnabled = () => hasCapability?.(ROUTINE_PAUSE_REASONS_CAPABILITY) === true;
   const webLiveVoice = useWebLiveVoice();
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
   const downloadListeners = new Set<(progress: AttachmentDownloadProgress) => void>();
-  const attachmentMedia = createWebAttachmentMedia(
-    remote,
-    hostId,
-    undefined,
-    () => hasCapability?.(ATTACHMENT_PREVIEW_CAPABILITY) === true,
-  );
+  const attachmentMedia = createWebAttachmentMedia(remote, hostId, undefined, imageCopiesSupported);
   const files = createWebAttachmentFiles(remote, hostId, attachmentMedia);
   let importing: { cancelled: boolean; serverId: string } | undefined;
   let importBusy = false;
