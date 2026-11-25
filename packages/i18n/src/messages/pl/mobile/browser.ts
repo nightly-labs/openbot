@@ -42,6 +42,8 @@ export const messages = {
   "mobile.browser.keyboard.field": "Pisanie na stronie",
   "mobile.browser.reconnect": "Połącz ponownie",
   "mobile.browser.status.connecting": "Łączenie z przeglądarką…",
+  "mobile.browser.dialog.title": "Strona wyświetla komunikat",
+  "mobile.browser.dialog.ok": "OK",
   "mobile.browser.status.ended": "Podgląd na żywo zakończył się.",
   "mobile.browser.status.offline": "Serwer nie jest połączony.",
   "mobile.browser.status.noTab": "Agent {name} nie ma otwartej karty przeglądarki.",

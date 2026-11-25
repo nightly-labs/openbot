@@ -37,6 +37,8 @@ export const messages = {
   "mobile.browser.keyboard.field": "הקלדה בדף",
   "mobile.browser.reconnect": "חיבור מחדש",
   "mobile.browser.status.connecting": "מתחבר לדפדפן…",
+  "mobile.browser.dialog.title": "הדף מציג הודעה",
+  "mobile.browser.dialog.ok": "אישור",
   "mobile.browser.status.ended": "התצוגה החיה הסתיימה.",
   "mobile.browser.status.offline": "השרת לא מחובר.",
   "mobile.browser.status.noTab": "אין ל-{name} לשונית דפדפן פתוחה.",

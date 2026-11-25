@@ -724,7 +724,7 @@ For a page's own `alert` with no watch, the engine calls the reply callback of E
 | Event | Dialog |
 | --- | --- |
 | Page's own `alert` in an agent tab, with no agent action and no person input in the last 5 s | OK at once. The agent gets the text in its next snapshot. |
-| Person's click, or a `confirm` from a tool that is not an input action, or any dialog in a person's tab | Native box. The agent is not told. |
+| Person's click, or a `confirm` from a tool that is not an input action, or any dialog in a person's tab | Native box. The agent is not told. A live view with `browser-view-dialog-v1` shows it (below). |
 | Turn ends | Handed off: the box stays for a person, and the agent can no longer answer it. |
 | Person answers first | `handle_dialog` fails with "This dialog is closed". |
 | Tab closed or browser destroyed | The engine detaches its debugger, so the tab queue drains. Then it cancels every box of the tab, a person's box too, also a box that shows after the close: Electron keeps a box open after its page closes. |
@@ -733,6 +733,28 @@ For a page's own `alert` with no watch, the engine calls the reply callback of E
 The agent never gets a dialog id for a dialog that an `evaluate`, `wait_for`, or `fill_fields` call opens,
 or one in a cross-origin frame. A `confirm` there stays native. An `alert` there in an agent tab gets
 OK at once, as above, and the agent gets its text in the next snapshot.
+
+A member on a joined server cannot see the native box: it opens on the host's screen. While a dialog
+is open, the page answers no CDP command that needs its renderer, so a live view that starts then
+waits in the lease before `Page.startScreencast`, and the client showed "Connecting" with no end
+(#12651). A host with `browser-view-dialog-v1` sends the open dialog (id, type, message, the same
+redacted text that the agent gets) as a `dialog` message to a socket opened with `dialog=1`, and
+`dialog: null` when it closes. `startView` sends it before the screencast starts, so the member sees
+it while the start waits. The member answers with a `dialog` input. The gateway handles that input
+when it arrives, not in the input queue, because queued input waits behind the dialog too. The answer
+uses the same CDP answer and `-cancel-dialogs` as `handle_dialog`, with no turn check: a person can
+answer every dialog. Then the waiting start continues. While a view runs, the engine keeps `Page`
+events on, so it also sees a dialog that the member's own click opens. A pointer or key press from a
+view with `dialog=1` counts as person input, so a page `alert` that it opens in an agent tab stays for
+the member and is not answered with OK at once. A view without `dialog=1` cannot show the alert, so
+its input does not count. A dialog that opened while
+the engine did not watch stays unknown: `Page.enable` waits behind it and reports nothing. While a
+dialog is open, the gateway drops pointer and key input and answers `copy` with no text. The desktop
+and web clients show the dialog as a sheet at the top of the page area, named after the site of the
+tab ("openbot.run says"). It dims only the page: the tabs, the address and the chat box stay usable.
+A click outside it does not answer it, and OK has the focus. Escape answers Cancel only when the focus
+is on the sheet or the page, not in the chat box or the address. Before the first
+frame, the page area says that the page waits for the answer. The phone shows it in `Alert.alert`.
 
 A member on a remote server cannot see the host's tab, because the tab is a native view on the host's
 own screen. `browser-view-gateway.ts` answers that with a session and a websocket: `BrowserHost`

@@ -37,6 +37,8 @@ export const messages = {
   "mobile.browser.keyboard.field": "在页面上输入",
   "mobile.browser.reconnect": "重新连接",
   "mobile.browser.status.connecting": "正在连接浏览器…",
+  "mobile.browser.dialog.title": "页面显示了一条消息",
+  "mobile.browser.dialog.ok": "确定",
   "mobile.browser.status.ended": "实时视图已结束。",
   "mobile.browser.status.offline": "服务器未连接。",
   "mobile.browser.status.noTab": "{name} 没有打开浏览器标签页。",
