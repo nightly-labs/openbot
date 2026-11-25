@@ -320,6 +320,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "El servidor se detuvo antes de responder. Ejecuta el comando en una terminal para ver su error.",
   "error.backend.mcpServerExitedWithOutput": "El servidor se detuvo antes de responder. Escribió: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "El servidor no se inició porque su descarga falló. Comprueba la conexión a internet y vuelve a intentarlo.",
   "error.backend.mcpServerFailedToStart": "El servidor no se inició: {reason}",
   "error.backend.mcpServerProgramMissing":
     "OpenBot no pudo iniciar el servidor MCP {name}, porque su programa no está instalado en el equipo que ejecuta OpenBot. Instala la aplicación que ofrece {name} en ese equipo, o desactiva {name} en Marketplace, Apps.",
