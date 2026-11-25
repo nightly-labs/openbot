@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
+import { sharedWindowsLookup } from "./cli";
 import { piAgentDirectory } from "./process-confinement";
 
 const execFileAsync = promisify(execFile);
@@ -14,7 +15,10 @@ const WSL_LAUNCHER_FOLDERS = new Set(["system32", "sysnative", "windowsapps"]);
 
 const WSL_CHECK_TIMEOUT_MS = 15_000;
 
+const BROKEN_LAUNCHER_REUSE_MS = 60_000;
+
 const workingLaunchers = new Set<string>();
+const brokenLaunchers = new Map<string, number>();
 
 export const piWindowsShellArguments = Effect.fn("PiWindowsShell.arguments")(function* (
   cwd: string,
@@ -49,10 +53,17 @@ const piBashPath = Effect.fn("PiWindowsShell.bashPath")(function* (cwd: string, 
     if (yield* exists(gitBash)) return gitBash;
   }
   const where = win32.join(variable(environment, "SystemRoot") ?? "C:\\Windows", "System32", "where.exe");
-  const found = yield* Effect.tryPromise((signal) =>
-    execFileAsync(where, ["bash.exe"], { cwd, env: environment, signal, timeout: 5_000, windowsHide: true }),
+  const key = ["pi-bash", where, cwd, variable(environment, "PATH") ?? "", variable(environment, "PATHEXT") ?? ""].join(
+    "\u0000",
+  );
+  const found = yield* Effect.tryPromise(() =>
+    sharedWindowsLookup(key, () =>
+      execFileAsync(where, ["bash.exe"], { cwd, env: environment, timeout: 5_000, windowsHide: true }).then(
+        ({ stdout }) => stdout,
+      ),
+    ),
   ).pipe(
-    Effect.map(({ stdout }) => stdout.trim().split(/\r?\n/u)[0]?.trim() ?? ""),
+    Effect.map((stdout) => stdout.trim().split(/\r?\n/u)[0]?.trim() ?? ""),
     Effect.orElseSucceed(() => ""),
   );
   return found && (yield* exists(found)) ? found : null;
@@ -68,6 +79,8 @@ const launcherRuns = Effect.fn("PiWindowsShell.launcherRuns")(function* (
   environment: Record<string, string>,
 ) {
   if (workingLaunchers.has(bash)) return true;
+  const brokenAt = brokenLaunchers.get(bash);
+  if (brokenAt !== undefined && Date.now() - brokenAt < BROKEN_LAUNCHER_REUSE_MS) return false;
   return yield* Effect.tryPromise({
     try: (signal) =>
       execFileAsync(bash, ["-c", "true"], {
@@ -81,7 +94,11 @@ const launcherRuns = Effect.fn("PiWindowsShell.launcherRuns")(function* (
   }).pipe(
     Effect.tap(() => Effect.sync(() => workingLaunchers.add(bash))),
     Effect.as(true),
-    Effect.catch((cause) => Effect.succeed(isDynamicRecord(cause) && cause.killed === true)),
+    Effect.catch((cause) => {
+      const timedOut = isDynamicRecord(cause) && cause.killed === true;
+      if (!timedOut) brokenLaunchers.set(bash, Date.now());
+      return Effect.succeed(timedOut);
+    }),
   );
 });
 

@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "このホストではイベントを利用できません。",
   "error.backend.databaseIntegrity": "OpenBot のデータベースが整合性チェックに失敗しました。",
+  "error.backend.creditsHoldAdminOnly":
+    "エージェントのクレジット使用を許可できるのは、このサーバーのオーナーまたは管理者のみです。",
+  "error.backend.creditsHoldShort": "クレジットがまだ足りません。",
   "error.backend.webhookRouteLimit": "1 つのホストの Webhook ルーティンは最大 {limit} 個です。",
   "error.backend.webhookSettingsInvalid": "Webhook の設定を確認して、もう一度お試しください。",
   "error.backend.webhookSenderSecretInvalid":
@@ -325,6 +328,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "サーバーは応答する前に停止しました。ターミナルでコマンドを実行してエラーを確認してください。",
   "error.backend.mcpServerExitedWithOutput": "サーバーは応答する前に停止しました。出力: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "ダウンロードに失敗したため、サーバーが起動しませんでした。インターネット接続を確認してから、もう一度お試しください。",
   "error.backend.mcpServerFailedToStart": "サーバーが起動しませんでした: {reason}",
   "error.backend.mcpServerProgramMissing":
     "MCP サーバー {name} のプログラムが OpenBot を実行しているコンピューターにインストールされていないため、OpenBot は起動できませんでした。そのコンピューターに {name} を提供するアプリをインストールするか、マーケットプレイス、アプリで {name} をオフにしてください。",
@@ -447,6 +452,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "プロキシ {name} がサインインを拒否したため、ページを開けませんでした。",
   "error.backend.browserSystemProxyFailed":
     "OpenBot を実行しているコンピューターの設定にあるプロキシが応答しないか接続を拒否したため、ページを開けませんでした。そのコンピューターのプロキシ設定を確認してください。",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "サイト、または OpenBot を実行しているコンピューターの設定にあるプロキシが応答なしで接続を閉じたため、ページを開けませんでした。どのサイトも開けない場合は、そのコンピューターのプロキシ設定を確認してください。",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "サイト、またはこのブラウザープロファイルのプロキシが応答なしで接続を閉じたため、ページを開けませんでした。どのサイトも開けない場合は、プロファイルのプロキシを確認してください。",
   "error.backend.browserProxyComputerUnreachable":
     "このプロファイルが使うコンピューターが応答しないため、ページを開けませんでした。",
   "error.backend.browserProxyComputerLocalAddress":

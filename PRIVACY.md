@@ -84,8 +84,8 @@ users goes up or down, its renewal is cancelled or resumed, it ends, or its paym
 is refunded or is disputed.
 It also sends an event when your OpenBot credits change: a credits Checkout starts, is paid or
 expires, a refund or a lost dispute takes credits back, you move credits to or from a server, you
-redeem a credit code, a license gives free monthly credits or they expire, or a workflow step that uses OpenBot credits
-starts, is charged or ends with no charge. A credits event has your account ID (for a server step
+redeem a credit code, a license gives free monthly credits or they expire, or a workflow step or an agent's image or video
+tool that uses OpenBot credits starts, is charged or ends with no charge. A credits event has your account ID (for a server step
 that no member started, or a server's free credits, the account ID of the server owner), whether
 the credits are personal or a server's, the number of credits, the currency and amount of a
 payment, and for a generation the model, its kind (image or video), the resolution, duration,
@@ -517,11 +517,12 @@ The service stores:
   without the ID of the deleted account. For each image or video that OpenBot credits pay for, the
   service keeps a hold record: the job ID, the account or server that pays, the account that started
   it, the model, the credits held and charged, the result (completed, failed, canceled, refused or
-  expired), the media generation processor and its job ID, and the times. It keeps no prompt, picture
-  or result file. Deleting the account removes the hold records of its own balance. For the free
+  expired), whether welcome credits paid for it, the media generation processor and its job ID, and
+  the times. It keeps no prompt, picture or result file. Deleting the account removes the hold records of its own balance. For the free
   monthly credits of a paid license, it keeps a grant record: the license, the account or server that
   has them, the credits given and left, and the start and end times. Deleting the account removes the
-  grant records of its own balance.
+  grant records of its own balance. The 10 welcome credits of each account have a grant record of the
+  same kind, without a license.
   For credit codes, it keeps the SHA-256 hash of each code, never the code itself, with the credits,
   the number of uses, the end date, and a campaign name and a note from OpenBot. For each redemption it
   keeps the code, the account, the server that got the credits (when one is selected), the grant and
@@ -1685,15 +1686,25 @@ covers what Higgsfield keeps.
 A step with an OpenBot model uses OpenBot credits. When the computer is signed in to an OpenBot
 account, the credits of that account pay; a server pays with its own credits. The computer sends the
 prompt, the model, the size settings and the input pictures to the account service
-(`openbot.run`). The account service holds the credits, sends the same values to a media generation
-processor, and returns the result file to the computer, which keeps it. A processor can keep the
-input pictures for up to three days so that it can read them. The account service passes
-the prompt, the pictures and the file through in transit only: it does not store or log them. It
+(`openbot.run`). The account service holds the credits, sends the same values through OpenBot's
+media gateway service, which runs on Cloudflare too, to a media generation processor, and returns the
+result file to the computer, which keeps it. A processor can keep the input pictures for up to three
+days so that it can read them. The account service and the media gateway pass the prompt, the
+pictures and the file through in transit only: they do not store or log them. The account service
 keeps only the hold record above. A failed or refused generation spends no credits. A stop does not
 cancel a generation that was sent: when the run stops or the app closes, the job continues, and the
 computer gets the file when the job ends or at its next start. While the Canvas page is open, the computer also asks the account service for the OpenBot models, their
 prices in credits and the credit balance. Each member of a joined server who can use workflows can
 see them.
+
+An agent can make an image or a video with OpenBot credits through its `generate_image` and
+`generate_video` tools, and it can ask for the OpenBot models and their prices with
+`list_media_models`. The computer that runs the agent sends the prompt, the model, the size settings
+and the input pictures that the agent names to the account service, in the same way as a workflow
+step, and the same rules apply. It pays with the credits of the signed-in account, or a server pays
+with its own credits. When the price is more than the approval limit of the server (50 credits by
+default, and owners and administrators can change it), the agent asks the user first. The result
+file stays in the chat on that computer, and each member who can read the chat can see it.
 
 While the Canvas page is open, the computer also asks Sunra and Higgsfield for their model lists, and
 for the price of the model and the settings of an image or video step. A price request sends the

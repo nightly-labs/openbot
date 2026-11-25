@@ -70,6 +70,7 @@ import { useConversation } from "./conversation-context";
 import { useConversationController } from "./conversation-controller-context";
 import { messagePromptRequestKey, promptRequestKey } from "./conversation-keys";
 import type { ConversationThreads } from "./conversation-types";
+import { useDesktopMediaApproval } from "./desktop-media-approval";
 import {
   createAgentMessageDeleteAccess,
   desktopAgentMessageDeleteAccess,
@@ -162,6 +163,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     failedModels,
     queues,
   } = useTurns();
+
   const {
     activeMessages,
     conversations,
@@ -191,6 +193,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const panelAgentStatus = () => (remoteLoading() ? { ...agentStatus(), phase: "starting" as const } : agentStatus());
   const usage = useUsage();
   const windowPage = useWindowPage();
+  const mediaApproval = useDesktopMediaApproval();
   const auth = useAuth();
   const { teamPresence, readerMemberId } = usePresence();
   const { selectAgent, openAgentMessage, messageFocusRequest, globalSearchOpen } = useNavigation();
@@ -641,6 +644,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         onPromptResolutionPresented={presentPromptResolution}
         onRespondToApproval={respondToApproval}
         onAlwaysAllowApproval={alwaysAllowApproval()}
+        mediaApproval={mediaApproval}
         agentAutoApproves={activeAgentAutoApproves()}
         remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
         remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}

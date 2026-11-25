@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "이 호스트에서는 이벤트를 사용할 수 없어요.",
   "error.backend.databaseIntegrity": "OpenBot 데이터베이스가 무결성 검사에 실패했어요.",
+  "error.backend.creditsHoldAdminOnly": "이 서버의 소유자나 관리자만 에이전트가 크레딧을 사용하도록 허용할 수 있어요.",
+  "error.backend.creditsHoldShort": "크레딧이 아직 충분하지 않아요.",
   "error.backend.webhookRouteLimit": "호스트 하나에는 웹훅 루틴을 최대 {limit}개까지 둘 수 있어요.",
   "error.backend.webhookSettingsInvalid": "웹훅 설정을 확인한 후 다시 시도해 주세요.",
   "error.backend.webhookSenderSecretInvalid":
@@ -301,6 +303,8 @@ export const messages = {
     "로그인 서버가 OpenBot이 읽을 수 없는 응답을 보냈어요. 서비스에서 API 키나 토큰을 제공한다면 이 서버의 설정에 추가한 후 다시 연결을 테스트해 주세요.",
   "error.backend.mcpServerExited": "서버가 응답하기 전에 중지되었어요. 터미널에서 명령을 실행해 오류를 확인하세요.",
   "error.backend.mcpServerExitedWithOutput": "서버가 응답하기 전에 중지되었어요. 출력: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "다운로드에 실패해서 서버가 시작되지 않았어요. 인터넷 연결을 확인한 다음 다시 시도하세요.",
   "error.backend.mcpServerFailedToStart": "서버가 시작되지 않았어요: {reason}",
   "error.backend.mcpServerProgramMissing":
     "OpenBot을 실행하는 컴퓨터에 MCP 서버 {name}의 프로그램이 설치되어 있지 않아서 OpenBot이 시작할 수 없었어요. 그 컴퓨터에 {name}을(를) 제공하는 앱을 설치하거나, 마켓플레이스, 앱에서 {name}을(를) 끄세요.",
@@ -421,6 +425,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "프록시 {name}이(가) 로그인을 거부해 페이지를 열지 못했어요.",
   "error.backend.browserSystemProxyFailed":
     "OpenBot을 실행하는 컴퓨터 설정의 프록시가 응답하지 않거나 연결을 거부해 페이지를 열지 못했어요. 그 컴퓨터의 프록시 설정을 확인하세요.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "사이트 또는 OpenBot을 실행하는 컴퓨터 설정의 프록시가 응답 없이 연결을 닫아 페이지를 열지 못했어요. 어떤 사이트도 열리지 않으면 그 컴퓨터의 프록시 설정을 확인하세요.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "사이트 또는 이 브라우저 프로필의 프록시가 응답 없이 연결을 닫아 페이지를 열지 못했어요. 어떤 사이트도 열리지 않으면 프로필의 프록시를 확인하세요.",
   "error.backend.browserProxyComputerUnreachable":
     "이 프로필이 사용하는 컴퓨터가 응답하지 않아 페이지를 열지 못했어요.",
   "error.backend.browserProxyComputerLocalAddress":

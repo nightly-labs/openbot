@@ -100,6 +100,9 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Empezando el inicio de sesión de {name} en {host}…",
   "provider.codeLogin.pageOpening": "Abriendo la página de inicio de sesión de {name} en {host}…",
   "provider.codeLogin.linkStep": "Inicia sesión en {name}. OpenBot continúa automáticamente.",
+  "provider.codeLogin.thisComputerDescription":
+    "Abre este enlace en un navegador de este ordenador. OpenBot espera aquí.",
+  "provider.codeLogin.copyLink": "Copiar enlace",
   "provider.codeLogin.chatgptDeviceSetting":
     "En ChatGPT en un ordenador, abre la configuración de seguridad y activa el inicio de sesión con código de dispositivo para Codex. En una cuenta de trabajo, lo activa el administrador del espacio de trabajo.",
   "provider.useApp.title": "Conecta {name} en la app de OpenBot",
@@ -232,6 +235,7 @@ export const messages = {
   "provider.account.apiKey": "Clave de API",
   "provider.account.listLabel": "Cuentas de {name}",
   "provider.account.usedBy": "Usada por {agents}",
+  "provider.account.sameEmail": "Mismo correo que {name}",
   "provider.account.failed": "Error al iniciar sesión",
   "provider.account.moreActions": "Más acciones para {name}",
   "provider.account.renameLabel": "Nombre de {name}",

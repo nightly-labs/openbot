@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "Events zijn niet beschikbaar op deze host.",
   "error.backend.databaseIntegrity": "De database van OpenBot heeft de integriteitscontrole niet doorstaan.",
+  "error.backend.creditsHoldAdminOnly":
+    "Alleen een eigenaar of beheerder van deze server kan agents credits laten gebruiken.",
+  "error.backend.creditsHoldShort": "Er zijn nog niet genoeg credits.",
   "error.backend.webhookRouteLimit": "Een host kan maximaal {limit} webhookroutines hebben.",
   "error.backend.webhookSettingsInvalid": "Controleer de webhookinstellingen en probeer het opnieuw.",
   "error.backend.webhookSenderSecretInvalid":
@@ -322,6 +325,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
   "error.backend.mcpServerExitedWithOutput": "De server is gestopt voordat hij antwoordde. Hij schreef: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "De server is niet gestart, omdat de download is mislukt. Controleer de internetverbinding en probeer het opnieuw.",
   "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
   "error.backend.mcpServerProgramMissing":
     "OpenBot kon de MCP-server {name} niet starten, omdat het programma ervan niet is geïnstalleerd op de computer waarop OpenBot draait. Installeer de app die {name} levert op die computer, of zet {name} uit in Marktplaats, Apps.",
@@ -448,6 +453,10 @@ export const messages = {
     "De proxy {name} heeft de aanmelding geweigerd, dus de pagina is niet geopend.",
   "error.backend.browserSystemProxyFailed":
     "De proxy in de instellingen van de computer waarop OpenBot draait reageert niet of heeft de verbinding geweigerd, dus de pagina is niet geopend. Controleer de proxy-instellingen van die computer.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "De site of de proxy in de instellingen van de computer waarop OpenBot draait heeft de verbinding zonder antwoord gesloten, dus de pagina is niet geopend. Als geen enkele site opent, controleer dan de proxy-instellingen van die computer.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "De site of de proxy van dit browserprofiel heeft de verbinding zonder antwoord gesloten, dus de pagina is niet geopend. Als geen enkele site opent, controleer dan de proxy van het profiel.",
   "error.backend.browserProxyComputerUnreachable":
     "De computer van dit profiel reageert niet, dus de pagina is niet geopend.",
   "error.backend.browserProxyComputerLocalAddress":

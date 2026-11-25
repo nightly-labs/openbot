@@ -7,16 +7,11 @@ import { homedir, hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { Readable } from "node:stream";
-import {
-  isKeyOnlyProvider,
-  isManagedRuntimeProvider,
-  type ManagedProviderId,
-} from "@openbot/contracts/agent-providers";
+import { isKeyOnlyProvider, isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
-  AgentProviderStatus,
   AgentStatus,
   AppVariant,
   BrowserDisplayState,
@@ -94,7 +89,6 @@ import { AgentThreadStore } from "../backend/agent-threads/agent-thread-store";
 import { type BrowserAgentChat, BrowserHost } from "../backend/browser-host";
 import { BrowserProfileStore } from "../backend/browser-profiles/browser-profile-store";
 import { BrowserProxyStore } from "../backend/browser-profiles/browser-proxy-store";
-import { CodexCliError, resolveClaudeCli, resolveCodexCli } from "../backend/cli";
 import { type CrmHandle, createCrm } from "../backend/crm/crm";
 import { CrmError } from "../backend/crm/crm-handle";
 import { stripeSource } from "../backend/crm/crm-stripe";
@@ -377,6 +371,14 @@ import {
 } from "./mcp-oauth-redirect-server";
 import { McpOAuthStore } from "./mcp-oauth-store";
 import { MCP_SERVER_OWNERS_FILE, McpServerOwnersStore } from "./mcp-server-owners-store";
+import {
+  type CreditAsksControl,
+  createCreditAsksMutedStore,
+  createMediaApprovalCreditsPreferenceStore,
+  creditAsksControl,
+  type MediaApprovalCreditsControl,
+  mediaApprovalCreditsControl,
+} from "./media-approval-credits-preference-store";
 import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
 import { createModelReasoningSupport, MODEL_REASONING_RETRY_WAITS_MS } from "./model-reasoning-probe";
@@ -389,6 +391,7 @@ import { PasswordManagersService } from "./password-managers/password-managers-s
 import { managedProtonPassCli } from "./password-managers/proton-pass-cli-installer";
 import { ProtonPassDriver, protonPassRecordSchema } from "./password-managers/proton-pass-driver";
 import { PointerForwardingGate } from "./pointer-forwarding-gate";
+import { ProcessLauncher } from "./process-launcher";
 import { PromptCacheTtlPreferenceStore } from "./prompt-cache-ttl-preference-store";
 import { ProviderAccountsHost } from "./provider-accounts-host";
 import { ProviderCredentialStore } from "./provider-credential-store";
@@ -461,6 +464,7 @@ import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-de
 import { SpeechPreferenceStore } from "./speech-preference-store";
 import { StartupTiming } from "./startup-timing";
 import { AGENT_CERTIFICATES_FILE, agentCertificateEnvironment } from "./system-certificates";
+import { createSystemCliTracker } from "./system-cli-tracker";
 import { mcpSignInSharedWithOthers } from "./team-api/mcp-member-access";
 import { LEGACY_TEAM_STORE_FILE, TEAM_STORE_FILE, TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
@@ -542,6 +546,8 @@ const SERVER_PERSONALITY_PREFERENCE_FILE = "openbot-server-personality-v1.json";
 const PROMPT_CACHE_TTL_PREFERENCE_FILE = "openbot-prompt-cache-ttl-v1.json";
 const CLAUDE_USER_SETUP_PREFERENCE_FILE = "openbot-claude-user-setup-v1.json";
 const CACHE_EXPIRY_COMPACTION_PREFERENCE_FILE = "openbot-cache-expiry-compaction-v1.json";
+const MEDIA_APPROVAL_CREDITS_PREFERENCE_FILE = "openbot-media-approval-credits-v1.json";
+const CREDIT_ASKS_MUTED_PREFERENCE_FILE = "openbot-credit-asks-muted-v1.json";
 const CRM_PREFERENCE_FILE = "openbot-crm-v1.json";
 const CLAUDE_COMPACT_WINDOW_PREFERENCE_FILE = "openbot-claude-compact-window-v1.json";
 const PROVIDER_ENVIRONMENT_PREFERENCE_FILE = "openbot-provider-environment-v1.json";
@@ -630,6 +636,7 @@ const TEARDOWN_ORDER = {
   automation: 108,
   storageUsage: 109,
   service: 110,
+  processLauncher: 110.25,
   cuaDriver: 110.5,
   mcpOAuth: 111,
   analytics: 112,
@@ -741,6 +748,8 @@ export interface ApplicationServices {
   promptCacheTtl: PromptCacheTtlPreferenceStore;
   claudeUserSetup: ClaudeUserSetupControl;
   cacheExpiryCompaction: CacheExpiryCompactionControl;
+  mediaApprovalCredits: MediaApprovalCreditsControl;
+  creditAsks: CreditAsksControl;
   claudeCompactWindow: ClaudeCompactWindowControl;
   providerEnvironment: ProviderEnvironmentControl;
   modelVisibility: ModelVisibility;
@@ -1513,6 +1522,14 @@ export async function createApplicationServices({
   const cacheExpiryCompaction = createCacheExpiryCompactionPreferenceStore(
     join(app.getPath("userData"), CACHE_EXPIRY_COMPACTION_PREFERENCE_FILE),
   );
+  const mediaApprovalCredits = createMediaApprovalCreditsPreferenceStore(
+    join(app.getPath("userData"), MEDIA_APPROVAL_CREDITS_PREFERENCE_FILE),
+  );
+  const creditAsksMuted = createCreditAsksMutedStore(join(app.getPath("userData"), CREDIT_ASKS_MUTED_PREFERENCE_FILE));
+  const mediaApprovalCreditsSetting = mediaApprovalCreditsControl(mediaApprovalCredits, () =>
+    service.recheckCreditsHolds(),
+  );
+  const creditAsks = creditAsksControl(mediaApprovalCreditsSetting, creditAsksMuted);
   const crmPreference = createCrmPreferenceStore(join(app.getPath("userData"), CRM_PREFERENCE_FILE));
   const claudeCompactWindow = createClaudeCompactWindowPreferenceStore(
     join(app.getPath("userData"), CLAUDE_COMPACT_WINDOW_PREFERENCE_FILE),
@@ -1559,6 +1576,8 @@ export async function createApplicationServices({
       promptCacheTtl.load(),
       claudeUserSetup.load(),
       cacheExpiryCompaction.load(),
+      mediaApprovalCredits.load(),
+      creditAsksMuted.load(),
       crmPreference.load(),
       claudeCompactWindow.load(),
       providerEnvironment.load(),
@@ -1992,6 +2011,9 @@ export async function createApplicationServices({
     computerUsePermissionHelp.close();
   });
   const providerTempDirectory = join(app.getPath("userData"), "provider-temp");
+  const processLauncher = process.platform === "win32" ? new ProcessLauncher() : null;
+  if (processLauncher)
+    teardown.push(TEARDOWN_ORDER.processLauncher, "the process launcher", () => processLauncher.dispose());
   performance.mark("openbot:services.computer-use");
   if (process.platform === "win32") await Effect.runPromise(sweepProviderTemp(providerTempDirectory));
   const agentApiKeys = new AgentApiKeys(join(app.getPath("userData"), "agent-api-keys"), vault.items);
@@ -2069,6 +2091,8 @@ export async function createApplicationServices({
     browser,
     finishCheck: true,
     cacheExpiryCompaction: () => cacheExpiryCompaction.get().enabled,
+    mediaApprovalCredits: () => mediaApprovalCredits.get(),
+    creditAsks,
     visualPreview: new ChatVisualPreviewer(),
     avatarDecoder: (bytes) => !nativeImage.createFromBuffer(Buffer.from(bytes)).isEmpty(),
     setCommitCoAuthor: (enabled) => agentDefaultsSettings.update({ commitCoAuthor: enabled }),
@@ -2213,6 +2237,7 @@ export async function createApplicationServices({
       appVersion: app.getVersion(),
       providerStateDirectory: join(app.getPath("userData"), "provider-state"),
       ...(process.platform === "win32" ? { providerTempDirectory } : {}),
+      ...(processLauncher ? { launchProcess: processLauncher.launch } : {}),
       serverEnvironment,
       agentEnvironment: (inherited) => ({
         ...agentDisplayEnvironment(process.platform),
@@ -2266,6 +2291,7 @@ export async function createApplicationServices({
     skillLearner: () => localSkillLearner(skills),
     responseStyle: () => serverPersonality.responseStyle(),
     timezone: () => serverTimezone.effective(),
+    chosenTimezone: () => serverTimezone.get().timezone,
     extraRoutineSources: () => (workflowTriggers ? [workflowTriggers] : []),
     channelPersonAgentLevel: (personId, agentId) => host.channelPersonAgentLevel(personId, agentId),
     channelRemotePerson: (personId) => host.channelPersonIsRemote(personId),
@@ -2645,52 +2671,23 @@ export async function createApplicationServices({
     libraryFolders.reconcileFiles(new Set(mailbox.listStoredFiles().map((stored) => stored.attachment.id))),
   );
 
-  const hostedCliDownloads = new Set<ManagedProviderId>();
-  const resolvesAsMissing = (provider: "claude" | "codex") =>
-    (provider === "claude" ? resolveClaudeCli : resolveCodexCli)({
-      bundledExecutable: providerRuntimes.executablePath(provider),
-    }).pipe(
-      Effect.as(false),
-      Effect.catch((failure) =>
-        Effect.succeed(failure.cause instanceof CodexCliError && failure.cause.code === "missing"),
-      ),
-    );
-  const hostedCliDownload = (provider: AgentProviderStatus, agentProviders: ReadonlySet<string>) => {
-    if (provider.state === "outdated") return Effect.succeed(true);
-    if (!agentProviders.has(provider.id) || provider.cliSource !== undefined || provider.version !== null) return null;
-    if (provider.state === "not-installed") return Effect.succeed(true);
-    if (provider.state === "error" && (provider.id === "claude" || provider.id === "codex"))
-      return resolvesAsMissing(provider.id);
-    return null;
-  };
+  const runsAsServer = Boolean(hostedServer || serverModeEnvironment || localServerChild);
+  const trackSystemCliVersionsOnly = createSystemCliTracker({
+    runtimes: providerRuntimes,
+    providerUse,
+    agentProviders: () =>
+      new Set(service.listAgents().map((agent) => (isKeyOnlyProvider(agent.provider) ? "pi" : agent.provider))),
+    hosted: hostedServer !== null,
+    server: runsAsServer,
+  });
   const trackSystemCliVersions = (status: AgentStatus): void => {
-    let copyInUse = false;
-    const agentProviders =
-      hostedServer === null
-        ? null
-        : new Set(service.listAgents().map((agent) => (isKeyOnlyProvider(agent.provider) ? "pi" : agent.provider)));
-    for (const provider of status.providers ?? []) {
-      if (!isManagedRuntimeProvider(provider.id)) continue;
-      const version = provider.cliSource === "system" ? (provider.version ?? null) : null;
-      if (providerRuntimes.setSystemVersion(provider.id, version, provider.cliIncomplete === true)) copyInUse = true;
-      const needsDownload = agentProviders === null ? null : hostedCliDownload(provider, agentProviders);
-      if (needsDownload !== null && !hostedCliDownloads.has(provider.id) && !providerUse.off().includes(provider.id)) {
-        hostedCliDownloads.add(provider.id);
-        const runtime = provider.id;
-        Effect.runFork(
-          needsDownload.pipe(
-            Effect.flatMap((download) => (download ? providerRuntimes.download(runtime) : Effect.void)),
-            Effect.ignore,
-          ),
-        );
-      }
-    }
-    if (copyInUse) Effect.runFork(providerRuntimes.providerUseChanged());
+    trackSystemCliVersionsOnly(status);
     hermesInstaller.setProvider(status.providers?.find((provider) => provider.id === "hermes"));
   };
   trackSystemCliVersions(service.getStatus());
   service.on("event", (event) => {
     if (event.type === "status") trackSystemCliVersions(event.status);
+    else if (event.type === "agents-changed" && runsAsServer) trackSystemCliVersionsOnly(service.getStatus());
   });
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
   if (diskRestoring()) {
@@ -3103,6 +3100,10 @@ export async function createApplicationServices({
         get: () => cacheExpiryCompaction.get().enabled,
         set: (enabled) => cacheExpiryCompactionSetting.set(enabled),
       },
+      mediaApprovalCredits: {
+        get: () => mediaApprovalCredits.get(),
+        set: (setting) => mediaApprovalCreditsSetting.set(setting),
+      },
       claudeCompactWindow: {
         get: () => claudeCompactWindowSetting.get().tokens,
         set: (tokens) => claudeCompactWindowSetting.set(tokens),
@@ -3381,7 +3382,7 @@ export async function createApplicationServices({
           }
         : {}),
       turnLimits: hostTurnLimits,
-      ...(serverModeEnvironment
+      ...(serverModeEnvironment || hostedServer
         ? {
             restart: {
               request: (memberId) => {
@@ -3400,6 +3401,8 @@ export async function createApplicationServices({
       promptCacheTtl,
       claudeUserSetup: claudeUserSetupSetting,
       cacheExpiryCompaction: cacheExpiryCompactionSetting,
+      mediaApprovalCredits: mediaApprovalCreditsSetting,
+      creditAsks,
       claudeCompactWindow: claudeCompactWindowSetting,
       providerEnvironment: providerEnvironmentSetting,
       providerDetection: { detection: providerDetection, settings: providerDetectionSettings },
@@ -3972,6 +3975,14 @@ export async function createApplicationServices({
       sendToRenderer(contents && BrowserWindow.fromWebContents(contents), IPC_ENDPOINTS.browser.liveViewEvent, event);
     },
     writeClipboard: (text) => clipboard.writeText(text),
+    frameSize: (owner) => {
+      const contents = webContents.fromId(owner);
+      const window = contents && BrowserWindow.fromWebContents(contents);
+      if (!window || window.isDestroyed()) return null;
+      const [width = 0, height = 0] = window.getContentSize();
+      const { scaleFactor } = screen.getDisplayMatching(window.getBounds());
+      return { width: width * scaleFactor, height: height * scaleFactor };
+    },
   });
   teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => runCauseEffect(browserView.stop()));
   const remoteDesktop = new RemoteDesktopManager({
@@ -4449,6 +4460,8 @@ export async function createApplicationServices({
     promptCacheTtl,
     claudeUserSetup: claudeUserSetupSetting,
     cacheExpiryCompaction: cacheExpiryCompactionSetting,
+    mediaApprovalCredits: mediaApprovalCreditsSetting,
+    creditAsks,
     claudeCompactWindow: claudeCompactWindowSetting,
     providerEnvironment: providerEnvironmentSetting,
     modelVisibility,

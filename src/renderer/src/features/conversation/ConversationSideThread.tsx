@@ -283,6 +283,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             onAttachmentAction={(attachment, action) => fromThread(() => attachmentAction(attachment, action))}
             backdropAction={backdropAction}
             approval={current().thread.approval}
+            media={view.mediaApproval}
             onRespondApproval={(decision) =>
               current().thread.onRespondApproval(decision, failureToast("prompt.approval.answerFailed"))
             }

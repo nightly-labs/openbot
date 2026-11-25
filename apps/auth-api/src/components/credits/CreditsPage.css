@@ -8,14 +8,19 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  margin-top: clamp(24px, 4vw, 40px);
-  padding: 12px 0 4px;
+  display: grid;
+  grid-template-columns: fit-content(100%);
+  justify-content: center;
+  padding: clamp(16px, 2vw, 24px) 0 4px;
   background: var(--openbot-bg-canvas);
 }
 
+.credits-main .compare-index-hero {
+  padding-bottom: 0;
+}
+
 .credits-search {
-  max-width: 560px;
-  margin: 0 auto 16px;
+  margin: 0 0 14px;
 }
 
 .credits-filters {
@@ -180,7 +185,12 @@
 }
 
 @media (max-width: 720px) {
+  .credits-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .credits-filters {
+    min-width: 0;
     flex-wrap: nowrap;
     justify-content: flex-start;
     overflow-x: auto;

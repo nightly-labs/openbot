@@ -36,6 +36,7 @@ asarUnpack:
   - out/main/agent-database-host.js
   - out/main/voice-transcription-host.js
   - out/main/voice-speech-host.js
+  - out/main/process-launcher-host.js
   - node_modules/effect/**/*
   - node_modules/@koromix/koffi-*/**/*
 extraResources:

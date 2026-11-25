@@ -301,6 +301,8 @@ export const messages = defineMessages("error.provider", {
     "The OpenCode model wrote its actions as text and did not do them. Try again, or choose another model.",
   "error.provider.acpNoAnswer":
     "{provider} ended the turn with no answer. Send the message again, or start a new chat.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} received the results from its teammates, then ended the turn with no answer. Ask the agent to continue.",
   "error.provider.noAnswerAfterSteps":
     "{provider} did some steps, then ended the turn with no answer. Ask the agent what it did before you send the same request again.",
   "error.provider.acpRefusedNoReason": "{provider} stopped without an answer. Send the message again.",

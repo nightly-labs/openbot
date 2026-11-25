@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "אירועים אינם זמינים במארח הזה.",
   "error.backend.databaseIntegrity": "מסד הנתונים של OpenBot נכשל בבדיקת השלמות.",
+  "error.backend.creditsHoldAdminOnly": "רק בעלים או מנהל של השרת הזה יכולים לאפשר לסוכנים להשתמש בקרדיטים.",
+  "error.backend.creditsHoldShort": "עדיין אין מספיק קרדיטים.",
   "error.backend.webhookRouteLimit": "במארח אחד יכולות להיות לכל היותר {limit} שגרות webhook.",
   "error.backend.webhookSettingsInvalid": "יש לבדוק את הגדרות ה-webhook ולנסות שוב.",
   "error.backend.webhookSenderSecretInvalid":
@@ -288,6 +290,7 @@ export const messages = {
     "שרת ההתחברות שלח תשובה ש-OpenBot לא יכול לקרוא. אם השירות נותן לך מפתח API או טוקן, יש להוסיף אותו להגדרות של השרת הזה ולבדוק שוב את החיבור.",
   "error.backend.mcpServerExited": "השרת נעצר לפני שענה. יש להריץ את הפקודה במסוף כדי לראות את השגיאה שלו.",
   "error.backend.mcpServerExitedWithOutput": "השרת נעצר לפני שענה. הוא כתב: {detail}",
+  "error.backend.mcpServerDownloadFailed": "השרת לא התחיל, כי ההורדה שלו נכשלה. בדקו את החיבור לאינטרנט ונסו שוב.",
   "error.backend.mcpServerFailedToStart": "השרת לא התחיל: {reason}",
   "error.backend.mcpServerProgramMissing":
     "OpenBot לא הצליח להפעיל את שרת ה-MCP {name}, כי התוכנה שלו לא מותקנת במחשב שמריץ את OpenBot. יש להתקין את האפליקציה שמספקת את {name} במחשב הזה, או לכבות את {name} בחנות, אפליקציות.",
@@ -407,6 +410,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "הפרוקסי {name} דחה את ההתחברות, ולכן הדף לא נפתח.",
   "error.backend.browserSystemProxyFailed":
     "הפרוקסי בהגדרות של המחשב שמריץ את OpenBot אינו עונה או דחה את החיבור, ולכן הדף לא נפתח. בדקו את הגדרות הפרוקסי של המחשב הזה.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "האתר או הפרוקסי בהגדרות של המחשב שמריץ את OpenBot סגרו את החיבור בלי תשובה, ולכן הדף לא נפתח. אם אף אתר לא נפתח, בדקו את הגדרות הפרוקסי של המחשב הזה.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "האתר או הפרוקסי של פרופיל הדפדפן הזה סגרו את החיבור בלי תשובה, ולכן הדף לא נפתח. אם אף אתר לא נפתח, בדקו את הפרוקסי של הפרופיל.",
   "error.backend.browserProxyComputerUnreachable": "המחשב שהפרופיל הזה משתמש בו אינו עונה, ולכן הדף לא נפתח.",
   "error.backend.browserProxyComputerLocalAddress":
     "המחשב שהפרופיל הזה משתמש בו פותח רק אתרים ציבוריים. הוא לא פותח כתובות ברשת מקומית, ולכן הדף לא נפתח.",

@@ -79,6 +79,7 @@ import type { MachineAlertMonitor } from "../machine-alerts";
 import type { McpAccessControl } from "../mcp-access-store";
 import type { McpHostSignIns } from "../mcp-host-sign-ins";
 import type { McpServerOwnersStore } from "../mcp-server-owners-store";
+import type { CreditAsksControl, MediaApprovalCreditsControl } from "../media-approval-credits-preference-store";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
 import type { ModelVisibility } from "../model-visibility";
 import type { OnePasswordConnectorService } from "../onepassword-connector-service";
@@ -196,9 +197,13 @@ type TeamApiAgentMethods = Pick<
   | "compactTaskContext"
   | "agentIdForRequest"
   | "pendingApproval"
+  | "pendingMediaApproval"
+  | "pendingCreditsHold"
   | "pendingPrompts"
   | "respondToPrompt"
   | "respondToApproval"
+  | "respondToMediaApproval"
+  | "respondToCreditsHold"
   | "respondToBrowserSecret"
   | "respondToBrowserTakeover"
 >;
@@ -484,6 +489,8 @@ export interface TeamApiAdmin {
   promptCacheTtl?: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   claudeUserSetup?: ClaudeUserSetupControl;
   cacheExpiryCompaction?: CacheExpiryCompactionControl;
+  mediaApprovalCredits?: MediaApprovalCreditsControl;
+  creditAsks?: Pick<CreditAsksControl, "setMuted" | "mutedFor">;
   claudeCompactWindow?: ClaudeCompactWindowControl;
   providerEnvironment?: Pick<ProviderEnvironmentControl, "get" | "set">;
   providerDetection?: {

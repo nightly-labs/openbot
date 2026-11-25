@@ -108,6 +108,8 @@ import type {
   McpServerConfig,
   McpSignInState,
   McpTestResult,
+  MediaApprovalCreditsSetting,
+  MediaApprovalCreditsUpdate,
   MessagingOverview,
   MessagingWorkspaceInput,
   OnePasswordConnectorStatus,
@@ -444,6 +446,12 @@ export interface MobileWorkspaceContextValue {
   canManageAgentMemoryLimit: (serverId: string) => boolean;
   loadAgentMemoryLimit: (serverId: string) => Promise<HostAgentMemoryLimit>;
   setAgentMemoryLimit: (limit: number, serverId: string) => Promise<HostAgentMemoryLimit>;
+  canManageMediaApprovalCredits: (serverId: string) => boolean;
+  loadMediaApprovalCredits: (serverId: string) => Promise<MediaApprovalCreditsSetting>;
+  setMediaApprovalCredits: (
+    update: MediaApprovalCreditsUpdate,
+    serverId: string,
+  ) => Promise<MediaApprovalCreditsSetting>;
   canManageMemoryReview: (serverId: string) => boolean;
   loadMemoryReview: (serverId: string) => Promise<HostMemoryReview>;
   setMemoryReview: (interval: number, serverId: string) => Promise<HostMemoryReview>;
@@ -896,6 +904,7 @@ type ServerCheckKey =
   | "servesServerSignalHome"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
+  | "canManageMediaApprovalCredits"
   | "canManageMemoryReview"
   | "canManageSkillLearning"
   | "canManageBrowsingMemory"

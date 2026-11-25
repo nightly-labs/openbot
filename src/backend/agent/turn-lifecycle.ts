@@ -1005,6 +1005,15 @@ export class TurnLifecycle {
       });
       return false;
     }
+    const teammateResults = deliveries.every(({ delivery }) => answeredRequestId(delivery) !== null);
+    if (teammateResults && this.#awaitsTeammateInOwnLane(agentId, threadId, snapshot.threadId)) {
+      logger.info("A turn for a teammate result ended with no answer while a teammate still works.", {
+        agentId,
+        turnId,
+        provider: source.provider,
+      });
+      return false;
+    }
     if (!NO_ANSWER_CHECKED_PROVIDERS.has(source.provider)) return false;
     if (deliveries.every(({ delivery }) => this.#mailbox.answersHandledRequest(delivery.id))) {
       logger.info("A turn for another teammate result to a handled request ended quietly.", {
@@ -1036,9 +1045,14 @@ export class TurnLifecycle {
     }
     if (deliveries.every(({ delivery }) => this.#mailbox.isAgentSetupDelivery(delivery.id))) return false;
     const channelTask = this.#channelTask(snapshot.threadId, deliveries);
-    const message = sourceText(channelTask ? "error.provider.channelNoAnswer" : "error.provider.acpNoAnswer", {
-      provider: agentProviderDescriptor(source.provider).displayName,
-    });
+    const message = sourceText(
+      channelTask
+        ? "error.provider.channelNoAnswer"
+        : teammateResults
+          ? "error.provider.teammateResultsNoAnswer"
+          : "error.provider.acpNoAnswer",
+      { provider: agentProviderDescriptor(source.provider).displayName },
+    );
     const context = {
       causeCode: "empty_answer" as const,
       provider: source.provider,
@@ -1051,6 +1065,12 @@ export class TurnLifecycle {
     this.#turnCauses.set(turnId, context.causeCode);
     this.#failoverTurns.set(turnId, { message, context });
     return true;
+  }
+
+  #awaitsTeammateInOwnLane(agentId: string, threadId: string, publicThreadId: string | null): boolean {
+    const taskId = this.#taskForThread(agentId, threadId);
+    if (taskId === null && this.#conversation.isExecutionThread(publicThreadId)) return false;
+    return this.#mailbox.teammateStillWorks(agentId, taskId);
   }
 
   #channelTask(threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
@@ -1583,6 +1603,13 @@ export class TurnLifecycle {
         running.continues = origin !== null && running.continues.length > 0 ? [...running.continues, origin] : [];
         if (origin !== null)
           this.#noteSelfStartedOrigins(turnId, [...(this.#selfStartedOrigins.get(turnId) ?? []), origin]);
+        return;
+      }
+      case "openbot/unread-steers": {
+        const turnId = getString(params, "turnId");
+        if (!threadId || !agentId || !turnId) return;
+        yield* this.#requeueUnreadSteers(agentId, threadId, turnId, getArray(params, "unreadSteers").filter(isString));
+        this.#hooks.scheduleDrain(agentId);
         return;
       }
       case "openbot/background-work": {

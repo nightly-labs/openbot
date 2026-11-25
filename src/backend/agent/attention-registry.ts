@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { CreditMediaGenerationKind } from "@openbot/contracts/credit-media";
 import type { FeedbackPhone } from "@openbot/contracts/feedback";
 import type {
   AgentApproval,
@@ -11,9 +12,14 @@ import type {
   BrowserTakeoverRequest,
   BrowserVaultSkipReason,
   ConversationMessageSender,
+  CreditsHold,
   LocalBrowserSecretResponse,
+  MediaApprovalChoice,
+  MediaApprovalOffer,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
+  RespondToCreditsHoldInput,
+  RespondToMediaApprovalInput,
   RespondToPromptInput,
 } from "@openbot/contracts/ipc";
 import {
@@ -183,6 +189,48 @@ const AUTOMATIC_RESPONDER: PromptResponder = { privileged: true, automatic: true
 export interface ApprovalResponder {
   owner: boolean;
   phone?: FeedbackPhone;
+  person?: { id: string; canAdminister: boolean };
+}
+
+export interface CreditsHoldCall {
+  kind: CreditMediaGenerationKind;
+  cost: number;
+}
+
+export interface CreditsHoldWallet {
+  agentsAllowed: () => boolean;
+  enableAgents: () => Effect.Effect<void, unknown>;
+  balance: () => Effect.Effect<number | null>;
+}
+
+export type CreditAnswerVia = "local" | "remote" | "automatic";
+
+function answerVia(responder: ApprovalResponder | undefined): CreditAnswerVia {
+  return responder ? "remote" : "local";
+}
+
+export interface CreditsHoldAnswer {
+  action: "continue" | "skip" | "mute";
+  responder?: ApprovalResponder;
+  via?: CreditAnswerVia;
+  enabled?: boolean;
+  stopped?: boolean;
+}
+
+interface PendingCreditsHold {
+  call: CreditsHoldCall;
+  balance: number | null;
+  wallet: CreditsHoldWallet;
+  answer: (answer: CreditsHoldAnswer) => void;
+}
+
+function respondsAsAdmin(responder: ApprovalResponder | undefined): boolean {
+  if (!responder) return true;
+  return responder.person?.canAdminister ?? responder.owner;
+}
+
+function creditsSum(values: readonly number[]): number {
+  return Math.round(values.reduce((total, value) => total + value, 0) * 1000) / 1000;
 }
 
 interface PendingApproval {
@@ -193,13 +241,21 @@ interface PendingApproval {
   approval: AgentApproval;
   executionThreadId: string;
   hostedSiteMutation?: HostedSiteMutationContext;
-  decide?: (decision: ToolApprovalDecision, phone?: FeedbackPhone) => void;
+  decide?: (decision: ToolApprovalDecision, responder?: ApprovalResponder, choice?: MediaApprovalChoice) => void;
+  media?: MediaApprovalOffer;
+  creditsHold?: PendingCreditsHold;
   alwaysAsk?: boolean;
   ownerOnly?: boolean;
   needsPhone?: boolean;
 }
 
 export type ToolApprovalDecision = "accept" | "decline" | "cancel";
+
+interface MediaApprovalAnswer {
+  readonly decision: ToolApprovalDecision;
+  readonly choice?: MediaApprovalChoice;
+  readonly via: CreditAnswerVia;
+}
 
 const TOOL_APPROVAL_METHOD = "openbot/tool-approval";
 const MESSAGING_QUESTION_REFUSED =
@@ -583,6 +639,123 @@ export class AttentionRegistry {
     return pending ? structuredClone(pending.approval) : undefined;
   }
 
+  pendingMediaApproval(agentId: string, requestId: RequestId): MediaApprovalOffer | undefined {
+    const pending = this.#approvals.get(requestId);
+    if (!pending?.media || pending.approval.agentId !== agentId) return undefined;
+    return structuredClone(pending.media);
+  }
+
+  pendingCreditsHold(agentId: string, requestId: RequestId, canEnable: boolean): CreditsHold | undefined {
+    const pending = this.#approvals.get(requestId);
+    if (!pending?.creditsHold || pending.approval.agentId !== agentId) return undefined;
+    return this.#creditsHoldSummary(pending, pending.creditsHold, canEnable);
+  }
+
+  #creditsHoldGroup(pending: PendingApproval): PendingApproval[] {
+    const { agentId, threadId, turnId } = pending.approval;
+    return [...this.#approvals.values()].filter(
+      (other) =>
+        other.creditsHold !== undefined &&
+        other.approval.agentId === agentId &&
+        other.approval.threadId === threadId &&
+        other.approval.turnId === turnId,
+    );
+  }
+
+  #creditsHoldSummary(pending: PendingApproval, hold: PendingCreditsHold, canEnable: boolean): CreditsHold {
+    const calls = this.#creditsHoldGroup(pending).flatMap((other) =>
+      other.creditsHold ? [other.creditsHold.call] : [],
+    );
+    return {
+      reason: hold.wallet.agentsAllowed() ? "balance" : "agentsOff",
+      images: calls.filter((call) => call.kind === "image").length,
+      videos: calls.filter((call) => call.kind === "video").length,
+      cost: creditsSum(calls.map((call) => call.cost)),
+      balance: hold.balance,
+      canEnable,
+    };
+  }
+
+  #resolveCreditsHolds(group: readonly PendingApproval[], answer: CreditsHoldAnswer): void {
+    for (const pending of group) {
+      if (this.#approvals.get(pending.id) !== pending) continue;
+      this.#approvals.delete(pending.id);
+      this.#routines.markRunningForTurn(pending.approval.turnId);
+      this.#emitInputResolved("approval", pending.id, pending.approval.agentId);
+      pending.creditsHold?.answer(answer);
+    }
+    this.#emitRuntimeSnapshot();
+  }
+
+  readonly respondToCreditsHold = Effect.fn("AttentionRegistry.respondToCreditsHold")(function* (
+    this: AttentionRegistry,
+    input: RespondToCreditsHoldInput,
+    responder?: ApprovalResponder,
+    automatic = false,
+  ) {
+    const { pending, hold } = yield* attentionStep(() => {
+      const value = this.#approvals.get(input.requestId);
+      if (!value?.creditsHold || value.approval.agentId !== input.agentId)
+        throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
+      if (input.action === "enable" && !respondsAsAdmin(responder))
+        throw new ForbiddenAttentionAnswer(sourceText("error.backend.creditsHoldAdminOnly"));
+      return { pending: value, hold: value.creditsHold };
+    });
+    const canEnable = respondsAsAdmin(responder);
+    const via = automatic ? "automatic" : answerVia(responder);
+    if (input.action === "skip" || input.action === "mute") {
+      this.#resolveCreditsHolds(this.#creditsHoldGroup(pending), {
+        action: input.action,
+        via,
+        ...(responder ? { responder } : {}),
+      });
+      return null;
+    }
+    if (input.action === "enable" && !hold.wallet.agentsAllowed())
+      yield* hold.wallet.enableAgents().pipe(Effect.mapError((cause) => new AttentionOperationFailed({ cause })));
+    if (!hold.wallet.agentsAllowed()) return this.#creditsHoldSummary(pending, hold, canEnable);
+    const balance = yield* hold.wallet.balance();
+    const group = this.#creditsHoldGroup(pending);
+    const cost = creditsSum(group.flatMap((other) => (other.creditsHold ? [other.creditsHold.call.cost] : [])));
+    if (balance !== null && balance < cost) {
+      for (const other of group) if (other.creditsHold) other.creditsHold.balance = balance;
+      return this.#creditsHoldSummary(pending, hold, canEnable);
+    }
+    this.#resolveCreditsHolds(group, {
+      action: "continue",
+      via,
+      ...(input.action === "enable" ? { enabled: true } : {}),
+      ...(responder ? { responder } : {}),
+    });
+    return null;
+  }, Effect.uninterruptible).bind(this);
+
+  recheckCreditsHolds(): void {
+    const seen = new Set<string>();
+    for (const pending of [...this.#approvals.values()]) {
+      if (!pending.creditsHold) continue;
+      const key = `${pending.approval.agentId}\u0000${pending.approval.threadId}\u0000${pending.approval.turnId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const report = (error: unknown) =>
+        Effect.sync(() => {
+          if (this.#approvals.get(pending.id) === pending)
+            this.#emitError("credits_hold_recheck_failed", error, pending.approval.agentId);
+        });
+      Effect.runFork(
+        this.respondToCreditsHold(
+          {
+            agentId: pending.approval.agentId,
+            requestId: pending.id,
+            action: "continue",
+          },
+          undefined,
+          true,
+        ).pipe(Effect.catch(report), Effect.catchDefect(report)),
+      );
+    }
+  }
+
   hasAttentionFor(agentId: string): boolean {
     return (
       [...this.#prompts.values()].some((pending) => pending.agentId === agentId) ||
@@ -891,14 +1064,45 @@ export class AttentionRegistry {
     return { pending: answer.pending, item, saved };
   });
 
+  readonly respondToMediaApproval = Effect.fn("AttentionRegistry.respondToMediaApproval")(function* (
+    this: AttentionRegistry,
+    input: RespondToMediaApprovalInput,
+    responder?: ApprovalResponder,
+  ) {
+    yield* attentionStep(() => {
+      if (!this.pendingMediaApproval(input.agentId, input.requestId))
+        throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
+    });
+    yield* this.respondToApproval({ requestId: input.requestId, decision: "accept" }, responder, input.choice);
+  }).bind(this);
+
   readonly respondToApproval = Effect.fn("AttentionRegistry.respondToApproval")(function* (
     this: AttentionRegistry,
     input: RespondToApprovalInput,
     responder?: ApprovalResponder,
+    choice?: MediaApprovalChoice,
   ) {
+    const held = this.#approvals.get(input.requestId);
+    if (held?.creditsHold) {
+      const still = yield* this.respondToCreditsHold(
+        {
+          agentId: held.approval.agentId,
+          requestId: input.requestId,
+          action: input.decision === "accept" ? "continue" : "skip",
+        },
+        responder,
+      );
+      if (still)
+        yield* attentionStep(() => {
+          throw new ForbiddenAttentionAnswer(sourceText("error.backend.creditsHoldShort"));
+        });
+      return;
+    }
     const pending = yield* attentionStep(() => {
       const value = this.#approvals.get(input.requestId);
       if (!value) throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
+      if (choice && !value.media?.models.some((model) => model.id === choice.model))
+        throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
       if (value.ownerOnly && responder && !responder.owner)
         throw new ForbiddenAttentionAnswer(sourceText("error.backend.approvalOwnerOnly"));
       if (value.needsPhone && input.decision === "accept" && !responder?.phone)
@@ -911,7 +1115,7 @@ export class AttentionRegistry {
 
     const mutation = pending.hostedSiteMutation;
     if (pending.decide) {
-      pending.decide(input.decision, responder?.phone);
+      pending.decide(input.decision, responder, choice);
     } else if (mutation) {
       this.#approvals.delete(input.requestId);
       yield* this.#hostedSites
@@ -1118,6 +1322,47 @@ export class AttentionRegistry {
     return (yield* this.#awaitToolAnswer(client, request, approval, options)).decision;
   }).bind(this);
 
+  readonly awaitMediaApproval = Effect.fn("AttentionRegistry.awaitMediaApproval")(function* (
+    this: AttentionRegistry,
+    client: AgentClient,
+    request: AppServerRequest,
+    approval: AgentApproval,
+    media: MediaApprovalOffer,
+  ) {
+    const answer = yield* this.#awaitToolAnswer(client, request, approval, { alwaysAsk: true, media });
+    const choice = "choice" in answer ? answer.choice : undefined;
+    const via = "via" in answer && answer.via ? answer.via : "local";
+    return { decision: answer.decision, via, ...(choice ? { choice } : {}) } satisfies MediaApprovalAnswer;
+  }).bind(this);
+
+  readonly awaitCreditsHold = Effect.fn("AttentionRegistry.awaitCreditsHold")(function* (
+    this: AttentionRegistry,
+    client: AgentClient,
+    request: AppServerRequest,
+    approval: AgentApproval,
+    hold: { call: CreditsHoldCall; balance: number | null; wallet: CreditsHoldWallet },
+  ) {
+    if (request.signal?.aborted) return { action: "skip" } satisfies CreditsHoldAnswer;
+    const answer = Deferred.makeUnsafe<CreditsHoldAnswer>();
+    const settle = (value: CreditsHoldAnswer) => Deferred.doneUnsafe(answer, Effect.succeed(value));
+    this.#holdApproval({
+      client,
+      id: request.id,
+      method: TOOL_APPROVAL_METHOD,
+      params: request.params,
+      approval,
+      decide: (decision, responder) =>
+        settle(
+          decision === "cancel"
+            ? { action: "skip", stopped: true }
+            : { action: decision === "accept" ? "continue" : "skip", via: answerVia(responder) },
+        ),
+      creditsHold: { ...hold, answer: settle },
+      alwaysAsk: true,
+    });
+    return yield* Deferred.await(answer);
+  }).bind(this);
+
   readonly awaitPhoneFeedbackApproval = Effect.fn("AttentionRegistry.awaitPhoneFeedbackApproval")(function* (
     this: AttentionRegistry,
     client: AgentClient,
@@ -1132,20 +1377,39 @@ export class AttentionRegistry {
     client: AgentClient,
     request: AppServerRequest,
     approval: AgentApproval,
-    options: { readonly alwaysAsk?: boolean; readonly ownerOnly?: boolean; readonly needsPhone?: boolean },
+    options: {
+      readonly alwaysAsk?: boolean;
+      readonly ownerOnly?: boolean;
+      readonly needsPhone?: boolean;
+      readonly media?: MediaApprovalOffer;
+    },
   ) {
     if (request.signal?.aborted) return { decision: "cancel" } as const;
     const alwaysAsk = options.alwaysAsk || options.ownerOnly;
     if (!alwaysAsk && this.#answersForAgent(approval.agentId)) return { decision: "accept" } as const;
-    const answer = Deferred.makeUnsafe<{ decision: ToolApprovalDecision; phone?: FeedbackPhone }>();
+    const answer = Deferred.makeUnsafe<{
+      decision: ToolApprovalDecision;
+      phone?: FeedbackPhone;
+      choice?: MediaApprovalChoice;
+      via?: CreditAnswerVia;
+    }>();
     this.#holdApproval({
       client,
       id: request.id,
       method: TOOL_APPROVAL_METHOD,
       params: request.params,
       approval,
-      decide: (decision, phone) =>
-        Deferred.doneUnsafe(answer, Effect.succeed({ decision, ...(phone ? { phone } : {}) })),
+      decide: (decision, responder, choice) =>
+        Deferred.doneUnsafe(
+          answer,
+          Effect.succeed({
+            decision,
+            via: answerVia(responder),
+            ...(responder?.phone ? { phone: responder.phone } : {}),
+            ...(choice && decision === "accept" ? { choice } : {}),
+          }),
+        ),
+      ...(options.media ? { media: options.media } : {}),
       ...(alwaysAsk ? { alwaysAsk: true } : {}),
       ...(options.ownerOnly ? { ownerOnly: true } : {}),
       ...(options.needsPhone ? { needsPhone: true } : {}),

@@ -34,6 +34,7 @@ function decodeHost(value: unknown): RemoteTeamHost | null {
     ...optionalCustomServerPayment(value),
   };
   if (isNumber(value.memberLimit)) host.memberLimit = value.memberLimit;
+  if (isBoolean(value.licenseRaisesMemberLimit)) host.licenseRaisesMemberLimit = value.licenseRaisesMemberLimit;
   if (isBoolean(value.hosted)) host.hosted = value.hosted;
   if (isBoolean(value.restartAvailable)) host.restartAvailable = value.restartAvailable;
   if (isNumber(value.storageGb)) host.storageGb = value.storageGb;

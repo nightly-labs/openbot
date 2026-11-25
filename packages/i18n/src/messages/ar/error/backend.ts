@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "الأحداث غير متاحة على هذا المضيف.",
   "error.backend.databaseIntegrity": "فشلت قاعدة بيانات OpenBot في فحص السلامة.",
+  "error.backend.creditsHoldAdminOnly": "يمكن لمالك هذا الخادم أو مسؤوله فقط السماح للوكلاء باستخدام الأرصدة.",
+  "error.backend.creditsHoldShort": "لا توجد أرصدة كافية بعد.",
   "error.backend.webhookRouteLimit": "يمكن أن يحتوي المضيف على {limit} مهام دورية webhook كحد أقصى.",
   "error.backend.webhookSettingsInvalid": "تحقق من إعدادات webhook وحاول مرة أخرى.",
   "error.backend.webhookSenderSecretInvalid":
@@ -292,6 +294,8 @@ export const messages = {
     "أرسل خادم تسجيل الدخول ردًا لا يستطيع OpenBot قراءته. إذا كانت الخدمة تمنحك مفتاح API أو رمزًا، فأضفه إلى إعدادات هذا الخادم، ثم اختبر الاتصال مرة أخرى.",
   "error.backend.mcpServerExited": "توقف الخادم قبل أن يُجيب. شغّل الأمر في الطرفية لرؤية الخطأ.",
   "error.backend.mcpServerExitedWithOutput": "توقف الخادم قبل أن يُجيب. كتب: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "لم يبدأ الخادم، لأن تنزيله فشل. تحقّق من الاتصال بالإنترنت، ثم حاول مرة أخرى.",
   "error.backend.mcpServerFailedToStart": "لم يبدأ الخادم: {reason}",
   "error.backend.mcpServerProgramMissing":
     "تعذّر على OpenBot تشغيل خادم MCP {name}، لأن برنامجه غير مثبّت على الكمبيوتر الذي يشغّل OpenBot. ثبّت التطبيق الذي يوفّر {name} على ذلك الكمبيوتر، أو أوقف {name} في المتجر، التطبيقات.",
@@ -413,6 +417,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "رفض الوكيل {name} تسجيل الدخول، لذلك لم تُفتح الصفحة.",
   "error.backend.browserSystemProxyFailed":
     "الوكيل في إعدادات الكمبيوتر الذي يشغّل OpenBot لا يستجيب أو رفض الاتصال، لذلك لم تُفتح الصفحة. تحقّق من إعدادات الوكيل في ذلك الكمبيوتر.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "أغلق الموقع أو الوكيل في إعدادات الكمبيوتر الذي يشغّل OpenBot الاتصال دون أي رد، لذلك لم تُفتح الصفحة. إذا لم يُفتح أي موقع، فتحقّق من إعدادات الوكيل في ذلك الكمبيوتر.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "أغلق الموقع أو وكيل ملف تعريف المتصفح هذا الاتصال دون أي رد، لذلك لم تُفتح الصفحة. إذا لم يُفتح أي موقع، فتحقّق من وكيل ملف التعريف.",
   "error.backend.browserProxyComputerUnreachable":
     "الكمبيوتر الذي يستخدمه هذا الملف الشخصي لا يستجيب، لذلك لم تُفتح الصفحة.",
   "error.backend.browserProxyComputerLocalAddress":

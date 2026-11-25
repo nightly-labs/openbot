@@ -21,6 +21,7 @@ const WAIT_MS = 5_000;
 const AGENTS = new Set(["agent-research"]);
 const TITLE_ANSWER = "A red bicycle at dawn";
 const CALLER = "agent-builder";
+const REQUESTER_TIMEZONE = "Europe/Warsaw";
 
 const created = z.object({ workflowId: z.string(), ids: z.record(z.string(), z.string()) });
 const workflowRead = z.object({
@@ -153,7 +154,16 @@ async function call(
   const resolved = resolveDeferredTool(params("tool_call", { name: `openbot.${name}`, arguments: args }), "codex");
   assert.ok(resolved, `tool_call refused openbot.${name}`);
   const response = await runCauseEffect(
-    handleWorkflowTool(resolved.tool, resolved.arguments, workflows, CALLER, callKey, AGENTS, confirmDelete),
+    handleWorkflowTool(
+      resolved.tool,
+      resolved.arguments,
+      workflows,
+      CALLER,
+      callKey,
+      AGENTS,
+      REQUESTER_TIMEZONE,
+      confirmDelete,
+    ),
   );
   assert.ok(response, `no handler for ${name}`);
   const item = response.contentItems[0];
@@ -804,11 +814,26 @@ try {
     workflowId,
     ops: [{ op: "update", node: ids.start, schedule: { kind: "daily", time: "08:00" } }],
   });
-  const trigger = (await runCauseEffect(workflows.get(workflowId))).graph.nodes.find((node) => node.id === ids.start);
+  const scheduledDetail = await runCauseEffect(workflows.get(workflowId));
+  const trigger = scheduledDetail.graph.nodes.find((node) => node.id === ids.start);
   check(
     "a schedule on a manual trigger makes it a schedule trigger",
     scheduled.ok && trigger?.fields.trigger === "schedule" && JSON.stringify(trigger.schedule).includes("08:00"),
     trigger,
+  );
+  const nextDueAt = scheduledDetail.triggers.find((state) => state.nodeId === ids.start)?.nextDueAt;
+  const requesterClock =
+    nextDueAt &&
+    new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: REQUESTER_TIMEZONE,
+    }).format(new Date(nextDueAt));
+  check(
+    "a schedule that an agent sets runs at that time in the requester's time zone, not the host's",
+    trigger?.fields.timezone === REQUESTER_TIMEZONE && requesterClock === "08:00",
+    { timezone: trigger?.fields.timezone, nextDueAt },
   );
 
   deleteAnswer = false;

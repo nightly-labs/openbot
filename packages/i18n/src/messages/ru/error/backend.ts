@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "События недоступны на этом хосте.",
   "error.backend.databaseIntegrity": "База данных OpenBot не прошла проверку целостности.",
+  "error.backend.creditsHoldAdminOnly":
+    "Только владелец или администратор этого сервера может разрешить агентам использовать кредиты.",
+  "error.backend.creditsHoldShort": "Кредитов пока недостаточно.",
   "error.backend.webhookRouteLimit": "На хосте может быть не более {limit} регулярных задач с вебхуком.",
   "error.backend.webhookSettingsInvalid": "Проверьте настройки вебхука и повторите попытку.",
   "error.backend.webhookSenderSecretInvalid":
@@ -314,6 +317,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Сервер остановился, не ответив. Запустите команду в терминале, чтобы увидеть ошибку.",
   "error.backend.mcpServerExitedWithOutput": "Сервер остановился, не ответив. Он написал: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "Сервер не запустился, потому что его загрузка не удалась. Проверьте подключение к интернету и попробуйте снова.",
   "error.backend.mcpServerFailedToStart": "Сервер не запустился: {reason}",
   "error.backend.mcpServerProgramMissing":
     "OpenBot не может запустить MCP-сервер {name}, потому что его программа не установлена на компьютере, где работает OpenBot. Установите на этот компьютер приложение, которое даёт {name}, или выключите {name} в разделе Каталог, Приложения.",
@@ -437,6 +442,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "Прокси {name} отклонил вход, поэтому страница не открылась.",
   "error.backend.browserSystemProxyFailed":
     "Прокси в настройках компьютера, на котором работает OpenBot, не отвечает или отклонил подключение, поэтому страница не открылась. Проверьте настройки прокси этого компьютера.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "Сайт или прокси в настройках компьютера, на котором работает OpenBot, закрыл подключение без ответа, поэтому страница не открылась. Если не открывается ни один сайт, проверьте настройки прокси этого компьютера.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "Сайт или прокси этого профиля браузера закрыл подключение без ответа, поэтому страница не открылась. Если не открывается ни один сайт, проверьте прокси профиля.",
   "error.backend.browserProxyComputerUnreachable":
     "Компьютер этого профиля не отвечает, поэтому страница не открылась.",
   "error.backend.browserProxyComputerLocalAddress":

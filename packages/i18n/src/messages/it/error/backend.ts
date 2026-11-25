@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "Gli eventi non sono disponibili su questo host.",
   "error.backend.databaseIntegrity": "Il database di OpenBot non ha superato il controllo di integrità.",
+  "error.backend.creditsHoldAdminOnly":
+    "Solo un proprietario o un amministratore di questo server può consentire agli agenti di usare i crediti.",
+  "error.backend.creditsHoldShort": "Non ci sono ancora abbastanza crediti.",
   "error.backend.webhookRouteLimit": "Un host può avere al massimo {limit} routine webhook.",
   "error.backend.webhookSettingsInvalid": "Controlla le impostazioni del webhook e riprova.",
   "error.backend.webhookSenderSecretInvalid":
@@ -322,6 +325,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Il server si è fermato prima di rispondere. Esegui il comando in un terminale per vedere l'errore.",
   "error.backend.mcpServerExitedWithOutput": "Il server si è fermato prima di rispondere. Ha scritto: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "Il server non si è avviato perché il download non è riuscito. Controlla la connessione a internet, poi riprova.",
   "error.backend.mcpServerFailedToStart": "Il server non si è avviato: {reason}",
   "error.backend.mcpServerProgramMissing":
     "OpenBot non è riuscito ad avviare il server MCP {name}, perché il suo programma non è installato sul computer che esegue OpenBot. Installa l’app che fornisce {name} su quel computer, oppure disattiva {name} in Marketplace, App.",
@@ -445,6 +450,10 @@ export const messages = {
     "Il proxy {name} ha rifiutato l’accesso, quindi la pagina non si è aperta.",
   "error.backend.browserSystemProxyFailed":
     "Il proxy nelle impostazioni del computer che esegue OpenBot non risponde o ha rifiutato la connessione, quindi la pagina non si è aperta. Controlla le impostazioni proxy di quel computer.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "Il sito o il proxy nelle impostazioni del computer che esegue OpenBot ha chiuso la connessione senza risposta, quindi la pagina non si è aperta. Se non si apre nessun sito, controlla le impostazioni proxy di quel computer.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "Il sito o il proxy di questo profilo del browser ha chiuso la connessione senza risposta, quindi la pagina non si è aperta. Se non si apre nessun sito, controlla il proxy del profilo.",
   "error.backend.browserProxyComputerUnreachable":
     "Il computer di questo profilo non risponde, quindi la pagina non si è aperta.",
   "error.backend.browserProxyComputerLocalAddress":

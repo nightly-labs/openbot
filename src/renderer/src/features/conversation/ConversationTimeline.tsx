@@ -1704,6 +1704,7 @@ export function ConversationTimeline() {
                     onApprove={() => approve(approval)}
                     onReject={() => props.onRespondToApproval("decline")}
                     onAlwaysAllow={props.onAlwaysAllowApproval}
+                    media={props.mediaApproval}
                   />
                 </Loading>
               )}

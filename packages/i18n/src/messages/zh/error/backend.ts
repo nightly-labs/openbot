@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "这台主机不支持事件。",
   "error.backend.databaseIntegrity": "OpenBot 数据库未通过完整性校验。",
+  "error.backend.creditsHoldAdminOnly": "只有此服务器的所有者或管理员可以允许助手使用积分。",
+  "error.backend.creditsHoldShort": "积分还不够。",
   "error.backend.webhookRouteLimit": "一台主机最多可有 {limit} 个 Webhook 自动化任务。",
   "error.backend.webhookSettingsInvalid": "请检查 Webhook 设置后重试。",
   "error.backend.webhookSenderSecretInvalid": "请粘贴发送方提供的完整签名密钥。它包含 16 到 1024 个字符，且没有空格。",
@@ -273,6 +275,7 @@ export const messages = {
     "登录服务器发送了 OpenBot 无法读取的响应。如果该服务为你提供了 API 密钥或令牌，请将其添加到该服务器的设置中，然后重新测试连接。",
   "error.backend.mcpServerExited": "服务器在响应之前就停止了。请在终端中运行该命令以查看错误。",
   "error.backend.mcpServerExitedWithOutput": "服务器在响应之前就停止了。它输出了：{detail}",
+  "error.backend.mcpServerDownloadFailed": "服务器没有启动，因为下载失败。请检查网络连接，然后重试。",
   "error.backend.mcpServerFailedToStart": "服务器没有启动：{reason}",
   "error.backend.mcpServerProgramMissing":
     "OpenBot 无法启动 MCP 服务器 {name}，因为运行 OpenBot 的电脑上没有安装它的程序。请在那台电脑上安装提供 {name} 的应用，或在 市场、应用 中关闭 {name}。",
@@ -389,6 +392,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "代理 {name} 拒绝了登录，因此页面没有打开。",
   "error.backend.browserSystemProxyFailed":
     "运行 OpenBot 的计算机设置中的代理没有响应或拒绝了连接，因此页面没有打开。请检查该计算机的代理设置。",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "网站或运行 OpenBot 的计算机设置中的代理没有应答就关闭了连接，因此页面没有打开。如果所有网站都打不开，请检查该计算机的代理设置。",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "网站或此浏览器配置文件的代理没有应答就关闭了连接，因此页面没有打开。如果所有网站都打不开，请检查该配置文件的代理。",
   "error.backend.browserProxyComputerUnreachable": "此配置文件使用的计算机没有响应，因此页面没有打开。",
   "error.backend.browserProxyComputerLocalAddress":
     "此配置文件使用的计算机只打开公共网站。它不打开本地网络上的地址，因此页面没有打开。",

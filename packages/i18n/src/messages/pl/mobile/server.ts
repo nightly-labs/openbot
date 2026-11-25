@@ -603,6 +603,19 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Nie udało się zapisać limitu wspomnień. Spróbuj ponownie.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego limit wspomnień.",
+  "mobile.server.settings.mediaApprovalCredits": "Pytaj przed wydaniem ponad",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "kredytów",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed":
+    "Nie udało się wczytać progu zatwierdzania kredytów tego serwera.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed":
+    "Nie udało się zapisać progu zatwierdzania kredytów. Spróbuj ponownie.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby zmienić tutaj jego próg zatwierdzania kredytów.",
+  "mobile.server.settings.mediaApprovalAgents": "Agenci mogą używać kredytów",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed":
+    "Nie udało się zmienić używania kredytów przez agentów. Spróbuj ponownie.",
+  "mobile.server.settings.mediaApprovalAsk": "Pytaj, gdy potrzebne są kredyty",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "Nie udało się zmienić próśb o kredyty. Spróbuj ponownie.",
   "mobile.server.settings.memoryReview": "Przegląd wspomnień",
   "mobile.server.settings.memoryReviewDescription":
     "Jak często agenci na tym serwerze zapisują w tle trwałe fakty ze swoich czatów.",

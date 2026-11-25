@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "Los eventos no están disponibles en este host.",
   "error.backend.databaseIntegrity": "La base de datos de OpenBot no superó la comprobación de integridad.",
+  "error.backend.creditsHoldAdminOnly":
+    "Solo un propietario o administrador de este servidor puede permitir que los agentes usen créditos.",
+  "error.backend.creditsHoldShort": "Aún no hay suficientes créditos.",
   "error.backend.webhookRouteLimit": "Un host puede tener un máximo de {limit} rutinas de webhook.",
   "error.backend.webhookSettingsInvalid": "Comprueba los ajustes del webhook e inténtalo de nuevo.",
   "error.backend.webhookSenderSecretInvalid":
@@ -323,6 +326,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "El servidor se detuvo antes de responder. Ejecuta el comando en una terminal para ver su error.",
   "error.backend.mcpServerExitedWithOutput": "El servidor se detuvo antes de responder. Escribió: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "El servidor no se inició porque su descarga falló. Comprueba la conexión a internet y vuelve a intentarlo.",
   "error.backend.mcpServerFailedToStart": "El servidor no se inició: {reason}",
   "error.backend.mcpServerProgramMissing":
     "OpenBot no pudo iniciar el servidor MCP {name}, porque su programa no está instalado en el equipo que ejecuta OpenBot. Instala la aplicación que ofrece {name} en ese equipo, o desactiva {name} en Marketplace, Apps.",
@@ -445,6 +450,10 @@ export const messages = {
     "El proxy {name} rechazó el inicio de sesión, así que la página no se abrió.",
   "error.backend.browserSystemProxyFailed":
     "El proxy de la configuración del ordenador que ejecuta OpenBot no responde o rechazó la conexión, así que la página no se abrió. Revisa la configuración de proxy de ese ordenador.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "El sitio o el proxy de la configuración del ordenador que ejecuta OpenBot cerró la conexión sin responder, así que la página no se abrió. Si no se abre ningún sitio, revisa la configuración de proxy de ese ordenador.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "El sitio o el proxy de este perfil del navegador cerró la conexión sin responder, así que la página no se abrió. Si no se abre ningún sitio, revisa el proxy del perfil.",
   "error.backend.browserProxyComputerUnreachable":
     "El ordenador que usa este perfil no responde, así que la página no se abrió.",
   "error.backend.browserProxyComputerLocalAddress":

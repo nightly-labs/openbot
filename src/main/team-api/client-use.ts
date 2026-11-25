@@ -65,6 +65,8 @@ import { LIVE_VOICE_ACCOUNT_ROUTES } from "@openbot/contracts/team-protocol/live
 import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MACHINE_RESOURCES_ROUTES } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
+import { MEDIA_APPROVAL_CHOICE_ROUTES } from "@openbot/contracts/team-protocol/media-approval-choice-v1";
+import { MEDIA_APPROVAL_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/media-approval-credits-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
@@ -153,6 +155,9 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   PROMPT_CACHE_TTL_ROUTES.settings,
   CLAUDE_COMPACT_WINDOW_ROUTES.settings,
   CACHE_EXPIRY_COMPACTION_ROUTES.settings,
+  MEDIA_APPROVAL_CREDITS_ROUTES.settings,
+  MEDIA_APPROVAL_CHOICE_ROUTES.read,
+  MEDIA_APPROVAL_CHOICE_ROUTES.mutedRead,
   PROVIDER_ENVIRONMENT_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.listing,
