@@ -81,10 +81,11 @@ is never quiet.
 
 A teammate update ends quiet in the same way. It is a teammate's message with `expectsReply` false
 that does not reply to a message of the agent (`quietTeammateDelivery`), so nobody waits for the
-turn. Its prompt names `routine_no_update`, because a provider such as Claude Code makes the model
-write a visible answer, and without the tool each update put filler in the user's chat (#6821). A turn
-of only quiet routine runs and teammate updates settles as above, also on the empty-answer error
-path and in the history import. The desktop chat shows its quiet answers under the marker of the
+turn. A message with `expectsReply` false that replies to the agent's own answer is an update too,
+not a result for the agent (`MailboxStore.followsUpOwnAnswer`, #16136). The prompt of an update
+names `routine_no_update`, because a provider such as Claude Code makes the model write a visible
+answer, and without the tool each update put filler in the user's chat (#6821). A turn of only quiet routine runs and teammate
+updates settles as above, also on the empty-answer error path and in the history import. The desktop chat shows its quiet answers under the marker of the
 last update or request of the turn, which starts closed (`teammateTurnAnswers`).
 
 A teammate's answer to a request that a quiet routine run sent continues that run, so nobody waits

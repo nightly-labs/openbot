@@ -1980,7 +1980,7 @@ export class TurnLifecycle {
       !deliveries.some(
         ({ delivery }) =>
           delivery.sender.kind === "routine" ||
-          quietTeammateDelivery(delivery) ||
+          quietTeammateDelivery(delivery, this.#followsUpOwnAnswer) ||
           teammateRequest(delivery) ||
           this.#continuesQuietRun(delivery),
       )
@@ -2137,8 +2137,14 @@ export class TurnLifecycle {
   }
 
   #quietTeammateTurnDelivery(delivery: QueueDelivery): boolean {
-    return quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id));
+    return quietTeammateTurnDelivery(
+      delivery,
+      (request) => this.#mailbox.hasOwnReplyFrom(request.id),
+      this.#followsUpOwnAnswer,
+    );
   }
+
+  readonly #followsUpOwnAnswer = (delivery: QueueDelivery): boolean => this.#mailbox.followsUpOwnAnswer(delivery);
 
   readonly #completeTurn = Effect.fn("TurnLifecycle.completeTurn")(
     function* (this: TurnLifecycle, agentId: string, threadId: string, turnId: string, status: string) {

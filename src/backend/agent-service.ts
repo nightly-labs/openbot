@@ -280,7 +280,12 @@ import { isBalanceDiagnostic, isPlanLimitDiagnostic, providerResetDelayMs } from
 import { type AgentClientFactory, ProviderRuntime, toProviderOperationFailed } from "./agent/provider-runtime";
 import { ProviderSignInWaits } from "./agent/provider-sign-in-waits";
 import { QueueControls } from "./agent/queue-controls";
-import { quietRoutineRun, quietTeammateDelivery, quietTeammateTurnDelivery } from "./agent/routine-quiet-runs";
+import {
+  type FollowsUpOwnAnswer,
+  quietRoutineRun,
+  quietTeammateDelivery,
+  quietTeammateTurnDelivery,
+} from "./agent/routine-quiet-runs";
 import { type RoutineMutationOptions, RoutineScheduler, toRoutineOperationFailed } from "./agent/routine-scheduler";
 import { localTimezone } from "./agent/routine-tools";
 import { buildRuntimeSnapshot } from "./agent/runtime-snapshot";
@@ -7163,12 +7168,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #noticeWaitsForQuietTurn(agentId: string, turnId: string, taskId: string | null, deliveryId: string): boolean {
     const notice = this.#mailbox.getDelivery(deliveryId)?.delivery;
-    if (!notice || !quietTeammateDelivery(notice)) return false;
+    const followsUpOwnAnswer: FollowsUpOwnAnswer = (delivery) => this.#mailbox.followsUpOwnAnswer(delivery);
+    if (!notice || !quietTeammateDelivery(notice, followsUpOwnAnswer)) return false;
     const deliveries = this.#turnDeliveries(agentId, turnId, taskId);
     return (
       deliveries.length > 0 &&
       deliveries.every(({ delivery }) =>
-        quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id)),
+        quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id), followsUpOwnAnswer),
       )
     );
   }

@@ -966,6 +966,7 @@ export class DrainScheduler {
                   ? this.#routines.timezoneForDelivery(item.delivery.id)
                   : undefined,
               answeredRoutine: this.answeredRoutine(item.delivery),
+              followsUpOwnAnswer: this.#mailbox.followsUpOwnAnswer(item.delivery),
               taskReport: this.taskReport(item),
               taskReportWaiting: this.taskReportWaiting(item),
               tags,
@@ -1069,7 +1070,9 @@ export class DrainScheduler {
                   ? { clientTurnId: randomUUID() }
                   : {}),
                 answerOptional:
-                  delivery.sender.kind === "agent" && delivery.expectsReply === false && !delivery.replyToMessageId,
+                  delivery.sender.kind === "agent" &&
+                  delivery.expectsReply === false &&
+                  (!delivery.replyToMessageId || this.#mailbox.followsUpOwnAnswer(delivery)),
                 input: inputForThread(providerThreadId),
                 cwd: agent.workspacePath,
                 runtimeWorkspaceRoots: workspaceWritableRoots(agent, this.#store.sharedRoot),
