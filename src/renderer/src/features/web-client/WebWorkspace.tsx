@@ -2180,12 +2180,19 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         errorBanners.noteError(key, event.message, message);
         controller.setConversationErrors((current) => ({ ...current, [key]: message }));
         const details = agentErrorDetails(event.message, message);
+        const link = event.link;
         const notice = isRetryNotice(event.message);
         controller.setConversationErrorRuns((current) => {
-          if (details || notice)
+          if (link || details || notice)
             return {
               ...current,
-              [key]: { message, run: null, ...(details ? { details } : {}), ...(notice ? { notice } : {}) },
+              [key]: {
+                message,
+                run: null,
+                ...(link ? { link } : {}),
+                ...(details ? { details } : {}),
+                ...(notice ? { notice } : {}),
+              },
             };
           if (!(key in current)) return current;
           const { [key]: _replaced, ...next } = current;
