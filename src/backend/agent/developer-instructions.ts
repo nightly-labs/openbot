@@ -30,6 +30,13 @@ import { ROUTINE_NO_UPDATE_MARKER, ROUTINE_NO_UPDATE_TOOL } from "./routine-quie
 import type { PromptInstructionsFile } from "./workspace-instructions";
 import { existingAgentFolders, workspaceExcludedFolders } from "./workspace-sandbox";
 
+function computerUseNotReadyRule(serverHost: boolean): string {
+  const next = serverHost
+    ? " on this server, so you cannot do that step"
+    : "; when openbot.read_agent for you gives computerUseMissingPermissions, name them. Then call openbot.show_setting with computer-use.permissions: its card opens Settings, then Computer Use, where OpenBot starts it or shows what is missing and the user can grant it; it works from their next message";
+  return `Computer Use is on for you, but it is not ready on this ${serverHost ? "server" : "computer"} now, so you have no ${COMPUTER_USE_MCP_SERVER_NAME} tools; do not search for them or use another desktop-control plugin. When a task needs a desktop application outside the embedded browser, say in one plain sentence that Computer Use is not ready${next}.`;
+}
+
 const ROUTINE_SIGN_IN_RULE =
   "In a routine run, first check saved logins with openbot_browser.list_logins. Use a matching login's username and submit_secret with its loginId for a password or authenticator code. With several logins, use only the account that the task names. When no login fits, the account is unclear, a fill fails, or the page needs a person (email or SMS sign-in code, CAPTCHA, passkey, or a payment confirmation that you cannot complete), report the sign-in requirement; do not call request_takeover or submit_secret without loginId.";
 const ROUTINE_NO_TAKEOVER_RULE = "In a routine run, report a required sign-in instead of a takeover.";
@@ -334,6 +341,14 @@ export const SELF_WAKE_NOTE = [
   "</openbot_background_wake>",
 ].join("\n");
 
+const SESSION_RELOAD_START = "<openbot_session_reload>";
+
+export const SESSION_RELOAD_NOTE = [
+  SESSION_RELOAD_START,
+  "OpenBot stopped the idle process of this session and loaded the session again. No server restarted. If a notice says that your subagents and background tasks stopped because of a server restart: OpenBot, your teammates and the tasks that you gave them with OpenBot tools still run, and their replies still come to you. Do not send those tasks again. Start again only your own background work that you still need and that no longer runs.",
+  "</openbot_session_reload>",
+].join("\n");
+
 export function isTurnContextBlock(text: string): boolean {
   return [
     MEMORY_BLOCK_START,
@@ -344,12 +359,13 @@ export function isTurnContextBlock(text: string): boolean {
     TURN_STYLE_START,
     STEER_NOTE_START,
     BACKGROUND_WAKE_START,
+    SESSION_RELOAD_START,
   ].some((start) => text.startsWith(`${start}\n`));
 }
 
 export function withoutTurnContext(text: string): string {
   return text.replace(
-    /^(?:<(openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_agent_instructions|openbot_saved_logins|openbot_turn_style|openbot_steer|openbot_background_wake)>\n[\s\S]*?\n<\/\1>\n*)+/u,
+    /^(?:<(openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_agent_instructions|openbot_saved_logins|openbot_turn_style|openbot_steer|openbot_background_wake|openbot_session_reload)>\n[\s\S]*?\n<\/\1>\n*)+/u,
     "",
   );
 }
@@ -395,7 +411,7 @@ export function developerInstructions(
         : "openbot.tool_search finds the other OpenBot and browser tools by short capability phrases, openbot.tool_describe loads their schemas and guidance, and openbot.tool_call runs one. Use the returned namespace.tool names exactly. tool_call does not run bridge tools."
     }${
       agent.provider === "codex"
-        ? " In exec, ALL_TOOLS omits openbot, openbot_browser and image_gen tools; call them directly. Open a local image, or one for image_gen to copy, with openbot.read_image: view_image in exec drops a file over 6 MB."
+        ? " In exec, ALL_TOOLS omits openbot, openbot_browser and image_gen tools; call them directly. Open a local image, or one for image_gen to copy, with openbot.read_image: view_image in exec drops a file over 6 MB. image_gen makes GPT Image pictures; use openbot.generate_image only when the user asks for OpenBot credits or names a model of another maker."
         : // OpenCode Code Mode puts only the direct tools under `tools.openbot`. A model that read
           agent.provider === "opencode"
           ? ` In execute, tools.openbot and tools.openbot_browser have only your listed tools; run each other tool as tools.openbot.tool_call({ name: "openbot.create_agent", arguments: {…} }), never as tools.openbot.create_agent or tools.openbot_browser.click. Send execute code as plain JavaScript, never in a \`\`\` fence; when execute fails with "The called value is not a function" at line 1, col 1, remove the fence and send the code again. Call ${ROUTINE_NO_UPDATE_TOOL} in execute as tools.openbot.${ROUTINE_NO_UPDATE_TOOL}({}), never as a separate tool; when OpenCode refuses it with "No tool named", answer only ${ROUTINE_NO_UPDATE_MARKER}.${
@@ -519,7 +535,7 @@ export function developerInstructions(
       : []),
     ...homeSkillInstructions(options.homeSkills ?? []),
     agentComputerUseEnabled(agent) && options.computerUseNotReady
-      ? `Computer Use is on for you, but it is not ready on this ${options.serverHost ? "server" : "computer"} now, so you have no ${COMPUTER_USE_MCP_SERVER_NAME} tools; do not search for them or use another desktop-control plugin. When a task needs a desktop application outside the embedded browser, say in one plain sentence that Computer Use is not ready${options.serverHost ? " on this server, so you cannot do that step" : ", and that the user can open Settings, then Computer Use, where OpenBot starts it or shows what is missing; it works from their next message"}.`
+      ? computerUseNotReadyRule(options.serverHost === true)
       : agentComputerUseEnabled(agent)
         ? `Use ${COMPUTER_USE_MCP_SERVER_NAME} for every GUI task outside the embedded browser, never ${agent.provider === "claude" ? "" : "Codex Computer Use, the Sky computer use service, or "}another desktop-control plugin: they show no OpenBot cursor and can fight this one for the pointer.${options.agentCursorDrawn ? " OpenBot draws your cursor at each point that you click, scroll or move_cursor to in another app, also when the driver refuses its own cursor overlay." : ""}${options.computerUseOnWayland ? " On this Wayland desktop, video recording can be unavailable: when start_recording with record_video true answers video_active false and does not ask you to install ffmpeg, call stop_recording and do not try video again; tell the user in one plain sentence, without the driver's reason, that OpenBot cannot record video on this desktop, and offer screenshots instead." : ""}${options.computerUseInputRefused ? " On this desktop, OpenBot cannot send keys or clicks to other apps. Where a window offers an accessibility action, such as set_value on a text field, use it. When typing, a key or a click is refused, do not retry it and do not change its delivery mode; tell the user in one plain sentence, without the driver's reason, that OpenBot cannot type or click in apps on this desktop, and say that you can still read windows and take screenshots." : inputRefusalRules(options.computerUseOnWayland === true)}${process.platform === "win32" ? WINDOWS_MENU_RULE : ""} After each action, read its structuredContent, or its JSON copy at the end of the result text: refused or suspected_noop means that the action did not happen, so do not report it as done; unverifiable means read the window again and report what you saw; a delivery.mode of foreground took the screen from the user. browser_consent_required means that OpenBot cannot use the user's own browser profiles: do not call browser_prepare; say so in one plain sentence and continue in openbot_browser, with request_takeover for a sign-in. Select a window by its title and size, never the first match: most windows are small empty helpers. Pixel coordinates apply only to the main display; on another display, use the element token, or the element_index with the window_id and snapshot_id of the same read. Take the shortest path and do not repeat reads; use query or include_screenshot false when you only need an element. Read ${COMPUTER_USE_GUIDE_URI} before the first GUI action of a conversation.${agent.provider === "pi" || isKeyOnlyProvider(agent.provider) ? ` ${piComputerUseGuideStep()}` : ""}`
         : options.computerUseInOwnChat

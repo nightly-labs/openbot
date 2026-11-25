@@ -232,11 +232,6 @@ export class DynamicIslandWindowController {
 
   #applyShape(displayId: number, window: BrowserWindow): void {
     const scaleFactor = this.#options.getDisplays().find((candidate) => candidate.id === displayId)?.scaleFactor;
-    if (this.#interactiveDisplays.has(displayId) || this.#collapseTimers.has(displayId)) {
-      const { width, height } = window.getBounds();
-      this.#setShape(window, [{ x: 0, y: 0, width, height }], scaleFactor);
-      return;
-    }
     this.#setShape(window, this.#inputRegions.get(displayId) ?? [], scaleFactor);
   }
 

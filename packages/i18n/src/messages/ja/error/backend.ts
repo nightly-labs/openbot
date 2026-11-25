@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "このホストではイベントを利用できません。",
   "error.backend.databaseIntegrity": "OpenBot のデータベースが整合性チェックに失敗しました。",
+  "error.backend.creditsHoldAdminOnly":
+    "エージェントのクレジット使用を許可できるのは、このサーバーのオーナーまたは管理者のみです。",
+  "error.backend.creditsHoldShort": "クレジットがまだ足りません。",
   "error.backend.webhookRouteLimit": "1 つのホストの Webhook ルーティンは最大 {limit} 個です。",
   "error.backend.webhookSettingsInvalid": "Webhook の設定を確認して、もう一度お試しください。",
   "error.backend.webhookSenderSecretInvalid":
@@ -68,6 +71,12 @@ export const messages = {
     "圧縮してもこのチャットは小さくなりません。2回圧縮しても、モデルのコンテキストウィンドウの{percent}%を使っているため、OpenBotは自動圧縮を止めます。ウィンドウの大部分はツールと指示が使っています。このエージェントに不要なMCPサーバーやコンピューター操作をオフにするか、より大きなウィンドウのモデルを選んでください。その後、新しいチャットを開始してください。",
   "error.backend.contextCompactionStopped":
     "このチャットの圧縮が2回続けて失敗したため、OpenBot は自動圧縮を停止します。試行のたびにチャット全体がモデルに送信され、プランの上限を消費します。もう一度試すには「今すぐ圧縮」を選択するか、新しいチャットを開始してください。",
+  "error.backend.contextCompactionRetrying":
+    "プロバイダーはこのチャットを圧縮できず、再試行しています。圧縮が終わるまで、このチャットの新しいメッセージは待機します。すぐに終わらない場合、OpenBot は圧縮を停止してメッセージを送信します。",
+  "error.backend.contextCompactionFailed":
+    "このチャットの圧縮に失敗しました。チャットは変更されていません。待機中のメッセージは今エージェントに送られます。",
+  "error.backend.contextCompactionTimedOut":
+    "このチャットの圧縮に時間がかかりすぎたため、OpenBot が停止しました。チャットは変更されていません。待機中のメッセージは今エージェントに送られます。",
   "error.backend.providerModelAtCapacity":
     "モデルが混雑しています。プロバイダーは数分後に再試行します。今すぐ続けるには、ターンを停止して別のモデルを選んでください。",
   "error.backend.providerRetrying":
@@ -116,6 +125,16 @@ export const messages = {
     "チャンネルリードが時間内に応答しませんでした。メンバーを選択するか、もう一度お試しください。",
   "error.backend.channelLeadFailed":
     "チャンネルリードがこのメッセージをルーティングできませんでした。メンバーを選択するか、もう一度お試しください。",
+  "error.backend.channelLeadBusy":
+    "チャンネルリードのモデルは混み合っています。数分後にもう一度お試しいただくか、メンバーを選択してください。",
+  "error.backend.channelLeadOffline":
+    "チャンネルリードのモデルの接続が切れました。もう一度お試しいただくか、メンバーを選択してください。",
+  "error.backend.channelLeadSignIn":
+    "チャンネルリードのプロバイダーのサインインが期限切れです。もう一度サインインするか、メンバーを選択してください。",
+  "error.backend.channelLeadModelGone":
+    "チャンネルリードのモデルは利用できません。リードに別のモデルを選ぶか、メンバーを選択してください。",
+  "error.backend.channelLeadRefused":
+    "チャンネルリードのモデルがこのリクエストを拒否しました。メンバーを選択するか、リードに別のモデルを選んでください。",
   "error.backend.channelRequestMemberRequired": "この依頼のメンバーを選択してください。",
   "error.backend.channelDeliveryNotCreated": "チャンネルへの配信を作成できませんでした。",
   "error.backend.channelAssignmentStopped": "このチャンネルの割り当ては停止されたか、置き換えられました。",
@@ -308,7 +327,11 @@ export const messages = {
   "error.backend.mcpServerExited":
     "サーバーは応答する前に停止しました。ターミナルでコマンドを実行してエラーを確認してください。",
   "error.backend.mcpServerExitedWithOutput": "サーバーは応答する前に停止しました。出力: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "ダウンロードに失敗したため、サーバーが起動しませんでした。インターネット接続を確認してから、もう一度お試しください。",
   "error.backend.mcpServerFailedToStart": "サーバーが起動しませんでした: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "MCP サーバー {name} のプログラムが OpenBot を実行しているコンピューターにインストールされていないため、OpenBot は起動できませんでした。そのコンピューターに {name} を提供するアプリをインストールするか、マーケットプレイス、アプリで {name} をオフにしてください。",
   "error.backend.mcpServerStartAbandoned":
     "サーバーが起動する前に {provider} が待つのをやめたため、{provider} のエージェントはこのサーバーのツールを使えません。",
   "error.backend.mcpServerStoppedDuringCall": "MCP サーバーがこの呼び出しに応答する前に停止しました。",
@@ -428,6 +451,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "プロキシ {name} がサインインを拒否したため、ページを開けませんでした。",
   "error.backend.browserSystemProxyFailed":
     "OpenBot を実行しているコンピューターの設定にあるプロキシが応答しないか接続を拒否したため、ページを開けませんでした。そのコンピューターのプロキシ設定を確認してください。",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "サイト、または OpenBot を実行しているコンピューターの設定にあるプロキシが応答なしで接続を閉じたため、ページを開けませんでした。どのサイトも開けない場合は、そのコンピューターのプロキシ設定を確認してください。",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "サイト、またはこのブラウザープロファイルのプロキシが応答なしで接続を閉じたため、ページを開けませんでした。どのサイトも開けない場合は、プロファイルのプロキシを確認してください。",
   "error.backend.browserProxyComputerUnreachable":
     "このプロファイルが使うコンピューターが応答しないため、ページを開けませんでした。",
   "error.backend.browserProxyComputerLocalAddress":

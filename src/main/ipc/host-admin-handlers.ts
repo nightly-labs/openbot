@@ -33,6 +33,7 @@ import {
   LEGACY_RESPONSE_STYLE,
   LOCAL_SERVER_ID,
   type MachineAlertSettings,
+  type MediaApprovalCreditsUpdate,
   PROVIDER_ENVIRONMENT_LIMITS,
   type PromptCacheTtl,
   type ProviderEnvironmentProvider,
@@ -42,6 +43,7 @@ import {
   parseAgentAccessChange,
   parseHostTurnLimitsInput,
   parseHostVoiceModelChange,
+  parseMediaApprovalCreditsUpdate,
   parseProviderModelVisibilityChange,
   parseProviderModelVisibilityProvider,
   parseSignalHomeChoice,
@@ -116,6 +118,11 @@ import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import {
+  decodeMediaApprovalCreditsResponse,
+  MEDIA_APPROVAL_CREDITS_CAPABILITY,
+  MEDIA_APPROVAL_CREDITS_ROUTES,
+} from "@openbot/contracts/team-protocol/media-approval-credits-v1";
 import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
@@ -146,6 +153,7 @@ import type { HostSignalHomeService } from "../host-signal-home";
 import type { HostTurnLimitsPreferenceStore } from "../host-turn-limits-preference-store";
 import type { HostVoiceModelService } from "../host-voice-model";
 import type { MachineAlertMonitor } from "../machine-alerts";
+import type { MediaApprovalCreditsControl } from "../media-approval-credits-preference-store";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
 import type { ModelVisibility } from "../model-visibility";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
@@ -196,6 +204,7 @@ interface HostAdminIpcDependencies {
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   claudeUserSetup: ClaudeUserSetupControl;
   cacheExpiryCompaction: CacheExpiryCompactionControl;
+  mediaApprovalCredits: MediaApprovalCreditsControl;
   claudeCompactWindow: ClaudeCompactWindowControl;
   providerEnvironment: Pick<ProviderEnvironmentControl, "get" | "set">;
   modelVisibility: Pick<ModelVisibility, "settings" | "set">;
@@ -226,6 +235,7 @@ export function hostAdminIpcHandlers({
   promptCacheTtl,
   claudeUserSetup,
   cacheExpiryCompaction,
+  mediaApprovalCredits,
   claudeCompactWindow,
   providerEnvironment,
   modelVisibility,
@@ -316,6 +326,13 @@ export function hostAdminIpcHandlers({
       throw new Error(sourceText("error.team.cacheExpiryCompactionUnsupported"));
     return runCauseEffect(
       remoteServers.request(serverId, route, decodeCacheExpiryCompactionResponse, { method: "POST", body }),
+    );
+  }
+  function remoteMediaApprovalCredits(serverId: string, route: string, body: MediaApprovalCreditsUpdate) {
+    if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CREDITS_CAPABILITY))
+      throw new Error(sourceText("error.team.mediaApprovalCreditsUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeMediaApprovalCreditsResponse, { method: "POST", body }),
     );
   }
   function remoteClaudeCompactWindow(serverId: string, route: string, body: { tokens?: number | null }) {
@@ -596,6 +613,15 @@ export function hostAdminIpcHandlers({
         remote: (enabled, serverId) =>
           remoteCacheExpiryCompaction(serverId, CACHE_EXPIRY_COMPACTION_ROUTES.update, { enabled }),
       }),
+      getMediaApprovalCredits: scopedQueryHandler({
+        local: () => mediaApprovalCredits.get(),
+        remote: (serverId) => remoteMediaApprovalCredits(serverId, MEDIA_APPROVAL_CREDITS_ROUTES.settings, {}),
+      }),
+      setMediaApprovalCredits: scopedHandler(parseMediaApprovalCredits, {
+        local: (update) => runCauseEffect(mediaApprovalCredits.set(update)),
+        remote: (update, serverId) =>
+          remoteMediaApprovalCredits(serverId, MEDIA_APPROVAL_CREDITS_ROUTES.update, update),
+      }),
       getClaudeCompactWindow: scopedQueryHandler({
         local: () => claudeCompactWindow.get(),
         remote: (serverId) => remoteClaudeCompactWindow(serverId, CLAUDE_COMPACT_WINDOW_ROUTES.settings, {}),
@@ -685,6 +711,12 @@ function parseClaudeUserSetup(value: unknown): boolean {
 function parseCacheExpiryCompaction(value: unknown): boolean {
   if (typeof value !== "boolean") throw new Error("Invalid cache expiry compaction setting.");
   return value;
+}
+
+function parseMediaApprovalCredits(value: unknown): MediaApprovalCreditsUpdate {
+  const update = parseMediaApprovalCreditsUpdate(value);
+  if (!update) throw new Error("Invalid media approval credits.");
+  return update;
 }
 
 function parseClaudeCompactWindow(value: unknown): number | null {

@@ -4,6 +4,7 @@ import {
   fileQuoteId,
   fileQuoteTarget,
   limitedQuoteText,
+  serializeChatTagReference,
 } from "@openbot/contracts/chat-tag-references";
 import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import {
@@ -76,7 +77,7 @@ import { createBrowserStore } from "./stores/browser-store";
 import { createComposerActions } from "./stores/composer-actions";
 import { conversationOwnerId, createComposerStore, currentConversationTarget } from "./stores/composer-store";
 import { createMcpServersStore } from "./stores/mcp-servers-store";
-import { createMessageActions } from "./stores/message-actions";
+import { createMessageActions, draftWithPageContext, draftWithPageText } from "./stores/message-actions";
 import { createMessagePinsStore } from "./stores/message-pins-store";
 import { createPanelsStore, isSidePanelMode } from "./stores/panels-store";
 import { PENDING_SEND_ID_PREFIX, type PendingSend, pendingSendMessage } from "./stores/pending-send-store";
@@ -342,6 +343,7 @@ export function createConversationViewScope(props: ConversationProps) {
     openBrowserWindow,
     reattachBrowserWindow,
     hideBrowserPanel,
+    openFileFromThread,
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
@@ -448,6 +450,7 @@ export function createConversationViewScope(props: ConversationProps) {
   const currentChatErrorRun = () => currentChatErrorEntry()?.run ?? null;
   const currentChatErrorLink = () => currentChatErrorEntry()?.link ?? null;
   const currentChatErrorDetails = () => currentChatErrorEntry()?.details ?? null;
+  const currentChatErrorNotice = () => currentChatErrorEntry()?.notice === true;
   const attachmentBusy = (target = currentTarget()) =>
     target !== undefined && importingDrafts().has(composerDraftKey(target));
   const uploadFailed = (target = currentTarget()) =>
@@ -1839,7 +1842,61 @@ export function createConversationViewScope(props: ConversationProps) {
 
   function quoteSelection(messageId: string, text: string) {
     const quoted = limitedQuoteText(text);
+    const thread = previewSideThread(messageId);
+    if (thread) {
+      const quote = serializeChatTagReference("quote", quoted, messageId);
+      addToSideDraft(thread, (draft) => `${draft}${draft && !/\s$/u.test(draft) ? " " : ""}${quote} `);
+      return;
+    }
     setQuoteRequest((current) => ({ id: (current?.id ?? 0) + 1, messageId, text: quoted }));
+  }
+
+  function quotesShownPreview(quoteId: string): boolean {
+    const target = fileQuoteTarget(quoteId);
+    return target !== null && fileQuoteId({ ...target, lines: undefined }) === previewQuoteId();
+  }
+
+  function previewSideThread(quoteId?: string): { id: string; draftKey: string } | undefined {
+    if (quoteId !== undefined && !quotesShownPreview(quoteId)) return undefined;
+    const id = filePreviewOpen() ? sidebarFilePreview()?.threadId : undefined;
+    const draftKey = id && sideThreadIds().includes(id) ? threadComposer.sideDraftKey(id) : undefined;
+    return id && draftKey ? { id, draftKey } : undefined;
+  }
+
+  function addToSideDraft(thread: { id: string; draftKey: string }, update: (draft: string) => string) {
+    threadComposer.setText(thread.draftKey, update(threadComposer.draft(thread.draftKey).text));
+    openPanelThread(thread.id);
+    flush();
+    requestDraftFocus(thread.draftKey);
+  }
+
+  function addPreviewPageText(text: string) {
+    const thread = previewSideThread();
+    if (thread) addToSideDraft(thread, (draft) => draftWithPageText(draft, text));
+    else addPageText(text);
+  }
+
+  function setPreviewPageContext(attachmentId: string, text: string) {
+    const hasAttachment = (message: { attachments?: readonly { id: string }[] | undefined }) =>
+      message.attachments?.some((file) => file.id === attachmentId) === true;
+    const thread = previewSideThread();
+    if (!thread) {
+      const message = props.messages.find(hasAttachment);
+      if (message) setPageContext(message, text);
+      return;
+    }
+    const message = props.threads?.side.thread(thread.id)?.conversation?.messages.find(hasAttachment);
+    const next = message && draftWithPageContext(threadComposer.draft(thread.draftKey).text, message.id, text);
+    if (next !== undefined) threadComposer.setText(thread.draftKey, next);
+  }
+
+  async function sendMessageSelection(messageId: string, body: string): Promise<boolean> {
+    const thread = previewSideThread(messageId);
+    const side = thread ? props.threads?.side.thread(thread.id) : undefined;
+    if (!thread || !side) return sendSelectionInstruction(messageId, body);
+    const sent = await side.onSend(body, [], null);
+    if (sent) openPanelThread(thread.id);
+    return sent;
   }
 
   const taggableBrowserTabs = createMemo(() =>
@@ -2700,6 +2757,7 @@ export function createConversationViewScope(props: ConversationProps) {
     currentChatErrorRun,
     currentChatErrorLink,
     currentChatErrorDetails,
+    currentChatErrorNotice,
     currentChatConversationKey,
     dismissCurrentChatErrors,
     dismissAwaitingReplies,
@@ -2802,6 +2860,7 @@ export function createConversationViewScope(props: ConversationProps) {
     editPendingSend,
     dismissPendingSend,
     presentedQueueDeliveries,
+    openFileFromThread,
     previewAttachment,
     props,
     queuePanelVisible,
@@ -2822,7 +2881,9 @@ export function createConversationViewScope(props: ConversationProps) {
     replyTarget,
     replyToMessage,
     addPageText,
+    addPreviewPageText,
     setPageContext,
+    setPreviewPageContext,
     skillSettingsRequest,
     openSkillSettings,
     clearSkillSettingsRequest,
@@ -2838,7 +2899,7 @@ export function createConversationViewScope(props: ConversationProps) {
     screenOpen,
     selectAndConfirmModel,
     selectAndConfirmReasoning,
-    sendSelectionInstruction,
+    sendMessageSelection,
     sendCardMessage,
     sendCardFile,
     saveSkillSuggestion,

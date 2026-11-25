@@ -247,6 +247,8 @@ export const messages = {
     "Je OpenCode-API-sleutel is verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go heeft je opgeslagen API-sleutel geweigerd. De sleutel is misschien verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode heeft niet de sleutel gebruikt die je in OpenBot hebt opgeslagen. Het gebruikte een andere OpenCode Go-sleutel die OpenCode zelf bewaart, en OpenCode Go heeft die sleutel geweigerd. Voer `opencode auth logout opencode-go` uit in een terminal op de computer waarop de agent draait en kies de sleutel om die sleutel te verwijderen. Probeer het daarna opnieuw.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go heeft het verzoek geweigerd. Een nieuwe API-sleutel lost dit niet op. Je OpenCode Go-abonnement is misschien niet actief, of OpenCode Go blokkeert misschien je netwerk: sommige diensten blokkeren vpn's, proxy's of bepaalde landen. Controleer in OpenCode Console of je abonnement actief is, of zet de vpn uit, en probeer het opnieuw. Je kunt ook een ander model kiezen.",
   "error.provider.opencodeServiceFailure":
@@ -310,6 +312,8 @@ export const messages = {
     "Het OpenCode-model schreef zijn acties als tekst en voerde ze niet uit. Probeer het opnieuw, of kies een ander model.",
   "error.provider.acpNoAnswer":
     "{provider} beëindigde de beurt zonder antwoord. Stuur het bericht opnieuw, of begin een nieuwe chat.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} kreeg de resultaten van zijn teamgenoten en beëindigde daarna de beurt zonder antwoord. Vraag de agent om verder te gaan.",
   "error.provider.noAnswerAfterSteps":
     "{provider} voerde enkele stappen uit en beëindigde de beurt daarna zonder antwoord. Vraag de agent wat hij deed voordat je hetzelfde verzoek opnieuw stuurt.",
   "error.provider.acpRefusedNoReason": "{provider} stopte zonder antwoord. Stuur het bericht opnieuw.",
@@ -375,6 +379,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Log in met Cursor of stel CURSOR_API_KEY in om Cursor te gebruiken.",
   "error.provider.cursorSignInUnusable":
     "Cursor kon met je aanmelding geen verbinding maken met zijn server. Controleer je internetverbinding en log daarna opnieuw in bij Cursor.",
+  "error.provider.cursorNoModels":
+    "Cursor heeft zijn lijst met modellen niet gestuurd. Kies 'Verbinden' om opnieuw aan te melden bij Cursor. Blijft dit bericht staan, controleer dan of je Cursor-abonnement modellen bevat.",
   "error.provider.clineArchivePath": "Het Cline-archief heeft een onverwacht pad.",
   "error.provider.clinePackageMismatch": "Het Cline-pakket komt niet overeen met de runtimecatalogus.",
   "error.provider.clineChecksum": "Checksum van de Cline-runtime komt niet overeen.",
@@ -417,6 +423,8 @@ export const messages = {
     "De Anthropic-API-sleutel heeft geen API-tegoed. Een Claude-abonnement betaalt geen verzoeken met een API-sleutel. Voeg tegoed toe in de Anthropic Console, of log bij Instellingen in bij Claude en kies het Claude-account in het modelmenu van de agent.",
   "error.provider.claudeAccountNoCredit":
     "Het tegoed van je Claude-account is te laag. Sommige verzoeken, zoals de snelle modus, gebruiken gebruikstegoed, ook als je Claude-abonnement nog gebruik over heeft. Voeg gebruikstegoed toe in je Claude-account, of kies een ander model in het modelmenu van de agent.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code stuurt verzoeken naar {host}, niet naar Anthropic: de Claude Code-instellingen of de omgevingsvariabelen geven dit API-adres op. {host} weigerde het verzoek vanwege het tegoed van het account, niet vanwege je Claude-abonnement. Voeg tegoed toe aan je {host}-account, of kies een ander model in het modelmenu van de agent.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "De Claude-dienst heeft dit verzoek geblokkeerd. Meestal is dit een kort probleem bij Claude, geen probleem met je account. Stuur het bericht over een paar minuten opnieuw.",
   "error.provider.foreignReasoning":

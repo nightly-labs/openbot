@@ -1276,6 +1276,12 @@ export function createMarketplaceController(
         setSignIns(mcpSignInRecord(states));
       }
     },
+    get copyLink() {
+      return props.pluginHostName || !calls().copySignInLink ? undefined : copySignInLink;
+    },
+    get pasteAddress() {
+      return props.pluginHostName || !calls().signInRelay ? undefined : pasteSignInAddress;
+    },
     get relay() {
       const relay = signInRelay();
       if (!relay) return undefined;

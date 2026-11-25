@@ -139,6 +139,8 @@ export const messages = {
   "error.team.claudeUserSetupUnsupported": "החיבור הזה לא תומך במתג ההגדרות של Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "החיבור הזה לא תומך בגודל הכיווץ של Claude.",
   "error.team.cacheExpiryCompactionUnsupported": "החיבור הזה לא תומך בכיווץ לפני שהמטמון פג.",
+  "error.team.mediaApprovalCreditsUnsupported": "החיבור הזה לא תומך בסף אישור הקרדיטים.",
+  "error.team.mediaApprovalCreditsInvalid": "יש להזין מספר שלם של קרדיטים בין 0 ל־100,000.",
   "error.team.providerEnvironmentUnsupported": "החיבור הזה לא תומך במשתני ספק.",
   "error.team.modelVisibilityUnsupported": "רשימת המודלים אינה נתמכת בחיבור הזה.",
   "error.team.providerDefaultUnsupported": "ספק ברירת המחדל אינו נתמך בחיבור הזה.",
@@ -205,4 +207,6 @@ export const messages = {
   "error.team.backgroundProcessesUnsupported": "החיבור הזה לא תומך בתהליכי רקע.",
   "error.team.providerUseUnsupported": "החיבור הזה לא תומך בהפעלה ובכיבוי של ספקים.",
   "error.team.providerUseInvalid": "לספק הזה אין מתג הפעלה וכיבוי.",
+  "error.team.mediaApprovalChoiceUnsupported": "השרת הזה לא תומך בבחירת מודל באישורי מדיה. יש לעדכן את OpenBot בשרת.",
+  "error.team.mediaApprovalChoiceInvalid": "הבחירה באישור המדיה אינה תקינה.",
 } as const satisfies PartialTranslation<typeof source>;

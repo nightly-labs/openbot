@@ -14,6 +14,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "У {previous} закончились кредиты. Выполнено переключение на {model}. Чтобы снова использовать эту модель, пополните кредиты и выберите её.",
   "status.agent.modelReturnedAfterError": "После ошибки провайдера снова используется {model}.",
+  "status.agent.modelSwitchedForRemovedModel": "Модель {previous} больше недоступна. Переключено на {model}.",
   "status.agent.marketplaceSuggested": "Предложено приложение из каталога: {app}.",
   "status.agent.settingShown": "Показан параметр: {setting}.",
   "status.agent.channelMemberAdded": "Агент {agent} добавил {member} в канал. Запрос: {person}.",
@@ -26,6 +27,12 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Сделать снимок главного экрана и отправить изображение модели агента.",
   "status.agent.screenCaptureChannel":
     "Изображение появится в канале {channel}, и его увидит каждый участник этого сервера, который читает канал.",
+  "status.agent.creditImageApproval": "Создать изображение с помощью {model}. Стоимость в кредитах: {credits}.",
+  "status.agent.creditVideoApproval": "Создать видео с помощью {model}. Стоимость в кредитах: {credits}.",
+  "status.agent.creditMediaChannel":
+    "Результат появится в канале {channel}, и его увидит каждый участник этого сервера, который читает канал.",
+  "status.agent.creditsHoldBalance": "Будет потрачено кредитов: {credits}. Баланс: {balance}.",
+  "status.agent.creditsHoldAgentsOff": "Агенты на этом сервере не могут использовать кредиты.",
   "status.agent.screenCapturePermissionNext": "Затем macOS может попросить вас разрешить OpenBot запись экрана.",
   "status.agent.screenCaptureDisplay": "Сделать снимок дисплея {name} и отправить изображение модели агента.",
   "status.agent.screenCaptureWindow": "Сделать снимок окна {name} и отправить изображение модели агента.",
@@ -113,15 +120,17 @@ export const messages = {
     "Память: сохранено {saved}, обновлено {updated}, забыто {forgotten}, не изменено {notChanged}, потому что другая ветка изменила их раньше.",
   "status.agent.mcpToolCall": "Запустить инструмент {tool} MCP-сервера {name}.",
   "status.agent.uiBlockClosedByMessage": "Закрыто новым сообщением",
-  "status.agent.nextStepContinues": "Агент остановился перед следующим шагом. Он продолжает ({current} из {limit}).",
-  "status.agent.planContinues": "В плане есть незавершённые шаги. Агент продолжает ({current} из {limit}).",
-  "status.agent.planStopped":
-    "Агент остановился, в плане остались незавершённые шаги. Отправьте сообщение, чтобы продолжить.",
-  "status.agent.compactionContinues": "Соединение прервалось, пока агент сжимал контекст. Агент продолжает.",
-  "status.agent.providerExitContinues": "Агент остановился, не закончив ответ. Агент продолжает.",
-  "status.agent.branchTitle": "Ответвлённый чат",
   "status.agent.location.field": "Ваше местоположение",
   "status.agent.location.placeholder": "Город, адрес или место",
   "status.agent.location.submit": "Поделиться",
   "status.agent.location.shared": "Местоположение отправлено",
+  "status.agent.nextStepContinues": "Агент остановился перед следующим шагом. Он продолжает ({current} из {limit}).",
+  "status.agent.planContinues": "В плане есть незавершённые шаги. Агент продолжает ({current} из {limit}).",
+  "status.agent.planStopped":
+    "Агент остановился, в плане остались незавершённые шаги. Отправьте сообщение, чтобы продолжить.",
+  "status.agent.continuationLimitReached":
+    "Агент остановился, не завершив запрос. Он больше не может продолжить сам. Отправьте сообщение, чтобы продолжить.",
+  "status.agent.compactionContinues": "Соединение прервалось, пока агент сжимал контекст. Агент продолжает.",
+  "status.agent.providerExitContinues": "Агент остановился, не закончив ответ. Агент продолжает.",
+  "status.agent.branchTitle": "Ответвлённый чат",
 } as const satisfies PartialTranslation<typeof source>;

@@ -14,6 +14,7 @@ import {
   Switch,
   Text,
 } from "@openbot/ui";
+import { McpSignInLinkCopy } from "@openbot/ui/features/settings/McpSignInDialog";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, Show } from "solid-js";
 import { McpRelaySignIn } from "./McpRelaySignIn";
@@ -282,6 +283,19 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                 />
               </ItemActions>
             </Item>
+            <Show when={waiting() ? props.tools.signIn()?.copyLink : undefined}>
+              {(copy) => (
+                <Item class="settings-modal-row">
+                  <ItemContent class="server-mcp-sign-in-link">
+                    <McpSignInLinkCopy
+                      onCopy={copy()}
+                      onPaste={props.tools.signIn()?.pasteAddress}
+                      waitingNote={false}
+                    />
+                  </ItemContent>
+                </Item>
+              )}
+            </Show>
           </ItemGroup>
           <Show when={state.error}>
             <Text class="server-mcp-runtime-note" variant="caption" tone="danger" role="alert">

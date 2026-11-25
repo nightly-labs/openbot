@@ -25,7 +25,7 @@ import type {
 } from "@openbot/ui/features/custom-providers/detected-providers";
 import type { ProviderDetectionSettingsValue } from "@openbot/ui/features/custom-providers/ProviderDetectionSettings";
 import { currentText } from "@openbot/ui/text";
-import { createStore } from "solid-js";
+import { createStore, snapshot } from "solid-js";
 import type { createCustomAgentsStore } from "../../custom-agents/stores/custom-agents-store";
 import type { createCustomProvidersStore } from "./custom-providers-store";
 
@@ -211,7 +211,7 @@ export function createProviderDetectionStore(options: ProviderDetectionStoreOpti
     });
     writes = writes.then(async () => {
       try {
-        const saved = await group.setSettings(payload());
+        const saved = await group.setSettings(snapshot(payload()));
         lastSaved = saved;
         if (listsChanged && saveTimer === undefined) {
           setState((draft) => {

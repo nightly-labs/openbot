@@ -43,6 +43,12 @@ interface Report {
   stream?: { deltaBeforeCompletion: boolean; reply: string };
   antigravity?: { stalled: boolean; stopStatus: string | null };
   antigravitySilent?: { status: string | null; error: string | null; elapsedMs: number };
+  antigravityOpenStep?: {
+    longStepStatus: string | null;
+    hangStatus: string | null;
+    error: string | null;
+    elapsedMs: number;
+  };
   antigravityLogged?: { status: string | null; error: string | null; elapsedMs: number };
   lostPrompt?: { status: string | null; reply: string; prompts: number; cancels: number; resumes: number };
   lostTwice?: { status: string | null; error: string | null; elapsedMs: number; next: string | null };
@@ -325,6 +331,29 @@ try {
   };
   assert.equal(silentTurn.value.status, "failed", "A silent Antigravity prompt ends at its silent limit.");
   assert.ok(silentTurn.elapsedMs >= STALL_MS * 2, "The silent prompt is not ended before its silent limit.");
+
+  const openStepFlavor: AcpFlavor = { ...silentFlavor, openToolStallMs: TOOL_MS * 2 };
+  const openStep = await open("antigravity", openStepFlavor, join(root, "antigravity-open-step.jsonl"));
+  const openStepThread = await startThread(openStep, { cwd: workspace });
+  const longStep = await runTurn(openStep, openStepThread, { text: "tool" });
+  const hungStep = await timed(() => runTurn(openStep, openStepThread, { text: "tool-hang", timeoutMs: TOOL_MS * 10 }));
+  report.antigravityOpenStep = {
+    longStepStatus: longStep.status,
+    hangStatus: hungStep.value.status,
+    error: hungStep.value.error,
+    elapsedMs: hungStep.elapsedMs,
+  };
+  assert.equal(longStep.status, "completed", "An Antigravity step longer than the silent limit still completes.");
+  assert.equal(hungStep.value.status, "failed", "An Antigravity step that never ends fails the turn.");
+  assert.equal(
+    hungStep.value.error,
+    sourceText("error.agent.turnStalled", { provider: "Gemini" }),
+    "An Antigravity step that never ends names the stall.",
+  );
+  assert.ok(
+    hungStep.elapsedMs >= TOOL_MS * 2,
+    "The open Antigravity step was ended at the open tool limit, not before.",
+  );
 
   const geminiDir = join(root, "gemini");
   const agyLogs = join(geminiDir, "antigravity-acp", "log");

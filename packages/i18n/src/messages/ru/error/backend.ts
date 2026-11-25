@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "События недоступны на этом хосте.",
   "error.backend.databaseIntegrity": "База данных OpenBot не прошла проверку целостности.",
+  "error.backend.creditsHoldAdminOnly":
+    "Только владелец или администратор этого сервера может разрешить агентам использовать кредиты.",
+  "error.backend.creditsHoldShort": "Кредитов пока недостаточно.",
   "error.backend.webhookRouteLimit": "На хосте может быть не более {limit} регулярных задач с вебхуком.",
   "error.backend.webhookSettingsInvalid": "Проверьте настройки вебхука и повторите попытку.",
   "error.backend.webhookSenderSecretInvalid":
@@ -67,6 +70,12 @@ export const messages = {
     "Сжатие не уменьшает этот чат: после двух сжатий он всё ещё занимает {percent}% окна контекста модели, поэтому OpenBot перестаёт его сжимать. Большую часть окна занимают инструменты и инструкции. Отключите MCP-серверы или управление компьютером, которые не нужны этому агенту, или выберите модель с большим окном. Затем начните новый чат.",
   "error.backend.contextCompactionStopped":
     "Два сжатия этого чата подряд не удались, поэтому OpenBot больше не сжимает его автоматически. Каждая попытка отправляет весь чат модели и расходует лимит тарифа. Выберите «Сжать сейчас», чтобы попробовать снова, или начните новый чат.",
+  "error.backend.contextCompactionRetrying":
+    "Провайдер не смог сжать этот чат и пробует снова. Новые сообщения в этом чате ждут, пока сжатие не закончится. Если оно скоро не закончится, OpenBot остановит его и отправит ваши сообщения.",
+  "error.backend.contextCompactionFailed":
+    "Не удалось сжать этот чат. Чат не изменился. Ожидающие сообщения теперь отправляются агенту.",
+  "error.backend.contextCompactionTimedOut":
+    "Сжатие этого чата заняло слишком много времени, поэтому OpenBot остановил его. Чат не изменился. Ожидающие сообщения теперь отправляются агенту.",
   "error.backend.providerModelAtCapacity":
     "Модель перегружена. Провайдер повторит попытку через несколько минут. Чтобы продолжить сейчас, остановите ход и выберите другую модель.",
   "error.backend.providerRetrying":
@@ -111,6 +120,16 @@ export const messages = {
   "error.backend.channelLeadTimedOut": "Ведущий канала не ответил вовремя. Выберите участника или повторите попытку.",
   "error.backend.channelLeadFailed":
     "Ведущему канала не удалось направить это сообщение. Выберите участника или повторите попытку.",
+  "error.backend.channelLeadBusy":
+    "Модель ведущего канала сейчас занята. Повторите попытку через несколько минут или выберите участника.",
+  "error.backend.channelLeadOffline":
+    "Модель ведущего канала потеряла соединение. Повторите попытку или выберите участника.",
+  "error.backend.channelLeadSignIn":
+    "Срок входа у провайдера ведущего канала истёк. Войдите снова или выберите участника.",
+  "error.backend.channelLeadModelGone":
+    "Модель ведущего канала недоступна. Выберите для ведущего другую модель или выберите участника.",
+  "error.backend.channelLeadRefused":
+    "Модель ведущего канала отклонила этот запрос. Выберите участника или другую модель для ведущего.",
   "error.backend.channelRequestMemberRequired": "Выберите участника для этого запроса.",
   "error.backend.channelDeliveryNotCreated": "Доставка в канал не создана.",
   "error.backend.channelAssignmentStopped": "Это назначение в канале остановлено или заменено.",
@@ -297,7 +316,11 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Сервер остановился, не ответив. Запустите команду в терминале, чтобы увидеть ошибку.",
   "error.backend.mcpServerExitedWithOutput": "Сервер остановился, не ответив. Он написал: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "Сервер не запустился, потому что его загрузка не удалась. Проверьте подключение к интернету и попробуйте снова.",
   "error.backend.mcpServerFailedToStart": "Сервер не запустился: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot не может запустить MCP-сервер {name}, потому что его программа не установлена на компьютере, где работает OpenBot. Установите на этот компьютер приложение, которое даёт {name}, или выключите {name} в разделе Каталог, Приложения.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} перестал ждать до запуска сервера, поэтому его агенты не получают инструменты этого сервера.",
   "error.backend.mcpServerStoppedDuringCall": "MCP-сервер остановился, не ответив на этот вызов.",
@@ -418,6 +441,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "Прокси {name} отклонил вход, поэтому страница не открылась.",
   "error.backend.browserSystemProxyFailed":
     "Прокси в настройках компьютера, на котором работает OpenBot, не отвечает или отклонил подключение, поэтому страница не открылась. Проверьте настройки прокси этого компьютера.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "Сайт или прокси в настройках компьютера, на котором работает OpenBot, закрыл подключение без ответа, поэтому страница не открылась. Если не открывается ни один сайт, проверьте настройки прокси этого компьютера.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "Сайт или прокси этого профиля браузера закрыл подключение без ответа, поэтому страница не открылась. Если не открывается ни один сайт, проверьте прокси профиля.",
   "error.backend.browserProxyComputerUnreachable":
     "Компьютер этого профиля не отвечает, поэтому страница не открылась.",
   "error.backend.browserProxyComputerLocalAddress":

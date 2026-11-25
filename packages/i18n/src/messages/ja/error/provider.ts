@@ -255,6 +255,8 @@ export const messages = {
     "OpenCode の API キーの有効期限が切れました。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go が保存済みの API キーを拒否しました。キーの有効期限が切れている可能性があります。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode は OpenBot に保存したキーを使いませんでした。OpenCode が自身で保持している別の OpenCode Go キーを使い、OpenCode Go がそのキーを拒否しました。そのキーを削除するには、エージェントを実行しているコンピューターのターミナルで `opencode auth logout opencode-go` を実行し、そのキーを選んでください。その後、もう一度お試しください。",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go がリクエストを拒否しました。新しい API キーでは解決しません。OpenCode Go のプランが有効でないか、OpenCode Go がお使いのネットワークをブロックしている可能性があります。一部のサービスは VPN、プロキシ、または一部の国をブロックします。OpenCode Console でプランが有効か確認するか、VPN をオフにしてから、もう一度お試しください。別のモデルを選ぶこともできます。",
   "error.provider.opencodeServiceFailure":
@@ -319,6 +321,8 @@ export const messages = {
     "OpenCode のモデルが操作をテキストとして書き、実行しませんでした。もう一度お試しいただくか、別のモデルを選択してください。",
   "error.provider.acpNoAnswer":
     "{provider} が回答なしでターンを終了しました。メッセージをもう一度送信するか、新しいチャットを開始してください。",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} はチームメイトから結果を受け取りましたが、回答なしでターンを終了しました。エージェントに続けるよう頼んでください。",
   "error.provider.noAnswerAfterSteps":
     "{provider} はいくつかのステップを実行した後、回答せずにターンを終了しました。同じ依頼をもう一度送る前に、エージェントに何をしたか尋ねてください。",
   "error.provider.acpRefusedNoReason": "{provider} は回答せずに停止しました。メッセージをもう一度送信してください。",
@@ -386,6 +390,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Cursor を使うには Cursor でサインインするか、CURSOR_API_KEY を設定してください。",
   "error.provider.cursorSignInUnusable":
     "Cursor がサインイン情報でサーバーに接続できませんでした。インターネット接続を確認してから、もう一度 Cursor にサインインしてください。",
+  "error.provider.cursorNoModels":
+    "Cursor からモデルの一覧が届きませんでした。「接続」を選んで、もう一度 Cursor にサインインしてください。このメッセージが消えない場合は、Cursor のプランでモデルを使えるか確認してください。",
   "error.provider.clineArchivePath": "Cline のアーカイブに予期しないパスがあります。",
   "error.provider.clinePackageMismatch": "Cline のパッケージがランタイムカタログと一致しません。",
   "error.provider.clineChecksum": "Cline ランタイムのチェックサムが一致しません。",
@@ -432,6 +438,8 @@ export const messages = {
     "Anthropic API キーに API クレジットがありません。Claude のプランは API キーでのリクエストには使われません。Anthropic Console でクレジットを追加するか、設定で Claude にサインインして、エージェントのモデルメニューで Claude アカウントを選択してください。",
   "error.provider.claudeAccountNoCredit":
     "Claude アカウントのクレジット残高が不足しています。高速モードなど一部のリクエストは、Claude のプランに使用量が残っていても使用クレジットを使います。Claude アカウントで使用クレジットを追加するか、エージェントのモデルメニューで別のモデルを選択してください。",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code は Anthropic ではなく {host} にリクエストを送っています。Claude Code の設定または環境変数でこの API アドレスが指定されています。{host} はアカウント残高のためにリクエストを拒否しました。Claude のプランの問題ではありません。{host} のアカウントに残高を追加するか、エージェントのモデルメニューで別のモデルを選択してください。\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Claude のサービスがこのリクエストをブロックしました。通常は Claude 側の一時的な問題で、アカウントの問題ではありません。数分後にもう一度メッセージを送信してください。",
   "error.provider.foreignReasoning":

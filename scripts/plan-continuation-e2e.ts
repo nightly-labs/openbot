@@ -1306,8 +1306,30 @@ try {
       "Three continuation turns run.",
     );
     assert.ok(turns[3]?.text.includes("Automatic continuation 3 of 3."));
-    assert.equal(loggedChecks().length - checks, 3, "No check runs after the last continuation.");
+    assert.ok(
+      turns[3]?.text.includes("This can be the last automatic continuation"),
+      "The last note asks for a status.",
+    );
+    assert.ok(!turns[2]?.text.includes("This can be the last automatic continuation"));
+    assert.equal(loggedChecks().length - checks, 4, "One check runs after the last continuation.");
     assert.equal(continuationLines(agent.id).length, 0, "No finish check line shows.");
+    assert.deepEqual(
+      stopLines(agent.id).map((line) => line.text),
+      [
+        "The agent stopped before the request was done. It cannot continue by itself again. Send a message to continue.",
+      ],
+      "The chat says that the agent stopped at the limit.",
+    );
+
+    const finished = await createAgent("Finished");
+    const doneMark = loggedTurns().length;
+    const done = await send(
+      finished.id,
+      `Fix all files. ${verdicts(gap, gap, gap, { verdict: "done" })} ${plan(turn(1), turn(2), turn(3), turn(4))}`,
+    );
+    assert.equal(await settled(done), "completed");
+    assert.equal(turnsSince(doneMark).length, 4);
+    assert.equal(stopLines(finished.id).length, 0, "A request that the last continuation finished gets no line.");
     return { turns: turns.length };
   });
 

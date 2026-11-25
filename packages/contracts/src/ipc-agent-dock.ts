@@ -265,7 +265,7 @@ export type AgentDockAction =
   | { type: "open-settings" }
   | { type: "hide" };
 
-export type AboveAppsSupport = "restart" | "unsupported";
+export type AboveAppsSupport = "restart" | "unsupported" | "no-compositor";
 
 export interface SetAgentDockXWaylandInput {
   enabled: boolean;

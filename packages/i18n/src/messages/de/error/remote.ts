@@ -100,6 +100,8 @@ export const messages = {
     "Dieser Computer erreicht den Verbindungsdienst von OpenBot nicht. Prüfe seine Internetverbindung. OpenBot verbindet sich automatisch wieder.",
   "error.remote.serverAnswerTimeout":
     "Der Server hat nicht rechtzeitig geantwortet. OpenBot verbindet sich automatisch wieder.",
+  "error.remote.signInConnectionClosed":
+    "Die Verbindung zum Server wurde bei der Anmeldung getrennt. Wenn das wieder passiert, prüfe Datum und Uhrzeit auf dem Server und auf diesem Gerät.",
   "error.remote.connectionCancelled": "Die entfernte Verbindung wurde abgebrochen.",
   "error.remote.hostDisconnected":
     "Die Verbindung zum Server wurde unterbrochen. Prüfe, ob die Aktion abgeschlossen wurde, und versuche es dann erneut.",

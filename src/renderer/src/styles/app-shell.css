@@ -1127,10 +1127,26 @@ textarea {
 }
 
 .server-menu {
+  display: flex;
   min-width: 240px;
   max-width: 300px;
-  max-height: min(520px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 520px));
+  max-height: min(calc(100dvh - 16px), var(--kb-popper-content-available-height, 100dvh));
+  flex-direction: column;
   overflow-y: auto;
+}
+
+.server-menu > * {
+  flex-shrink: 0;
+}
+
+.server-menu > .server-menu-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.server-menu > .server-menu-list:has(> :nth-child(4)) {
+  min-height: calc(var(--openbot-control-md) * 3);
+  flex-shrink: 1;
 }
 
 .server-submenu {

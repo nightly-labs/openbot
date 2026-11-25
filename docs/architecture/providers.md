@@ -9,7 +9,11 @@ To add a provider, or to see how a provider signs in on a joined server, read
 Claude uses its native question tool instead of `ask_user`. The direct tools are `ask_user`,
 `attach_files_to_response`, `list_agents`, `send_message`, `search_memories`, `remember`,
 `forget_memory`, `react_to_user_message`, `request_api_key`, `routine_no_update`, and
-`routine_report_failure`. External plugin registration stays with each provider adapter.
+`routine_report_failure`. `generate_image` and `generate_video` are direct tools too: as a
+deferred tool behind `tool_call`, Claude did not find `generate_video` and made a video with ffmpeg.
+`list_media_models` stays behind `tool_call`. The guidance tells an agent with its own image or video tool,
+such as Codex `image_gen`, to use that tool. It uses the credits tools only when the user asks for
+OpenBot credits, or names a model that its own tool cannot make. External plugin registration stays with each provider adapter.
 
 A Claude session of a channel thread also gets `channel_result` and `channel_reply` as direct tools,
 and names them in `CLAUDE_CODE_TERMINAL_MCP_TOOLS`. Their accepted call tells the agent to end the
@@ -240,7 +244,11 @@ must fire (a correction of how the agent does a class of task, a technique that 
 worked, or a listed skill that was wrong), an update of a covering skill comes before a new skill,
 a new skill has a class-level name, and environment failures, claims that a tool does not work,
 errors that went away, tasks done once and attempts that never worked are not skills. The review
-suggests at most one skill, and only when a signal fired.
+suggests at most one skill, and only when a signal fired. Main also passes `reviewSkillsFull`: true
+when the agent's skill lock holds `INPUT_LIMITS.agentSkills` skills, so the install of a new skill
+would fail. Then the prompt forbids `create` and the review drops a `create` answer, which an idea
+from the OpenClaw skill workshop (MIT) suggested: check a limit when the review proposes, not when
+the save fails. Update suggestions stay. When the read fails, the review can still suggest `create`.
 
 Skill learning is a setting of the server that runs the agents: Server settings > Memory >
 Skill learning, with Automatic (the default), Ask first, or Off. An owner or admin of a joined server
@@ -335,6 +343,10 @@ OpenBot unloads a session that has no turn, keeps its identity, and resumes it a
   the session's process (`AcpThread.workHold`, #9551). No idle release closes it, and the provider
   process stays, until the session does not change for 30 minutes, or for 4 hours at most. When memory
   is low, `releaseQuietBackgroundThreads` closes a held session that did not change for 10 minutes.
+  When Antigravity loads a session again, it can tell the agent that a server restart stopped its
+  subagents and background tasks, also when nothing ran (#15853). So when OpenBot stops a session
+  with no turn and no held work, the next prompt to that session starts with a note
+  (`SESSION_RELOAD_NOTE`): no server restarted, and the agent's teammates and OpenBot tasks still run.
 - One Codex app server holds every thread of its account, and stops the MCP servers of a thread only
   when it unloads that thread. `CodexIdleSessions` (`src/backend/agent/codex-idle-sessions.ts`)
   releases an agent session 5 minutes after its last turn ends. When a turn ends, it releases at once
@@ -449,6 +461,20 @@ Claude sessions, sign-in and sign-out) start with the resolved `launchPath`: the
 folders, then OpenBot's own, then the CLI's folder for a system copy. An app that Finder starts can
 then run a `#!/usr/bin/env node` CLI. A CLI that exists but does not start reports whether the
 managed copy or the user's copy failed.
+
+A native system Codex with no `codex-code-mode-host` beside it, or in `codex-resources`, is
+`incomplete`: GPT-6 and other code-mode models cannot run tools with it. It runs only when no
+complete Codex starts, and Settings > Providers offers the managed copy. A desktop window waits for
+the user to click Download. A server (hosted, server mode, or a local server child) runs agents in
+the background, often for routines that nobody watches, so `createSystemCliTracker` in `src/main/system-cli-tracker.ts`
+downloads the managed copy once per process when an agent uses ChatGPT, the provider is on, the
+managed copy is not downloaded, and the user did not choose "Use installed version". It checks
+again at each provider status and each change to the agent list, so a server's first ChatGPT agent
+starts the download without a restart. An explicit
+`OPENBOT_CODEX_PATH` is never `incomplete`. The download replaces the CLI as Download in Settings
+does. `bun run test:server-incomplete-codex` (CI runs it in `test:provider-update-busy`) checks
+these decisions with the real runtime manager and resolver. It calls the tracker directly, so it
+does not cover the agent-list event or the server kinds.
 
 Installed runtimes live in one store per computer, `appData/OpenBot/provider-runtimes`, which is the
 path the packaged app always used: its `userData` is `appData/OpenBot`. Development profiles differ
@@ -719,6 +745,15 @@ only while that provider has no key, so a refused key there failed every free mo
 reach the next process with no other plumbing, and what carries `OPENCODE_DISABLE_AUTOUPDATE` to a
 managed install so the CLI cannot update past the pin. `src/main/provider-credential-store.ts` holds
 that optional key, encrypted by `safeStorage` in a `0o600` envelope under `userData`.
+
+OpenCode uses its own key before that config key: the newest active `credential` row (OpenCode 2.4
+also copies an `auth.json` key into that table once, when it makes its database), then
+`OPENCODE_API_KEY` (checked on OpenCode 2.2.5 and 2.4.1, #15988). An old `OPENCODE_API_KEY` in the
+host's environment, for example in a server's service file, thus shadowed the key saved in Settings.
+With a stored key, `clearedInheritedOpenCodeKeyEnv` sets an inherited `OPENCODE_API_KEY` to an empty
+value, which OpenCode treats as no key: the `opencode-go` provider uses the stored key, and the free
+tier keeps its anonymous key as #7550 requires. A paid Zen model that used only that variable is not
+listed while a key is stored.
 Only a status (`missing`, `saved` or `unreadable`) crosses IPC; no getter returns the key. A file the store cannot read does not stop
 startup: OpenCode runs keyless, Settings reports the key as unreadable, and the file stays until the
 user saves or removes a key. The store writes a change to disk before it changes memory, so a
@@ -736,7 +771,12 @@ the Go models and no paid Zen model (#6185).
 OpenCode first lists the models of a cached or built-in catalog and fetches the new catalog in the
 background, about 3 s later. A first start of OpenCode 2.2.5 listed 80 of 88 models. The OpenCode
 driver thus sets `catalog.relistAfterStart`: the list is read again 5 s after each start, and agents
-do not leave a model that only the first list lacks.
+do not leave a model that only the first list lacks. When the catalog fetch takes longer, for example
+right after the computer wakes, also the second list lacks new models (#16212). So for a provider with
+`catalog.partialListAtStart`, an agent leaves its model only when two starts in a row do not list it
+(`moveAgentsOffModelsUnlistedTwice`). The count is kept in memory, so the first start after an
+OpenBot restart never moves an agent. A model that is really gone moves at the next provider start,
+for example after the idle release.
 
 The CLI reports no Go quota over ACP. `readOpenCodeGoUsage` (`src/backend/opencode-usage.ts`)
 sends `opencode.ai/zen/go/v1/usage` the key the CLI uses. A saved key is the only key: the CLI
@@ -744,8 +784,10 @@ applies config `options.apiKey` last. With no saved key, it reads the CLI's own 
 T3 Code uses: the active OpenCode Console row (`integration_id = 'opencode'`, `type: "key"`, no
 self-hosted `metadata.server`) in the `credential` table of `$XDG_DATA_HOME/opencode/opencode.db`
 (or `OPENCODE_DB`), then the Go key: the `opencode-go` key of `auth.json` (or `OPENCODE_AUTH_CONTENT`,
-which also skips the database), or `OPENCODE_API_KEY` when that has none (#3548). A 401 or 403 on the
-Console key tries the Go key. The
+which also skips the database), or `OPENCODE_API_KEY` when that has none (#3548), then the `opencode`
+key of `auth.json` with no self-hosted `metadata.server` (#16230). OpenCode 1 keeps the Console key only
+there; OpenCode 2 copies it into the `credential` table once. A 401 or 403 tries the next key, and Go
+answers 403 for a key with no Go subscription. The
 database is opened read-only with a 100 ms busy timeout, because Effect cannot interrupt a blocked
 SQLite call. `scripts/opencode-go-usage-e2e.ts` covers it.
 
@@ -800,6 +842,14 @@ flavor shows `error.provider.opencodeProviderRefused`: the provider refused the 
 a proxy or a blocked country can be the cause. A key in an environment variable or a config file is
 not found, so the text stays `error.provider.opencodeAuthRequired`. An `opencode-go/` model keeps
 that text too, because it names the fix in OpenBot's settings for an expired Go key.
+
+A `credential` row for `opencode-go` wins over OpenBot's saved key, and OpenBot cannot override it
+(OpenCode issue anomalyco/opencode#58394). With a saved key, the client's `savedKeyShadowed` option
+reads the newest active row read-only (`readOpenCodeStoredKey` in `opencode-usage.ts`). When that key
+differs from the saved key, a refused turn shows `error.provider.opencodeOwnGoKeyRefused`: OpenCode
+used its own other key, and `opencode auth logout opencode-go` removes it (#15988). The same key, no
+row, or an `auth.json` entry alone keeps `error.provider.opencodeKeyRefused`; OpenCode 2.2.5 uses
+the config key before an `auth.json` entry.
 
 #### Turns of a background subagent or shell command
 
@@ -1457,15 +1507,17 @@ Hermes 0.21.5 advertises `session/resume`, but a resume of a missing session mak
 and the reply does not carry its id: each later prompt to the saved id would end as "refusal".
 `HERMES_ACP_FLAVOR.loadInsteadOfResume` restores with `session/load`, whose reply for a missing
 session is null, which the SDK gives as `{}`; a reply with no `modes` is a missing session.
-Hermes before 0.22.1 keeps one MCP server of each name for its whole process, so in one shared
-process each session's `openbot` call went out with the bearer token of the first session. OpenBot
-then ran it as that session's agent, and a message to that agent was refused as a message to
-itself (#13120). Hermes 0.22.1 gives each session its own servers (`GatewayACPAgent`). Both Hermes
-flavors set `sessionProcessesBefore: "0.22.1"`: when `initialize` reports an older `agentInfo.version`,
+Hermes before 0.22.1, and Hermes 0.22.2, keep one MCP server of each name for the whole process,
+so in one shared process each session's `openbot` call went out with the bearer token of the first
+session. OpenBot then ran it as that session's agent, and a message to that agent was refused as a message to
+itself (#13120). Hermes 0.22.3 gives each session its own servers (`GatewayACPAgent`,
+`gateway/session_local_mcp.py`). Hermes 0.22.1 had them too, but Hermes 0.22.2 is a rebuild of the
+older line without them, and shares the servers again (#15923). Both Hermes flavors set
+`sessionProcessesBefore: "0.22.3"`: when `initialize` reports an older `agentInfo.version`,
 each session runs in a Hermes process of its own, as for Mistral. Hermes keeps its sessions in
 `state.db`, so an idle session closes with its process and loads again in a new one. A version that
 `isVersion` does not read keeps the shared process. `bun run test:hermes-session-processes` checks
-both versions with a fake `hermes` agent.
+0.21.3, 0.22.2 and 0.22.3 with a fake `hermes` agent.
 Hermes reads only one project context file: `.hermes.md` or `HERMES.md` before `AGENTS.md`. It
 reads project skills only in a git root that `skills.trusted_project_dirs` names. A turn that fails
 with an exception in Hermes ends as answer text `Error: …`, not as a failed turn. Team API
@@ -1642,6 +1694,9 @@ The settings page, the admin route `agent-backup-models-v1`, and the `update_pro
 When the list is automatic, `UsageLimitGate` and `AgentService.#usageLimitMove` move the agent to the
 first ready model in the order that no hold covers. `usageLimitReturn` keeps the model the agent
 left, and the agent goes back to it when its hold ends. A model the user picks drops the return.
+An effort that the user or an agent picks on the backup model is also the effort that the agent goes
+back with, when its own model takes that effort (#16007). Otherwise the agent goes back with the effort
+that it had before the move.
 
 Two holds move an agent:
 
