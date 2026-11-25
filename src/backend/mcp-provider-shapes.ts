@@ -13,7 +13,7 @@ import {
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Option, Schema } from "effect";
-import { agentLaunchPath, forgetWindowsLookups, isExecutable, isWindowsRunnable, windowsPathExtensions } from "./cli";
+import { agentLaunchPath, isExecutable, isWindowsRunnable, windowsPathExtensions } from "./cli";
 import { causeHelpers } from "./effect-boundary";
 import { isMissingFileError } from "./file-errors";
 import type { McpOperationError } from "./mcp-effects";
@@ -237,7 +237,6 @@ const isMissingCommandFile = Effect.fn("McpShape.isMissingCommandFile")(function
 
 export function clearMcpCommandCache(): void {
   resolvedCommands.clear();
-  forgetWindowsLookups();
 }
 
 export function pickWindowsExecutable(stdout: string, pathext: string | undefined): string | null {
