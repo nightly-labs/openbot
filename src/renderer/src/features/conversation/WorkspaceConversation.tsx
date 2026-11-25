@@ -126,6 +126,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     activeAgent,
     userPausedAgentIds,
     modelOptions,
+    refreshModels,
     settingsRequest,
     updateAgent,
     setAgentAvatar,
@@ -544,6 +545,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         availableRoutineIds={activeRoutineIds()}
         routines={activeRoutines()}
         modelOptions={modelOptions()}
+        onOpenModelPicker={refreshModels}
         messages={activeMessages()}
         messageReferences={activeAgent() ? (conversations[activeAgent()?.id ?? ""]?.references ?? {}) : {}}
         missingMessageReferences={activeAgent() ? conversations[activeAgent()?.id ?? ""]?.missingReferences : undefined}

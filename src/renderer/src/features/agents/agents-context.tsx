@@ -50,6 +50,17 @@ const Agents = createSimpleContext({
     const [agentListSettled, setAgentListSettled] = createSignal(false);
     const [duplicatingAgentIds, setDuplicatingAgentIds] = createSignal<Set<string>>(new Set());
     const [modelOptions, setModelOptions] = createSignal<ClientAgentModelOption[]>([]);
+    let modelRefresh = 0;
+    function refreshModels(): void {
+      const serverId = activeServerId();
+      const request = ++modelRefresh;
+      void agentsPort()
+        .agent.listModels()
+        .then((models) => {
+          if (request === modelRefresh && activeServerId() === serverId && scopeIsCurrent()) setModelOptions(models);
+        })
+        .catch(() => undefined);
+    }
     const selectionServerId = untrack(activeServerId);
     const scopeIsCurrent = createScopeGuard();
     const chatWindowAgentId = usePlatform().chatWindow?.agentId;
@@ -324,6 +335,7 @@ const Agents = createSimpleContext({
       setDuplicatingAgentIds,
       modelOptions,
       setModelOptions,
+      refreshModels,
       activeAgentId,
       setActiveAgentId,
       activeAgent,

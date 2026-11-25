@@ -20,6 +20,7 @@ export function WebAgentSettings(props: {
   preference?: CreationPreference | null | undefined;
   customProviders?: readonly CustomProviderSummary[] | undefined;
   onManageProviders?: ((trigger: HTMLElement) => void) | undefined;
+  onOpenModelPicker?: (() => void) | undefined;
   liveModels?: ClientAgentModelOption[] | undefined;
   liveStatus?: AgentStatus | undefined;
   accountChoice?: boolean | undefined;
@@ -177,6 +178,7 @@ export function WebAgentSettings(props: {
       accountUsage={props.accountUsage}
       customProviders={props.customProviders}
       onManageProviders={props.onManageProviders}
+      onOpenModelPicker={props.onOpenModelPicker}
       onChange={(value) => {
         setState((draft) => {
           if (

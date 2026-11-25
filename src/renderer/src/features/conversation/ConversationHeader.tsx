@@ -148,6 +148,7 @@ export function ConversationHeader() {
         onConnectProvider: props.onConnectProvider,
         canConnectProvider: props.canConnectProvider,
         onManageProviders: props.onManageProviders,
+        onOpen: props.onOpenModelPicker,
         disabledReason: t("conversation.header.modelsUnavailable"),
         accountChoice: true,
         providerAccountId: props.agent ? agentNextProviderAccountId(props.agent) : undefined,

@@ -33,7 +33,7 @@ const context = createSimpleContext({
   init: () => {
     const { activeServer, hostStatus } = useServers();
     const { publishLocalServer } = useServerSettings();
-    const { agentList, agentStatus, modelOptions, serverSetupChoice, developmentCreation } = useAgents();
+    const { agentList, agentStatus, modelOptions, refreshModels, serverSetupChoice, developmentCreation } = useAgents();
     const { setupState } = useSetup();
     const endpoints = useCustomProviders();
     const localAgents = useCustomAgents();
@@ -52,6 +52,7 @@ const context = createSimpleContext({
         ),
         customProviders: endpoints.customProviders(),
         customAgents: localAgents.customAgents(),
+        onOpenModelPicker: refreshModels,
       };
     };
     const localMessaging = localMessagingApi();

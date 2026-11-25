@@ -96,7 +96,7 @@ export function AgentEventBridge() {
   const { applyAgentStatus, refreshAgentProviders } = useProviders();
   const {
     agentList,
-    setModelOptions,
+    refreshModels,
     explicitlyOpenedAgentChatId,
     applyStoredAgents,
     applyUserHiddenAgents,
@@ -169,7 +169,6 @@ export function AgentEventBridge() {
   let promptListScope = 0;
   const endedDuringPromptListRead = new Set<string>();
   const askedDuringPromptListRead = new Set<string>();
-  let modelRefresh = 0;
 
   function handleAgentEvent(event: AgentEvent) {
     if (
@@ -182,15 +181,7 @@ export function AgentEventBridge() {
     switch (event.type) {
       case "status":
         applyAgentStatus(event.status);
-        if (event.status.phase === "ready" || event.status.phase === "blocked") {
-          const request = ++modelRefresh;
-          void agentsPort()
-            .agent.listModels()
-            .then((models) => {
-              if (request === modelRefresh) setModelOptions(models);
-            })
-            .catch(() => undefined);
-        }
+        if (event.status.phase === "ready" || event.status.phase === "blocked") refreshModels();
         return;
       case "usage-changed":
         applyAccountUsage(event.usage);

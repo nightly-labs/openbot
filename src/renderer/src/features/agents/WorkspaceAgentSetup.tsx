@@ -25,6 +25,7 @@ export function WorkspaceAgentSetup() {
     creatingAgent,
     cancelAgentSetup,
     modelOptions,
+    refreshModels,
     agentStatus,
     serverSetupChoice,
     hostAccountLimits,
@@ -104,6 +105,7 @@ export function WorkspaceAgentSetup() {
       onConnectProvider={localProviderDownloads() ? connectProvider : undefined}
       onAddCustomProvider={manageProviders() ? openProviderSettings : undefined}
       onManageProviders={manageProviders() ? openProviderSettings : undefined}
+      onOpenModelPicker={refreshModels}
       onChange={(next) => {
         const current = agentSetupDraft();
         if (

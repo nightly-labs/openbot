@@ -60,6 +60,7 @@ export interface ChannelOrchestratorModels {
   initial: ChannelOrchestratorChoice | null;
   customProviders?: readonly CustomProviderSummary[];
   customAgents?: readonly CustomAgentSummary[];
+  onOpenModelPicker?: (() => void) | undefined;
 }
 
 export interface ChannelAvatar {
@@ -398,6 +399,7 @@ export function ChannelOrchestratorStep(props: {
                   agentStatus={models().agentStatus}
                   customProviders={models().customProviders}
                   customAgents={models().customAgents}
+                  onOpen={models().onOpenModelPicker}
                   disabled={props.busy}
                   onChange={(model, provider) => props.onChoose({ provider, model })}
                 />
