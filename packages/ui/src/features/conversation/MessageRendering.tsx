@@ -734,10 +734,22 @@ export function MessageBody(props: {
                 {(block, index) => (
                   <Switch>
                     <Match when={comparisonTableContent(block())}>
-                      {(table) => <ComparisonTable table={table()} renderCell={renderMarkdownInline} />}
+                      {(table) => (
+                        <ComparisonTable
+                          table={table()}
+                          renderCell={renderMarkdownInline}
+                          selectionMessageId={props.message.streaming !== true ? props.message.id : undefined}
+                        />
+                      )}
                     </Match>
                     <Match when={dataTableContent(block())}>
-                      {(table) => <DataTable table={table()} renderCell={renderMarkdownInline} />}
+                      {(table) => (
+                        <DataTable
+                          table={table()}
+                          renderCell={renderMarkdownInline}
+                          selectionMessageId={props.message.streaming !== true ? props.message.id : undefined}
+                        />
+                      )}
                     </Match>
                     <Match when={codeContent(block())}>
                       {(code) => (
