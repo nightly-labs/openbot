@@ -50,21 +50,17 @@ export const messages = {
   "error.workflow.providerOffline":
     "OpenBot kon de provider niet bereiken. Controleer de internetverbinding en voer de stap dan opnieuw uit.",
   "error.workflow.providerBilling":
-    "Het account bij de provider heeft geen tegoed, of het abonnement staat dit model niet toe. Controleer het abonnement van het account, of kies een ander model voor deze stap.",
-  "error.workflow.modelRefused":
-    "De provider staat dit model niet toe voor dit account. Kies een ander model voor deze stap.",
+    "Het account heeft geen tegoed, of het abonnement bevat dit model niet. Controleer het abonnement, of kies een ander model.",
+  "error.workflow.modelRefused": "De provider staat dit model niet toe voor dit account. Kies een ander model.",
   "error.workflow.modelRefusedReason":
-    'De provider staat dit model niet toe voor dit account: "{reason}". Kies een ander model voor deze stap.',
+    'Kies een ander model. De provider staat dit model niet toe voor dit account: "{reason}"',
   "error.workflow.contentBlocked":
-    "De provider heeft de invoer van deze stap geblokkeerd. Wijzig de invoer of de prompt en voer de stap dan opnieuw uit.",
-  "error.workflow.inputTooLong":
-    "De invoer van deze stap is te lang voor het model. Maak de invoer korter, of kies een model dat meer tekst leest.",
-  "error.workflow.requestRefused":
-    "De provider heeft deze stap niet geaccepteerd. Kies een ander model voor deze stap.",
+    "De provider heeft de invoer geblokkeerd. Wijzig de invoer of de prompt en voer de stap dan opnieuw uit.",
+  "error.workflow.inputTooLong": "De invoer is te lang voor dit model. Maak hem korter, of kies een ander model.",
+  "error.workflow.requestRefused": "De provider heeft deze stap niet geaccepteerd. Kies een ander model.",
   "error.workflow.requestRefusedReason":
-    'De provider heeft deze stap niet geaccepteerd: "{reason}". Kies een ander model voor deze stap.',
-  "error.workflow.providerRefused":
-    'De provider heeft deze stap geweigerd: "{reason}". Kies een ander model voor deze stap, of voer de stap opnieuw uit.',
+    'Kies een ander model. De provider heeft deze stap niet geaccepteerd: "{reason}"',
+  "error.workflow.providerRefused": 'Kies een ander model, of voer de stap opnieuw uit. De provider zei: "{reason}"',
   "error.workflow.modelBusy": "Er loopt een ander verzoek aan het model. Voer de stap zo opnieuw uit.",
   "error.workflow.mediaFailed": "Het model kon de afbeelding of video niet maken. Voer de stap opnieuw uit.",
   "error.workflow.mediaNotMade": "Het model heeft de afbeelding of video niet gemaakt. Het antwoordde: {answer}",

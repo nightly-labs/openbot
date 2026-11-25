@@ -46,19 +46,17 @@ export const messages = {
   "error.workflow.providerOffline":
     "OpenBot sağlayıcıya ulaşamadı. İnternet bağlantısını kontrol edin, sonra adımı yeniden çalıştırın.",
   "error.workflow.providerBilling":
-    "Sağlayıcı hesabında kredi yok ya da planı bu modele izin vermiyor. Hesap planını kontrol edin ya da bu adım için başka bir model seçin.",
-  "error.workflow.modelRefused": "Sağlayıcı bu hesap için bu modele izin vermiyor. Bu adım için başka bir model seçin.",
+    "Hesapta kredi yok ya da plan bu modeli içermiyor. Planı kontrol edin ya da başka bir model seçin.",
+  "error.workflow.modelRefused": "Sağlayıcı bu hesap için bu modele izin vermiyor. Başka bir model seçin.",
   "error.workflow.modelRefusedReason":
-    'Sağlayıcı bu hesap için bu modele izin vermiyor: "{reason}". Bu adım için başka bir model seçin.',
+    'Başka bir model seçin. Sağlayıcı bu hesap için bu modele izin vermiyor: "{reason}"',
   "error.workflow.contentBlocked":
-    "Sağlayıcı bu adımın girdisini engelledi. Girdiyi ya da istemi değiştirin, sonra adımı yeniden çalıştırın.",
-  "error.workflow.inputTooLong":
-    "Bu adımın girdisi model için çok uzun. Girdiyi kısaltın ya da daha fazla metin okuyan bir model seçin.",
-  "error.workflow.requestRefused": "Sağlayıcı bu adımı kabul etmedi. Bu adım için başka bir model seçin.",
-  "error.workflow.requestRefusedReason":
-    'Sağlayıcı bu adımı kabul etmedi: "{reason}". Bu adım için başka bir model seçin.',
+    "Sağlayıcı girdiyi engelledi. Girdiyi ya da istemi değiştirin, sonra adımı yeniden çalıştırın.",
+  "error.workflow.inputTooLong": "Girdi bu model için çok uzun. Kısaltın ya da başka bir model seçin.",
+  "error.workflow.requestRefused": "Sağlayıcı bu adımı kabul etmedi. Başka bir model seçin.",
+  "error.workflow.requestRefusedReason": 'Başka bir model seçin. Sağlayıcı bu adımı kabul etmedi: "{reason}"',
   "error.workflow.providerRefused":
-    'Sağlayıcı bu adımı reddetti: "{reason}". Bu adım için başka bir model seçin ya da adımı yeniden çalıştırın.',
+    'Başka bir model seçin ya da adımı yeniden çalıştırın. Sağlayıcının yanıtı: "{reason}"',
   "error.workflow.modelBusy": "Başka bir model isteği çalışıyor. Adımı birazdan yeniden çalıştırın.",
   "error.workflow.mediaFailed": "Model görseli veya videoyu oluşturamadı. Adımı yeniden çalıştırın.",
   "error.workflow.mediaNotMade": "Model görseli veya videoyu oluşturmadı. Modelin yanıtı: {answer}",

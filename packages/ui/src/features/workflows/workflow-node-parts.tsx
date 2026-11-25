@@ -705,12 +705,42 @@ export function FailureAlert(props: { id: string; running: boolean }) {
   return (
     <Show when={props.running ? undefined : resultFailure(board, props.id)}>
       {(failure) => (
-        <p class="wfn-alert" data-tone="danger">
+        <div class="wfn-alert" data-tone="danger">
           <CircleX aria-hidden="true" />
-          <span class="wfn-alert-text">{failure()}</span>
-        </p>
+          <ClampedText class="wfn-alert-clamp" value={failure()} />
+        </div>
       )}
     </Show>
+  );
+}
+
+export function ClampedText(props: { value: string; class?: string }) {
+  const { t } = useText();
+  const [open, setOpen] = createSignal(false);
+  const [overflows, setOverflows] = createSignal(false);
+  let body: HTMLDivElement | undefined;
+  onSettled(() => {
+    if (body) setOverflows(body.scrollHeight > body.clientHeight + 1);
+  });
+  return (
+    <div class={props.class ?? "wfn-step-text"} data-clamped={overflows() && !open() ? "" : undefined}>
+      <div ref={body} class="wfn-step-text-body" data-open={open() ? "" : undefined}>
+        {props.value}
+      </div>
+      <Show when={overflows()}>
+        <Button
+          variant="link"
+          size="xs"
+          class="wfn-step-text-toggle"
+          aria-expanded={open() ? "true" : "false"}
+          onClick={() => {
+            setOpen((value) => !value);
+          }}
+        >
+          {open() ? t("workflow.node.settings.showLess") : t("workflow.node.settings.showMore")}
+        </Button>
+      </Show>
+    </div>
   );
 }
 

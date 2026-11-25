@@ -49,21 +49,19 @@ export const messages = {
   "error.workflow.providerOffline":
     "OpenBot n’a pas pu joindre le fournisseur. Vérifiez la connexion internet, puis relancez l’étape.",
   "error.workflow.providerBilling":
-    "Le compte du fournisseur n’a plus de crédit, ou son forfait ne permet pas ce modèle. Vérifiez le forfait du compte, ou choisissez un autre modèle pour cette étape.",
-  "error.workflow.modelRefused":
-    "Le fournisseur ne permet pas ce modèle pour ce compte. Choisissez un autre modèle pour cette étape.",
+    "Le compte n’a plus de crédit, ou son forfait n’inclut pas ce modèle. Vérifiez le forfait, ou choisissez un autre modèle.",
+  "error.workflow.modelRefused": "Le fournisseur ne permet pas ce modèle pour ce compte. Choisissez un autre modèle.",
   "error.workflow.modelRefusedReason":
-    'Le fournisseur ne permet pas ce modèle pour ce compte : "{reason}". Choisissez un autre modèle pour cette étape.',
+    'Choisissez un autre modèle. Le fournisseur ne permet pas ce modèle pour ce compte : "{reason}"',
   "error.workflow.contentBlocked":
-    "Le fournisseur a bloqué l’entrée de cette étape. Modifiez l’entrée ou le prompt, puis relancez l’étape.",
+    "Le fournisseur a bloqué l’entrée. Modifiez l’entrée ou le prompt, puis relancez l’étape.",
   "error.workflow.inputTooLong":
-    "L’entrée de cette étape est trop longue pour le modèle. Raccourcissez l’entrée, ou choisissez un modèle qui lit plus de texte.",
-  "error.workflow.requestRefused":
-    "Le fournisseur n’a pas accepté cette étape. Choisissez un autre modèle pour cette étape.",
+    "L’entrée est trop longue pour ce modèle. Raccourcissez-la, ou choisissez un autre modèle.",
+  "error.workflow.requestRefused": "Le fournisseur n’a pas accepté cette étape. Choisissez un autre modèle.",
   "error.workflow.requestRefusedReason":
-    'Le fournisseur n’a pas accepté cette étape : "{reason}". Choisissez un autre modèle pour cette étape.',
+    'Choisissez un autre modèle. Le fournisseur n’a pas accepté cette étape : "{reason}"',
   "error.workflow.providerRefused":
-    'Le fournisseur a refusé cette étape : "{reason}". Choisissez un autre modèle pour cette étape, ou relancez l’étape.',
+    'Choisissez un autre modèle, ou relancez l’étape. Le fournisseur a dit : "{reason}"',
   "error.workflow.modelBusy": "Une autre requête au modèle est en cours. Relancez l’étape bientôt.",
   "error.workflow.mediaFailed": "Le modèle n’a pas pu créer l’image ou la vidéo. Relancez l’étape.",
   "error.workflow.mediaNotMade": "Le modèle n’a pas créé l’image ou la vidéo. Sa réponse : {answer}",

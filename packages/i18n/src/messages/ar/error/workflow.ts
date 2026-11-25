@@ -41,17 +41,14 @@ export const messages = {
   "error.workflow.providerOffline":
     "تعذّر على OpenBot الوصول إلى المزوّد. تحقّق من الاتصال بالإنترنت، ثم شغّل الخطوة مرة أخرى.",
   "error.workflow.providerBilling":
-    "لا يوجد رصيد في حساب المزوّد، أو أن خطته لا تسمح بهذا النموذج. تحقّق من خطة الحساب، أو اختر نموذجًا آخر لهذه الخطوة.",
-  "error.workflow.modelRefused": "لا يسمح المزوّد بهذا النموذج لهذا الحساب. اختر نموذجًا آخر لهذه الخطوة.",
-  "error.workflow.modelRefusedReason":
-    'لا يسمح المزوّد بهذا النموذج لهذا الحساب: "{reason}". اختر نموذجًا آخر لهذه الخطوة.',
-  "error.workflow.contentBlocked": "حظر المزوّد مُدخل هذه الخطوة. غيّر المُدخل أو الطلب، ثم شغّل الخطوة مرة أخرى.",
-  "error.workflow.inputTooLong":
-    "مُدخل هذه الخطوة طويل جدًا على النموذج. اجعل المُدخل أقصر، أو اختر نموذجًا يقرأ نصًا أطول.",
-  "error.workflow.requestRefused": "لم يقبل المزوّد هذه الخطوة. اختر نموذجًا آخر لهذه الخطوة.",
-  "error.workflow.requestRefusedReason": 'لم يقبل المزوّد هذه الخطوة: "{reason}". اختر نموذجًا آخر لهذه الخطوة.',
-  "error.workflow.providerRefused":
-    'رفض المزوّد هذه الخطوة: "{reason}". اختر نموذجًا آخر لهذه الخطوة، أو شغّل الخطوة مرة أخرى.',
+    "لا يوجد رصيد في الحساب، أو أن خطته لا تشمل هذا النموذج. تحقّق من الخطة، أو اختر نموذجًا آخر.",
+  "error.workflow.modelRefused": "لا يسمح المزوّد بهذا النموذج لهذا الحساب. اختر نموذجًا آخر.",
+  "error.workflow.modelRefusedReason": 'اختر نموذجًا آخر. لا يسمح المزوّد بهذا النموذج لهذا الحساب: "{reason}"',
+  "error.workflow.contentBlocked": "حظر المزوّد المُدخل. غيّر المُدخل أو الطلب، ثم شغّل الخطوة مرة أخرى.",
+  "error.workflow.inputTooLong": "المُدخل طويل جدًا على هذا النموذج. اجعله أقصر، أو اختر نموذجًا آخر.",
+  "error.workflow.requestRefused": "لم يقبل المزوّد هذه الخطوة. اختر نموذجًا آخر.",
+  "error.workflow.requestRefusedReason": 'اختر نموذجًا آخر. لم يقبل المزوّد هذه الخطوة: "{reason}"',
+  "error.workflow.providerRefused": 'اختر نموذجًا آخر، أو شغّل الخطوة مرة أخرى. قال المزوّد: "{reason}"',
   "error.workflow.modelBusy": "يجري تنفيذ طلب نموذج آخر. شغّل الخطوة مرة أخرى بعد قليل.",
   "error.workflow.mediaFailed": "تعذّر على النموذج إنشاء الصورة أو الفيديو. شغّل الخطوة مرة أخرى.",
   "error.workflow.mediaNotMade": "لم يُنشئ النموذج الصورة أو الفيديو. قال: {answer}",

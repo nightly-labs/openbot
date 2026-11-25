@@ -48,20 +48,16 @@ export const messages = {
   "error.workflow.providerOffline":
     "O OpenBot não conseguiu acessar o provedor. Verifique a conexão com a internet e execute a etapa novamente.",
   "error.workflow.providerBilling":
-    "A conta do provedor não tem crédito, ou o plano dela não permite este modelo. Verifique o plano da conta ou escolha outro modelo para esta etapa.",
-  "error.workflow.modelRefused":
-    "O provedor não permite este modelo para esta conta. Escolha outro modelo para esta etapa.",
+    "A conta não tem crédito, ou o plano dela não inclui este modelo. Verifique o plano ou escolha outro modelo.",
+  "error.workflow.modelRefused": "O provedor não permite este modelo para esta conta. Escolha outro modelo.",
   "error.workflow.modelRefusedReason":
-    'O provedor não permite este modelo para esta conta: "{reason}". Escolha outro modelo para esta etapa.',
+    'Escolha outro modelo. O provedor não permite este modelo para esta conta: "{reason}"',
   "error.workflow.contentBlocked":
-    "O provedor bloqueou a entrada desta etapa. Altere a entrada ou o prompt e execute a etapa novamente.",
-  "error.workflow.inputTooLong":
-    "A entrada desta etapa é longa demais para o modelo. Encurte a entrada ou escolha um modelo que leia mais texto.",
-  "error.workflow.requestRefused": "O provedor não aceitou esta etapa. Escolha outro modelo para esta etapa.",
-  "error.workflow.requestRefusedReason":
-    'O provedor não aceitou esta etapa: "{reason}". Escolha outro modelo para esta etapa.',
-  "error.workflow.providerRefused":
-    'O provedor recusou esta etapa: "{reason}". Escolha outro modelo para esta etapa ou execute a etapa novamente.',
+    "O provedor bloqueou a entrada. Altere a entrada ou o prompt e execute a etapa novamente.",
+  "error.workflow.inputTooLong": "A entrada é longa demais para este modelo. Encurte-a ou escolha outro modelo.",
+  "error.workflow.requestRefused": "O provedor não aceitou esta etapa. Escolha outro modelo.",
+  "error.workflow.requestRefusedReason": 'Escolha outro modelo. O provedor não aceitou esta etapa: "{reason}"',
+  "error.workflow.providerRefused": 'Escolha outro modelo ou execute a etapa novamente. O provedor disse: "{reason}"',
   "error.workflow.modelBusy": "Outra solicitação ao modelo está em andamento. Execute a etapa novamente em breve.",
   "error.workflow.mediaFailed": "O modelo não conseguiu criar a imagem ou o vídeo. Execute a etapa novamente.",
   "error.workflow.mediaNotMade": "O modelo não criou a imagem ou o vídeo. Ele respondeu: {answer}",
