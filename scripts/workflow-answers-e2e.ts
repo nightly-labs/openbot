@@ -704,6 +704,26 @@ try {
   complete(report.handoffs.at(-1)?.deliveryId ?? "", "Done.");
   await runUntil(workflows, quoted, ended);
 
+  const silent = await startRun(workflows, "Nothing to report", {
+    nodes: [
+      node("prompt", "prompt", 0, { text: "Check the inbox." }),
+      node("agent", "agent", 300, { agentId: AGENT, task: "Note anything new.", answer: "note?: text" }),
+    ],
+    edges: [{ id: "prompt-agent", from: "prompt", to: "agent", type: "text" }],
+    strokes: [],
+  });
+  detail = await runUntil(workflows, silent, (run) => stepOf(run, "agent")?.status === "running");
+  const silentHandoffs = report.handoffs.length;
+  complete(report.handoffs.at(-1)?.deliveryId ?? "", "[[no-update]]");
+  detail = await runUntil(workflows, silent, ended);
+  check(
+    "an agent step with only optional fields ends quietly with an empty answer and no fix message",
+    stepOf(detail, "agent")?.status === "done" &&
+      stepOf(detail, "agent")?.output === "{}" &&
+      report.handoffs.length === silentHandoffs,
+    { step: stepOf(detail, "agent"), handoffs: report.handoffs.slice(silentHandoffs) },
+  );
+
   modelReplies = ['{"priority":"high"}'];
   const missing = await startRun(workflows, "Missing value", {
     nodes: [
