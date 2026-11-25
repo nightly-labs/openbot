@@ -6,6 +6,13 @@ export interface GlassPoint {
   readonly y: number;
 }
 
+export interface GlassArea {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+}
+
 export interface GlassView {
   readonly width: number;
   readonly height: number;
@@ -14,6 +21,7 @@ export interface GlassView {
 export interface FluidGlassSettings {
   readonly scene: string;
   readonly home: GlassPoint;
+  readonly area: GlassArea;
   readonly shape: GlassShape;
   readonly cycle: readonly GlassShape[];
   readonly size: number;
@@ -50,6 +58,8 @@ interface ProgramEntry {
 
 const PIXEL_BUDGET = 5e6;
 const SHADOW_SIZE = 320;
+const WALL_MARGIN = 1.1;
+const WALL_BOUNCE = 0.35;
 const MAX_RATIO = 2;
 const INTERACTIVE = "a, button, input, select, textarea, [role='button']";
 const REFLECTION = 1;
@@ -741,6 +751,19 @@ function startEngine(
 
   const radius = () => Math.min(read().size / 2, Math.min(view.width, view.height) * 0.36);
 
+  const span = (low: number, high: number, edge: number) => {
+    const min = low + edge;
+    const max = high - edge;
+    return max >= min ? { min, max } : { min: (low + high) / 2, max: (low + high) / 2 };
+  };
+
+  const walls = (area: GlassArea, size: number) => {
+    const edge = size * WALL_MARGIN;
+    const x = span(Math.max(0, area.left), Math.min(view.width, area.right), edge);
+    const y = span(Math.max(0, area.top), Math.min(view.height, area.bottom), edge);
+    return { minX: x.min, maxX: x.max, minY: y.min, maxY: y.max };
+  };
+
   const drawScene = () => {
     const width = canvas.width;
     const height = canvas.height;
@@ -786,9 +809,9 @@ function startEngine(
       body.anchorY = body.y;
       placed = true;
     } else if (s.interaction === "drag") {
-      const edge = radius() * 1.08;
-      body.anchorX = clamp(body.anchorX, edge, Math.max(edge, cssWidth - edge));
-      body.anchorY = clamp(body.anchorY, edge, Math.max(edge, cssHeight - edge));
+      const wall = walls(s.area, radius());
+      body.anchorX = clamp(body.anchorX, wall.minX, wall.maxX);
+      body.anchorY = clamp(body.anchorY, wall.minY, wall.maxY);
     }
   };
 
@@ -806,9 +829,9 @@ function startEngine(
   const settle = () => {
     const size = radius();
     const drift = reduced ? ([0, 0] as const) : driftAt(idleClock, size);
-    const edge = size * 1.08;
-    body.anchorX = clamp(body.x, edge, Math.max(edge, view.width - edge)) - drift[0];
-    body.anchorY = clamp(body.y, edge, Math.max(edge, view.height - edge)) - drift[1];
+    const wall = walls(read().area, size);
+    body.anchorX = clamp(body.x, wall.minX, wall.maxX) - drift[0];
+    body.anchorY = clamp(body.y, wall.minY, wall.maxY) - drift[1];
   };
 
   const step = (key: SpringKey, target: number, omega: number, zeta: number, dt: number) => {
@@ -884,9 +907,21 @@ function startEngine(
       goalY = pointer.y - pointer.offsetY;
       flying = false;
     }
-    const edge = size * 1.08;
-    goalX = clamp(goalX, edge, Math.max(edge, view.width - edge));
-    goalY = clamp(goalY, edge, Math.max(edge, view.height - edge));
+    const wall = walls(s.area, size);
+    goalX = clamp(goalX, wall.minX, wall.maxX);
+    goalY = clamp(goalY, wall.minY, wall.maxY);
+    const hitWalls = (bounce: number) => {
+      if (body.x < wall.minX || body.x > wall.maxX) {
+        body.x = clamp(body.x, wall.minX, wall.maxX);
+        velocity.stretch -= Math.min(4, Math.abs(body.vx) * 0.0016) * s.wobble;
+        body.vx *= -bounce;
+      }
+      if (body.y < wall.minY || body.y > wall.maxY) {
+        body.y = clamp(body.y, wall.minY, wall.maxY);
+        velocity.stretch -= Math.min(4, Math.abs(body.vy) * 0.0016) * s.wobble;
+        body.vy *= -bounce;
+      }
+    };
     if (flying) {
       for (let index = 0; index < substeps; index++) {
         body.x += body.vx * h;
@@ -894,16 +929,7 @@ function startEngine(
         const friction = Math.exp(-h * 1.4);
         body.vx *= friction;
         body.vy *= friction;
-        if (body.x < edge || body.x > view.width - edge) {
-          body.x = clamp(body.x, edge, Math.max(edge, view.width - edge));
-          velocity.stretch -= Math.min(4, Math.abs(body.vx) * 0.0016) * s.wobble;
-          body.vx *= -0.62;
-        }
-        if (body.y < edge || body.y > view.height - edge) {
-          body.y = clamp(body.y, edge, Math.max(edge, view.height - edge));
-          velocity.stretch -= Math.min(4, Math.abs(body.vy) * 0.0016) * s.wobble;
-          body.vy *= -0.62;
-        }
+        hitWalls(0.62);
       }
       if (Math.hypot(body.vx, body.vy) < 30) {
         flying = false;
@@ -916,6 +942,7 @@ function startEngine(
       body.vy += (omega * omega * (goalY - body.y) - 2 * 0.86 * omega * body.vy) * h;
       body.x += body.vx * h;
       body.y += body.vy * h;
+      hitWalls(WALL_BOUNCE);
     }
     if (Math.abs(goalX - body.x) + Math.abs(goalY - body.y) > 0.05 || Math.hypot(body.vx, body.vy) > 0.5) busy = true;
     return busy;

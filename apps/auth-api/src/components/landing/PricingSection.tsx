@@ -11,6 +11,7 @@ export function PricingSection() {
   let eyebrowRef: HTMLHeadingElement | undefined;
   let factsRef: HTMLUListElement | undefined;
   let amountRef: HTMLParagraphElement | undefined;
+  let actionsRef: HTMLDivElement | undefined;
   let layerRef: HTMLDivElement | undefined;
   let canvasRef: HTMLCanvasElement | undefined;
   let handleRef: HTMLDivElement | undefined;
@@ -21,12 +22,14 @@ export function PricingSection() {
   const text = () => landing().pricing;
 
   createEffect(revealed, (shown) => {
-    if (!shown || !sectionRef || !eyebrowRef || !factsRef || !amountRef || !layerRef || !canvasRef) return;
+    if (!shown || !sectionRef || !eyebrowRef || !factsRef || !amountRef || !actionsRef || !layerRef || !canvasRef)
+      return;
     return mountPricingGlass(
       {
         section: sectionRef,
         copy: [eyebrowRef, factsRef],
         amount: amountRef,
+        actions: actionsRef,
         layer: layerRef,
         canvas: canvasRef,
         handle: handleRef,
@@ -56,7 +59,7 @@ export function PricingSection() {
             )}
           </For>
         </ul>
-        <div class="landing-pricing-actions" data-revealed={revealState()}>
+        <div ref={actionsRef} class="landing-pricing-actions" data-revealed={revealState()}>
           <ButtonLink to="/download" variant="primary" size="md" icon="download">
             {text().download}
           </ButtonLink>

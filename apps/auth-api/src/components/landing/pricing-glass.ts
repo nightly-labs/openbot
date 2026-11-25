@@ -1,6 +1,7 @@
 import {
   createFluidGlass,
   type FluidGlassSettings,
+  type GlassArea,
   type GlassInteraction,
   type GlassPoint,
   type GlassShape,
@@ -39,6 +40,8 @@ const FOREVER_SCALE = 1.56;
 const FOREVER_FIT = 0.96;
 const AMOUNT_SPACING = -0.055;
 const INTERACTIVE = "a, button, input, select, textarea, [role='button']";
+const ACTIONS_GAP = 8;
+const OPEN_AREA: GlassArea = { left: 0, top: 0, right: Number.POSITIVE_INFINITY, bottom: Number.POSITIVE_INFINITY };
 
 export interface PricingGlassText {
   readonly smallPrint: string;
@@ -49,6 +52,7 @@ export interface PricingGlassParts {
   readonly section: HTMLElement;
   readonly copy: readonly HTMLElement[];
   readonly amount: HTMLElement;
+  readonly actions: HTMLElement;
   readonly layer: HTMLElement;
   readonly canvas: HTMLCanvasElement;
   readonly handle: HTMLElement | undefined;
@@ -99,6 +103,7 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
   let visible = false;
   let amountSize = Number.parseFloat(getComputedStyle(amount).fontSize) || 230;
   let home: GlassPoint = { x: 0, y: 0 };
+  let area = OPEN_AREA;
   let layout = 0;
 
   const mode = (): SceneMode => {
@@ -117,6 +122,7 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
     const color = getComputedStyle(layer).color;
     amountSize = Number.parseFloat(style.fontSize) || amountSize;
     home = { x: box.left - origin.left + box.width / 2, y: box.top - origin.top + box.height / 2 };
+    area = { ...OPEN_AREA, bottom: parts.actions.getBoundingClientRect().top - origin.top - ACTIONS_GAP };
     const scene = mode();
     if (scene === "amount") {
       paintElement(ctx, amount, origin, color);
@@ -140,6 +146,7 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
     return {
       scene: [mode(), layout, words.smallPrint, words.forever].join("|"),
       home,
+      area,
       shape: state.forever ? "diamond" : "lens",
       cycle: CYCLE,
       size: amountSize * (state.forever ? FOREVER_SCALE : 1),
