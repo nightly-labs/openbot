@@ -146,6 +146,50 @@
   font-variant-numeric: tabular-nums;
 }
 
+.billing-lifecycle-timing {
+  display: grid;
+  gap: var(--openbot-space-2);
+  margin-bottom: var(--openbot-space-4);
+  font-size: var(--openbot-text-sm);
+}
+
+.billing-lifecycle-timing-option {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-3);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+}
+
+.billing-lifecycle-timing-option[data-checked] {
+  border-color: var(--openbot-accent);
+  background: var(--openbot-bg-surface);
+}
+
+.billing-lifecycle-timing-option[data-focus-visible] {
+  outline: 1px solid var(--openbot-accent);
+}
+
+.billing-lifecycle-timing-option label {
+  flex: 1;
+  cursor: pointer;
+}
+
+.billing-lifecycle-radio {
+  flex-shrink: 0;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+}
+
+.billing-lifecycle-radio[data-checked] {
+  border-color: var(--openbot-accent);
+  background: var(--openbot-accent);
+  box-shadow: inset 0 0 0 var(--openbot-space-1) var(--openbot-bg-canvas);
+}
+
 @container (max-width: 450px) {
   .billing-lifecycle-price {
     order: 2;
