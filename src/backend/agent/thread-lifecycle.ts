@@ -830,6 +830,7 @@ export class ThreadLifecycle {
       config?: {
         mcp_servers?: Record<string, CodexMcpServer | CodexDisabledMcpServer>;
         tools: typeof CODEX_TOOLS_CONFIG;
+        model_reasoning_effort: AgentSummary["reasoningEffort"];
         project_doc_max_bytes: number;
         mcp_optional_startup_grace_ms: number;
         "features.goals": false;
@@ -854,6 +855,7 @@ export class ThreadLifecycle {
       config: {
         ...(Object.keys(mcpServers).length > 0 ? { mcp_servers: mcpServers } : {}),
         tools: CODEX_TOOLS_CONFIG,
+        model_reasoning_effort: agent.reasoningEffort,
         ...CODEX_FEATURES_CONFIG,
         ...codexPromptSettings(own.read),
         ...CODEX_BROWSER_PLUGINS_OFF,
