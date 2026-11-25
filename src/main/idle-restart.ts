@@ -59,10 +59,7 @@ export class IdleRestart {
       if (status.managedByHost) throw new Error(sourceText("error.update.managedByHost"));
       if (status.phase !== "ready") throw new Error(sourceText("error.update.notReady"));
     }
-    if (!this.#heldSince) {
-      this.#heldSince = new Date();
-      this.#holdRoutines();
-    }
+    this.#hold();
     this.#log(`The user asked for a restart when idle (${target}).`);
     this.#publish({ target, waitingFor: [] });
     this.#schedule(0);
@@ -108,6 +105,8 @@ export class IdleRestart {
     if (!status || status.error) return;
     const { safeToRestart, reasons } = this.#describeReadiness();
     if (!safeToRestart) {
+      if (reasons.every((reason) => reason === "open-question")) this.#release();
+      else this.#hold();
       const waitingFor = [...new Set(reasons)];
       if (waitingFor.join() !== status.waitingFor.join()) this.#publish({ ...status, waitingFor });
       this.#schedule(this.#pollMs);
@@ -119,6 +118,7 @@ export class IdleRestart {
   });
 
   #startRestart(status: IdleRestartStatus): void {
+    this.#hold();
     this.#restarting = true;
     this.#publish({ ...status, waitingFor: [] });
     this.#keepHold();
@@ -149,11 +149,20 @@ export class IdleRestart {
   #end(status: IdleRestartStatus | null): void {
     this.#clearTimer();
     this.#publish(status);
-    if (this.#heldSince && !this.#handedOff) {
-      this.#heldSince = null;
-      this.#recordHold(null);
-      this.#releaseRoutines();
-    }
+    this.#release();
+  }
+
+  #hold(): void {
+    if (this.#heldSince) return;
+    this.#heldSince = new Date();
+    this.#holdRoutines();
+  }
+
+  #release(): void {
+    if (!this.#heldSince || this.#handedOff) return;
+    this.#heldSince = null;
+    this.#recordHold(null);
+    this.#releaseRoutines();
   }
 
   #keepHold(): void {

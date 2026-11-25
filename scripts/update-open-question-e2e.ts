@@ -27,6 +27,7 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type DynamicToolNamespace, LocalMcpBridge } from "../src/backend/local-mcp-bridge";
 import { PendingServerRequests } from "../src/backend/pending-server-requests";
 import { type DynamicToolResult, isRecord, PROVIDER_STOPPED_WAITING, type RequestId } from "../src/backend/protocol";
+import { IdleRestart } from "../src/main/idle-restart";
 import { RequestedUpdate } from "../src/main/requested-update";
 import type { TeamApiRequestContext } from "../src/main/team-api/request-context";
 import { routeHostUpdate } from "../src/main/team-api/route-host-update";
@@ -64,6 +65,12 @@ interface Report {
     installsAfterMaximumWait?: number;
     cardAtInstall?: CardState;
     managedHostSafeToRestart?: boolean;
+  };
+  idleRestart?: {
+    routinesHeldWhileOnlyACardWaits?: boolean;
+    relaunchesWhileOpen?: number;
+    routinesHeldAtRelaunch?: boolean;
+    relaunchesAfterAnswer?: number;
   };
   error?: string;
 }
@@ -116,6 +123,7 @@ class StagedReleaseUpdater extends EventEmitter {
   };
   getAutoDownload = () => true;
   setAutoDownload = () => Effect.void;
+  setIdleRestart = () => {};
 }
 
 function isDynamicToolResult(value: unknown): value is DynamicToolResult {
@@ -408,6 +416,49 @@ try {
   assert.equal(report.hosted.cardAtInstall, "pending", "The hosted install did not ignore the open card.");
   await Effect.runPromise(hosted.requested.dispose());
   registry.clearPrompts();
+
+  report.idleRestart = {};
+  turn = "turn-4";
+  await askUntilTheCardDetaches();
+  let routinesHeld = false;
+  let relaunches = 0;
+  let routinesHeldAtRelaunch = false;
+  let idleChecks = 0;
+  const idleRestart = new IdleRestart({
+    updater: new StagedReleaseUpdater(),
+    describeReadiness: () => {
+      idleChecks += 1;
+      return readiness();
+    },
+    holdRoutines: () => {
+      routinesHeld = true;
+    },
+    releaseRoutines: () => {
+      routinesHeld = false;
+    },
+    recordHold: () => {},
+    relaunch: () => {
+      relaunches += 1;
+      routinesHeldAtRelaunch = routinesHeld;
+    },
+    log: () => {},
+    pollMs: POLL_MS,
+  });
+  idleRestart.request("relaunch");
+  const target = idleChecks + POLLS_WHILE_HELD;
+  await until("more idle restart checks", () => idleChecks >= target);
+  report.idleRestart.routinesHeldWhileOnlyACardWaits = routinesHeld;
+  report.idleRestart.relaunchesWhileOpen = relaunches;
+  assert.equal(relaunches, 0, "The restart when idle did not wait for the open card.");
+  assert.equal(routinesHeld, false, "Routines stayed held while only an open card waited.");
+  const idlePrompt = registry.pendingPrompts().find((candidate) => candidate.turnId === turn);
+  assert.ok(idlePrompt?.detached);
+  await runCauseEffect(registry.respondToPrompt({ requestId: idlePrompt.requestId, answers: { send: ["No"] } }));
+  await until("the restart after the answer", () => relaunches === 1);
+  report.idleRestart.relaunchesAfterAnswer = relaunches;
+  report.idleRestart.routinesHeldAtRelaunch = routinesHeldAtRelaunch;
+  assert.equal(routinesHeldAtRelaunch, true, "Routines were not held again before the restart.");
+  idleRestart.dispose();
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? error.message : String(error);

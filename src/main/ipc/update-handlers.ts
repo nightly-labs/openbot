@@ -16,7 +16,7 @@ export interface UpdateIpcDependencies {
 }
 
 function restartWouldStopWork({ reasons }: RestartReadiness): boolean {
-  return reasons.some((reason) => reason !== "initialization");
+  return reasons.some((reason) => reason !== "initialization" && reason !== "open-question");
 }
 
 export function updateIpcHandlers({
