@@ -46,7 +46,8 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
 
   const config = createMemo(() => props.tools.servers().find((candidate) => candidate.id === props.id));
   const signedIn = () => Boolean(props.tools.signIns()[props.id]?.signedIn);
-  const signInApp = () => (config()?.transport === "http" ? props.tools.signIn()?.app : undefined);
+  const transport = createMemo(() => config()?.transport);
+  const signInApp = createMemo(() => (transport() === "http" ? props.tools.signIn()?.app : undefined));
 
   const test = createMemo((): McpTestState | undefined => {
     const current = config();

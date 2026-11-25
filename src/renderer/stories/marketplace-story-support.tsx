@@ -10,6 +10,7 @@ import {
   type MarketplaceSkillSummary,
   type McpServerAccess,
   type McpServerConfig,
+  type McpSignInApp,
   type McpSignInState,
   type SkillCategory,
 } from "@openbot/contracts/ipc";
@@ -40,6 +41,7 @@ import { createSignal, createStore, onSettled, Show, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import { McpServerControls } from "../src/features/servers/McpServerControls";
 import { McpServerForm } from "../src/features/servers/McpServerForm";
+import type { McpPanelSignInApp } from "../src/features/servers/McpSignInAppSection";
 import type { McpServerTools } from "../src/features/servers/mcp-server-tools";
 import { MARKETPLACE_PLUGINS } from "../src/features/settings/marketplace-plugin-catalog";
 import {
@@ -536,6 +538,26 @@ export function MarketplaceStory(props: StoryProps) {
   const [dialogOpen, setDialogOpen] = createSignal(true);
 
   const [signIns, setSignIns] = createSignal<Record<string, McpSignInState>>({});
+  const [savedSignInApp, setSavedSignInApp] = createSignal<McpSignInApp | null>(null);
+  const storySignInAppState = () => ({ redirectUrl: STORY_SIGN_IN_CALLBACK, app: savedSignInApp() });
+  const storySignInApp: McpPanelSignInApp | undefined = signInAppNeeded
+    ? {
+        load: async () => storySignInAppState(),
+        save: async (input) => {
+          setSavedSignInApp({
+            clientId: input.clientId,
+            secretSaved:
+              input.clientSecret === null ? (savedSignInApp()?.secretSaved ?? false) : input.clientSecret !== "",
+            scope: input.scope,
+          });
+          return storySignInAppState();
+        },
+        remove: async () => {
+          setSavedSignInApp(null);
+          return storySignInAppState();
+        },
+      }
+    : undefined;
   const customServers = () => state.apps.flatMap((app) => (app.kind === "custom" ? [app.server] : []));
   const putServer = (server: McpServerConfig) =>
     setState((draft) => {
@@ -577,16 +599,7 @@ export function MarketplaceStory(props: StoryProps) {
       signOut: async (id) => {
         setSignIns((held) => ({ ...held, [id]: { mcpServerId: id, signedIn: false } }));
       },
-      app: signInAppNeeded
-        ? {
-            load: async () => ({ redirectUrl: STORY_SIGN_IN_CALLBACK, app: null }),
-            save: async (input) => ({
-              redirectUrl: STORY_SIGN_IN_CALLBACK,
-              app: { clientId: input.clientId, secretSaved: Boolean(input.clientSecret), scope: input.scope },
-            }),
-            remove: async () => ({ redirectUrl: STORY_SIGN_IN_CALLBACK, app: null }),
-          }
-        : undefined,
+      app: storySignInApp,
     }),
     signInRequest: () => null,
     endSignInRequest: () => {},
