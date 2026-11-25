@@ -2166,6 +2166,7 @@ export async function createApplicationServices({
     store,
     mailbox,
     browser,
+    usageReportWorkerPath: join(__dirname, "usage-report-worker.js"),
     finishCheck: true,
     cacheExpiryCompaction: () => cacheExpiryCompaction.get().enabled,
     mediaApprovalCredits: () => mediaApprovalCredits.get(),

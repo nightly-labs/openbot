@@ -51,6 +51,7 @@ export default defineConfig({
           "voice-transcription-host": resolve("src/main/voice-transcription-host.ts"),
           "voice-speech-host": resolve("src/main/voice-speech-host.ts"),
           "process-launcher-host": resolve("src/main/process-launcher-host.ts"),
+          "usage-report-worker": resolve("src/backend/database/usage-report-worker.ts"),
         },
       },
     },
