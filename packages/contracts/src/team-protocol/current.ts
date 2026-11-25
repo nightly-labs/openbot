@@ -80,6 +80,7 @@ import { BROWSING_MEMORY_CAPABILITY } from "./browsing-memory-v1";
 import { CACHE_EXPIRY_COMPACTION_CAPABILITY } from "./cache-expiry-compaction-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CHANNEL_BROWSER_CAPABILITY } from "./channel-browser-v1";
+import { CHANNEL_COMPACT_AVAILABILITY_CAPABILITY } from "./channel-compact-availability-v1";
 import { CHANNEL_FOLDERS_CAPABILITY } from "./channel-folders-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
 import { CHANNEL_PAGE_TASKS_CAPABILITY } from "./channel-page-tasks-v1";
@@ -371,6 +372,7 @@ export {
   BROWSING_MEMORY_CAPABILITY,
   CACHE_EXPIRY_COMPACTION_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
+  CHANNEL_COMPACT_AVAILABILITY_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_FOLDERS_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
@@ -873,6 +875,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [BROWSER_PERMISSIONS_CAPABILITY, V10],
   [TEAM_BROWSER_VIEW_DIALOG_CAPABILITY, V10],
   [BROWSER_HTTP_SIGN_IN_CAPABILITY, V10],
+  [CHANNEL_COMPACT_AVAILABILITY_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

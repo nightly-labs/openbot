@@ -707,6 +707,7 @@ import type { AccountSession, MobileConnectedDevice, MobileConnectLink, MobileCo
 import type { AcceptedOwnerTransfer, OwnerTransfer } from "./owner-transfer";
 import type { ReferralPageRequest, ReferralState } from "./referral";
 import type { AgentActiveQueues } from "./team-protocol/agent-active-queues-v1";
+import type { ChannelCompactAvailability } from "./team-protocol/channel-compact-availability-v1";
 
 declare const payloadType: unique symbol;
 declare const resultType: unique symbol;
@@ -1555,6 +1556,9 @@ export const IPC_ENDPOINTS = {
     clearChannelContext: scopedRequest<string, void>()("agent:channels:clear-context"),
     deleteChannelHistory: scopedRequest<string, void>()("agent:channels:delete-history"),
     compactChannelContext: scopedRequest<string, void>()("agent:channels:compact-context"),
+    channelCompactAvailability: scopedRequest<string, ChannelCompactAvailability>()(
+      "agent:channels:compact-availability",
+    ),
     getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
     mutateSidebarLayout: scopedRequest<SidebarLayoutAction, SidebarLayoutSnapshot>()("agent:mutate-sidebar-layout"),
     getSidebarPins: scopedQuery<SidebarPinsSnapshot>()("agent:sidebar-pins:get"),

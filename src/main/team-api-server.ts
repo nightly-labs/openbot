@@ -77,6 +77,7 @@ import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/br
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { CACHE_EXPIRY_COMPACTION_CAPABILITY } from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
+import { CHANNEL_COMPACT_AVAILABILITY_CAPABILITY } from "@openbot/contracts/team-protocol/channel-compact-availability-v1";
 import { CHANNEL_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
@@ -434,7 +435,7 @@ import { routeCacheExpiryCompaction } from "./team-api/route-cache-expiry-compac
 import { routeChannelFolders } from "./team-api/route-channel-folders";
 import { routeChannels } from "./team-api/route-channels";
 import { chatColorsOf, routeChatColors, visibleChatColors } from "./team-api/route-chat-colors";
-import { routeChatHistory } from "./team-api/route-chat-history";
+import { routeChannelCompactAvailability, routeChatHistory } from "./team-api/route-chat-history";
 import { routeClaudeCompactWindow } from "./team-api/route-claude-compact-window";
 import { routeClaudeUserSetup } from "./team-api/route-claude-user-setup";
 import { routeClientBrowser } from "./team-api/route-client-browser";
@@ -1422,6 +1423,11 @@ export class TeamApiServer {
       if ((await routeMessageDelete(context, this.#options.agents, this.#options.channels, hidden)) === "handled")
         return;
       if ((await routeChatHistory(context, this.#options.agents, this.#options.channels, hidden)) === "handled") return;
+      if (
+        (await routeChannelCompactAvailability(context, this.#options.agents, this.#options.channels, hidden)) ===
+        "handled"
+      )
+        return;
       if ((await routeConversationUnreadFrom(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentMemoryPage(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeWorkspaceDirectory(context, this.#options.agents, hidden)) === "handled") return;
@@ -2783,7 +2789,8 @@ export class TeamApiServer {
           capability === CHANNEL_TASK_CANCEL_CAPABILITY ||
           capability === CHANNEL_ISOLATION_CAPABILITY ||
           capability === CHANNEL_PICTURE_CAPABILITY ||
-          capability === CHANNEL_BROWSER_CAPABILITY
+          capability === CHANNEL_BROWSER_CAPABILITY ||
+          capability === CHANNEL_COMPACT_AVAILABILITY_CAPABILITY
         )
           return this.#options.channels !== undefined;
         if (capability === "remote-desktop-setup")

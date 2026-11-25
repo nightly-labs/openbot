@@ -160,6 +160,12 @@ import {
   TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
+  CHANNEL_COMPACT_AVAILABILITY_CAPABILITY,
+  CHANNEL_COMPACT_AVAILABILITY_ROUTE,
+  type ChannelCompactAvailability,
+  decodeChannelCompactAvailability,
+} from "@openbot/contracts/team-protocol/channel-compact-availability-v1";
+import {
   CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_PICTURE_ROUTES,
 } from "@openbot/contracts/team-protocol/channel-picture-v1";
@@ -400,6 +406,7 @@ export interface WebWorkspaceRuntime {
   deleteHistory?: (input: WebHistoryDelete) => Promise<void>;
   clearChannelContext?: (channelId: string) => Promise<void>;
   compactChannelContext?: (channelId: string) => Promise<void>;
+  channelCompactAvailability?: (channelId: string) => Promise<ChannelCompactAvailability>;
   listWaits?: (agentId: string) => Promise<AgentWaitsSnapshot>;
   listPinnedMessages?: (agentId: string) => Promise<PinnedMessagesSnapshot>;
   setMessagePinned?: (input: SetMessagePinnedInput) => Promise<PinnedMessagesSnapshot>;
@@ -1467,6 +1474,10 @@ export function createWebWorkspaceRuntime(
       if (!capabilities.includes(CHAT_HISTORY_CAPABILITY))
         throw new Error(currentText().t("error.team.channelContextUnsupported"));
       await request("POST", CHAT_HISTORY_ROUTES.channelCompact, { channelId });
+    },
+    async channelCompactAvailability(channelId) {
+      if (!capabilities.includes(CHANNEL_COMPACT_AVAILABILITY_CAPABILITY)) return { available: true };
+      return decodeChannelCompactAvailability(await request("POST", CHANNEL_COMPACT_AVAILABILITY_ROUTE, { channelId }));
     },
     async listWaits(agentId) {
       if (!capabilities.includes(AGENT_WAITS_CAPABILITY))
