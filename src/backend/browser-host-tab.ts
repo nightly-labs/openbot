@@ -76,12 +76,12 @@ export interface BrowserHostTab {
   httpSignInAnswer?: (BrowserHttpSignInRealm & { username: string; password: string }) | undefined;
 }
 
-export interface BrowserHttpSignInRealm {
+interface BrowserHttpSignInRealm {
   origin: string;
   realm: string;
 }
 
-export interface BrowserHttpSignInPrompt extends BrowserHttpSignInRealm {
+interface BrowserHttpSignInPrompt extends BrowserHttpSignInRealm {
   refused: boolean;
 }
 

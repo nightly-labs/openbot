@@ -18,6 +18,7 @@ const config: KnipConfig = {
   ignoreBinaries: [
     "xterm",
     "ssh-keygen",
+    "openssl",
     "ssh-keyscan",
     "ssh-add",
     "cmake",
