@@ -1,7 +1,7 @@
-import { Effect, Result } from "effect";
+import { Effect, Exit } from "effect";
 
 export const ACCOUNT_ACTIVITY_PATH = "/v1/me/activity";
-const MAX_ACCOUNTS_PER_REPORT = 100;
+const MAX_ACCOUNTS_PER_REPORT = 50;
 const RETRY_AFTER_FAILURE_MS = 5 * 60_000;
 const DAY_FORMAT = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Europe/Warsaw",
@@ -62,10 +62,10 @@ export class AccountActivityReporter {
       this.#pending.delete(account);
       this.#inFlight.add(account);
     }
-    this.#sending = Effect.runPromise(Effect.result(this.#send(batch))).then((result) => {
+    this.#sending = Effect.runPromiseExit(this.#send(batch)).then((exit) => {
       this.#sending = null;
       this.#inFlight.clear();
-      if (Result.isFailure(result)) {
+      if (Exit.isFailure(exit)) {
         if (day === this.#day) for (const account of batch) this.#pending.add(account);
         this.#retryAt = this.#now() + this.#retryAfterMs;
         this.#scheduleRetry();

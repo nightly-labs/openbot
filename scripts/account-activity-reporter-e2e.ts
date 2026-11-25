@@ -20,20 +20,18 @@ function harness(start: number) {
   let failNext = 0;
   const sent: string[][] = [];
   const waiters: (() => void)[] = [];
-  const reporter = new AccountActivityReporter({
-    now: () => now,
-    retryAfterMs: 10,
-    send: (accounts) =>
-      Effect.suspend(() => {
-        const failed = failNext > 0;
-        if (failed) failNext -= 1;
-        else sent.push([...accounts]);
-        for (const wake of waiters.splice(0)) wake();
-        return failed ? Effect.fail("unavailable") : Effect.succeed(null);
-      }),
-  });
+  const send = (accounts: readonly string[]) =>
+    Effect.suspend(() => {
+      const failed = failNext > 0;
+      if (failed) failNext -= 1;
+      else sent.push([...accounts]);
+      for (const wake of waiters.splice(0)) wake();
+      return failed ? Effect.fail("unavailable") : Effect.succeed(null);
+    });
+  const reporter = new AccountActivityReporter({ now: () => now, retryAfterMs: 10, send });
   return {
     reporter,
+    send,
     sent,
     setNow: (value: number) => {
       now = value;
@@ -77,6 +75,26 @@ async function main() {
     "a failed send is tried again with no new activity",
     retried && JSON.stringify(retry.sent) === JSON.stringify([["ada"]]),
     retry.sent,
+  );
+
+  let crashed = false;
+  const crash = harness(NOON_23RD);
+  const crashing = new AccountActivityReporter({
+    now: () => NOON_23RD,
+    retryAfterMs: 10,
+    send: (accounts) => {
+      if (crashed) return crash.send(accounts);
+      crashed = true;
+      return Effect.die("send crashed");
+    },
+  });
+  const afterCrash = crash.nextSend();
+  crashing.record("ada");
+  const resent = await afterCrash;
+  check(
+    "a send that crashes is tried again and does not stop the reporter",
+    resent && JSON.stringify(crash.sent) === JSON.stringify([["ada"]]),
+    crash.sent,
   );
 
   const midnight = harness(LATE_23RD);

@@ -3229,15 +3229,17 @@ export async function createApplicationServices({
       ? state.user
       : null;
   };
+  let ownerAnalyticsOn = analyticsPreference.enabled;
   const accountActivity = new AccountActivityReporter({
     send: (accounts) =>
-      centralAuth.requestAuthorized(
-        ACCOUNT_ACTIVITY_PATH,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accounts }) },
-        (value) => value,
-      ),
+      !ownerAnalyticsOn
+        ? Effect.void
+        : centralAuth.requestAuthorized(
+            ACCOUNT_ACTIVITY_PATH,
+            { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accounts }) },
+            (value) => value,
+          ),
   });
-  let ownerAnalyticsOn = analyticsPreference.enabled;
   service.on("event", (event) => {
     if (event.type !== "turn-started" || !ownerAnalyticsOn) return;
     const owner = resolveHostOwner();
@@ -3245,7 +3247,7 @@ export async function createApplicationServices({
   });
   const host = new HostService({
     onMemberUse: (memberId) => {
-      const accountId = teamStore.getMemberAccountId(memberId);
+      const accountId = ownerAnalyticsOn ? teamStore.getMemberAccountId(memberId) : null;
       if (accountId) accountActivity.record(accountId);
     },
     appVersion: app.getVersion(),

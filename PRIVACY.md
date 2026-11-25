@@ -126,8 +126,8 @@ It does not send Stripe identifiers, server identifiers, or Checkout return toke
 An account deletion clears its profile reference and stops pending account event delivery.
 Once a day, the account service sends OpenPanel the number of accounts that were active on the
 day before, with no account ID. It counts each account once, on all its computers, phones and
-servers, also when the user has not answered the analytics question. It does not count an account
-whose analytics answer is off.
+servers. It does not count an account whose analytics answer is off, an account whose computer has
+analytics off, or a member who has not turned analytics on.
 The account service also sends an event when it makes a new account (with the app used to sign in)
 and when it saves the first website visit of an account. A payment event and a revenue event include
 that first visit when the account has one.
@@ -467,11 +467,12 @@ The service stores:
   that server removes its record;
 - remote memberships and invitations with roles, states, hashed invitation tokens, and lifecycle times;
 - for each day until its total is sent, the accounts that were active: the account ID and the day. A
-  host sends the owner's account when a turn starts there, unless analytics is off on that computer,
-  and the account of each member who uses it. The service keeps no row for an account whose analytics
-  answer is off, and turning analytics off deletes the account's rows. It deletes the rows of a day
-  when analytics accepts the daily total, usually in the first hour of the next day, and deleting an
-  account removes its rows;
+  host with analytics on sends the owner's account when a turn starts there, and the account of each
+  member who uses it; a host with analytics off sends nothing. The service keeps the owner's row unless
+  the owner's analytics answer is off, and a member's row only when the member's own analytics answer
+  is on. Turning analytics off deletes the account's rows. It deletes the rows of a day when analytics
+  accepts the daily total, usually in the first hour of the next day, and after 7 days in all cases.
+  Deleting an account removes its rows;
 - logical remote session records with the account, host, originating account-session hash, start,
   end, and expiration times;
 - the current account avatar file and its content type when the user uploads an avatar.

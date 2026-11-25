@@ -3,8 +3,9 @@ import { Effect, Schema } from "effect";
 import type { AccountEventDelivery } from "./account-analytics";
 
 export const ACCOUNT_ACTIVITY_TIME_ZONE = "Europe/Warsaw";
-export const MAX_REPORTED_ACCOUNTS = 100;
-export const SNAPSHOT_DELAY_MS = 15 * 60_000;
+export const MAX_REPORTED_ACCOUNTS = 50;
+const SNAPSHOT_DELAY_MS = 15 * 60_000;
+const MAX_ROW_AGE_MS = 7 * 24 * 60 * 60_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const DAY_FORMAT = new Intl.DateTimeFormat("en-CA", {
   timeZone: ACCOUNT_ACTIVITY_TIME_ZONE,
@@ -13,7 +14,7 @@ const DAY_FORMAT = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
 });
 
-export class AccountActivityError extends Schema.TaggedError<AccountActivityError>()("AccountActivityError", {}) {}
+class AccountActivityError extends Schema.TaggedError<AccountActivityError>()("AccountActivityError", {}) {}
 
 export function accountActivityDay(now: number): string {
   return DAY_FORMAT.format(new Date(now));
@@ -62,12 +63,19 @@ export const recordAccountActivity = Effect.fn("AccountActivity.record")(functio
   const recorded = accounts.filter((account) => account === callerId || members.has(account));
   if (recorded.length === 0) return { recorded: 0 };
   const day = accountActivityDay(now);
-  const insert = database.prepare(
+  const insertCaller = database.prepare(
     `INSERT OR IGNORE INTO account_active_days(day, account_id)
      SELECT ?, id FROM users WHERE id = ? AND analytics_enabled IS NOT 0`,
   );
+  const insertMember = database.prepare(
+    `INSERT OR IGNORE INTO account_active_days(day, account_id)
+     SELECT ?, id FROM users WHERE id = ? AND analytics_enabled = 1`,
+  );
   yield* Effect.tryPromise({
-    try: () => database.batch(recorded.map((account) => insert.bind(day, account))),
+    try: () =>
+      database.batch(
+        recorded.map((account) => (account === callerId ? insertCaller : insertMember).bind(day, account)),
+      ),
     catch: () => new AccountActivityError({}),
   });
   return { recorded: recorded.length };
@@ -78,6 +86,14 @@ export const sendAccountActivitySnapshots = Effect.fn("AccountActivity.sendSnaps
   deliver: AccountEventDelivery,
   now: number,
 ) {
+  yield* Effect.tryPromise({
+    try: () =>
+      database
+        .prepare("DELETE FROM account_active_days WHERE day < ?")
+        .bind(accountActivityDay(now - MAX_ROW_AGE_MS))
+        .run(),
+    catch: () => new AccountActivityError({}),
+  });
   const closedBefore = accountActivityDay(now - SNAPSHOT_DELAY_MS);
   const days = yield* Effect.tryPromise({
     try: () =>

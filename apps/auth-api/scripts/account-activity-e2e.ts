@@ -31,7 +31,7 @@ function migratedDatabase(): DatabaseSync {
   const database = new DatabaseSync(":memory:");
   database.exec("PRAGMA foreign_keys = ON");
   for (const name of readdirSync(MIGRATIONS).sort()) database.exec(readFileSync(join(MIGRATIONS, name), "utf8"));
-  for (const id of ["owner", "member", "removed", "stranger", "other-owner", "opted-out"]) {
+  for (const id of ["owner", "member", "removed", "stranger", "other-owner", "opted-out", "unanswered"]) {
     database
       .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
       .run(id, `email:${id}`, `${id}@example.test`);
@@ -56,6 +56,8 @@ function migratedDatabase(): DatabaseSync {
   membership.run("m-other", "other", "member", "member", null);
   membership.run("m-opted-out", "host", "opted-out", "member", null);
   database.prepare("UPDATE users SET analytics_enabled = 0, analytics_answered_at = 1 WHERE id = 'opted-out'").run();
+  membership.run("m-unanswered", "host", "unanswered", "member", null);
+  database.prepare("UPDATE users SET analytics_enabled = 1, analytics_answered_at = 1 WHERE id = 'member'").run();
   return database;
 }
 
@@ -92,6 +94,16 @@ async function main() {
     "an account with analytics off is not recorded, by its own host or by another",
     !rows(sqlite).some((row) => row.account_id === "opted-out"),
     rows(sqlite),
+  );
+  await record("owner", ["unanswered"], LATE_23RD);
+  const unansweredByOther = rows(sqlite).some((row) => row.account_id === "unanswered");
+  await record("unanswered", ["unanswered"], LATE_23RD);
+  const unansweredByOwnHost = rows(sqlite).some((row) => row.account_id === "unanswered");
+  sqlite.prepare("DELETE FROM account_active_days WHERE account_id = 'unanswered'").run();
+  check(
+    "a member with no analytics answer is not recorded by another host, but by its own host",
+    !unansweredByOther && unansweredByOwnHost,
+    { unansweredByOther, unansweredByOwnHost },
   );
   await record("owner", ["owner", "member"], LATE_23RD);
   await record("member", ["member"], LATE_23RD);
@@ -173,10 +185,12 @@ async function main() {
 
   sent.length = 0;
   openPanelStatus = 503;
+  sqlite.prepare("INSERT INTO account_active_days(day, account_id) VALUES ('2026-11-17', 'owner')").run();
   await snapshot(NOON_25TH);
   check(
-    "a day whose send fails keeps its rows",
-    JSON.stringify(days()) === JSON.stringify(["2026-11-24", "2026-11-25"]),
+    "a day whose send fails keeps its rows for up to 7 days",
+    JSON.stringify(days()) === JSON.stringify(["2026-11-24", "2026-11-25"]) &&
+      !totals().some(([day]) => day === "2026-11-17"),
     { totals: totals(), days: days() },
   );
 
