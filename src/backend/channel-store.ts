@@ -898,6 +898,52 @@ export class ChannelStore {
     ).map((row) => requiredStringColumn(row, "thread_id"));
   }
 
+  clearAgentContexts(agentId: string): void {
+    const threadIds = this.contextThreadsForAgent(agentId);
+    if (threadIds.length === 0) return;
+    this.database.dispatch(
+      `channel-agent-contexts-cleared:${agentId}:${randomUUID()}`,
+      [
+        {
+          aggregateType: "channel-agent",
+          aggregateId: agentId,
+          eventType: "channel.agent-contexts-cleared",
+          payload: { threadIds },
+        },
+      ],
+      (db, sequences) => {
+        const now = new Date().toISOString();
+        for (const threadId of threadIds) {
+          const context = databaseRow(
+            db.prepare("SELECT channel_id FROM projection_channel_contexts WHERE thread_id = ?").get(threadId),
+          );
+          const thread = databaseRow(
+            db.prepare("SELECT title, created_at FROM projection_threads WHERE thread_id = ?").get(threadId),
+          );
+          if (!context || !thread) continue;
+          deleteAggregateHistory(db, "thread", [threadId]);
+          deleteThreadAttachments(db, threadId);
+          db.prepare("DELETE FROM projection_channel_contexts WHERE thread_id = ?").run(threadId);
+          db.prepare("DELETE FROM projection_threads WHERE thread_id = ?").run(threadId);
+          db.prepare("INSERT INTO projection_threads VALUES (?, ?, ?, NULL, ?, ?, ?)").run(
+            threadId,
+            agentId,
+            requiredStringColumn(thread, "title"),
+            requiredStringColumn(thread, "created_at"),
+            now,
+            sequences[0] ?? 0,
+          );
+          db.prepare("INSERT INTO projection_channel_contexts(channel_id, agent_id, thread_id) VALUES (?, ?, ?)").run(
+            requiredStringColumn(context, "channel_id"),
+            agentId,
+            threadId,
+          );
+        }
+        return null;
+      },
+    );
+  }
+
   allContextThreads(): string[] {
     return databaseRows(
       this.database.connection.prepare("SELECT thread_id FROM projection_channel_contexts").all(),

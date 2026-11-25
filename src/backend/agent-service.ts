@@ -2019,6 +2019,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             for (const threadId of threadIds) yield* this.#forgetExecutionThread(threadId);
             yield* lifecycleStep("delete agent tasks", () => this.#tasks.deleteForAgent(agentId));
           }).pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause }))),
+        clearChannelContexts: (agentId) =>
+          Effect.gen({ self: this }, function* () {
+            const threadIds = yield* lifecycleStep("list agent channel contexts", () =>
+              this.channels.store.contextThreadsForAgent(agentId),
+            );
+            for (const threadId of threadIds) yield* this.#forgetExecutionThread(threadId);
+            yield* lifecycleStep("clear agent channel contexts", () => this.channels.store.clearAgentContexts(agentId));
+          }).pipe(Effect.mapError((failure) => new AgentRemovalFailed({ cause: failure.cause }))),
         cancelMemoryReview: (agentId) => this.#memoryReview.cancel(agentId),
         stopAgentProcess: (agentId) =>
           Effect.gen({ self: this }, function* () {
