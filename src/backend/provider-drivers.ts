@@ -449,6 +449,7 @@ export interface ProviderClientContext {
   readonly codexTurnContext?: TurnContext;
   readonly providerEnvironment?: (provider: ProviderEnvironmentProvider) => Readonly<Record<string, string>>;
   readonly systemProxyFetch?: (url: string, init: RequestInit) => Promise<Response>;
+  readonly grokProxyEnvironment?: () => Readonly<Record<string, string>>;
   readonly fitImage?: ImageFitter | null;
 }
 
@@ -472,6 +473,15 @@ function withAccountEnvironment(
   const { agentEnvironment, accountEnvironment } = context;
   if (!accountEnvironment) return agentEnvironment;
   return (inherited) => ({ ...agentEnvironment?.(inherited), ...accountEnvironment });
+}
+
+function withGrokProxy(
+  context: ProviderClientContext,
+  environment: (() => Readonly<Record<string, string>>) | undefined,
+): (() => Readonly<Record<string, string>>) | undefined {
+  const proxy = context.grokProxyEnvironment;
+  if (!proxy) return environment;
+  return () => ({ ...proxy(), ...environment?.() });
 }
 
 function claudeAgentEnvironment(
@@ -802,12 +812,12 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         context.mcpToolRuntimes,
         context.mcpEndpoint,
         confinement,
-        withAccountEnvironment(context),
+        withGrokProxy(context, withAccountEnvironment(context)),
         context.history?.("grok"),
         context.fitImage,
         () => discoveryFolder("grok"),
       ),
-    createProfileClient: (cli, requestTimeoutMs, { accountEnvironment }) =>
+    createProfileClient: (cli, requestTimeoutMs, context) =>
       new GrokAgentClient(
         cli,
         requestTimeoutMs,
@@ -817,12 +827,12 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         undefined,
         undefined,
         undefined,
-        accountEnvironment && (() => accountEnvironment),
+        withGrokProxy(context, context.accountEnvironment && (() => ({ ...context.accountEnvironment }))),
         undefined,
         undefined,
         () => discoveryFolder("grok"),
       ),
-    createMediaClient: (cli, requestTimeoutMs, { accountEnvironment }) =>
+    createMediaClient: (cli, requestTimeoutMs, context) =>
       new GrokAgentClient(
         cli,
         requestTimeoutMs,
@@ -832,7 +842,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         undefined,
         undefined,
         undefined,
-        accountEnvironment && (() => accountEnvironment),
+        withGrokProxy(context, context.accountEnvironment && (() => ({ ...context.accountEnvironment }))),
         undefined,
         undefined,
         () => discoveryFolder("grok"),

@@ -89,7 +89,7 @@ export interface SignalIngressOptions {
 
 const CHROMIUM_PROXY_RULE = /^(PROXY|HTTPS)\s+(\S+)$/u;
 
-function proxyUrlFromRules(rules: string): string | null {
+export function proxyUrlFromRules(rules: string): string | null {
   for (const rule of rules.split(";").map((entry) => entry.trim())) {
     if (rule === "DIRECT") return null;
     const match = CHROMIUM_PROXY_RULE.exec(rule);

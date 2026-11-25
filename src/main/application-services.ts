@@ -269,6 +269,7 @@ import { GitHubConnectorStore } from "./github-connector-store";
 import { GitHubRelay, receiveGitHubDelivery } from "./github-relay";
 import { createGitHubRest, type WorkflowGitHubDirectory, workflowGitHubDirectory } from "./github-rest";
 import { githubSkillSource } from "./github-skill-source";
+import { createGrokSystemProxy } from "./grok-system-proxy";
 import { hermesRoot } from "./hermes-import-reader";
 import { HermesImportService } from "./hermes-import-service";
 import { HermesInstaller } from "./hermes-installer";
@@ -1518,6 +1519,7 @@ export async function createApplicationServices({
   const providerEnvironment = createProviderEnvironmentPreferenceStore(
     join(app.getPath("userData"), PROVIDER_ENVIRONMENT_PREFERENCE_FILE),
   );
+  const grokSystemProxy = createGrokSystemProxy((url) => session.defaultSession.resolveProxy(url));
   const remoteSessionReuse = createRemoteSessionReusePreferenceStore(
     join(app.getPath("userData"), REMOTE_SESSION_REUSE_PREFERENCE_FILE),
   );
@@ -1560,6 +1562,7 @@ export async function createApplicationServices({
       crmPreference.load(),
       claudeCompactWindow.load(),
       providerEnvironment.load(),
+      grokSystemProxy.refresh,
       remoteSessionReuse.load(),
       externalLinkPreference.load(),
       remoteNetworkRoute.load(),
@@ -2207,6 +2210,7 @@ export async function createApplicationServices({
       mcpOAuth,
       mcpOAuthProxySettings,
       systemProxyFetch: (url, init) => net.fetch(url, { ...init, credentials: "omit", cache: "no-store" }),
+      grokProxyEnvironment: grokSystemProxy.environment,
       appVersion: app.getVersion(),
       providerStateDirectory: join(app.getPath("userData"), "provider-state"),
       ...(process.platform === "win32" ? { providerTempDirectory } : {}),
