@@ -212,6 +212,9 @@ export const messages = {
     "Wszystkie wiadomości i pliki tego czatu znikną z OpenBot, a agent o nich zapomni. Nie można tego cofnąć. Wątki poboczne, instrukcje, model, narzędzia, wspomnienia, przestrzeń robocza i przeglądarka się nie zmienią.",
   "agentSettings.deleteHistory.confirm": "Usuń historię",
   "agentSettings.deleteHistory.failed": "Nie udało się usunąć historii.",
+  "agentSettings.deleteAgent.title": "Usuń agenta",
+  "agentSettings.deleteAgent.description": "Agent, jego czat, wspomnienia, rutyny i obszar roboczy znikają z OpenBot.",
+  "agentSettings.deleteAgent.button": "Usuń",
   "agentSettings.fullAccess.title": "Dać temu agentowi pełny dostęp?",
   "agentSettings.fullAccess.askTitle": "Pozwolić temu agentowi pracować poza obszarem roboczym?",
   "agentSettings.fullAccess.description":

@@ -235,6 +235,7 @@ export interface ConversationProps {
   onUpdateAgentPermissions?: ((input: UpdateAgentAdminSettingsInput) => Promise<void>) | undefined;
   onClearAgentContext?: (() => Promise<void>) | undefined;
   onDeleteAgentHistory?: (() => Promise<void>) | undefined;
+  onDeleteAgent?: ((agentId: string) => Promise<void>) | undefined;
   onCompactAgentContext?: (() => Promise<void>) | undefined;
   onRespondToBrowserTakeover: (decision: "complete" | "cancel", options?: PromptAnswerOptions) => Promise<boolean>;
   onCancelQueuedMessage: (deliveryId: string, recipientAgentId?: string) => void;

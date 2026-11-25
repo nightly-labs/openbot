@@ -193,6 +193,10 @@ export const messages = {
     "Alle Nachrichten und Dateien dieses Chats werden aus OpenBot gelöscht, und der Agent vergisst sie. Das lässt sich nicht rückgängig machen. Nebenthreads, Anweisungen, Modell, Tools, Erinnerungen, Arbeitsbereich und Browser ändern sich nicht.",
   "agentSettings.deleteHistory.confirm": "Verlauf löschen",
   "agentSettings.deleteHistory.failed": "Der Verlauf konnte nicht gelöscht werden.",
+  "agentSettings.deleteAgent.title": "Agenten löschen",
+  "agentSettings.deleteAgent.description":
+    "Der Agent, sein Chat, seine Erinnerungen, Routinen und sein Arbeitsbereich werden aus OpenBot entfernt.",
+  "agentSettings.deleteAgent.button": "Löschen",
   "agentSettings.fullAccess.title": "Diesem Agenten vollen Zugriff geben?",
   "agentSettings.fullAccess.askTitle": "Diesen Agenten außerhalb seines Arbeitsbereichs arbeiten lassen?",
   "agentSettings.fullAccess.description":

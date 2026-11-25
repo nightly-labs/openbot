@@ -184,6 +184,9 @@ export const messages = {
     "이 채팅의 모든 메시지와 파일이 OpenBot에서 삭제되고 에이전트도 잊어요. 되돌릴 수 없어요. 사이드 스레드, 지침, 모델, 도구, 메모리, 작업 공간, 브라우저는 바뀌지 않아요.",
   "agentSettings.deleteHistory.confirm": "기록 삭제",
   "agentSettings.deleteHistory.failed": "기록을 삭제할 수 없어요.",
+  "agentSettings.deleteAgent.title": "에이전트 삭제",
+  "agentSettings.deleteAgent.description": "에이전트와 채팅, 메모리, 루틴, 워크스페이스가 OpenBot에서 삭제돼요.",
+  "agentSettings.deleteAgent.button": "삭제",
   "agentSettings.fullAccess.title": "이 에이전트에 전체 접근 권한을 줄까요?",
   "agentSettings.fullAccess.askTitle": "이 에이전트가 워크스페이스 밖에서 작업하도록 허용할까요?",
   "agentSettings.fullAccess.description":
