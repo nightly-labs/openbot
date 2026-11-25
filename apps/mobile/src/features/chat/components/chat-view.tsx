@@ -394,7 +394,12 @@ export function ChatView({
   const sendingUpload = sendingMessage ? outboxSnapshot.uploads.get(sendingMessage.clientMessageId) : undefined;
   const sendsToQueue = Boolean(queue && (activeTurnId || queue.queued.length || queue.replies.length));
   const queueSends = useRef(new Set<string>());
-  if (sendingMessage && sendsToQueue) queueSends.current.add(sendingMessage.clientMessageId);
+  const routedSends = useRef(new Set<string>());
+  if (sendingMessage && !routedSends.current.has(sendingMessage.clientMessageId)) {
+    routedSends.current.add(sendingMessage.clientMessageId);
+    if (sendsToQueue) queueSends.current.add(sendingMessage.clientMessageId);
+  } else if (sendingMessage && !sendsToQueue) queueSends.current.delete(sendingMessage.clientMessageId);
+  const sendingToQueue = Boolean(sendingMessage && queueSends.current.has(sendingMessage.clientMessageId));
   const queueDeliveries = queue?.deliveries;
   const sentToQueue =
     outboxMessages.find(
@@ -404,7 +409,7 @@ export function ChatView({
         !queueDeliveries?.some((delivery) => delivery.id === message.messageId),
     ) ?? null;
   const queuePending = useMemo(() => {
-    if (sendsToQueue && sendingMessage)
+    if (sendingToQueue && sendingMessage)
       return {
         message: outboxRow(outbox, sendingMessage),
         progress: sendingUpload?.completed ?? 0,
@@ -412,7 +417,7 @@ export function ChatView({
         cancel: () => outbox.cancelUpload(sendingMessage.clientMessageId),
       };
     return sentToQueue ? { message: outboxRow(outbox, sentToQueue), progress: 0, total: 0, cancel: () => {} } : null;
-  }, [sentToQueue, sendsToQueue, sendingMessage, sendingUpload?.completed, outbox]);
+  }, [sentToQueue, sendingToQueue, sendingMessage, sendingUpload?.completed, outbox]);
   const queued = queue?.queued;
   const heldQueueEdit = queue?.edit?.delivery ?? null;
   const queueRows = useMemo(
@@ -489,7 +494,7 @@ export function ChatView({
   const pendingMessages = useMemo(
     () =>
       outboxMessages.flatMap((message): PendingChatMessage[] =>
-        (message.state === "sending" && sendsToQueue) ||
+        (message.state === "sending" && sendingToQueue) ||
         (message.state === "sent" && queueSends.current.has(message.clientMessageId)) ||
         (message.messageId !== null && queuedMessageIds.has(message.messageId))
           ? []
@@ -503,7 +508,7 @@ export function ChatView({
               },
             ],
       ),
-    [outboxMessages, outboxSnapshot.storing, sendsToQueue, queuedMessageIds, outbox],
+    [outboxMessages, outboxSnapshot.storing, sendingToQueue, queuedMessageIds, outbox],
   );
   const messages = useMemo(
     () =>
@@ -517,8 +522,12 @@ export function ChatView({
   useEffect(() => {
     for (const id of sendBaselines.current.keys())
       if (!outboxSnapshot.storing.has(id)) sendBaselines.current.delete(id);
-    for (const id of queueSends.current)
-      if (!outboxMessages.some((message) => message.clientMessageId === id)) queueSends.current.delete(id);
+    for (const id of routedSends.current) {
+      const message = outboxMessages.find((item) => item.clientMessageId === id);
+      if (message?.state === "sending" || message?.state === "sent") continue;
+      routedSends.current.delete(id);
+      queueSends.current.delete(id);
+    }
     const received = outboxMessages.filter((message) => message.messageId !== null);
     if (received.some((message) => message.messageId !== null && !messageAliases.has(message.messageId)))
       setMessageAliases((current) => {
@@ -1117,14 +1126,14 @@ export function ChatView({
   const dismissSelection = useCallback(() => setSelection(null), []);
   const listUpload = useMemo(
     () =>
-      sendingMessage && sendingUpload && !sendsToQueue
+      sendingMessage && sendingUpload && !sendingToQueue
         ? {
             messageId: outboxRowId(sendingMessage),
             ...sendingUpload,
             cancel: () => outbox.cancelUpload(sendingMessage.clientMessageId),
           }
         : null,
-    [sendingMessage, sendingUpload, sendsToQueue, outbox],
+    [sendingMessage, sendingUpload, sendingToQueue, outbox],
   );
 
   return (
