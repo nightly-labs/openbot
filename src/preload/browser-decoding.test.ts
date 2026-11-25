@@ -42,6 +42,7 @@ const fullTab = {
   diagnosticErrorCount: 2,
   openerTabId: "tab-0",
   popupFailure: { id: "popup-1", message: "The popup was blocked." },
+  permissionRequest: { id: "request-1", origin: "https://maps.example.test", permission: "geolocation" },
   userControl: true,
   canGoBack: true,
   canGoForward: false,
@@ -189,6 +190,16 @@ describe("browser decoders", () => {
     ["browser tab with a text error count", decodeBrowserTab, { ...tab, diagnosticErrorCount: "2" }],
     ["browser tab with a text canGoBack", decodeBrowserTab, { ...tab, canGoBack: "true" }],
     ["browser tab with a numeric canGoForward", decodeBrowserTab, { ...tab, canGoForward: 1 }],
+    [
+      "browser tab with an unknown permission request",
+      decodeBrowserTab,
+      { ...tab, permissionRequest: { id: "request-1", origin: "https://example.test", permission: "camera" } },
+    ],
+    [
+      "browser tab with a permission request without an origin",
+      decodeBrowserTab,
+      { ...tab, permissionRequest: { id: "request-1", permission: "geolocation" } },
+    ],
     ["browser tab list that is not an array", decodeBrowserTabs, tab],
     ["browser display state without tabs", decodeBrowserDisplayState, { activeTabId: null }],
     [

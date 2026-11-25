@@ -7,6 +7,12 @@ import {
   BROWSER_PAGE_STATE_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-page-state-v1";
 import {
+  BROWSER_PERMISSIONS_CAPABILITY,
+  BROWSER_PERMISSIONS_ROUTES,
+  browserPermissionRequests,
+  decodeBrowserPermissionAnswer,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
+import {
   BROWSER_SIGN_IN_STORAGE_CAPABILITY,
   BROWSER_SIGN_IN_STORAGE_ROUTES,
   decodeBrowserSignInStorageImport,
@@ -200,6 +206,21 @@ export async function routeBrowser(
         .listTabs()
         .filter((tab) => !hidden(tab.id))
         .map((tab) => ({ tabId: tab.id, canGoBack: tab.canGoBack === true, canGoForward: tab.canGoForward === true })),
+    });
+  }
+
+  if (method === "POST" && Object.values(BROWSER_PERMISSIONS_ROUTES).some((path) => path === url.pathname)) {
+    if (!capabilities.has(BROWSER_PERMISSIONS_CAPABILITY))
+      throw new HttpError(400, sourceText("error.backend.browserPermissionsUnsupported"));
+    const body = await readJson(request);
+    if (url.pathname === BROWSER_PERMISSIONS_ROUTES.answer) {
+      const answer = decodeBrowserPermissionAnswer({ ...body, tabId: tabId(body) });
+      if (answer.allow && !answer.location)
+        throw new HttpError(400, sourceText("error.backend.browserLocationRequired"));
+      await runCauseEffect(browser.answerPermission(answer));
+    }
+    return json(200, {
+      requests: browserPermissionRequests(browser.listTabs().filter((tab) => !hidden(tab.id))),
     });
   }
 

@@ -274,4 +274,11 @@ export const messages = {
   },
   "browser.proxies.changeTitle": "Изменить прокси профиля {name}?",
   "browser.proxies.change": "Изменить прокси",
+  "browser.location.title": "{site} хочет узнать ваше местоположение",
+  "browser.location.description": "Разрешайте только надежным сайтам.",
+  "browser.location.block": "Блокировать",
+  "browser.location.allow": "Разрешить",
+  "browser.location.allowAlways": "Разрешать всегда",
+  "browser.location.unavailable": "Не удалось получить местоположение этого устройства.",
+  "browser.location.answerFailed": "Не удалось ответить на запрос местоположения.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -250,4 +250,11 @@ export const messages = {
   },
   "browser.proxies.changeTitle": "Cambiare il proxy di {name}?",
   "browser.proxies.change": "Cambia proxy",
+  "browser.location.title": "{site} vuole conoscere la tua posizione",
+  "browser.location.description": "Consenti solo ai siti attendibili.",
+  "browser.location.block": "Blocca",
+  "browser.location.allow": "Consenti",
+  "browser.location.allowAlways": "Consenti sempre",
+  "browser.location.unavailable": "Impossibile ottenere la posizione di questo dispositivo.",
+  "browser.location.answerFailed": "Impossibile rispondere alla richiesta di posizione.",
 } as const satisfies PartialTranslation<typeof source>;

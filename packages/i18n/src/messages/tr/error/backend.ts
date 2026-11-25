@@ -61,6 +61,9 @@ export const messages = {
     "OpenBot oturum açma penceresinde sayfayı yükleyemedi. İnternet bağlantısını kontrol edin, ardından oturum açma penceresini yeniden açın.",
   "error.backend.browserSignInReadFailed": "OpenBot pencereden oturumu okuyamadı.",
   "error.backend.browserStopUnsupported": "Bu uzak ana makine sayfa yüklemesini durduramaz.",
+  "error.backend.browserLocationFailed": "Sayfanın konumu ayarlanamadı.",
+  "error.backend.browserPermissionsUnsupported": "Bu uzak ana bilgisayar konum isteklerini yanıtlayamaz.",
+  "error.backend.browserLocationRequired": "İsteğe izin vermek için cihazın konumunu gönderin.",
   "error.backend.sharedDataLocalOnly": "Paylaşılan veriler bu ajanları çalıştıran bilgisayarda yönetilir.",
   "error.backend.browserUrlProtocol": "Yalnızca HTTP(S) tarayıcı URL'lerine izin verilir.",
   "error.backend.sunshineNotReady": "Sunshine hazır hale gelmedi.",
@@ -283,6 +286,8 @@ export const messages = {
     "Oturum açma sunucusu OpenBot'u henüz bir uygulama olarak kabul etmiyor. Hesabınız bunun nedeni değildir. Yerel bir MCP sunucusu gibi bağlanmanın başka bir yolunu kullanın.",
   "error.backend.mcpRegistrationUnavailable":
     "Oturum açma sunucusu OpenBot'u uygulama olarak kaydedemiyor. Hesabınız bunun nedeni değildir. Bağlanmak için bu sunucuyu Pazaryeri, Uygulamalar bölümünde kaydedin, ardından ona bir oturum açma uygulaması ekleyin.",
+  "error.backend.mcpSignInAppNeeded":
+    "Oturum açma sunucusu OpenBot'u uygulama olarak kaydedemiyor. Hesabınız bunun nedeni değildir. Bağlanmak için bu sunucuyu Pazaryeri, Uygulamalar bölümünde açın, Bağlantıyı test et'e tıklayın, ardından bir oturum açma uygulaması ekleyin.",
   "error.backend.mcpSignInAbandonedGeneric": "Oturum açma yarıda bırakıldı.",
   "error.backend.mcpSignInForgotten": "MCP oturum açma işlemi çalışırken unutuldu.",
   "error.backend.mcpSignInAbandoned": "MCP oturum açma işlemi yarıda bırakıldı.",
@@ -426,6 +431,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "{name} proxy'si oturum açmayı reddetti, bu yüzden sayfa açılmadı.",
   "error.backend.browserSystemProxyFailed":
     "OpenBot'u çalıştıran bilgisayarın ayarlarındaki proxy yanıt vermiyor veya bağlantıyı reddetti, bu yüzden sayfa açılmadı. O bilgisayarın proxy ayarlarını kontrol edin.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "Site veya OpenBot'u çalıştıran bilgisayarın ayarlarındaki proxy bağlantıyı yanıt vermeden kapattı, bu yüzden sayfa açılmadı. Hiçbir site açılmıyorsa o bilgisayarın proxy ayarlarını kontrol edin.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "Site veya bu tarayıcı profilinin proxy'si bağlantıyı yanıt vermeden kapattı, bu yüzden sayfa açılmadı. Hiçbir site açılmıyorsa profilin proxy'sini kontrol edin.",
   "error.backend.browserProxyComputerUnreachable":
     "Bu profilin kullandığı bilgisayar yanıt vermiyor, bu yüzden sayfa açılmadı.",
   "error.backend.browserProxyComputerLocalAddress":

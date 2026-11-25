@@ -235,4 +235,11 @@ export const messages = {
   "browser.proxies.closesTabs": { other: "{count} 个打开的标签页会关闭。" },
   "browser.proxies.changeTitle": "要更改 {name} 的代理吗？",
   "browser.proxies.change": "更改代理",
+  "browser.location.title": "{site} 想知道你的位置",
+  "browser.location.description": "仅允许你信任的网站。",
+  "browser.location.block": "阻止",
+  "browser.location.allow": "允许",
+  "browser.location.allowAlways": "始终允许",
+  "browser.location.unavailable": "无法获取此设备的位置。",
+  "browser.location.answerFailed": "无法回应位置请求。",
 } as const satisfies PartialTranslation<typeof source>;

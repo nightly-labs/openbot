@@ -13,9 +13,30 @@ export interface BrowserTab {
   diagnosticErrorCount?: number;
   openerTabId?: string;
   popupFailure?: { id: string; message: string };
+  permissionRequest?: BrowserPermissionRequest;
   userControl?: true;
   canGoBack?: boolean;
   canGoForward?: boolean;
+}
+
+export interface BrowserPermissionRequest {
+  id: string;
+  origin: string;
+  permission: "geolocation";
+}
+
+export interface BrowserLocation {
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number | null;
+}
+
+export interface BrowserPermissionAnswer {
+  tabId: string;
+  requestId: string;
+  allow: boolean;
+  always?: boolean | undefined;
+  location?: BrowserLocation | undefined;
 }
 
 export interface BrowserTeachStep {

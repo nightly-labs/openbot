@@ -722,7 +722,7 @@ function isProtocolMismatch(error: Error, code: string | null): boolean {
 
 const REGISTRATION_REFUSED = sourceText("error.backend.mcpRegistrationRefused");
 
-const REGISTRATION_UNAVAILABLE = sourceText("error.backend.mcpRegistrationUnavailable");
+const REGISTRATION_UNAVAILABLE = sourceText("error.backend.mcpSignInAppNeeded");
 
 function isAccessRefusal(status: number | null): boolean {
   return status === 401 || status === 403;

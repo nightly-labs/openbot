@@ -160,8 +160,13 @@ const accountReadDecoder = (provider: AgentProvider) =>
   provider === "codex" ? decodeCodexAccountReadResult : decodeAccountReadResult;
 const LONG_START_TIMEOUT_MS = 180_000;
 const PROVIDER_IDLE_RELEASE_MS = 10 * 60_000;
+const CODEX_MCP_TOOL_LIST_REUSE_MS = 30 * 60_000;
 const PROVIDER_UNASSIGNED_RELEASE_MS = 60_000;
 const PROVIDER_IDLE_CHECK_MS = 60_000;
+
+function assignedProviderIdleReleaseMs(provider: AgentProvider): number {
+  return provider === "codex" ? CODEX_MCP_TOOL_LIST_REUSE_MS : PROVIDER_IDLE_RELEASE_MS;
+}
 const LAUNCH_START_CONCURRENCY = 2;
 const SIGN_IN_FILE_POLL_MS = 2_000;
 const SIGN_IN_RECHECK_DELAYS_MS: readonly number[] = [5_000, 10_000, 20_000];
@@ -849,7 +854,7 @@ export class ProviderRuntime implements ProviderPort {
         continue;
       }
       const limit = this.#hooks.isProviderAssigned(provider)
-        ? PROVIDER_IDLE_RELEASE_MS
+        ? assignedProviderIdleReleaseMs(provider)
         : PROVIDER_UNASSIGNED_RELEASE_MS;
       if (now - lastUsed < limit) continue;
       logger.info("Stopped an idle provider CLI.", { provider });

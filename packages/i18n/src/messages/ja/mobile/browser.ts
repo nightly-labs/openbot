@@ -85,4 +85,11 @@ export const messages = {
   "mobile.browser.help.handBack.title": "操作を戻す",
   "mobile.browser.help.handBack.body":
     "エージェントから操作の引き継ぎを求められたら、··· メニューで「完了しました」を選びます。エージェントはこのタブで作業を続けます。",
+  "mobile.browser.location.title": "{site} が現在地を知りたがっています",
+  "mobile.browser.location.description": "信頼できるサイトにのみ許可してください。",
+  "mobile.browser.location.block": "ブロック",
+  "mobile.browser.location.allow": "許可",
+  "mobile.browser.location.allowAlways": "常に許可",
+  "mobile.browser.location.unavailable": "このデバイスの位置情報を取得できませんでした。",
+  "mobile.browser.location.answerFailed": "位置情報のリクエストに応答できませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

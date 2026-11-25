@@ -83,4 +83,11 @@ export const messages = defineMessages("mobile.browser", {
   "mobile.browser.help.handBack.title": "Hand it back",
   "mobile.browser.help.handBack.body":
     "When an agent asks you to take over, choose I'm done in the ··· menu. The agent then continues in this tab.",
+  "mobile.browser.location.title": "{site} wants to know your location",
+  "mobile.browser.location.description": "Allow only for sites that you trust.",
+  "mobile.browser.location.block": "Block",
+  "mobile.browser.location.allow": "Allow",
+  "mobile.browser.location.allowAlways": "Allow always",
+  "mobile.browser.location.unavailable": "Could not get the location of this device.",
+  "mobile.browser.location.answerFailed": "Could not answer the location request.",
 });

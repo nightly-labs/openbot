@@ -62,6 +62,9 @@ export const messages = {
     "OpenBot nie mógł wczytać strony w oknie logowania. Sprawdź połączenie z internetem, a potem otwórz okno logowania ponownie.",
   "error.backend.browserSignInReadFailed": "OpenBot nie mógł odczytać logowania z okna.",
   "error.backend.browserStopUnsupported": "Ten zdalny host nie może zatrzymać wczytywania strony.",
+  "error.backend.browserLocationFailed": "Nie można ustawić lokalizacji dla strony.",
+  "error.backend.browserPermissionsUnsupported": "Ten zdalny host nie może odpowiadać na prośby o lokalizację.",
+  "error.backend.browserLocationRequired": "Wyślij lokalizację urządzenia, aby zezwolić na prośbę.",
   "error.backend.sharedDataLocalOnly": "Dane współdzielone są zarządzane na komputerze, na którym działają ci agenci.",
   "error.backend.browserUrlProtocol": "Dozwolone są tylko adresy URL HTTP(S).",
   "error.backend.sunshineNotReady": "Sunshine nie osiągnął gotowości.",
@@ -290,6 +293,8 @@ export const messages = {
     "Serwer logowania nie akceptuje jeszcze OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Połącz się w inny sposób, na przykład przez lokalny serwer MCP.",
   "error.backend.mcpRegistrationUnavailable":
     "Serwer logowania nie może zarejestrować OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Aby się połączyć, zapisz ten serwer w Marketplace, Aplikacje, a potem dodaj do niego aplikację logowania.",
+  "error.backend.mcpSignInAppNeeded":
+    "Serwer logowania nie może zarejestrować OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Aby się połączyć, otwórz ten serwer w Marketplace, Aplikacje, kliknij Testuj połączenie, a potem dodaj aplikację logowania.",
   "error.backend.mcpSignInAbandonedGeneric": "Logowanie zostało porzucone.",
   "error.backend.mcpSignInForgotten": "Logowanie MCP zostało zapomniane w trakcie działania.",
   "error.backend.mcpSignInAbandoned": "Logowanie MCP zostało porzucone.",
@@ -437,6 +442,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "Proxy {name} odrzuciło logowanie, więc strona się nie otworzyła.",
   "error.backend.browserSystemProxyFailed":
     "Proxy w ustawieniach komputera, na którym działa OpenBot, nie odpowiada lub odrzuciło połączenie, więc strona się nie otworzyła. Sprawdź ustawienia proxy tego komputera.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "Witryna lub proxy w ustawieniach komputera, na którym działa OpenBot, zamknęło połączenie bez odpowiedzi, więc strona się nie otworzyła. Jeśli żadna witryna się nie otwiera, sprawdź ustawienia proxy tego komputera.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "Witryna lub proxy tego profilu przeglądarki zamknęło połączenie bez odpowiedzi, więc strona się nie otworzyła. Jeśli żadna witryna się nie otwiera, sprawdź proxy profilu.",
   "error.backend.browserProxyComputerUnreachable":
     "Komputer, którego używa ten profil, nie odpowiada, więc strona się nie otworzyła.",
   "error.backend.browserProxyComputerLocalAddress":

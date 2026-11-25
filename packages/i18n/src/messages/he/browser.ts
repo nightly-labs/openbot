@@ -255,4 +255,11 @@ export const messages = {
   },
   "browser.proxies.changeTitle": "לשנות את הפרוקסי של {name}?",
   "browser.proxies.change": "שינוי פרוקסי",
+  "browser.location.title": "{site} רוצה לדעת את המיקום שלך",
+  "browser.location.description": "אפשר רק לאתרים שאתה סומך עליהם.",
+  "browser.location.block": "חסימה",
+  "browser.location.allow": "אישור",
+  "browser.location.allowAlways": "לאפשר תמיד",
+  "browser.location.unavailable": "לא ניתן לקבל את המיקום של המכשיר הזה.",
+  "browser.location.answerFailed": "לא ניתן להשיב לבקשת המיקום.",
 } as const satisfies PartialTranslation<typeof source>;
