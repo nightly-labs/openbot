@@ -13,7 +13,8 @@ const ATTACH_IDLE_MS = 30_000;
 const LOAD_WAIT_MS = 15_000;
 const SCREENSHOT_WAIT_MS = 15_000;
 const SEND_WAIT_MS = 20_000;
-const TAB_NOT_ANSWERING = "The tab did not answer in time, so OpenBot stopped this action. Try again.";
+const TAB_NOT_ANSWERING =
+  "The tab did not answer in time, so OpenBot stopped this action. The action may have happened: read the page before you try again.";
 const SNAPSHOT_TEXT = 40_000;
 const SNAPSHOT_ELEMENTS = 400;
 
@@ -362,7 +363,7 @@ async function screenshot(id: number, tab: chrome.tabs.Tab): Promise<ClientBrows
   try {
     return await capture(id, size);
   } finally {
-    await overlay(id, { step: "show", label: workingLabel, x: 0, y: 0 });
+    await overlay(id, { step: "show", label: workingLabel, x: 0, y: 0 }).catch(() => undefined);
   }
 }
 
@@ -549,7 +550,12 @@ async function focusInClosedShadow(tabId: number): Promise<boolean> {
   });
   const objectId = isDynamicRecord(focused.result) ? focused.result.objectId : null;
   if (!isString(objectId)) return false;
-  const described = await send(tabId, "DOM.describeNode", { objectId, depth: 1, pierce: true }).catch(() => null);
+  const described = await send(tabId, "DOM.describeNode", { objectId, depth: 1, pierce: true }).catch(
+    (error: unknown) => {
+      if (error instanceof TabNotAnswering) throw error;
+      return null;
+    },
+  );
   const roots = described && isDynamicRecord(described.node) ? described.node.shadowRoots : null;
   return Array.isArray(roots) && roots.some((root) => isDynamicRecord(root) && root.shadowRootType === "closed");
 }
