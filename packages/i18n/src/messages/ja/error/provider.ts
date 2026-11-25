@@ -256,7 +256,7 @@ export const messages = {
   "error.provider.opencodeKeyRefused":
     "OpenCode Go が保存済みの API キーを拒否しました。キーの有効期限が切れている可能性があります。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
   "error.provider.opencodeOwnGoKeyRefused":
-    "OpenCode は OpenBot に保存したキーを使いませんでした。OpenCode が自身で保持している古い OpenCode Go キーを使い、OpenCode Go がそのキーを拒否しました。古いキーを削除するには、エージェントを実行しているコンピューターのターミナルで `opencode auth logout opencode-go` を実行し、古いキーを選んでください。その後、もう一度お試しください。",
+    "OpenCode は OpenBot に保存したキーを使いませんでした。OpenCode が自身で保持している別の OpenCode Go キーを使い、OpenCode Go がそのキーを拒否しました。そのキーを削除するには、エージェントを実行しているコンピューターのターミナルで `opencode auth logout opencode-go` を実行し、そのキーを選んでください。その後、もう一度お試しください。",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go がリクエストを拒否しました。新しい API キーでは解決しません。OpenCode Go のプランが有効でないか、OpenCode Go がお使いのネットワークをブロックしている可能性があります。一部のサービスは VPN、プロキシ、または一部の国をブロックします。OpenCode Console でプランが有効か確認するか、VPN をオフにしてから、もう一度お試しください。別のモデルを選ぶこともできます。",
   "error.provider.opencodeServiceFailure":

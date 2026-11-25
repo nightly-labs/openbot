@@ -99,16 +99,8 @@ export const hasOpenCodeProviderKey = Effect.fn("OpenCode.hasProviderKey")(funct
     Option.isSome(Schema.decodeUnknownOption(AuthFileEntry)(entries.value[provider]))
   )
     return true;
-  if (inlineAuth) return false;
-  return yield* hasOpenCodeSavedCredential(provider, env);
-});
-
-export const hasOpenCodeSavedCredential = Effect.fn("OpenCode.hasSavedCredential")(function* (
-  provider: string,
-  env: NodeJS.ProcessEnv,
-) {
   const databasePath = openCodeDatabasePath(env);
-  if (!databasePath) return false;
+  if (inlineAuth || !databasePath) return false;
   return yield* Effect.try({
     try: () =>
       readOpenCodeDatabase(
@@ -152,19 +144,38 @@ function authFileGoKey(text: string): string | undefined {
   return Option.isSome(entry) ? entry.value.key : undefined;
 }
 
+function newestStoredKey(databasePath: string, integration: string) {
+  const row = readOpenCodeDatabase(databasePath, (database) =>
+    database
+      .prepare(
+        `SELECT value FROM credential
+         WHERE integration_id = ? AND active IS NOT 0
+         ORDER BY active DESC, time_created DESC, id DESC LIMIT 1`,
+      )
+      .get(integration),
+  );
+  return Schema.decodeUnknownOption(Schema.fromJsonString(StoredKey))(row?.value);
+}
+
+export const readOpenCodeStoredKey = Effect.fn("OpenCode.readStoredKey")(function* (
+  integration: string,
+  env: NodeJS.ProcessEnv,
+) {
+  const databasePath = openCodeDatabasePath(env);
+  if (!databasePath) return null;
+  return yield* Effect.try({
+    try: () => {
+      const stored = newestStoredKey(databasePath, integration);
+      return Option.isSome(stored) ? stored.value.key.trim() || null : null;
+    },
+    catch: (cause) => new OpenCodeUsageFailed({ cause }),
+  }).pipe(Effect.orElseSucceed(() => null));
+});
+
 const readConsoleKey = Effect.fn("OpenCode.readConsoleKey")(function* (databasePath: string) {
   return yield* Effect.try({
     try: () => {
-      const row = readOpenCodeDatabase(databasePath, (database) =>
-        database
-          .prepare(
-            `SELECT value FROM credential
-             WHERE integration_id = 'opencode' AND active IS NOT 0
-             ORDER BY active DESC, time_created DESC, id DESC LIMIT 1`,
-          )
-          .get(),
-      );
-      const stored = Schema.decodeUnknownOption(Schema.fromJsonString(StoredKey))(row?.value);
+      const stored = newestStoredKey(databasePath, "opencode");
       if (Option.isNone(stored)) return undefined;
       const server = stored.value.metadata?.server;
       if (typeof server === "string") {

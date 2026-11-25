@@ -215,7 +215,7 @@ export const messages = {
   "error.provider.opencodeKeyRefused":
     "OpenCode Go 拒绝了你保存的 API 密钥。密钥可能已过期。请在 OpenCode Console 中创建新密钥，粘贴到 OpenCode 设置中，然后重试。",
   "error.provider.opencodeOwnGoKeyRefused":
-    "OpenCode 没有使用你在 OpenBot 中保存的密钥，而是使用了 OpenCode 自己保存的旧 OpenCode Go 密钥，OpenCode Go 拒绝了该密钥。要删除旧密钥，请在运行该代理的电脑上的终端中运行 `opencode auth logout opencode-go`，然后选择旧密钥。之后再试一次。",
+    "OpenCode 没有使用你在 OpenBot 中保存的密钥，而是使用了 OpenCode 自己保存的另一个 OpenCode Go 密钥，OpenCode Go 拒绝了该密钥。要删除该密钥，请在运行该代理的电脑上的终端中运行 `opencode auth logout opencode-go`，然后选择该密钥。之后再试一次。",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go 拒绝了该请求。新的 API 密钥无法解决此问题。你的 OpenCode Go 套餐可能未激活，或者 OpenCode Go 可能屏蔽了你的网络：某些服务会屏蔽 VPN、代理或某些国家/地区。请在 OpenCode Console 中确认套餐已激活，或关闭 VPN，然后重试。你也可以选择其他模型。",
   "error.provider.opencodeServiceFailure":

@@ -717,17 +717,21 @@ lists the free models, and a spawn with it lists the paid Go catalog. OpenBot se
 only as `options.apiKey` of the `opencode-go` provider in `OPENCODE_CONFIG_CONTENT`, never as
 `OPENCODE_API_KEY` or on the free `opencode` provider. OpenCode gives the free tier its anonymous key
 only while that provider has no key, so a refused key there failed every free model with
-"provider authentication required" (#7550). OpenCode uses its own key before that config key: the
-newest active `credential` row (OpenCode 2.4 also copies an `auth.json` key into that table), then
-`OPENCODE_API_KEY` (checked on OpenCode 2.2.5 and 2.4.1, #15988). When OpenBot inherits
-`OPENCODE_API_KEY` and has a stored key, `openCodeInheritedKeyEnv` replaces the inherited value with
-the stored key, so an old key in the host's environment cannot shadow the key saved in Settings. The
-free tier already had a key in that case, so #7550 does not change. So `AcpAgentClient` derives `#signedIn` from the models
+"provider authentication required" (#7550). So `AcpAgentClient` derives `#signedIn` from the models
 `session/new` returns, not from a credential, and a keyless OpenCode reports `available`.
 `AcpProviderOptions.extraEnv` is read at every spawn, which is what lets a key saved in Settings
 reach the next process with no other plumbing, and what carries `OPENCODE_DISABLE_AUTOUPDATE` to a
 managed install so the CLI cannot update past the pin. `src/main/provider-credential-store.ts` holds
 that optional key, encrypted by `safeStorage` in a `0o600` envelope under `userData`.
+
+OpenCode uses its own key before that config key: the newest active `credential` row (OpenCode 2.4
+also copies an `auth.json` key into that table once, when it makes its database), then
+`OPENCODE_API_KEY` (checked on OpenCode 2.2.5 and 2.4.1, #15988). An old `OPENCODE_API_KEY` in the
+host's environment, for example in a server's service file, thus shadowed the key saved in Settings.
+With a stored key, `clearedInheritedOpenCodeKeyEnv` sets an inherited `OPENCODE_API_KEY` to an empty
+value, which OpenCode treats as no key: the `opencode-go` provider uses the stored key, and the free
+tier keeps its anonymous key as #7550 requires. A paid Zen model that used only that variable is not
+listed while a key is stored.
 Only a status (`missing`, `saved` or `unreadable`) crosses IPC; no getter returns the key. A file the store cannot read does not stop
 startup: OpenCode runs keyless, Settings reports the key as unreadable, and the file stays until the
 user saves or removes a key. The store writes a change to disk before it changes memory, so a
@@ -812,10 +816,11 @@ that text too, because it names the fix in OpenBot's settings for an expired Go 
 
 A `credential` row for `opencode-go` wins over OpenBot's saved key, and OpenBot cannot override it
 (OpenCode issue anomalyco/opencode#58394). With a saved key, the client's `savedKeyShadowed` option
-reads that row read-only (`hasOpenCodeSavedCredential` in `opencode-usage.ts`). When the row exists,
-a refused turn shows `error.provider.opencodeOwnGoKeyRefused`: OpenCode used its own older key, and
-`opencode auth logout opencode-go` removes it (#15988). An `auth.json` entry alone does not count,
-because OpenCode 2.2.5 uses the config key before it.
+reads the newest active row read-only (`readOpenCodeStoredKey` in `opencode-usage.ts`). When that key
+differs from the saved key, a refused turn shows `error.provider.opencodeOwnGoKeyRefused`: OpenCode
+used its own other key, and `opencode auth logout opencode-go` removes it (#15988). The same key, no
+row, or an `auth.json` entry alone keeps `error.provider.opencodeKeyRefused`; OpenCode 2.2.5 uses
+the config key before an `auth.json` entry.
 
 #### Turns of a background subagent or shell command
 

@@ -248,7 +248,7 @@ export const messages = {
   "error.provider.opencodeKeyRefused":
     "OpenCode Go heeft je opgeslagen API-sleutel geweigerd. De sleutel is misschien verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
   "error.provider.opencodeOwnGoKeyRefused":
-    "OpenCode heeft niet de sleutel gebruikt die je in OpenBot hebt opgeslagen. Het gebruikte een oudere OpenCode Go-sleutel die OpenCode zelf bewaart, en OpenCode Go heeft die sleutel geweigerd. Voer `opencode auth logout opencode-go` uit in een terminal op de computer waarop de agent draait en kies de oude sleutel om de oudere sleutel te verwijderen. Probeer het daarna opnieuw.",
+    "OpenCode heeft niet de sleutel gebruikt die je in OpenBot hebt opgeslagen. Het gebruikte een andere OpenCode Go-sleutel die OpenCode zelf bewaart, en OpenCode Go heeft die sleutel geweigerd. Voer `opencode auth logout opencode-go` uit in een terminal op de computer waarop de agent draait en kies de sleutel om die sleutel te verwijderen. Probeer het daarna opnieuw.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go heeft het verzoek geweigerd. Een nieuwe API-sleutel lost dit niet op. Je OpenCode Go-abonnement is misschien niet actief, of OpenCode Go blokkeert misschien je netwerk: sommige diensten blokkeren vpn's, proxy's of bepaalde landen. Controleer in OpenCode Console of je abonnement actief is, of zet de vpn uit, en probeer het opnieuw. Je kunt ook een ander model kiezen.",
   "error.provider.opencodeServiceFailure":

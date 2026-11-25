@@ -255,7 +255,7 @@ export const messages = {
   "error.provider.opencodeKeyRefused":
     "OpenCode Go rechazó tu clave de API guardada. Puede que la clave haya caducado. Crea una clave nueva en OpenCode Console, pégala en los ajustes de OpenCode y luego inténtalo de nuevo.",
   "error.provider.opencodeOwnGoKeyRefused":
-    "OpenCode no usó la clave que guardaste en OpenBot. Usó una clave anterior de OpenCode Go que OpenCode guarda por su cuenta, y OpenCode Go rechazó esa clave. Para quitar la clave anterior, ejecuta `opencode auth logout opencode-go` en una terminal del equipo que ejecuta el agente y elige la clave antigua. Luego inténtalo de nuevo.",
+    "OpenCode no usó la clave que guardaste en OpenBot. Usó otra clave de OpenCode Go que OpenCode guarda por su cuenta, y OpenCode Go rechazó esa clave. Para quitar esa clave, ejecuta `opencode auth logout opencode-go` en una terminal del equipo que ejecuta el agente y elige la clave. Luego inténtalo de nuevo.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go rechazó la solicitud. Una clave de API nueva no lo soluciona. Puede que tu plan de OpenCode Go no esté activo, o que OpenCode Go bloquee tu red: algunos servicios bloquean VPN, proxies o algunos países. Comprueba que tu plan esté activo en OpenCode Console o desactiva la VPN, y luego inténtalo de nuevo. También puedes elegir otro modelo.",
   "error.provider.opencodeServiceFailure":

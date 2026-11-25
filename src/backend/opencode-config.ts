@@ -245,11 +245,8 @@ function mergeOpenCodeConfig(
   };
 }
 
-export function openCodeInheritedKeyEnv(
-  apiKey: string | null,
-  inherited: Readonly<Record<string, string | undefined>>,
-): Record<string, string> {
-  return apiKey && inherited.OPENCODE_API_KEY?.trim() ? { OPENCODE_API_KEY: apiKey } : {};
+export function clearedInheritedOpenCodeKeyEnv(apiKey: string | null): Record<string, string> {
+  return apiKey && process.env.OPENCODE_API_KEY?.trim() ? { OPENCODE_API_KEY: "" } : {};
 }
 
 export function openCodeConfigEnv(

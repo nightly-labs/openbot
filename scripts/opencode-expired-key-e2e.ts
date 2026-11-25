@@ -34,6 +34,7 @@ interface Report {
   providerRefused?: { error: string };
   inheritedEnvKey?: { envKey: string | null; configKey: string | null };
   ownGoKey?: { error: string };
+  sameGoKey?: { error: string };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-expired-key-e2e-"));
@@ -195,7 +196,7 @@ try {
 
   const database = new DatabaseSync(join(openCodeData, "opencode.db"));
   database.exec(
-    "CREATE TABLE credential (id TEXT PRIMARY KEY, integration_id TEXT, label TEXT NOT NULL, value TEXT NOT NULL, active INTEGER)",
+    "CREATE TABLE credential (id TEXT PRIMARY KEY, integration_id TEXT, label TEXT NOT NULL, value TEXT NOT NULL, active INTEGER, time_created INTEGER NOT NULL DEFAULT 0)",
   );
   database
     .prepare("INSERT INTO credential (id, integration_id, label, value, active) VALUES (?, ?, ?, ?, ?)")
@@ -214,16 +215,19 @@ try {
 
   delete process.env.FAKE_PROVIDER_AUTH;
   storedKey = "fresh";
+  const inheritedKey = process.env.OPENCODE_API_KEY;
   process.env.OPENCODE_API_KEY = "old-env";
   await rm(log, { force: true });
   try {
     await startThread(open(cli), { cwd: workspace });
   } finally {
-    delete process.env.OPENCODE_API_KEY;
+    if (inheritedKey === undefined) delete process.env.OPENCODE_API_KEY;
+    else process.env.OPENCODE_API_KEY = inheritedKey;
   }
   const inheritedSpawn = (await readJsonl<LogEntry>(log)).find((entry) => entry.event === "spawn");
-  assert.equal(inheritedSpawn?.envKey, "fresh", "The saved key replaces an inherited OPENCODE_API_KEY (#15988).");
-  assert.equal(inheritedSpawn?.zenKey, null, "The free tier still gets no config key (#7550).");
+  assert.equal(inheritedSpawn?.envKey, "", "With a saved key, an inherited OPENCODE_API_KEY is cleared (#15988).");
+  assert.equal(inheritedSpawn?.configKey, "fresh", "The saved key stays the OpenCode Go config key.");
+  assert.equal(inheritedSpawn?.zenKey, null, "The free tier gets no key (#7550).");
   report.inheritedEnvKey = { envKey: inheritedSpawn?.envKey ?? null, configKey: inheritedSpawn?.configKey ?? null };
 
   storedKey = "expired-v2";
@@ -240,6 +244,21 @@ try {
     "A Go key in OpenCode's own store is named as the refused key, not the key saved in OpenBot (#15988).",
   );
   report.ownGoKey = { error: ownGo };
+  await runCauseEffect(ninth.stop());
+
+  const sameKey = new DatabaseSync(join(openCodeData, "opencode.db"));
+  sameKey
+    .prepare("UPDATE credential SET value = ? WHERE id = ?")
+    .run(JSON.stringify({ type: "key", key: "expired-v2" }), "cred_2");
+  sameKey.close();
+  const tenth = open(cli);
+  const { error: sameGo } = await runTurn(tenth, await startThread(tenth, { cwd: workspace }));
+  assert.equal(
+    sameGo,
+    sourceText("error.provider.opencodeKeyRefused"),
+    "When OpenCode's own Go key is the saved key, the saved key is named as refused.",
+  );
+  report.sameGoKey = { error: sameGo };
   report.passed = true;
 } finally {
   await stopClients(clients);

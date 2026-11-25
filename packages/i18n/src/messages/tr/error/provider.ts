@@ -248,7 +248,7 @@ export const messages = {
   "error.provider.opencodeKeyRefused":
     "OpenCode Go kayıtlı API anahtarınızı reddetti. Anahtarın süresi dolmuş olabilir. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
   "error.provider.opencodeOwnGoKeyRefused":
-    "OpenCode, OpenBot'a kaydettiğiniz anahtarı kullanmadı. OpenCode'un kendisinin sakladığı daha eski bir OpenCode Go anahtarını kullandı ve OpenCode Go bu anahtarı reddetti. Eski anahtarı kaldırmak için ajanı çalıştıran bilgisayarda bir terminalde `opencode auth logout opencode-go` komutunu çalıştırın ve eski anahtarı seçin. Ardından yeniden deneyin.",
+    "OpenCode, OpenBot'a kaydettiğiniz anahtarı kullanmadı. OpenCode'un kendisinin sakladığı başka bir OpenCode Go anahtarını kullandı ve OpenCode Go bu anahtarı reddetti. Bu anahtarı kaldırmak için ajanı çalıştıran bilgisayarda bir terminalde `opencode auth logout opencode-go` komutunu çalıştırın ve anahtarı seçin. Ardından yeniden deneyin.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go isteği reddetti. Yeni bir API anahtarı bunu düzeltmez. OpenCode Go planınız etkin olmayabilir veya OpenCode Go ağınızı engelliyor olabilir: bazı hizmetler VPN'leri, proxy'leri veya bazı ülkeleri engeller. Planınızın OpenCode Console'da etkin olduğundan emin olun ya da VPN'i kapatın, sonra yeniden deneyin. Başka bir model de seçebilirsiniz.",
   "error.provider.opencodeServiceFailure":
