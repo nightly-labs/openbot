@@ -62,6 +62,7 @@ export const messages = {
     other: "Можно добавить не больше {count} папки",
   },
   "agentSettings.folders.browse.places": "Перейти",
+  "agentSettings.folders.browse.path": "Путь к папке",
   "agentSettings.folders.browse.home": "Домашняя папка",
   "agentSettings.folders.browse.parent": "Вверх: {folder}",
   "agentSettings.folders.browse.failed": "Не удалось открыть эту папку.",
@@ -117,6 +118,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Лимит использования исчерпан · пропущена",
   "agentSettings.backupModels.unavailable": "Сейчас недоступна · пропущена",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Если лимит использования остановит {name} после начала работы, {name} продолжит ту же работу на первой доступной модели из списка. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
   "agentSettings.groups.brain": "Мозг",

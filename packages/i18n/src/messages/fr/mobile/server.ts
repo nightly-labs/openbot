@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "Impossible de quitter {name}",
   "mobile.server.drawer.removeFailed": "Impossible de supprimer {name}",
   "mobile.server.drawer.deleteFailed": "Impossible de supprimer {name}",
+  "mobile.server.drawer.hide": "Masquer le serveur",
+  "mobile.server.drawer.show": "Afficher le serveur",
+  "mobile.server.drawer.hiddenServers": "Serveurs masqués",
+  "mobile.server.drawer.hideFailed": "Impossible de masquer {name}",
+  "mobile.server.drawer.showFailed": "Impossible d’afficher {name}",
   "mobile.server.drawer.actionFailed": "OpenBot n’a pas pu terminer cette action. Réessayez.",
   "mobile.server.drawer.moveUp": "Monter",
   "mobile.server.drawer.moveDown": "Descendre",
@@ -100,14 +105,17 @@ export const messages = {
   "mobile.server.hosted.intro.description":
     "Un serveur cloud exécute vos agents et vos routines lorsque votre ordinateur est éteint. OpenBot le configure et le maintient en marche.",
   "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
-  "mobile.server.hosted.computer.title": "Sur votre ordinateur",
+  "mobile.server.hosted.steps.title": "Ajoutez-le sur votre ordinateur",
+  "mobile.server.hosted.steps.open": "Ouvrez OpenBot sur votre ordinateur.",
+  "mobile.server.hosted.steps.settings": "Allez dans Réglages → Serveurs hébergés.",
+  "mobile.server.hosted.steps.add": "Sélectionnez « Ajouter un serveur » et choisissez une offre.",
+  "mobile.server.hosted.plansToggle": "Ce que comprend chaque offre",
   "mobile.server.hosted.computer.add": "Ajouter un serveur cloud",
   "mobile.server.hosted.computer.addHint":
     "Dans OpenBot, ouvrez Réglages → Serveurs hébergés et sélectionnez « Ajouter un serveur ».",
   "mobile.server.hosted.computer.change": "Changer d’offre",
   "mobile.server.hosted.computer.changeHint": "Dans OpenBot, ouvrez Réglages → Facturation.",
   "mobile.server.hosted.yourServers": "Vos serveurs",
-  "mobile.server.hosted.plans": "Offres",
   "mobile.server.hosted.currentPlan": "Votre offre",
   "mobile.server.hosted.soldOut": "Épuisé",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
@@ -271,6 +279,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Le serveur est supprimé du service de comptes pour tous les membres. Les fichiers et les discussions sur son ordinateur restent. Pour le réutiliser, enregistrez-le depuis cet ordinateur.",
   "mobile.server.settings.remove": "Supprimer le serveur",
+  "mobile.server.settings.hide": "Masquer le serveur",
+  "mobile.server.settings.show": "Afficher le serveur",
   "mobile.server.settings.deleteTitle": "Supprimer {name} ?",
   "mobile.server.settings.deleteBody":
     "OpenBot arrête le serveur sur son ordinateur et déplace ses agents, discussions et fichiers dans la corbeille de cet ordinateur. Le serveur quitte la liste des serveurs sur tous vos appareils.",
@@ -525,6 +535,20 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Impossible de changer la clé du serveur. Réessayez.",
   "mobile.server.settings.keyOwnerOnly": "Seul le propriétaire peut changer la clé du serveur.",
   "mobile.server.settings.keyUnsupported": "Mettez à jour OpenBot sur ce serveur pour changer sa clé ici.",
+  "mobile.server.settings.turnLimit": "Fils en même temps",
+  "mobile.server.settings.turnLimitDescription":
+    "Le nombre de fils d’agents qui peuvent s’exécuter en même temps sur ce serveur. Plus de fils utilisent plus de mémoire.",
+  "mobile.server.settings.turnLimitAutomatic": "Automatique ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Automatique (sans limite)",
+  "mobile.server.settings.turnLimitUnlimited": "Sans limite",
+  "mobile.server.settings.turnLimitsLoadFailed": "Impossible de charger les limites de fils de ce serveur.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Impossible d’enregistrer la limite de fils. Réessayez.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Mettez à jour OpenBot sur ce serveur pour changer sa limite de fils ici.",
+  "mobile.server.settings.agentTaskLimit": "Fils en parallèle par agent",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Le nombre de fils que chaque agent sans limite propre peut exécuter en même temps.",
+  "mobile.server.settings.agentTaskLimitDefault": "Par défaut ({count})",
   "mobile.server.settings.memoryLimit": "Souvenirs par agent",
   "mobile.server.settings.memoryLimitDescription": "Nombre de souvenirs que chaque agent de ce serveur peut conserver.",
   "mobile.server.settings.memoryLimitLoadFailed": "Impossible de charger la limite de souvenirs de ce serveur.",
@@ -963,7 +987,7 @@ export const messages = {
     "Seules votre discussion « Message à vous-même » et les personnes que vous autorisez peuvent écrire. Les autres ne reçoivent pas de réponse. Désactivé, OpenBot répond aux inconnus avec un code.",
   "mobile.server.connectors.whatsapp.workingMessage": "Message « En cours… »",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot l’envoie pendant que l’agent travaille, puis le remplace par la réponse. Une demande qui attend une demande précédente reçoit aussi un message d’attente. Désactivez pour n’envoyer que la réponse.",
+    "OpenBot l’envoie pendant que l’agent travaille, puis le remplace par la réponse. Une demande qui attend une demande précédente reçoit aussi un message d’attente. Avec un numéro personnel, seule votre discussion « Message à vous-même » reçoit ces messages. Désactivez pour n’envoyer que la réponse.",
   "mobile.server.connectors.whatsapp.statusReactions": "Réactions d’état",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot réagit avec 👀 quand un message arrive et avec ✅ quand la réponse est prête. Désactivez pour n’envoyer aucune réaction.",

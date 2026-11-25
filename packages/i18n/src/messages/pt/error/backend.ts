@@ -305,6 +305,8 @@ export const messages = {
     "O servidor parou antes de responder. Execute o comando em um terminal para ver o erro.",
   "error.backend.mcpServerExitedWithOutput": "O servidor parou antes de responder. Ele escreveu: {detail}",
   "error.backend.mcpServerFailedToStart": "O servidor não iniciou: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "O OpenBot não conseguiu iniciar o servidor MCP {name}, porque o programa dele não está instalado no computador que executa o OpenBot. Instale o app que fornece {name} nesse computador, ou desative {name} na Loja, Apps.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} parou de esperar antes de o servidor iniciar, por isso os agentes dele não recebem as ferramentas deste servidor.",
   "error.backend.mcpServerStoppedDuringCall": "O servidor MCP parou antes de responder a esta chamada.",
@@ -438,6 +440,8 @@ export const messages = {
     "O certificado de segurança deste site não é confiável, por isso a página não abriu.",
   "error.backend.browserLowMemory":
     "Este servidor está com pouca memória, por isso o navegador não pode abrir outra aba. Feche uma aba ou aguarde os outros agentes terminarem.",
+  "error.backend.browserNoMemory":
+    "Este servidor está quase sem memória, por isso o navegador não pode abrir uma aba agora. Aguarde os outros agentes terminarem e tente novamente.",
   "error.backend.browserOpenFailed": "Não foi possível abrir {url}: {reason}",
   "error.backend.popupSecureInput":
     "Pop-ups são bloqueados durante a entrada segura. Conclua ou cancele a entrada segura e tente novamente na página.",

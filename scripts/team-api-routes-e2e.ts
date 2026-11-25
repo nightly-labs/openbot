@@ -36,6 +36,7 @@ import {
   type Channel,
   type ChannelMessage,
   type ChannelRoutine,
+  type ChannelTask,
   type ConversationMessage,
   type CustomAgentResult,
   type CustomAgentSummary,
@@ -80,6 +81,7 @@ import {
   type StoredFileRow,
   type UpdateChannelRoutineInput,
   type UpdateRoutineInput,
+  VOICE_AUDIO_LIMITS,
   VOICE_MODEL_IDS,
   type VoiceLiveEvent,
   type VoiceModelStatus,
@@ -244,6 +246,12 @@ import {
   CLAUDE_USER_SETUP_CODECS,
   CLAUDE_USER_SETUP_ROUTES,
 } from "@openbot/contracts/team-protocol/claude-user-setup-v1";
+import {
+  CLIENT_BROWSER_CAPABILITY,
+  CLIENT_BROWSER_ROUTES,
+  type ClientBrowserCommandEvent,
+  clientBrowserCommandEvent,
+} from "@openbot/contracts/team-protocol/client-browser-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import {
   CONTEXT_COMPACT_CAPABILITY,
@@ -257,10 +265,12 @@ import {
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import {
   AGENT_HIDDEN_WORK_CAPABILITY,
+  CHANNEL_PAGE_TASKS_CAPABILITY,
   decodeTeamProtocolSupportExpanded,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_USAGE_GROUPS_CAPABILITY,
   TEAM_USAGE_READ_FAILED_CAPABILITY,
+  teamCapabilitiesForProtocol,
   teamCapabilityHeaders,
 } from "@openbot/contracts/team-protocol/current";
 import {
@@ -306,6 +316,7 @@ import {
   HOST_SIGNAL_HOME_CAPABILITY,
   HOST_SIGNAL_HOME_ROUTES,
 } from "@openbot/contracts/team-protocol/host-signal-home-v1";
+import { HOST_TURN_LIMITS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/host-turn-limits-events-v1";
 import {
   HOST_TURN_LIMITS_CAPABILITY,
   HOST_TURN_LIMITS_ROUTES,
@@ -314,6 +325,7 @@ import {
   HOST_VOICE_MODEL_CAPABILITY,
   HOST_VOICE_MODEL_ROUTES,
 } from "@openbot/contracts/team-protocol/host-voice-model-v1";
+import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
 import {
   INSTANCE_TRANSFER_CHUNK_BYTES,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
@@ -382,6 +394,11 @@ import {
   PROMPT_CACHE_TTL_CAPABILITY,
   PROMPT_CACHE_TTL_PI_CAPABILITY,
 } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import {
+  addPromptQuestionDetails,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
+  withPromptQuestionDetails,
+} from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import {
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_ROUTES,
@@ -492,6 +509,10 @@ import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-pr
 import { VAULT_V3_CAPABILITY, VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
 import { VAULT_V4_CAPABILITY, VAULT_V4_ROUTES } from "@openbot/contracts/team-protocol/vault-v4";
 import {
+  VOICE_TRANSCRIPTION_CAPABILITY,
+  VOICE_TRANSCRIPTION_ROUTES,
+} from "@openbot/contracts/team-protocol/voice-transcription-v1";
+import {
   WEBHOOK_AGENT_SECRET_CAPABILITY,
   WEBHOOK_AGENT_SECRET_ROUTES,
 } from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
@@ -524,6 +545,7 @@ import { planLimitRows } from "@openbot/team-client/plan-limits";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect } from "effect";
 import { strToU8, unzipSync, zipSync } from "fflate";
+import { runClientBrowserTool, withClientTabs } from "../src/backend/agent/client-browser-tools";
 import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "../src/backend/agent/inactive-attention-request";
 import { SteerUnsupportedError } from "../src/backend/agent/queue-controls";
 import { AgentLifecycleFailed } from "../src/backend/agent-service";
@@ -544,6 +566,7 @@ import { canConfineProcesses } from "../src/backend/process-confinement";
 import { RoutineResultError } from "../src/backend/routine-results/routine-results";
 import type { OwnedRoutineRecord } from "../src/backend/routine-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
+import { resolveSharedFile as resolveSharedFileOnDisk } from "../src/backend/workspace-paths";
 import type { AgentAccessState } from "../src/main/agent-access-store";
 import { createAgentDefaultsPreferenceStore } from "../src/main/agent-defaults-preference-store";
 import { createAgentDefaultsSettings } from "../src/main/agent-defaults-settings";
@@ -574,6 +597,7 @@ import {
   claudeUserSetupControl,
   createClaudeUserSetupPreferenceStore,
 } from "../src/main/claude-user-setup-preference-store";
+import { ClientBrowserHub } from "../src/main/client-browser-hub";
 import { createCustomProviderChanges } from "../src/main/custom-provider-changes";
 import { CustomProviderStore } from "../src/main/custom-provider-store";
 import { githubSkillSource } from "../src/main/github-skill-source";
@@ -615,6 +639,7 @@ import type {
   TeamApiLiveVoice,
   TeamApiMailbox,
   TeamApiRoutineRunPlaces,
+  TeamApiVoiceTranscription,
 } from "../src/main/team-api/dependencies";
 import { isPeerHiddenProvider } from "../src/main/team-api/provider-visibility";
 import { WEBRTC_FRAME_BODY_BUDGET } from "../src/main/team-api/request-helpers";
@@ -622,10 +647,12 @@ import { TeamApiServer } from "../src/main/team-api-server";
 import { TeamStore } from "../src/main/team-store";
 import { VaultService } from "../src/main/vault-service";
 import { VaultStore } from "../src/main/vault-store";
+import { VoiceOperationError } from "../src/main/voice-model-service";
 import { emptyInstanceTransferService } from "./instance-transfer-e2e-fixture";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/team-api-routes-e2e");
 const APP_VERSION = "0.43.0";
+const PROMPT_DETAIL_E2E_TEXT = "Run:\n```sh\necho hello\n```";
 const MIB = 1024 * 1024;
 
 interface Check {
@@ -1106,6 +1133,9 @@ function accountModelsStatus(): AgentStatus {
 let hidden: HiddenAgentsSnapshot = { agents: [{ agentId: "agent-pi", hiddenAt: new Date(0).toISOString() }] };
 
 const agentEventListeners = new Set<(event: AgentEvent, memberId?: string) => void>();
+hostTurnLimits.onChange(() => {
+  for (const listener of agentEventListeners) listener({ type: "host-turn-limits-changed" });
+});
 let accessLevels: AgentAccessState = { revision: 0, everyone: {}, roles: [] };
 let largePendingPrompts = false;
 let importFreeBytes: number | null = null;
@@ -1162,9 +1192,9 @@ function libraryScan(): StorageUsage {
   };
 }
 const libraryStorage: LibraryFoldersSources["storage"] = {
-  usage: (input) =>
+  hostFiles: () =>
     Effect.sync(() => {
-      record("libraryScan", input);
+      record("libraryScan");
       return libraryScan();
     }),
   invalidate: () => {
@@ -1448,10 +1478,17 @@ const fakeAgents: TeamApiAgents = {
   resolveSharedFile: (path) =>
     Effect.sync(() => {
       record("resolveSharedFile", path);
-      return path === "big.bin"
-        ? { path: sharedPath, name: "big.bin", size: ATTACHMENT_LIMITS.fileBytes + 1 }
-        : { path: sharedPath, name: "shared.txt", size: readFileSync(sharedPath).length };
-    }),
+    }).pipe(
+      Effect.flatMap(() =>
+        path === "big.bin"
+          ? Effect.succeed({ path: sharedPath, name: "big.bin", size: ATTACHMENT_LIMITS.fileBytes + 1 })
+          : resolveSharedFileOnDisk(files, path).pipe(
+              Effect.mapError(
+                (failure) => new AgentLifecycleFailed({ operation: "resolveSharedFile", cause: failure.cause }),
+              ),
+            ),
+      ),
+    ),
   resolveWorkspaceFile: (agentId, path) =>
     Effect.sync(() => {
       record("resolveWorkspaceFile", agentId, path);
@@ -1708,6 +1745,24 @@ const fakeAgents: TeamApiAgents = {
                 status: "completed",
                 ...(anchor.messageId === "skill-question"
                   ? { itemType: "skill-suggestion:create", skillSuggestion: { name: "Weekly report" } }
+                  : {}),
+                ...(anchor.messageId === "detail-question"
+                  ? {
+                      questionPrompt: {
+                        requestId: "request-detail",
+                        questions: [
+                          {
+                            id: "install",
+                            header: "Install",
+                            question: "Did the install work?",
+                            detail: PROMPT_DETAIL_E2E_TEXT,
+                            isSecret: false,
+                            options: null,
+                          },
+                        ],
+                        resolution: null,
+                      },
+                    }
                   : {}),
               },
             ]
@@ -2026,9 +2081,10 @@ const fakeAgentTasks: TeamApiAgentTasks = {
       closedAt: null,
     });
   },
-  sendMessage: (input, sender) =>
+  sendMessage: (input, sender, _timezone, fromChrome) =>
     Effect.sync(() => {
       record("sendTaskMessage", input, sender);
+      if (fromChrome) record("taskMessageFromChrome", input.agentId);
       return {
         messageId: "message-reply",
         deliveries: [{ id: "delivery-reply", recipientAgentId: input.agentId, status: "queued", position: 1 }],
@@ -2441,6 +2497,17 @@ const machineMetrics = {
   checkedAt: "2026-10-27T12:00:00.000Z",
 };
 const machineAlertStore = new MachineAlertPreferenceStore(join(root, "machine-alerts.json"));
+const voiceTranscription: TeamApiVoiceTranscription = {
+  transcribe: (audio) => {
+    record("transcribe", audio.byteLength);
+    return audio.byteLength === 44
+      ? Effect.fail(new VoiceOperationError({ cause: new Error(sourceText("error.voice.host.preparing")) }))
+      : Effect.succeed({ text: `heard ${audio.byteLength - 44} bytes` });
+  },
+};
+
+const clientBrowser = new ClientBrowserHub({ commandMs: 1_500, presenceMs: 60_000 });
+
 const liveVoiceListeners = new Set<(event: VoiceLiveEvent, memberId: string | null) => void>();
 let liveVoiceStarts = 0;
 let liveVoiceStopped: (() => void) | null = null;
@@ -2452,6 +2519,13 @@ const liveVoice: TeamApiLiveVoice = {
         new AgentLifecycleFailed({
           operation: "startLiveVoice",
           cause: new Error(sourceText("error.voice.live.signIn")),
+        }),
+      );
+    if (input.sdp === "offer-codex-failed")
+      return Effect.fail(
+        new AgentLifecycleFailed({
+          operation: "startLiveVoice",
+          cause: new Error(sourceText("error.voice.live.startFailed", { reason: "realtime session failed" })),
         }),
       );
     liveVoiceStarts += 1;
@@ -2522,11 +2596,13 @@ const githubSkillsAdmin: Pick<
 const adaSkills = join(root, "workspaces", "agent-ada", ".claude", "skills");
 mkdirSync(join(adaSkills, "good-skill"), { recursive: true });
 writeFileSync(join(adaSkills, "good-skill", "SKILL.md"), "---\nname: good-skill\ndescription: Works.\n---\n# Good\n");
-mkdirSync(join(adaSkills, "settlement-economy"), { recursive: true });
+mkdirSync(join(adaSkills, "bom-skill"), { recursive: true });
 writeFileSync(
-  join(adaSkills, "settlement-economy", "SKILL.md"),
-  "\uFEFF---\r\nname: settlement-economy\r\ndescription: Settles.\r\n---\r\n# Settle\r\n",
+  join(adaSkills, "bom-skill", "SKILL.md"),
+  "\uFEFF---\r\nname: bom-skill\r\ndescription: Saved with a byte order mark.\r\n---\r\n# Bom\r\n",
 );
+mkdirSync(join(adaSkills, "settlement-economy"), { recursive: true });
+writeFileSync(join(adaSkills, "settlement-economy", "SKILL.md"), "\uFEFF# Settle\r\n");
 const chatSkills = new SkillMarketplaceService(
   {
     requestAuthorized: () => Effect.die("Not used."),
@@ -3097,6 +3173,8 @@ try {
       stop: (id) => Effect.sync(() => record("stopBackgroundProcess", id)),
     },
     liveVoice,
+    voiceTranscription,
+    clientBrowser,
     storage: {
       usage: (input) =>
         Effect.sync(() => {
@@ -4170,11 +4248,66 @@ try {
         !existsSync(hostTurnLimitsPath),
       outOfRange.map(summary),
     );
+    const openTurnLimitsSocket = async (capabilities: string[]) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+        TEAM_PROTOCOL_V1_WEBSOCKET,
+        `openbot-token.${bobToken}`,
+      ]);
+      const state = { declared: false, changed: 0, marked: false };
+      const waiters = new Set<() => void>();
+      socket.addEventListener("message", (message) => {
+        const value = JSON.parse(String(message.data));
+        if (isDynamicRecord(value) && value.type === "chat-colors-changed") state.declared = true;
+        if (isDynamicRecord(value) && value.type === "host-turn-limits-changed") state.changed++;
+        if (isDynamicRecord(value) && value.type === "library-folders-changed") state.marked = true;
+        for (const wake of waiters) wake();
+      });
+      await new Promise<void>((resolveOpen, reject) => {
+        socket.addEventListener("open", () => resolveOpen(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+      });
+      const until = (ready: () => boolean) =>
+        new Promise<boolean>((resolveReady) => {
+          if (ready()) return resolveReady(true);
+          const timer = setTimeout(() => {
+            waiters.delete(wake);
+            resolveReady(false);
+          }, 5_000);
+          const wake = () => {
+            if (!ready()) return;
+            clearTimeout(timer);
+            waiters.delete(wake);
+            resolveReady(true);
+          };
+          waiters.add(wake);
+        });
+      socket.send(
+        JSON.stringify({
+          type: "agent-event-scope",
+          includeConversations: false,
+          capabilities: [CHAT_COLORS_CAPABILITY, LIBRARY_FOLDERS_EVENTS_CAPABILITY, ...capabilities],
+        }),
+      );
+      const ready = await until(() => state.declared);
+      return { socket, state, ready, until };
+    };
+    const listening = await openTurnLimitsSocket([HOST_TURN_LIMITS_EVENTS_CAPABILITY]);
+    const older = await openTurnLimitsSocket([]);
     const adminSet = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
       token: adaToken,
       json: { turnLimit: 32, agentTaskLimit: 8 },
       ...v9,
     });
+    const heard = await listening.until(() => listening.state.changed === 1);
+    for (const listener of agentEventListeners) listener({ type: "library-folders-changed" });
+    const olderMarked = await older.until(() => older.state.marked);
+    listening.socket.close();
+    older.socket.close();
+    check(
+      "a change of the limits reaches a member socket that has the events capability, and not an older socket",
+      listening.ready && older.ready && heard && olderMarked && older.state.changed === 0,
+      JSON.stringify({ listening: listening.state, older: older.state }),
+    );
     const reloaded = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
     await runCauseEffect(reloaded.load());
     const chosen = { turnLimit: 32, automaticTurnLimit: 8, agentTaskLimit: 8, defaultAgentTaskLimit: 4 };
@@ -7120,6 +7253,88 @@ try {
   }
 
   {
+    const capabilities = [TEAM_PROMPT_DETAIL_CAPABILITY];
+    check(
+      "prompt-detail-v1 is a protocol 10 capability only",
+      !teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).includes(TEAM_PROMPT_DETAIL_CAPABILITY) &&
+        teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).includes(TEAM_PROMPT_DETAIL_CAPABILITY),
+    );
+    const detailPagePath = `${TEAM_API_ROUTES.agent.conversationPage("agent-ada")}?around=detail-question`;
+    const withDetail = await call("GET", detailPagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities,
+    });
+    const withoutDetail = await call("GET", detailPagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [],
+    });
+    const pageQuestion = (body: Json | undefined) =>
+      list(field(list(field(body, "messages"))[0], "questionPrompt", "questions"))[0];
+    check(
+      "a conversation page carries the detail of an agent question only with prompt-detail-v1",
+      withDetail.status === 200 &&
+        field(pageQuestion(withDetail.body), "detail") === PROMPT_DETAIL_E2E_TEXT &&
+        field(pageQuestion(withDetail.body), "question") === "Did the install work?" &&
+        withoutDetail.status === 200 &&
+        field(pageQuestion(withoutDetail.body), "question") === "Did the install work?" &&
+        field(pageQuestion(withoutDetail.body), "detail") === undefined,
+      [summary(withDetail), summary(withoutDetail)],
+    );
+    const decoded = teamHttpCodec(TEAM_PROTOCOL_V10).decodeResponse("GET", detailPagePath, 200, withDetail.body);
+    const frozenDetail = field(pageQuestion(parseJson(JSON.stringify(decoded))), "detail");
+    addPromptQuestionDetails(decoded, withDetail.body);
+    const restoredDetail = field(pageQuestion(parseJson(JSON.stringify(decoded))), "detail");
+    check(
+      "a client copies the question detail back after the frozen codec decodes the page",
+      frozenDetail === undefined && restoredDetail === PROMPT_DETAIL_E2E_TEXT,
+      { frozenDetail: frozenDetail ?? null, restoredDetail: restoredDetail ?? null },
+    );
+
+    const promptEvent = {
+      type: "prompt" as const,
+      requestId: 7,
+      agentId: "agent-ada",
+      threadId: "thread-agent-ada",
+      turnId: "turn-1",
+      questions: [
+        {
+          id: "install",
+          header: "Install",
+          question: "Did the install work?",
+          detail: PROMPT_DETAIL_E2E_TEXT,
+          isSecret: false,
+          options: [
+            { label: "Done", description: "It worked." },
+            { label: "Need help", description: "It failed." },
+          ],
+        },
+      ],
+    };
+    const plainEvent = encodeTeamProtocolV8BaseCurrentEvent(promptEvent, {}) ?? "";
+    const detailEvent = JSON.parse(withPromptQuestionDetails(plainEvent, promptEvent));
+    const readEvent = decodeTeamProtocolV8BaseCurrentEvent(detailEvent);
+    const frozenEventDetail =
+      readEvent.kind === "known" && readEvent.event.type === "prompt" ? readEvent.event.questions[0]?.detail : null;
+    if (readEvent.kind === "known") addPromptQuestionDetails(readEvent.event, detailEvent);
+    const restoredEvent = readEvent.kind === "known" && readEvent.event.type === "prompt" ? readEvent.event : null;
+    const otherAgentEvent = JSON.parse(
+      withPromptQuestionDetails(plainEvent, { ...promptEvent, agentId: "agent-pi", type: "prompt" }),
+    );
+    check(
+      "a prompt event carries the question detail with prompt-detail-v1, and only for the same prompt",
+      !plainEvent.includes("echo hello") &&
+        frozenEventDetail === undefined &&
+        restoredEvent?.questions[0]?.detail === PROMPT_DETAIL_E2E_TEXT &&
+        restoredEvent?.questions[0]?.question === "Did the install work?" &&
+        restoredEvent?.questions[0]?.options?.length === 2 &&
+        !JSON.stringify(otherAgentEvent).includes("echo hello"),
+      { plainEvent, restored: restoredEvent?.questions[0] ?? null },
+    );
+  }
+
+  {
     const capabilities = [SKILLS_ADMIN_CAPABILITY, GITHUB_SKILLS_CAPABILITY];
     const v9 = { protocol: TEAM_PROTOCOL_V9, capabilities };
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
@@ -7517,14 +7732,19 @@ try {
         .filter((skill) => skill.skillId.startsWith("workspace:"))
         .map(({ slug, problem }) => ({ slug, problem }));
     check(
-      "an older client gets only the usable skill folder, as before",
-      plain.status === 200 && isDeepStrictEqual(named(plain), [{ slug: "good-skill", problem: undefined }]),
+      "an older client gets only the usable skill folders, as before, and a byte order mark does not make a folder unusable",
+      plain.status === 200 &&
+        isDeepStrictEqual(named(plain), [
+          { slug: "bom-skill", problem: undefined },
+          { slug: "good-skill", problem: undefined },
+        ]),
       summary(plain),
     );
     check(
-      "a client with skill-problems-v1 also gets the folder whose SKILL.md has a byte order mark, with the reason",
+      "a client with skill-problems-v1 also gets the folder whose SKILL.md has no frontmatter, with the reason",
       withProblems.status === 200 &&
         isDeepStrictEqual(named(withProblems), [
+          { slug: "bom-skill", problem: undefined },
           { slug: "good-skill", problem: undefined },
           { slug: "settlement-economy", problem: sourceText("error.skill.frontmatterMissing") },
         ]),
@@ -9881,6 +10101,54 @@ try {
         field(alertRow, "unreadCount") === 1 &&
         logged.slice(alertLogStart).every((line) => !line.includes("Team API request failed")),
       [heldSequence, shownSequence, summary(readAfterDelete), summary(readPastHistory), field(alertRow, "unreadCount")],
+    );
+
+    const pageTask = (id: string, requestMessageId: string, state: ChannelTask["state"]): ChannelTask => ({
+      id,
+      channelId,
+      parentTaskId: null,
+      rootTaskId: id,
+      ownerAgentId: "agent-ada",
+      requestMessageId,
+      instruction: id,
+      attachmentDraftIds: [],
+      expectedResult: id,
+      sourceMessageIds: [requestMessageId],
+      dependencies: [],
+      resources: [],
+      state,
+      revision: 1,
+      assignmentCount: 1,
+      error: null,
+    });
+    pictures.store.commit("page-tasks", {
+      channel: pictures.store.get(channelId),
+      messages: [],
+      tasks: [
+        pageTask("task-history", "message-not-in-channel", "completed"),
+        pageTask("task-open", "message-not-in-channel", "running"),
+        pageTask("task-shown", "alert-first", "completed"),
+      ],
+      assignments: [],
+    });
+    const taskIds = (reply: Reply) =>
+      list(field(reply.body, "tasks"))
+        .map((task) => field(task, "id"))
+        .filter((id) => typeof id === "string" && id.startsWith("task-"))
+        .sort();
+    const fullTasks = await call("POST", CHANNEL_ROUTES.read, { ...use, json: { channelId } });
+    const windowTasks = await call("POST", CHANNEL_ROUTES.read, {
+      ...use,
+      capabilities: [...pictured, CHANNEL_PAGE_TASKS_CAPABILITY],
+      json: { channelId },
+    });
+    check(
+      "a client with channel-page-tasks-v1 gets only open runs and the tasks of shown messages, and an older client keeps every task",
+      fullTasks.status === 200 &&
+        windowTasks.status === 200 &&
+        taskIds(fullTasks).join() === "task-history,task-open,task-shown" &&
+        taskIds(windowTasks).join() === "task-open,task-shown",
+      [taskIds(fullTasks), taskIds(windowTasks)],
     );
   }
 
@@ -13215,6 +13483,16 @@ try {
         ]),
       [summary(noSignIn), callsOf("startLiveVoice").at(-1)],
     );
+    const codexFailed = await call("POST", LIVE_VOICE_ROUTES.start, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", sdp: "offer-codex-failed" },
+    });
+    check(
+      "a host whose Codex cannot start the voice answers 409 with the reason and the next step for the member",
+      errorIs(codexFailed, 409, sourceText("error.voice.live.startFailed", { reason: "realtime session failed" })),
+      summary(codexFailed),
+    );
     const revoked = await call("POST", LIVE_VOICE_ROUTES.start, {
       token: bobToken,
       ...v9,
@@ -13426,6 +13704,28 @@ try {
         shared.headers.get("content-disposition") === "attachment; filename*=UTF-8''shared.txt" &&
         errorIs(sharedBig, 413, sourceText("error.team.sharedFileTooLarge")),
       [summary(sharedMissing), summary(shared), summary(sharedBig)],
+    );
+    const sharedAtLine = await call(
+      "GET",
+      `${TEAM_API_ROUTES.sharedFiles}?path=${encodeURIComponent("shared.txt:26")}`,
+      {
+        token: bobToken,
+      },
+    );
+    const sharedAtAnchor = await call(
+      "GET",
+      `${TEAM_API_ROUTES.sharedFiles}?path=${encodeURIComponent("Shared/shared.txt#L26")}`,
+      { token: bobToken },
+    );
+    check(
+      "shared files: a link with a line number gives the bytes of the file without the line number",
+      [sharedAtLine, sharedAtAnchor].every(
+        (response) =>
+          response.status === 200 &&
+          response.text === "shared file bytes\n" &&
+          response.headers.get("content-disposition") === "attachment; filename*=UTF-8''shared.txt",
+      ),
+      [summary(sharedAtLine), summary(sharedAtAnchor)],
     );
     const workspaceMissing = await call("GET", `${TEAM_API_ROUTES.workspaceFiles}?path=notes.md`, { token: bobToken });
     const workspace = await call("GET", `${TEAM_API_ROUTES.workspaceFiles}?botId=agent-ada&path=notes.md`, {
@@ -15061,6 +15361,325 @@ try {
   }
 
   {
+    const route = VOICE_TRANSCRIPTION_ROUTES.transcribe;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES),
+    });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises voice-transcription-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(VOICE_TRANSCRIPTION_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(VOICE_TRANSCRIPTION_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const wav = (samples: number) => {
+      const bytes = new Uint8Array(44 + samples * 2);
+      const view = new DataView(bytes.buffer);
+      bytes.set(new TextEncoder().encode("RIFF"), 0);
+      view.setUint32(4, bytes.byteLength - 8, true);
+      bytes.set(new TextEncoder().encode("WAVEfmt "), 8);
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, 16_000, true);
+      view.setUint32(28, 32_000, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      bytes.set(new TextEncoder().encode("data"), 36);
+      view.setUint32(40, samples * 2, true);
+      return bytes;
+    };
+    const transcribed = () => callsOf("transcribe").length;
+    const options = { token: bobToken, protocol: TEAM_PROTOCOL_V10, capabilities: [VOICE_TRANSCRIPTION_CAPABILITY] };
+    const unsupported = await call("POST", route, { token: bobToken, bytes: wav(1_600) });
+    const invalid = await call("POST", route, { ...options, bytes: new Uint8Array(100) });
+    const tooLong = await rawCall(route, bobToken, VOICE_AUDIO_LIMITS.maximumWavBytes + 1, null, options);
+    check(
+      "a recording without voice-transcription-v1, one that is not a 16 kHz WAV, or one over 120 s is not transcribed",
+      errorIs(unsupported, 400, sourceText("error.team.voiceTranscriptionUnsupported")) &&
+        errorIs(invalid, 400, sourceText("error.voice.host.invalidRecording")) &&
+        tooLong.status === 413 &&
+        field(tooLong.body, "error") === sourceText("error.voice.host.tooLong") &&
+        transcribed() === 0,
+      [summary(unsupported), summary(invalid), tooLong],
+    );
+    const heard = await call("POST", route, { ...options, bytes: wav(1_600) });
+    const preparing = await call("POST", route, { ...options, bytes: wav(0) });
+    check(
+      "a member's recording comes back as text, and a host with no model ready answers 409 with the sentence",
+      heard.status === 200 &&
+        isDeepStrictEqual(heard.body, { text: "heard 3200 bytes" }) &&
+        errorIs(preparing, 409, sourceText("error.voice.host.preparing")) &&
+        isDeepStrictEqual(
+          callsOf("transcribe").map((args) => args[0]),
+          [3_244, 44],
+        ),
+      [summary(heard), summary(preparing), callsOf("transcribe")],
+    );
+  }
+
+  {
+    const v10 = { protocol: TEAM_PROTOCOL_V10, capabilities: [CLIENT_BROWSER_CAPABILITY] };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES),
+    });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises client-browser-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(CLIENT_BROWSER_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(CLIENT_BROWSER_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const tab = { id: "41", url: "https://example.com/", title: "Example", active: true };
+    const unsupported = await call("POST", CLIENT_BROWSER_ROUTES.presence, {
+      token: bobToken,
+      json: { sharing: true, tabs: [tab] },
+    });
+    const tooMany = await call("POST", CLIENT_BROWSER_ROUTES.presence, {
+      token: bobToken,
+      ...v10,
+      json: { sharing: true, tabs: Array.from({ length: 51 }, (_, index) => ({ ...tab, id: String(index) })) },
+    });
+    const badTab = await call("POST", CLIENT_BROWSER_ROUTES.presence, {
+      token: bobToken,
+      ...v10,
+      json: { sharing: true, tabs: [{ ...tab, id: "41:x" }] },
+    });
+    check(
+      "a presence without client-browser-v1, with more than 50 tabs, or with a bad tab id shares nothing",
+      errorIs(unsupported, 400, sourceText("error.team.clientBrowserUnsupported")) &&
+        tooMany.status === 400 &&
+        badTab.status === 400 &&
+        clientBrowser.tabs(bobId) === null,
+      [summary(unsupported), summary(tooMany), summary(badTab)],
+    );
+
+    const openChromeSocket = async (token: string, capabilities: string[]) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+        TEAM_PROTOCOL_V1_WEBSOCKET,
+        `openbot-token.${token}`,
+      ]);
+      const events: ClientBrowserCommandEvent[] = [];
+      const waiters = new Set<() => void>();
+      let declared = false;
+      socket.addEventListener("message", (message) => {
+        const value = JSON.parse(String(message.data));
+        if (isDynamicRecord(value) && value.type === "chat-colors-changed") declared = true;
+        const event = clientBrowserCommandEvent(value);
+        if (event) events.push(event);
+        for (const wake of waiters) wake();
+      });
+      await new Promise<void>((resolveOpen, reject) => {
+        socket.addEventListener("open", () => resolveOpen(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+      });
+      const until = (ready: () => boolean) =>
+        new Promise<boolean>((resolveReady) => {
+          if (ready()) return resolveReady(true);
+          const timer = setTimeout(() => {
+            waiters.delete(wake);
+            resolveReady(false);
+          }, 5_000);
+          const wake = () => {
+            if (!ready()) return;
+            clearTimeout(timer);
+            waiters.delete(wake);
+            resolveReady(true);
+          };
+          waiters.add(wake);
+        });
+      socket.send(
+        JSON.stringify({
+          type: "agent-event-scope",
+          includeConversations: false,
+          capabilities: [CHAT_COLORS_CAPABILITY, ...capabilities],
+        }),
+      );
+      const ready = await until(() => declared);
+      return { socket, events, ready, until };
+    };
+    const bobSocket = await openChromeSocket(bobToken, [CLIENT_BROWSER_CAPABILITY]);
+    const bobOld = await openChromeSocket(bobToken, []);
+    const adaSocket = await openChromeSocket(adaToken, [CLIENT_BROWSER_CAPABILITY]);
+    const shared = await call("POST", CLIENT_BROWSER_ROUTES.presence, {
+      token: bobToken,
+      ...v10,
+      json: { sharing: true, tabs: [tab] },
+    });
+    const listed = withClientTabs({ success: true, contentItems: [] }, clientBrowser, [bobId]);
+    const groupListed = withClientTabs({ success: true, contentItems: [] }, clientBrowser, [adaId, bobId]);
+    const listedText = listed.contentItems[0]?.type === "inputText" ? listed.contentItems[0].text : "";
+    const chromeTabs = list(field(parseJson(listedText), "chromeTabs"));
+    const chromeTabId = field(chromeTabs[0] ?? null, "id");
+    check(
+      "a member shares tabs; list_tabs of a turn that only the member requested shows them as chrome: tabs, and a turn of many people shows none",
+      bobSocket.ready &&
+        bobOld.ready &&
+        adaSocket.ready &&
+        shared.status === 200 &&
+        isDeepStrictEqual(
+          clientBrowser.tabs(bobId)?.map((shared) => shared.tabs),
+          [[tab]],
+        ) &&
+        clientBrowser.tabs(adaId) === null &&
+        chromeTabs.length === 1 &&
+        groupListed.contentItems.length === 0 &&
+        typeof chromeTabId === "string" &&
+        /^chrome:[0-9a-f]{8}:[0-9a-f]{6}:41$/u.test(chromeTabId),
+      [summary(shared), listedText],
+    );
+    assert.ok(typeof chromeTabId === "string", "The shared tab is not listed.");
+    const fromChrome = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, {
+      token: bobToken,
+      capabilities: [AGENT_HIDDEN_CAPABILITY, AGENT_THREAD_REPLIES_CAPABILITY],
+      json: {
+        agentId: "agent-ada",
+        taskId: "task-1",
+        text: "From my Chrome",
+        attachmentDraftIds: [],
+        replyToMessageId: "message-7",
+        clientMessageId: "client-chrome",
+      },
+    });
+    check(
+      "a message from a session that shares Chrome tabs reaches the agent as from Chrome, and the earlier ones did not",
+      fromChrome.status === 202 &&
+        isDeepStrictEqual(
+          callsOf("taskMessageFromChrome").map((args) => args[0]),
+          ["agent-ada"],
+        ),
+      [summary(fromChrome), callsOf("taskMessageFromChrome")],
+    );
+
+    const agent = { id: "agent-ada", name: "Ada" };
+    const runTool = (requesters: string[], tool: string, args: unknown) =>
+      Effect.runPromise(runClientBrowserTool(clientBrowser, requesters, agent, tool, args));
+    const text = (result: { contentItems: { type: string; text?: string }[] }) =>
+      result.contentItems.map((item) => item.text ?? "").join("\n");
+    const clicked = runTool([bobId], "click", { tabId: chromeTabId, target: { kind: "text", text: "More" } });
+    const delivered = await bobSocket.until(() => bobSocket.events.length === 1);
+    const command = bobSocket.events[0];
+    check(
+      "a click on a shared tab reaches only the member's own session that reads client-browser-v1",
+      delivered &&
+        isDeepStrictEqual(command && { ...command, id: "" }, {
+          type: "client-browser-command",
+          id: "",
+          agentId: "agent-ada",
+          agentName: "Ada",
+          command: { kind: "click", tabId: "41", target: { text: "More" } },
+        }) &&
+        bobOld.events.length === 0 &&
+        adaSocket.events.length === 0,
+      [bobSocket.events, bobOld.events, adaSocket.events],
+    );
+    assert.ok(command, "The command did not arrive.");
+    const answer = { id: command.id, ok: true, result: { text: "clicked", image: null, tab: null } };
+    const foreign = await call("POST", CLIENT_BROWSER_ROUTES.result, { token: adaToken, ...v10, json: answer });
+    const answered = await call("POST", CLIENT_BROWSER_ROUTES.result, { token: bobToken, ...v10, json: answer });
+    const clickResult = await clicked;
+    const late = await call("POST", CLIENT_BROWSER_ROUTES.result, { token: bobToken, ...v10, json: answer });
+    check(
+      "another member cannot answer a command; the member's result ends the tool call, and a late result is refused",
+      errorIs(foreign, 404, sourceText("error.team.clientBrowserCommandUnknown")) &&
+        answered.status === 200 &&
+        clickResult.success &&
+        text(clickResult) === "clicked" &&
+        errorIs(late, 404, sourceText("error.team.clientBrowserCommandUnknown")),
+      [summary(foreign), summary(answered), clickResult, summary(late)],
+    );
+
+    const screenshot = runTool([bobId], "screenshot", { tabId: chromeTabId });
+    await bobSocket.until(() => bobSocket.events.length === 2);
+    const denied = await call("POST", CLIENT_BROWSER_ROUTES.result, {
+      token: bobToken,
+      ...v10,
+      json: { id: bobSocket.events[1]?.id, ok: false, error: "", code: "denied" },
+    });
+    const deniedResult = await screenshot;
+    const timedOut = await runTool([bobId], "snapshot", { tabId: chromeTabId });
+    check(
+      "a denied command and a command with no answer end the tool call with a failure",
+      denied.status === 200 &&
+        !deniedResult.success &&
+        text(deniedResult).includes("denied") &&
+        !timedOut.success &&
+        text(timedOut).includes("did not answer in time") &&
+        isDeepStrictEqual(
+          bobSocket.events.map((event) => event.command.kind),
+          ["click", "screenshot", "snapshot"],
+        ),
+      [deniedResult, timedOut, bobSocket.events.map((event) => event.command)],
+    );
+
+    const script = await runTool([bobId], "run_script", { tabId: chromeTabId, script: "await snapshot()" });
+    const role = await runTool([bobId], "click", { tabId: chromeTabId, target: { kind: "role", role: "button" } });
+    const notRequester = await runTool([adaId], "snapshot", { tabId: chromeTabId });
+    const groupTurn = await runTool([adaId, bobId], "snapshot", { tabId: chromeTabId });
+    const otherChrome = await runTool([bobId], "snapshot", {
+      tabId: chromeTabId.replace(/:[0-9a-f]{6}:/u, ":000000:"),
+    });
+    const httpOnly = await runTool([bobId], "open", { url: "file:///etc/hosts", browser: "chrome" });
+    check(
+      "a tool that Chrome tabs do not take, a role target, a person who did not request the turn, a turn of many people, a Chrome that is not shared, or a file URL sends no command",
+      !script.success &&
+        text(script).startsWith("On a Chrome tab, use only") &&
+        !role.success &&
+        !notRequester.success &&
+        text(notRequester).startsWith("No Chrome tabs are shared in this turn") &&
+        !groupTurn.success &&
+        text(groupTurn).startsWith("No Chrome tabs are shared in this turn") &&
+        !otherChrome.success &&
+        text(otherChrome).startsWith("The tab is not shared now") &&
+        !httpOnly.success &&
+        bobSocket.events.length === 3,
+      [script, role, notRequester, groupTurn, otherChrome, httpOnly],
+    );
+
+    const waiting = runTool([bobId], "snapshot", { tabId: chromeTabId });
+    await bobSocket.until(() => bobSocket.events.length === 4);
+    const stopped = await call("POST", CLIENT_BROWSER_ROUTES.presence, {
+      token: bobToken,
+      ...v10,
+      json: { sharing: false, tabs: [] },
+    });
+    const stoppedResult = await waiting;
+    check(
+      "a member who stops sharing ends the waiting command, and the tabs go away",
+      stopped.status === 200 &&
+        !stoppedResult.success &&
+        text(stoppedResult).startsWith("No Chrome tabs are shared in this turn") &&
+        clientBrowser.tabs(bobId) === null,
+      [summary(stopped), stoppedResult],
+    );
+
+    await call("POST", CLIENT_BROWSER_ROUTES.presence, {
+      token: bobToken,
+      ...v10,
+      json: { sharing: true, tabs: [tab] },
+    });
+    const sharedAgain = clientBrowser.tabs(bobId) !== null;
+    bobSocket.socket.close();
+    bobOld.socket.close();
+    adaSocket.socket.close();
+    const closed = await new Promise<boolean>((resolveClosed) => {
+      const deadline = setTimeout(() => resolveClosed(false), 5_000);
+      const poll = setInterval(() => {
+        if (clientBrowser.tabs(bobId) !== null) return;
+        clearTimeout(deadline);
+        clearInterval(poll);
+        resolveClosed(true);
+      }, 20);
+    });
+    check("the shared tabs end when the last event connection of the member's session closes", sharedAgain && closed, {
+      sharedAgain,
+      closed,
+    });
+  }
+
+  {
     const capabilities = [HOST_RESTART_CAPABILITY];
     const restarts = () => callsOf("restartHost").length;
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
@@ -15295,7 +15914,6 @@ try {
           placement: { "file-ada-1": "folder-campaign" },
         }) &&
         scans() === 1 &&
-        isDeepStrictEqual(callsOf("libraryScan")[0], [{ scope: "host" }]) &&
         invalidations() === 0,
       summary(created),
     );

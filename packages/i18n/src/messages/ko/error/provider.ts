@@ -245,6 +245,8 @@ export const messages = {
     "OpenCode API 키가 만료되었어요. OpenCode Console에서 새 키를 만들어 OpenCode 설정에 붙여넣은 후 다시 시도해 주세요.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go가 저장된 API 키를 거부했어요. 키가 만료되었을 수 있어요. OpenCode Console에서 새 키를 만들어 OpenCode 설정에 붙여넣은 후 다시 시도해 주세요.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode가 OpenBot에 저장한 키를 사용하지 않았습니다. OpenCode가 직접 보관하는 다른 OpenCode Go 키를 사용했고, OpenCode Go가 그 키를 거부했습니다. 그 키를 삭제하려면 에이전트를 실행하는 컴퓨터의 터미널에서 `opencode auth logout opencode-go`를 실행하고 그 키를 선택하세요. 그런 다음 다시 시도하세요.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go가 요청을 거부했습니다. 새 API 키로는 해결되지 않습니다. OpenCode Go 플랜이 활성 상태가 아니거나 OpenCode Go가 네트워크를 차단했을 수 있습니다. 일부 서비스는 VPN, 프록시 또는 일부 국가를 차단합니다. OpenCode Console에서 플랜이 활성 상태인지 확인하거나 VPN을 끈 다음 다시 시도하세요. 다른 모델을 선택할 수도 있습니다.",
   "error.provider.opencodeServiceFailure":
@@ -303,6 +305,8 @@ export const messages = {
   "error.provider.opencodeNoAnswer": "OpenCode 모델이 답변 없이 턴을 끝냈어요. 다시 시도하거나 다른 모델을 선택하세요.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "OpenCode 모델이 추론만 하고 답변 없이 턴을 끝냈어요. 다시 시도하거나 다른 모델을 선택하세요.",
+  "error.provider.opencodeToolCallsAsText":
+    "OpenCode 모델이 작업을 텍스트로만 쓰고 실행하지 않았어요. 다시 시도하거나 다른 모델을 선택하세요.",
   "error.provider.acpNoAnswer":
     "{provider}이(가) 답변 없이 턴을 끝냈어요. 메시지를 다시 보내거나 새 채팅을 시작해 주세요.",
   "error.provider.noAnswerAfterSteps":
@@ -368,6 +372,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Cursor를 사용하려면 Cursor로 로그인하거나 CURSOR_API_KEY를 설정하세요.",
   "error.provider.cursorSignInUnusable":
     "Cursor가 로그인 정보로 서버에 연결하지 못했어요. 인터넷 연결을 확인한 다음 Cursor에 다시 로그인하세요.",
+  "error.provider.cursorNoModels":
+    "Cursor가 모델 목록을 보내지 않았습니다. '연결'을 선택해 Cursor에 다시 로그인하세요. 이 메시지가 계속 표시되면 Cursor 요금제에 모델이 포함되어 있는지 확인하세요.",
   "error.provider.clineArchivePath": "Cline 아카이브에 예상하지 못한 경로가 있어요.",
   "error.provider.clinePackageMismatch": "Cline 패키지가 런타임 카탈로그와 일치하지 않아요.",
   "error.provider.clineChecksum": "Cline 런타임 체크섬이 일치하지 않아요.",
@@ -411,6 +417,8 @@ export const messages = {
     "Anthropic API 키에 API 크레딧이 없어요. Claude 플랜은 API 키로 보낸 요청에 사용되지 않아요. Anthropic Console에서 크레딧을 추가하거나, 설정에서 Claude에 로그인한 다음 에이전트의 모델 메뉴에서 Claude 계정을 선택하세요.",
   "error.provider.claudeAccountNoCredit":
     "Claude 계정의 크레딧 잔액이 너무 적어요. 빠른 모드 같은 일부 요청은 Claude 플랜에 사용량이 남아 있어도 사용 크레딧을 써요. Claude 계정에서 사용 크레딧을 추가하거나, 에이전트의 모델 메뉴에서 다른 모델을 선택하세요.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code가 Anthropic이 아닌 {host}(으)로 요청을 보내요. Claude Code 설정 또는 환경 변수에서 이 API 주소를 지정했어요. {host}에서 계정 잔액 때문에 요청을 거부했어요. Claude 플랜의 문제가 아니에요. {host} 계정에 잔액을 추가하거나, 에이전트의 모델 메뉴에서 다른 모델을 선택하세요.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Claude 서비스가 이 요청을 차단했어요. 보통 Claude 쪽의 일시적인 문제이며, 계정 문제가 아니에요. 몇 분 후에 메시지를 다시 보내세요.",
   "error.provider.foreignReasoning":
@@ -427,6 +435,8 @@ export const messages = {
     "{provider}이(가) 안전 규칙 때문에 이 메시지를 차단했습니다: {reason} {provider}이(가) 다음 메시지도 차단하면 새 채팅을 시작하세요.",
   "error.provider.codexAudioRefused":
     "이 모델은 오디오를 들을 수 없어서 이 채팅의 소리를 받지 않았습니다. OpenBot이 채팅 기록으로 새 Codex 세션을 시작했습니다. 계속하려면 요청을 다시 보내고 에이전트에게 소리 없이 작업하라고 요청하세요. 소리를 확인하려면 에이전트의 모델 메뉴에서 오디오를 들을 수 있는 모델을 선택하세요.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex가 ChatGPT 계정 설정을 불러오지 못해서 에이전트가 멈췄어요. 다시 시도해 주세요. 다시 멈추면 서버 설정 → 제공자에서 ChatGPT의 다시 연결을 선택해 주세요.",
   "error.provider.imageTooSmall":
     "이미지가 너무 작아서 모델이 이 채팅의 이미지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
   "error.provider.imageTooLarge":
@@ -559,6 +569,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "{provider} CLI 버전을 읽을 수 없었어요.",
   "error.provider.piSessionBusy": "현재 Pi 턴이 끝날 때까지 기다려 주세요.",
   "error.provider.acpSessionBusy": "{provider}이(가) 중지된 턴을 아직 마무리하고 있습니다. 잠시 후 다시 시도해 주세요.",
+  "error.provider.acpSettingsConflict":
+    "OpenBot이 설정을 적용하는 동안 {provider}이(가) 이 채팅을 변경했습니다. 다시 시도하세요.",
   "error.provider.acpSessionStale":
     "{provider}이(가) 이 채팅의 최신 버전을 불러오지 못했어요. 메시지를 다시 보내 주세요.",
   "error.provider.acpModelNotOffered":

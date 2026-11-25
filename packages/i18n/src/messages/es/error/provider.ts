@@ -254,6 +254,8 @@ export const messages = {
     "Tu clave de API de OpenCode caducó. Crea una clave nueva en OpenCode Console, pégala en los ajustes de OpenCode y luego inténtalo de nuevo.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go rechazó tu clave de API guardada. Puede que la clave haya caducado. Crea una clave nueva en OpenCode Console, pégala en los ajustes de OpenCode y luego inténtalo de nuevo.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode no usó la clave que guardaste en OpenBot. Usó otra clave de OpenCode Go que OpenCode guarda por su cuenta, y OpenCode Go rechazó esa clave. Para quitar esa clave, ejecuta `opencode auth logout opencode-go` en una terminal del equipo que ejecuta el agente y elige la clave. Luego inténtalo de nuevo.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go rechazó la solicitud. Una clave de API nueva no lo soluciona. Puede que tu plan de OpenCode Go no esté activo, o que OpenCode Go bloquee tu red: algunos servicios bloquean VPN, proxies o algunos países. Comprueba que tu plan esté activo en OpenCode Console o desactiva la VPN, y luego inténtalo de nuevo. También puedes elegir otro modelo.",
   "error.provider.opencodeServiceFailure":
@@ -312,6 +314,8 @@ export const messages = {
     "El modelo de OpenCode terminó el turno sin respuesta. Inténtalo de nuevo o elige otro modelo.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "El modelo de OpenCode terminó el turno después de razonar, sin respuesta. Inténtalo de nuevo o elige otro modelo.",
+  "error.provider.opencodeToolCallsAsText":
+    "El modelo de OpenCode escribió sus acciones como texto y no las hizo. Inténtalo de nuevo o elige otro modelo.",
   "error.provider.acpNoAnswer":
     "{provider} terminó el turno sin respuesta. Envía el mensaje de nuevo o empieza un nuevo chat.",
   "error.provider.noAnswerAfterSteps":
@@ -379,6 +383,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Inicia sesión con Cursor o define CURSOR_API_KEY para usar Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor no pudo conectarse a su servidor con tu inicio de sesión. Revisa tu conexión a internet y vuelve a iniciar sesión en Cursor.",
+  "error.provider.cursorNoModels":
+    "Cursor no envió su lista de modelos. Elige «Conectar» para volver a iniciar sesión en Cursor. Si este mensaje sigue apareciendo, comprueba que tu plan de Cursor incluye modelos.",
   "error.provider.clineArchivePath": "El archivo de Cline tiene una ruta inesperada.",
   "error.provider.clinePackageMismatch": "El paquete de Cline no coincide con el catálogo de entornos de ejecución.",
   "error.provider.clineChecksum": "La suma de comprobación del entorno de ejecución de Cline no coincide.",
@@ -421,6 +427,8 @@ export const messages = {
     "La clave de API de Anthropic no tiene crédito de API. Un plan de Claude no paga las solicitudes con una clave de API. Añade crédito en la Anthropic Console, o inicia sesión en Claude en Ajustes y selecciona la cuenta de Claude en el menú de modelos del agente.",
   "error.provider.claudeAccountNoCredit":
     "El saldo de créditos de tu cuenta de Claude es demasiado bajo. Algunas solicitudes, como el modo rápido, usan créditos de uso aunque tu plan de Claude tenga uso disponible. Añade créditos de uso en tu cuenta de Claude, o selecciona otro modelo en el menú de modelos del agente.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code envía las solicitudes a {host}, no a Anthropic: los ajustes de Claude Code o las variables de entorno definen esta dirección de API. {host} rechazó la solicitud por el saldo de la cuenta, no por tu plan de Claude. Añade saldo a tu cuenta de {host}, o selecciona otro modelo en el menú de modelos del agente.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "El servicio de Claude bloqueó esta solicitud. Suele ser un problema breve de Claude, no de tu cuenta. Vuelve a enviar el mensaje en unos minutos.",
   "error.provider.foreignReasoning":
@@ -437,6 +445,8 @@ export const messages = {
     "{provider} bloqueó este mensaje por sus reglas de seguridad: {reason} Si {provider} también bloquea tus próximos mensajes, inicia un nuevo chat.",
   "error.provider.codexAudioRefused":
     "Este modelo no puede escuchar audio, por eso no aceptó el sonido de este chat. OpenBot inició una nueva sesión de Codex con el historial del chat. Para continuar, envía tu solicitud de nuevo y pide al agente que trabaje sin el sonido. Para revisar el sonido, selecciona en el menú de modelos del agente un modelo que pueda escuchar audio.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex no pudo cargar los ajustes de tu cuenta de ChatGPT, por eso el agente se detuvo. Inténtalo de nuevo. Si se detiene otra vez, selecciona Reconectar para ChatGPT en Ajustes del servidor → Proveedores.",
   "error.provider.imageTooSmall":
     "El modelo no aceptó una imagen de este chat porque la imagen es demasiado pequeña. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
   "error.provider.imageTooLarge":
@@ -574,6 +584,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "No se pudo leer la versión de la CLI de {provider}.",
   "error.provider.piSessionBusy": "Espera a que termine el turno actual de Pi.",
   "error.provider.acpSessionBusy": "{provider} aún termina un turno detenido. Inténtalo de nuevo en un momento.",
+  "error.provider.acpSettingsConflict":
+    "{provider} cambió este chat mientras OpenBot aplicaba su configuración. Inténtalo de nuevo.",
   "error.provider.acpSessionStale":
     "{provider} no pudo cargar la versión más reciente de este chat. Envía tu mensaje de nuevo.",
   "error.provider.acpModelNotOffered":

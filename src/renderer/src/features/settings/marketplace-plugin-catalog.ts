@@ -1,3 +1,11 @@
+/**
+ * The plugins the marketplace offers.
+ *
+ * Generated from marketplace/plugin-catalog/ by scripts/build-plugin-catalog.ts.
+ * Do not edit by hand: run bun run marketplace:build:plugins, or
+ * bun run marketplace:build:plugins -- --check to verify.
+ */
+
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 

@@ -416,7 +416,7 @@ export const messages = {
     "Pisać mogą tylko twój czat „Wiadomość do siebie” i osoby, którym pozwolisz. Inne osoby nie dostają odpowiedzi. Gdy jest wyłączone, OpenBot odpowiada nieznanym osobom kodem.",
   "connector.whatsapp.workingMessage": "Wiadomość „Pracuję nad tym…”",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot wysyła ją, gdy agent pracuje, a potem zastępuje odpowiedzią. Żądanie, które czeka na wcześniejsze, też dostaje wiadomość o oczekiwaniu. Wyłącz, aby wysyłać tylko odpowiedź.",
+    "OpenBot wysyła ją, gdy agent pracuje, a potem zastępuje odpowiedzią. Żądanie, które czeka na wcześniejsze, też dostaje wiadomość o oczekiwaniu. Przy numerze prywatnym te wiadomości dostaje tylko twój czat „Wiadomość do siebie”. Wyłącz, aby wysyłać tylko odpowiedź.",
   "connector.whatsapp.statusReactions": "Reakcje stanu",
   "connector.whatsapp.statusReactionsDescription":
     "OpenBot reaguje 👀, gdy przychodzi wiadomość, i ✅, gdy odpowiedź jest gotowa. Wyłącz, aby nie wysyłać reakcji.",

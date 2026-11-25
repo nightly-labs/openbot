@@ -227,6 +227,8 @@ export const messages = {
     "انتهت صلاحية مفتاح OpenCode API الخاص بك. أنشئ مفتاحًا جديدًا في OpenCode Console، والصقه في إعدادات OpenCode، ثم أعد المحاولة.",
   "error.provider.opencodeKeyRefused":
     "رفض OpenCode Go مفتاح API المحفوظ. ربما انتهت صلاحية المفتاح. أنشئ مفتاحًا جديدًا في OpenCode Console، والصقه في إعدادات OpenCode، ثم أعد المحاولة.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "لم يستخدم OpenCode المفتاح الذي حفظته في OpenBot. استخدم مفتاح OpenCode Go آخر يحتفظ به OpenCode بنفسه، ورفض OpenCode Go هذا المفتاح. لإزالة هذا المفتاح، شغّل `opencode auth logout opencode-go` في طرفية على الكمبيوتر الذي يشغّل الوكيل، واختر المفتاح. ثم حاول مرة أخرى.",
   "error.provider.opencodeGoRequestRefused":
     "رفض OpenCode Go الطلب. لا يحل مفتاح API جديد هذه المشكلة. قد لا تكون خطة OpenCode Go نشطة، أو قد يحظر OpenCode Go شبكتك: بعض الخدمات تحظر شبكات VPN أو الخوادم الوكيلة أو بعض البلدان. تأكد من أن خطتك نشطة في OpenCode Console، أو أوقف VPN، ثم حاول مرة أخرى. يمكنك أيضًا اختيار نموذج آخر.",
   "error.provider.opencodeServiceFailure":
@@ -282,6 +284,8 @@ export const messages = {
   "error.provider.opencodeNoAnswer": "أنهى نموذج OpenCode الدور بدون إجابة. أعد المحاولة، أو اختر نموذجًا آخر.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "أنهى نموذج OpenCode الدور بعد الاستدلال، بدون إجابة. أعد المحاولة، أو اختر نموذجًا آخر.",
+  "error.provider.opencodeToolCallsAsText":
+    "كتب نموذج OpenCode إجراءاته كنص ولم ينفّذها. أعد المحاولة، أو اختر نموذجًا آخر.",
   "error.provider.acpNoAnswer": "أنهى {provider} الدور بدون إجابة. أرسل الرسالة مرة أخرى، أو ابدأ دردشة جديدة.",
   "error.provider.noAnswerAfterSteps":
     "نفّذ {provider} بعض الخطوات، ثم أنهى الدور بدون إجابة. اسأل الوكيل عمّا فعله قبل أن ترسل الطلب نفسه مرة أخرى.",
@@ -344,6 +348,8 @@ export const messages = {
   "error.provider.cursorSignIn": "سجّل الدخول باستخدام Cursor أو عيّن CURSOR_API_KEY لاستخدام Cursor.",
   "error.provider.cursorSignInUnusable":
     "تعذّر على Cursor الاتصال بخادمه باستخدام تسجيل دخولك. تحقّق من اتصالك بالإنترنت، ثم سجّل الدخول إلى Cursor مرة أخرى.",
+  "error.provider.cursorNoModels":
+    "لم يرسل Cursor قائمة النماذج. اختر «اتصال» لتسجيل الدخول إلى Cursor مرة أخرى. إذا بقيت هذه الرسالة، فتحقق من أن خطة Cursor تتضمن نماذج.",
   "error.provider.clineArchivePath": "يحتوي أرشيف Cline على مسار غير متوقع.",
   "error.provider.clinePackageMismatch": "لا تطابق حزمة Cline كتالوج بيئات التشغيل.",
   "error.provider.clineChecksum": "عدم تطابق المجموع الاختباري لبيئة تشغيل Cline.",
@@ -386,6 +392,8 @@ export const messages = {
     "لا يوجد رصيد API في مفتاح Anthropic API. لا تدفع خطة Claude مقابل الطلبات التي تستخدم مفتاح API. أضف رصيدًا في Anthropic Console، أو سجّل الدخول إلى Claude في الإعدادات واختر حساب Claude في قائمة نموذج الوكيل.",
   "error.provider.claudeAccountNoCredit":
     "رصيد حسابك على Claude منخفض جدًا. بعض الطلبات، مثل الوضع السريع، تستخدم أرصدة الاستخدام حتى إذا بقي استخدام في خطة Claude. أضف أرصدة استخدام في حسابك على Claude، أو اختر نموذجًا آخر في قائمة نموذج الوكيل.",
+  "error.provider.claudeCustomEndpointBilling":
+    "يرسل Claude Code الطلبات إلى {host}، لا إلى Anthropic: إعدادات Claude Code أو متغيرات البيئة تحدد عنوان API هذا. رفض {host} الطلب بسبب رصيد الحساب، لا بسبب خطة Claude. أضف رصيدًا إلى حسابك على {host}، أو اختر نموذجًا آخر في قائمة نموذج الوكيل.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "حظرت خدمة Claude هذا الطلب. عادةً تكون هذه مشكلة قصيرة من جهة Claude، وليست مشكلة في حسابك. أرسل الرسالة مرة أخرى بعد بضع دقائق.",
   "error.provider.foreignReasoning":
@@ -402,6 +410,8 @@ export const messages = {
     "حظر {provider} هذه الرسالة بسبب قواعد الأمان الخاصة به: {reason} إذا حظر {provider} رسائلك التالية أيضًا، فابدأ دردشة جديدة.",
   "error.provider.codexAudioRefused":
     "لا يستطيع هذا النموذج الاستماع إلى الصوت، لذلك لم يقبل الصوت في هذه الدردشة. بدأ OpenBot جلسة Codex جديدة مع سجل الدردشة. للمتابعة، أرسل طلبك مرة أخرى واطلب من الوكيل أن يعمل بدون الصوت. لفحص الصوت، اختر في قائمة نموذج الوكيل نموذجًا يستطيع الاستماع إلى الصوت.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "لم يتمكن Codex من تحميل إعدادات حساب ChatGPT، لذلك توقف الوكيل. أعد المحاولة. إذا توقف مرة أخرى، فاختر إعادة الاتصال لـ ChatGPT في إعدادات الخادم ← المزوّدون.",
   "error.provider.imageTooSmall":
     "لم يقبل النموذج صورة في هذه الدردشة لأن الصورة صغيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.imageTooLarge":
@@ -527,6 +537,7 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "تعذّرت قراءة إصدار واجهة {provider} CLI.",
   "error.provider.piSessionBusy": "انتظر حتى ينتهي دور Pi الحالي.",
   "error.provider.acpSessionBusy": "لا يزال {provider} ينهي دورًا تم إيقافه. حاول مرة أخرى بعد قليل.",
+  "error.provider.acpSettingsConflict": "غيّر {provider} هذه الدردشة أثناء تطبيق OpenBot لإعداداتها. حاول مرة أخرى.",
   "error.provider.acpSessionStale": "تعذّر على {provider} تحميل أحدث نسخة من هذه المحادثة. أرسل رسالتك مرة أخرى.",
   "error.provider.acpModelNotOffered":
     "لا يوفّر {provider} النموذج {model} الآن. اختر نموذجًا آخر لهذا الوكيل، ثم حاول مرة أخرى.",

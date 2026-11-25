@@ -3,8 +3,10 @@ import { type BillingState, parseBillingState } from "@openbot/contracts/billing
 import { type BillingDetails, parseBillingDetails } from "@openbot/contracts/billing-details";
 import {
   type CreditActivity,
+  type CreditRedeemResult,
   type CreditsState,
   parseCreditActivity,
+  parseCreditRedeemResult,
   parseCreditsState,
 } from "@openbot/contracts/credits";
 import {
@@ -779,6 +781,12 @@ export function decodeCreditsState(value: unknown): CreditsState {
   const state = parseCreditsState(value);
   if (!state) throw new Error("Invalid credits state response.");
   return state;
+}
+
+export function decodeCreditRedeemResult(value: unknown): CreditRedeemResult {
+  const result = parseCreditRedeemResult(value);
+  if (!result) throw new Error("Invalid credit redeem response.");
+  return result;
 }
 
 export function decodeCreditActivity(value: unknown): CreditActivity {

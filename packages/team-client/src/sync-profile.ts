@@ -30,6 +30,7 @@ const QUERY_KEY = /^[A-Za-z]+$/;
 
 let installed: RemoteSyncProfileSink | null = null;
 let inFlight = 0;
+const textEncoder = new TextEncoder();
 
 export function installRemoteSyncProfileSink(sink: RemoteSyncProfileSink | null): void {
   installed = sink;
@@ -51,7 +52,7 @@ function now(): number {
 }
 
 function byteLength(text: string): number {
-  return new TextEncoder().encode(text).byteLength;
+  return textEncoder.encode(text).byteLength;
 }
 
 export function routeTemplate(path: string): string {

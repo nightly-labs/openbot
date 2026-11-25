@@ -305,6 +305,8 @@ export const messages = {
     "El servidor se detuvo antes de responder. Ejecuta el comando en una terminal para ver su error.",
   "error.backend.mcpServerExitedWithOutput": "El servidor se detuvo antes de responder. Escribió: {detail}",
   "error.backend.mcpServerFailedToStart": "El servidor no se inició: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot no pudo iniciar el servidor MCP {name}, porque su programa no está instalado en el equipo que ejecuta OpenBot. Instala la aplicación que ofrece {name} en ese equipo, o desactiva {name} en Marketplace, Apps.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} dejó de esperar antes de que el servidor se iniciara, así que sus agentes no reciben las herramientas de este servidor.",
   "error.backend.mcpServerStoppedDuringCall": "El servidor MCP se detuvo antes de responder a esta llamada.",
@@ -432,6 +434,8 @@ export const messages = {
     "El certificado de seguridad de este sitio no es de confianza, así que la página no se abrió.",
   "error.backend.browserLowMemory":
     "Este servidor tiene poca memoria disponible, por lo que el navegador no puede abrir otra pestaña. Cierra una pestaña o espera a que terminen otros agentes.",
+  "error.backend.browserNoMemory":
+    "Este servidor casi no tiene memoria libre, por lo que el navegador no puede abrir una pestaña ahora. Espera a que terminen otros agentes y vuelve a intentarlo.",
   "error.backend.browserOpenFailed": "No se pudo abrir {url}: {reason}",
   "error.backend.popupSecureInput":
     "Las ventanas emergentes están bloqueadas durante la entrada segura. Termina o cancela la entrada segura y vuelve a intentarlo desde la página.",

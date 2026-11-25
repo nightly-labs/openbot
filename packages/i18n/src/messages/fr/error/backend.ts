@@ -310,6 +310,8 @@ export const messages = {
     "Le serveur s’est arrêté avant de répondre. Exécutez la commande dans un terminal pour voir son erreur.",
   "error.backend.mcpServerExitedWithOutput": "Le serveur s’est arrêté avant de répondre. Il a écrit : {detail}",
   "error.backend.mcpServerFailedToStart": "Le serveur n’a pas démarré : {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot n’a pas pu démarrer le serveur MCP {name}, car son programme n’est pas installé sur l’ordinateur qui exécute OpenBot. Installez l’application qui fournit {name} sur cet ordinateur, ou désactivez {name} dans Marketplace, Apps.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} a cessé d’attendre avant le démarrage du serveur : ses agents n’ont donc pas les outils de ce serveur.",
   "error.backend.mcpServerStoppedDuringCall": "Le serveur MCP s’est arrêté avant de répondre à cet appel.",
@@ -441,6 +443,8 @@ export const messages = {
     "Le certificat de sécurité de ce site n’est pas fiable, la page ne s’est donc pas ouverte.",
   "error.backend.browserLowMemory":
     "Ce serveur manque de mémoire : le navigateur ne peut pas ouvrir un autre onglet. Fermez un onglet, ou attendez la fin du travail des autres agents.",
+  "error.backend.browserNoMemory":
+    "Ce serveur n'a presque plus de mémoire : le navigateur ne peut pas ouvrir d'onglet pour le moment. Attendez la fin du travail des autres agents, puis réessayez.",
   "error.backend.browserOpenFailed": "Impossible d’ouvrir {url} : {reason}",
   "error.backend.popupSecureInput":
     "Les fenêtres contextuelles sont bloquées pendant une saisie sécurisée. Terminez ou annulez la saisie sécurisée, puis réessayez depuis la page.",

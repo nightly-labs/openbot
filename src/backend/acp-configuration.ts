@@ -10,7 +10,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Fiber, Schedule, type Scope, Semaphore } from "effect";
 import type { AcpConnection } from "./acp-connection";
-import { type AgentProvider, ProviderModelNotOfferedError } from "./agent-client";
+import { type AgentProvider, ProviderModelNotOfferedError, ProviderSettingsConflictError } from "./agent-client";
 import { isRecord } from "./protocol";
 import {
   type ProviderClientOperationError,
@@ -30,6 +30,10 @@ const MODEL_REASONING_CLEANUP_MS = 1_000;
 const MODEL_DISCOVERY_RETURN_MS = 250;
 
 const PROBE_START_RETRY_MS = 1_000;
+
+const CONFIG_CONFLICT_RETRIES = 2;
+
+const CONFIG_CONFLICT_RETRY_MS = 250;
 
 export interface AcpModel {
   id: string;
@@ -62,6 +66,7 @@ export interface AcpConfigurationOptions {
   modelSetUnsaved?: ((error: RequestError) => boolean) | undefined;
   modelConfigId?: string | undefined;
   configSetUnsaved?: ((error: RequestError) => boolean) | undefined;
+  configConflict?: ((error: unknown) => boolean) | undefined;
   keepProbeSession?: () => boolean;
   probeCloseDelayMs?: number | undefined;
   effortCategories?: readonly string[] | undefined;
@@ -546,7 +551,22 @@ export class AcpConfiguration {
   }
 
   #timed<T>(method: string, request: () => Promise<T>): Effect.Effect<T, ProviderClientOperationError> {
-    return providerCall(request).pipe(
+    const conflict = this.options.configConflict;
+    const call = conflict
+      ? providerCall(request).pipe(
+          Effect.retry({
+            times: CONFIG_CONFLICT_RETRIES,
+            while: (failure) => conflict(failure.cause),
+            schedule: Schedule.spaced(CONFIG_CONFLICT_RETRY_MS),
+          }),
+          Effect.mapError((failure) =>
+            conflict(failure.cause)
+              ? providerFailure(new ProviderSettingsConflictError(this.options.label()))
+              : failure,
+          ),
+        )
+      : providerCall(request);
+    return call.pipe(
       Effect.timeoutOrElse({
         duration: this.options.requestTimeoutMs,
         orElse: () => {

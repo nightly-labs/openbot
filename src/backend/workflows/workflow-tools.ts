@@ -125,7 +125,7 @@ export const WORKFLOW_TOOL_DEFINITIONS = [
   {
     name: "edit_workflow",
     description:
-      "Create a workflow, a canvas of steps a trigger starts (no workflowId, title required), or change one: rename, and apply ops in order to add, update, move or remove nodes and connect or disconnect them. One agent's scheduled task is a routine.",
+      "Create a workflow, a canvas of steps (no workflowId, title required), or change one: rename, and apply ops in order to nodes and edges. A trigger is optional: without one, run_workflow runs all steps. One agent's scheduled task is a routine.",
     shape: editSchema.shape,
   },
   {

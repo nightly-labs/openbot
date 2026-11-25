@@ -5,6 +5,8 @@ import {
   CREDIT_METADATA_KIND,
   type CreditActivity,
   type CreditCheckoutRequest,
+  type CreditRedeemRequest,
+  type CreditRedeemResult,
   type CreditServerRole,
   type CreditServerWallet,
   type CreditsState,
@@ -26,10 +28,12 @@ import {
   stripeFailure,
   stripeRequest,
 } from "./billing-errors";
+import type { CreditPurchase } from "./billing-purchase";
 import { paymentReversal } from "./billing-sales";
 import { checkoutTax } from "./billing-tax";
 import { creditActivity } from "./credit-activity";
 import { CreditAudit, creditAuditCode } from "./credit-audit";
+import { type CreditCodeAttempt, redeemCreditCode } from "./credit-codes";
 import { consumeGrantsSql, creditExpiring, expiringGrantsSql, moveGrantsSql } from "./credit-grants";
 import { availableTenthsSql, overdueGrantTenthsSql } from "./credit-spending";
 import {
@@ -69,6 +73,7 @@ export interface CreditServiceOptions {
   now: () => number;
   ensureCustomer: (user: { id: string; email: string }) => Effect.Effect<string, Failure>;
   analytics?: AccountAnalytics;
+  onPurchase?: (purchase: CreditPurchase) => void;
 }
 
 export interface CreditCheckoutInput {
@@ -167,6 +172,7 @@ export class CreditService {
   readonly #ensureCustomer: CreditServiceOptions["ensureCustomer"];
   readonly #analytics: AccountAnalytics;
   readonly #audit: CreditAudit;
+  readonly #onPurchase: ((purchase: CreditPurchase) => void) | null;
 
   constructor(options: CreditServiceOptions) {
     this.#database = options.database;
@@ -177,6 +183,7 @@ export class CreditService {
     this.#ensureCustomer = options.ensureCustomer;
     this.#analytics = options.analytics ?? NO_ACCOUNT_ANALYTICS;
     this.#audit = new CreditAudit(options.database, options.now);
+    this.#onPurchase = options.onPurchase ?? null;
   }
 
   readonly getState = Effect.fn("CreditService.getState")(function* (
@@ -416,6 +423,50 @@ export class CreditService {
     return yield* this.getState(userId);
   }).bind(this);
 
+  redeem(userId: string, request: CreditRedeemRequest, sourceIp: string): Effect.Effect<CreditRedeemResult, Failure> {
+    return this.#redeem(userId, request, sourceIp).pipe(
+      Effect.tapError((error) =>
+        this.#audit.failed({
+          event: "redeem",
+          code: creditAuditCode(error),
+          wallet: { userId: request.serverId === undefined ? userId : null, serverId: request.serverId ?? null },
+          actorUserId: userId,
+        }),
+      ),
+    );
+  }
+
+  readonly #redeem = Effect.fn("CreditService.redeem")(function* (
+    this: CreditService,
+    userId: string,
+    request: CreditRedeemRequest,
+    sourceIp: string,
+  ): Effect.fn.Return<CreditRedeemResult, Failure> {
+    const report = (attempt: CreditCodeAttempt) => {
+      const wallet = attempt.serverId === null ? "personal" : "server";
+      this.#analytics.track(userId, {
+        name: "credit_code_redeem",
+        outcome: attempt.outcome,
+        wallet,
+        ...(attempt.limit === undefined ? {} : { limit: attempt.limit }),
+        ...(attempt.campaign === undefined ? {} : { campaign: attempt.campaign }),
+        ...(attempt.multiUse === undefined ? {} : { multiUse: attempt.multiUse }),
+        ...(attempt.credits === undefined ? {} : { credits: attempt.credits }),
+      });
+      if (attempt.outcome !== "redeemed" || attempt.credits === undefined) return;
+      this.#analytics.track(userId, {
+        name: "credit_action",
+        action: "redeemed",
+        wallet,
+        credits: attempt.credits,
+        ...(attempt.campaign === undefined ? {} : { campaign: attempt.campaign }),
+        ...(attempt.multiUse === undefined ? {} : { multiUse: attempt.multiUse }),
+      });
+    };
+    const redeemed = yield* redeemCreditCode(this.#database, this.#now(), { userId, sourceIp, request, report });
+    return { credits: redeemed.credits, state: yield* this.getState(userId) };
+  }).bind(this);
+
   readonly webhook = Effect.fn("CreditService.webhook")(function* (
     this: CreditService,
     event: StripeEvent,
@@ -572,6 +623,20 @@ export class CreditService {
       wallet: isDynamicRecord(entry) && typeof entry.server_id === "string" ? "server" : "personal",
       credits: target.credits,
       ...(isBillingCurrency(currency) ? { currency, amount } : {}),
+    });
+    const onPurchase = this.#onPurchase;
+    if (!onPurchase || !isBillingCurrency(currency)) return;
+    const account = yield* billingCall(() =>
+      this.#database.prepare("SELECT email FROM users WHERE id = ?").bind(target.userId).first<{ email: string }>(),
+    ).pipe(Effect.catch(() => Effect.succeed(null)));
+    if (!account) return;
+    onPurchase({
+      email: account.email,
+      credits: target.credits,
+      currency,
+      amount,
+      wallet: isDynamicRecord(entry) && typeof entry.server_id === "string" ? "server" : "personal",
+      serverId: target.serverId,
     });
   }).bind(this);
 

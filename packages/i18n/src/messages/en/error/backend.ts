@@ -289,6 +289,8 @@ export const messages = defineMessages("error.backend", {
     "The server stopped before it answered. Run the command in a terminal to see its error.",
   "error.backend.mcpServerExitedWithOutput": "The server stopped before it answered. It wrote: {detail}",
   "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot could not start the MCP server {name}, because its program is not installed on the computer that runs OpenBot. Install the app that gives {name} on that computer, or turn {name} off in Marketplace, Apps.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} stopped waiting before the server started, so its agents do not get the tools of this server.",
   "error.backend.mcpServerStoppedDuringCall": "The MCP server stopped before it answered this call.",
@@ -428,6 +430,8 @@ export const messages = defineMessages("error.backend", {
     "The security certificate of this site is not trusted, so the page did not open.",
   "error.backend.browserLowMemory":
     "This server is low on memory, so the browser cannot open another tab. Close a tab, or wait for other agents to finish.",
+  "error.backend.browserNoMemory":
+    "This server is almost out of memory, so the browser cannot open a tab now. Wait for other agents to finish, then try again.",
   "error.backend.browserOpenFailed": "Unable to open {url}: {reason}",
   "error.backend.popupSecureInput":
     "Popups are blocked during secure input. Finish or cancel secure input, then retry from the page.",

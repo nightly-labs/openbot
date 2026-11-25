@@ -284,6 +284,10 @@ export function activeServerHasProviderSettings(server: ServerSummary): boolean 
   return server.kind === "local" || remoteAdminServer(server, "providers-v1") !== undefined;
 }
 
+export const PROVIDER_SEARCH_NAMES: readonly string[] = AGENT_PROVIDERS.filter((provider) => provider !== "acp").map(
+  (provider) => agentProviderDescriptor(provider).displayName,
+);
+
 export function serverHasAgentDefaults(server: ServerSummary): boolean {
   return serverCanAdminister(server, "agent-defaults-v1") && (server.kind === "local" || server.state === "online");
 }

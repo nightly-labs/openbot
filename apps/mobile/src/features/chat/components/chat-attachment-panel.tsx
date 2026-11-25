@@ -20,6 +20,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
+import { useFullScreenCameraPreference } from "@/features/settings/model/camera-mode";
 import { useColumnWidth } from "@/shared/components/adaptive-split";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
@@ -28,6 +29,7 @@ import { useText } from "@/shared/lib/text";
 import { END_X } from "@/shared/lib/text-direction";
 import { ChatCameraContent } from "./chat-camera-panel";
 import { type ComposerContextMeter, ComposerContextRing } from "./composer-context-ring";
+import { FullScreenCameraTip } from "./full-screen-camera-tip";
 import type { ChatAttachmentAnchor, ChatAttachments } from "./use-chat-attachments";
 
 const OPTION_ROW = 48;
@@ -168,6 +170,7 @@ export function ChatAttachmentPanel({
   const busyRef = useRef(false);
   const reduceMotion = useReducedMotion();
   const [glassLit, setGlassLit] = useState(true);
+  const [cameraFailed, setCameraFailed] = useState(false);
   const captured = useRef<string | null>(null);
   const morph = useSharedValue(0);
   const cameraWidth = Math.min(440, safeWidth - BAR_INSET * 2);
@@ -266,6 +269,10 @@ export function ChatAttachmentPanel({
   }
 
   async function chooseCamera() {
+    if (useFullScreenCameraPreference.getState().fullScreen) {
+      choose(attachments.takePhoto);
+      return;
+    }
     if (!(await attachments.requestCamera())) {
       dismiss();
       return;
@@ -424,10 +431,18 @@ export function ChatAttachmentPanel({
                   busyRef.current = busy;
                 }}
                 onCancel={showOptions}
+                onFailedChange={setCameraFailed}
                 onCaptured={(uri) => {
                   captured.current = uri;
                   dismiss();
                 }}
+              />
+            ) : null}
+            {mode === "camera" && !closing && appActive && !cameraFailed ? (
+              <FullScreenCameraTip
+                outerRadius={SURFACE_RADIUS}
+                canSwitch={() => !busyRef.current && !closingRef.current}
+                onUseFullScreen={() => choose(attachments.takePhoto)}
               />
             ) : null}
           </Animated.View>

@@ -87,7 +87,7 @@ const registryHost = {
   },
   browser: { listTabs: () => [], toolCanUseTab: () => false, beginTakeover: () => Effect.void, endTakeover: () => {} },
   hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
-  routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+  routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {}, runsTurn: () => false },
   emit: (event: AgentEvent) => events.push(event),
   emitError: () => {},
   emitRuntimeSnapshot: () => {},

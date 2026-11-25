@@ -77,6 +77,7 @@ import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CHANNEL_BROWSER_CAPABILITY } from "./channel-browser-v1";
 import { CHANNEL_FOLDERS_CAPABILITY } from "./channel-folders-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
+import { CHANNEL_PAGE_TASKS_CAPABILITY } from "./channel-page-tasks-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "./channel-picture-v1";
 import { CHANNEL_SEEN_SUBTASKS_CAPABILITY } from "./channel-seen-subtasks-v1";
 import { CHANNEL_TASK_WAITS_CAPABILITY } from "./channel-task-waits-v1";
@@ -85,6 +86,7 @@ import { CHAT_HISTORY_CAPABILITY } from "./chat-history-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
 import { CLAUDE_COMPACT_WINDOW_CAPABILITY } from "./claude-compact-window-v1";
 import { CLAUDE_USER_SETUP_CAPABILITY } from "./claude-user-setup-v1";
+import { CLIENT_BROWSER_CAPABILITY } from "./client-browser-v1";
 import { CODEX_API_KEY_CAPABILITY } from "./codex-api-key-v1";
 import { COMPUTER_ACTIVITY_CAPABILITY } from "./computer-activity-v1";
 import { CONNECTORS_CAPABILITY } from "./connectors-v1";
@@ -114,6 +116,7 @@ import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
 import { HOST_RESTART_CAPABILITY } from "./host-restart-v1";
 import { HOST_SIGNAL_HOME_CAPABILITY } from "./host-signal-home-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
+import { HOST_TURN_LIMITS_EVENTS_CAPABILITY } from "./host-turn-limits-events-v1";
 import { HOST_TURN_LIMITS_CAPABILITY } from "./host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOST_VOICE_MODEL_CAPABILITY } from "./host-voice-model-v1";
@@ -149,6 +152,7 @@ import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
 import { PENDING_PROMPTS_CAPABILITY } from "./pending-prompts-v1";
 import { PHONE_FEEDBACK_CAPABILITY } from "./phone-feedback-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY, PROMPT_CACHE_TTL_PI_CAPABILITY } from "./prompt-cache-ttl-v1";
+import { TEAM_PROMPT_DETAIL_CAPABILITY } from "./prompt-detail-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "./provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "./provider-account-keys-v1";
@@ -174,6 +178,7 @@ import { PROVIDERS_V4_CAPABILITY } from "./providers-v4";
 import { PROVIDERS_V5_CAPABILITY } from "./providers-v5";
 import { PROVIDERS_V8_CAPABILITY } from "./providers-v8";
 import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "./push-notification-threads-v1";
+import { PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY } from "./push-notification-workflows-v1";
 import { ANDROID_PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-android-v1";
 import { PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
@@ -247,6 +252,7 @@ import { VAULT_V2_CAPABILITY } from "./vault-v2";
 import { VAULT_V3_CAPABILITY } from "./vault-v3";
 import { VAULT_V4_CAPABILITY } from "./vault-v4";
 import { TEAM_VIDEO_GENERATION_CAPABILITY } from "./video-generation-v1";
+import { VOICE_TRANSCRIPTION_CAPABILITY } from "./voice-transcription-v1";
 import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
@@ -357,6 +363,7 @@ export {
   CHANNEL_DELETE_CAPABILITY,
   CHANNEL_FOLDERS_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
+  CHANNEL_PAGE_TASKS_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
@@ -386,6 +393,7 @@ export {
   HOST_RESTART_CAPABILITY,
   HOST_TIMEZONE_CAPABILITY,
   HOST_TURN_LIMITS_CAPABILITY,
+  HOST_TURN_LIMITS_EVENTS_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
@@ -471,6 +479,7 @@ export {
   TEAM_HISTORY_EXTENT_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_REASONING_EFFORTS_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
@@ -834,6 +843,12 @@ const TEAM_CAPABILITY_REGISTRY = [
   [WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY, V10],
   [ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY, V10],
   [WHATSAPP_READ_ONLY_CAPABILITY, V10],
+  [VOICE_TRANSCRIPTION_CAPABILITY, V10],
+  [CLIENT_BROWSER_CAPABILITY, V10],
+  [CHANNEL_PAGE_TASKS_CAPABILITY, V10],
+  [PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY, V10],
+  [TEAM_PROMPT_DETAIL_CAPABILITY, V10],
+  [HOST_TURN_LIMITS_EVENTS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

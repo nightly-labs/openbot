@@ -87,6 +87,7 @@ import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import {
   GEMINI_INVALID_CREDENTIALS,
   isBalanceDiagnostic,
+  isCodexAccountSettingsFailure,
   isPlanLimitDiagnostic,
   isUsageLimitDiagnostic,
   providerResetDelayMs,
@@ -169,6 +170,7 @@ export const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "empty_answer",
   "model_not_found",
   "invalid_request",
+  "provider_internal_error",
 ]);
 
 const CODEX_SAFETY_BLOCKS: ReadonlySet<string> = new Set(["cyberPolicy", "misalignmentPolicyViolation"]);
@@ -221,6 +223,7 @@ interface HeldProviderError {
   context: FailureContext & { causeCode: CauseCode };
   quiet?: boolean;
   link?: string;
+  movesToBackup?: true;
 }
 
 function accountLink(params: unknown): string | undefined {
@@ -247,6 +250,7 @@ export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTar
   shareTab(tabId: string, target: { agentId: string; threadId: string }): void;
   unshareThread(threadId: string): void;
   agentTab(tabId: string, agentId: string): { title: string; url: string } | null;
+  releaseIdleTabs?(runningThreadIds: ReadonlySet<string>): Effect.Effect<void>;
 }
 
 export interface TurnHooks {
@@ -698,10 +702,24 @@ export class TurnLifecycle {
     });
   }
 
-  #loseBackgroundWork(threadId: string, agentId: string): void {
+  #loseBackgroundWork(threadId: string, agentId: string, waker: AgentClient | null = null): void {
     this.#waitingThreads.delete(threadId);
     const taskId = this.#taskForThread(agentId, threadId);
     if (taskId !== null && this.#hooks.taskOpen(taskId)) this.#hooks.taskBackgroundLost(taskId);
+    else if (taskId === null && waker?.wakeAfterLostWork)
+      Effect.runFork(
+        waker.wakeAfterLostWork(threadId).pipe(
+          Effect.catchCause((cause) =>
+            Effect.sync(() =>
+              logger.warn("The agent got no turn after its provider process stopped its background work.", {
+                provider: waker.provider,
+                error: Cause.squash(cause),
+              }),
+            ),
+          ),
+          Effect.forkIn(this.#scope, { startImmediately: true }),
+        ),
+      );
   }
 
   #taskRunsInProvider(agentId: string, taskId: string): boolean {
@@ -1490,11 +1508,12 @@ export class TurnLifecycle {
           !this.#turnErrors.has(turnId)
             ? "completed"
             : (reported === "interrupted" &&
-                  this.#compactionFailures.get(turnId)?.stalled &&
+                  (this.#compactionFailures.get(turnId)?.stalled || this.#failoverTurns.get(turnId)?.movesToBackup) &&
                   !this.#hooks.turnStopped(agentId, this.#taskForThread(agentId, threadId), turnId)) ||
                 noAnswer
               ? "failed"
               : reported;
+        if (status !== "failed") this.#dropCapacityHandOff(turnId);
         if (status === "failed" && !this.#turnErrors.has(turnId)) {
           this.#hooks.emitFailure?.({
             code: "agent_error",
@@ -1562,7 +1581,8 @@ export class TurnLifecycle {
           for (const turn of this.#runningTurns.values())
             if (turn.threadId === threadId && turn.client === source) turn.startedBackgroundWork = true;
         const waited = this.#waitingThreads.has(threadId);
-        if (!runs && isRecord(params) && params.closed === true) this.#loseBackgroundWork(threadId, agentId);
+        if (!runs && isRecord(params) && params.closed === true)
+          this.#loseBackgroundWork(threadId, agentId, params.lost === true ? source : null);
         if (runs === waited) return;
         if (runs) this.#waitingThreads.set(threadId, { agentId, client: source, since: Date.now() });
         else this.#waitingThreads.delete(threadId);
@@ -1614,12 +1634,13 @@ export class TurnLifecycle {
           return;
         }
         if (isRecord(params) && params.willRetry === true) {
+          const details = getString(error, "additionalDetails");
           this.#providerRetried(
             agentId,
             threadId,
             getString(params, "turnId"),
             source.provider,
-            modelAtCapacity(error, getString(error, "additionalDetails")),
+            modelAtCapacity(error, details) ? (details ?? message) : null,
           );
           return;
         }
@@ -1640,8 +1661,17 @@ export class TurnLifecycle {
           });
           return;
         }
+        const accountSettingsFailure =
+          notification.method === "error" && source.provider === "codex" && isCodexAccountSettingsFailure(message);
+        if (accountSettingsFailure)
+          logger.warn("Codex could not load the settings of its ChatGPT account.", {
+            message: this.#hooks.redactMcp(message),
+          });
+        const shownMessage = accountSettingsFailure
+          ? sourceText("error.provider.codexAccountSettingsUnreadable")
+          : message;
         if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
-          this.#turnErrors.set(errorTurnId, message);
+          this.#turnErrors.set(errorTurnId, shownMessage);
           this.#turnCauses.set(errorTurnId, causeCode);
           if (refusedSessionFailure(source.provider, message) !== null) return;
           const errorInfo = error?.codexErrorInfo;
@@ -1784,7 +1814,7 @@ export class TurnLifecycle {
             isRefusedGeminiToken(source.provider, message) ||
             this.#mayHoldError(agentId, errorTurnId, context.causeCode))
         ) {
-          this.#failoverTurns.set(errorTurnId, { message, context, ...(link ? { link } : {}) });
+          this.#failoverTurns.set(errorTurnId, { message: shownMessage, context, ...(link ? { link } : {}) });
           return;
         }
         if (notification.method === "warning" && userErrorMessage(message, "") === "") {
@@ -1809,7 +1839,7 @@ export class TurnLifecycle {
             model: context.model,
             message: this.#hooks.redactMcp(message),
           });
-        const shown = backupsAtLimit ? sourceText("error.agent.backupModelsAtLimit") : message;
+        const shown = backupsAtLimit ? sourceText("error.agent.backupModelsAtLimit") : shownMessage;
         if (taskId !== null) {
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId ? { agentId } : {}), ...context });
           this.#hooks.taskFailed(taskId, shown);
@@ -1823,9 +1853,11 @@ export class TurnLifecycle {
     threadId: string | null | undefined,
     turnId: string | null,
     provider: AgentClient["provider"],
-    atCapacity: boolean,
+    capacityMessage: string | null,
   ): void {
     if (!agentId || !threadId || !turnId || !this.#runningTurns.has(turnId)) return;
+    if (this.#failoverTurns.get(turnId)?.movesToBackup) return;
+    const atCapacity = capacityMessage !== null;
     const attempts = (this.#turnRetries.get(turnId) ?? 0) + 1;
     this.#turnRetries.set(turnId, attempts);
     logger.info("A provider retries a request.", {
@@ -1837,6 +1869,7 @@ export class TurnLifecycle {
     if (atCapacity) {
       if (this.#capacityNotices.has(turnId)) return;
       this.#capacityNotices.add(turnId);
+      if (this.#movesToBackupAtCapacity(agentId, threadId, turnId, provider, capacityMessage)) return;
     } else if (attempts !== RETRY_NOTICE_ATTEMPTS) return;
     const compacts = !atCapacity && this.#compaction.retrying(threadId);
     const percent = this.#compaction.usedPercent(threadId);
@@ -1859,6 +1892,67 @@ export class TurnLifecycle {
         ...(atCapacity ? { causeCode: CAPACITY_CAUSE } : {}),
       },
     );
+  }
+
+  #movesToBackupAtCapacity(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    provider: AgentClient["provider"],
+    message: string,
+  ): boolean {
+    const running = this.#runningTurns.get(turnId);
+    const model = this.#hooks.turnModel(agentId, turnId);
+    const failedKey = this.#usageLimits.failureKey(agentId, model);
+    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    if (
+      running === undefined ||
+      failedKey === null ||
+      deliveries.length === 0 ||
+      this.#limitedTurns.has(turnId) ||
+      this.#failoverTurns.has(turnId) ||
+      this.#observedCompactions.get(threadId) === turnId ||
+      this.#compaction.isCompactionTurn(threadId, turnId) ||
+      this.#channelTask(this.#conversation.publicThreadId(agentId, threadId), deliveries) ||
+      deliveries.some(({ delivery }) => this.#failoverRetries.get(delivery.id)?.has(failedKey)) ||
+      this.#hooks.turnStopped(agentId, this.#taskForThread(agentId, threadId), turnId) ||
+      !this.#hooks.mayFailOver(agentId)
+    )
+      return false;
+    logger.info("A model is at capacity, so OpenBot moves the turn to a backup model.", { provider, model });
+    this.#turnErrors.set(turnId, message);
+    this.#turnCauses.set(turnId, CAPACITY_CAUSE);
+    this.#failoverTurns.set(turnId, {
+      message,
+      context: { causeCode: CAPACITY_CAUSE, provider, model, turnId, severity: "error" },
+      movesToBackup: true,
+    });
+    Effect.runFork(
+      running.client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            if (!this.#dropCapacityHandOff(turnId) || !this.#runningTurns.has(turnId)) return;
+            logger.warn("OpenBot could not stop a turn at capacity, so the provider tries again.", { provider, error });
+            this.#hooks.emitError("agent_warning", sourceText("error.backend.providerModelAtCapacity"), agentId, {
+              provider,
+              model,
+              turnId,
+              severity: "warning",
+              causeCode: CAPACITY_CAUSE,
+            });
+          }),
+        ),
+      ),
+    );
+    return true;
+  }
+
+  #dropCapacityHandOff(turnId: string): boolean {
+    if (!this.#failoverTurns.get(turnId)?.movesToBackup) return false;
+    this.#failoverTurns.delete(turnId);
+    this.#turnErrors.delete(turnId);
+    this.#turnCauses.delete(turnId);
+    return true;
   }
 
   requestNoUpdate(
@@ -1886,7 +1980,7 @@ export class TurnLifecycle {
       !deliveries.some(
         ({ delivery }) =>
           delivery.sender.kind === "routine" ||
-          quietTeammateDelivery(delivery) ||
+          quietTeammateDelivery(delivery, this.#followsUpOwnAnswer) ||
           teammateRequest(delivery) ||
           this.#continuesQuietRun(delivery),
       )
@@ -2043,8 +2137,14 @@ export class TurnLifecycle {
   }
 
   #quietTeammateTurnDelivery(delivery: QueueDelivery): boolean {
-    return quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id));
+    return quietTeammateTurnDelivery(
+      delivery,
+      (request) => this.#mailbox.hasOwnReplyFrom(request.id),
+      this.#followsUpOwnAnswer,
+    );
   }
+
+  readonly #followsUpOwnAnswer = (delivery: QueueDelivery): boolean => this.#mailbox.followsUpOwnAnswer(delivery);
 
   readonly #completeTurn = Effect.fn("TurnLifecycle.completeTurn")(
     function* (this: TurnLifecycle, agentId: string, threadId: string, turnId: string, status: string) {
@@ -3058,7 +3158,7 @@ export class TurnLifecycle {
       !this.#mailbox.expectsReply(messageId) ||
       this.#mailbox.hasReplyFrom(agentId, messageId) ||
       this.#mailbox.heldByTask(agentId, messageId) ||
-      this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId, requestIds) ||
+      this.#mailbox.hasAgentReplyOrRequestFromTurnTo(agentId, turnId, recipientAgentId, requestIds) ||
       (text === undefined && this.#mailbox.hasRequestFromTurn(agentId, turnId)) ||
       this.#mailbox.steeredIntoOtherWork(delivery.id)
     );

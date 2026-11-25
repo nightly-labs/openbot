@@ -233,6 +233,31 @@ await scenario("J An edit next to Python cache folders still refuses", async (co
   return { revise };
 });
 
+await scenario("K An empty runtime folder in an installed copy is not a local change", async (context) => {
+  for (const folder of [".agents/skills", ".claude/skills"])
+    await mkdir(join(context.workspace, folder, context.slug, ".claude/.cc-writes"), { recursive: true });
+  const before = await installedState(context);
+  assert.equal(before, "installed@1");
+  await writeFile(join(context.workspace, "source/SKILL.md"), skillMarkdown("First.", "Revision 2."));
+  const revise = await reviseFrom(context, 1, "source");
+  assert.equal(revise, null);
+  const after = await installedState(context);
+  assert.equal(after, "installed@2");
+  return { before, revise, after };
+});
+
+await scenario("L A file inside a runtime folder still refuses", async (context) => {
+  const folder = join(context.workspace, ".agents/skills", context.slug, ".claude/.cc-writes");
+  await mkdir(folder, { recursive: true });
+  await writeFile(join(folder, "notes.md"), "An edit that is not saved.\n");
+  const before = await installedState(context);
+  assert.equal(before, "modified@1");
+  await writeFile(join(context.workspace, "source/SKILL.md"), skillMarkdown("First.", "Revision 2."));
+  const revise = await reviseFrom(context, 1, "source");
+  assert.ok(revise?.includes(REFUSED), "The file stops the install.");
+  return { before, revise };
+});
+
 async function replaceWithOwnCopy(context: Context, text: string): Promise<string> {
   await Effect.runPromise(context.service.uninstall({ agentId: AGENT_ID, skillId: context.skillId }));
   const ownFile = join(context.workspace, ".claude/skills", context.slug, "SKILL.md");
@@ -241,7 +266,7 @@ async function replaceWithOwnCopy(context: Context, text: string): Promise<strin
   return ownFile;
 }
 
-await scenario("K An own copy with the same files as the skill installs over it", async (context) => {
+await scenario("M An own copy with the same files as the skill installs over it", async (context) => {
   const installedText = await readFile(join(context.workspace, ".claude/skills", context.slug, "SKILL.md"), "utf8");
   await replaceWithOwnCopy(context, installedText);
   const install = await failure(
@@ -253,7 +278,7 @@ await scenario("K An own copy with the same files as the skill installs over it"
   return { install, after };
 });
 
-await scenario("L An own skill with the same name and other files stays and names the skill", async (context) => {
+await scenario("N An own skill with the same name and other files stays and names the skill", async (context) => {
   const ownText = skillMarkdown("First.", "The agent's own skill.");
   const ownFile = await replaceWithOwnCopy(context, ownText);
   const install = await failure(

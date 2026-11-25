@@ -227,6 +227,9 @@ export const messages = {
   "server.rail.delete": "删除服务器",
   "server.rail.hide": "隐藏服务器",
   "server.rail.showLocal": "显示 {name}",
+  "server.rail.hiddenServers": "已隐藏的服务器",
+  "server.rail.hideFailed": "无法隐藏 {name}",
+  "server.rail.showFailed": "无法显示 {name}",
   "server.plan.daysLeft": {
     one: "{count} 天",
     other: "{count} 天",

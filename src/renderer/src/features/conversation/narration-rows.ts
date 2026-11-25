@@ -101,21 +101,29 @@ export function placeUpdatesAfterSteers(rows: AgentMessage[], turns: readonly Ag
 function turnSteerTimes(rows: readonly AgentMessage[]): Map<string, string> {
   const firstTimes = new Map<string, string>();
   const inputs = new Map<string, AgentMessage[]>();
+  const questions = new Map<string, string>();
   for (const row of rows) {
     if (!row.turnId || !row.createdAt) continue;
     const first = firstTimes.get(row.turnId);
     if (first === undefined || row.createdAt < first) firstTimes.set(row.turnId, row.createdAt);
+    const asked = questions.get(row.turnId);
+    if (row.questionPrompt && (asked === undefined || row.createdAt < asked)) questions.set(row.turnId, row.createdAt);
     if (row.author !== "you" && row.exchange?.direction !== "incoming") continue;
     inputs.set(row.turnId, [...(inputs.get(row.turnId) ?? []), row]);
   }
-  const steerTimes = new Map<string, string>();
+  const steerTimes = new Map(questions);
   for (const [turnId, turnInputs] of inputs) {
     const second = turnInputs.map((row) => row.createdAt ?? "").sort()[1];
     const first = firstTimes.get(turnId) ?? "";
     const steers = turnInputs.flatMap((row) =>
       row.steered && row.createdAt && row.createdAt > first ? [row.createdAt] : [],
     );
-    const steerAt = [...(second === undefined ? [] : [second]), ...steers].sort()[0];
+    const asked = questions.get(turnId);
+    const steerAt = [
+      ...(second === undefined ? [] : [second]),
+      ...steers,
+      ...(asked === undefined ? [] : [asked]),
+    ].sort()[0];
     if (steerAt !== undefined) steerTimes.set(turnId, steerAt);
   }
   return steerTimes;

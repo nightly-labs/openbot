@@ -480,7 +480,7 @@ async function startHost(): Promise<Host> {
   await runCauseEffect(libraryFolderStore.initialize());
   const libraryFolders = new LibraryFoldersService({
     store: libraryFolderStore,
-    storage: { usage: scan, invalidate: () => undefined },
+    storage: { hostFiles: scan, invalidate: () => undefined },
     agents: () => agents.listAgents(),
   });
   const workflows = await Effect.runPromise(

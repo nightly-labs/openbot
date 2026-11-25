@@ -247,6 +247,8 @@ export const messages = {
     "OpenCode API anahtarınızın süresi doldu. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go kayıtlı API anahtarınızı reddetti. Anahtarın süresi dolmuş olabilir. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode, OpenBot'a kaydettiğiniz anahtarı kullanmadı. OpenCode'un kendisinin sakladığı başka bir OpenCode Go anahtarını kullandı ve OpenCode Go bu anahtarı reddetti. Bu anahtarı kaldırmak için ajanı çalıştıran bilgisayarda bir terminalde `opencode auth logout opencode-go` komutunu çalıştırın ve anahtarı seçin. Ardından yeniden deneyin.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go isteği reddetti. Yeni bir API anahtarı bunu düzeltmez. OpenCode Go planınız etkin olmayabilir veya OpenCode Go ağınızı engelliyor olabilir: bazı hizmetler VPN'leri, proxy'leri veya bazı ülkeleri engeller. Planınızın OpenCode Console'da etkin olduğundan emin olun ya da VPN'i kapatın, sonra yeniden deneyin. Başka bir model de seçebilirsiniz.",
   "error.provider.opencodeServiceFailure":
@@ -306,6 +308,8 @@ export const messages = {
     "OpenCode modeli turu yanıt vermeden bitirdi. Tekrar deneyin veya başka bir model seçin.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "OpenCode modeli turu akıl yürütmesinden sonra yanıt vermeden bitirdi. Tekrar deneyin veya başka bir model seçin.",
+  "error.provider.opencodeToolCallsAsText":
+    "OpenCode modeli eylemlerini metin olarak yazdı ve gerçekleştirmedi. Tekrar deneyin veya başka bir model seçin.",
   "error.provider.acpNoAnswer":
     "{provider} turu yanıt vermeden bitirdi. Mesajı yeniden gönderin veya yeni bir sohbet başlatın.",
   "error.provider.noAnswerAfterSteps":
@@ -373,6 +377,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Cursor'ı kullanmak için Cursor ile oturum açın veya CURSOR_API_KEY ayarlayın.",
   "error.provider.cursorSignInUnusable":
     "Cursor, oturum bilgilerinizle sunucusuna bağlanamadı. İnternet bağlantınızı kontrol edin, ardından Cursor'da yeniden oturum açın.",
+  "error.provider.cursorNoModels":
+    'Cursor model listesini göndermedi. Cursor’a yeniden giriş yapmak için "Bağlan"ı seçin. Bu mesaj kalırsa Cursor planınızın modelleri içerdiğini kontrol edin.',
   "error.provider.clineArchivePath": "Cline arşivi beklenmeyen bir yola sahip.",
   "error.provider.clinePackageMismatch": "Cline paketi çalışma zamanı kataloğuyla eşleşmiyor.",
   "error.provider.clineChecksum": "Cline çalışma zamanı sağlama toplamı (checksum) eşleşmiyor.",
@@ -418,6 +424,8 @@ export const messages = {
     "Anthropic API anahtarında API kredisi yok. Claude planı, API anahtarıyla yapılan istekleri ödemez. Anthropic Console'da kredi ekleyin ya da Ayarlar'da Claude'da oturum açıp ajanın model menüsünde Claude hesabını seçin.",
   "error.provider.claudeAccountNoCredit":
     "Claude hesabınızın kredi bakiyesi çok düşük. Hızlı mod gibi bazı istekler, Claude planınızda kullanım kalsa da kullanım kredisi harcar. Claude hesabınıza kullanım kredisi ekleyin ya da ajanın model menüsünde başka bir model seçin.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code istekleri Anthropic'e değil, {host} adresine gönderiyor: bu API adresini Claude Code ayarları veya ortam değişkenleri belirliyor. {host}, isteği Claude planınız yüzünden değil, hesap bakiyesi yüzünden reddetti. {host} hesabınıza bakiye ekleyin ya da ajanın model menüsünde başka bir model seçin.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Claude hizmeti bu isteği engelledi. Bu genellikle Claude tarafında kısa süreli bir sorundur, hesabınızla ilgili değildir. Mesajı birkaç dakika sonra yeniden gönderin.",
   "error.provider.foreignReasoning":
@@ -434,6 +442,8 @@ export const messages = {
     "{provider}, güvenlik kuralları nedeniyle bu mesajı engelledi: {reason} {provider} sonraki mesajlarınızı da engellerse yeni bir sohbet başlatın.",
   "error.provider.codexAudioRefused":
     "Bu model ses dinleyemez, bu yüzden bu sohbetteki sesi kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir Codex oturumu başlattı. Devam etmek için isteğinizi yeniden gönderin ve ajandan ses olmadan çalışmasını isteyin. Sesi kontrol etmek için ajanın model menüsünde ses dinleyebilen bir model seçin.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex, ChatGPT hesabınızın ayarlarını yükleyemediği için ajan durdu. Tekrar deneyin. Yine durursa Sunucu ayarları → Sağlayıcılar bölümünde ChatGPT için Yeniden bağlan'ı seçin.",
   "error.provider.imageTooSmall":
     "Görsel çok küçük olduğu için model bu sohbetteki bir görseli kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageTooLarge":
@@ -567,6 +577,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "{provider} CLI sürümü okunamadı.",
   "error.provider.piSessionBusy": "Mevcut Pi turunun bitmesini bekleyin.",
   "error.provider.acpSessionBusy": "{provider} durdurulan turu hâlâ bitiriyor. Biraz sonra yeniden deneyin.",
+  "error.provider.acpSettingsConflict":
+    "OpenBot ayarlarını uygularken {provider} bu sohbeti değiştirdi. Tekrar deneyin.",
   "error.provider.acpSessionStale": "{provider} bu sohbetin en son sürümünü yükleyemedi. Mesajınızı yeniden gönderin.",
   "error.provider.acpModelNotOffered":
     "{provider} şu anda {model} modelini sunmuyor. Bu ajan için başka bir model seçip yeniden deneyin.",

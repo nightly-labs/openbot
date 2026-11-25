@@ -317,6 +317,8 @@ export const messages = {
     "Der Server wurde beendet, bevor er geantwortet hat. Führe den Befehl in einem Terminal aus, um seinen Fehler zu sehen.",
   "error.backend.mcpServerExitedWithOutput": "Der Server wurde beendet, bevor er geantwortet hat. Er schrieb: {detail}",
   "error.backend.mcpServerFailedToStart": "Der Server ist nicht gestartet: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot konnte den MCP-Server {name} nicht starten, weil sein Programm nicht auf dem Computer installiert ist, auf dem OpenBot läuft. Installiere die App, die {name} bereitstellt, auf diesem Computer, oder schalte {name} unter Marketplace, Apps aus.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} hat nicht mehr gewartet, bevor der Server gestartet ist. Seine Agenten erhalten die Tools dieses Servers daher nicht.",
   "error.backend.mcpServerStoppedDuringCall":
@@ -449,6 +451,8 @@ export const messages = {
     "Das Sicherheitszertifikat dieser Website ist nicht vertrauenswürdig, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserLowMemory":
     "Dieser Server hat wenig freien Arbeitsspeicher. Der Browser kann daher keinen weiteren Tab öffnen. Schließe einen Tab oder warte, bis andere Agenten fertig sind.",
+  "error.backend.browserNoMemory":
+    "Der Arbeitsspeicher dieses Servers ist fast voll. Der Browser kann daher jetzt keinen Tab öffnen. Warte, bis andere Agenten fertig sind, und versuche es dann erneut.",
   "error.backend.browserOpenFailed": "{url} konnte nicht geöffnet werden: {reason}",
   "error.backend.popupSecureInput":
     "Pop-ups sind während der sicheren Eingabe blockiert. Beende die sichere Eingabe oder brich sie ab und versuche es dann erneut auf der Seite.",

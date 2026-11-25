@@ -296,6 +296,8 @@ export const messages = {
     "Serwer zatrzymał się przed odpowiedzią. Uruchom polecenie w terminalu, aby zobaczyć błąd.",
   "error.backend.mcpServerExitedWithOutput": "Serwer zatrzymał się przed odpowiedzią. Napisał: {detail}",
   "error.backend.mcpServerFailedToStart": "Serwer się nie uruchomił: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot nie może uruchomić serwera MCP {name}, ponieważ jego program nie jest zainstalowany na komputerze, na którym działa OpenBot. Zainstaluj na tym komputerze aplikację, która dostarcza {name}, albo wyłącz {name} w Marketplace, Aplikacje.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} przestał czekać, zanim serwer się uruchomił, więc jego agenci nie dostają narzędzi tego serwera.",
   "error.backend.mcpServerStoppedDuringCall": "Serwer MCP zatrzymał się, zanim odpowiedział na to wywołanie.",
@@ -423,6 +425,8 @@ export const messages = {
     "Certyfikat bezpieczeństwa tej witryny nie jest zaufany, więc strona się nie otworzyła.",
   "error.backend.browserLowMemory":
     "Na tym serwerze brakuje pamięci, więc przeglądarka nie może otworzyć kolejnej karty. Zamknij kartę lub poczekaj, aż inni agenci skończą.",
+  "error.backend.browserNoMemory":
+    "Na tym serwerze prawie skończyła się pamięć, więc przeglądarka nie może teraz otworzyć karty. Poczekaj, aż inni agenci skończą, i spróbuj ponownie.",
   "error.backend.browserOpenFailed": "Nie można otworzyć {url}: {reason}",
   "error.backend.popupSecureInput":
     "Wyskakujące okna są blokowane podczas bezpiecznego wprowadzania. Zakończ lub anuluj bezpieczne wprowadzanie, a potem ponów próbę na stronie.",

@@ -237,6 +237,8 @@ export const messages = defineMessages("error.provider", {
     "Your OpenCode API key expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go refused your saved API key. The key may have expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode did not use the key that you saved in OpenBot. It used a different OpenCode Go key that OpenCode keeps itself, and OpenCode Go refused that key. To remove that key, run `opencode auth logout opencode-go` in a terminal on the computer that runs the agent, and choose the key. Then try again.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go refused the request. A new API key does not fix this. Your OpenCode Go plan may not be active, or OpenCode Go may block your network: some services block VPNs, proxies or some countries. Make sure that your plan is active in OpenCode Console, or turn off the VPN, then try again. You can also choose a different model.",
   "error.provider.opencodeServiceFailure":
@@ -295,6 +297,8 @@ export const messages = defineMessages("error.provider", {
     "The OpenCode model ended the turn with no answer. Try again, or choose another model.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "The OpenCode model ended the turn after its reasoning, with no answer. Try again, or choose another model.",
+  "error.provider.opencodeToolCallsAsText":
+    "The OpenCode model wrote its actions as text and did not do them. Try again, or choose another model.",
   "error.provider.acpNoAnswer":
     "{provider} ended the turn with no answer. Send the message again, or start a new chat.",
   "error.provider.noAnswerAfterSteps":
@@ -360,6 +364,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.cursorSignIn": "Sign in with Cursor or set CURSOR_API_KEY to use Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor could not connect to its server with your sign-in. Check your internet connection, then sign in to Cursor again.",
+  "error.provider.cursorNoModels":
+    "Cursor did not send its list of models. Select Connect to sign in to Cursor again. If this message stays, check that your Cursor plan includes models.",
   "error.provider.clineArchivePath": "The Cline archive has an unexpected path.",
   "error.provider.clinePackageMismatch": "The Cline package does not match the runtime catalog.",
   "error.provider.clineChecksum": "Cline runtime checksum mismatch.",
@@ -401,6 +407,8 @@ export const messages = defineMessages("error.provider", {
     "The credit balance of the Anthropic API key is too low. A Claude plan does not pay for requests with an API key. Add credit in the Anthropic Console, or sign in to Claude in Settings and select the Claude account in the agent's model menu.",
   "error.provider.claudeAccountNoCredit":
     "Your Claude account's credit balance is too low. Some requests, such as fast mode, use usage credits also when your Claude plan has usage left. Add usage credits in your Claude account, or select a different model in the agent's model menu.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code sends requests to {host}, not to Anthropic: the Claude Code settings or the environment variables set this API address. {host} refused the request because of the account's balance, not because of your Claude plan. Add funds to your {host} account, or select a different model in the agent's model menu.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Claude's service blocked this request. This is usually a short problem on Claude's side, not a problem with your account. Send the message again in a few minutes.",
   "error.provider.foreignReasoning":
@@ -417,6 +425,8 @@ export const messages = defineMessages("error.provider", {
     "{provider} blocked this message because of its safety rules: {reason} If {provider} also blocks your next messages, start a new chat.",
   "error.provider.codexAudioRefused":
     "This model cannot listen to audio, so it did not accept the sound in this chat. OpenBot started a new Codex session with the chat history. To continue, send your request again and ask the agent to work without the sound. To check sound, select a model that can listen to audio in the agent's model menu.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex could not load the settings of your ChatGPT account, so the agent stopped. Try again. If it stops again, select Reconnect for ChatGPT in Server settings → Providers.",
   "error.provider.imageTooSmall":
     "The model did not accept an image in this chat because the image is too small. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageTooLarge":
@@ -547,6 +557,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.nativeVersionUnreadable": "The {provider} CLI version could not be read.",
   "error.provider.piSessionBusy": "Wait for the current Pi turn to finish.",
   "error.provider.acpSessionBusy": "{provider} still finishes a stopped turn. Try again in a moment.",
+  "error.provider.acpSettingsConflict": "{provider} changed this chat while OpenBot applied its settings. Try again.",
   "error.provider.acpSessionStale":
     "{provider} could not load the latest version of this chat. Send your message again.",
   "error.provider.acpModelNotOffered":

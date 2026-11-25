@@ -256,6 +256,8 @@ export const messages = {
     "Dein OpenCode-API-Schlüssel ist abgelaufen. Erstelle in der OpenCode Console einen neuen Schlüssel, füge ihn in den OpenCode-Einstellungen ein und versuche es dann erneut.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go hat deinen gespeicherten API-Schlüssel abgelehnt. Der Schlüssel ist vielleicht abgelaufen. Erstelle in der OpenCode Console einen neuen Schlüssel, füge ihn in den OpenCode-Einstellungen ein und versuche es dann erneut.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode hat nicht den Schlüssel verwendet, den du in OpenBot gespeichert hast. Es hat einen anderen OpenCode-Go-Schlüssel verwendet, den OpenCode selbst speichert, und OpenCode Go hat diesen Schlüssel abgelehnt. Um diesen Schlüssel zu entfernen, führe `opencode auth logout opencode-go` in einem Terminal auf dem Computer aus, auf dem der Agent läuft, und wähle den Schlüssel. Versuche es dann erneut.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go hat die Anfrage abgelehnt. Ein neuer API-Schlüssel hilft hier nicht. Dein OpenCode-Go-Abo ist vielleicht nicht aktiv, oder OpenCode Go blockiert dein Netzwerk: Manche Dienste blockieren VPNs, Proxys oder bestimmte Länder. Prüfe in der OpenCode Console, ob dein Abo aktiv ist, oder schalte das VPN aus. Versuche es dann erneut. Du kannst auch ein anderes Modell wählen.",
   "error.provider.opencodeServiceFailure":
@@ -316,6 +318,8 @@ export const messages = {
     "Das OpenCode-Modell hat den Durchlauf ohne Antwort beendet. Versuche es erneut oder wähle ein anderes Modell.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "Das OpenCode-Modell hat den Durchlauf nach seinem Nachdenken ohne Antwort beendet. Versuche es erneut oder wähle ein anderes Modell.",
+  "error.provider.opencodeToolCallsAsText":
+    "Das OpenCode-Modell hat seine Aktionen als Text geschrieben und nicht ausgeführt. Versuche es erneut oder wähle ein anderes Modell.",
   "error.provider.acpNoAnswer":
     "{provider} hat den Durchlauf ohne Antwort beendet. Sende die Nachricht erneut oder starte einen neuen Chat.",
   "error.provider.noAnswerAfterSteps":
@@ -387,6 +391,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Melde dich mit Cursor an oder setze CURSOR_API_KEY, um Cursor zu verwenden.",
   "error.provider.cursorSignInUnusable":
     "Cursor konnte sich mit deiner Anmeldung nicht mit seinem Server verbinden. Prüfe deine Internetverbindung und melde dich dann erneut bei Cursor an.",
+  "error.provider.cursorNoModels":
+    "Cursor hat seine Modellliste nicht gesendet. Wähle „Verbinden“, um dich erneut bei Cursor anzumelden. Wenn diese Meldung bleibt, prüfe, ob dein Cursor-Tarif Modelle enthält.",
   "error.provider.clineArchivePath": "Das Cline-Archiv hat einen unerwarteten Pfad.",
   "error.provider.clinePackageMismatch": "Das Cline-Paket stimmt nicht mit dem Laufzeitkatalog überein.",
   "error.provider.clineChecksum": "Die Prüfsumme der Cline-Laufzeit stimmt nicht überein.",
@@ -431,6 +437,8 @@ export const messages = {
     "Der Anthropic-API-Schlüssel hat kein API-Guthaben. Ein Claude-Abo bezahlt keine Anfragen mit einem API-Schlüssel. Lade Guthaben in der Anthropic Console auf, oder melde dich in den Einstellungen bei Claude an und wähle das Claude-Konto im Modellmenü des Agenten.",
   "error.provider.claudeAccountNoCredit":
     "Das Guthaben deines Claude-Kontos ist zu niedrig. Manche Anfragen, zum Beispiel im Schnellmodus, nutzen Nutzungsguthaben, auch wenn dein Claude-Abo noch Nutzung übrig hat. Lade Nutzungsguthaben in deinem Claude-Konto auf, oder wähle ein anderes Modell im Modellmenü des Agenten.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code sendet Anfragen an {host}, nicht an Anthropic: Die Claude-Code-Einstellungen oder die Umgebungsvariablen legen diese API-Adresse fest. {host} hat die Anfrage wegen des Kontoguthabens abgelehnt, nicht wegen deines Claude-Abos. Lade Guthaben in deinem {host}-Konto auf, oder wähle ein anderes Modell im Modellmenü des Agenten.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Der Claude-Dienst hat diese Anfrage blockiert. Das ist meist ein kurzes Problem bei Claude, kein Problem mit deinem Konto. Sende die Nachricht in ein paar Minuten noch einmal.",
   "error.provider.foreignReasoning":
@@ -447,6 +455,8 @@ export const messages = {
     "{provider} hat diese Nachricht wegen seiner Sicherheitsregeln blockiert: {reason} Wenn {provider} auch deine nächsten Nachrichten blockiert, starte einen neuen Chat.",
   "error.provider.codexAudioRefused":
     "Dieses Modell kann kein Audio anhören, darum hat es den Ton in diesem Chat nicht akzeptiert. OpenBot hat eine neue Codex-Sitzung mit dem Chatverlauf gestartet. Um fortzufahren, sende deine Anfrage erneut und bitte den Agenten, ohne den Ton zu arbeiten. Um Ton zu prüfen, wähle im Modellmenü des Agenten ein Modell, das Audio anhören kann.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex konnte die Einstellungen deines ChatGPT-Kontos nicht laden, darum hat der Agent angehalten. Versuche es erneut. Wenn er wieder anhält, wähle für ChatGPT „Neu verbinden“ unter Servereinstellungen → Anbieter.",
   "error.provider.imageTooSmall":
     "Das Modell hat ein Bild in diesem Chat nicht akzeptiert, weil das Bild zu klein ist. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.imageTooLarge":
@@ -591,6 +601,8 @@ export const messages = {
   "error.provider.piSessionBusy": "Warte, bis der aktuelle Pi-Durchlauf endet.",
   "error.provider.acpSessionBusy":
     "{provider} beendet noch einen gestoppten Durchlauf. Versuche es gleich noch einmal.",
+  "error.provider.acpSettingsConflict":
+    "{provider} hat diesen Chat geändert, während OpenBot seine Einstellungen übernommen hat. Versuche es erneut.",
   "error.provider.acpSessionStale":
     "{provider} konnte die neueste Version dieses Chats nicht laden. Sende deine Nachricht noch einmal.",
   "error.provider.acpModelNotOffered":
