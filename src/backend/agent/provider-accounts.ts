@@ -216,7 +216,12 @@ export class ProviderAccounts {
     if (!cli) return yield* accountFailure(sourceText("error.provider.accountNeedsConnection", { provider: name }));
     if (code && !support.codeSignIn)
       return yield* accountFailure(sourceText("error.provider.noCodeSignIn", { provider: name }));
-    if (code && support.codeSignIn?.flow === "paste" && !pasteCodeLoginSupported())
+    if (
+      code &&
+      support.codeSignIn?.flow === "paste" &&
+      !support.codeSignIn.command.pipedInput &&
+      !pasteCodeLoginSupported()
+    )
       return yield* accountFailure(sourceText("error.provider.codeLoginUnsupported"));
     let account: StoredProviderAccount;
     const added = accountId === null;
@@ -257,13 +262,16 @@ export class ProviderAccounts {
     const signIn = Effect.scoped(
       Effect.gen({ self: this }, function* () {
         if (code && codeSignIn) {
+          const { argv, closeInput, pipedInput } = codeSignIn.command;
+          const env = { ...cliPathEnvironment(cli), ...codeSignIn.command.env(cli), ...this.environment(account) };
           const login = yield* startCliCodeLogin({
             flow: codeSignIn.flow,
             executable: cli.executable,
-            argv: codeSignIn.command.argv,
-            env: { ...cliPathEnvironment(cli), ...codeSignIn.command.env(cli), ...this.environment(account) },
+            argv: typeof argv === "function" ? argv({ ...process.env, ...env }) : argv,
+            env,
             timeoutMs: codeSignIn.command.timeoutMs,
-            ...(codeSignIn.command.closeInput ? { closeInput: true } : {}),
+            ...(closeInput ? { closeInput: true } : {}),
+            ...(pipedInput ? { pipedInput: true } : {}),
           }).pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
           const prompt = yield* login.prompt.pipe(
             Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
@@ -1020,7 +1028,7 @@ export class ProviderAccounts {
   }
 
   #message(provider: AgentProviderId, error: unknown): string {
-    const cause = error instanceof ProviderAccountFailed ? error.cause : error;
+    const cause = signInCause(error) ?? (error instanceof ProviderAccountFailed ? error.cause : error);
     const text = cause instanceof Error ? cause.message : String(cause);
     return shortenDiagnostic(this.#host.redact(text)) || providerLabel(provider);
   }

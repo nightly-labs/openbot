@@ -157,6 +157,11 @@ interface ProviderSignInCommand extends Omit<ProviderCliCommand, "argv" | "env">
   readonly pipedInput?: true;
 }
 
+interface ProviderAccountCodeCommand extends Omit<ProviderCliCommand, "argv"> {
+  readonly argv: AcpArgv;
+  readonly pipedInput?: true;
+}
+
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
 
 const CURSOR_KEY_ACCOUNTS_MIN_VERSION = "2026.10.01";
@@ -164,7 +169,7 @@ const CURSOR_KEY_ACCOUNTS_MIN_VERSION = "2026.10.01";
 export interface ProviderHomeAccountSupport {
   readonly homeVariable: string;
   readonly signIn: ProviderCliCommand | AcpAuthenticateSignIn;
-  readonly codeSignIn?: { readonly flow: "device" | "paste" | "link"; readonly command: ProviderCliCommand };
+  readonly codeSignIn?: { readonly flow: "device" | "paste" | "link"; readonly command: ProviderAccountCodeCommand };
   readonly signOut?: ProviderCliCommand;
   supports?(cli: AgentCliInfo): boolean;
   readonly usageLeavesSession?: boolean;
@@ -338,6 +343,13 @@ const ANTIGRAVITY_SIGN_IN: AcpAuthenticateSignIn = {
 
 const ANTIGRAVITY_CODE_SIGN_IN: ProviderSignInCommand = {
   argv: () => Effect.succeed([...antigravityArgv({ ...process.env, ...ANTIGRAVITY_ENV }), "--login"]),
+  env: () => ({ ...ANTIGRAVITY_ENV }),
+  timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+  pipedInput: true,
+};
+
+const ANTIGRAVITY_ACCOUNT_CODE_SIGN_IN: ProviderAccountCodeCommand = {
+  argv: (env) => [...antigravityArgv(env), "--login"],
   env: () => ({ ...ANTIGRAVITY_ENV }),
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
   pipedInput: true,
@@ -943,6 +955,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     accounts: {
       homeVariable: "GEMINI_HOME",
       signIn: ANTIGRAVITY_SIGN_IN,
+      codeSignIn: { flow: "paste", command: ANTIGRAVITY_ACCOUNT_CODE_SIGN_IN },
       supports: (cli) => antigravityTakesStateFolders(cli.version),
       usageLeavesSession: true,
     },
