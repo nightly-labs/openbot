@@ -10,6 +10,7 @@ import { type HermesImportAgents, HermesImportService } from "../src/main/hermes
 const REPO = resolve(import.meta.dirname, "..");
 const OUT = join(REPO, ".openbot-build/hermes-import-name-e2e");
 const GLOBAL_NAME = "Sol";
+const CODEX_PATH = process.env.OPENBOT_CODEX_PATH?.trim() || "codex";
 
 interface Check {
   name: string;
@@ -106,7 +107,7 @@ function openBotPrompt(agent: AgentSummary): string {
 
 function askCodex(workspace: string, codexHome: string): string {
   const result = spawnSync(
-    "codex",
+    CODEX_PATH,
     [
       "exec",
       "--skip-git-repo-check",
