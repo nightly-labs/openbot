@@ -468,6 +468,8 @@ export const messages = {
     "Muse non è riuscito ad avviare un server MCP e ha bloccato MCP in questa sessione. OpenBot ha avviato una nuova sessione Muse con la cronologia della chat. Riprova. Se l’errore continua, disattiva Controllo del computer o il server MCP non riuscito per questo agente.",
   "error.provider.claudeSessionMissing":
     "Claude Code non ha trovato la sessione salvata di questa chat. OpenBot ha avviato una nuova sessione di Claude Code con la cronologia della chat. Riprova.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode non ha trovato la sessione salvata di questa chat. OpenBot ha avviato una nuova sessione di OpenCode con la cronologia della chat. Riprova.",
   "error.provider.grokSignIn": "Esegui `grok login` o imposta XAI_API_KEY per usare Grok.",
   "error.provider.acpSignInNoStart":
     "Il provider non si è avviato, quindi l’accesso non è potuto iniziare. Riprova o riavvia OpenBot.",

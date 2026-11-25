@@ -459,6 +459,8 @@ export const messages = {
     "Muse가 MCP 서버를 시작하지 못해서 이 세션에서 MCP를 차단했어요. OpenBot이 채팅 기록으로 새 Muse 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 이 에이전트의 컴퓨터 제어 또는 실패한 MCP 서버를 끄세요.",
   "error.provider.claudeSessionMissing":
     "Claude Code가 이 채팅의 저장된 세션을 찾지 못했어요. OpenBot이 채팅 기록으로 새 Claude Code 세션을 시작했어요. 다시 시도해 주세요.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode가 이 채팅의 저장된 세션을 찾지 못했어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 다시 시도해 주세요.",
   "error.provider.grokSignIn": "Grok을 사용하려면 `grok login`을 실행하거나 XAI_API_KEY를 설정하세요.",
   "error.provider.acpSignInNoStart":
     "제공자가 시작되지 않아 로그인을 시작할 수 없었어요. 다시 시도하거나 OpenBot을 다시 시작해 주세요.",
