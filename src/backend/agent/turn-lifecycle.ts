@@ -1429,6 +1429,11 @@ export class TurnLifecycle {
         const turnId = getString(params, "turnId");
         const item = getRecord(params, "item");
         if (!turnId || !item) return;
+        if (notification.method === "item/completed" && writesFiles(item)) {
+          const workspace = this.#store.get(agentId)?.workspacePath;
+          const written = getArray(params, "filePaths").filter(isString);
+          if (workspace && written.length > 0) yield* this.#instructions.agentWrote(agentId, workspace, written);
+        }
         this.fileHistory.record(
           agentId,
           this.#conversation.publicThreadId(agentId, threadId),
@@ -3876,6 +3881,12 @@ function codeModeOpenBotTool(call: unknown): string | null {
 function isUserReactionCall(item: DynamicRecord): boolean {
   const threadItem = toThreadItem(item);
   return threadItem !== null && openBotTool(threadItem) === "react_to_user_message";
+}
+
+const FILE_WRITE_TOOL_KINDS: readonly unknown[] = ["edit", "delete", "move"];
+
+function writesFiles(item: DynamicRecord): boolean {
+  return item.type === "fileChange" || (item.type === "toolCall" && FILE_WRITE_TOOL_KINDS.includes(item.toolKind));
 }
 
 function isEmptyAnswer(item: { type?: unknown; phase?: unknown; text?: unknown }): boolean {

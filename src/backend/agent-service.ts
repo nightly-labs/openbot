@@ -1266,6 +1266,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const agent = store.get(agentId);
         return agent !== undefined && confinedWritesAllowed(agent, store.sharedRoot, paths);
       },
+      beforeFileChangeAccepted: (agentId, paths) => {
+        const workspace = store.get(agentId)?.workspacePath;
+        return workspace ? this.#instructionChanges.beforeAgentWrite(agentId, workspace, paths) : Effect.void;
+      },
       messagingThread: (threadId) => this.messaging.store.linkForThread(threadId) !== null,
       messagingRequestTurn: (agentId, turnId) => this.#mailbox.answersMessagingRequest(agentId, turnId),
       approvalChatThread: (agentId, threadId) =>
