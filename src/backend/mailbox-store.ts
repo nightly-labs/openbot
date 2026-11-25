@@ -1712,12 +1712,7 @@ export class MailboxStore {
               return {
                 id: delivery.id,
                 recipientAgentId: delivery.recipientAgentId,
-                status:
-                  delivery.status === "completed" &&
-                  message.expectsReply !== false &&
-                  this.heldByTask(item.recipientAgentId, message.id, undefined, holders)
-                    ? "running"
-                    : delivery.status,
+                status: this.outgoingRequestStatus(delivery, message.expectsReply !== false, holders),
                 position: delivery.position,
                 error: delivery.error,
               };
@@ -2767,6 +2762,20 @@ export class MailboxStore {
       return yield* new StoredStateFailure({ cause });
     }
   }, Effect.uninterruptible).bind(this);
+
+  outgoingRequestStatus(
+    delivery: Pick<QueueDelivery, "id" | "messageId" | "recipientAgentId" | "status">,
+    expectsReply: boolean,
+    holders: ReadonlyMap<string, ReadonlySet<string>> = this.#requestHolders(),
+  ): QueueDeliveryStatus {
+    if (!expectsReply) return delivery.status;
+    if (delivery.status === "completed")
+      return this.heldByTask(delivery.recipientAgentId, delivery.messageId, undefined, holders)
+        ? "running"
+        : "completed";
+    const working = delivery.status === "starting" || delivery.status === "running";
+    return working && this.#answeredRequest(delivery.id) ? "completed" : delivery.status;
+  }
 
   #answeredRequest(deliveryId: string): boolean {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
