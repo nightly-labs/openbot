@@ -375,6 +375,7 @@
     "test:provider-runtime-blocked": "bun scripts/provider-runtime-blocked-e2e.ts",
     "test:provider-runtime-kernel": "bun scripts/provider-runtime-kernel-e2e.ts",
     "test:provider-runtime-remove": "bun scripts/provider-runtime-remove-e2e.ts",
+    "test:provider-runtime-network": "bun scripts/provider-runtime-network-e2e.ts",
     "test:provider-exit-session": "bun scripts/provider-exit-session-e2e.ts",
     "test:codex-hung-app-server": "bun scripts/codex-hung-app-server-e2e.ts",
     "test:codex-midturn-compaction": "bun scripts/codex-midturn-compaction-e2e.ts",
