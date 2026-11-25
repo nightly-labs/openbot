@@ -208,7 +208,8 @@ function apply(id: string, status: HostUpdateStatus, stored: Flow | undefined = 
   if (!stored || stored.result) return;
   const runtime = runtimes.get(id);
   if (runtime) note({ serverId: id, name: stored.name, canManage: stored.canManage, calls: runtime.calls }, status);
-  const backFromRestart = stored.restarting && restartEnded(status);
+  const backFromRestart =
+    stored.restarting && restartEnded(status) && status.currentVersion !== stored.status.currentVersion;
   const flow: Flow = {
     ...stored,
     status,
@@ -353,7 +354,7 @@ function finish(id: string, result: "online" | "failed", failure: ServerUpdateFa
     current.result = result;
     current.failure = failure;
     current.busy = null;
-    if (result === "online") current.error = null;
+    current.error = null;
   });
   if (openId() === id) return;
   const name = flow.name;
@@ -489,7 +490,7 @@ async function act(id: string, busy: ServerUpdateBusy, call: (runtime: Runtime) 
       const current = draft[id];
       if (!current) return;
       current.busy = null;
-      if (!current.restarting && !current.wentDown)
+      if (busy === "cancel" || (!current.restarting && !current.wentDown))
         current.error = errorMessage(error, t("server.settings.actionFailed"));
     });
   }
@@ -524,7 +525,9 @@ function follow(hosts: readonly HostRestartView[]): void {
     if (restarting && !flow.restarting) {
       setFlows((draft) => {
         const current = draft[id];
-        if (current) current.restarting = true;
+        if (!current) return;
+        current.restarting = true;
+        current.error = null;
       });
       startClock(id);
       startRestartLimit(id);
