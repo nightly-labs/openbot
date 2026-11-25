@@ -1,12 +1,12 @@
 import {
-  createFluidGlass,
-  type FluidGlassSettings,
+  createGlassLens,
   type GlassArea,
   type GlassInteraction,
+  type GlassLensSettings,
   type GlassPoint,
   type GlassShape,
   type GlassView,
-} from "./fluid-glass";
+} from "./glass-lens";
 import { fitSize, paintCentered, paintElement, paintRobot } from "./glass-scene";
 
 const AMOUNT = "$0";
@@ -141,7 +141,7 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
     paintCentered(ctx, { ...font, lines, center: home, size, color });
   };
 
-  const settings = (): FluidGlassSettings => {
+  const settings = (): GlassLensSettings => {
     const words = text();
     return {
       scene: [mode(), layout, words.smallPrint, words.forever].join("|"),
@@ -164,7 +164,7 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
     else delete section.dataset.glass;
   };
 
-  const glass = createFluidGlass(
+  const glass = createGlassLens(
     { container: layer, canvas: parts.canvas, handle: parts.handle, paint, onLive: setLive },
     settings,
   );
