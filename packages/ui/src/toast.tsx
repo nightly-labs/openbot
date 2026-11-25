@@ -1,13 +1,14 @@
 import { classifyFailure, type FailureProperties, type NotificationMetadata } from "@openbot/telemetry";
 import { errorReference } from "@openbot/user-errors";
 import type { ComponentProps, JSX } from "@solidjs/web";
-import { createEffect, omit, onSettled } from "solid-js";
+import { createEffect, createMemo, omit, onSettled, Show } from "solid-js";
 import {
   Toaster as Sonner,
   type ExternalToast as SonnerExternalToast,
   toast as sonnerToast,
   useSonner,
 } from "solid-sonner";
+import { Button } from "./button";
 import { documentColorScheme } from "./document-color-scheme";
 import { ErrorReference } from "./error-reference";
 import { CircleCheck, Info, LoaderCircle, OctagonX, TriangleAlert } from "./icons";
@@ -87,10 +88,21 @@ export const toast = Object.assign((...args: Parameters<typeof sonnerToast>) => 
 
 export const TOAST_DURATION = 6_000;
 
+function edgeOffset(offset: ToasterProps["offset"], edge: "top" | "right"): string {
+  const value = (typeof offset === "object" ? offset[edge] : offset) ?? 24;
+  return typeof value === "number" ? `${value}px` : value;
+}
+
 export function Toaster(props: ToasterProps): JSX.Element {
   const { t } = currentText();
   const notifications = useSonner();
   const sonnerProps = omit(props, "onToastShown", "hidden");
+  const position = () => props.position ?? "top-right";
+  const activeStack = createMemo(() =>
+    notifications
+      .toasts()
+      .filter((item) => item.toasterId === props.id && (item.position ?? position()) === "top-right"),
+  );
   createEffect(
     () => ({ toasts: notifications.toasts(), hidden: props.hidden }),
     ({ toasts, hidden }) => {
@@ -136,11 +148,25 @@ export function Toaster(props: ToasterProps): JSX.Element {
   });
   return (
     <div ref={layer} data-kb-top-layer="" class={cx("ui-toast-layer", props.hidden && "ui-toast-layer-hidden")}>
+      <Show when={activeStack().length > 1}>
+        <Button
+          class="ui-toast-dismiss-all"
+          size="xs"
+          variant="secondary"
+          data-cuelume-close=""
+          style={{ top: edgeOffset(props.offset, "top"), right: edgeOffset(props.offset, "right") }}
+          onClick={() => {
+            for (const item of activeStack()) sonnerToast.dismiss(item.id);
+          }}
+        >
+          {t("notification.toast.dismissAll")}
+        </Button>
+      </Show>
       <Sonner
         {...sonnerProps}
         class={cx("ui-toaster", (props.closeButton ?? true) && "ui-toaster-closeable", props.class)}
         theme={props.theme ?? documentColorScheme()}
-        position={props.position ?? "top-right"}
+        position={position()}
         visibleToasts={props.visibleToasts ?? 6}
         duration={props.duration ?? TOAST_DURATION}
         gap={props.gap ?? 8}

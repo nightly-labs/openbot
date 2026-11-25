@@ -31,4 +31,5 @@ export const messages = defineMessages("notification", {
   "notification.welcome": "OpenBot will tell you here when an agent needs you.",
   "notification.toast.region": "Notifications",
   "notification.toast.close": "Close notification",
+  "notification.toast.dismissAll": "Dismiss all",
 });

@@ -32,4 +32,5 @@ export const messages = {
   "notification.welcome": "当助手需要你时，OpenBot 会在这里通知你。",
   "notification.toast.region": "通知",
   "notification.toast.close": "关闭通知",
+  "notification.toast.dismissAll": "全部关闭",
 } as const satisfies PartialTranslation<typeof source>;

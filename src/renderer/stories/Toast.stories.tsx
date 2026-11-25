@@ -37,7 +37,7 @@ export const Gallery: Story = {
       <Heading as="h1" size="lg">
         Toasts
       </Heading>
-      <Text tone="secondary">Trigger each tone or create a compact stack.</Text>
+      <Text tone="secondary">Trigger each tone or show a stack to try Dismiss all.</Text>
       <div class="foundation-story-row">
         <Button
           variant="outline"
