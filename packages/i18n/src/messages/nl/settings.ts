@@ -114,7 +114,8 @@ export const messages = {
   "settings.quitGuard.always": "Altijd",
   "settings.quitGuard.never": "Nooit",
   "settings.externalLinks.title": "Open externe links in",
-  "settings.externalLinks.description": "Links in chats, inlogpagina’s en betaalpagina’s openen hier.",
+  "settings.externalLinks.description":
+    "Links in chats, inlogpagina’s en betaalpagina’s openen hier. Met OpenBot openen alleen links in chats van het hoofdvenster met agents op deze computer in OpenBot. Andere links openen in de standaardbrowser.",
   "settings.externalLinks.defaultBrowser": "Standaardbrowser",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Standaard ({name})",
