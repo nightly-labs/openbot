@@ -215,25 +215,41 @@ export class GitHubInstallationTokens {
     const user: Credential = { kind: "user", token: userToken };
     const { installations } = yield* this.#get(`/user/installations?per_page=${PAGE_SIZE}`, user, installationsSchema);
     const routes: GitHubRepositoryRoute[] = [];
-    for (const installation of installations.filter((entry) => entry.app_id === appId).slice(0, MAX_INSTALLATIONS)) {
+    const ours = installations
+      .filter((entry) => entry.app_id === appId)
+      .slice(0, MAX_INSTALLATIONS)
+      .map((installation) => ({
+        id: installation.id,
+        events: installation.events ? GITHUB_ROUTE_EVENTS.every((event) => installation.events?.includes(event)) : true,
+      }));
+    for (const installation of ours) {
       if (wanted.size === 0) break;
-      const events = installation.events
-        ? GITHUB_ROUTE_EVENTS.every((event) => installation.events?.includes(event))
-        : true;
       const result = yield* Effect.result(
         this.#eachRepository(installation.id, user, (repository) => {
           const name = repository.full_name.toLowerCase();
           if (!wanted.delete(name)) return wanted.size > 0;
-          routes.push({ id: repository.id, installationId: installation.id, fullName: repository.full_name, events });
+          routes.push({
+            id: repository.id,
+            installationId: installation.id,
+            fullName: repository.full_name,
+            events: installation.events,
+          });
           return wanted.size > 0;
         }),
       );
       if (Result.isFailure(result) && result.failure.code !== "github_failed") return yield* result.failure;
+    }
+    for (const installation of ours) {
       if (wanted.size === 0) break;
       const listed = yield* this.#publicInstallationRepositories(installation.id).pipe(Effect.orElseSucceed(() => []));
       for (const repository of listed) {
         if (!wanted.delete(repository.full_name.toLowerCase())) continue;
-        routes.push({ id: repository.id, installationId: installation.id, fullName: repository.full_name, events });
+        routes.push({
+          id: repository.id,
+          installationId: installation.id,
+          fullName: repository.full_name,
+          events: installation.events,
+        });
       }
     }
     return routes;
