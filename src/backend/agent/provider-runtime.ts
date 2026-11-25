@@ -2346,8 +2346,20 @@ export class ProviderRuntime implements ProviderPort {
     );
     this.#countActivation(provider);
     this.#forgetUsage(provider);
-    return yield* this.#reprobeProvider(provider);
+    return yield* this.#reprobeProvider(provider).pipe(
+      Effect.tapError(() => this.#releaseClientWithOldCredential(provider)),
+    );
   }, Effect.uninterruptible);
+
+  readonly #releaseClientWithOldCredential = Effect.fn("ProviderRuntime.releaseClientWithOldCredential")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+  ) {
+    const client = this.#clients.get(provider);
+    if (!client || this.#hooks.isProviderBusy(provider)) return;
+    logger.info("Stopped a provider CLI that still uses the previous credential.", { provider });
+    yield* this.#releaseClient(provider, client);
+  });
 
   updateProviderCli(
     provider: AgentProvider,
