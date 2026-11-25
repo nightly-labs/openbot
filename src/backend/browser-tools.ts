@@ -209,7 +209,12 @@ export const BROWSER_TOOL_DEFINITIONS = [
     description: "Open an HTTP(S) URL in a new persistent private-browser tab; returns its first snapshot.",
     shape: {
       url: requiredString(INPUT_LIMITS.browserUrl),
-      browser: z.literal("chrome").optional(),
+      browser: z
+        .literal("chrome")
+        .optional()
+        .describe(
+          "Only when the person sent this message from the OpenBot extension in their own Chrome. Otherwise omit it: the OpenBot browser opens the page.",
+        ),
     },
   }),
   browserTool({
