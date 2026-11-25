@@ -574,7 +574,6 @@ export interface AttentionRegistryOptions {
     sender: ConversationMessageSender | undefined,
   ): void;
   userAnswerLimitMs?: number;
-  detachedQuestionRestartHoldMs?: number;
 }
 
 export interface CodexSubagentParent {
@@ -618,7 +617,6 @@ export class AttentionRegistry {
   readonly #lateAnswerTarget: (agentId: string, publicThreadId: string) => LateAnswerTarget | null;
   readonly #sendLateAnswer: NonNullable<AttentionRegistryOptions["sendLateAnswer"]>;
   readonly #userAnswerLimitMs: number;
-  readonly #detachedQuestionRestartHoldMs: number;
   readonly #prompts = new Map<RequestId, PendingPrompt>();
   readonly #approvals = new Map<RequestId, PendingApproval>();
   readonly #takeovers = new Map<RequestId, PendingBrowserTakeover>();
@@ -648,7 +646,6 @@ export class AttentionRegistry {
     this.#lateAnswerTarget = options.lateAnswerTarget ?? (() => null);
     this.#sendLateAnswer = options.sendLateAnswer ?? (() => undefined);
     this.#userAnswerLimitMs = options.userAnswerLimitMs ?? USER_ANSWER_LIMIT_MS;
-    this.#detachedQuestionRestartHoldMs = options.detachedQuestionRestartHoldMs ?? DETACHED_QUESTION_RESTART_HOLD_MS;
     this.#codexSubagentParent = options.codexSubagentParent ?? (() => undefined);
   }
 
@@ -878,7 +875,7 @@ export class AttentionRegistry {
   hasDetachedQuestionHoldingRestart(now = Date.now()): boolean {
     for (const pending of this.#prompts.values()) {
       if (!pending.detached || pending.saving || pending.detachedAt === undefined) continue;
-      if (now - pending.detachedAt < this.#detachedQuestionRestartHoldMs) return true;
+      if (now - pending.detachedAt < DETACHED_QUESTION_RESTART_HOLD_MS) return true;
     }
     return false;
   }
