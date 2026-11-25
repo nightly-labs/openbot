@@ -222,6 +222,13 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
     about: "Choose which agents the dock shows.",
     words: "dock agents list",
   },
+  "computer-use.permissions": {
+    title: "System permissions",
+    place: `${APP} > Computer Use`,
+    about:
+      "Shows if Computer Use is ready on this computer, and what is missing when it is not, with a button to fix it. Show it when Computer Use is not ready.",
+    words: "computer use ready not ready permissions screen recording accessibility grant macos privacy driver",
+  },
   "updates.track": {
     title: "Update track",
     place: `${APP} > Updates`,
@@ -292,7 +299,8 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
   "agent.computer-use": {
     title: "Computer Use",
     place: `${AGENT} > Permissions`,
-    about: "Let this agent see the screen and control apps on this computer.",
+    about:
+      "Let this agent see the screen and control apps on this computer. It does not show if Computer Use is ready: computer-use.permissions does.",
     words: "control apps click screen mouse keyboard desktop automation",
   },
   "agent.local-scripts": {
