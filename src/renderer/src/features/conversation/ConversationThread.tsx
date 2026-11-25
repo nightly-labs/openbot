@@ -31,6 +31,7 @@ import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatC
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
 import { narrationRows, naturalThreadRows } from "./narration-rows";
+import { useNearPaymentApproval } from "./near-payment-approval";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { withQuestionContext } from "./stores/scroll-store";
 import { createTurnSteps } from "./turn-steps";
@@ -79,6 +80,7 @@ export function ConversationThread() {
   const threadBackgroundWorkSince = (taskId: string | undefined) =>
     taskId === undefined ? undefined : props.backgroundWorkSince?.(taskId);
   const { t, errorMessage } = useText();
+  const { card: nearPaymentCard } = useNearPaymentApproval(() => props.server?.kind === "local" && !props.runtime);
   const [picker, setPicker] = createSignal<HTMLInputElement>();
   const failureToast = (fallback: AppTextKey) => ({
     onError: (error: unknown) => {
@@ -303,6 +305,13 @@ export function ConversationThread() {
             media={props.mediaApproval}
             onRespondApproval={(decision) =>
               current().threads.onRespondApproval(decision, failureToast("prompt.approval.answerFailed"))
+            }
+            approvalCard={(approval) =>
+              nearPaymentCard(
+                approval,
+                () => current().threads.onRespondApproval("accept", failureToast("prompt.approval.answerFailed")),
+                () => current().threads.onRespondApproval("decline", failureToast("prompt.approval.answerFailed")),
+              )
             }
             context={contextUsageView(current().threads.contextState)}
             onCompactContext={current().threads.onCompactContext}

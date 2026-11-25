@@ -30,6 +30,7 @@ import {
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, For, Show } from "solid-js";
 import { useText } from "../../text";
+import { chainName } from "./near-deposit-coins";
 import {
   NearAddFundsDialog,
   NearAgentsDialog,
@@ -40,7 +41,7 @@ import {
 import {
   AgentStack,
   agentNames,
-  chainName,
+  backupText,
   createNearRun,
   NearIntentsLogo,
   type NearWalletActions,
@@ -49,7 +50,7 @@ import {
   usdNumber,
 } from "./near-wallet-parts";
 
-export { NearSetupDialog } from "./near-wallet-dialogs";
+export { NearAddFundsDialog, NearSetupDialog } from "./near-wallet-dialogs";
 export type { NearWalletActions, NearWalletAgent } from "./near-wallet-parts";
 
 export interface VaultNearWalletProps {
@@ -87,6 +88,7 @@ export function VaultNearWalletRow(props: VaultNearWalletProps & { onOpen: () =>
   const detail = () => {
     if (props.status.signing) return t("vault.near.waiting");
     if (props.status.error) return sourceText(props.status.error);
+    if (props.status.state === "signed-out") return t("vault.near.signedOut");
     if (!connected()) return "";
     const total = format.currencyUsd(totalUsd(props.status));
     const account = props.status.account;
@@ -136,7 +138,7 @@ export function VaultNearWalletRow(props: VaultNearWalletProps & { onOpen: () =>
           </Show>
         </ItemContent>
         <ItemActions class="integrations-hub-actions">
-          <Show when={connected()} fallback={connect()}>
+          <Show when={connected()} fallback={<Show when={props.status.state !== "signed-out"}>{connect()}</Show>}>
             <ChevronRight class="near-wallet-chevron" aria-hidden="true" />
           </Show>
         </ItemActions>
@@ -144,7 +146,6 @@ export function VaultNearWalletRow(props: VaultNearWalletProps & { onOpen: () =>
       <Show when={setup()}>
         <NearSetupDialog
           status={props.status}
-          agents={props.agents}
           actions={props.actions}
           onClose={() => {
             setSetup(false);
@@ -197,7 +198,9 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
     return asset ? chainName(asset.blockchain) : "";
   };
 
+  const payingIds = () => (props.status.allAgents ? props.agents.map((agent) => agent.id) : props.status.agentIds);
   const canPayTitle = () => {
+    if (props.status.allAgents) return t("vault.near.allCanPay");
     const ids = props.status.agentIds;
     if (ids.length === 0) return t("vault.near.noneCanPay");
     const known = props.agents.filter((agent) => ids.includes(agent.id));
@@ -214,10 +217,12 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
   };
   const grantDetail = () => {
     const current = account();
-    const count = t("vault.near.agentsOf", {
-      count: String(props.status.agentIds.length),
-      total: String(props.agents.length),
-    });
+    const count = props.status.allAgents
+      ? t("vault.near.everyAgent")
+      : t("vault.near.agentsOf", {
+          count: String(props.status.agentIds.length),
+          total: String(props.agents.length),
+        });
     if (!current?.grantExpiresAt) return count;
     const until = t("vault.near.until", {
       date: format.date(new Date(current.grantExpiresAt), { dateStyle: "medium" }),
@@ -240,6 +245,18 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
     if (at && !changeAllowed())
       parts.push(t("vault.near.changeAt", { time: format.date(new Date(at), { timeStyle: "short" }) }));
     return parts.join(" · ");
+  };
+
+  const backupTitle = () => {
+    const record = props.status.ownerBackup;
+    return record ? t(backupText(record.state).title) : t("vault.near.backup.notChecked");
+  };
+  const backupDetail = () => {
+    const record = props.status.ownerBackup;
+    if (!record) return t("vault.near.backup.noCopy");
+    return t("vault.near.backup.checked", {
+      date: format.date(new Date(record.checkedAt), { dateStyle: "medium" }),
+    });
   };
 
   const addFunds = () => (
@@ -465,9 +482,9 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
       <SettingsSection title={t("vault.near.agentsTitle")}>
         <Card label={t("vault.near.agentsTitle")}>
           <Item class="settings-modal-row">
-            <Show when={props.status.agentIds.length > 0}>
+            <Show when={payingIds().length > 0}>
               <ItemMedia>
-                <AgentStack agents={props.agents} ids={props.status.agentIds} />
+                <AgentStack agents={props.agents} ids={payingIds()} />
               </ItemMedia>
             </Show>
             <ItemContent>
@@ -501,6 +518,32 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
           </Item>
         </Card>
       </SettingsSection>
+
+      <Show when={account()}>
+        <SettingsSection title={t("vault.near.backup.title")}>
+          <Card label={t("vault.near.backup.title")}>
+            <Item class="settings-modal-row">
+              <ItemContent>
+                <ItemTitle>{backupTitle()}</ItemTitle>
+                <ItemDescription>{backupDetail()}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  loading={busyWith("check-backup")}
+                  loadingLabel={t("vault.near.waitingShort")}
+                  disabled={Boolean(signing())}
+                  onClick={() => void run.run(props.actions.checkBackup)}
+                >
+                  {t("vault.near.backup.check")}
+                </Button>
+              </ItemActions>
+            </Item>
+          </Card>
+        </SettingsSection>
+      </Show>
 
       <SettingsSection title={t("vault.near.stop")}>
         <Card label={t("vault.near.stop")}>

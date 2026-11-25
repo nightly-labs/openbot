@@ -384,8 +384,9 @@ import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
 import { createModelReasoningSupport, MODEL_REASONING_RETRY_WAITS_MS } from "./model-reasoning-probe";
 import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
+import { createNearIntentsGateway } from "./near-intents-gateway";
 import { NearWalletService } from "./near-wallet-service";
-import { NearOwnerSigning } from "./near-wallet-signing";
+import { NEAR_PASSKEY_WALLET_ORIGIN, NearOwnerSigning } from "./near-wallet-signing";
 import { NearWalletStore } from "./near-wallet-store";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
@@ -1826,10 +1827,18 @@ export async function createApplicationServices({
   });
   await Effect.runPromise(linkAccount.load());
   teardown.push(TEARDOWN_ORDER.linkAccount, "the Link account", () => Effect.runPromise(linkAccount.dispose()));
+  const nearHost: { serverId: () => string | null } = { serverId: () => null };
   const nearWallet = new NearWalletService({
+    gateway: createNearIntentsGateway({
+      auth: centralAuth,
+      hostId: () => nearHost.serverId(),
+      serverWallet: Boolean(hostedServer || serverModeEnvironment || localServerChild),
+    }),
     store: new NearWalletStore(join(app.getPath("userData"), NEAR_WALLET_FILE), secretCipher),
     signing: new NearOwnerSigning({
-      pageOrigin: centralAuthApiUrl(),
+      pageOrigin: app.isPackaged
+        ? NEAR_PASSKEY_WALLET_ORIGIN
+        : process.env.OPENBOT_DEV_NEAR_SIGNING_ORIGIN || centralAuthApiUrl(),
       openExternal: openLink,
       loopback: !app.isPackaged,
     }),
@@ -2757,6 +2766,7 @@ export async function createApplicationServices({
     join(app.getPath("userData"), LEGACY_TEAM_STORE_FILE),
   );
   await runCauseEffect(teamStore.initialize());
+  nearHost.serverId = () => teamStore.getIdentity()?.serverId ?? null;
   performance.mark("openbot:services.team");
   const machineAlertStore = new MachineAlertPreferenceStore(
     join(app.getPath("userData"), MACHINE_ALERTS_PREFERENCE_FILE),

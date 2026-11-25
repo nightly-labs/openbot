@@ -16,7 +16,7 @@
         "@modelcontextprotocol/client": "2.4.0",
         "@modelcontextprotocol/sdk": "1.32.1",
         "@muse-code/sdk": "1.4.12",
-        "@near-intents-agent-api/sdk": "0.8.0",
+        "@near-intents-agent-api/sdk": "0.9.5",
         "@noble/curves": "catalog:",
         "@noble/hashes": "catalog:",
         "@norbert_bodziony/bloub": "catalog:",
@@ -1169,7 +1169,7 @@
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.2.3", "", { "dependencies": { "@tybys/wasm-util": "^0.10.3" }, "peerDependencies": { "@emnapi/core": "^1.7.1 || ^2.0.0-alpha.4", "@emnapi/runtime": "^1.7.1 || ^2.0.0-alpha.4" } }, "sha512-UMduMbqO5s5zF2NkNacMT/yK5Y5QiKvWr2+50bzIIxFDwVJ2h49b+oyjaCGPhJxd2/gC2x39EHv/gHVuu36x2Q=="],
 
-    "@near-intents-agent-api/sdk": ["@near-intents-agent-api/sdk@0.8.0", "", { "dependencies": { "@noble/curves": "^2.4.0", "@noble/hashes": "^2.4.0", "@scure/base": "^2.4.0" } }, "sha512-2FaONCg1VxHyQ7tVrWwFrjqnDp3ja2FlnnE6/x5DzUas9mi3/GAQYHSdQBRPHkLfHTbk8O6E62cEzoOWUW3IJQ=="],
+    "@near-intents-agent-api/sdk": ["@near-intents-agent-api/sdk@0.9.5", "", { "dependencies": { "@noble/curves": "^2.4.0", "@noble/hashes": "^2.4.0", "@scure/base": "^2.4.0" } }, "sha512-hIsUK9Gh2mcnEYU7MDrQvGftsWAzQGLl/h+WsLdCYvEx6p/kJC0x6Xt8iVEbHhLg9Du3wnKpNyBjRrsrkR1UGg=="],
 
     "@noble/curves": ["@noble/curves@2.4.0", "", { "dependencies": { "@noble/hashes": "2.4.0" } }, "sha512-P4/62zrgfH33CneE3Dn4WhJVA22YUU0eR51wKIan4NVRvwsA0YnPTwWGpNbpuacSujmSFLvyzpyuR30+fbq2Ew=="],
 

@@ -1,26 +1,30 @@
 import {
   NEAR_RULE_DAILY_USD,
-  NEAR_WALLET_LIMITS,
   type NearOwnerAction,
-  type NearOwnerMethod,
+  type NearPasskeyChoice,
   type NearWalletStatus,
 } from "@openbot/contracts/ipc";
-import { Button, Field, Input, NativeSelect, RadioGroup, Text } from "@openbot/ui";
+import { Button, Field, NativeSelect, RadioGroup, Text } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createStore, For, Match, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
+import { AddFundsFields } from "./near-wallet-funds";
 import {
-  AddFundsFields,
   AgentPicker,
+  AllAgentsChoice,
   agentNames,
   createNearRun,
+  NearCheck,
   NearFailure,
   NearSigningWait,
   type NearWalletActions,
   type NearWalletAgent,
   NearWalletDialog,
-  OwnerMethodChoice,
+  PasskeyBackupNotice,
   RiskAccept,
+  SETUP_SIGNATURE_COUNT,
+  SetupSignatures,
+  SetupSteps,
   usdNumber,
 } from "./near-wallet-parts";
 
@@ -65,37 +69,46 @@ function BudgetChoice(props: { values: readonly string[]; value: string; onChang
   );
 }
 
-type SetupStep = "key" | "spending" | "agents" | "sign" | "funds";
+type SetupStep = "sign" | "backup" | "funds";
+
+const SETUP_DAILY_BUDGET = "25";
 
 const STEP_KEYS = {
-  key: "vault.near.step.key",
-  spending: "vault.near.step.spending",
-  agents: "vault.near.step.agents",
   sign: "vault.near.step.sign",
+  backup: "vault.near.step.backup",
   funds: "vault.near.step.funds",
 } as const;
 
 const SETUP_ACTIONS: readonly NearOwnerAction[] = ["register", "create", "grant"];
+const SETUP_STEPS: readonly SetupStep[] = ["sign", "backup", "funds"];
 
-export function NearSetupDialog(props: NearDialogProps & { agents: readonly NearWalletAgent[] }) {
+export function NearSetupDialog(props: NearDialogProps) {
   const { t, sourceText } = useText();
-  const steps: readonly SetupStep[] = untrack(() =>
-    props.status.state === "no-key"
-      ? ["key", "spending", "agents", "sign", "funds"]
-      : ["spending", "agents", "sign", "funds"],
-  );
   const [started, setStarted] = createSignal(untrack(() => signingFor(props.status, SETUP_ACTIONS)));
-  const [index, setIndex] = createSignal(untrack(() => (started() ? steps.indexOf("sign") : 0)));
-  const step = () => steps[index()] ?? "funds";
-  const [key, setKey] = createSignal("");
-  const [budget, setBudget] = createSignal<string>("25");
-  const [agentIds, setAgentIds] = createSignal<string[]>(untrack(() => [...props.status.agentIds]));
-  const [method, setMethod] = createSignal<NearOwnerMethod>("passkey");
+  const [index, setIndex] = createSignal(0);
+  const step = () => SETUP_STEPS[index()] ?? "funds";
   const [accepted, setAccepted] = createSignal(false);
+  const [keepAccepted, setKeepAccepted] = createSignal(false);
+  const [acceptedAt, setAcceptedAt] = createSignal<string | null>(null);
   const [stopped, setStopped] = createSignal(false);
+  const [signed, setSigned] = createSignal(-1);
   const action = createNearRun();
   const connected = () => props.status.state === "ready" || props.status.state === "frozen";
-  const waiting = () => started() && !stopped() && !connected();
+  const backup = () => props.status.ownerBackup;
+  const deviceWarning = () => {
+    const record = backup();
+    return (
+      started() &&
+      !connected() &&
+      props.status.signing === null &&
+      !action.busy() &&
+      record !== null &&
+      record.state === "deviceOnly" &&
+      record.checkedAt !== acceptedAt()
+    );
+  };
+  const checking = () => props.status.signing?.action === "check-backup";
+  const waiting = () => started() && !stopped() && !connected() && !deviceWarning();
   const failure = () => {
     const own = action.failure();
     if (own !== null) return own;
@@ -111,108 +124,153 @@ export function NearSetupDialog(props: NearDialogProps & { agents: readonly Near
   );
 
   createEffect(
-    () => started() && connected(),
-    (ready) => {
-      if (ready) setIndex(steps.indexOf("funds"));
+    () => props.status.signing?.action ?? null,
+    (current) => {
+      if (current === null) return;
+      const reached = SETUP_ACTIONS.indexOf(current);
+      if (reached > signed()) setSigned(reached);
     },
   );
 
+  createEffect(
+    () => started() && connected(),
+    (ready) => {
+      if (ready) setIndex(SETUP_STEPS.indexOf("backup"));
+    },
+  );
+
+  createEffect(deviceWarning, (warn) => {
+    if (!warn) return;
+    setKeepAccepted(false);
+    setIndex(SETUP_STEPS.indexOf("backup"));
+  });
+
   const canGo = () => {
-    if (step() === "key") return key().trim() !== "" && !action.busy();
-    if (step() === "agents") return agentIds().length > 0;
     if (step() === "sign") return accepted() && !waiting();
+    if (step() === "backup") return !action.busy() && !checking() && (!deviceWarning() || keepAccepted());
     return true;
   };
 
+  async function create(passkey?: NearPasskeyChoice) {
+    setStopped(false);
+    setSigned(-1);
+    setStarted(true);
+    const input = { dailyBudgetUsd: SETUP_DAILY_BUDGET };
+    const sent = await action.run(() => props.actions.create(passkey ? { ...input, passkey } : input));
+    if (!sent) setStopped(true);
+  }
+
+  function resume(passkey: NearPasskeyChoice) {
+    setAcceptedAt(backup()?.checkedAt ?? null);
+    setIndex(SETUP_STEPS.indexOf("sign"));
+    void create(passkey);
+  }
+
   async function next() {
     if (!canGo()) return;
-    if (step() === "key") {
-      const saved = await action.run(() => props.actions.setKey(key().trim()));
-      if (!saved) return;
-      setKey("");
-    }
     if (step() === "sign") {
-      setStopped(false);
-      setStarted(true);
-      const sent = await action.run(() =>
-        props.actions.create({ ownerMethod: method(), dailyBudgetUsd: budget(), agentIds: agentIds() }),
-      );
-      if (!sent) setStopped(true);
-      return;
+      setAcceptedAt(null);
+      return create();
     }
+    if (step() === "backup" && deviceWarning()) return resume("keep");
     if (step() === "funds") return props.onClose();
     setIndex(index() + 1);
   }
 
-  const title = () => t("vault.near.setupTitle", { step: t(STEP_KEYS[step()]) });
   const submitLabel = () => {
+    if (step() === "sign" && stopped()) return t("common.tryAgain");
     if (step() === "sign") return t("vault.near.signInBrowser");
+    if (deviceWarning()) return t("vault.near.backup.keep");
     if (step() === "funds") return t("common.done");
     return t("common.continue");
   };
-  const canGoBack = () => index() > 0 && !waiting() && step() !== "funds" && !connected();
+  const activeSignature = () => {
+    if (waiting()) return Math.max(signed(), 0);
+    if (started() && stopped()) return signed();
+    return -1;
+  };
+  const signingNow = () => step() === "sign" && waiting();
+  const canGoBack = () => index() > 0 && !waiting() && step() !== "funds" && step() !== "backup" && !connected();
   const wait = () => <NearSigningWait onOpenAgain={props.actions.openSigning} onCancel={props.actions.cancelSigning} />;
+  const stepLabels = () => SETUP_STEPS.map((item) => t(STEP_KEYS[item]));
   const footer = () => (
-    <>
-      <Text as="span" variant="caption" tone="muted" class="near-wallet-step">
-        {t("vault.near.stepCount", { step: String(index() + 1), count: String(steps.length) })}
-      </Text>
+    <Show
+      when={!signingNow()}
+      fallback={
+        <>
+          <Text as="span" variant="caption" tone="muted" class="near-wallet-status" role="status">
+            {t("vault.near.signature.count", {
+              step: String(activeSignature() + 1),
+              count: String(SETUP_SIGNATURE_COUNT),
+            })}
+          </Text>
+          <Button type="button" variant="ghost" onClick={props.actions.cancelSigning}>
+            {t("common.cancel")}
+          </Button>
+        </>
+      }
+    >
+      <Show when={step() === "sign"}>
+        <Button type="button" variant="ghost" onClick={props.onClose}>
+          {t("common.cancel")}
+        </Button>
+      </Show>
       <Show when={canGoBack()}>
         <Button type="button" variant="ghost" onClick={() => setIndex(index() - 1)}>
           {t("common.back")}
         </Button>
       </Show>
-      <Button
-        type="submit"
-        disabled={!canGo()}
-        loading={waiting() || (step() === "key" && action.busy())}
-        loadingLabel={t("vault.near.waitingShort")}
-      >
+      <Show when={deviceWarning()}>
+        <Button type="button" variant="ghost" onClick={() => resume("replace")}>
+          {t("vault.near.backup.useAnother")}
+        </Button>
+      </Show>
+      <Button type="submit" disabled={!canGo()} loading={checking()} loadingLabel={t("vault.near.waitingShort")}>
         {submitLabel()}
       </Button>
-    </>
+    </Show>
   );
 
   return (
     <NearWalletDialog
-      title={title()}
-      focusSearch={step() === "agents"}
+      title={t("vault.near.setupTitle")}
+      focusCheckbox={!started()}
       onClose={props.onClose}
       onSubmit={() => void next()}
       actions={footer()}
     >
+      <SetupSteps labels={stepLabels()} current={index()} />
       <Switch>
-        <Match when={step() === "key"}>
-          <Field label={t("vault.near.keyLabel")}>
-            <Input
-              type="password"
-              autocomplete="off"
-              spellcheck={false}
-              maxlength={NEAR_WALLET_LIMITS.partnerKey}
-              value={key()}
-              onValueChange={setKey}
-            />
-          </Field>
-        </Match>
-        <Match when={step() === "spending"}>
-          <BudgetChoice values={BUDGET_PRESETS} value={budget()} onChange={setBudget} />
-        </Match>
-        <Match when={step() === "agents"}>
-          <AgentPicker
-            agents={props.agents}
-            label={t("vault.near.agentsTitle")}
-            checked={(id) => agentIds().includes(id)}
-            set={(ids, on) =>
-              setAgentIds(on ? [...new Set([...agentIds(), ...ids])] : agentIds().filter((item) => !ids.includes(item)))
-            }
-          />
-        </Match>
         <Match when={step() === "sign"}>
-          <Show when={!waiting()} fallback={wait()}>
-            <Field label={t("vault.near.signWith")}>
-              <OwnerMethodChoice value={method()} onChange={setMethod} />
-            </Field>
+          <SetupSignatures
+            active={activeSignature()}
+            failed={started() && stopped()}
+            dailyBudgetUsd={SETUP_DAILY_BUDGET}
+          />
+          <Show when={!started()}>
             <RiskAccept accepted={accepted()} onChange={setAccepted} />
+          </Show>
+        </Match>
+        <Match when={step() === "backup"}>
+          <Show when={!checking()} fallback={wait()}>
+            <PasskeyBackupNotice state={backup()?.state ?? null}>
+              <Show when={deviceWarning()}>
+                <NearCheck label={t("vault.near.backup.accept")} checked={keepAccepted()} onChange={setKeepAccepted} />
+              </Show>
+              <Show when={connected() && backup()?.state !== "synced"}>
+                <div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={action.busy()}
+                    onClick={() => void action.run(props.actions.checkBackup)}
+                  >
+                    {t("vault.near.backup.checkAgain")}
+                  </Button>
+                </div>
+              </Show>
+            </PasskeyBackupNotice>
           </Show>
         </Match>
         <Match when={step() === "funds"}>
@@ -293,7 +351,7 @@ function OwnerChangeDialog(props: {
 
 export function NearBudgetDialog(props: NearDialogProps) {
   const { t } = useText();
-  const current = untrack(() => props.status.account?.dailyBudgetUsd ?? "25");
+  const current = untrack(() => props.status.account?.dailyBudgetUsd ?? SETUP_DAILY_BUDGET);
   const values = [...new Set([...BUDGET_PRESETS, current])].sort((a, b) => usdNumber(a) - usdNumber(b));
   const [budget, setBudget] = createSignal(current);
   const run = createNearRun();
@@ -320,11 +378,13 @@ export function NearBudgetDialog(props: NearDialogProps) {
 export function NearAgentsDialog(props: NearDialogProps & { agents: readonly NearWalletAgent[] }) {
   const { t, format } = useText();
   const [draft, setDraft] = createStore<{ on: Record<string, boolean> }>({ on: {} });
-  const has = (id: string) => props.status.agentIds.includes(id);
+  const [allAgents, setAllAgents] = createSignal(untrack(() => props.status.allAgents));
+  const has = (id: string) => props.status.allAgents || props.status.agentIds.includes(id);
   const checked = (id: string) => draft.on[id] ?? has(id);
   const adds = () => props.agents.filter((agent) => draft.on[agent.id] === true && !has(agent.id)).map((a) => a.id);
   const removes = () => props.agents.filter((agent) => draft.on[agent.id] === false && has(agent.id)).map((a) => a.id);
   const label = () => {
+    if (allAgents() !== props.status.allAgents) return t("common.save");
     const added = adds();
     const removed = removes();
     if (added.length > 0 && removed.length > 0)
@@ -333,7 +393,8 @@ export function NearAgentsDialog(props: NearDialogProps & { agents: readonly Nea
     if (removed.length > 0) return t("vault.near.removeAgents", { names: agentNames(format, props.agents, removed) });
     return t("common.save");
   };
-  const unchanged = () => adds().length === 0 && removes().length === 0;
+  const unchanged = () =>
+    allAgents() === props.status.allAgents && (allAgents() || (adds().length === 0 && removes().length === 0));
   const run = createNearRun();
   async function save() {
     if (unchanged()) return;
@@ -342,7 +403,7 @@ export function NearAgentsDialog(props: NearDialogProps & { agents: readonly Nea
       ...props.status.agentIds.filter((id) => !known.has(id)),
       ...props.agents.filter((agent) => checked(agent.id)).map((agent) => agent.id),
     ];
-    if (await run.run(() => props.actions.setAgents(agentIds))) props.onClose();
+    if (await run.run(() => props.actions.setAgents({ allAgents: allAgents(), agentIds }))) props.onClose();
   }
   return (
     <OwnerChangeDialog
@@ -350,22 +411,24 @@ export function NearAgentsDialog(props: NearDialogProps & { agents: readonly Nea
       submitLabel={label()}
       canSave={!unchanged()}
       sign={false}
-      focusSearch
       actions={props.actions}
       run={run}
       onClose={props.onClose}
       onSave={() => void save()}
     >
-      <AgentPicker
-        agents={props.agents}
-        label={t("vault.near.agentsTitle")}
-        checked={checked}
-        set={(ids, on) =>
-          setDraft((state) => {
-            for (const id of ids) state.on[id] = on;
-          })
-        }
-      />
+      <AllAgentsChoice checked={allAgents()} onChange={setAllAgents} />
+      <Show when={!allAgents()}>
+        <AgentPicker
+          agents={props.agents}
+          label={t("vault.near.agentsTitle")}
+          checked={checked}
+          set={(ids, on) =>
+            setDraft((state) => {
+              for (const id of ids) state.on[id] = on;
+            })
+          }
+        />
+      </Show>
     </OwnerChangeDialog>
   );
 }

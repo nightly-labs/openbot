@@ -2,11 +2,8 @@ import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isFiniteNumber, isIdentifier, isNullableBoundedString } from "./ipc-bounded-values";
 import { isBoolean, isDynamicRecord, isOneOf } from "./runtime-values";
 
-export type NearWalletState = "no-key" | "no-wallet" | "ready" | "frozen";
-export const NEAR_WALLET_STATES = ["no-key", "no-wallet", "ready", "frozen"] as const satisfies NearWalletState[];
-
-export type NearOwnerMethod = "passkey" | "evm";
-export const NEAR_OWNER_METHODS = ["passkey", "evm"] as const satisfies NearOwnerMethod[];
+export type NearWalletState = "signed-out" | "no-wallet" | "ready" | "frozen";
+export const NEAR_WALLET_STATES = ["signed-out", "no-wallet", "ready", "frozen"] as const satisfies NearWalletState[];
 
 export type NearOwnerAction =
   | "register"
@@ -16,7 +13,8 @@ export type NearOwnerAction =
   | "freeze"
   | "unfreeze"
   | "auto-pay"
-  | "approve-payment";
+  | "approve-payment"
+  | "check-backup";
 export const NEAR_OWNER_ACTIONS = [
   "register",
   "create",
@@ -26,15 +24,27 @@ export const NEAR_OWNER_ACTIONS = [
   "unfreeze",
   "auto-pay",
   "approve-payment",
+  "check-backup",
 ] as const satisfies NearOwnerAction[];
+
+export type NearPasskeyBackup = "synced" | "notSynced" | "deviceOnly";
+export const NEAR_PASSKEY_BACKUPS = ["synced", "notSynced", "deviceOnly"] as const satisfies NearPasskeyBackup[];
+
+export type NearPasskeyChoice = "keep" | "replace";
+export const NEAR_PASSKEY_CHOICES = ["keep", "replace"] as const satisfies NearPasskeyChoice[];
+
+export interface NearOwnerBackup {
+  state: NearPasskeyBackup | null;
+  checkedAt: string;
+}
 
 export const NEAR_RULE_DAILY_USD = [5, 10, 25, 50, 100] as const;
 
 export const NEAR_WALLET_LIMITS = {
-  partnerKey: 512,
   recipient: 128,
   recipientsPerRule: 8,
   rules: 64,
+  assets: 1024,
   asset: 160,
   amount: 80,
   reason: 500,
@@ -71,7 +81,6 @@ export interface NearPendingPayment {
 
 export interface NearWalletAccount {
   accountId: string;
-  ownerMethod: NearOwnerMethod;
   ownerApproval: boolean;
   dailyBudgetUsd: string;
   spentTodayUsd: string | null;
@@ -95,28 +104,36 @@ export interface NearWalletStatus {
   account: NearWalletAccount | null;
   balances: NearBalance[];
   depositAssets: NearDepositAsset[];
+  allAgents: boolean;
   agentIds: string[];
   rules: NearPayRule[];
   payments: NearPendingPayment[];
   signing: NearSigning | null;
+  ownerBackup: NearOwnerBackup | null;
   error: string | null;
 }
 
 export const NO_NEAR_WALLET: NearWalletStatus = {
-  state: "no-key",
+  state: "no-wallet",
   account: null,
   balances: [],
   depositAssets: [],
+  allAgents: true,
   agentIds: [],
   rules: [],
   payments: [],
   signing: null,
+  ownerBackup: null,
   error: null,
 };
 
 export interface NearWalletCreateInput {
-  ownerMethod: NearOwnerMethod;
   dailyBudgetUsd: string;
+  passkey?: NearPasskeyChoice;
+}
+
+export interface NearAgentsInput {
+  allAgents: boolean;
   agentIds: string[];
 }
 
@@ -172,22 +189,16 @@ function isIdList(value: unknown): value is string[] {
   );
 }
 
-export function parseNearPartnerKey(value: unknown): string | null {
-  if (!isBoundedString(value, NEAR_WALLET_LIMITS.partnerKey)) return null;
-  const key = value.trim();
-  return key.length > 0 && !/\s/.test(key) ? key : null;
-}
-
 export function parseNearWalletCreateInput(value: unknown): NearWalletCreateInput | null {
   if (
     !isDynamicRecord(value) ||
-    !isOneOf(NEAR_OWNER_METHODS, value.ownerMethod) ||
     !isNearBudgetText(value.dailyBudgetUsd) ||
-    !isIdList(value.agentIds)
+    !(value.passkey === undefined || isOneOf(NEAR_PASSKEY_CHOICES, value.passkey))
   ) {
     return null;
   }
-  return { ownerMethod: value.ownerMethod, dailyBudgetUsd: value.dailyBudgetUsd, agentIds: [...value.agentIds] };
+  const input = { dailyBudgetUsd: value.dailyBudgetUsd };
+  return value.passkey === undefined ? input : { ...input, passkey: value.passkey };
 }
 
 export function parseNearBudgetInput(value: unknown): { dailyBudgetUsd: string } | null {
@@ -196,8 +207,10 @@ export function parseNearBudgetInput(value: unknown): { dailyBudgetUsd: string }
     : null;
 }
 
-export function parseNearAgentsInput(value: unknown): { agentIds: string[] } | null {
-  return isDynamicRecord(value) && isIdList(value.agentIds) ? { agentIds: [...value.agentIds] } : null;
+export function parseNearAgentsInput(value: unknown): NearAgentsInput | null {
+  return isDynamicRecord(value) && typeof value.allAgents === "boolean" && isIdList(value.agentIds)
+    ? { allAgents: value.allAgents, agentIds: [...value.agentIds] }
+    : null;
 }
 
 export function parseNearDepositInput(value: unknown): NearDepositInput | null {
@@ -276,7 +289,6 @@ function isNearWalletAccount(value: unknown): value is NearWalletAccount {
   return (
     isDynamicRecord(value) &&
     isBoundedString(value.accountId, NEAR_WALLET_LIMITS.recipient) &&
-    isOneOf(NEAR_OWNER_METHODS, value.ownerMethod) &&
     isBoolean(value.ownerApproval) &&
     isNullableBoundedString(value.dailyBudgetUsd, NEAR_WALLET_LIMITS.usd) &&
     isNullableBoundedString(value.spentTodayUsd, NEAR_WALLET_LIMITS.usd) &&
@@ -302,6 +314,14 @@ function isNearSigning(value: unknown): value is NearSigning {
   );
 }
 
+function isNearOwnerBackup(value: unknown): value is NearOwnerBackup {
+  return (
+    isDynamicRecord(value) &&
+    (value.state === null || isOneOf(NEAR_PASSKEY_BACKUPS, value.state)) &&
+    isBoundedString(value.checkedAt, NEAR_WALLET_LIMITS.usd)
+  );
+}
+
 function listOf<T>(value: unknown, limit: number, check: (item: unknown) => item is T): value is T[] {
   return Array.isArray(value) && value.length <= limit && value.every(check);
 }
@@ -311,12 +331,14 @@ export function parseNearWalletStatus(value: unknown): NearWalletStatus | null {
     !isDynamicRecord(value) ||
     !isOneOf(NEAR_WALLET_STATES, value.state) ||
     !(value.account === null || isNearWalletAccount(value.account)) ||
-    !listOf(value.balances, NEAR_WALLET_LIMITS.rules, isNearBalance) ||
-    !listOf(value.depositAssets, NEAR_WALLET_LIMITS.rules, isNearDepositAsset) ||
+    !listOf(value.balances, NEAR_WALLET_LIMITS.assets, isNearBalance) ||
+    !listOf(value.depositAssets, NEAR_WALLET_LIMITS.assets, isNearDepositAsset) ||
+    typeof value.allAgents !== "boolean" ||
     !isIdList(value.agentIds) ||
     !listOf(value.rules, NEAR_WALLET_LIMITS.rules, isNearPayRule) ||
     !listOf(value.payments, NEAR_WALLET_LIMITS.rules, isNearPendingPayment) ||
     !(value.signing === null || isNearSigning(value.signing)) ||
+    !(value.ownerBackup === null || isNearOwnerBackup(value.ownerBackup)) ||
     !isNullableBoundedString(value.error, INPUT_LIMITS.messageText)
   ) {
     return null;
@@ -326,10 +348,12 @@ export function parseNearWalletStatus(value: unknown): NearWalletStatus | null {
     account: value.account,
     balances: value.balances,
     depositAssets: value.depositAssets,
+    allAgents: value.allAgents,
     agentIds: value.agentIds,
     rules: value.rules,
     payments: value.payments,
     signing: value.signing,
+    ownerBackup: value.ownerBackup,
     error: value.error,
   };
 }

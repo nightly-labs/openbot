@@ -98,6 +98,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.browserClicking": "Clicking on the web page…",
   "status.agent.browserTyping": "Typing on the web page…",
   "status.agent.browserActing": "Using the web page…",
+  "status.agent.browserPaying": "Sending the payment…",
   "status.agent.browserReviewing": "Reviewing the web page…",
   "status.agent.memoriesSearching": "Searching its memories…",
   "status.agent.chatsSearching": "Searching its past chats…",

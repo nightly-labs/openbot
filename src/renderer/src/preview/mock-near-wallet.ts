@@ -9,6 +9,8 @@ const MOCK_SIGNATURE_MS = 2_000;
 
 const MOCK_ACCOUNT_ID = "7f3c2a9e41b8d6c05e12f4a3b7c9d8e1f0a2b4c6d8e0f1a3b5c7d9e1f2a4b6c8";
 
+const mockBackup = () => ({ state: "synced" as const, checkedAt: new Date().toISOString() });
+
 export function createMockNearWallet(): NearWalletDesktopApi {
   let status: NearWalletStatus = structuredClone(NO_NEAR_WALLET);
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -34,15 +36,14 @@ export function createMockNearWallet(): NearWalletDesktopApi {
     current.account ? { ...current, account: { ...current.account, ...change } } : current;
   return {
     status: async () => structuredClone(status),
-    setKey: async () => set({ ...status, state: "no-wallet", error: null }),
     create: async (input) =>
       sign("create", (current) => ({
         ...current,
         state: "ready",
-        agentIds: input.agentIds,
+        ownerBackup: mockBackup(),
+        allAgents: true,
         account: {
           accountId: MOCK_ACCOUNT_ID,
-          ownerMethod: input.ownerMethod,
           ownerApproval: true,
           dailyBudgetUsd: input.dailyBudgetUsd,
           spentTodayUsd: "0",
@@ -56,11 +57,12 @@ export function createMockNearWallet(): NearWalletDesktopApi {
         ],
       })),
     setBudget: async ({ dailyBudgetUsd }) => sign("budget", (current) => withAccount(current, { dailyBudgetUsd })),
-    setAgents: async ({ agentIds }) => set({ ...status, agentIds }),
+    setAgents: async ({ allAgents, agentIds }) => set({ ...status, allAgents, agentIds }),
     renewGrant: async () =>
       sign("grant", (current) =>
         withAccount(current, { grantExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60_000).toISOString() }),
       ),
+    checkBackup: async () => sign("check-backup", (current) => ({ ...current, ownerBackup: mockBackup() })),
     freeze: async () => sign("freeze", (current) => ({ ...current, state: "frozen" })),
     unfreeze: async () => sign("unfreeze", (current) => ({ ...current, state: "ready" })),
     deposit: async () => ({ address: MOCK_ACCOUNT_ID, memo: null, minAmount: null, expiresAt: null }),

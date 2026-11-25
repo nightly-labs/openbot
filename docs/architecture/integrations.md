@@ -690,24 +690,25 @@ The Crypto tab of the Vault connects one NEAR Intents agent account (Agent API, 
 [`near-wallet-store.ts`](../../src/main/near-wallet-store.ts). The renderer, the backend and the
 agent processes never get the partner key, the grant token or a signature.
 
-- **Owner.** A passkey or an EVM wallet. Each owner action (register, create, grant, budget, freeze,
+- **Owner.** A passkey. OpenBot does not support an EVM wallet owner. Each owner action (register, create, grant, budget, freeze,
   unfreeze, auto-pay, a vote on a payment) opens `/near/sign` of the account service in the system
   browser ([`near-wallet-signing.ts`](../../src/main/near-wallet-signing.ts)). The request is in the
   URL fragment, which no server gets. The page returns the signature with
   `openbot://near-signature?nonce=…&data=…`; a development build uses a loopback listener. Main takes
-  only the result of the one waiting nonce (32 random bytes, used once) and checks its shape, the EVM
-  signer and the passkey key type.
+  only the result of the one waiting nonce (32 random bytes, used once) and checks its shape and the
+  passkey key type.
 - **Grant.** OpenBot holds an agent grant for 30 days. Payments use it; Renew signs a new one.
 - **Payments.** An agent calls `request_near_payment`
-  ([`attention-registry.ts`](../../src/backend/agent/attention-registry.ts)). Only the agents that the
-  owner chose can ask, and a request from a Slack, Discord or Telegram chat is refused. A payment that
-  no rule allows waits for the owner on the chat card. A rule of "Pay without asking" allows a
+  ([`attention-registry.ts`](../../src/backend/agent/attention-registry.ts)). All agents can ask, also
+  agents made later, until the owner chooses a list on the wallet page; a wallet stored with a list
+  keeps it. A new wallet's daily budget is $25. A request from a Slack, Discord or Telegram chat is
+  refused. A payment that no rule allows waits for the owner on the chat card. A rule of "Pay without asking" allows a
   recipient for a domain up to a daily USD limit; the first rule turns off `owner_approval` with one
   signature. The Agent API keeps the daily budget of all payments.
 - **No double payment.** A payment is stored with its idempotency key before it is sent. A lost
   answer is `uncertain`: OpenBot sends it again with the same key, also after a restart, for one hour.
 - **Test.** `bun run test:near-wallet-e2e` runs the service against a fake Agent API on 127.0.0.1
-  with a real secp256k1 owner key. The real Agent API has no test network; do not run payments
+  with a real P-256 passkey owner key. The real Agent API has no test network; do not run payments
   against it without the owner's consent.
 
 ## Add a Team API capability

@@ -78,6 +78,7 @@ export const messages = {
   "status.agent.browserClicking": "Klick auf der Webseite…",
   "status.agent.browserTyping": "Eingabe auf der Webseite…",
   "status.agent.browserActing": "Webseite wird bedient…",
+  "status.agent.browserPaying": "Zahlung wird gesendet…",
   "status.agent.browserReviewing": "Webseite wird geprüft…",
   "status.agent.memoriesSearching": "Erinnerungen werden durchsucht…",
   "status.agent.chatsSearching": "Frühere Chats werden durchsucht…",

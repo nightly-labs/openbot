@@ -15,10 +15,9 @@ export function createNearWalletStore(api: () => NearWalletDesktopApi = () => wi
   };
 
   const actions: NearWalletActions = {
-    setKey: async (key) => show(await api().setKey(key)),
     create: async (input) => show(await api().create(input)),
     setBudget: async (dailyBudgetUsd) => show(await api().setBudget({ dailyBudgetUsd })),
-    setAgents: async (agentIds) => show(await api().setAgents({ agentIds })),
+    setAgents: async (input) => show(await api().setAgents(input)),
     renewGrant: async () => show(await api().renewGrant()),
     freeze: async () => show(await api().freeze()),
     unfreeze: async () => show(await api().unfreeze()),
@@ -28,6 +27,7 @@ export function createNearWalletStore(api: () => NearWalletDesktopApi = () => wi
     allowPayment: async (input) => show(await api().allowPayment(input)),
     openSigning: () => api().openSigning(),
     cancelSigning: async () => show(await api().cancelSigning()),
+    checkBackup: async () => show(await api().checkBackup()),
     disconnect: async () => show(await api().disconnect()),
   };
 

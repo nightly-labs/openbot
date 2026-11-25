@@ -1,17 +1,21 @@
 import {
+  type NearDepositAddress,
+  type NearOwnerAction,
   type NearPendingPayment,
   type NearWalletDesktopApi,
   type NearWalletStatus,
   NO_NEAR_WALLET,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { NearPaymentCard } from "@openbot/ui/features/vault/NearPaymentCard";
-import { NearSetupDialog, VaultNearWalletPage } from "@openbot/ui/features/vault/VaultNearWallet";
+import { NearAddFundsDialog, NearSetupDialog, VaultNearWalletPage } from "@openbot/ui/features/vault/VaultNearWallet";
 import { onSettled } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { createNearWalletStore } from "../src/features/vault/stores/near-wallet-store";
 import { createVaultStore } from "../src/features/vault/stores/vault-store";
 import { STORY_AGENTS } from "../src/preview/fixtures";
+import { STORY_DEPOSIT_ASSETS } from "./near-deposit-assets";
 import { ServerSettingsStory, serverSettingsArgs } from "./server-settings-story";
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -33,7 +37,6 @@ const READY: NearWalletStatus = {
   state: "ready",
   account: {
     accountId: "7f3c2a9e41b8d6c05e12f4a3b7c9d8e1f0a2b4c6d8e0f1a3b5c7d9e1f2a4b6c8",
-    ownerMethod: "passkey",
     ownerApproval: false,
     dailyBudgetUsd: "25",
     spentTodayUsd: "4.20",
@@ -44,10 +47,8 @@ const READY: NearWalletStatus = {
     { assetId: "nep141:usdc.near", symbol: "USDC", amount: "42.50", usd: "42.50" },
     { assetId: "nep141:wrap.near", symbol: "NEAR", amount: "3.2", usd: "9.60" },
   ],
-  depositAssets: [
-    { assetId: "nep141:usdc.near", symbol: "USDC", blockchain: "near" },
-    { assetId: "nep141:wrap.near", symbol: "NEAR", blockchain: "near" },
-  ],
+  depositAssets: STORY_DEPOSIT_ASSETS,
+  allAgents: false,
   agentIds: STORY_AGENTS.slice(0, 2).map((agent) => agent.id),
   rules: [
     { domain: "api.exa.ai", recipients: ["exa.near"], dailyUsd: 10, spentTodayUsd: 4.2 },
@@ -55,10 +56,40 @@ const READY: NearWalletStatus = {
   ],
   payments: [PAYMENT],
   signing: null,
+  ownerBackup: { state: "notSynced", checkedAt: new Date(Date.now() - DAY_MS).toISOString() },
   error: null,
 };
 
-function storyNearApi(initial: NearWalletStatus): NearWalletDesktopApi {
+const STORY_ADDRESSES: Readonly<Record<string, string>> = {
+  btc: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+  near: "4f1d7a3e9b2c8d6f0a5e7c1b3d9f2a6e8c4b0d7f1e3a5c9b2d6f8e0a4c7b1d3f",
+  sol: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+  stellar: "GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37",
+  ton: "UQBvW8Z5huBkMJYdnfAEM5JqTNkuWX3diqYENkWsIL0XggGG",
+  tron: "TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7",
+  xrp: "rEb8TK3gBgk5auZkwc6sHnwrGVJH8DuaLh",
+};
+
+function storyDepositAddress(assetId: string): Promise<NearDepositAddress> {
+  const blockchain = STORY_DEPOSIT_ASSETS.find((asset) => asset.assetId === assetId)?.blockchain ?? "eth";
+  const memo = blockchain === "stellar" || blockchain === "xrp" ? "2048117" : null;
+  return Promise.resolve({
+    address: STORY_ADDRESSES[blockchain] ?? "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+    memo,
+    minAmount: "1",
+    expiresAt: null,
+  });
+}
+
+type SetupStory = { deviceOnly?: boolean; waitAt?: NearOwnerAction; stopAt?: NearOwnerAction };
+
+function stopSigning(set: (change: Partial<NearWalletStatus>) => NearWalletStatus, action: NearOwnerAction) {
+  const status = set({ signing: { action, requestId: null } });
+  return { ...status, signing: null, error: sourceText("error.connector.nearSigningCanceled") };
+}
+
+function storyNearApi(initial: NearWalletStatus, setup: SetupStory = {}): NearWalletDesktopApi {
+  const { deviceOnly = false, waitAt, stopAt } = setup;
   let status = structuredClone(initial);
   const listeners = new Set<(status: NearWalletStatus) => void>();
   const set = (change: Partial<NearWalletStatus>) => {
@@ -70,20 +101,27 @@ function storyNearApi(initial: NearWalletStatus): NearWalletDesktopApi {
     status.account ? { account: { ...status.account, ...change } } : {};
   return {
     status: async () => structuredClone(status),
-    setKey: async () => set({ state: "no-wallet" }),
-    create: async ({ agentIds }) => set({ ...READY, agentIds, payments: [] }),
+    create: async ({ passkey }) => {
+      if (waitAt) return new Promise<NearWalletStatus>(() => set({ signing: { action: waitAt, requestId: null } }));
+      if (stopAt) return stopSigning(set, stopAt);
+      if (deviceOnly && passkey !== "keep") {
+        return set({ state: "no-wallet", ownerBackup: { state: "deviceOnly", checkedAt: new Date().toISOString() } });
+      }
+      return set({ ...READY, allAgents: true, agentIds: [], payments: [] });
+    },
     setBudget: async ({ dailyBudgetUsd }) => set(account({ dailyBudgetUsd })),
-    setAgents: async ({ agentIds }) => set({ agentIds }),
+    setAgents: async ({ allAgents, agentIds }) => set({ allAgents, agentIds }),
     renewGrant: async () => set(account({ grantExpiresAt: new Date(Date.now() + 30 * DAY_MS).toISOString() })),
     freeze: async () => set({ state: "frozen" }),
     unfreeze: async () => set({ state: "ready" }),
-    deposit: async () => ({ address: READY.account?.accountId ?? "", memo: null, minAmount: "1", expiresAt: null }),
+    deposit: async ({ assetId }) => storyDepositAddress(assetId),
     saveRule: async (rule) =>
       set({ rules: [...status.rules.filter((item) => item.domain !== rule.domain), { ...rule, spentTodayUsd: 0 }] }),
     removeRule: async ({ domain }) => set({ rules: status.rules.filter((item) => item.domain !== domain) }),
     allowPayment: async () => set({}),
     openSigning: async () => undefined,
     cancelSigning: async () => set({ signing: null }),
+    checkBackup: async () => set({ ownerBackup: { state: "synced", checkedAt: new Date().toISOString() } }),
     disconnect: async () => set(structuredClone(NO_NEAR_WALLET)),
     onChanged: (listener) => {
       listeners.add(listener);
@@ -92,8 +130,8 @@ function storyNearApi(initial: NearWalletStatus): NearWalletDesktopApi {
   };
 }
 
-function storyStore(initial: NearWalletStatus) {
-  const api = storyNearApi(initial);
+function storyStore(initial: NearWalletStatus, setup: SetupStory = {}) {
+  const api = storyNearApi(initial, setup);
   const store = createNearWalletStore(() => api);
   onSettled(() => {
     const stop = store.subscribe();
@@ -135,9 +173,14 @@ function InVault(props: { status: NearWalletStatus }) {
   );
 }
 
-function Setup() {
-  const store = storyStore(NO_NEAR_WALLET);
-  return <NearSetupDialog status={store.state.status} agents={STORY_AGENTS} actions={store.actions} onClose={fn()} />;
+function Setup(props: SetupStory) {
+  const store = storyStore(NO_NEAR_WALLET, props);
+  return <NearSetupDialog status={store.state.status} actions={store.actions} onClose={fn()} />;
+}
+
+function AddFundsView(props: { status: NearWalletStatus }) {
+  const store = storyStore(props.status);
+  return <NearAddFundsDialog status={store.state.status} actions={store.actions} onClose={fn()} />;
 }
 
 function PaymentCard(props: { payment: NearPendingPayment; status: NearWalletStatus }) {
@@ -173,7 +216,24 @@ export const VaultNotConnected: Story = {
   render: () => <InVault status={NO_NEAR_WALLET} />,
 };
 
+export const VaultSignedOut: Story = {
+  parameters: { layout: "fullscreen" },
+  render: () => <InVault status={{ ...NO_NEAR_WALLET, state: "signed-out" }} />,
+};
+
 export const GuidedSetup: Story = { render: () => <Setup /> };
+
+export const GuidedSetupDeviceOnlyPasskey: Story = { render: () => <Setup deviceOnly /> };
+
+export const GuidedSetupSigning: Story = {
+  render: () => <Setup waitAt="create" />,
+};
+
+export const GuidedSetupStopped: Story = {
+  render: () => <Setup stopAt="create" />,
+};
+
+export const AddFunds: Story = { render: () => <AddFundsView status={READY} /> };
 
 export const WalletPage: Story = { render: () => <WalletPageView status={READY} /> };
 

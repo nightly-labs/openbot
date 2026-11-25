@@ -74,6 +74,7 @@ export const messages = {
   "status.agent.browserClicking": "웹 페이지를 클릭하는 중…",
   "status.agent.browserTyping": "웹 페이지에 입력하는 중…",
   "status.agent.browserActing": "웹 페이지를 사용하는 중…",
+  "status.agent.browserPaying": "결제를 보내는 중…",
   "status.agent.browserReviewing": "웹 페이지를 확인하는 중…",
   "status.agent.memoriesSearching": "메모리를 검색하는 중…",
   "status.agent.chatsSearching": "이전 채팅을 검색하는 중…",

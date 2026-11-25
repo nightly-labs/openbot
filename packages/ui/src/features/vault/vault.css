@@ -309,22 +309,90 @@
   gap: var(--openbot-space-3);
 }
 
-.near-wallet-qr {
+.near-wallet-funds-pick {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--openbot-space-3);
+}
+
+.near-wallet-pick-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.near-wallet-pick-name {
+  flex: none;
+  white-space: nowrap;
+}
+
+.near-wallet-pick-detail {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crypto-logo {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.crypto-logo-letter {
+  display: grid;
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control-active);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  line-height: 1;
+}
+
+.near-wallet-deposit {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--openbot-space-4);
+  align-items: center;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  padding: var(--openbot-space-3);
+}
+
+.near-wallet-deposit-loading {
+  min-height: 188px;
+  grid-template-columns: 1fr;
   place-items: center;
 }
 
-.near-wallet-address {
-  display: flex;
-  gap: var(--openbot-space-2);
-  align-items: center;
+.near-wallet-qr-mark.crypto-logo {
+  width: 32px;
+  height: 32px;
 }
 
-.near-wallet-address-input {
-  flex: 1;
-  min-inline-size: 0;
+.near-wallet-deposit-fields {
+  display: grid;
+  gap: var(--openbot-space-4);
+  min-width: 0;
+}
+
+.near-wallet-copy {
+  display: grid;
+  justify-items: start;
+  gap: var(--openbot-space-2);
+}
+
+.near-wallet-copy-value {
+  margin: 0;
+  justify-self: stretch;
   font-family: var(--openbot-font-mono);
   font-size: var(--openbot-text-sm);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .near-wallet-network {
@@ -342,7 +410,7 @@
   font-weight: var(--openbot-weight-semibold);
 }
 
-.near-wallet-step {
+.near-wallet-status {
   align-self: center;
   margin-inline-end: auto;
 }
@@ -452,4 +520,133 @@
 
 .near-chat-card[data-inline-actions] > .ui-block-content > .ui-block-header:has(> .ui-block-status) {
   flex-basis: 100%;
+}
+
+.near-wallet-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.near-wallet-steps li {
+  display: grid;
+  gap: var(--openbot-space-1-5);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.near-wallet-steps-line {
+  block-size: 3px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-border);
+}
+
+.near-wallet-steps li[data-state="current"] {
+  color: var(--openbot-text-primary);
+}
+
+.near-wallet-steps li[data-state="current"] .near-wallet-steps-line {
+  background: var(--openbot-text-primary);
+}
+
+.near-wallet-steps li[data-state="done"] .near-wallet-steps-line {
+  background: var(--openbot-success);
+}
+
+.near-wallet-signature {
+  transition: opacity var(--openbot-duration-fast) ease;
+}
+
+.near-wallet-signature .near-wallet-signature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 36px;
+  block-size: 36px;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-bg-control);
+  color: var(--openbot-text-secondary);
+  transition: color var(--openbot-duration-fast) ease;
+}
+
+.near-wallet-signature[data-state="current"] .near-wallet-signature-icon,
+.near-wallet-signature[data-state="failed"] .near-wallet-signature-icon {
+  color: var(--openbot-text-primary);
+}
+
+.near-wallet-signatures:has(.near-wallet-signature[data-state="current"], .near-wallet-signature[data-state="failed"])
+  .near-wallet-signature[data-state="next"] {
+  opacity: 0.5;
+}
+
+.near-wallet-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  inline-size: 22px;
+  block-size: 22px;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.near-wallet-mark[data-tone="busy"] {
+  border: none;
+  color: var(--openbot-text-primary);
+}
+
+.near-wallet-mark[data-tone="success"] {
+  border: none;
+  background: var(--openbot-success);
+  color: var(--openbot-bg-canvas);
+}
+
+.near-wallet-mark[data-tone="danger"] {
+  border: none;
+  background: var(--openbot-danger);
+  color: var(--openbot-bg-canvas);
+}
+
+.near-wallet-risk-check {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--openbot-space-2);
+  row-gap: var(--openbot-space-3);
+  align-items: center;
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+}
+
+.near-wallet-risk-icon {
+  justify-self: center;
+  color: var(--openbot-warning);
+}
+
+.near-wallet-risk-check p {
+  margin: 0;
+}
+
+.near-wallet-risk-label {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.near-wallet-risk-label label {
+  cursor: pointer;
+}
+
+.near-wallet-risk-label a {
+  color: var(--openbot-text-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }

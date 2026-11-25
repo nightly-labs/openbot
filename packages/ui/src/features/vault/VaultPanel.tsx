@@ -431,6 +431,9 @@ export function VaultPanel(props: VaultPanelProps) {
   const selectTab = (value: string) => {
     if (isFilter(value) || (isCrypto(value) && props.near)) setFilter(value);
   };
+  createEffect(nearConnected, (connected) => {
+    if (!connected) setNearPage(false);
+  });
   createEffect(nearOpen, (open) => {
     if (!open) return;
     props.onDetailChange?.({ title: t("vault.near.name"), back: () => setNearPage(false) });

@@ -73,6 +73,7 @@ export const messages = {
   "status.agent.browserClicking": "לוחץ בדף האינטרנט…",
   "status.agent.browserTyping": "מקליד בדף האינטרנט…",
   "status.agent.browserActing": "משתמש בדף האינטרנט…",
+  "status.agent.browserPaying": "שולח את התשלום…",
   "status.agent.browserReviewing": "בודק את דף האינטרנט…",
   "status.agent.memoriesSearching": "מחפש בזיכרונות שלו…",
   "status.agent.chatsSearching": "מחפש בצ'אטים הקודמים שלו…",

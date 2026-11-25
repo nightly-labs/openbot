@@ -77,6 +77,7 @@ export const messages = {
   "status.agent.browserClicking": "Web ページをクリックしています…",
   "status.agent.browserTyping": "Web ページに入力しています…",
   "status.agent.browserActing": "Web ページを操作しています…",
+  "status.agent.browserPaying": "支払いを送信しています…",
   "status.agent.browserReviewing": "Web ページを確認しています…",
   "status.agent.memoriesSearching": "メモリーを検索しています…",
   "status.agent.chatsSearching": "過去のチャットを検索しています…",

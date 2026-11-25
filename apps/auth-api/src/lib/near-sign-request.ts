@@ -1,15 +1,8 @@
-import type { NearOwnerAction, NearOwnerMethod } from "@openbot/contracts/ipc";
+import type { NearOwnerAction } from "@openbot/contracts/ipc";
 
 export type NearJsonValue = string | number | boolean | null | NearJsonValue[] | NearJsonObject;
 export interface NearJsonObject {
   [key: string]: NearJsonValue;
-}
-
-export interface NearEip712Payload {
-  domain: NearJsonObject;
-  types: Record<string, { name: string; type: string }[]>;
-  primaryType: string;
-  message: NearJsonObject;
 }
 
 export interface NearWebAuthnPayload {
@@ -21,33 +14,13 @@ export interface NearWebAuthnPayload {
 }
 
 export type NearSignRequest =
-  | {
-      kind: "register";
-      method: "passkey";
-      nonce: string;
-      summary: string;
-      challenge: string;
-      userId: string;
-      port: number | null;
-    }
-  | { kind: "register"; method: "evm"; nonce: string; summary: string; challenge: string; port: number | null }
+  | { kind: "register"; nonce: string; summary: string; challenge: string; userId: string; port: number | null }
   | {
       kind: "sign";
-      method: "passkey";
       nonce: string;
       action: Exclude<NearOwnerAction, "register">;
       summary: string;
       payload: NearWebAuthnPayload;
-      port: number | null;
-    }
-  | {
-      kind: "sign";
-      method: "evm";
-      nonce: string;
-      action: Exclude<NearOwnerAction, "register">;
-      summary: string;
-      payload: NearEip712Payload;
-      address: string;
       port: number | null;
     };
 
@@ -60,25 +33,13 @@ const OWNER_ACTIONS = {
   unfreeze: true,
   "auto-pay": true,
   "approve-payment": true,
+  "check-backup": true,
 } as const satisfies Record<NearOwnerAction, true>;
 
-const FRAGMENT_KEYS = new Set([
-  "v",
-  "nonce",
-  "kind",
-  "method",
-  "action",
-  "summary",
-  "challenge",
-  "userId",
-  "intent",
-  "address",
-  "port",
-]);
+const FRAGMENT_KEYS = new Set(["v", "nonce", "kind", "action", "summary", "challenge", "userId", "intent", "port"]);
 
 const NONCE_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/u;
-const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/u;
 const MAX_FRAGMENT_CHARS = 64 * 1024;
 const MAX_SUMMARY_CHARS = 2000;
 const MAX_ID_CHARS = 1366;
@@ -119,33 +80,6 @@ function isOwnerAction(value: NearJsonValue | undefined): value is NearOwnerActi
 
 function isSignAction(value: NearJsonValue | undefined): value is Exclude<NearOwnerAction, "register"> {
   return isOwnerAction(value) && value !== "register";
-}
-
-function isMethod(value: NearJsonValue | undefined): value is NearOwnerMethod {
-  return value === "passkey" || value === "evm";
-}
-
-function eip712Payload(value: NearJsonValue | undefined): NearEip712Payload | null {
-  if (
-    !isNearJsonObject(value) ||
-    !isNearJsonObject(value.domain) ||
-    !isNearJsonObject(value.types) ||
-    !isNearJsonObject(value.message)
-  )
-    return null;
-  const primaryType = value.primaryType;
-  if (typeof primaryType !== "string" || !Object.hasOwn(value.types, primaryType)) return null;
-  const types: NearEip712Payload["types"] = {};
-  for (const [name, fields] of Object.entries(value.types)) {
-    if (!Array.isArray(fields)) return null;
-    const checked: { name: string; type: string }[] = [];
-    for (const field of fields) {
-      if (!isNearJsonObject(field) || typeof field.name !== "string" || typeof field.type !== "string") return null;
-      checked.push({ name: field.name, type: field.type });
-    }
-    types[name] = checked;
-  }
-  return { domain: value.domain, types, primaryType, message: value.message };
 }
 
 function webAuthnPayload(value: NearJsonValue | undefined): NearWebAuthnPayload | null {
@@ -192,64 +126,27 @@ export function parseNearSignFragment(fragment: string): NearSignRequest | null 
     return null;
   }
   if (!isNearJsonObject(value) || Object.keys(value).some((key) => !FRAGMENT_KEYS.has(key))) return null;
-  const { v, nonce, kind, method, action, summary } = value;
-  if (v !== 1 || typeof nonce !== "string" || !NONCE_PATTERN.test(nonce) || !isMethod(method)) return null;
+  const { v, nonce, kind, action, summary } = value;
+  if (v !== 1 || typeof nonce !== "string" || !NONCE_PATTERN.test(nonce)) return null;
   if (typeof summary !== "string" || summary.length > MAX_SUMMARY_CHARS) return null;
   const port = returnPort(value.port);
   if (port === undefined) return null;
   if (kind === "register") {
-    if (action !== "register" || !isBase64url(value.challenge, 128)) return null;
-    if (value.intent !== undefined || value.address !== undefined) return null;
-    if (method === "evm") {
-      if (value.userId !== undefined) return null;
-      return { kind, method, nonce, summary, challenge: value.challenge, port };
-    }
-    if (!isBase64url(value.userId, 128)) return null;
-    return { kind, method, nonce, summary, challenge: value.challenge, userId: value.userId, port };
+    if (action !== "register" || !isBase64url(value.challenge, 128) || !isBase64url(value.userId, 128)) return null;
+    if (value.intent !== undefined) return null;
+    return { kind, nonce, summary, challenge: value.challenge, userId: value.userId, port };
   }
   if (kind !== "sign" || !isSignAction(action)) return null;
   if (value.challenge !== undefined || value.userId !== undefined || !isNearJsonObject(value.intent)) return null;
   const { standard, payload } = value.intent;
   if (Object.keys(value.intent).some((key) => key !== "standard" && key !== "payload")) return null;
-  if (method === "passkey") {
-    const checked = standard === "webauthn" ? webAuthnPayload(payload) : null;
-    if (!checked || value.address !== undefined) return null;
-    return { kind, method, nonce, action, summary, payload: checked, port };
-  }
-  const checked = standard === "eip712" ? eip712Payload(payload) : null;
-  const address = value.address;
-  if (!checked || typeof address !== "string" || !EVM_ADDRESS_PATTERN.test(address)) return null;
-  return { kind, method, nonce, action, summary, payload: checked, address, port };
+  const checked = standard === "webauthn" ? webAuthnPayload(payload) : null;
+  if (!checked) return null;
+  return { kind, nonce, action, summary, payload: checked, port };
 }
 
 export function nearSignAction(request: NearSignRequest): NearOwnerAction {
   return request.kind === "register" ? "register" : request.action;
-}
-
-export interface NearTypedField {
-  path: string;
-  value: string;
-}
-
-const MAX_TYPED_FIELDS = 64;
-const MAX_TYPED_DEPTH = 6;
-
-export function nearTypedFields(message: NearJsonObject): NearTypedField[] {
-  const fields: NearTypedField[] = [];
-  const visit = (value: NearJsonValue, path: string, depth: number) => {
-    if (fields.length >= MAX_TYPED_FIELDS) return;
-    if (depth < MAX_TYPED_DEPTH && (isNearJsonObject(value) || Array.isArray(value))) {
-      const entries = Array.isArray(value)
-        ? value.map((item, index) => [String(index), item] as const)
-        : Object.entries(value);
-      if (entries.length === 0) fields.push({ path, value: Array.isArray(value) ? "[]" : "{}" });
-      for (const [key, item] of entries) visit(item, path ? `${path}.${key}` : key, depth + 1);
-      return;
-    }
-    fields.push({ path, value: typeof value === "string" ? value : JSON.stringify(value) });
-  };
-  visit(message, "", 0);
-  return fields;
 }
 
 export function nearReturnUrl(request: NearSignRequest, data: string): string {

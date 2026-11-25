@@ -75,6 +75,7 @@ export const messages = {
   "status.agent.browserClicking": "Web sayfasında tıklanıyor…",
   "status.agent.browserTyping": "Web sayfasına yazılıyor…",
   "status.agent.browserActing": "Web sayfası kullanılıyor…",
+  "status.agent.browserPaying": "Ödeme gönderiliyor…",
   "status.agent.browserReviewing": "Web sayfası inceleniyor…",
   "status.agent.memoriesSearching": "Belleklerinde arıyor…",
   "status.agent.chatsSearching": "Önceki sohbetlerinde arıyor…",

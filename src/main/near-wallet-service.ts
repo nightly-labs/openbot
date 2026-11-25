@@ -18,12 +18,13 @@ import {
 } from "@near-intents-agent-api/sdk";
 import {
   NEAR_WALLET_LIMITS,
+  type NearAgentsInput,
   type NearAllowPaymentInput,
   type NearBalance,
   type NearDepositAddress,
   type NearDepositAsset,
   type NearDepositInput,
-  type NearOwnerAction,
+  type NearPasskeyBackup,
   type NearPendingPayment,
   type NearRuleInput,
   type NearSigning,
@@ -40,8 +41,15 @@ import {
   type NearWallet,
   NearWalletError,
 } from "../backend/near-wallet";
+import type { NearGatewayOwner, NearIntentsGateway } from "./near-intents-gateway";
 import { type NearOperationError, nearCall, nearFailure, nearMessage } from "./near-wallet-effects";
-import type { NearIntentToSign, NearOwnerSigning, NearSigningRequest } from "./near-wallet-signing";
+import {
+  type NearIntentToSign,
+  type NearOwnerSigning,
+  type NearSignAction,
+  type NearSigningRequest,
+  nearBackupState,
+} from "./near-wallet-signing";
 import type { NearOwner, NearStoredPayment, NearWalletRecord, NearWalletStore } from "./near-wallet-store";
 
 const logger = createOpenBotLogger("near-wallet");
@@ -61,6 +69,7 @@ const SEND_ATTEMPTS = 3;
 const MAX_PREPARED = 32;
 const MAX_ACTIONS_PER_HOUR = 20;
 const AGENT_NAME = "OpenBot";
+const GATEWAY_API_KEY = "openbot-gateway";
 
 const NEAR_ACCOUNT =
   /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$|^[0-9a-f]{64}$|^0x[0-9a-f]{40}$/u;
@@ -74,8 +83,8 @@ const UNCLEAR = new Set(["UNCERTAIN", "NEEDS_REVIEW"]);
 export interface NearWalletServiceOptions {
   store: NearWalletStore;
   signing: NearOwnerSigning;
+  gateway: NearIntentsGateway;
   baseUrl?: string | undefined;
-  fetch?: typeof fetch;
   now?: () => number;
 }
 
@@ -95,8 +104,8 @@ interface PreparedPayment {
 export class NearWalletService implements NearWallet {
   readonly #store: NearWalletStore;
   readonly #signing: NearOwnerSigning;
+  readonly #gateway: NearIntentsGateway;
   readonly #baseUrl: string | undefined;
-  readonly #fetch: typeof fetch | undefined;
   readonly #now: () => number;
   readonly #scope = Scope.makeUnsafe();
   readonly #listeners = new Set<(status: NearWalletStatus) => void>();
@@ -112,8 +121,8 @@ export class NearWalletService implements NearWallet {
   constructor(options: NearWalletServiceOptions) {
     this.#store = options.store;
     this.#signing = options.signing;
+    this.#gateway = options.gateway;
     this.#baseUrl = options.baseUrl;
-    this.#fetch = options.fetch;
     this.#now = options.now ?? Date.now;
   }
 
@@ -138,7 +147,6 @@ export class NearWalletService implements NearWallet {
         wallet?.accountId && owner && wallet.grant?.active
           ? {
               accountId: wallet.accountId,
-              ownerMethod: owner.type,
               ownerApproval: wallet.ownerApproval,
               dailyBudgetUsd: wallet.dailyBudgetUsd,
               spentTodayUsd: this.#policy?.usage.budget.daily.spent_usd ?? null,
@@ -148,10 +156,15 @@ export class NearWalletService implements NearWallet {
           : null,
       balances: this.#balances?.list ?? [],
       depositAssets: depositAssets(this.#tokens?.list ?? []),
+      allAgents: record.allAgents,
       agentIds: record.agentIds,
       rules: record.rules.map((rule) => ({ ...rule, spentTodayUsd: (spend[rule.domain] ?? 0) / 100 })),
       payments: [...this.#prepared.values()].flatMap((payment) => (payment.pending ? [payment.pending] : [])),
       signing: this.#signingState,
+      ownerBackup:
+        owner && record.ownerBackup
+          ? { state: record.ownerBackup.state, checkedAt: new Date(record.ownerBackup.checkedAt).toISOString() }
+          : null,
       error: this.#error,
     };
   }
@@ -162,7 +175,8 @@ export class NearWalletService implements NearWallet {
   }
 
   ready(): boolean {
-    return this.#state() === "ready" && this.#grantValid(this.#store.read());
+    const record = this.#store.read();
+    return this.#state() === "ready" && this.#grantValid(record) && this.#gatewayOwner(record) !== null;
   }
 
   readonly refresh = Effect.fn("NearWallet.refresh")(function* (this: NearWalletService) {
@@ -170,22 +184,11 @@ export class NearWalletService implements NearWallet {
     return this.status();
   }).bind(this);
 
-  readonly setKey = Effect.fn("NearWallet.setKey")(function* (this: NearWalletService, key: string) {
-    registerSecretValue(key);
-    return yield* this.#ownerStep(
-      Effect.gen({ self: this }, function* () {
-        if (this.#store.read().wallet) return yield* nearFailure(sourceText("error.connector.nearWalletExists"));
-        yield* nearCall((signal) => this.#client(key).whoami({ signal }));
-        yield* this.#store.update((record) => ({ ...record, partnerKey: key }));
-      }),
-    );
-  }).bind(this);
-
   readonly create = Effect.fn("NearWallet.create")(function* (this: NearWalletService, input: NearWalletCreateInput) {
     if (this.#disposed) return this.status();
     const record = this.#store.read();
-    if (!record.partnerKey) {
-      this.#error = sourceText("error.connector.nearNoKey");
+    if (!this.#gatewayOwner(record)) {
+      this.#error = sourceText("error.connector.nearSignIn");
       this.#emitStatus();
       return this.status();
     }
@@ -194,6 +197,7 @@ export class NearWalletService implements NearWallet {
       this.#emitStatus();
       return this.status();
     }
+    this.#error = null;
     yield* Effect.forkIn(this.#ownerStep(this.#create(input)), this.#scope);
     return this.status();
   }).bind(this);
@@ -216,8 +220,10 @@ export class NearWalletService implements NearWallet {
     );
   }).bind(this);
 
-  readonly setAgents = Effect.fn("NearWallet.setAgents")(function* (this: NearWalletService, agentIds: string[]) {
-    return yield* this.#ownerStep(this.#store.update((record) => ({ ...record, agentIds })));
+  readonly setAgents = Effect.fn("NearWallet.setAgents")(function* (this: NearWalletService, input: NearAgentsInput) {
+    return yield* this.#ownerStep(
+      this.#store.update((record) => ({ ...record, allAgents: input.allAgents, agentIds: input.agentIds })),
+    );
   }).bind(this);
 
   readonly renewGrant = Effect.fn("NearWallet.renewGrant")(function* (this: NearWalletService) {
@@ -354,6 +360,18 @@ export class NearWalletService implements NearWallet {
     return this.status();
   }
 
+  readonly checkBackup = Effect.fn("NearWallet.checkBackup")(function* (this: NearWalletService) {
+    return yield* this.#ownerStep(
+      Effect.gen({ self: this }, function* () {
+        const owner = this.#store.read().owner;
+        if (!owner) return yield* nearFailure(sourceText("error.connector.nearNoWallet"));
+        const result = yield* this.#sign({ kind: "check", action: "check-backup", summary: "" }, owner, null);
+        if (result.kind !== "backup") return yield* nearFailure(sourceText("error.connector.nearSigningInvalid"));
+        yield* this.#saveBackup(result.backup);
+      }),
+    );
+  }).bind(this);
+
   receiveSignature(nonce: string, data: string): boolean {
     return this.#signing.receive(nonce, data);
   }
@@ -384,7 +402,7 @@ export class NearWalletService implements NearWallet {
       if (!wallet?.grant?.active) return yield* nearFailure(sourceText("error.connector.nearNoWallet"));
       if (wallet.frozen) return yield* nearFailure(sourceText("error.connector.nearFrozen"));
       if (!this.#grantValid(record)) return yield* nearFailure(sourceText("error.connector.nearGrantExpired"));
-      if (!record.agentIds.includes(request.agentId))
+      if (!record.allAgents && !record.agentIds.includes(request.agentId))
         return yield* nearFailure(sourceText("error.connector.nearAgentNotAllowed"));
       if (this.#prepared.has(request.requestId) || this.#prepared.size >= MAX_PREPARED)
         return yield* nearFailure(sourceText("error.connector.nearSigningBusy"));
@@ -486,7 +504,7 @@ export class NearWalletService implements NearWallet {
         recipient: payment.request.recipient,
       });
       const result = yield* this.#follow(wallet.agentId, stored, sent.correlationId, PAYMENT_TIMEOUT_MS, summary);
-      yield* this.#background(this.#refresh(true));
+      yield* Effect.forkIn(this.#background(this.#refresh(true)), this.#scope);
       return result;
     },
     (operation) => operation.pipe(Effect.mapError(walletError)),
@@ -497,20 +515,24 @@ export class NearWalletService implements NearWallet {
     input: NearWalletCreateInput,
   ) {
     let record = this.#store.read();
-    if (!record.owner || (record.owner.type !== input.ownerMethod && !record.wallet)) {
-      const result = yield* this.#sign(
-        { kind: "register", method: input.ownerMethod, action: "register", summary: "" },
-        input.ownerMethod,
-        null,
-        null,
-      );
+    const replace = input.passkey === "replace" && !record.wallet;
+    if (!record.owner || replace) {
+      const result = yield* this.#sign({ kind: "register", action: "register", summary: "" }, null, null);
       if (result.kind !== "owner") return yield* nearFailure(sourceText("error.connector.nearSigningInvalid"));
-      record = yield* this.#store.update((current) => ({ ...current, owner: result.owner, agentIds: input.agentIds }));
+      const ownerBackup = { state: result.backup, checkedAt: this.#now() };
+      record = yield* this.#store.update((current) => ({
+        ...current,
+        owner: result.owner,
+        ownerBackup,
+        allAgents: true,
+      }));
     } else {
-      record = yield* this.#store.update((current) => ({ ...current, agentIds: input.agentIds }));
+      record = yield* this.#store.update((current) => ({ ...current, allAgents: true }));
     }
     const owner = record.owner;
     if (!owner) return yield* nearFailure(sourceText("error.connector.nearSigningInvalid"));
+    const deviceOnly = record.ownerBackup?.state === "deviceOnly";
+    if (deviceOnly && input.passkey !== "keep" && !record.wallet) return;
     yield* this.#createAccount(owner, input.dailyBudgetUsd);
     yield* this.#issueGrant(false);
     yield* this.#refresh(true);
@@ -538,6 +560,8 @@ export class NearWalletService implements NearWallet {
       }
       yield* this.#store.update((record) => ({ ...record, wallet: null }));
     }
+    const gatewayOwner = this.#gatewayOwner(this.#store.read());
+    if (!gatewayOwner) return yield* nearFailure(sourceText("error.connector.nearSignIn"));
     const intent = yield* this.#generate({
       type: "agent_create",
       name: AGENT_NAME,
@@ -554,6 +578,7 @@ export class NearWalletService implements NearWallet {
         ownerApproval: true,
         frozen: false,
         grant: null,
+        gatewayOwner,
       },
     }));
     const signed = yield* this.#signIntent(
@@ -676,7 +701,7 @@ export class NearWalletService implements NearWallet {
     const intent = yield* this.#generate({
       type: "policy_update",
       agent_id: wallet.agentId,
-      policy: change(view.policy),
+      policy: { ...change(view.policy), confidential: true },
       expected_revision: view.revision,
     });
     yield* this.#signAndSubmit(action, intent, summary, null);
@@ -703,7 +728,7 @@ export class NearWalletService implements NearWallet {
 
   readonly #signAndSubmit = Effect.fn("NearWallet.signAndSubmit")(function* (
     this: NearWalletService,
-    action: Exclude<NearOwnerAction, "register">,
+    action: NearSignAction,
     intent: GenerateIntentResponse,
     summary: string,
     requestId: string | null,
@@ -714,7 +739,7 @@ export class NearWalletService implements NearWallet {
 
   readonly #signIntent = Effect.fn("NearWallet.signIntent")(function* (
     this: NearWalletService,
-    action: Exclude<NearOwnerAction, "register">,
+    action: NearSignAction,
     intent: GenerateIntentResponse,
     summary: string,
     requestId: string | null,
@@ -724,24 +749,34 @@ export class NearWalletService implements NearWallet {
     const toSign = intentToSign(intent);
     if (!toSign)
       return yield* nearFailure(sourceText("error.connector.nearUnexpected", { detail: intent.intent.standard }));
-    const result = yield* this.#sign({ kind: "sign", action, summary, intent: toSign }, owner.type, owner, requestId);
-    if (result.kind === "eip712" && intent.intent.standard === "eip712")
-      return { standard: "eip712", payload: intent.intent.payload, signature: result.signature };
-    if (result.kind === "webauthn" && intent.intent.standard === "webauthn")
+    const result = yield* this.#sign({ kind: "sign", action, summary, intent: toSign }, owner, requestId);
+    if (result.kind === "webauthn" && intent.intent.standard === "webauthn") {
+      const backup = nearBackupState(result.credential.response.authenticatorData, owner.rp_id);
+      if (backup !== null && backup !== this.#store.read().ownerBackup?.state) yield* this.#saveBackup(backup);
       return { standard: "webauthn", payload: intent.intent.payload, credential: result.credential };
+    }
     return yield* nearFailure(sourceText("error.connector.nearSigningInvalid"));
+  });
+
+  readonly #saveBackup = Effect.fn("NearWallet.saveBackup")(function* (
+    this: NearWalletService,
+    state: NearPasskeyBackup | null,
+  ) {
+    yield* this.#store.update((current) =>
+      current.owner ? { ...current, ownerBackup: { state, checkedAt: this.#now() } } : current,
+    );
+    this.#emitStatus();
   });
 
   readonly #sign = Effect.fn("NearWallet.sign")(function* (
     this: NearWalletService,
     request: NearSigningRequest,
-    method: NearOwner["type"],
     owner: NearOwner | null,
     requestId: string | null,
   ) {
     this.#signingState = { action: request.action, requestId };
     this.#emitStatus();
-    return yield* nearCall(() => this.#signing.sign(request, method, owner)).pipe(
+    return yield* nearCall(() => this.#signing.sign(request, owner)).pipe(
       Effect.ensuring(
         Effect.sync(() => {
           this.#signingState = null;
@@ -988,16 +1023,22 @@ export class NearWalletService implements NearWallet {
     if (!wallet?.accountId) return;
     const api = yield* this.#partnerClient();
     const now = this.#now();
-    if (force || !this.#tokens || this.#tokens.at + TOKEN_CACHE_MS < now) {
-      const list = yield* nearCall((signal) => api.getTokens({ signal }));
-      this.#tokens = { at: now, list };
-    }
-    if (force || !this.#balances || this.#balances.at + BALANCE_CACHE_MS < now) {
-      const view = yield* nearCall((signal) => api.getBalances(wallet.agentId, {}, { signal }));
-      const raw = view.balances.filter((entry) => entry.balance_raw !== "0");
+    const tokensStale = !this.#tokens || this.#tokens.at + TOKEN_CACHE_MS < now;
+    const balancesStale = force || !this.#balances || this.#balances.at + BALANCE_CACHE_MS < now;
+    const [tokens, balances, policy] = yield* Effect.all(
+      [
+        tokensStale ? nearCall((signal) => api.getTokens({ signal })) : Effect.succeed(null),
+        balancesStale ? nearCall((signal) => api.getBalances(wallet.agentId, {}, { signal })) : Effect.succeed(null),
+        force ? nearCall((signal) => api.getPolicy(wallet.agentId, { signal })) : Effect.succeed(null),
+      ],
+      { concurrency: "unbounded" },
+    );
+    if (tokens) this.#tokens = { at: now, list: tokens };
+    if (balances) {
+      const raw = balances.balances.filter((entry) => entry.balance_raw !== "0");
       this.#balances = { at: now, raw, list: raw.map(balanceView) };
     }
-    if (force) this.#policy = yield* nearCall((signal) => api.getPolicy(wallet.agentId, { signal }));
+    if (policy) this.#policy = policy;
     this.#emitStatus();
   });
 
@@ -1047,24 +1088,31 @@ export class NearWalletService implements NearWallet {
     return Effect.succeed(wallet);
   }
 
-  #client(apiKey: string): AgentApi {
-    const options: AgentApiOptions = { apiKey };
+  #gatewayOwner(record: NearWalletRecord): NearGatewayOwner | null {
+    const available = this.#gateway.owners();
+    const wanted = record.wallet?.gatewayOwner;
+    if (wanted) return available.includes(wanted) ? wanted : null;
+    return available[0] ?? null;
+  }
+
+  #client(owner: NearGatewayOwner): AgentApi {
+    const options: AgentApiOptions = { apiKey: GATEWAY_API_KEY, fetch: this.#gateway.fetch(owner) };
     if (this.#baseUrl) options.baseUrl = this.#baseUrl;
-    if (this.#fetch) options.fetch = this.#fetch;
     return createAgentApi(options);
   }
 
   #partnerClient(): Effect.Effect<AgentApi, NearOperationError> {
-    const key = this.#store.read().partnerKey;
-    return key ? Effect.succeed(this.#client(key)) : nearFailure(sourceText("error.connector.nearNoKey"));
+    const owner = this.#gatewayOwner(this.#store.read());
+    return owner ? Effect.succeed(this.#client(owner)) : nearFailure(sourceText("error.connector.nearSignIn"));
   }
 
   #grantClient(): Effect.Effect<AgentApi, NearOperationError> {
     const record = this.#store.read();
     const grant = record.wallet?.grant;
-    if (!record.partnerKey) return nearFailure(sourceText("error.connector.nearNoKey"));
+    const owner = this.#gatewayOwner(record);
+    if (!owner) return nearFailure(sourceText("error.connector.nearSignIn"));
     if (!grant?.active || !this.#grantValid(record)) return nearFailure(sourceText("error.connector.nearGrantExpired"));
-    return Effect.succeed(this.#client(record.partnerKey).forGrant(grant.token));
+    return Effect.succeed(this.#client(owner).forGrant(grant.token));
   }
 
   #grantValid(record: NearWalletRecord): boolean {
@@ -1074,8 +1122,8 @@ export class NearWalletService implements NearWallet {
 
   #state(): NearWalletState {
     const record = this.#store.read();
-    if (!record.partnerKey) return "no-key";
     const wallet = record.wallet;
+    if (!wallet && this.#gateway.owners().length === 0) return "signed-out";
     if (!wallet?.accountId || !wallet.grant?.active) return "no-wallet";
     return wallet.frozen ? "frozen" : "ready";
   }
@@ -1103,7 +1151,7 @@ function createPolicy(dailyUsd: string): Policy {
   return {
     frozen: false,
     actions: ["transfer", "withdraw"],
-    confidential: false,
+    confidential: true,
     owner_approval: true,
     assets: "any",
     limits: {},
@@ -1116,7 +1164,7 @@ function createPolicy(dailyUsd: string): Policy {
 
 function intentToSign(intent: GenerateIntentResponse): NearIntentToSign | null {
   const value = intent.intent;
-  return value.standard === "eip712" || value.standard === "webauthn" ? value : null;
+  return value.standard === "webauthn" ? value : null;
 }
 
 function approvalIdOf(status: StatusResponse): string | null {
@@ -1172,9 +1220,18 @@ function apiDetail(error: AgentApiError): string {
   return error.detail ? `${error.code}: ${error.detail}` : error.code;
 }
 
+function relayFailureText(cause: AgentApiError): string | null {
+  if (cause.status === 401 || cause.code === "unauthorized") return sourceText("error.connector.nearSignIn");
+  if (cause.code === "wallet_service_unavailable") return sourceText("error.connector.nearServiceUnavailable");
+  if (cause.code === "wallet_not_found") return sourceText("error.connector.nearWalletNotFound");
+  if (cause.code === "wallet_limit") return sourceText("error.connector.nearWalletLimit");
+  return null;
+}
+
 function failureText(cause: unknown): string {
   if (cause instanceof AgentApiError) {
-    if (cause.status === 401) return sourceText("error.connector.nearKeyRejected");
+    const relayText = relayFailureText(cause);
+    if (relayText) return relayText;
     return sourceText("error.connector.nearRefused", { detail: apiDetail(cause) });
   }
   if (cause instanceof AgentApiRequestError)

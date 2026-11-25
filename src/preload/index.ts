@@ -1092,7 +1092,6 @@ const openbotApi: OpenBotDesktopApi = {
   }),
   nearWallet: bridgeGroup(IPC_ENDPOINTS.nearWallet, {
     status: decodeNearWalletStatus,
-    setKey: decodeNearWalletStatus,
     create: decodeNearWalletStatus,
     setBudget: decodeNearWalletStatus,
     setAgents: decodeNearWalletStatus,
@@ -1105,6 +1104,7 @@ const openbotApi: OpenBotDesktopApi = {
     allowPayment: decodeNearWalletStatus,
     openSigning: decodeVoid,
     cancelSigning: decodeNearWalletStatus,
+    checkBackup: decodeNearWalletStatus,
     disconnect: decodeNearWalletStatus,
     changed: decodeNearWalletStatus,
   }),

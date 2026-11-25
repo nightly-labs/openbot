@@ -67,7 +67,6 @@ import {
   toggleSpokenReply,
 } from "../speech/speech-replies";
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
-import { createNearWalletStore } from "../vault/stores/near-wallet-store";
 import { groupedMessageIds } from "./agent-message-timeline";
 import { ChatVisualReply, shownVisualReply } from "./ChatVisualReply";
 import { ConversationBrowserLocation } from "./ConversationBrowserLocation";
@@ -90,6 +89,7 @@ import { MarketplaceSuggestionChatCard, marketplaceSuggestionKnown } from "./Mar
 import { McpSignInChatCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction, watchAgentBackdrops } from "./message-backdrop";
 import { createMessageImageFiles, decodedPath } from "./message-image-files";
+import { useNearPaymentApproval } from "./near-payment-approval";
 import { RoutineChatCard } from "./RoutineChatCard";
 import { createChatWebhookRoutines, RoutineWebhookChatCard } from "./RoutineWebhookChatCard";
 import { createRoutineRunFailures, type RoutineRunFailureSource } from "./routine-run-failures";
@@ -360,19 +360,9 @@ export function ConversationTimeline() {
     () => props.isOwnSender,
   );
   const messageImageFiles = props.runtime ? undefined : createMessageImageFiles(runtime.agent);
-  const nearWallet = createNearWalletStore();
-  const nearWalletLocal = () => props.server?.kind === "local" && !props.runtime;
-  createEffect(nearWalletLocal, (local) => {
-    if (!local) return;
-    const stop = nearWallet.subscribe();
-    void nearWallet.refresh().catch(() => undefined);
-    return stop;
-  });
-  const nearPayment = (approval: AgentApproval) => {
-    if (approval.kind !== "permissions" || !nearWalletLocal()) return undefined;
-    const requestId = String(approval.requestId);
-    return nearWallet.state.status.payments.find((payment) => payment.requestId === requestId);
-  };
+  const { payment: nearPayment, wallet: nearWallet } = useNearPaymentApproval(
+    () => props.server?.kind === "local" && !props.runtime,
+  );
   const withdrawFeedback = createMemo(() => {
     const agentId = props.agent?.id;
     const server = props.server;

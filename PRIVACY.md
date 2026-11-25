@@ -1060,11 +1060,10 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   card number are redacted from logs, exports and diagnostics.
 - The NEAR Intents wallet (Server settings › Vault › Crypto) is kept in
   `~/Library/Application Support/OpenBot/openbot-near-wallet-v1.json`, encrypted by the operating
-  system's secret storage. It holds the partner key, the payment grant token, the owner's passkey
-  credential ID and public key or EVM address, the agents that can pay, the payment rules, today's
-  spend, and the payments that wait for an answer. The app window never receives the key or the
-  token. Disconnect deletes the file. The key and the token are redacted from logs, exports and
-  diagnostics.
+  system's secret storage. It holds the payment grant token, the owner's passkey credential ID and
+  public key, the agents that can pay, the payment rules, today's spend, and the payments that wait
+  for an answer. The app window never receives the token. Disconnect deletes the
+  file. The token is redacted from logs, exports and diagnostics.
 - The ElevenLabs API key for dictation and spoken replies is kept in
   `~/Library/Application Support/OpenBot/voice-api-key.json`, encrypted by the operating system's
   secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
@@ -1555,9 +1554,13 @@ Network traffic can also occur when:
   approve it, and OpenBot then reads the one-time card from `api.link.com`. Nothing else about the
   user's agents, conversations or files is sent to Link;
 - the user sets up the NEAR Intents wallet in Server settings › Vault › Crypto. OpenBot sends the
-  partner key, the owner's public key or EVM address, the daily budget and the signed owner actions to
-  the NEAR Intents Agent API (`api.agentsonintents.com`). When an agent pays, OpenBot sends the
-  recipient, the asset, the amount and an idempotency key. The owner signs on the OpenBot page
+  owner's passkey public key, the daily budget and the signed owner actions to the NEAR Intents
+  Agent API (`api.agentsonintents.com`). When an agent pays, OpenBot sends the recipient, the asset,
+  the amount, an idempotency key and the payment grant token. These calls go through the OpenBot
+  account service (`api.openbot.run/v1/near/*`), which adds the OpenBot partner key and passes them
+  through in transit only. It does not store or log them. It keeps only the wallet ID, the OpenBot
+  account or server that owns it, and the time it was made, so that only that owner can use the
+  wallet. The owner signs on the OpenBot page
   `api.openbot.run/near/sign` in the system browser; the request is in the address fragment, which the
   browser does not send to the server, and the page sends the signature back to OpenBot only. The
   agent's reason and the domain of a payment stay on this computer. The chat card and the Crypto tab

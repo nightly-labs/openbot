@@ -477,6 +477,8 @@ function browserProgressText(tool: string): string {
     case "fill_fields":
     case "press":
       return sourceText("status.agent.browserTyping");
+    case "request_near_payment":
+      return sourceText("status.agent.browserPaying");
     default:
       return sourceText("status.agent.browserActing");
   }

@@ -1,29 +1,43 @@
-import { createPublicKey, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createPublicKey, randomBytes, timingSafeEqual, verify } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { Socket } from "node:net";
 import type { Intent, SignedData } from "@near-intents-agent-api/sdk";
-import { secp256k1 } from "@noble/curves/secp256k1.js";
-import { keccak_256 } from "@noble/hashes/sha3.js";
-import type { NearOwnerAction, NearOwnerMethod } from "@openbot/contracts/ipc";
+import type { NearOwnerAction, NearPasskeyBackup } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 import { parseDeepLink } from "./deep-link-router";
 import type { NearOwner } from "./near-wallet-store";
 
 export const NEAR_SIGNING_PATH = "/near/sign";
+export const NEAR_PASSKEY_WALLET_ORIGIN = "https://nearintents.openbot.run";
 export const NEAR_SIGNATURE_DEV_PATH = "/near-signature";
 export const NEAR_SIGNING_TIMEOUT_MS = 10 * 60_000;
 const MAX_RESULT_CHARS = 16 * 1024;
+const BACKUP_CHECK_TIMEOUT_MS = 5 * 60_000;
+const AUTH_DATA_MIN_BYTES = 37;
+const FLAGS_BYTE = 32;
+const FLAG_USER_PRESENT = 0x01;
+const FLAG_USER_VERIFIED = 0x04;
+const FLAG_BACKUP_ELIGIBLE = 0x08;
+const FLAG_BACKED_UP = 0x10;
 
-export type NearIntentToSign = Extract<Intent, { standard: "eip712" | "webauthn" }>;
+export type NearIntentToSign = Extract<Intent, { standard: "webauthn" }>;
 
 export type NearSigningRequest =
-  | { kind: "register"; method: NearOwnerMethod; action: "register"; summary: string }
-  | { kind: "sign"; action: Exclude<NearOwnerAction, "register">; summary: string; intent: NearIntentToSign };
+  | { kind: "register"; action: "register"; summary: string }
+  | {
+      kind: "sign";
+      action: Exclude<NearOwnerAction, "register" | "check-backup">;
+      summary: string;
+      intent: NearIntentToSign;
+    }
+  | { kind: "check"; action: "check-backup"; summary: string };
+
+export type NearSignAction = Extract<NearSigningRequest, { kind: "sign" }>["action"];
 
 export type NearSigningResult =
-  | { kind: "owner"; owner: NearOwner }
-  | { kind: "eip712"; signature: string }
+  | { kind: "owner"; owner: NearOwner; backup: NearPasskeyBackup | null }
+  | { kind: "backup"; backup: NearPasskeyBackup | null }
   | { kind: "webauthn"; credential: NearWebAuthnCredential };
 
 export type NearWebAuthnCredential = Extract<SignedData, { standard: "webauthn" }>["credential"];
@@ -32,33 +46,26 @@ interface SigningFragment {
   v: 1;
   nonce: string;
   kind: "register" | "sign";
-  method: NearOwnerMethod;
   action: NearOwnerAction;
   summary: string;
   challenge?: string;
   userId?: string;
   intent?: NearIntentToSign;
-  address?: string;
   port?: number;
 }
 
 const base64url = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64url");
 const randomToken = (size: number) => base64url(randomBytes(size));
 
-export function evmRegisterMessage(challenge: string): string {
-  return `OpenBot NEAR wallet owner\nNonce: ${challenge}`;
-}
-
-const evmRegisterSchema = z.object({
-  address: z.string().regex(/^0x[0-9a-fA-F]{40}$/u),
-  chainId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-  signature: z.string().regex(/^0x[0-9a-fA-F]{130}$/u),
-});
 const passkeyRegisterSchema = z.object({
   credentialId: z.string().regex(/^[A-Za-z0-9_-]{16,1366}$/u),
   publicKey: z.string().regex(/^MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE[A-Za-z0-9_-]{85}[AQgw]$/u),
+  authenticatorData: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]+$/u)
+    .optional(),
 });
-const eip712ResultSchema = z.object({ signature: z.string().regex(/^0x[0-9a-fA-F]{130}$/u) });
+const clientDataSchema = z.object({ type: z.string(), challenge: z.string(), origin: z.string() });
 const webauthnResultSchema = z.object({
   credential: z
     .object({
@@ -80,24 +87,6 @@ const webauthnResultSchema = z.object({
     .strict(),
 });
 
-export function recoverPersonalSignKey(message: string, signatureHex: string): Uint8Array {
-  const text = new TextEncoder().encode(message);
-  const prefix = new TextEncoder().encode(`\x19Ethereum Signed Message:\n${text.length}`);
-  const hash = keccak_256(new Uint8Array([...prefix, ...text]));
-  const signature = Buffer.from(signatureHex.slice(2), "hex");
-  const v = signature[64] ?? 0;
-  const recovery = v >= 27 ? v - 27 : v;
-  if (recovery !== 0 && recovery !== 1) throw new Error("bad recovery id");
-  const point = secp256k1.Signature.fromBytes(signature.subarray(0, 64), "compact")
-    .addRecoveryBit(recovery)
-    .recoverPublicKey(hash);
-  return point.toBytes(false).subarray(1);
-}
-
-export function evmAddressOf(publicKey: Uint8Array): string {
-  return `0x${Buffer.from(keccak_256(publicKey).subarray(-20)).toString("hex")}`;
-}
-
 function isP256Key(spki: string): boolean {
   try {
     const key = createPublicKey({ key: Buffer.from(spki, "base64url"), format: "der", type: "spki" });
@@ -107,12 +96,73 @@ function isP256Key(spki: string): boolean {
   }
 }
 
+const sha256 = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest();
+
+export function nearBackupState(authenticatorData: string, rpId: string): NearPasskeyBackup | null {
+  const data = Buffer.from(authenticatorData, "base64url");
+  if (data.length < AUTH_DATA_MIN_BYTES || !data.subarray(0, FLAGS_BYTE).equals(sha256(Buffer.from(rpId)))) {
+    return null;
+  }
+  const flags = data[FLAGS_BYTE] ?? 0;
+  const eligible = (flags & FLAG_BACKUP_ELIGIBLE) !== 0;
+  const backedUp = (flags & FLAG_BACKED_UP) !== 0;
+  if (backedUp && !eligible) return null;
+  if (backedUp) return "synced";
+  return eligible ? "notSynced" : "deviceOnly";
+}
+
+function verifiedBackupState(
+  credential: z.infer<typeof webauthnResultSchema>["credential"],
+  owner: NearOwner,
+  challenge: string,
+): NearPasskeyBackup | null {
+  if (credential.rawId !== owner.credential_id) throw new Error("credential");
+  const clientDataJSON = Buffer.from(credential.response.clientDataJSON, "base64url");
+  const clientData = clientDataSchema.parse(JSON.parse(clientDataJSON.toString("utf8")));
+  if (clientData.type !== "webauthn.get" || clientData.challenge !== challenge || clientData.origin !== owner.origin) {
+    throw new Error("client data");
+  }
+  const authenticatorData = Buffer.from(credential.response.authenticatorData, "base64url");
+  if (authenticatorData.length < AUTH_DATA_MIN_BYTES) throw new Error("authenticator data");
+  if (!authenticatorData.subarray(0, FLAGS_BYTE).equals(sha256(Buffer.from(owner.rp_id)))) throw new Error("rp");
+  const flags = authenticatorData[FLAGS_BYTE] ?? 0;
+  if ((flags & FLAG_USER_PRESENT) === 0 || (flags & FLAG_USER_VERIFIED) === 0) throw new Error("user");
+  const key = createPublicKey({ key: Buffer.from(owner.public_key, "base64url"), format: "der", type: "spki" });
+  const signed = Buffer.concat([authenticatorData, sha256(clientDataJSON)]);
+  if (!verify("sha256", signed, key, Buffer.from(credential.response.signature, "base64url"))) {
+    throw new Error("signature");
+  }
+  return nearBackupState(credential.response.authenticatorData, owner.rp_id);
+}
+
+function backupCheckIntent(owner: NearOwner, challenge: string): NearIntentToSign {
+  return {
+    standard: "webauthn",
+    payload: {
+      challenge,
+      rpId: owner.rp_id,
+      allowCredentials: [{ id: owner.credential_id, type: "public-key" }],
+      userVerification: "required",
+      timeout: BACKUP_CHECK_TIMEOUT_MS,
+    },
+  };
+}
+
+function signingIntent(
+  request: NearSigningRequest,
+  checkOwner: NearOwner | null,
+  challenge: string | null,
+): NearIntentToSign | null {
+  if (request.kind === "sign") return request.intent;
+  if (request.kind === "check" && checkOwner && challenge) return backupCheckIntent(checkOwner, challenge);
+  return null;
+}
+
 interface Session {
   nonce: string;
   request: NearSigningRequest;
-  method: NearOwnerMethod;
+  owner: NearOwner | null;
   challenge: string | null;
-  address: string | null;
   resolve: (result: NearSigningResult) => void;
   reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout>;
@@ -139,27 +189,23 @@ export class NearOwnerSigning {
     return this.#session !== null;
   }
 
-  async sign(
-    request: NearSigningRequest,
-    method: NearOwnerMethod,
-    owner: NearOwner | null,
-  ): Promise<NearSigningResult> {
+  async sign(request: NearSigningRequest, owner: NearOwner | null): Promise<NearSigningResult> {
     if (this.#session) throw new Error(sourceText("error.connector.nearSigningBusy"));
     const nonce = randomToken(32);
-    const challenge = request.kind === "register" ? randomToken(32) : null;
-    const address = owner?.type === "evm" ? owner.address : null;
+    const checkOwner = request.kind === "check" ? owner : null;
+    if (request.kind === "check" && !checkOwner) throw new Error(sourceText("error.connector.nearSigningInvalid"));
+    const challenge = request.kind === "sign" ? null : randomToken(32);
+    const intent = signingIntent(request, checkOwner, challenge);
     const port = this.#options.loopback ? await this.#listen() : undefined;
     const fragment: SigningFragment = {
       v: 1,
       nonce,
-      kind: request.kind,
-      method,
+      kind: request.kind === "register" ? "register" : "sign",
       action: request.action,
       summary: request.summary,
-      ...(challenge ? { challenge } : {}),
-      ...(request.kind === "register" && method === "passkey" ? { userId: randomToken(16) } : {}),
-      ...(request.kind === "sign" ? { intent: request.intent } : {}),
-      ...(address ? { address } : {}),
+      ...(request.kind === "register" && challenge ? { challenge } : {}),
+      ...(request.kind === "register" ? { userId: randomToken(16) } : {}),
+      ...(intent ? { intent } : {}),
       ...(port ? { port } : {}),
     };
     const url = `${this.#options.pageOrigin}${NEAR_SIGNING_PATH}#${Buffer.from(JSON.stringify(fragment)).toString("base64url")}`;
@@ -168,7 +214,7 @@ export class NearOwnerSigning {
         () => this.#end(nonce, new Error(sourceText("error.connector.nearSigningExpired"))),
         this.#options.timeoutMs ?? NEAR_SIGNING_TIMEOUT_MS,
       );
-      this.#session = { nonce, request, method, challenge, address, resolve, reject, timer };
+      this.#session = { nonce, request, owner, challenge, resolve, reject, timer };
     });
     this.#url = url;
     await this.#options.openExternal(url).catch(() => undefined);
@@ -205,22 +251,6 @@ export class NearOwnerSigning {
     const value = z.json().parse(JSON.parse(Buffer.from(data, "base64url").toString("utf8")));
     const request = session.request;
     if (request.kind === "register") {
-      if (session.method === "evm") {
-        const result = evmRegisterSchema.parse(value);
-        const challenge = session.challenge ?? "";
-        const publicKey = recoverPersonalSignKey(evmRegisterMessage(challenge), result.signature);
-        const address = evmAddressOf(publicKey);
-        if (address !== result.address.toLowerCase()) throw new Error("address");
-        return {
-          kind: "owner",
-          owner: {
-            type: "evm",
-            address,
-            chain_id: result.chainId,
-            public_key: `0x${Buffer.from(publicKey).toString("hex")}`,
-          },
-        };
-      }
       const result = passkeyRegisterSchema.parse(value);
       if (!isP256Key(result.publicKey)) throw new Error("key");
       const page = new URL(this.#options.pageOrigin);
@@ -233,9 +263,15 @@ export class NearOwnerSigning {
           rp_id: page.hostname,
           origin: page.origin,
         },
+        backup: result.authenticatorData ? nearBackupState(result.authenticatorData, page.hostname) : null,
       };
     }
-    if (request.intent.standard === "eip712") return { kind: "eip712", ...eip712ResultSchema.parse(value) };
+    if (request.kind === "check") {
+      const owner = session.owner;
+      if (!owner || !session.challenge) throw new Error("owner");
+      const { credential } = webauthnResultSchema.parse(value);
+      return { kind: "backup", backup: verifiedBackupState(credential, owner, session.challenge) };
+    }
     const { credential } = webauthnResultSchema.parse(value);
     const { userHandle, ...response } = credential.response;
     const { authenticatorAttachment, response: _response, ...fields } = credential;

@@ -107,8 +107,6 @@ export function billingReturnText(t: AppTranslate) {
   };
 }
 
-export const NEAR_ADDRESS_MARKER = "\u{E010}";
-
 export function nearSignText(t: AppTranslate) {
   return {
     pageTitle: t("sitePage.nearSign.pageTitle"),
@@ -125,16 +123,13 @@ export function nearSignText(t: AppTranslate) {
       unfreeze: t("sitePage.nearSign.action.unfreeze"),
       "auto-pay": t("sitePage.nearSign.action.autoPay"),
       "approve-payment": t("sitePage.nearSign.action.approvePayment"),
+      "check-backup": t("sitePage.nearSign.action.checkBackup"),
     } satisfies Record<NearOwnerAction, string>,
-    account: t("sitePage.nearSign.account"),
-    details: t("sitePage.nearSign.details"),
     createPasskey: t("sitePage.nearSign.createPasskey"),
     usePasskey: t("sitePage.nearSign.usePasskey"),
-    connectWallet: t("sitePage.nearSign.connectWallet"),
-    signInWallet: t("sitePage.nearSign.signInWallet"),
     tryAgain: t("sitePage.nearSign.tryAgain"),
     workingPasskey: t("sitePage.nearSign.workingPasskey"),
-    workingEvm: t("sitePage.nearSign.workingEvm"),
+    registerDoneTitle: t("sitePage.nearSign.registerDoneTitle"),
     doneTitle: t("sitePage.nearSign.doneTitle"),
     doneBody: t("sitePage.nearSign.doneBody"),
     openAgain: t("sitePage.nearSign.openAgain"),
@@ -142,13 +137,8 @@ export function nearSignText(t: AppTranslate) {
     failure: {
       cancelled: t("sitePage.nearSign.failure.cancelled"),
       noPasskey: t("sitePage.nearSign.failure.noPasskey"),
-      noWallet: t("sitePage.nearSign.failure.noWallet"),
-      walletBusy: t("sitePage.nearSign.failure.walletBusy"),
-      wrongAccount: t("sitePage.nearSign.failure.wrongAccount", { address: NEAR_ADDRESS_MARKER }),
       wrongSite: t("sitePage.nearSign.failure.wrongSite"),
       keyType: t("sitePage.nearSign.failure.keyType"),
-      chain: t("sitePage.nearSign.failure.chain"),
-      signatureType: t("sitePage.nearSign.failure.signatureType"),
       tooLarge: t("sitePage.nearSign.failure.tooLarge"),
       failed: t("sitePage.nearSign.failure.failed"),
     } satisfies Record<NearSignFailure, string>,

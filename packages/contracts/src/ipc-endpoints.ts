@@ -492,6 +492,7 @@ import type {
 } from "./ipc-messaging";
 import type { ProviderModelVisibility, ProviderModelVisibilityChange } from "./ipc-model-visibility";
 import type {
+  NearAgentsInput,
   NearAllowPaymentInput,
   NearDepositAddress,
   NearDepositInput,
@@ -1374,10 +1375,9 @@ export const IPC_ENDPOINTS = {
   },
   nearWallet: {
     status: request<undefined, NearWalletStatus>()("near-wallet:status"),
-    setKey: request<string, NearWalletStatus>()("near-wallet:set-key"),
     create: request<NearWalletCreateInput, NearWalletStatus>()("near-wallet:create"),
     setBudget: request<{ dailyBudgetUsd: string }, NearWalletStatus>()("near-wallet:set-budget"),
-    setAgents: request<{ agentIds: string[] }, NearWalletStatus>()("near-wallet:set-agents"),
+    setAgents: request<NearAgentsInput, NearWalletStatus>()("near-wallet:set-agents"),
     renewGrant: request<undefined, NearWalletStatus>()("near-wallet:renew-grant"),
     freeze: request<undefined, NearWalletStatus>()("near-wallet:freeze"),
     unfreeze: request<undefined, NearWalletStatus>()("near-wallet:unfreeze"),
@@ -1387,6 +1387,7 @@ export const IPC_ENDPOINTS = {
     allowPayment: request<NearAllowPaymentInput, NearWalletStatus>()("near-wallet:allow-payment"),
     openSigning: request<undefined, void>()("near-wallet:open-signing"),
     cancelSigning: request<undefined, NearWalletStatus>()("near-wallet:cancel-signing"),
+    checkBackup: request<undefined, NearWalletStatus>()("near-wallet:check-backup"),
     disconnect: request<undefined, NearWalletStatus>()("near-wallet:disconnect"),
     changed: event<NearWalletStatus>()("near-wallet:changed"),
   },

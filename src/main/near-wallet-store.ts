@@ -7,23 +7,22 @@ import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 import { NearOperationError, nearCall, nearDecode, nearFailure, toNearOperationError } from "./near-wallet-effects";
 import type { SecretCipher } from "./provider-credential-store";
 
-const ownerSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("evm"),
-    address: z.string().regex(/^0x[0-9a-f]{40}$/u),
-    chain_id: z.number().int().positive(),
-    public_key: z.string().regex(/^0x[0-9a-f]{128}$/u),
-  }),
-  z.object({
-    type: z.literal("passkey"),
-    credential_id: z.string().regex(/^[A-Za-z0-9_-]+$/u),
-    public_key: z.string().regex(/^MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE[A-Za-z0-9_-]{85}[AQgw]$/u),
-    rp_id: z.string().min(1).max(253),
-    origin: z.string().url(),
-  }),
-]);
+const ownerSchema = z.object({
+  type: z.literal("passkey"),
+  credential_id: z.string().regex(/^[A-Za-z0-9_-]+$/u),
+  public_key: z.string().regex(/^MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE[A-Za-z0-9_-]{85}[AQgw]$/u),
+  rp_id: z.string().min(1).max(253),
+  origin: z.string().url(),
+});
 
 export type NearOwner = z.infer<typeof ownerSchema>;
+
+const ownerBackupSchema = z.object({
+  state: z.enum(["synced", "notSynced", "deviceOnly"]).nullable(),
+  checkedAt: z.number(),
+});
+
+export type NearOwnerBackupRecord = z.infer<typeof ownerBackupSchema>;
 
 const grantSchema = z.object({
   token: z.string().min(1),
@@ -41,6 +40,7 @@ const walletSchema = z.object({
   ownerApproval: z.boolean(),
   frozen: z.boolean(),
   grant: grantSchema.nullable(),
+  gatewayOwner: z.enum(["server", "personal"]).default("personal"),
 });
 
 const ruleSchema = z.object({
@@ -66,9 +66,10 @@ const paymentSchema = z.object({
 export type NearStoredPayment = z.infer<typeof paymentSchema>;
 
 const recordSchema = z.object({
-  partnerKey: z.string().min(1).nullable(),
   owner: ownerSchema.nullable(),
+  ownerBackup: ownerBackupSchema.nullable().default(null),
   wallet: walletSchema.nullable(),
+  allAgents: z.boolean().default(false),
   agentIds: z.array(z.string()),
   rules: z.array(ruleSchema),
   spend: z.object({ day: z.string(), byDomainCents: z.record(z.string(), z.number().int().nonnegative()) }),
@@ -80,9 +81,10 @@ export type NearWalletAccountRecord = z.infer<typeof walletSchema>;
 export type NearGrantRecord = z.infer<typeof grantSchema>;
 
 export const EMPTY_NEAR_WALLET_RECORD: NearWalletRecord = {
-  partnerKey: null,
   owner: null,
+  ownerBackup: null,
   wallet: null,
+  allAgents: true,
   agentIds: [],
   rules: [],
   spend: { day: "", byDomainCents: {} },
@@ -94,7 +96,6 @@ const envelopeSchema = z.object({ version: z.literal(1), record: z.string() });
 const MAX_ENVELOPE_BYTES = 512 * 1024;
 
 export function registerNearSecrets(record: NearWalletRecord): void {
-  if (record.partnerKey) registerSecretValue(record.partnerKey);
   if (record.wallet?.grant) registerSecretValue(record.wallet.grant.token);
 }
 

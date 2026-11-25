@@ -80,6 +80,7 @@ export const messages = {
   "status.agent.browserClicking": "Clic sulla pagina web…",
   "status.agent.browserTyping": "Digitazione nella pagina web…",
   "status.agent.browserActing": "Uso della pagina web…",
+  "status.agent.browserPaying": "Invio del pagamento…",
   "status.agent.browserReviewing": "Analisi della pagina web…",
   "status.agent.memoriesSearching": "Ricerca nelle sue memorie…",
   "status.agent.chatsSearching": "Ricerca nelle sue chat precedenti…",

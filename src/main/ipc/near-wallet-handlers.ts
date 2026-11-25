@@ -4,11 +4,9 @@ import {
   parseNearBudgetInput,
   parseNearDepositInput,
   parseNearDomainInput,
-  parseNearPartnerKey,
   parseNearRuleInput,
   parseNearWalletCreateInput,
 } from "@openbot/contracts/ipc";
-import { registerSecretValue } from "@openbot/logging";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { NearWalletService } from "../near-wallet-service";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
@@ -17,7 +15,6 @@ export interface NearWalletIpcDependencies {
   nearWallet: Pick<
     NearWalletService,
     | "status"
-    | "setKey"
     | "create"
     | "setBudget"
     | "setAgents"
@@ -30,6 +27,7 @@ export interface NearWalletIpcDependencies {
     | "allowPayment"
     | "openSigning"
     | "cancelSigning"
+    | "checkBackup"
     | "disconnect"
   >;
 }
@@ -42,26 +40,18 @@ function required<Payload>(parse: (value: unknown) => Payload | null, name: stri
   };
 }
 
-function decodePartnerKey(value: unknown): string {
-  const key = parseNearPartnerKey(value);
-  if (key === null) throw new Error("Invalid NEAR wallet partner key.");
-  registerSecretValue(key);
-  return key;
-}
-
 export function nearWalletIpcHandlers({ nearWallet }: NearWalletIpcDependencies): Pick<IpcGroupHandlers, "nearWallet"> {
   return {
     nearWallet: {
       status: handler(() => nearWallet.status()),
-      setKey: payloadHandler(decodePartnerKey, (key) => runCauseEffect(nearWallet.setKey(key))),
       create: payloadHandler(required(parseNearWalletCreateInput, "setup"), (input) =>
         runCauseEffect(nearWallet.create(input)),
       ),
       setBudget: payloadHandler(required(parseNearBudgetInput, "budget"), ({ dailyBudgetUsd }) =>
         runCauseEffect(nearWallet.setBudget(dailyBudgetUsd)),
       ),
-      setAgents: payloadHandler(required(parseNearAgentsInput, "agent list"), ({ agentIds }) =>
-        runCauseEffect(nearWallet.setAgents(agentIds)),
+      setAgents: payloadHandler(required(parseNearAgentsInput, "agent list"), (input) =>
+        runCauseEffect(nearWallet.setAgents(input)),
       ),
       renewGrant: handler(() => runCauseEffect(nearWallet.renewGrant())),
       freeze: handler(() => runCauseEffect(nearWallet.freeze())),
@@ -80,6 +70,7 @@ export function nearWalletIpcHandlers({ nearWallet }: NearWalletIpcDependencies)
       ),
       openSigning: handler(() => runCauseEffect(nearWallet.openSigning())),
       cancelSigning: handler(() => nearWallet.cancelSigning()),
+      checkBackup: handler(() => runCauseEffect(nearWallet.checkBackup())),
       disconnect: handler(() => runCauseEffect(nearWallet.disconnect())),
     },
   };

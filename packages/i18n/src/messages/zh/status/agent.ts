@@ -71,6 +71,7 @@ export const messages = {
   "status.agent.browserClicking": "正在点击网页…",
   "status.agent.browserTyping": "正在网页中输入…",
   "status.agent.browserActing": "正在使用网页…",
+  "status.agent.browserPaying": "正在发送付款…",
   "status.agent.browserReviewing": "正在查看网页…",
   "status.agent.memoriesSearching": "正在搜索记忆…",
   "status.agent.chatsSearching": "正在搜索以往的对话…",

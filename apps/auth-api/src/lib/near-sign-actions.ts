@@ -2,25 +2,13 @@ import {
   base64urlToBytes,
   bytesToBase64url,
   isNearJsonObject,
-  type NearEip712Payload,
   type NearJsonObject,
   type NearSignRequest,
   type NearWebAuthnPayload,
   nearJsonValue,
 } from "./near-sign-request";
 
-export type NearSignFailure =
-  | "cancelled"
-  | "noPasskey"
-  | "noWallet"
-  | "walletBusy"
-  | "wrongAccount"
-  | "wrongSite"
-  | "keyType"
-  | "chain"
-  | "signatureType"
-  | "tooLarge"
-  | "failed";
+export type NearSignFailure = "cancelled" | "noPasskey" | "wrongSite" | "keyType" | "tooLarge" | "failed";
 
 export class NearSignError extends Error {
   readonly failure: NearSignFailure;
@@ -31,41 +19,10 @@ export class NearSignError extends Error {
   }
 }
 
-function evmRegisterMessage(challenge: string): string {
-  return `OpenBot NEAR wallet owner\nNonce: ${challenge}`;
-}
-
 const PASSKEY_REGISTER_TIMEOUT_MS = 5 * 60_000;
 const ES256 = -7;
 const MAX_RESULT_CHARS = 16 * 1024;
-const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/u;
-const EVM_SIGNATURE_PATTERN = /^0x[0-9a-fA-F]{130}$/u;
 const CREDENTIAL_ID_PATTERN = /^[A-Za-z0-9_-]{16,1366}$/u;
-
-const EIP1193_USER_REJECTED = 4001;
-const EIP1193_REQUEST_PENDING = -32002;
-
-const EIP712_DOMAIN_FIELDS = [
-  { name: "name", type: "string" },
-  { name: "version", type: "string" },
-  { name: "chainId", type: "uint256" },
-  { name: "verifyingContract", type: "address" },
-  { name: "salt", type: "bytes32" },
-] as const;
-
-interface Eip1193Provider {
-  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-}
-
-function isEip1193Provider(value: unknown): value is Eip1193Provider {
-  return typeof value === "object" && value !== null && "request" in value && typeof value.request === "function";
-}
-
-function browserWallet(): Eip1193Provider {
-  const provider = "ethereum" in window ? window.ethereum : undefined;
-  if (!isEip1193Provider(provider)) throw new NearSignError("noWallet");
-  return provider;
-}
 
 function passkeysAvailable(): boolean {
   return typeof window.PublicKeyCredential === "function" && typeof navigator.credentials?.create === "function";
@@ -77,43 +34,7 @@ function failureOf(error: unknown): NearSignFailure {
     return "cancelled";
   }
   if (error instanceof DOMException && error.name === "SecurityError") return "wrongSite";
-  const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
-  if (code === EIP1193_USER_REJECTED) return "cancelled";
-  if (code === EIP1193_REQUEST_PENDING) return "walletBusy";
   return "failed";
-}
-
-function utf8Hex(text: string): string {
-  let hex = "0x";
-  for (const byte of new TextEncoder().encode(text)) hex += byte.toString(16).padStart(2, "0");
-  return hex;
-}
-
-function chainIdOf(value: unknown): bigint | null {
-  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "bigint") return null;
-  try {
-    const chainId = BigInt(value);
-    return chainId > 0n ? chainId : null;
-  } catch {
-    return null;
-  }
-}
-
-async function walletAccounts(wallet: Eip1193Provider): Promise<string[]> {
-  const accounts = await wallet.request({ method: "eth_requestAccounts" });
-  if (!Array.isArray(accounts)) throw new NearSignError("failed");
-  return accounts.filter((account): account is string => typeof account === "string");
-}
-
-async function walletChainId(wallet: Eip1193Provider): Promise<bigint> {
-  const chainId = chainIdOf(await wallet.request({ method: "eth_chainId" }));
-  if (chainId === null) throw new NearSignError("chain");
-  return chainId;
-}
-
-function evmSignature(value: unknown): string {
-  if (typeof value !== "string" || !EVM_SIGNATURE_PATTERN.test(value)) throw new NearSignError("signatureType");
-  return value;
 }
 
 async function registerPasskey(challenge: string, userId: string, userName: string) {
@@ -124,7 +45,7 @@ async function registerPasskey(challenge: string, userId: string, userName: stri
       rp: { id: location.hostname, name: "OpenBot" },
       user: { id: base64urlToBytes(userId), name: userName, displayName: userName },
       pubKeyCredParams: [{ type: "public-key", alg: ES256 }],
-      authenticatorSelection: { userVerification: "required", residentKey: "preferred" },
+      authenticatorSelection: { userVerification: "required", residentKey: "required" },
       attestation: "none",
       timeout: PASSKEY_REGISTER_TIMEOUT_MS,
     },
@@ -136,7 +57,13 @@ async function registerPasskey(challenge: string, userId: string, userName: stri
   if (!publicKey) throw new NearSignError("keyType");
   const credentialId = bytesToBase64url(credential.rawId);
   if (!CREDENTIAL_ID_PATTERN.test(credentialId)) throw new NearSignError("keyType");
-  return { credentialId, publicKey: bytesToBase64url(publicKey) };
+  const authenticatorData =
+    typeof response.getAuthenticatorData === "function" ? bytesToBase64url(response.getAuthenticatorData()) : null;
+  return {
+    credentialId,
+    publicKey: bytesToBase64url(publicKey),
+    ...(authenticatorData ? { authenticatorData } : {}),
+  };
 }
 
 function extensionResults(credential: PublicKeyCredential): NearJsonObject {
@@ -177,53 +104,6 @@ async function signWithPasskey(payload: NearWebAuthnPayload) {
   };
 }
 
-async function registerEvmWallet(challenge: string) {
-  const wallet = browserWallet();
-  const [address] = await walletAccounts(wallet);
-  if (!address || !EVM_ADDRESS_PATTERN.test(address)) throw new NearSignError("failed");
-  const chainId = await walletChainId(wallet);
-  if (chainId > BigInt(Number.MAX_SAFE_INTEGER)) throw new NearSignError("chain");
-  const signature = evmSignature(
-    await wallet.request({ method: "personal_sign", params: [utf8Hex(evmRegisterMessage(challenge)), address] }),
-  );
-  return { address, chainId: Number(chainId), signature };
-}
-
-function typesWithDomain(payload: NearEip712Payload): NearEip712Payload["types"] {
-  if (Object.hasOwn(payload.types, "EIP712Domain")) return payload.types;
-  const domain = EIP712_DOMAIN_FIELDS.filter(
-    (field) => payload.domain[field.name] !== undefined && payload.domain[field.name] !== null,
-  ).map((field) => ({ name: field.name, type: field.type }));
-  return { EIP712Domain: domain, ...payload.types };
-}
-
-async function signTypedData(payload: NearEip712Payload, owner: string) {
-  const wallet = browserWallet();
-  const accounts = await walletAccounts(wallet);
-  const address = accounts.find((account) => account.toLowerCase() === owner.toLowerCase());
-  if (!address) throw new NearSignError("wrongAccount");
-  const wanted = payload.domain.chainId === undefined ? null : chainIdOf(payload.domain.chainId);
-  if (payload.domain.chainId !== undefined && wanted === null) throw new NearSignError("chain");
-  if (wanted !== null && (await walletChainId(wallet)) !== wanted) {
-    try {
-      await wallet.request({ method: "wallet_switchEthereumChain", params: [{ chainId: `0x${wanted.toString(16)}` }] });
-    } catch (error) {
-      throw new NearSignError(failureOf(error) === "cancelled" ? "cancelled" : "chain");
-    }
-    if ((await walletChainId(wallet)) !== wanted) throw new NearSignError("chain");
-  }
-  const typedData = {
-    domain: payload.domain,
-    types: typesWithDomain(payload),
-    primaryType: payload.primaryType,
-    message: payload.message,
-  };
-  const signature = evmSignature(
-    await wallet.request({ method: "eth_signTypedData_v4", params: [address, JSON.stringify(typedData)] }),
-  );
-  return { signature };
-}
-
 function encodeResult(result: unknown): string {
   const data = bytesToBase64url(new TextEncoder().encode(JSON.stringify(result)));
   if (data.length > MAX_RESULT_CHARS) throw new NearSignError("tooLarge");
@@ -233,17 +113,9 @@ function encodeResult(result: unknown): string {
 export async function runNearSignature(request: NearSignRequest, passkeyName: string): Promise<string> {
   try {
     if (request.kind === "register") {
-      return encodeResult(
-        request.method === "passkey"
-          ? await registerPasskey(request.challenge, request.userId, passkeyName)
-          : await registerEvmWallet(request.challenge),
-      );
+      return encodeResult(await registerPasskey(request.challenge, request.userId, passkeyName));
     }
-    return encodeResult(
-      request.method === "passkey"
-        ? await signWithPasskey(request.payload)
-        : await signTypedData(request.payload, request.address),
-    );
+    return encodeResult(await signWithPasskey(request.payload));
   } catch (error) {
     throw new NearSignError(failureOf(error));
   }

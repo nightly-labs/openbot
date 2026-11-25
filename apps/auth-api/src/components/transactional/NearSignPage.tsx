@@ -1,15 +1,14 @@
 import { AppLogo } from "@openbot/brand";
-import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
+import { createSignal, Match, onSettled, Show, Switch } from "solid-js";
 import { NearSignError, type NearSignFailure, runNearSignature } from "../../lib/near-sign-actions";
 import {
   type NearSignRequest,
   nearReturnUrl,
   nearSignAction,
-  nearTypedFields,
   parseNearSignFragment,
 } from "../../lib/near-sign-request";
 import { Button } from "../ui/button";
-import { NEAR_ADDRESS_MARKER, type NearSignText } from "./page-text";
+import type { NearSignText } from "./page-text";
 import { TransactionalPage } from "./TransactionalPage";
 
 export type NearSignState =
@@ -51,15 +50,7 @@ export function NearSignPage(props: { lang: string; text: NearSignText }) {
 }
 
 function actionLabel(text: NearSignText, request: NearSignRequest): string {
-  if (request.kind === "register") return request.method === "passkey" ? text.createPasskey : text.connectWallet;
-  return request.method === "passkey" ? text.usePasskey : text.signInWallet;
-}
-
-function failureText(text: NearSignText, request: NearSignRequest, failure: NearSignFailure): string {
-  const sentence = text.failure[failure];
-  return request.kind === "sign" && request.method === "evm"
-    ? sentence.replace(NEAR_ADDRESS_MARKER, request.address)
-    : sentence;
+  return request.kind === "register" ? text.createPasskey : text.usePasskey;
 }
 
 function requestOf(state: NearSignState): NearSignRequest | null {
@@ -75,19 +66,14 @@ export function NearSignView(props: {
   const request = () => requestOf(props.state);
   const failure = () => (props.state.step === "failed" ? props.state.failure : null);
   const returnUrl = () => (props.state.step === "done" ? props.state.returnUrl : null);
-  const typedFields = () => {
-    const current = request();
-    return current?.kind === "sign" && current.method === "evm" ? nearTypedFields(current.payload.message) : [];
-  };
-  const ownerAddress = () => {
-    const current = request();
-    return current?.kind === "sign" && current.method === "evm" ? current.address : null;
-  };
+  const createsPasskey = () => request()?.kind === "register";
 
   return (
-    <TransactionalPage titleId={TITLE_ID} lang={props.lang}>
+    <TransactionalPage titleId={TITLE_ID} lang={props.lang} bare>
       <AppLogo variant="production" animation="blink" class="join-card-logo" />
-      <p class="join-card-eyebrow">{props.text.eyebrow}</p>
+      <Show when={!createsPasskey()}>
+        <p class="join-card-eyebrow">{props.text.eyebrow}</p>
+      </Show>
       <Switch>
         <Match when={props.state.step === "loading"}>
           <h1 id={TITLE_ID}>{props.text.pageTitle}</h1>
@@ -104,7 +90,9 @@ export function NearSignView(props: {
         <Match when={returnUrl()}>
           {(url) => (
             <>
-              <h1 id={TITLE_ID}>{props.text.doneTitle}</h1>
+              <h1 id={TITLE_ID}>
+                {request()?.kind === "register" ? props.text.registerDoneTitle : props.text.doneTitle}
+              </h1>
               <p class="join-card-copy">{props.text.doneBody}</p>
               <div class="join-card-actions join-card-actions-single">
                 <Button href={url()} variant="primary" size="lg" icon="open">
@@ -121,41 +109,16 @@ export function NearSignView(props: {
               <Show when={current().summary}>
                 <p class="join-card-copy near-sign-summary">{current().summary}</p>
               </Show>
-              <Show when={ownerAddress()}>
-                {(address) => (
-                  <dl class="near-sign-facts">
-                    <div>
-                      <dt>{props.text.account}</dt>
-                      <dd class="near-sign-mono">{address()}</dd>
-                    </div>
-                  </dl>
-                )}
-              </Show>
-              <Show when={typedFields().length > 0}>
-                <section class="near-sign-details" aria-label={props.text.details}>
-                  <p class="near-sign-details-title">{props.text.details}</p>
-                  <dl>
-                    <For each={typedFields()}>
-                      {(field) => (
-                        <div>
-                          <dt class="near-sign-mono">{field.path}</dt>
-                          <dd class="near-sign-mono">{field.value}</dd>
-                        </div>
-                      )}
-                    </For>
-                  </dl>
-                </section>
-              </Show>
               <Show when={failure()}>
                 {(kind) => (
                   <p class="join-card-error" role="alert">
-                    {failureText(props.text, current(), kind())}
+                    {props.text.failure[kind()]}
                   </p>
                 )}
               </Show>
               <Show when={props.state.step === "working"}>
                 <p class="join-card-copy" aria-live="polite">
-                  {current().method === "passkey" ? props.text.workingPasskey : props.text.workingEvm}
+                  {props.text.workingPasskey}
                 </p>
               </Show>
               <div class="join-card-actions join-card-actions-single">

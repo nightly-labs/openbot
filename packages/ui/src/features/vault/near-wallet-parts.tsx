@@ -1,14 +1,20 @@
-import type { NearDepositAddress, NearDepositAsset, NearOwnerMethod, NearWalletStatus } from "@openbot/contracts/ipc";
+import type {
+  NearAgentsInput,
+  NearDepositAddress,
+  NearPasskeyBackup,
+  NearWalletCreateInput,
+  NearWalletStatus,
+} from "@openbot/contracts/ipc";
 import {
   Alert,
   AlertContent,
   AlertDescription,
-  Badge,
+  AlertTitle,
+  Bot,
   Button,
+  Check,
   Checkbox,
-  CopyButton,
   Dialog,
-  Field,
   IconButton,
   Input,
   Item,
@@ -18,19 +24,19 @@ import {
   ItemGroup,
   ItemMedia,
   ItemTitle,
-  NativeSelect,
-  QrCode,
-  RadioGroup,
+  KeyRound,
   Search,
+  ShieldCheck,
   Spinner,
   Switch,
   Text,
+  TriangleAlert,
   X,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createSignal, createStore, createUniqueId, For, onCleanup, Show } from "solid-js";
+import { Switch as Choose, createSignal, createStore, createUniqueId, For, Match, onCleanup, Show } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { type TextValue, useText } from "../../text";
 
@@ -40,14 +46,9 @@ export type NearWalletAgent = Pick<
 >;
 
 export interface NearWalletActions {
-  setKey: (key: string) => Promise<NearWalletStatus>;
-  create: (input: {
-    ownerMethod: NearOwnerMethod;
-    dailyBudgetUsd: string;
-    agentIds: string[];
-  }) => Promise<NearWalletStatus>;
+  create: (input: NearWalletCreateInput) => Promise<NearWalletStatus>;
   setBudget: (dailyBudgetUsd: string) => Promise<NearWalletStatus>;
-  setAgents: (agentIds: string[]) => Promise<NearWalletStatus>;
+  setAgents: (input: NearAgentsInput) => Promise<NearWalletStatus>;
   renewGrant: () => Promise<NearWalletStatus>;
   freeze: () => Promise<NearWalletStatus>;
   unfreeze: () => Promise<NearWalletStatus>;
@@ -57,6 +58,7 @@ export interface NearWalletActions {
   allowPayment: (input: { requestId: string; dailyUsd: number }) => Promise<NearWalletStatus>;
   openSigning: () => Promise<void>;
   cancelSigning: () => Promise<NearWalletStatus>;
+  checkBackup: () => Promise<NearWalletStatus>;
   disconnect: () => Promise<NearWalletStatus>;
 }
 
@@ -97,10 +99,20 @@ export function SiteIcon(props: { domain: string; class?: string | undefined }) 
   );
 }
 
+function initialFocus(
+  content: HTMLElement | undefined,
+  options: { focusSearch?: boolean | undefined; focusCheckbox?: boolean | undefined },
+) {
+  if (options.focusSearch) return content?.querySelector<HTMLElement>("input[type=search]") ?? null;
+  if (options.focusCheckbox) return content?.querySelector<HTMLElement>("input[type=checkbox]") ?? null;
+  return null;
+}
+
 export function NearWalletDialog(props: {
   title: string;
   busy?: boolean | undefined;
   focusSearch?: boolean | undefined;
+  focusCheckbox?: boolean | undefined;
   onClose: () => void;
   onSubmit?: (() => void) | undefined;
   children: JSX.Element;
@@ -119,10 +131,10 @@ export function NearWalletDialog(props: {
               content = element;
             }}
             onOpenAutoFocus={(event) => {
-              const search = props.focusSearch ? content?.querySelector<HTMLElement>("input[type=search]") : null;
-              if (!search) return;
+              const first = initialFocus(content, props);
+              if (!first) return;
               event.preventDefault();
-              search.focus({ preventScroll: true });
+              first.focus({ preventScroll: true });
             }}
           >
             <form
@@ -148,6 +160,97 @@ export function NearWalletDialog(props: {
         </Dialog.Overlay>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+const SETUP_SIGNATURES = [
+  { title: "vault.near.signature.register", detail: "vault.near.signature.registerDetail", icon: KeyRound },
+  { title: "vault.near.signature.create", detail: "vault.near.signature.createDetail", icon: ShieldCheck },
+  { title: "vault.near.signature.grant", detail: "vault.near.signature.grantDetail", icon: Bot },
+] as const;
+
+export const SETUP_SIGNATURE_COUNT = SETUP_SIGNATURES.length;
+
+type StepState = "next" | "current" | "done";
+
+export type SignatureState = StepState | "failed";
+
+const stepState = (index: number, current: number): StepState => {
+  if (index < current) return "done";
+  if (index === current) return "current";
+  return "next";
+};
+
+const currentStep = (state: SignatureState) => (state === "current" ? "step" : undefined);
+
+export function SetupSteps(props: { labels: readonly string[]; current: number }) {
+  const { t } = useText();
+  return (
+    <ol class="near-wallet-steps" aria-label={t("vault.near.steps")}>
+      <For each={props.labels}>
+        {(label, index) => {
+          const state = () => stepState(index(), props.current);
+          return (
+            <li data-state={state()} aria-current={currentStep(state())}>
+              <span class="near-wallet-steps-line" aria-hidden="true" />
+              <span>{label}</span>
+            </li>
+          );
+        }}
+      </For>
+    </ol>
+  );
+}
+
+function SignatureMark(props: { state: SignatureState; index: number }) {
+  return (
+    <Choose fallback={<span class="near-wallet-mark">{props.index + 1}</span>}>
+      <Match when={props.state === "done"}>
+        <span class="near-wallet-mark" data-tone="success">
+          <Check size={14} />
+        </span>
+      </Match>
+      <Match when={props.state === "current"}>
+        <span class="near-wallet-mark" data-tone="busy">
+          <Spinner />
+        </span>
+      </Match>
+      <Match when={props.state === "failed"}>
+        <span class="near-wallet-mark" data-tone="danger">
+          <X size={14} />
+        </span>
+      </Match>
+    </Choose>
+  );
+}
+
+export function SetupSignatures(props: { active: number; failed: boolean; dailyBudgetUsd: string }) {
+  const { t, format } = useText();
+  const amount = () => format.currencyUsd(usdNumber(props.dailyBudgetUsd), { minimumFractionDigits: 0 });
+  const state = (index: number): SignatureState => {
+    const base = stepState(index, props.active);
+    if (base === "current" && props.failed) return "failed";
+    return base;
+  };
+  return (
+    <ItemGroup class="settings-modal-card near-wallet-signatures" aria-label={t("vault.near.signature.label")}>
+      <For each={SETUP_SIGNATURES}>
+        {(signature, index) => (
+          <Item class="near-wallet-signature" data-state={state(index())} aria-current={currentStep(state(index()))}>
+            <ItemMedia class="near-wallet-signature-icon">
+              <signature.icon size={18} aria-hidden="true" />
+            </ItemMedia>
+            <ItemContent>
+              <ItemTitle>{t(signature.title)}</ItemTitle>
+              <ItemDescription>{t(signature.detail, { amount: amount() })}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <SignatureMark state={state(index())} index={index()} />
+            </ItemActions>
+          </Item>
+        )}
+      </For>
+    </ItemGroup>
   );
 }
 
@@ -211,7 +314,7 @@ export function NearFailure(props: { text: string | null }) {
   return (
     <Show when={props.text}>
       {(text) => (
-        <Text as="p" variant="body-sm" class="vault-link-error" role="alert">
+        <Text as="p" variant="body-sm" tone="danger" role="alert">
           {text()}
         </Text>
       )}
@@ -219,44 +322,20 @@ export function NearFailure(props: { text: string | null }) {
   );
 }
 
-export function OwnerMethodChoice(props: { value: NearOwnerMethod; onChange: (value: NearOwnerMethod) => void }) {
+export function AllAgentsChoice(props: { checked: boolean; onChange: (on: boolean) => void }) {
   const { t } = useText();
-  const methods = [
-    { value: "passkey", name: "vault.near.method.passkey", detail: "vault.near.method.passkeyDetail" },
-    { value: "evm", name: "vault.near.method.evm", detail: "vault.near.method.evmDetail" },
-  ] as const;
+  const id = `near-all-agents-${createUniqueId()}`;
   return (
-    <RadioGroup.Root
-      class="settings-mobile-route-choice"
-      aria-label={t("vault.near.signWith")}
-      value={props.value}
-      onChange={(value) => {
-        const method = methods.find((item) => item.value === value);
-        if (method) props.onChange(method.value);
-      }}
-    >
-      <For each={methods}>
-        {(method) => (
-          <RadioGroup.Item class="settings-mobile-route-option" value={method.value}>
-            <RadioGroup.ItemInput />
-            <RadioGroup.ItemControl class="settings-mobile-route-card">
-              <span class="settings-mobile-route-dot" aria-hidden="true" />
-              <span class="settings-mobile-route-text">
-                <RadioGroup.ItemLabel class="settings-mobile-route-name">
-                  {t(method.name)}
-                  <Show when={method.value === "passkey"}>
-                    <Badge variant="info-light">{t("vault.near.recommended")}</Badge>
-                  </Show>
-                </RadioGroup.ItemLabel>
-                <RadioGroup.ItemDescription class="settings-mobile-route-hint">
-                  {t(method.detail)}
-                </RadioGroup.ItemDescription>
-              </span>
-            </RadioGroup.ItemControl>
-          </RadioGroup.Item>
-        )}
-      </For>
-    </RadioGroup.Root>
+    <ItemGroup class="settings-modal-card">
+      <Item>
+        <ItemContent>
+          <ItemTitle id={id}>{t("vault.near.everyAgent")}</ItemTitle>
+        </ItemContent>
+        <ItemActions>
+          <Switch checked={props.checked} onChange={props.onChange} aria-labelledby={id} />
+        </ItemActions>
+      </Item>
+    </ItemGroup>
   );
 }
 
@@ -362,120 +441,53 @@ export function RiskAccept(props: { accepted: boolean; onChange: (accepted: bool
   const { t } = useText();
   const id = `near-wallet-accept-${createUniqueId()}`;
   return (
-    <Alert tone="warning" report={false} class="near-wallet-risk">
+    <div class="near-wallet-risk-check">
+      <TriangleAlert size={16} class="near-wallet-risk-icon" aria-hidden="true" />
+      <Text as="p" variant="caption" tone="secondary">
+        {t("vault.near.risk")}
+      </Text>
+      <Checkbox id={id} checked={props.accepted} onChange={(event) => props.onChange(event.currentTarget.checked)} />
+      <span class="near-wallet-risk-label">
+        <label for={id}>{t("vault.near.accept")}</label>{" "}
+        <a href="https://docs.agentsonintents.com" target="_blank" rel="noreferrer">
+          {t("vault.near.terms")}
+        </a>
+      </span>
+    </div>
+  );
+}
+
+const BACKUP_TEXT = {
+  synced: { title: "vault.near.backup.synced", detail: "vault.near.backup.syncedDetail", tone: "success" },
+  notSynced: { title: "vault.near.backup.notSynced", detail: "vault.near.backup.notSyncedDetail", tone: "warning" },
+  deviceOnly: { title: "vault.near.backup.deviceOnly", detail: "vault.near.backup.deviceOnlyDetail", tone: "danger" },
+  unknown: { title: "vault.near.backup.unknown", detail: "vault.near.backup.unknownDetail", tone: "warning" },
+} as const;
+
+export const backupText = (state: NearPasskeyBackup | null) => BACKUP_TEXT[state ?? "unknown"];
+
+export function PasskeyBackupNotice(props: { state: NearPasskeyBackup | null; children?: JSX.Element }) {
+  const { t } = useText();
+  const text = () => backupText(props.state);
+  return (
+    <Alert tone={text().tone} report={false} class="near-wallet-risk">
       <AlertContent>
-        <AlertDescription>{t("vault.near.risk")}</AlertDescription>
-        <div class="near-wallet-accept">
-          <Checkbox
-            id={id}
-            checked={props.accepted}
-            onChange={(event) => props.onChange(event.currentTarget.checked)}
-          />
-          <label for={id}>{t("vault.near.accept")}</label>
-          <a href="https://docs.agentsonintents.com" target="_blank" rel="noreferrer">
-            {t("vault.near.terms")}
-          </a>
-        </div>
+        <AlertTitle>{t(text().title)}</AlertTitle>
+        <AlertDescription>{t(text().detail)}</AlertDescription>
+        <AlertDescription>{t("vault.near.backup.noCopy")}</AlertDescription>
+        {props.children}
       </AlertContent>
     </Alert>
   );
 }
 
-export const chainName = (blockchain: string) => blockchain.toUpperCase();
-
-export function assetLabel(t: TextValue["t"], asset: NearDepositAsset) {
-  return t("vault.near.assetOn", { symbol: asset.symbol, chain: chainName(asset.blockchain) });
-}
-
-export function AddFundsFields(props: {
-  assets: readonly NearDepositAsset[];
-  deposit: (assetId: string) => Promise<NearDepositAddress>;
-}) {
-  const { t, errorMessage } = useText();
-  const [assetId, setAssetId] = createSignal(props.assets[0]?.assetId ?? "");
-  const [address, setAddress] = createSignal<NearDepositAddress | null>(null);
-  const [failure, setFailure] = createSignal<string | null>(null);
-  const asset = () => props.assets.find((item) => item.assetId === assetId()) ?? props.assets[0];
-  createEffect(
-    () => asset()?.assetId,
-    (id) => {
-      if (!id) return;
-      let live = true;
-      setAddress(null);
-      setFailure(null);
-      props.deposit(id).then(
-        (result) => {
-          if (live) setAddress(result);
-        },
-        (error: unknown) => {
-          if (live) setFailure(errorMessage(error, t("vault.near.failed")));
-        },
-      );
-      return () => {
-        live = false;
-      };
-    },
-  );
-  const loading = () => (
-    <Show when={!failure()}>
-      <div class="near-wallet-waiting" role="status">
-        <Spinner />
-      </div>
-    </Show>
-  );
+export function NearCheck(props: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  const id = `near-wallet-check-${createUniqueId()}`;
   return (
-    <Show when={asset()}>
-      {(current) => (
-        <div class="near-wallet-funds">
-          <Field label={t("vault.near.asset")}>
-            <NativeSelect value={current().assetId} onChange={(event) => setAssetId(event.currentTarget.value)}>
-              <For each={props.assets}>{(item) => <option value={item.assetId}>{assetLabel(t, item)}</option>}</For>
-            </NativeSelect>
-          </Field>
-          <NearFailure text={failure()} />
-          <Show when={address()} fallback={loading()}>
-            {(deposit) => (
-              <>
-                <div class="near-wallet-qr">
-                  <QrCode
-                    value={deposit().address}
-                    size={168}
-                    label={t("vault.near.depositQr", { symbol: current().symbol })}
-                  />
-                </div>
-                <Field
-                  label={t("vault.near.addressOn", {
-                    symbol: current().symbol,
-                    chain: chainName(current().blockchain),
-                  })}
-                >
-                  <div class="near-wallet-address">
-                    <Input readonly class="near-wallet-address-input" value={deposit().address} />
-                    <CopyButton value={deposit().address} iconOnly variant="outline" />
-                  </div>
-                </Field>
-                <Show when={deposit().memo}>
-                  {(memo) => (
-                    <Field label={t("vault.near.memo")}>
-                      <div class="near-wallet-address">
-                        <Input readonly class="near-wallet-address-input" value={memo()} />
-                        <CopyButton value={memo()} iconOnly variant="outline" />
-                      </div>
-                    </Field>
-                  )}
-                </Show>
-                <Text variant="caption" tone="muted">
-                  <Show when={deposit().minAmount}>
-                    {(amount) => <>{t("vault.near.minimum", { amount: amount(), symbol: current().symbol })} </>}
-                  </Show>
-                  {t("vault.near.onlyAsset", { symbol: current().symbol, chain: chainName(current().blockchain) })}
-                </Text>
-              </>
-            )}
-          </Show>
-        </div>
-      )}
-    </Show>
+    <div class="near-wallet-accept">
+      <Checkbox id={id} checked={props.checked} onChange={(event) => props.onChange(event.currentTarget.checked)} />
+      <label for={id}>{props.label}</label>
+    </div>
   );
 }
 
