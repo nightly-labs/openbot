@@ -33,6 +33,7 @@ export interface RemoteHostSummary {
   membershipId: string;
   role: "owner" | "admin" | "member";
   memberLimit?: number;
+  licenseRaisesMemberLimit?: boolean;
   hosted?: boolean;
   restartAvailable?: boolean;
   storageGb?: number;
@@ -189,6 +190,7 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       membershipId: requiredString(host, "membershipId"),
       role: host.role,
       ...(validLimit ? { memberLimit } : {}),
+      ...(isBoolean(host.licenseRaisesMemberLimit) ? { licenseRaisesMemberLimit: host.licenseRaisesMemberLimit } : {}),
       ...(isBoolean(host.hosted) ? { hosted: host.hosted } : {}),
       ...(isBoolean(host.restartAvailable) ? { restartAvailable: host.restartAvailable } : {}),
       ...(validStorage ? { storageGb } : {}),

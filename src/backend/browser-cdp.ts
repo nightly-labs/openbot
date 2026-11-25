@@ -401,6 +401,7 @@ interface DialogWatch {
 }
 
 const DIALOG_MESSAGE_LIMIT = 2_000;
+const PERSON_ACTIVATION_MS = 5_000;
 const CANCEL_DIALOGS_EVENT = "-cancel-dialogs";
 const RUN_DIALOG_EVENT = "-run-dialog";
 const DIALOG_CLOSED_ERROR = "This dialog is closed. A person answered it, or the page closed it. Read the tab again.";
@@ -942,6 +943,8 @@ export class BrowserCdpEngine {
   #dialogBoxPending = false;
   #cancelDialogBox = false;
   #dialogsReleased = false;
+  #acceptsPageAlert: ((message: string) => boolean) | undefined;
+  #personInputAt = Number.NEGATIVE_INFINITY;
   #highlightSessionId: string | undefined;
   readonly #uploadDocumentIds = new Set<string>();
   readonly #targetSessions = new Map<string, { sessionId: string; url: string }>();
@@ -953,11 +956,20 @@ export class BrowserCdpEngine {
       this.#closing = true;
     });
     const internalEvents: NodeJS.EventEmitter = contents;
-    internalEvents.on(RUN_DIALOG_EVENT, () => {
+    internalEvents.on(RUN_DIALOG_EVENT, (info: unknown, reply: unknown) => {
       this.#dialogBoxPending = false;
-      if (!this.#cancelDialogBox) return;
-      this.#cancelDialogBox = false;
-      contents.emit(CANCEL_DIALOGS_EVENT);
+      if (this.#cancelDialogBox) {
+        this.#cancelDialogBox = false;
+        contents.emit(CANCEL_DIALOGS_EVENT);
+        return;
+      }
+      if (this.#acceptedPageAlert(info, reply)) contents.emit(CANCEL_DIALOGS_EVENT);
+    });
+    contents.on("before-mouse-event", (_event, input) => {
+      if (input.type === "mouseDown") this.#notePersonInput();
+    });
+    contents.on("before-input-event", (_event, input) => {
+      if (input.type === "keyDown") this.#notePersonInput();
     });
     contents.on("did-start-navigation", (details) => {
       if (details.isMainFrame) this.#navigationGeneration += 1;
@@ -2224,6 +2236,25 @@ export class BrowserCdpEngine {
     if (!changed) return;
     this.#signalDialogChange();
     this.#releaseIdleDebugger();
+  }
+
+  acceptPageAlerts(accepts: (message: string) => boolean): void {
+    this.#acceptsPageAlert = accepts;
+  }
+
+  #notePersonInput(): void {
+    if (this.#activeLeases === 0) this.#personInputAt = Date.now();
+  }
+
+  #acceptedPageAlert(info: unknown, reply: unknown): boolean {
+    if (!this.#acceptsPageAlert || this.#dialogsReleased || this.#dialogWatches.size > 0 || this.#dialog?.agent)
+      return false;
+    if (Date.now() - this.#personInputAt < PERSON_ACTIVATION_MS) return false;
+    if (!isRecord(info) || info.dialogType !== "alert" || typeof reply !== "function") return false;
+    const message = redactText(this.#cardScrub.text(stringValue(info.messageText))).slice(0, DIALOG_MESSAGE_LIMIT);
+    if (!this.#acceptsPageAlert(message)) return false;
+    reply(true, "");
+    return true;
   }
 
   releaseDialogs(): void {

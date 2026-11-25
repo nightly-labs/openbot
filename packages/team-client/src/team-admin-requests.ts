@@ -186,6 +186,8 @@ import {
   type McpSignInState,
   type McpSignInStatus,
   type McpTestResult,
+  type MediaApprovalCreditsSetting,
+  type MediaApprovalCreditsUpdate,
   type MessagingOverview,
   type MessagingWorkspaceInput,
   type OnePasswordConnectorStatus,
@@ -363,6 +365,10 @@ import { MCP_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/mcp-access-v
 import { MCP_SIGN_IN_APP_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
+import {
+  decodeMediaApprovalCreditsResponse,
+  MEDIA_APPROVAL_CREDITS_ROUTES,
+} from "@openbot/contracts/team-protocol/media-approval-credits-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
@@ -1071,6 +1077,23 @@ export function setHostCacheExpiryCompaction(
 ): Effect.Effect<CacheExpiryCompactionSetting, TeamAdminRequestError> {
   return adminCall(() =>
     request("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, decodeCacheExpiryCompactionResponse, { enabled }),
+  );
+}
+
+export function getHostMediaApprovalCredits(
+  request: TeamApiRequest,
+): Effect.Effect<MediaApprovalCreditsSetting, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", MEDIA_APPROVAL_CREDITS_ROUTES.settings, decodeMediaApprovalCreditsResponse, {}),
+  );
+}
+
+export function setHostMediaApprovalCredits(
+  request: TeamApiRequest,
+  update: MediaApprovalCreditsUpdate,
+): Effect.Effect<MediaApprovalCreditsSetting, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", MEDIA_APPROVAL_CREDITS_ROUTES.update, decodeMediaApprovalCreditsResponse, update),
   );
 }
 

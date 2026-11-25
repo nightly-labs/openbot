@@ -1516,7 +1516,30 @@ try {
       const lidOnly = message({ chat: "999456@lid", text: "still there?" });
       phone.current().receive([lidOnly]);
       await until(() => received(agents, `${LID_FRIEND}@s.whatsapp.net`, lidOnly.key.id ?? ""), "the LID-only message");
-      return { chat: `${LID_FRIEND}@s.whatsapp.net` };
+      const ownerReply = message({ chat: LID_FRIEND_CHAT, fromMe: true, text: "On my way, 10 minutes" });
+      const unknownJid = "48600100999@s.whatsapp.net";
+      const ownerToUnknown = message({ chat: unknownJid, fromMe: true, text: "See you" });
+      const marker = message({ chat: OWNER_JID, fromMe: true, text: "marker LID" });
+      phone.current().receive([ownerReply, ownerToUnknown, marker]);
+      await until(() => phone.reactedTo(marker.key.id), "the marker");
+      assert.equal(
+        received(agents, `${LID_FRIEND}@s.whatsapp.net`, ownerReply.key.id ?? ""),
+        false,
+        "The owner's message to an allowed contact started work.",
+      );
+      const id = connectionId(agents);
+      assert.ok(
+        agents.messaging.history
+          .recent(id, `${LID_FRIEND}@s.whatsapp.net`, null, 200)
+          .some((entry) => entry.id === ownerReply.key.id),
+        "The owner's message to an allowed contact was not saved.",
+      );
+      assert.equal(
+        agents.messaging.history.recent(id, unknownJid, null, 200).length,
+        0,
+        "The owner's message to a contact that is not allowed was saved.",
+      );
+      return { chat: `${LID_FRIEND}@s.whatsapp.net`, ownerReplySaved: true };
     });
 
     await step("LID contacts: posts, edits and reactions to a contact with a LID go to the LID chat", async () => {

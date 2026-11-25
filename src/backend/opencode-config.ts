@@ -94,7 +94,7 @@ export const OPENCODE_AGENT_CONFIG: OpenCodeConfigBase = {
 
 const OPENCODE_CONFIG_ENV = "OPENCODE_CONFIG_CONTENT";
 
-const OPENCODE_GO_PROVIDER = "opencode-go";
+export const OPENCODE_GO_PROVIDER = "opencode-go";
 
 const OPENCODE_GO_ADVICE = "OpenCode listed no model. Add an OpenCode Go key to continue.";
 
@@ -243,6 +243,10 @@ function mergeOpenCodeConfig(
     ...(Object.keys(entries).length > 0 ? { provider: entries } : {}),
     ...(native ? { providers: native } : {}),
   };
+}
+
+export function clearedInheritedOpenCodeKeyEnv(apiKey: string | null): Record<string, string> {
+  return apiKey && process.env.OPENCODE_API_KEY?.trim() ? { OPENCODE_API_KEY: "" } : {};
 }
 
 export function openCodeConfigEnv(

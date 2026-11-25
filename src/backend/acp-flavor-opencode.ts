@@ -90,6 +90,7 @@ function openCodeAuthRequired(
   savedKey: boolean,
   providerKeyStored: (provider: string) => boolean,
   refusalStatus: () => number | null,
+  savedKeyShadowed: () => boolean,
 ): string | null {
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
   if (endpoint)
@@ -101,10 +102,12 @@ function openCodeAuthRequired(
     );
   if (model?.toLowerCase().startsWith("opencode/") && isFreeOpencodeModel(model, model))
     return sourceText("error.provider.opencodeFreeModelRefused");
-  if (savedKey)
+  if (savedKey) {
+    if (refusalStatus() === 403) return sourceText("error.provider.opencodeGoRequestRefused");
     return sourceText(
-      refusalStatus() === 403 ? "error.provider.opencodeGoRequestRefused" : "error.provider.opencodeKeyRefused",
+      savedKeyShadowed() ? "error.provider.opencodeOwnGoKeyRefused" : "error.provider.opencodeKeyRefused",
     );
+  }
   const provider = model?.includes("/") ? model.slice(0, model.indexOf("/")) : "";
   if (!provider) return sourceText("error.provider.opencodeAuthRequiredUnknown");
   return provider.toLowerCase() !== "opencode-go" && providerKeyStored(provider)
@@ -251,8 +254,28 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
           (typeof error.data.cwd === "string" &&
             error.message === `Invalid params: session ${sessionId} does not belong to cwd: ${error.data.cwd}`))
       : null,
-  turnFailure: (error, detail, redact, log, model, endpoint, savedKey, providerKeyStored, _label, refusalStatus) => {
-    const authRequired = openCodeAuthRequired(error, model, endpoint, savedKey, providerKeyStored, refusalStatus);
+  turnFailure: (
+    error,
+    detail,
+    redact,
+    log,
+    model,
+    endpoint,
+    savedKey,
+    providerKeyStored,
+    _label,
+    refusalStatus,
+    savedKeyShadowed,
+  ) => {
+    const authRequired = openCodeAuthRequired(
+      error,
+      model,
+      endpoint,
+      savedKey,
+      providerKeyStored,
+      refusalStatus,
+      savedKeyShadowed,
+    );
     if (authRequired) return authRequired;
     if (/invalid api key|api key not valid|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail))
       return sourceText("error.provider.opencodeCredentialsRejected", {

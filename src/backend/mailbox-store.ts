@@ -1136,19 +1136,39 @@ export class MailboxStore {
   awaitsTeammate(agentId: string, taskId: string | null, turnIds: ReadonlySet<string> | null): boolean {
     const messages = this.#messagesById();
     const sourceTurnIds = this.#sourceTurnIds();
-    return this.#state.deliveries.some((delivery) => {
-      const held = delivery.status === "completed";
-      if ((!held && !isActiveDelivery(delivery)) || delivery.recipientAgentId === agentId) return false;
-      const request = messages.get(delivery.messageId);
-      return (
-        request?.sender.kind === "agent" &&
-        request.sender.agentId === agentId &&
-        request.expectsReply !== false &&
-        (request.senderTaskId ?? null) === taskId &&
-        (turnIds === null || turnIds.has(sourceTurnIds.get(request.id) ?? "")) &&
-        (!held || this.heldByTask(delivery.recipientAgentId, request.id))
-      );
-    });
+    return this.#state.deliveries.some(
+      (delivery) =>
+        this.#awaitsTeammateDelivery(agentId, taskId, delivery, messages) &&
+        (turnIds === null || turnIds.has(sourceTurnIds.get(delivery.messageId) ?? "")),
+    );
+  }
+
+  teammateStillWorks(agentId: string, taskId: string | null): boolean {
+    const messages = this.#messagesById();
+    return this.#state.deliveries.some(
+      (delivery) =>
+        delivery.status !== "queued" &&
+        this.#awaitsTeammateDelivery(agentId, taskId, delivery, messages) &&
+        !this.hasReplyFrom(delivery.recipientAgentId, delivery.messageId),
+    );
+  }
+
+  #awaitsTeammateDelivery(
+    agentId: string,
+    taskId: string | null,
+    delivery: StoredDelivery,
+    messages: ReadonlyMap<string, StoredMessage>,
+  ): boolean {
+    const held = delivery.status === "completed";
+    if ((!held && !isActiveDelivery(delivery)) || delivery.recipientAgentId === agentId) return false;
+    const request = messages.get(delivery.messageId);
+    return (
+      request?.sender.kind === "agent" &&
+      request.sender.agentId === agentId &&
+      request.expectsReply !== false &&
+      (request.senderTaskId ?? null) === taskId &&
+      (!held || this.heldByTask(delivery.recipientAgentId, request.id))
+    );
   }
 
   taskRequesterIds(taskId: string): string[] {
@@ -2406,6 +2426,12 @@ export class MailboxStore {
     return reply !== undefined && isAnswer(reply) && this.#answeredRequestOf(agentId, reply) !== undefined;
   }
 
+  followsUpOwnAnswer(delivery: QueueDelivery): boolean {
+    if (delivery.sender.kind !== "agent" || !delivery.replyToMessageId || delivery.expectsReply !== false) return false;
+    const replied = this.#state.messages.find((message) => message.id === delivery.replyToMessageId);
+    return replied !== undefined && isAnswer(replied) && replied.sender.agentId === delivery.recipientAgentId;
+  }
+
   expectsReply(messageId: string): boolean {
     return this.#state.messages.find((message) => message.id === messageId)?.expectsReply !== false;
   }
@@ -2551,10 +2577,35 @@ export class MailboxStore {
     recipientAgentId: string,
     turnRequestIds: ReadonlySet<string>,
   ): boolean {
+    return this.#agentMessageFromTurnTo(agentId, turnId, recipientAgentId, turnRequestIds, () => true);
+  }
+
+  hasAgentReplyOrRequestFromTurnTo(
+    agentId: string,
+    turnId: string,
+    recipientAgentId: string,
+    turnRequestIds: ReadonlySet<string>,
+  ): boolean {
+    return this.#agentMessageFromTurnTo(
+      agentId,
+      turnId,
+      recipientAgentId,
+      turnRequestIds,
+      (message) => message.replyToMessageId !== null || message.expectsReply !== false,
+    );
+  }
+
+  #agentMessageFromTurnTo(
+    agentId: string,
+    turnId: string,
+    recipientAgentId: string,
+    turnRequestIds: ReadonlySet<string>,
+    counts: (message: StoredMessage) => boolean,
+  ): boolean {
     const turnIds = this.#sourceTurnIds();
     return this.#state.messages.some((message) => {
       if (message.sender.kind !== "agent" || message.sender.agentId !== agentId) return false;
-      if (turnIds.get(message.id) !== turnId) return false;
+      if (turnIds.get(message.id) !== turnId || !counts(message)) return false;
       if (message.replyToMessageId !== null && turnRequestIds.has(message.replyToMessageId)) return false;
       return this.#state.deliveries.some(
         (delivery) => delivery.messageId === message.id && delivery.recipientAgentId === recipientAgentId,
@@ -3300,6 +3351,12 @@ export class MailboxStore {
     });
   }
 
+  hasQueuedDelivery(agentId: string): boolean {
+    return this.#state.deliveries.some(
+      (delivery) => delivery.recipientAgentId === agentId && delivery.status === "queued",
+    );
+  }
+
   hasStartedDelivery(agentId: string): boolean {
     return this.#state.deliveries.some(
       (delivery) =>
@@ -3566,6 +3623,12 @@ export class MailboxStore {
     const staged = this.#stagedGeneratedAttachments.get(attachmentId);
     if (staged) return staged.sha256;
     return this.#fileRecords().find((record) => record.id === attachmentId && !record.deletedAt)?.sha256 ?? null;
+  }
+
+  attachmentPath(attachmentId: string): string | null {
+    const staged = this.#stagedGeneratedAttachments.get(attachmentId);
+    if (staged) return staged.path;
+    return this.#fileRecords().find((record) => record.id === attachmentId && !record.deletedAt)?.path ?? null;
   }
 
   storeGeneratedAttachment = Effect.fn("MailboxStore.storeGeneratedAttachment")(function* (

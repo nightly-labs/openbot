@@ -13,6 +13,7 @@ import { markdownImageName } from "@openbot/contracts/markdown-preview-text";
 import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
+import markedCjkFriendly from "marked-cjk-friendly";
 import { createMemo, createSignal, For, Show } from "solid-js";
 import { ScrollEdges } from "../../components/ScrollEdges";
 import { textDirection } from "../../content-direction";
@@ -129,6 +130,7 @@ const markdown = new Marked({
     },
   ],
 });
+markdown.use(markedCjkFriendly());
 
 const VOID_HTML_ELEMENTS = new Set([
   "area",

@@ -221,6 +221,18 @@ const PREVIEW_STALE_AFTER_MS = 1_000;
 const VIEW_FRAME_QUALITY = 60;
 const VIEW_FRAME_MAX_WIDTH = 1_280;
 const VIEW_FRAME_MAX_HEIGHT = 800;
+const VIEW_FRAME_LIMIT = 2_048;
+const VIEW_FRAME_MAX_PIXELS = 2_048 * 1_080;
+
+function viewFrameBox(asked: BrowserViewViewport | undefined): { maxWidth: number; maxHeight: number } {
+  if (!asked) return { maxWidth: VIEW_FRAME_MAX_WIDTH, maxHeight: VIEW_FRAME_MAX_HEIGHT };
+  const maxWidth = Math.min(VIEW_FRAME_LIMIT, Math.max(VIEW_FRAME_MAX_WIDTH, Math.round(asked.width)));
+  const tallest = Math.max(VIEW_FRAME_MAX_HEIGHT, Math.floor(VIEW_FRAME_MAX_PIXELS / maxWidth));
+  return {
+    maxWidth,
+    maxHeight: Math.min(VIEW_FRAME_LIMIT, tallest, Math.max(VIEW_FRAME_MAX_HEIGHT, Math.round(asked.height))),
+  };
+}
 const TAB_SET_TOOLS: ReadonlySet<string> = new Set(["open", "list_tabs", "status"]);
 const VIEW_CONTEXT_MENU_MS = 1_500;
 const DIALOG_ACTION_WAIT_MS = 10_000;
@@ -241,6 +253,7 @@ const DOWNLOAD_TOO_LARGE =
 export interface BrowserViewOptions {
   onCursor?: (cursor: BrowserViewCursor) => void;
   viewport?: BrowserViewViewport;
+  frameSize?: BrowserViewViewport;
   onPageCopy?: (text: string) => void;
 }
 
@@ -288,6 +301,8 @@ const PROXY_ERROR_LIST: readonly (readonly [name: string, code: number, failure:
   ["net::ERR_PROXY_CERTIFICATE_INVALID", -136, "unreachable"],
   ["net::ERR_MANDATORY_PROXY_CONFIGURATION_FAILED", -131, "unreachable"],
 ];
+const EMPTY_RESPONSE_ERROR_CODE = -324;
+const PROXY_ROUTE = /^(?:PROXY|HTTPS|SOCKS[45]?|QUIC)\s/u;
 const PROXY_ERRORS = new Map(PROXY_ERROR_LIST.map(([name, , failure]) => [name, failure]));
 const PROXY_ERROR_CODES = new Map(PROXY_ERROR_LIST.map(([, code, failure]) => [code, failure]));
 
@@ -346,6 +361,7 @@ const USES_BACKGROUND_WINDOW =
   process.platform === "darwin" || process.platform === "win32" || process.platform === "linux";
 
 const SHOWS_VIEWS_IN_BACKGROUND = process.platform === "linux";
+const PAGE_ALERT_ACCEPTED = "The page showed an alert. OpenBot pressed OK so the app stays usable. Alert text: ";
 
 function createBackgroundWindow(): BaseWindow {
   const window = new BaseWindow({
@@ -1081,7 +1097,7 @@ export class BrowserHost {
             }
             this.#emitChanged();
             yield* this.#persistState();
-            const proxyFailure = this.#proxyLoadFailure(tab, operationFailure);
+            const proxyFailure = yield* this.#loadFailure(tab, operationFailure, normalizedUrl);
             if (proxyFailure !== operationFailure) return yield* proxyFailure;
             const certificateFailure = closeOnFailure ? operationFailure : certificateLoadFailure(operationFailure);
             if (certificateFailure !== operationFailure) return yield* certificateFailure;
@@ -1154,7 +1170,11 @@ export class BrowserHost {
             tab,
             navigateAndWait(tab.contents, () => tab.contents.loadURL(normalizedUrl, browserLoadOptions())),
           ).pipe(
-            Effect.mapError((failure) => certificateLoadFailure(this.#proxyLoadFailure(tab, failure))),
+            Effect.catch((failure) =>
+              this.#loadFailure(tab, failure, normalizedUrl).pipe(
+                Effect.flatMap((loadFailure) => Effect.fail(certificateLoadFailure(loadFailure))),
+              ),
+            ),
             Effect.ensuring(
               Effect.sync(() => {
                 tab.focusOnCommit = false;
@@ -2224,7 +2244,7 @@ export class BrowserHost {
     onEnded?: (reason: string) => void,
     options: BrowserViewOptions = {},
   ): Effect.fn.Return<() => Effect.Effect<void>, BrowserOperationError> {
-    const { onCursor, viewport, onPageCopy } = options;
+    const { onCursor, viewport, frameSize, onPageCopy } = options;
     const tab = yield* this.#requireTab(tabId);
     const protection = tab.secret;
     if (protection?.submitted && !protection.running && this.#takeoverTabIds.has(tabId))
@@ -2270,8 +2290,7 @@ export class BrowserHost {
       tab.engine.startScreencast(
         {
           quality: VIEW_FRAME_QUALITY,
-          maxWidth: VIEW_FRAME_MAX_WIDTH,
-          maxHeight: VIEW_FRAME_MAX_HEIGHT,
+          ...viewFrameBox(frameSize),
           ...(viewport ? { viewport } : {}),
           ...(onPageCopy
             ? {
@@ -2983,7 +3002,11 @@ export class BrowserHost {
               tab.contents,
               () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
               operationTimeout,
-            ).pipe(Effect.mapError((failure) => this.#proxyLoadFailure(tab, failure)));
+            ).pipe(
+              Effect.catch((failure) =>
+                this.#loadFailure(tab, failure, normalizedUrl).pipe(Effect.flatMap(Effect.fail)),
+              ),
+            );
           } else if (direction === "reload") {
             yield* navigateAndWait(
               tab.contents,
@@ -3416,6 +3439,30 @@ export class BrowserHost {
     this.#onProxyStatusChanged();
   }
 
+  readonly #loadFailure = Effect.fn("BrowserHost.loadFailure")(function* (
+    this: BrowserHost,
+    tab: BrowserHostTab,
+    failure: BrowserOperationError,
+    url: string,
+  ) {
+    const proxyFailure = this.#proxyLoadFailure(tab, failure);
+    if (proxyFailure !== failure || chromiumErrorCode(String(failure.cause)) !== EMPTY_RESPONSE_ERROR_CODE)
+      return proxyFailure;
+    const route = yield* Effect.tryPromise(() => this.#tabSession(tab).resolveProxy(url)).pipe(
+      Effect.orElseSucceed(() => "DIRECT"),
+    );
+    if (!PROXY_ROUTE.test(route.trim())) return failure;
+    return browserFailure(
+      new Error(
+        sourceText(
+          this.#tabProxy(tab) === null
+            ? "error.backend.browserSystemProxyOrSiteClosed"
+            : "error.backend.browserProfileProxyOrSiteClosed",
+        ),
+      ),
+    );
+  }).bind(this);
+
   #proxyLoadFailure(tab: BrowserHostTab, failure: BrowserOperationError): BrowserOperationError {
     const proxy = this.#tabProxy(tab);
     const proxyError = proxyErrorInText(String(failure.cause));
@@ -3659,9 +3706,23 @@ export class BrowserHost {
     });
   }
 
+  #agentRunsTab(tab: BrowserHostTab): boolean {
+    return (
+      (tab.ownerThreadId !== null || tab.ownerAgentId !== null) &&
+      !tab.secret &&
+      !this.#takeoverTabIds.has(tab.id) &&
+      !this.#userControlTabIds.has(tab.id)
+    );
+  }
+
   #bindTabEvents(tab: BrowserHostTab): void {
     const contents = tab.contents;
     const changed = () => this.#emitChanged();
+    tab.engine.acceptPageAlerts((message) => {
+      if (tab.closing || !this.#agentRunsTab(tab)) return false;
+      tab.diagnostics.add({ kind: "console", level: "warning", message: `${PAGE_ALERT_ACCEPTED}${message}` });
+      return true;
+    });
     if (this.#tabProxy(tab)) contents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
     let proxySignIns = 0;
     contents.on("login", (event, _details, authInfo, callback) => {
@@ -3800,13 +3861,7 @@ export class BrowserHost {
     contents.on("did-start-loading", changed);
     contents.on("dom-ready", () => {
       void contents.insertCSS(":where(html) { scrollbar-gutter: stable; }").catch(() => undefined);
-      if (
-        (tab.ownerThreadId !== null || tab.ownerAgentId !== null) &&
-        !tab.secret &&
-        !this.#takeoverTabIds.has(tab.id) &&
-        !this.#userControlTabIds.has(tab.id)
-      )
-        refuseCookieBanners(contents);
+      if (this.#agentRunsTab(tab)) refuseCookieBanners(contents);
     });
     contents.on("did-stop-loading", () => {
       if (tab.closing || tab.contents !== contents || contents.isDestroyed()) return;

@@ -19,6 +19,8 @@ export const messages = {
     "הכלי לא רץ. tool_call לא מצא כלי בשם הזה. יש להשתמש בשם המלא המדויק ש-tool_search מחזיר, למשל openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "הכלי לא רץ. tool_call לא מצא כלי בשם הזה. ייתכן שהשם המלא הוא {name}. אם כן, יש לשלוח את הקריאה שוב עם השם הזה.",
+  "error.agent.toolCallNullValue":
+    "הכלי לא רץ. {name} צריך אובייקט או רשימה ב-{paths}, אבל כל אחד מפריטי הרשימה האלה הגיע כ-null. יש לשלוח את הקריאה שוב ולתת כל אחד מהפריטים האלה כמחרוזת שמכילה את ה-JSON שלו.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe לא מצא כלי OpenBot בשם {names}. הוא מתאר רק את כלי OpenBot והדפדפן ש-openbot.tool_search מציג, ולא כלי MCP.",
   "error.agent.toolDescribeDiscoveryNames": "קרא ל-{names} ישירות. tool_describe לא מתאר את כלי החיפוש.",
@@ -173,6 +175,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "צילום מסך לא פועל בשיחה ב-Slack, ב-Discord או ב-Telegram, כי אנשים אחרים מקבלים את הקבצים שלו.",
   "error.agent.screenCaptureDeclined": "המשתמש לא אישר את צילום המסך הזה. דבר לא צולם.",
+  "error.agent.creditMediaDeclined": "המשתמש לא אישר את היצירה הזו. לא נוצלו קרדיטים.",
+  "error.agent.creditMediaNotSaved": "הקובץ נוצר, אבל OpenBot לא הצליח לשמור אותו בצ׳אט.",
   "error.agent.mcpServerDeclined": "המשתמש לא אישר את שינוי שרת ה-MCP הזה. דבר לא השתנה.",
   "error.agent.mcpToolDeclined": "המשתמש לא אישר את הקריאה לכלי MCP הזה. הכלי לא הופעל.",
   "error.agent.mcpServerNotSaved": "שרת ה-MCP לא הגיב, ולכן לא נשמר. {error}",

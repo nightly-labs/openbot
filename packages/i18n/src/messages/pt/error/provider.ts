@@ -249,6 +249,8 @@ export const messages = {
     "Sua chave de API do OpenCode expirou. Crie uma nova chave no OpenCode Console, cole-a nas configurações do OpenCode e tente novamente.",
   "error.provider.opencodeKeyRefused":
     "O OpenCode Go recusou sua chave de API salva. A chave pode ter expirado. Crie uma nova chave no OpenCode Console, cole-a nas configurações do OpenCode e tente novamente.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "O OpenCode não usou a chave que você salvou no OpenBot. Ele usou outra chave do OpenCode Go que o próprio OpenCode guarda, e o OpenCode Go recusou essa chave. Para remover essa chave, execute `opencode auth logout opencode-go` em um terminal no computador que executa o agente e escolha a chave. Depois, tente novamente.",
   "error.provider.opencodeGoRequestRefused":
     "O OpenCode Go recusou a solicitação. Uma nova chave de API não resolve isso. Seu plano do OpenCode Go pode não estar ativo, ou o OpenCode Go pode bloquear sua rede: alguns serviços bloqueiam VPNs, proxies ou alguns países. Verifique se o seu plano está ativo no OpenCode Console ou desative a VPN e tente novamente. Você também pode escolher outro modelo.",
   "error.provider.opencodeServiceFailure":
@@ -312,6 +314,8 @@ export const messages = {
     "O modelo do OpenCode escreveu as ações como texto e não as executou. Tente novamente ou escolha outro modelo.",
   "error.provider.acpNoAnswer":
     "{provider} encerrou o turno sem resposta. Envie a mensagem novamente ou inicie um novo chat.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} recebeu os resultados dos colegas de equipe e depois encerrou o turno sem resposta. Peça ao agente para continuar.",
   "error.provider.noAnswerAfterSteps":
     "{provider} executou alguns passos e terminou o turno sem resposta. Pergunte ao agente o que ele fez antes de enviar o mesmo pedido de novo.",
   "error.provider.acpRefusedNoReason": "{provider} parou sem resposta. Envie a mensagem novamente.",
@@ -376,6 +380,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Entre com o Cursor ou defina CURSOR_API_KEY para usar o Cursor.",
   "error.provider.cursorSignInUnusable":
     "O Cursor não conseguiu se conectar ao servidor com o seu login. Verifique sua conexão com a internet e entre no Cursor novamente.",
+  "error.provider.cursorNoModels":
+    'O Cursor não enviou a lista de modelos. Escolha "Conectar" para entrar no Cursor de novo. Se esta mensagem continuar, confira se o seu plano do Cursor inclui modelos.',
   "error.provider.clineArchivePath": "O arquivo compactado do Cline tem um caminho inesperado.",
   "error.provider.clinePackageMismatch": "O pacote do Cline não corresponde ao catálogo de ambientes de execução.",
   "error.provider.clineChecksum": "A soma de verificação do ambiente de execução do Cline não corresponde.",
@@ -418,6 +424,8 @@ export const messages = {
     "A chave de API da Anthropic não tem crédito de API. Um plano do Claude não paga as solicitações feitas com uma chave de API. Adicione crédito no Anthropic Console, ou entre no Claude em Configurações e selecione a conta do Claude no menu de modelos do agente.",
   "error.provider.claudeAccountNoCredit":
     "O saldo de créditos da sua conta do Claude está baixo demais. Algumas solicitações, como o modo rápido, usam créditos de uso mesmo quando o seu plano do Claude ainda tem uso disponível. Adicione créditos de uso na sua conta do Claude, ou selecione outro modelo no menu de modelos do agente.",
+  "error.provider.claudeCustomEndpointBilling":
+    "O Claude Code envia as solicitações para {host}, não para a Anthropic: as configurações do Claude Code ou as variáveis de ambiente definem este endereço de API. {host} recusou a solicitação por causa do saldo da conta, não por causa do seu plano do Claude. Adicione saldo à sua conta do {host}, ou selecione outro modelo no menu de modelos do agente.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "O serviço do Claude bloqueou esta solicitação. Normalmente é um problema rápido do lado do Claude, não da sua conta. Envie a mensagem de novo em alguns minutos.",
   "error.provider.foreignReasoning":

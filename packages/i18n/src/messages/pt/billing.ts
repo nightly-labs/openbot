@@ -216,4 +216,28 @@ export const messages = {
   "billing.details.vatIdInvalid": "Este não é um número de IVA do país escolhido.",
   "billing.details.countryMissing": "Escolha o país de cobrança.",
   "billing.details.saveFailed": "Não foi possível salvar os dados de cobrança",
+  "billing.credits.explainer.title": "O que são créditos?",
+  "billing.credits.explainer.page": "{page} de {total}",
+  "billing.credits.explainer.pages": "Páginas",
+  "billing.credits.explainer.mediaTitle": "Os créditos pagam por mídia",
+  "billing.credits.explainer.mediaText": "Quando um agente cria uma imagem, um vídeo ou uma voz, ele usa créditos.",
+  "billing.credits.explainer.chatTitle": "Os chats continuam grátis",
+  "billing.credits.explainer.chatText":
+    "Os chats usam seu próprio provedor de IA. Conversar com seus agentes não usa créditos.",
+  "billing.credits.explainer.chatFree": "0 crédito",
+  "billing.credits.explainer.modelsTitle": "Cada modelo tem um preço",
+  "billing.credits.explainer.modelsText":
+    "Modelos melhores custam mais. Uma imagem usa {pictureMin}–{pictureMax} créditos, e um vídeo de {seconds} s usa {videoMin}–{videoMax}.",
+  "billing.credits.explainer.perPicture": "/ imagem",
+  "billing.credits.explainer.perClip": "/ vídeo de {seconds} s",
+  "billing.credits.explainer.getTitle": "Conseguir créditos",
+  "billing.credits.explainer.getText":
+    "Compre um pacote quando precisar de mais. Pacotes maiores dão um preço melhor por crédito.",
+  "billing.credits.explainer.freeEnd": "Os créditos grátis mensais têm data de validade",
+  "billing.credits.explainer.welcome": "Contas novas recebem {amount} créditos grátis para experimentar alguns modelos",
+  "billing.credits.welcomeIncluded": "Créditos grátis: {amount}",
+  "billing.credits.explainer.allPrices": "Todos os {count} modelos",
+  "billing.credits.explainer.next": "Avançar",
+  "billing.credits.explainer.gotIt": "Entendi",
+  "billing.credits.explainer.place": "OpenBot",
 } as const satisfies PartialTranslation<typeof source>;

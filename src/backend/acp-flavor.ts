@@ -50,6 +50,11 @@ export interface AcpMcpServerFailure {
   readonly reason: string;
 }
 
+interface AcpTaskTurns {
+  readonly startsTask: (toolCallId: string, input: unknown) => boolean;
+  readonly toolCallKey: (toolCallId: string) => string;
+}
+
 export interface AcpFlavor {
   mediaTools?: {
     kind(update: {
@@ -75,6 +80,7 @@ export interface AcpFlavor {
     providerKeyStored: (provider: string) => boolean,
     label: string,
     refusalStatus: () => number | null,
+    savedKeyShadowed: () => boolean,
   ): string;
   failureCause?(error: unknown, answer: string): CauseCode | null;
   unexplainedFailureVerification?(error: unknown, detail: string, message: string): string | null;
@@ -98,6 +104,7 @@ export interface AcpFlavor {
   configConflict?(error: unknown): boolean;
   staleSession?(error: unknown): boolean;
   keepModelsOnRefreshFailure?: true;
+  noModelsAfterRetry?(): string;
   processWideModel?: true;
   setsConfigOnlyOnChange?: true;
   modelSetUnsaved?(error: RequestError): boolean;
@@ -138,6 +145,7 @@ export interface AcpFlavor {
   promptOpenForBackgroundTasks?: true;
   silentTurnLimitMs?: number;
   unsentBackgroundTurns?: true;
+  unsentTaskTurns?: AcpTaskTurns;
   wakesAfterPromptEnds?: true;
   restartNoticeOnReload?: true;
   selfWakeTools?: RegExp;
@@ -453,6 +461,7 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
     error.code === -32603 && isRecord(error.data) && error.data.message === "Failed to initialize session services"
       ? sourceText("error.provider.cursorSignInUnusable")
       : null,
+  noModelsAfterRetry: () => sourceText("error.provider.cursorNoModels"),
   planUsedUpChunk: /^(?:\n\nUpgrade your plan to continue|\s*Add a payment method to continue\.?\s*)$/u,
   connectionLostChunk: /^\s*Error: RetriableError: \[(?:canceled|aborted|unavailable|deadline_exceeded)\] [^\n]*\s*$/u,
   turnFailure: cursorTurnFailure,
@@ -460,6 +469,16 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   processWideModel: true,
   mcpServersLoadWithSession: true,
   enableMcpServers: enableCursorMcpServers,
+};
+
+const KIMI_CODE_TOOL_CALL_TURN = /^\d+:/u;
+
+const KIMI_TASK_TURNS: AcpTaskTurns = {
+  startsTask: (toolCallId, input) =>
+    KIMI_CODE_TOOL_CALL_TURN.test(toolCallId) &&
+    isRecord(input) &&
+    (input.run_in_background === true || typeof input.task_id === "string"),
+  toolCallKey: (toolCallId) => toolCallId.replace(KIMI_CODE_TOOL_CALL_TURN, ""),
 };
 
 export const KIMI_ACP_FLAVOR: AcpFlavor = {
@@ -476,6 +495,9 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
   mcpToolsFixedAtStart: true,
   turnStallMs: 12 * 60_000,
   staleSession: kimiStaleSession,
+  unsentBackgroundTurns: true,
+  unsentTaskTurns: KIMI_TASK_TURNS,
+  messagePerId: true,
 };
 
 export const DEVIN_ACP_FLAVOR: AcpFlavor = {
@@ -573,7 +595,14 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     failureReport: HERMES_FAILURE_SUMMARY,
     catalogAsMcpTools: true,
   },
-  kimi: { ...CUSTOM_ACP_FLAVOR, mcpToolsFixedAtStart: true, staleSession: kimiStaleSession },
+  kimi: {
+    ...CUSTOM_ACP_FLAVOR,
+    mcpToolsFixedAtStart: true,
+    staleSession: kimiStaleSession,
+    unsentBackgroundTurns: true,
+    unsentTaskTurns: KIMI_TASK_TURNS,
+    messagePerId: true,
+  },
   "kiro-cli": { ...CUSTOM_ACP_FLAVOR, mcpToolCallLimitMs: 120_000, modelConfigId: "model" },
 };
 

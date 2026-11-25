@@ -89,6 +89,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Volgend deel",
   "mobile.chat.preview.pdfFailed": "Kan deze PDF niet tonen.",
   "mobile.chat.preview.spreadsheetFailed": "Kan deze spreadsheet niet lezen.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Deze spreadsheet is te groot voor een voorvertoning. Deel hem om hem in een andere app te openen.",
   "mobile.chat.preview.spreadsheetTruncated": "Voorvertoning beperkt tot de eerste {rows} rijen en {columns} kolommen.",
   "mobile.chat.copyFailedMessage": "Probeer het opnieuw.",
   "mobile.chat.message.copyFailed": "Kan bericht niet kopiëren",
@@ -487,6 +489,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Verbinden met server",
   "mobile.chat.history.loading": "Chatgeschiedenis laden",
   "mobile.chat.history.waiting": "Wachten op verbinding",
+  "mobile.chat.history.syncing": "Zoeken naar nieuwe berichten",
   "mobile.chat.history.loadFailed": "Kan chatgeschiedenis niet laden",
   "mobile.chat.scrollToLatest": "Scroll naar nieuwste bericht",
   "mobile.chat.agentUnavailable.title": "Agent niet beschikbaar",

@@ -97,6 +97,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Sonraki bölüm",
   "mobile.chat.preview.pdfFailed": "Bu PDF gösterilemedi.",
   "mobile.chat.preview.spreadsheetFailed": "Bu elektronik tablo okunamadı.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Bu elektronik tablo önizleme için çok büyük. Başka bir uygulamada açmak için paylaşın.",
   "mobile.chat.preview.spreadsheetTruncated": "Önizleme ilk {rows} satır ve {columns} sütunla sınırlandırıldı.",
   "mobile.chat.copyFailedMessage": "Lütfen tekrar deneyin.",
   "mobile.chat.message.copyFailed": "Mesaj kopyalanamadı",
@@ -224,7 +226,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "Sunucu bağlı değil. Yeniden bağlandığında konuşma devam eder.",
   "mobile.chat.liveVoice.speakFailed": "Yanıt sesli okunamadı.",
   "mobile.chat.liveVoice.voiceNotReady": "Ayarlar > Ses bölümünden bir yanıt sesi seç.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 bu dili okuyamaz.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 bu dili okuyamaz. Ayarlar > Ses bölümünden başka bir yanıt sesi seç.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs API anahtarını kabul etmedi.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "ElevenLabs anahtarında bir izin eksik. Ayarlar > Ses bölümünden kontrol et.",
@@ -516,6 +519,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Sunucuya bağlanılıyor",
   "mobile.chat.history.loading": "Sohbet geçmişi yükleniyor",
   "mobile.chat.history.waiting": "Bağlantı bekleniyor",
+  "mobile.chat.history.syncing": "Yeni mesajlar denetleniyor",
   "mobile.chat.history.loadFailed": "Sohbet geçmişi yüklenemedi",
   "mobile.chat.scrollToLatest": "En son mesaja kaydır",
   "mobile.chat.agentUnavailable.title": "Ajan kullanılamıyor",

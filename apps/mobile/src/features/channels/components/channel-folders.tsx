@@ -14,7 +14,12 @@ import Plus from "lucide-react-native/icons/plus";
 import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import { useState } from "react";
 import { Alert, View } from "react-native";
-import { alertFolderFailure, FolderBrowserListing, FolderRowAction } from "@/features/agents/components/agent-folders";
+import {
+  alertFolderFailure,
+  FolderBrowserListing,
+  FolderRowAction,
+  useTypedHostFolder,
+} from "@/features/agents/components/agent-folders";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
@@ -210,7 +215,7 @@ export function ChannelFolderBrowser({ channel, available }: { channel: ChannelF
     placeholderData: keepPreviousData,
   });
   const [saving, setSaving] = useState(false);
-  const folder = query.data;
+  const typed = useTypedHostFolder(query);
   const moving = query.isPlaceholderData;
 
   function go(next: string) {
@@ -218,10 +223,11 @@ export function ChannelFolderBrowser({ channel, available }: { channel: ChannelF
   }
 
   async function choose(): Promise<void> {
-    if (!folder || moving || saving) return;
+    const target = typed.target;
+    if (!target || moving || saving) return;
     setSaving(true);
     try {
-      const change = await addChannelFolder({ channelId: channel.channelId, path: folder.path }, channel.serverId);
+      const change = await addChannelFolder({ channelId: channel.channelId, path: target }, channel.serverId);
       await queryClient.cancelQueries({ queryKey: foldersKey, exact: true });
       queryClient.setQueryData<ChannelFolderList>(foldersKey, change.list);
       const refusal = folderRefusal(change);
@@ -247,12 +253,12 @@ export function ChannelFolderBrowser({ channel, available }: { channel: ChannelF
     <>
       <SheetSaveAction
         dirty
-        canSave={Boolean(folder) && !moving}
+        canSave={Boolean(typed.target) && !moving}
         pending={saving}
         label={t("mobile.agent.folders.addHere")}
         onSave={() => void choose()}
       />
-      <FolderBrowserListing query={query} path={path} busy={saving} onGo={go} />
+      <FolderBrowserListing query={query} path={path} typed={typed} busy={saving} onGo={go} />
     </>
   );
 }

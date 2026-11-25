@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "Bu ana makinede etkinlikler kullanılamıyor.",
   "error.backend.databaseIntegrity": "OpenBot veritabanı bütünlük denetiminden geçemedi.",
+  "error.backend.creditsHoldAdminOnly":
+    "Ajanların kredi kullanmasına yalnızca bu sunucunun sahibi veya yöneticisi izin verebilir.",
+  "error.backend.creditsHoldShort": "Henüz yeterli kredi yok.",
   "error.backend.webhookRouteLimit": "Bir ana makinede en fazla {limit} webhook rutini olabilir.",
   "error.backend.webhookSettingsInvalid": "Webhook ayarlarını kontrol edin ve tekrar deneyin.",
   "error.backend.webhookSenderSecretInvalid":
@@ -67,6 +70,12 @@ export const messages = {
     "Sıkıştırma bu sohbeti küçültmüyor: iki sıkıştırmadan sonra hâlâ modelin bağlam penceresinin %{percent} kadarını kullanıyor, bu yüzden OpenBot sıkıştırmayı durduruyor. Pencerenin çoğunu araçlar ve talimatlar kullanıyor. Bu ajanın ihtiyaç duymadığı MCP sunucularını veya bilgisayar kullanımını kapatın ya da daha büyük pencereli bir model seçin. Ardından yeni bir sohbet başlatın.",
   "error.backend.contextCompactionStopped":
     'Bu sohbetin art arda iki sıkıştırması başarısız oldu, bu yüzden OpenBot onu otomatik olarak sıkıştırmayı bırakıyor. Her deneme tüm sohbeti modele gönderir ve plan sınırınızı kullanır. Yeniden denemek için "Şimdi sıkıştır"ı seçin veya yeni bir sohbet başlatın.',
+  "error.backend.contextCompactionRetrying":
+    "Sağlayıcı bu sohbeti sıkıştıramadı ve yeniden deniyor. Bu sohbetteki yeni mesajlar sıkıştırma bitene kadar bekler. Yakında bitmezse OpenBot onu durdurur ve mesajlarını gönderir.",
+  "error.backend.contextCompactionFailed":
+    "Bu sohbetin sıkıştırılması başarısız oldu. Sohbet değişmedi. Bekleyen mesajlar şimdi ajana gidiyor.",
+  "error.backend.contextCompactionTimedOut":
+    "Bu sohbetin sıkıştırılması çok uzun sürdü, bu yüzden OpenBot onu durdurdu. Sohbet değişmedi. Bekleyen mesajlar şimdi ajana gidiyor.",
   "error.backend.providerModelAtCapacity":
     "Model kapasitesinin sınırında. Sağlayıcı birkaç dakika içinde yeniden deneyecek. Hemen devam etmek için turu durdurun ve başka bir model seçin.",
   "error.backend.providerRetrying":
@@ -108,6 +117,15 @@ export const messages = {
   "error.backend.channelRoutingFailed": "Yönlendirme başarısız oldu. Bir üye seçin veya tekrar deneyin.",
   "error.backend.channelLeadTimedOut": "Kanal lideri zamanında yanıt vermedi. Bir üye seçin veya tekrar deneyin.",
   "error.backend.channelLeadFailed": "Kanal lideri bu mesajı yönlendiremedi. Bir üye seçin veya tekrar deneyin.",
+  "error.backend.channelLeadBusy":
+    "Kanal liderinin modeli şu anda meşgul. Birkaç dakika sonra tekrar deneyin veya bir üye seçin.",
+  "error.backend.channelLeadOffline": "Kanal liderinin modelinin bağlantısı koptu. Tekrar deneyin veya bir üye seçin.",
+  "error.backend.channelLeadSignIn":
+    "Kanal liderinin sağlayıcı oturumunun süresi doldu. Tekrar oturum açın veya bir üye seçin.",
+  "error.backend.channelLeadModelGone":
+    "Kanal liderinin modeli kullanılamıyor. Lider için başka bir model seçin veya bir üye seçin.",
+  "error.backend.channelLeadRefused":
+    "Kanal liderinin modeli bu isteği reddetti. Bir üye veya lider için başka bir model seçin.",
   "error.backend.channelRequestMemberRequired": "Bu istek için bir üye seçin.",
   "error.backend.channelDeliveryNotCreated": "Kanal teslimatı oluşturulamadı.",
   "error.backend.channelAssignmentStopped": "Bu kanal ataması durduruldu veya değiştirildi.",
@@ -288,7 +306,11 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
   "error.backend.mcpServerExitedWithOutput": "Sunucu yanıt vermeden durdu. Yazdığı: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "Sunucu başlamadı, çünkü indirilmesi başarısız oldu. İnternet bağlantısını kontrol edin, sonra yeniden deneyin.",
   "error.backend.mcpServerFailedToStart": "Sunucu başlamadı: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot, {name} MCP sunucusunu başlatamadı, çünkü programı OpenBot'un çalıştığı bilgisayarda yüklü değil. {name} sağlayan uygulamayı o bilgisayara yükleyin veya Pazaryeri, Uygulamalar bölümünde {name} öğesini kapatın.",
   "error.backend.mcpServerStartAbandoned":
     "{provider}, sunucu başlamadan beklemeyi bıraktı. Bu yüzden ajanları bu sunucunun araçlarını almıyor.",
   "error.backend.mcpServerStoppedDuringCall": "MCP sunucusu bu çağrıya yanıt vermeden durdu.",
@@ -404,6 +426,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "{name} proxy'si oturum açmayı reddetti, bu yüzden sayfa açılmadı.",
   "error.backend.browserSystemProxyFailed":
     "OpenBot'u çalıştıran bilgisayarın ayarlarındaki proxy yanıt vermiyor veya bağlantıyı reddetti, bu yüzden sayfa açılmadı. O bilgisayarın proxy ayarlarını kontrol edin.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "Site veya OpenBot'u çalıştıran bilgisayarın ayarlarındaki proxy bağlantıyı yanıt vermeden kapattı, bu yüzden sayfa açılmadı. Hiçbir site açılmıyorsa o bilgisayarın proxy ayarlarını kontrol edin.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "Site veya bu tarayıcı profilinin proxy'si bağlantıyı yanıt vermeden kapattı, bu yüzden sayfa açılmadı. Hiçbir site açılmıyorsa profilin proxy'sini kontrol edin.",
   "error.backend.browserProxyComputerUnreachable":
     "Bu profilin kullandığı bilgisayar yanıt vermiyor, bu yüzden sayfa açılmadı.",
   "error.backend.browserProxyComputerLocalAddress":

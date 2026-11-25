@@ -13,8 +13,10 @@ import {
   type BusyMessageMode,
   DEFAULT_AGENT_DEFAULTS,
   DEFAULT_MACHINE_ALERT_SETTINGS,
+  DEFAULT_MEDIA_APPROVAL_CREDITS_SETTING,
   type HostTurnLimitsInput,
   type MachineAlertSettings,
+  type MediaApprovalCreditsSetting,
   type MemoryReviewInterval,
   type PromptCacheTtl,
   type ResponseStyle,
@@ -232,6 +234,7 @@ function profile(name: string) {
     browsingMemory: { enabled: boolean };
     claudeUserSetup: boolean;
     cacheExpiryCompaction: boolean;
+    mediaApprovalCredits: MediaApprovalCreditsSetting;
     claudeCompactWindow: number | null;
     machineAlerts: MachineAlertSettings;
     modelVisibility: { provider: string; hidden: string[] }[];
@@ -249,6 +252,7 @@ function profile(name: string) {
     browsingMemory: { enabled: true },
     claudeUserSetup: false,
     cacheExpiryCompaction: true,
+    mediaApprovalCredits: DEFAULT_MEDIA_APPROVAL_CREDITS_SETTING,
     claudeCompactWindow: null,
     machineAlerts: DEFAULT_MACHINE_ALERT_SETTINGS,
     modelVisibility: [],
@@ -314,6 +318,7 @@ function profile(name: string) {
       browsingMemory: preference("browsingMemory"),
       claudeUserSetup: preference("claudeUserSetup"),
       cacheExpiryCompaction: preference("cacheExpiryCompaction"),
+      mediaApprovalCredits: preference("mediaApprovalCredits"),
       claudeCompactWindow: preference("claudeCompactWindow"),
       machineAlerts: preference("machineAlerts"),
       modelVisibility: preference("modelVisibility"),
@@ -672,6 +677,13 @@ try {
     browsingMemory: { enabled: false },
     claudeUserSetup: true,
     cacheExpiryCompaction: false,
+    mediaApprovalCredits: {
+      agents: false,
+      askWhenBlocked: false,
+      credits: 250,
+      imageModel: "gpt-image-2",
+      videoModel: null,
+    },
     claudeCompactWindow: 400_000,
     machineAlerts: { diskPercent: 70, memoryPercent: 75, cpuPercent: 80, responsibleMemberId: "member-on-old-server" },
     modelVisibility: [{ provider: "codex", hidden: ["gpt-old-model"] }],

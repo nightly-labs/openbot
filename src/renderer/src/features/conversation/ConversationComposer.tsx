@@ -49,6 +49,7 @@ import { type OpenWaitItem, OpenWaits } from "@openbot/ui/features/conversation/
 import { SpeakingBar } from "@openbot/ui/features/conversation/SpeakingBar";
 import { ComposerVoiceControls } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { useText } from "@openbot/ui/text";
+import { usesTouchLayout } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show, snapshot } from "solid-js";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
@@ -88,6 +89,7 @@ export function ConversationComposer() {
     currentChatErrorRun,
     currentChatErrorLink,
     currentChatErrorDetails,
+    currentChatErrorNotice,
     currentDraft,
     dismissCurrentChatErrors,
     installedSkills,
@@ -263,8 +265,17 @@ export function ConversationComposer() {
     return keyError ? props.onManageProviders : undefined;
   };
   const errorInChat = (error: string) => {
-    const marker = props.messages.at(-1)?.actionMarker;
-    return marker?.kind === "sign-in-failure" && readableAgentError(marker.text) === error;
+    for (let index = props.messages.length - 1; index >= 0; index -= 1) {
+      const message = props.messages[index];
+      if (message?.author === "you") return false;
+      const marker = message?.actionMarker;
+      if (
+        (marker?.kind === "sign-in-failure" || marker?.kind === "no-answer") &&
+        readableAgentError(marker.text) === error
+      )
+        return true;
+    }
+    return false;
   };
   const errorBannerAction = () => {
     const updateKey = updateOpenCodeKey();
@@ -368,6 +379,10 @@ export function ConversationComposer() {
   const unreadableContent = () =>
     props.agent?.provider === "opencode" &&
     currentChatError() === localizeSourceText(sourceText("error.provider.opencodeUnreadableContent"));
+  const chatErrorTone = createMemo<"warning" | "danger">((previous) => {
+    if (!currentChatError()) return previous ?? "danger";
+    return unreadableContent() || currentChatErrorNotice() ? "warning" : "danger";
+  });
   const [now, setNow] = createSignal(Date.now());
   const agentAccountId = () => props.agent?.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
   const agentUsageLimit = (limit: AccountUsageLimit) =>
@@ -450,6 +465,10 @@ export function ConversationComposer() {
     voicePhase() === "recording"
       ? undefined
       : t(sendShortcutHintKey(deviceSendShortcut(props.platform), editingDeliveryId() ? "save" : "send"));
+  const sendFromButton = () => {
+    submitComposer();
+    if (!usesTouchLayout()) setComposerFocusRequest((current) => current + 1);
+  };
   const SendControl = () => (
     <ComposerSendControl
       stop={Boolean(
@@ -476,7 +495,7 @@ export function ConversationComposer() {
         voicePhase() === "transcribing"
       }
       busy={submitting()}
-      onSend={submitComposer}
+      onSend={sendFromButton}
     />
   );
   return (
@@ -742,7 +761,7 @@ export function ConversationComposer() {
               <ComposerErrorBanner
                 message={message()}
                 title={currentChatErrorRun() ?? undefined}
-                tone={unreadableContent() ? "warning" : "danger"}
+                tone={chatErrorTone()}
                 reference={currentChatErrorReference()}
                 onShown={() => reportErrorBanner(message(), "turn")}
                 conversationKey={currentChatConversationKey()}
@@ -891,7 +910,7 @@ export function ConversationComposer() {
                   onStart={() => void startVoiceRecording()}
                   onCancel={cancelVoiceRecording}
                   onFinish={stopVoiceRecording}
-                  onSend={submitComposer}
+                  onSend={sendFromButton}
                   send={<SendControl />}
                 />
               </Show>

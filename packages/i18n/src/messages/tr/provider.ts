@@ -96,6 +96,9 @@ export const messages = {
   "provider.codeLogin.relayStarting": "{name} oturum açma işlemi {host} üzerinde başlatılıyor…",
   "provider.codeLogin.pageOpening": "{name} oturum açma sayfası {host} üzerinde açılıyor…",
   "provider.codeLogin.linkStep": "{name} hesabında oturum açın. OpenBot kendiliğinden devam eder.",
+  "provider.codeLogin.thisComputerDescription":
+    "Bu bağlantıyı bu bilgisayardaki bir tarayıcıda açın. OpenBot burada bekler.",
+  "provider.codeLogin.copyLink": "Bağlantıyı kopyala",
   "provider.codeLogin.chatgptDeviceSetting":
     "Bir bilgisayarda ChatGPT'de güvenlik ayarlarını açın ve Codex için cihaz koduyla oturum açmayı açın. İş hesabında bunu çalışma alanı yöneticiniz açar.",
   "provider.useApp.title": "{name} bağlantısını OpenBot uygulamasında yapın",
@@ -229,6 +232,7 @@ export const messages = {
   "provider.account.apiKey": "API anahtarı",
   "provider.account.listLabel": "{name} hesapları",
   "provider.account.usedBy": "Kullanan: {agents}",
+  "provider.account.sameEmail": "{name} ile aynı e-posta",
   "provider.account.failed": "Oturum açılamadı",
   "provider.account.moreActions": "{name} için diğer eylemler",
   "provider.account.renameLabel": "{name} adı",

@@ -20,14 +20,7 @@ import {
   parseCreditMediaModel,
 } from "@openbot/contracts/credit-media";
 import { creditsFromTenths } from "@openbot/contracts/credits";
-import {
-  type DynamicRecord,
-  isBoolean,
-  isDynamicRecord,
-  isNumber,
-  isOneOf,
-  isString,
-} from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
 import type { AccountAnalytics } from "./account-analytics";
@@ -40,6 +33,7 @@ import {
   creditAuditTrace,
   upstreamDetail,
 } from "./credit-audit";
+import { CreditGrants, welcomeTenthsSql } from "./credit-grants";
 import {
   availableTenthsSql,
   type CreditHold,
@@ -51,17 +45,15 @@ import {
   type CreditWallet,
 } from "./credit-spending";
 import {
-  type MediaGeneration,
-  type MediaGenerationInput,
-  type MediaUpstream,
-  type MediaUpstreamArtifact,
-  type MediaUpstreamBody,
-  type MediaUpstreamError,
-  type MediaUpstreams,
-  type MediaUpstreamValue,
-  mediaUpstreamFields,
-  ROUTER_MEDIA_UPSTREAM,
-} from "./media-upstream";
+  LEGACY_MEDIA_UPSTREAM,
+  type MediaFunding,
+  type MediaGateway,
+  type MediaGatewayArtifact,
+  type MediaGatewayError,
+  type MediaGatewayGeneration,
+  type MediaGatewayInput,
+  type MediaGatewayModel,
+} from "./media-gateway";
 
 type Failure = BillingError | BillingOperationError;
 
@@ -72,7 +64,7 @@ const NOT_ACCEPTED_STATUSES = new Set([401, 402, 403, 429]);
 
 export type CreditMediaPayer = { wallet: "personal"; userId: string } | { wallet: "server"; serverId: string };
 
-type CreditMediaInput = MediaGenerationInput;
+type CreditMediaInput = MediaGatewayInput;
 
 export interface CreditMediaSubmission {
   request: CreditMediaJobRequest;
@@ -81,23 +73,18 @@ export interface CreditMediaSubmission {
 
 export interface CreditMediaServiceOptions {
   database: D1Database;
-  upstreams: MediaUpstreams;
+  gateway: MediaGateway | null;
   now: () => number;
   analytics?: AccountAnalytics;
 }
 
 interface ModelRow {
   model_id: string;
-  upstream: string | null;
-  upstream_id: string | null;
   kind: string;
   name: string;
   maker: string;
   variant: string | null;
   specs: string;
-  upstream_params: string | null;
-  upstream_fields: string | null;
-  route_specs: string | null;
   resolution: string;
   unit: string;
   credits: number;
@@ -107,6 +94,7 @@ interface ModelRow {
 interface StoredModel {
   model: CreditMediaModel;
   route: CreditSubmitTarget | null;
+  welcome: CreditSubmitTarget | null;
 }
 
 function parseJsonRecord(text: string): DynamicRecord | null {
@@ -118,24 +106,8 @@ function parseJsonRecord(text: string): DynamicRecord | null {
   }
 }
 
-function routeOf(row: ModelRow): CreditSubmitTarget | null {
-  if (row.upstream === null || row.upstream_id === null) return null;
-  return {
-    upstream: row.upstream,
-    model: row.upstream_id,
-    params: JSON.stringify(upstreamParams(row.upstream_params ?? "{}")),
-    fields: row.upstream_fields ?? "{}",
-  };
-}
-
-function upstreamParams(text: string): MediaUpstreamBody {
-  const value = parseJsonRecord(text);
-  if (!value) return {};
-  const params: Record<string, MediaUpstreamValue> = {};
-  for (const [key, item] of Object.entries(value)) {
-    if (isString(item) || isNumber(item) || isBoolean(item)) params[key] = item;
-  }
-  return params;
+function targetOf(modelId: string, upstream: string | null): CreditSubmitTarget | null {
+  return upstream === null ? null : { upstream, model: modelId, params: "{}", fields: "{}" };
 }
 
 function withOfferedPrices(model: CreditMediaModel): CreditMediaModel | null {
@@ -150,15 +122,17 @@ function withOfferedPrices(model: CreditMediaModel): CreditMediaModel | null {
   return prices.length > 0 ? { ...model, prices } : model;
 }
 
-function storedModels(rows: readonly ModelRow[]): StoredModel[] {
+function storedModels(rows: readonly ModelRow[], routes: readonly MediaGatewayModel[]): StoredModel[] {
+  const routed = new Map(routes.map((route) => [route.id, route]));
   const grouped = new Map<string, ModelRow[]>();
   for (const row of rows) grouped.set(row.model_id, [...(grouped.get(row.model_id) ?? []), row]);
   return [...grouped.values()].flatMap((group) => {
     const first = group[0];
     if (!first) return [];
+    const route = routed.get(first.model_id) ?? null;
     const model = parseCreditMediaModel({
       ...parseJsonRecord(first.specs),
-      ...parseJsonRecord(first.route_specs ?? "{}"),
+      ...route?.specs,
       id: first.model_id,
       kind: first.kind,
       name: first.name,
@@ -172,7 +146,14 @@ function storedModels(rows: readonly ModelRow[]): StoredModel[] {
       })),
     });
     const offered = model ? withOfferedPrices(model) : null;
-    return offered ? [{ model: offered, route: routeOf(first) }] : [];
+    if (!offered) return [];
+    return [
+      {
+        model: offered,
+        route: targetOf(first.model_id, route?.upstream ?? null),
+        welcome: route ? targetOf(first.model_id, route.welcomeUpstream) : null,
+      },
+    ];
   });
 }
 
@@ -195,7 +176,7 @@ function failureOf(outcome: CreditHoldOutcome | null): CreditMediaFailure {
   return "failed";
 }
 
-function outputsOf(artifacts: readonly MediaUpstreamArtifact[]): CreditMediaOutput[] {
+function outputsOf(artifacts: readonly MediaGatewayArtifact[]): CreditMediaOutput[] {
   return artifacts.map((artifact, index) => ({
     index,
     mimeType: artifact.mimeType,
@@ -207,15 +188,17 @@ function outputsOf(artifacts: readonly MediaUpstreamArtifact[]): CreditMediaOutp
 
 function generationOf(
   stored: StoredModel,
-  target: CreditSubmitTarget,
+  upstream: string,
+  funding: MediaFunding,
   submission: CreditMediaSubmission,
-): MediaGeneration {
+): MediaGatewayGeneration {
   const { request, inputs } = submission;
   return {
+    jobId: request.jobId,
+    model: stored.model.id,
+    upstream,
+    funding,
     kind: stored.model.kind,
-    model: target.model,
-    params: upstreamParams(target.params),
-    fields: mediaUpstreamFields(parseJsonRecord(target.fields)),
     prompt: request.prompt,
     aspect: request.aspect ?? stored.model.defaultAspect,
     resolution: request.resolution ?? stored.model.defaultResolution,
@@ -266,7 +249,7 @@ function notFound(): BillingError {
   return new BillingError(404, "media_job_not_found", sourceText("error.billing.mediaJobNotFound"));
 }
 
-function logUpstream(operation: string, error: MediaUpstreamError, trace: CreditAuditTrace): void {
+function logUpstream(operation: string, error: MediaGatewayError, trace: CreditAuditTrace): void {
   console.error("media: upstream request failed", { operation, status: error.status, code: error.code });
   trace.upstream = { operation, status: error.status, code: error.code };
 }
@@ -304,19 +287,25 @@ export const readCreditMediaSubmission = Effect.fn("CreditMedia.readSubmission")
 
 export class CreditMediaService {
   readonly #database: D1Database;
-  readonly #upstreams: MediaUpstreams;
+  readonly #gateway: MediaGateway | null;
   readonly #spending: CreditSpending;
   readonly #audit: CreditAudit;
+  readonly #grants: CreditGrants;
 
   constructor(options: CreditMediaServiceOptions) {
     this.#database = options.database;
-    this.#upstreams = options.upstreams;
+    this.#gateway = options.gateway;
     this.#spending = new CreditSpending({
       database: options.database,
       now: options.now,
       ...(options.analytics ? { analytics: options.analytics } : {}),
     });
     this.#audit = new CreditAudit(options.database, options.now);
+    this.#grants = new CreditGrants({
+      database: options.database,
+      now: options.now,
+      ...(options.analytics ? { analytics: options.analytics } : {}),
+    });
   }
 
   #audited<A>(
@@ -343,39 +332,61 @@ export class CreditMediaService {
     );
   }
 
-  #models(modelId: string | null, pinnedUpstream: string | null = null): Effect.Effect<StoredModel[], Failure> {
-    return billingCall(() =>
+  #models(
+    gateway: MediaGateway,
+    modelId: string | null,
+    pinnedUpstream: string | null,
+    trace: CreditAuditTrace,
+    routesDown: "unrouted" | "busy",
+  ): Effect.Effect<StoredModel[], Failure> {
+    const rows = billingCall(() =>
       this.#database
         .prepare(
-          `SELECT m.model_id, r.upstream, r.upstream_id, m.kind, m.name, m.maker, m.variant, m.specs,
-                  r.upstream_params, r.upstream_fields, r.specs AS route_specs, p.resolution, p.unit, p.credits, p.silent_credits
+          `SELECT m.model_id, m.kind, m.name, m.maker, m.variant, m.specs,
+                  p.resolution, p.unit, p.credits, p.silent_credits
              FROM credit_media_models m
              JOIN credit_media_prices p ON p.model_id = m.model_id
-             LEFT JOIN credit_media_routes r ON r.model_id = m.model_id
-              AND r.upstream = COALESCE(?3, (SELECT upstream FROM credit_media_settings WHERE id = 1), ?2)
             WHERE m.enabled = 1 AND (?1 IS NULL OR m.model_id = ?1)
             ORDER BY m.kind, m.position, m.model_id, p.resolution`,
         )
-        .bind(modelId, ROUTER_MEDIA_UPSTREAM, pinnedUpstream)
+        .bind(modelId)
         .all<ModelRow>(),
-    ).pipe(Effect.map((result) => storedModels(result.results)));
+    );
+    const routes = gateway.models(pinnedUpstream).pipe(
+      Effect.catch((error) => {
+        logUpstream("models", error, trace);
+        return routesDown === "busy" ? Effect.fail(busy()) : Effect.succeed<MediaGatewayModel[]>([]);
+      }),
+    );
+    return Effect.all([rows, routes], { concurrency: "unbounded" }).pipe(
+      Effect.map(([result, routed]) => storedModels(result.results, routed)),
+    );
   }
 
-  #upstreamOrFail(name: string | null): Effect.Effect<MediaUpstream, BillingError> {
-    const upstream = this.#upstreams.get(name ?? ROUTER_MEDIA_UPSTREAM);
-    return upstream ? Effect.succeed(upstream) : Effect.fail(unavailable());
+  #issueWelcome(payer: CreditMediaPayer): Effect.Effect<void> {
+    if (payer.wallet !== "personal") return Effect.void;
+    return this.#grants.welcome(payer.userId).pipe(
+      Effect.asVoid,
+      Effect.orElseSucceed(() => undefined),
+    );
+  }
+
+  #gatewayOrFail(): Effect.Effect<MediaGateway, BillingError> {
+    return this.#gateway ? Effect.succeed(this.#gateway) : Effect.fail(unavailable());
   }
 
   readonly catalog = Effect.fn("CreditMedia.catalog")(function* (
     this: CreditMediaService,
   ): Effect.fn.Return<CreditMediaCatalog, Failure> {
-    if (this.#upstreams.size === 0) return { models: [] };
-    const stored = yield* this.#models(null);
-    const routed = (entry: StoredModel) => entry.route !== null && this.#upstreams.has(entry.route.upstream);
+    if (!this.#gateway) return { models: [] };
+    const stored = yield* this.#models(this.#gateway, null, null, creditAuditTrace(), "unrouted");
+    const routed = (entry: StoredModel) => entry.route !== null;
     const byKind = (entries: readonly StoredModel[]) =>
       CREDIT_MEDIA_KINDS.flatMap((kind) => entries.filter((entry) => entry.model.kind === kind));
+    const offered = (entry: StoredModel): CreditMediaModel =>
+      entry.welcome ? { ...entry.model, welcome: true } : entry.model;
     return {
-      models: byKind(stored.filter(routed)).map((entry) => entry.model),
+      models: byKind(stored.filter(routed)).map(offered),
       unavailable: byKind(stored.filter((entry) => !routed(entry))).map(({ model }) => ({
         id: model.id,
         kind: model.kind,
@@ -389,15 +400,23 @@ export class CreditMediaService {
     this: CreditMediaService,
     payer: CreditMediaPayer,
   ): Effect.fn.Return<CreditMediaBalance, Failure> {
+    yield* this.#issueWelcome(payer);
     const column = payer.wallet === "personal" ? "user_id" : "server_id";
     const id = payer.wallet === "personal" ? payer.userId : payer.serverId;
     const row = yield* billingCall(() =>
       this.#database
-        .prepare(`SELECT ${availableTenthsSql(column, "?1")} AS available_tenths`)
+        .prepare(
+          `SELECT ${availableTenthsSql(column, "?1")} AS available_tenths,
+                  ${welcomeTenthsSql(column, "?1")} AS welcome_tenths`,
+        )
         .bind(id)
-        .first<{ available_tenths: number }>(),
+        .first<{ available_tenths: number; welcome_tenths: number }>(),
     );
-    return { wallet: payer.wallet, available: creditsFromTenths(Math.max(0, row?.available_tenths ?? 0)) };
+    const availableTenths = Math.max(0, row?.available_tenths ?? 0);
+    const welcomeTenths = Math.min(availableTenths, Math.max(0, row?.welcome_tenths ?? 0));
+    const balance: CreditMediaBalance = { wallet: payer.wallet, available: creditsFromTenths(availableTenths) };
+    if (welcomeTenths > 0) balance.welcome = creditsFromTenths(welcomeTenths);
+    return balance;
   }).bind(this);
 
   #view(
@@ -454,35 +473,37 @@ export class CreditMediaService {
     trace: CreditAuditTrace,
     quote: { credits?: number },
   ): Effect.fn.Return<CreditMediaJob, Failure> {
-    if (this.#upstreams.size === 0) return yield* unavailable();
+    const gateway = yield* this.#gatewayOrFail();
     const { request } = submission;
     const earlier = yield* this.#ownedHold(payer, request.jobId);
-    const stored = (yield* this.#models(request.model, earlier?.upstream ?? null))[0];
+    const stored = (yield* this.#models(gateway, request.model, earlier?.upstream ?? null, trace, "busy"))[0];
     if (!stored) return yield* modelUnavailable();
-    if (stored.route) yield* this.#upstreamOrFail(stored.route.upstream);
-    else if (!resumable(earlier)) return yield* modelUnavailable();
+    if (!stored.route && !resumable(earlier)) return yield* modelUnavailable();
     if (creditMediaRequestProblem(stored.model, request) || inputsProblem(stored.model, submission.inputs))
       return yield* invalidRequest();
     const credits = creditMediaCost(stored.model, request);
     if (credits === null) return yield* unavailable();
     quote.credits = credits;
+    const welcome = payer.wallet === "personal" ? stored.welcome : null;
+    if (welcome) yield* this.#issueWelcome(payer);
     const hold = yield* this.#spending.hold({
       jobId: request.jobId,
       wallet: walletOf(payer),
       actorUserId,
       modelId: stored.model.id,
       credits,
+      welcome: welcome !== null,
     });
     if (hold.status === "released") return this.#releasedView(hold);
     if (hold.status === "charged" || hold.providerJobId) return yield* this.#job(payer, hold.jobId, trace);
-    const target = yield* this.#spending.claimSubmit(hold.jobId, stored.route);
+    const target = yield* this.#spending.claimSubmit(
+      hold.jobId,
+      hold.funding === "welcome" ? stored.welcome : stored.route,
+    );
     if (!target) return yield* this.#job(payer, hold.jobId, trace);
-    const upstream = this.#upstreams.get(target.upstream);
-    if (!upstream) {
-      yield* this.#spending.endSubmit(hold.jobId);
-      return yield* unavailable();
-    }
-    const submitted = yield* Effect.result(upstream.submit(hold.jobId, generationOf(stored, target, submission)));
+    const submitted = yield* Effect.result(
+      gateway.submit(generationOf(stored, target.upstream, hold.funding, submission)),
+    );
     if (Result.isFailure(submitted)) {
       const error = submitted.failure;
       logUpstream("submit", error, trace);
@@ -504,7 +525,7 @@ export class CreditMediaService {
       count: request.count,
       audio: request.audio,
     };
-    const started = (yield* this.#spending.start(hold.jobId, job.id, details, target.upstream)) ?? hold;
+    const started = (yield* this.#spending.start(hold.jobId, job.id, details, job.upstream)) ?? hold;
     return this.#view(started, job.status, job.pollAfterSeconds, []);
   }).bind(this);
 
@@ -513,11 +534,12 @@ export class CreditMediaService {
   }
 
   #artifacts(
-    upstream: MediaUpstream,
+    gateway: MediaGateway,
+    upstream: string,
     providerJobId: string,
     trace: CreditAuditTrace,
-  ): Effect.Effect<MediaUpstreamArtifact[], BillingError> {
-    return upstream.result(providerJobId).pipe(
+  ): Effect.Effect<MediaGatewayArtifact[], BillingError> {
+    return gateway.result(upstream, providerJobId).pipe(
       Effect.mapError((error) => {
         logUpstream("result", error, trace);
         return new BillingError(503, "media_result_unavailable", sourceText("error.billing.mediaResultUnavailable"));
@@ -537,13 +559,14 @@ export class CreditMediaService {
   ): Effect.fn.Return<CreditMediaJob, Failure> {
     const hold = yield* this.#owned(payer, jobId);
     if (hold.status === "released") return this.#releasedView(hold);
-    const upstream = yield* this.#upstreamOrFail(hold.upstream);
+    const gateway = yield* this.#gatewayOrFail();
+    const upstream = hold.upstream ?? LEGACY_MEDIA_UPSTREAM;
     if (!hold.providerJobId) return this.#view(hold, "queued", QUEUED_POLL_SECONDS, []);
     if (hold.status === "charged") {
-      const artifacts = yield* this.#artifacts(upstream, hold.providerJobId, trace);
+      const artifacts = yield* this.#artifacts(gateway, upstream, hold.providerJobId, trace);
       return this.#view(hold, "completed", 0, outputsOf(artifacts));
     }
-    const checked = yield* Effect.result(upstream.status(hold.providerJobId));
+    const checked = yield* Effect.result(gateway.status(upstream, hold.providerJobId));
     if (Result.isFailure(checked)) {
       logUpstream("status", checked.failure, trace);
       if (checked.failure.status === 404) return this.#releasedView(yield* this.#settle(hold, { outcome: "failed" }));
@@ -553,7 +576,7 @@ export class CreditMediaService {
     if (state.status === "failed" || state.status === "canceled")
       return this.#releasedView(yield* this.#settle(hold, { outcome: state.status }));
     if (state.status !== "completed") return this.#view(hold, state.status, state.pollAfterSeconds, []);
-    const artifacts = yield* this.#artifacts(upstream, hold.providerJobId, trace);
+    const artifacts = yield* this.#artifacts(gateway, upstream, hold.providerJobId, trace);
     if (artifacts.length === 0) return this.#releasedView(yield* this.#settle(hold, { outcome: "failed" }));
     const charged = yield* this.#settle(hold, { outcome: "completed" });
     return this.#view(charged, "completed", 0, outputsOf(artifacts));
@@ -574,10 +597,11 @@ export class CreditMediaService {
   ): Effect.fn.Return<Response, Failure> {
     const hold = yield* this.#owned(payer, jobId);
     if (hold.status !== "charged" || !hold.providerJobId) return yield* notFound();
-    const upstream = yield* this.#upstreamOrFail(hold.upstream);
-    const artifact = (yield* this.#artifacts(upstream, hold.providerJobId, trace))[index];
+    const gateway = yield* this.#gatewayOrFail();
+    const upstream = hold.upstream ?? LEGACY_MEDIA_UPSTREAM;
+    const artifact = (yield* this.#artifacts(gateway, upstream, hold.providerJobId, trace))[index];
     if (!artifact) return yield* notFound();
-    const response = yield* upstream.download(artifact.url).pipe(
+    const response = yield* gateway.output(upstream, hold.providerJobId, index).pipe(
       Effect.mapError((error) => {
         logUpstream("download", error, trace);
         return new BillingError(503, "media_result_unavailable", sourceText("error.billing.mediaResultUnavailable"));
@@ -595,19 +619,16 @@ export class CreditMediaService {
   }).bind(this);
 
   checker(): CreditJobChecker | null {
-    if (this.#upstreams.size === 0) return null;
+    const gateway = this.#gateway;
+    if (!gateway) return null;
     return (providerJobId, jobId, name) => {
       const trace = creditAuditTrace();
-      const upstream = this.#upstreams.get(name ?? ROUTER_MEDIA_UPSTREAM);
-      if (!upstream) {
-        console.error("media: upstream not configured", { upstream: name });
-        return Effect.fail(new BillingOperationError({}));
-      }
-      return upstream.status(providerJobId).pipe(
+      const upstream = name ?? LEGACY_MEDIA_UPSTREAM;
+      return gateway.status(upstream, providerJobId).pipe(
         Effect.flatMap((state) => {
           if (state.status === "completed")
-            return upstream
-              .result(providerJobId)
+            return gateway
+              .result(upstream, providerJobId)
               .pipe(
                 Effect.map(
                   (artifacts): CreditJobCheck =>

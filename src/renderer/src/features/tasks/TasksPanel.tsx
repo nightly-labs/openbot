@@ -17,6 +17,7 @@ import { createAttachmentDownloads } from "../conversation/attachment-downloads"
 import { EMPTY_DRAFT } from "../conversation/composer-draft";
 import { composerDraftKey } from "../conversation/conversation-keys";
 import type { ComposerDraft } from "../conversation/conversation-types";
+import { useDesktopMediaApproval } from "../conversation/desktop-media-approval";
 import { createVoiceStore, VOICE_LEVEL_COUNT, type VoiceStoreDeps } from "../conversation/stores/voice-store";
 import { createServerResponseStyle } from "../servers/server-personality";
 import { useServers } from "../servers/servers-context";
@@ -35,6 +36,7 @@ export function TasksPanel(props: TasksPanelProps) {
   const { agentList } = useAgents();
   const { approvals, pendingPrompts, respondToApprovalRequest } = useTurns();
   const threads = useAgentTasks();
+  const mediaApproval = useDesktopMediaApproval();
   const tabs = useAgentThreads();
   const { selectAgent } = useNavigation();
   const platform = usePlatform();
@@ -64,6 +66,7 @@ export function TasksPanel(props: TasksPanelProps) {
       source={desktopTasksSource()}
       failureText={props.serverId === LOCAL_SERVER_ID ? undefined : remoteAgentError}
       agents={agentList()}
+      mediaApproval={mediaApproval}
       voice={createTasksVoice}
       onOpenLink={(url) => void appPort().openUrl(url)}
       onAttachmentAction={attachmentFiles.open}
