@@ -79,6 +79,8 @@ export * from "./ipc-machine-resources";
 export * from "./ipc-marketplace-agents";
 export * from "./ipc-mcp-access";
 export * from "./ipc-mcp-servers";
+export * from "./ipc-media-approval";
+export * from "./ipc-media-approval-credits";
 export * from "./ipc-message-pins";
 export * from "./ipc-messaging";
 export * from "./ipc-model-visibility";

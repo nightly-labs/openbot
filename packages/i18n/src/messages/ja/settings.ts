@@ -278,6 +278,9 @@ export const messages = {
   "settings.agentDock.xwayland.unsupported":
     "XWayland のない Wayland では、ドックをほかのアプリの上に表示できません。OpenBot のウィンドウ内に表示されます。",
   "settings.agentDock.xwayland.restart": "再起動",
+  "settings.agentDock.noCompositor.title": "OpenBot のウィンドウ内に表示",
+  "settings.agentDock.noCompositor.description":
+    "お使いのデスクトップは透明なウィンドウを表示できないため、ドックは OpenBot のウィンドウ内に表示されます。ほかのアプリの上に表示するには、システム設定でデスクトップ効果（コンポジター）をオンにして、OpenBot を再起動してください。",
   "settings.agentDock.display.title": "ディスプレイ",
   "settings.agentDock.display.description":
     "そのディスプレイが接続されていない場合、ドックは OpenBot ウィンドウのディスプレイに表示されます。",

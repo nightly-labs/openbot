@@ -263,6 +263,9 @@ export const messages = {
   "settings.agentDock.xwayland.unsupported":
     "在没有 XWayland 的 Wayland 上，停靠栏无法显示在其他应用上方。它显示在 OpenBot 窗口中。",
   "settings.agentDock.xwayland.restart": "重新启动",
+  "settings.agentDock.noCompositor.title": "显示在 OpenBot 窗口中",
+  "settings.agentDock.noCompositor.description":
+    "你的桌面无法显示透明窗口，因此停靠栏显示在 OpenBot 窗口中。要让它显示在其他应用上方，请在系统设置中开启桌面特效（合成器），然后重启 OpenBot。",
   "settings.agentDock.display.title": "显示器",
   "settings.agentDock.display.description": "如果该显示器未连接，停靠栏会移到 OpenBot 窗口所在的显示器。",
   "settings.agentDock.display.window": "跟随 OpenBot 窗口",

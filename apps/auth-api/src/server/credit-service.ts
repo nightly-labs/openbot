@@ -5,6 +5,8 @@ import {
   CREDIT_METADATA_KIND,
   type CreditActivity,
   type CreditCheckoutRequest,
+  type CreditRedeemRequest,
+  type CreditRedeemResult,
   type CreditServerRole,
   type CreditServerWallet,
   type CreditsState,
@@ -31,8 +33,16 @@ import { paymentReversal } from "./billing-sales";
 import { checkoutTax } from "./billing-tax";
 import { creditActivity } from "./credit-activity";
 import { CreditAudit, creditAuditCode } from "./credit-audit";
-import { consumeGrantsSql, creditExpiring, expiringGrantsSql, moveGrantsSql } from "./credit-grants";
-import { availableTenthsSql, overdueGrantTenthsSql } from "./credit-spending";
+import { type CreditCodeAttempt, redeemCreditCode } from "./credit-codes";
+import {
+  CreditGrants,
+  consumeGrantsSql,
+  creditExpiring,
+  expiringGrantsSql,
+  moveGrantsSql,
+  welcomeTenthsSql,
+} from "./credit-grants";
+import { availableTenthsSql, overdueGrantTenthsSql, paidTenthsSql } from "./credit-spending";
 import {
   EARLY_START_METADATA,
   isBillingCurrency,
@@ -48,7 +58,7 @@ const PRICE_TTL_MS = 5 * 60 * 1_000;
 const priceCache = new Map<string, { expiresAt: number; prices: ReadonlyMap<string, StripePrice> }>();
 const SERVER_ROLES: readonly CreditServerRole[] = ["owner", "admin", "member"];
 function movedGrantsSql(nowParam: string): string {
-  return `SELECT ?1 AS user_id, ?2 AS server_id, ?3 AS tenths, ${nowParam} AS created_at
+  return `SELECT ?1 AS user_id, ?2 AS server_id, 'paid' AS funding, ?3 AS tenths, ${nowParam} AS created_at
     WHERE EXISTS (SELECT 1 FROM credit_ledger WHERE entry_id = ?4)`;
 }
 function ownedServerSql(serverParam: string, userParam: string): string {
@@ -91,6 +101,7 @@ interface ServerRow {
 
 interface WalletRow {
   balance_tenths: number;
+  welcome_tenths: number;
   expiring_tenths: number;
   expiring_at: number | null;
 }
@@ -198,11 +209,16 @@ export class CreditService {
         }),
     );
     const currency = locked ?? (currencies.includes("eur") ? "eur" : (currencies[0] ?? "eur"));
+    yield* new CreditGrants({ database: this.#database, now: this.#now, analytics: this.#analytics })
+      .welcome(userId)
+      .pipe(Effect.orElseSucceed(() => false));
     const now = this.#now();
     const personal = yield* billingCall(() =>
       this.#database
         .prepare(
-          `SELECT ${availableTenthsSql("user_id", "?1")} AS balance_tenths, ${expiringGrantsSql("user_id", "?1", "?2")}`,
+          `SELECT ${availableTenthsSql("user_id", "?1")} AS balance_tenths,
+                  ${welcomeTenthsSql("user_id", "?1")} AS welcome_tenths,
+                  ${expiringGrantsSql("user_id", "?1", "?2")}`,
         )
         .bind(userId, now)
         .first<WalletRow>(),
@@ -244,6 +260,8 @@ export class CreditService {
     };
     const expiring = personal ? creditExpiring(personal, balanceTenths) : null;
     if (expiring) state.expiring = expiring;
+    const welcomeTenths = Math.min(balanceTenths, Math.max(0, personal?.welcome_tenths ?? 0));
+    if (welcomeTenths > 0) state.welcome = creditsFromTenths(welcomeTenths);
     return state;
   }).bind(this);
 
@@ -371,7 +389,7 @@ export class CreditService {
                entry_id, user_id, server_id, amount_tenths, kind, actor_user_id, reference, created_at
              )
              SELECT ?1, ?2, ?3, ?4, 'transfer', ?5, ?6, ?7
-              WHERE ${availableTenthsSql(sourceColumn, "?8")} - ${overdueGrantTenthsSql(sourceColumn, "?8", "?7")} >= ?9
+              WHERE ${paidTenthsSql(sourceColumn, "?8")} - ${overdueGrantTenthsSql(sourceColumn, "?8", "?7")} >= ?9
                 AND ${ownedServerSql("?10", "?5")}`,
           )
           .bind(
@@ -420,6 +438,50 @@ export class CreditService {
     return yield* this.getState(userId);
   }).bind(this);
 
+  redeem(userId: string, request: CreditRedeemRequest, sourceIp: string): Effect.Effect<CreditRedeemResult, Failure> {
+    return this.#redeem(userId, request, sourceIp).pipe(
+      Effect.tapError((error) =>
+        this.#audit.failed({
+          event: "redeem",
+          code: creditAuditCode(error),
+          wallet: { userId: request.serverId === undefined ? userId : null, serverId: request.serverId ?? null },
+          actorUserId: userId,
+        }),
+      ),
+    );
+  }
+
+  readonly #redeem = Effect.fn("CreditService.redeem")(function* (
+    this: CreditService,
+    userId: string,
+    request: CreditRedeemRequest,
+    sourceIp: string,
+  ): Effect.fn.Return<CreditRedeemResult, Failure> {
+    const report = (attempt: CreditCodeAttempt) => {
+      const wallet = attempt.serverId === null ? "personal" : "server";
+      this.#analytics.track(userId, {
+        name: "credit_code_redeem",
+        outcome: attempt.outcome,
+        wallet,
+        ...(attempt.limit === undefined ? {} : { limit: attempt.limit }),
+        ...(attempt.campaign === undefined ? {} : { campaign: attempt.campaign }),
+        ...(attempt.multiUse === undefined ? {} : { multiUse: attempt.multiUse }),
+        ...(attempt.credits === undefined ? {} : { credits: attempt.credits }),
+      });
+      if (attempt.outcome !== "redeemed" || attempt.credits === undefined) return;
+      this.#analytics.track(userId, {
+        name: "credit_action",
+        action: "redeemed",
+        wallet,
+        credits: attempt.credits,
+        ...(attempt.campaign === undefined ? {} : { campaign: attempt.campaign }),
+        ...(attempt.multiUse === undefined ? {} : { multiUse: attempt.multiUse }),
+      });
+    };
+    const redeemed = yield* redeemCreditCode(this.#database, this.#now(), { userId, sourceIp, request, report });
+    return { credits: redeemed.credits, state: yield* this.getState(userId) };
+  }).bind(this);
+
   readonly webhook = Effect.fn("CreditService.webhook")(function* (
     this: CreditService,
     event: StripeEvent,
@@ -465,7 +527,7 @@ export class CreditService {
              entry_id, user_id, server_id, amount_tenths, kind, actor_user_id, reference, created_at
            )
            SELECT ?1, ?2, ?3, -MIN(?4, balance), 'reversal', NULL, ?5, ?6
-             FROM (SELECT ${availableTenthsSql(column, "?7")} AS balance)
+             FROM (SELECT ${paidTenthsSql(column, "?7")} AS balance)
             WHERE balance > 0 AND ?4 > 0
               AND (?2 IS NULL OR EXISTS (SELECT 1 FROM users WHERE id = ?2))
            RETURNING amount_tenths`,

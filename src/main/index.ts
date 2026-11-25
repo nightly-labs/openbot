@@ -183,7 +183,7 @@ import { applyServerTimezone, SERVER_TIMEZONE_PREFERENCE_FILE } from "./server-t
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { singleInstanceExitMessage, singleInstanceOwnerPid } from "./single-instance-owner";
-import { StartAttempts, takeForcedStartFailure } from "./start-attempts";
+import { StartAttempts, takeForcedRendererStop, takeForcedStartFailure } from "./start-attempts";
 import { compatiblePreviousRelease, readDatabaseSchemaVersion } from "./start-recovery-release";
 import { openStartRecoveryWindow, type StartRecovery } from "./start-recovery-window";
 import { trustSystemCertificates } from "./system-certificates";
@@ -195,6 +195,7 @@ import { macShipItDirectory, shipItInstallInProgress } from "./update-install-gu
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
 import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance";
 import { placeWindowButtons } from "./window-buttons";
+import { clearEarlierWindowsNotifications } from "./windows-notification-history";
 import { restartOutsideWindowsPackage } from "./windows-package-restart";
 
 guardConsoleOutput([process.stdout, process.stderr], () => {
@@ -209,6 +210,7 @@ let startAttempts: StartAttempts | null = null;
 let previousStartHalt: StartHaltRecord | null = null;
 let startHaltExitCode: number | null = null;
 let serverSafeMode: ServerSafeMode | null = null;
+let openStartRecovery: StartRecovery | null = null;
 const SERVER_SAFE_MODE_LIFETIME_MS = 60 * 60 * 1_000;
 process.on("unhandledRejection", (reason) => reportMainProcessFailure("unhandledRejection", reason));
 process.on("uncaughtExceptionMonitor", (error, origin) => reportMainProcessFailure(origin, error));
@@ -280,6 +282,7 @@ const serverMode = takeServerModeEnvironment(process.env, app.isPackaged, proces
 const localServerChildEnvironment = takeLocalServerChildEnvironment(process.env, commandLineUserDataDirectory);
 const localServerChild = serverMode || hostedServer ? null : localServerChildEnvironment;
 const forcedStartFailure = takeForcedStartFailure(process.env, app.isPackaged);
+const forcedRendererStop = takeForcedRendererStop(process.env, app.isPackaged);
 const serverStartGuard =
   serverMode !== null || hostedServer !== null || takeServerStartGuardTest(process.env, app.isPackaged);
 const localServerControl = localServerChild
@@ -326,7 +329,8 @@ const systemTimezone =
     ? applyServerTimezone(join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE), process.env)
     : localTimezone;
 app.enableSandbox();
-if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
+const WINDOWS_APP_USER_MODEL_ID = app.isPackaged ? "app.openbot.desktop" : "app.openbot.desktop.dev";
+if (process.platform === "win32") app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID);
 if (
   app.isPackaged &&
   !(serverMode || hostedServer || localServerChildEnvironment) &&
@@ -588,6 +592,7 @@ const windows = createMainWindowController({
   developmentProfile,
   developmentRemoteRole,
   developmentTestClientEnabled,
+  stopsFirstRenderer: forcedRendererStop === "first-load",
   isQuitting: () => isQuitting,
   keepRunningInBackground: () => services?.appBehavior.keepRunningInBackground ?? false,
   getServices: () => services,
@@ -713,6 +718,7 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
 function registerIpcHandlers({
   service,
   signInRelayClient,
+  localSignInPages,
   relayedMessagingInstalls,
   providerRuntimes,
   providerCredentials,
@@ -761,6 +767,8 @@ function registerIpcHandlers({
   promptCacheTtl,
   claudeUserSetup,
   cacheExpiryCompaction,
+  mediaApprovalCredits,
+  creditAsks,
   claudeCompactWindow,
   providerEnvironment,
   modelVisibility,
@@ -896,6 +904,7 @@ function registerIpcHandlers({
       providerRuntimes,
       credentials: providerCredentials,
       openLink,
+      signInPages: localSignInPages,
     }),
     ...voiceIpcHandlers({
       voice,
@@ -1041,6 +1050,7 @@ function registerIpcHandlers({
       promptCacheTtl,
       claudeUserSetup,
       cacheExpiryCompaction,
+      mediaApprovalCredits,
       claudeCompactWindow,
       providerEnvironment,
       modelVisibility,
@@ -1062,6 +1072,7 @@ function registerIpcHandlers({
       customProviders: customProviderChanges,
       remoteServers,
       relay: signInRelayClient,
+      signInPages: localSignInPages,
     }),
     ...messagingIpcHandlers({
       messaging,
@@ -1116,6 +1127,7 @@ function registerIpcHandlers({
       openExternal: openLink,
       modelVisibility,
       closeChatNotifications,
+      creditAsks,
     }),
     ...browserIpcHandlers({
       browserPictureInPicture,
@@ -1202,8 +1214,11 @@ async function recoverFromStartLoop(): Promise<
     translate: translateFor(locale),
     iconPath: appIconPath,
     showWithoutFocus: windowsOpenInBackground(),
+    stopsRenderer: forcedRendererStop === "recovery",
   });
+  openStartRecovery = recovery;
   const choice = await recovery.choice;
+  openStartRecovery = null;
   logger.info(`Recovery window choice: ${choice}.`);
   return choice === "quit" ? "quit" : recovery;
 }
@@ -1451,6 +1466,10 @@ if (!hasSingleInstanceLock) {
   app.on("second-instance", (_event, argv) => {
     const deepLink = findDeepLink(argv, inviteLinkOptions);
     if (deepLink) acceptDeepLink(deepLink);
+    if (openStartRecovery) {
+      openStartRecovery.present();
+      return;
+    }
     const window = windowHolder.current;
     const hasMainWindow = Boolean(window && !window.isDestroyed());
     const response = secondLaunchResponse({
@@ -1487,7 +1506,10 @@ if (!hasSingleInstanceLock) {
         app.quit();
         return;
       }
-      if (!localServerChild && !serverMode && !hostedServer) await presentApplication();
+      if (!localServerChild && !serverMode && !hostedServer) {
+        clearEarlierWindowsNotifications(WINDOWS_APP_USER_MODEL_ID);
+        await presentApplication();
+      }
       const recovery = await recoverFromStartLoop();
       if (recovery === "quit") {
         quitFor("quit");
@@ -1631,6 +1653,7 @@ if (!hasSingleInstanceLock) {
       });
       service.on("toolUsage", (usage) => built.analytics.handleToolUsage(usage));
       service.on("workflowRun", (end) => built.analytics.handleWorkflowRun(end));
+      service.on("creditMedia", (report) => built.analytics.handleCreditMedia(report));
       service.on("liveVoice", forwardVoiceLiveEvent);
       built.browser.onSiteVisited((visit) => built.analytics.handleSiteVisit(visit));
       sidebarLayout.on("changed", (layout) => forwardAgentEvent("local", { type: "sidebar-layout-changed", layout }));

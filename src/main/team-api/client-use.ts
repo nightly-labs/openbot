@@ -31,6 +31,7 @@ import { AGENT_WAITS_ROUTES } from "@openbot/contracts/team-protocol/agent-waits
 import { BACKGROUND_PROCESSES_ROUTES } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BITWARDEN_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
 import { BROWSER_PAGE_STATE_ROUTES } from "@openbot/contracts/team-protocol/browser-page-state-v1";
+import { BROWSER_PERMISSIONS_ROUTES } from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_USER_CONTROL_ROUTES } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
@@ -64,6 +65,8 @@ import { LIVE_VOICE_ACCOUNT_ROUTES } from "@openbot/contracts/team-protocol/live
 import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MACHINE_RESOURCES_ROUTES } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
+import { MEDIA_APPROVAL_CHOICE_ROUTES } from "@openbot/contracts/team-protocol/media-approval-choice-v1";
+import { MEDIA_APPROVAL_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/media-approval-credits-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
@@ -152,6 +155,9 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   PROMPT_CACHE_TTL_ROUTES.settings,
   CLAUDE_COMPACT_WINDOW_ROUTES.settings,
   CACHE_EXPIRY_COMPACTION_ROUTES.settings,
+  MEDIA_APPROVAL_CREDITS_ROUTES.settings,
+  MEDIA_APPROVAL_CHOICE_ROUTES.read,
+  MEDIA_APPROVAL_CHOICE_ROUTES.mutedRead,
   PROVIDER_ENVIRONMENT_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.listing,
@@ -259,6 +265,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   AGENT_THREAD_QUEUE_ROUTES.list,
   BROWSER_USER_CONTROL_ROUTES.state,
   BROWSER_PAGE_STATE_ROUTES.state,
+  BROWSER_PERMISSIONS_ROUTES.state,
   CRM_ROUTES.settings,
   CRM_ROUTES.overview,
   CRM_ROUTES.customers,

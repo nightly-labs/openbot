@@ -37,11 +37,18 @@ const voiceRuntimeFiles = [
 ];
 const voiceHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-transcription-host.js");
 const speechHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/voice-speech-host.js");
+const processLauncherHostPath = resolve(resourcesPath, "app.asar.unpacked/out/main/process-launcher-host.js");
 
 await Promise.all([
   access(executablePath),
   access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/package.json")),
   access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/dist/index.js")),
+  access(
+    resolve(
+      resourcesPath,
+      "app.asar.unpacked/node_modules/@indutny/simple-windows-notifications/prebuilds/win32-x64/@indutny+simple-windows-notifications.node",
+    ),
+  ),
   access(resolve(resourcesPath, "app.asar")),
   access(resolve(resourcesPath, "licenses/Electron-LICENSE")),
   access(resolve(resourcesPath, "licenses/LICENSES.chromium.html")),
@@ -56,6 +63,7 @@ await Promise.all([
   ...voiceRuntimeFiles.map((name) => access(resolve(voiceRuntimePath, name))),
   access(voiceHostPath),
   access(speechHostPath),
+  access(processLauncherHostPath),
   access(resolve(resourcesPath, "remote-desktop-runtime/licenses/Sunshine-GPL-3.0.txt")),
   access(resolve(resourcesPath, "remote-desktop-runtime/licenses/moonlight-web-stream-GPL-3.0.txt")),
   access(resolve(resourcesPath, "remote-desktop-runtime/source-manifest.json")),

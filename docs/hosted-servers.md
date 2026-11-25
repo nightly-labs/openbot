@@ -1070,7 +1070,7 @@ The bootstrap does not restart OpenBot, and a second run gives the same state:
 | Part | Result | Files |
 | --- | --- | --- |
 | SSH | Keys only, no forwarding. The operator keys sign in as root, and as no other user. | `/etc/ssh/sshd_config.d/00-openbot-hardening.conf`, `/etc/ssh/openbot-operator-keys/root` |
-| Egress rules | The service user cannot connect to the CloudStack router (the DHCP server, which gives metadata and a reset root password to each process that asks), nor to private, link-local and multicast addresses. No user can connect to TCP port 25. | `/usr/local/sbin/openbot-egress-firewall`, `/etc/openbot/egress-router`, `openbot-egress-firewall.service`, `openbot.service.d/10-egress-firewall.conf` |
+| Egress rules | The service user cannot connect to the CloudStack router (the DHCP server, which gives metadata and a reset root password to each process that asks), nor to private, link-local and multicast addresses. It also cannot connect to the IPv6 addresses of Google services (`goog.json` without `cloud.json` from `https://www.gstatic.com/ipranges/`), so Gemini and other Google services connect over IPv4. Google can put an IPv6 range of Leaseweb in a country where Gemini refuses requests (#15812). No user can connect to TCP port 25. | `/usr/local/sbin/openbot-egress-firewall`, `/etc/openbot/egress-router`, `openbot-egress-firewall.service`, `openbot.service.d/10-egress-firewall.conf` |
 | Updates | Security updates each day. They restart neither the server nor OpenBot. Ubuntu (`needrestart`) restarts each other service that uses an updated library. | `/etc/apt/apt.conf.d/20auto-upgrades`, `52openbot-unattended`, `/etc/needrestart/conf.d/50-openbot.conf` |
 | Kernel | A new kernel gets a boot entry: the bootstrap installs `grub-pc` when the image has no `update-grub`. The boot arguments of the image stay. | `/etc/default/grub.d/50-openbot.cfg` |
 
@@ -1109,6 +1109,7 @@ Leaseweb accounts use one scheme:
 | `custom-<NN> <customer> <owner email>` | A server for one customer, not in the pool. `<NN>` is the next number after the highest on all accounts; `leaseweb-pool.ts custom` sets it. `<customer>` is one word in small letters. | `custom-01 acme jane@example.com` |
 | `openbot-signal-<home>` | A Signal machine (see `docs/remote-session-deployment.md`). | `openbot-signal-us` |
 | `pool-test-<NN>` | A test machine of the operator. | `pool-test-01` |
+| `internal-<purpose>` | A machine of the operators, not in the pool and not for tests. `internal-store-review` is the server of the app store reviewers; see `AGENTS.md`. | `internal-store-review` |
 
 `leaseweb-pool.ts traffic [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]` is read only. It shows the public
 traffic in and out of each VPS on the five accounts, from the first day of this month (UTC) to today,
@@ -1254,10 +1255,11 @@ The Worker cannot connect to a machine, and it has no Leaseweb key. So the machi
 4. At the payment, the Worker reads the ready machines with the product of the plan: `VPS01` for
    Starter, `VPS02` for Standard, `VPS03` for Pro. It never uses a larger or a smaller machine. The
    currency gives the locations (`poolLocations`): a purchase in `usd` or `brl` gets a machine in
-   `WDC-02`, and one in `AMS-01` when `WDC-02` has none. A purchase in `eur` or `pln` gets only a
-   machine in `AMS-01`, so that its data stays in the EU, as on boat. A machine in each other location
-   gets no new server; `PRIVACY.md` names the locations, so change the two together. In a location,
-   the machine that was added first comes first. One `UPDATE` writes `operator_host` and the hash of a host ID
+   `WDC-02`, and one in `AMS-01` or `FRA-01` when `WDC-02` has none. A purchase in `eur` or `pln`
+   gets a machine in `AMS-01`, and one in `FRA-01` when `AMS-01` has none, so that its data stays in
+   the EU, as on boat. A machine in each other location gets no new server; `PRIVACY.md` names the
+   locations, so change the two together. The first location of the list comes first. In the other
+   locations, and in a location, the machine that was added first comes first. One `UPDATE` writes `operator_host` and the hash of a host ID
    claim, and it changes no row when another server has the machine. So two payments in the same second
    never get one machine. After three machines that another payment took, the server starts on boat.
 5. The next request of the machine gets `{"state":"assigned","serverId":…,"claim":…}`. The unit runs
@@ -1300,7 +1302,8 @@ A machine of the pool is not the boat image:
 - It has no Docker and no boat desktop. OpenBot uses its own virtual displays.
 - It shows the storage of the plan (25, 75 and 150 GB), the same numbers as the pricing page
   (`storageTierGb`).
-- The clients show no restart action, and the server does not stop when it is not in use.
+- Restart server asks the server to restart itself (`host-restart-v1`), as on a self-hosted server,
+  and the server does not stop when it is not in use.
 
 Measured on the test Worker with a real Leaseweb VPS 2 (smoke, 2026-11-13): `prepare` of a clean
 machine takes about 3 minutes. OpenBot on the machine signed in 9 seconds after the payment, and the
@@ -1342,7 +1345,7 @@ writes `observed_state`:
 | The plan ends | Sets `desired_state = 'stopped'`, `observed_error = 'plan_ended'` and `plan_ended_at`. A start request gets `402 plan_required`. | Stop `openbot.service`, then write `observed_state = 'stopped'`. Until then the server still runs. |
 | The owner renews | Sets `desired_state = 'running'` and clears the error. `plan_ended_at` stays. | Start `openbot.service`, then write `observed_state = 'running'`. |
 | 14 days after the plan ended, with no open subscription | Reads the subscription at Stripe, then deletes the server as the owner does. | As for a delete. |
-| The owner or an admin restarts the server | Refuses with `409 hosted_server_restart_unavailable`. | Restart `openbot.service` on a request to support. |
+| The owner or an admin restarts the server | Refuses with `409 hosted_server_restart_unavailable`. The clients send the restart to the server (`host-restart-v1`), so the Worker gets no request. | Restart `openbot.service` on a request to support when OpenBot does not answer. |
 | The owner deletes the server | Cancels the plan, deletes the sandbox in `retired_sandbox_id`, removes the Remote host, ends the session, and sets `observed_state = 'deleted'`. `operator_host` stays. | Reinstall the VPS, set its reference to `pool`, then set `operator_host = NULL`. |
 | boat sends an event for the old sandbox | Finds no row for it. | Nothing. |
 
@@ -1572,9 +1575,10 @@ The VPS is not the same machine as the sandbox:
   agent of the customer that used Docker does not have it after the move.
 - `provision.sh` also writes `~/.boat/pre-stop` and `~/.boatignore` on the VPS, as each update does
   on a hosted server. Nothing on the VPS reads them.
-- The clients show no restart action for a moved server: the server list of the account service has
-  `restartAvailable: false` for it. A client from before this field shows the action and gets the
-  refusal of the Worker.
+- The server list of the account service has `restartAvailable: false` for a moved server, so the
+  clients do not send its restart to the Worker. The owner or an admin restarts it through the
+  server (`host-restart-v1`) while it is online. A client from before this field sends the restart
+  to the Worker and gets its refusal.
 - Each server has the storage of its plan: 25, 75 and 150 GB for Starter, Standard and Pro
   (`BILLING_PLANS`, and `storageTierGb` with a storage tier). The account service sends the number in
   the server list, the hosting list and the billing state, so the storage meter, the storage alerts,

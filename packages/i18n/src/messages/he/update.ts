@@ -42,6 +42,7 @@ export const messages = {
   "update.idleRestart.description": "הרצות שגרה חדשות ימתינו עד ההפעלה מחדש.",
   "update.idleRestart.waitingFor": "ממתין: {reasons}.",
   "update.idleRestart.cancel": "ביטול ההפעלה מחדש",
+  "update.idleRestart.openSettings": "פתיחת הגדרות העדכון",
   "update.idleRestart.restartNow": "הפעלה מחדש עכשיו",
   "update.idleRestart.restartNowTitle": "להפעיל מחדש את OpenBot עכשיו?",
   "update.idleRestart.restartNowDescription": "תורות של סוכנים והרצות שגרה שלא הסתיימו ייעצרו עכשיו.",

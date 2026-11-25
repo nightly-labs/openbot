@@ -70,6 +70,7 @@ export const messages = {
   "provider.aria.install": "Instalar {name}",
   "provider.aria.signIn": "Iniciar sesión en {name}",
   "provider.aria.codeFallback": "Iniciar sesión en {name} con un código",
+  "provider.aria.addressFallback": "Pegar la dirección de inicio de sesión de {name}",
   "provider.aria.moreActions": "Más acciones para {name}",
   "provider.aria.use": "Usar {name} en OpenBot",
   "provider.use.inUseOne": "{agent} usa {name}. Cambia el modelo de este agente y después desactiva {name}.",
@@ -96,10 +97,15 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "Esperando tu respuesta. Este inicio de sesión se detiene en {time}.",
   "provider.codeLogin.linkTitle": "Iniciar sesión en {name} desde otro dispositivo",
   "provider.codeLogin.pageTitle": "Iniciar sesión en {name}",
+  "provider.codeLogin.addressDescription":
+    "Termina el inicio de sesión en el navegador. Esta ventana se cierra cuando el inicio de sesión termina.",
   "provider.codeLogin.pageDescription": "Esta página está abierta en el navegador de {host}. Inicia sesión aquí.",
   "provider.codeLogin.relayStarting": "Empezando el inicio de sesión de {name} en {host}…",
   "provider.codeLogin.pageOpening": "Abriendo la página de inicio de sesión de {name} en {host}…",
   "provider.codeLogin.linkStep": "Inicia sesión en {name}. OpenBot continúa automáticamente.",
+  "provider.codeLogin.thisComputerDescription":
+    "Abre este enlace en un navegador de este ordenador. OpenBot espera aquí.",
+  "provider.codeLogin.copyLink": "Copiar enlace",
   "provider.codeLogin.chatgptDeviceSetting":
     "En ChatGPT en un ordenador, abre la configuración de seguridad y activa el inicio de sesión con código de dispositivo para Codex. En una cuenta de trabajo, lo activa el administrador del espacio de trabajo.",
   "provider.useApp.title": "Conecta {name} en la app de OpenBot",
@@ -232,6 +238,7 @@ export const messages = {
   "provider.account.apiKey": "Clave de API",
   "provider.account.listLabel": "Cuentas de {name}",
   "provider.account.usedBy": "Usada por {agents}",
+  "provider.account.sameEmail": "Mismo correo que {name}",
   "provider.account.failed": "Error al iniciar sesión",
   "provider.account.moreActions": "Más acciones para {name}",
   "provider.account.renameLabel": "Nombre de {name}",

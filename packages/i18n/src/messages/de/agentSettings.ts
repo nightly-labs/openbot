@@ -50,6 +50,7 @@ export const messages = {
     other: "Du kannst höchstens {count} Ordner hinzufügen",
   },
   "agentSettings.folders.browse.places": "Gehe zu",
+  "agentSettings.folders.browse.path": "Ordnerpfad",
   "agentSettings.folders.browse.home": "Benutzerordner",
   "agentSettings.folders.browse.parent": "Nach oben: {folder}",
   "agentSettings.folders.browse.failed": "Dieser Ordner kann nicht geöffnet werden.",
@@ -96,6 +97,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Nutzungslimit erreicht · übersprungen",
   "agentSettings.backupModels.unavailable": "Gerade nicht verfügbar · übersprungen",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Stoppt ein Nutzungslimit {name} nach Beginn der Arbeit, setzt {name} dieselbe Arbeit mit dem ersten verfügbaren Modell der Reihenfolge fort. Wenn das Limit endet oder 10 Minuten nach einem Anbieterfehler, kehrt {name} zu {model} zurück.",
   "agentSettings.groups.brain": "Gehirn",
@@ -191,6 +193,10 @@ export const messages = {
     "Alle Nachrichten und Dateien dieses Chats werden aus OpenBot gelöscht, und der Agent vergisst sie. Das lässt sich nicht rückgängig machen. Nebenthreads, Anweisungen, Modell, Tools, Erinnerungen, Arbeitsbereich und Browser ändern sich nicht.",
   "agentSettings.deleteHistory.confirm": "Verlauf löschen",
   "agentSettings.deleteHistory.failed": "Der Verlauf konnte nicht gelöscht werden.",
+  "agentSettings.deleteAgent.title": "Agenten löschen",
+  "agentSettings.deleteAgent.description":
+    "Der Agent, sein Chat, seine Erinnerungen, Routinen und sein Arbeitsbereich werden aus OpenBot entfernt.",
+  "agentSettings.deleteAgent.button": "Löschen",
   "agentSettings.fullAccess.title": "Diesem Agenten vollen Zugriff geben?",
   "agentSettings.fullAccess.askTitle": "Diesen Agenten außerhalb seines Arbeitsbereichs arbeiten lassen?",
   "agentSettings.fullAccess.description":

@@ -109,6 +109,8 @@ export const messages = {
   "workflow.agent.removedLabel": "에이전트가 삭제됐어요. 에이전트 선택",
   "workflow.agent.list": "에이전트",
   "workflow.agent.search": "에이전트 검색",
+  "workflow.agentMade.title": "{agent}이(가) 워크플로를 만들었습니다",
+  "workflow.agentMade.open": "열기",
 
   "workflow.model.label": "모델: {name}",
   "workflow.model.title": "모델",
@@ -542,8 +544,34 @@ export const messages = {
   "workflow.canvas.presence.follow": "{name} 따라가기",
   "workflow.canvas.presence.you": "{name} (나)",
   "workflow.canvas.presence.following": "{name} 따라가는 중",
-  "workflow.canvas.empty.title": "트리거로 시작하세요",
-  "workflow.canvas.empty.add": "트리거 추가",
+  "workflow.canvas.start.title": "템플릿으로 시작",
+  "workflow.canvas.start.blank": "빈 캔버스",
+  "workflow.template.morningBrief.title": "아침 브리핑",
+  "workflow.template.morningBrief.brief": "매일 아침 08:00에 관심 주제 뉴스를 5줄로 받습니다.",
+  "workflow.template.morningBrief.task":
+    "다음 주제에 대한 지난 하루의 뉴스를 찾아 주세요: AI, 스타트업. 가장 중요한 5개를 한 줄씩 링크와 함께 쓰세요.",
+  "workflow.template.answerIssues.title": "새 이슈에 답하기",
+  "workflow.template.answerIssues.brief": "누군가 GitHub 이슈를 열면 답글을 달고 라벨을 추가합니다.",
+  "workflow.template.answerIssues.task":
+    "이슈를 읽으세요. 코드에서 가능성 높은 원인을 찾으세요. 짧고 친절한 답글을 쓰고 라벨 하나를 고르세요.",
+  "workflow.template.weeklyReport.title": "주간 보고서",
+  "workflow.template.weeklyReport.brief": "매주 금요일 16:00에 한 주를 요약합니다. 보내기 전에 승인합니다.",
+  "workflow.template.weeklyReport.task":
+    "이번 주 팀이 한 일을 요약하세요: 끝낸 작업, 남은 문제, 다음 단계. 짧은 목록을 사용하세요.",
+  "workflow.template.weeklyReport.question": "이 주간 보고서를 보낼까요?",
+  "workflow.template.priceWatch.title": "가격 알림",
+  "workflow.template.priceWatch.brief":
+    "매일 아침 09:00에 상품 가격을 확인합니다. 기준 아래로 내려가면 알림을 받습니다.",
+  "workflow.template.priceWatch.task":
+    "이 상품 페이지를 열고 가격을 읽으세요: https://example.com/product. 가격과 링크만 쓰세요.",
+  "workflow.template.priceWatch.rule": "가격이 100보다 낮다.",
+  "workflow.template.priceWatch.alert": "가격 하락",
+  "workflow.template.socialPost.title": "이미지가 있는 게시물",
+  "workflow.template.socialPost.brief": "아이디어 하나를 쓰면 짧은 게시물과 정사각형 이미지를 받습니다.",
+  "workflow.template.socialPost.idea": "이제 일요일에도 10:00부터 16:00까지 문을 엽니다.",
+  "workflow.template.socialPost.prompt":
+    "이 소식에 대한 SNS 게시물을 280자 미만으로 쓰세요. 첫 줄은 명확하게, 해시태그는 쓰지 마세요.",
+  "workflow.template.socialPost.picture": "이 게시물을 위한 깔끔하고 밝은 이미지.",
   "workflow.canvas.tool.label": "캔버스 도구",
   "workflow.canvas.tool.select": "선택",
   "workflow.canvas.tool.pan": "이동",

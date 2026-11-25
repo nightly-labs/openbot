@@ -3,7 +3,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, agentProviderDescriptor, defaultProviderModel } from "@openbot/contracts/ipc";
+import {
+  AGENT_PROVIDERS,
+  agentProviderDescriptor,
+  defaultProviderModel,
+  isNoAnswerNotice,
+} from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
@@ -226,6 +231,7 @@ interface CaseResult {
   runs: number;
   turns: number;
   errors: string[];
+  notices: string[];
   lastAnswer: string | null;
 }
 
@@ -338,6 +344,10 @@ try {
         .slice(errorsBefore)
         .filter((error) => error.agentId === agent.id)
         .map((error) => error.message),
+      notices: shown
+        .slice(turnStart + 1)
+        .filter(isNoAnswerNotice)
+        .map((message) => message.text),
       lastAnswer: answer?.text ?? null,
     };
     report.cases[text] = result;
@@ -355,6 +365,11 @@ try {
     if (result.runs !== 1) report.failures.push(`${label}: the message ran ${result.runs} times, not once.`);
     if (JSON.stringify(result.errors) !== JSON.stringify(expectedErrors))
       report.failures.push(`${label}: errors ${JSON.stringify(result.errors)}, not ${JSON.stringify(expectedErrors)}.`);
+    const expectedNotices = expectedErrors.filter((error) => error === NO_ANSWER_AFTER_STEPS);
+    if (JSON.stringify(result.notices) !== JSON.stringify(expectedNotices))
+      report.failures.push(
+        `${label}: the chat keeps the notes ${JSON.stringify(result.notices)}, not ${JSON.stringify(expectedNotices)}.`,
+      );
     if (result.lastAnswer !== lastAnswer)
       report.failures.push(`${label}: the last answer is ${JSON.stringify(result.lastAnswer)}.`);
   };

@@ -66,6 +66,10 @@ import { ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-pro
 import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { BROWSER_PAGE_STATE_CAPABILITY } from "@openbot/contracts/team-protocol/browser-page-state-v1";
+import {
+  BROWSER_PERMISSIONS_CAPABILITY,
+  browserPermissionRequests,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import { BROWSER_PROFILES_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-events-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
@@ -84,6 +88,7 @@ import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex
 import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import {
   AGENT_ADMIN_CAPABILITY,
+  AGENT_ERROR_LINK_CAPABILITY,
   AGENT_HIDDEN_WORK_CAPABILITY,
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
@@ -137,6 +142,7 @@ import {
   MEMORY_REVIEW_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
+  OPENBOT_CREDITS_EVENTS_CAPABILITY,
   PASSWORD_MANAGERS_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
   PROMPT_CACHE_TTL_PI_CAPABILITY,
@@ -248,6 +254,7 @@ import {
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
+import { MEDIA_APPROVAL_CREDITS_CAPABILITY } from "@openbot/contracts/team-protocol/media-approval-credits-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { MODEL_STEERING_CAPABILITY } from "@openbot/contracts/team-protocol/model-steering-v1";
@@ -467,6 +474,8 @@ import { routeMcpServers } from "./team-api/route-mcp";
 import { routeMcpAccess } from "./team-api/route-mcp-access";
 import { routeMcpSignIn } from "./team-api/route-mcp-sign-in";
 import { routeMcpSignInApp } from "./team-api/route-mcp-sign-in-app";
+import { routeMediaApprovalChoice } from "./team-api/route-media-approval-choice";
+import { routeMediaApprovalCredits } from "./team-api/route-media-approval-credits";
 import { routeMemoryReview } from "./team-api/route-memory-review";
 import { routeMessageDelete } from "./team-api/route-message-delete";
 import { routeMessagePins } from "./team-api/route-message-pins";
@@ -848,6 +857,7 @@ export class TeamApiServer {
   #recordClientUse(sessionId: string | null, memberId: string): void {
     const now = Date.now();
     this.#lastClientUseAt = now;
+    this.#options.onMemberUse?.(memberId);
     if (!sessionId) return;
     this.#sessionUse.set(sessionId, { memberId, at: now });
     pruneSessions(this.#sessionUse, now);
@@ -1374,6 +1384,7 @@ export class TeamApiServer {
       if ((await routeClaudeUserSetup(context, this.#options.admin)) === "handled") return;
       if ((await routeClaudeCompactWindow(context, this.#options.admin)) === "handled") return;
       if ((await routeCacheExpiryCompaction(context, this.#options.admin)) === "handled") return;
+      if ((await routeMediaApprovalCredits(context, this.#options.admin)) === "handled") return;
       if ((await routeProviderEnvironment(context, this.#options.admin)) === "handled") return;
       if ((await routeProviderDetection(context, this.#options.admin)) === "handled") return;
       if ((await routeModelVisibility(context, this.#options.admin)) === "handled") return;
@@ -1397,6 +1408,11 @@ export class TeamApiServer {
       if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentWaits(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routePendingApproval(context, this.#options.agents, hidden)) === "handled") return;
+      if (
+        (await routeMediaApprovalChoice(context, this.#options.agents, hidden, this.#options.admin?.creditAsks)) ===
+        "handled"
+      )
+        return;
       if ((await routePendingPrompts(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routePhoneFeedback(context, this.#options.agents)) === "handled") return;
       if ((await routeMessagePins(context, this.#options.agents, this.#options.agentTasks, hidden)) === "handled")
@@ -1651,6 +1667,7 @@ export class TeamApiServer {
         agentPendingRuntime: capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
         queueHold: capabilities.has(QUEUE_HOLD_CAPABILITY),
         queueHoldSignIn: capabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
+        errorLink: capabilities.has(AGENT_ERROR_LINK_CAPABILITY),
         uiBlocks: capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
         subagents: capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
         promptMultiSelect: capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
@@ -2059,6 +2076,12 @@ export class TeamApiServer {
     client.send(JSON.stringify(this.#eventFor(connection, { type: "browser-page-state-changed", tabs })));
   }
 
+  #sendBrowserPermissions(client: Ws.WebSocket, connection: EventClientState): void {
+    const requests = browserPermissionRequests(this.#options.browser.listTabs());
+    if (client.readyState !== webSockets.WebSocket.OPEN) return;
+    client.send(JSON.stringify(this.#eventFor(connection, { type: "browser-permissions-changed", requests })));
+  }
+
   #eventFor(connection: EventClientState, event: AgentEvent, access?: () => EventAccess): AgentEvent {
     if (event.type === "usage-changed" && event.usage.limits.some((limit) => limit.accountId !== undefined))
       return {
@@ -2078,6 +2101,15 @@ export class TeamApiServer {
       );
       if (!hidden) return event;
       return { ...event, tabs: event.tabs.filter((tab) => !hidden(tab.tabId)) };
+    }
+    if (event.type === "browser-permissions-changed") {
+      const hidden = this.#hiddenTab(
+        connection,
+        event.requests.map((request) => request.tabId),
+        access,
+      );
+      if (!hidden) return event;
+      return { ...event, requests: event.requests.filter((request) => !hidden(request.tabId)) };
     }
     if (event.type === "browser-control-changed") {
       const tabIds = event.state.sessions.flatMap((session) => (session.tabId === null ? [] : [session.tabId]));
@@ -2178,6 +2210,7 @@ export class TeamApiServer {
               connection.capabilities.has(HOST_MEMBER_UPDATE_CAPABILITY);
             const userControlWasSent = connection.capabilities.has(BROWSER_USER_CONTROL_CAPABILITY);
             const pageStateWasSent = connection.capabilities.has(BROWSER_PAGE_STATE_CAPABILITY);
+            const permissionsWereSent = connection.capabilities.has(BROWSER_PERMISSIONS_CAPABILITY);
             const machineAlertsWereSent = connection.capabilities.has(MACHINE_RESOURCES_CAPABILITY);
             const colorsWereSent = connection.capabilities.has(AGENT_COLORS_CAPABILITY);
             const chatColorsWereSent = connection.capabilities.has(CHAT_COLORS_CAPABILITY);
@@ -2191,6 +2224,8 @@ export class TeamApiServer {
               this.#sendBrowserUserControl(client, connection);
             if (!pageStateWasSent && connection.capabilities.has(BROWSER_PAGE_STATE_CAPABILITY))
               this.#sendBrowserPageState(client, connection);
+            if (!permissionsWereSent && connection.capabilities.has(BROWSER_PERMISSIONS_CAPABILITY))
+              this.#sendBrowserPermissions(client, connection);
             if (!colorsWereSent && connection.capabilities.has(AGENT_COLORS_CAPABILITY))
               this.#sendAgentColors(client, connection);
             if (!chatColorsWereSent && connection.capabilities.has(CHAT_COLORS_CAPABILITY))
@@ -2900,6 +2935,8 @@ export class TeamApiServer {
           return this.#options.admin?.claudeCompactWindow !== undefined;
         if (capability === CACHE_EXPIRY_COMPACTION_CAPABILITY)
           return this.#options.admin?.cacheExpiryCompaction !== undefined;
+        if (capability === MEDIA_APPROVAL_CREDITS_CAPABILITY)
+          return this.#options.admin?.mediaApprovalCredits !== undefined;
         if (capability === PROVIDER_ENVIRONMENT_CAPABILITY)
           return this.#options.admin?.providerEnvironment !== undefined;
         if (capability === PROVIDER_DETECTION_CAPABILITY) return this.#options.admin?.providerDetection !== undefined;
@@ -3125,6 +3162,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   TEAM_PROMPT_DETAIL_CAPABILITY,
   QUEUE_HOLD_CAPABILITY,
   QUEUE_HOLD_SIGN_IN_CAPABILITY,
+  AGENT_ERROR_LINK_CAPABILITY,
 ];
 
 function eventEncodingKey(capabilities: ReadonlySet<string>, options: { preserveSemanticTags?: boolean }): string {
@@ -3157,6 +3195,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   if (event.type === "agent-access-changed") return AGENT_ACCESS_CAPABILITY;
   if (event.type === "browser-user-control-changed") return BROWSER_USER_CONTROL_CAPABILITY;
   if (event.type === "browser-page-state-changed") return BROWSER_PAGE_STATE_CAPABILITY;
+  if (event.type === "browser-permissions-changed") return BROWSER_PERMISSIONS_CAPABILITY;
   if (
     event.type === "agent-tasks-changed" ||
     event.type === "agent-task-conversation" ||
@@ -3173,6 +3212,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   if (event.type === "host-turn-limits-changed") return HOST_TURN_LIMITS_EVENTS_CAPABILITY;
   if (event.type === "library-folders-changed") return LIBRARY_FOLDERS_EVENTS_CAPABILITY;
   if (event.type === "usage-credits-changed") return USAGE_CREDITS_CAPABILITY;
+  if (event.type === "openbot-credits-changed") return OPENBOT_CREDITS_EVENTS_CAPABILITY;
   if (event.type === "turn-progress") return TEAM_AGENT_ACTIVITY_CAPABILITY;
   if (event.type === "runtime-snapshot") return "agent-runtime-snapshots";
   if (event.type === "sidebar-layout-changed") return "sidebar-layout";

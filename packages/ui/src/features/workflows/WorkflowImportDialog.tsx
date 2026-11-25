@@ -25,7 +25,7 @@ export interface WorkflowImportDialogProps {
   paused: boolean;
   upload?: ((file: File) => Promise<StoredFileRow>) | undefined;
   onCancel: () => void;
-  onImport: (input: { title: string; graph: WorkflowGraph }) => void;
+  onImport: (input: { title: string; graph: WorkflowGraph }) => Promise<void>;
 }
 
 interface ReferenceRow {
@@ -85,7 +85,7 @@ export function WorkflowImportDialog(props: WorkflowImportDialogProps) {
       const id = choices[row.key];
       if (id) references.set(row.key, id);
     }
-    props.onImport(workflowFromFile(file, { references, assets: uploaded }));
+    await props.onImport(workflowFromFile(file, { references, assets: uploaded }));
   };
   const confirm = async () => {
     setError(undefined);

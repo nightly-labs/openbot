@@ -43,6 +43,7 @@ export const messages = {
   "update.idleRestart.description": "新しいルーティンの実行は再起動まで待機します。",
   "update.idleRestart.waitingFor": "{reasons} を待っています。",
   "update.idleRestart.cancel": "再起動をキャンセル",
+  "update.idleRestart.openSettings": "アップデート設定を開く",
   "update.idleRestart.restartNow": "今すぐ再起動",
   "update.idleRestart.restartNowTitle": "今すぐ OpenBot を再起動しますか？",
   "update.idleRestart.restartNowDescription":

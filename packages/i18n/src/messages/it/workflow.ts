@@ -112,6 +112,8 @@ export const messages = {
   "workflow.agent.removedLabel": "Agente rimosso. Scegli agente",
   "workflow.agent.list": "Agenti",
   "workflow.agent.search": "Cerca agenti",
+  "workflow.agentMade.title": "{agent} ha creato un flusso di lavoro",
+  "workflow.agentMade.open": "Apri",
 
   "workflow.model.label": "Modello: {name}",
   "workflow.model.title": "Modelli",
@@ -546,8 +548,35 @@ export const messages = {
   "workflow.canvas.presence.follow": "Segui {name}",
   "workflow.canvas.presence.you": "{name} (tu)",
   "workflow.canvas.presence.following": "Stai seguendo {name}",
-  "workflow.canvas.empty.title": "Inizia con un trigger",
-  "workflow.canvas.empty.add": "Aggiungi trigger",
+  "workflow.canvas.start.title": "Inizia da un modello",
+  "workflow.canvas.start.blank": "Canvas vuoto",
+  "workflow.template.morningBrief.title": "Notizie del mattino",
+  "workflow.template.morningBrief.brief": "Ogni mattina alle 08:00, 5 righe di notizie sui tuoi temi.",
+  "workflow.template.morningBrief.task":
+    "Trova le notizie dell’ultimo giorno su questi temi: IA, startup. Scrivi le 5 più importanti, una riga ciascuna, con un link.",
+  "workflow.template.answerIssues.title": "Rispondi alle nuove issue",
+  "workflow.template.answerIssues.brief": "Quando qualcuno apre una issue su GitHub, rispondi e aggiungi un’etichetta.",
+  "workflow.template.answerIssues.task":
+    "Leggi la issue. Trova la causa probabile nel codice. Scrivi una risposta breve e cordiale e scegli un’etichetta.",
+  "workflow.template.weeklyReport.title": "Report settimanale",
+  "workflow.template.weeklyReport.brief":
+    "Ogni venerdì alle 16:00, riassumi la settimana. Lo approvi prima dell’invio.",
+  "workflow.template.weeklyReport.task":
+    "Riassumi cosa ha fatto il team questa settimana: lavoro finito, problemi aperti e prossimi passi. Usa elenchi brevi.",
+  "workflow.template.weeklyReport.question": "Inviare questo report settimanale?",
+  "workflow.template.priceWatch.title": "Controllo prezzo",
+  "workflow.template.priceWatch.brief":
+    "Ogni mattina alle 09:00, controlla il prezzo di un prodotto. Ricevi una notifica quando scende sotto il tuo limite.",
+  "workflow.template.priceWatch.task":
+    "Apri questa pagina prodotto e leggi il prezzo: https://example.com/product. Scrivi solo il prezzo e il link.",
+  "workflow.template.priceWatch.rule": "Il prezzo è inferiore a 100.",
+  "workflow.template.priceWatch.alert": "Calo di prezzo",
+  "workflow.template.socialPost.title": "Post con immagine",
+  "workflow.template.socialPost.brief": "Scrivi un’idea. Ottieni un post breve e un’immagine quadrata.",
+  "workflow.template.socialPost.idea": "Ora siamo aperti la domenica, dalle 10:00 alle 16:00.",
+  "workflow.template.socialPost.prompt":
+    "Scrivi un post social su questa novità in meno di 280 caratteri. Usa una prima riga chiara e niente hashtag.",
+  "workflow.template.socialPost.picture": "Un’immagine pulita e luminosa per questo post.",
   "workflow.canvas.tool.label": "Strumenti della tela",
   "workflow.canvas.tool.select": "Seleziona",
   "workflow.canvas.tool.pan": "Sposta",

@@ -16,6 +16,7 @@ import {
   ownsBrowserTab,
   browserControlForTab as sharedBrowserControlForTab,
 } from "../../browser/browser-window-model";
+import { answerLocationRequest } from "../../browser/device-location";
 import { serverSupportsCapability } from "../../servers/server-capabilities";
 import { conversationPort } from "../conversation-port";
 import { conversationRuntime } from "../conversation-runtime";
@@ -77,6 +78,7 @@ function canonicalBrowserUrl(url: string): string {
 
 interface BrowserPanels {
   activeRightPanel: () => RightPanelMode;
+  paneShown: (pane: "browser") => boolean;
   setActiveRightPanel: (mode: RightPanelMode, agentId?: string) => void;
   reattachBrowserWindow: () => void;
   closeBrowserPane: () => void;
@@ -99,6 +101,7 @@ export interface BrowserStoreDeps {
   takeoverPageRequest: () => { agentId: string; tabId: string } | null;
   setTakeoverPageRequest: (request: null) => void;
   setComposerError: (error: string | null, targetOverride?: ConversationTarget, cause?: unknown) => void;
+  browserWindowOpen: () => boolean;
   panels: BrowserPanels;
 }
 
@@ -106,7 +109,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   const browserInteractionAvailable = createMemo(
     () => deps.props.browserEnabled !== false && !deps.props.browserVisibilitySuspended,
   );
-  const browserSidebarOpen = () => browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser";
+  const browserSidebarOpen = () => browserInteractionAvailable() && deps.panels.paneShown("browser");
   const browserExpandedOpen = () =>
     browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser-expanded";
   const browserPipOpen = () => browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser-pip";
@@ -141,10 +144,12 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       const agentId = untrack(viewId);
       for (const [requestKey, request] of deps.browserOpenRequests) {
         if (request.serverId !== serverId || request.agentId !== agentId) continue;
-        const tabAppeared = tabs.some(
+        const appearedTab = tabs.find(
           (tab) => canonicalBrowserUrl(tab.url) === request.url && !request.existingTabIds.has(tab.id),
         );
-        if (tabAppeared) deps.browserOpenRequests.delete(requestKey);
+        if (!appearedTab) continue;
+        deps.browserOpenRequests.delete(requestKey);
+        deps.props.onNoticeBrowserTabs?.([appearedTab.id]);
       }
     },
   );
@@ -279,7 +284,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       previousBrowserTabs = { owner, count };
       if (!enabled || previous.owner !== owner || previous.count === 0 || count > 0) return;
       const mode = untrack(deps.panels.activeRightPanel);
-      if (mode === "browser" || mode === "browser-expanded" || mode === "browser-pip")
+      if (untrack(() => deps.panels.paneShown("browser")) || mode === "browser-expanded" || mode === "browser-pip")
         untrack(deps.panels.closeBrowserPane);
     },
   );
@@ -311,6 +316,38 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     if (tab) showTabInAgentChat(tab, agentId);
     deps.props.onSelectAgent(agentId, MAIN_THREAD_ID);
   }
+
+  const unseenBrowserTabs = createMemo(() => {
+    const agent = deps.props.agent;
+    const noticed = deps.props.noticedBrowserTabIds;
+    if (!agent || channel || !noticed || deps.props.browserVisibilitySuspended) return [];
+    return deps.props.browserTabs.filter(
+      (tab) => ownsBrowserTab(agent, tab) && !noticed.has(tab.id) && !closingBrowserTabIds.has(tab.id),
+    );
+  });
+  function noticeBrowserTabs() {
+    const tabIds = untrack(unseenBrowserTabs).map((tab) => tab.id);
+    if (tabIds.length > 0) deps.props.onNoticeBrowserTabs?.(tabIds);
+  }
+  const browserShown = () => screenOpen() || (deps.browserWindowOpen() && deps.props.browserEnabled !== false);
+  createEffect(
+    () => (browserShown() ? unseenBrowserTabs().length : 0),
+    (unseenShown) => {
+      if (unseenShown > 0) noticeBrowserTabs();
+    },
+  );
+  createEffect(
+    () => deps.props.browserTakeover?.tabId,
+    (tabId) => {
+      if (tabId) deps.props.onNoticeBrowserTabs?.([tabId]);
+    },
+  );
+  const browserTabNotice = createMemo(() => {
+    const tabs = unseenBrowserTabs();
+    const newest = tabs.at(-1);
+    if (!newest || browserShown() || deps.props.browserTakeover) return undefined;
+    return { tab: newest, count: tabs.length };
+  });
 
   const canOpenBrowserTakeoverTab = () => {
     const tab = browserTakeoverTab();
@@ -605,6 +642,29 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     }
   }
 
+  const [permissionAnswerPending, setPermissionAnswerPending] = createSignal(false);
+
+  async function answerBrowserPermission(tabId: string, requestId: string, allow: boolean, always = false) {
+    if (!browserInteractionAvailable() || permissionAnswerPending()) return;
+    const agentId = deps.props.agent?.id;
+    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
+    const browser = conversationRuntime(deps.props).browser;
+    setPermissionAnswerPending(true);
+    try {
+      const result = await answerLocationRequest(browser, deps.props.server?.kind === "remote", {
+        tabId,
+        requestId,
+        allow,
+        ...(allow && always ? { always: true } : {}),
+      });
+      if (result === "unavailable") deps.setComposerError(currentText().t("browser.location.unavailable"), target);
+    } catch (error) {
+      deps.setComposerError(currentText().t("browser.location.answerFailed"), target, error);
+    } finally {
+      setPermissionAnswerPending(false);
+    }
+  }
+
   async function stopBrowserTab(tabId: string) {
     if (
       !browserInteractionAvailable() ||
@@ -821,6 +881,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     openBrowserTakeoverTab,
     openWaitingAgent,
     canOpenBrowserTakeoverTab,
+    browserTabNotice,
+    noticeBrowserTabs,
     localSignIn: {
       state: localSignIn,
       canStart: canSignInLocally,
@@ -845,6 +907,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     browserTabOwner,
     reloadBrowserTab,
     stopBrowserTab,
+    answerBrowserPermission,
+    permissionAnswerPending,
     navigateBrowserTab,
     takeBrowserControl,
     releaseBrowserControl,

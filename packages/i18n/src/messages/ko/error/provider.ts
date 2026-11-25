@@ -245,6 +245,8 @@ export const messages = {
     "OpenCode API 키가 만료되었어요. OpenCode Console에서 새 키를 만들어 OpenCode 설정에 붙여넣은 후 다시 시도해 주세요.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go가 저장된 API 키를 거부했어요. 키가 만료되었을 수 있어요. OpenCode Console에서 새 키를 만들어 OpenCode 설정에 붙여넣은 후 다시 시도해 주세요.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode가 OpenBot에 저장한 키를 사용하지 않았습니다. OpenCode가 직접 보관하는 다른 OpenCode Go 키를 사용했고, OpenCode Go가 그 키를 거부했습니다. 그 키를 삭제하려면 에이전트를 실행하는 컴퓨터의 터미널에서 `opencode auth logout opencode-go`를 실행하고 그 키를 선택하세요. 그런 다음 다시 시도하세요.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go가 요청을 거부했습니다. 새 API 키로는 해결되지 않습니다. OpenCode Go 플랜이 활성 상태가 아니거나 OpenCode Go가 네트워크를 차단했을 수 있습니다. 일부 서비스는 VPN, 프록시 또는 일부 국가를 차단합니다. OpenCode Console에서 플랜이 활성 상태인지 확인하거나 VPN을 끈 다음 다시 시도하세요. 다른 모델을 선택할 수도 있습니다.",
   "error.provider.opencodeServiceFailure":
@@ -307,6 +309,8 @@ export const messages = {
     "OpenCode 모델이 작업을 텍스트로만 쓰고 실행하지 않았어요. 다시 시도하거나 다른 모델을 선택하세요.",
   "error.provider.acpNoAnswer":
     "{provider}이(가) 답변 없이 턴을 끝냈어요. 메시지를 다시 보내거나 새 채팅을 시작해 주세요.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider}이(가) 팀원의 결과를 받은 뒤 답변 없이 턴을 끝냈어요. 에이전트에게 계속하라고 요청해 주세요.",
   "error.provider.noAnswerAfterSteps":
     "{provider}이(가) 몇 가지 단계를 실행한 뒤 답변 없이 턴을 끝냈어요. 같은 요청을 다시 보내기 전에 에이전트에게 무엇을 했는지 물어보세요.",
   "error.provider.acpRefusedNoReason": "{provider}이(가) 답변 없이 멈췄어요. 메시지를 다시 보내 주세요.",
@@ -370,6 +374,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Cursor를 사용하려면 Cursor로 로그인하거나 CURSOR_API_KEY를 설정하세요.",
   "error.provider.cursorSignInUnusable":
     "Cursor가 로그인 정보로 서버에 연결하지 못했어요. 인터넷 연결을 확인한 다음 Cursor에 다시 로그인하세요.",
+  "error.provider.cursorNoModels":
+    "Cursor가 모델 목록을 보내지 않았습니다. '연결'을 선택해 Cursor에 다시 로그인하세요. 이 메시지가 계속 표시되면 Cursor 요금제에 모델이 포함되어 있는지 확인하세요.",
   "error.provider.clineArchivePath": "Cline 아카이브에 예상하지 못한 경로가 있어요.",
   "error.provider.clinePackageMismatch": "Cline 패키지가 런타임 카탈로그와 일치하지 않아요.",
   "error.provider.clineChecksum": "Cline 런타임 체크섬이 일치하지 않아요.",
@@ -413,6 +419,8 @@ export const messages = {
     "Anthropic API 키에 API 크레딧이 없어요. Claude 플랜은 API 키로 보낸 요청에 사용되지 않아요. Anthropic Console에서 크레딧을 추가하거나, 설정에서 Claude에 로그인한 다음 에이전트의 모델 메뉴에서 Claude 계정을 선택하세요.",
   "error.provider.claudeAccountNoCredit":
     "Claude 계정의 크레딧 잔액이 너무 적어요. 빠른 모드 같은 일부 요청은 Claude 플랜에 사용량이 남아 있어도 사용 크레딧을 써요. Claude 계정에서 사용 크레딧을 추가하거나, 에이전트의 모델 메뉴에서 다른 모델을 선택하세요.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code가 Anthropic이 아닌 {host}(으)로 요청을 보내요. Claude Code 설정 또는 환경 변수에서 이 API 주소를 지정했어요. {host}에서 계정 잔액 때문에 요청을 거부했어요. Claude 플랜의 문제가 아니에요. {host} 계정에 잔액을 추가하거나, 에이전트의 모델 메뉴에서 다른 모델을 선택하세요.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Claude 서비스가 이 요청을 차단했어요. 보통 Claude 쪽의 일시적인 문제이며, 계정 문제가 아니에요. 몇 분 후에 메시지를 다시 보내세요.",
   "error.provider.foreignReasoning":

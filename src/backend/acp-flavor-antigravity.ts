@@ -214,7 +214,8 @@ const GEMINI_TERMINATED_ANSWER = /^\s*(?:\u26A0 )?Agent execution terminated due
 const GEMINI_EXECUTOR_ERROR = /\bagent executor error: [^\n]+/u;
 const GEMINI_API_ERROR_MESSAGE = /\bError \d{3}, Message: (.+?), Status: /u;
 const GEMINI_PROMPT_LOG = "Sending user message to conversation ";
-const GEMINI_REFUSED_TOOL = /\bbuilding toolbox: tool "(mcp_[^"]+)" advertises an invalid parameter schema\b/gu;
+const GEMINI_REFUSED_TOOL =
+  /\bbuilding toolbox: tool "(mcp_[^"]+)" advertises an invalid parameter schema\b|\bUnable to submit request because `(mcp_[^`]+)` functionDeclaration\b/gu;
 const GOOGLE_REFUSED_FIELD =
   /\bGenerateContentRequest\.tools\[(\d+\]\.function_declarations\[\d+)\]\.parameters((?:\.\w+(?:\[[^\]]*\])?)*): (missing field|cannot be empty|field predicate failed: \$type == Type\.\w+)/gu;
 const GOOGLE_FIELD_TYPE = /^field predicate failed: \$type == Type\.(\w+)$/u;
@@ -277,8 +278,12 @@ function antigravityLastPromptLog(
   return null;
 }
 
+function namedRefusedMcpTools(text: string): string[] {
+  return Array.from(text.matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? match[2] ?? "");
+}
+
 function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessionId: string): string[] {
-  const answered = Array.from(text.matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
+  const answered = namedRefusedMcpTools(text);
   if (answered.length > 0) return answered;
   const home = flagValue(argv, GEMINI_DIR_FLAG);
   const appData = flagValue(argv, APP_DATA_DIR_FLAG);
@@ -288,7 +293,7 @@ function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessi
   if (google.length > 0 || !GEMINI_TERMINATED_ANSWER.test(text)) return google;
   const log = antigravityLastPromptLog(argv, sessionId);
   if (log === null) return [];
-  const named = Array.from(log.matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
+  const named = namedRefusedMcpTools(log);
   return named.length > 0 ? named : googleRefusedMcpTools(log, schemas);
 }
 
@@ -455,7 +460,9 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   },
   promptOpenForBackgroundTasks: true,
   silentTurnLimitMs: 15 * 60_000,
+  openToolStallMs: 30 * 60_000,
   wakesAfterPromptEnds: true,
+  restartNoticeOnReload: true,
   selfWakeTools: /\b(?:start|invoke)_subagent\b|^(?:Run(?:ning)? )?schedule\??$/u,
   contextCompaction: "handoff",
   closeKeepsSession: true,

@@ -98,6 +98,8 @@ export const messages = {
   "error.remote.connectionServiceUnreachable":
     "Bu bilgisayar OpenBot bağlantı hizmetine ulaşamıyor. İnternet bağlantısını kontrol edin. OpenBot otomatik olarak yeniden bağlanır.",
   "error.remote.serverAnswerTimeout": "Sunucu zamanında yanıt vermedi. OpenBot otomatik olarak yeniden bağlanır.",
+  "error.remote.signInConnectionClosed":
+    "Oturum açılırken sunucu bağlantısı kapandı. Bu devam ederse sunucuda ve bu cihazda tarih ve saatin doğru olduğundan emin olun.",
   "error.remote.connectionCancelled": "Uzak bağlantı iptal edildi.",
   "error.remote.hostDisconnected":
     "Sunucuyla bağlantı kesildi. Eylemin tamamlanıp tamamlanmadığını kontrol edin, ardından tekrar deneyin.",

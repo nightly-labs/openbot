@@ -6,6 +6,7 @@ import {
   CREDITS_UNAVAILABLE_STATE,
   EMPTY_CREDIT_ACTIVITY,
   parseCreditCheckoutRequest,
+  parseCreditRedeemRequest,
   parseCreditTransferRequest,
 } from "@openbot/contracts/credits";
 import { parseHostedServerLifecycleInput } from "@openbot/contracts/hosted-servers";
@@ -561,6 +562,11 @@ const handleCredits = Effect.fn("BrowserApi.handleCredits")(function* (
     const input = parseCreditTransferRequest(body);
     if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
     return json(yield* billing.credits.transfer(user.id, input));
+  }
+  if (path === "v1/me/credits/redeem") {
+    const input = parseCreditRedeemRequest(body);
+    if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
+    return json(yield* billing.credits.redeem(user.id, input, services.sourceIp(request)));
   }
   return null;
 }, refuseWith(BillingError));

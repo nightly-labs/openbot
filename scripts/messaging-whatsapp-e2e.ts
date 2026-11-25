@@ -67,6 +67,7 @@ const LID_FRIEND = "48600100500";
 const LID_FRIEND_CHAT = "999123@lid";
 const LEAD = "48600100600";
 const OTHER_LEAD = "48600100700";
+const NO_COUNTRY_CODE = "600100800";
 const BRAZIL_TYPED = "5531988887777";
 const BRAZIL_ACCOUNT = "553188887777";
 const GROUP = "120363000000000001@g.us";
@@ -246,9 +247,11 @@ class FakeSocket implements WhatsAppSocket {
   }
 
   async onWhatsApp(...phoneNumbers: string[]) {
+    this.#phone.lookups.push(...phoneNumbers);
+    if (this.#phone.lookupFails) throw new Error("usync failed");
     return phoneNumbers.map((number) => ({
       jid: `${number === BRAZIL_TYPED ? BRAZIL_ACCOUNT : number}@s.whatsapp.net`,
-      exists: true,
+      exists: !this.#phone.noAccount.has(number),
     }));
   }
 
@@ -261,6 +264,9 @@ class FakePhone {
   readonly sockets: FakeSocket[] = [];
   readonly sent: Sent[] = [];
   readonly refused = new Map<string, string>();
+  readonly noAccount = new Set<string>();
+  readonly lookups: string[] = [];
+  lookupFails = false;
   dropNext: string | null = null;
   holdAcks = false;
   readonly lost: Sent[] = [];
@@ -723,6 +729,60 @@ try {
       );
       await runCauseEffect(messaging.removeWhatsAppSender(OWNER, OTHER_LEAD));
       return { agent: "WhatsApp Orchestrator", teammate: "Sales" };
+    });
+
+    await step("contact with no account: a post fails and is not sent, as WhatsApp answers (#13597)", async () => {
+      const sales = agents.listAgents().find((agent) => agent.name === "Sales");
+      assert.ok(sales, "No Sales agent.");
+      const jid = `${NO_COUNTRY_CODE}@s.whatsapp.net`;
+      try {
+        phone.noAccount.add(NO_COUNTRY_CODE);
+        phone.lookupFails = true;
+        await runCauseEffect(
+          messaging.addWhatsAppSender(OWNER, { id: NO_COUNTRY_CODE, kind: "contact", name: "Marta" }),
+        );
+        const unknownBefore = phone.lookups.filter((number) => number === NO_COUNTRY_CODE).length;
+        await postAs(agents, sales.id, jid, "Sent while WhatsApp does not answer.");
+        assert.equal(phone.textsTo(jid).length, 1, "A post did not go out while the account check had no answer.");
+        assert.equal(
+          phone.lookups.filter((number) => number === NO_COUNTRY_CODE).length - unknownBefore,
+          1,
+          "One post asked WhatsApp more than once about the same contact.",
+        );
+        phone.lookupFails = false;
+        const refused = await runCauseEffect(
+          agents.messaging.outboundTool(
+            sales.id,
+            { threadId: `thread-${sales.id}`, turnId: `turn-${sales.id}` },
+            "messaging_post",
+            { connection: connectionId(agents), place: jid, text: "Nobody gets this." },
+            () => Effect.succeed([]),
+          ),
+        );
+        const text = refused.contentItems[0]?.text ?? "";
+        assert.ok(text.includes("OpenBot sent nothing"), `The agent was not told that the post failed: ${text}`);
+        assert.ok(text.includes("country code"), "The agent was not told about the country code.");
+        assert.equal(phone.textsTo(jid).length, 1, "A post to a number with no account went out.");
+        await runCauseEffect(messaging.addWhatsAppSender(OWNER, { id: FRIEND, kind: "contact", name: "Ewa" }));
+        const friendJid = `${FRIEND}@s.whatsapp.net`;
+        const lookupsBefore = phone.lookups.filter((number) => number === FRIEND).length;
+        await postAs(agents, sales.id, friendJid, "First post.");
+        await postAs(agents, sales.id, friendJid, "Second post.");
+        assert.equal(phone.textsTo(friendJid).length, 2, "A post to a contact with an account did not go out.");
+        assert.equal(
+          phone.lookups.filter((number) => number === FRIEND).length - lookupsBefore,
+          1,
+          "OpenBot asked WhatsApp again about a contact it already checked on this connection.",
+        );
+        const contacts = messaging.whatsappOverview().accounts[0]?.allowedSenders.map((sender) => sender.id) ?? [];
+        assert.ok(contacts.includes(NO_COUNTRY_CODE), "OpenBot removed the saved contact.");
+        return { refused: true, lookupsPerContact: 1 };
+      } finally {
+        phone.lookupFails = false;
+        phone.noAccount.clear();
+        await runCauseEffect(messaging.removeWhatsAppSender(OWNER, NO_COUNTRY_CODE));
+        await runCauseEffect(messaging.removeWhatsAppSender(OWNER, FRIEND));
+      }
     });
 
     await step("own chat: the owner's message reaches the orchestrator and gets 👀", async () => {
@@ -1516,7 +1576,30 @@ try {
       const lidOnly = message({ chat: "999456@lid", text: "still there?" });
       phone.current().receive([lidOnly]);
       await until(() => received(agents, `${LID_FRIEND}@s.whatsapp.net`, lidOnly.key.id ?? ""), "the LID-only message");
-      return { chat: `${LID_FRIEND}@s.whatsapp.net` };
+      const ownerReply = message({ chat: LID_FRIEND_CHAT, fromMe: true, text: "On my way, 10 minutes" });
+      const unknownJid = "48600100999@s.whatsapp.net";
+      const ownerToUnknown = message({ chat: unknownJid, fromMe: true, text: "See you" });
+      const marker = message({ chat: OWNER_JID, fromMe: true, text: "marker LID" });
+      phone.current().receive([ownerReply, ownerToUnknown, marker]);
+      await until(() => phone.reactedTo(marker.key.id), "the marker");
+      assert.equal(
+        received(agents, `${LID_FRIEND}@s.whatsapp.net`, ownerReply.key.id ?? ""),
+        false,
+        "The owner's message to an allowed contact started work.",
+      );
+      const id = connectionId(agents);
+      assert.ok(
+        agents.messaging.history
+          .recent(id, `${LID_FRIEND}@s.whatsapp.net`, null, 200)
+          .some((entry) => entry.id === ownerReply.key.id),
+        "The owner's message to an allowed contact was not saved.",
+      );
+      assert.equal(
+        agents.messaging.history.recent(id, unknownJid, null, 200).length,
+        0,
+        "The owner's message to a contact that is not allowed was saved.",
+      );
+      return { chat: `${LID_FRIEND}@s.whatsapp.net`, ownerReplySaved: true };
     });
 
     await step("LID contacts: posts, edits and reactions to a contact with a LID go to the LID chat", async () => {

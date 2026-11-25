@@ -852,6 +852,25 @@ html.panel-resizing {
   user-select: none;
 }
 
+.panel-resizer-vertical {
+  width: 100%;
+  height: 16px;
+  cursor: row-resize;
+  transform: translateY(-50%);
+}
+
+.panel-resizer-vertical::after {
+  inset: 50% 0 auto;
+  width: auto;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--openbot-text-dim) 50%, transparent);
+  transform: translateY(-50%);
+}
+
+html.panel-resizing:has(.panel-resizer-vertical.panel-resizer-active) {
+  cursor: row-resize;
+}
+
 .right-panel-resizer {
   position: absolute;
   top: 0;
@@ -1108,10 +1127,26 @@ textarea {
 }
 
 .server-menu {
+  display: flex;
   min-width: 240px;
   max-width: 300px;
-  max-height: min(520px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 520px));
+  max-height: min(calc(100dvh - 16px), var(--kb-popper-content-available-height, 100dvh));
+  flex-direction: column;
   overflow-y: auto;
+}
+
+.server-menu > * {
+  flex-shrink: 0;
+}
+
+.server-menu > .server-menu-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.server-menu > .server-menu-list:has(> :nth-child(4)) {
+  min-height: calc(var(--openbot-control-md) * 3);
+  flex-shrink: 1;
 }
 
 .server-submenu {

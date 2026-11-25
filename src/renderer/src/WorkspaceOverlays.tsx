@@ -917,6 +917,7 @@ function ServerSettings() {
           hostVoiceModel={{}}
           hostSignalHome={{}}
           hostTurnLimits={{}}
+          mediaApprovalCredits={{}}
           hostPersonality={{}}
           hostMemoryLimit={{}}
           memoryReview={{}}

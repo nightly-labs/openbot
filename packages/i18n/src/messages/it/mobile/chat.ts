@@ -97,6 +97,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Parte successiva",
   "mobile.chat.preview.pdfFailed": "Impossibile mostrare questo PDF.",
   "mobile.chat.preview.spreadsheetFailed": "Impossibile leggere questo foglio di calcolo.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Questo foglio di calcolo è troppo grande per l’anteprima. Condividilo per aprirlo in un’altra app.",
   "mobile.chat.preview.spreadsheetTruncated": "Anteprima limitata alle prime {rows} righe e {columns} colonne.",
   "mobile.chat.copyFailedMessage": "Riprova.",
   "mobile.chat.message.copyFailed": "Impossibile copiare il messaggio",
@@ -226,7 +228,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "Il server non è connesso. La conversazione riprende quando si riconnette.",
   "mobile.chat.liveVoice.speakFailed": "Non è stato possibile leggere la risposta ad alta voce.",
   "mobile.chat.liveVoice.voiceNotReady": "Scegli una voce in Impostazioni > Voce.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 non legge questa lingua.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 non legge questa lingua. Scegli un'altra voce in Impostazioni > Voce.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs non ha accettato la chiave API.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "Alla chiave ElevenLabs manca un permesso. Controllalo in Impostazioni > Voce.",
@@ -521,6 +524,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Connessione al server",
   "mobile.chat.history.loading": "Caricamento della cronologia della chat",
   "mobile.chat.history.waiting": "In attesa della connessione",
+  "mobile.chat.history.syncing": "Ricerca di nuovi messaggi",
   "mobile.chat.history.loadFailed": "Impossibile caricare la cronologia della chat",
   "mobile.chat.scrollToLatest": "Vai all'ultimo messaggio",
   "mobile.chat.agentUnavailable.title": "Agente non disponibile",

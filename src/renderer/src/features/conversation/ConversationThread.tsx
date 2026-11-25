@@ -19,6 +19,7 @@ import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut, deviceSendShortcut } from "../../send-shortcut-preference";
 import { remoteAgentError } from "../agents/agent-error-text";
 import { useThreadVisualReplyCard } from "./ChatVisualReply";
+import { ConversationBrowserLocation } from "./ConversationBrowserLocation";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { chatSearchOpensMessage } from "./chat-search";
@@ -72,6 +73,7 @@ export function ConversationThread() {
     changeMarkerActions,
     shownSubagentId,
     toggleSubagentPanel,
+    browserTabs,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(props));
   const threadBackgroundWorkSince = (taskId: string | undefined) =>
@@ -86,7 +88,8 @@ export function ConversationThread() {
     },
   });
   const takeoverShown = () => props.browserTakeover !== undefined || browserTakeoverResolution() !== null;
-  const hasAttention = createMemo(() => takeoverShown() || props.prompt !== undefined);
+  const locationAsked = () => browserTabs().some((tab) => tab.permissionRequest !== undefined);
+  const hasAttention = createMemo(() => takeoverShown() || locationAsked() || props.prompt !== undefined);
   const messages = createProjection<AgentMessage[]>(
     () => {
       const conversation = props.threads?.conversation;
@@ -222,6 +225,7 @@ export function ConversationThread() {
           }
         />
         <ConversationBrowserTakeover />
+        <ConversationBrowserLocation />
       </>
     );
   };
@@ -296,6 +300,7 @@ export function ConversationThread() {
             downloads={attachmentDownloads}
             macWindowControls={props.platform === "darwin"}
             approval={current().threads.approval}
+            media={props.mediaApproval}
             onRespondApproval={(decision) =>
               current().threads.onRespondApproval(decision, failureToast("prompt.approval.answerFailed"))
             }

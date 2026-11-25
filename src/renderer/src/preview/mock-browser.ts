@@ -76,6 +76,7 @@ export function createMockBrowser(
     activate: async (tabId) => {
       activeBrowserTabId = tabId;
       emit(browserDisplayListeners, { tabs: browserTabs, activeTabId: activeBrowserTabId });
+      emitAgentEvent({ type: "browser-changed", tabs: browserTabs, activeTabId: activeBrowserTabId });
     },
     navigate: async (input) => {
       if (!("url" in input)) return;
@@ -87,6 +88,15 @@ export function createMockBrowser(
     },
     reload: async () => undefined,
     stop: async () => undefined,
+    answerPermission: async ({ tabId, requestId }) => {
+      browserTabs = browserTabs.map((tab) => {
+        if (tab.id !== tabId || tab.permissionRequest?.id !== requestId) return tab;
+        const { permissionRequest: _, ...rest } = tab;
+        return rest;
+      });
+      emit(browserDisplayListeners, { tabs: browserTabs, activeTabId: activeBrowserTabId });
+      emitAgentEvent({ type: "browser-changed", tabs: browserTabs, activeTabId: activeBrowserTabId });
+    },
     takeControl: async (tabId) => setUserControl(tabId, true),
     releaseControl: async (tabId) => setUserControl(tabId, false),
     startTeach: async (tabId) => setUserControl(tabId, true),

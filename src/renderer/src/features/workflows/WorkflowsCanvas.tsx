@@ -33,6 +33,7 @@ export function WorkflowsCanvas(props: {
   models: WorkflowCatalogs["models"];
   status: WorkflowCatalogs["status"];
   self?: WorkflowCatalogs["self"];
+  preference?: WorkflowCatalogs["preference"];
   request?: WorkflowRequest | undefined;
   serverId?: string | undefined;
   agentProgress?: ((agentId: string) => WorkflowAgentProgress | undefined) | undefined;
@@ -230,6 +231,9 @@ export function WorkflowsCanvas(props: {
     get agentFiles() {
       return props.host.agentFilesSupported();
     },
+    get preference() {
+      return props.preference;
+    },
     get answers() {
       return props.host.answersSupported();
     },
@@ -271,7 +275,7 @@ export function WorkflowsCanvas(props: {
     const slack = props.admin && workflows.slack().length > 0;
     const outputs = [
       ...WORKFLOW_FEATURES_V1.outputs.filter((output) => output !== "channel" || workflows.places().length > 0),
-      ...(workflows.channels().length > 0 ? (["chat-channel"] as const) : []),
+      ...(props.admin && workflows.channels().length > 0 ? (["chat-channel"] as const) : []),
     ];
     const added = [
       ...(github ? (["github"] as const) : []),

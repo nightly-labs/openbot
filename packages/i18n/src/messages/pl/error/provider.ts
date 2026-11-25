@@ -242,6 +242,8 @@ export const messages = {
     "Twój klucz API OpenCode wygasł. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go odrzucił Twój zapisany klucz API. Klucz mógł wygasnąć. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode nie użył klucza zapisanego w OpenBot. Użył innego klucza OpenCode Go, który OpenCode przechowuje sam, a OpenCode Go odrzucił ten klucz. Aby usunąć ten klucz, uruchom `opencode auth logout opencode-go` w terminalu na komputerze, na którym działa agent, i wybierz klucz. Potem spróbuj ponownie.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go odrzucił żądanie. Nowy klucz API tego nie naprawi. Twój plan OpenCode Go może być nieaktywny albo OpenCode Go może blokować Twoją sieć: niektóre usługi blokują VPN, serwery proxy lub niektóre kraje. Sprawdź w OpenCode Console, czy plan jest aktywny, albo wyłącz VPN, a potem spróbuj ponownie. Możesz też wybrać inny model.",
   "error.provider.opencodeServiceFailure":
@@ -304,6 +306,8 @@ export const messages = {
     "Model OpenCode zapisał swoje działania jako tekst i ich nie wykonał. Spróbuj ponownie albo wybierz inny model.",
   "error.provider.acpNoAnswer":
     "{provider} zakończył turę bez odpowiedzi. Wyślij wiadomość ponownie albo rozpocznij nowy czat.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} otrzymał wyniki od członków zespołu, a potem zakończył turę bez odpowiedzi. Poproś agenta, aby kontynuował.",
   "error.provider.noAnswerAfterSteps":
     "{provider} wykonał kilka kroków, a potem zakończył turę bez odpowiedzi. Zanim wyślesz tę samą prośbę ponownie, zapytaj agenta, co zrobił.",
   "error.provider.acpRefusedNoReason": "{provider} zatrzymał się bez odpowiedzi. Wyślij wiadomość ponownie.",
@@ -368,6 +372,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Zaloguj się przez Cursor lub ustaw CURSOR_API_KEY, aby używać Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor nie mógł połączyć się ze swoim serwerem przy użyciu Twojego logowania. Sprawdź połączenie z internetem, a potem zaloguj się ponownie do Cursor.",
+  "error.provider.cursorNoModels":
+    "Cursor nie wysłał listy modeli. Wybierz „Połącz”, aby ponownie zalogować się do Cursor. Jeśli ten komunikat nie znika, sprawdź, czy Twój plan Cursor obejmuje modele.",
   "error.provider.clineArchivePath": "Archiwum Cline ma nieoczekiwaną ścieżkę.",
   "error.provider.clinePackageMismatch": "Pakiet Cline nie pasuje do katalogu środowisk uruchomieniowych.",
   "error.provider.clineChecksum": "Niezgodna suma kontrolna środowiska uruchomieniowego Cline.",
@@ -410,6 +416,8 @@ export const messages = {
     "Klucz API Anthropic nie ma środków API. Plan Claude nie płaci za zapytania z kluczem API. Doładuj środki w Anthropic Console albo zaloguj się do Claude w Ustawieniach i wybierz konto Claude w menu modeli agenta.",
   "error.provider.claudeAccountNoCredit":
     "Saldo środków na koncie Claude jest za niskie. Niektóre zapytania, na przykład w trybie szybkim, korzystają ze środków na użycie, także gdy plan Claude ma jeszcze limit. Doładuj środki na użycie na koncie Claude albo wybierz inny model w menu modeli agenta.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code wysyła zapytania do {host}, nie do Anthropic: ten adres API ustawiają ustawienia Claude Code lub zmienne środowiskowe. {host} odrzucił zapytanie z powodu salda konta, nie z powodu planu Claude. Doładuj konto {host} albo wybierz inny model w menu modeli agenta.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Usługa Claude zablokowała to zapytanie. Zwykle to krótki problem po stronie Claude, a nie problem z Twoim kontem. Wyślij wiadomość ponownie za kilka minut.",
   "error.provider.foreignReasoning":

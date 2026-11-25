@@ -1,5 +1,10 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  BROWSER_PERMISSIONS_CAPABILITY,
+  BROWSER_PERMISSIONS_ROUTES,
+  decodeBrowserPermissionsSnapshot,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
+import {
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY,
   TEAM_BROWSER_VIEW_CURSOR_CAPABILITY,
@@ -32,7 +37,10 @@ export function createBrowserActions({
   liveState: LiveWorkspaceStore;
   client: (serverId: string) => RemoteTeamTransportRef | undefined;
   capabilities: ServerCapabilities;
-}): Pick<MobileWorkspaceContextValue, "browserViewSupport" | "openBrowserView" | "controlBrowserTab"> {
+}): Pick<
+  MobileWorkspaceContextValue,
+  "browserViewSupport" | "openBrowserView" | "controlBrowserTab" | "answerBrowserPermission"
+> {
   return {
     browserViewSupport: (serverId) => {
       const advertised = capabilities.get(serverId) ?? [];
@@ -43,6 +51,7 @@ export function createBrowserActions({
         contextMenu: view && advertised.includes(TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY),
         viewport: view && advertised.includes(TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY),
         navigation: view && advertised.includes(TEAM_BROWSER_NAVIGATION_CAPABILITY),
+        permissions: view && advertised.includes(BROWSER_PERMISSIONS_CAPABILITY),
       };
     },
     openBrowserView: (serverId, tabId, listener) => {
@@ -61,6 +70,18 @@ export function createBrowserActions({
         },
         listener,
       );
+    },
+    answerBrowserPermission: async (serverId, answer) => {
+      const { location, ...decision } = answer;
+      const body = location ? { ...decision, location: { ...location } } : decision;
+      const { requests } = await request(
+        "POST",
+        BROWSER_PERMISSIONS_ROUTES.answer,
+        decodeBrowserPermissionsSnapshot,
+        body,
+        serverId,
+      );
+      liveState.update("browserPermissions", (current) => ({ ...current, [serverId]: requests }));
     },
     controlBrowserTab: async (serverId, action) => {
       const readTabs = () =>

@@ -396,6 +396,10 @@ export class TeamStore {
     return owner?.accountId && owner.email ? { id: owner.accountId, email: owner.email } : null;
   }
 
+  getMemberAccountId(memberId: string): string | null {
+    return this.#state?.members.find((member) => member.id === memberId)?.accountId ?? null;
+  }
+
   assertOwnerAccount(user: CentralAuthUser): void {
     const owner = this.#state?.members.find((member) => member.role === "owner");
     if (!owner?.email) {

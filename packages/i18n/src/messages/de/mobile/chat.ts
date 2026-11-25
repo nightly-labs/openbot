@@ -98,6 +98,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Nächster Teil",
   "mobile.chat.preview.pdfFailed": "Dieses PDF konnte nicht angezeigt werden.",
   "mobile.chat.preview.spreadsheetFailed": "Diese Tabelle konnte nicht gelesen werden.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Diese Tabelle ist zu groß für die Vorschau. Teile sie, um sie in einer anderen App zu öffnen.",
   "mobile.chat.preview.spreadsheetTruncated": "Vorschau auf die ersten {rows} Zeilen und {columns} Spalten begrenzt.",
   "mobile.chat.copyFailedMessage": "Versuche es erneut.",
   "mobile.chat.message.copyFailed": "Nachricht konnte nicht kopiert werden",
@@ -228,7 +230,8 @@ export const messages = {
     "Der Server ist nicht verbunden. Das Gespräch geht weiter, sobald er wieder verbunden ist.",
   "mobile.chat.liveVoice.speakFailed": "Die Antwort konnte nicht vorgelesen werden.",
   "mobile.chat.liveVoice.voiceNotReady": "Wähle eine Antwortstimme unter Einstellungen > Stimme.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 kann diese Sprache nicht lesen.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 kann diese Sprache nicht lesen. Wähle eine andere Antwortstimme unter Einstellungen > Stimme.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs hat den API-Schlüssel nicht akzeptiert.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "Dem ElevenLabs-Schlüssel fehlt eine Berechtigung. Prüfe sie unter Einstellungen > Stimme.",
@@ -531,6 +534,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Verbindung zum Server wird hergestellt",
   "mobile.chat.history.loading": "Chatverlauf wird geladen",
   "mobile.chat.history.waiting": "Warten auf Verbindung",
+  "mobile.chat.history.syncing": "Suche nach neuen Nachrichten",
   "mobile.chat.history.loadFailed": "Chatverlauf konnte nicht geladen werden",
   "mobile.chat.scrollToLatest": "Zur neuesten Nachricht scrollen",
   "mobile.chat.agentUnavailable.title": "Agent nicht verfügbar",

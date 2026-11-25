@@ -10,7 +10,7 @@ async function transferFile(
   signal: AbortSignal,
   onBytesWritten: (bytesWritten: number) => void,
 ): Promise<void> {
-  const onProgress = ({ bytesWritten }: DownloadProgress) => onBytesWritten(bytesWritten);
+  const onProgress = ({ bytesWritten }: DownloadProgress) => onBytesWritten(Number(bytesWritten));
   if (Platform.OS === "ios")
     await File.createDownloadTask(url, destination, { sessionType: "background", signal, onProgress }).downloadAsync();
   else await File.downloadFileAsync(url, destination, { idempotent: true, signal, onProgress });

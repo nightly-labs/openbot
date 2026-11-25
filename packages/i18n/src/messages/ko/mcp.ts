@@ -40,6 +40,7 @@ export const messages = {
   "mcp.status.signedIn": "로그인됨",
   "mcp.status.signingIn": "로그인 중…",
   "mcp.status.signInNeeded": "로그인 필요",
+  "mcp.status.signInAppNeeded": "로그인 앱 필요",
   "mcp.status.refused": "거부됨",
   "mcp.status.checkUrl": "URL을 확인하세요",
   "mcp.status.noAnswer": "응답 없음",

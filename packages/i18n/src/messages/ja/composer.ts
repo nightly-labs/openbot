@@ -7,6 +7,10 @@ export const messages = {
   "composer.feedbackFix.body":
     "レポート #{number} を修正しています。リクエストを送信するか、キャンセルしてレポートをそのままにします。",
   "composer.feedbackFix.cancel": "キャンセル",
+  "composer.browserTab.opened": "{name} がブラウザーで {title} を開きました。",
+  "composer.browserTab.openedMany": { other: "{name} がブラウザーで {count} ページを開きました。" },
+  "composer.browserTab.open": "ページを開く",
+  "composer.browserTab.hide": "非表示",
   "composer.providerWait.offlineTitle": "インターネットに接続されていません",
   "composer.providerWait.offline": "このコンピューターがオンラインに戻るまで、{provider} は返信できません。",
   "composer.providerWait.silent": "{provider} からの更新が {duration} ありません。",

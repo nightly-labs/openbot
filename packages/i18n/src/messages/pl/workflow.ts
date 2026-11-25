@@ -129,6 +129,8 @@ export const messages = {
   "workflow.agent.removedLabel": "Agent usunięty. Wybierz agenta",
   "workflow.agent.list": "Agenci",
   "workflow.agent.search": "Szukaj agentów",
+  "workflow.agentMade.title": "Nowy przepływ od {agent}",
+  "workflow.agentMade.open": "Otwórz",
 
   "workflow.model.label": "Model: {name}",
   "workflow.model.title": "Modele",
@@ -592,8 +594,34 @@ export const messages = {
   "workflow.canvas.presence.follow": "Śledź: {name}",
   "workflow.canvas.presence.you": "{name} (ty)",
   "workflow.canvas.presence.following": "Śledzisz: {name}",
-  "workflow.canvas.empty.title": "Zacznij od wyzwalacza",
-  "workflow.canvas.empty.add": "Dodaj wyzwalacz",
+  "workflow.canvas.start.title": "Zacznij od szablonu",
+  "workflow.canvas.start.blank": "Pusta kanwa",
+  "workflow.template.morningBrief.title": "Poranny przegląd",
+  "workflow.template.morningBrief.brief": "Codziennie o 08:00 dostajesz 5 linijek wiadomości na swoje tematy.",
+  "workflow.template.morningBrief.task":
+    "Znajdź wiadomości z ostatniego dnia na te tematy: AI, startupy. Wypisz 5 najważniejszych, każdą w jednej linijce, z linkiem.",
+  "workflow.template.answerIssues.title": "Odpowiadaj na nowe zgłoszenia",
+  "workflow.template.answerIssues.brief": "Gdy ktoś otworzy zgłoszenie na GitHubie, odpowiedz na nie i dodaj etykietę.",
+  "workflow.template.answerIssues.task":
+    "Przeczytaj zgłoszenie. Znajdź prawdopodobną przyczynę w kodzie. Napisz krótką, uprzejmą odpowiedź i wybierz jedną etykietę.",
+  "workflow.template.weeklyReport.title": "Raport tygodniowy",
+  "workflow.template.weeklyReport.brief": "W każdy piątek o 16:00 podsumuj tydzień. Zatwierdzasz go przed wysłaniem.",
+  "workflow.template.weeklyReport.task":
+    "Podsumuj, co zespół zrobił w tym tygodniu: skończoną pracę, otwarte problemy i kolejne kroki. Używaj krótkich list.",
+  "workflow.template.weeklyReport.question": "Wysłać ten raport tygodniowy?",
+  "workflow.template.priceWatch.title": "Śledzenie ceny",
+  "workflow.template.priceWatch.brief":
+    "Codziennie o 09:00 sprawdzaj cenę produktu. Dostań powiadomienie, gdy spadnie poniżej Twojego limitu.",
+  "workflow.template.priceWatch.task":
+    "Otwórz tę stronę produktu i odczytaj cenę: https://example.com/product. Napisz tylko cenę i link.",
+  "workflow.template.priceWatch.rule": "Cena jest niższa niż 100.",
+  "workflow.template.priceWatch.alert": "Spadek ceny",
+  "workflow.template.socialPost.title": "Post z obrazem",
+  "workflow.template.socialPost.brief": "Napisz jeden pomysł. Dostaniesz krótki post i kwadratowy obraz do niego.",
+  "workflow.template.socialPost.idea": "Od teraz jesteśmy otwarci w niedziele, od 10:00 do 16:00.",
+  "workflow.template.socialPost.prompt":
+    "Napisz post do mediów społecznościowych o tej nowości w mniej niż 280 znakach. Użyj jasnej pierwszej linijki i bez hashtagów.",
+  "workflow.template.socialPost.picture": "Czysty, jasny obraz do tego posta.",
   "workflow.canvas.tool.label": "Narzędzia kanwy",
   "workflow.canvas.tool.select": "Zaznacz",
   "workflow.canvas.tool.pan": "Przesuń",
