@@ -58,6 +58,7 @@ import { makeOpenBotSignalRepository } from "@openbot/whatsapp/signal-repository
 import { Effect, Fiber, Schema } from "effect";
 import {
   app,
+  autoUpdater,
   BrowserWindow,
   clipboard,
   desktopCapturer,
@@ -336,6 +337,7 @@ import type { MacHapticFeedback } from "./mac-haptic-feedback";
 import { restartFromInstalledCopy } from "./mac-installed-copy";
 import { hidePanelFromWindowSwitchers } from "./mac-panel-activation";
 import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
+import { stageSquirrelUpdate } from "./mac-squirrel-stage";
 import { MACHINE_ALERTS_PREFERENCE_FILE, MachineAlertMonitor, MachineAlertPreferenceStore } from "./machine-alerts";
 import { MachineMetricsSampler } from "./machine-metrics";
 import {
@@ -489,6 +491,7 @@ import {
   loadElectronUpdater,
   supportsInstalledUpdates,
   type UpdateAdapter,
+  UpdateOperationFailure,
   UpdateService,
 } from "./update-service";
 import { listSiblingOpenBotInstances } from "./update-sibling-instances";
@@ -4211,6 +4214,8 @@ export async function createApplicationServices({
     ...(process.platform === "darwin"
       ? {
           shipItDirectory: macShipItDirectory(),
+          stageInstall: () =>
+            stageSquirrelUpdate(autoUpdater).pipe(Effect.mapError((cause) => new UpdateOperationFailure({ cause }))),
           handoverPath: join(app.getPath("userData"), UPDATE_HANDOVER_FILE),
           installRecordPath: join(app.getPath("userData"), UPDATE_INSTALL_RECORD_FILE),
           notInstalledVersion: Effect.runSync(
