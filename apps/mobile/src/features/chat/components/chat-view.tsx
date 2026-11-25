@@ -397,7 +397,7 @@ export function ChatView({
   if (sendingMessage && !routedSends.current.has(sendingMessage.clientMessageId)) {
     routedSends.current.add(sendingMessage.clientMessageId);
     if (sendsToQueue) queueSends.current.add(sendingMessage.clientMessageId);
-  }
+  } else if (sendingMessage && !sendsToQueue) queueSends.current.delete(sendingMessage.clientMessageId);
   const sendingToQueue = Boolean(sendingMessage && queueSends.current.has(sendingMessage.clientMessageId));
   const queueDeliveries = queue?.deliveries;
   const sentToQueue =
@@ -493,8 +493,8 @@ export function ChatView({
   const pendingMessages = useMemo(
     () =>
       outboxMessages.flatMap((message): PendingChatMessage[] =>
-        ((message.state === "sending" || message.state === "sent") &&
-          queueSends.current.has(message.clientMessageId)) ||
+        (message.state === "sending" && sendingToQueue) ||
+        (message.state === "sent" && queueSends.current.has(message.clientMessageId)) ||
         (message.messageId !== null && queuedMessageIds.has(message.messageId))
           ? []
           : [
@@ -507,7 +507,7 @@ export function ChatView({
               },
             ],
       ),
-    [outboxMessages, outboxSnapshot.storing, queuedMessageIds, outbox],
+    [outboxMessages, outboxSnapshot.storing, sendingToQueue, queuedMessageIds, outbox],
   );
   const messages = useMemo(
     () =>
