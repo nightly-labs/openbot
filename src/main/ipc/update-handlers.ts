@@ -11,7 +11,7 @@ export interface UpdateIpcDependencies {
   updater: UpdateService;
   updatePreferenceFile: string;
   requestedUpdate: Pick<RequestedUpdate, "cancel" | "setPreference">;
-  idleRestart: Pick<IdleRestart, "request" | "cancel">;
+  idleRestart: Pick<IdleRestart, "request" | "cancel" | "restartNow">;
   describeReadiness: () => RestartReadiness;
 }
 
@@ -46,6 +46,7 @@ export function updateIpcHandlers({
       }),
       restartWhenIdle: payloadHandler(parseIdleRestartTarget, (target) => idleRestart.request(target)),
       cancelIdleRestart: handler(() => idleRestart.cancel()),
+      restartNow: handler(() => idleRestart.restartNow()),
     },
   };
 }

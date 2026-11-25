@@ -38,6 +38,8 @@ export const messages = {
     "Żaden agent nie może tu jeszcze odpowiadać. W OpenBot otwórz Marketplace > Aplikacje > Telegram i kliknij Dodaj agenta.",
   "status.messaging.telegramLinked":
     "OpenBot jest połączony z tym czatem. Oznacz {bot} lub odpowiedz na wiadomość OpenBot, aby zapytać agentów.",
+  "status.messaging.telegramNotLinked":
+    "OpenBot nie jest połączony z tym czatem. Aby go połączyć, otwórz aplikację OpenBot, przejdź do Marketplace → Aplikacje → Telegram i wybierz „Dodaj do grupy” lub „Otwórz czat prywatny”.",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Odpowiada w Telegramie i pyta zespół",
   "status.messaging.whatsappNoAgent":

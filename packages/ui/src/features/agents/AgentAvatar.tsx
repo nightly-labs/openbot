@@ -237,7 +237,7 @@ function GeneratedAvatar(props: {
     { equals: sameAppearance },
   );
   const flatBreathe = () => {
-    const amount = flat() && !cyclesFaces() && ambientMotion() ? avatarMoodPresentation(props.mood).breathe : 0;
+    const amount = flat() && ambientMotion() ? avatarMoodPresentation(props.mood).breathe : 0;
     return amount > 0 ? String(amount) : undefined;
   };
   const spanStyle = () => {
@@ -245,7 +245,7 @@ function GeneratedAvatar(props: {
     return amount ? { ...props.style, "--agent-avatar-breathe": amount } : props.style;
   };
   const animated = () =>
-    props.followPointer ||
+    (props.followPointer && documentFocused() && onScreen()) ||
     (plushMood().busy && ambientMotion()) ||
     (!STATIC_MOTIONS.has(props.motion) && documentFocused()) ||
     interacting();

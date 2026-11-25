@@ -4,6 +4,7 @@ import { access, lstat, open, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
 import { promisify, stripVTControlCharacters } from "node:util";
+import { olderVersion } from "@openbot/contracts/cli-version";
 import { type AgentProviderId, agentProviderName } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -11,6 +12,8 @@ import { Deferred, Effect, Result } from "effect";
 import { providerCheckTimeoutMs } from "./disk-restore";
 import type { SignInRegion } from "./kimi-region";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
+
+export { compareReleases, isVersion, olderVersion } from "@openbot/contracts/cli-version";
 
 const execFileAsync = promisify(execFile);
 const MINIMUM_CODEX_VERSION = [0, 156, 0] as const;
@@ -713,6 +716,7 @@ const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
   let found = false;
   let outdated: CodexCliError | undefined;
   for (const candidate of candidates) {
+    if (provider === "muse" && isWindowsLauncherScript(candidate.executable)) continue;
     if (!(yield* isExecutable(candidate.executable))) continue;
     found = true;
     const attempt = yield* Effect.result(
@@ -803,6 +807,13 @@ function parseMistralVersion(output: string): string {
 
 export const COPILOT_ENV: Readonly<Record<string, string>> = { COPILOT_AUTO_UPDATE: "false" };
 
+export const ANTIGRAVITY_UPDATE_ENV: Readonly<Record<string, string>> = { AGY_CLI_DISABLE_AUTO_UPDATE: "true" };
+
+const VERSION_READ_ENV: Partial<Record<AgentProviderId, Readonly<Record<string, string>>>> = {
+  copilot: COPILOT_ENV,
+  antigravity: ANTIGRAVITY_UPDATE_ENV,
+};
+
 type NativeCliProvider = "pi" | "muse" | "devin" | "copilot" | "mistral" | "antigravity";
 
 export const NATIVE_VERSION_PARSERS: Readonly<Record<NativeCliProvider, (output: string) => string>> = {
@@ -813,19 +824,6 @@ export const NATIVE_VERSION_PARSERS: Readonly<Record<NativeCliProvider, (output:
   mistral: parseMistralVersion,
   antigravity: parseAntigravityVersion,
 };
-
-export function isVersion(value: string): boolean {
-  return /^\d+\.\d+\.\d+(?:(?:-\d{2}-\d{2}-\d{2})?-[0-9a-f]{7,40})?$/u.test(value);
-}
-
-export function olderVersion(installed: string, target: string): boolean {
-  return isVersion(installed) && isVersion(target) && compareReleases(installed, target) < 0;
-}
-
-export function compareReleases(a: string, b: string): number {
-  const release = (version: string) => version.replace(/-[0-9a-f]{7,40}$/u, "").replaceAll("-", ".");
-  return release(a).localeCompare(release(b), "en", { numeric: true });
-}
 
 export function resolveInstalledFirst<Cli extends AgentCliInfo, E>(
   resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
@@ -916,8 +914,13 @@ const collectCandidates = Effect.fn("Cli.collectCandidates")(function* (
   if (override) return [override];
   const command = cliCommandName(provider);
   if (process.platform === "win32") {
+    const searchPath = windowsPathWithRegistry(process.env, yield* windowsRegistryPathFolders());
     const output = yield* providerCall(() =>
-      execFileAsync("where.exe", [command], { timeout: 5_000, maxBuffer: 64 * 1024 }),
+      execFileAsync("where.exe", [command], {
+        timeout: 5_000,
+        maxBuffer: 64 * 1024,
+        ...(searchPath ? { env: withWindowsPath(process.env, searchPath) } : {}),
+      }),
     ).pipe(Effect.catch(() => Effect.succeed({ stdout: "" })));
     candidates.push(
       ...output.stdout
@@ -934,6 +937,65 @@ const collectCandidates = Effect.fn("Cli.collectCandidates")(function* (
   }
   return [...new Set(candidates)];
 });
+
+const WINDOWS_PATH_KEYS = [
+  "HKCU\\Environment",
+  "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment",
+];
+
+let pendingRegistryPathRead: Promise<string[]> | null = null;
+
+async function readWindowsRegistryPathFolders(): Promise<string[]> {
+  const reg = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "reg.exe");
+  const values = await Promise.all(
+    WINDOWS_PATH_KEYS.map(
+      (key) =>
+        new Promise<string>((resolve) => {
+          execFile(reg, ["query", key, "/v", "Path"], { timeout: 5_000, windowsHide: true }, (error, stdout) => {
+            resolve(error ? "" : (/^\s*Path\s+REG_(?:EXPAND_)?SZ\s+(.*)$/imu.exec(stdout)?.[1] ?? ""));
+          });
+        }),
+    ),
+  );
+  return values
+    .flatMap((value) => value.split(";"))
+    .map((folder) => folder.trim().replace(/%([^%]+)%/gu, (text, name: string) => process.env[name] ?? text))
+    .filter((folder) => folder.length > 0);
+}
+
+export const windowsRegistryPathFolders = Effect.fn("Cli.windowsRegistryPathFolders")(function* () {
+  if (!pendingRegistryPathRead) {
+    const read = readWindowsRegistryPathFolders().finally(() => {
+      if (pendingRegistryPathRead === read) pendingRegistryPathRead = null;
+    });
+    pendingRegistryPathRead = read;
+  }
+  const read = pendingRegistryPathRead;
+  return yield* Effect.promise(() => read);
+});
+
+function windowsPathKey(folder: string): string {
+  return folder.trim().replace(/\\+$/u, "").toLowerCase();
+}
+
+function windowsPathWithRegistry(environment: NodeJS.ProcessEnv, registryFolders: string[]): string | null {
+  const current = Object.entries(environment).find(([key]) => key.toUpperCase() === "PATH")?.[1] ?? "";
+  const known = new Set(current.split(";").map(windowsPathKey));
+  const added: string[] = [];
+  for (const folder of registryFolders) {
+    const key = windowsPathKey(folder);
+    if (!key || known.has(key)) continue;
+    known.add(key);
+    added.push(folder);
+  }
+  if (added.length === 0) return null;
+  return [current, ...added].filter((part) => part.length > 0).join(";");
+}
+
+function withWindowsPath(environment: NodeJS.ProcessEnv, path: string): NodeJS.ProcessEnv {
+  const rest = Object.fromEntries(Object.entries(environment).filter(([key]) => key.toUpperCase() !== "PATH"));
+  return { ...rest, Path: path };
+}
 
 const DEFAULT_PATHEXT = ".COM;.EXE;.BAT;.CMD";
 
@@ -972,6 +1034,16 @@ function windowsFallbackPaths(
     if (localAppData) paths.push(win32.join(localAppData, "Microsoft", "WinGet", "Links", "opencode.exe"));
   }
   if (command === "kimi") paths.push(win32.join(userHome, ".kimi-code", "bin", "kimi.exe"));
+  if (command === "hermes") {
+    const configuredRoot = environment.HERMES_HOME?.trim();
+    const hermesRoots = [
+      ...(configuredRoot ? [configuredRoot] : []),
+      ...(localAppData ? [win32.join(localAppData, "hermes")] : []),
+    ];
+    for (const hermesRoot of hermesRoots) {
+      paths.push(win32.join(hermesRoot, "bin", "hermes.exe"), win32.join(hermesRoot, "bin", "hermes.cmd"));
+    }
+  }
   if (appData) paths.push(win32.join(appData, "npm", `${command}.cmd`));
   paths.push(
     win32.join(userHome, ".local", "bin", `${command}.exe`),
@@ -1144,12 +1216,16 @@ function batchArgument(argument: string): string {
   return `${quoted}${"\\".repeat(backslashes)}"`;
 }
 
+function isWindowsLauncherScript(executable: string, platform: NodeJS.Platform = process.platform): boolean {
+  return platform === "win32" && [".bat", ".cmd"].includes(extname(executable).toLowerCase());
+}
+
 export function cliSpawnTarget(
   executable: string,
   argv: readonly string[],
   platform: NodeJS.Platform = process.platform,
 ): { command: string; args: string[]; windowsVerbatimArguments: boolean } {
-  if (platform !== "win32" || ![".bat", ".cmd"].includes(extname(executable).toLowerCase())) {
+  if (!isWindowsLauncherScript(executable, platform)) {
     return { command: executable, args: [...argv], windowsVerbatimArguments: false };
   }
 
@@ -1177,11 +1253,11 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
 ) {
   const launchPath = yield* cliLaunchPath(candidate, source);
   const launch = launchPath ? { launchPath } : {};
-  const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
+  const target = isWindowsLauncherScript(candidate);
   const slow = slowVersionReads.has(candidate);
   const firstTimeout = provider === "antigravity" ? ANTIGRAVITY_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS;
   const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : firstTimeout);
-  const providerEnv = provider === "copilot" ? COPILOT_ENV : {};
+  const providerEnv = VERSION_READ_ENV[provider] ?? {};
   const output = yield* Effect.tryPromise({
     try: (signal) =>
       target

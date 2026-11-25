@@ -22,9 +22,12 @@ export const messages = {
   "error.remote.screenRecordingDenied": "主机未允许 OpenBot 录制屏幕。请在主机上授予屏幕录制权限后重试。",
   "error.remote.windowsSessionDisconnected":
     "主机上的 Windows 会话已断开，没有可共享的屏幕。请在主机的屏幕上登录 Windows，然后重试。",
+  "error.remote.windowsCaptureDenied":
+    "主机上的 Windows 不允许 OpenBot 录制屏幕。请在主机的屏幕上解锁 Windows 并关闭所有管理员提示，然后重试。如果问题仍然存在，请重启主机。",
   "error.remote.macScreenLocked": "Mac 已锁定，无法共享屏幕。请在 Mac 的屏幕上解锁，然后重试。",
   "error.remote.streamTooSlowLowerQuality": "与主机的连接太慢，无法显示画面。请重试：下一次连接将使用较低的画质。",
   "error.remote.streamTooSlow": "与主机的连接太慢，无法显示画面。请使用更快的网络，然后重试。",
+  "error.remote.noPictureSwitchEncoder": "主机没有发送画面。请重试：下一次连接会使用适用于更多电脑的视频设置。",
   "error.remote.teamSessionExpired": "团队会话已过期。",
   "error.remote.finishTestBeforeSwitch": "切换显示器前请先结束远程桌面测试。",
   "error.remote.displayNotFound": "未找到远程显示器。",
@@ -80,7 +83,9 @@ export const messages = {
   "error.remote.hostKeyMissing":
     "此服务器的安全密钥缺失或已更改，OpenBot 无法验证此服务器。请让服务器所有者检查服务器。",
   "error.remote.connectionNotStarted": "OpenBot 无法开始连接此服务器。如果问题持续，请退出 OpenBot 并重新打开。",
-  "error.remote.hostDidNotConnect": "WebRTC 主机未连接。",
+  "error.remote.connectionServiceUnreachable":
+    "此电脑无法连接 OpenBot 连接服务。请检查网络连接。OpenBot 会自动重新连接。",
+  "error.remote.serverAnswerTimeout": "服务器未及时响应。OpenBot 会自动重新连接。",
   "error.remote.connectionCancelled": "远程连接已取消。",
   "error.remote.hostDisconnected": "与服务器的连接已断开。请确认该操作是否已完成，然后重试。",
   "error.remote.eventGap": "主机事件序列存在断档。",

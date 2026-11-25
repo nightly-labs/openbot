@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { MANAGED_RUNTIME_PROVIDERS } from "@openbot/contracts/agent-providers";
 import { createOpenBotLogger } from "@openbot/logging";
 import { z } from "zod";
 import {
@@ -40,8 +41,13 @@ const SEEDED_CACHES = [
   ".config/OpenBot/Cache/Cache_Data/e2e",
   ".config/OpenBot/Partitions/openbot-browser/Cache/Cache_Data/e2e",
   ".config/OpenBot/Partitions/openbot-browser/Code Cache/js/e2e",
+  ".config/OpenBot/provider-runtimes/claude/linux-x64/e2e/bin/claude",
+  ".config/OpenBot/provider-runtimes/.downloads/claude-linux-x64-e2e.partial",
 ];
-const SEEDED_SITE_DATA = ".config/OpenBot/Partitions/openbot-browser/Service Worker/CacheStorage/e2e";
+const SEEDED_KEPT = [
+  ".config/OpenBot/Partitions/openbot-browser/Service Worker/CacheStorage/e2e",
+  ".config/OpenBot/provider-runtimes/bun/e2e",
+];
 const CACHE_NAMES = [
   "Cache",
   "Code Cache",
@@ -55,7 +61,7 @@ const CACHE_NAMES = [
   "component_crx_cache",
   "extensions_crx_cache",
 ];
-const NOT_ARCHIVED = ` home/user/(\\.cache|\\.npm/_npx|\\.config/OpenBot/(Partitions/[^/]+/)?(${CACHE_NAMES.join("|")}))(/| |$)`;
+const NOT_ARCHIVED = ` home/user/(\\.cache|\\.npm/_npx|\\.config/OpenBot/(Partitions/[^/]+/)?(${CACHE_NAMES.join("|")})|\\.config/OpenBot/provider-runtimes/(\\.downloads|${MANAGED_RUNTIME_PROVIDERS.join("|")}))(/| |$)`;
 
 const FACTS = `
 set -euo pipefail
@@ -69,13 +75,13 @@ if command -v crontab >/dev/null; then echo "crontab $(crontab -u user -l 2>/dev
 } | grep -v -E '${NOT_ARCHIVED}'
 `;
 
-const SEED_CACHES = [...SEEDED_CACHES, SEEDED_SITE_DATA]
+const SEED_CACHES = [...SEEDED_CACHES, ...SEEDED_KEPT]
   .map((path) => `mkdir -p "$(dirname "${path}")" && head -c 65536 /dev/urandom >"${path}"`)
   .join("\n");
 
 const CACHES_LEFT = `cd /home/user
 for path in ${SEEDED_CACHES.map((path) => `"${path}"`).join(" ")}; do [ ! -e "$path" ] || echo "$path"; done
-[ -s "${SEEDED_SITE_DATA}" ] || echo "missing ${SEEDED_SITE_DATA}"
+for path in ${SEEDED_KEPT.map((path) => `"${path}"`).join(" ")}; do [ -s "$path" ] || echo "missing $path"; done
 `;
 
 const SEED = (hostId: string, extraGb: number) => `
@@ -440,9 +446,9 @@ async function main() {
     });
     const cachesLeft = remote(machine, "bash -s", { input: CACHES_LEFT }).trim();
     checks.push({
-      name: "the import has no browser, npx or home cache, and keeps the site data of the browser",
+      name: "the import has no cache or provider CLI, and keeps the site data of the browser and bun",
       pass: cachesLeft === "",
-      detail: cachesLeft === "" ? `${SEEDED_CACHES.length} caches not restored` : cachesLeft,
+      detail: cachesLeft === "" ? `${SEEDED_CACHES.length} caches and provider CLIs not restored` : cachesLeft,
     });
 
     await step("start", () => remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh start`));

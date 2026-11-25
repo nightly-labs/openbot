@@ -29,6 +29,10 @@ export function imageGenerationFailure(item: ThreadItem): string | null {
   return getString(failure, "message") ?? getString(item, "error") ?? getString(item, "failure");
 }
 
+export function imageGenerationUsageLimited(item: ThreadItem): boolean {
+  return getString(getRecord(item, "failure"), "type") === "usageLimitExceeded";
+}
+
 export function generatedImageName(savedPath: string): string {
   const extension = savedPath.match(/\.(png|jpe?g|webp|gif|avif)$/i)?.[1]?.toLowerCase() ?? "png";
   return `generated-image.${extension}`;

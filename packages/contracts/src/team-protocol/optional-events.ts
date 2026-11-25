@@ -10,8 +10,10 @@ import { type BrowserProfilesEvent, browserProfilesEvent } from "./browser-profi
 import { type BrowserUserControlEvent, browserUserControlEvent } from "./browser-user-control-v1";
 import { type ChannelEvent, channelEvent } from "./channels-v1";
 import { type ChatColorsEvent, chatColorsEvent } from "./chat-colors-v1";
+import { type ClientBrowserCommandEvent, clientBrowserCommandEvent } from "./client-browser-v1";
 import { type CrmEvent, crmEvent } from "./crm-v1";
 import { type HostAppearanceEvent, hostAppearanceEvent } from "./host-appearance-v1";
+import { type HostTurnLimitsEvent, hostTurnLimitsEvent } from "./host-turn-limits-events-v1";
 import { type HostRestartEvent, hostRestartEvent } from "./host-update-v1";
 import { type LibraryFoldersEvent, libraryFoldersEvent } from "./library-folders-events-v1";
 import { type LiveVoiceEvent, liveVoiceEvent } from "./live-voice-v1";
@@ -24,6 +26,7 @@ import { type SidebarPinsEvent, sidebarPinsEvent } from "./sidebar-pins-v1";
 import { type SkillsEvent, skillsEvent } from "./skills-events-v1";
 import { type UsageCreditsEvent, usageCreditsEvent } from "./usage-credits-v1";
 import { type VaultEvent, vaultEvent } from "./vault-v1";
+import { type WorkflowFoldersEvent, workflowFoldersEvent } from "./workflow-folders-v1";
 import { type WorkflowsEvent, workflowsEvent } from "./workflows-v1";
 
 export type OptionalTeamEvent =
@@ -33,6 +36,7 @@ export type OptionalTeamEvent =
   | AgentNotificationLevelsEvent
   | AgentSessionSettingsEvent
   | ChatColorsEvent
+  | ClientBrowserCommandEvent
   | BrowserPageStateEvent
   | BrowserProfilesEvent
   | BrowserUserControlEvent
@@ -40,6 +44,7 @@ export type OptionalTeamEvent =
   | ChannelEvent
   | HostAppearanceEvent
   | HostRestartEvent
+  | HostTurnLimitsEvent
   | LibraryFoldersEvent
   | LiveVoiceEvent
   | MachineAlertEvent
@@ -52,6 +57,7 @@ export type OptionalTeamEvent =
   | UsageCreditsEvent
   | VaultEvent
   | WorkflowsEvent
+  | WorkflowFoldersEvent
   | CrmEvent;
 
 export interface OptionalTeamEventOptions {
@@ -66,6 +72,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     agentNotificationLevelsEvent(value) ??
     agentSessionSettingsEvent(value) ??
     chatColorsEvent(value) ??
+    clientBrowserCommandEvent(value) ??
     browserPageStateEvent(value) ??
     browserProfilesEvent(value) ??
     browserUserControlEvent(value) ??
@@ -73,6 +80,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     channelEvent(value) ??
     hostAppearanceEvent(value) ??
     hostRestartEvent(value) ??
+    hostTurnLimitsEvent(value) ??
     libraryFoldersEvent(value) ??
     liveVoiceEvent(value) ??
     machineAlertEvent(value) ??
@@ -85,6 +93,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     usageCreditsEvent(value) ??
     vaultEvent(value) ??
     workflowsEvent(value) ??
+    workflowFoldersEvent(value) ??
     crmEvent(value);
   return event && options?.agentTaskUiBlocks ? withAgentTaskEventUiBlocks(event, value) : event;
 }

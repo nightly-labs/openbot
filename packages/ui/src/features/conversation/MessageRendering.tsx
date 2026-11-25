@@ -4,6 +4,7 @@ import { removeAttachmentReferences } from "@openbot/contracts/attachment-refere
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import type { AttachmentSummary, InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
 import { canPreviewAttachment, MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS } from "@openbot/contracts/ipc";
+import { markdownImageName } from "@openbot/contracts/markdown-preview-text";
 import { parseSelectionInstruction } from "@openbot/contracts/selection-instruction";
 import {
   AudioLines,
@@ -61,7 +62,6 @@ import {
   MarkdownInlineText,
   MarkdownMessageText,
   type MessageImageFile,
-  markdownImageName,
   messageImageFiles,
 } from "./MarkdownMessageText";
 import { ReplyQuote } from "./ReplyQuote";
@@ -403,19 +403,6 @@ export function MessageBody(props: {
       return shown;
     }),
   );
-  const standaloneAttachments = createMemo(() => {
-    const referencedIds = referencedAttachmentIds();
-    const generatedAttachmentId =
-      generatedImageShown() || generatedVideoShown() ? props.message.attachments?.[0]?.id : undefined;
-    const showsReferencedImages = props.message.author === "you";
-    return shownAttachments().filter(
-      (attachment) =>
-        (!referencedIds.has(attachment.id) ||
-          (showsReferencedImages && attachment.kind === "image") ||
-          playableMediaKind(attachment.mimeType || attachmentMimeTypeForName(attachment.name)) !== null) &&
-        attachment.id !== generatedAttachmentId,
-    );
-  });
   const namedImageFiles = createMemo(
     () => {
       if (props.message.author !== "agent" || props.message.streaming || !props.loadImageFile) return [];
@@ -433,6 +420,7 @@ export function MessageBody(props: {
     { equals: (previous, next) => imageFileKeys(previous) === imageFileKeys(next) },
   );
   const [fileImages, setFileImages] = createSignal<AttachmentSummary[]>([]);
+  const [settledImageFiles, setSettledImageFiles] = createSignal<readonly MessageImageFile[] | null>(null);
   createEffect(
     () => ({ files: namedImageFiles(), load: untrack(() => props.loadImageFile) }),
     ({ files, load }) => {
@@ -449,13 +437,36 @@ export function MessageBody(props: {
           ),
         ),
       ).then((images) => {
-        if (current) setFileImages(images.filter((image) => image !== null));
+        if (!current) return;
+        setFileImages(images.filter((image) => image !== null));
+        setSettledImageFiles(files);
       });
       return () => {
         current = false;
       };
     },
   );
+  const namedImageFilesSettled = () => namedImageFiles().length === 0 || settledImageFiles() === namedImageFiles();
+  const isPlayableMedia = (attachment: AttachmentSummary) =>
+    playableMediaKind(attachment.mimeType || attachmentMimeTypeForName(attachment.name)) !== null;
+  const isRevealedAgentImage = (attachment: AttachmentSummary) =>
+    props.message.author === "agent" && referencedAttachmentIds().has(attachment.id) && !isPlayableMedia(attachment);
+  const showsReferencedImage = (attachment: AttachmentSummary) =>
+    attachment.kind === "image" &&
+    (props.message.author === "you" ||
+      (!props.message.streaming &&
+        namedImageFilesSettled() &&
+        !fileImages().some((image) => image.name === attachment.name)));
+  const standaloneAttachments = createMemo(() => {
+    const referencedIds = referencedAttachmentIds();
+    const generatedAttachmentId =
+      generatedImageShown() || generatedVideoShown() ? props.message.attachments?.[0]?.id : undefined;
+    return shownAttachments().filter(
+      (attachment) =>
+        (!referencedIds.has(attachment.id) || showsReferencedImage(attachment) || isPlayableMedia(attachment)) &&
+        attachment.id !== generatedAttachmentId,
+    );
+  });
   const [unloadedImages, setUnloadedImages] = createSignal<ReadonlySet<string>>(new Set());
   const loadLimit = (attachment: AttachmentSummary) =>
     props.message.imageGeneration && props.message.attachments?.[0]?.id === attachment.id ? "generated" : "thumbnail";
@@ -477,13 +488,19 @@ export function MessageBody(props: {
   });
   const standaloneFileAttachments = createMemo(() => {
     const images = new Set(standaloneImageAttachments());
-    return standaloneAttachments().filter((attachment) => !images.has(attachment));
+    return standaloneAttachments().filter((attachment) => !images.has(attachment) && !isRevealedAgentImage(attachment));
   });
   const loadedImages = new Set<string>();
+  const loadingImages = new Set<string>();
+  let loadingSource = props.mediaSource;
   createEffect(
     () => standaloneImageAttachments().filter((attachment) => !attachment.previewUrl),
     (arriving) => {
       const source = props.mediaSource;
+      if (source !== loadingSource) {
+        loadingImages.clear();
+        loadingSource = source;
+      }
       const unloaded = (attachment: AttachmentSummary) =>
         setUnloadedImages((current) => new Set(current).add(attachment.id));
       for (const attachment of arriving) {
@@ -491,13 +508,21 @@ export function MessageBody(props: {
           unloaded(attachment);
           continue;
         }
-        void source?.load(attachment, loadLimit(attachment)).then(
-          (shown) => {
-            if (shown) loadedImages.add(attachment.id);
-            else unloaded(attachment);
-          },
-          () => unloaded(attachment),
-        );
+        if (!source) continue;
+        const limit = loadLimit(attachment);
+        const loading = `${attachment.id}:${limit}`;
+        if (loadingImages.has(loading)) continue;
+        loadingImages.add(loading);
+        void source
+          .load(attachment, limit)
+          .then(
+            (shown) => {
+              if (shown) loadedImages.add(attachment.id);
+              else unloaded(attachment);
+            },
+            () => unloaded(attachment),
+          )
+          .finally(() => loadingImages.delete(loading));
       }
     },
   );

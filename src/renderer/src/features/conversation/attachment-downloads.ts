@@ -4,7 +4,9 @@ import type {
   FileAction,
   OpenAttachmentInput,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { AttachmentDownloadState, AttachmentDownloads } from "@openbot/ui/features/conversation/AttachmentCards";
+import { normalizeMessage } from "@openbot/user-errors/reference";
 import { createStore, onCleanup } from "solid-js";
 
 export interface AttachmentDownloadCalls {
@@ -19,6 +21,8 @@ interface TrackedDownload {
 }
 
 const LOCAL_SERVER_ID = "local";
+
+const NO_APP_OPENED_FILE = sourceText("error.attachment.noApp");
 
 function downloadKey(serverId: string, attachmentId: string): string {
   return JSON.stringify([serverId, attachmentId]);
@@ -65,6 +69,10 @@ export function createAttachmentDownloads<Target>(options: {
       (error: unknown) => {
         if (shows)
           setTracked((draft) => {
+            if (normalizeMessage(error) === NO_APP_OPENED_FILE) {
+              delete draft[key];
+              return;
+            }
             const entry = draft[key];
             if (entry) entry.state = { phase: "failed" };
             else draft[key] = { action, state: { phase: "failed" } };

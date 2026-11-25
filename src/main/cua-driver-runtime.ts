@@ -43,6 +43,9 @@ const EMBEDDED_ENV = "CUA_DRIVER_EMBEDDED";
 const PARENT_LIVENESS_ENV = "CUA_DRIVER_PARENT_LIVENESS_STDIN";
 const HOST_BUNDLE_ID_ENV = "CUA_DRIVER_HOST_BUNDLE_ID";
 const WAYLAND_ENV = "CUA_DRIVER_RS_ENABLE_WAYLAND";
+const KEEP_DISPLAY_AWAKE_ENV = "CUA_DRIVER_KEEP_DISPLAY_AWAKE";
+const CLICK_HOLD_ENV = "CUA_DRIVER_CLICK_GAP_MS";
+const MAC_CLICK_HOLD_MS = "60";
 
 const REQUIRED_PERMISSIONS: Readonly<Partial<Record<NodeJS.Platform, readonly MacPermissionId[]>>> = {
   darwin: ["screen-recording", "accessibility"],
@@ -201,6 +204,10 @@ export class CuaDriverRuntime {
     return this.#tap.lastPointer(maxAgeMs);
   }
 
+  onToolCall(listener: () => void): void {
+    this.#tap.onToolCall(listener);
+  }
+
   mcpServerConfig(): McpServerConfig | null {
     const command = this.#command ?? this.#executable;
     if (!command || !this.running()) return null;
@@ -304,7 +311,11 @@ export class CuaDriverRuntime {
         ? { status: "permissions-required", permissions, message: null }
         : this.#restartRequired
           ? restartRequiredState(permissions)
-          : { status: "ready", permissions, message: null },
+          : {
+              status: "ready",
+              permissions,
+              message: waylandInputRefused ? sourceText("status.computerUse.inputRefused") : null,
+            },
     );
     if (!granted) yield* this.stop().pipe(Effect.catch(() => Effect.void));
     return state;
@@ -355,6 +366,7 @@ export class CuaDriverRuntime {
     yield* this.#stopOrphanedDaemon(socketPath);
     yield* this.#removeSocket();
     this.#command = yield* this.#linkCommandAlias(executable);
+    const tapListening = yield* this.#startTap(socketPath);
     const child = yield* cuaSync(() =>
       this.#spawn(executable, ["serve", "--socket", socketPath, "--no-overlay"], {
         cwd: dirname(executable),
@@ -366,6 +378,8 @@ export class CuaDriverRuntime {
           ...CUA_DRIVER_VENDOR_CALLS_OFF,
           [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
           ...waylandEnvironment(this.#options.platform),
+          ...clickHoldEnvironment(this.#options.platform),
+          ...(tapListening ? displayAwakeEnvironment(this.#options.platform) : {}),
         },
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
@@ -399,13 +413,12 @@ export class CuaDriverRuntime {
       yield* this.#stop();
       return yield* ready.failure;
     }
-    yield* this.#startTap(socketPath);
   });
 
   #startTap = Effect.fn("CuaDriver.startTap")(function* (
     this: CuaDriverRuntime,
     socketPath: string,
-  ): Effect.fn.Return<void, CuaDriverFailure> {
+  ): Effect.fn.Return<boolean, CuaDriverFailure> {
     const endpoint = this.#options.endpoint;
     const address =
       endpoint.kind === "windows-pipe" ? `${endpoint.name}-tap` : join(endpoint.directory, TAP_SOCKET_FILE);
@@ -416,6 +429,7 @@ export class CuaDriverRuntime {
       this.#options.onDiagnostic?.(
         `OpenBot: the Computer Use tap could not listen. ${describe(listening.failure.cause)}\n`,
       );
+    return Result.isSuccess(listening);
   });
 
   #stopOrphanedDaemon = Effect.fn("CuaDriver.stopOrphanedDaemon")(function* (
@@ -572,6 +586,14 @@ function ungranted(platform: NodeJS.Platform): ComputerUsePermission[] {
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function clickHoldEnvironment(platform: NodeJS.Platform): Record<string, string> {
+  return platform === "darwin" ? { [CLICK_HOLD_ENV]: MAC_CLICK_HOLD_MS } : {};
+}
+
+function displayAwakeEnvironment(platform: NodeJS.Platform): Record<string, string> {
+  return platform === "darwin" ? { [KEEP_DISPLAY_AWAKE_ENV]: "0" } : {};
 }
 
 function waylandEnvironment(platform: NodeJS.Platform): NodeJS.ProcessEnv {

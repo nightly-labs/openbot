@@ -128,27 +128,30 @@ export function MarketplaceAppConnectScreen() {
               label={t("mobile.marketplace.app.stepOpen", { name: listing.name })}
             />
             <ConnectStep index={1} current={step} label={t("mobile.marketplace.app.stepAllow")} />
-            <ConnectStep
-              index={2}
-              current={step}
-              label={t("mobile.marketplace.app.stepReturn", { name: listing.name })}
-            />
+            {signingIn?.paste ? (
+              <>
+                <ConnectStep index={2} current={step} label={t("mobile.marketplace.app.stepBlank")} />
+                <ConnectStep index={3} current={step} label={t("mobile.marketplace.app.stepCopy")} />
+                <ConnectStep index={4} current={step} label={t("mobile.marketplace.app.stepPaste")} />
+              </>
+            ) : (
+              <ConnectStep
+                index={2}
+                current={step}
+                label={t("mobile.marketplace.app.stepReturn", { name: listing.name })}
+              />
+            )}
           </SettingsSection>
           {signingIn?.paste ? (
-            <View className="gap-3">
-              <Typography.Paragraph type="body-sm" className="px-1 text-grouped-secondary">
-                {t("mobile.marketplace.app.pasteHint")}
-              </Typography.Paragraph>
-              <SheetFormField
-                label={t("mobile.marketplace.app.pasteLabel")}
-                placeholder={RELAY_PASTE_PLACEHOLDER}
-                value={address}
-                autoCapitalize="none"
-                autoCorrect={false}
-                inputMode="url"
-                onChangeText={setAddress}
-              />
-            </View>
+            <SheetFormField
+              label={t("mobile.marketplace.app.pasteLabel")}
+              placeholder={RELAY_PASTE_PLACEHOLDER}
+              value={address}
+              autoCapitalize="none"
+              autoCorrect={false}
+              inputMode="url"
+              onChangeText={setAddress}
+            />
           ) : null}
           {signingIn?.paste ? (
             <Button

@@ -16,12 +16,12 @@ of activated accounts that return for another successful turn within one and fou
 
 Every event has these low-cardinality properties:
 
-- `surface`: `desktop`, `desktop_host`, `landing`, `web`, `mobile`, `account_api`, or `signal`;
+- `surface`: `desktop`, `desktop_host`, `landing`, `web`, `mobile`, `extension`, `account_api`, or `signal`;
 - `environment`: currently `production` only;
 - `event_schema_version`: the integer schema generation of that surface: currently `13` on `desktop`,
-  `21` on `desktop_host`, `10` on `landing`, `16` on `account_api`, `5` on `mobile`, `2` on `web`, and `2` on
+  `21` on `desktop_host`, `10` on `landing`, `19` on `account_api`, `5` on `mobile`, `2` on `web`, `1` on `extension`, and `2` on
   `signal`;
-- `app_version` and `platform` on desktop surfaces;
+- `app_version` and `platform` on desktop surfaces, and on `extension` (`platform: chrome`);
 - `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`;
 - `source_platform` on landing surfaces: an allowlisted platform name, or `unknown`.
 
@@ -65,7 +65,9 @@ Account service generation 13 adds the `license` kind of `email_sent`. Account s
 adds `email_fallback_sent`. Account service generation 15 adds the `ready` action of
 `hosted_server_action`, with `duration_ms` and the `create` reason. Account service generation 16 adds
 `hosted_pool_snapshot`. Account service generation 17 adds `machine` to the `provisioned`, `ready` and
-`setup_failed` actions of `hosted_server_action`, and `ready` to `hosted_pool_snapshot`.
+`setup_failed` actions of `hosted_server_action`, and `ready` to `hosted_pool_snapshot`. Account
+service generation 18 adds `credit_action`. Account service generation 19 adds the `redeemed` action of
+`credit_action` and `credit_code_redeem`.
 
 Landing reports must filter to `event_schema_version = 10`. Generation 10 adds
 `billing_return_viewed` and `contact_form_submitted`. In generation 9, an iPhone or Android visitor
@@ -90,10 +92,14 @@ be mixed into current conversion or reliability metrics.
   analytics preference does not apply to these events: the account service records a payment or a
   server change, not a UI action on the computer. `email_sent` has no account, so it has no
   `profileId`, as `billing_snapshot`.
+- `credit_action` uses the account that did the action as `profileId`: the buyer of a purchase, the
+  owner who moved credits, or the member who started a generation. A generation that a server pays
+  with no member (a server workflow) and an expiry of a server's free credits use the account of
+  the server owner. The server ID is never sent, so a report splits by `wallet` and not by server.
 - A paying account is not anonymous. With a `billing_action` of `plan_started`, `plan_changed`,
   `cancel_scheduled` or `cancel_withdrawn`, and with each payment (`payment_succeeded` and `revenue`
-  from the sales ledger, once per account in a drain), for a server plan or a license, the account
-  service sends an OpenPanel `identify` with the account ID and the normalized account email from D1.
+  from the sales ledger, once per account in a drain), for a server plan or a license, and with a
+  `credit_action` of `purchased`, the account service sends an OpenPanel `identify` with the account ID and the normalized account email from D1.
   The app analytics preference does not stop it. The email stays a profile trait and is not in the
   event. An account that paid before this change gets its email at its next payment or plan change;
   the identity backfill below can set it earlier. `bun run test:paid-account-identity` checks this in `check:api`.
@@ -122,6 +128,19 @@ and `platform: web`, through the same allowlists. It sends only from a productio
 `https://openbot.run`. The "Share product analytics" setting of the web app gates these events and
 the failure reports. It is on by default, is stored in the browser, and a storage failure turns it
 off. Turning analytics off on any surface first sends one `analytics_preference_changed` event.
+
+From extension generation 1, the Chrome extension (`apps/browser-extension`) sends its own events
+(below) with `surface: extension` and `platform: chrome`, from its side panel and its background
+service worker. It sends only from a production build that uses `https://api.openbot.run`; a
+development build sends nothing, or sends to the loopback `OPENBOT_ANALYTICS_CAPTURE_URL` given at
+build time. The extension's **Link analytics to my account** switch (server menu > **Settings**) decides the
+`profileId`: on, the account ID (with an `identify` that sets the email); off or signed out, a random
+install ID kept in the extension's storage, rotated after 395 days. An account answer of off always
+wins. Else a choice made in the extension by the same account wins; with none, the extension follows
+the account's answer, and with no answer, the same region default as the web app. The panel reads the
+account's answer again each time it opens. The choice also goes to the account (`PUT /v1/me/analytics`). There is no
+queue: an event that fails to send is dropped. Each extension event and property is allowlisted in
+`apps/browser-extension/src/analytics.ts`.
 
 ## Event catalogue
 
@@ -191,7 +210,7 @@ off. Turning analytics off on any surface first sends one `analytics_preference_
 | `notification_settings_action` | Do mobile users keep notifications on? | Mobile. `action`: `enabled`, `disabled`, `preview_toggled`, `thread_replies_toggled`, `live_activities_toggled` (with `enabled`), or `permission_prompted` with `permission` `granted`, `denied` or `undetermined`, sent only when the system prompt shows |
 | `live_activity_action` | Are iPhone Live Activities used? | Mobile. `action` is `started` or `ended`. A Live Activity left from an earlier launch that the app ends also sends `ended` |
 | `usage_viewed` | Is the Usage view used? | Desktop and mobile. `scope` is `agent` or `server`. Desktop adds `range` (`7d`, `30d`, `90d`, `1y`) and `filtered` (an agent filter that the user selected); each change of these sends again |
-| `analytics_preference_changed` | How many users turn product analytics off? | Desktop, web and mobile. `enabled: false`, sent once before tracking stops. Turning analytics on sends nothing |
+| `analytics_preference_changed` | How many users turn product analytics off? | Desktop, web, mobile and extension. `enabled: false`, sent once before tracking stops. Turning analytics on sends nothing |
 | `screen_view` | Which public website routes and articles are viewed in a session? | One safe view for `/`, `/join`, `/contact`, `/teams`, `/pricing`, `/download`, a `/download/<os>` page, a collection index, or a published article path, with allowlisted campaign tags and no hash |
 | `landing_viewed` | How much qualified landing traffic arrives? | Non-automation production page view |
 | `landing_download_clicked` | Which safe channel/placement drives downloads? | Allowlisted download link clicked |
@@ -207,10 +226,23 @@ off. Turning analytics off on any surface first sends one `analytics_preference_
 | `billing_snapshot` | What is recurring revenue at the sample time? | Daily aggregate without a profile. `snapshot_date`, `as_of`, `reported_at`, `currency`, `mrr`, `arr`, `overdue_mrr`, `paying_accounts`, `paid_servers`, `cancellations_scheduled`, `checkout_mature_accounts`, `checkout_converted_accounts`, `checkout_pending_accounts`, `skipped_subscriptions` (subscriptions left out because Stripe has no valid data for them). From account service generation 11, `mrr`, `arr`, `overdue_mrr` and `paying_accounts` count servers only; `license_mrr`, `license_accounts` and `licensed_users` count licenses; `total_mrr` and `total_arr` count both. `skipped_subscriptions` counts both. Money is USD cents. Never sum snapshots across days. |
 | `hosted_server_action` | Do paid hosted servers start, stay in use and come back, and how long does a start take? | `action`: `provisioned`, `ready`, `setup_failed`, `idle_stopped`, `woken`, `resized`, `plan_stopped`, `renewed`, or `deleted`, when the account service changes the server. Optional `plan`, `size`, `reason` (`create`, `message`, `restart`, `schedule` or `retention`) and `error` (an allowlisted hosted server error code). From account service generation 15, `ready` goes once for each start, when boat first reports the sandbox as usable after the account service asked for a create (`reason` `create`) or a resume (the reason of that wake). `duration_ms` is the time from that request to the report, from 0 to 2 hours; a start that took longer sends no event. The machine is then usable; OpenBot in it starts after that, so the user's whole wait is `hosted_start_wait_ms` on `system_remote_connect`. From account service generation 17, `provisioned`, `ready` and `setup_failed` have `machine`: `pool` for a machine of the Leaseweb pool, `boat` for a boat sandbox. A new server on a pool machine sends `provisioned` when it gets the machine and `ready` when OpenBot on the machine signs in, so that `duration_ms` has the start of OpenBot in it and is not the same measure as on boat: split the report by `machine`. A pool start that did not sign in sends `setup_failed` with `error` `start_failed` and `machine` `pool`, and then `provisioned` with `machine` `boat` |
 | `hosted_pool_snapshot` | How many pool machines are free now, and how many are free in 7 and 30 days, in each location? | From account service generation 16, one snapshot each 5 minutes (until November 2026, each hour at minute 0), with one event for each `location` and `product` of the Leaseweb pool (`docs/hosted-servers.md#reuse-a-pool-machine`), and one with `location` and `product` `all`. `location` is a data center such as `AMS-01`, `all`, or `unknown` (a server names a machine that is not in the pool); `product` is such as `VPS02`, `all`, or `unknown`. Counts: `machines`, and one state for each machine: `free`, `to_reinstall`, `plan_ended`, `cancel_scheduled` and `in_use`; from generation 17, `ready` is the part of `free` that a new customer can get at once (`docs/hosted-servers.md#a-new-server-on-a-pool-machine`); `free_in_7d` and `free_in_30d` are the machines that are free in that time when no owner renews. No profile, server ID, machine ID or address is sent. No event when the pool has no machine |
+| `credit_action` | Who buys, moves and uses OpenBot credits, and on which models? | From account service generation 18, one event for each stored credit change. `action`: `checkout_started`, `purchased`, `checkout_expired`, `reversed` (a refund or a lost dispute took credits back), `moved`, `granted` (the free monthly credits of a license), `grant_expired` (unused free credits ended), `redeemed` (a credit code added free credits; the code and its ID are not sent; adds `code_uses`, `single` or `multi`, and the `campaign` of the code when it has one), `media_started`, `media_charged`, or `media_released`. `wallet` is `personal` or `server`; `credits` is the number of credits of the change, to 0.1. A checkout and a purchase add `currency` and `amount` (minor units of `currency`, from Stripe); `checkout_started` adds `early_start` (the buyer agreed to start before the withdrawal period ends); a reversal adds the refund or dispute `amount`. `moved` adds `direction` (`to_server` or `to_personal`); its `wallet` is the wallet that got the credits. The `media_*` actions add `model_id` and `kind` (`image` or `video`) of the generation. `media_started` comes when the provider accepted the job, with the held `credits` and the requested `resolution`, `duration_seconds`, `count` and `audio` when the request has them. `media_charged` has the charged `credits`; `media_released` (no charge) has the held `credits`; both add `credits_held` and `outcome` (`completed`, `failed`, `canceled`, `refused`, `abandoned` or `expired`). Each event comes once, from the stored change, also when Stripe or the app sends the change again. Credit purchases are not in `revenue` yet. No prompt, job ID, server ID, Stripe ID or file is sent |
+| `credit_code_redeem` | Do credit codes work, and does somebody guess or farm them? | From account service generation 19, one event for each try to redeem a credit code. `outcome`: `redeemed`, `invalid` (no such code), `disabled`, `expired`, `used_up` (no redemptions left), `redeemed_before` (this account used the code), `not_member` (the server wallet of a server where the account is not a member), or `rate_limited`. `wallet` is `personal` or `server`. `rate_limited` adds `limit`: `account_tries`, `network_tries`, `account_wrong`, `network_wrong` or `network_code`. When the code exists, the event adds `code_uses` (`single` or `multi`) and the `campaign` of the code when it has one; `redeemed` adds `credits`. No code, code ID, network address or server ID is sent |
 | `system_remote_connect` | How long does this computer take to connect to a remote server, and which step is slow? | From host generation 15, when a connection attempt to a remote server makes its first request (`outcome` `connected`), and for the first attempt that fails after a connection, a cancel or the start (`outcome` `failed`). Later failed attempts send nothing; the next connection counts them in `failed_attempts`. A cancel sends nothing. `connection`: `first` (no attempt to that server connected earlier in this process) or `reconnect`. `session_kind`: `new`, `stored` or `reused` session. `last_phase`: the last step that finished (`start`, `session`, `ticket`, `bridge`, `signal-socket`, `signal`, `channels`, `auth`, `compatibility`, `first-request`). `first_request`: `ok` or `error`. Milliseconds from the start of the attempt to the end of each step that finished: `session_ms`, `ticket_ms`, `bridge_ms`, `signal_socket_ms`, `signal_ms`, `channels_ms`, `auth_ms`, `compatibility_ms` and `first_request_ms` (the bridge runs beside the session and ticket requests, so the times are not in a fixed order). `total_ms` is the attempt; `wait_ms` is from the first of the counted failed attempts (the same as `total_ms` when none failed). `hosted_start_wait_ms` is from the time this computer asked a hosted server to start until the connection. From host generation 21, `signal_home` is the Signal home that the ticket names, after the ticket step: the home id of `REMOTE_SIGNAL_HOMES` (today `a`, `b`, `us`, `au` or `sg`), `entry` when the ticket names no home (a host without a home uses the entry address, `signal.openbot.run` in production; the entry failover can move that name to another machine, so read `openbot_remote_signal_entry` for the machine at that time) or `other` when the claim is not a short lowercase name. The account service picks the home from the host's location, so a report by `signal_home` and the client `country` shows where a connection from a country goes and which step fails there. Times have two significant digits. No server ID, address, session, ticket or key is sent |
 | `email_sent` | How much of the hourly quota of the SMTP mailbox (500 messages) does the account service use? | One event for each message that the account service tries to send by SMTP through the SMTP mailbox (`no_reply@openbot.run`; `hello@openbot.run` before the change to a no-reply sender), after its retries. The webhook delivery does not use the mailbox and sends none. `kind`: `sign_in_code`, `team_invite`, `contact`, `welcome` (the welcome email of the first server plan of an account), or, from account service generation 13, `license` (a license email, with replies to `licenses@openbot.run`: the first payment, a failed renewal payment, or the end of a license). `result`: `accepted`; `rate_limited` (the mail server refused it for its sender limit); `unknown` (the send stopped after the server may have taken the message); or `failed` (also a message that a check stopped before the connection). Count `accepted` and `unknown` against the quota. No `profileId`, address, name or content |
 | `email_fallback_sent` | How often does Cloudflare Email Service send because the SMTP mailbox could not? | From account service generation 14. One event for each message that the account service sends through Cloudflare after its `email_sent` ended `rate_limited` or `failed` for a reason that any sender would not also refuse. It does not send after an `unknown` SMTP result, because the recipient can already have the message. `kind` as on `email_sent`. `result`: `accepted`; `unknown` (no answer before the deadline); or `failed`. These messages do not count against the mailbox quota. No `profileId`, address, name or content |
 | `signal_capacity` | How near is the TURN relay to its allocation quota (`total-quota` in `remote/coturn/turnserver.conf`)? | One event every 5 minutes from each Signal host. `turn_host` (`turn.openbot.run`, `turn2.openbot.run` on the second Signal machine, `turn-us.openbot.run` in San Jose or `turn-au.openbot.run` in Sydney); `turn_allocations`, and `turn_allocations_udp`, `_tcp` and `_tls` for the client transports (0 when a transport has none); `signal_sockets` and `signal_peer_connections`. From generation 2, the generic webhook answers of the 5 minutes before: `webhook_answers_<status>` for `200`, `202`, `400`, `401`, `404`, `413`, `415`, `429` and `503`, `webhook_waits` (requests that Signal sent to a host and waited for), `webhook_slow_waits` (waits of 5 s or more) and `webhook_wait_ms_avg` (only when there was a wait). The first sample after the reporter starts sends no webhook values; a Signal restart starts the counts again. From generation 3, `network_in_bytes` and `network_out_bytes`: the public traffic of the machine since the last sent event, from the kernel counters of the interface of the default route. They are not in the first event after the reporter starts, and a sample that is not sent adds its traffic to the next one. Add them up for the traffic of a day or a month |
+| `extension_installed` | How many browsers install or update the extension? | Extension. `reason`: `install` or `update`; an update adds `from_version` |
+| `extension_opened` | How often is the side panel opened, and by signed-in users? | Extension. Once each time the side panel opens and has read its session. `signed_in` |
+| `account_sign_in_completed` (extension) | Does extension sign-in work? | Extension. `method`: `web` (through openbot.run) or `email`; `result`: `succeeded`, `failed` or `cancelled`; `failure_code`: `invalid_sign_in_code`, `invalid_company_sign_in_code`, `company_sign_in_required`, `auth_api_unavailable` or `unknown` |
+| `account_sign_out` (extension) | Why do extension sessions end? | Extension. `reason`: `user` or `session_ended` (the account service ended the session) |
+| `message_send` (extension) | Do users send messages from the side panel? | Extension. `target`: `chat`, `thread`, `new_thread` or `channel`; `result`: `succeeded` or `failed`. No text, agent or channel |
+| `voice_transcription` (extension) | Does dictation in the side panel work? | Extension. `result`, `audio_duration_seconds`, and `empty: true` when the server found no words |
+| `agent_action`, `channel_action`, `folder_action` (extension) | Do users make agents, channels and folders in the side panel? | Extension. `action`: `create` (agent) or `created` (channel, folder); `result`. No names |
+| `agent_input_action` (extension) | Do users answer agent questions in the side panel? | Extension. `kind: prompt`, `decision: answered`, `result` |
+| `x_reply_action` | Do X replies reach the X agent? | Extension. `action`: `queued` (the reply is in the outbox), `sent` (the server has it), `retry` (an attempt failed; `reached` says if it may have reached the server), `dropped` (too old to send) or `notification_opened`. `attempts` is the count of failed attempts before. No post, handle or address |
+| `browser_sharing_action` | Do users remove the sites that they allowed? | Extension. `action`: `site_removed` (an "Always" site removed in the panel). No site |
+| `browser_sharing_ask` | How do users answer the shared-tab questions? | Extension. `kind`: `site`, `password`, `payment`, `download` or `sign-in`; `choice`: `once`, `always`, `deny` or `timeout`. No site, agent or action detail |
 
 ## Privacy and runtime validation
 
@@ -297,6 +329,14 @@ and only a loopback `http:` origin is accepted.
     `product`. `ready` (generation 17 and later) is not on the dashboard yet. The Worker sends one snapshot each 5 minutes. Each report is a bar with the `max`
     metric, the minute interval and a 30-minute range: a longer interval adds up more than one
     snapshot (`docs/hosted-servers.md#reuse-a-pool-machine`).
+14. Ops, "Credits": `credit_action` (`account_api` generation 18 and later). Sum of `credits` with
+    `action` `media_charged` by profile, by `model_id` and by `kind` answers who uses the most
+    credits and on what; `media_released` by `outcome` shows failed and refused generations. Sum of
+    `credits` with `action` `purchased` by profile and by `currency` shows the buyers; `granted`
+    against `grant_expired` shows how much of the free monthly credits is used. From generation 19,
+    sum of `credits` with `action` `redeemed` by `campaign` and `wallet` shows what credit codes
+    give; `credit_code_redeem` by `outcome`, by `limit` (`rate_limited` only) and refused tries by
+    profile show guessing and abuse.
 
 Every dashboard must filter by the intended `surface` and that surface's current
 `event_schema_version`. Website bounce

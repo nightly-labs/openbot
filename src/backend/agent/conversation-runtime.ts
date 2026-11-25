@@ -16,6 +16,7 @@ import { isTurnEndEvent, withoutQueuePositions } from "../database/conversation-
 import { withTransaction } from "../database/sqlite-transaction";
 import { MAILBOX_CONVERSATION_MESSAGE_LIMIT } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
+import { perfCount, perfTimed } from "../perf-probe-hooks";
 import { conversationContentSignature } from "./delivery-content";
 
 interface TransactionScope {
@@ -284,8 +285,7 @@ export class ConversationRuntime {
         if (current !== cached || untrimmable.has(cached)) return false;
         if (cached.snapshot.messages.every((message) => isActiveMessage(message, cached.snapshot.activeTurnId)))
           return false;
-        if (kind === "agent" && !cached.snapshot.activeTurnId && cached.snapshot.messages.some(hasActiveDelivery))
-          return false;
+        if (!cached.snapshot.activeTurnId && cached.snapshot.messages.some(hasActiveDelivery)) return false;
         return isCommitted(cached);
       });
       if (!oldest) return;
@@ -309,7 +309,7 @@ export class ConversationRuntime {
         if (cached?.snapshot.activeTurnId) trim(cached);
         else {
           const snapshot = this.#executionSnapshots.get(oldest.id);
-          if (snapshot) snapshot.messages = [];
+          if (snapshot) this.#executionSnapshots.set(oldest.id, { ...snapshot, messages: [] });
           this.#dropCachedExecutionSnapshot(oldest.id);
         }
       }
@@ -468,7 +468,22 @@ export class ConversationRuntime {
   }
 
   loadedExecutionSnapshot(threadId: string): ConversationSnapshot | undefined {
-    return this.#executionSnapshots.get(threadId);
+    return this.#cachedExecutionSnapshots.has(threadId) ? this.#executionSnapshots.get(threadId) : undefined;
+  }
+
+  executionSnapshot(threadId: string): ConversationSnapshot | undefined {
+    const execution = this.#executionSnapshots.get(threadId);
+    if (!execution || this.#cachedExecutionSnapshots.has(threadId)) return execution;
+    const page = this.#store.database.readConversationPage(execution.agentId, threadId, { type: "latest" }, 100);
+    const reloaded: ConversationSnapshot = {
+      agentId: execution.agentId,
+      threadId: page.threadId,
+      activeTurnId: page.activeTurnId,
+      revision: page.revision,
+      messages: page.messages,
+    };
+    this.#setExecutionSnapshot(threadId, reloaded);
+    return this.loadedExecutionSnapshot(threadId) ?? reloaded;
   }
 
   isExecutionThread(threadId: string | null): boolean {
@@ -480,18 +495,7 @@ export class ConversationRuntime {
     const execution = publicId ? this.#executionSnapshots.get(publicId) : undefined;
     if (execution && publicId) {
       if (execution.agentId !== agentId) throw new Error("Execution thread belongs to another agent.");
-      if (!this.#cachedExecutionSnapshots.has(publicId) && execution.messages.length === 0) {
-        const page = this.#store.database.readConversationPage(agentId, publicId, { type: "latest" }, 100);
-        this.#setExecutionSnapshot(publicId, {
-          agentId,
-          threadId: page.threadId,
-          activeTurnId: page.activeTurnId,
-          revision: page.revision,
-          messages: page.messages,
-        });
-        return this.#executionSnapshots.get(publicId) ?? execution;
-      }
-      return execution;
+      return this.executionSnapshot(publicId) ?? execution;
     }
     const cached = this.#snapshots.get(agentId);
     if (cached && (!threadId || cached.threadId === threadId)) return cached;
@@ -549,7 +553,8 @@ export class ConversationRuntime {
     this.#dropDeletedMessages(snapshot);
     sortConversationMessages(snapshot.messages);
     const digests = messageDigests();
-    const signature = conversationContentSignature(snapshot, digests.json);
+    perfCount("conversation.emit");
+    const signature = perfTimed("conversation.signature", () => conversationContentSignature(snapshot, digests.json));
     const unchanged = this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature;
     const turnEnd = isTurnEndEvent(eventType);
     if (unchanged && !turnEnd) {
@@ -810,11 +815,11 @@ export class ConversationRuntime {
     const deleted = this.#deletedMessageIds.get(threadId);
     if (deleted) deleted.add(messageId);
     else this.#deletedMessageIds.set(threadId, this.#store.database.deletedConversationMessageIds(threadId));
-    const execution = this.#executionSnapshots.get(threadId);
+    const execution = this.executionSnapshot(threadId);
     if (execution) {
       remove(execution);
       this.#setExecutionSnapshot(threadId, execution);
-      return this.#executionSnapshots.get(threadId);
+      return this.loadedExecutionSnapshot(threadId) ?? execution;
     }
     const evicted = this.#evictedSnapshots.get(agentId);
     const retained = evicted?.threadId === threadId ? evicted.snapshot.deref() : undefined;

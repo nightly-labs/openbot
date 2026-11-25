@@ -117,8 +117,6 @@ export const messages = {
     "Memorie: {saved} salvate, {updated} aggiornate, {forgotten} dimenticate, {notChanged} non modificate perché un altro thread le ha modificate prima.",
   "status.agent.mcpToolCall": "Eseguire lo strumento {tool} del server MCP {name}.",
   "status.agent.uiBlockClosedByMessage": "Chiuso da un nuovo messaggio",
-  "status.agent.finishCheckContinues":
-    "La richiesta non è ancora completata. L’agente continua ({current} di {limit}).",
   "status.agent.nextStepContinues":
     "L'agente si è fermato prima del passaggio successivo. Continua ({current} di {limit}).",
   "status.agent.planContinues": "Il piano ha passaggi aperti. L'agente continua ({current} di {limit}).",
@@ -127,4 +125,8 @@ export const messages = {
     "La connessione si è interrotta mentre l'agente compattava il contesto. L'agente continua.",
   "status.agent.providerExitContinues": "L'agente si è fermato prima di finire la risposta. L'agente continua.",
   "status.agent.branchTitle": "Chat ramificata",
+  "status.agent.location.field": "La tua posizione",
+  "status.agent.location.placeholder": "Città, indirizzo o luogo",
+  "status.agent.location.submit": "Condividi",
+  "status.agent.location.shared": "Posizione condivisa",
 } as const satisfies PartialTranslation<typeof source>;

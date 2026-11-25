@@ -113,7 +113,6 @@ export const messages = {
     "Recuerdos: {saved} guardados, {updated} actualizados, {forgotten} olvidados, {notChanged} sin cambios porque otro hilo los cambió antes.",
   "status.agent.mcpToolCall": "Ejecutar la herramienta {tool} del servidor MCP {name}.",
   "status.agent.uiBlockClosedByMessage": "Cerrado por un mensaje nuevo",
-  "status.agent.finishCheckContinues": "La solicitud aún no está terminada. El agente continúa ({current} de {limit}).",
   "status.agent.nextStepContinues": "El agente se detuvo antes del siguiente paso. Continúa ({current} de {limit}).",
   "status.agent.planContinues": "El plan tiene pasos pendientes. El agente continúa ({current} de {limit}).",
   "status.agent.planStopped": "El agente se detuvo con pasos pendientes en su plan. Envía un mensaje para continuar.",
@@ -121,4 +120,8 @@ export const messages = {
     "La conexión se detuvo mientras el agente compactaba su contexto. El agente continúa.",
   "status.agent.providerExitContinues": "El agente se detuvo antes de terminar su respuesta. El agente continúa.",
   "status.agent.branchTitle": "Chat ramificado",
+  "status.agent.location.field": "Tu ubicación",
+  "status.agent.location.placeholder": "Ciudad, dirección o lugar",
+  "status.agent.location.submit": "Compartir",
+  "status.agent.location.shared": "Ubicación compartida",
 } as const satisfies PartialTranslation<typeof source>;

@@ -141,8 +141,13 @@ try {
     (await runCauseEffect(workflows.get(workflowId))).triggers.find((entry) => entry.nodeId === "trigger")
       ?.webhookUrl ?? null;
   const routeIdOf = (url: string | null) => new URL(url ?? "").pathname.split("/").at(-1) ?? "";
-  const deliver = (routeId: string, secret: string, deliveryId: string) => {
-    const body = new TextEncoder().encode(JSON.stringify({ type: "order.paid", data: { order: DATA_MARKER } }));
+  const deliver = (
+    routeId: string,
+    secret: string,
+    deliveryId: string,
+    data: Readonly<Record<string, string>> = { order: DATA_MARKER },
+  ) => {
+    const body = new TextEncoder().encode(JSON.stringify({ type: "order.paid", data }));
     const timestamp = String(Math.floor(Date.now() / 1000));
     const signature = signWebhookBody(secret, timestamp, deliveryId, body);
     return Effect.runPromise(events.receive({ routeId, deliveryId, timestamp, signature, body }));
@@ -204,6 +209,33 @@ try {
   statuses.newSecret = (await deliver(routeId, second.secret, "delivery-4")).status;
   check("the old secret is refused", statuses.oldSecret === 401);
   check("the new secret starts a run", statuses.newSecret === 202 && (await runsOf(ordersId)).length === 2, statuses);
+
+  await runCauseEffect(workflows.setPaused({ workflowId: ordersId, paused: true }));
+  await Effect.runPromise(events.syncRoutes({ all: false }));
+  check("a paused workflow keeps its route", !revoked.includes(routeId), revoked);
+  statuses.paused = (await deliver(routeId, second.secret, "paused-1")).status;
+  check(
+    "a paused workflow accepts the request and starts no run",
+    statuses.paused === 202 && (await runsOf(ordersId)).length === 2,
+    statuses,
+  );
+  const pausedReceipt = database.connection
+    .prepare("SELECT status, reason FROM workflow_webhook_receipts WHERE delivery_id = 'paused-1'")
+    .get();
+  check(
+    "the paused request has a refused receipt",
+    pausedReceipt?.status === "ignored" && pausedReceipt.reason === "refused",
+    pausedReceipt,
+  );
+  statuses.pausedRepeat = (await deliver(routeId, second.secret, "paused-1")).status;
+  check("a paused delivery again is a no-op", statuses.pausedRepeat === 200);
+  await runCauseEffect(workflows.setPaused({ workflowId: ordersId, paused: false }));
+  statuses.resumed = (await deliver(routeId, second.secret, "resumed-1")).status;
+  check(
+    "a resumed workflow starts a run again",
+    statuses.resumed === 202 && (await runsOf(ordersId)).length === 3,
+    statuses,
+  );
 
   const gated = await runCauseEffect(workflows.create({ title: "Approve refunds" }));
   const gatedSaved = await runCauseEffect(
@@ -270,6 +302,45 @@ try {
   statuses.refusedRepeat = (await deliver(filedRoute, filedSecret.secret, "file-1")).status;
   check("a refused delivery again is a no-op", statuses.refusedRepeat === 200);
 
+  const typed = await runCauseEffect(workflows.create({ title: "Typed orders" }));
+  const typedGraph = graphOf("webhook", "notify");
+  const typedSaved = await runCauseEffect(
+    workflows.saveGraph({
+      workflowId: typed.summary.id,
+      baseRevision: typed.revision,
+      graph: {
+        ...typedGraph,
+        nodes: typedGraph.nodes.map((node) =>
+          node.id === "trigger" ? { ...node, fields: { ...node.fields, answer: "order: text\ntotal: number" } } : node,
+        ),
+      },
+    }),
+  );
+  assert.ok(typedSaved.ok);
+  const typedSecret = await runCauseEffect(
+    events.rotateWorkflowSecret({ workflowId: typed.summary.id, nodeId: "trigger" }),
+  );
+  const typedRoute = routeIdOf(await webhookUrl(typed.summary.id));
+  statuses.typedBad = (await deliver(typedRoute, typedSecret.secret, "typed-1", { order: DATA_MARKER })).status;
+  check(
+    "a body that does not fit the trigger's answer fields is refused with 400 and starts no run",
+    statuses.typedBad === 400 && (await runsOf(typed.summary.id)).length === 0,
+    statuses,
+  );
+  statuses.typedGood = (
+    await deliver(typedRoute, typedSecret.secret, "typed-1", { order: DATA_MARKER, total: "12.5", extra: "dropped" })
+  ).status;
+  const typedRuns = await runsOf(typed.summary.id);
+  const typedTrigger = typedRuns[0]?.steps.find((step) => step.nodeId === "trigger");
+  check(
+    "the same delivery with a fitting body starts a run with only the checked fields",
+    statuses.typedGood === 202 &&
+      typedRuns.length === 1 &&
+      typedTrigger?.output?.includes('"total":12.5') === true &&
+      !typedTrigger.output.includes("dropped"),
+    { statuses, output: typedTrigger?.output },
+  );
+
   const current = await runCauseEffect(workflows.get(ordersId));
   const manual = await runCauseEffect(
     workflows.saveGraph({ workflowId: ordersId, baseRevision: current.revision, graph: graphOf("manual", "notify") }),
@@ -278,7 +349,7 @@ try {
   await Effect.runPromise(events.syncRoutes({ all: false }));
   check("a removed webhook trigger revokes its route", revoked.includes(routeId), revoked);
   statuses.removed = (await deliver(routeId, second.secret, "delivery-5")).status;
-  check("its address no longer starts a run", statuses.removed === 404 && (await runsOf(ordersId)).length === 2);
+  check("its address no longer starts a run", statuses.removed === 404 && (await runsOf(ordersId)).length === 3);
   await runCauseEffect(workflows.remove(gated.summary.id));
   await Effect.runPromise(events.syncRoutes({ all: false }));
   check("a deleted workflow revokes its route", revoked.includes(gatedRoute), revoked);

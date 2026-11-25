@@ -306,6 +306,45 @@
   grid-area: 1 / 1;
 }
 
+.voice-pill-talk-slot[data-downloading] > :not(.voice-pill-download) {
+  visibility: hidden;
+}
+
+.voice-pill-download {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  align-self: stretch;
+  justify-self: stretch;
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--openbot-text-primary) 6%, transparent);
+}
+
+.voice-pill-download-fill {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--openbot-accent) 28%, transparent);
+  transform: scaleX(var(--voice-pill-download, 0));
+  transform-origin: left center;
+  transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.voice-pill-download-fill:dir(rtl) {
+  transform-origin: right center;
+}
+
+.voice-pill-download-label {
+  position: relative;
+  overflow: hidden;
+  padding-inline: var(--openbot-space-3);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .voice-pill-wave {
   display: flex;
   opacity: clamp(0, 1 - var(--voice-pill-push, 0) * 2.5, 1);
@@ -460,6 +499,10 @@
 
   .voice-pill .voice-pill-button:active:not(:disabled) {
     scale: none;
+  }
+
+  .voice-pill-download-fill {
+    transition: none;
   }
 }
 

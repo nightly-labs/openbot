@@ -2,6 +2,7 @@ import type {
   AgentAdminSettings,
   AgentBackupModelSettings,
   AgentBackupModels,
+  AgentBuiltinMemorySettings,
   AgentFastModeSettings,
   AgentHostSettings,
   AgentNewChatSettings,
@@ -15,6 +16,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { AGENT_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_BUILTIN_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
 import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_HOST_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import { AGENT_NEW_CHAT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
@@ -37,6 +39,8 @@ export type RemoteAgentAdminCalls = Pick<
   | "updateAgentNewChat"
   | "getAgentPlanCard"
   | "updateAgentPlanCard"
+  | "getAgentBuiltinMemory"
+  | "updateAgentBuiltinMemory"
   | "getAgentFastMode"
   | "updateAgentFastMode"
 >;
@@ -56,6 +60,8 @@ interface RemoteAgentAdminState {
   newChat: AgentNewChatSettings | null;
   planCardKey: string | null;
   planCard: AgentPlanCardSettings | null;
+  builtinMemoryKey: string | null;
+  builtinMemory: AgentBuiltinMemorySettings | null;
   fastModeKey: string | null;
   fastMode: AgentFastModeSettings | null;
 }
@@ -75,6 +81,8 @@ export function createRemoteAgentAdmin(
     newChat: null,
     planCardKey: null,
     planCard: null,
+    builtinMemoryKey: null,
+    builtinMemory: null,
     fastModeKey: null,
     fastMode: null,
   });
@@ -215,6 +223,40 @@ export function createRemoteAgentAdmin(
         .catch(() => undefined);
     },
   );
+  const builtinMemoryKey = createMemo(() => {
+    const current = target();
+    if (current?.server.kind !== "remote" || !serverCanAdminister(current.server, AGENT_BUILTIN_MEMORY_CAPABILITY))
+      return null;
+    return JSON.stringify([current.server.id, current.agentId]);
+  });
+  function acceptBuiltinMemory(requestKey: string, settings: AgentBuiltinMemorySettings): void {
+    if (builtinMemoryKey() !== requestKey) return;
+    setState((draft) => {
+      draft.builtinMemoryKey = requestKey;
+      draft.builtinMemory = settings;
+    });
+  }
+  let builtinMemoryReadGeneration = 0;
+  createEffect(
+    createMemo(() => JSON.stringify([builtinMemoryKey(), target()?.updatedAt])),
+    () => {
+      const requestKey = untrack(builtinMemoryKey);
+      const generation = ++builtinMemoryReadGeneration;
+      if (untrack(() => state.builtinMemoryKey) !== requestKey)
+        setState((draft) => {
+          draft.builtinMemoryKey = null;
+          draft.builtinMemory = null;
+        });
+      const current = untrack(target);
+      if (!requestKey || !current) return;
+      calls()
+        .getAgentBuiltinMemory(current.agentId, current.server.id)
+        .then((settings) => {
+          if (generation === builtinMemoryReadGeneration) acceptBuiltinMemory(requestKey, settings);
+        })
+        .catch(() => undefined);
+    },
+  );
   const fastModeKey = createMemo(() => {
     const current = target();
     if (current?.server.kind !== "remote" || !serverHasFastMode(current.server)) return null;
@@ -322,6 +364,18 @@ export function createRemoteAgentAdmin(
       if (planCardKey() === JSON.stringify([server.id, agentId])) planCardReadGeneration += 1;
       acceptPlanCard(JSON.stringify([server.id, agentId]), settings);
     },
+    memory: (): boolean | undefined =>
+      state.builtinMemoryKey !== null && state.builtinMemoryKey === builtinMemoryKey()
+        ? state.builtinMemory?.memory
+        : undefined,
+    async updateBuiltinMemory(agentId: string, memory: boolean): Promise<void> {
+      const server = target()?.server;
+      if (server?.kind !== "remote" || !serverCanAdminister(server, AGENT_BUILTIN_MEMORY_CAPABILITY))
+        throw new Error(currentText().t("agent.error.adminOnly"));
+      const settings = await calls().updateAgentBuiltinMemory({ agentId, memory }, server.id);
+      if (builtinMemoryKey() === JSON.stringify([server.id, agentId])) builtinMemoryReadGeneration += 1;
+      acceptBuiltinMemory(JSON.stringify([server.id, agentId]), settings);
+    },
     fastMode: (): boolean | null | undefined =>
       state.fastModeKey !== null && state.fastModeKey === fastModeKey() ? state.fastMode?.fastMode : undefined,
     ultrafast: (): boolean =>
@@ -355,7 +409,13 @@ export function createRemoteAgentAdmin(
 export async function updateRemoteAgent(
   admin: Pick<
     RemoteAgentAdmin,
-    "update" | "updateHostSettings" | "updateBackupModels" | "updateNewChat" | "updatePlanCard" | "updateFastMode"
+    | "update"
+    | "updateHostSettings"
+    | "updateBackupModels"
+    | "updateNewChat"
+    | "updatePlanCard"
+    | "updateBuiltinMemory"
+    | "updateFastMode"
   >,
   input: UpdateAgentInput,
   updateProfile: (input: UpdateAgentInput) => Promise<void>,
@@ -368,6 +428,7 @@ export async function updateRemoteAgent(
     backupModels,
     allowNewChat,
     quickAcknowledgement,
+    memory,
     fastMode,
     ultrafast,
     agentId,
@@ -387,6 +448,7 @@ export async function updateRemoteAgent(
   if (backupModels !== undefined) await admin.updateBackupModels(agentId, backupModels);
   if (allowNewChat !== undefined) await admin.updateNewChat(agentId, allowNewChat);
   if (quickAcknowledgement !== undefined) await admin.updatePlanCard(agentId, quickAcknowledgement);
+  if (memory !== undefined) await admin.updateBuiltinMemory(agentId, memory);
   if (fastMode !== undefined) await admin.updateFastMode(agentId, fastMode, ultrafast === true);
   if (Object.keys(fields).length) await updateProfile({ agentId, ...fields });
 }

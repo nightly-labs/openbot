@@ -8,8 +8,6 @@ import {
   type BillingCurrency,
   type BillingInterval,
   type BillingPlanId,
-  type BillingStorageTier,
-  hostedPlanStorageGb,
   isBillingAmount,
   isStorageGb,
   isStripeCheckoutUrl,
@@ -42,17 +40,6 @@ export const HOSTED_BOAT_PLAN_SIZE: Readonly<Record<BillingPlanId, HostedServerS
   ...HOSTED_PLAN_SIZE,
   starter: "default",
 };
-
-export function hostedServerStorageGb(
-  plan: BillingPlanId,
-  onOperatorHost: boolean,
-  size: HostedServerSize | null,
-  storageTier: BillingStorageTier,
-): number {
-  const storageGb = hostedPlanStorageGb(plan, onOperatorHost, storageTier);
-  if (onOperatorHost || size === null) return storageGb;
-  return Math.min(storageGb, HOSTED_SERVER_SIZES[size].diskGb);
-}
 
 export const HOSTED_SERVER_BASE_IMAGE_GB = 22;
 

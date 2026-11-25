@@ -447,6 +447,7 @@ export class BootRecovery {
             agentId: agent.id,
             publicThreadId,
             cwd: typeof params.cwd === "string" ? params.cwd : agent.workspacePath,
+            retired: session.state === "inactive",
             findDelivery: (deliveryId) => this.#mailbox.deliveryForProviderMessage(agent.id, deliveryId),
             findMessageDelivery: (messageId) => this.#mailbox.deliveryForMessage(messageId, agent.id),
             quietRoutineDelivery: (deliveryId) => this.#hooks.quietRoutineDelivery(deliveryId),
@@ -459,12 +460,13 @@ export class BootRecovery {
             },
             requestAnswered: (deliveryId) =>
               this.#mailbox.hasOwnReplyFrom(deliveryId) || this.#mailbox.hasSentResultFor(deliveryId),
+            followsUpOwnAnswer: (delivery) => this.#mailbox.followsUpOwnAnswer(delivery),
           }).pipe(toBootRecoveryFailed);
           yield* recoveryStep(() => this.#refreshBackfilledConversation(agent.id, publicThreadId));
         }).pipe(
           Effect.catch((failure) =>
             Effect.sync(() => {
-              if (unreadableHistory(failure)) this.#unreadableHistory.add(historyKey);
+              if (session.state === "inactive" || unreadableHistory(failure)) this.#unreadableHistory.add(historyKey);
               try {
                 this.#refreshBackfilledConversation(agent.id, publicThreadId);
               } catch (refreshFailure) {

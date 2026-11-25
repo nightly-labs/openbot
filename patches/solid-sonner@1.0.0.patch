@@ -1,0 +1,82 @@
+diff --git a/dist/index.js b/dist/index.js
+index 12d3a6b5595b5fffa44b07b93af35b184a525fb6..a358ef7ab9c820ca88bd0b44b7ffc6727fca90df 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -527,12 +527,13 @@ function Toast(props) {
+ 	const swipeDirections = () => props.swipeDirections ?? getDefaultSwipeDirections(props.position);
+ 	const y = createMemo(() => props.position.split("-")[0]);
+ 	const x = createMemo(() => props.position.split("-")[1]);
+-	const heightIndex = createMemo(() => Math.max(0, props.heights.findIndex((height) => height.toastId === props.toast.id)));
++	// OpenBot patch: stack in list order, not mount order. Toasts raised in one tick mount together and
++	// each prepends its height, so `heights` came out reversed and a toast past `visibleToasts` held an
++	// empty slot between the visible ones. A toast being removed has no height and takes no slot.
++	const measuredToasts = createMemo(() => props.toasts.filter((toast) => props.heights.some((height) => height.toastId === toast.id)));
++	const heightIndex = createMemo(() => Math.max(0, measuredToasts().findIndex((toast) => toast.id === props.toast.id)));
+ 	const toastsHeightBefore = createMemo(() => {
+-		return props.heights.reduce((prev, curr, reducerIndex) => {
+-			if (reducerIndex >= heightIndex()) return prev;
+-			return prev + curr.height;
+-		}, 0);
++		return measuredToasts().slice(0, heightIndex()).reduce((prev, toast) => prev + (props.heights.find((height) => height.toastId === toast.id)?.height ?? 0), 0);
+ 	});
+ 	const offset = createMemo(() => heightIndex() * (props.gap ?? GAP) + toastsHeightBefore());
+ 	const isDocumentHidden = useIsDocumentHidden();
+@@ -589,7 +590,7 @@ function Toast(props) {
+ 		props.setHeights((h) => [{
+ 			...entry,
+ 			height
+-		}, ...h]);
++		}, ...h.filter((height) => height.toastId !== entry.toastId)]);
+ 		return () => {
+ 			props.setHeights((h) => h.filter((height) => height.toastId !== entry.toastId));
+ 		};
+@@ -1172,7 +1173,7 @@ function Toaster(props) {
+ 							t: readShallow(className$2()),
+ 							a: actualTheme(),
+ 							o: {
+-								"--front-toast-height": `${heightsByPosition()[0]?.height ?? 0}px`,
++								"--front-toast-height": `${toastsByPosition().map((toast) => heightsByPosition().find((height) => height.toastId === toast.id)).find(Boolean)?.height ?? 0}px`,
+ 								"--gap": `${gap()}px`,
+ 								...props.style,
+ 								...assignOffset(props.offset, props.mobileOffset)
+diff --git a/dist/index.jsx b/dist/index.jsx
+index bcfb2471e96a1671f54da966e0e3bb9a63e4de89..b3a1f2ed66702515df759a6d1522a4cb71c09a38 100644
+--- a/dist/index.jsx
++++ b/dist/index.jsx
+@@ -507,12 +507,13 @@ function Toast(props) {
+ 	const swipeDirections = () => props.swipeDirections ?? getDefaultSwipeDirections(props.position);
+ 	const y = createMemo(() => props.position.split("-")[0]);
+ 	const x = createMemo(() => props.position.split("-")[1]);
+-	const heightIndex = createMemo(() => Math.max(0, props.heights.findIndex((height) => height.toastId === props.toast.id)));
++	// OpenBot patch: stack in list order, not mount order. Toasts raised in one tick mount together and
++	// each prepends its height, so `heights` came out reversed and a toast past `visibleToasts` held an
++	// empty slot between the visible ones. A toast being removed has no height and takes no slot.
++	const measuredToasts = createMemo(() => props.toasts.filter((toast) => props.heights.some((height) => height.toastId === toast.id)));
++	const heightIndex = createMemo(() => Math.max(0, measuredToasts().findIndex((toast) => toast.id === props.toast.id)));
+ 	const toastsHeightBefore = createMemo(() => {
+-		return props.heights.reduce((prev, curr, reducerIndex) => {
+-			if (reducerIndex >= heightIndex()) return prev;
+-			return prev + curr.height;
+-		}, 0);
++		return measuredToasts().slice(0, heightIndex()).reduce((prev, toast) => prev + (props.heights.find((height) => height.toastId === toast.id)?.height ?? 0), 0);
+ 	});
+ 	const offset = createMemo(() => heightIndex() * (props.gap ?? GAP) + toastsHeightBefore());
+ 	const isDocumentHidden = useIsDocumentHidden();
+@@ -549,7 +550,7 @@ function Toast(props) {
+ 		props.setHeights((h) => [{
+ 			...entry,
+ 			height
+-		}, ...h]);
++		}, ...h.filter((height) => height.toastId !== entry.toastId)]);
+ 		return () => {
+ 			props.setHeights((h) => h.filter((height) => height.toastId !== entry.toastId));
+ 		};
+@@ -840,7 +841,7 @@ function Toaster(props) {
+ 		});
+ 		return <Show when={filteredToasts().length > 0}>
+               <ol tabindex={-1} ref={(el) => listRef = el} dir={dir() === "auto" ? getDocumentDirection() : dir()} class={className()} data-sonner-toaster data-sonner-theme={actualTheme()} data-y-position={y} data-x-position={x} style={{
+-			"--front-toast-height": `${heightsByPosition()[0]?.height ?? 0}px`,
++			"--front-toast-height": `${toastsByPosition().map((toast) => heightsByPosition().find((height) => height.toastId === toast.id)).find(Boolean)?.height ?? 0}px`,
+ 			"--width": `${TOAST_WIDTH}px`,
+ 			"--gap": `${gap()}px`,
+ 			...props.style,

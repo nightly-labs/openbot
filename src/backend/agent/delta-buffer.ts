@@ -1,6 +1,7 @@
 import type { AgentEvent, ConversationSnapshot } from "@openbot/contracts/ipc";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import type { OpenBotDatabase, StreamingMessageWrite } from "../openbot-database";
+import { perfCount } from "../perf-probe-hooks";
 import type { ConversationRuntime } from "./conversation-runtime";
 
 const logger = createOpenBotLogger("delta-buffer");
@@ -64,6 +65,7 @@ export class DeltaBuffer {
   }
 
   buffer(delta: PendingDeltaInput): void {
+    perfCount("delta.buffered");
     const key = `${delta.externalThreadId}:${delta.turnId}:${delta.messageId}`;
     const existing = this.#pending.get(key);
     if (existing) {
@@ -90,6 +92,8 @@ export class DeltaBuffer {
     const pending = this.#pending.get(key);
     if (!pending) return;
     this.#pending.delete(key);
+    perfCount("delta.flush");
+    perfCount("delta.flushBytes", pending.bytes);
     const snapshot = this.#conversation.ensureSnapshot(pending.agentId, pending.publicThreadId);
     let revision: number;
     try {

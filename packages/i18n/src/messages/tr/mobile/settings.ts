@@ -297,6 +297,9 @@ export const messages = {
   "mobile.settings.conversations.fullQualityPhotos": "Fotoğrafları tam kalitede gönder",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Bu kapalıyken uygulama her fotoğrafın daha küçük bir kopyasını gönderir, uzun kenarda en fazla 2048 piksel. Yavaş bağlantıda daha hızlı ulaşır. Orijinal fotoğrafı göndermek için açın.",
+  "mobile.settings.conversations.fullScreenCamera": "Tam ekran kamerayı kullan",
+  "mobile.settings.conversations.fullScreenCameraFooter":
+    "Açık olduğunda Kamera, yakınlaştırma ve tüm lenslerle sistem kamerasını açar. Kapalı olduğunda sohbette küçük bir kamera açılır.",
   "mobile.settings.profile.nameUnsafe": "Adınızdaki satır sonlarını ve kontrol karakterlerini kaldırın.",
   "mobile.settings.profile.nameLength": "Görünen adınız için 3–20 karakter kullanın.",
   "mobile.settings.profile.saveFailed": "Değişiklikler kaydedilemedi. Tekrar deneyin.",
@@ -459,6 +462,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "Sunucular",
   "mobile.settings.voice.gptLive.serversFooter":
     "Codex'i bir ChatGPT hesabına bağlamak için oturum açması gereken bir sunucuya dokunun. Bir sunucunun oturumunu yalnızca sahip veya yönetici görür.",
+  "mobile.settings.voice.gptLive.account": "GPT canlı ses hesabı",
   "mobile.settings.voice.gptLive.status.ready": "Hazır",
   "mobile.settings.voice.gptLive.status.supported": "Destekleniyor",
   "mobile.settings.voice.gptLive.status.offline": "Çevrimdışı",

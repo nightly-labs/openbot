@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
+import { EventEmitter } from "node:events";
 import {
   existsSync,
   mkdirSync,
@@ -19,6 +20,7 @@ import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits
 import {
   type AccountUsageLimit,
   AGENT_PROVIDERS,
+  AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT,
   type AgentEvent,
   type AgentModelId,
   type AgentModelOption,
@@ -31,13 +33,17 @@ import {
   type BitwardenConnectorStatus,
   type CentralAuthUser,
   CHANNEL_CHATS_CAPABILITY,
+  type Channel,
+  type ChannelMessage,
   type ChannelRoutine,
+  type ChannelTask,
   type ConversationMessage,
   type CustomAgentResult,
   type CustomAgentSummary,
   type CustomProviderResult,
   type CustomProviderSummary,
   DEFAULT_AGENT_DEFAULTS,
+  DEFAULT_VOICE_SETTINGS,
   decodeHostPasswordManagerList,
   decodeHostPasswordManagerStatus,
   decodeHostProviderAccountModels,
@@ -50,10 +56,14 @@ import {
   type HiddenAgentsSnapshot,
   INSTANCE_TRANSFER_LIMITS,
   isAccountUsage,
+  isLocalVoiceModelId,
   isQueueSnapshot,
+  isWhatsAppReadOnlyList,
   isWhatsAppStatusReactionsList,
   isWhatsAppWorkingMessageList,
   type LibraryFolderAction,
+  LOCAL_VOICE_MODEL_IDS,
+  type LocalVoiceModelId,
   type PasswordManagerConnectMethod,
   type PasswordManagerStatus,
   type PinnedMessagesSnapshot,
@@ -71,17 +81,23 @@ import {
   type StoredFileRow,
   type UpdateChannelRoutineInput,
   type UpdateRoutineInput,
+  VOICE_AUDIO_LIMITS,
+  VOICE_MODEL_IDS,
   type VoiceLiveEvent,
+  type VoiceModelStatus,
+  type VoiceSettings,
   type WhatsAppAccount,
   type WhatsAppLinkState,
+  type WhatsAppReadOnlyList,
   type WhatsAppStatusReactionsList,
   type WhatsAppWorkingMessageList,
   withHostProviderAccountModels,
+  withWhatsAppReadOnly,
   withWhatsAppStatusReactions,
   withWhatsAppWorkingMessages,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { TEAM_API_ROUTES, WORKSPACE_FILE_EXACT_PATH_QUERY } from "@openbot/contracts/team-api-routes";
 import { TEAM_PROTOCOL_V1_WEBSOCKET } from "@openbot/contracts/team-protocol";
 import {
   AGENT_ACTIVE_QUEUE_DELIVERY_LIMIT,
@@ -89,9 +105,17 @@ import {
   AGENT_ACTIVE_QUEUES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import {
+  AGENT_ARCHIVED_THREADS_CAPABILITY,
+  AGENT_ARCHIVED_THREADS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-archived-threads-v1";
+import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import {
+  AGENT_BUILTIN_MEMORY_CAPABILITY,
+  AGENT_BUILTIN_MEMORY_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
 import { AGENT_COLORS_CAPABILITY, AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_DEFAULTS_CAPABILITY, AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import {
@@ -163,6 +187,7 @@ import {
   AGENT_WAITS_REQUEST_TEXT_LIMIT,
   AGENT_WAITS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-waits-v1";
+import { ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/antigravity-code-sign-in-v1";
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import {
   BACKGROUND_PROCESS_COMMAND_LIMIT,
@@ -196,6 +221,15 @@ import {
   BROWSING_MEMORY_ROUTES,
 } from "@openbot/contracts/team-protocol/browsing-memory-v1";
 import {
+  CACHE_EXPIRY_COMPACTION_CAPABILITY,
+  CACHE_EXPIRY_COMPACTION_CODECS,
+  CACHE_EXPIRY_COMPACTION_ROUTES,
+} from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
+import {
+  CHANNEL_FOLDERS_CAPABILITY,
+  CHANNEL_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/channel-folders-v1";
+import {
   CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_PICTURE_ROUTES,
 } from "@openbot/contracts/team-protocol/channel-picture-v1";
@@ -212,6 +246,12 @@ import {
   CLAUDE_USER_SETUP_CODECS,
   CLAUDE_USER_SETUP_ROUTES,
 } from "@openbot/contracts/team-protocol/claude-user-setup-v1";
+import {
+  CLIENT_BROWSER_CAPABILITY,
+  CLIENT_BROWSER_ROUTES,
+  type ClientBrowserCommandEvent,
+  clientBrowserCommandEvent,
+} from "@openbot/contracts/team-protocol/client-browser-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import {
   CONTEXT_COMPACT_CAPABILITY,
@@ -225,9 +265,12 @@ import {
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import {
   AGENT_HIDDEN_WORK_CAPABILITY,
+  CHANNEL_PAGE_TASKS_CAPABILITY,
   decodeTeamProtocolSupportExpanded,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_USAGE_GROUPS_CAPABILITY,
+  TEAM_USAGE_READ_FAILED_CAPABILITY,
+  teamCapabilitiesForProtocol,
   teamCapabilityHeaders,
 } from "@openbot/contracts/team-protocol/current";
 import {
@@ -270,9 +313,19 @@ import {
 } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import { HOST_RESTART_CAPABILITY, HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-restart-v1";
 import {
+  HOST_SIGNAL_HOME_CAPABILITY,
+  HOST_SIGNAL_HOME_ROUTES,
+} from "@openbot/contracts/team-protocol/host-signal-home-v1";
+import { HOST_TURN_LIMITS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/host-turn-limits-events-v1";
+import {
   HOST_TURN_LIMITS_CAPABILITY,
   HOST_TURN_LIMITS_ROUTES,
 } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
+import {
+  HOST_VOICE_MODEL_CAPABILITY,
+  HOST_VOICE_MODEL_ROUTES,
+} from "@openbot/contracts/team-protocol/host-voice-model-v1";
+import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
 import {
   INSTANCE_TRANSFER_CHUNK_BYTES,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
@@ -291,6 +344,11 @@ import {
   LIBRARY_FOLDERS_CAPABILITY,
   LIBRARY_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/library-folders-v1";
+import {
+  decodeLiveVoiceAccount,
+  LIVE_VOICE_ACCOUNT_CAPABILITY,
+  LIVE_VOICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/live-voice-account-v1";
 import {
   LIVE_VOICE_CAPABILITY,
   LIVE_VOICE_ROUTES,
@@ -311,6 +369,14 @@ import { MESSAGE_PINS_CAPABILITY, MESSAGE_PINS_ROUTES } from "@openbot/contracts
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
+import {
+  MODEL_VISIBILITY_CAPABILITY,
+  MODEL_VISIBILITY_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-v1";
+import {
   PASSWORD_MANAGERS_CAPABILITY,
   PASSWORD_MANAGERS_CODECS,
   PASSWORD_MANAGERS_ROUTES,
@@ -319,7 +385,20 @@ import {
   PENDING_APPROVAL_CAPABILITY,
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
+import {
+  PENDING_PROMPTS_CAPABILITY,
+  PENDING_PROMPTS_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-prompts-v1";
 import { PHONE_FEEDBACK_CAPABILITY, PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
+import {
+  PROMPT_CACHE_TTL_CAPABILITY,
+  PROMPT_CACHE_TTL_PI_CAPABILITY,
+} from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import {
+  addPromptQuestionDetails,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
+  withPromptQuestionDetails,
+} from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import {
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_ROUTES,
@@ -388,7 +467,11 @@ import {
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY, ROUTINES_ONCE_ROUTES } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { SETTING_LINK_MARKERS_CAPABILITY } from "@openbot/contracts/team-protocol/setting-link-markers-v1";
-import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
+import {
+  SIDE_QUESTION_CAPABILITY,
+  SIDE_QUESTION_ROUTES,
+  SIDE_QUESTION_THREADS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/side-question-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
@@ -426,6 +509,10 @@ import { VAULT_V2_CAPABILITY, VAULT_V2_ROUTES } from "@openbot/contracts/team-pr
 import { VAULT_V3_CAPABILITY, VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
 import { VAULT_V4_CAPABILITY, VAULT_V4_ROUTES } from "@openbot/contracts/team-protocol/vault-v4";
 import {
+  VOICE_TRANSCRIPTION_CAPABILITY,
+  VOICE_TRANSCRIPTION_ROUTES,
+} from "@openbot/contracts/team-protocol/voice-transcription-v1";
+import {
   WEBHOOK_AGENT_SECRET_CAPABILITY,
   WEBHOOK_AGENT_SECRET_ROUTES,
 } from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
@@ -434,6 +521,11 @@ import {
   WHATSAPP_CONNECTOR_CODECS,
   WHATSAPP_CONNECTOR_ROUTES,
 } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import {
+  WHATSAPP_READ_ONLY_CAPABILITY,
+  WHATSAPP_READ_ONLY_CODECS,
+  WHATSAPP_READ_ONLY_ROUTES,
+} from "@openbot/contracts/team-protocol/whatsapp-read-only-v1";
 import {
   WHATSAPP_STATUS_REACTIONS_CAPABILITY,
   WHATSAPP_STATUS_REACTIONS_CODECS,
@@ -453,6 +545,7 @@ import { planLimitRows } from "@openbot/team-client/plan-limits";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect } from "effect";
 import { strToU8, unzipSync, zipSync } from "fflate";
+import { runClientBrowserTool, withClientTabs } from "../src/backend/agent/client-browser-tools";
 import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "../src/backend/agent/inactive-attention-request";
 import { SteerUnsupportedError } from "../src/backend/agent/queue-controls";
 import { AgentLifecycleFailed } from "../src/backend/agent-service";
@@ -473,6 +566,7 @@ import { canConfineProcesses } from "../src/backend/process-confinement";
 import { RoutineResultError } from "../src/backend/routine-results/routine-results";
 import type { OwnedRoutineRecord } from "../src/backend/routine-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
+import { resolveSharedFile as resolveSharedFileOnDisk } from "../src/backend/workspace-paths";
 import type { AgentAccessState } from "../src/main/agent-access-store";
 import { createAgentDefaultsPreferenceStore } from "../src/main/agent-defaults-preference-store";
 import { createAgentDefaultsSettings } from "../src/main/agent-defaults-settings";
@@ -491,6 +585,11 @@ import { createBrowserProfileService } from "../src/main/browser-profile-service
 import { BrowsingMemoryPreferenceStore } from "../src/main/browsing-memory-preference-store";
 import { BusyMessageModePreferenceStore } from "../src/main/busy-message-mode-preference-store";
 import {
+  cacheExpiryCompactionControl,
+  createCacheExpiryCompactionPreferenceStore,
+} from "../src/main/cache-expiry-compaction-preference-store";
+import { createChannelFolders } from "../src/main/channel-folders";
+import {
   claudeCompactWindowControl,
   createClaudeCompactWindowPreferenceStore,
 } from "../src/main/claude-compact-window-preference-store";
@@ -498,11 +597,14 @@ import {
   claudeUserSetupControl,
   createClaudeUserSetupPreferenceStore,
 } from "../src/main/claude-user-setup-preference-store";
+import { ClientBrowserHub } from "../src/main/client-browser-hub";
 import { createCustomProviderChanges } from "../src/main/custom-provider-changes";
 import { CustomProviderStore } from "../src/main/custom-provider-store";
 import { githubSkillSource } from "../src/main/github-skill-source";
 import type { HostEventsApi } from "../src/main/host-events-api";
+import { HostSignalHomeService, SIGNAL_HOME_PREFERENCE_FILE } from "../src/main/host-signal-home";
 import { HostTurnLimitsPreferenceStore } from "../src/main/host-turn-limits-preference-store";
+import { HostVoiceModelService, type VoiceModels } from "../src/main/host-voice-model";
 import {
   INSTANCE_TRANSFER_FORMAT,
   INSTANCE_TRANSFER_MANIFEST,
@@ -511,6 +613,7 @@ import {
 import { LibraryFoldersService, type LibraryFoldersSources } from "../src/main/library-folders-service";
 import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/machine-alerts";
 import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
+import { ModelReleaseCatalog, ModelVisibility } from "../src/main/model-visibility";
 import type { PasswordManagerDriver } from "../src/main/password-managers/driver";
 import { PasswordManagersService } from "../src/main/password-managers/password-managers-service";
 import { ProviderAccountsHost } from "../src/main/provider-accounts-host";
@@ -536,6 +639,7 @@ import type {
   TeamApiLiveVoice,
   TeamApiMailbox,
   TeamApiRoutineRunPlaces,
+  TeamApiVoiceTranscription,
 } from "../src/main/team-api/dependencies";
 import { isPeerHiddenProvider } from "../src/main/team-api/provider-visibility";
 import { WEBRTC_FRAME_BODY_BUDGET } from "../src/main/team-api/request-helpers";
@@ -543,10 +647,12 @@ import { TeamApiServer } from "../src/main/team-api-server";
 import { TeamStore } from "../src/main/team-store";
 import { VaultService } from "../src/main/vault-service";
 import { VaultStore } from "../src/main/vault-store";
+import { VoiceOperationError } from "../src/main/voice-model-service";
 import { emptyInstanceTransferService } from "./instance-transfer-e2e-fixture";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/team-api-routes-e2e");
 const APP_VERSION = "0.43.0";
+const PROMPT_DETAIL_E2E_TEXT = "Run:\n```sh\necho hello\n```";
 const MIB = 1024 * 1024;
 
 interface Check {
@@ -592,6 +698,79 @@ const busyMessageModePreferences = new BusyMessageModePreferenceStore(join(root,
 const hostTurnLimitsPath = join(root, "host-turn-limits.json");
 const hostTurnLimits = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
 await runCauseEffect(hostTurnLimits.load());
+
+class FakeVoiceModels extends EventEmitter<{ modelStatus: [VoiceModelStatus] }> implements VoiceModels {
+  settings: VoiceSettings = { ...DEFAULT_VOICE_SETTINGS };
+  readonly statuses = new Map<string, VoiceModelStatus>(
+    VOICE_MODEL_IDS.map((modelId) => [modelId, { modelId, phase: "missing", progress: null, message: null }]),
+  );
+
+  set(modelId: LocalVoiceModelId, phase: VoiceModelStatus["phase"], progress: number | null): VoiceModelStatus {
+    const status: VoiceModelStatus = { modelId, phase, progress, message: null };
+    this.statuses.set(modelId, status);
+    this.emit("modelStatus", status);
+    return status;
+  }
+
+  getModelStatuses() {
+    return Effect.sync(() => [...this.statuses.values()].map((status) => ({ ...status })));
+  }
+
+  getSettings() {
+    return { ...this.settings };
+  }
+
+  setSettings(settings: VoiceSettings) {
+    return Effect.sync(() => {
+      record("setVoiceSettings", settings.modelId);
+      this.settings = { ...settings };
+      return { ...settings };
+    });
+  }
+
+  downloadModel(modelId: LocalVoiceModelId): Effect.Effect<VoiceModelStatus> {
+    return Effect.gen({ self: this }, function* () {
+      record("downloadVoiceModel", modelId);
+      yield* Effect.yieldNow;
+      this.set(modelId, "downloading", 5);
+      return yield* Effect.never;
+    });
+  }
+
+  cancelModelDownload(modelId: LocalVoiceModelId) {
+    return Effect.sync(() => this.set(modelId, "missing", null));
+  }
+
+  removeModel(modelId: LocalVoiceModelId) {
+    return Effect.sync(() => {
+      record("removeVoiceModel", modelId);
+      return this.set(modelId, "missing", null);
+    });
+  }
+}
+const fakeVoiceModels = new FakeVoiceModels();
+const signalHomePreferencePath = join(root, SIGNAL_HOME_PREFERENCE_FILE);
+let signalHomeInUse: string | null = "a";
+const hostSignalHome = new HostSignalHomeService({
+  path: signalHomePreferencePath,
+  fetch: async (url) => {
+    record("signalHealth", url);
+    if (url.startsWith("https://signal-down.test/")) throw new TypeError("fetch failed");
+    return new Response("{}", { status: 200 });
+  },
+  listHomes: () =>
+    Effect.succeed([
+      { id: "a", url: "wss://signal-a.test/v1/signal" },
+      { id: "au", url: "wss://signal-au.test/v1/signal" },
+      { id: "sg", url: "wss://signal-down.test/v1/signal" },
+    ]),
+  currentHome: () => signalHomeInUse,
+  followHome: () =>
+    Effect.sync(() => {
+      record("followSignalHome");
+      signalHomeInUse = hostSignalHome.preferred() ?? "a";
+    }),
+});
 const transferUploads = join(root, "user-data", "instance-transfer-uploads");
 const checks: Check[] = [];
 const calls: RecordedCall[] = [];
@@ -633,6 +812,7 @@ function check(name: string, passed: boolean, detail: unknown = null): void {
 }
 
 const MISTRAL_SIGN_IN_PAGE = "https://console.mistral.ai/vibe/sign-in/e2e";
+const GOOGLE_SIGN_IN_PAGE = "https://accounts.google.com/o/oauth2/auth?client_id=e2e";
 
 function record(method: string, ...args: unknown[]): void {
   calls.push({ method, args });
@@ -788,6 +968,22 @@ const agents = [
   agent("agent-oc", "Oscar", "opencode", "anthropic/claude-sonnet-4-5"),
   agent("agent-pi", "Pia", "pi", "anthropic/claude-sonnet-4-5"),
 ];
+const folderChannels = new Map<string, Channel>([
+  [
+    "channel-shared",
+    {
+      id: "channel-shared",
+      name: "shared",
+      title: "",
+      instructions: "",
+      members: [{ agentId: "agent-ada" }],
+      leadAgentId: null,
+      archived: false,
+      revision: 1,
+      createdAt: "2026-11-01T00:00:00.000Z",
+    },
+  ],
+]);
 const transferAgent = agent("agent-transfer", "Tess", "claude", "claude-sonnet-4-5");
 mkdirSync(transferAgent.workspacePath, { recursive: true });
 writeFileSync(join(transferAgent.workspacePath, "random.bin"), randomBytes(INSTANCE_TRANSFER_CHUNK_BYTES + 4096));
@@ -823,6 +1019,7 @@ function activeQueue(agentId: string): QueueSnapshot {
 let queueSnapshotHold: { agentId: string; hold: QueueHold } | null = null;
 
 let groupedUsageLimit: AccountUsageLimit | null = null;
+let readFailedUsageLimit: AccountUsageLimit | null = null;
 
 const ANTIGRAVITY_GROUPS = [
   {
@@ -904,6 +1101,7 @@ const REFUSED_ACCOUNT_KEY = "key_e2e_refused";
 const ACCOUNT_KEY = "key_e2e_accepted";
 
 let antigravityPool: ProviderAccountPool | undefined;
+let codexLiveVoiceAccount: string | null = null;
 let codeSignInAccount: string | null = null;
 let agentStatus: AgentStatus | null = null;
 let deleteFailure: string | null = null;
@@ -935,7 +1133,11 @@ function accountModelsStatus(): AgentStatus {
 let hidden: HiddenAgentsSnapshot = { agents: [{ agentId: "agent-pi", hiddenAt: new Date(0).toISOString() }] };
 
 const agentEventListeners = new Set<(event: AgentEvent, memberId?: string) => void>();
+hostTurnLimits.onChange(() => {
+  for (const listener of agentEventListeners) listener({ type: "host-turn-limits-changed" });
+});
 let accessLevels: AgentAccessState = { revision: 0, everyone: {}, roles: [] };
+let largePendingPrompts = false;
 let importFreeBytes: number | null = null;
 const accessListeners = new Set<(serverId: string, state: AgentAccessState) => void>();
 const agentAccess: TeamApiAgentAccess = {
@@ -990,9 +1192,9 @@ function libraryScan(): StorageUsage {
   };
 }
 const libraryStorage: LibraryFoldersSources["storage"] = {
-  usage: (input) =>
+  hostFiles: () =>
     Effect.sync(() => {
-      record("libraryScan", input);
+      record("libraryScan");
       return libraryScan();
     }),
   invalidate: () => {
@@ -1276,10 +1478,17 @@ const fakeAgents: TeamApiAgents = {
   resolveSharedFile: (path) =>
     Effect.sync(() => {
       record("resolveSharedFile", path);
-      return path === "big.bin"
-        ? { path: sharedPath, name: "big.bin", size: ATTACHMENT_LIMITS.fileBytes + 1 }
-        : { path: sharedPath, name: "shared.txt", size: readFileSync(sharedPath).length };
-    }),
+    }).pipe(
+      Effect.flatMap(() =>
+        path === "big.bin"
+          ? Effect.succeed({ path: sharedPath, name: "big.bin", size: ATTACHMENT_LIMITS.fileBytes + 1 })
+          : resolveSharedFileOnDisk(files, path).pipe(
+              Effect.mapError(
+                (failure) => new AgentLifecycleFailed({ operation: "resolveSharedFile", cause: failure.cause }),
+              ),
+            ),
+      ),
+    ),
   resolveWorkspaceFile: (agentId, path) =>
     Effect.sync(() => {
       record("resolveWorkspaceFile", agentId, path);
@@ -1287,9 +1496,9 @@ const fakeAgents: TeamApiAgents = {
         ? { path: workspacePath, name: "big.bin", size: ATTACHMENT_LIMITS.fileBytes + 1, insideWorkspace: true }
         : { path: workspacePath, name: "notes.md", size: readFileSync(workspacePath).length, insideWorkspace: true };
     }),
-  resolveLocalWorkspaceFile: (agentId, path) =>
+  resolveLocalWorkspaceFile: (agentId, path, options) =>
     Effect.sync(() => {
-      record("resolveLocalWorkspaceFile", agentId, path);
+      record("resolveLocalWorkspaceFile", agentId, path, options?.exactPath === true);
       return {
         path: workspacePath,
         name: "notes.md",
@@ -1328,6 +1537,7 @@ const fakeAgents: TeamApiAgents = {
         { id: "claude", primary: null, secondary: SPENT_WEEK },
         { id: "codex", accountId: "a0123456789abcdef", primary: null, secondary: SPENT_WEEK, creditsAvailable: false },
         ...(groupedUsageLimit ? [groupedUsageLimit] : []),
+        ...(readFailedUsageLimit ? [readFailedUsageLimit] : []),
       ],
     }),
   getAnalytics: unused("getAnalytics"),
@@ -1536,6 +1746,24 @@ const fakeAgents: TeamApiAgents = {
                 ...(anchor.messageId === "skill-question"
                   ? { itemType: "skill-suggestion:create", skillSuggestion: { name: "Weekly report" } }
                   : {}),
+                ...(anchor.messageId === "detail-question"
+                  ? {
+                      questionPrompt: {
+                        requestId: "request-detail",
+                        questions: [
+                          {
+                            id: "install",
+                            header: "Install",
+                            question: "Did the install work?",
+                            detail: PROMPT_DETAIL_E2E_TEXT,
+                            isSecret: false,
+                            options: null,
+                          },
+                        ],
+                        resolution: null,
+                      },
+                    }
+                  : {}),
               },
             ]
           : [],
@@ -1612,6 +1840,39 @@ const fakeAgents: TeamApiAgents = {
     return Effect.void;
   },
   agentIdForRequest: (requestId) => (requestId === 7 ? "agent-ada" : undefined),
+  pendingPrompts: () => {
+    record("pendingPrompts");
+    if (largePendingPrompts)
+      return Array.from({ length: 300 }, (_, index) => ({
+        requestId: `prompt-large-${index}`,
+        agentId: "agent-ada",
+        threadId: `thread-large-${index}`,
+        turnId: `turn-large-${index}`,
+        questions: Array.from({ length: 32 }, (_, question) => ({
+          id: `question-${question}`,
+          header: "h".repeat(80),
+          question: "q".repeat(240),
+          isSecret: false,
+          options: null,
+        })),
+      }));
+    return [
+      ...Array.from({ length: 5 }, (_, index) => ({
+        requestId: `prompt-ada-${index}`,
+        agentId: "agent-ada",
+        threadId: `thread-ada-${index}`,
+        turnId: `turn-ada-${index}`,
+        questions: [{ id: "color", header: "Color", question: "Pick a color", isSecret: false, options: null }],
+      })),
+      {
+        requestId: "prompt-gone",
+        agentId: "agent-gone",
+        threadId: "thread-gone",
+        turnId: "turn-gone",
+        questions: [{ id: "day", header: "Day", question: "Pick a day", isSecret: false, options: null }],
+      },
+    ];
+  },
   pendingApproval: (requestId) => {
     record("pendingApproval", requestId);
     if (requestId === 7)
@@ -1712,6 +1973,31 @@ const fakeAgentTasks: TeamApiAgentTasks = {
     return { agentId, tasks: [task("task-queued", queue), asking], limit: 10 };
   },
   readTask: unused("readTask"),
+  listArchivedTasks: (input) => {
+    record("listArchivedTasks", input);
+    return {
+      tasks: [
+        {
+          id: "task-archived",
+          agentId: input.agentId,
+          threadId: "thread-task-archived",
+          origin: "agent",
+          title: "Archived thread",
+          state: "closed",
+          outcome: "completed",
+          hold: null,
+          activeTurnId: null,
+          progress: null,
+          error: null,
+          queuedMessages: [],
+          createdAt: "2026-11-01T07:00:00.000Z",
+          updatedAt: "2026-11-01T08:00:00.000Z",
+          closedAt: "2026-11-01T08:00:00.000Z",
+        },
+      ],
+      hasMore: input.before === null,
+    };
+  },
   readTaskPage: (input) => {
     record("readTaskPage", input);
     return {
@@ -1795,9 +2081,10 @@ const fakeAgentTasks: TeamApiAgentTasks = {
       closedAt: null,
     });
   },
-  sendMessage: (input, sender) =>
+  sendMessage: (input, sender, _timezone, fromChrome) =>
     Effect.sync(() => {
       record("sendTaskMessage", input, sender);
+      if (fromChrome) record("taskMessageFromChrome", input.agentId);
       return {
         messageId: "message-reply",
         deliveries: [{ id: "delivery-reply", recipientAgentId: input.agentId, status: "queued", position: 1 }],
@@ -2153,6 +2440,13 @@ const whatsappMessaging: TeamApiConnectors["messaging"] = {
       record("whatsapp.setStatusReactions", workspaceId, statusReactions);
       whatsappAccount.statusReactions = statusReactions;
     }),
+  setWhatsAppSenderReadOnly: (workspaceId, senderId, readOnly) =>
+    Effect.sync(() => {
+      record("whatsapp.setSenderReadOnly", workspaceId, senderId, readOnly);
+      whatsappAccount.allowedSenders = whatsappAccount.allowedSenders.map((sender) =>
+        sender.id === senderId ? { ...sender, readOnly } : sender,
+      );
+    }),
 };
 const connectors: TeamApiConnectors = {
   github: {
@@ -2203,6 +2497,17 @@ const machineMetrics = {
   checkedAt: "2026-10-27T12:00:00.000Z",
 };
 const machineAlertStore = new MachineAlertPreferenceStore(join(root, "machine-alerts.json"));
+const voiceTranscription: TeamApiVoiceTranscription = {
+  transcribe: (audio) => {
+    record("transcribe", audio.byteLength);
+    return audio.byteLength === 44
+      ? Effect.fail(new VoiceOperationError({ cause: new Error(sourceText("error.voice.host.preparing")) }))
+      : Effect.succeed({ text: `heard ${audio.byteLength - 44} bytes` });
+  },
+};
+
+const clientBrowser = new ClientBrowserHub({ commandMs: 1_500, presenceMs: 60_000 });
+
 const liveVoiceListeners = new Set<(event: VoiceLiveEvent, memberId: string | null) => void>();
 let liveVoiceStarts = 0;
 let liveVoiceStopped: (() => void) | null = null;
@@ -2214,6 +2519,13 @@ const liveVoice: TeamApiLiveVoice = {
         new AgentLifecycleFailed({
           operation: "startLiveVoice",
           cause: new Error(sourceText("error.voice.live.signIn")),
+        }),
+      );
+    if (input.sdp === "offer-codex-failed")
+      return Effect.fail(
+        new AgentLifecycleFailed({
+          operation: "startLiveVoice",
+          cause: new Error(sourceText("error.voice.live.startFailed", { reason: "realtime session failed" })),
         }),
       );
     liveVoiceStarts += 1;
@@ -2284,11 +2596,13 @@ const githubSkillsAdmin: Pick<
 const adaSkills = join(root, "workspaces", "agent-ada", ".claude", "skills");
 mkdirSync(join(adaSkills, "good-skill"), { recursive: true });
 writeFileSync(join(adaSkills, "good-skill", "SKILL.md"), "---\nname: good-skill\ndescription: Works.\n---\n# Good\n");
-mkdirSync(join(adaSkills, "settlement-economy"), { recursive: true });
+mkdirSync(join(adaSkills, "bom-skill"), { recursive: true });
 writeFileSync(
-  join(adaSkills, "settlement-economy", "SKILL.md"),
-  "\uFEFF---\r\nname: settlement-economy\r\ndescription: Settles.\r\n---\r\n# Settle\r\n",
+  join(adaSkills, "bom-skill", "SKILL.md"),
+  "\uFEFF---\r\nname: bom-skill\r\ndescription: Saved with a byte order mark.\r\n---\r\n# Bom\r\n",
 );
+mkdirSync(join(adaSkills, "settlement-economy"), { recursive: true });
+writeFileSync(join(adaSkills, "settlement-economy", "SKILL.md"), "\uFEFF# Settle\r\n");
 const chatSkills = new SkillMarketplaceService(
   {
     requestAuthorized: () => Effect.die("Not used."),
@@ -2425,6 +2739,49 @@ try {
   libraryStore.onChanged(() => {
     for (const listener of agentEventListeners) listener({ type: "library-folders-changed" });
   });
+  const agentFolders = createAgentFolders({
+    service: {
+      listAgents: () => agents,
+      sharedRoot: join(root, "OpenBot", "Shared"),
+      updateAgent: (input) =>
+        Effect.sync(() => {
+          record("updateAgentFolders", input);
+          const target = agents.find((item) => item.id === input.agentId);
+          if (!target) throw new Error("Agent not found.");
+          if (input.additionalFolders) target.additionalFolders = input.additionalFolders;
+          if (input.excludedFolders) target.excludedFolders = input.excludedFolders;
+          return target;
+        }),
+    },
+    userDataPath: join(root, "user-data"),
+  });
+  const channelFolders = createChannelFolders({
+    service: {
+      listAgents: () => agents,
+      sharedRoot: join(root, "OpenBot", "Shared"),
+      channels: {
+        store: {
+          get: (channelId) => {
+            const channel = folderChannels.get(channelId);
+            if (!channel) throw new Error("Channel not found.");
+            return channel;
+          },
+          exists: (channelId) => folderChannels.has(channelId),
+        },
+        setFolders: (channelId, folders) =>
+          Effect.sync(() => {
+            record("setChannelFolders", channelId, [...folders]);
+            const channel = folderChannels.get(channelId);
+            if (!channel) throw new Error("Channel not found.");
+            const updated = { ...channel, folders: [...folders] };
+            folderChannels.set(channelId, updated);
+            return updated;
+          }),
+      },
+    },
+    userDataPath: join(root, "user-data"),
+    browse: (path) => agentFolders.browse(path),
+  });
   server = new TeamApiServer({
     appVersion: APP_VERSION,
     agentImport,
@@ -2440,6 +2797,14 @@ try {
     skills: chatSkills,
     admin: {
       skills: githubSkillsAdmin,
+      modelVisibility: new ModelVisibility({
+        path: join(root, "model-visibility.json"),
+        catalog: new ModelReleaseCatalog({ XDG_CACHE_HOME: join(root, "cache") }, root),
+        listModels: () => FAST_MODE_MODELS,
+        listAgents: () => agents,
+        customEndpoints: () => [],
+        modelsChanged: () => {},
+      }),
       customAgents: {
         list: () => Effect.succeed(customAgentList),
         save: (input) =>
@@ -2458,22 +2823,8 @@ try {
             return customAgentResult();
           }),
       },
-      folders: createAgentFolders({
-        service: {
-          listAgents: () => agents,
-          sharedRoot: join(root, "OpenBot", "Shared"),
-          updateAgent: (input) =>
-            Effect.sync(() => {
-              record("updateAgentFolders", input);
-              const target = agents.find((item) => item.id === input.agentId);
-              if (!target) throw new Error("Agent not found.");
-              if (input.additionalFolders) target.additionalFolders = input.additionalFolders;
-              if (input.excludedFolders) target.excludedFolders = input.excludedFolders;
-              return target;
-            }),
-        },
-        userDataPath: join(root, "user-data"),
-      }),
+      folders: agentFolders,
+      channelFolders,
       instructions: createAgentInstructionsFiles({
         listAgents: () => agents,
         instructionsSaving: (agentId, text) => {
@@ -2498,6 +2849,8 @@ try {
               if (input.quickAcknowledgement === null) delete target.quickAcknowledgement;
               else if (input.quickAcknowledgement !== undefined)
                 target.quickAcknowledgement = input.quickAcknowledgement;
+              if (input.memory === true) delete target.memory;
+              else if (input.memory === false) target.memory = false;
               if (input.fastMode !== undefined) {
                 target.fastMode = input.fastMode;
                 if (input.fastMode && input.ultrafast) target.ultrafast = true;
@@ -2555,6 +2908,8 @@ try {
           ),
       },
       turnLimits: hostTurnLimits,
+      voiceModel: new HostVoiceModelService(fakeVoiceModels),
+      signalHome: hostSignalHome,
       localServers: {
         list: () => Effect.sync(() => ({ servers: [...localServerList], limit: 5 })),
         create: (name) =>
@@ -2620,10 +2975,17 @@ try {
         createClaudeUserSetupPreferenceStore(join(root, "claude-user-setup.json")),
         () => record("claudeUserSetupChanged"),
       ),
+      cacheExpiryCompaction: cacheExpiryCompactionControl(
+        createCacheExpiryCompactionPreferenceStore(join(root, "cache-expiry-compaction.json")),
+      ),
       claudeCompactWindow: claudeCompactWindowControl(
         createClaudeCompactWindowPreferenceStore(join(root, "claude-compact-window.json")),
         () => record("claudeCompactWindowChanged"),
       ),
+      promptCacheTtl: {
+        get: () => ({ ttl: "1h" as const }),
+        set: (ttl) => Effect.succeed({ ttl }),
+      },
       providerEnvironment,
       providerDetection: {
         detection: {
@@ -2666,6 +3028,8 @@ try {
         service: {
           startProviderCodeLogin: (provider) => {
             record("startProviderCodeLogin", provider);
+            if (provider === "antigravity")
+              return Effect.succeed({ kind: "paste", verificationUrl: GOOGLE_SIGN_IN_PAGE, expiresAt: 1 });
             if (provider !== "mistral") throw new Error(sourceText("error.provider.noCodeSignIn", { provider }));
             return Effect.succeed({ kind: "link", verificationUrl: MISTRAL_SIGN_IN_PAGE, expiresAt: 1 });
           },
@@ -2809,6 +3173,8 @@ try {
       stop: (id) => Effect.sync(() => record("stopBackgroundProcess", id)),
     },
     liveVoice,
+    voiceTranscription,
+    clientBrowser,
     storage: {
       usage: (input) =>
         Effect.sync(() => {
@@ -2844,6 +3210,13 @@ try {
             antigravityPool = enabled
               ? { leftOut: out, inUse: known.find((id) => !out.includes(id)) ?? null }
               : undefined;
+            return accountModelsStatus();
+          }),
+        liveVoiceAccount: () => codexLiveVoiceAccount,
+        setLiveVoiceAccount: (accountId) =>
+          Effect.sync(() => {
+            record("setLiveVoiceAccount", accountId);
+            codexLiveVoiceAccount = accountId;
             return accountModelsStatus();
           }),
         getProviderAccountUsage: unused("providerAccounts.getProviderAccountUsage"),
@@ -3875,11 +4248,66 @@ try {
         !existsSync(hostTurnLimitsPath),
       outOfRange.map(summary),
     );
+    const openTurnLimitsSocket = async (capabilities: string[]) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+        TEAM_PROTOCOL_V1_WEBSOCKET,
+        `openbot-token.${bobToken}`,
+      ]);
+      const state = { declared: false, changed: 0, marked: false };
+      const waiters = new Set<() => void>();
+      socket.addEventListener("message", (message) => {
+        const value = JSON.parse(String(message.data));
+        if (isDynamicRecord(value) && value.type === "chat-colors-changed") state.declared = true;
+        if (isDynamicRecord(value) && value.type === "host-turn-limits-changed") state.changed++;
+        if (isDynamicRecord(value) && value.type === "library-folders-changed") state.marked = true;
+        for (const wake of waiters) wake();
+      });
+      await new Promise<void>((resolveOpen, reject) => {
+        socket.addEventListener("open", () => resolveOpen(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+      });
+      const until = (ready: () => boolean) =>
+        new Promise<boolean>((resolveReady) => {
+          if (ready()) return resolveReady(true);
+          const timer = setTimeout(() => {
+            waiters.delete(wake);
+            resolveReady(false);
+          }, 5_000);
+          const wake = () => {
+            if (!ready()) return;
+            clearTimeout(timer);
+            waiters.delete(wake);
+            resolveReady(true);
+          };
+          waiters.add(wake);
+        });
+      socket.send(
+        JSON.stringify({
+          type: "agent-event-scope",
+          includeConversations: false,
+          capabilities: [CHAT_COLORS_CAPABILITY, LIBRARY_FOLDERS_EVENTS_CAPABILITY, ...capabilities],
+        }),
+      );
+      const ready = await until(() => state.declared);
+      return { socket, state, ready, until };
+    };
+    const listening = await openTurnLimitsSocket([HOST_TURN_LIMITS_EVENTS_CAPABILITY]);
+    const older = await openTurnLimitsSocket([]);
     const adminSet = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
       token: adaToken,
       json: { turnLimit: 32, agentTaskLimit: 8 },
       ...v9,
     });
+    const heard = await listening.until(() => listening.state.changed === 1);
+    for (const listener of agentEventListeners) listener({ type: "library-folders-changed" });
+    const olderMarked = await older.until(() => older.state.marked);
+    listening.socket.close();
+    older.socket.close();
+    check(
+      "a change of the limits reaches a member socket that has the events capability, and not an older socket",
+      listening.ready && older.ready && heard && olderMarked && older.state.changed === 0,
+      JSON.stringify({ listening: listening.state, older: older.state }),
+    );
     const reloaded = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
     await runCauseEffect(reloaded.load());
     const chosen = { turnLimit: 32, automaticTurnLimit: 8, agentTaskLimit: 8, defaultAgentTaskLimit: 4 };
@@ -3916,6 +4344,182 @@ try {
       "an admin returns both limits to their defaults",
       adminReset.status === 200 && isDeepStrictEqual(adminReset.body, automatic),
       summary(adminReset),
+    );
+  }
+
+  {
+    const v10 = { capabilities: [HOST_VOICE_MODEL_CAPABILITY], protocol: TEAM_PROTOCOL_V10 };
+    const route = HOST_VOICE_MODEL_ROUTES;
+    const modelOf = (body: Json, modelId: string) =>
+      list(field(body, "models")).find((model) => field(model, "modelId") === modelId);
+    const unsupported = await call("POST", route.settings, {
+      token: adaToken,
+      json: {},
+      capabilities: [],
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    const memberRead = await call("POST", route.settings, { token: bobToken, json: {}, ...v10 });
+    const memberChange = await call("POST", route.change, {
+      token: bobToken,
+      json: { action: "select", modelId: "whisper-turbo" },
+      ...v10,
+    });
+    check(
+      "a member cannot read or change the server speech model, and a client without host-voice-model-v1 gets 400",
+      errorIs(unsupported, 400, sourceText("error.team.hostVoiceModelUnsupported")) &&
+        errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberChange, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("setVoiceSettings").length === 0,
+      [summary(unsupported), summary(memberRead), summary(memberChange)],
+    );
+    const adminRead = await call("POST", route.settings, { token: adaToken, json: {}, ...v10 });
+    const models = list(field(adminRead.body, "models"));
+    check(
+      "an admin reads the selected speech model and only the models that the server downloads",
+      adminRead.status === 200 &&
+        field(adminRead.body, "modelId") === DEFAULT_VOICE_SETTINGS.modelId &&
+        models.length === LOCAL_VOICE_MODEL_IDS.length &&
+        models.every((model) => isLocalVoiceModelId(field(model, "modelId")) && field(model, "phase") === "missing"),
+      summary(adminRead),
+    );
+    const cloudChoice = await call("POST", route.change, {
+      token: adaToken,
+      json: { action: "select", modelId: "groq-whisper-large-v3" },
+      ...v10,
+    });
+    check(
+      "the host refuses a cloud model as the server speech model and saves nothing",
+      cloudChoice.status === 400 && callsOf("setVoiceSettings").length === 0,
+      summary(cloudChoice),
+    );
+    const selected = await call("POST", route.change, {
+      token: adaToken,
+      json: { action: "select", modelId: "whisper-turbo" },
+      ...v10,
+    });
+    check(
+      "an admin selects the server speech model, and the host saves it with the old language",
+      selected.status === 200 &&
+        field(selected.body, "modelId") === "whisper-turbo" &&
+        fakeVoiceModels.getSettings().modelId === "whisper-turbo" &&
+        fakeVoiceModels.getSettings().language === DEFAULT_VOICE_SETTINGS.language,
+      summary(selected),
+    );
+    const download = await call("POST", route.change, {
+      token: adaToken,
+      json: { action: "download", modelId: "whisper-turbo" },
+      ...v10,
+    });
+    check(
+      "the download route answers when the download starts, not when it ends",
+      download.status === 200 &&
+        field(modelOf(download.body, "whisper-turbo"), "phase") === "downloading" &&
+        callsOf("downloadVoiceModel").length === 1 &&
+        fakeVoiceModels.listenerCount("modelStatus") === 0,
+      summary(download),
+    );
+    const cancelled = await call("POST", route.change, {
+      token: adaToken,
+      json: { action: "cancel", modelId: "whisper-turbo" },
+      ...v10,
+    });
+    check(
+      "an admin stops the download of the server speech model",
+      cancelled.status === 200 && field(modelOf(cancelled.body, "whisper-turbo"), "phase") === "missing",
+      summary(cancelled),
+    );
+    fakeVoiceModels.set("whisper-turbo", "ready", 100);
+    const removed = await call("POST", route.change, {
+      token: adaToken,
+      json: { action: "remove", modelId: "whisper-turbo" },
+      ...v10,
+    });
+    check(
+      "an admin removes a downloaded server speech model",
+      removed.status === 200 &&
+        field(modelOf(removed.body, "whisper-turbo"), "phase") === "missing" &&
+        isDeepStrictEqual(callsOf("removeVoiceModel"), [["whisper-turbo"]]),
+      summary(removed),
+    );
+  }
+
+  {
+    const v10 = { capabilities: [HOST_SIGNAL_HOME_CAPABILITY], protocol: TEAM_PROTOCOL_V10 };
+    const route = HOST_SIGNAL_HOME_ROUTES;
+    const latencyOf = (body: Json, id: string) =>
+      field(
+        list(field(body, "homes")).find((home) => field(home, "id") === id),
+        "latencyMs",
+      );
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const unsupported = await call("POST", route.settings, {
+      token: adaToken,
+      json: {},
+      capabilities: [],
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    const memberRead = await call("POST", route.settings, { token: bobToken, json: {}, ...v10 });
+    const memberChange = await call("POST", route.update, { token: bobToken, json: { home: "au" }, ...v10 });
+    check(
+      "the host advertises host-signal-home-v1; a member reads the Signal servers but cannot choose one, and a client without the capability gets 400",
+      JSON.stringify(compatibility.body).includes(HOST_SIGNAL_HOME_CAPABILITY) &&
+        errorIs(unsupported, 400, sourceText("error.team.hostSignalHomeUnsupported")) &&
+        memberRead.status === 200 &&
+        list(field(memberRead.body, "homes")).length === 3 &&
+        errorIs(memberChange, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("followSignalHome").length === 0,
+      [summary(unsupported), summary(memberRead), summary(memberChange)],
+    );
+    const adminRead = await call("POST", route.settings, { token: adaToken, json: {}, ...v10 });
+    check(
+      "an admin reads each Signal server with the latency that the host measures once a minute, and no latency for a server that does not answer",
+      adminRead.status === 200 &&
+        field(adminRead.body, "preferred") === null &&
+        field(adminRead.body, "current") === "a" &&
+        typeof latencyOf(adminRead.body, "a") === "number" &&
+        typeof latencyOf(adminRead.body, "au") === "number" &&
+        latencyOf(adminRead.body, "sg") === null &&
+        callsOf("signalHealth").filter(([url]) => url === "https://signal-a.test/health/ready").length === 4,
+      summary(adminRead),
+    );
+    const unknown = await call("POST", route.update, { token: adaToken, json: { home: "eu" }, ...v10 });
+    const invalid = await call("POST", route.update, { token: adaToken, json: { home: "Not a home" }, ...v10 });
+    check(
+      "the host refuses a Signal server that the account service does not list, and saves nothing",
+      errorIs(unknown, 400, sourceText("error.host.signalHomeUnknown")) &&
+        invalid.status === 400 &&
+        !existsSync(signalHomePreferencePath) &&
+        callsOf("followSignalHome").length === 0,
+      [summary(unknown), summary(invalid)],
+    );
+    const chosen = await call("POST", route.update, { token: adaToken, json: { home: "au" }, ...v10 });
+    check(
+      "an admin chooses a Signal server; the host saves it, moves to it, and answers with the new server in use",
+      chosen.status === 200 &&
+        field(chosen.body, "preferred") === "au" &&
+        field(chosen.body, "current") === "au" &&
+        hostSignalHome.preferred() === "au" &&
+        JSON.parse(readFileSync(signalHomePreferencePath, "utf8")).home === "au" &&
+        callsOf("followSignalHome").length === 1,
+      summary(chosen),
+    );
+    const reloaded = new HostSignalHomeService({
+      path: signalHomePreferencePath,
+      fetch: async () => new Response("{}", { status: 200 }),
+      listHomes: () => Effect.succeed([]),
+      currentHome: () => null,
+      followHome: () => Effect.void,
+    });
+    await Effect.runPromise(reloaded.load());
+    const automatic = await call("POST", route.update, { token: adaToken, json: { home: null }, ...v10 });
+    check(
+      "the choice stays after a restart, and an admin returns the server to the automatic Signal server",
+      reloaded.preferred() === "au" &&
+        automatic.status === 200 &&
+        field(automatic.body, "preferred") === null &&
+        field(automatic.body, "current") === "a" &&
+        callsOf("followSignalHome").length === 2,
+      summary(automatic),
     );
   }
 
@@ -4114,6 +4718,145 @@ try {
   }
 
   {
+    const v10 = { capabilities: [CHANNEL_FOLDERS_CAPABILITY], protocol: TEAM_PROTOCOL_V10 };
+    const shared = join(root, "channel-shared-work");
+    mkdirSync(join(shared, "docs"), { recursive: true });
+    const work = realpathSync(shared);
+    const docs = realpathSync(join(shared, "docs"));
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises channel-folders-v1 to a protocol 10 peer only",
+      list(field(compatibility.body, "capabilities")).includes(CHANNEL_FOLDERS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(CHANNEL_FOLDERS_CAPABILITY),
+      [summary(compatibility).status, list(field(older.body, "capabilities")).length],
+    );
+    const writes = callsOf("setChannelFolders").length;
+    const unsupported = await call("POST", CHANNEL_FOLDERS_ROUTES.read, {
+      token: adaToken,
+      json: { channelId: "channel-shared" },
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    check(
+      "the channel folder routes without the capability get 400 channelFoldersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.channelFoldersUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", CHANNEL_FOLDERS_ROUTES.read, {
+      token: bobToken,
+      json: { channelId: "channel-shared" },
+      ...v10,
+    });
+    const memberBrowse = await call("POST", CHANNEL_FOLDERS_ROUTES.browse, {
+      token: bobToken,
+      json: { channelId: "channel-shared", path: null },
+      ...v10,
+    });
+    const memberAdd = await call("POST", CHANNEL_FOLDERS_ROUTES.add, {
+      token: bobToken,
+      json: { channelId: "channel-shared", path: work },
+      ...v10,
+    });
+    check(
+      "a member cannot read, browse or change the folders of a group chat",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberBrowse, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberAdd, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("setChannelFolders").length === writes,
+      [summary(memberRead), summary(memberBrowse), summary(memberAdd)],
+    );
+    const browse = await call("POST", CHANNEL_FOLDERS_ROUTES.browse, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: work },
+      ...v10,
+    });
+    check(
+      "an admin lists the folders in a host folder for a group chat",
+      browse.status === 200 &&
+        field(browse.body, "path") === work &&
+        isDeepStrictEqual(field(browse.body, "entries"), [{ name: "docs", path: docs }]),
+      summary(browse),
+    );
+    const added = await call("POST", CHANNEL_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: work },
+      ...v10,
+    });
+    const readBack = await call("POST", CHANNEL_FOLDERS_ROUTES.read, {
+      token: adaToken,
+      json: { channelId: "channel-shared" },
+      ...v10,
+    });
+    check(
+      "an admin adds a host folder to a group chat and reads it back",
+      added.status === 200 &&
+        field(added.body, "outcome") === "added" &&
+        isDeepStrictEqual(field(readBack.body, "folders"), [{ path: work, found: true }]) &&
+        isDeepStrictEqual(callsOf("setChannelFolders").at(-1), ["channel-shared", [work]]),
+      [summary(added), summary(readBack)],
+    );
+    const covered = await call("POST", CHANNEL_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: docs },
+      ...v10,
+    });
+    const userData = await call("POST", CHANNEL_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: join(root, "user-data") },
+      ...v10,
+    });
+    const memberWorkspace = await call("POST", CHANNEL_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: join(root, "workspaces", "agent-ada") },
+      ...v10,
+    });
+    const gone = await call("POST", CHANNEL_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: join(shared, "gone") },
+      ...v10,
+    });
+    check(
+      "the host does not add a folder in an added folder, the app data, a member workspace, or a missing folder, and writes nothing",
+      field(covered.body, "outcome") === "covered" &&
+        field(covered.body, "folder") === work &&
+        field(userData.body, "refusal") === "protected" &&
+        field(memberWorkspace.body, "refusal") === "protected" &&
+        field(gone.body, "refusal") === "missing" &&
+        callsOf("setChannelFolders").length === writes + 1,
+      [summary(covered), summary(userData), summary(memberWorkspace), summary(gone)],
+    );
+    const removed = await call("POST", CHANNEL_FOLDERS_ROUTES.remove, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: work },
+      ...v10,
+    });
+    check(
+      "an admin removes the folder from the group chat",
+      field(removed.body, "outcome") === "removed" &&
+        isDeepStrictEqual(field(removed.body, "list", "folders"), []) &&
+        isDeepStrictEqual(callsOf("setChannelFolders").at(-1), ["channel-shared", []]),
+      summary(removed),
+    );
+    const missing = await call("POST", CHANNEL_FOLDERS_ROUTES.read, {
+      token: adaToken,
+      json: { channelId: "channel-none" },
+      ...v10,
+    });
+    const emptyPath = await call("POST", CHANNEL_FOLDERS_ROUTES.add, {
+      token: adaToken,
+      json: { channelId: "channel-shared", path: "" },
+      ...v10,
+    });
+    check(
+      "an unknown group chat gets 404 channelNotFound, an empty path gets 400, and the host writes nothing",
+      errorIs(missing, 404, sourceText("error.backend.channelNotFound")) &&
+        emptyPath.status === 400 &&
+        callsOf("setChannelFolders").length === writes + 2,
+      [summary(missing), summary(emptyPath)],
+    );
+  }
+
+  {
     const v9 = { capabilities: [PROVIDER_ACCOUNT_MODELS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
     const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
@@ -4267,6 +5010,71 @@ try {
       "an admin turns the pool off again",
       offAgain.status === 200 && isDeepStrictEqual(cleared.body, { pools: [] }),
       [summary(offAgain), summary(cleared)],
+    );
+  }
+
+  {
+    const v10 = { capabilities: [LIVE_VOICE_CAPABILITY, LIVE_VOICE_ACCOUNT_CAPABILITY], protocol: TEAM_PROTOCOL_V10 };
+    const route = LIVE_VOICE_ACCOUNT_ROUTES;
+    const unsupported = await call("POST", route.settings, {
+      token: adaToken,
+      json: {},
+      capabilities: [LIVE_VOICE_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    check(
+      "the live voice account route without live-voice-account-v1 gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const writes = callsOf("setLiveVoiceAccount").length;
+    const memberRead = await call("POST", route.settings, { token: bobToken, json: {}, ...v10 });
+    const memberUpdate = await call("POST", route.update, {
+      token: bobToken,
+      json: { accountId: ULTRA_ACCOUNT },
+      ...v10,
+    });
+    check(
+      "a member cannot read or change the live voice account, and the host writes nothing",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberUpdate, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("setLiveVoiceAccount").length === writes,
+      [summary(memberRead), summary(memberUpdate)],
+    );
+    const automatic = await call("POST", route.settings, { token: adaToken, json: {}, ...v10 });
+    check(
+      "with no choice, the live voice account is automatic",
+      automatic.status === 200 && isDeepStrictEqual(automatic.body, { accountId: null }),
+      summary(automatic),
+    );
+    const badAccount = await call("POST", route.update, {
+      token: adaToken,
+      json: { accountId: "not-an-account" },
+      ...v10,
+    });
+    check(
+      "an account id that is not one gets 400, and the host writes nothing",
+      badAccount.status === 400 && callsOf("setLiveVoiceAccount").length === writes,
+      summary(badAccount),
+    );
+    const chosen = await call("POST", route.update, { token: adaToken, json: { accountId: ULTRA_ACCOUNT }, ...v10 });
+    const read = await call("POST", route.settings, { token: adaToken, json: {}, ...v10 });
+    check(
+      "an admin chooses the Codex account for live voice, and the client decodes it",
+      chosen.status === 200 &&
+        isDeepStrictEqual(callsOf("setLiveVoiceAccount").at(-1), [ULTRA_ACCOUNT]) &&
+        read.status === 200 &&
+        decodeLiveVoiceAccount(read.body) === ULTRA_ACCOUNT,
+      [summary(chosen), summary(read)],
+    );
+    const reset = await call("POST", route.update, { token: adaToken, json: { accountId: null }, ...v10 });
+    const cleared = await call("POST", route.settings, { token: adaToken, json: {}, ...v10 });
+    check(
+      "an admin sets the live voice account back to automatic",
+      reset.status === 200 &&
+        isDeepStrictEqual(callsOf("setLiveVoiceAccount").at(-1), [null]) &&
+        isDeepStrictEqual(cleared.body, { accountId: null }),
+      [summary(reset), summary(cleared)],
     );
   }
 
@@ -5032,6 +5840,116 @@ try {
   }
 
   {
+    const memoryCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_BUILTIN_MEMORY_CAPABILITY];
+    const v10 = { capabilities: memoryCapabilities, protocol: TEAM_PROTOCOL_V10 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises agent-builtin-memory-v1 to a protocol 10 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_BUILTIN_MEMORY_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(AGENT_BUILTIN_MEMORY_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const writes = callsOf("updateAgent").length;
+    const adminRead = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      ...v10,
+    });
+    check(
+      "an admin reads that OpenBot memory is on for an agent with no own value",
+      adminRead.status === 200 && isDeepStrictEqual(adminRead.body, { memory: true }),
+      summary(adminRead),
+    );
+    const unsupported = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    check(
+      "the OpenBot memory routes without the capability get 400 agentSettingsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.agentSettingsUnsupported")),
+      summary(unsupported),
+    );
+    const memberRead = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.settings, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      ...v10,
+    });
+    const memberSet = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.update, {
+      token: bobToken,
+      json: { agentId: "agent-ada", memory: false },
+      ...v10,
+    });
+    check(
+      "a member cannot read or set OpenBot memory",
+      errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("updateAgent").length === writes,
+      [summary(memberRead), summary(memberSet)],
+    );
+    const notBoolean = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", memory: null },
+      ...v10,
+    });
+    check(
+      "the host refuses an OpenBot memory value that is not a boolean, and writes nothing",
+      notBoolean.status === 400 && callsOf("updateAgent").length === writes,
+      summary(notBoolean),
+    );
+    const adminOff = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", memory: false },
+      ...v10,
+    });
+    const readOff = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      ...v10,
+    });
+    check(
+      "an admin turns off OpenBot memory through the agent writer and reads it back",
+      adminOff.status === 200 &&
+        isDeepStrictEqual(adminOff.body, { memory: false }) &&
+        isDeepStrictEqual(readOff.body, { memory: false }) &&
+        isDeepStrictEqual(callsOf("updateAgent").at(-1), [{ agentId: "agent-ada", memory: false }]),
+      [summary(adminOff), summary(readOff)],
+    );
+    const adminOn = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.update, {
+      token: adaToken,
+      json: { agentId: "agent-ada", memory: true },
+      ...v10,
+    });
+    const missing = await call("POST", AGENT_BUILTIN_MEMORY_ROUTES.settings, {
+      token: adaToken,
+      json: { agentId: "agent-none" },
+      ...v10,
+    });
+    check(
+      "an admin turns OpenBot memory on again, and an unknown agent gets 404",
+      adminOn.status === 200 &&
+        isDeepStrictEqual(adminOn.body, { memory: true }) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")),
+      [summary(adminOn), summary(missing)],
+    );
+    const colorWrites = callsOf("updateAgentColor").length;
+    const profilePatch = await call("PATCH", TEAM_API_ROUTES.agent.one("agent-ada"), {
+      token: adaToken,
+      json: { memory: false },
+      ...v10,
+    });
+    check(
+      "the agent profile update refuses OpenBot memory and writes nothing",
+      profilePatch.status === 400 &&
+        callsOf("updateAgent").length === writes + 2 &&
+        callsOf("updateAgentColor").length === colorWrites,
+      summary(profilePatch),
+    );
+  }
+
+  {
     const defaultsCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, AGENT_DEFAULTS_CAPABILITY];
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
     const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
@@ -5469,6 +6387,71 @@ try {
       steering.status === 200 &&
         isDeepStrictEqual(steering.body, { models: [{ provider: "acp", id: "steering-agent/default" }] }),
       summary(steering),
+    );
+  }
+
+  {
+    const visibilityCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, MODEL_VISIBILITY_CAPABILITY];
+    const keptCapabilities = [...visibilityCapabilities, MODEL_VISIBILITY_KEPT_CAPABILITY];
+    const ada = agents.find((item) => item.id === "agent-ada");
+    assert.ok(ada, "agent-ada is missing.");
+    const backups = ada.backupModels;
+    ada.backupModels = { automatic: true, order: [{ provider: "codex", model: "gpt-standard" }] };
+    const hide = await call("POST", MODEL_VISIBILITY_ROUTES.update, {
+      token: adaToken,
+      json: { provider: "codex", shown: [] },
+      capabilities: visibilityCapabilities,
+    });
+    const unsupported = await call("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: visibilityCapabilities,
+    });
+    const kept = await call("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: keptCapabilities,
+    });
+    const listing = await call("POST", MODEL_VISIBILITY_ROUTES.listing, {
+      token: bobToken,
+      json: {},
+      capabilities: keptCapabilities,
+    });
+    const released = await call("GET", TEAM_API_ROUTES.agents.models, {
+      token: bobToken,
+      capabilities: keptCapabilities,
+    });
+    const ids = list(released.body).map((model) => field(model, "id"));
+    check(
+      "a turned-off model that an agent uses stays in the model list, and only model-visibility-kept-v1 marks it",
+      hide.status === 200 &&
+        errorIs(unsupported, 400, sourceText("error.team.modelVisibilityUnsupported")) &&
+        kept.status === 200 &&
+        isDeepStrictEqual(kept.body, { models: [{ provider: "codex", id: "gpt-standard" }] }) &&
+        listing.status === 200 &&
+        list(field(listing.body, "models")).every((entry) => field(entry, "id") !== "gpt-standard") &&
+        released.status === 200 &&
+        ids.includes("gpt-standard") &&
+        !ids.includes("gpt-fast") &&
+        list(released.body).every((model) => field(model, "listing") === undefined),
+      [summary(hide), summary(unsupported), summary(kept), summary(listing), summary(released)],
+    );
+    const reset = await call("POST", MODEL_VISIBILITY_ROUTES.update, {
+      token: adaToken,
+      json: { provider: "codex", shown: null },
+      capabilities: visibilityCapabilities,
+    });
+    if (backups) ada.backupModels = backups;
+    else delete ada.backupModels;
+    const none = await call("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: keptCapabilities,
+    });
+    check(
+      "after a reset no model is kept",
+      reset.status === 200 && none.status === 200 && isDeepStrictEqual(none.body, { models: [] }),
+      [summary(reset), summary(none)],
     );
   }
 
@@ -6063,6 +7046,13 @@ try {
       [summary(compatibility), summary(older)],
     );
     check(
+      "the host advertises prompt-cache-ttl-pi-v1 with prompt-cache-ttl-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(PROMPT_CACHE_TTL_PI_CAPABILITY) &&
+        decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(PROMPT_CACHE_TTL_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(PROMPT_CACHE_TTL_PI_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    check(
       "the host advertises vault-member-save-v1 to a protocol 10 peer only",
       decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(VAULT_MEMBER_SAVE_CAPABILITY) &&
         !list(field(older.body, "capabilities")).includes(VAULT_MEMBER_SAVE_CAPABILITY),
@@ -6259,6 +7249,88 @@ try {
           [{ agentId: "agent-ada", messageId: "suggestion-2" }],
         ]),
       [summary(saved), summary(notSaved)],
+    );
+  }
+
+  {
+    const capabilities = [TEAM_PROMPT_DETAIL_CAPABILITY];
+    check(
+      "prompt-detail-v1 is a protocol 10 capability only",
+      !teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).includes(TEAM_PROMPT_DETAIL_CAPABILITY) &&
+        teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).includes(TEAM_PROMPT_DETAIL_CAPABILITY),
+    );
+    const detailPagePath = `${TEAM_API_ROUTES.agent.conversationPage("agent-ada")}?around=detail-question`;
+    const withDetail = await call("GET", detailPagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities,
+    });
+    const withoutDetail = await call("GET", detailPagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [],
+    });
+    const pageQuestion = (body: Json | undefined) =>
+      list(field(list(field(body, "messages"))[0], "questionPrompt", "questions"))[0];
+    check(
+      "a conversation page carries the detail of an agent question only with prompt-detail-v1",
+      withDetail.status === 200 &&
+        field(pageQuestion(withDetail.body), "detail") === PROMPT_DETAIL_E2E_TEXT &&
+        field(pageQuestion(withDetail.body), "question") === "Did the install work?" &&
+        withoutDetail.status === 200 &&
+        field(pageQuestion(withoutDetail.body), "question") === "Did the install work?" &&
+        field(pageQuestion(withoutDetail.body), "detail") === undefined,
+      [summary(withDetail), summary(withoutDetail)],
+    );
+    const decoded = teamHttpCodec(TEAM_PROTOCOL_V10).decodeResponse("GET", detailPagePath, 200, withDetail.body);
+    const frozenDetail = field(pageQuestion(parseJson(JSON.stringify(decoded))), "detail");
+    addPromptQuestionDetails(decoded, withDetail.body);
+    const restoredDetail = field(pageQuestion(parseJson(JSON.stringify(decoded))), "detail");
+    check(
+      "a client copies the question detail back after the frozen codec decodes the page",
+      frozenDetail === undefined && restoredDetail === PROMPT_DETAIL_E2E_TEXT,
+      { frozenDetail: frozenDetail ?? null, restoredDetail: restoredDetail ?? null },
+    );
+
+    const promptEvent = {
+      type: "prompt" as const,
+      requestId: 7,
+      agentId: "agent-ada",
+      threadId: "thread-agent-ada",
+      turnId: "turn-1",
+      questions: [
+        {
+          id: "install",
+          header: "Install",
+          question: "Did the install work?",
+          detail: PROMPT_DETAIL_E2E_TEXT,
+          isSecret: false,
+          options: [
+            { label: "Done", description: "It worked." },
+            { label: "Need help", description: "It failed." },
+          ],
+        },
+      ],
+    };
+    const plainEvent = encodeTeamProtocolV8BaseCurrentEvent(promptEvent, {}) ?? "";
+    const detailEvent = JSON.parse(withPromptQuestionDetails(plainEvent, promptEvent));
+    const readEvent = decodeTeamProtocolV8BaseCurrentEvent(detailEvent);
+    const frozenEventDetail =
+      readEvent.kind === "known" && readEvent.event.type === "prompt" ? readEvent.event.questions[0]?.detail : null;
+    if (readEvent.kind === "known") addPromptQuestionDetails(readEvent.event, detailEvent);
+    const restoredEvent = readEvent.kind === "known" && readEvent.event.type === "prompt" ? readEvent.event : null;
+    const otherAgentEvent = JSON.parse(
+      withPromptQuestionDetails(plainEvent, { ...promptEvent, agentId: "agent-pi", type: "prompt" }),
+    );
+    check(
+      "a prompt event carries the question detail with prompt-detail-v1, and only for the same prompt",
+      !plainEvent.includes("echo hello") &&
+        frozenEventDetail === undefined &&
+        restoredEvent?.questions[0]?.detail === PROMPT_DETAIL_E2E_TEXT &&
+        restoredEvent?.questions[0]?.question === "Did the install work?" &&
+        restoredEvent?.questions[0]?.options?.length === 2 &&
+        !JSON.stringify(otherAgentEvent).includes("echo hello"),
+      { plainEvent, restored: restoredEvent?.questions[0] ?? null },
     );
   }
 
@@ -6588,6 +7660,47 @@ try {
   }
 
   {
+    const path = TEAM_API_ROUTES.agents.usage;
+    readFailedUsageLimit = { id: "grok", primary: null, secondary: null, readFailed: true };
+    const read = (headers?: Record<string, string>, protocol: number = TEAM_PROTOCOL_V10) =>
+      call("GET", path, { token: bobToken, protocol, ...(headers ? { headers } : {}) });
+    const grokLimit = (body: unknown) =>
+      isDynamicRecord(body) && Array.isArray(body.limits)
+        ? (body.limits.find((limit) => isDynamicRecord(limit) && limit.id === "grok") ?? null)
+        : "no limits";
+    const withFlag = await read(teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES));
+    const plain = await read(
+      teamCapabilityHeaders(
+        TEAM_PROTOCOL_V10,
+        TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== TEAM_USAGE_READ_FAILED_CAPABILITY),
+      ),
+    );
+    const older = await read(undefined, TEAM_PROTOCOL_V9);
+    const decoded =
+      withFlag.status === 200 ? decodeTeamProtocolV8CurrentHttpResponse("GET", path, 200, withFlag.body) : null;
+    check(
+      "a client with usage-read-failed-v1 reads the failed Grok usage read, and its decoder keeps it",
+      withFlag.status === 200 &&
+        isAccountUsage(decoded) &&
+        isDeepStrictEqual(grokLimit(decoded), readFailedUsageLimit) &&
+        decoded.limits.length === 3,
+      [summary(withFlag), decoded],
+    );
+    check(
+      "a client without usage-read-failed-v1, and a protocol 9 client, read the usage without it, as before",
+      plain.status === 200 &&
+        grokLimit(plain.body) === null &&
+        older.status === 200 &&
+        grokLimit(older.body) === null &&
+        isDynamicRecord(plain.body) &&
+        Array.isArray(plain.body.limits) &&
+        plain.body.limits.length === 2,
+      [summary(plain), summary(older)],
+    );
+    readFailedUsageLimit = null;
+  }
+
+  {
     const withSkillProblems = teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES);
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
       protocol: TEAM_PROTOCOL_V10,
@@ -6619,14 +7732,19 @@ try {
         .filter((skill) => skill.skillId.startsWith("workspace:"))
         .map(({ slug, problem }) => ({ slug, problem }));
     check(
-      "an older client gets only the usable skill folder, as before",
-      plain.status === 200 && isDeepStrictEqual(named(plain), [{ slug: "good-skill", problem: undefined }]),
+      "an older client gets only the usable skill folders, as before, and a byte order mark does not make a folder unusable",
+      plain.status === 200 &&
+        isDeepStrictEqual(named(plain), [
+          { slug: "bom-skill", problem: undefined },
+          { slug: "good-skill", problem: undefined },
+        ]),
       summary(plain),
     );
     check(
-      "a client with skill-problems-v1 also gets the folder whose SKILL.md has a byte order mark, with the reason",
+      "a client with skill-problems-v1 also gets the folder whose SKILL.md has no frontmatter, with the reason",
       withProblems.status === 200 &&
         isDeepStrictEqual(named(withProblems), [
+          { slug: "bom-skill", problem: undefined },
           { slug: "good-skill", problem: undefined },
           { slug: "settlement-economy", problem: sourceText("error.skill.frontmatterMissing") },
         ]),
@@ -7039,6 +8157,79 @@ try {
         errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
         callsOf("readTaskPage").length === 1,
       [summary(hidden), summary(missing)],
+    );
+  }
+
+  {
+    const capabilities = [AGENT_ARCHIVED_THREADS_CAPABILITY];
+    const v10 = { capabilities, protocol: TEAM_PROTOCOL_V10 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises agent-archived-threads-v1 to a protocol 10 peer only",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_ARCHIVED_THREADS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(AGENT_ARCHIVED_THREADS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const first = { agentId: "agent-ada", before: null };
+    const unsupported = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, { token: bobToken, json: first });
+    check(
+      "the archived thread route without the capability gets 400 threadRemoteUnsupported, and reads nothing",
+      errorIs(unsupported, 400, sourceText("error.backend.threadRemoteUnsupported")) &&
+        callsOf("listArchivedTasks").length === 0,
+      summary(unsupported),
+    );
+    const page = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, { token: bobToken, ...v10, json: first });
+    const next = {
+      agentId: "agent-ada",
+      before: { updatedAt: "2026-11-01T08:00:00.000Z", threadId: "thread-task-archived" },
+    };
+    const after = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, { token: bobToken, ...v10, json: next });
+    const tasks = list(field(page.body, "tasks"));
+    check(
+      "a member reads the archived threads page by page: the host gets the place, and answers archived tasks and hasMore",
+      page.status === 200 &&
+        tasks.length === 1 &&
+        field(tasks[0], "id") === "task-archived" &&
+        field(tasks[0], "state") === "closed" &&
+        field(page.body, "hasMore") === true &&
+        after.status === 200 &&
+        field(after.body, "hasMore") === false &&
+        isDeepStrictEqual(callsOf("listArchivedTasks"), [[first], [next]]),
+      [summary(page), summary(after), callsOf("listArchivedTasks")],
+    );
+    const extra = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, {
+      token: bobToken,
+      ...v10,
+      json: { ...first, limit: 100 },
+    });
+    const noPlace = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, {
+      token: bobToken,
+      ...v10,
+      json: { agentId: "agent-ada" },
+    });
+    const badPlace = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, {
+      token: bobToken,
+      ...v10,
+      json: { agentId: "agent-ada", before: { updatedAt: "2026-11-01T08:00:00.000Z", threadId: "" } },
+    });
+    check(
+      "the frozen codec refuses an unknown field, a missing place, and a place with an empty thread id",
+      extra.status === 400 &&
+        noPlace.status === 400 &&
+        badPlace.status === 400 &&
+        callsOf("listArchivedTasks").length === 2,
+      [summary(extra), summary(noPlace), summary(badPlace)],
+    );
+    const missing = await call("POST", AGENT_ARCHIVED_THREADS_ROUTES.list, {
+      token: bobToken,
+      ...v10,
+      json: { ...first, agentId: "agent-none" },
+    });
+    check(
+      "an unknown agent gets 404 and reads nothing",
+      errorIs(missing, 404, sourceText("error.team.agentNotFound")) && callsOf("listArchivedTasks").length === 2,
+      summary(missing),
     );
   }
 
@@ -8171,6 +9362,46 @@ try {
   }
 
   {
+    const newest = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises antigravity-code-sign-in-v1 to a protocol 10 peer only",
+      list(field(newest.body, "capabilities")).includes(ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY),
+      [summary(newest), summary(older)],
+    );
+    const v10 = {
+      token: adaToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [PROVIDERS_V8_CAPABILITY, ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY],
+    };
+    const before = callsOf("startProviderCodeLogin").length;
+    const started = await call("POST", PROVIDERS_V8_ROUTES.codeLoginStart, {
+      ...v10,
+      json: { provider: "antigravity" },
+    });
+    check(
+      "an admin starts the Gemini code sign-in on providers-v8 and gets the Google link to paste a code from",
+      started.status === 200 &&
+        field(started.body, "kind") === "paste" &&
+        field(started.body, "verificationUrl") === GOOGLE_SIGN_IN_PAGE &&
+        isDeepStrictEqual(callsOf("startProviderCodeLogin").slice(before), [["antigravity"]]),
+      summary(started),
+    );
+    const member = await call("POST", PROVIDERS_V8_ROUTES.codeLoginStart, {
+      ...v10,
+      token: bobToken,
+      json: { provider: "antigravity" },
+    });
+    check(
+      "a member gets 403 and starts no Gemini sign-in",
+      member.status === 403 && callsOf("startProviderCodeLogin").length === before + 1,
+      summary(member),
+    );
+  }
+
+  {
     const v8 = { token: adaToken, protocol: 8, capabilities: [PROVIDERS_V8_CAPABILITY] };
     const key = ["sk", "e2e", "deepseek", "fake0000"].join("-");
     const before = await call("POST", PROVIDERS_V8_ROUTES.apiKeyState, { ...v8, json: { provider: "deepseek" } });
@@ -8344,6 +9575,57 @@ try {
         isDeepStrictEqual(off.body, { enabled: false }) &&
         callsOf("claudeUserSetupChanged").length === 2,
       [summary(member), summary(memberRead), summary(noCapability), summary(off)],
+    );
+  }
+
+  {
+    const setup = { token: adaToken, protocol: TEAM_PROTOCOL_V10, capabilities: [CACHE_EXPIRY_COMPACTION_CAPABILITY] };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES),
+    });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const before = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.settings, { ...setup, json: {} });
+    const off = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, { ...setup, json: { enabled: false } });
+    const after = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.settings, { ...setup, json: {} });
+    const saved = parseJson(readFileSync(join(root, "cache-expiry-compaction.json"), "utf8"));
+    check(
+      "the host advertises cache-expiry-compaction-v1 to a protocol 10 peer only, the switch is on by default, and an admin turns it off, which the host saves",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(CACHE_EXPIRY_COMPACTION_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(CACHE_EXPIRY_COMPACTION_CAPABILITY) &&
+        isDeepStrictEqual(before.body, { enabled: true }) &&
+        isDeepStrictEqual(off.body, { enabled: false }) &&
+        isDeepStrictEqual(after.body, { enabled: false }) &&
+        CACHE_EXPIRY_COMPACTION_CODECS.get(CACHE_EXPIRY_COMPACTION_ROUTES.update)?.response(200, off.body) !==
+          undefined &&
+        isDeepStrictEqual(saved, { version: 1, enabled: false }),
+      [summary(compatibility), summary(before), summary(off), summary(after)],
+    );
+    const member = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, {
+      ...setup,
+      token: bobToken,
+      json: { enabled: true },
+    });
+    const memberRead = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.settings, {
+      ...setup,
+      token: bobToken,
+      json: {},
+    });
+    const noCapability = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, {
+      token: adaToken,
+      protocol: TEAM_PROTOCOL_V10,
+      json: { enabled: true },
+    });
+    const unchanged = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.settings, { ...setup, json: {} });
+    const on = await call("POST", CACHE_EXPIRY_COMPACTION_ROUTES.update, { ...setup, json: { enabled: true } });
+    check(
+      "a member cannot read or set the compaction switch (403), a client without cache-expiry-compaction-v1 gets 400, and neither changes it",
+      member.status === 403 &&
+        memberRead.status === 403 &&
+        errorIs(noCapability, 400, sourceText("error.team.cacheExpiryCompactionUnsupported")) &&
+        isDeepStrictEqual(unchanged.body, { enabled: false }) &&
+        isDeepStrictEqual(on.body, { enabled: true }),
+      [summary(member), summary(memberRead), summary(noCapability), summary(on)],
     );
   }
 
@@ -8768,6 +10050,105 @@ try {
         Buffer.from(visibleRead.bytes).equals(Buffer.from(png)) &&
         pictures.store.get(channelId).imageUrl === field(visible.body, "imageUrl"),
       [summary(hidden), summary(hiddenRead), summary(visible), { status: visibleRead.status, body: visibleRead.type }],
+    );
+
+    const alert = (id: string, author: ChannelMessage["author"]): ChannelMessage => ({
+      id,
+      channelId,
+      taskId: null,
+      author,
+      sequence: 0,
+      superseded: false,
+      message: {
+        id,
+        text: id,
+        author: author.kind === "member" ? "user" : "assistant",
+        createdAt: new Date(clock).toISOString(),
+        status: "completed",
+      },
+    });
+    const postAlert = (id: string, author: ChannelMessage["author"]) =>
+      pictures.store.commit(`alert:${id}`, {
+        channel: pictures.store.get(channelId),
+        messages: [alert(id, author)],
+        tasks: [],
+        assignments: [],
+      });
+    const alertMember = { kind: "member" as const, id: "member-alerts", name: "Alerts" };
+    postAlert("alert-first", alertMember);
+    postAlert("alert-second", alertMember);
+    const alertPage = await call("POST", CHANNEL_ROUTES.read, { ...use, json: { channelId } });
+    const heldSequence = field(alertPage.body, "throughSequence");
+    const deletedAlert = pictures.store.message(channelId, "alert-second");
+    if (deletedAlert) pictures.store.deleteMessage(pictures.store.get(channelId), deletedAlert);
+    const shownSequence = pictures.store.page(channelId).throughSequence;
+    const alertLogStart = logged.length;
+    const markRead = (throughSequence: unknown, operationId: string) =>
+      call("POST", CHANNEL_ROUTES.command, { ...use, json: { type: "read", operationId, channelId, throughSequence } });
+    const readAfterDelete = await markRead(heldSequence, "alert-read-after-delete");
+    const readPastHistory = await markRead(999, "alert-read-past-history");
+    postAlert("alert-third", { kind: "agent", id: "agent-ada", name: "Ada" });
+    const alertRow = list((await call("GET", CHANNEL_ROUTES.list, use)).body).find(
+      (row) => field(row, "id") === channelId,
+    );
+    check(
+      "a read through a deleted newest message and a read past the history both answer 200, and a later message stays unread",
+      typeof heldSequence === "number" &&
+        deletedAlert !== null &&
+        shownSequence < heldSequence &&
+        readAfterDelete.status === 200 &&
+        readPastHistory.status === 200 &&
+        field(alertRow, "unreadCount") === 1 &&
+        logged.slice(alertLogStart).every((line) => !line.includes("Team API request failed")),
+      [heldSequence, shownSequence, summary(readAfterDelete), summary(readPastHistory), field(alertRow, "unreadCount")],
+    );
+
+    const pageTask = (id: string, requestMessageId: string, state: ChannelTask["state"]): ChannelTask => ({
+      id,
+      channelId,
+      parentTaskId: null,
+      rootTaskId: id,
+      ownerAgentId: "agent-ada",
+      requestMessageId,
+      instruction: id,
+      attachmentDraftIds: [],
+      expectedResult: id,
+      sourceMessageIds: [requestMessageId],
+      dependencies: [],
+      resources: [],
+      state,
+      revision: 1,
+      assignmentCount: 1,
+      error: null,
+    });
+    pictures.store.commit("page-tasks", {
+      channel: pictures.store.get(channelId),
+      messages: [],
+      tasks: [
+        pageTask("task-history", "message-not-in-channel", "completed"),
+        pageTask("task-open", "message-not-in-channel", "running"),
+        pageTask("task-shown", "alert-first", "completed"),
+      ],
+      assignments: [],
+    });
+    const taskIds = (reply: Reply) =>
+      list(field(reply.body, "tasks"))
+        .map((task) => field(task, "id"))
+        .filter((id) => typeof id === "string" && id.startsWith("task-"))
+        .sort();
+    const fullTasks = await call("POST", CHANNEL_ROUTES.read, { ...use, json: { channelId } });
+    const windowTasks = await call("POST", CHANNEL_ROUTES.read, {
+      ...use,
+      capabilities: [...pictured, CHANNEL_PAGE_TASKS_CAPABILITY],
+      json: { channelId },
+    });
+    check(
+      "a client with channel-page-tasks-v1 gets only open runs and the tasks of shown messages, and an older client keeps every task",
+      fullTasks.status === 200 &&
+        windowTasks.status === 200 &&
+        taskIds(fullTasks).join() === "task-history,task-open,task-shown" &&
+        taskIds(windowTasks).join() === "task-open,task-shown",
+      [taskIds(fullTasks), taskIds(windowTasks)],
     );
   }
 
@@ -9367,14 +10748,29 @@ try {
         bitwardenCalls.length === 0,
       summary(plainHttp),
     );
+    const wrongKeySettled = bitwardenSettled(bitwardenConnector);
+    const wrongKey = await connectAs(adaToken, { ...input, clientSecret: "wrong-client-secret" });
+    const wrongKeyStatus = await wrongKeySettled;
+    check(
+      "a wrong API key names the sign-in step, does not unlock, and leaves no CLI data",
+      field(wrongKey.body, "state") === "connecting" &&
+        !wrongKeyStatus.connected &&
+        wrongKeyStatus.error === sourceText("error.connector.bitwardenHostSignInFailed") &&
+        bitwardenCalls.some((entry) => entry.args[0] === "login") &&
+        !bitwardenCalls.some((entry) => entry.args[0] === "unlock") &&
+        !existsSync(bitwardenFile) &&
+        !existsSync(bitwardenData),
+      { wrongKey: summary(wrongKey), wrongKeyStatus },
+    );
+    bitwardenCalls.length = 0;
     const wrongSettled = bitwardenSettled(bitwardenConnector);
     const wrong = await connectAs(adaToken, { ...input, masterPassword: "wrong-master-password" });
     const wrongStatus = await wrongSettled;
     check(
-      "a wrong master password leaves no connection, no stored file and no signed-in CLI data",
+      "a wrong master password names the unlock step and leaves no connection, no stored file and no signed-in CLI data",
       field(wrong.body, "state") === "connecting" &&
         !wrongStatus.connected &&
-        wrongStatus.error === sourceText("error.connector.bitwardenHostFailed") &&
+        wrongStatus.error === sourceText("error.connector.bitwardenHostUnlockFailed") &&
         bitwardenCalls.some((entry) => entry.args[0] === "login") &&
         bitwardenCalls.filter((entry) => entry.args[0] === "unlock").length === 1 &&
         !existsSync(bitwardenFile) &&
@@ -9846,6 +11242,100 @@ try {
         asClient(restored).numbers[0]?.statusReactions === true,
       [summary(on), summary(restored)],
     );
+  }
+
+  {
+    const v10 = { capabilities: [WHATSAPP_READ_ONLY_CAPABILITY], protocol: TEAM_PROTOCOL_V10 };
+    const group = "120363000000000009@g.us";
+    whatsappAccount.allowedSenders = [
+      ...whatsappAccount.allowedSenders.filter((sender) => sender.id !== group),
+      { id: group, kind: "group", name: "Branding", readOnly: false },
+    ];
+    const settingCalls = () => calls.filter((entry) => entry.method === "whatsapp.setSenderReadOnly");
+    const groupOf = (overview: { accounts: WhatsAppAccount[] }) =>
+      overview.accounts[0]?.allowedSenders.find((sender) => sender.id === group);
+    const asClient = (reply: Reply): WhatsAppReadOnlyList => {
+      const codec = WHATSAPP_READ_ONLY_CODECS.get(WHATSAPP_READ_ONLY_ROUTES.list);
+      assert(codec, WHATSAPP_READ_ONLY_ROUTES.list);
+      const value = codec.response(reply.status, reply.body);
+      assert(isWhatsAppReadOnlyList(value), "the list does not pass the client's guard");
+      return value;
+    };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises whatsapp-read-only-v1 to a protocol 10 peer only",
+      JSON.stringify(compatibility.body).includes(WHATSAPP_READ_ONLY_CAPABILITY) &&
+        !JSON.stringify(older.body).includes(WHATSAPP_READ_ONLY_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const update = { workspaceId: WHATSAPP_NUMBER, senderId: group, readOnly: true };
+    const unsupported = await call("POST", WHATSAPP_READ_ONLY_ROUTES.update, {
+      token: adaToken,
+      json: update,
+      capabilities: [],
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    const memberList = await call("POST", WHATSAPP_READ_ONLY_ROUTES.list, { token: bobToken, json: {}, ...v10 });
+    const memberUpdate = await call("POST", WHATSAPP_READ_ONLY_ROUTES.update, {
+      token: bobToken,
+      json: update,
+      ...v10,
+    });
+    check(
+      "a client without the capability gets 400, and a member cannot read or set the read-only chats",
+      errorIs(unsupported, 400, sourceText("error.team.connectorsUnsupported")) &&
+        errorIs(memberList, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberUpdate, 403, sourceText("error.team.adminRequired")) &&
+        settingCalls().length === 0 &&
+        groupOf({ accounts: [whatsappAccount] })?.readOnly === false,
+      [summary(unsupported), summary(memberList), summary(memberUpdate)],
+    );
+    const before = await call("POST", WHATSAPP_READ_ONLY_ROUTES.list, { token: adaToken, json: {}, ...v10 });
+    const bad = await call("POST", WHATSAPP_READ_ONLY_ROUTES.update, {
+      token: adaToken,
+      json: { ...update, readOnly: "yes" },
+      ...v10,
+    });
+    const on = await call("POST", WHATSAPP_READ_ONLY_ROUTES.update, { token: adaToken, json: update, ...v10 });
+    const after = await call("POST", WHATSAPP_READ_ONLY_ROUTES.list, { token: adaToken, json: {}, ...v10 });
+    const overview = await call("POST", WHATSAPP_CONNECTOR_ROUTES.overview, {
+      token: adaToken,
+      json: {},
+      capabilities: [WHATSAPP_CONNECTOR_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const connectorCodec = WHATSAPP_CONNECTOR_CODECS.get(WHATSAPP_CONNECTOR_ROUTES.overview);
+    assert(connectorCodec, WHATSAPP_CONNECTOR_ROUTES.overview);
+    const plain = decodeHostWhatsAppOverview(connectorCodec.response(overview.status, overview.body));
+    check(
+      "an admin makes a group read only; a bad value is refused, and the released overview does not carry the mode",
+      before.status === 200 &&
+        asClient(before).numbers[0]?.workspaceId === WHATSAPP_NUMBER &&
+        asClient(before).numbers[0]?.readOnly.includes(group) === false &&
+        bad.status === 400 &&
+        on.status === 200 &&
+        settingCalls().length === 1 &&
+        asClient(after).numbers[0]?.readOnly.includes(group) === true &&
+        groupOf(plain)?.readOnly === undefined &&
+        groupOf(withWhatsAppReadOnly(plain, asClient(after)))?.readOnly === true &&
+        groupOf(withWhatsAppReadOnly(plain, null))?.readOnly === undefined,
+      [summary(before), summary(bad), summary(on), summary(after), summary(overview)],
+    );
+    const off = await call("POST", WHATSAPP_READ_ONLY_ROUTES.update, {
+      token: adaToken,
+      json: { ...update, readOnly: false },
+      ...v10,
+    });
+    const restored = await call("POST", WHATSAPP_READ_ONLY_ROUTES.list, { token: adaToken, json: {}, ...v10 });
+    check(
+      "an admin lets the group give work again",
+      off.status === 200 &&
+        settingCalls().length === 2 &&
+        asClient(restored).numbers[0]?.readOnly.includes(group) === false,
+      [summary(off), summary(restored)],
+    );
+    whatsappAccount.allowedSenders = whatsappAccount.allowedSenders.filter((sender) => sender.id !== group);
   }
 
   {
@@ -11789,6 +13279,28 @@ try {
         ),
       [summary(first), summary(second)],
     );
+    const inThread = await call("POST", SIDE_QUESTION_ROUTES.ask, {
+      token: bobToken,
+      capabilities: [...sideCapabilities, SIDE_QUESTION_THREADS_CAPABILITY],
+      json: { agentId: "agent-ada", question: "What did this thread change?", earlier: [], taskId: "task-1" },
+    });
+    const badThread = await call("POST", SIDE_QUESTION_ROUTES.ask, {
+      token: bobToken,
+      capabilities: [...sideCapabilities, SIDE_QUESTION_THREADS_CAPABILITY],
+      json: { agentId: "agent-ada", question: "Which thread?", earlier: [], taskId: "" },
+    });
+    check(
+      "a side question in a side thread gives the host the thread's task id, and an empty task id gets 400",
+      inThread.status === 200 &&
+        callsOf("askSideQuestion").some((args) =>
+          isDeepStrictEqual(args, [
+            { agentId: "agent-ada", question: "What did this thread change?", earlier: [], taskId: "task-1" },
+          ]),
+        ) &&
+        badThread.status === 400 &&
+        callsOf("askSideQuestion").every((args) => !JSON.stringify(args).includes("Which thread?")),
+      [summary(inThread), summary(badThread)],
+    );
     const busy = await call("POST", SIDE_QUESTION_ROUTES.ask, {
       token: bobToken,
       capabilities: sideCapabilities,
@@ -11970,6 +13482,16 @@ try {
           bobId,
         ]),
       [summary(noSignIn), callsOf("startLiveVoice").at(-1)],
+    );
+    const codexFailed = await call("POST", LIVE_VOICE_ROUTES.start, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", sdp: "offer-codex-failed" },
+    });
+    check(
+      "a host whose Codex cannot start the voice answers 409 with the reason and the next step for the member",
+      errorIs(codexFailed, 409, sourceText("error.voice.live.startFailed", { reason: "realtime session failed" })),
+      summary(codexFailed),
     );
     const revoked = await call("POST", LIVE_VOICE_ROUTES.start, {
       token: bobToken,
@@ -12183,6 +13705,28 @@ try {
         errorIs(sharedBig, 413, sourceText("error.team.sharedFileTooLarge")),
       [summary(sharedMissing), summary(shared), summary(sharedBig)],
     );
+    const sharedAtLine = await call(
+      "GET",
+      `${TEAM_API_ROUTES.sharedFiles}?path=${encodeURIComponent("shared.txt:26")}`,
+      {
+        token: bobToken,
+      },
+    );
+    const sharedAtAnchor = await call(
+      "GET",
+      `${TEAM_API_ROUTES.sharedFiles}?path=${encodeURIComponent("Shared/shared.txt#L26")}`,
+      { token: bobToken },
+    );
+    check(
+      "shared files: a link with a line number gives the bytes of the file without the line number",
+      [sharedAtLine, sharedAtAnchor].every(
+        (response) =>
+          response.status === 200 &&
+          response.text === "shared file bytes\n" &&
+          response.headers.get("content-disposition") === "attachment; filename*=UTF-8''shared.txt",
+      ),
+      [summary(sharedAtLine), summary(sharedAtAnchor)],
+    );
     const workspaceMissing = await call("GET", `${TEAM_API_ROUTES.workspaceFiles}?path=notes.md`, { token: bobToken });
     const workspace = await call("GET", `${TEAM_API_ROUTES.workspaceFiles}?botId=agent-ada&path=notes.md`, {
       token: bobToken,
@@ -12211,8 +13755,20 @@ try {
         ownerOutside.status === 200 &&
         ownerOutside.text === "# workspace notes\n" &&
         callsOf("resolveLocalWorkspaceFile").length === localReads + 1 &&
-        isDeepStrictEqual(callsOf("resolveLocalWorkspaceFile").at(-1), ["agent-ada", "~/Desktop/notes.md"]),
+        isDeepStrictEqual(callsOf("resolveLocalWorkspaceFile").at(-1), ["agent-ada", "~/Desktop/notes.md", false]),
       [summary(memberOutside), summary(ownerOutside), callsOf("resolveLocalWorkspaceFile")],
+    );
+    const skillPath = `.claude/skills/pdf/SKILL.md`;
+    const ownerExact = await call(
+      "GET",
+      `${TEAM_API_ROUTES.workspaceFiles}?${new URLSearchParams({ botId: "agent-ada", path: skillPath, [WORKSPACE_FILE_EXACT_PATH_QUERY]: "1" })}`,
+      { token: adaToken },
+    );
+    check(
+      "workspace files: exact=1 makes the owner read only the named path, with no file-history match",
+      ownerExact.status === 200 &&
+        isDeepStrictEqual(callsOf("resolveLocalWorkspaceFile").at(-1), ["agent-ada", skillPath, true]),
+      [summary(ownerExact), callsOf("resolveLocalWorkspaceFile").at(-1)],
     );
   }
 
@@ -12494,6 +14050,56 @@ try {
         errorIs(closed, 409, sourceText("error.backend.approvalInactive")) &&
         !JSON.stringify(otherAgent.body).includes("r".repeat(100)),
       [summary(otherAgent), summary(closed)],
+    );
+  }
+
+  {
+    const capabilities = [PENDING_PROMPTS_CAPABILITY];
+    const v10 = { capabilities, protocol: TEAM_PROTOCOL_V10 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises pending-prompts-v1 to a protocol 10 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PENDING_PROMPTS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(PENDING_PROMPTS_CAPABILITY),
+      summary(compatibility),
+    );
+    const unsupported = await call("POST", PENDING_PROMPTS_ROUTES.list, { token: bobToken, json: {} });
+    check(
+      "a list of the open questions without the capability is refused",
+      errorIs(unsupported, 400, sourceText("error.team.pendingPromptsUnsupported")) &&
+        callsOf("pendingPrompts").length === 0,
+      summary(unsupported),
+    );
+    const listed = await call("POST", PENDING_PROMPTS_ROUTES.list, { token: bobToken, ...v10, json: {} });
+    const prompts = list(field(listed.body, "prompts"));
+    check(
+      "a member reads every open question past the 4 items of a runtime snapshot, and no question of a missing agent",
+      listed.status === 200 &&
+        prompts.length === 5 &&
+        prompts.every((prompt) => field(prompt, "agentId") === "agent-ada") &&
+        field(prompts[4], "requestId") === "prompt-ada-4",
+      { status: listed.status, prompts: prompts.length },
+    );
+    largePendingPrompts = true;
+    const large = await call("POST", PENDING_PROMPTS_ROUTES.list, { token: bobToken, ...v10, json: {} });
+    largePendingPrompts = false;
+    const largeCount = list(field(large.body, "prompts")).length;
+    check(
+      "a list of large questions stops at the byte limit of a runtime snapshot",
+      large.status === 200 &&
+        largeCount > 0 &&
+        largeCount < 300 &&
+        Buffer.byteLength(JSON.stringify(large.body)) <= AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT + 64,
+      { status: large.status, prompts: largeCount },
+    );
+    accessLevels = { revision: 95, everyone: { "agent-ada": "none" }, roles: [] };
+    const blocked = await call("POST", PENDING_PROMPTS_ROUTES.list, { token: bobToken, ...v10, json: {} });
+    accessLevels = { revision: 96, everyone: {}, roles: [] };
+    check(
+      "a member with no access to an agent reads none of its questions",
+      blocked.status === 200 && list(field(blocked.body, "prompts")).length === 0,
+      summary(blocked),
     );
   }
 
@@ -13755,6 +15361,325 @@ try {
   }
 
   {
+    const route = VOICE_TRANSCRIPTION_ROUTES.transcribe;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES),
+    });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises voice-transcription-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(VOICE_TRANSCRIPTION_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(VOICE_TRANSCRIPTION_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const wav = (samples: number) => {
+      const bytes = new Uint8Array(44 + samples * 2);
+      const view = new DataView(bytes.buffer);
+      bytes.set(new TextEncoder().encode("RIFF"), 0);
+      view.setUint32(4, bytes.byteLength - 8, true);
+      bytes.set(new TextEncoder().encode("WAVEfmt "), 8);
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, 16_000, true);
+      view.setUint32(28, 32_000, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      bytes.set(new TextEncoder().encode("data"), 36);
+      view.setUint32(40, samples * 2, true);
+      return bytes;
+    };
+    const transcribed = () => callsOf("transcribe").length;
+    const options = { token: bobToken, protocol: TEAM_PROTOCOL_V10, capabilities: [VOICE_TRANSCRIPTION_CAPABILITY] };
+    const unsupported = await call("POST", route, { token: bobToken, bytes: wav(1_600) });
+    const invalid = await call("POST", route, { ...options, bytes: new Uint8Array(100) });
+    const tooLong = await rawCall(route, bobToken, VOICE_AUDIO_LIMITS.maximumWavBytes + 1, null, options);
+    check(
+      "a recording without voice-transcription-v1, one that is not a 16 kHz WAV, or one over 120 s is not transcribed",
+      errorIs(unsupported, 400, sourceText("error.team.voiceTranscriptionUnsupported")) &&
+        errorIs(invalid, 400, sourceText("error.voice.host.invalidRecording")) &&
+        tooLong.status === 413 &&
+        field(tooLong.body, "error") === sourceText("error.voice.host.tooLong") &&
+        transcribed() === 0,
+      [summary(unsupported), summary(invalid), tooLong],
+    );
+    const heard = await call("POST", route, { ...options, bytes: wav(1_600) });
+    const preparing = await call("POST", route, { ...options, bytes: wav(0) });
+    check(
+      "a member's recording comes back as text, and a host with no model ready answers 409 with the sentence",
+      heard.status === 200 &&
+        isDeepStrictEqual(heard.body, { text: "heard 3200 bytes" }) &&
+        errorIs(preparing, 409, sourceText("error.voice.host.preparing")) &&
+        isDeepStrictEqual(
+          callsOf("transcribe").map((args) => args[0]),
+          [3_244, 44],
+        ),
+      [summary(heard), summary(preparing), callsOf("transcribe")],
+    );
+  }
+
+  {
+    const v10 = { protocol: TEAM_PROTOCOL_V10, capabilities: [CLIENT_BROWSER_CAPABILITY] };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, {
+      protocol: TEAM_PROTOCOL_V10,
+      headers: teamCapabilityHeaders(TEAM_PROTOCOL_V10, TEAM_CURRENT_CAPABILITIES),
+    });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises client-browser-v1 to a protocol 10 peer only",
+      decodeTeamProtocolSupportExpanded(compatibility.body).capabilities.includes(CLIENT_BROWSER_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(CLIENT_BROWSER_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const tab = { id: "41", url: "https://example.com/", title: "Example", active: true };
+    const unsupported = await call("POST", CLIENT_BROWSER_ROUTES.presence, {
+      token: bobToken,
+      json: { sharing: true, tabs: [tab] },
+    });
+    const tooMany = await call("POST", CLIENT_BROWSER_ROUTES.presence, {
+      token: bobToken,
+      ...v10,
+      json: { sharing: true, tabs: Array.from({ length: 51 }, (_, index) => ({ ...tab, id: String(index) })) },
+    });
+    const badTab = await call("POST", CLIENT_BROWSER_ROUTES.presence, {
+      token: bobToken,
+      ...v10,
+      json: { sharing: true, tabs: [{ ...tab, id: "41:x" }] },
+    });
+    check(
+      "a presence without client-browser-v1, with more than 50 tabs, or with a bad tab id shares nothing",
+      errorIs(unsupported, 400, sourceText("error.team.clientBrowserUnsupported")) &&
+        tooMany.status === 400 &&
+        badTab.status === 400 &&
+        clientBrowser.tabs(bobId) === null,
+      [summary(unsupported), summary(tooMany), summary(badTab)],
+    );
+
+    const openChromeSocket = async (token: string, capabilities: string[]) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+        TEAM_PROTOCOL_V1_WEBSOCKET,
+        `openbot-token.${token}`,
+      ]);
+      const events: ClientBrowserCommandEvent[] = [];
+      const waiters = new Set<() => void>();
+      let declared = false;
+      socket.addEventListener("message", (message) => {
+        const value = JSON.parse(String(message.data));
+        if (isDynamicRecord(value) && value.type === "chat-colors-changed") declared = true;
+        const event = clientBrowserCommandEvent(value);
+        if (event) events.push(event);
+        for (const wake of waiters) wake();
+      });
+      await new Promise<void>((resolveOpen, reject) => {
+        socket.addEventListener("open", () => resolveOpen(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+      });
+      const until = (ready: () => boolean) =>
+        new Promise<boolean>((resolveReady) => {
+          if (ready()) return resolveReady(true);
+          const timer = setTimeout(() => {
+            waiters.delete(wake);
+            resolveReady(false);
+          }, 5_000);
+          const wake = () => {
+            if (!ready()) return;
+            clearTimeout(timer);
+            waiters.delete(wake);
+            resolveReady(true);
+          };
+          waiters.add(wake);
+        });
+      socket.send(
+        JSON.stringify({
+          type: "agent-event-scope",
+          includeConversations: false,
+          capabilities: [CHAT_COLORS_CAPABILITY, ...capabilities],
+        }),
+      );
+      const ready = await until(() => declared);
+      return { socket, events, ready, until };
+    };
+    const bobSocket = await openChromeSocket(bobToken, [CLIENT_BROWSER_CAPABILITY]);
+    const bobOld = await openChromeSocket(bobToken, []);
+    const adaSocket = await openChromeSocket(adaToken, [CLIENT_BROWSER_CAPABILITY]);
+    const shared = await call("POST", CLIENT_BROWSER_ROUTES.presence, {
+      token: bobToken,
+      ...v10,
+      json: { sharing: true, tabs: [tab] },
+    });
+    const listed = withClientTabs({ success: true, contentItems: [] }, clientBrowser, [bobId]);
+    const groupListed = withClientTabs({ success: true, contentItems: [] }, clientBrowser, [adaId, bobId]);
+    const listedText = listed.contentItems[0]?.type === "inputText" ? listed.contentItems[0].text : "";
+    const chromeTabs = list(field(parseJson(listedText), "chromeTabs"));
+    const chromeTabId = field(chromeTabs[0] ?? null, "id");
+    check(
+      "a member shares tabs; list_tabs of a turn that only the member requested shows them as chrome: tabs, and a turn of many people shows none",
+      bobSocket.ready &&
+        bobOld.ready &&
+        adaSocket.ready &&
+        shared.status === 200 &&
+        isDeepStrictEqual(
+          clientBrowser.tabs(bobId)?.map((shared) => shared.tabs),
+          [[tab]],
+        ) &&
+        clientBrowser.tabs(adaId) === null &&
+        chromeTabs.length === 1 &&
+        groupListed.contentItems.length === 0 &&
+        typeof chromeTabId === "string" &&
+        /^chrome:[0-9a-f]{8}:[0-9a-f]{6}:41$/u.test(chromeTabId),
+      [summary(shared), listedText],
+    );
+    assert.ok(typeof chromeTabId === "string", "The shared tab is not listed.");
+    const fromChrome = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, {
+      token: bobToken,
+      capabilities: [AGENT_HIDDEN_CAPABILITY, AGENT_THREAD_REPLIES_CAPABILITY],
+      json: {
+        agentId: "agent-ada",
+        taskId: "task-1",
+        text: "From my Chrome",
+        attachmentDraftIds: [],
+        replyToMessageId: "message-7",
+        clientMessageId: "client-chrome",
+      },
+    });
+    check(
+      "a message from a session that shares Chrome tabs reaches the agent as from Chrome, and the earlier ones did not",
+      fromChrome.status === 202 &&
+        isDeepStrictEqual(
+          callsOf("taskMessageFromChrome").map((args) => args[0]),
+          ["agent-ada"],
+        ),
+      [summary(fromChrome), callsOf("taskMessageFromChrome")],
+    );
+
+    const agent = { id: "agent-ada", name: "Ada" };
+    const runTool = (requesters: string[], tool: string, args: unknown) =>
+      Effect.runPromise(runClientBrowserTool(clientBrowser, requesters, agent, tool, args));
+    const text = (result: { contentItems: { type: string; text?: string }[] }) =>
+      result.contentItems.map((item) => item.text ?? "").join("\n");
+    const clicked = runTool([bobId], "click", { tabId: chromeTabId, target: { kind: "text", text: "More" } });
+    const delivered = await bobSocket.until(() => bobSocket.events.length === 1);
+    const command = bobSocket.events[0];
+    check(
+      "a click on a shared tab reaches only the member's own session that reads client-browser-v1",
+      delivered &&
+        isDeepStrictEqual(command && { ...command, id: "" }, {
+          type: "client-browser-command",
+          id: "",
+          agentId: "agent-ada",
+          agentName: "Ada",
+          command: { kind: "click", tabId: "41", target: { text: "More" } },
+        }) &&
+        bobOld.events.length === 0 &&
+        adaSocket.events.length === 0,
+      [bobSocket.events, bobOld.events, adaSocket.events],
+    );
+    assert.ok(command, "The command did not arrive.");
+    const answer = { id: command.id, ok: true, result: { text: "clicked", image: null, tab: null } };
+    const foreign = await call("POST", CLIENT_BROWSER_ROUTES.result, { token: adaToken, ...v10, json: answer });
+    const answered = await call("POST", CLIENT_BROWSER_ROUTES.result, { token: bobToken, ...v10, json: answer });
+    const clickResult = await clicked;
+    const late = await call("POST", CLIENT_BROWSER_ROUTES.result, { token: bobToken, ...v10, json: answer });
+    check(
+      "another member cannot answer a command; the member's result ends the tool call, and a late result is refused",
+      errorIs(foreign, 404, sourceText("error.team.clientBrowserCommandUnknown")) &&
+        answered.status === 200 &&
+        clickResult.success &&
+        text(clickResult) === "clicked" &&
+        errorIs(late, 404, sourceText("error.team.clientBrowserCommandUnknown")),
+      [summary(foreign), summary(answered), clickResult, summary(late)],
+    );
+
+    const screenshot = runTool([bobId], "screenshot", { tabId: chromeTabId });
+    await bobSocket.until(() => bobSocket.events.length === 2);
+    const denied = await call("POST", CLIENT_BROWSER_ROUTES.result, {
+      token: bobToken,
+      ...v10,
+      json: { id: bobSocket.events[1]?.id, ok: false, error: "", code: "denied" },
+    });
+    const deniedResult = await screenshot;
+    const timedOut = await runTool([bobId], "snapshot", { tabId: chromeTabId });
+    check(
+      "a denied command and a command with no answer end the tool call with a failure",
+      denied.status === 200 &&
+        !deniedResult.success &&
+        text(deniedResult).includes("denied") &&
+        !timedOut.success &&
+        text(timedOut).includes("did not answer in time") &&
+        isDeepStrictEqual(
+          bobSocket.events.map((event) => event.command.kind),
+          ["click", "screenshot", "snapshot"],
+        ),
+      [deniedResult, timedOut, bobSocket.events.map((event) => event.command)],
+    );
+
+    const script = await runTool([bobId], "run_script", { tabId: chromeTabId, script: "await snapshot()" });
+    const role = await runTool([bobId], "click", { tabId: chromeTabId, target: { kind: "role", role: "button" } });
+    const notRequester = await runTool([adaId], "snapshot", { tabId: chromeTabId });
+    const groupTurn = await runTool([adaId, bobId], "snapshot", { tabId: chromeTabId });
+    const otherChrome = await runTool([bobId], "snapshot", {
+      tabId: chromeTabId.replace(/:[0-9a-f]{6}:/u, ":000000:"),
+    });
+    const httpOnly = await runTool([bobId], "open", { url: "file:///etc/hosts", browser: "chrome" });
+    check(
+      "a tool that Chrome tabs do not take, a role target, a person who did not request the turn, a turn of many people, a Chrome that is not shared, or a file URL sends no command",
+      !script.success &&
+        text(script).startsWith("On a Chrome tab, use only") &&
+        !role.success &&
+        !notRequester.success &&
+        text(notRequester).startsWith("No Chrome tabs are shared in this turn") &&
+        !groupTurn.success &&
+        text(groupTurn).startsWith("No Chrome tabs are shared in this turn") &&
+        !otherChrome.success &&
+        text(otherChrome).startsWith("The tab is not shared now") &&
+        !httpOnly.success &&
+        bobSocket.events.length === 3,
+      [script, role, notRequester, groupTurn, otherChrome, httpOnly],
+    );
+
+    const waiting = runTool([bobId], "snapshot", { tabId: chromeTabId });
+    await bobSocket.until(() => bobSocket.events.length === 4);
+    const stopped = await call("POST", CLIENT_BROWSER_ROUTES.presence, {
+      token: bobToken,
+      ...v10,
+      json: { sharing: false, tabs: [] },
+    });
+    const stoppedResult = await waiting;
+    check(
+      "a member who stops sharing ends the waiting command, and the tabs go away",
+      stopped.status === 200 &&
+        !stoppedResult.success &&
+        text(stoppedResult).startsWith("No Chrome tabs are shared in this turn") &&
+        clientBrowser.tabs(bobId) === null,
+      [summary(stopped), stoppedResult],
+    );
+
+    await call("POST", CLIENT_BROWSER_ROUTES.presence, {
+      token: bobToken,
+      ...v10,
+      json: { sharing: true, tabs: [tab] },
+    });
+    const sharedAgain = clientBrowser.tabs(bobId) !== null;
+    bobSocket.socket.close();
+    bobOld.socket.close();
+    adaSocket.socket.close();
+    const closed = await new Promise<boolean>((resolveClosed) => {
+      const deadline = setTimeout(() => resolveClosed(false), 5_000);
+      const poll = setInterval(() => {
+        if (clientBrowser.tabs(bobId) !== null) return;
+        clearTimeout(deadline);
+        clearInterval(poll);
+        resolveClosed(true);
+      }, 20);
+    });
+    check("the shared tabs end when the last event connection of the member's session closes", sharedAgain && closed, {
+      sharedAgain,
+      closed,
+    });
+  }
+
+  {
     const capabilities = [HOST_RESTART_CAPABILITY];
     const restarts = () => callsOf("restartHost").length;
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
@@ -13989,7 +15914,6 @@ try {
           placement: { "file-ada-1": "folder-campaign" },
         }) &&
         scans() === 1 &&
-        isDeepStrictEqual(callsOf("libraryScan")[0], [{ scope: "host" }]) &&
         invalidations() === 0,
       summary(created),
     );

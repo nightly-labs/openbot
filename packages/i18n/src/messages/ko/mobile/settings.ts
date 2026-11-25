@@ -296,6 +296,9 @@ export const messages = {
   "mobile.settings.conversations.fullQualityPhotos": "사진을 원본 화질로 보내기",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "끄면 앱이 각 사진의 작은 사본(긴 쪽 최대 2048픽셀)을 보냅니다. 느린 연결에서도 더 빨리 도착합니다. 원본 사진을 보내려면 켜세요.",
+  "mobile.settings.conversations.fullScreenCamera": "전체 화면 카메라 사용",
+  "mobile.settings.conversations.fullScreenCameraFooter":
+    "켜면 카메라가 확대/축소와 모든 렌즈를 쓸 수 있는 시스템 카메라로 열립니다. 끄면 채팅 안에 작은 카메라가 열립니다.",
   "mobile.settings.profile.nameUnsafe": "이름에서 줄바꿈과 제어 문자를 제거해 주세요.",
   "mobile.settings.profile.nameLength": "표시 이름은 3~20자로 입력해 주세요.",
   "mobile.settings.profile.saveFailed": "변경 사항을 저장할 수 없었어요. 다시 시도해 주세요.",
@@ -452,6 +455,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "서버",
   "mobile.settings.voice.gptLive.serversFooter":
     "로그인이 필요한 서버를 탭하면 Codex를 ChatGPT 계정에 연결할 수 있습니다. 서버의 로그인은 소유자나 관리자만 볼 수 있습니다.",
+  "mobile.settings.voice.gptLive.account": "GPT 라이브 음성 계정",
   "mobile.settings.voice.gptLive.status.ready": "준비됨",
   "mobile.settings.voice.gptLive.status.supported": "지원됨",
   "mobile.settings.voice.gptLive.status.offline": "오프라인",

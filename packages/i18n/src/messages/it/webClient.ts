@@ -36,7 +36,7 @@ export const messages = {
     "Crea un server ospitato per chattare con i tuoi agenti da questo browser. Puoi anche eseguire OpenBot sul tuo computer o unirti a un server con un invito.",
   "webClient.connect.stepInstall": "Installa e apri OpenBot sul tuo computer.",
   "webClient.connect.stepSignIn": "Accedi con la tua email.",
-  "webClient.connect.stepRemote": "Attiva l'accesso remoto.",
+  "webClient.connect.stepRemote": "In OpenBot, apri Impostazioni server > Membri e attiva Pubblica questo server.",
   "webClient.notice.download": "Scarica OpenBot",
   "webClient.notice.createServer": "Crea un server ospitato",
   "webClient.notice.join": "Unisciti con un invito",

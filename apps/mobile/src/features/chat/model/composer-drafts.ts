@@ -32,6 +32,10 @@ export function useComposerDraft(chat: DraftChat): [string, (value: SetStateActi
   return [draft, setDraft];
 }
 
+export function appendComposerDraft(chat: DraftChat, text: string): void {
+  writeDraft(chat, outboxChatKey(chat), (current) => (current.trim() ? `${current.trimEnd()}\n${text}` : text));
+}
+
 export function getComposerDraft(chat: DraftChat): string {
   return useComposerDrafts.getState().drafts[outboxChatKey(chat)]?.text ?? "";
 }

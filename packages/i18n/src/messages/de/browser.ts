@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "Browser-Tab schließen",
   "browser.newTab": "Neuer Browser-Tab",
   "browser.backToChat": "Zurück zum Chat",
+  "browser.fullView.open": "In Vollansicht öffnen",
   "browser.goBack": "Zurück",
   "browser.goForward": "Vorwärts",
   "browser.reload": "Seite neu laden",
@@ -58,6 +59,8 @@ export const messages = {
   "browser.pip.close": "Browser-Popup schließen",
   "browser.pip.reattachFailed": "OpenBot konnte den Browser nicht wieder andocken.",
   "browser.pip.closeFailed": "OpenBot konnte das Browser-Popup nicht schließen.",
+  "browser.window.open": "Browser in neuem Fenster öffnen",
+  "browser.window.openFailed": "OpenBot konnte das Browserfenster nicht öffnen.",
   "browser.popupBlocked.title": "Popup blockiert",
   "browser.popupBlocked.dismiss": "Popup-Meldung schließen",
   "browser.liveView.label": "Live-Ansicht der Seite auf dem Server",
@@ -95,6 +98,7 @@ export const messages = {
   "browser.secret.takeOver": "Übernehmen",
   "browser.secret.failed":
     "Die Anfrage konnte nicht abgeschlossen werden. Prüfe die Verbindung und versuche es erneut.",
+  "browser.secret.ended": "Diese Anmeldeanfrage ist beendet. Bitte den Agenten, es noch einmal zu versuchen.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil der Agent ein Skript auf dieser Seite ausgeführt hat. Bitte den Agenten, die Seite neu zu laden und es noch einmal zu versuchen.",
   "browser.secret.vaultSkip.fieldKind":

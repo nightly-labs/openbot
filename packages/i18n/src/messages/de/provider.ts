@@ -121,11 +121,14 @@ export const messages = {
   "provider.picker.download": "Download von {name}",
   "provider.picker.search": "Modelle suchen",
   "provider.picker.noMatches": "Keine Modelle entsprechen deiner Suche.",
+  "provider.picker.openrouterNoMatches":
+    "Keine Modelle entsprechen deiner Suche. Deine Einstellungen für Datenschutz, Anbieter und Guardrails auf openrouter.ai können Modelle aus dieser Liste ausblenden.",
   "provider.picker.workspaceOnlyUnavailable":
     "Diese Modelle funktionieren unter Windows und Linux nicht mit „Nur Arbeitsbereich“. Ändere dafür „Zugriff“ in den Agenteneinstellungen.",
   "provider.picker.olderModels": "Ältere Modelle",
   "provider.picker.olderModelsList": "Ältere {name}-Modelle",
-  "provider.picker.noModels": "Keine Modelle von {name} verfügbar.",
+  "provider.picker.noModels":
+    "Hier werden keine Modelle von {name} angezeigt. Wenn sie ausgeschaltet sind, kann ein Administrator sie unter Servereinstellungen > Anbieter > {name} > Modelle einschalten.",
   "provider.picker.endpointModelsInCustom":
     "{name} führt deine eigenen Endpunkte aus. Ihre Modelle sind im Tab Benutzerdefiniert.",
   "provider.picker.showCustomModels": "Modelle zeigen",
@@ -146,6 +149,8 @@ export const messages = {
   "provider.picker.effort": "Aufwand",
   "provider.picker.effortLabel": "Denkaufwand des Agenten",
   "provider.picker.effortFixed": "{effort}, festgelegt von {provider}",
+  "provider.picker.effortLimited":
+    "Deine Claude-Einstellungen oder deine Organisation begrenzen den Aufwand auf {effort}.",
   "provider.picker.fast": "Schnell",
   "provider.picker.fastText": "Schnellere Antworten, höhere Nutzung",
   "provider.picker.speed": "Geschwindigkeit",
@@ -271,6 +276,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot meldet {provider} auf dem Server ab.",
   "provider.settings.geminiKeyReplacesAccount":
     "Ein gespeicherter Gemini-API-Schlüssel wird statt einer Google-Anmeldung verwendet. Entferne den Schlüssel, um einen Google-Plan und seine Modelle zu nutzen.",
+  "provider.settings.museKeyInUse":
+    "Muse nutzt diesen Schlüssel, nicht deine Anmeldung. Entferne den Schlüssel, um deine Anmeldung zu nutzen.",
   "provider.settings.versionInstalledByUser": "{version} · von dir installiert",
   "provider.settings.versionDownloaded": "{version} · von OpenBot geladen",
   "provider.settings.otherVersionInstalledByUser": "Nicht in Gebrauch: {version} · von dir installiert",
@@ -282,10 +289,15 @@ export const messages = {
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Prompt-Cache",
   "provider.settings.promptCacheDescription":
-    "Wie lange Claude den Kontext eines Agenten zwischen den Zügen im Cache behält.",
+    "Wie lange Claude und Pi den Kontext eines Agenten zwischen den Zügen im Cache behalten.",
   "provider.settings.promptCacheHour": "1 Stunde",
-  "provider.settings.promptCacheDefault": "Claude Code-Standard",
+  "provider.settings.promptCacheDefault": "Anbieter-Standard",
   "provider.settings.promptCacheLoadFailed": "Die Prompt-Cache-Dauer dieses Servers konnte nicht geladen werden.",
+  "provider.settings.cacheExpiryCompaction": "Vor Ablauf des Caches komprimieren",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Wenn ein Chat mit 200K oder mehr Tokens Kontext mit einem 1-Stunden-Cache inaktiv ist, komprimiert der Agent den Kontext, bevor der Cache abläuft. Dann liest die nächste Nachricht nicht den ganzen Kontext erneut ohne Cache.",
+  "provider.settings.cacheExpiryCompactionLoadFailed":
+    "Die Komprimierungseinstellung dieses Servers konnte nicht geladen werden.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Mein Claude-Code-Setup verwenden",
   "provider.settings.claudeUserSetupDescription":

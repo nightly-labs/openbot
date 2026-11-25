@@ -1,3 +1,4 @@
+import { type CustomServerPlan, optionalCustomServerPayment } from "@openbot/contracts/custom-server-plans";
 import { type HostKeyHandover, optionalHostKeyHandovers } from "@openbot/contracts/host-key-handover";
 import {
   createInviteUrl,
@@ -46,9 +47,12 @@ export interface RemoteTeamHost {
   role: "owner" | "admin" | "member";
   memberLimit?: number;
   hosted?: boolean;
+  hidden?: true;
   restartAvailable?: boolean;
   storageGb?: number;
   keyChangedAt?: number;
+  paymentRequired?: true;
+  customPlan?: CustomServerPlan;
 }
 
 export interface RemoteTeamMember {
@@ -223,9 +227,11 @@ export class RemoteTeamDirectoryClient {
                 role: candidate.role,
                 ...(memberLimit === undefined ? {} : { memberLimit }),
                 ...(isBoolean(hosted) ? { hosted } : {}),
+                ...(candidate.hidden === true ? { hidden: true as const } : {}),
                 ...(isBoolean(restartAvailable) ? { restartAvailable } : {}),
                 ...(isNumber(storageGb) && Number.isSafeInteger(storageGb) && storageGb >= 1 ? { storageGb } : {}),
                 ...(keyChangedAt === null ? {} : { keyChangedAt }),
+                ...optionalCustomServerPayment(candidate),
               },
             ];
           }),
@@ -412,6 +418,13 @@ export class RemoteTeamDirectoryClient {
         method: "POST",
       });
     });
+  }
+
+  setHostHidden(hostId: string, hidden: boolean): Effect.Effect<void, DirectoryFailure> {
+    return this.#request(`/v2/remote/hosts/${encodeURIComponent(hostId)}/hidden`, {
+      method: "PUT",
+      body: { hidden },
+    }).pipe(Effect.asVoid);
   }
 
   removeOwnedHost(hostId: string): Effect.Effect<void, DirectoryFailure> {

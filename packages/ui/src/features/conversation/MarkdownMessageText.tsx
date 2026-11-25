@@ -9,6 +9,7 @@ import {
 } from "@openbot/contracts/chat-math";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import { markdownImageName } from "@openbot/contracts/markdown-preview-text";
 import { Button, Checkbox } from "@openbot/ui";
 import { Dynamic } from "@solidjs/web";
 import { Marked, type Token, type Tokens, type TokensList } from "marked";
@@ -1284,15 +1285,24 @@ function messageFileDirectory(body: string): FileDirectoryContext | null {
   return contexts.size === 1 ? (contexts.values().next().value ?? null) : null;
 }
 
+const ABSOLUTE_PATH = /^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u;
+
+function absoluteFilePath(path: string): boolean {
+  if (!ABSOLUTE_PATH.test(path) || /^[/\\]{2}/u.test(path) || /[\0\r\n]/u.test(path)) return false;
+  if (!/^[^.].*\.[\p{L}\p{N}_-]*\p{L}[\p{L}\p{N}_-]*$/u.test(fileReferenceName(path))) return false;
+  if (!/\s/u.test(path)) return true;
+  return !/\s-+\p{L}/u.test(path) && !/[/\\]s?bin[/\\]/u.test(path.split(/\s/u)[0] ?? "");
+}
+
 function mentionedFileTarget(
   value: string,
   directory: FileDirectoryContext | null,
 ): (FileDirectoryContext & { asWritten?: string }) | null {
   const path = value.trim();
-  if (!isFileReference(path)) return null;
+  if (!isFileReference(path) && !absoluteFilePath(path)) return null;
   const shared = sharedFileTarget(path);
   if (shared) return { path: shared, kind: "shared" };
-  if (/^(?:~[/\\]|[/\\]|[A-Za-z]:[/\\])/u.test(path)) {
+  if (ABSOLUTE_PATH.test(path)) {
     const workspace = workspaceFileTarget(path);
     return workspace ? { path: workspace, kind: "workspace" } : null;
   }
@@ -1362,14 +1372,4 @@ function linkFileTarget(href: string): FileDirectoryContext | null {
   const { shared, workspace } = linkFileTargets(href);
   if (shared) return { path: shared, kind: "shared" };
   return workspace ? { path: workspace, kind: "workspace" } : null;
-}
-
-export function markdownImageName(alt: string, url: string): string {
-  if (alt.trim()) return alt.trim();
-  try {
-    const path = new URL(url).pathname;
-    const name = decodeURIComponent(path.slice(path.lastIndexOf("/") + 1));
-    if (name) return name;
-  } catch {}
-  return url;
 }

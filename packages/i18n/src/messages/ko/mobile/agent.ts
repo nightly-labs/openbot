@@ -319,6 +319,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "이 제공자에서 사용할 수 있는 모델이 없어요.",
   "mobile.agent.runtime.searchModels": "모델 검색",
   "mobile.agent.runtime.noMatches": "검색과 일치하는 모델이 없어요.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "검색과 일치하는 모델이 없어요. openrouter.ai의 개인정보 보호, 제공업체, 가드레일 설정 때문에 이 목록에서 모델이 숨겨질 수 있어요.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "이 제공업체는 Windows와 Linux에서 '워크스페이스만'으로 작동하지 않아요. 사용하려면 먼저 '권한'을 바꾸세요.",
   "mobile.agent.runtime.usageLimit": "사용 한도에 도달했어요",
@@ -401,6 +403,9 @@ export const messages = {
   "mobile.agent.planCard.label": "긴 작업 전에 계획 표시",
   "mobile.agent.planCard.footer":
     "긴 작업 전에 에이전트가 계획을 보여줘요. 10초 후 또는 시작을 누르면 작업이 시작돼요.",
+  "mobile.agent.builtinMemory.label": "OpenBot 메모리",
+  "mobile.agent.builtinMemory.footer":
+    "에이전트가 자신의 메모리를 저장하고 읽어요. Mem0 같은 메모리 앱만 쓰려면 끄세요. 저장된 메모리는 그대로 남아요.",
   "mobile.agent.workspace.title": "워크스페이스 폴더",
   "mobile.agent.workspace.footer": "호스트 컴퓨터에 있는 이 에이전트의 폴더예요.",
   "mobile.agent.advanced.behavior": "동작",
@@ -481,6 +486,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "이 호스트는 원격 기기에서 에이전트를 게시할 수 없어요.",
   "mobile.agent.usage.tokensWithoutCacheReads": "캐시 읽기를 제외한 토큰",
   "mobile.agent.usage.estimatedCost": "예상 비용",
+  "mobile.agent.usage.noCostEstimate": "비용 추정치 없음",
   "mobile.agent.usage.daily": "일별 사용량",
   "mobile.agent.usage.tokens": "토큰",
   "mobile.agent.usage.cost": "비용",
@@ -515,6 +521,7 @@ export const messages = {
   "mobile.agent.usage.collection": "수집 시작: {started}. 업데이트: {updated}.",
   "mobile.agent.usage.never": "없음",
   "mobile.agent.record.time": "시간",
+  "mobile.agent.record.date": "날짜",
   "mobile.agent.section.changeFailed": "폴더를 변경할 수 없어요",
   "mobile.agent.section.tryAgain": "다시 시도해 주세요.",
   "mobile.agent.section.moveUp": "위로 이동",
@@ -593,13 +600,13 @@ export const messages = {
   "mobile.agent.home.serversFailed": "서버를 불러올 수 없어요",
   "mobile.agent.home.serversFailedBody": "데스크톱 앱이 실행 중인지 확인한 후 다시 시도해 주세요.",
   "mobile.agent.home.noServers": "사용할 수 있는 서버가 없어요",
-  "mobile.agent.home.noServersBody": "데스크톱 앱을 다시 연결하거나 원격 서버에 참여해 주세요.",
+  "mobile.agent.home.noServersBody":
+    "이 계정으로 컴퓨터에서 OpenBot을 열고 서버 설정 → 멤버에서 이 서버 게시를 켜 주세요. 또는 원격 서버에 참여해 주세요.",
   "mobile.agent.home.chooseServer": "서버 선택",
   "mobile.agent.home.openServers": "서버 열기",
   "mobile.agent.home.noChatOpen": "열린 채팅 없음",
   "mobile.agent.home.noChatOpenBody": "목록에서 채팅을 선택해 주세요.",
   "mobile.agent.home.chatListWidth": "채팅 목록 너비",
-  "mobile.agent.home.serverTitle": "{name}, 서버 열기",
   "mobile.agent.home.waiting": "연결 대기 중",
   "mobile.agent.home.waitingBody": "이 서버에 연결되면 에이전트 목록을 불러와요.",
   "mobile.agent.home.noAgents": "이 서버에 에이전트가 없어요",

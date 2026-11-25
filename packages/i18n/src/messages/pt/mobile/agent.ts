@@ -325,6 +325,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Nenhum modelo disponível para este provedor.",
   "mobile.agent.runtime.searchModels": "Buscar modelos",
   "mobile.agent.runtime.noMatches": "Nenhum modelo corresponde à sua busca.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Nenhum modelo corresponde à sua busca. Suas configurações de privacidade, provedores e guardrails no openrouter.ai podem ocultar modelos desta lista.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Este provedor não funciona com “Somente o espaço de trabalho” no Windows e no Linux. Para usá-lo, altere primeiro as “Permissões”.",
   "mobile.agent.runtime.usageLimit": "Limite de uso atingido",
@@ -411,6 +413,9 @@ export const messages = {
   "mobile.agent.planCard.label": "Mostrar o plano antes de tarefas longas",
   "mobile.agent.planCard.footer":
     "Antes de uma tarefa longa, o agente mostra o plano. Ele começa após 10 s ou quando você toca em Iniciar.",
+  "mobile.agent.builtinMemory.label": "Memória do OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "O agente salva e lê as próprias memórias. Desative para usar só um app de memória, como o Mem0. As memórias salvas continuam.",
   "mobile.agent.workspace.title": "Pasta do espaço de trabalho",
   "mobile.agent.workspace.footer": "A pasta deste agente no computador anfitrião.",
   "mobile.agent.advanced.behavior": "Comportamento",
@@ -497,6 +502,7 @@ export const messages = {
     "Este computador anfitrião não pode publicar agentes a partir de um dispositivo remoto.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Tokens sem leituras de cache",
   "mobile.agent.usage.estimatedCost": "Custo estimado",
+  "mobile.agent.usage.noCostEstimate": "Sem estimativa de custo",
   "mobile.agent.usage.daily": "Uso diário",
   "mobile.agent.usage.tokens": "Tokens",
   "mobile.agent.usage.cost": "Custo",
@@ -531,6 +537,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Coleta iniciada em {started}. Atualizado em {updated}.",
   "mobile.agent.usage.never": "nunca",
   "mobile.agent.record.time": "Horário",
+  "mobile.agent.record.date": "Data",
   "mobile.agent.section.changeFailed": "Não foi possível alterar a pasta",
   "mobile.agent.section.tryAgain": "Tente novamente.",
   "mobile.agent.section.moveUp": "Mover para cima",
@@ -616,13 +623,13 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Não foi possível carregar seus servidores",
   "mobile.agent.home.serversFailedBody": "Verifique se o app para computador está em execução e tente novamente.",
   "mobile.agent.home.noServers": "Nenhum servidor disponível",
-  "mobile.agent.home.noServersBody": "Conecte o app para computador novamente ou entre em um servidor remoto.",
+  "mobile.agent.home.noServersBody":
+    "Abra o OpenBot no seu computador com esta conta e ative Publicar este servidor em Configurações do servidor → Membros. Ou entre em um servidor remoto.",
   "mobile.agent.home.chooseServer": "Escolha um servidor",
   "mobile.agent.home.openServers": "Abrir servidores",
   "mobile.agent.home.noChatOpen": "Nenhum chat aberto",
   "mobile.agent.home.noChatOpenBody": "Escolha um chat na lista.",
   "mobile.agent.home.chatListWidth": "Largura da lista de chats",
-  "mobile.agent.home.serverTitle": "{name}, abrir servidores",
   "mobile.agent.home.waiting": "Aguardando conexão",
   "mobile.agent.home.waitingBody": "A lista de agentes será carregada quando este servidor estiver conectado.",
   "mobile.agent.home.noAgents": "Nenhum agente neste servidor",

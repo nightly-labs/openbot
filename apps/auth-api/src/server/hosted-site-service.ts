@@ -54,6 +54,11 @@ export interface HostedSiteUploadSession {
 type OperationClaim = { status: "pending"; token: string } | { status: "completed"; response: string };
 
 const CLEANUP_BATCH_SIZE = 50;
+export const UNSYNCED_SITES_SQL = `SELECT id, hostname FROM hosted_sites
+  WHERE +status IN ('active', 'blocked', 'deleted', 'expired') AND route_synced_at IS NULL
+  ORDER BY updated_at, id LIMIT ${CLEANUP_BATCH_SIZE}`;
+export const PRUNE_SITE_CREATION_EVENTS_SQL = "DELETE FROM site_creation_events WHERE created_at < ?";
+export const PRUNE_SITE_OPERATION_RECEIPTS_SQL = "DELETE FROM site_operation_receipts WHERE created_at < ?";
 const CLEANUP_RUNTIME_BUDGET_MS = 20_000;
 
 export class HostedSiteService {
@@ -801,13 +806,7 @@ export class HostedSiteService {
         }
 
         const unsyncedSites = yield* siteCall(() =>
-          database
-            .prepare(
-              `SELECT id, hostname FROM hosted_sites
-           WHERE status IN ('active', 'blocked', 'deleted', 'expired') AND route_synced_at IS NULL
-           ORDER BY updated_at, id LIMIT ${CLEANUP_BATCH_SIZE}`,
-            )
-            .all<{ id: string; hostname: string }>(),
+          database.prepare(UNSYNCED_SITES_SQL).all<{ id: string; hostname: string }>(),
         );
         hasMore ||= unsyncedSites.results.length === CLEANUP_BATCH_SIZE;
         for (const site of unsyncedSites.results) {
@@ -920,13 +919,13 @@ export class HostedSiteService {
       }
       yield* siteCall(() =>
         database
-          .prepare("DELETE FROM site_creation_events WHERE created_at < ?")
+          .prepare(PRUNE_SITE_CREATION_EVENTS_SQL)
           .bind(now - 2 * 24 * 60 * 60_000)
           .run(),
       );
       yield* siteCall(() =>
         database
-          .prepare("DELETE FROM site_operation_receipts WHERE created_at < ?")
+          .prepare(PRUNE_SITE_OPERATION_RECEIPTS_SQL)
           .bind(now - 90 * 24 * 60 * 60_000)
           .run(),
       );
@@ -1254,13 +1253,23 @@ export class HostedSiteService {
            AND (
              SELECT COUNT(*) FROM site_deployments
              WHERE user_id = ? AND activation_authorized_at >= ?
-           ) < 20
+           ) < ?
            AND (
              SELECT COUNT(*) FROM site_deployments
              WHERE user_id = ? AND activation_authorized_at >= ?
-           ) < 100`,
+           ) < ?`,
           )
-          .bind(now, deployment.id, userId, userId, hour, userId, day)
+          .bind(
+            now,
+            deployment.id,
+            userId,
+            userId,
+            hour,
+            HOSTED_SITE_LIMITS.activationsPerHour,
+            userId,
+            day,
+            HOSTED_SITE_LIMITS.activationsPerDay,
+          )
           .run(),
       );
       if (claim.meta.changes === 1) {
@@ -1280,10 +1289,26 @@ export class HostedSiteService {
           .bind(deployment.id, userId)
           .run(),
       );
+      const counts = yield* siteCall(() =>
+        database
+          .prepare(
+            `SELECT
+               (SELECT COUNT(*) FROM site_deployments WHERE user_id = ? AND activation_authorized_at >= ?) AS hour_count,
+               (SELECT COUNT(*) FROM site_deployments WHERE user_id = ? AND activation_authorized_at >= ?) AS day_count`,
+          )
+          .bind(userId, hour, userId, day)
+          .first<{ hour_count: number; day_count: number }>(),
+      );
+      if ((counts?.day_count ?? 0) >= HOSTED_SITE_LIMITS.activationsPerDay) {
+        return yield* activationRateLimitError(true, now);
+      }
+      if ((counts?.hour_count ?? 0) >= HOSTED_SITE_LIMITS.activationsPerHour) {
+        return yield* activationRateLimitError(false, now);
+      }
       return yield* new HostedSiteInputError(
-        429,
-        "activation_rate_limit",
-        "The publish limit for this account was reached.",
+        409,
+        "operation_in_progress",
+        "This site operation is already in progress.",
       );
     },
   );
@@ -1836,6 +1861,22 @@ export class HostedSiteService {
 function requireSiteInBucket(site: SiteRow, serverId: string | null): void {
   if ((site.server_id ?? null) === serverId) return;
   throw new HostedSiteInputError(409, "site_other_server", "This site belongs to another server.");
+}
+
+function activationRateLimitError(daily: boolean, now: number): HostedSiteInputError {
+  const window = daily ? 86_400_000 : 3_600_000;
+  const retryAfterSeconds = Math.ceil((window - (now % window)) / 1000);
+  const minutes = Math.max(1, Math.ceil(retryAfterSeconds / 60));
+  const wait = minutes < 90 ? (minutes === 1 ? "1 minute" : `${minutes} minutes`) : `${Math.ceil(minutes / 60)} hours`;
+  const limit = daily
+    ? `${HOSTED_SITE_LIMITS.activationsPerDay} site publishes and replaces in one day (UTC)`
+    : `${HOSTED_SITE_LIMITS.activationsPerHour} site publishes and replaces in one clock hour`;
+  return new HostedSiteInputError(
+    429,
+    "activation_rate_limit",
+    `This account reached its limit of ${limit}. This is not the limit on the number of sites. Try again in about ${wait}.`,
+    retryAfterSeconds,
+  );
 }
 
 function siteLimitError(bucket: HostedSiteBucket, slots: HostedSiteSlots): HostedSiteInputError {

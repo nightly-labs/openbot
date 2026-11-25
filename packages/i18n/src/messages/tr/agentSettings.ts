@@ -180,6 +180,8 @@ export const messages = {
     "Ajan sıfırdan başlar ve gerektiğinde bu sohbette arama yapabilir. Mesajlar bir ayırıcının üzerinde görünür kalır. Talimatlar, model, araçlar, bellekler, çalışma alanı ve tarayıcı değişmez.",
   "agentSettings.newChat.confirm": "Yeni sohbet başlat",
   "agentSettings.newChat.failed": "Yeni bir sohbet başlatılamadı.",
+  "agentSettings.newChat.busy":
+    "Ajan çalışıyor. Yeni bir sohbet başlatmak için bitmesini bekleyin veya ajanı durdurun.",
   "agentSettings.deleteHistory.title": "Geçmişi sil",
   "agentSettings.deleteHistory.description": "Bu sohbetin mesajları silinir ve ajan onları unutur. Kurulumu kalır.",
   "agentSettings.deleteHistory.button": "Sil",
@@ -225,6 +227,9 @@ export const messages = {
     "Sohbeti uzadığında ajanın yeni bir sohbet başlatmasına izin verir. Önce notlarını kaydeder.",
   "agentSettings.quickAcknowledgement.title": "Uzun görevlerden önce planı göster",
   "agentSettings.quickAcknowledgement.description": "Uzun bir görevden önce ajan planını gösterir.",
+  "agentSettings.builtinMemory.title": "OpenBot belleği",
+  "agentSettings.builtinMemory.description":
+    "Ajan kendi belleklerini kaydeder ve okur. Yalnızca Mem0 gibi bir bellek uygulaması kullanmak için kapatın. Kayıtlı bellekler kalır.",
   "agentSettings.browserProfile.label": "Tarayıcı profili",
   "agentSettings.browserProfile.shared": "Paylaşılan",
   "agentSettings.browserProfile.agent": "Yalnızca bu ajan",

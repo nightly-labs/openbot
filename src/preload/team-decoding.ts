@@ -1,3 +1,4 @@
+import { parseCustomServerPlan } from "@openbot/contracts/custom-server-plans";
 import {
   type DirectConversationPage,
   type DirectConversationReadState,
@@ -105,6 +106,7 @@ export function decodeHostStatus(value: unknown): HostStatus {
     apiOnline: requiredBoolean(status, "apiOnline"),
     remoteDesktopReady: requiredBoolean(status, "remoteDesktopReady"),
     remoteDesktopScreenRecordingDenied: requiredBoolean(status, "remoteDesktopScreenRecordingDenied"),
+    remoteDesktopNeedsX11Session: requiredBoolean(status, "remoteDesktopNeedsX11Session"),
     remoteDesktopUnattended: requiredBoolean(status, "remoteDesktopUnattended"),
     remoteDesktopActiveSessions: requiredNumber(status, "remoteDesktopActiveSessions"),
     remoteDesktopMaxSessions: requiredNumber(status, "remoteDesktopMaxSessions"),
@@ -282,8 +284,11 @@ function server(summary: DynamicRecord): ServerSummary {
     hosted,
     restartAvailable,
     storageGb,
+    paymentRequired,
+    customPlan,
     keyChangedAt,
     thisComputer,
+    hidden,
     appearance,
   } = summary;
   if (!isOneOf(SERVER_NOTIFICATION_LEVELS, notificationLevel)) throw new Error("Invalid notificationLevel.");
@@ -305,6 +310,10 @@ function server(summary: DynamicRecord): ServerSummary {
     throw new Error("Invalid keyChangedAt.");
   }
   if (thisComputer !== undefined && thisComputer !== true) throw new Error("Invalid thisComputer.");
+  if (hidden !== undefined && !isBoolean(hidden)) throw new Error("Invalid hidden.");
+  if (paymentRequired !== undefined && paymentRequired !== true) throw new Error("Invalid paymentRequired.");
+  const plan = customPlan === undefined ? undefined : parseCustomServerPlan(customPlan);
+  if (plan === null) throw new Error("Invalid customPlan.");
   if (capabilitiesPending !== undefined && capabilitiesPending !== true) {
     throw new Error("Invalid capabilitiesPending.");
   }
@@ -338,8 +347,11 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(hosted === undefined ? {} : { hosted }),
     ...(restartAvailable === undefined ? {} : { restartAvailable }),
     ...(storageGb === undefined ? {} : { storageGb }),
+    ...(paymentRequired === undefined ? {} : { paymentRequired }),
+    ...(plan === undefined ? {} : { customPlan: plan }),
     ...(keyChangedAt === undefined ? {} : { keyChangedAt }),
     ...(thisComputer === undefined ? {} : { thisComputer }),
+    ...(hidden === undefined ? {} : { hidden }),
   };
 }
 

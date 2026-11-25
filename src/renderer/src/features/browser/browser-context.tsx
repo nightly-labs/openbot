@@ -4,6 +4,7 @@ import { desktopAnalytics } from "../../analytics";
 import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
+import { useConversationController } from "../conversation/conversation-controller-context";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useServerSwitch } from "../servers/server-switch";
 import { useServers } from "../servers/servers-context";
@@ -18,7 +19,9 @@ const BrowserTabs = createSimpleContext({
     const { currentServerSelection } = useServers();
     const { browserVisibilitySuspended: switchHidesBrowser } = useServerSwitch();
     const windowPage = useWindowPage();
+    const { browserWindowOpen } = useConversationController();
     const browserVisibilitySuspended = () => switchHidesBrowser() || windowPage.conversationCovered();
+    const browserTabsHidden = () => switchHidesBrowser() || (windowPage.conversationCovered() && !browserWindowOpen());
     const scopeIsCurrent = createScopeGuard();
 
     const [browserTabs, setBrowserTabs] = createSignal<BrowserTab[]>([]);
@@ -81,7 +84,7 @@ const BrowserTabs = createSimpleContext({
       const selectionIsCurrent = currentServerSelection();
       try {
         await browserTabActivationOperations.get(tabId)?.catch(() => undefined);
-        if (browserVisibilitySuspended() || !selectionIsCurrent() || !scopeIsCurrent()) {
+        if (browserTabsHidden() || !selectionIsCurrent() || !scopeIsCurrent()) {
           return;
         }
         await browserPort().browser.close(tabId);

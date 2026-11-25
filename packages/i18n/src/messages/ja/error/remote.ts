@@ -25,12 +25,16 @@ export const messages = {
     "ホストが OpenBot に画面の収録を許可していません。ホストで画面収録を許可してから、再試行してください。",
   "error.remote.windowsSessionDisconnected":
     "ホストの Windows セッションが切断されているため、共有する画面がありません。ホストの画面で Windows にサインインしてから、再試行してください。",
+  "error.remote.windowsCaptureDenied":
+    "ホストの Windows が OpenBot による画面の記録を許可していません。ホストの画面で Windows のロックを解除し、管理者の確認画面をすべて閉じてから、再試行してください。解決しない場合は、ホストを再起動してください。",
   "error.remote.macScreenLocked":
     "Mac がロックされているため、画面を共有できません。Mac の画面でロックを解除してから、再試行してください。",
   "error.remote.streamTooSlowLowerQuality":
     "ホストへの接続が遅すぎて画面を表示できません。再試行してください。次の接続では画質を下げます。",
   "error.remote.streamTooSlow":
     "ホストへの接続が遅すぎて画面を表示できません。より速いネットワークを使ってから、再試行してください。",
+  "error.remote.noPictureSwitchEncoder":
+    "ホストから画面が送られてきませんでした。再試行してください。次の接続では、より多くのコンピューターで動作するビデオ設定を使います。",
   "error.remote.teamSessionExpired": "チームのセッションの期限が切れました。",
   "error.remote.finishTestBeforeSwitch":
     "ディスプレイを切り替える前に、リモートデスクトップのテストを終了してください。",
@@ -94,7 +98,9 @@ export const messages = {
     "セキュリティキーがないか変更されたため、OpenBot はこのサーバーを確認できません。サーバーの所有者にサーバーの確認を依頼してください。",
   "error.remote.connectionNotStarted":
     "OpenBot はこのサーバーへの接続を開始できませんでした。問題が続く場合は、OpenBot を終了してもう一度開いてください。",
-  "error.remote.hostDidNotConnect": "WebRTC ホストが接続しませんでした。",
+  "error.remote.connectionServiceUnreachable":
+    "このコンピューターから OpenBot の接続サービスに接続できません。インターネット接続を確認してください。OpenBot は自動で再接続します。",
+  "error.remote.serverAnswerTimeout": "サーバーが時間内に応答しませんでした。OpenBot は自動で再接続します。",
   "error.remote.connectionCancelled": "リモート接続がキャンセルされました。",
   "error.remote.hostDisconnected":
     "サーバーとの接続が切れました。操作が完了したか確認してから、もう一度お試しください。",

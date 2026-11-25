@@ -69,6 +69,27 @@ describe("redactMcpRecord", () => {
       item: { type: "agentMessage", text: "Provider `magpie` (Magpie), token •••" },
     });
   });
+
+  it("keeps a long html answer with many CSS rules whole (#9778)", () => {
+    const rules = Array.from({ length: 40 }, (_, index) => `.card-${index}{display:flex;color:#fff}`);
+    const jsx = "{items.map((item) => <li key={item.id}>{item.name}</li>)}";
+    const text = ["```html", '<div class="digest">', "<style>", ...rules, "</style>", jsx, "</div>", "```"].join("\n");
+    expect(redactMcpRecord({ item: { type: "agentMessage", text } }, [])).toEqual({
+      item: { type: "agentMessage", text },
+    });
+  });
+
+  it("still redacts secrets after many brace runs in an answer", () => {
+    const rules = Array.from({ length: 20 }, (_, index) => `.card-${index}{color:#fff}`).join("\n");
+    const record = (tail: string) => ({ item: { type: "agentMessage", text: `${rules}\n${tail}` } });
+    const keyed = JSON.stringify(redactMcpRecord(record("key sk-ant-abcdefghijklmnop"), []));
+    expect(keyed).not.toContain("sk-ant-abcdefghijklmnop");
+    expect(keyed).toContain(".card-19{color:#fff}");
+    const named = JSON.stringify(redactMcpRecord(record('{"name":"api_key","value":"plain-value-1"}'), []));
+    expect(named).not.toContain("plain-value-1");
+    for (const tail of ['"tokens": {\n  "prod": "plain-value-2"\n}', "tokens = {'prod': 'plain-value-2'}"])
+      expect(JSON.stringify(redactMcpRecord(record(tail), []))).not.toContain("plain-value-2");
+  });
 });
 
 describe("mcpSecretValues", () => {

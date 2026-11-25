@@ -1,5 +1,5 @@
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import type { Page } from "playwright-core";
+import type { CDPSession, Page } from "playwright-core";
 import type { MetricValues } from "./bench-stats";
 import type { InspectorClient } from "./inspector-client";
 
@@ -37,6 +37,17 @@ function installObservers(frames: boolean): string {
       }
     });
     observer.observe({ type: "longtask" });
+    const inputDelays = [];
+    let slowEvents = 0;
+    let slowestEventMs = 0;
+    const events = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        if (entry.interactionId) inputDelays.push(entry.processingStart - entry.startTime);
+        if (entry.duration > 50) slowEvents += 1;
+        slowestEventMs = Math.max(slowestEventMs, entry.duration);
+      }
+    });
+    events.observe({ type: "event", durationThreshold: 16 });
     let last = 0;
     const frame = (now) => {
       if (!state.running) return;
@@ -54,14 +65,35 @@ function installObservers(frames: boolean): string {
       stop() {
         state.running = false;
         observer.disconnect();
+        events.disconnect();
+        const sorted = inputDelays.sort((left, right) => left - right);
+        const p95 = sorted.length === 0 ? 0 : sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+        const animationsRunning = document.getAnimations().filter((animation) => animation.playState === "running").length;
         const { running, ...values } = state;
-        return values;
+        return { ...values, interactions: sorted.length, inputDelayP95Ms: p95, slowEvents, slowestEventMs, animationsRunning };
       },
     };
   })()`;
 }
 
 const STOP_OBSERVERS = `window.${PAGE_STATE}?.stop() ?? null`;
+
+const LAYER_WAIT_MS = 2_000;
+
+async function countLayers(session: CDPSession): Promise<number | null> {
+  const layers = new Promise<number | null>((resolve) => {
+    const timer = setTimeout(() => resolve(null), LAYER_WAIT_MS);
+    session.on("LayerTree.layerTreeDidChange", (event) => {
+      if (!event.layers) return;
+      clearTimeout(timer);
+      resolve(event.layers.length);
+    });
+  });
+  await session.send("LayerTree.enable");
+  const count = await layers;
+  await session.send("LayerTree.disable").catch(() => undefined);
+  return count;
+}
 
 function cdpMetrics(result: { metrics: { name: string; value: number }[] }): Map<string, number> {
   return new Map(result.metrics.map((metric) => [metric.name, metric.value]));
@@ -88,6 +120,8 @@ export async function startRenderRecording(
         const end = after.get(name);
         if (start !== undefined && end !== undefined) values[metric] = Math.round((end - start) * factor);
       }
+      const layers = await countLayers(session).catch(() => null);
+      if (layers !== null) values["render.layers"] = layers;
       const observed = await page.evaluate(STOP_OBSERVERS).catch(() => null);
       if (isDynamicRecord(observed)) {
         for (const [key, value] of Object.entries(observed)) {

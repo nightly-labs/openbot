@@ -26,12 +26,16 @@ export const messages = {
     "L’hôte n’a pas autorisé OpenBot à enregistrer son écran. Autorisez l’enregistrement de l’écran sur l’hôte, puis réessayez.",
   "error.remote.windowsSessionDisconnected":
     "La session Windows de l’hôte est déconnectée : elle n’a aucun écran à partager. Connectez-vous à Windows sur l’écran de l’hôte, puis réessayez.",
+  "error.remote.windowsCaptureDenied":
+    "Windows sur l’hôte n’autorise pas OpenBot à enregistrer son écran. Déverrouillez Windows sur l’écran de l’hôte, fermez toute invite d’administrateur, puis réessayez. Si le problème persiste, redémarrez l’hôte.",
   "error.remote.macScreenLocked":
     "Le Mac est verrouillé : il ne peut pas partager son écran. Déverrouillez le Mac sur son écran, puis réessayez.",
   "error.remote.streamTooSlowLowerQuality":
     "La connexion à l’hôte est trop lente pour l’image. Réessayez : la prochaine connexion utilisera une qualité inférieure.",
   "error.remote.streamTooSlow":
     "La connexion à l’hôte est trop lente pour l’image. Utilisez un réseau plus rapide, puis réessayez.",
+  "error.remote.noPictureSwitchEncoder":
+    "L’hôte n’a envoyé aucune image. Réessayez : la prochaine connexion utilise un réglage vidéo qui fonctionne sur plus d’ordinateurs.",
   "error.remote.teamSessionExpired": "La session de l’équipe a expiré.",
   "error.remote.finishTestBeforeSwitch": "Terminez le test du bureau à distance avant de changer d’écran.",
   "error.remote.displayNotFound": "Écran distant introuvable.",
@@ -95,7 +99,9 @@ export const messages = {
     "OpenBot ne peut pas vérifier ce serveur, car sa clé de sécurité est absente ou a changé. Demandez au propriétaire du serveur de le vérifier.",
   "error.remote.connectionNotStarted":
     "OpenBot n’a pas pu démarrer la connexion à ce serveur. Si le problème persiste, quittez OpenBot et rouvrez-le.",
-  "error.remote.hostDidNotConnect": "L’hôte WebRTC ne s’est pas connecté.",
+  "error.remote.connectionServiceUnreachable":
+    "Cet ordinateur ne peut pas joindre le service de connexion d’OpenBot. Vérifiez sa connexion Internet. OpenBot se reconnecte automatiquement.",
+  "error.remote.serverAnswerTimeout": "Le serveur n’a pas répondu à temps. OpenBot se reconnecte automatiquement.",
   "error.remote.connectionCancelled": "La connexion distante a été annulée.",
   "error.remote.hostDisconnected":
     "La connexion au serveur a été perdue. Vérifiez si l’action a abouti, puis réessayez.",

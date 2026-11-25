@@ -9,7 +9,7 @@ import { elfSearchPaths, ORIGIN_SEARCH_PATH } from "./elf-search-paths";
 
 const logger = createOpenBotLogger("prepare-voice");
 
-const SHERPA_ONNX_VERSION = "2.0.1";
+const SHERPA_ONNX_VERSION = "2.0.3";
 
 interface RuntimePackage {
   name: string;
@@ -20,27 +20,27 @@ interface RuntimePackage {
 const RUNTIME_PACKAGES: Readonly<Record<string, RuntimePackage>> = {
   "darwin-arm64": {
     name: "sherpa-onnx-darwin-arm64",
-    integrity: "sha512-agXmbbwiVPUSMViMhWhYAt59iG21ui7x6HxQFU35XzHOfQe9x6Pg9V160Pzak/66x0ePMjixsLUtMaaUrLfCwQ==",
+    integrity: "sha512-PuPsSgMvzKYYBG+/CwEZbbtl4kmztravlpN8KmsQy2jWGJ3WjEJ1NkPzUNgEbrq/9s5xnyd20FFlWJXOIcAHoA==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.dylib", "libonnxruntime.dylib"],
   },
   "darwin-x64": {
     name: "sherpa-onnx-darwin-x64",
-    integrity: "sha512-SBnHa3LDOSI/5/rpBHGxKQDFq+yIdxowYY0InLzfojTUx+yGgqu7cYBrRxjzvHOiOKi0O4rmlFVZboyhIqpDgA==",
+    integrity: "sha512-ZFSsikOf0xrnvEl8Xj5Z8IpG0hqWGFDy3HwLFagwV1apftVgh/SVXbwQ+pIf0xFRBrAr+SaR3asvoCEc6DxOSg==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.dylib", "libonnxruntime.dylib"],
   },
   "win32-x64": {
     name: "sherpa-onnx-win-x64",
-    integrity: "sha512-7vwdAw9PGEb0JLSpK7UFxAdp1vabBHK9Nhw2jFRBWSFgtslUPHIB0T6syJfRgiUGyCeNW9fJvcFAk2F2u7hBEw==",
+    integrity: "sha512-UDPUCNmuhWWC0oNMphHjgdRE0M8bVbUFXk9AyyJUuOtubmxhQBLz2sd2v6RWIAXSDh/7GwPbImLqAWI51ITTNQ==",
     files: [VOICE_RUNTIME_ADDON, "sherpa-onnx-c-api.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll"],
   },
   "linux-x64": {
     name: "sherpa-onnx-linux-x64",
-    integrity: "sha512-w5mRRrIvPvcNWac7rQ8AN/t/cwElPGoRpH+ceCRBV7XfjCIQ9Rcr3Ig/kXcJLNOxgK4bGmef+Y47lIWiesDODw==",
+    integrity: "sha512-cORrflhfgu/vD22UAfU4DvwCjKC6cSmVGM2o2fXnM6O9meN8Mpu5enqb/afIi+Nwweo9eS6YmaQcvmT+L6ia2A==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.so", "libonnxruntime.so"],
   },
   "linux-arm64": {
     name: "sherpa-onnx-linux-arm64",
-    integrity: "sha512-5CJvLjFYIg23oELCsT7l07fMLT3PdquZ3tqh7KZK3Pzi+c2YiPKRe1DDUxoNdtCaw3ZiS4aQSQPBblB9JStuDA==",
+    integrity: "sha512-F4cciAFw4rrV39CR6o1yNLG1e/Gcd4Je2wGxi4Q+jl1NJh7VSvE3n4NCz4bQzBlvZWgU8ThhV9ggD6xC5iJWFQ==",
     files: [VOICE_RUNTIME_ADDON, "libsherpa-onnx-c-api.so", "libonnxruntime.so"],
   },
 };

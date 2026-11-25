@@ -6,6 +6,9 @@ import { BillingSales } from "./billing-sales";
 import { BillingService } from "./billing-service";
 import { captureBillingSnapshot } from "./billing-snapshots";
 import { canonicalHostRedirect, permanentTrailingSlashRedirect } from "./canonical-redirect";
+import { CreditAudit } from "./credit-audit";
+import { CreditGrants } from "./credit-grants";
+import { CreditMediaService } from "./credit-media-service";
 import { runApiEffect } from "./effect-runtime";
 import { createHostedBilling } from "./hosted-billing";
 import { createHostedPoolAlert } from "./hosted-pool-alert";
@@ -13,6 +16,7 @@ import { readHostedPool } from "./hosted-pool-snapshot";
 import type { HostedServerBindings } from "./hosted-server-service";
 import { HostedSiteService } from "./hosted-site-service";
 import { enforceMarketplaceIngress, MarketplaceRateLimitError } from "./marketplace-request-policy";
+import { type MediaUpstreamBindings, mediaUpstreamsFromBindings } from "./media-upstream-bindings";
 import { observedD1 } from "./observed-d1";
 import { pageMarkdownResponse } from "./page-markdown";
 import {
@@ -123,11 +127,23 @@ export function createWorkerHandler(
             Effect.exit(tickSalesAnalytics(bindings, now)),
             Effect.exit(tickHostedPool(bindings, now)),
             Effect.exit(tickReferralCredit(bindings)),
+            Effect.exit(tickCreditHolds(bindings, now)),
+            Effect.exit(tickCreditGrants(bindings, now)),
           ],
           { concurrency: "unbounded" },
         ).pipe(
-          Effect.flatMap(([retentionExit, deliveryExit, sitesExit, salesExit, poolExit, referralExit]) =>
-            Effect.all([retentionExit, deliveryExit, sitesExit, salesExit, poolExit, referralExit]),
+          Effect.flatMap(
+            ([retentionExit, deliveryExit, sitesExit, salesExit, poolExit, referralExit, holdsExit, grantsExit]) =>
+              Effect.all([
+                retentionExit,
+                deliveryExit,
+                sitesExit,
+                salesExit,
+                poolExit,
+                referralExit,
+                holdsExit,
+                grantsExit,
+              ]),
           ),
         ),
       );
@@ -187,10 +203,9 @@ const tickReferralCredit = Effect.fn("ReferralCredit.tick")(function* (bindings:
   yield* billing.releaseReferralCredit();
 });
 
-const tickHostedPool = Effect.fn("HostedPool.tick")(function* (bindings: SalesBindings, now: number) {
-  if (!bindings.OPENPANEL_CLIENT_ID?.trim() || !bindings.OPENPANEL_CLIENT_SECRET?.trim()) return;
-  const groups = yield* readHostedPool(bindings.DB, now);
-  if (groups.length === 0) return;
+type AnalyticsBindings = Pick<WorkerBindings, "DB" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET">;
+
+function tickAnalytics(bindings: AnalyticsBindings) {
   const sends: Effect.Effect<void>[] = [];
   const analytics = createAccountAnalytics({
     clientId: bindings.OPENPANEL_CLIENT_ID,
@@ -199,8 +214,42 @@ const tickHostedPool = Effect.fn("HostedPool.tick")(function* (bindings: SalesBi
     schedule: (send) => sends.push(send),
     database: bindings.DB,
   });
+  return { analytics, flush: Effect.suspend(() => Effect.all(sends, { concurrency: "unbounded", discard: true })) };
+}
+
+const tickCreditHolds = Effect.fn("CreditHolds.tick")(function* (
+  bindings: AnalyticsBindings & MediaUpstreamBindings,
+  now: number,
+) {
+  const { analytics, flush } = tickAnalytics(bindings);
+  const result = yield* new CreditMediaService({
+    database: bindings.DB,
+    upstreams: mediaUpstreamsFromBindings(bindings),
+    now: () => now,
+    analytics,
+  })
+    .sweep()
+    .pipe(Effect.ensuring(flush));
+  const auditPruned = yield* new CreditAudit(bindings.DB, () => now).prune();
+  if (Object.values(result).some(Boolean) || auditPruned > 0)
+    console.info("Credit hold sweep completed.", { ...result, auditPruned });
+});
+
+const tickCreditGrants = Effect.fn("CreditGrants.tick")(function* (bindings: AnalyticsBindings, now: number) {
+  const { analytics, flush } = tickAnalytics(bindings);
+  const result = yield* new CreditGrants({ database: bindings.DB, now: () => now, analytics })
+    .sweep()
+    .pipe(Effect.ensuring(flush));
+  if (Object.values(result).some(Boolean)) console.info("Credit grant sweep completed.", result);
+});
+
+const tickHostedPool = Effect.fn("HostedPool.tick")(function* (bindings: SalesBindings, now: number) {
+  if (!bindings.OPENPANEL_CLIENT_ID?.trim() || !bindings.OPENPANEL_CLIENT_SECRET?.trim()) return;
+  const groups = yield* readHostedPool(bindings.DB, now);
+  if (groups.length === 0) return;
+  const { analytics, flush } = tickAnalytics(bindings);
   for (const group of groups) analytics.track(null, { name: "hosted_pool_snapshot", group });
-  yield* Effect.all(sends, { concurrency: "unbounded", discard: true });
+  yield* flush;
 });
 
 const checkoutReturnResponse = Effect.fn("BillingSales.returnResponse")(function* (

@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { Logger } from "@openbot/logging";
 import type { Browser, CDPSession, Page } from "playwright-core";
 import { cpuMetrics, type MetricValues, parseFootprint, processMetrics } from "./bench-stats";
@@ -45,6 +46,19 @@ async function readFootprints(rows: ProcessTableRow[]): Promise<Map<number, numb
   }
 }
 
+const READ_PROCESS_KINDS = "globalThis.__openbotPerfProbes?.processKinds() ?? null";
+const KIND_REFRESH_TICKS = 10;
+
+export async function readAppProcessKinds(inspector: InspectorClient | null): Promise<Map<number, string>> {
+  const kinds = new Map<number, string>();
+  const listed = inspector ? await inspector.evaluate(READ_PROCESS_KINDS).catch(() => null) : null;
+  if (!Array.isArray(listed)) return kinds;
+  for (const entry of listed) {
+    if (isDynamicRecord(entry) && isNumber(entry.pid) && isString(entry.kind)) kinds.set(entry.pid, entry.kind);
+  }
+  return kinds;
+}
+
 function allPages(browser: Browser | null): Page[] {
   return browser?.contexts().flatMap((context) => context.pages()) ?? [];
 }
@@ -66,6 +80,8 @@ export class ResourceSampler {
   readonly #samples: ResourceSample[] = [];
   #previousRows: ProcessTableRow[] | null = null;
   #previousAt = 0;
+  #appKinds = new Map<number, string>();
+  #kindsTick = -KIND_REFRESH_TICKS;
   #tick = 0;
   #timer: ReturnType<typeof setTimeout> | null = null;
   #running: Promise<void> | null = null;
@@ -115,11 +131,21 @@ export class ResourceSampler {
     const atMs = Date.now();
     const rows = await readProcessTree(this.#options.rootPid);
     const values: MetricValues = processMetrics(rows, await readFootprints(rows));
-    if (this.#previousRows) Object.assign(values, cpuMetrics(this.#previousRows, rows, atMs - this.#previousAt));
+    await this.#refreshAppKinds(rows);
+    if (this.#previousRows) {
+      Object.assign(values, cpuMetrics(this.#previousRows, rows, atMs - this.#previousAt, this.#appKinds));
+    }
     this.#previousRows = rows;
     this.#previousAt = atMs;
     if (withHeaps) Object.assign(values, await this.readHeaps());
     return { atMs, values };
+  }
+
+  async #refreshAppKinds(rows: ProcessTableRow[]): Promise<void> {
+    const unknownPid = rows.some((row) => row.ppid === this.#options.rootPid && !this.#appKinds.has(row.pid));
+    if (!unknownPid && this.#tick - this.#kindsTick < KIND_REFRESH_TICKS) return;
+    this.#kindsTick = this.#tick;
+    this.#appKinds = await readAppProcessKinds(this.#options.inspector());
   }
 
   start(): void {
@@ -167,9 +193,10 @@ export class ResourceSampler {
     const startedAt = Date.now();
     await new Promise((resolve) => setTimeout(resolve, waitMs));
     const after = await readProcessTree(rootPid);
+    const appKinds = await readAppProcessKinds(this.#options.inspector());
     return {
       ...processMetrics(after, await readFootprints(after)),
-      ...cpuMetrics(before, after, Date.now() - startedAt),
+      ...cpuMetrics(before, after, Date.now() - startedAt, appKinds),
       ...(await this.readHeaps()),
     };
   }

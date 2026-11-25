@@ -24,6 +24,10 @@ import {
   PROVIDER_MODEL_SOURCE_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import { SKILL_PROBLEMS_CAPABILITY } from "@openbot/contracts/team-protocol/skill-problems-v1";
+import {
+  TEAM_USAGE_READ_FAILED_CAPABILITY,
+  usageWithoutReadFailed,
+} from "@openbot/contracts/team-protocol/usage-read-failed-v1";
 import { V5_AGENT_MODEL } from "@openbot/contracts/team-protocol/v5-adapter";
 import { V6_AGENT_MODEL } from "@openbot/contracts/team-protocol/v6-adapter";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
@@ -185,7 +189,8 @@ export async function routeAgents(
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.usage) {
     const usage = await runCauseEffect(agents.getUsage());
-    return json(200, { ...usage, limits: usage.limits.filter((limit) => limit.accountId === undefined) });
+    const signIns = { ...usage, limits: usage.limits.filter((limit) => limit.accountId === undefined) };
+    return json(200, capabilities.has(TEAM_USAGE_READ_FAILED_CAPABILITY) ? signIns : usageWithoutReadFailed(signIns));
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.models) {
     const modelId = context.protocol < 6 ? V5_AGENT_MODEL : V6_AGENT_MODEL;
@@ -331,7 +336,7 @@ export async function routeAgents(
       throw new HttpError(400, sourceText("error.team.secureAuthUnsupported"));
     const input = parseBrowserSecretResponse(await readJson(request));
     requireRequestAgent(input.agentId);
-    await runCauseEffect(agents.respondToBrowserSecret(input));
+    await runCauseEffect(agents.respondToBrowserSecret(input)).catch(inactiveAsConflict);
     return empty(204);
   }
   if (method === "POST" && url.pathname === BROWSER_SECRET_VAULT_ROUTES.respond) {
@@ -341,7 +346,7 @@ export async function routeAgents(
       throw new HttpError(400, sourceText("error.team.vaultUnsupported"));
     const input = parseBrowserSecretResponse({ ...(await readJson(request)), decision: "submit" });
     requireRequestAgent(input.agentId);
-    await runCauseEffect(agents.respondToBrowserSecret({ ...input, saveToVault: true }));
+    await runCauseEffect(agents.respondToBrowserSecret({ ...input, saveToVault: true })).catch(inactiveAsConflict);
     return json(200, {});
   }
   if (method === "POST" && url.pathname === TEAM_API_ROUTES.respond.browserTakeover) {

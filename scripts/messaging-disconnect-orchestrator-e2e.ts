@@ -103,6 +103,7 @@ async function boot<T>(
     agents: {
       listAgents: () => agents.listAgents(),
       respondToApproval: (input) => agents.respondToApproval(input),
+      approvalExecutionThreadId: (requestId) => agents.approvalExecutionThreadId(requestId),
       onEvent: () => () => {},
       createAgentProfile: (input) => agents.createAgentProfile(input),
       createMemory: (input) => agents.createMemory(input),

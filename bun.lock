@@ -24,6 +24,7 @@
         "effect": "catalog:",
         "electron-updater": "6.8.11",
         "fflate": "catalog:",
+        "https-proxy-agent": "7.0.6",
         "jose": "catalog:",
         "koffi": "3.3.5",
         "long": "catalog:",
@@ -36,7 +37,7 @@
         "qrcode": "catalog:",
         "quickjs-emscripten-core": "0.32.0",
         "smol-toml": "catalog:",
-        "solid-js": "2.0.0",
+        "solid-js": "2.0.3",
         "tldts": "7.4.19",
         "ws": "8.22.0",
         "yaml": "catalog:",
@@ -112,7 +113,7 @@
         "effect": "catalog:",
         "fflate": "catalog:",
         "jose": "catalog:",
-        "solid-js": "2.0.0",
+        "solid-js": "2.0.3",
         "yaml": "catalog:",
         "zod": "catalog:",
       },
@@ -130,9 +131,31 @@
         "wrangler": "catalog:",
       },
     },
+    "apps/browser-extension": {
+      "name": "@openbot/browser-extension",
+      "version": "0.0.0",
+      "dependencies": {
+        "@fontsource-variable/inter": "catalog:",
+        "@openbot/brand": "workspace:*",
+        "@openbot/contracts": "workspace:*",
+        "@openbot/i18n": "workspace:*",
+        "@openbot/team-client": "workspace:*",
+        "@openbot/telemetry": "workspace:*",
+        "@openbot/ui": "workspace:*",
+        "@solidjs/signals": "catalog:",
+        "@solidjs/web": "catalog:",
+        "solid-js": "2.0.3",
+      },
+      "devDependencies": {
+        "@solidjs/vite-plugin": "catalog:",
+        "@tailwindcss/vite": "catalog:",
+        "tailwindcss": "catalog:",
+        "vite": "catalog:",
+      },
+    },
     "apps/mobile": {
       "name": "@openbot/mobile",
-      "version": "1.4.12",
+      "version": "1.4.14",
       "dependencies": {
         "@config-plugins/react-native-webrtc": "15.0.2",
         "@expo/metro-runtime": "~58.0.17",
@@ -155,6 +178,7 @@
         "effect": "catalog:",
         "expo": "~58.0.25",
         "expo-application": "~58.1.2",
+        "expo-background-task": "~58.0.13",
         "expo-blur": "~58.0.6",
         "expo-build-properties": "~58.0.12",
         "expo-camera": "~58.0.14",
@@ -175,6 +199,7 @@
         "expo-linking": "~58.0.17",
         "expo-local-authentication": "~58.0.3",
         "expo-localization": "~58.0.5",
+        "expo-location": "~58.0.22",
         "expo-media-library": "~58.0.14",
         "expo-network": "~58.0.5",
         "expo-notifications": "~58.1.9",
@@ -186,6 +211,7 @@
         "expo-status-bar": "~58.0.5",
         "expo-symbols": "~58.0.5",
         "expo-system-ui": "~58.0.7",
+        "expo-task-manager": "~58.0.14",
         "expo-updates": "~58.0.22",
         "expo-video": "~58.0.14",
         "expo-web-browser": "~58.0.8",
@@ -259,7 +285,7 @@
         "@solidjs/web": "catalog:",
         "effect": "catalog:",
         "lucide-solid": "catalog:",
-        "solid-js": "2.0.0",
+        "solid-js": "2.0.3",
       },
       "devDependencies": {
         "@solidjs/vite-plugin": "catalog:",
@@ -280,7 +306,7 @@
       },
       "peerDependencies": {
         "@solidjs/web": "catalog:",
-        "solid-js": "2.0.0",
+        "solid-js": "2.0.3",
       },
     },
     "packages/contracts": {
@@ -370,7 +396,7 @@
       },
       "peerDependencies": {
         "@solidjs/web": "catalog:",
-        "solid-js": "2.0.0",
+        "solid-js": "2.0.3",
       },
     },
     "packages/user-errors": {
@@ -417,6 +443,7 @@
         "@discordjs/rest": "2.6.3",
         "@discordjs/ws": "2.0.4",
         "@openbot/contracts": "workspace:*",
+        "@openbot/i18n": "workspace:*",
         "discord-api-types": "0.38.57",
         "effect": "catalog:",
         "elysia": "1.4.30",
@@ -440,16 +467,17 @@
     "react-native-reserved-regions@0.2.0": "patches/react-native-reserved-regions@0.2.0.patch",
     "@kobalte/core@2.0.0-alpha.0": "patches/@kobalte%2Fcore@2.0.0-alpha.0.patch",
     "dmg-builder@26.18.0": "patches/dmg-builder@26.18.0.patch",
+    "solid-sonner@1.0.0": "patches/solid-sonner@1.0.0.patch",
     "storybook-solidjs-vite@10.7.1": "patches/storybook-solidjs-vite@10.7.1.patch",
-    "@openpanel/react-native@1.4.4": "patches/@openpanel%2Freact-native@1.4.4.patch",
     "@modelcontextprotocol/sdk@1.32.1": "patches/@modelcontextprotocol%2Fsdk@1.32.1.patch",
-    "expo-widgets@58.0.28": "patches/expo-widgets@58.0.28.patch",
+    "@openpanel/react-native@1.4.4": "patches/@openpanel%2Freact-native@1.4.4.patch",
     "expo@58.0.25": "patches/expo@58.0.25.patch",
     "lucide-solid@1.33.0": "patches/lucide-solid@1.33.0.patch",
     "solid-recharts@1.0.1": "patches/solid-recharts@1.0.1.patch",
     "@react-native-masked-view/masked-view@0.3.2": "patches/@react-native-masked-view%2Fmasked-view@0.3.2.patch",
     "expo-splash-screen@58.0.14": "patches/expo-splash-screen@58.0.14.patch",
-    "solid-sonner@0.3.2": "patches/solid-sonner@0.3.2.patch",
+    "expo-widgets@58.0.28": "patches/expo-widgets@58.0.28.patch",
+    "@expo/cli@58.1.20": "patches/@expo%2Fcli@58.1.20.patch",
     "cuelume@0.2.8": "patches/cuelume@0.2.8.patch",
     "expo-image@58.0.18": "patches/expo-image@58.0.18.patch",
     "@expo/ui@58.0.28": "patches/@expo%2Fui@58.0.28.patch",
@@ -464,13 +492,13 @@
     "@kobalte/core": "2.0.0-alpha.0",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",
-    "@norbert_bodziony/bloub": "0.6.7",
+    "@norbert_bodziony/bloub": "0.7.0",
     "@openpanel/web": "1.4.2",
     "@paper-design/shaders": "0.0.80",
-    "@solidjs/signals": "2.0.0",
+    "@solidjs/signals": "2.0.3",
     "@solidjs/testing-library": "1.0.0-rc.2",
-    "@solidjs/vite-plugin": "3.0.0",
-    "@solidjs/web": "2.0.0",
+    "@solidjs/vite-plugin": "3.0.1",
+    "@solidjs/web": "2.0.3",
     "@speed-highlight/core": "1.2.24",
     "@tailwindcss/vite": "4.3.3",
     "@tanstack/virtual-core": "3.19.7",
@@ -496,7 +524,7 @@
     "qrcode": "^1.5.4",
     "smol-toml": "1.9.0",
     "solid-recharts": "1.0.1",
-    "solid-sonner": "0.3.2",
+    "solid-sonner": "1.0.0",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.3.5",
@@ -1158,7 +1186,7 @@
 
     "@node-datachannel/win32-x64-msvc": ["@node-datachannel/win32-x64-msvc@0.33.6", "", { "os": "win32", "cpu": "x64" }, "sha512-N5GW6XH11Iuu+kyHLTiCMcCHdwWwpKqvtYril0LzQm6xBgmGQN3JXxFmgi4g4usw1nLy6WhBWADjbhSXJiiEMA=="],
 
-    "@norbert_bodziony/bloub": ["@norbert_bodziony/bloub@0.6.7", "", { "peerDependencies": { "@solidjs/web": "^2.0.0-rc.0", "solid-js": "^2.0.0-rc.0" } }, "sha512-RPRieMg0EGglIgdwhybjDg2gn0w2WREnO+PMiaQK4hF1DLYvnR4i96GphJh8dHW01XGB60vz6Ex3Q3VC+gDUDg=="],
+    "@norbert_bodziony/bloub": ["@norbert_bodziony/bloub@0.7.0", "", { "peerDependencies": { "@solidjs/web": "^2.0.0-rc.0", "solid-js": "^2.0.0-rc.0" } }, "sha512-/41poHd8KMzclDDH2bUJi1XpwScZ2GoLxLR8XO7k9tAMjs+XLeR6VBWm95TncdDQqfYp83B6GVDc5r3bX9w80Q=="],
 
     "@nothing-but/utils": ["@nothing-but/utils@0.17.0", "", {}, "sha512-TuCHcHLOqDL0SnaAxACfuRHBNRgNJcNn9X0GiH5H3YSDBVquCr3qEIG3FOQAuMyZCbu9w8nk2CHhOsn7IvhIwQ=="],
 
@@ -1189,6 +1217,8 @@
     "@openbot/auth-api": ["@openbot/auth-api@workspace:apps/auth-api"],
 
     "@openbot/brand": ["@openbot/brand@workspace:packages/brand"],
+
+    "@openbot/browser-extension": ["@openbot/browser-extension@workspace:apps/browser-extension"],
 
     "@openbot/contracts": ["@openbot/contracts@workspace:packages/contracts"],
 
@@ -1560,13 +1590,13 @@
 
     "@solidjs/meta": ["@solidjs/meta@0.29.4", "", { "peerDependencies": { "solid-js": ">=1.8.4" } }, "sha512-zdIWBGpR9zGx1p1bzIPqF5Gs+Ks/BH8R6fWhmUa/dcK1L2rUC8BAcZJzNRYBQv74kScf1TSOs0EY//Vd/I0V8g=="],
 
-    "@solidjs/signals": ["@solidjs/signals@2.0.0", "", {}, "sha512-jrcT6XTVvsYRpesRp0At/mSUnsWr6jiprK8C93Oat56B8n7X9BMSe58Rxl6qSZUhBN0L+sxm8GzeO7HdhBXvDw=="],
+    "@solidjs/signals": ["@solidjs/signals@2.0.3", "", {}, "sha512-M6+kiJflqSvJRHRcmdsdIXpPLPkQrY817zWKKfxZ3z3ZRE5eEtddtWPrDXY4IM1Wz3zAqG+3Fx/HQIkAtpRwnA=="],
 
     "@solidjs/testing-library": ["@solidjs/testing-library@1.0.0-rc.2", "", { "dependencies": { "@testing-library/dom": "^10.4.2" }, "peerDependencies": { "@solidjs/web": ">=2.0.0-0", "solid-js": ">=2.0.0-0" } }, "sha512-QZqIVoyDAqaGgSsWQ3gnYGaG1peFkNF0/n5uM+393g5plZlcvgxmUgdjsQtwrRLVZCrh0K1lp7YHxsAlN5XPkA=="],
 
-    "@solidjs/vite-plugin": ["@solidjs/vite-plugin@3.0.0", "", { "dependencies": { "@ampproject/remapping": "^2.3.0", "@solidjs/compiler": "^2.0.0", "magic-string": "^0.30.21", "merge-anything": "^5.1.7", "vitefu": "^1.0.4" }, "peerDependencies": { "@babel/core": "^7.23.3 || ^8.0.0", "@solidjs/babel-plugin": "^2.0.0", "@solidjs/start-devtools": "^1.0.0-next.2", "@solidjs/web": "^2.0.0", "@testing-library/jest-dom": "^5.16.6 || ^5.17.0 || ^6.0.0 || ^7.0.0", "solid-js": "^2.0.0", "vite": "^8.0.0 || ^9.0.0" }, "optionalPeers": ["@babel/core", "@solidjs/babel-plugin", "@solidjs/start-devtools", "@testing-library/jest-dom"] }, "sha512-JXFEewd+vKxbAuqc2+gtf0cnsc4esDq+lax6KKGRvP3D5np49rhF1V6mCLtiOEfeVEcSrBP6MRlArObiTaCQfA=="],
+    "@solidjs/vite-plugin": ["@solidjs/vite-plugin@3.0.1", "", { "dependencies": { "@ampproject/remapping": "^2.3.0", "@solidjs/compiler": "^2.0.0", "magic-string": "^0.30.21", "merge-anything": "^5.1.7", "vitefu": "^1.0.4" }, "peerDependencies": { "@babel/core": "^7.23.3 || ^8.0.0", "@solidjs/babel-plugin": "^2.0.0", "@solidjs/start-devtools": "^1.0.0-next.2", "@solidjs/web": "^2.0.0", "@testing-library/jest-dom": "^5.16.6 || ^5.17.0 || ^6.0.0 || ^7.0.0", "solid-js": "^2.0.0", "vite": "^8.0.0 || ^9.0.0" }, "optionalPeers": ["@babel/core", "@solidjs/babel-plugin", "@solidjs/start-devtools", "@testing-library/jest-dom"] }, "sha512-dyRU4LJXhzEEgtF32AtUdjqaUuMVYTVLQvhYlT6HcYBvf10yIVmKgW9cg42b5YDxkl6BgAJ9o0OjUnAy3qKb9A=="],
 
-    "@solidjs/web": ["@solidjs/web@2.0.0", "", { "dependencies": { "csstype": "^3.1.0", "seroval": "^1.8.0", "seroval-plugins": "^1.8.0" }, "peerDependencies": { "solid-js": "^2.0.0" } }, "sha512-R0+JMCD6ukEXaID/sH5PVQe9bCIN9pRzJry+F6Sb6YvtlkAp9DEyVI7AeZYiV0cd6TSL98kpbCyLDiZnaAKGrA=="],
+    "@solidjs/web": ["@solidjs/web@2.0.3", "", { "dependencies": { "csstype": "^3.1.0", "seroval": "^1.8.0", "seroval-plugins": "^1.8.0" }, "peerDependencies": { "solid-js": "^2.0.3" } }, "sha512-XYl9JGOtQ8yJSZRnd6uC+5gYXsYvnIRNxhn89m+F1v6D4d4ZFdTJY2Lq/8XJ3YcjckkCrK/mNfd3kIiqqgnG7w=="],
 
     "@speed-highlight/core": ["@speed-highlight/core@1.2.24", "", {}, "sha512-qeW2e1l78afw8VhRPfPQ1Gjj+KU5XFQ/OFV5ti6eTa9bruO7mJyZtA4vw0ofqmA3tKCkROE9xLk3VZoeRc98nw=="],
 
@@ -2364,6 +2394,8 @@
 
     "expo-asset": ["expo-asset@58.0.21", "", { "dependencies": { "@expo/image-utils": "^0.12.7", "expo-constants": "~58.0.16" }, "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-qaJmuTtswggXdBQfiUdpxrVGM7l+tH8iEDHwVDMuxyCF/kAau8sUGVuWrDKYNW4yAx7Z8ncgsT8s27pXjRH5GA=="],
 
+    "expo-background-task": ["expo-background-task@58.0.13", "", { "dependencies": { "expo-task-manager": "~58.0.14" }, "peerDependencies": { "expo": "*" } }, "sha512-1AbMsRPgD9eHgvWWhNCdPwR7u4J2c1pCZDWjZ0NiNVkbaVof5Jqaqk8I6vWN+Z9taFD+C9ACE61PsK3NIJqSzg=="],
+
     "expo-blur": ["expo-blur@58.0.6", "", { "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-gjcw+pBi/15Qy9L0vD6n+KbEbutz6owvrjbYr+74kSaNgj0DEf2qJ7cEU3EJ8/f8KcZss0/7sUWWO9FtBEg+Wg=="],
 
     "expo-build-properties": ["expo-build-properties@58.0.12", "", { "dependencies": { "@expo/schema-utils": "^58.0.3", "resolve-from": "^5.0.0", "semver": "^7.7.4" }, "peerDependencies": { "expo": "*" } }, "sha512-Wrs1X1iz0kigrBBDs3qILxvXmANccvbsjpR937KqX0Qq7ON6ISk2uJyfz7Tb7/GFhDuJ6MAfW0jR+oryYdOhcg=="],
@@ -2418,6 +2450,8 @@
 
     "expo-localization": ["expo-localization@58.0.5", "", { "dependencies": { "rtl-detect": "^1.0.2" }, "peerDependencies": { "expo": "*", "react": "*" } }, "sha512-2wyZl/5wn95l38AAtdaUAq2VMJWbGbgQQDEuIEkkemmsA/BZ8gS21Nq+7I2X9hDfL5Z+4hlyLVdPtDIH0vvt1A=="],
 
+    "expo-location": ["expo-location@58.0.22", "", { "dependencies": { "@expo/image-utils": "^0.12.7" }, "peerDependencies": { "expo": "*", "expo-task-manager": "*", "react": "*", "react-native": "*" }, "optionalPeers": ["expo-task-manager"] }, "sha512-riZCEjY9//enExdweKSMNvjGS2AGCNG7Z8NJa+3GP5In+ZtrPdkbnhPo3JHwhWZE0NE72yv2t+AKPWauen3fkA=="],
+
     "expo-manifests": ["expo-manifests@58.0.1", "", { "dependencies": { "expo-json-utils": "~58.0.1" }, "peerDependencies": { "expo": "*" } }, "sha512-fVeJJ71Fj8FJgcAUggn6QIsm7CTxsXFgekLl4pEPHgON6fmcxog63FGO0sisQ3F6yUWFR4nn8iJmgBp1Exs7ew=="],
 
     "expo-media-library": ["expo-media-library@58.0.14", "", { "peerDependencies": { "expo": "*", "react-native": "*" } }, "sha512-7j96Q2DUsslfiYSGtW2kZv9HKxkpaujM5yoR+1WDhfY2Z4Rbphhv+ZbrJHRDmTCvzAhqn2duve4aqAW0tWsEhw=="],
@@ -2456,6 +2490,8 @@
 
     "expo-system-ui": ["expo-system-ui@58.0.7", "", { "dependencies": { "@react-native/normalize-colors": "0.88.1", "debug": "^4.3.2" }, "peerDependencies": { "expo": "*", "react-native": "*", "react-native-web": "*" }, "optionalPeers": ["react-native-web"] }, "sha512-XxrMY93bT8MpZUlc6uRKzkeUoXhBi/Eq8j3qx2pjk0ARCV+0Ed1eqzmgxuAoKZ+10cyOZVSke5Hhi78NVFReuQ=="],
 
+    "expo-task-manager": ["expo-task-manager@58.0.14", "", { "dependencies": { "unimodules-app-loader": "~58.0.2" }, "peerDependencies": { "expo": "*", "react-native": "*" } }, "sha512-a8GFlS0pcL7P7FFY9nukmeQz9gBpRFftXDEdA08NkWZDjVn2VNjdJw2nSbElEnLQCLYzKMkITJLbnixXqVoQdQ=="],
+
     "expo-updates": ["expo-updates@58.0.22", "", { "dependencies": { "@expo/code-signing-certificates": "^0.0.7", "@expo/env": "^2.6.0", "@expo/plist": "^0.10.2", "@expo/spawn-async": "^1.8.0", "@react-native/asset-utils": "0.88.1", "arg": "^4.1.0", "chalk": "^4.1.2", "debug": "^4.3.4", "expo-eas-client": "~58.0.2", "expo-manifests": "~58.0.1", "expo-structured-headers": "~58.0.1", "expo-updates-interface": "~58.0.1", "ignore": "^5.3.1", "nullthrows": "^1.1.1", "resolve-from": "^5.0.0" }, "peerDependencies": { "expo": "*", "expo-dev-client": "*", "react": "*", "react-native": "*" }, "optionalPeers": ["expo-dev-client"], "bin": { "expo-updates": "bin/cli.js" } }, "sha512-ceGlQ+C1fKX+cOEd4tg+/IP0YNdPrRYBScLUoNaV5f9ABEUypsWNTfruFDkBeKv1YdbDLdGahyXhDk2B8Fa+Zg=="],
 
     "expo-updates-interface": ["expo-updates-interface@58.0.1", "", { "peerDependencies": { "expo": "*" } }, "sha512-OF+3BtMXtUsXWDfpHVNus9yHpx7WjMwjxDfeeN9LQBYSq/UtYmNNHBSfzChYTuqljWFSOAHRfsDykV9EB73Wlg=="],
@@ -2472,7 +2508,7 @@
 
     "express-rate-limit": ["express-rate-limit@8.6.2", "", { "dependencies": { "debug": "^4.4.3", "ip-address": "^10.2.0" }, "peerDependencies": { "express": ">= 4.11" } }, "sha512-YH4ru+eOJxQABscKFfRCy9R7x9QFGdezclVMwwgFFndzS2Xnm0uo6B0ABZsLhcpeptGv2qvuJVWlQr9gQZoC3A=="],
 
-    "exsolve": ["exsolve@1.1.1", "", {}, "sha512-9U/jZUgjnSGyntRr6y5Muu1MJcwFl6kPu7k8qLF0IMNfLqvw0NZ4nnVDq0RVoZ0RvCyumib4Ez3KYrVfilrw+g=="],
+    "exsolve": ["exsolve@1.2.0", "", {}, "sha512-h1pQPR9XoeSMdntRNCjyTznaume4UpfXrULBnlkZ2CUM/G5eSa+pBByGldO5uR8dxbPC+OuJXsPPNf+JZ81ADg=="],
 
     "fast-decode-uri-component": ["fast-decode-uri-component@1.0.1", "", {}, "sha512-WKgKWg5eUxvRZGwW8FvfbaH7AXSh2cL+3j5fMGzUMCxWBJ3dV3a7Wz8y2f/uQ0e3B6WmodD3oS54jTQ9HVTIIg=="],
 
@@ -3266,13 +3302,13 @@
 
     "smol-toml": ["smol-toml@1.9.0", "", {}, "sha512-hpd+HLON7HdZXqYchMM/+LaTTbdK0AU3NngIJ4KVyWbY9bfQqdL9cD+4yf6dUoU2Ap4VsU0JkQi6FxAI1B2mXQ=="],
 
-    "solid-js": ["solid-js@2.0.0", "", { "dependencies": { "@solidjs/signals": "^2.0.0", "seroval": "^1.8.0", "seroval-plugins": "^1.8.0" } }, "sha512-9zN4uH2OQeQAYbF4BmIzoaa+L5Hb8Dp6kkP6ZXobHQ1FZVICdmzREPDVDBJY7umzdAE8D6zbFfWhxGtagkyslA=="],
+    "solid-js": ["solid-js@2.0.3", "", { "dependencies": { "@solidjs/signals": "^2.0.3", "seroval": "^1.8.0", "seroval-plugins": "^1.8.0" } }, "sha512-XOHstv+GAJjfcSGZU9xfX5q6Mbqmv72IcdWh2JuMx3KvBbfpQPdy/Yl00A1ouk7A0etjqhNe799CPdr6i7koWg=="],
 
     "solid-recharts": ["solid-recharts@1.0.1", "", { "dependencies": { "@types/d3-scale": "^4.0.2", "@types/d3-shape": "^3.1.0", "d3-scale": "^4.0.2", "d3-shape": "^3.1.0" }, "peerDependencies": { "solid-js": "^1.9.0" } }, "sha512-EKwNlogDiYm9YHN9CKbzaRGb3rOliIXPoE938ldwdOoOS0LlenwKrIVkxGx6Ty5dV2yZgTjXIU7ign6Hde9xDQ=="],
 
     "solid-refresh": ["solid-refresh@0.6.3", "", { "dependencies": { "@babel/generator": "^7.23.6", "@babel/helper-module-imports": "^7.22.15", "@babel/types": "^7.23.6" }, "peerDependencies": { "solid-js": "^1.3" } }, "sha512-F3aPsX6hVw9ttm5LYlth8Q15x6MlI/J3Dn+o3EQyRTtTxidepSTwAYdozt01/YA+7ObcciagGEyXIopGZzQtbA=="],
 
-    "solid-sonner": ["solid-sonner@0.3.2", "", { "peerDependencies": { "solid-js": "^1.6.0" } }, "sha512-rkCiFz6m247+9TwDgMNEjq+S+pDVfHJFtDUjaaqosXrhf7W6h7m7J+Meerc196SDYlUGTqQCQdGvG8Ul+pdpmw=="],
+    "solid-sonner": ["solid-sonner@1.0.0", "", { "peerDependencies": { "@solidjs/web": "^2.0.0", "solid-js": "^2.0.0" } }, "sha512-KuBUO29W5qykhYJjQyyfsKPFoF4G78sa/Yo+yYPJkHBsClCjnh7dx5mOGrnYczJ45Y8dvA8U90+zIX8NnDAzFg=="],
 
     "sonic-boom": ["sonic-boom@4.2.1", "", { "dependencies": { "atomic-sleep": "^1.0.0" } }, "sha512-w6AxtubXa2wTXAUsZMMWERrsIRAdrK0Sc+FUytWvYAhBJLyuI4llrMIC1DtlNSdI99EI86KZum2MMq3EAZlF9Q=="],
 
@@ -3442,13 +3478,15 @@
 
     "unicode-property-aliases-ecmascript": ["unicode-property-aliases-ecmascript@2.2.0", "", {}, "sha512-hpbDzxUY9BFwX+UeBnxv3Sh1q7HFxj48DTmXchNgRa46lO8uj3/1iEn3MiNUYTg1g9ctIqXCCERn8gYZhHC5lQ=="],
 
+    "unimodules-app-loader": ["unimodules-app-loader@58.0.2", "", {}, "sha512-d7vZN9/awIwPCqzfw1qR/geJEzv3ElW0VdwXFnPw29QZYoAZI0jqXGKPZVG1vQCfhEiWJtBX/nVm1XI8wshrDg=="],
+
     "universalify": ["universalify@2.0.1", "", {}, "sha512-gptHNQghINnc/vTGIk0SOFGFNXw7JVrlRUtConJRlvaw6DuX0wO5Jeko9sWrMBhh+PsYAZ7oXAiOnf/UKogyiw=="],
 
     "uniwind": ["uniwind@1.13.2", "", { "dependencies": { "@tailwindcss/node": "4.3.3", "@tailwindcss/oxide": "4.3.3", "culori": "4.0.2", "lightningcss": "1.30.1" }, "peerDependencies": { "@expo/metro-config": "*", "metro": "*", "metro-cache": "*", "metro-transform-worker": "*", "react": ">=19.0.0", "react-native": ">=0.81.0", "tailwindcss": ">=4" }, "optionalPeers": ["@expo/metro-config", "metro-transform-worker"], "bin": { "uniwind": "dist/cli/index.mjs" } }, "sha512-9huLBRBtZkVbKG8UZoJEo6ubX/R7oVj8zTORdq8c+lfOpjWlEjAS04FaqShuaecgEfO+oqSraxQ+mWgtsu6BqQ=="],
 
     "unpipe": ["unpipe@1.0.0", "", {}, "sha512-pjy2bYhSsufwWlKwPc+l3cN7+wuJlK6uz0YdJEOlQDbl6jo/YlPi4mb8agUkVC8BF7V8NuzeyPNqRksA3hztKQ=="],
 
-    "unplugin": ["unplugin@3.3.0", "", { "dependencies": { "@jridgewell/remapping": "^2.3.5", "picomatch": "^4.0.4", "webpack-virtual-modules": "^0.6.2" }, "peerDependencies": { "@farmfe/core": "*", "@rspack/core": "*", "bun-types-no-globals": "*", "esbuild": "*", "rolldown": "*", "rollup": "*", "unloader": "*", "vite": "*", "webpack": "*" }, "optionalPeers": ["@farmfe/core", "@rspack/core", "bun-types-no-globals", "esbuild", "rolldown", "rollup", "unloader", "vite", "webpack"] }, "sha512-qa66K+crbfyE6JK10GjvbJeRrOsuC/JpbnHctfyp/i4oBTxWOzJfRZyDiOk1PtErMFRu8JhsU/wPvOdBNWe5Rg=="],
+    "unplugin": ["unplugin@3.7.0", "", { "dependencies": { "@jridgewell/remapping": "^2.3.5", "@rolldown/pluginutils": "^1.0.1", "picomatch": "^4.0.7", "webpack-virtual-modules": "^0.6.2" }, "peerDependencies": { "@farmfe/core": "*", "@rsbuild/core": "*", "@rspack/core": "*", "bun-types-no-globals": "*", "esbuild": "*", "rolldown": "*", "rollup": "*", "unloader": "*", "vite": "*", "webpack": "*" }, "optionalPeers": ["@farmfe/core", "@rsbuild/core", "@rspack/core", "bun-types-no-globals", "esbuild", "rolldown", "rollup", "unloader", "vite", "webpack"] }, "sha512-GrM2uq3DQo3hvLU2FjeYhooJ8BY9N6j1Fbzgx7Pta3VVJevsD3VP4dPjZkZOS0mLvN8w9zzr9OlP+31bSMyuLw=="],
 
     "unzipper": ["unzipper@0.12.5", "", { "dependencies": { "bluebird": "~3.7.2", "duplexer2": "~0.1.4", "fs-extra": "11.3.1", "graceful-fs": "^4.2.2", "node-int64": "^0.4.0" } }, "sha512-tXYOi9R57Uj/2Z25SOs5RRSzq886MBQj2gY8dPL+xl/kv6s6SvByoKfAtvfVeEuhntWDgjd2o9p2lb4TVPAz0A=="],
 
@@ -3939,8 +3977,6 @@
     "type-is/media-typer": ["media-typer@1.1.1", "", {}, "sha512-yz3xRaG20c6/BOzvYoDaGtPmGscs7YivItZEEqe6GbwNfHuxu9YNmvnEkMzKldAGY4/80pRcQRZSEnhquk9XuQ=="],
 
     "uniwind/lightningcss": ["lightningcss@1.30.1", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-darwin-arm64": "1.30.1", "lightningcss-darwin-x64": "1.30.1", "lightningcss-freebsd-x64": "1.30.1", "lightningcss-linux-arm-gnueabihf": "1.30.1", "lightningcss-linux-arm64-gnu": "1.30.1", "lightningcss-linux-arm64-musl": "1.30.1", "lightningcss-linux-x64-gnu": "1.30.1", "lightningcss-linux-x64-musl": "1.30.1", "lightningcss-win32-arm64-msvc": "1.30.1", "lightningcss-win32-x64-msvc": "1.30.1" } }, "sha512-xi6IyHML+c9+Q3W0S4fCQJOym42pyurFiJUHEcEyHS0CeKzia4yZDEsLlqOFykxOdHpNy0NmvVO31vcSqAxJCg=="],
-
-    "unplugin/picomatch": ["picomatch@4.0.5", "", {}, "sha512-RvwwcruNjI1ncT5xRakeyS9Lf8lcItv34KD+aif+VH9kduAyfYBipGh12274xtenIPZ119/R9BdTBa8gAwSh0A=="],
 
     "unzipper/fs-extra": ["fs-extra@11.3.1", "", { "dependencies": { "graceful-fs": "^4.2.0", "jsonfile": "^6.0.1", "universalify": "^2.0.0" } }, "sha512-eXvGGwZ5CL17ZSwHWd3bbgk7UUpF6IFHtP57NYYakPvHOs8GDgDe5KJI36jIJzDkJ6eJjuzRA8eBQb6SkKue0g=="],
 

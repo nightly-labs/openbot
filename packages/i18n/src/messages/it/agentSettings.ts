@@ -184,6 +184,7 @@ export const messages = {
     "L'agente riparte da zero e può ancora consultare questa chat quando serve. I messaggi restano visibili sopra un divisore. Istruzioni, modello, tool, memorie, workspace e browser non cambiano.",
   "agentSettings.newChat.confirm": "Inizia una nuova chat",
   "agentSettings.newChat.failed": "Impossibile iniziare una nuova chat.",
+  "agentSettings.newChat.busy": "L'agente sta lavorando. Per iniziare una nuova chat, attendi che finisca o fermalo.",
   "agentSettings.deleteHistory.title": "Elimina cronologia",
   "agentSettings.deleteHistory.description":
     "I messaggi di questa chat vengono eliminati e l'agente li dimentica. La sua configurazione resta.",
@@ -232,6 +233,9 @@ export const messages = {
     "L'agente può avviare una nuova chat quando la sua diventa lunga. Prima salva delle note.",
   "agentSettings.quickAcknowledgement.title": "Mostra il piano prima delle attività lunghe",
   "agentSettings.quickAcknowledgement.description": "Prima di un'attività lunga, l'agente mostra il suo piano.",
+  "agentSettings.builtinMemory.title": "Memoria di OpenBot",
+  "agentSettings.builtinMemory.description":
+    "L'agente salva e legge le proprie memorie. Disattiva per usare solo un'app di memoria, come Mem0. Le memorie salvate restano.",
   "agentSettings.browserProfile.label": "Profilo del browser",
   "agentSettings.browserProfile.shared": "Condiviso",
   "agentSettings.browserProfile.agent": "Solo questo agente",

@@ -148,6 +148,12 @@ export function createMockTeam(
       );
       return clone(servers);
     },
+    setHidden: async ({ serverId, hidden }) => {
+      if (!servers.some((server) => server.id === serverId)) throw new Error("Remote server not found.");
+      servers = servers.map((server) => (server.id === serverId ? { ...server, hidden } : server));
+      emit(serverListeners, servers);
+      return clone(servers);
+    },
     setNotificationLevel: async ({ serverId, level }) => {
       if (!servers.some((server) => server.id === serverId)) throw new Error("Remote server not found.");
       servers = servers.map((server) => (server.id === serverId ? { ...server, notificationLevel: level } : server));

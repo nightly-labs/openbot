@@ -15,6 +15,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { MailboxStore } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
+import { perfTimed } from "../perf-probe-hooks";
 import type { AttentionRegistry } from "./attention-registry";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { TurnLifecycle } from "./turn-lifecycle";
@@ -154,7 +155,11 @@ export interface RuntimeSnapshotSources {
   waitsForLimit: (agentId: string) => boolean;
 }
 
-export function buildRuntimeSnapshot({
+export function buildRuntimeSnapshot(sources: RuntimeSnapshotSources): AgentRuntimeSnapshot {
+  return perfTimed("runtime.snapshot", () => buildRuntimeSnapshotNow(sources));
+}
+
+function buildRuntimeSnapshotNow({
   contextStates,
   threadContextStates,
   agents,

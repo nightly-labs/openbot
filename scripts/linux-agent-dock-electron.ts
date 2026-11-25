@@ -227,6 +227,7 @@ async function start(): Promise<void> {
         regions.push({ at: Date.now(), rects });
         controller.setInputRegion(rendererId, rects);
       },
+      setExtent: (rendererId, extent) => controller.setExtent(rendererId, extent),
       listDisplays: () => controller.listDisplays(),
       drag: (rendererId, phase) => controller.drag(rendererId, phase),
     },

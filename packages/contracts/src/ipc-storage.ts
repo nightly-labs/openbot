@@ -64,6 +64,17 @@ export interface StoredFileConversation {
   title: string;
 }
 
+export interface StoredFileWorkflowFolder {
+  id: string;
+  name: string;
+}
+
+export interface StoredFileWorkflow {
+  id: string;
+  name: string;
+  folder: StoredFileWorkflowFolder | null;
+}
+
 export interface StoredFileRow extends AttachmentSummary {
   source: StoredFileSource;
   agentId: string | null;
@@ -72,6 +83,7 @@ export interface StoredFileRow extends AttachmentSummary {
   createdAt: string;
   status: StoredFileStatus;
   deletable: boolean;
+  workflow?: StoredFileWorkflow;
 }
 
 export interface StorageUsage {
@@ -246,6 +258,24 @@ function decodeConversationRow(value: unknown): ConversationStorageRow {
   };
 }
 
+function decodeFileWorkflowFolder(value: unknown): StoredFileWorkflowFolder | null {
+  if (value === null) return null;
+  const folder = record(value, "stored file workflow folder");
+  return {
+    id: identifier(folder.id, "stored file workflow folder"),
+    name: title(folder.name, "stored file workflow folder"),
+  };
+}
+
+function decodeFileWorkflow(value: unknown): StoredFileWorkflow {
+  const workflow = record(value, "stored file workflow");
+  return {
+    id: identifier(workflow.id, "stored file workflow"),
+    name: title(workflow.name, "stored file workflow"),
+    folder: decodeFileWorkflowFolder(workflow.folder),
+  };
+}
+
 function decodeFileRow(value: unknown): StoredFileRow {
   const row = record(value, "stored file");
   if (!isAttachmentSummary(row)) invalid("stored file");
@@ -274,6 +304,7 @@ function decodeFileRow(value: unknown): StoredFileRow {
     createdAt: row.createdAt,
     status: row.status,
     deletable: row.deletable,
+    ...(row.workflow === undefined ? {} : { workflow: decodeFileWorkflow(row.workflow) }),
   };
 }
 

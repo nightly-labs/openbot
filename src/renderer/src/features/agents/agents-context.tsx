@@ -13,6 +13,7 @@ import {
 import { AGENT_HIDDEN_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import type { AgentProfile } from "@openbot/ui/data";
+import type { CreationPreference, DevelopmentCreation } from "@openbot/ui/features/agents/agent-creation-model";
 import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
@@ -28,7 +29,6 @@ import { useDirectMessages } from "../conversation/direct-messages-context";
 import { remoteAdminServer } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
 import { useWindowPage } from "../window/window-page-context";
-import type { CreationPreference, DevelopmentCreation } from "./agent-creation-model";
 import { AGENT_SELECTION_STORAGE_KEY, readAgentSelection, writeAgentSelection } from "./agent-selection";
 import { agentsPort } from "./agents-port";
 import {

@@ -1,5 +1,5 @@
 import type { AgentPromptResolution, RespondToPromptInput } from "@openbot/contracts/ipc";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessage } from "@/features/chat/model/chat-messages";
 import { answeredPromptResolution, nextUnansweredQuestion } from "@/features/chat/model/question-prompt";
 import { haptics } from "@/shared/lib/haptics";
@@ -10,6 +10,7 @@ interface PromptState {
   index: number;
   answers: Record<string, string[]>;
   drafts: Record<string, string>;
+  picks: Record<string, string[]>;
   pending: boolean;
   failedAnswers: Record<string, string[]> | null;
   resolution: AgentPromptResolution | null;
@@ -22,6 +23,7 @@ function initialState(scope: string): PromptState {
     index: 0,
     answers: {},
     drafts: {},
+    picks: {},
     pending: false,
     failedAnswers: null,
     resolution: null,
@@ -34,19 +36,34 @@ export function useQuestionPrompt(
   message: Extract<ChatMessage, { kind: "question" }> | undefined,
   canSend: boolean,
   respond: (agentId: string, input: RespondToPromptInput) => Promise<void>,
+  onUnsentPreview?: (text: string) => void,
+  automaticAnswer = false,
 ) {
   const scope = JSON.stringify([agentId, message?.id]);
   const [stored, setState] = useState(() => initialState(scope));
   const state = stored.scope === scope ? stored : initialState(scope);
   if (stored.scope !== scope) setState(state);
   const submitting = useRef(new Set<string>());
+  const unsentPreview = useRef<{ scope: string; text: string } | undefined>(undefined);
+  useEffect(() => {
+    const unsent = unsentPreview.current;
+    if (!unsent || unsent.scope === scope) return;
+    unsentPreview.current = undefined;
+    onUnsentPreview?.(unsent.text);
+  }, [scope, onUnsentPreview]);
   const prompt = message?.prompt;
   const resolution = prompt?.resolution ?? state.resolution;
   const question = resolution ? undefined : prompt?.questions[state.index];
-  const disabled = !canSend || state.pending || Boolean(resolution) || !prompt;
+  const locked = state.pending || Boolean(resolution) || !prompt;
+  const disabled = !canSend || locked;
   const messageId = message?.id;
 
   return useMemo(() => {
+    const picked = question?.multiSelect
+      ? (question.options ?? [])
+          .map((option) => option.label)
+          .filter((label) => state.picks[question.id]?.includes(label))
+      : [];
     function update(change: Partial<PromptState>): void {
       setState((current) => (current.scope === scope ? { ...current, ...change } : current));
     }
@@ -56,22 +73,31 @@ export function useQuestionPrompt(
         throw new Error(currentText().t("mobile.chat.question.sendFailed"));
       submitting.current.add(scope);
       update({ pending: true, failedAnswers: null });
+      const unsent = unsentPreview.current;
+      unsentPreview.current = undefined;
       try {
         await respond(agentId, { requestId: prompt.requestId, answers });
-        update({ resolution: answeredPromptResolution(prompt.questions, answers), answers: {}, drafts: {} });
+        update({ resolution: answeredPromptResolution(prompt.questions, answers), answers: {}, drafts: {}, picks: {} });
+      } catch (error) {
+        unsentPreview.current ??= unsent;
+        throw error;
       } finally {
         submitting.current.delete(scope);
         update({ pending: false });
       }
     }
 
-    async function submit(answers: Record<string, string[]>): Promise<void> {
-      if (disabled || !prompt || submitting.current.has(scope)) return;
-      await send(answers).then(
-        () => void haptics.notification("success"),
+    async function submit(answers: Record<string, string[]>): Promise<boolean> {
+      if (disabled || !prompt || submitting.current.has(scope)) return false;
+      return send(answers).then(
+        () => {
+          void haptics.notification("success");
+          return true;
+        },
         () => {
           void haptics.notification("error");
           update({ failedAnswers: answers });
+          return false;
         },
       );
     }
@@ -90,7 +116,20 @@ export function useQuestionPrompt(
       if (next === null) void submit(answers);
     }
 
+    function togglePick(label: string): void {
+      if (disabled || !question?.multiSelect) return;
+      void haptics.selection();
+      const current = state.picks[question.id] ?? [];
+      const picks = current.includes(label) ? current.filter((item) => item !== label) : [...current, label];
+      update({ picks: { ...state.picks, [question.id]: picks }, failedAnswers: null });
+    }
+
+    function answerText(text: string): void {
+      answer([...picked, text]);
+    }
+
     return {
+      agentId,
       messageId,
       index: state.index,
       question,
@@ -100,7 +139,10 @@ export function useQuestionPrompt(
       failedAnswers: state.failedAnswers,
       draft: question ? (state.drafts[question.id] ?? "") : "",
       setDraft: (text: string) => {
-        if (question && !disabled) update({ drafts: { ...state.drafts, [question.id]: text } });
+        if (question && !locked) update({ drafts: { ...state.drafts, [question.id]: text } });
+      },
+      setUnsentPreview: (text: string | undefined) => {
+        unsentPreview.current = text === undefined ? undefined : { scope, text };
       },
       replyInChat: state.replyInChat,
       setReplyInChat: (replyInChat: boolean) => {
@@ -113,11 +155,15 @@ export function useQuestionPrompt(
         void haptics.selection();
         update({ index, replyInChat: false });
       },
+      picked,
+      togglePick,
       answer,
+      answerText,
       submit,
       send,
+      automaticAnswer,
     };
-  }, [scope, messageId, state, question, resolution, disabled, prompt, respond, agentId]);
+  }, [scope, messageId, state, question, resolution, disabled, locked, prompt, respond, agentId, automaticAnswer]);
 }
 
 export type QuestionPromptController = ReturnType<typeof useQuestionPrompt>;

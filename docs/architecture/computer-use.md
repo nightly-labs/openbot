@@ -86,6 +86,29 @@ window only by `app` or `window` title removes the cursor, because only the driv
 The driver skips the reads between the steps of a batch and does one read at the end. The tap keeps
 the `screenshot_width` of that end read (`observation.state` in the answer) as of a direct read.
 
+On macOS, driver 0.52.9 keeps no screenshot frame after a read that ends in
+`ax_window_unresolved`: the window exists, but no accessibility window claims it, as with Premiere
+Pro. Every pixel action on that window is then refused as `window_never_read`, also in the
+foreground, and a new full read does the same again (#14480, upstream trycua/cua#6755). A
+screenshot-only read (`include_accessibility_tree: false`, `include_screenshot: true`) has no
+accessibility result to fail, so the driver keeps its frame. The agent instructions name that read
+on macOS. When a driver release with trycua/cua#8117 is pinned, the rule can go.
+
+iPhone Mirroring (`com.apple.ScreenContinuity`) drops the window routes of driver 0.52.9 on macOS 26,
+and the driver answers `unverifiable` (#14837). A background click stamps the screen point, which
+the mirror does not map to the phone (upstream trycua/cua#4920; #5492 changes this only on macOS 27).
+A foreground window click is posted to the pid, and the mirror takes no pid-posted tap. Only the
+desktop scope reaches it: a click and a scroll at a `get_desktop_state` point go through the global
+HID queue, and a scroll first posts real `MouseMoved` events at the point. So the macOS agent
+instructions name the desktop scope for iPhone Mirroring, with `bring_to_front` before each click
+or scroll, because desktop input goes to the window in front. `get_desktop_state` captures only the
+main display, so the agent first moves a mirror on another display there. The mirror samples
+HID report state and misses a press shorter than one report, so the daemon gets
+`CUA_DRIVER_CLICK_GAP_MS=60` on macOS, in place of the driver's 28 ms. oh-my-pi holds 60 ms and
+mirroir-mcp 50 ms for the same reason. A longer hold also suits an `NSButton` tracking loop, which
+the driver's own note says can miss a shorter one. When a driver release fixes the window routes,
+the rule can go.
+
 ### Agent display on a server
 
 A self-hosted server and the container start two Xvfb displays, and name the agent display in
@@ -141,6 +164,20 @@ Because the driver draws no cursor, its motion styles do not apply. The renderer
 min-jerk glide, or a wide swoop for a move over 900 points. The tap does not delay a request, so the
 cursor shows where an action went, from 180 ms to about 1.1 s after the driver acts.
 
+On macOS the daemon gets `CUA_DRIVER_KEEP_DISPLAY_AWAKE=0`, and OpenBot keeps the display awake
+itself. The tap starts before the daemon, and the daemon gets the variable only when the tap listens:
+without the tap, provider calls go to the daemon directly and OpenBot cannot see them, so the
+driver's guard stays on. The driver's own guard holds `PreventUserIdleDisplaySleep` until 600 s after the last tool
+call, and `end_session` counts as a call, so the display stayed on for up to 10 minutes after the
+agent stopped, against the user's display sleep setting. The tap reports each provider tool call.
+`ComputerUseDisplayAwake` (`computer-use-display-awake.ts`) then holds Electron's
+`prevent-display-sleep` blocker, the same assertion, from each call. A `turn-completed` event
+without `continues` releases it when no turn runs, so the hold stays between the turns of one task, and it is always released 600 s after the last call, as the driver's
+guard was. A call outside a turn, such as background provider work, thus keeps the driver's hold
+time, and the display never stays on longer than before. The guard exists because display sleep locks the
+session, and a locked session gives Computer Use no windows and no input. OpenBot's own
+`list_windows` reads for the highlight go to the daemon socket, not to the tap, so they take no hold.
+
 Every copy OpenBot starts gets `CUA_DRIVER_RS_TELEMETRY_ENABLED=0` and
 `CUA_DRIVER_RS_UPDATE_CHECK=0`. OpenBot ships the driver, so its vendor analytics are not something
 a user chose, and OpenBot pins the version, so a release check could only offer an update OpenBot
@@ -192,7 +229,18 @@ quiet, so that text stays and the quality does not change. In the desktop app an
 stall also sets Moonlight's `bitrate` and `fps` to the phone app's Data saver values (3 Mbit/s,
 30 fps) for the streams of that server in the next 24 hours, so Retry shows a picture. The key holds
 the server ID, because one viewer origin shows all joined servers. The phone app keeps the quality
-from its menu. The host serves this script also when it has no clipboard writer, but then without
+from its menu. A Windows host lets Sunshine pick a hardware encoder, and some hardware encoders
+(AMD AMF on some drivers) pass Sunshine's start probe but never send a frame that the viewer can
+decode (#14210). When no frame came before the stall, the viewer is the only session of a Windows
+host, and that host does not use the software encoder yet, the text says that the next connection
+uses a different video setting, and the script sends `noPicture` with the `error` report. The host
+then writes the `sunshine-software-encoder` marker, with an expiry 7 days later, in the runtime
+state folder. Retry closes the only session, so the runtime stops, and the next Sunshine start
+writes `encoder = software`. The expiry lets a host go back to the hardware encoder after a false
+alarm, such as a slow link, or after a driver update. With more than one session, the host does not
+change the encoder: another member may see a picture, and Sunshine does not restart for them.
+`scripts/remote-desktop-no-picture-e2e.ts` checks this through the real gateway in a browser. The
+host serves this script also when it has no clipboard writer, but then without
 the paste part.
 
 The same script also keeps keys from staying down on the host when the viewer runs on a Mac or an
@@ -322,3 +370,11 @@ user's own Codex file. Codex (0.160 to 0.170) does not read `features.computer_u
 A loaded session keeps the plugins of its start, so the session fingerprint has a value for a
 session without Computer Use. The next turn replaces a session from before, and a session whose
 setting changed, with the usual handoff.
+
+Every Codex session also sets `plugins.<id>.enabled = false` for Codex's bundled browser plugins
+(`browser`, `chrome`, `chrome-dev` and `chrome-internal`, all `@openai-bundled`). These plugins need a
+browser access host that only the ChatGPT desktop app gives to the sessions that it starts. In an
+OpenBot session, each call fails with "The browser access host is unavailable" (openai/codex#57641).
+Agents use the OpenBot browser, or the user's Chrome through the OpenBot extension. The value does
+not change, so it is not in the session fingerprint: a resumed session gets it, and no session is
+replaced.

@@ -470,7 +470,8 @@ Ordered by cost.
 2. ~~`marketplace/plugin-catalog/` and `scripts/build-plugin-catalog.ts`, with fixtures and `--check`.~~ Done:
    the source holds 17 listings (no-auth, header key, stdio env key, and OAuth
    over HTTP, which the main process signs in to itself), and the build writes the renderer literal,
-   the Worker module, and the offline snapshot. No CI job runs `--check` yet.
+   the Worker module, and the offline snapshot. CI checks catalog freshness with
+   `bun run marketplace:build:plugins -- --check`.
 3. The Worker routes: the JSON first, then the page and the sitemap entries. Partly done: the pages
    (`apps/auth-api/src/routes/plugins/`) and the sitemap entries (`apps/auth-api/src/server/content-feed.ts`)
    read the generated catalog. The JSON route does not exist.

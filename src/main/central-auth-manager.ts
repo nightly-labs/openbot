@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { companySignInErrorKey } from "@openbot/contracts/company-sign-in";
+import { CREDIT_MEDIA_HOST_HEADER, CREDIT_MEDIA_HOST_TOKEN_HEADER } from "@openbot/contracts/credit-media";
 import type { HostKeyHandover } from "@openbot/contracts/host-key-handover";
 import { parseHostedServerClaim } from "@openbot/contracts/hosted-servers";
 import type {
@@ -20,6 +21,7 @@ import type {
 import {
   decodeCompanySignInScimToken,
   decodeCompanySignInSettings,
+  isSignalHomeId,
   type TestCompanySignInInput,
   type TestCompanySignInResult,
 } from "@openbot/contracts/ipc";
@@ -177,6 +179,24 @@ export type RemoteConnectionBootstrap = RemoteSessionTicket;
 
 export interface RemoteHostTicketHome {
   readonly failedSignalUrl?: string;
+  readonly preferredSignalHome?: string | null;
+}
+
+export interface RemoteSignalHomeEntry {
+  readonly id: string;
+  readonly url: string;
+}
+
+function decodeRemoteSignalHomes(value: unknown): RemoteSignalHomeEntry[] {
+  const homes = decodeRecord(value, "Signal homes").homes;
+  if (!Array.isArray(homes)) throw new Error("Invalid Signal homes.");
+  return homes.map((home) => {
+    const entry = decodeRecord(home, "Signal home");
+    const id = requiredString(entry, "id");
+    const url = requiredString(entry, "url");
+    if (!isSignalHomeId(id) || !/^wss?:/u.test(url)) throw new Error("Invalid Signal home.");
+    return { id, url };
+  });
 }
 
 export type VerifiedRemoteSessionTicket = Pick<
@@ -393,6 +413,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       this: CentralAuthManager,
       host: MobileConnectHostBinding,
     ): Effect.fn.Return<MobileConnectTicket, CentralAuthOperationError, CentralAuthTransport> {
+      const requestedAt = Date.now();
       const result = yield* this.#authorizedRequestEffect(
         "/v1/mobile-auth/ticket",
         {
@@ -400,16 +421,18 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ host }),
         },
-        decodeTicketResponse,
+        (value, response) => ({ ...decodeTicketResponse(value), serverDate: response.headers.get("Date") }),
       );
-      if (!result.ticket || !Number.isFinite(result.expiresAt) || result.expiresAt <= Date.now()) {
+      const receivedAt = Date.now();
+      const expiresAt = result.expiresAt - serverClockOffsetMs(result.serverDate, requestedAt, receivedAt);
+      if (!result.ticket || !Number.isFinite(expiresAt) || expiresAt <= receivedAt) {
         return yield* new CentralAuthOperationError({
           cause: new Error("The account service returned an invalid Mobile Connect ticket."),
         });
       }
       return {
         qrData: createMobileConnectUrl({ apiUrl: this.#options.mobileConnectApiUrl, ticket: result.ticket, host }),
-        expiresAt: result.expiresAt,
+        expiresAt,
       };
     },
     (operation) => this.#owned(operation),
@@ -654,6 +677,51 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     return machineToken ? { hostId, machineToken } : null;
   }
 
+  #hostHeaders(hostId: string, init: HeadersInit | undefined) {
+    return this.#hostMachineToken(hostId).pipe(
+      Effect.map((machineToken) => {
+        const headers = new Headers(init);
+        headers.set(CREDIT_MEDIA_HOST_HEADER, hostId);
+        headers.set(CREDIT_MEDIA_HOST_TOKEN_HEADER, machineToken);
+        return headers;
+      }),
+    );
+  }
+
+  requestAsHost<T>(
+    hostId: string,
+    path: string,
+    init: RequestInit,
+    decoder: (value: unknown) => T,
+    timeoutMs?: number,
+  ): Effect.Effect<T, CentralAuthOperationError> {
+    return this.#owned(
+      this.#hostHeaders(hostId, init.headers).pipe(
+        Effect.flatMap((headers) => this.#requestEffect(path, { ...init, headers }, decoder, timeoutMs)),
+      ),
+    );
+  }
+
+  readonly downloadAsHost = Effect.fn("CentralAuth.downloadAsHost")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      path: string,
+      timeoutMs = 30_000,
+    ): Effect.fn.Return<Uint8Array, CentralAuthOperationError, CentralAuthTransport> {
+      const headers = yield* this.#hostHeaders(hostId, undefined);
+      const response = yield* CentralAuthTransport.use((transport) =>
+        transport.fetch(new URL(path, this.#options.apiUrl), { headers, signal: AbortSignal.timeout(timeoutMs) }),
+      );
+      if (!response.ok)
+        return yield* new CentralAuthOperationError({
+          cause: yield* AuthApiError.fromResponseEffect(response),
+        });
+      return new Uint8Array(yield* authCall(() => response.arrayBuffer()));
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
   readonly #hostMachineToken = Effect.fn("CentralAuth.hostMachineToken")(function* (
     this: CentralAuthManager,
     hostId: string,
@@ -678,6 +746,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
             machineToken,
             signalHome: true,
             ...(home.failedSignalUrl === undefined ? {} : { failedSignalUrl: home.failedSignalUrl }),
+            ...(home.preferredSignalHome ? { preferredSignalHome: home.preferredSignalHome } : {}),
           }
         : // `false` keeps the stored home: the host peer of this build still connects to it.
           { machineToken, signalHome: false };
@@ -685,6 +754,21 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/ticket`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
         decodeRemoteSessionTicket,
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  readonly listRemoteSignalHomes = Effect.fn("CentralAuth.listRemoteSignalHomes")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+    ): Effect.fn.Return<RemoteSignalHomeEntry[], CentralAuthOperationError, CentralAuthTransport> {
+      const machineToken = yield* this.#hostMachineToken(hostId);
+      return yield* this.#requestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/signal-homes`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ machineToken }) },
+        decodeRemoteSignalHomes,
       );
     },
     (operation) => this.#owned(operation),
@@ -1228,6 +1312,21 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       return yield* this.#authorizedRequestEffect(
         `/v2/remote/hosts/${encodeURIComponent(hostId)}/`,
         { method: "DELETE" },
+        decodeVoid,
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  readonly setRemoteHostHidden = Effect.fn("CentralAuth.setRemoteHostHidden")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      hidden: boolean,
+    ): Effect.fn.Return<void, CentralAuthOperationError, CentralAuthTransport> {
+      return yield* this.#authorizedRequestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/hidden`,
+        { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hidden }) },
         decodeVoid,
       );
     },
@@ -2253,7 +2352,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     this: CentralAuthManager,
     path: string,
     init: RequestInit,
-    decoder: (value: unknown) => T,
+    decoder: (value: unknown, response: Response) => T,
     timeoutMs = 10_000,
   ): Effect.fn.Return<T, CentralAuthOperationError, CentralAuthTransport> {
     const response = yield* CentralAuthTransport.use((transport) =>
@@ -2267,7 +2366,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         cause: yield* AuthApiError.fromResponseEffect(response),
       });
     const value = response.status === 204 ? undefined : yield* authCall(() => response.json());
-    return yield* authDecode(() => decoder(value));
+    return yield* authDecode(() => decoder(value, response));
   });
 
   readonly #startupRequestEffect = Effect.fn("CentralAuth.startupRequest")(function* <T>(
@@ -2320,7 +2419,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     this: CentralAuthManager,
     path: string,
     init: RequestInit,
-    decoder: (value: unknown) => T,
+    decoder: (value: unknown, response: Response) => T,
     timeoutMs?: number,
   ): Effect.fn.Return<T, CentralAuthOperationError, CentralAuthTransport> {
     if (!this.#sessionToken)
@@ -2514,6 +2613,17 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       },
     });
   }
+}
+
+const HTTP_DATE_RESOLUTION_MS = 1_000;
+
+function serverClockOffsetMs(dateHeader: string | null, requestedAt: number, receivedAt: number): number {
+  const serverSecondStart = dateHeader ? Date.parse(dateHeader) : Number.NaN;
+  if (!Number.isFinite(serverSecondStart)) return 0;
+  if (serverSecondStart > receivedAt) return serverSecondStart - receivedAt;
+  const serverSecondEnd = serverSecondStart + HTTP_DATE_RESOLUTION_MS;
+  if (serverSecondEnd < requestedAt) return serverSecondEnd - requestedAt;
+  return 0;
 }
 
 export function readCentralAuthApiUrl(value: string | undefined, fallback = "http://127.0.0.1:3100"): string {

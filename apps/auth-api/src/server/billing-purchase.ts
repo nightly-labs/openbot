@@ -36,6 +36,15 @@ export type BillingPurchaseDetails =
 
 export type BillingPurchase = BillingPurchaseDetails & { email: string };
 
+export interface CreditPurchase {
+  email: string;
+  credits: number;
+  currency: BillingCurrency;
+  amount: number | null;
+  wallet: "personal" | "server";
+  serverId: string | null;
+}
+
 export function subscriptionEnd(subscription: StripeSubscription): number | null {
   return typeof subscription.cancel_at === "number"
     ? subscription.cancel_at * 1_000
@@ -103,6 +112,15 @@ export function purchaseAlertText(purchase: BillingPurchase): string {
     ...plan,
     alertAmount(purchase.amount, purchase.currency, purchase.interval),
     ...purchaseNote(purchase),
+  ]);
+}
+
+export function creditPurchaseAlertText(purchase: CreditPurchase): string {
+  return alertLine("💳 **Credits purchased**", [
+    alertCode(purchase.email),
+    `${purchase.credits} credits`,
+    alertAmount(purchase.amount, purchase.currency),
+    purchase.wallet === "server" ? `server ${alertCode(purchase.serverId ?? "unknown")}` : "personal wallet",
   ]);
 }
 

@@ -316,6 +316,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "אין מודלים זמינים לספק הזה.",
   "mobile.agent.runtime.searchModels": "חיפוש מודלים",
   "mobile.agent.runtime.noMatches": "אין מודלים שתואמים לחיפוש.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "אין מודלים שתואמים לחיפוש. הגדרות הפרטיות, הספקים ומגבלות ההגנה שלך ב-openrouter.ai יכולות להסתיר מודלים מהרשימה הזו.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "הספק הזה לא עובד עם „סביבת עבודה בלבד” ב-Windows וב-Linux. כדי להשתמש בו, שנו קודם את „הרשאות”.",
   "mobile.agent.runtime.usageLimit": "הגעת למגבלת השימוש",
@@ -399,6 +401,9 @@ export const messages = {
   "mobile.agent.planCard.label": "הצגת התוכנית לפני משימות ארוכות",
   "mobile.agent.planCard.footer":
     "לפני משימה ארוכה הסוכן מציג את התוכנית שלו. היא מתחילה אחרי 10 שניות, או כשלוחצים על התחלה.",
+  "mobile.agent.builtinMemory.label": "הזיכרון של OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "הסוכן שומר וקורא את הזיכרונות שלו. כבו כדי להשתמש רק באפליקציית זיכרון, כמו Mem0. הזיכרונות השמורים נשארים.",
   "mobile.agent.workspace.title": "תיקיית סביבת עבודה",
   "mobile.agent.workspace.footer": "התיקייה של הסוכן הזה במחשב המארח.",
   "mobile.agent.advanced.behavior": "התנהגות",
@@ -482,6 +487,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "המארח הזה לא יכול לפרסם סוכנים מהתקן מרוחק.",
   "mobile.agent.usage.tokensWithoutCacheReads": "טוקנים ללא קריאות מטמון",
   "mobile.agent.usage.estimatedCost": "עלות משוערת",
+  "mobile.agent.usage.noCostEstimate": "אין הערכת עלות",
   "mobile.agent.usage.daily": "שימוש יומי",
   "mobile.agent.usage.tokens": "טוקנים",
   "mobile.agent.usage.cost": "עלות",
@@ -515,6 +521,7 @@ export const messages = {
   "mobile.agent.usage.collection": "איסוף הנתונים התחיל {started}. עודכן {updated}.",
   "mobile.agent.usage.never": "אף פעם",
   "mobile.agent.record.time": "שעה",
+  "mobile.agent.record.date": "תאריך",
   "mobile.agent.section.changeFailed": "לא ניתן לשנות את התיקייה",
   "mobile.agent.section.tryAgain": "יש לנסות שוב.",
   "mobile.agent.section.moveUp": "העברה למעלה",
@@ -605,13 +612,13 @@ export const messages = {
   "mobile.agent.home.serversFailed": "לא ניתן לטעון את השרתים שלך",
   "mobile.agent.home.serversFailedBody": "יש לוודא שאפליקציית שולחן העבודה פועלת ולנסות שוב.",
   "mobile.agent.home.noServers": "אין שרתים זמינים",
-  "mobile.agent.home.noServersBody": "יש לחבר מחדש את אפליקציית שולחן העבודה או להצטרף לשרת מרוחק.",
+  "mobile.agent.home.noServersBody":
+    "יש לפתוח את OpenBot במחשב עם החשבון הזה ולהפעיל את פרסום השרת הזה בהגדרות השרת ← חברים. אפשר גם להצטרף לשרת מרוחק.",
   "mobile.agent.home.chooseServer": "בחירת שרת",
   "mobile.agent.home.openServers": "פתיחת שרתים",
   "mobile.agent.home.noChatOpen": "אין צ'אט פתוח",
   "mobile.agent.home.noChatOpenBody": "יש לבחור צ'אט ברשימה.",
   "mobile.agent.home.chatListWidth": "רוחב רשימת הצ'אטים",
-  "mobile.agent.home.serverTitle": "{name}, פתיחת שרתים",
   "mobile.agent.home.waiting": "ממתין לחיבור",
   "mobile.agent.home.waitingBody": "רשימת הסוכנים תיטען כשהשרת הזה יתחבר.",
   "mobile.agent.home.noAgents": "אין סוכנים בשרת הזה",

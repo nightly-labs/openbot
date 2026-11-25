@@ -96,11 +96,13 @@ import { createServerOwnerTransferSection, type OwnerTransferCalls } from "./Ser
 import { type ServerPersonalityOptions, ServerPersonalitySetting } from "./ServerPersonalitySetting";
 import { createServerRolesSection, type ServerAgentAccessOptions } from "./ServerRolesSection";
 import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
+import type { ServerSignalHomeOptions } from "./ServerSignalHomeSetting";
 import type { ServerSkillLearningOptions } from "./ServerSkillLearningSetting";
 import type { ServerTimezoneOptions } from "./ServerTimezoneSetting";
 import { type ServerTransferOptions, ServerTransferPanel } from "./ServerTransferPanel";
 import type { ServerTurnLimitsOptions } from "./ServerTurnLimitsSetting";
 import { type ServerUpdateOptions, ServerUpdatePanel } from "./ServerUpdatePanel";
+import type { ServerVoiceModelOptions } from "./ServerVoiceModelSetting";
 import { serverCanAdminister, serverRoleCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
@@ -141,6 +143,8 @@ export interface ServerSettingsModalProps {
   instanceTransfer?: ServerTransferOptions | undefined;
   hostUpdate?: ServerUpdateOptions | undefined;
   hostTimezone?: ServerTimezoneOptions | undefined;
+  hostVoiceModel?: ServerVoiceModelOptions | undefined;
+  hostSignalHome?: ServerSignalHomeOptions | undefined;
   hostTurnLimits?: ServerTurnLimitsOptions | undefined;
   hostPersonality?: ServerPersonalityOptions | undefined;
   hostMemoryLimit?: ServerMemoryLimitOptions | undefined;
@@ -233,6 +237,7 @@ const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
   agents: [
     "server.settings.timezone",
     "server.settings.turnLimit",
+    "server.settings.voiceModel.section",
     "server.settings.agentTaskLimit",
     "agentSettings.automation.title",
     "agentSettings.agentNewChat.title",
@@ -312,7 +317,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   function promptCacheSource(): ProviderPromptCacheSource | undefined {
     const options = props.hostPromptCacheTtl;
     if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "prompt-cache-ttl-v1")) return undefined;
-    return { ...options, serverId: props.server.id };
+    return {
+      ...options,
+      serverId: props.server.id,
+      appliesToPi: local() || serverCanAdminister(props.server, "prompt-cache-ttl-pi-v1"),
+      compaction: local() || serverCanAdminister(props.server, "cache-expiry-compaction-v1"),
+    };
   }
   function claudeUserSetupSource(): ProviderClaudeUserSetupSource | undefined {
     const options = props.claudeUserSetup;

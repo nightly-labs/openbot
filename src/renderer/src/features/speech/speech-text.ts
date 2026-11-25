@@ -11,7 +11,7 @@ export class SpeechParts {
   readonly #growth: number;
   #last: string | undefined;
 
-  constructor(text: string, locale: string, speed = 1) {
+  constructor(text: string, locale: string | undefined, speed = 1) {
     const segmenter = new Intl.Segmenter(locale, { granularity: "sentence" });
     this.#sentences = Array.from(segmenter.segment(text), ({ segment }) => segment.trim()).filter(Boolean);
     this.#growth = PART_GROWTH / Math.max(1, speed);
@@ -23,7 +23,7 @@ export class SpeechParts {
     const length = first
       ? FIRST_PART_LENGTH
       : Math.min(PART_LENGTH, Math.max(FIRST_PART_LENGTH, Math.floor(last.length * this.#growth)));
-    const limit = Math.min(length, budget);
+    const limit = Math.min(length, Math.max(budget, FIRST_PART_LENGTH));
     let part = "";
     for (let sentence = this.#sentences[0]; sentence !== undefined; sentence = this.#sentences[0]) {
       const piece = sentence.length > length ? firstPiece(sentence, length) : sentence;

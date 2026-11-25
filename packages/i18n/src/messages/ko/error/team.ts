@@ -91,6 +91,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "이 연결에서는 루틴 실행을 중지할 수 없어요.",
   "error.team.sidebarFoldersUnsupported": "이 연결에서는 폴더 안의 폴더를 지원하지 않아요.",
   "error.team.libraryFoldersUnsupported": "이 연결에서는 라이브러리 폴더를 지원하지 않아요.",
+  "error.team.workflowFoldersUnsupported": "이 연결은 워크플로 폴더를 지원하지 않아요.",
   "error.team.agentNotificationLevelsUnsupported":
     "이 서버는 에이전트별 알림 수준을 저장할 수 없어요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
   "error.team.sidebarPinsUnsupported":
@@ -123,6 +124,8 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "이 연결에서는 서버 ID 변경을 지원하지 않아요.",
   "error.team.hostUpdateUnsupported": "이 연결에서는 호스트 업데이트를 지원하지 않아요.",
   "error.team.hostTimezoneUnsupported": "이 연결에서는 서버 시간대를 지원하지 않아요.",
+  "error.team.hostSignalHomeUnsupported": "이 연결에서는 Signal 서버 선택을 지원하지 않아요.",
+  "error.team.hostVoiceModelUnsupported": "이 연결은 서버의 음성 인식 모델을 지원하지 않아요.",
   "error.team.hostRestartUnsupported": "이 연결에서는 서버 다시 시작을 지원하지 않아요.",
   "error.team.ownerTransferUnsupported": "이 서버는 소유권 이전을 지원하지 않아요.",
   "error.team.hostKeyRotationUnsupported": "이 연결에서는 서버 키 변경을 지원하지 않아요.",
@@ -130,12 +133,14 @@ export const messages = {
   "error.team.routineResultsUnsupported": "이 연결에서는 루틴 결과 전송 위치를 지원하지 않아요.",
   "error.team.agentMemoryLimitUnsupported": "이 연결에서는 에이전트 메모리 한도를 지원하지 않아요.",
   "error.team.agentFoldersUnsupported": "이 연결에서는 에이전트 폴더를 지원하지 않아요.",
+  "error.team.channelFoldersUnsupported": "이 연결에서는 채널 폴더를 지원하지 않아요.",
   "error.team.folderUnavailable": "이 폴더는 호스트 컴퓨터에서 사용할 수 없어요.",
   "error.team.memoryReviewUnsupported": "이 연결에서는 메모리 검토를 지원하지 않아요.",
   "error.team.skillLearningUnsupported": "이 연결은 스킬 학습을 지원하지 않습니다.",
   "error.team.browsingMemoryUnsupported": "이 연결은 브라우징 학습을 지원하지 않습니다.",
   "error.team.claudeUserSetupUnsupported": "이 연결은 Claude Code 설정 스위치를 지원하지 않아요.",
   "error.team.claudeCompactWindowUnsupported": "이 연결은 Claude 압축 크기를 지원하지 않아요.",
+  "error.team.cacheExpiryCompactionUnsupported": "이 연결은 캐시가 만료되기 전 압축을 지원하지 않아요.",
   "error.team.providerEnvironmentUnsupported": "이 연결은 공급자 변수를 지원하지 않아요.",
   "error.team.modelVisibilityUnsupported": "이 연결에서는 모델 목록을 지원하지 않아요.",
   "error.team.providerDefaultUnsupported": "이 연결에서는 기본 제공자를 지원하지 않아요.",
@@ -153,6 +158,8 @@ export const messages = {
   "error.team.mcpUnsupported": "이 연결에서는 MCP 서버를 지원하지 않아요.",
   "error.team.mcpServerListNeedsUpdate":
     "이 서버에서 MCP 서버를 {limit}개보다 많이 사용하려면 이 기기의 OpenBot을 업데이트하세요.",
+  "error.team.providerAccountListNeedsUpdate":
+    "이 서버에서 한 제공자의 계정을 {limit}개보다 많이 사용하려면 이 기기의 OpenBot을 업데이트하세요.",
   "error.team.storageUnsupported": "이 연결에서는 스토리지를 지원하지 않아요.",
   "error.team.machineResourcesUnsupported": "이 연결에서는 머신 사용량을 지원하지 않아요.",
   "error.team.machineAlertMemberInvalid": "이 서버의 소유자나 관리자만 머신 알림을 받을 수 있어요.",
@@ -192,6 +199,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "이 연결은 서버 성격을 지원하지 않아요.",
   "error.team.agentWaitsUnsupported": "이 연결에서는 열린 대기를 지원하지 않아요.",
   "error.team.pendingApprovalUnsupported": "이 연결에서는 승인 요청 전체를 읽을 수 없어요.",
+  "error.team.pendingPromptsUnsupported": "이 연결에서는 답변을 기다리는 질문을 읽을 수 없습니다.",
   "error.team.phoneFeedbackUnsupported": "이 연결에서는 휴대폰 앱에서 신고를 보낼 수 없어요.",
   "error.team.messagePinsUnsupported": "이 연결은 고정된 메시지를 지원하지 않습니다.",
   "error.team.queuedMessageThreadUnsupported": "이 연결에서는 대기 중인 메시지를 새 스레드로 실행할 수 없어요.",

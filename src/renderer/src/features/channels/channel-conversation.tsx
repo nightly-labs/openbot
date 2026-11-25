@@ -18,6 +18,7 @@ import type {
   SendMessageResult,
 } from "../conversation/conversation-types";
 import { readerCanDeleteMessage } from "../conversation/message-delete-access";
+import { speechReading } from "../speech/speech-playback";
 import {
   ChannelAboveComposer,
   ChannelEmptyState,
@@ -53,7 +54,7 @@ export interface ChannelConversationEnvironment {
 
 export function createChannelConversation(env: ChannelConversationEnvironment) {
   const channels = useChannels();
-  const { t, errorDetails } = useText();
+  const { t, errorDetails, sourceText } = useText();
   const channelId = env.channelId;
   const page = () => {
     const current = channels.state.page;
@@ -63,6 +64,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
   const threads = () => summary()?.threads;
   const readOnly = () => page()?.channel.archived === true;
   const memberThreadIds = createMemo(() => new Set(threads()?.map((thread) => thread.threadId)));
+  const memberAgentIds = createMemo(() => new Set(page()?.channel.members.map((member) => member.agentId)));
   const browserOwner = createMemo(() => {
     const channel = page()?.channel;
     const allowed = channel ? channelBrowserAgent(channel) : false;
@@ -91,7 +93,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     const current = page();
     if (!current) return [];
     const next = new Map<string, AgentMessage>();
-    const mappedRows = channelConversationRows(entries(), current.tasks);
+    const mappedRows = channelConversationRows(entries(), current.tasks, sourceText);
     const lastKnown = mappedRows.findLastIndex((mapped) => rowsById.has(mapped.id));
     const rows = mappedRows.map((mapped, index) => {
       const known = rowsById.get(mapped.id);
@@ -143,6 +145,19 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
   const activeRuns = createMemo(() => {
     const current = page();
     return current ? activeChannelRuns(current) : [];
+  });
+  const replyView = createMemo(() => ({ messages: page()?.messages ?? [], tasks: page()?.tasks ?? [] }));
+  const voiceAgent = createMemo(() => {
+    const current = page();
+    if (!current) return undefined;
+    const readingId = speechReading()?.messageId;
+    const reader = readingId
+      ? current.messages.find((entry) => entry.id === readingId && entry.author.kind === "agent")?.author.id
+      : undefined;
+    const running = new Set(activeRuns());
+    const worker = current.tasks.findLast((task) => running.has(task.id) && task.ownerAgentId)?.ownerAgentId;
+    const speakerId = reader ?? worker ?? current.channel.leadAgentId ?? current.channel.members[0]?.agentId;
+    return channels.agents().find((agent) => agent.id === speakerId);
   });
 
   let settingsNonce = 0;
@@ -237,6 +252,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
         : [];
     },
     memberThreadIds,
+    memberAgentIds,
     browserOwner,
     workingTurns,
     interactionAgentName: () => {
@@ -261,6 +277,8 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
           rowStopping = false;
         });
     },
+    replyView,
+    voiceAgent,
     HeaderTitle: (props) => <ChannelHeaderTitle channelId={channelId} onOpenSettings={props.onOpenSettings} />,
     SettingsPane: (props) => (
       <ChannelSettingsPane
@@ -289,7 +307,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     hasOlder: () => Boolean(page()?.olderCursor),
     unloadedHistory: () => unloadedHistory(page()),
     mentionAgents: () => {
-      const members = new Set(page()?.channel.members.map((member) => member.agentId));
+      const members = memberAgentIds();
       return channels.agents().filter((agent) => members.has(agent.id));
     },
     activeTurnId: () => activeRuns()[0] ?? null,

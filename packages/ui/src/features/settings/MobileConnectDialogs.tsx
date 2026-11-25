@@ -156,15 +156,29 @@ function createConnectedClose(source: () => { name: string; value: string } | nu
 
 type AddScreen = "ask" | "install" | "signin";
 
+export interface MobileInstallRequest {
+  platform: MobilePlatformLogoVariant;
+  nonce: number;
+}
+
 export function MobileConnectAddPhoneDialog(props: {
   open: boolean;
   store: Store;
   canCancelTicket: boolean;
+  installRequest?: MobileInstallRequest | null;
   onClose: () => void;
 }) {
   const { t } = useText();
   const [screen, setScreen] = createSignal<AddScreen>("ask");
   const [platform, setPlatform] = createSignal<MobilePlatformLogoVariant>("ios");
+  createEffect(
+    () => props.installRequest,
+    (request) => {
+      if (!request) return;
+      setPlatform(request.platform);
+      setScreen("install");
+    },
+  );
   const session = () => props.store.state.connect.session;
   const live = () => {
     const current = session();

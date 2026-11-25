@@ -49,6 +49,17 @@ const sharedQuotaRows = accountUsageProviderRows({
   ],
 });
 
+const readFailedRows = accountUsageProviderRows({
+  limits: [
+    {
+      id: "codex",
+      primary: { usedPercent: 28, windowDurationMins: 300, resetsAt: nowSeconds + 2 * 3_600 },
+      secondary: { usedPercent: 15, windowDurationMins: 10_080, resetsAt: nowSeconds + 4 * 86_400 },
+    },
+    { id: "grok", primary: null, secondary: null, readFailed: true },
+  ],
+});
+
 const account = (id: string, label: string) =>
   ({ id, label, email: `${label.toLowerCase()}@example.com`, state: "connected", message: null }) as const;
 const window5h = (usedPercent: number) => ({ usedPercent, windowDurationMins: 300, resetsAt: nowSeconds + 7_200 });
@@ -128,6 +139,7 @@ function RailPreview(props: {
   customAgentUsage?: readonly CustomAgentUsageRailRow[];
   usageRows?: PageRailProps["usageRows"];
   mediaCredits?: readonly MediaCreditsRailRow[];
+  creditBalance?: number;
   crm?: boolean;
 }) {
   const { t } = useText();
@@ -140,6 +152,10 @@ function RailPreview(props: {
   function crmConnectorsAction(): (() => void) | undefined {
     if (!props.crm) return undefined;
     return () => setCurrent("crm");
+  }
+  function creditsAction(): (() => void) | undefined {
+    if (props.creditBalance === undefined) return undefined;
+    return () => setCurrent("credits");
   }
   return (
     <div class="app-window" style={{ height: "100vh" }}>
@@ -160,6 +176,8 @@ function RailPreview(props: {
           onUsage={() => setCurrent("usage")}
           onCrm={crmAction()}
           onCrmConnectors={crmConnectorsAction()}
+          onCredits={creditsAction()}
+          creditBalance={props.creditBalance}
           onMarketplace={fn()}
           onSettings={() => setCurrent("settings")}
           settingsNotice={props.updateReady ? t("account.update.ready") : undefined}
@@ -219,6 +237,10 @@ export const SharedQuota: Story = {
   args: { usageRows: sharedQuotaRows },
 };
 
+export const UsageReadFailed: Story = {
+  args: { usageRows: readFailedRows },
+};
+
 export const ManyAccounts: Story = {
   args: { usageRows: manyAccountRows },
 };
@@ -229,6 +251,10 @@ export const WebLogo: Story = {
 
 export const DesktopLogo: Story = {
   args: { logo: { variant: "production" } },
+};
+
+export const Credits: Story = {
+  args: { creditBalance: 1250 },
 };
 
 export const MediaCreditsQuota: Story = {

@@ -1,18 +1,25 @@
 import {
   type AgentAccessLevels,
+  applyWorkflowFolderAction,
   graphAgentIds,
   type StoredFileRow,
   type WorkflowDetail,
+  type WorkflowFolderAction,
+  type WorkflowFoldersSnapshot,
   type WorkflowGitHubCatalog,
   type WorkflowGitHubRepositoryOptions,
   type WorkflowGraph,
   type WorkflowNodeKind,
+  type WorkflowRunDetail,
+  type WorkflowRunPage,
   type WorkflowSaveResult,
+  type WorkflowStep,
   type WorkflowSummary,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { toast } from "@openbot/ui";
 import type { WorkflowCanvasProps } from "@openbot/ui/features/workflows/WorkflowCanvas";
+import type { WorkflowCanvasTabs } from "@openbot/ui/features/workflows/WorkflowTabs";
 import type { WorkflowBuild } from "@openbot/ui/features/workflows/workflow-build";
 import {
   EMPTY_GITHUB_HISTORY,
@@ -28,7 +35,7 @@ import type {
   WorkflowSlackWorkspace,
   WorkflowTelegramChat,
 } from "@openbot/ui/features/workflows/workflow-model";
-import { EMPTY_WORKFLOW_RUN_VIEW } from "@openbot/ui/features/workflows/workflow-run-view";
+import { EMPTY_WORKFLOW_RUN_VIEW, sameWorkflowStep } from "@openbot/ui/features/workflows/workflow-run-view";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, untrack } from "solid-js";
 import { agentAskedHere } from "../../agent-requests";
@@ -41,6 +48,7 @@ import type { WorkflowHost } from "./workflows-port";
 const RUN_PAGE = 20;
 const CACHED_WORKFLOWS = 20;
 const SAVE_DELAY_MS = 400;
+const REFRESH_DELAY_MS = 50;
 
 const NO_OPTIONS: WorkflowGitHubRepositoryOptions = { labels: [], people: [] };
 
@@ -64,9 +72,49 @@ export interface WorkflowRequest {
   taken: () => void;
 }
 
-type WorkflowBase = { revision: number; graph: WorkflowGraph };
+type WorkflowBase = { revision: number; graph: WorkflowGraph; readOnly?: true };
 
 type WorkflowsControllerProps = Omit<WorkflowCanvasProps, "workflow" | "features" | "frame" | "readOnly" | "catalogs">;
+
+const sameRun = (left: WorkflowRunDetail, right: WorkflowRunDetail): boolean => {
+  const one = left.run;
+  const other = right.run;
+  if (
+    one.id !== other.id ||
+    one.workflowId !== other.workflowId ||
+    one.number !== other.number ||
+    one.triggerNodeId !== other.triggerNodeId ||
+    one.source !== other.source ||
+    one.status !== other.status ||
+    one.error !== other.error ||
+    one.startedAt !== other.startedAt ||
+    one.endedAt !== other.endedAt ||
+    left.steps.length !== right.steps.length
+  )
+    return false;
+  return left.steps.every((step, index) => {
+    const otherStep = right.steps[index];
+    return otherStep !== undefined && sameWorkflowStep(step, otherStep);
+  });
+};
+
+type RunPageLike = Pick<WorkflowRunPage, "nextBefore"> & {
+  readonly runs: readonly WorkflowRunDetail[];
+  readonly soloSteps: readonly WorkflowStep[];
+};
+
+const sameRunPage = (left: RunPageLike, right: RunPageLike): boolean =>
+  left.nextBefore === right.nextBefore &&
+  left.soloSteps.length === right.soloSteps.length &&
+  left.runs.length === right.runs.length &&
+  left.runs.every((run, index) => {
+    const other = right.runs[index];
+    return other !== undefined && sameRun(run, other);
+  }) &&
+  left.soloSteps.every((step, index) => {
+    const other = right.soloSteps[index];
+    return other !== undefined && sameWorkflowStep(step, other);
+  });
 
 const lastWorkflowKey = (hostKey: string) => `openbot:last-workflow:${hostKey}`;
 function readLastWorkflow(hostKey: string): string | undefined {
@@ -81,6 +129,22 @@ function rememberLastWorkflow(hostKey: string, workflowId: string): void {
     if (window.localStorage.getItem(lastWorkflowKey(hostKey)) !== workflowId) {
       window.localStorage.setItem(lastWorkflowKey(hostKey), workflowId);
     }
+  } catch {}
+}
+
+const tabsKey = (hostKey: string) => `openbot:workflow-tabs:${hostKey}`;
+function readTabs(hostKey: string | undefined): readonly string[] {
+  if (hostKey === undefined) return [];
+  try {
+    return (window.localStorage.getItem(tabsKey(hostKey)) ?? "").split("\n").filter((id) => id !== "");
+  } catch {
+    return [];
+  }
+}
+function rememberTabs(hostKey: string | undefined, ids: readonly string[]): void {
+  if (hostKey === undefined) return;
+  try {
+    window.localStorage.setItem(tabsKey(hostKey), ids.join("\n"));
   } catch {}
 }
 
@@ -139,19 +203,29 @@ export function createWorkflowsController(
   const [levels, setLevels] = createSignal<AgentAccessLevels | null>(hostCache?.levels ?? null);
   const [preview, setPreview] = createSignal<{ versionId: string; graph: WorkflowGraph }>();
   const [resetKey, setResetKey] = createSignal(0);
+  const [tabIds, setTabIds] = createSignal<readonly string[]>(readTabs(hostKey));
+  const [folders, setFolders] = createSignal<WorkflowFoldersSnapshot>();
   const [build, setBuild] = createSignal<WorkflowBuild>();
+  const [opening, setOpening] = createSignal<string>();
+  const [failed, setFailed] = createSignal(false);
   const playBuild = (workflowId: string, agentId: string, before: WorkflowGraph | null) =>
     setBuild((last) => ({ key: (last?.key ?? 0) + 1, workflowId, agentId, before }));
 
   let current = visited?.detail.summary.id ?? "";
   const bases = new Map<string, WorkflowBase>();
   const setBase = (detail: WorkflowDetail) =>
-    bases.set(detail.summary.id, { revision: detail.revision, graph: detail.graph });
+    bases.set(detail.summary.id, {
+      revision: detail.revision,
+      graph: detail.graph,
+      ...(detail.needsNewerApp ? { readOnly: true } : {}),
+    });
   if (visited) setBase(visited.detail);
   let limit = RUN_PAGE;
   let disposed = false;
   let pending: { workflowId: string; graph: WorkflowGraph } | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  const refreshPending = new Map<string, { workflowId: string | null; agentId: string | undefined }>();
   let edits = 0;
   let writing = 0;
   let previewRequest = 0;
@@ -286,6 +360,7 @@ export function createWorkflowsController(
     if (disposed) return;
     library = list;
     setSummaries(list);
+    pruneTabs(list);
     if (hostKey !== undefined) {
       const entry = cache.get(hostKey);
       if (entry) entry.library = list;
@@ -294,8 +369,8 @@ export function createWorkflowsController(
     if (workflowId !== current || !list.some((summary) => summary.id === workflowId)) return;
     const [next, page, versions, github] = await (details ?? readDetail(workflowId));
     if (disposed || workflowId !== current) return;
-    const open = stored()?.detail;
-    const shown = open?.summary.id === workflowId ? open : undefined;
+    const open = stored();
+    const shown = open?.detail.summary.id === workflowId ? open.detail : undefined;
     const known = shown && bases.get(workflowId);
     const detail = shown && known && next.revision < known.revision ? shown : next;
     const newer = known !== undefined && next.revision > known.revision;
@@ -305,7 +380,12 @@ export function createWorkflowsController(
       const entry = cache.get(hostKey);
       if (entry) entry.last = workflowId;
     }
-    const value = { detail, runs: page, versions, github };
+    const value = {
+      detail,
+      runs: open && shown ? (sameRunPage(open.runs, page) ? open.runs : page) : page,
+      versions,
+      github,
+    };
     if (newer && idle && agentId !== undefined && shown) {
       playBuild(workflowId, agentId, shown.graph);
       show(value);
@@ -328,12 +408,22 @@ export function createWorkflowsController(
       readGitHubHistory(workflowId),
     ]);
 
+  const readOpening = async (workflowId: string, listed?: readonly WorkflowSummary[]) => {
+    const shownId = stored()?.detail.summary.id;
+    setOpening(shownId !== undefined && shownId !== workflowId ? workflowId : undefined);
+    try {
+      return await read(workflowId, undefined, listed);
+    } finally {
+      if (opening() === workflowId) setOpening(undefined);
+    }
+  };
+
   const load = async (workflowId: string, listed?: readonly WorkflowSummary[]) => {
     current = workflowId;
     limit = RUN_PAGE;
     const known = cached(workflowId);
     if (known && !disposed) show(known);
-    await read(workflowId, undefined, listed);
+    await readOpening(workflowId, listed);
   };
 
   const save = async (
@@ -344,13 +434,13 @@ export function createWorkflowsController(
     if (foreignCount(workflowId) !== queuedOn.seen) {
       if (canvasShows(workflowId)) return;
       const now = bases.get(workflowId);
-      if (!now || !queuedOn.from) return;
+      if (!now || now.readOnly || !queuedOn.from) return;
       const merged = mergeWorkflowGraphs(queuedOn.from.graph, edit.graph, now.graph);
       if (stableJson(merged) === stableJson(now.graph)) return;
       return save({ workflowId, graph: merged }, { from: now, seen: foreignCount(workflowId) });
     }
     const from = bases.get(workflowId);
-    if (!from) return;
+    if (!from || from.readOnly) return;
     saving = { workflowId, json: stableJson(edit.graph) };
     let result: WorkflowSaveResult;
     try {
@@ -372,7 +462,7 @@ export function createWorkflowsController(
     if (newer.revision <= known.revision) return;
     takeForeign(newer);
     putDetail(workflowId, () => newer);
-    if (canvasShows(workflowId)) return;
+    if (canvasShows(workflowId) || newer.needsNewerApp) return;
     const merged = mergeWorkflowGraphs(from.graph, edit.graph, newer.graph);
     if (stableJson(merged) !== stableJson(newer.graph)) {
       await save({ workflowId, graph: merged }, { from: bases.get(workflowId), seen: foreignCount(workflowId) });
@@ -393,6 +483,87 @@ export function createWorkflowsController(
     flush();
     closePreview();
     write(() => load(workflowId));
+  };
+
+  const keepTabs = (next: readonly string[]) => {
+    setTabIds(next);
+    rememberTabs(hostKey, next);
+  };
+  const pruneTabs = (list: readonly WorkflowSummary[]) => {
+    const known = new Set(list.map((summary) => summary.id));
+    const kept = untrack(tabIds).filter((id) => id === current || known.has(id));
+    if (kept.length !== untrack(tabIds).length) keepTabs(kept);
+  };
+  createEffect(
+    () => stored()?.detail.summary.id,
+    (workflowId) => {
+      if (workflowId === undefined) return;
+      const ids = untrack(tabIds);
+      if (!ids.includes(workflowId)) keepTabs([...ids, workflowId]);
+    },
+  );
+  const shownTabs = () => {
+    const open = stored()?.detail.summary.id;
+    const known = new Set(summaries().map((summary) => summary.id));
+    return tabIds().filter((id) => id === open || known.has(id));
+  };
+  const closeTabs = (keep: (id: string, index: number) => boolean, fallback: string) => {
+    const ids = shownTabs();
+    const kept = ids.filter(keep);
+    if (kept.length === 0) return;
+    keepTabs(kept);
+    if (kept.includes(current)) return;
+    const index = ids.indexOf(current);
+    const next =
+      ids.slice(index + 1).find((id) => kept.includes(id)) ?? (kept.includes(fallback) ? fallback : kept.at(-1));
+    if (next !== undefined) open(next);
+  };
+  const tabs: WorkflowCanvasTabs = {
+    get ids() {
+      return shownTabs();
+    },
+    onClose: (workflowId) => closeTabs((id) => id !== workflowId, workflowId),
+    onCloseOthers: (workflowId) => closeTabs((id) => id === workflowId, workflowId),
+    onCloseRight: (workflowId) => {
+      const index = shownTabs().indexOf(workflowId);
+      closeTabs((_, at) => at <= index, workflowId);
+    },
+    onMove: (workflowId, index) => {
+      const ids = shownTabs().filter((id) => id !== workflowId);
+      ids.splice(Math.max(0, Math.min(index, ids.length)), 0, workflowId);
+      keepTabs(ids);
+    },
+  };
+
+  let folderRead = 0;
+  const readFolders = () => {
+    const request = ++folderRead;
+    if (!host.foldersSupported()) {
+      setFolders(undefined);
+      return;
+    }
+    host.folders().then((next) => {
+      if (!disposed && request === folderRead) setFolders(next);
+    }, report);
+  };
+  const folderFailed = (error: unknown) => {
+    toast.error(errorMessage(error, t("workflow.canvas.folder.failed")));
+    readFolders();
+  };
+  const folderAction = (action: WorkflowFolderAction) => {
+    const before = folders();
+    if (!before) return;
+    try {
+      const workflowIds = new Set(summaries().map((summary) => summary.id));
+      setFolders(applyWorkflowFolderAction(before, action, { workflowIds }));
+    } catch (error) {
+      folderFailed(error);
+      return;
+    }
+    const request = ++folderRead;
+    host.folderAction(action).then((next) => {
+      if (!disposed && request === folderRead) setFolders(next);
+    }, folderFailed);
   };
 
   const readLevels = () => {
@@ -436,7 +607,7 @@ export function createWorkflowsController(
     return libraryPictures();
   };
 
-  const refresh = (workflowId: string | null, agentId?: string) => {
+  const refreshNow = (workflowId: string | null, agentId?: string) => {
     if (
       workflowId !== null &&
       agentId !== undefined &&
@@ -456,14 +627,37 @@ export function createWorkflowsController(
     readPlaces();
     readLevels();
     readGitHubCatalog();
+    readFolders();
+  };
+
+  const flushRefresh = () => {
+    refreshTimer = undefined;
+    if (disposed) return;
+    const requests = [...refreshPending.values()];
+    refreshPending.clear();
+    for (const request of requests) {
+      try {
+        refreshNow(request.workflowId, request.agentId);
+      } catch (error) {
+        report(error);
+      }
+    }
+  };
+
+  const refresh = (workflowId: string | null, agentId?: string) => {
+    refreshPending.set(`${workflowId ?? ""}\u0000${agentId ?? ""}`, { workflowId, agentId });
+    refreshTimer ??= setTimeout(flushRefresh, REFRESH_DELAY_MS);
   };
 
   onSettled(() => {
     const stop = host.onChanged(refresh);
+    const stopFolders = host.onFoldersChanged(readFolders);
     window.addEventListener("focus", onFocus);
     return () => {
       stop();
+      stopFolders();
       window.removeEventListener("focus", onFocus);
+      if (refreshTimer !== undefined) clearTimeout(refreshTimer);
       flush();
       disposed = true;
     };
@@ -473,8 +667,9 @@ export function createWorkflowsController(
     readPlaces();
     readLevels();
     readGitHubCatalog();
+    readFolders();
   });
-  write(async () => {
+  void queued(async () => {
     const asked = untrack(() => requested?.workflowId());
     const remembered = hostKey === undefined ? undefined : readLastWorkflow(hostKey);
     const known = asked ?? (current === "" ? remembered : current);
@@ -484,7 +679,7 @@ export function createWorkflowsController(
       limit = RUN_PAGE;
       const shown = cached(known);
       if (shown && stored()?.detail.summary.id !== known) show(shown);
-      if (await read(known)) return;
+      if (await readOpening(known)) return;
       if (disposed) return;
     }
     const list = library ?? (await host.workflows.list());
@@ -497,7 +692,7 @@ export function createWorkflowsController(
     }
     const created = await host.workflows.create({ title: t("workflow.canvas.untitled") });
     if (!disposed) await load(created.summary.id);
-  });
+  }).catch(() => setFailed(true));
   createEffect(
     () => requested?.workflowId(),
     (workflowId) => {
@@ -599,6 +794,14 @@ export function createWorkflowsController(
     get library() {
       return summaries();
     },
+    tabs,
+    get folders() {
+      return folders();
+    },
+    onFolderAction: folderAction,
+    get opening() {
+      return opening() !== undefined;
+    },
     onGraphChange: (graph) => {
       edits += 1;
       pending = { workflowId: current, graph };
@@ -614,11 +817,14 @@ export function createWorkflowsController(
         }),
       );
     },
-    onRunStep: (nodeId) => {
+    onRunStep: (nodeId, takes = 1) => {
       const kind = stored()?.detail.graph.nodes.find((node) => node.id === nodeId)?.kind;
       start(
         "run_step",
-        (workflowId) => host.workflows.runStep({ workflowId, nodeId, requestId: crypto.randomUUID() }),
+        async (workflowId) => {
+          for (let take = 0; take < takes; take += 1)
+            await host.workflows.runStep({ workflowId, nodeId, requestId: crypto.randomUUID() });
+        },
         kind,
       );
     },
@@ -673,6 +879,19 @@ export function createWorkflowsController(
     onRename: (workflowId, title) => {
       tracked("rename", () => host.workflows.rename({ workflowId, title })).catch(report);
     },
+    get onSetPaused() {
+      if (!host.pauseSupported()) return undefined;
+      return (workflowId: string, paused: boolean) => {
+        host.workflows.setPaused({ workflowId, paused }).catch(report);
+      };
+    },
+    get onExport() {
+      if (!host.portableSupported()) return undefined;
+      return (workflowId: string) => {
+        flush();
+        return queued(() => host.workflows.exportFile(workflowId));
+      };
+    },
     onDelete: (workflowId) => {
       flush();
       return queued(async () => {
@@ -682,8 +901,13 @@ export function createWorkflowsController(
         if (hostKey !== undefined) cache.get(hostKey)?.workflows.delete(workflowId);
         if (disposed || workflowId !== current) return;
         const rest = before.filter((summary) => summary.id !== workflowId);
-        const next = rest[Math.min(Math.max(index, 0), rest.length - 1)];
-        const opened = next?.id ?? (await host.workflows.create({ title: t("workflow.canvas.untitled") })).summary.id;
+        const ids = untrack(shownTabs);
+        const at = ids.indexOf(workflowId);
+        const neighbor = [...ids.slice(at + 1), ...ids.slice(0, Math.max(at, 0)).reverse()].find((id) =>
+          rest.some((summary) => summary.id === id),
+        );
+        const next = neighbor ?? rest[Math.min(Math.max(index, 0), rest.length - 1)]?.id;
+        const opened = next ?? (await host.workflows.create({ title: t("workflow.canvas.untitled") })).summary.id;
         closePreview();
         await load(opened);
       });
@@ -696,8 +920,12 @@ export function createWorkflowsController(
       return row;
     });
 
+  const hostDownload = host.downloadMedia;
+  const downloadMedia = hostDownload ? (attachmentId: string) => reported(hostDownload(attachmentId)) : undefined;
+
   return {
     detail: () => stored()?.detail,
+    failed,
     places,
     channels,
     discord,
@@ -705,6 +933,7 @@ export function createWorkflowsController(
     slack,
     pictures,
     uploadPicture,
+    downloadMedia,
     readOnly: () => lock() !== undefined,
     github,
     props,

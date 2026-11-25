@@ -38,6 +38,8 @@ export const messages = {
     "Aún no hay ningún agente que pueda responder aquí. En OpenBot, abre Marketplace > Apps > Telegram y haz clic en Añadir agente.",
   "status.messaging.telegramLinked":
     "OpenBot está conectado a este chat. Menciona a {bot} o responde a un mensaje de OpenBot para consultar a los agentes.",
+  "status.messaging.telegramNotLinked":
+    "OpenBot no está conectado a este chat. Para conectarlo, abre la app de OpenBot, ve a Marketplace → Apps → Telegram y selecciona «Añadir a un grupo» o «Abrir un chat directo».",
   "status.messaging.telegramOrchestratorName": "Orquestador de Telegram",
   "status.messaging.telegramOrchestratorTitle": "Responde en Telegram y consulta al equipo",
   "status.messaging.whatsappNoAgent":

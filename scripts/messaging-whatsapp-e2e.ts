@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Boom } from "@hapi/boom";
 import type { MessagingConnection, WhatsAppLinkState } from "@openbot/contracts/ipc";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import {
   newStoreKey,
@@ -16,6 +17,7 @@ import {
 import {
   type AnyMessageContent,
   type BaileysEventMap,
+  type BinaryNode,
   type GroupMetadata,
   type MiscMessageGenerationOptions,
   proto,
@@ -40,7 +42,9 @@ import {
   backoffDelay,
   closeDecision,
   MESSAGE_ACK,
+  NODE_HANDLING,
   type WhatsAppAck,
+  WhatsAppSession,
   type WhatsAppSocket,
 } from "../src/backend/messaging/whatsapp/whatsapp-session";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -118,8 +122,7 @@ interface Sent {
 
 class FakeSocket implements WhatsAppSocket {
   readonly #events = new EventEmitter();
-  readonly #frames = new Set<() => void>();
-  readonly #acks = new Set<(node: WhatsAppAck) => void>();
+  readonly #ws = new EventEmitter();
   readonly #phone: FakePhone;
   readonly config: UserFacingSocketConfig;
   ended = false;
@@ -129,12 +132,7 @@ class FakeSocket implements WhatsAppSocket {
       this.#events.on(event, listener);
     },
   };
-  readonly ws: WhatsAppSocket["ws"] = {
-    on: (event: string, listener: (node: WhatsAppAck) => void) => {
-      if (event === MESSAGE_ACK) this.#acks.add(listener);
-      else this.#frames.add(() => listener({ attrs: {} }));
-    },
-  };
+  readonly ws: WhatsAppSocket["ws"] = this.#ws;
   readonly signalRepository = {
     lidMapping: {
       getPNForLID: async (lid: string) =>
@@ -150,8 +148,17 @@ class FakeSocket implements WhatsAppSocket {
 
   emit<T extends keyof BaileysEventMap>(event: T, arg: BaileysEventMap[T]): void {
     if (this.ended) return;
-    for (const frame of this.#frames) frame();
+    this.#ws.emit("frame");
     this.#events.emit(event, arg);
+  }
+
+  keepAlive(): void {
+    if (!this.ended) this.#ws.emit("frame");
+  }
+
+  stallNode(): void {
+    if (!this.ended)
+      this.#ws.emit(NODE_HANDLING, { tag: "message", attrs: { id: "STALLED" } } satisfies BinaryNode, true);
   }
 
   boot(): void {
@@ -196,9 +203,10 @@ class FakeSocket implements WhatsAppSocket {
     }
     this.#phone.sent.push({ jid, content, id, quotedId: options?.quoted?.key.id ?? null });
     const error = this.#phone.refused.get(jid);
-    setTimeout(() => {
-      for (const ack of this.#acks) ack({ attrs: { id, ...(error ? { error } : {}) } });
-    }, 0);
+    if (!this.#phone.holdAcks)
+      setTimeout(() => {
+        this.#ws.emit(MESSAGE_ACK, { attrs: { id, ...(error ? { error } : {}) } } satisfies WhatsAppAck);
+      }, 0);
     const text = "text" in content && typeof content.text === "string" ? content.text : "";
     const message: WAMessage = {
       key: { remoteJid: jid, id, fromMe: true },
@@ -254,6 +262,7 @@ class FakePhone {
   readonly sent: Sent[] = [];
   readonly refused = new Map<string, string>();
   dropNext: string | null = null;
+  holdAcks = false;
   readonly lost: Sent[] = [];
   logouts = 0;
   offline = false;
@@ -409,6 +418,7 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
     agents: {
       listAgents: () => agents.listAgents(),
       respondToApproval: (input) => agents.respondToApproval(input),
+      approvalExecutionThreadId: (requestId) => agents.approvalExecutionThreadId(requestId),
       onEvent: () => () => {},
       createAgentProfile: (input) => agents.createAgentProfile(input),
       createMemory: (input) => agents.createMemory(input),
@@ -862,7 +872,7 @@ try {
       return { reason: signIn, general };
     });
 
-    await step("answer: an email address and a link stay, and a secret is masked", async () => {
+    await step("answer: an email address, a link and an asked password stay, and an API key is masked", async () => {
       const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
       assert.ok(link, "No conversation for the owner's chat.");
       const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
@@ -871,7 +881,8 @@ try {
       const scope = Effect.runSync(Scope.make());
       const turn = { agentId: link.agentId, threadId: link.threadId, turnId: "turn-answer-with-address" };
       agents.messaging.event({ type: "turn-started", ...turn }, scope);
-      const answer = "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=hunter2";
+      const answer =
+        "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=hunter2, key sk-ant-api03-e2efakekey";
       const snapshot = database.readConversation(link.agentId, link.threadId);
       snapshot.messages.push({
         id: `${turn.turnId}:answer`,
@@ -885,7 +896,7 @@ try {
       await runCauseEffect(mailbox.markTerminal(request.delivery.id, "completed", null));
       agents.messaging.event({ type: "turn-completed", ...turn, status: "completed" }, scope);
       const expected =
-        "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=[redacted]";
+        "Write to kontakt@example.pl or open https://wa.me/48500100200?text=Hi%20there. password=hunter2, key [redacted]";
       const texts = () =>
         phone.sent.flatMap((sent) =>
           sent.jid === OWNER_JID && "text" in sent.content && typeof sent.content.text === "string"
@@ -895,7 +906,7 @@ try {
       await until(() => texts().some((text) => text.includes("kontakt")), "the answer");
       const posted = texts().find((text) => text.includes("kontakt"));
       assert.equal(posted, expected, "The answer changed on its way to WhatsApp.");
-      assert.ok(!texts().some((text) => text.includes("hunter2")), "A secret reached WhatsApp.");
+      assert.ok(!texts().some((text) => text.includes("e2efakekey")), "An API key reached WhatsApp.");
       for (let index = 1; mailbox.unresolvedMessagingDeliveries(link.linkId).length < 2; index += 1) {
         const again = message({ chat: OWNER_JID, fromMe: true, text: `answer request again ${index}` });
         phone.current().receive([again]);
@@ -1399,6 +1410,91 @@ try {
       },
     );
 
+    await step(
+      "read only: a read-only group or contact is saved, starts no work, and OpenBot sends nothing to it",
+      async () => {
+        const id = connectionId(agents);
+        const reader = "48600100800";
+        const readerJid = `${reader}@s.whatsapp.net`;
+        await runCauseEffect(messaging.addWhatsAppSender(OWNER, { id: reader, kind: "contact", name: "Reader" }));
+        await runCauseEffect(messaging.setWhatsAppSenderReadOnly(OWNER, GROUP, true));
+        await runCauseEffect(messaging.setWhatsAppSenderReadOnly(OWNER, reader, true));
+        const modes = () =>
+          new Map(
+            (messaging.whatsappOverview().accounts[0]?.allowedSenders ?? []).map((sender) => [
+              sender.id,
+              sender.readOnly,
+            ]),
+          );
+        assert.equal(modes().get(GROUP), true, "The group is not read only.");
+        assert.equal(modes().get(reader), true, "The contact is not read only.");
+        const from = phone.sent.length;
+        const mention = message({
+          chat: GROUP,
+          participant: `${FRIEND}@s.whatsapp.net`,
+          text: "@48600100200 we chose the blue logo",
+          mentions: [OWNER_JID],
+          pushName: "Ewa",
+        });
+        const direct = message({ chat: readerJid, text: "the client approved the blue logo", pushName: "Reader" });
+        phone.current().receive([mention, direct]);
+        const marker = message({ chat: OWNER_JID, fromMe: true, text: "marker read only" });
+        phone.current().receive([marker]);
+        await until(() => phone.reactedTo(marker.key.id), "the marker");
+        await until(
+          () => agents.messaging.history.recent(id, GROUP, null, 200).some((entry) => entry.id === mention.key.id),
+          "the saved mention",
+        );
+        await until(
+          () => agents.messaging.history.recent(id, readerJid, null, 200).some((entry) => entry.id === direct.key.id),
+          "the saved direct message",
+        );
+        assert.equal(
+          received(agents, GROUP, mention.key.id ?? ""),
+          false,
+          "A mention in a read-only group started work.",
+        );
+        assert.equal(received(agents, readerJid, direct.key.id ?? ""), false, "A read-only contact started work.");
+        const notes = join(root, "read-only-notes.txt");
+        writeFileSync(notes, "notes");
+        const tool = (name: string, args: { place?: string; text?: string; files?: string[] }) =>
+          runCauseEffect(
+            agents.messaging.outboundTool(
+              "agent-whatsapp-e2e",
+              { threadId: "thread-whatsapp-e2e", turnId: "turn-whatsapp-e2e" },
+              name,
+              { connection: id, ...args },
+              (paths) => Effect.succeed(paths.map(() => ({ name: "notes.txt", path: notes, mimeType: "text/plain" }))),
+            ),
+          );
+        const groupPost = await tool("messaging_post", { place: GROUP, text: "Noted." });
+        const contactPost = await tool("messaging_post", { place: `+${reader}`, text: "Noted." });
+        const filePost = await tool("messaging_post", { place: GROUP, files: ["notes.txt"] });
+        for (const refused of [groupPost, contactPost, filePost]) {
+          assert.equal(refused.success, false, "A post to a read-only chat was accepted.");
+          assert.match(refused.contentItems[0]?.text ?? "", /read only/u);
+        }
+        const listed = JSON.parse((await tool("messaging_list_places", {})).contentItems[0]?.text ?? "{}");
+        assert.ok(
+          isDynamicRecord(listed) &&
+            Array.isArray(listed.places) &&
+            listed.places.some((place) => isDynamicRecord(place) && place.id === GROUP && place.readOnly === true),
+          "The group is not marked read only in the places.",
+        );
+        const history = await readHistory(agents, { place: GROUP, query: "blue logo" });
+        assert.deepEqual(
+          history.messages.map((entry) => entry.text),
+          ["@48600100200 we chose the blue logo"],
+        );
+        const elsewhere = phone.sent.slice(from).filter((sent) => sent.jid !== OWNER_JID);
+        assert.deepEqual(elsewhere, [], "OpenBot sent something to a read-only chat.");
+        await runCauseEffect(messaging.setWhatsAppSenderReadOnly(OWNER, GROUP, false));
+        await runCauseEffect(messaging.removeWhatsAppSender(OWNER, reader));
+        assert.equal(modes().get(GROUP), false, "The group does not give work again.");
+        return { saved: 2, sent: elsewhere.length };
+      },
+    );
+
     await step("LID authors: a LID chat with a phone form, and a LID group member, map to their numbers", async () => {
       const input = parseWhatsAppSenderInput({
         workspaceId: OWNER,
@@ -1420,7 +1516,30 @@ try {
       const lidOnly = message({ chat: "999456@lid", text: "still there?" });
       phone.current().receive([lidOnly]);
       await until(() => received(agents, `${LID_FRIEND}@s.whatsapp.net`, lidOnly.key.id ?? ""), "the LID-only message");
-      return { chat: `${LID_FRIEND}@s.whatsapp.net` };
+      const ownerReply = message({ chat: LID_FRIEND_CHAT, fromMe: true, text: "On my way, 10 minutes" });
+      const unknownJid = "48600100999@s.whatsapp.net";
+      const ownerToUnknown = message({ chat: unknownJid, fromMe: true, text: "See you" });
+      const marker = message({ chat: OWNER_JID, fromMe: true, text: "marker LID" });
+      phone.current().receive([ownerReply, ownerToUnknown, marker]);
+      await until(() => phone.reactedTo(marker.key.id), "the marker");
+      assert.equal(
+        received(agents, `${LID_FRIEND}@s.whatsapp.net`, ownerReply.key.id ?? ""),
+        false,
+        "The owner's message to an allowed contact started work.",
+      );
+      const id = connectionId(agents);
+      assert.ok(
+        agents.messaging.history
+          .recent(id, `${LID_FRIEND}@s.whatsapp.net`, null, 200)
+          .some((entry) => entry.id === ownerReply.key.id),
+        "The owner's message to an allowed contact was not saved.",
+      );
+      assert.equal(
+        agents.messaging.history.recent(id, unknownJid, null, 200).length,
+        0,
+        "The owner's message to a contact that is not allowed was saved.",
+      );
+      return { chat: `${LID_FRIEND}@s.whatsapp.net`, ownerReplySaved: true };
     });
 
     await step("LID contacts: posts, edits and reactions to a contact with a LID go to the LID chat", async () => {
@@ -1533,7 +1652,12 @@ try {
           me: { number: OWNER, lid: `${OWNER_LID}@lid` },
           openedAt: Date.now(),
           now: Date.now(),
-          rules: { ownNumber: true, contacts: new Map<string, string>(), groups: new Set<string>() },
+          rules: {
+            ownNumber: true,
+            contacts: new Map<string, string>(),
+            groups: new Set<string>(),
+            readOnly: new Set<string>(),
+          },
           chats,
           isOwnPost: () => false,
           threadOf: () => null,
@@ -1917,6 +2041,75 @@ try {
       return { disconnected: true };
     });
   });
+
+  await step(
+    "a socket that stops handling messages reconnects by itself, and stops after three stalls in an hour",
+    async () => {
+      let clock = Date.now();
+      const store = WhatsAppAuthStore.open({ path: join(root, "stall.db"), key: newStoreKey(), now: () => clock });
+      store.creds.me = { id: `${OWNER}:7@s.whatsapp.net` };
+      store.saveCreds();
+      const session = new WhatsAppSession({
+        store,
+        createSocket: phone.create,
+        makeSignalRepository: () => {
+          throw new Error("Not used by the fake socket.");
+        },
+        fetchVersion: async () => null,
+        now: () => clock,
+      });
+      const advance = (ms: number) => {
+        clock += ms;
+        phone.current().keepAlive();
+      };
+      const stall = async (label: string) => {
+        const socket = phone.current();
+        socket.stallNode();
+        advance(5 * 60_000);
+        await until(() => socket.ended, label, 20_000);
+      };
+      try {
+        session.start();
+        await until(() => session.state === "open", "the first socket open");
+        await stall("a stalled node ends its socket");
+        await until(() => session.state === "open", "a new socket after the first stall");
+
+        phone.holdAcks = true;
+        const unconfirmed = phone.current();
+        const posted = await runCauseEffect(session.send(OWNER_JID, { text: "not confirmed" }));
+        phone.holdAcks = false;
+        assert.ok(posted.key.id, "The unconfirmed post failed.");
+        await until(() => unconfirmed.ended && session.state === "open", "a new socket after an unconfirmed post");
+
+        await stall("a second stalled node ends its socket");
+        await until(() => session.state === "open", "a new socket after the second stall");
+        await stall("a third stalled node ends its socket");
+        await until(() => session.state === "failing", "Needs attention after three stalls in an hour");
+
+        session.reconnect();
+        await until(() => session.state === "open", "connected after a wake");
+        await stall("a stall after the wake ends its socket");
+        await until(() => session.state === "open", "a new socket after a stall that follows the wake");
+
+        await runCauseEffect(session.stop());
+        session.start();
+        await until(() => session.state === "open", "connected after Reconnect");
+        return {
+          states: [
+            "open after a stall",
+            "open after an unconfirmed post, which does not count",
+            "open after the second stall",
+            "failing after the third stall",
+            "open after a wake, and after one more stall",
+            "open after Reconnect",
+          ],
+        };
+      } finally {
+        await runCauseEffect(session.stop());
+        store.close();
+      }
+    },
+  );
 
   report.passed = true;
 } finally {

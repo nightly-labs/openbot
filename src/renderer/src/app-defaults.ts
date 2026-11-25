@@ -65,6 +65,7 @@ export const FALLBACK_HOST_STATUS: HostStatus = {
   apiOnline: false,
   remoteDesktopReady: false,
   remoteDesktopScreenRecordingDenied: false,
+  remoteDesktopNeedsX11Session: false,
   remoteDesktopUnattended: false,
   remoteDesktopActiveSessions: 0,
   remoteDesktopMaxSessions: 4,
