@@ -3802,8 +3802,12 @@ export class BrowserHost {
           return;
         }
         const { id, ownerThreadId, ownerAgentId, sharedThreadIds } = tab;
-        note = { tab: { id, ownerThreadId, ownerAgentId, sharedThreadIds }, text: scrubbed };
-        this.#downloadNotes = [...this.#downloadNotes, note].slice(-MAX_DOWNLOAD_NOTES);
+        const added: BrowserDownloadNote = {
+          tab: { id, ownerThreadId, ownerAgentId, ...(sharedThreadIds ? { sharedThreadIds } : {}) },
+          text: scrubbed,
+        };
+        note = added;
+        this.#downloadNotes = [...this.#downloadNotes, added].slice(-MAX_DOWNLOAD_NOTES);
       };
       const stopped = (message: string) => {
         if (!tab || tab.secret) return;
