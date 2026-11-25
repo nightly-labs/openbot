@@ -1,5 +1,6 @@
 import { readFile, rm } from "node:fs/promises";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Result, Schema, Semaphore } from "effect";
 import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 import { causeHelpers } from "../backend/effect-boundary";
@@ -83,8 +84,20 @@ const envelopeSchema = Schema.Struct({ version: Schema.Literal(1), record: Schem
 
 const MAX_VAULT_ENVELOPE_BYTES = 4 * 1024 * 1024;
 
+const logger = createOpenBotLogger("vault");
+
 function unreadable() {
   return new PasswordVaultError({ cause: new Error(sourceText("error.vault.unreadable")) });
+}
+
+function errorKind(cause: unknown): string {
+  if (!(cause instanceof Error)) return typeof cause;
+  return "code" in cause && typeof cause.code === "string" ? cause.code : cause.name;
+}
+
+function logUnreadable(step: "open" | "envelope" | "decrypt" | "items") {
+  return ({ cause }: PasswordVaultError) =>
+    Effect.sync(() => logger.warn("OpenBot cannot read the Vault file.", { step, error: errorKind(cause) }));
 }
 
 export class VaultStore {
@@ -151,14 +164,21 @@ export class VaultStore {
           ? Effect.succeed(null)
           : Effect.fail(new PasswordVaultError({ cause })),
       ),
+      Effect.tapError(logUnreadable("open")),
     );
     if (source === null) return null;
     if (source.length > MAX_VAULT_ENVELOPE_BYTES) return yield* unreadable();
-    return yield* vaultDecode(() => {
-      const envelope = Schema.decodeUnknownSync(envelopeSchema)(JSON.parse(source));
-      return Schema.decodeUnknownSync(recordSchema)(
-        JSON.parse(this.#cipher.decrypt(Buffer.from(envelope.record, "base64"))),
-      );
-    }).pipe(Effect.mapError(unreadable));
+    const envelope = yield* vaultDecode(() => Schema.decodeUnknownSync(envelopeSchema)(JSON.parse(source))).pipe(
+      Effect.tapError(logUnreadable("envelope")),
+      Effect.mapError(unreadable),
+    );
+    const text = yield* vaultDecode(() => this.#cipher.decrypt(Buffer.from(envelope.record, "base64"))).pipe(
+      Effect.tapError(logUnreadable("decrypt")),
+      Effect.mapError(unreadable),
+    );
+    return yield* vaultDecode(() => Schema.decodeUnknownSync(recordSchema)(JSON.parse(text))).pipe(
+      Effect.tapError(logUnreadable("items")),
+      Effect.mapError(unreadable),
+    );
   });
 }

@@ -128,7 +128,7 @@ import {
 } from "../protocol";
 import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
 import type { StoredStateFailure } from "../stored-state-effects";
-import type { VaultItems } from "../vault-items";
+import { type VaultItems, vaultClosedText } from "../vault-items";
 import { WORKFLOW_ANSWER_TOOL } from "../workflows/workflow-answers";
 import {
   handleWorkflowAnswerTool,
@@ -278,6 +278,13 @@ const API_KEY_TOOLS: ReadonlySet<string> = new Set([
   "list_api_keys",
   "remove_api_key",
   "save_api_key",
+]);
+
+const VAULT_ITEM_TOOLS: ReadonlySet<string> = new Set([
+  "list_vault_items",
+  "request_vault_item",
+  "save_vault_item",
+  "delete_vault_item",
 ]);
 
 function lowerCaseColor(color: string): AvatarColor {
@@ -883,6 +890,7 @@ export class OpenBotToolRouter {
               if (client.running) client.respond(toolRequest.id, result);
               return;
             }
+            if (this.#vaultItems && VAULT_ITEM_TOOLS.has(toolRequest.params.tool)) yield* this.#vaultItems.reload();
             if (toolRequest.params.tool === "request_vault_item") {
               const result = yield* this.#attention.requestVaultItem(client, toolRequest, {
                 ...toolRequest.params,
@@ -1172,6 +1180,7 @@ export class OpenBotToolRouter {
     if (!agentId) throw new Error("The calling OpenBot agent is unknown.");
     const apiKeys = this.#apiKeys;
     if (!apiKeys) return openBotToolFailure("This OpenBot server cannot save API keys.");
+    if (this.#vaultItems) yield* this.#vaultItems.reload();
     const failed = (failure: { cause: unknown }) =>
       Effect.succeed(
         openBotToolFailure(
@@ -1265,7 +1274,7 @@ export class OpenBotToolRouter {
         "Only a person's message, in your OpenBot chat or a thread they opened, can save a key to the Vault. Ask the user to add it in Server settings > Vault.",
       );
     const vault = this.#vaultItems;
-    if (!vault?.ready()) return openBotToolFailure("No Vault is available on this computer. Ask the user.");
+    if (!vault?.ready()) return openBotToolFailure(vaultClosedText(vault?.status()));
     const agentName = this.#store.list().find((candidate) => candidate.id === agentId)?.name;
     const saved = yield* Effect.result(vault.saveApiKey({ name, key, notes }, { id: agentId, name: agentName }, false));
     if (Result.isFailure(saved)) {
