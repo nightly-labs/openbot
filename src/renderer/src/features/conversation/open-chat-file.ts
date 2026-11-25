@@ -46,7 +46,7 @@ export function chatFileError(error: unknown, path: string, fallback: string): s
     : message;
 }
 
-const LOCATION_SUFFIX = /(?::\d+(?::\d+)?|#L\d+(?:C\d+)?)$/u;
+const LOCATION_SUFFIX = /(?::\d+(?::\d+)?|#L\d+(?:C\d+)?(?:-L?\d+(?:C\d+)?)?)$/u;
 
 function fileAction(path: string): FileAction {
   return isOpenableAttachmentName(decodedPath(path).replace(LOCATION_SUFFIX, "")) ? "open" : "reveal";
