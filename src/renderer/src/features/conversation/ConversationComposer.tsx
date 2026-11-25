@@ -49,6 +49,7 @@ import { type OpenWaitItem, OpenWaits } from "@openbot/ui/features/conversation/
 import { SpeakingBar } from "@openbot/ui/features/conversation/SpeakingBar";
 import { ComposerVoiceControls } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { useText } from "@openbot/ui/text";
+import { usesTouchLayout } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show, snapshot } from "solid-js";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
@@ -464,6 +465,10 @@ export function ConversationComposer() {
     voicePhase() === "recording"
       ? undefined
       : t(sendShortcutHintKey(deviceSendShortcut(props.platform), editingDeliveryId() ? "save" : "send"));
+  const sendFromButton = () => {
+    submitComposer();
+    if (!usesTouchLayout()) setComposerFocusRequest((current) => current + 1);
+  };
   const SendControl = () => (
     <ComposerSendControl
       stop={Boolean(
@@ -490,7 +495,7 @@ export function ConversationComposer() {
         voicePhase() === "transcribing"
       }
       busy={submitting()}
-      onSend={submitComposer}
+      onSend={sendFromButton}
     />
   );
   return (
@@ -905,7 +910,7 @@ export function ConversationComposer() {
                   onStart={() => void startVoiceRecording()}
                   onCancel={cancelVoiceRecording}
                   onFinish={stopVoiceRecording}
-                  onSend={submitComposer}
+                  onSend={sendFromButton}
                   send={<SendControl />}
                 />
               </Show>
