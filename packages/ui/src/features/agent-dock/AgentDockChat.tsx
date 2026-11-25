@@ -118,6 +118,13 @@ export function pendingMessageDelivered(pending: AgentDockPendingMessage, messag
   return messages.slice(start).some((message) => isOwn(message) && message.body.trim() === pending.text);
 }
 
+export type AgentDockFileOpener = (
+  kind: "shared" | "workspace",
+  agentId: string | undefined,
+  path: string,
+  asWritten?: string,
+) => void;
+
 export function AgentDockChat(props: {
   seat: AgentDockSeat;
   chat: AgentDockChatModel;
@@ -142,6 +149,7 @@ export function AgentDockChat(props: {
   agents: ComposerAgent[];
   onSelectAgent?: ((agentId: string) => void) | undefined;
   onOpenLink?: ((url: string) => void) | undefined;
+  onOpenFile?: AgentDockFileOpener | undefined;
   answers?: AgentDockChatAnswers | undefined;
 }) {
   const { t } = useText();
@@ -177,6 +185,23 @@ export function AgentDockChat(props: {
     if (!channel() || isOwn(message)) return undefined;
     if (message.senderMember) return message.senderMember.name;
     return props.agents.find((agent) => agent.id === message.senderAgentId)?.name;
+  };
+  const fileAgentId = (message: AgentMessage): string | undefined => {
+    if (!channel()) return agentSeat()?.agent.id;
+    return message.author === "agent" ? message.senderAgentId : undefined;
+  };
+  const sharedFileOpener = (message: AgentMessage) => {
+    const open = props.onOpenFile;
+    return open
+      ? (path: string, asWritten?: string) => open("shared", fileAgentId(message), path, asWritten)
+      : undefined;
+  };
+  const workspaceFileOpener = (message: AgentMessage) => {
+    const open = props.onOpenFile;
+    const agentId = fileAgentId(message);
+    return open && agentId
+      ? (path: string, asWritten?: string) => open("workspace", agentId, path, asWritten)
+      : undefined;
   };
   const agentTint = (message: AgentMessage) => {
     if (message.author !== "agent" || message.kind === "error") return undefined;
@@ -470,6 +495,8 @@ export function AgentDockChat(props: {
                                 onSelectAgent={(agentId) => props.onSelectAgent?.(agentId)}
                                 onOpenAttachment={() => props.onOpenInMain()}
                                 onOpenLink={(url) => props.onOpenLink?.(url)}
+                                onOpenSharedFile={sharedFileOpener(message)}
+                                onOpenWorkspaceFile={workspaceFileOpener(message)}
                               />
                             </div>
                           }

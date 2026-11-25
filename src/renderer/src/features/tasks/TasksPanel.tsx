@@ -18,6 +18,7 @@ import { EMPTY_DRAFT } from "../conversation/composer-draft";
 import { composerDraftKey } from "../conversation/conversation-keys";
 import type { ComposerDraft } from "../conversation/conversation-types";
 import { useDesktopMediaApproval } from "../conversation/desktop-media-approval";
+import { openChatFile } from "../conversation/open-chat-file";
 import { createVoiceStore, VOICE_LEVEL_COUNT, type VoiceStoreDeps } from "../conversation/stores/voice-store";
 import { createServerResponseStyle } from "../servers/server-personality";
 import { useServers } from "../servers/servers-context";
@@ -70,6 +71,20 @@ export function TasksPanel(props: TasksPanelProps) {
       voice={createTasksVoice}
       onOpenLink={(url) => void appPort().openUrl(url)}
       onAttachmentAction={attachmentFiles.open}
+      onOpenFile={(kind, agentId, path, asWritten) =>
+        void openChatFile(
+          {
+            openSharedFile: (input) => window.openbot.agent.openSharedFile(input, props.serverId),
+            openWorkspaceFile: (input) => window.openbot.agent.openWorkspaceFile(input, props.serverId),
+          },
+          kind,
+          agentId,
+          path,
+          asWritten,
+        ).then((error) => {
+          if (error) actionToast.error(error);
+        })
+      }
       downloads={attachmentFiles.downloads}
       files={{
         accepted: threads.filesAccepted,

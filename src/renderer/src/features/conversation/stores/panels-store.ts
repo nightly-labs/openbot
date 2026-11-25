@@ -8,13 +8,11 @@ import {
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
-import { matchingSourceKeys } from "@openbot/i18n";
 import type { AgentSettingLinkId, AgentSettingReveal } from "@openbot/ui/features/conversation/agent-setting-links";
 import type { ImageCopies } from "@openbot/ui/features/conversation/ImageLightbox";
 import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { isSidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import { currentText } from "@openbot/ui/text";
-import { normalizeMessage } from "@openbot/user-errors/reference";
 import { createEffect, createMemo, createSignal, onCleanup, type Store, type StoreSetter, untrack } from "solid-js";
 import { createScopeGuard } from "../../../scope-lifetime";
 import { serverSupportsCapability } from "../../servers/server-capabilities";
@@ -32,6 +30,7 @@ import type {
 } from "../conversation-types";
 import { agentSkillsMode } from "../installed-skills-source";
 import { decodedPath, SHARED_FOLDER_PATH } from "../message-image-files";
+import { chatFileError, chatFileName } from "../open-chat-file";
 import { filePreviewQuoteId } from "../quoted-text";
 import { conversationOwnerId } from "./composer-store";
 
@@ -951,21 +950,8 @@ export function filePreviewKey(source: SidebarFilePreview["source"]): string {
 }
 
 function filePreviewError(error: unknown, path: string): string {
-  const name = decodedPath(path).replaceAll("\\", "/").split("/").pop() || t("attachment.error.fileFallback");
-  if (error instanceof Error && /\bENOENT\b/u.test(error.message)) {
-    return t("attachment.error.fileNotFound", { name });
-  }
-  const fallback = t("attachment.error.previewFile", { name });
-  const message = errorMessage(error, fallback);
-  return message === fallback && matchingSourceKeys(normalizeMessage(error)).some((key) => MISSING_PATH_KEYS.has(key))
-    ? t("attachment.error.fileNotFound", { name })
-    : message;
+  return chatFileError(error, path, t("attachment.error.previewFile", { name: chatFileName(path) }));
 }
-
-const MISSING_PATH_KEYS = new Set([
-  "error.backend.workspacePathMissing",
-  "error.backend.workspacePathMissingForMember",
-]);
 
 function sharedSiblingPath(documentPath: string, link: string): string | null {
   if (/^(?:[/\\~]|[A-Za-z]:)/u.test(link) || SHARED_FOLDER_PATH.test(link)) return null;
