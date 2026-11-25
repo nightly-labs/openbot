@@ -20,8 +20,6 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit, Result } from "effect";
-import { zipSync } from "fflate";
-import { parseDocument } from "yaml";
 import type { AgentService } from "../backend/agent-service";
 import type { ChannelService } from "../backend/channel-service";
 import { runCauseEffect } from "../backend/effect-boundary";
@@ -48,7 +46,7 @@ import { validTimezone } from "./agent-marketplace-service";
 import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } from "./archive-effects";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import type { SkillMarketplaceFailure } from "./skill-marketplace-service";
-import { inspectArchive, SKILL_FRONTMATTER } from "./skill-package";
+import { renameSkill } from "./skill-package";
 
 const SKILL_STAGING = ".openbot/import-skills";
 const IMPORTED_FILES = "imported";
@@ -698,7 +696,13 @@ export class AgentImportService {
         .list()
         .pipe(Effect.mapError((error) => archiveFailure(error.cause)));
       const names = new Map(library.map((candidate) => [candidate.slug, candidate.name]));
-      const renamed = yield* archiveSync(() => renameSkill(skill.files, planned, names));
+      const renamed = yield* archiveSync(() =>
+        renameSkill(
+          skill.files,
+          (slug, name) => planned.has(slug) || (names.get(slug) ?? name) !== name,
+          planned.size + names.size + 2,
+        ),
+      );
       warnings.push(
         sourceText("error.import.skillRenamed", { name: source.name, skill: renamed.from, renamed: renamed.name }),
       );
@@ -849,34 +853,6 @@ function skillDigest(files: ReadonlyArray<readonly [string, Uint8Array]>): strin
   for (const [name, data] of [...files].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
     hash.update(`${name}\0${data.byteLength}\0`).update(data);
   return hash.digest("hex");
-}
-
-function renameSkill(
-  files: ReadonlyArray<readonly [string, Uint8Array]>,
-  planned: ReadonlyMap<string, string>,
-  library: ReadonlyMap<string, string>,
-) {
-  const index = files.findIndex(([name]) => name === "SKILL.md");
-  const text = new TextDecoder("utf-8", { fatal: true }).decode(files[index]?.[1]);
-  const match = text.match(SKILL_FRONTMATTER);
-  const frontmatter = parseDocument(match?.[1] ?? "");
-  const from = String(frontmatter.get("name")).trim();
-  const base = from.slice(0, 56).trimEnd();
-  for (let number = 2; number <= planned.size + library.size + 2; number++) {
-    const name = `${base} ${number}`;
-    frontmatter.set("name", name);
-    const head = `---\n${frontmatter.toString({ lineWidth: 0 })}---\n`;
-    const skillFile = new TextEncoder().encode(head + text.slice(match?.[0].length ?? 0));
-    const { slug } = inspectArchive(zipSync({ "SKILL.md": skillFile }));
-    if (!planned.has(slug) && (library.get(slug) ?? name) === name)
-      return {
-        files: files.map((file, at) => (at === index ? (["SKILL.md", skillFile] as const) : file)),
-        slug,
-        from,
-        name,
-      };
-  }
-  throw new Error(sourceText("error.skill.localNameTaken"));
 }
 
 function wrapperFolder(names: string[]): string {

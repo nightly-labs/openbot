@@ -21,6 +21,7 @@ import {
 } from "./skill-package";
 
 const logger = createOpenBotLogger("local-skill-library");
+const TEMPLATE_ORIGIN_FILE = "template-origin";
 
 export class LocalSkillLibrary {
   readonly #writes = Semaphore.makeUnsafe(1);
@@ -230,6 +231,28 @@ export class LocalSkillLibrary {
       yield* this.publishEffect(current.id, current.version + 1, bytes);
       return yield* this.get(current.id, current.version + 1);
     });
+  }
+
+  templateOrigin(id: string): Effect.Effect<string | null, LocalSkillFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<string | null, LocalSkillFailure> {
+      const directory = yield* localSync(() => this.directory(id));
+      yield* rejectLinks(this.root, directory);
+      const read = yield* Effect.result(localIO(() => readFile(join(directory, TEMPLATE_ORIGIN_FILE), "utf8")));
+      if (Result.isSuccess(read)) return read.success.trim();
+      const error = read.failure.cause;
+      if (isDynamicRecord(error) && error.code === "ENOENT") return null;
+      return yield* read.failure;
+    });
+  }
+
+  recordTemplateOrigin(id: string, templateId: string): Effect.Effect<void, LocalSkillFailure> {
+    return this.serialize(
+      Effect.gen({ self: this }, function* () {
+        const directory = yield* localSync(() => this.directory(id));
+        yield* rejectLinks(this.root, directory);
+        yield* localIO(() => writeFile(join(directory, TEMPLATE_ORIGIN_FILE), templateId, { mode: 0o600, flag: "wx" }));
+      }),
+    );
   }
 
   withdraw(id: string, revision: number): Effect.Effect<void, LocalSkillFailure> {

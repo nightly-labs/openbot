@@ -23,6 +23,7 @@ import {
   isAgentTemplateCardPng,
   isAgentTemplateSnapshot,
   isReleasedRoutineSchedule,
+  type MarketplaceSkillDetail,
   type PublishAgentTemplateInput,
   type RoutineSchedule,
   toAgentTemplateSnapshot,
@@ -38,7 +39,7 @@ import type { CentralAuthOperationError } from "./central-auth-effects";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import { MANAGED_SKILL_SLUGS } from "./managed-skill-service";
 import type { SkillMarketplaceFailure } from "./skill-marketplace-service";
-import { inspectSkillMarkdown, normalizedFiles } from "./skill-package";
+import { inspectSkillMarkdown, normalizedFiles, renameSkill } from "./skill-package";
 
 function snapshotProblemText(problem: AgentTemplateSnapshotProblem): string {
   switch (problem.kind) {
@@ -123,7 +124,10 @@ interface AgentTemplateSkills {
     skillId: string;
     versionId: string;
   }): Effect.Effect<unknown, SkillMarketplaceFailure>;
-  library(): Pick<LocalSkillLibrary, "list" | "create" | "revise" | "bundle" | "withdraw">;
+  library(): Pick<
+    LocalSkillLibrary,
+    "list" | "create" | "revise" | "bundle" | "withdraw" | "templateOrigin" | "recordTemplateOrigin"
+  >;
   installLocal(input: {
     agentId: string;
     skillId: string;
@@ -239,16 +243,53 @@ export class AgentTemplateService {
         });
       const library = yield* templateSync(() => this.skills.library());
       const localSkills = yield* library.list().pipe(toAgentTemplateFailure);
+      const latestText = (skill: MarketplaceSkillDetail) =>
+        library.bundle(skill.id, skill.version).pipe(
+          Effect.map((bytes) => new TextDecoder().decode(normalizedFiles(bytes)["SKILL.md"])),
+          toAgentTemplateFailure,
+        );
+      const fromOtherOrigin = (skill: MarketplaceSkillDetail) =>
+        library.templateOrigin(skill.id).pipe(
+          Effect.map((origin) => origin !== input.templateId),
+          toAgentTemplateFailure,
+        );
+      const templateSlugs = new Set<string>();
+      for (const skill of detail.skills)
+        if (skill.kind === "embedded")
+          templateSlugs.add((yield* templateSync(() => inspectSkillMarkdown(skill.markdown))).slug);
+      let otherOrigins: Set<string> | undefined;
+      const skills: AgentTemplateSkill[] = [];
       const existingSkills = new Map<string, { id: string; revision: number; sameText: boolean }>();
       for (const skill of detail.skills) {
-        if (skill.kind !== "embedded") continue;
-        const { slug } = yield* templateSync(() => inspectSkillMarkdown(skill.markdown));
-        const current = localSkills.find((candidate) => candidate.slug === slug);
-        if (!current) continue;
-        const text = new TextDecoder().decode(
-          normalizedFiles(yield* library.bundle(current.id, current.version).pipe(toAgentTemplateFailure))["SKILL.md"],
-        );
-        existingSkills.set(slug, { id: current.id, revision: current.version, sameText: text === skill.markdown });
+        if (skill.kind !== "embedded") {
+          skills.push(skill);
+          continue;
+        }
+        let { name, markdown } = skill;
+        let slug = inspectSkillMarkdown(markdown).slug;
+        let current = localSkills.find((candidate) => candidate.slug === slug);
+        let sameText = current !== undefined && (yield* latestText(current)) === markdown;
+        if (current && !sameText && (yield* fromOtherOrigin(current))) {
+          if (!otherOrigins) {
+            otherOrigins = new Set();
+            for (const local of localSkills) if (yield* fromOtherOrigin(local)) otherOrigins.add(local.slug);
+          }
+          const taken = otherOrigins;
+          const renamed = yield* templateSync(() =>
+            renameSkill(
+              [["SKILL.md", new TextEncoder().encode(markdown)]],
+              (candidate) => templateSlugs.has(candidate) || taken.has(candidate),
+              templateSlugs.size + localSkills.length + 2,
+            ),
+          );
+          ({ slug, name } = renamed);
+          markdown = new TextDecoder().decode(renamed.files[0]?.[1]);
+          templateSlugs.add(slug);
+          current = localSkills.find((candidate) => candidate.slug === slug);
+          sameText = current !== undefined && (yield* latestText(current)) === markdown;
+        }
+        skills.push({ kind: "embedded", slug, name, markdown });
+        if (current) existingSkills.set(slug, { id: current.id, revision: current.version, sameText });
       }
       let avatar: AvatarImageInput | null = null;
       if (detail.avatarUrl) {
@@ -273,7 +314,7 @@ export class AgentTemplateService {
       {
         const outcome = yield* Effect.result(
           Effect.gen({ self: this }, function* () {
-            for (const skill of detail.skills) {
+            for (const skill of skills) {
               if (skill.kind === "marketplace") {
                 yield* this.skills
                   .installVersion({ agentId: agent.id, skillId: skill.skillId, versionId: skill.versionId })
@@ -299,6 +340,8 @@ export class AgentTemplateService {
                       : library.create(agent.id, folder)
                   ).pipe(toAgentTemplateFailure);
                   published.push({ id: revision.id, revision: revision.version });
+                  if (!existing)
+                    yield* library.recordTemplateOrigin(revision.id, input.templateId).pipe(toAgentTemplateFailure);
                   return revision;
                 }).pipe(Effect.uninterruptible);
                 yield* this.skills
