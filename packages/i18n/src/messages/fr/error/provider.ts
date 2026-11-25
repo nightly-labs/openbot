@@ -262,6 +262,8 @@ export const messages = {
     "Votre clé d’API OpenCode a expiré. Créez une nouvelle clé dans OpenCode Console, collez-la dans les réglages d’OpenCode, puis réessayez.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go a refusé votre clé d’API enregistrée. La clé a peut-être expiré. Créez une nouvelle clé dans OpenCode Console, collez-la dans les réglages d’OpenCode, puis réessayez.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode n’a pas utilisé la clé que vous avez enregistrée dans OpenBot. Il a utilisé une ancienne clé OpenCode Go qu’OpenCode conserve lui-même, et OpenCode Go a refusé cette clé. Pour supprimer l’ancienne clé, exécutez `opencode auth logout opencode-go` dans un terminal sur l’ordinateur qui exécute l’agent, puis choisissez l’ancienne clé. Réessayez ensuite.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go a refusé la requête. Une nouvelle clé d'API ne corrige pas ce problème. Votre forfait OpenCode Go n'est peut-être pas actif, ou OpenCode Go bloque peut-être votre réseau : certains services bloquent les VPN, les proxys ou certains pays. Vérifiez que votre forfait est actif dans OpenCode Console ou désactivez le VPN, puis réessayez. Vous pouvez aussi choisir un autre modèle.",
   "error.provider.opencodeServiceFailure":

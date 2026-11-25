@@ -237,6 +237,8 @@ export const messages = defineMessages("error.provider", {
     "Your OpenCode API key expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go refused your saved API key. The key may have expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode did not use the key that you saved in OpenBot. It used an older OpenCode Go key that OpenCode keeps itself, and OpenCode Go refused that key. To remove the older key, run `opencode auth logout opencode-go` in a terminal on the computer that runs the agent, and choose the old key. Then try again.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go refused the request. A new API key does not fix this. Your OpenCode Go plan may not be active, or OpenCode Go may block your network: some services block VPNs, proxies or some countries. Make sure that your plan is active in OpenCode Console, or turn off the VPN, then try again. You can also choose a different model.",
   "error.provider.opencodeServiceFailure":

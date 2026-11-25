@@ -228,6 +228,8 @@ export const messages = {
     "תוקף מפתח ה-API של OpenCode פג. יש ליצור מפתח חדש ב-OpenCode Console, להדביק אותו בהגדרות OpenCode ואז לנסות שוב.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go דחה את מפתח ה-API השמור. ייתכן שתוקף המפתח פג. יש ליצור מפתח חדש ב-OpenCode Console, להדביק אותו בהגדרות OpenCode ואז לנסות שוב.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode לא השתמש במפתח ששמרת ב-OpenBot. הוא השתמש במפתח OpenCode Go ישן יותר ש-OpenCode שומר בעצמו, ו-OpenCode Go דחה את המפתח הזה. כדי להסיר את המפתח הישן, הרץ את `opencode auth logout opencode-go` בטרמינל במחשב שמריץ את הסוכן, ובחר את המפתח הישן. לאחר מכן נסה שוב.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go דחה את הבקשה. מפתח API חדש לא יפתור את זה. ייתכן שהתוכנית שלך ב-OpenCode Go לא פעילה, או ש-OpenCode Go חוסם את הרשת שלך: חלק מהשירותים חוסמים VPN, שרתי Proxy או מדינות מסוימות. ודא ב-OpenCode Console שהתוכנית פעילה, או כבה את ה-VPN, ואז נסה שוב. אפשר גם לבחור מודל אחר.",
   "error.provider.opencodeServiceFailure":

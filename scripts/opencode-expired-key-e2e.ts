@@ -32,6 +32,8 @@ interface Report {
   authRequired?: { error: string };
   refusedV2?: { saved: string; notSaved: string; refused401: string | null; refused403: string | null };
   providerRefused?: { error: string };
+  inheritedEnvKey?: { envKey: string | null; configKey: string | null };
+  ownGoKey?: { error: string };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-expired-key-e2e-"));
@@ -208,6 +210,36 @@ try {
     "A provider with a stored key reads as a refused request, not a missing sign-in.",
   );
   report.providerRefused = { error: refused };
+  await runCauseEffect(eighth.stop());
+
+  delete process.env.FAKE_PROVIDER_AUTH;
+  storedKey = "fresh";
+  process.env.OPENCODE_API_KEY = "old-env";
+  await rm(log, { force: true });
+  try {
+    await startThread(open(cli), { cwd: workspace });
+  } finally {
+    delete process.env.OPENCODE_API_KEY;
+  }
+  const inheritedSpawn = (await readJsonl<LogEntry>(log)).find((entry) => entry.event === "spawn");
+  assert.equal(inheritedSpawn?.envKey, "fresh", "The saved key replaces an inherited OPENCODE_API_KEY (#15988).");
+  assert.equal(inheritedSpawn?.zenKey, null, "The free tier still gets no config key (#7550).");
+  report.inheritedEnvKey = { envKey: inheritedSpawn?.envKey ?? null, configKey: inheritedSpawn?.configKey ?? null };
+
+  storedKey = "expired-v2";
+  const credentials = new DatabaseSync(join(openCodeData, "opencode.db"));
+  credentials
+    .prepare("INSERT INTO credential (id, integration_id, label, value, active) VALUES (?, ?, ?, ?, ?)")
+    .run("cred_2", "opencode-go", "API key", JSON.stringify({ type: "key", key: "old" }), null);
+  credentials.close();
+  const ninth = open(cli);
+  const { error: ownGo } = await runTurn(ninth, await startThread(ninth, { cwd: workspace }));
+  assert.equal(
+    ownGo,
+    sourceText("error.provider.opencodeOwnGoKeyRefused"),
+    "A Go key in OpenCode's own store is named as the refused key, not the key saved in OpenBot (#15988).",
+  );
+  report.ownGoKey = { error: ownGo };
   report.passed = true;
 } finally {
   await stopClients(clients);

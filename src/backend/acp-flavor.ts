@@ -75,6 +75,7 @@ export interface AcpFlavor {
     providerKeyStored: (provider: string) => boolean,
     label: string,
     refusalStatus: () => number | null,
+    savedKeyShadowed: () => boolean,
   ): string;
   failureCause?(error: unknown, answer: string): CauseCode | null;
   unexplainedFailureVerification?(error: unknown, detail: string, message: string): string | null;

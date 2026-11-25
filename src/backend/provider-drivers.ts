@@ -92,12 +92,19 @@ import {
   type CustomProviderSource,
   customProvidersOn,
   OPENCODE_AGENT_CONFIG,
+  OPENCODE_GO_PROVIDER,
   OPENCODE_PROFILE_CONFIG,
   openCodeConfigEnv,
+  openCodeInheritedKeyEnv,
   openCodeModelName,
   openCodeSignInMessage,
 } from "./opencode-config";
-import { hasOpenCodeProviderKey, readOpenCodeGoUsage, readOpenCodeRefusalStatus } from "./opencode-usage";
+import {
+  hasOpenCodeProviderKey,
+  hasOpenCodeSavedCredential,
+  readOpenCodeGoUsage,
+  readOpenCodeRefusalStatus,
+} from "./opencode-usage";
 import { PiAgentClient } from "./pi-client";
 import {
   antigravityStatePaths,
@@ -864,6 +871,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
               confinement ? "confined" : "provider-asks",
             ),
             ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
+            ...openCodeInheritedKeyEnv(context.apiKey("opencode"), { ...process.env, ...agentEnvironment }),
             ...(confinement ? OPENCODE_CONFINED_ENV : {}),
           };
         },
@@ -889,6 +897,10 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           Effect.runSync(hasOpenCodeProviderKey(provider, { ...process.env, ...context.agentEnvironment?.() })),
         providerRefusalStatus: (sessionId) =>
           Effect.runSync(readOpenCodeRefusalStatus(sessionId, { ...process.env, ...context.agentEnvironment?.() })),
+        savedKeyShadowed: () =>
+          Effect.runSync(
+            hasOpenCodeSavedCredential(OPENCODE_GO_PROVIDER, { ...process.env, ...context.agentEnvironment?.() }),
+          ),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
         fitImage: context.fitImage,
@@ -913,6 +925,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         extraEnv: () => ({
           ...opencodeEnv(cli),
           ...openCodeConfigEnv(OPENCODE_PROFILE_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
+          ...openCodeInheritedKeyEnv(context.apiKey("opencode"), process.env),
         }),
         signInMessage: openCodeSignInMessage(openCodeEndpoints(context)().length),
         modelName: (id, name) => openCodeModelName(id, name, openCodeEndpoints(context)),

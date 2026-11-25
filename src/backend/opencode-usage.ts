@@ -99,8 +99,16 @@ export const hasOpenCodeProviderKey = Effect.fn("OpenCode.hasProviderKey")(funct
     Option.isSome(Schema.decodeUnknownOption(AuthFileEntry)(entries.value[provider]))
   )
     return true;
+  if (inlineAuth) return false;
+  return yield* hasOpenCodeSavedCredential(provider, env);
+});
+
+export const hasOpenCodeSavedCredential = Effect.fn("OpenCode.hasSavedCredential")(function* (
+  provider: string,
+  env: NodeJS.ProcessEnv,
+) {
   const databasePath = openCodeDatabasePath(env);
-  if (inlineAuth || !databasePath) return false;
+  if (!databasePath) return false;
   return yield* Effect.try({
     try: () =>
       readOpenCodeDatabase(

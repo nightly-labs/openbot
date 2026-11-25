@@ -242,6 +242,8 @@ export const messages = {
     "Twój klucz API OpenCode wygasł. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go odrzucił Twój zapisany klucz API. Klucz mógł wygasnąć. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode nie użył klucza zapisanego w OpenBot. Użył starszego klucza OpenCode Go, który OpenCode przechowuje sam, a OpenCode Go odrzucił ten klucz. Aby usunąć starszy klucz, uruchom `opencode auth logout opencode-go` w terminalu na komputerze, na którym działa agent, i wybierz stary klucz. Potem spróbuj ponownie.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go odrzucił żądanie. Nowy klucz API tego nie naprawi. Twój plan OpenCode Go może być nieaktywny albo OpenCode Go może blokować Twoją sieć: niektóre usługi blokują VPN, serwery proxy lub niektóre kraje. Sprawdź w OpenCode Console, czy plan jest aktywny, albo wyłącz VPN, a potem spróbuj ponownie. Możesz też wybrać inny model.",
   "error.provider.opencodeServiceFailure":

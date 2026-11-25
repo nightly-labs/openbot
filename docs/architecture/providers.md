@@ -717,7 +717,12 @@ lists the free models, and a spawn with it lists the paid Go catalog. OpenBot se
 only as `options.apiKey` of the `opencode-go` provider in `OPENCODE_CONFIG_CONTENT`, never as
 `OPENCODE_API_KEY` or on the free `opencode` provider. OpenCode gives the free tier its anonymous key
 only while that provider has no key, so a refused key there failed every free model with
-"provider authentication required" (#7550). So `AcpAgentClient` derives `#signedIn` from the models
+"provider authentication required" (#7550). OpenCode uses its own key before that config key: the
+newest active `credential` row (OpenCode 2.4 also copies an `auth.json` key into that table), then
+`OPENCODE_API_KEY` (checked on OpenCode 2.2.5 and 2.4.1, #15988). When OpenBot inherits
+`OPENCODE_API_KEY` and has a stored key, `openCodeInheritedKeyEnv` replaces the inherited value with
+the stored key, so an old key in the host's environment cannot shadow the key saved in Settings. The
+free tier already had a key in that case, so #7550 does not change. So `AcpAgentClient` derives `#signedIn` from the models
 `session/new` returns, not from a credential, and a keyless OpenCode reports `available`.
 `AcpProviderOptions.extraEnv` is read at every spawn, which is what lets a key saved in Settings
 reach the next process with no other plumbing, and what carries `OPENCODE_DISABLE_AUTOUPDATE` to a
@@ -804,6 +809,13 @@ flavor shows `error.provider.opencodeProviderRefused`: the provider refused the 
 a proxy or a blocked country can be the cause. A key in an environment variable or a config file is
 not found, so the text stays `error.provider.opencodeAuthRequired`. An `opencode-go/` model keeps
 that text too, because it names the fix in OpenBot's settings for an expired Go key.
+
+A `credential` row for `opencode-go` wins over OpenBot's saved key, and OpenBot cannot override it
+(OpenCode issue anomalyco/opencode#58394). With a saved key, the client's `savedKeyShadowed` option
+reads that row read-only (`hasOpenCodeSavedCredential` in `opencode-usage.ts`). When the row exists,
+a refused turn shows `error.provider.opencodeOwnGoKeyRefused`: OpenCode used its own older key, and
+`opencode auth logout opencode-go` removes it (#15988). An `auth.json` entry alone does not count,
+because OpenCode 2.2.5 uses the config key before it.
 
 #### Turns of a background subagent or shell command
 

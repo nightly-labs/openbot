@@ -445,6 +445,7 @@ export interface AcpProviderOptions {
   savedKey?: (modelId: string | null) => boolean;
   providerKeyStored?: (provider: string) => boolean;
   providerRefusalStatus?: (sessionId: string) => number | null;
+  savedKeyShadowed?: () => boolean;
   redactValues?: () => readonly string[];
   profileGeneration?: boolean;
   mediaGeneration?: boolean;
@@ -4288,6 +4289,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           (provider) => this.options.providerKeyStored?.(provider) ?? false,
           this.#label,
           () => this.options.providerRefusalStatus?.(thread.id) ?? null,
+          () => this.options.savedKeyShadowed?.() ?? false,
         ) ??
         detail;
       const verificationMessage = verification
