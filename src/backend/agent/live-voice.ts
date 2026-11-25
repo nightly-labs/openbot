@@ -166,8 +166,11 @@ interface LiveSession {
   unfinishedUserLine: string;
   sentTurnIsOpen: boolean;
   sending: number;
+  lastAskId: number;
   lastTranscript: string;
   lastUserFinal: string;
+  answerSpoken: boolean;
+  userSpokeAfterAnswer: boolean;
   readonly answer: Deferred.Deferred<string, LiveVoiceFailed>;
   readonly onNotification: (notification: AppServerNotification) => void;
   readonly onRequest: (request: AppServerRequest) => void;
@@ -180,6 +183,7 @@ interface LiveSession {
 interface PendingAsk {
   readonly session: LiveSession;
   readonly deliveryId: string;
+  readonly askId: number;
 }
 
 export class LiveVoice {
@@ -224,8 +228,11 @@ export class LiveVoice {
       unfinishedUserLine: "",
       sentTurnIsOpen: false,
       sending: 0,
+      lastAskId: 0,
       lastTranscript: "",
       lastUserFinal: "",
+      answerSpoken: false,
+      userSpokeAfterAnswer: false,
       answer: Deferred.makeUnsafe<string, LiveVoiceFailed>(),
       onNotification: (notification) => this.#notification(session, notification),
       onRequest: (request) =>
@@ -354,10 +361,13 @@ export class LiveVoice {
             session.owner?.memberId ?? null,
           );
         if (!final) {
-          if (role === "user" && text) session.unfinishedUserLine += text;
+          if (role === "user" && text) {
+            session.unfinishedUserLine += text;
+            if (session.answerSpoken && words(text)) session.userSpokeAfterAnswer = true;
+          }
           return;
         }
-        if (role === "assistant" && !this.#waitsForAnswer(session)) session.lastTranscript = "";
+        if (role === "assistant" && !this.#waitsForAnswer(session)) session.answerSpoken = true;
         const line =
           role === "user" && session.sentTurnIsOpen ? withoutLeadingStops(session.unfinishedUserLine) : text?.trim();
         if (role === "user") {
@@ -366,7 +376,10 @@ export class LiveVoice {
         }
         if (line && !(role === "user" && oneLine(line) === session.rule)) {
           session.heard.push({ role, text: line });
-          if (role === "user") session.lastUserFinal = line;
+          if (role === "user") {
+            session.lastUserFinal = line;
+            if (session.answerSpoken && words(line)) session.userSpokeAfterAnswer = true;
+          }
           if (session.heard.length > HEARD_LINE_LIMIT) session.heard.shift();
         }
         return;
@@ -390,13 +403,21 @@ export class LiveVoice {
       : [...session.heard];
     const said = heard.flatMap((line) => (line.role === "user" ? [line.text] : [])).join("\n");
     const request = this.#requestText(session, voiceHeard, latest);
-    if (!request || this.#isRetry(session, voiceHeard, latest)) return;
+    if (!request) return;
+    if (this.#isRetry(session, voiceHeard, latest)) {
+      logger.info("Live voice gave the same request again without new speech. It is not sent again.");
+      return;
+    }
     const turnClosed = endsWithWords(words(finalLine), words(request));
+    session.lastAskId += 1;
+    const askId = session.lastAskId;
     if (voiceHeard) session.lastTranscript = voiceHeard;
     session.lastUserFinal = "";
     session.heard.length = 0;
     session.unfinishedUserLine = "";
     if (!turnClosed) session.sentTurnIsOpen = true;
+    session.answerSpoken = false;
+    session.userSpokeAfterAnswer = false;
     session.sending += 1;
     const waits = this.#hooks.busy(session.agentId);
     Effect.runFork(
@@ -404,6 +425,7 @@ export class LiveVoice {
         Effect.match({
           onFailure: (failure) => {
             if (!this.#sessions.has(session.id)) return;
+            if (session.lastAskId === askId) session.lastTranscript = "";
             session.heard.unshift(...heard);
             session.heard.splice(0, session.heard.length - HEARD_LINE_LIMIT);
             this.#say(
@@ -413,7 +435,7 @@ export class LiveVoice {
           },
           onSuccess: (deliveryId) => {
             if (!this.#sessions.has(session.id)) return;
-            const ask: PendingAsk = { session, deliveryId };
+            const ask: PendingAsk = { session, deliveryId, askId };
             this.#asks.add(ask);
             this.#answerSettled();
             if (waits && this.#asks.has(ask)) this.#say(session, Effect.succeed(QUEUED_NOTICE), false);
@@ -445,8 +467,9 @@ export class LiveVoice {
   }
 
   #isRetry(session: LiveSession, voiceHeard: string, latest: string): boolean {
-    if (!voiceHeard || voiceHeard !== session.lastTranscript) return false;
     const voiceWords = words(voiceHeard);
+    if (!voiceWords || voiceWords !== words(session.lastTranscript)) return false;
+    if (session.userSpokeAfterAnswer) return false;
     const latestWords = words(latest);
     return !startsWithWords(latestWords, voiceWords) && !endsWithWords(latestWords, voiceWords);
   }
@@ -462,6 +485,7 @@ export class LiveVoice {
       const reply = this.#hooks.reply(ask.session.agentId, ask.deliveryId);
       if (!reply) continue;
       this.#asks.delete(ask);
+      if (!reply.success && ask.session.lastAskId === ask.askId) ask.session.lastTranscript = "";
       const spoken = reply.turnId !== undefined && ask.session.answeredTurns.has(reply.turnId);
       if (reply.turnId) ask.session.answeredTurns.add(reply.turnId);
       if (spoken) continue;
