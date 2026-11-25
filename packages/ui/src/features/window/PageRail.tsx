@@ -330,6 +330,7 @@ function mediaCreditsTone(row: MediaCreditsRailRow) {
 
 function CreditsRailButton(props: {
   balance: number | undefined;
+  welcome: number | null | undefined;
   current: boolean;
   agents: boolean | undefined;
   onAgentsChange: ((agents: boolean) => void) | undefined;
@@ -337,6 +338,7 @@ function CreditsRailButton(props: {
   onAskChange: ((ask: boolean) => void) | undefined;
   walletName: string | null | undefined;
   onMove: (() => void) | undefined;
+  onOpenPrices: (() => void) | undefined;
   onOpen: () => void;
 }) {
   const { t } = useText();
@@ -346,6 +348,7 @@ function CreditsRailButton(props: {
       fallback={
         <CreditsRailChip
           balance={props.balance ?? 0}
+          welcome={props.welcome}
           current={props.current}
           agents={props.agents}
           onAgentsChange={props.onAgentsChange}
@@ -353,6 +356,7 @@ function CreditsRailButton(props: {
           onAskChange={props.onAskChange}
           walletName={props.walletName}
           onMove={props.onMove}
+          onOpenPrices={props.onOpenPrices}
           onBuy={props.onOpen}
         />
       }
@@ -483,12 +487,14 @@ export interface PageRailProps {
   onMarketplace?: (() => void) | undefined;
   onCredits?: (() => void) | undefined;
   creditBalance?: number | undefined;
+  creditWelcome?: number | null | undefined;
   creditAgents?: boolean | undefined;
   onCreditAgentsChange?: ((agents: boolean) => void) | undefined;
   creditAsk?: boolean | undefined;
   onCreditAskChange?: ((ask: boolean) => void) | undefined;
   creditWalletName?: string | null | undefined;
   onCreditMove?: (() => void) | undefined;
+  onCreditPrices?: (() => void) | undefined;
   hiddenItems?: readonly PageRailHideableItem[] | undefined;
   onHiddenChange?: ((item: PageRailHideableItem, hidden: boolean) => void) | undefined;
   onSettings: (button: HTMLElement) => void;
@@ -804,6 +810,7 @@ export function PageRail(props: PageRailProps) {
               {(onCredits) => (
                 <CreditsRailButton
                   balance={props.creditBalance}
+                  welcome={props.creditWelcome}
                   current={props.current === "credits"}
                   agents={props.creditAgents}
                   onAgentsChange={props.onCreditAgentsChange}
@@ -811,6 +818,7 @@ export function PageRail(props: PageRailProps) {
                   onAskChange={props.onCreditAskChange}
                   walletName={props.creditWalletName}
                   onMove={props.onCreditMove}
+                  onOpenPrices={props.onCreditPrices}
                   onOpen={() => onCredits()()}
                 />
               )}

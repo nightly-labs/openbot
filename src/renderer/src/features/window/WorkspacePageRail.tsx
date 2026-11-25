@@ -14,6 +14,7 @@ import { usePlatform } from "../../platform";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { serverHasStorage } from "../files/storage-usage";
 import { createCreditAgentsRail } from "../servers/credit-agents-rail";
+import { openCreditPrices } from "../servers/credit-prices";
 import { useServerActions } from "../servers/server-actions";
 import {
   activeServerHasProviderSettings,
@@ -134,8 +135,10 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
       onCrmConnectors={crmConnectorsAction()}
       onCredits={creditsRailAction()}
       creditBalance={creditWallet()?.balance}
+      creditWelcome={creditWallet()?.welcome}
       creditWalletName={creditWallet()?.name}
       onCreditMove={creditMoveAction()}
+      onCreditPrices={() => openCreditPrices(appPort().openUrl)}
       creditAgents={creditAgents.agents()}
       onCreditAgentsChange={creditAgents.change()}
       creditAsk={creditAgents.ask()}
@@ -185,6 +188,7 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
           version={whatsNew.state.version}
           onOpenWhatsNew={whatsNew.reopen}
           onOpenLink={(destination) => void appPort().openExternal(destination)}
+          onOpenUrl={appPort().openUrl}
         />
       }
     />

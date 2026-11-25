@@ -303,6 +303,7 @@ import type { ScheduleRoutine } from "../schedule/SchedulePanel";
 import { scheduleRoutinePorts } from "../schedule/schedule-routine-create";
 import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOverlay";
 import { createCreditAgentsRail } from "../servers/credit-agents-rail";
+import { openCreditPrices } from "../servers/credit-prices";
 import { createHostedUpsellOffline, HostedServerUpsell } from "../servers/hosted-server-upsell-controller";
 import { mcpSignInRecord } from "../servers/mcp-servers";
 import { type HostMediaApprovalCreditsCalls, saveMediaApprovalCredits } from "../servers/media-approval-credits-store";
@@ -3039,8 +3040,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               }}
               onCredits={creditsRailAction()}
               creditBalance={creditWallet()?.balance}
+              creditWelcome={creditWallet()?.welcome}
               creditWalletName={creditWallet()?.name}
               onCreditMove={creditMoveAction()}
+              onCreditPrices={() => openCreditPrices(openWebLink)}
               creditAgents={creditAgents.agents()}
               onCreditAgentsChange={creditAgents.change()}
               creditAsk={creditAgents.ask()}
@@ -3081,6 +3084,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   version={null}
                   onOpenWhatsNew={() => void openWebDestination("changelog")}
                   onOpenLink={(destination) => void openWebDestination(destination)}
+                  onOpenUrl={openWebLink}
                 />
               }
             />

@@ -213,6 +213,22 @@
   padding: var(--openbot-space-3) var(--openbot-space-2) 10px;
 }
 
+.credits-rail-welcome {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding: 0 var(--openbot-space-2) var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.credits-rail-welcome svg {
+  width: 14px;
+  height: 14px;
+  color: var(--openbot-credit-max);
+}
+
 .credits-rail-head .credits-rail-head-icon > .credits-rail-head-star {
   width: 20px;
   height: 20px;

@@ -3,7 +3,9 @@ import type { AppTextKey } from "@openbot/i18n";
 import type { AgentSettingLinkId } from "@openbot/ui/features/conversation/agent-setting-links";
 import { type SettingsTab, settingsTabShown } from "./settings-tabs";
 
-export type AppSettingLinkId = Exclude<SettingLinkId, AgentSettingLinkId>;
+export type CreditsSettingLinkId = "credits.explainer";
+
+export type AppSettingLinkId = Exclude<SettingLinkId, AgentSettingLinkId | CreditsSettingLinkId>;
 
 export interface AppSettingLinkTarget {
   tab: SettingsTab;

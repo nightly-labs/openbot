@@ -1,9 +1,10 @@
-import { ArrowLeftRight, Button, Popover, Switch } from "@openbot/ui";
+import { ArrowLeftRight, Button, CircleQuestionMark, Gift, Popover, Switch } from "@openbot/ui";
 import { type MotionPlace, useMenuMotion } from "@openbot/ui/menu-motion";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createSignal, createUniqueId, onCleanup, Show } from "solid-js";
 import { CreditIcon } from "./CreditIcon";
+import { CreditsExplainerDialog } from "./CreditsExplainerDialog";
 import "./credits-rail.css";
 
 const OPEN_DELAY = 120;
@@ -14,6 +15,7 @@ const RAIL_PANEL_SHOWN = ".ui-motion-tooltip:is([data-expanded], [data-menu-hold
 
 export interface CreditsRailChipProps {
   balance: number;
+  welcome?: number | null | undefined;
   current: boolean;
   agents?: boolean | undefined;
   onAgentsChange?: ((agents: boolean) => void) | undefined;
@@ -21,6 +23,7 @@ export interface CreditsRailChipProps {
   onAskChange?: ((ask: boolean) => void) | undefined;
   walletName?: string | null | undefined;
   onMove?: (() => void) | undefined;
+  onOpenPrices?: (() => void) | undefined;
   onBuy: () => void;
 }
 
@@ -175,10 +178,11 @@ export function CreditsRailChip(props: CreditsRailChipProps) {
     card.close();
     onMove();
   };
-  const rowsShown = () =>
-    (props.agents !== undefined && props.onAgentsChange) ||
-    (props.ask !== undefined && props.onAskChange) ||
-    props.onMove;
+  const [explaining, setExplaining] = createSignal(false);
+  const explain = () => {
+    card.close();
+    setExplaining(true);
+  };
   return (
     <>
       <Button
@@ -241,45 +245,56 @@ export function CreditsRailChip(props: CreditsRailChipProps) {
                 </span>
                 <CreditsBuyButton label={t("app.rail.creditsBuy")} onBuy={buy} />
               </div>
-              <Show when={rowsShown()}>
-                <div class="credits-rail-rows">
-                  <Show when={props.agents !== undefined && props.onAgentsChange}>
-                    {(onAgentsChange) => (
-                      <RailSwitch
-                        label={t("app.rail.creditsAgents")}
-                        checked={!agentsOff()}
-                        onChange={(agents) => onAgentsChange()(agents)}
-                      />
-                    )}
-                  </Show>
-                  <Show when={props.ask !== undefined && props.onAskChange}>
-                    {(onAskChange) => (
-                      <RailSwitch
-                        label={t("app.rail.creditsAsk")}
-                        checked={props.ask === true}
-                        onChange={(ask) => onAskChange()(ask)}
-                      />
-                    )}
-                  </Show>
-                  <Show when={props.onMove}>
-                    {(onMove) => (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        class="credits-rail-row credits-rail-move"
-                        onClick={() => move(onMove())}
-                      >
-                        <span class="credits-rail-row-label">{t("billing.credits.moveTitle")}</span>
-                        <ArrowLeftRight class="credits-rail-move-icon" aria-hidden="true" />
-                      </Button>
-                    )}
-                  </Show>
-                </div>
+              <Show when={props.welcome}>
+                {(welcome) => (
+                  <p class="credits-rail-welcome">
+                    <Gift aria-hidden="true" />
+                    {t("billing.credits.welcomeIncluded", { amount: exact(welcome()) })}
+                  </p>
+                )}
               </Show>
+              <div class="credits-rail-rows">
+                <Show when={props.agents !== undefined && props.onAgentsChange}>
+                  {(onAgentsChange) => (
+                    <RailSwitch
+                      label={t("app.rail.creditsAgents")}
+                      checked={!agentsOff()}
+                      onChange={(agents) => onAgentsChange()(agents)}
+                    />
+                  )}
+                </Show>
+                <Show when={props.ask !== undefined && props.onAskChange}>
+                  {(onAskChange) => (
+                    <RailSwitch
+                      label={t("app.rail.creditsAsk")}
+                      checked={props.ask === true}
+                      onChange={(ask) => onAskChange()(ask)}
+                    />
+                  )}
+                </Show>
+                <Show when={props.onMove}>
+                  {(onMove) => (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      class="credits-rail-row credits-rail-move"
+                      onClick={() => move(onMove())}
+                    >
+                      <span class="credits-rail-row-label">{t("billing.credits.moveTitle")}</span>
+                      <ArrowLeftRight class="credits-rail-move-icon" aria-hidden="true" />
+                    </Button>
+                  )}
+                </Show>
+                <Button type="button" variant="ghost" class="credits-rail-row credits-rail-move" onClick={explain}>
+                  <span class="credits-rail-row-label">{t("billing.credits.explainer.title")}</span>
+                  <CircleQuestionMark class="credits-rail-move-icon" aria-hidden="true" />
+                </Button>
+              </div>
             </div>
           </CreditsCardContent>
         </Popover.Portal>
       </Popover.Root>
+      <CreditsExplainerDialog open={explaining()} onOpenChange={setExplaining} onOpenPrices={props.onOpenPrices} />
     </>
   );
 }

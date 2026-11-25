@@ -10,6 +10,7 @@ import {
   type CreditMediaRequestProblem,
   creditMediaCost,
   creditMediaRequestProblem,
+  creditMediaSpendable,
 } from "@openbot/contracts/credit-media";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -88,7 +89,7 @@ export const CREDIT_MEDIA_TOOL_DEFINITIONS = [
   {
     name: LIST_MEDIA_MODELS_TOOL,
     description:
-      "List the models of generate_image and generate_video with their options and prices, the default model of each kind, the credit balance, and askAboveCredits: the price above which OpenBot asks the user.",
+      "List the models of generate_image and generate_video with their options and prices, the default model of each kind, the credit balance, freeCredits (they pay only for models with takesFreeCredits), and askAboveCredits: the price above which OpenBot asks the user.",
     shape: listMediaModelsToolSchema.shape,
   },
   {
@@ -232,6 +233,12 @@ function blockedText(blocked: Blocked, cost: number): string {
     : `This costs ${cost} credits, and the balance is ${blocked.balance ?? 0}.`;
 }
 
+function spendableFor(media: CreditMediaWorkflows, model: CreditMediaModel) {
+  return media
+    .balance()
+    .pipe(Effect.map((balance) => (balance ? creditMediaSpendable(balance, model.welcome === true) : null)));
+}
+
 function listedModel(model: CreditMediaModel) {
   return {
     id: model.id,
@@ -253,6 +260,7 @@ function listedModel(model: CreditMediaModel) {
       : {}),
     referencePictures: model.references,
     promptRequired: model.promptRequired,
+    ...(model.welcome ? { takesFreeCredits: true } : {}),
     prices: model.prices.map((price) => ({
       resolution: price.resolution,
       per: price.unit,
@@ -525,9 +533,10 @@ export class CreditMediaTools {
     const parsed = listMediaModelsToolSchema.safeParse(call.arguments ?? {}, { reportInput: true });
     if (!parsed.success) return failure(z.prettifyError(parsed.error));
     const kind = parsed.data.kind;
-    const [models, balance] = yield* Effect.all([media.models(), media.credits()], { concurrency: "unbounded" });
+    const [models, balance] = yield* Effect.all([media.models(), media.balance()], { concurrency: "unbounded" });
     return openBotToolResult({
       balance: balance?.available ?? null,
+      ...(balance?.welcome ? { freeCredits: balance.welcome } : {}),
       agentsCanUseCredits: this.#options.agentsAllowed(),
       askAboveCredits: this.#options.approvalCredits(),
       defaultModels: { image: this.#options.defaultModel("image"), video: this.#options.defaultModel("video") },
@@ -557,7 +566,7 @@ export class CreditMediaTools {
     }
     run.facts.agentModel = first.model.id;
     notePlan(run, first);
-    const held = yield* this.#holdUntilFunded(media, call, run, first.cost);
+    const held = yield* this.#holdUntilFunded(media, call, run, first.model, first.cost);
     if (held) return failure(held);
     const read = yield* Effect.result(call.readInputs(roles.map(({ path }) => path)));
     if (read._tag === "Failure") {
@@ -589,7 +598,7 @@ export class CreditMediaTools {
           return failure(chosen);
         }
         notePlan(run, chosen);
-        const chosenFunded = chosen.cost > first.cost ? yield* this.#funded(media, chosen) : null;
+        const chosenFunded = yield* this.#funded(media, chosen);
         if (chosenFunded) {
           run.facts.outcome = "short";
           return failure(chosenFunded);
@@ -689,12 +698,13 @@ export class CreditMediaTools {
   #blocked = Effect.fn("CreditMediaTools.blocked")(function* (
     this: CreditMediaTools,
     media: CreditMediaWorkflows,
+    model: CreditMediaModel,
     cost: number,
   ) {
     if (!this.#options.agentsAllowed()) return { reason: "agentsOff", balance: null } satisfies Blocked;
-    const balance = yield* media.credits();
-    if (!balance || cost <= balance.available) return null;
-    return { reason: "balance", balance: balance.available } satisfies Blocked;
+    const spendable = yield* spendableFor(media, model);
+    if (spendable === null || cost <= spendable) return null;
+    return { reason: "balance", balance: spendable } satisfies Blocked;
   });
 
   #holdUntilFunded = Effect.fn("CreditMediaTools.holdUntilFunded")(function* (
@@ -702,10 +712,11 @@ export class CreditMediaTools {
     media: CreditMediaWorkflows,
     call: CreditMediaToolCall,
     run: CreditMediaRun,
+    model: CreditMediaModel,
     cost: number,
   ) {
     const kind = run.facts.kind;
-    const blocked = yield* this.#blocked(media, cost);
+    const blocked = yield* this.#blocked(media, model, cost);
     if (!blocked) return null;
     const hold: NonNullable<CreditMediaReport["hold"]> = {
       reason: blocked.reason === "agentsOff" ? "agents_off" : "balance",
@@ -725,7 +736,7 @@ export class CreditMediaTools {
     const wallet: CreditsHoldWallet = {
       agentsAllowed: () => this.#options.agentsAllowed(),
       enableAgents: () => this.#options.enableAgents(),
-      balance: () => media.credits().pipe(Effect.map((balance) => balance?.available ?? null)),
+      balance: () => spendableFor(media, model),
     };
     const answer = yield* call.hold(reason, { call: { kind, cost }, balance: blocked.balance, wallet });
     hold.answer = holdOutcome(answer);
@@ -739,9 +750,9 @@ export class CreditMediaTools {
   });
 
   #funded = Effect.fn("CreditMediaTools.funded")(function* (media: CreditMediaWorkflows, planned: PlannedJob) {
-    const balance = yield* media.credits();
-    if (!balance || planned.cost <= balance.available) return null;
-    return `This costs ${planned.cost} credits, and the balance is ${balance.available}. Tell the user to add credits in Settings > Credits. Nothing was spent.`;
+    const spendable = yield* spendableFor(media, planned.model);
+    if (spendable === null || planned.cost <= spendable) return null;
+    return `This costs ${planned.cost} credits, and the balance for this model is ${spendable}. Tell the user to add credits in Settings > Credits. Nothing was spent.`;
   });
 
   #imageResult(

@@ -494,11 +494,12 @@ The service stores:
   without the ID of the deleted account. For each image or video that OpenBot credits pay for, the
   service keeps a hold record: the job ID, the account or server that pays, the account that started
   it, the model, the credits held and charged, the result (completed, failed, canceled, refused or
-  expired), the media generation processor and its job ID, and the times. It keeps no prompt, picture
-  or result file. Deleting the account removes the hold records of its own balance. For the free
+  expired), whether welcome credits paid for it, the media generation processor and its job ID, and
+  the times. It keeps no prompt, picture or result file. Deleting the account removes the hold records of its own balance. For the free
   monthly credits of a paid license, it keeps a grant record: the license, the account or server that
   has them, the credits given and left, and the start and end times. Deleting the account removes the
-  grant records of its own balance.
+  grant records of its own balance. The 10 welcome credits of each account have a grant record of the
+  same kind, without a license.
   Settings > Billing shows an account the ledger entries and holds of its own balance and of the
   servers where it is a member. The owner and the admins of a server see all of the server's entries,
   with the names of the accounts that acted. Other members see only the entries that they made. No
@@ -1652,10 +1653,11 @@ covers what Higgsfield keeps.
 A step with an OpenBot model uses OpenBot credits. When the computer is signed in to an OpenBot
 account, the credits of that account pay; a server pays with its own credits. The computer sends the
 prompt, the model, the size settings and the input pictures to the account service
-(`openbot.run`). The account service holds the credits, sends the same values to a media generation
-processor, and returns the result file to the computer, which keeps it. A processor can keep the
-input pictures for up to three days so that it can read them. The account service passes
-the prompt, the pictures and the file through in transit only: it does not store or log them. It
+(`openbot.run`). The account service holds the credits, sends the same values through OpenBot's
+media gateway service, which runs on Cloudflare too, to a media generation processor, and returns the
+result file to the computer, which keeps it. A processor can keep the input pictures for up to three
+days so that it can read them. The account service and the media gateway pass the prompt, the
+pictures and the file through in transit only: they do not store or log them. The account service
 keeps only the hold record above. A failed or refused generation spends no credits. A stop does not
 cancel a generation that was sent: when the run stops or the app closes, the job continues, and the
 computer gets the file when the job ends or at its next start. While the Canvas page is open, the computer also asks the account service for the OpenBot models, their

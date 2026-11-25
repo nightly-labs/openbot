@@ -506,6 +506,9 @@ export const CREDIT_MODEL_COSTS: readonly CreditModelCost[] = [
 ];
 
 export const CREDIT_CLIP_SECONDS = 5;
+export const CREDIT_WELCOME = 10;
+
+export const CREDIT_PRICES_URL = "https://openbot.run/credits";
 
 export const CREDIT_MIN_RATE = 0.1;
 
@@ -601,6 +604,7 @@ export interface CreditsState {
   balance: number;
   servers: CreditServerWallet[];
   expiring?: CreditExpiring;
+  welcome?: number;
 }
 
 export const CREDITS_UNAVAILABLE_STATE: CreditsState = {
@@ -691,6 +695,7 @@ export function parseCreditsState(value: unknown): CreditsState | null {
   };
   const expiring = parseExpiring(value.expiring);
   if (expiring) state.expiring = expiring;
+  if (isCreditAmount(value.welcome) && value.welcome > 0) state.welcome = Math.min(value.welcome, value.balance);
   return state;
 }
 

@@ -337,8 +337,16 @@ export class CreditMediaWorkflows {
   }).bind(this);
 
   readonly credits = Effect.fn("CreditMediaWorkflows.credits")(function* (this: CreditMediaWorkflows) {
+    const balance = yield* this.balance();
+    if (!balance) return null;
+    return { available: Math.max(0, balance.available), quota: null } satisfies WorkflowMediaCreditBalance;
+  }).bind(this);
+
+  readonly balance = Effect.fn("CreditMediaWorkflows.balance")(function* (
+    this: CreditMediaWorkflows,
+  ): Effect.fn.Return<CreditMediaBalance | null> {
     if (!this.available()) return null;
-    const balance = yield* this.#options.gateway.balance().pipe(
+    return yield* this.#options.gateway.balance().pipe(
       Effect.catch((failure) =>
         Effect.sync(() => {
           this.#options.warn("Could not read the media credits.", { error: failure.message });
@@ -346,8 +354,6 @@ export class CreditMediaWorkflows {
         }),
       ),
     );
-    if (!balance) return null;
-    return { available: Math.max(0, balance.available), quota: null } satisfies WorkflowMediaCreditBalance;
   }).bind(this);
 
   #uploads = Effect.fn("CreditMediaWorkflows.uploads")(function* (

@@ -2617,11 +2617,13 @@ export class OpenBotToolRouter {
         status: "shown",
         setting: shown,
         next:
-          SETTING_LINK_SCOPES[setting] !== "agent"
-            ? "The card is in the chat. On the OpenBot desktop app, its Open button shows the row in OpenBot Settings of the computer that shows the chat; the web client shows only where it is. In one or two sentences, tell the user what the setting does and what to choose there. Do not describe the card."
-            : this.#channels.store.channelForThread(executionThreadId)
-              ? "The card is in the channel. In a channel it has no Open button: the user opens the row in your agent settings from their own chat with you. In one or two sentences, tell the user what the setting does and what to choose there. Do not describe the card."
-              : "The card is in the chat. Its Open button shows the row in your agent settings in the side panel. In one or two sentences, tell the user what the setting does and what to choose there. Do not describe the card.",
+          setting === "credits.explainer"
+            ? "The card is in the chat. Its Open button shows a short explainer of OpenBot credits, on the desktop app and the web client. In one or two sentences, answer the user's question about credits. Do not describe the card."
+            : SETTING_LINK_SCOPES[setting] !== "agent"
+              ? "The card is in the chat. On the OpenBot desktop app, its Open button shows the row in OpenBot Settings of the computer that shows the chat; the web client shows only where it is. In one or two sentences, tell the user what the setting does and what to choose there. Do not describe the card."
+              : this.#channels.store.channelForThread(executionThreadId)
+                ? "The card is in the channel. In a channel it has no Open button: the user opens the row in your agent settings from their own chat with you. In one or two sentences, tell the user what the setting does and what to choose there. Do not describe the card."
+                : "The card is in the chat. Its Open button shows the row in your agent settings in the side panel. In one or two sentences, tell the user what the setting does and what to choose there. Do not describe the card.",
       });
     }
 

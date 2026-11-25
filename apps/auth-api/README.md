@@ -49,6 +49,13 @@ The bootstrap also creates the `openbot_credits` Product and one Price for each 
 and a server that it owns. The web client uses the same routes under `/api/browser`.
 `bun run test:credits` checks them.
 
+Each account gets 10 welcome credits once, with no end date. They pay only for the models that the
+media gateway gives a welcome route. The Worker reaches the media generation processor only through
+the private Worker `openbot-media-gateway` (service binding `MEDIA_GATEWAY`, production only). D1 keeps
+the models, prices, holds and ledger; the gateway keeps the adapters, routes and keys. Without the
+binding, as in local development, every credits model is unavailable. `bun run test:credit-media`
+checks the service against a fake gateway.
+
 The optional Worker variable `VIES_REQUESTER_VAT_ID` is the seller's EU VAT ID (for example
 `PL1234567890`). With it, the EU VIES check of a buyer's VAT ID returns a consultation number, which the
 Stripe customer keeps as proof of the check. Without it, the check works and has no number.

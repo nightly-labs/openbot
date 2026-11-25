@@ -25,6 +25,7 @@ import {
   CREDIT_HOLD_START_GRACE_MS,
   type CreditJobCheck,
   CreditSpending,
+  type CreditWallet,
 } from "../src/server/credit-spending";
 import { createHostedBilling } from "../src/server/hosted-billing";
 import { RemoteControlPlane } from "../src/server/remote-control-plane";
@@ -67,7 +68,9 @@ function check(name: string, passed: boolean, detail?: unknown) {
   checks.push({ name, passed, ...(detail === undefined ? {} : { detail }) });
 }
 
-function migratedDatabase(): DatabaseSync {
+type WelcomeStart = "used" | "unissued";
+
+function migratedDatabase(welcome: WelcomeStart): DatabaseSync {
   const database = new DatabaseSync(":memory:");
   database.exec("PRAGMA foreign_keys = ON");
   for (const name of readdirSync(MIGRATIONS).sort()) database.exec(readFileSync(join(MIGRATIONS, name), "utf8"));
@@ -75,6 +78,13 @@ function migratedDatabase(): DatabaseSync {
     database
       .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
       .run(user.id, `email:${user.email}`, user.email);
+    if (welcome === "used") {
+      database
+        .prepare(
+          "INSERT INTO credit_grants(grant_id, user_id, credits_tenths, remaining_tenths, source, scope, starts_at, expires_at, created_at) VALUES (?, ?, 100, 0, 'welcome', 'welcome', 0, ?, 0)",
+        )
+        .run(`welcome:${user.id}`, user.id, Date.UTC(9999, 11, 31));
+    }
   }
   database.exec(`
     INSERT INTO remote_hosts(host_id, owner_user_id, name, created_at, updated_at)
@@ -256,8 +266,8 @@ function addOwnedServer(database: DatabaseSync, serverId: string) {
   `);
 }
 
-async function harness() {
-  const database = migratedDatabase();
+async function harness(welcome: WelcomeStart = "used") {
+  const database = migratedDatabase(welcome);
   const stripe = fakeStripe();
   const work: Promise<void>[] = [];
   const { billing } = createHostedBilling(
@@ -1430,7 +1440,7 @@ async function freeMonthlyCredits() {
     (
       await d1
         .prepare(
-          "SELECT grant_id, user_id, server_id, credits_tenths / 10.0 AS credits, remaining_tenths / 10.0 AS remaining, starts_at, expires_at, status FROM credit_grants WHERE user_id = ?1 OR server_id = ?1 ORDER BY created_at, grant_id",
+          "SELECT grant_id, user_id, server_id, credits_tenths / 10.0 AS credits, remaining_tenths / 10.0 AS remaining, starts_at, expires_at, status FROM credit_grants WHERE (user_id = ?1 OR server_id = ?1) AND scope = 'all' ORDER BY created_at, grant_id",
         )
         .bind(user)
         .all<GrantRow>()
@@ -1611,12 +1621,120 @@ async function freeMonthlyCredits() {
   );
 }
 
+async function welcomeCredits() {
+  const { database, credits, deliver, session, state, analytics, creditEvents } = await harness("unissued");
+  const spending = new CreditSpending({ database: sqliteD1(database), now: () => Date.now(), analytics });
+  const run = <A>(effect: Effect.Effect<A, BillingError | BillingOperationError>) => Effect.runPromise(effect);
+  const hold = (jobId: string, amount: number, welcome: boolean, wallet: CreditWallet = { userId: OWNER.id }) =>
+    spending.hold({ jobId, wallet, actorUserId: OWNER.id, modelId: "image-model", credits: amount, welcome });
+  const welcomeGrant = () =>
+    database
+      .prepare(
+        "SELECT credits_tenths / 10.0 AS credits, remaining_tenths / 10.0 AS remaining, status FROM credit_grants WHERE grant_id = ?",
+      )
+      .get(`welcome:${OWNER.id}`);
+  const ledgerRows = () =>
+    database
+      .prepare("SELECT kind, amount_tenths / 10.0 AS amount FROM credit_ledger WHERE user_id = ? ORDER BY entry_id")
+      .all(OWNER.id);
+
+  const first = await state(OWNER.id);
+  const second = await state(OWNER.id);
+  const granted = eventsOf(await creditEvents(), OWNER.id, { action: "granted", wallet: "personal", credits: 10 });
+  check(
+    "a new account gets 10 free credits once, with one ledger entry and one event",
+    first.balance === 10 &&
+      first.welcome === 10 &&
+      first.expiring === undefined &&
+      second.balance === 10 &&
+      second.welcome === 10 &&
+      JSON.stringify(ledgerRows()) === JSON.stringify([{ kind: "grant", amount: 10 }]) &&
+      granted.length === 1,
+    { first, second, ledger: ledgerRows(), granted: granted.length },
+  );
+
+  const paidOnly = await failure(hold("w-paid", 2, false));
+  const move = await failure(credits.transfer(OWNER.id, { serverId: SERVER_ID, direction: "to_server", credits: 5 }));
+  const serverHold = await failure(hold("w-server", 2, true, { serverId: SERVER_ID }));
+  check(
+    "free credits cannot pay a model without free use, a move to a server, or a server generation",
+    paidOnly.code === "credits_spend_not_enough" &&
+      move.code === "credits_not_enough" &&
+      serverHold.code === "credits_spend_not_enough" &&
+      (await state(OWNER.id)).welcome === 10,
+    { paidOnly, move, serverHold },
+  );
+
+  const free = await run(hold("w-1", 4.5, true));
+  const whileHeld = await state(OWNER.id);
+  await run(spending.settle("w-1", { outcome: "completed" }));
+  const afterFree = await state(OWNER.id);
+  check(
+    "a model with free use holds and charges the free credits",
+    free.funding === "welcome" &&
+      whileHeld.balance === 5.5 &&
+      whileHeld.welcome === 5.5 &&
+      afterFree.balance === 5.5 &&
+      afterFree.welcome === 5.5 &&
+      JSON.stringify(welcomeGrant()) === JSON.stringify({ credits: 10, remaining: 5.5, status: "active" }),
+    { free, whileHeld, afterFree, grant: welcomeGrant() },
+  );
+
+  await deliver("checkout.session.completed", {
+    ...session("cs_w1", OWNER.id, 10_000, 2_000),
+    payment_status: "paid",
+    payment_intent: "pi_w1",
+  });
+  const tooBigForFree = await run(hold("w-2", 8.5, true));
+  await run(spending.settle("w-2", { outcome: "completed" }));
+  const paidHold = await run(hold("w-3", 20, false));
+  await run(spending.settle("w-3", { outcome: "completed" }));
+  const afterPaid = await state(OWNER.id);
+  check(
+    "a hold that the free credits cannot cover uses paid credits, and paid generations keep the free credits",
+    tooBigForFree.funding === "paid" &&
+      paidHold.funding === "paid" &&
+      afterPaid.balance === 2_000 - 8.5 - 20 + 5.5 &&
+      afterPaid.welcome === 5.5 &&
+      JSON.stringify(welcomeGrant()) === JSON.stringify({ credits: 10, remaining: 5.5, status: "active" }),
+    { tooBigForFree, paidHold, afterPaid, grant: welcomeGrant() },
+  );
+
+  const moved = await run(
+    credits.transfer(OWNER.id, { serverId: SERVER_ID, direction: "to_server", credits: 2_000 - 8.5 - 20 }),
+  );
+  const tooFar = await failure(credits.transfer(OWNER.id, { serverId: SERVER_ID, direction: "to_server", credits: 1 }));
+  check(
+    "a move to a server takes all paid credits but never the free credits",
+    moved.balance === 5.5 && tooFar.code === "credits_not_enough" && (await state(OWNER.id)).welcome === 5.5,
+    { moved, tooFar },
+  );
+  await run(credits.transfer(OWNER.id, { serverId: SERVER_ID, direction: "to_personal", credits: 1_000 }));
+
+  const refund = {
+    id: "re_w1",
+    object: "refund",
+    status: "succeeded",
+    payment_intent: "pi_w1",
+    amount: 10_000,
+    currency: "eur",
+  };
+  await deliver("refund.created", refund);
+  const refunded = await state(OWNER.id);
+  check(
+    "a refund takes back paid credits only and keeps the free credits",
+    refunded.balance === 5.5 && refunded.welcome === 5.5,
+    refunded,
+  );
+}
+
 let passed = false;
 try {
   await walletsAndTransfers();
   await holdsAndSpending();
   await holdLimits();
   await freeMonthlyCredits();
+  await welcomeCredits();
   passed = checks.every((item) => item.passed);
 } finally {
   await mkdir(OUT, { recursive: true });
