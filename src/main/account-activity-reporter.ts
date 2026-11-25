@@ -43,6 +43,7 @@ export class AccountActivityReporter {
 
   clear(): void {
     this.#pending = new Set();
+    this.#reported = new Set();
   }
 
   async idle(): Promise<void> {

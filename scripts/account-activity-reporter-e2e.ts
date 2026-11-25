@@ -175,6 +175,27 @@ async function main() {
     optOut.sent,
   );
 
+  const rejoin = harness(NOON_23RD);
+  const rejoinHost = new HostAccountActivity({
+    analyticsOn: true,
+    now: () => NOON_23RD,
+    retryAfterMs: 10,
+    send: rejoin.send,
+    resolveOwner: () => ({ id: "owner" }),
+    memberAccountId: () => null,
+  });
+  rejoinHost.turnStarted();
+  await rejoinHost.idle();
+  rejoinHost.setAnalyticsOn(false);
+  rejoinHost.setAnalyticsOn(true);
+  rejoinHost.turnStarted();
+  await rejoinHost.idle();
+  check(
+    "after analytics is turned off and on again on the same day, the owner is sent again",
+    JSON.stringify(rejoin.sent) === JSON.stringify([["owner"], ["owner"]]),
+    rejoin.sent,
+  );
+
   await mkdir(OUT, { recursive: true });
   const passed = checks.every((entry) => entry.passed);
   await writeFile(join(OUT, "report.json"), `${JSON.stringify({ passed, checks }, null, 2)}\n`);
