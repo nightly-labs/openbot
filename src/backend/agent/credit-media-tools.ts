@@ -408,7 +408,15 @@ function freeOfferText(tool: string, short: PlannedJob, spendable: number, free:
     ...(free.job.resolution === null ? [] : [`resolution "${free.job.resolution}"`]),
     ...(free.job.duration === null ? [] : [`duration ${free.job.duration}`]),
   ].join(", ");
-  return `Nothing was spent. ${short.model.id} costs ${short.cost} credits, and the paid balance is ${spendable}. ${listedModel(free.model).name} takes free credits: call ${tool} again with ${settings} (${free.cost} credits). When the user named ${short.model.id}, ask the user first; they add paid credits in Settings > Credits.`;
+  const balance =
+    short.model.welcome === true
+      ? `the free credits are ${spendable}, too few for these settings`
+      : `the paid balance is ${spendable}`;
+  const next =
+    free.model.id === short.model.id
+      ? `It fits at lower settings: call ${tool} again with ${settings} (${free.cost} credits).`
+      : `${listedModel(free.model).name} takes free credits: call ${tool} again with ${settings} (${free.cost} credits).`;
+  return `Nothing was spent. ${short.model.id} costs ${short.cost} credits, and ${balance}. ${next} When the user named ${short.model.id}, ask the user first; they add paid credits in Settings > Credits.`;
 }
 
 function settingsText(planned: PlannedJob): string {

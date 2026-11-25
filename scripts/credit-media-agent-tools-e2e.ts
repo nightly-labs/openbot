@@ -870,6 +870,17 @@ async function freeFlow() {
     { text: named.text, reports: named.reports },
   );
 
+  const namedFree = await call("generate_video", { prompt: "A slow river", model: "video-free" });
+  check(
+    "a named free model above the free credits offers lower settings and does not call the free credits a paid balance",
+    !namedFree.result.success &&
+      namedFree.submitted === undefined &&
+      namedFree.error?.includes('model "video-free"') === true &&
+      namedFree.error.includes("free credits are") &&
+      namedFree.error.includes("paid balance") === false,
+    { text: namedFree.text },
+  );
+
   walletBalance = 100;
   const paid = await call("generate_image", { prompt: "A green kite" });
   check(
