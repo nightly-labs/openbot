@@ -1520,6 +1520,7 @@ export async function createApplicationServices({
     join(app.getPath("userData"), PROVIDER_ENVIRONMENT_PREFERENCE_FILE),
   );
   const grokSystemProxy = createGrokSystemProxy((url) => session.defaultSession.resolveProxy(url));
+  Effect.runFork(grokSystemProxy.refresh);
   const remoteSessionReuse = createRemoteSessionReusePreferenceStore(
     join(app.getPath("userData"), REMOTE_SESSION_REUSE_PREFERENCE_FILE),
   );
@@ -1562,7 +1563,6 @@ export async function createApplicationServices({
       crmPreference.load(),
       claudeCompactWindow.load(),
       providerEnvironment.load(),
-      grokSystemProxy.refresh,
       remoteSessionReuse.load(),
       externalLinkPreference.load(),
       remoteNetworkRoute.load(),

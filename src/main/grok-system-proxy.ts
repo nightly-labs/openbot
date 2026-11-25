@@ -38,13 +38,13 @@ export function createGrokSystemProxy(
   let current: Readonly<Record<string, string>> = {};
   let reading = false;
   const refresh = Effect.tryPromise(() => resolveProxy(GROK_API_URL)).pipe(
-    Effect.timeoutOrElse({ duration: PROXY_READ_TIMEOUT_MS, orElse: () => Effect.succeed("DIRECT") }),
-    Effect.orElseSucceed(() => "DIRECT"),
+    Effect.timeout(PROXY_READ_TIMEOUT_MS),
     Effect.flatMap((rules) =>
       Effect.sync(() => {
         current = grokProxyEnvironment(rules, environment);
       }),
     ),
+    Effect.ignore,
     Effect.ensuring(
       Effect.sync(() => {
         reading = false;
