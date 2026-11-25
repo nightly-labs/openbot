@@ -9,7 +9,7 @@ import { type AgentProviderId, agentProviderName } from "@openbot/contracts/ipc"
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Deferred, Effect, Result } from "effect";
+import { Deferred, Effect, Fiber, Option, Result, type Scope } from "effect";
 import { providerCheckTimeoutMs } from "./disk-restore";
 import type { SignInRegion } from "./kimi-region";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
@@ -865,14 +865,79 @@ export interface InstalledFirstChoice<Cli> {
   } | null;
 }
 
+const OPTIONAL_INSTALLED_CLI_WAIT_MS = 20_000;
+const SKIP_HUNG_INSTALLED_CLI_MS = 10 * 60_000;
+
+interface InstalledCliCheck {
+  waitedOut: boolean;
+  hungAt: number | null;
+}
+
+const installedCliChecks = new Map<string, InstalledCliCheck>();
+
+function isTimeoutFailure(failure: unknown): boolean {
+  return isDynamicRecord(failure) && isCliTimeout(failure.cause);
+}
+
+function settleInstalledCliCheck(key: string, check: InstalledCliCheck, hung: boolean): void {
+  if (installedCliChecks.get(key) !== check) return;
+  if (hung && check.waitedOut) check.hungAt = Date.now();
+  else installedCliChecks.delete(key);
+}
+
+function skipsInstalledCli(key: string): boolean {
+  const hungAt = installedCliChecks.get(key)?.hungAt ?? null;
+  return hungAt !== null && Date.now() - hungAt < SKIP_HUNG_INSTALLED_CLI_MS;
+}
+
+function optionalInstalledCli<Cli, E>(
+  installed: Effect.Effect<Cli, E>,
+  key: string,
+  backgroundScope: Scope.Closeable | undefined,
+) {
+  const withinWait = <A>(effect: Effect.Effect<A>) =>
+    effect.pipe(Effect.timeoutOption(providerCheckTimeoutMs(OPTIONAL_INSTALLED_CLI_WAIT_MS)));
+  return Effect.gen(function* () {
+    if (skipsInstalledCli(key)) return null;
+    const running = installedCliChecks.get(key);
+    if (running && running.hungAt === null) {
+      if (running.waitedOut) return null;
+      const own = yield* withinWait(Effect.result(installed));
+      return Option.isSome(own) && Result.isSuccess(own.value) ? own.value.success : null;
+    }
+    const check: InstalledCliCheck = { waitedOut: false, hungAt: null };
+    installedCliChecks.set(key, check);
+    const read = installed.pipe(
+      Effect.result,
+      Effect.tap((result) =>
+        Effect.sync(() =>
+          settleInstalledCliCheck(key, check, Result.isFailure(result) && isTimeoutFailure(result.failure)),
+        ),
+      ),
+      Effect.onInterrupt(() => Effect.sync(() => settleInstalledCliCheck(key, check, false))),
+    );
+    const fiber = yield* backgroundScope && backgroundScope.state._tag !== "Closed"
+      ? Effect.forkIn(read, backgroundScope)
+      : Effect.forkChild(read);
+    const answer = yield* withinWait(Fiber.join(fiber));
+    if (Option.isNone(answer)) {
+      check.waitedOut = true;
+      return null;
+    }
+    return Result.isSuccess(answer.value) ? answer.value.success : null;
+  });
+}
+
 export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
   resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
   bundledExecutable: string | null | undefined,
   preferInstalled: boolean,
   installedChosen = false,
+  backgroundScope?: Scope.Closeable,
 ): Effect.Effect<InstalledFirstChoice<Cli>, E> {
   const copy = resolve(bundledExecutable === undefined ? {} : { bundledExecutable });
-  const installedCli = resolve({ bundledExecutable: null }).pipe(Effect.orElseSucceed(() => null));
+  const installed = resolve({ bundledExecutable: null });
+  const installedCli = installed.pipe(Effect.orElseSucceed(() => null));
   const choose = (resolved: Cli, installed: Cli | null): InstalledFirstChoice<Cli> => {
     if (resolved.source !== "managed" || installed?.source !== "system") return { cli: resolved, passedOver: null };
     const asNew = installed.version === resolved.version || olderVersion(resolved.version, installed.version);
@@ -891,8 +956,11 @@ export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
   };
   return Effect.gen(function* () {
     if (bundledExecutable) {
-      const [resolved, installed] = yield* Effect.all([copy, installedCli], { concurrency: 2 });
-      return choose(resolved, installed);
+      const installedCheck = installedChosen
+        ? installedCli
+        : optionalInstalledCli(installed, bundledExecutable, backgroundScope);
+      const [resolved, installedFound] = yield* Effect.all([copy, installedCheck], { concurrency: 2 });
+      return choose(resolved, installedFound);
     }
     const resolved = yield* copy;
     return resolved.source === "managed" ? choose(resolved, yield* installedCli) : { cli: resolved, passedOver: null };

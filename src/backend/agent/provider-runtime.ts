@@ -781,6 +781,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#bundledExecutables[cliProvider],
         preferInstalled,
         this.#installedChosen.has(cliProvider) || this.#installedFallback.has(cliProvider),
+        this.#scope,
       ).pipe(toProviderOperationFailed);
       this.#cliSources.set(provider, cli);
       if (passedOver) this.#passedOverClis.set(provider, passedOver);
