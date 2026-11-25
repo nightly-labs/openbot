@@ -139,6 +139,7 @@ export interface AcpFlavor {
   silentTurnLimitMs?: number;
   unsentBackgroundTurns?: true;
   wakesAfterPromptEnds?: true;
+  restartNoticeOnReload?: true;
   selfWakeTools?: RegExp;
   messagePerId?: true;
   resendsAnswer?: true;

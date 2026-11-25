@@ -36,6 +36,7 @@ interface Report {
   refusedByCli?: { refused: string; cliRefusals: number; reply: string; status: string | null };
   oldCli?: { refused: string; prompts: number; status: string | null };
   heldWork?: { status: string | null; releasable: boolean | undefined; closedSessions: number; daemonRuns: boolean };
+  reloadNote?: { afterIdleStop: boolean; secondPrompt: boolean; heldSession: boolean };
   failure?: string;
 }
 
@@ -321,8 +322,10 @@ try {
   const releasable = held.client.canReleaseProcess?.();
   assert.equal(releasable, false, "Running work must keep the provider process.");
   const laterPids: number[] = [];
+  const laterThreads: string[] = [];
   for (let index = 0; index < 3; index += 1) {
     const thread = await startThread(held.client, { cwd: root });
+    laterThreads.push(thread);
     assert.equal((await (await startTurn(held.client, thread, held.log, "hello")).done).status, "completed");
     laterPids.push(await sessionPid(held.log, "hello", index));
   }
@@ -331,6 +334,22 @@ try {
   assert.ok(daemonRuns, "The idle limit closed the session whose daemon command runs.");
   const closedSessions = laterPids.filter((pid) => !isRunning(pid)).length;
   report.heldWork = { status: daemon.status, releasable, closedSessions, daemonRuns };
+
+  const notedPrompt = async (thread: string, text: string) => {
+    assert.equal((await (await startTurn(held.client, thread, held.log, text)).done).status, "completed");
+    const prompt = (await prompts(held.log)).findLast((entry) => entry.text?.endsWith(text));
+    return prompt?.text?.includes("<openbot_session_reload>") === true;
+  };
+  const [stoppedThread] = laterThreads;
+  if (!stoppedThread) throw new Error("The later sessions did not start.");
+  report.reloadNote = {
+    afterIdleStop: await notedPrompt(stoppedThread, "again after the idle stop"),
+    secondPrompt: await notedPrompt(stoppedThread, "once more on the same process"),
+    heldSession: await notedPrompt(daemonThread, "again on the held session"),
+  };
+  assert.ok(report.reloadNote.afterIdleStop, "A session that OpenBot stopped as idle must get the reload note.");
+  assert.ok(!report.reloadNote.secondPrompt, "The reload note must come only once.");
+  assert.ok(!report.reloadNote.heldSession, "A session whose work held its process must not get the reload note.");
 
   report.passed = true;
 } catch (error) {
