@@ -1,9 +1,10 @@
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect, Schema } from "effect";
-import type { AccountAnalytics } from "./account-analytics";
+import type { AccountEventDelivery } from "./account-analytics";
 
 export const ACCOUNT_ACTIVITY_TIME_ZONE = "Europe/Warsaw";
 export const MAX_REPORTED_ACCOUNTS = 100;
+export const SNAPSHOT_DELAY_MS = 15 * 60_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const DAY_FORMAT = new Intl.DateTimeFormat("en-CA", {
   timeZone: ACCOUNT_ACTIVITY_TIME_ZONE,
@@ -71,24 +72,34 @@ export const recordAccountActivity = Effect.fn("AccountActivity.record")(functio
 
 export const sendAccountActivitySnapshots = Effect.fn("AccountActivity.sendSnapshots")(function* (
   database: D1Database,
-  analytics: AccountAnalytics,
+  deliver: AccountEventDelivery,
   now: number,
 ) {
-  const today = accountActivityDay(now);
+  const closedBefore = accountActivityDay(now - SNAPSHOT_DELAY_MS);
   const days = yield* Effect.tryPromise({
     try: () =>
       database
         .prepare("SELECT DISTINCT day FROM account_active_days WHERE day < ? ORDER BY day")
-        .bind(today)
+        .bind(closedBefore)
         .all<{ day: string }>(),
     catch: () => new AccountActivityError({}),
   });
   for (const { day } of days.results) {
-    const deleted = yield* Effect.tryPromise({
+    const counted = yield* Effect.tryPromise({
+      try: () =>
+        database
+          .prepare("SELECT COUNT(*) AS total FROM account_active_days WHERE day = ?")
+          .bind(day)
+          .first<{ total: number }>(),
+      catch: () => new AccountActivityError({}),
+    });
+    const activeAccounts = counted?.total ?? 0;
+    if (activeAccounts === 0) continue;
+    const delivered = yield* deliver({ name: "account_activity_snapshot", day, activeAccounts });
+    if (!delivered) continue;
+    yield* Effect.tryPromise({
       try: () => database.prepare("DELETE FROM account_active_days WHERE day = ?").bind(day).run(),
       catch: () => new AccountActivityError({}),
     });
-    const activeAccounts = deleted.meta.changes;
-    if (activeAccounts > 0) analytics.track(null, { name: "account_activity_snapshot", day, activeAccounts });
   }
 });

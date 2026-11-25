@@ -13,29 +13,29 @@ const DAY_FORMAT = new Intl.DateTimeFormat("en-CA", {
 export interface AccountActivityReporterOptions {
   send: (accounts: readonly string[]) => Effect.Effect<unknown, unknown>;
   now?: () => number;
+  retryAfterMs?: number;
 }
 
 export class AccountActivityReporter {
   readonly #send: AccountActivityReporterOptions["send"];
   readonly #now: () => number;
+  readonly #retryAfterMs: number;
   #day: string | null = null;
   #reported = new Set<string>();
   #pending = new Set<string>();
   #inFlight = new Set<string>();
   #sending: Promise<void> | null = null;
   #retryAt = 0;
+  #retryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(options: AccountActivityReporterOptions) {
     this.#send = options.send;
     this.#now = options.now ?? Date.now;
+    this.#retryAfterMs = options.retryAfterMs ?? RETRY_AFTER_FAILURE_MS;
   }
 
   record(accountId: string): void {
-    const day = DAY_FORMAT.format(new Date(this.#now()));
-    if (day !== this.#day) {
-      this.#day = day;
-      this.#reported = new Set();
-    }
+    this.#rollDay();
     if (this.#reported.has(accountId) || this.#inFlight.has(accountId)) return;
     this.#pending.add(accountId);
     this.#flush();
@@ -45,7 +45,16 @@ export class AccountActivityReporter {
     while (this.#sending) await this.#sending;
   }
 
+  #rollDay(): void {
+    const day = DAY_FORMAT.format(new Date(this.#now()));
+    if (day === this.#day) return;
+    this.#day = day;
+    this.#reported = new Set();
+    this.#pending = new Set();
+  }
+
   #flush(): void {
+    this.#rollDay();
     if (this.#sending || this.#pending.size === 0 || this.#now() < this.#retryAt) return;
     const day = this.#day;
     const batch = [...this.#pending].slice(0, MAX_ACCOUNTS_PER_REPORT);
@@ -57,12 +66,23 @@ export class AccountActivityReporter {
       this.#sending = null;
       this.#inFlight.clear();
       if (Result.isFailure(result)) {
-        for (const account of batch) this.#pending.add(account);
-        this.#retryAt = this.#now() + RETRY_AFTER_FAILURE_MS;
+        if (day === this.#day) for (const account of batch) this.#pending.add(account);
+        this.#retryAt = this.#now() + this.#retryAfterMs;
+        this.#scheduleRetry();
         return;
       }
       if (day === this.#day) for (const account of batch) this.#reported.add(account);
       this.#flush();
     });
+  }
+
+  #scheduleRetry(): void {
+    if (this.#retryTimer) clearTimeout(this.#retryTimer);
+    this.#retryTimer = setTimeout(() => {
+      this.#retryTimer = null;
+      this.#retryAt = 0;
+      this.#flush();
+    }, this.#retryAfterMs);
+    this.#retryTimer.unref?.();
   }
 }

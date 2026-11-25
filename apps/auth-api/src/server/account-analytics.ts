@@ -219,31 +219,61 @@ export async function readAccountEmail(database: D1Database, accountId: string):
   return typeof row?.email === "string" ? normalizeEmailAddress(row.email) : null;
 }
 
-export function createAccountAnalytics(options: AccountAnalyticsOptions): AccountAnalytics {
+type OpenPanelTarget = Pick<AccountAnalyticsOptions, "fetch"> & { clientId: string; clientSecret: string };
+
+function openPanelTarget(options: Pick<AccountAnalyticsOptions, "clientId" | "clientSecret" | "fetch">) {
   const clientId = options.clientId?.trim();
   const clientSecret = options.clientSecret?.trim();
-  if (!clientId || !clientSecret) return NO_ACCOUNT_ANALYTICS;
-  const post = Effect.fn("AccountAnalytics.post")(function* (body: OpenPanelBody) {
-    const response = yield* Effect.tryPromise({
-      try: (signal) =>
-        options.fetch(`${OPENPANEL_API_URL}/track`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "openpanel-client-id": clientId,
-            "openpanel-client-secret": clientSecret,
-          },
-          body: JSON.stringify(body),
-          signal: AbortSignal.any([signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]),
-        }),
-      catch: () => new AnalyticsDeliveryError({}),
-    });
-    if (!response.ok) {
-      console.warn(body.type === "track" ? "Account analytics send failed." : "Account analytics identify failed.", {
-        status: response.status,
-      });
-    }
+  return clientId && clientSecret ? { fetch: options.fetch, clientId, clientSecret } : null;
+}
+
+const postToOpenPanel = Effect.fn("AccountAnalytics.post")(function* (target: OpenPanelTarget, body: OpenPanelBody) {
+  const response = yield* Effect.tryPromise({
+    try: (signal) =>
+      target.fetch(`${OPENPANEL_API_URL}/track`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "openpanel-client-id": target.clientId,
+          "openpanel-client-secret": target.clientSecret,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.any([signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]),
+      }),
+    catch: () => new AnalyticsDeliveryError({}),
   });
+  if (!response.ok) {
+    console.warn(body.type === "track" ? "Account analytics send failed." : "Account analytics identify failed.", {
+      status: response.status,
+    });
+  }
+  return response.ok;
+});
+
+export type AccountEventDelivery = (event: AccountAnalyticsEvent) => Effect.Effect<boolean>;
+
+export function createAccountEventDelivery(
+  options: Pick<AccountAnalyticsOptions, "clientId" | "clientSecret" | "fetch">,
+): AccountEventDelivery {
+  const target = openPanelTarget(options);
+  return (event) => {
+    const properties = accountEventProperties(event);
+    if (!target || !properties) return Effect.succeed(true);
+    return postToOpenPanel(target, { type: "track", payload: { name: event.name, properties } }).pipe(
+      Effect.catch(() =>
+        Effect.sync(() => {
+          console.warn("Account analytics send failed.");
+          return false;
+        }),
+      ),
+    );
+  };
+}
+
+export function createAccountAnalytics(options: AccountAnalyticsOptions): AccountAnalytics {
+  const target = openPanelTarget(options);
+  if (!target) return NO_ACCOUNT_ANALYTICS;
+  const post = (body: OpenPanelBody) => postToOpenPanel(target, body).pipe(Effect.asVoid);
   const identify = Effect.fn("AccountAnalytics.identify")(function* (accountId: string) {
     const email = yield* Effect.tryPromise({
       try: () => readAccountEmail(options.database, accountId),

@@ -516,6 +516,7 @@
     "test:billing-sale-alert": "bun apps/auth-api/scripts/billing-sale-alert-e2e.ts",
     "test:paid-account-identity": "bun apps/auth-api/scripts/paid-account-identity-e2e.ts",
     "test:account-activity": "bun apps/auth-api/scripts/account-activity-e2e.ts",
+    "test:account-activity-reporter": "bun scripts/account-activity-reporter-e2e.ts",
     "test:smtp-stall": "bun apps/auth-api/scripts/smtp-stall-e2e.ts",
     "test:keep-previous-assets": "bun apps/auth-api/scripts/keep-previous-assets-e2e.ts",
     "test:mobile-connected-devices": "bun scripts/mobile-connected-devices-e2e.ts",

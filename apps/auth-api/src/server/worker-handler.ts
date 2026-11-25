@@ -1,7 +1,7 @@
 import { Effect, Result } from "effect";
 import { routeRequest as routeHostedSiteRequest } from "../../../site-router/src/index";
 import { sendAccountActivitySnapshots } from "./account-activity";
-import { createAccountAnalytics } from "./account-analytics";
+import { createAccountAnalytics, createAccountEventDelivery } from "./account-analytics";
 import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
 import { BillingSales } from "./billing-sales";
 import { BillingService } from "./billing-service";
@@ -257,8 +257,12 @@ const tickCreditGrants = Effect.fn("CreditGrants.tick")(function* (bindings: Ana
 });
 
 const tickAccountActivity = Effect.fn("AccountActivity.tick")(function* (bindings: AnalyticsBindings, now: number) {
-  const { analytics, flush } = tickAnalytics(bindings);
-  yield* sendAccountActivitySnapshots(bindings.DB, analytics, now).pipe(Effect.ensuring(flush));
+  const deliver = createAccountEventDelivery({
+    clientId: bindings.OPENPANEL_CLIENT_ID,
+    clientSecret: bindings.OPENPANEL_CLIENT_SECRET,
+    fetch: (input, init) => fetch(input, init),
+  });
+  yield* sendAccountActivitySnapshots(bindings.DB, deliver, now);
 });
 
 const tickHostedPool = Effect.fn("HostedPool.tick")(function* (bindings: SalesBindings, now: number) {

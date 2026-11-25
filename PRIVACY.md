@@ -465,9 +465,10 @@ The service stores:
   the desktop app is signed in, so the owner's phones and other computers can connect to it. Deleting
   that server removes its record;
 - remote memberships and invitations with roles, states, hashed invitation tokens, and lifecycle times;
-- for the current day, the accounts that were active: the account ID and the day. A host sends the
-  owner's account when a turn starts there, and the account of each member who uses it. The service
-  deletes the rows of a day when it sends the daily total, and deleting an account removes its rows;
+- for each day until its total is sent, the accounts that were active: the account ID and the day. A
+  host sends the owner's account when a turn starts there, and the account of each member who uses
+  it. The service deletes the rows of a day when analytics accepts the daily total, usually in the
+  first hour of the next day, and deleting an account removes its rows;
 - logical remote session records with the account, host, originating account-session hash, start,
   end, and expiration times;
 - the current account avatar file and its content type when the user uploads an avatar.

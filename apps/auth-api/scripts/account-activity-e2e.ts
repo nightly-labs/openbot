@@ -10,7 +10,7 @@ import {
   recordAccountActivity,
   sendAccountActivitySnapshots,
 } from "../src/server/account-activity";
-import { ACCOUNT_ANALYTICS_SCHEMA_VERSION, createAccountAnalytics } from "../src/server/account-analytics";
+import { ACCOUNT_ANALYTICS_SCHEMA_VERSION, createAccountEventDelivery } from "../src/server/account-analytics";
 import { sqliteD1 } from "./sqlite-d1";
 
 const ROOT = resolve(import.meta.dirname, "../../..");
@@ -18,6 +18,7 @@ const OUT = join(ROOT, ".openbot-build", "account-activity-e2e");
 const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
 const LATE_23RD = Date.parse("2026-11-23T22:30:00Z");
 const EARLY_24TH = Date.parse("2026-11-23T23:30:00Z");
+const JUST_AFTER_25TH_STARTS = Date.parse("2026-11-24T23:05:00Z");
 const NOON_25TH = Date.parse("2026-11-25T11:00:00Z");
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
@@ -118,31 +119,25 @@ async function main() {
   );
 
   const sent: SentBody[] = [];
-  const work: Promise<void>[] = [];
-  const analytics = createAccountAnalytics({
+  let openPanelStatus = 200;
+  const deliver = createAccountEventDelivery({
     clientId: "client",
     clientSecret: "secret",
     fetch: async (_input, init) => {
       sent.push(JSON.parse(String(init.body)));
-      return new Response("{}", { status: 200 });
+      return new Response("{}", { status: openPanelStatus });
     },
-    schedule: (send) => work.push(Effect.runPromise(send)),
-    database,
   });
-  await Promise.all([
-    Effect.runPromise(sendAccountActivitySnapshots(database, analytics, NOON_25TH)),
-    Effect.runPromise(sendAccountActivitySnapshots(database, analytics, NOON_25TH)),
-  ]);
-  await Promise.all(work.splice(0));
-  const totals = sent.map((body) => [body.payload.properties.day, body.payload.properties.active_accounts]);
+  const snapshot = (now: number) => Effect.runPromise(sendAccountActivitySnapshots(database, deliver, now));
+  const totals = () => sent.map((body) => [body.payload.properties.day, body.payload.properties.active_accounts]);
+  const days = () => [...new Set(rows(sqlite).map((row) => row.day))];
+
+  await snapshot(JUST_AFTER_25TH_STARTS);
   check(
-    "each closed day sends one total, also when two cron runs overlap",
-    JSON.stringify(totals) ===
-      JSON.stringify([
-        ["2026-11-23", 3],
-        ["2026-11-24", 1],
-      ]),
-    totals,
+    "a day is sent only 15 minutes after it ends, so a request from before midnight cannot add to a sent day",
+    JSON.stringify(totals()) === JSON.stringify([["2026-11-23", 3]]) &&
+      JSON.stringify(days()) === JSON.stringify(["2026-11-24", "2026-11-25"]),
+    { totals: totals(), days: days() },
   );
   check(
     "the total has no profile and no account ID",
@@ -164,6 +159,24 @@ async function main() {
     ),
     sent,
   );
+
+  sent.length = 0;
+  openPanelStatus = 503;
+  await snapshot(NOON_25TH);
+  check(
+    "a day whose send fails keeps its rows",
+    JSON.stringify(days()) === JSON.stringify(["2026-11-24", "2026-11-25"]),
+    { totals: totals(), days: days() },
+  );
+
+  sent.length = 0;
+  openPanelStatus = 200;
+  await Promise.all([snapshot(NOON_25TH), snapshot(NOON_25TH)]);
+  check(
+    "the failed day is sent on the next run, and two overlapping runs send only the same total",
+    sent.length >= 1 && totals().every(([day, total]) => day === "2026-11-24" && total === 1),
+    totals(),
+  );
   check(
     "sent days are deleted and today stays",
     JSON.stringify(rows(sqlite)) === JSON.stringify([{ day: "2026-11-25", account_id: "owner" }]),
@@ -171,9 +184,8 @@ async function main() {
   );
 
   sent.length = 0;
-  await Effect.runPromise(sendAccountActivitySnapshots(database, analytics, NOON_25TH));
-  await Promise.all(work.splice(0));
-  check("a second run sends nothing", sent.length === 0, sent);
+  await snapshot(NOON_25TH);
+  check("a later run sends nothing", sent.length === 0, sent);
 
   sqlite.prepare("DELETE FROM users WHERE id = 'owner'").run();
   check("a deleted account leaves no activity row", rows(sqlite).length === 0, rows(sqlite));
