@@ -54,6 +54,7 @@ export const messages = {
   "agent.dock.openInMain": "在主窗口中打开",
   "agent.dock.openWindow": "在新窗口中打开",
   "agent.dock.openPage": "打开 {title}",
+  "agent.dock.openFile": "打开 {name}",
   "agent.dock.remove": "从停靠栏移除",
   "agent.dock.send": "发送",
   "agent.dock.working": "工作中…",

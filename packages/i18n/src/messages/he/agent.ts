@@ -60,6 +60,7 @@ export const messages = {
   "agent.dock.openInMain": "פתיחה בחלון הראשי",
   "agent.dock.openWindow": "פתיחה בחלון חדש",
   "agent.dock.openPage": "פתיחת {title}",
+  "agent.dock.openFile": "פתיחת {name}",
   "agent.dock.remove": "הסרה מהמעגן",
   "agent.dock.send": "שליחה",
   "agent.dock.working": "עובד…",
