@@ -199,7 +199,8 @@
 
 :root[data-openbot-window-glass]
   .app-window
-  .tasks-page-scroll[data-composer-stuck]
+  .tasks-page:not([data-empty])
+  > .tasks-page-scroll[data-composer-stuck]
   .tasks-page-composer.composer-wrap {
   background: var(--window-glass-card);
 }
@@ -218,7 +219,7 @@
     .sidebar-folder > header,
     .marketplace-skill-group-bar,
     .agent-instructions-bar,
-    .tasks-page-scroll[data-composer-stuck] .tasks-page-composer.composer-wrap,
+    .tasks-page:not([data-empty]) > .tasks-page-scroll[data-composer-stuck] .tasks-page-composer.composer-wrap,
     .trace-row[data-parent],
     .trace-axis-row
   ) {
