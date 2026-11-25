@@ -475,8 +475,14 @@
   --integrations-agent-face-size: 24px;
 }
 
-.ui-item-group:has(.integrations-agent-face:not([data-size="sm"])) .ui-item-media > svg {
-  margin-inline: calc((32px - var(--openbot-icon-lg)) / 2);
+.ui-item-group:has(.integrations-agent-face:not([data-size="sm"])) {
+  --integrations-agent-face-group: wide;
+}
+
+@container style(--integrations-agent-face-group: wide) {
+  .ui-item-group .ui-item-media > svg {
+    margin-inline: calc((32px - var(--openbot-icon-lg)) / 2);
+  }
 }
 
 .integrations-agent-face > * {

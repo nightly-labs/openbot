@@ -184,6 +184,8 @@ export function ScrollEdges(props: {
     <div
       class={cx("scroll-edges", props.class)}
       data-axis={props.axis}
+      data-start-visible={state.start ? "" : undefined}
+      data-end-visible={state.end ? "" : undefined}
       dir={props.dir}
       style={state.middle === null ? undefined : { "--scroll-edges-middle": `${state.middle}px` }}
       onPointerEnter={() => setHovered(true)}
