@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
+import { attachmentReferenceIds, expandAttachmentReferences } from "@openbot/contracts/attachment-references";
 import { chatTagReferences, expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type {
   AgentSummary,
@@ -417,10 +417,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       `The user is replying to message ${delivery.replyToMessageId}.`,
       "--- referenced message ---",
       referenced
-        ? displayMessageReferences(referenced.text, referenced.attachments ?? [], agentNames, {
-            fileHeadings: true,
-            tags: sources.tags,
-          })
+        ? referencedMessageText(referenced, agentNames, sources.tags)
         : "(The referenced message is unavailable.)",
       "--- user reply ---",
       displayText || "(The reply contains attachments only.)",
@@ -797,6 +794,25 @@ export function displayMessageReferences(
   );
 }
 
+function referencedMessageText(
+  message: ConversationMessage,
+  agentNames: ReadonlyMap<string, string>,
+  tags: TagReferenceSource | undefined,
+): string {
+  const attachments = message.attachments ?? [];
+  const inlineIds = attachmentReferenceIds(message.text);
+  return [
+    displayMessageReferences(message.text, attachments, agentNames, { fileHeadings: true, tags }),
+    ...attachments.filter(({ id }) => !inlineIds.has(id)).map(attachmentMetadataLine),
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function attachmentMetadataLine(attachment: NonNullable<ConversationMessage["attachments"]>[number]): string {
+  return `[attachment: ${attachment.name}; ${attachment.mimeType}; ${attachment.size} bytes]`;
+}
+
 function homeSkillTagName(id: string, name: string): string | undefined {
   const slug = homeSkillTagSlug(id);
   return slug === null ? undefined : `${name} at ${join(homeSkillRoot(), slug, "SKILL.md")}`;
@@ -810,9 +826,7 @@ export function renderHandoffMessage(
   message: ConversationSnapshot["messages"][number],
   agentNames: ReadonlyMap<string, string>,
 ): string {
-  const attachmentMetadata = (message.attachments ?? [])
-    .map((attachment) => `[attachment: ${attachment.name}; ${attachment.mimeType}; ${attachment.size} bytes]`)
-    .join("\n");
+  const attachmentMetadata = (message.attachments ?? []).map(attachmentMetadataLine).join("\n");
   const senderName = message.senderAgentId ? agentNames.get(message.senderAgentId) : undefined;
   const sender = message.senderAgentId
     ? ` agent:${senderName ? `${senderName} (${message.senderAgentId})` : message.senderAgentId}`
