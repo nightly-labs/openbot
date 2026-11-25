@@ -207,4 +207,28 @@ export const messages = {
   "billing.details.vatIdInvalid": "選択した国の VAT ID ではありません。",
   "billing.details.countryMissing": "請求先の国を選択してください。",
   "billing.details.saveFailed": "請求先情報を保存できませんでした",
+  "billing.credits.explainer.title": "クレジットとは？",
+  "billing.credits.explainer.page": "{page} / {total}",
+  "billing.credits.explainer.pages": "ページ",
+  "billing.credits.explainer.mediaTitle": "クレジットはメディアの支払いに使います",
+  "billing.credits.explainer.mediaText": "エージェントが画像、動画、音声を作ると、クレジットを使います。",
+  "billing.credits.explainer.chatTitle": "チャットは無料です",
+  "billing.credits.explainer.chatText":
+    "チャットはご自身の AI プロバイダーを使います。エージェントとの会話でクレジットは減りません。",
+  "billing.credits.explainer.chatFree": "0 クレジット",
+  "billing.credits.explainer.modelsTitle": "モデルごとに料金があります",
+  "billing.credits.explainer.modelsText":
+    "高性能なモデルほど高くなります。画像は {pictureMin}～{pictureMax} クレジット、{seconds} 秒の動画は {videoMin}～{videoMax} クレジットです。",
+  "billing.credits.explainer.perPicture": "/ 画像",
+  "billing.credits.explainer.perClip": "/ {seconds} 秒の動画",
+  "billing.credits.explainer.getTitle": "クレジットを入手",
+  "billing.credits.explainer.getText":
+    "足りないときはパックを購入できます。大きいパックほど 1 クレジットあたりの価格がお得です。",
+  "billing.credits.explainer.freeEnd": "毎月の無料クレジットには有効期限があります",
+  "billing.credits.explainer.welcome": "新しいアカウントには、一部のモデルを試せる無料クレジット {amount} が付きます",
+  "billing.credits.welcomeIncluded": "無料クレジット: {amount}",
+  "billing.credits.explainer.allPrices": "全{count}モデル",
+  "billing.credits.explainer.next": "次へ",
+  "billing.credits.explainer.gotIt": "OK",
+  "billing.credits.explainer.place": "OpenBot",
 } as const satisfies PartialTranslation<typeof source>;

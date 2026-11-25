@@ -2,13 +2,14 @@ import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import { View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { useAvatarHole } from "@/features/agents/components/avatar-cutout";
 import { useText } from "@/shared/lib/text";
 
 const DESKTOP_AVATAR = 46;
+const LARGEST_BADGE_AVATAR = 54;
 const FELT = 16 / DESKTOP_AVATAR;
-const RING = 3.5 / DESKTOP_AVATAR;
-const END_OFFSET = 3 / DESKTOP_AVATAR;
-const BOTTOM_OFFSET = 1 / DESKTOP_AVATAR;
+const RING = 3 / LARGEST_BADGE_AVATAR;
+const INSET = 1 / DESKTOP_AVATAR;
 const DIGITS = 14 / DESKTOP_AVATAR;
 
 export function AgentUnreadBadge({
@@ -23,33 +24,44 @@ export function AgentUnreadBadge({
   const { format } = useText();
   const [background] = useThemeColor(["background"]);
   const [plum, cream] = useCSSVariable(["--openbot-felt-plum-bottom", "--openbot-felt-cream"]);
-  const felt = Math.round(avatarSize * FELT);
-  const ring = Math.round(avatarSize * RING);
-  const fontSize = Math.round(avatarSize * DIGITS);
+  const scale = Math.min(avatarSize, LARGEST_BADGE_AVATAR);
+  const felt = Math.round(scale * FELT);
+  const ring = Math.round(scale * RING);
+  const inset = Math.round(scale * INSET);
+  const fontSize = Math.round(scale * DIGITS);
+  const reportHole = useAvatarHole();
   return (
     <View
       pointerEvents="none"
-      className="absolute items-center justify-center rounded-full"
+      className="absolute"
+      onLayout={reportHole}
       style={{
-        right: -Math.round(avatarSize * END_OFFSET) - ring,
-        bottom: -Math.round(avatarSize * BOTTOM_OFFSET) - ring,
-        minWidth: felt + ring * 2,
-        height: felt + ring * 2,
-        paddingHorizontal: Math.round(felt * 0.2),
-        borderWidth: ring,
-        borderColor: ringColor ?? String(background),
-        backgroundColor: String(plum),
+        right: inset - ring,
+        bottom: inset - ring,
+        padding: ring,
+        borderRadius: felt / 2 + ring,
+        backgroundColor: reportHole ? "transparent" : (ringColor ?? String(background)),
       }}
     >
-      {count > 0 ? (
-        <Typography.Paragraph
-          className="font-extrabold"
-          style={{ color: String(cream), fontSize, lineHeight: felt }}
-          numberOfLines={1}
-        >
-          {format.number(Math.min(count, 99))}
-        </Typography.Paragraph>
-      ) : null}
+      <View
+        className="items-center justify-center rounded-full"
+        style={{
+          minWidth: felt,
+          height: felt,
+          paddingHorizontal: Math.round(felt * 0.2),
+          backgroundColor: String(plum),
+        }}
+      >
+        {count > 0 ? (
+          <Typography.Paragraph
+            className="font-extrabold"
+            style={{ color: String(cream), fontSize, lineHeight: felt }}
+            numberOfLines={1}
+          >
+            {format.number(Math.min(count, 99))}
+          </Typography.Paragraph>
+        ) : null}
+      </View>
     </View>
   );
 }

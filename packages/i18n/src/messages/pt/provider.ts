@@ -91,6 +91,9 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Iniciando o login de {name} em {host}…",
   "provider.codeLogin.pageOpening": "Abrindo a página de login de {name} em {host}…",
   "provider.codeLogin.linkStep": "Entre em {name}. O OpenBot continua sozinho.",
+  "provider.codeLogin.thisComputerDescription":
+    "Abra este link em um navegador neste computador. O OpenBot espera aqui.",
+  "provider.codeLogin.copyLink": "Copiar link",
   "provider.codeLogin.chatgptDeviceSetting":
     "No ChatGPT em um computador, abra as configurações de segurança e ative o login com código de dispositivo para o Codex. Em uma conta de trabalho, o administrador do workspace ativa isso.",
   "provider.useApp.title": "Conecte {name} no app OpenBot",
@@ -223,6 +226,7 @@ export const messages = {
   "provider.account.apiKey": "Chave de API",
   "provider.account.listLabel": "Contas de {name}",
   "provider.account.usedBy": "Usada por {agents}",
+  "provider.account.sameEmail": "Mesmo e-mail que {name}",
   "provider.account.failed": "Falha ao entrar",
   "provider.account.moreActions": "Mais ações para {name}",
   "provider.account.renameLabel": "Nome de {name}",

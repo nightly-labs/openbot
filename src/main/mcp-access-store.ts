@@ -28,6 +28,11 @@ export function sameMcpAgents(left: McpServerAccess["agents"], right: McpServerA
   return agents.size === new Set(right).size && right.every((agentId) => agents.has(agentId));
 }
 
+export function mcpAgentsOnlyAdded(before: McpServerAccess["agents"], after: McpServerAccess["agents"]): boolean {
+  if (after === null) return true;
+  return before?.every((agentId) => after.includes(agentId)) === true;
+}
+
 export function mcpAccessLevel(
   access: McpServerAccess,
   member: Pick<TeamMemberSummary, "id" | "role">,

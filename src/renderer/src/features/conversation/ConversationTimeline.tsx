@@ -27,7 +27,7 @@ import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
 import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui/features/conversation/ContextUsage";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
 import { CHAT_TIME_GAP_MS, continuesSenderRun } from "@openbot/ui/features/conversation/chat-grouping";
-import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
+import { type MessageImageFile, markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import {
   DeleteMessageDialog,
@@ -81,7 +81,7 @@ import { useConversationViewScope } from "./conversation-scope";
 import { MarketplaceSuggestionChatCard, marketplaceSuggestionKnown } from "./MarketplaceSuggestionChatCard";
 import { McpSignInChatCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction, watchAgentBackdrops } from "./message-backdrop";
-import { createMessageImageFiles } from "./message-image-files";
+import { createMessageImageFiles, decodedPath } from "./message-image-files";
 import { RoutineChatCard } from "./RoutineChatCard";
 import { createChatWebhookRoutines, RoutineWebhookChatCard } from "./RoutineWebhookChatCard";
 import { createRoutineRunFailures, type RoutineRunFailureSource } from "./routine-run-failures";
@@ -491,6 +491,7 @@ export function ConversationTimeline() {
             <ChatMessageRow
               message={answer}
               author={ownAgentAuthor()}
+              showAuthor
               showTime
               agents={props.agents}
               onSelectAgent={props.onSelectAgent}
@@ -935,13 +936,16 @@ export function ConversationTimeline() {
                   const current = message();
                   return current?.author === "agent" ? current.senderAgentId : undefined;
                 };
-                const turnAttachment = (path: string) => {
+                const turnAttachmentsNamed = (path: string) => {
                   const turnId = message()?.turnId;
-                  if (!turnId || /[/\\]/u.test(path)) return undefined;
-                  const matches = timelineMessages()
+                  if (!turnId || /[/\\]/u.test(path)) return [];
+                  return timelineMessages()
                     .filter((candidate) => candidate.turnId === turnId)
                     .flatMap((candidate) => candidate.attachments ?? [])
                     .filter((attachment) => attachment.name === path);
+                };
+                const turnAttachment = (path: string) => {
+                  const matches = turnAttachmentsNamed(path);
                   return matches.length === 1 ? matches[0] : undefined;
                 };
                 const imageScope = () => ({
@@ -949,6 +953,10 @@ export function ConversationTimeline() {
                   messageId: message()?.id ?? initialMessage.id,
                   agentId: workspaceAgentId(),
                 });
+                const loadImageFile = (file: MessageImageFile) =>
+                  turnAttachmentsNamed(decodedPath(file.path)).length > 0
+                    ? Promise.resolve(null)
+                    : (messageImageFiles?.load(file, imageScope()) ?? Promise.resolve(null));
                 const writtenFile = (asWritten: string | undefined) => {
                   const agentId = workspaceAgentId();
                   return asWritten && agentId
@@ -1541,7 +1549,7 @@ export function ConversationTimeline() {
                             mediaSource={runtime.attachmentMedia}
                             downloads={attachmentDownloads}
                             macWindowControls={props.platform === "darwin"}
-                            loadImageFile={messageImageFiles && ((file) => messageImageFiles.load(file, imageScope()))}
+                            loadImageFile={messageImageFiles && loadImageFile}
                             onDownloadImageFile={
                               messageImageFiles &&
                               ((file) =>
@@ -1695,6 +1703,7 @@ export function ConversationTimeline() {
                     onApprove={() => approve(approval)}
                     onReject={() => props.onRespondToApproval("decline")}
                     onAlwaysAllow={props.onAlwaysAllowApproval}
+                    media={props.mediaApproval}
                   />
                 </Loading>
               )}

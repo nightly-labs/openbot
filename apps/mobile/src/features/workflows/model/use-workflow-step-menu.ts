@@ -70,10 +70,10 @@ export function useWorkflowStepMenu(node: WorkflowNode, draft: WorkflowDraft) {
         deleteGroup,
       ]
     : [
-        ...(outline && flowList && canMove(outline, node.id, -1)
+        ...(outline && flowList && canMove(draft.graph, outline, node.id, -1)
           ? [{ id: "up", title: t("mobile.workflow.editor.moveUp"), image: "arrow.up" } satisfies MenuAction]
           : []),
-        ...(outline && flowList && canMove(outline, node.id, 1)
+        ...(outline && flowList && canMove(draft.graph, outline, node.id, 1)
           ? [{ id: "down", title: t("mobile.workflow.editor.moveDown"), image: "arrow.down" } satisfies MenuAction]
           : []),
         ...(flowList

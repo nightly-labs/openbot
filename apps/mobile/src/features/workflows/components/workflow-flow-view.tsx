@@ -5,6 +5,7 @@ import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import { Fragment, useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { CreditBadge } from "@/features/workflows/components/workflow-credit-badge";
 import {
   FLOW_CARD_WIDTH,
   FlowAddButton,
@@ -21,6 +22,7 @@ import {
 } from "@/features/workflows/components/workflow-run-visuals";
 import { WorkflowStepMenuLayer } from "@/features/workflows/components/workflow-step-menu-layer";
 import { pathLabel, pathTone, type WorkflowStepMenu } from "@/features/workflows/components/workflow-steps-list";
+import { type NodeCredits, useMediaCredits } from "@/features/workflows/model/use-media-credits";
 import { type FlowItem, type FlowPath, workflowFlowTree } from "@/features/workflows/model/workflow-flow-tree";
 import type { GraphPlace } from "@/features/workflows/model/workflow-graph-edit";
 import { stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
@@ -42,12 +44,14 @@ export function FlowStepCard({
   press,
   problem,
   run,
+  credits,
 }: {
   node: WorkflowNode;
   agents: readonly MobileAgent[];
   press: StepPress | undefined;
   problem: string | undefined;
   run?: { step: WorkflowStep | undefined; selected: boolean } | undefined;
+  credits?: NodeCredits | undefined;
 }) {
   const { t } = useText();
   const [control, grouped, danger, warning, accent] = useCSSVariable([
@@ -92,6 +96,7 @@ export function FlowStepCard({
         <WorkflowKindTile
           kind={node.kind}
           trigger={node.kind === "trigger" ? triggerType(node) : undefined}
+          fields={node.fields}
           size={30}
         />
         <View className="min-w-0 flex-1">
@@ -104,6 +109,11 @@ export function FlowStepCard({
           <Typography.Paragraph numberOfLines={4} style={typeScale.caption}>
             {text}
           </Typography.Paragraph>
+          {credits ? (
+            <View className="mt-1">
+              <CreditBadge credits={credits.credits} short={credits.short} />
+            </View>
+          ) : null}
           {problem ? (
             <Typography.Paragraph className="font-medium text-danger-text" numberOfLines={3} style={typeScale.small}>
               {problem}
@@ -172,6 +182,7 @@ function PathLabel({ path, index }: { path: FlowPath; index: number }) {
 }
 
 export function WorkflowFlowView({
+  serverId,
   graph,
   agents,
   menu,
@@ -181,6 +192,7 @@ export function WorkflowFlowView({
   onAdd,
   run,
 }: {
+  serverId: string;
   graph: WorkflowGraph;
   agents: readonly MobileAgent[];
   menu?: WorkflowStepMenu;
@@ -196,6 +208,7 @@ export function WorkflowFlowView({
 }) {
   const { t } = useText();
   const tree = useMemo(() => workflowFlowTree(graph), [graph]);
+  const { byNode } = useMediaCredits(serverId, run ? [] : graph.nodes);
   const byId = new Map(graph.nodes.map((node) => [node.id, node]));
   const press: StepPress | undefined = run
     ? { kind: "open", open: run.onSelect, canOpen: () => true }
@@ -257,6 +270,7 @@ export function WorkflowFlowView({
           press={press}
           problem={problems?.get(item.id)}
           run={run ? { step: run.steps.get(item.id), selected: run.selectedId === item.id } : undefined}
+          credits={byNode.get(item.id)}
         />
       ) : null;
     }

@@ -1,4 +1,5 @@
-import { type Dirent, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { type Dirent, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Effect, Option, Schema } from "effect";
 
@@ -64,6 +65,9 @@ export class RunMarker {
   readonly #path: string;
   #record: RunMarkerRecord;
   #heartbeat: ReturnType<typeof setInterval> | null = null;
+  #sequence = 0;
+  #written = 0;
+  #writing = false;
 
   private constructor(path: string, record: RunMarkerRecord) {
     this.#path = path;
@@ -90,8 +94,8 @@ export class RunMarker {
       slept: false,
       osShutdown: false,
     });
-    marker.#write();
-    marker.#heartbeat = setInterval(() => marker.#update({}), RUN_HEARTBEAT_MS);
+    marker.#writeNow();
+    marker.#heartbeat = setInterval(() => marker.#updateLater({}), RUN_HEARTBEAT_MS);
     marker.#heartbeat.unref();
     return { marker, previous };
   }
@@ -101,7 +105,7 @@ export class RunMarker {
   }
 
   resume(): void {
-    this.#update({ sleeping: false });
+    this.#updateLater({ sleeping: false });
   }
 
   osShutdown(): void {
@@ -125,20 +129,35 @@ export class RunMarker {
     this.#update({ state: "clean" });
   }
 
+  get #pendingPath(): string {
+    return `${this.#path}.pending`;
+  }
+
   #stopHeartbeat(): void {
     if (this.#heartbeat) clearInterval(this.#heartbeat);
     this.#heartbeat = null;
   }
 
   #update(change: Partial<RunMarkerRecord>): void {
-    if (this.#record.state === "clean") return;
-    this.#record = { ...this.#record, ...change, heartbeatAt: Date.now() };
-    this.#write();
+    if (this.#change(change)) this.#writeNow();
   }
 
-  #write(): void {
-    const content = `${JSON.stringify(this.#record)}\n`;
+  #updateLater(change: Partial<RunMarkerRecord>): void {
+    if (this.#change(change)) this.#writeLater();
+  }
+
+  #change(change: Partial<RunMarkerRecord>): boolean {
+    if (this.#record.state === "clean") return false;
+    this.#record = { ...this.#record, ...change, heartbeatAt: Date.now() };
+    this.#sequence += 1;
+    return true;
+  }
+
+  #writeNow(): void {
+    this.#written = this.#sequence;
+    const content = recordContent(this.#record);
     const temporaryPath = `${this.#path}.tmp`;
+    if (this.#writing) this.#removePending();
     Effect.runSync(
       Effect.try({
         try: () => {
@@ -149,6 +168,64 @@ export class RunMarker {
       }).pipe(Effect.ignore),
     );
   }
+
+  #removePending(): void {
+    Effect.runSync(
+      Effect.try({
+        try: () => rmSync(this.#pendingPath, { force: true }),
+        catch: (cause) => new RunMarkerFailure({ cause }),
+      }).pipe(Effect.ignore),
+    );
+  }
+
+  #writeLater(): void {
+    if (this.#writing) return;
+    this.#writing = true;
+    Effect.runFork(
+      this.#flush().pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            this.#writing = false;
+            if (this.#written < this.#sequence) this.#writeLater();
+          }),
+        ),
+      ),
+    );
+  }
+
+  readonly #flush = Effect.fn("RunMarker.flush")(function* (this: RunMarker) {
+    while (this.#written < this.#sequence) {
+      const sequence = this.#sequence;
+      const replaced = yield* this.#replace(sequence, recordContent(this.#record)).pipe(
+        Effect.orElseSucceed(() => false),
+      );
+      yield* Effect.sync(() => {
+        if (replaced && this.#written >= sequence) this.#writeNow();
+        this.#written = Math.max(this.#written, sequence);
+      });
+    }
+  });
+
+  readonly #replace = Effect.fn("RunMarker.replace")(function* (this: RunMarker, sequence: number, content: string) {
+    const pendingPath = this.#pendingPath;
+    yield* Effect.tryPromise({
+      try: () => writeFile(pendingPath, content, { mode: 0o600 }),
+      catch: (cause) => new RunMarkerFailure({ cause }),
+    });
+    if (this.#written >= sequence) {
+      yield* Effect.promise(() => rm(pendingPath, { force: true }).catch(() => undefined));
+      return false;
+    }
+    yield* Effect.tryPromise({
+      try: () => rename(pendingPath, this.#path),
+      catch: (cause) => new RunMarkerFailure({ cause }),
+    });
+    return true;
+  });
+}
+
+function recordContent(record: RunMarkerRecord): string {
+  return `${JSON.stringify(record)}\n`;
 }
 
 function uncleanExit(record: RunMarkerRecord, options: RunMarkerOptions): UncleanExitProperties | null {

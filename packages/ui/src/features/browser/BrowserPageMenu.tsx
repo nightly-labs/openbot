@@ -91,9 +91,20 @@ export function BrowserPageMenu(props: { view: BrowserFullViewProps; narrow: boo
             )}
           </Show>
           <DropdownMenu.Separator />
-          <DropdownMenu.Item onSelect={props.view.onBack}>
-            {props.view.detached ? t("browser.pip.reattachTitle") : t("browser.backToChat")}
-          </DropdownMenu.Item>
+          <Show
+            when={props.view.onOpenFullView}
+            fallback={
+              <DropdownMenu.Item onSelect={props.view.onBack}>
+                {props.view.detached ? t("browser.pip.reattachTitle") : t("browser.backToChat")}
+              </DropdownMenu.Item>
+            }
+          >
+            {(openFullView) => (
+              <DropdownMenu.Item disabled={!tab()} onSelect={() => openFullView()()}>
+                {t("browser.fullView.open")}
+              </DropdownMenu.Item>
+            )}
+          </Show>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

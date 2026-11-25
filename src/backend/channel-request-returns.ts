@@ -1,7 +1,12 @@
 import type { ChannelMessage, ChannelTask, ChannelTaskState } from "@openbot/contracts/ipc";
 import { Cause, Effect } from "effect";
 import { isTaskAnswer } from "./channel-history";
-import { type ChannelService, channelHandoffSenderAgentId, channelResultId } from "./channel-service";
+import {
+  type ChannelService,
+  channelHandoffSenderAgentId,
+  channelHandoffSenderTaskId,
+  channelResultId,
+} from "./channel-service";
 import type { MailboxStore } from "./mailbox-store";
 
 const RETURN_KEY_PREFIX = "channel-request-result:";
@@ -12,6 +17,7 @@ const RETURNED_STATES: ReadonlySet<ChannelTaskState> = new Set(["completed", "fa
 
 export interface ChannelRequestReturnHooks {
   agentExists(agentId: string): boolean;
+  taskOpen(taskId: string): boolean;
   delivered(recipientAgentId: string, deliveryIds: readonly string[]): Effect.Effect<void>;
   error(error: unknown): void;
 }
@@ -106,12 +112,15 @@ export class ChannelRequestReturns {
     if (!senderAgentId || !this.#hooks.agentExists(senderAgentId) || !this.#hooks.agentExists(requesterId)) return;
     const answer = task.state === "completed" ? this.#answer(channelId, task, request, recent) : null;
     const sourcePaths = answer ? yield* this.#attachmentPaths(answer) : [];
+    const requesterTaskId = channelHandoffSenderTaskId(request);
+    const taskId = requesterTaskId && this.#hooks.taskOpen(requesterTaskId) ? requesterTaskId : undefined;
     const receipt = yield* this.#mailbox.enqueue({
       sender: { kind: "agent", agentId: senderAgentId },
       recipientAgentIds: [requesterId],
       text: returnText(task, channelId, channelName, answer),
       sourcePaths,
       replyToMessageId: request.id,
+      ...(taskId ? { taskId } : {}),
       expectsReply: false,
       idempotencyKey: key,
     });

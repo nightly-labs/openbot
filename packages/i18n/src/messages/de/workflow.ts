@@ -74,6 +74,8 @@ export const messages = {
   "workflow.node.place.choose": "Kanal wählen",
   "workflow.node.result.title": "Ergebnis",
   "workflow.node.result.copy": "Ergebnis kopieren",
+  "workflow.node.result.yes": "Ja",
+  "workflow.node.result.no": "Nein",
   "workflow.node.result.list": "Ergebnisse",
   "workflow.node.result.previous": "Vorheriges Ergebnis",
   "workflow.node.result.next": "Nächstes Ergebnis",
@@ -148,6 +150,7 @@ export const messages = {
   "workflow.image.descriptionPlaceholder": "Beschreibe das Bild",
   "workflow.image.models": "Bildmodelle",
   "workflow.image.chooseModel": "Modell wählen",
+  "workflow.image.modelUnavailable": "Modell nicht verfügbar",
   "workflow.media.subscription": "{name}-Abo",
   "workflow.media.apiKey": "{name}-API-Schlüssel",
   "workflow.media.credits": "{name}-Credits",
@@ -544,8 +547,37 @@ export const messages = {
   "workflow.canvas.presence.follow": "{name} folgen",
   "workflow.canvas.presence.you": "{name} (du)",
   "workflow.canvas.presence.following": "Du folgst {name}",
-  "workflow.canvas.empty.title": "Beginne mit einem Auslöser",
-  "workflow.canvas.empty.add": "Auslöser hinzufügen",
+  "workflow.canvas.start.title": "Mit einer Vorlage beginnen",
+  "workflow.canvas.start.blank": "Leere Fläche",
+  "workflow.template.morningBrief.title": "Morgenbriefing",
+  "workflow.template.morningBrief.brief": "Jeden Morgen um 08:00 Uhr 5 Zeilen Nachrichten zu deinen Themen.",
+  "workflow.template.morningBrief.task":
+    "Finde Nachrichten des letzten Tages zu diesen Themen: KI, Startups. Schreibe die 5 wichtigsten Meldungen, je eine Zeile mit Link.",
+  "workflow.template.answerIssues.title": "Neue Issues beantworten",
+  "workflow.template.answerIssues.brief":
+    "Wenn jemand ein GitHub-Issue öffnet, antworte darauf und füge ein Label hinzu.",
+  "workflow.template.answerIssues.task":
+    "Lies das Issue. Finde die wahrscheinliche Ursache im Code. Schreibe eine kurze, freundliche Antwort und wähle ein Label.",
+  "workflow.template.weeklyReport.title": "Wochenbericht",
+  "workflow.template.weeklyReport.brief":
+    "Jeden Freitag um 16:00 Uhr die Woche zusammenfassen. Du gibst ihn frei, bevor er gesendet wird.",
+  "workflow.template.weeklyReport.task":
+    "Fasse zusammen, was das Team diese Woche getan hat: erledigte Arbeit, offene Probleme und nächste Schritte. Nutze kurze Listen.",
+  "workflow.template.weeklyReport.question": "Diesen Wochenbericht senden?",
+  "workflow.template.priceWatch.title": "Preiswächter",
+  "workflow.template.priceWatch.brief":
+    "Jeden Morgen um 09:00 Uhr einen Produktpreis prüfen. Benachrichtigung, wenn er unter deinem Limit liegt.",
+  "workflow.template.priceWatch.task":
+    "Öffne diese Produktseite und lies den Preis: https://example.com/product. Schreibe nur den Preis und den Link.",
+  "workflow.template.priceWatch.rule": "Der Preis ist niedriger als 100.",
+  "workflow.template.priceWatch.alert": "Preis gesunken",
+  "workflow.template.socialPost.title": "Beitrag mit Bild",
+  "workflow.template.socialPost.brief":
+    "Schreibe eine Idee. Erhalte einen kurzen Beitrag und ein quadratisches Bild dazu.",
+  "workflow.template.socialPost.idea": "Wir haben jetzt sonntags geöffnet, von 10:00 bis 16:00 Uhr.",
+  "workflow.template.socialPost.prompt":
+    "Schreibe einen Social-Media-Beitrag über diese Neuigkeit in weniger als 280 Zeichen. Nutze eine klare erste Zeile und keine Hashtags.",
+  "workflow.template.socialPost.picture": "Ein klares, helles Bild für diesen Beitrag.",
   "workflow.canvas.tool.label": "Canvas-Werkzeuge",
   "workflow.canvas.tool.select": "Auswählen",
   "workflow.canvas.tool.pan": "Verschieben",

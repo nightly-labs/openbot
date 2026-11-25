@@ -229,6 +229,9 @@ export const messages = {
   "server.rail.delete": "Eliminar servidor",
   "server.rail.hide": "Ocultar servidor",
   "server.rail.showLocal": "Mostrar {name}",
+  "server.rail.hiddenServers": "Servidores ocultos",
+  "server.rail.hideFailed": "No se pudo ocultar {name}",
+  "server.rail.showFailed": "No se pudo mostrar {name}",
   "server.plan.daysLeft": {
     one: "{count} día",
     other: "{count} días",
@@ -355,6 +358,7 @@ export const messages = {
     "Muestra la página del CRM a propietarios y administradores, permite que los agentes lean el CRM y sincroniza Stripe. Al desactivarlo, los datos se conservan.",
   "server.settings.agentDefaultsTitle": "Predeterminados de agentes",
   "server.settings.threadsCard": "Hilos y zona horaria",
+  "server.settings.creditsCard": "Créditos",
   "server.settings.memoryTitle": "Memoria",
   "server.settings.memoryDescription": "Elige qué recuerdan y aprenden los agentes de este servidor.",
   "server.settings.memoriesCard": "Recuerdos",
@@ -394,6 +398,25 @@ export const messages = {
     "Las rutinas nuevas usan esta zona horaria cuando el mensaje no indica la zona horaria del remitente. En un servidor, el navegador también la usa después del próximo reinicio.",
   "server.settings.timezoneAutomatic": "Automática ({zone})",
   "server.settings.timezoneLoadFailed": "No se pudo cargar la zona horaria del servidor.",
+  "server.settings.connectionTitle": "Conexión",
+  "server.settings.signalHome": "Servidor de Signal",
+  "server.settings.signalHomeDescription":
+    "Los miembros se conectan a este servidor a través de este servidor de Signal. Un servidor de Signal con menos latencia da conexiones más rápidas.",
+  "server.settings.signalHomeFallback":
+    "{chosen} no responde. El servidor usa {name} hasta que {chosen} vuelva a responder.",
+  "server.settings.signalHomeMoving":
+    "El servidor se cambia a {name}. Los miembros se vuelven a conectar en unos segundos.",
+  "server.settings.signalHomeLoadFailed": "No se pudieron cargar los servidores de Signal.",
+  "server.settings.signalHomeAutomatic": "Automático (el más cercano)",
+  "server.settings.signalHomeAutomaticUsing": "Automático ({name})",
+  "server.settings.signalHomeOption": "{name} · {latency}",
+  "server.settings.signalHomeLatency": "{latency} ms",
+  "server.settings.signalHomeNoAnswer": "Sin respuesta",
+  "server.settings.signalHomePlaceHelsinki1": "Helsinki 1",
+  "server.settings.signalHomePlaceHelsinki2": "Helsinki 2",
+  "server.settings.signalHomePlaceSanJose": "San José",
+  "server.settings.signalHomePlaceSydney": "Sídney",
+  "server.settings.signalHomePlaceSingapore": "Singapur",
   "server.settings.voiceModel.section": "Reconocimiento de voz",
   "server.settings.voiceModel.description":
     "Los agentes de este servidor usan este modelo para transcribir el sonido de los vídeos que no tienen subtítulos.",
@@ -411,6 +434,12 @@ export const messages = {
   "server.settings.agentTaskLimitDescription":
     "Cuántos hilos puede ejecutar a la vez cada agente que no tiene un límite propio.",
   "server.settings.agentTaskLimitDefault": "Predeterminado ({count})",
+  "server.settings.mediaApprovalCredits": "Preguntar antes de gastar más de",
+  "server.settings.mediaApprovalCreditsUnit": "créditos",
+  "server.settings.mediaApprovalCreditsLoadFailed":
+    "No se pudo cargar el límite de aprobación de créditos de este servidor.",
+  "server.settings.mediaApprovalAgents": "Los agentes pueden usar créditos",
+  "server.settings.mediaApprovalAsk": "Preguntar cuando se necesiten créditos",
   "server.settings.memoryLimit": "Recuerdos por agente",
   "server.settings.memoryLimitDescription": "Cuántos recuerdos puede guardar cada agente en este servidor.",
   "server.settings.memoryLimitLoadFailed": "No se pudo cargar el límite de recuerdos de este servidor.",

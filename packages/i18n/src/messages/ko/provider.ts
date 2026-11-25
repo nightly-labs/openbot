@@ -96,6 +96,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "{host}에서 {name} 로그인을 시작하는 중…",
   "provider.codeLogin.pageOpening": "{host}에서 {name} 로그인 페이지를 여는 중…",
   "provider.codeLogin.linkStep": "{name}에 로그인하세요. OpenBot이 알아서 이어서 진행해요.",
+  "provider.codeLogin.thisComputerDescription": "이 컴퓨터의 브라우저에서 이 링크를 여세요. OpenBot이 여기서 기다려요.",
+  "provider.codeLogin.copyLink": "링크 복사",
   "provider.codeLogin.chatgptDeviceSetting":
     "컴퓨터의 ChatGPT에서 보안 설정을 열고 Codex용 기기 코드 로그인을 켜세요. 회사 계정은 워크스페이스 관리자가 켜요.",
 
@@ -230,6 +232,7 @@ export const messages = {
   "provider.account.apiKey": "API 키",
   "provider.account.listLabel": "{name} 계정",
   "provider.account.usedBy": "{agents}이(가) 사용 중",
+  "provider.account.sameEmail": "{name}과(와) 같은 이메일",
   "provider.account.failed": "로그인 실패",
   "provider.account.moreActions": "{name} 추가 작업",
   "provider.account.renameLabel": "{name}의 이름",

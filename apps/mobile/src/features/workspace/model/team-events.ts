@@ -106,6 +106,10 @@ export function syncEventQueries(
   if (event.type === "library-folders-changed") {
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverLibraryFolders(scope, serverId) });
   }
+  if (event.type === "host-turn-limits-changed") {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.serverTurnLimits(scope, serverId) });
+    return;
+  }
   if (event.type === "usage-credits-changed") {
     void queryClient.invalidateQueries({ queryKey: queryKeys.planLimits(scope, serverId) });
     return;

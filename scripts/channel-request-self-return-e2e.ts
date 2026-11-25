@@ -88,8 +88,10 @@ try {
     },
   });
   channels = service;
+  const openTasks = new Set<string>();
   const returns = new ChannelRequestReturns(service, mailbox, {
     agentExists: (agentId) => agents.some((item) => item.id === agentId),
+    taskOpen: (taskId) => openTasks.has(taskId),
     delivered: () => Effect.void,
     error: (error) => {
       throw error;

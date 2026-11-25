@@ -103,6 +103,7 @@ import {
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   DEFAULT_EXTERNAL_LINK_PREFERENCE,
   DEFAULT_MACHINE_ALERT_SETTINGS,
+  DEFAULT_MEDIA_APPROVAL_CREDITS_SETTING,
   DEFAULT_MEMORY_REVIEW_INTERVAL,
   DEFAULT_PROMPT_CACHE_TTL,
   DEFAULT_PROVIDER_ACCOUNT_ID,
@@ -144,6 +145,7 @@ import {
   MESSAGE_PIN_THREAD_TITLE_LIMIT,
   MESSAGE_PINS_LIMIT,
   MESSAGE_PINS_LIST_LIMIT,
+  type MediaApprovalCreditsSetting,
   type MemoryReviewPreference,
   type MessagePinner,
   nextBrowserProfileHue,
@@ -163,6 +165,7 @@ import {
   type ProviderModelVisibility,
   parseAgentAccessChange,
   parseBrowserProxyAddress,
+  parseMediaApprovalCreditsUpdate,
   parseProviderModelVisibilityChange,
   parseSetMcpAccessInput,
   providerEnvironmentProblem,
@@ -248,6 +251,7 @@ import { type MockCrmSeed, mockCrm } from "./mock-crm";
 import { createMockEvents } from "./mock-events";
 import { createMockGitHubConnector } from "./mock-github-connector";
 import { createMockHostPersonality } from "./mock-host-personality";
+import { createMockHostSignalHome } from "./mock-host-signal-home";
 import { createMockHostTimezone } from "./mock-host-timezone";
 import { createMockHostTurnLimits } from "./mock-host-turn-limits";
 import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
@@ -504,7 +508,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let approvalAutomation = clone<ApprovalAutomationPreference>(DEFAULT_APPROVAL_AUTOMATION_PREFERENCE);
   let busyMessageMode: BusyMessageModePreference = { mode: DEFAULT_BUSY_MESSAGE_MODE };
   let agentDefaults: AgentDefaults = { ...DEFAULT_AGENT_DEFAULTS };
-  const hostTurnLimits = createMockHostTurnLimits();
+  const hostTurnLimits = createMockHostTurnLimits(() => emitAgentEvent({ type: "host-turn-limits-changed" }));
   let agentMemoryLimit: AgentMemoryLimitPreference = { limit: DEFAULT_AGENT_MEMORY_LIMIT };
   let memoryReview: MemoryReviewPreference = { interval: DEFAULT_MEMORY_REVIEW_INTERVAL };
   let skillLearning: SkillLearningPreference = { mode: DEFAULT_SKILL_LEARNING_MODE };
@@ -513,6 +517,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let promptCacheTtl: PromptCacheTtlSetting = { ...DEFAULT_PROMPT_CACHE_TTL };
   let claudeUserSetup: ClaudeUserSetupSetting = { ...DEFAULT_CLAUDE_USER_SETUP };
   let cacheExpiryCompaction: CacheExpiryCompactionSetting = { ...DEFAULT_CACHE_EXPIRY_COMPACTION };
+  let mediaApprovalCredits: MediaApprovalCreditsSetting = { ...DEFAULT_MEDIA_APPROVAL_CREDITS_SETTING };
   let claudeCompactWindow: ClaudeCompactWindowSetting = { ...DEFAULT_CLAUDE_COMPACT_WINDOW };
   const providerVariables = new Map<
     ProviderEnvironmentProvider,
@@ -3565,6 +3570,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       respondToApproval: async () => undefined,
       readPendingApproval: async () => null,
+      readMediaApproval: async () => ({ media: null, hold: null }),
+      respondToMediaApproval: async () => undefined,
+      respondToCreditsHold: async () => null,
+      setCreditsAskMuted: async () => undefined,
+      readCreditsAskMuted: async () => ({ muted: false }),
       listPendingPrompts: async () => (runtimeSnapshot ? clone(runtimeSnapshot.pendingPrompts) : []),
       respondToBrowserSecret: async (input) => {
         for (const listener of agentListeners)
@@ -3691,6 +3701,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       restartHost: async () => {},
       ...createMockHostUpdate(options),
       ...createMockHostTimezone(),
+      ...createMockHostSignalHome(),
       ...createMockHostVoiceModel(),
       ...hostTurnLimits,
       ...createMockHostPersonality(),
@@ -3734,6 +3745,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (typeof enabled !== "boolean") throw new Error("Invalid cache expiry compaction setting.");
         cacheExpiryCompaction = { enabled };
         return clone(cacheExpiryCompaction);
+      },
+      getMediaApprovalCredits: async () => clone(mediaApprovalCredits),
+      setMediaApprovalCredits: async (update) => {
+        const parsed = parseMediaApprovalCreditsUpdate(update);
+        if (!parsed) throw new Error("Invalid media approval credits.");
+        mediaApprovalCredits = { ...mediaApprovalCredits, ...parsed };
+        return clone(mediaApprovalCredits);
       },
       getClaudeUserSetup: async () => clone(claudeUserSetup),
       setClaudeUserSetup: async (enabled) => {

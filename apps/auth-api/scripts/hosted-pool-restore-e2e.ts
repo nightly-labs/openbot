@@ -470,7 +470,7 @@ async function restoreWaitsAndOldMachinesStepAside() {
       w.sandboxes.length === 0 &&
       waitAlerts().length === 1 &&
       waitAlerts()[0] ===
-        `🛠️ **Restore waits** · standard server · eur · ${waiting.serverId.slice(0, 8)} · no ready VPS02 in AMS-01`,
+        `🛠️ **Restore waits** · standard server · eur · ${waiting.serverId.slice(0, 8)} · no ready VPS02 in AMS-01, FRA-01`,
     { row: waited, alerts: w.alerts },
   );
   const waitingStatus = await w.status(waiting.serverId);

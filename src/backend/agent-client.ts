@@ -40,6 +40,7 @@ export interface AgentClient {
   readonly structuredOutput?: boolean;
   readonly canReleaseProcess?: () => boolean;
   readonly runsBackgroundWork?: () => boolean;
+  runsTurn?(externalThreadId: string, turnId: string): boolean;
   readonly replaceForNextTurn?: (threadIds: readonly string[]) => Effect.Effect<boolean>;
   start(): void;
   stop(): Effect.Effect<void, ProviderClientOperationError>;
@@ -54,6 +55,7 @@ export interface AgentClient {
   relaysMcpServer?(externalThreadId: string, config: McpServerConfig): boolean;
   holdsBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
   wakesAfterBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
+  wakeAfterLostWork?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
   archiveThread?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
   newestTurnId?(externalThreadId: string): Effect.Effect<string | null, ProviderClientOperationError>;
   nameThread?(externalThreadId: string, name: string): Effect.Effect<void, ProviderClientOperationError>;
@@ -109,6 +111,12 @@ export class ProviderSessionBusyError extends ProviderTurnActiveError {
   }
 }
 
+export class ProviderSettingsConflictError extends Error {
+  constructor(readonly providerName: string) {
+    super(sourceText("error.provider.acpSettingsConflict", { provider: providerName }));
+  }
+}
+
 export class ProviderStoppedError extends Error {
   constructor(
     readonly providerName: string,
@@ -152,6 +160,17 @@ const BUN_PROCESSOR_FEATURE_MISSING = /\bthis CPU is missing \S+ support,? (?:wh
 
 export function reportsMissingProcessorFeature(output: string, illegalInstruction: boolean): boolean {
   return BUN_PROCESSOR_FEATURE_MISSING.test(output) || (illegalInstruction && PROCESSOR_FEATURE_MISSING.test(output));
+}
+
+const LARGE_MEMORY_PAGES = /\bpage-size\.cc\b|\bCompile-time page size does not match\b/u;
+const IPV6_MISSING = /\b(?:AF_INET6|enforce_kernel_ipv6_support)\b/u;
+
+export function unsupportedKernelReason(
+  output: string,
+): "error.provider.largeMemoryPages" | "error.provider.ipv6Missing" | null {
+  if (LARGE_MEMORY_PAGES.test(output)) return "error.provider.largeMemoryPages";
+  if (IPV6_MISSING.test(output)) return "error.provider.ipv6Missing";
+  return null;
 }
 
 const EXIT_DETAIL_LIMIT = 300;

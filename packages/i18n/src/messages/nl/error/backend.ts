@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "Events zijn niet beschikbaar op deze host.",
   "error.backend.databaseIntegrity": "De database van OpenBot heeft de integriteitscontrole niet doorstaan.",
+  "error.backend.creditsHoldAdminOnly":
+    "Alleen een eigenaar of beheerder van deze server kan agents credits laten gebruiken.",
+  "error.backend.creditsHoldShort": "Er zijn nog niet genoeg credits.",
   "error.backend.webhookRouteLimit": "Een host kan maximaal {limit} webhookroutines hebben.",
   "error.backend.webhookSettingsInvalid": "Controleer de webhookinstellingen en probeer het opnieuw.",
   "error.backend.webhookSenderSecretInvalid":
@@ -70,6 +73,12 @@ export const messages = {
     "Comprimeren maakt deze chat niet kleiner: na twee keer comprimeren gebruikt hij nog {percent}% van het contextvenster van het model, dus OpenBot stopt met comprimeren. Tools en instructies gebruiken het grootste deel van het venster. Zet de MCP-servers of computerbediening uit die deze agent niet nodig heeft, of kies een model met een groter venster. Start daarna een nieuwe chat.",
   "error.backend.contextCompactionStopped":
     "Twee compressies van deze chat zijn na elkaar mislukt, dus OpenBot comprimeert hem niet meer automatisch. Elke poging stuurt de hele chat naar het model en gebruikt je abonnementslimiet. Kies ‘Nu comprimeren’ om het opnieuw te proberen, of start een nieuwe chat.",
+  "error.backend.contextCompactionRetrying":
+    "De provider kon deze chat niet comprimeren en probeert het opnieuw. Nieuwe berichten in deze chat wachten tot het comprimeren klaar is. Als het niet snel klaar is, stopt OpenBot het en verstuurt je berichten.",
+  "error.backend.contextCompactionFailed":
+    "Het comprimeren van deze chat is mislukt. De chat is niet gewijzigd. Wachtende berichten gaan nu naar de agent.",
+  "error.backend.contextCompactionTimedOut":
+    "Het comprimeren van deze chat duurde te lang, dus OpenBot heeft het gestopt. De chat is niet gewijzigd. Wachtende berichten gaan nu naar de agent.",
   "error.backend.providerModelAtCapacity":
     "Het model zit aan zijn capaciteit. De provider probeert het over een paar minuten opnieuw. Stop de beurt en kies een ander model om nu door te gaan.",
   "error.backend.providerRetrying":
@@ -113,6 +122,16 @@ export const messages = {
   "error.backend.channelLeadTimedOut": "De kanaalleider reageerde niet op tijd. Kies een lid of probeer het opnieuw.",
   "error.backend.channelLeadFailed":
     "De kanaalleider kon dit bericht niet doorsturen. Kies een lid of probeer het opnieuw.",
+  "error.backend.channelLeadBusy":
+    "Het model van de kanaalleider is nu bezet. Probeer het over een paar minuten opnieuw, of kies een lid.",
+  "error.backend.channelLeadOffline":
+    "Het model van de kanaalleider verloor de verbinding. Probeer het opnieuw, of kies een lid.",
+  "error.backend.channelLeadSignIn":
+    "De aanmelding bij de provider van de kanaalleider is verlopen. Meld je opnieuw aan, of kies een lid.",
+  "error.backend.channelLeadModelGone":
+    "Het model van de kanaalleider is niet beschikbaar. Kies een ander model voor de leider, of kies een lid.",
+  "error.backend.channelLeadRefused":
+    "Het model van de kanaalleider weigerde dit verzoek. Kies een lid, of een ander model voor de leider.",
   "error.backend.channelRequestMemberRequired": "Kies een lid voor dit verzoek.",
   "error.backend.channelDeliveryNotCreated": "De bezorging in het kanaal is niet gemaakt.",
   "error.backend.channelAssignmentStopped": "Deze kanaalopdracht is gestopt of vervangen.",
@@ -303,7 +322,11 @@ export const messages = {
   "error.backend.mcpServerExited":
     "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
   "error.backend.mcpServerExitedWithOutput": "De server is gestopt voordat hij antwoordde. Hij schreef: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "De server is niet gestart, omdat de download is mislukt. Controleer de internetverbinding en probeer het opnieuw.",
   "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot kon de MCP-server {name} niet starten, omdat het programma ervan niet is geïnstalleerd op de computer waarop OpenBot draait. Installeer de app die {name} levert op die computer, of zet {name} uit in Marktplaats, Apps.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} stopte met wachten voordat de server was gestart, dus de agents ervan krijgen de tools van deze server niet.",
   "error.backend.mcpServerStoppedDuringCall": "De MCP-server stopte voordat hij op deze aanroep antwoordde.",
@@ -427,6 +450,10 @@ export const messages = {
     "De proxy {name} heeft de aanmelding geweigerd, dus de pagina is niet geopend.",
   "error.backend.browserSystemProxyFailed":
     "De proxy in de instellingen van de computer waarop OpenBot draait reageert niet of heeft de verbinding geweigerd, dus de pagina is niet geopend. Controleer de proxy-instellingen van die computer.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "De site of de proxy in de instellingen van de computer waarop OpenBot draait heeft de verbinding zonder antwoord gesloten, dus de pagina is niet geopend. Als geen enkele site opent, controleer dan de proxy-instellingen van die computer.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "De site of de proxy van dit browserprofiel heeft de verbinding zonder antwoord gesloten, dus de pagina is niet geopend. Als geen enkele site opent, controleer dan de proxy van het profiel.",
   "error.backend.browserProxyComputerUnreachable":
     "De computer van dit profiel reageert niet, dus de pagina is niet geopend.",
   "error.backend.browserProxyComputerLocalAddress":
@@ -435,6 +462,8 @@ export const messages = {
     "Het beveiligingscertificaat van deze site wordt niet vertrouwd, dus de pagina is niet geopend.",
   "error.backend.browserLowMemory":
     "Deze server heeft weinig geheugen, dus de browser kan geen tabblad meer openen. Sluit een tabblad, of wacht tot andere agents klaar zijn.",
+  "error.backend.browserNoMemory":
+    "Deze server heeft bijna geen geheugen meer, dus de browser kan nu geen tabblad openen. Wacht tot andere agents klaar zijn en probeer het dan opnieuw.",
   "error.backend.browserOpenFailed": "Kan {url} niet openen: {reason}",
   "error.backend.popupSecureInput":
     "Pop-ups worden geblokkeerd tijdens beveiligde invoer. Rond de beveiligde invoer af of annuleer deze, en probeer het opnieuw vanaf de pagina.",

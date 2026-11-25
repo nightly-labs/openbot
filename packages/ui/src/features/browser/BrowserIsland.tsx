@@ -9,6 +9,7 @@ import { RichMessageText } from "@openbot/ui/features/conversation/RichMessageTe
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { useText } from "@openbot/ui/text";
 import { Match, Show, Switch } from "solid-js";
+import type { MediaApprovalControls } from "../conversation/MediaApprovalCard";
 
 export type BrowserIslandContent = BrowserDockIsland;
 
@@ -39,6 +40,7 @@ export interface BrowserIslandFaceProps {
   onRespondSecret: (input: LocalBrowserSecretResponse) => Promise<void>;
   onAnswerPrompt: (requestId: string | number, answers: Record<string, string[]>) => Promise<boolean>;
   onRespondApproval: (requestId: string | number, decision: "accept" | "decline") => Promise<boolean>;
+  media?: MediaApprovalControls | undefined;
   onDismissReply: (id: string) => void;
   onOpenChat?: (() => void) | undefined;
   onSelectAgent: (agentId: string) => void;
@@ -139,6 +141,7 @@ export function BrowserIslandFace(props: BrowserIslandFaceProps) {
                   approval={current().approval}
                   onApprove={() => props.onRespondApproval(current().approval.requestId, "accept")}
                   onReject={() => props.onRespondApproval(current().approval.requestId, "decline")}
+                  media={props.media}
                 />
               )}
             </Show>

@@ -3,6 +3,10 @@ import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runti
 
 export const CREDIT_MEDIA_KINDS = ["image", "video"] as const;
 export type CreditMediaGenerationKind = (typeof CREDIT_MEDIA_KINDS)[number];
+export const CREDIT_MEDIA_PREFERRED_MODELS: Readonly<Record<CreditMediaGenerationKind, string>> = {
+  image: "gpt-image-2.6",
+  video: "seedance-2.5",
+};
 export const CREDIT_MEDIA_PRICE_UNITS = ["item", "second"] as const;
 export type CreditMediaPriceUnit = (typeof CREDIT_MEDIA_PRICE_UNITS)[number];
 export const CREDIT_MEDIA_JOB_STATUSES = ["queued", "processing", "completed", "failed", "canceled"] as const;
@@ -63,10 +67,19 @@ export interface CreditMediaModel {
   maxCount: number;
   promptRequired: boolean;
   prices: readonly CreditMediaPrice[];
+  welcome?: true;
+}
+
+export interface CreditMediaUnavailableModel {
+  id: string;
+  kind: CreditMediaGenerationKind;
+  name: string;
+  variant: string | null;
 }
 
 export interface CreditMediaCatalog {
   models: readonly CreditMediaModel[];
+  unavailable?: readonly CreditMediaUnavailableModel[];
 }
 
 export interface CreditMediaJobRequest {
@@ -101,6 +114,7 @@ export interface CreditMediaJob {
 export interface CreditMediaBalance {
   wallet: CreditMediaWallet;
   available: number;
+  welcome?: number;
 }
 
 export interface CreditMediaCostInput {
@@ -224,7 +238,7 @@ export function parseCreditMediaModel(value: unknown): CreditMediaModel | null {
   if (!isBoolean(value.audio) || !isBoolean(value.promptRequired) || !Array.isArray(value.prices)) return null;
   const prices = value.prices.map(parsePrice).filter((price): price is CreditMediaPrice => price !== null);
   if (prices.length === 0 || prices.length !== value.prices.length) return null;
-  return {
+  const model: CreditMediaModel = {
     id: value.id,
     kind: value.kind,
     name: value.name,
@@ -243,12 +257,28 @@ export function parseCreditMediaModel(value: unknown): CreditMediaModel | null {
     promptRequired: value.promptRequired,
     prices,
   };
+  if (value.welcome === true) model.welcome = true;
+  return model;
+}
+
+function parseUnavailableModel(value: unknown): CreditMediaUnavailableModel | null {
+  if (!isDynamicRecord(value) || !isCreditMediaModelId(value.id) || !isOneOf(CREDIT_MEDIA_KINDS, value.kind))
+    return null;
+  if (!isString(value.name) || value.name.length === 0 || value.name.length > 120) return null;
+  const variant = nullableText(value.variant, 40);
+  if (variant === undefined) return null;
+  return { id: value.id, kind: value.kind, name: value.name, variant };
 }
 
 export function parseCreditMediaCatalog(value: unknown): CreditMediaCatalog | null {
   if (!isDynamicRecord(value) || !Array.isArray(value.models)) return null;
+  const models = value.models.map(parseCreditMediaModel).filter((model): model is CreditMediaModel => model !== null);
+  if (!Array.isArray(value.unavailable)) return { models };
   return {
-    models: value.models.map(parseCreditMediaModel).filter((model): model is CreditMediaModel => model !== null),
+    models,
+    unavailable: value.unavailable
+      .map(parseUnavailableModel)
+      .filter((model): model is CreditMediaUnavailableModel => model !== null),
   };
 }
 
@@ -296,5 +326,14 @@ export function parseCreditMediaJob(value: unknown): CreditMediaJob | null {
 export function parseCreditMediaBalance(value: unknown): CreditMediaBalance | null {
   if (!isDynamicRecord(value) || !isOneOf(CREDIT_MEDIA_WALLETS, value.wallet)) return null;
   const available = isCreditAmount(value.available) ? value.available : null;
-  return available === null ? null : { wallet: value.wallet, available };
+  if (available === null) return null;
+  const balance: CreditMediaBalance = { wallet: value.wallet, available };
+  if (isCreditAmount(value.welcome) && value.welcome > 0) balance.welcome = Math.min(value.welcome, available);
+  return balance;
+}
+
+export function creditMediaSpendable(balance: Pick<CreditMediaBalance, "available" | "welcome">, welcome: boolean) {
+  const kept = balance.welcome ?? 0;
+  const paid = Math.max(0, balance.available - kept);
+  return welcome ? Math.max(kept, paid) : paid;
 }

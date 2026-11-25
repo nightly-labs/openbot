@@ -232,6 +232,9 @@ export const messages = {
   "server.rail.delete": "Server löschen",
   "server.rail.hide": "Server ausblenden",
   "server.rail.showLocal": "{name} anzeigen",
+  "server.rail.hiddenServers": "Ausgeblendete Server",
+  "server.rail.hideFailed": "{name} konnte nicht ausgeblendet werden",
+  "server.rail.showFailed": "{name} konnte nicht eingeblendet werden",
   "server.plan.daysLeft": {
     one: "{count} Tag",
     other: "{count} Tage",
@@ -359,6 +362,7 @@ export const messages = {
     "Die CRM-Seite für Eigentümer und Admins zeigen, Agenten das CRM lesen lassen und Stripe synchronisieren. Beim Ausschalten bleiben die Daten erhalten.",
   "server.settings.agentDefaultsTitle": "Standardwerte für Agenten",
   "server.settings.threadsCard": "Threads und Zeitzone",
+  "server.settings.creditsCard": "Credits",
   "server.settings.memoryTitle": "Gedächtnis",
   "server.settings.memoryDescription": "Lege fest, was sich Agenten auf diesem Server merken und was sie lernen.",
   "server.settings.memoriesCard": "Erinnerungen",
@@ -398,6 +402,25 @@ export const messages = {
     "Neue Routinen verwenden diese Zeitzone, wenn die Nachricht die Zeitzone des Absenders nicht angibt. Auf einem Server verwendet auch der Browser sie nach dem nächsten Neustart.",
   "server.settings.timezoneAutomatic": "Automatisch ({zone})",
   "server.settings.timezoneLoadFailed": "Die Zeitzone des Servers konnte nicht geladen werden.",
+  "server.settings.connectionTitle": "Verbindung",
+  "server.settings.signalHome": "Signal-Server",
+  "server.settings.signalHomeDescription":
+    "Mitglieder verbinden sich über diesen Signal-Server mit diesem Server. Ein Signal-Server mit geringerer Latenz ergibt schnellere Verbindungen.",
+  "server.settings.signalHomeFallback":
+    "{chosen} antwortet nicht. Der Server nutzt {name}, bis {chosen} wieder antwortet.",
+  "server.settings.signalHomeMoving":
+    "Der Server wechselt zu {name}. Mitglieder verbinden sich in wenigen Sekunden neu.",
+  "server.settings.signalHomeLoadFailed": "Die Signal-Server konnten nicht geladen werden.",
+  "server.settings.signalHomeAutomatic": "Automatisch (nächster)",
+  "server.settings.signalHomeAutomaticUsing": "Automatisch ({name})",
+  "server.settings.signalHomeOption": "{name} · {latency}",
+  "server.settings.signalHomeLatency": "{latency} ms",
+  "server.settings.signalHomeNoAnswer": "Keine Antwort",
+  "server.settings.signalHomePlaceHelsinki1": "Helsinki 1",
+  "server.settings.signalHomePlaceHelsinki2": "Helsinki 2",
+  "server.settings.signalHomePlaceSanJose": "San José",
+  "server.settings.signalHomePlaceSydney": "Sydney",
+  "server.settings.signalHomePlaceSingapore": "Singapur",
   "server.settings.voiceModel.section": "Spracherkennung",
   "server.settings.voiceModel.description":
     "Agenten auf diesem Server verwenden dieses Modell, um den Ton von Videos ohne Untertitel zu transkribieren.",
@@ -415,6 +438,12 @@ export const messages = {
   "server.settings.agentTaskLimitDescription":
     "Wie viele Threads jeder Agent gleichzeitig ausführen kann, wenn er kein eigenes Limit hat.",
   "server.settings.agentTaskLimitDefault": "Standard ({count})",
+  "server.settings.mediaApprovalCredits": "Fragen bei mehr als",
+  "server.settings.mediaApprovalCreditsUnit": "Credits",
+  "server.settings.mediaApprovalCreditsLoadFailed":
+    "Die Credit-Freigabegrenze dieses Servers konnte nicht geladen werden.",
+  "server.settings.mediaApprovalAgents": "Agenten dürfen Credits verwenden",
+  "server.settings.mediaApprovalAsk": "Fragen, wenn Credits nötig sind",
   "server.settings.memoryLimit": "Erinnerungen pro Agent",
   "server.settings.memoryLimitDescription": "Wie viele Erinnerungen jeder Agent auf diesem Server behalten kann.",
   "server.settings.memoryLimitLoadFailed": "Das Erinnerungslimit dieses Servers konnte nicht geladen werden.",

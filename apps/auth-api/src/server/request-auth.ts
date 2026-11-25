@@ -10,7 +10,7 @@ import { adminTokenMatches } from "./admin-token";
 import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
 import { AgentTemplates } from "./agent-templates";
 import { type FcmRelaySender, sharedFcmSender } from "./android-notification-relay";
-import { AuthOperationError, AuthService, AuthServiceError } from "./auth-service";
+import { AuthOperationError, AuthService, AuthServiceError, readStoreReviewSignIn } from "./auth-service";
 import { BillingError, type BillingService } from "./billing-service";
 import { CompanySignInError, CompanySignInService } from "./company-sign-in";
 import type { ContactMessageServices } from "./contact-message";
@@ -36,6 +36,7 @@ import { GitHubInstallationTokens, GitHubInstallationTokensError } from "./githu
 import { createHostedBilling } from "./hosted-billing";
 import { type HostedServerService, HostedServerServiceError } from "./hosted-server-service";
 import { HostedSiteInputError } from "./hosted-site-contract";
+import { HostedSiteStorageError } from "./hosted-site-effects";
 import { enforceHostedSiteReportRateLimit as enforceReportRateLimit } from "./hosted-site-request-policy";
 import { adoptUnlinkedHostedSites, resolveHostedSiteScope } from "./hosted-site-server";
 import { HostedSiteService } from "./hosted-site-service";
@@ -47,7 +48,7 @@ import {
   type MarketplaceMutationKind,
   MarketplaceRateLimitError,
 } from "./marketplace-request-policy";
-import { mediaUpstreamFromBindings } from "./media-upstream";
+import { mediaGatewayFromBinding } from "./media-gateway";
 import { Referrals } from "./referrals";
 import {
   deliverPendingRemoteAuthEvents,
@@ -88,6 +89,7 @@ export function requestAuthService(): AuthService {
     repository: new D1AuthRepository(bindings.DB),
     delivery: exposeDevelopmentCode ? null : createEmailCodeDelivery(bindings, analytics),
     exposeDevelopmentCode,
+    storeReviewSignIn: readStoreReviewSignIn(bindings.STORE_REVIEW_EMAIL, bindings.STORE_REVIEW_CODE),
     flushSessionRevocations: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
     profileChanged: (userId) => notifyAccountProfileChanged(bindings, userId, schedule),
     analytics,
@@ -161,7 +163,7 @@ export function requestCreditMedia(): CreditMediaService {
   const bindings = requireWorkerBindings(env);
   return new CreditMediaService({
     database: bindings.DB,
-    upstream: mediaUpstreamFromBindings(bindings),
+    gateway: mediaGatewayFromBinding(bindings.MEDIA_GATEWAY),
     now: () => Date.now(),
     analytics: accountAnalytics(bindings),
   });
@@ -225,7 +227,28 @@ export function hostedSiteErrorResponse(error: unknown): Response {
     if (error.retryAfterSeconds !== undefined) response.headers.set("Retry-After", String(error.retryAfterSeconds));
     return response;
   }
+  if (error instanceof HostedSiteStorageError) return siteStorageUnavailableResponse(error);
   return authErrorResponse(error);
+}
+
+const SITE_STORAGE_RETRY_AFTER_SECONDS = 60;
+
+function siteStorageUnavailableResponse(error: HostedSiteStorageError): Response {
+  const reference = requestFailureReference();
+  console.error("Site storage request failed:", reference, error._tag);
+  const response = json(
+    {
+      error: {
+        code: "site_storage_unavailable",
+        message:
+          "Site storage did not answer for a short time. A site that is online stays online. Try again in about 1 minute.",
+        reference,
+      },
+    },
+    503,
+  );
+  response.headers.set("Retry-After", String(SITE_STORAGE_RETRY_AFTER_SECONDS));
+  return response;
 }
 
 let githubInstallationTokens: { key: string; service: GitHubInstallationTokens } | null = null;
@@ -580,12 +603,16 @@ export function authErrorResponse(error: unknown): Response {
     }
     return response;
   }
-  const reference = `auth/${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
+  const reference = requestFailureReference();
   console.error("Account service request failed:", reference, errorType(error));
   return json(
     { error: { code: "internal_error", message: "The account service could not complete the request.", reference } },
     500,
   );
+}
+
+function requestFailureReference(): string {
+  return `auth/${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
 }
 
 function errorType(error: unknown): string {

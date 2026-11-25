@@ -61,18 +61,26 @@ export class PreferenceStore<A extends object> {
     return { ...this.#value };
   }
 
-  readonly set = Effect.fn("PreferenceStore.set")(function* (this: PreferenceStore<A>, value: A) {
+  readonly update = Effect.fn("PreferenceStore.update")(function* (
+    this: PreferenceStore<A>,
+    change: (current: A) => A,
+  ) {
     yield* this.#writes.withPermit(
       Effect.uninterruptible(
-        writePreferenceFile(this.#path, { version: 1, ...value }).pipe(
-          Effect.tap(() =>
-            Effect.sync(() => {
-              this.#value = { ...value };
-            }),
-          ),
-        ),
+        Effect.suspend(() => {
+          const value = change(this.get());
+          return writePreferenceFile(this.#path, { version: 1, ...value }).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                this.#value = { ...value };
+              }),
+            ),
+          );
+        }),
       ),
     );
     return this.get();
   });
+
+  readonly set = (value: A) => this.update(() => value);
 }

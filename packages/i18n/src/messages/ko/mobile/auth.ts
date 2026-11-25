@@ -31,7 +31,7 @@ export const messages = {
   "mobile.auth.signIn.helpTitle": "QR 코드는 어디에 있나요?",
   "mobile.auth.signIn.helpStep1": "1. 컴퓨터에서 OpenBot을 열어요.",
   "mobile.auth.signIn.helpStep2": "2. 설정 → 모바일 연결로 이동해요.",
-  "mobile.auth.signIn.helpStep3": "3. QR 코드 생성을 선택한 다음 여기서 스캔해요.",
+  "mobile.auth.signIn.helpStep3": "3. 휴대폰 추가 → 예, 로그인을 선택한 다음 여기서 코드를 스캔해요.",
   "mobile.auth.signIn.emailButton": "이메일로 계속",
   "mobile.auth.done.title": "연결됨",
   "mobile.auth.done.body": "로그인했어요.",

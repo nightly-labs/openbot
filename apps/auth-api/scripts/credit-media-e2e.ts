@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { CREDIT_MEDIA_REQUEST_PART, type CreditMediaJob } from "@openbot/contracts/credit-media";
+import { CREDIT_MEDIA_REQUEST_PART } from "@openbot/contracts/credit-media";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { createAccountAnalytics } from "../src/server/account-analytics";
@@ -14,21 +14,19 @@ import {
   readCreditMediaSubmission,
 } from "../src/server/credit-media-service";
 import { CREDIT_HOLD_FIRST_CHECK_MS } from "../src/server/credit-spending";
-import { MediaUpstream, mediaUpstreamFromBindings } from "../src/server/media-upstream";
+import { HttpMediaGateway, mediaGatewayFromBinding } from "../src/server/media-gateway";
 import { sqliteD1 } from "./sqlite-d1";
 
 const ROOT = resolve(import.meta.dirname, "../../..");
 const OUT = join(ROOT, ".openbot-build", "credit-media-e2e");
 const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
-const UPSTREAM = "https://media.upstream.test";
-const ARTIFACTS = "https://cdn.upstream.test";
-const API_KEY = "media-key-e2e-secret";
+const GATEWAY = "https://openbot-media-gateway.internal";
+const ACCOUNT = "https://account.test";
 const OWNER = "owner";
 const OUTSIDER = "outsider";
 const SERVER_ID = "host-studio";
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
-const LIVE = process.argv.includes("--live");
-const LIVE_POLL_LIMIT = 60;
+const WEBP = new Uint8Array([0x52, 0x49, 0x46, 0x46, 4, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]);
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
 function check(name: string, passed: boolean, detail?: unknown) {
@@ -41,7 +39,9 @@ console.error = (...values: unknown[]) => {
   logs.push(values.map((value) => (typeof value === "string" ? value : JSON.stringify(value))).join(" "));
 };
 
-function migratedDatabase(): DatabaseSync {
+type WelcomeStart = "used" | "unissued";
+
+function migratedDatabase(welcome: WelcomeStart = "used"): DatabaseSync {
   const database = new DatabaseSync(":memory:");
   database.exec("PRAGMA foreign_keys = ON");
   for (const name of readdirSync(MIGRATIONS).sort()) database.exec(readFileSync(join(MIGRATIONS, name), "utf8"));
@@ -58,6 +58,15 @@ function migratedDatabase(): DatabaseSync {
            ('purchase:outsider', '${OUTSIDER}', NULL, 500, 'purchase', '${OUTSIDER}', 'cs_outsider', 1),
            ('transfer:studio', NULL, '${SERVER_ID}', 2000, 'transfer', '${OWNER}', 'studio', 1);
   `);
+  if (welcome === "used") {
+    for (const user of [OWNER, OUTSIDER]) {
+      database
+        .prepare(
+          "INSERT INTO credit_grants(grant_id, user_id, credits_tenths, remaining_tenths, source, scope, starts_at, expires_at, created_at) VALUES (?, ?, 100, 0, 'welcome', 'welcome', 0, ?, 0)",
+        )
+        .run(`welcome:${user}`, user, Date.UTC(9999, 11, 31));
+    }
+  }
   return database;
 }
 
@@ -111,79 +120,182 @@ function addModels(database: DatabaseSync) {
   `);
 }
 
-interface FakeJob {
-  status: string;
-  artifacts: { url: string; content_type: string }[];
+interface FakeRoute {
+  specs: DynamicRecord;
+  welcome: string | null;
 }
 
-function fakeUpstream() {
+interface FakeJob {
+  upstream: string;
+  status: string;
+  outputs: number;
+}
+
+interface FakeSubmit {
+  request: DynamicRecord;
+  files: { role: string; type: string; size: number }[];
+}
+
+function partTypes(raw: string, role: string): string[] {
+  return [...raw.matchAll(new RegExp(`name="${role}"[^\\r\\n]*\\r\\nContent-Type: ([^\\r\\n]+)`, "g"))].map(
+    (match) => match[1] ?? "",
+  );
+}
+
+function fakeGateway() {
+  const routes = new Map<string, Map<string, FakeRoute>>();
   const jobs = new Map<string, FakeJob>();
-  const submits: { kind: string; body: DynamicRecord; idempotencyKey: string | null; authorized: boolean }[] = [];
-  const downloads: { url: string; authorized: boolean }[] = [];
+  const submits: FakeSubmit[] = [];
+  const polls: string[] = [];
+  const outputs: string[] = [];
+  let active = "router";
   let submitStatus = 200;
+  let modelsStatus = 200;
   let sequence = 0;
+  let gate: { arrived: () => void; released: Promise<void> } | null = null;
+  const routesOf = (upstream: string) => {
+    const existing = routes.get(upstream);
+    if (existing) return existing;
+    const created = new Map<string, FakeRoute>();
+    routes.set(upstream, created);
+    return created;
+  };
+  const listed = (upstream: string) =>
+    [...routes.entries()].flatMap(([name, models]) =>
+      [...models.entries()].flatMap(([id, route]) => {
+        if (name === upstream)
+          return [
+            {
+              id,
+              upstream: name,
+              specs: route.specs,
+              ...(route.welcome ? { welcome: { upstream: route.welcome } } : {}),
+            },
+          ];
+        return [];
+      }),
+    );
+  const routedFor = (upstream: string, model: string, funding: unknown) => {
+    if (funding === "welcome") return [...routes.values()].some((models) => models.get(model)?.welcome === upstream);
+    return routes.get(upstream)?.has(model) === true;
+  };
   const fetch = async (input: string, init?: RequestInit) => {
     const url = new URL(input);
-    const headers = new Headers(init?.headers);
-    const authorized = headers.get("Authorization") === `Bearer ${API_KEY}`;
-    if (url.origin === ARTIFACTS) {
-      downloads.push({ url: input, authorized: headers.has("Authorization") });
-      return new Response(PNG, { headers: { "Content-Type": "image/png", "Content-Length": String(PNG.length) } });
+    if (url.origin !== GATEWAY) return Response.json({ error: { code: "wrong_origin" } }, { status: 421 });
+    if (url.pathname === "/v1/models") {
+      if (modelsStatus !== 200) return Response.json({ error: { code: "down" } }, { status: modelsStatus });
+      return Response.json({ models: listed(url.searchParams.get("upstream") ?? active) });
     }
-    if (!authorized) return Response.json({ error: { code: "unauthorized" } }, { status: 401 });
-    const moved = url.pathname.match(/^\/files\/(.+)$/);
-    if (moved) return new Response(null, { status: 302, headers: { Location: `${ARTIFACTS}/${moved[1]}` } });
-    const generate = url.pathname.match(/^\/v1\/(image|video)-router\/generate$/);
-    if (generate && init?.method === "POST") {
-      const body = JSON.parse(String(init.body));
-      submits.push({
-        kind: generate[1] ?? "",
-        body: isDynamicRecord(body) ? body : {},
-        idempotencyKey: headers.get("Idempotency-Key"),
-        authorized,
+    if (url.pathname === "/v1/jobs" && init?.method === "POST") {
+      const body = init.body ?? null;
+      const form = await new Request(input, { method: "POST", body }).formData();
+      const raw = await new Request(input, { method: "POST", body }).text();
+      const head = form.get("request");
+      const request = typeof head === "string" ? JSON.parse(head) : null;
+      const files = ["first", "last", "reference"].flatMap((role) => {
+        const types = partTypes(raw, role);
+        return form
+          .getAll(role)
+          .flatMap((entry, index) =>
+            typeof entry === "string" ? [] : [{ role, type: types[index] ?? "", size: entry.size }],
+          );
       });
+      submits.push({ request: isDynamicRecord(request) ? request : {}, files });
+      if (gate) {
+        const waiting = gate;
+        gate = null;
+        waiting.arrived();
+        await waiting.released;
+      }
       if (submitStatus !== 200) return Response.json({ error: { code: "upstream_said_no" } }, { status: submitStatus });
+      const upstream = isDynamicRecord(request) && typeof request.upstream === "string" ? request.upstream : "";
+      const model = isDynamicRecord(request) ? request.model : null;
+      if (typeof model !== "string" || !routedFor(upstream, model, request.funding))
+        return Response.json({ error: { code: "unrouted" } }, { status: 403 });
       sequence += 1;
-      const id = `up-job-${sequence}`;
-      jobs.set(id, { status: "queued", artifacts: [] });
-      return Response.json({ data: { job: { id, status: "queued" }, next_poll_after_seconds: 3 } });
+      const id = `${upstream}-job-${sequence}`;
+      jobs.set(`${upstream}/${id}`, { upstream, status: "queued", outputs: 0 });
+      return Response.json({ upstream, id, status: "queued", pollAfterSeconds: 3 });
     }
-    const job = url.pathname.match(/^\/v1\/jobs\/([^/]+)\/(status|result)$/);
-    const stored = job ? jobs.get(decodeURIComponent(job[1] ?? "")) : undefined;
+    const job = url.pathname.match(/^\/v1\/jobs\/([^/]+)\/([^/]+)(?:\/(result|outputs)(?:\/(\d+))?)?$/);
+    const key = job ? `${decodeURIComponent(job[1] ?? "")}/${decodeURIComponent(job[2] ?? "")}` : "";
+    const stored = jobs.get(key);
     if (!job || !stored) return Response.json({ error: { code: "not_found" } }, { status: 404 });
-    const id = decodeURIComponent(job[1] ?? "");
-    if (job[2] === "status") return Response.json({ data: { id, status: stored.status, next_poll_after_seconds: 4 } });
-    return Response.json({ data: { id, artifacts: stored.artifacts } });
+    const id = decodeURIComponent(job[2] ?? "");
+    if (!job[3]) {
+      polls.push(key);
+      return Response.json({ upstream: stored.upstream, id, status: stored.status, pollAfterSeconds: 4 });
+    }
+    if (job[3] === "result")
+      return Response.json({
+        artifacts: Array.from({ length: stored.outputs }, () => ({
+          mimeType: "image/png",
+          width: 64,
+          height: 64,
+          durationMs: null,
+        })),
+      });
+    const index = Number(job[4]);
+    if (!(index < stored.outputs)) return Response.json({ error: { code: "not_found" } }, { status: 404 });
+    outputs.push(`${key}/${index}`);
+    return new Response(PNG, { headers: { "Content-Type": "image/png", "Content-Length": String(PNG.length) } });
   };
-  const complete = (providerJobId: string, count: number) => {
-    const job = jobs.get(providerJobId);
+  const find = (providerJobId: string) => {
+    const job = [...jobs.entries()].find(([key]) => key.endsWith(`/${providerJobId}`));
     if (!job) throw new Error(`No fake job ${providerJobId}`);
-    job.status = "completed";
-    job.artifacts = Array.from({ length: count }, (_, index) => ({
-      url: `${ARTIFACTS}/${providerJobId}/${index}.png`,
-      content_type: "image/png",
-    }));
-  };
-  const moveArtifacts = (providerJobId: string) => {
-    const job = jobs.get(providerJobId);
-    if (!job) throw new Error(`No fake job ${providerJobId}`);
-    job.artifacts = job.artifacts.map((artifact) => ({
-      ...artifact,
-      url: artifact.url.replace(ARTIFACTS, `${UPSTREAM}/files`),
-    }));
+    return job;
   };
   return {
-    jobs,
     submits,
-    moveArtifacts,
-    downloads,
+    polls,
+    outputs,
     fetch,
-    complete,
+    route: (upstream: string, model: string, route: Partial<FakeRoute> = {}) =>
+      routesOf(upstream).set(model, { specs: route.specs ?? {}, welcome: route.welcome ?? null }),
+    unroute: (upstream: string, model: string) => routesOf(upstream).delete(model),
+    activate: (upstream: string) => {
+      active = upstream;
+    },
+    setStatus: (providerJobId: string, status: string) => {
+      find(providerJobId)[1].status = status;
+    },
+    complete: (providerJobId: string, count: number) => {
+      const [, job] = find(providerJobId);
+      job.status = "completed";
+      job.outputs = count;
+    },
+    forget: (providerJobId: string) => {
+      jobs.delete(find(providerJobId)[0]);
+    },
     setSubmitStatus: (status: number) => {
       submitStatus = status;
     },
-    lastJobId: () => `up-job-${sequence}`,
+    setModelsStatus: (status: number) => {
+      modelsStatus = status;
+    },
+    holdSubmits: () => {
+      let arrived = () => {};
+      let release = () => {};
+      const arrival = new Promise<void>((resolve) => {
+        arrived = resolve;
+      });
+      const released = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      gate = { arrived, released };
+      return { arrived: arrival, release };
+    },
+    lastJobId: () => {
+      const last = [...jobs.keys()].at(-1);
+      return last?.split("/")[1] ?? "";
+    },
   };
+}
+
+function routedGateway() {
+  const gateway = fakeGateway();
+  for (const model of ["image-one", "video-one", "video-off", "video-frames"]) gateway.route("router", model);
+  return gateway;
 }
 
 async function run<T>(effect: Effect.Effect<T, BillingError | BillingOperationError>): Promise<T> {
@@ -221,15 +333,14 @@ function multipart(request: DynamicRecord | string, files: { role: string; value
   const form = new FormData();
   form.set(CREDIT_MEDIA_REQUEST_PART, typeof request === "string" ? request : JSON.stringify(request));
   for (const file of files) form.append(file.role, file.value);
-  return new Request(`${UPSTREAM}/v1/media/jobs`, { method: "POST", body: form });
+  return new Request(`${ACCOUNT}/v1/media/jobs`, { method: "POST", body: form });
 }
 
-async function fakeUpstreamFlow() {
+async function gatewayFlow() {
   const database = migratedDatabase();
   addModels(database);
   let clock = 1_000_000;
-  const upstream = fakeUpstream();
-  const media = new MediaUpstream({ baseUrl: UPSTREAM, apiKey: API_KEY, fetch: upstream.fetch });
+  const upstream = routedGateway();
   const tracked: DynamicRecord[] = [];
   const sends: Promise<void>[] = [];
   const analytics = createAccountAnalytics({
@@ -245,11 +356,11 @@ async function fakeUpstreamFlow() {
   });
   const service = new CreditMediaService({
     database: sqliteD1(database),
-    upstream: media,
+    gateway: new HttpMediaGateway(upstream.fetch),
     now: () => clock,
     analytics,
   });
-  const offline = new CreditMediaService({ database: sqliteD1(database), upstream: null, now: () => clock });
+  const offline = new CreditMediaService({ database: sqliteD1(database), gateway: null, now: () => clock });
   const owner: CreditMediaPayer = { wallet: "personal", userId: OWNER };
   const outsider: CreditMediaPayer = { wallet: "personal", userId: OUTSIDER };
   const studio: CreditMediaPayer = { wallet: "server", serverId: SERVER_ID };
@@ -261,24 +372,21 @@ async function fakeUpstreamFlow() {
       )
       .all();
 
-  check(
-    "the media bindings give no upstream while a secret is missing",
-    mediaUpstreamFromBindings({ MEDIA_API_URL: UPSTREAM }) === null &&
-      mediaUpstreamFromBindings({ MEDIA_API_KEY: API_KEY }) === null,
-  );
+  check("a Worker without the gateway binding has no media gateway", mediaGatewayFromBinding(undefined) === null);
   const empty = await run(offline.catalog());
-  check("the catalog is empty while no upstream is set", empty.models.length === 0, empty);
+  check("the catalog is empty while no gateway is bound", empty.models.length === 0, empty);
   const offlineSubmit = await failure(offline.submit(owner, OWNER, submission("image-one")));
-  check("a job without an upstream fails as unavailable", offlineSubmit.code === "media_unavailable", offlineSubmit);
+  check("a job without a gateway fails as unavailable", offlineSubmit.code === "media_unavailable", offlineSubmit);
 
   const catalog = await run(service.catalog());
   check(
-    "the catalog lists only enabled models, images first, with their D1 prices and no upstream ids",
+    "the catalog lists only enabled models, images first, with their D1 prices and no upstream names",
     catalog.models.map((model) => model.id).join(",") === "image-one,video-one,video-frames" &&
       catalog.models[1]?.prices.length === 2 &&
       catalog.models[1]?.prices.every((price) => price.silentCredits !== null) === true &&
       catalog.models[0]?.prices[0]?.silentCredits === null &&
-      !JSON.stringify(catalog).includes("up-"),
+      catalog.unavailable?.length === 0 &&
+      !JSON.stringify(catalog).includes("router"),
     catalog,
   );
 
@@ -317,19 +425,21 @@ async function fakeUpstreamFlow() {
   const image = await run(service.submit(owner, OWNER, imageRequest));
   const imageSubmit = upstream.submits.at(-1);
   check(
-    "an image job holds its price, and the upstream gets its own model id, the options and the job id as idempotency key",
+    "an image job holds its price, and the gateway gets the public model, the upstream, the paid funding, the options and the job id",
     image.status === "queued" &&
       image.credits === 3 &&
       (await balance(owner)) === 297 &&
-      imageSubmit?.kind === "image" &&
-      imageSubmit.idempotencyKey === imageRequest.request.jobId &&
-      imageSubmit.body.model === "up-image-1" &&
-      imageSubmit.body.quality === "high" &&
-      imageSubmit.body.num_images === 2 &&
-      imageSubmit.body.aspect_ratio === "16:9" &&
-      Array.isArray(imageSubmit.body.image_urls) &&
-      String(imageSubmit.body.image_urls[0]).startsWith("data:image/png;base64,"),
-    { image, body: imageSubmit?.body },
+      imageSubmit?.request.kind === "image" &&
+      imageSubmit.request.jobId === imageRequest.request.jobId &&
+      imageSubmit.request.model === "image-one" &&
+      imageSubmit.request.upstream === "router" &&
+      imageSubmit.request.funding === "paid" &&
+      imageSubmit.request.count === 2 &&
+      imageSubmit.request.aspect === "16:9" &&
+      imageSubmit.request.inputs === undefined &&
+      JSON.stringify(imageSubmit.files) ===
+        JSON.stringify([{ role: "reference", type: "image/png", size: PNG.length }]),
+    { image, submit: imageSubmit },
   );
   const submitsBefore = upstream.submits.length;
   const again = await run(service.submit(owner, OWNER, imageRequest));
@@ -339,8 +449,7 @@ async function fakeUpstreamFlow() {
     again,
   );
   const imageProvider = upstream.lastJobId();
-  const upstreamJob = upstream.jobs.get(imageProvider);
-  if (upstreamJob) upstreamJob.status = "processing";
+  upstream.setStatus(imageProvider, "processing");
   const running = await run(service.job(owner, image.jobId));
   check(
     "a running job keeps its hold and returns the upstream poll interval",
@@ -377,25 +486,23 @@ async function fakeUpstreamFlow() {
 
   const output = await run(service.output(owner, image.jobId, 1));
   const bytes = new Uint8Array(await output.arrayBuffer());
-  const download = upstream.downloads.at(-1);
   check(
-    "an output streams the file as a private attachment, and the artifact host never gets the API key",
+    "an output streams the gateway file as a private attachment",
     output.status === 200 &&
       output.headers.get("Content-Type") === "image/png" &&
       output.headers.get("Cache-Control") === "private, no-store" &&
       output.headers.get("Content-Disposition") === "attachment" &&
       output.headers.get("X-Content-Type-Options") === "nosniff" &&
       bytes.length === PNG.length &&
-      download?.url.endsWith(`/${imageProvider}/1.png`) === true &&
-      download.authorized === false,
-    { headers: Object.fromEntries(output.headers), download },
+      upstream.outputs.at(-1) === `router/${imageProvider}/1`,
+    { headers: Object.fromEntries(output.headers), outputs: upstream.outputs },
   );
   const missingOutput = await failure(service.output(owner, image.jobId, 5));
   check("an output index past the list is not found", missingOutput.code === "media_job_not_found", missingOutput);
 
   const videoRequest = submission("video-one", { resolution: "1080p", duration: 10, audio: true }, [
     { role: "first", bytes: PNG, mimeType: "image/png" },
-    { role: "last", bytes: PNG, mimeType: "image/webp" },
+    { role: "last", bytes: WEBP, mimeType: "image/webp" },
   ]);
   const video = await run(service.submit(owner, OWNER, videoRequest));
   const videoSubmit = upstream.submits.at(-1);
@@ -403,17 +510,15 @@ async function fakeUpstreamFlow() {
     "a video job holds price per second times duration, and sends frames, duration and audio",
     video.credits === 155 &&
       (await balance(owner)) === 142 &&
-      videoSubmit?.kind === "video" &&
-      videoSubmit.body.duration === 10 &&
-      videoSubmit.body.resolution === "1080p" &&
-      videoSubmit.body.aspect_ratio === "16:9" &&
-      videoSubmit.body.generate_audio === true &&
-      String(videoSubmit.body.image_url).startsWith("data:image/png;base64,") &&
-      String(videoSubmit.body.end_image_url).startsWith("data:image/webp;base64,"),
-    { video, body: videoSubmit?.body },
+      videoSubmit?.request.kind === "video" &&
+      videoSubmit.request.duration === 10 &&
+      videoSubmit.request.resolution === "1080p" &&
+      videoSubmit.request.aspect === "16:9" &&
+      videoSubmit.request.audio === true &&
+      videoSubmit.files.map((file) => `${file.role}:${file.type}`).join(",") === "first:image/png,last:image/webp",
+    { video, submit: videoSubmit },
   );
-  const videoJob = upstream.jobs.get(upstream.lastJobId());
-  if (videoJob) videoJob.status = "failed";
+  upstream.setStatus(upstream.lastJobId(), "failed");
   const failed = await run(service.job(owner, video.jobId));
   check(
     "a failed generation frees its hold and uses no credits",
@@ -427,11 +532,10 @@ async function fakeUpstreamFlow() {
   const silentSubmit = upstream.submits.at(-1);
   check(
     "a video job with audio off holds the lower silent price",
-    silent.credits === 80 && (await balance(owner)) === 217 && silentSubmit?.body.generate_audio === false,
-    { silent, body: silentSubmit?.body },
+    silent.credits === 80 && (await balance(owner)) === 217 && silentSubmit?.request.audio === false,
+    { silent, submit: silentSubmit },
   );
-  const silentJob = upstream.jobs.get(upstream.lastJobId());
-  if (silentJob) silentJob.status = "failed";
+  upstream.setStatus(upstream.lastJobId(), "failed");
   await run(service.job(owner, silent.jobId));
 
   const refusedStatuses: [number, string, string][] = [
@@ -448,7 +552,7 @@ async function fakeUpstreamFlow() {
     const submitsAfter = upstream.submits.length;
     const view = await run(service.submit(owner, OWNER, request));
     check(
-      `an upstream ${status} at submit frees the hold, and the same job sent again does not reach the upstream`,
+      `a gateway ${status} at submit frees the hold, and the same job sent again does not reach the gateway`,
       refused.code === code &&
         view.status === "failed" &&
         view.failure === outcome &&
@@ -465,9 +569,9 @@ async function fakeUpstreamFlow() {
   upstream.setSubmitStatus(200);
   const heldAfterUnknown = await balance(owner);
   const retried = await run(service.submit(owner, OWNER, retryRequest));
-  const retriedSubmits = upstream.submits.filter((item) => item.idempotencyKey === retryRequest.request.jobId);
+  const retriedSubmits = upstream.submits.filter((item) => item.request.jobId === retryRequest.request.jobId);
   check(
-    "an unknown upstream answer keeps the hold, and a retry sends the same idempotency key once more",
+    "an unknown gateway answer keeps the hold, and a retry sends the same job id once more",
     unknown.code === "media_busy" &&
       heldAfterUnknown === 295.5 &&
       retried.status === "queued" &&
@@ -521,14 +625,14 @@ async function fakeUpstreamFlow() {
     { disabled, missing },
   );
   check(
-    "invalid jobs never reach the upstream or change the balance",
+    "invalid jobs never reach the gateway or change the balance",
     upstream.submits.length === submitsBeforeInvalid && (await balance(owner)) === balanceBeforeInvalid,
   );
   const tooExpensive = await failure(
     service.submit(outsider, OUTSIDER, submission("video-one", { resolution: "1080p", duration: 10 })),
   );
   check(
-    "a job that costs more than the free credits is refused before the upstream",
+    "a job that costs more than the free credits is refused before the gateway",
     tooExpensive.code === "credits_spend_not_enough" && upstream.submits.length === submitsBeforeInvalid,
     tooExpensive,
   );
@@ -545,13 +649,12 @@ async function fakeUpstreamFlow() {
   check(
     "a model that needs a first frame takes it with no prompt, uses the model defaults, and sends no audio switch",
     framesOnly.credits === 5 &&
-      framesSubmit?.body.duration === 5 &&
-      framesSubmit.body.resolution === "720p" &&
-      framesSubmit.body.aspect_ratio === "16:9" &&
-      framesSubmit.body.generate_audio === undefined &&
-      framesSubmit.body.end_image_url === undefined &&
-      String(framesSubmit.body.image_url).startsWith("data:image/png;base64,"),
-    { framesOnly, body: framesSubmit?.body },
+      framesSubmit?.request.duration === 5 &&
+      framesSubmit.request.resolution === "720p" &&
+      framesSubmit.request.aspect === "16:9" &&
+      framesSubmit.request.audio === null &&
+      framesSubmit.files.map((file) => file.role).join(",") === "first",
+    { framesOnly, submit: framesSubmit },
   );
 
   const reused = submission("image-one");
@@ -560,10 +663,10 @@ async function fakeUpstreamFlow() {
   check("a job id sent again with other options is a conflict", conflict.code === "credits_job_conflict", conflict);
 
   const lost = await run(service.submit(owner, OWNER, submission("image-one")));
-  upstream.jobs.delete(upstream.lastJobId());
+  upstream.forget(upstream.lastJobId());
   const lostView = await run(service.job(owner, lost.jobId));
   check(
-    "a job that the upstream no longer knows is failed and uses no credits",
+    "a job that the gateway no longer knows (404) is failed and uses no credits",
     lostView.status === "failed" && lostView.credits === 0,
     lostView,
   );
@@ -621,25 +724,6 @@ async function fakeUpstreamFlow() {
     { emptyStudioHold, before: studioBeforeEmpty, after: await balance(studio) },
   );
 
-  const movedJob = await run(service.submit(owner, OWNER, submission("image-one")));
-  const movedProvider = upstream.lastJobId();
-  upstream.complete(movedProvider, 1);
-  upstream.moveArtifacts(movedProvider);
-  await run(service.job(owner, movedJob.jobId));
-  const downloadsBeforeMove = upstream.downloads.length;
-  const movedOutput = await run(service.output(owner, movedJob.jobId, 0));
-  const movedBytes = new Uint8Array(await movedOutput.arrayBuffer());
-  const movedDownload = upstream.downloads.at(-1);
-  check(
-    "an output that redirects to another host follows the redirect without the API key",
-    movedOutput.status === 200 &&
-      movedBytes.length === PNG.length &&
-      upstream.downloads.length === downloadsBeforeMove + 1 &&
-      movedDownload?.url === `${ARTIFACTS}/${movedProvider}/0.png` &&
-      movedDownload.authorized === false,
-    { movedDownload },
-  );
-
   database.exec("UPDATE credit_media_prices SET credits = 2.5, updated_at = 2 WHERE model_id = 'image-one'");
   const repriced = await run(service.catalog());
   const repricedJob = await run(service.submit(owner, OWNER, submission("image-one", { count: 3 })));
@@ -666,7 +750,7 @@ async function fakeUpstreamFlow() {
     )
     .all();
   check("no wallet has fewer credits than zero or than its holds", negative.length === 0, negative);
-  check("only completed generations have a charge in the ledger", ledgerSpends().length === 3, ledgerSpends());
+  check("only completed generations have a charge in the ledger", ledgerSpends().length === 2, ledgerSpends());
   await Promise.all(sends.splice(0));
   const sent = (profileId: string, expected: Readonly<Record<string, string | number | boolean>>) =>
     tracked.filter(
@@ -710,16 +794,14 @@ async function fakeUpstreamFlow() {
     .all()
     .flatMap((row) => [row.job_id, row.provider_job_id].filter((id) => typeof id === "string"));
   check(
-    "generation analytics never send a prompt, a job, a server or an upstream address",
+    "generation analytics never send a prompt, a job, a server, an upstream or the gateway address",
     tracked.length > 0 &&
-      [SERVER_ID, "upstream.test", "lighthouse", API_KEY, ...jobIds].every((value) => !sentText.includes(value)),
+      [SERVER_ID, "media-gateway", "lighthouse", "router", ...jobIds].every((value) => !sentText.includes(value)),
     tracked.length,
   );
   check(
-    "every upstream request carries the API key, and logs never show the key, a prompt or an upstream URL",
-    upstream.submits.every((item) => item.authorized) &&
-      logs.length > 0 &&
-      logs.every((line) => !line.includes(API_KEY) && !line.includes("lighthouse") && !line.includes("upstream.test")),
+    "logs never show a prompt or the gateway address",
+    logs.length > 0 && logs.every((line) => !line.includes("lighthouse") && !line.includes("media-gateway")),
     { logs: logs.length },
   );
 
@@ -749,7 +831,7 @@ async function fakeUpstreamFlow() {
     trail,
   );
   check(
-    "the credit audit records each refused upstream submit with the upstream status and the model",
+    "the credit audit records each refused gateway submit with the gateway status and the model",
     [422, 401, 402, 429, 500].every(
       (status) =>
         upstreamDetail(status).filter(
@@ -784,80 +866,335 @@ async function fakeUpstreamFlow() {
   );
   const trailText = JSON.stringify(trail);
   check(
-    "the credit audit never keeps a prompt, the API key or an upstream address",
-    trail.length > 0 && [API_KEY, "lighthouse", "upstream.test"].every((value) => !trailText.includes(value)),
+    "the credit audit never keeps a prompt or the gateway address",
+    trail.length > 0 && ["lighthouse", "media-gateway"].every((value) => !trailText.includes(value)),
     trail.length,
   );
 }
 
-async function liveFlow() {
-  const upstream = mediaUpstreamFromBindings({
-    MEDIA_API_URL: process.env.MEDIA_API_URL,
-    MEDIA_API_KEY: process.env.MEDIA_API_KEY,
-  });
-  if (!upstream) {
-    check("live: MEDIA_API_URL and MEDIA_API_KEY are set", false);
-    return;
-  }
+async function routingFlow() {
   const database = migratedDatabase();
-  const specs = {
-    aspects: ["1:1"],
-    defaultAspect: "1:1",
-    resolutions: [],
-    defaultResolution: null,
-    durations: [],
-    defaultDuration: null,
-    frames: 0,
-    references: 0,
-    audio: false,
-    maxCount: 1,
-    promptRequired: true,
-  };
-  database
-    .prepare(
-      `INSERT INTO credit_media_models(model_id, upstream_id, kind, name, maker, variant, position, enabled, specs, upstream_params, updated_at)
-       VALUES ('z-image-turbo', 'z-image', 'image', 'Z-Image Turbo', 'Alibaba', NULL, 1, 1, ?1, '{}', 1)`,
-    )
-    .run(JSON.stringify(specs));
-  database.exec(
-    "INSERT INTO credit_media_prices(model_id, resolution, unit, credits, updated_at) VALUES ('z-image-turbo', '', 'item', 0.5, 1)",
-  );
-  const service = new CreditMediaService({ database: sqliteD1(database), upstream, now: () => Date.now() });
-  const owner: CreditMediaPayer = { wallet: "personal", userId: OWNER };
-  const request = submission("z-image-turbo", { prompt: "A small blue paper boat on calm water, studio light" });
-  let job: CreditMediaJob = await run(service.submit(owner, OWNER, request));
-  check("live: the upstream accepts one image job", job.status === "queued" || job.status === "processing", job);
-  for (let poll = 0; poll < LIVE_POLL_LIMIT && (job.status === "queued" || job.status === "processing"); poll += 1) {
-    await new Promise((resolvePoll) => setTimeout(resolvePoll, Math.max(1, job.pollAfterSeconds) * 1_000));
-    job = await run(service.job(owner, job.jobId));
-  }
-  const balance = (await run(service.balance(owner))).available;
-  check(
-    "live: the job completes, charges half a credit, and lists one image",
-    job.status === "completed" && job.credits === 0.5 && balance === 299.5 && job.outputs.length === 1,
-    { status: job.status, credits: job.credits, failure: job.failure, outputs: job.outputs, balance },
-  );
-  if (job.status !== "completed") return;
-  const output = await run(service.output(owner, job.jobId, 0));
-  const bytes = new Uint8Array(await output.arrayBuffer());
-  const type = output.headers.get("Content-Type") ?? "";
-  check("live: the image streams through the Worker", type.startsWith("image/") && bytes.length > 1_000, {
-    type,
-    bytes: bytes.length,
+  addModels(database);
+  let clock = 1_000_000;
+  const gateway = routedGateway();
+  const service = new CreditMediaService({
+    database: sqliteD1(database),
+    gateway: new HttpMediaGateway(gateway.fetch),
+    now: () => clock,
   });
-  await writeFile(join(OUT, `live-output.${type.split("/")[1] ?? "bin"}`), bytes);
+  const owner: CreditMediaPayer = { wallet: "personal", userId: OWNER };
+  const studio: CreditMediaPayer = { wallet: "server", serverId: SERVER_ID };
+  const holdUpstream = (jobId: string) =>
+    database.prepare("SELECT upstream FROM credit_holds WHERE job_id = ?").get(jobId)?.upstream ?? null;
+  const holdCount = () => database.prepare("SELECT COUNT(*) AS count FROM credit_holds").get()?.count;
+  const submitsFor = (jobId: string) => gateway.submits.filter((entry) => entry.request.jobId === jobId);
+
+  const routerJob = await run(service.submit(owner, OWNER, submission("image-one")));
+  const routerProvider = gateway.lastJobId();
+  check(
+    "a job starts on the upstream that the gateway routes the model to, and its hold names that upstream",
+    gateway.submits.at(-1)?.request.upstream === "router" && holdUpstream(routerJob.jobId) === "router",
+    { routerJob, upstream: holdUpstream(routerJob.jobId) },
+  );
+
+  gateway.route("tasks", "image-one");
+  const beforeSwitch = await run(service.catalog());
+  check(
+    "a route on an upstream that is not active changes nothing",
+    beforeSwitch.models.map((model) => model.id).join(",") === "image-one,video-one,video-frames",
+    beforeSwitch.models.map((model) => model.id),
+  );
+  gateway.activate("tasks");
+  const switched = await run(service.catalog());
+  check(
+    "after a gateway switch, the catalog lists only the models routed on the active upstream, with no upstream name",
+    switched.models.map((model) => model.id).join(",") === "image-one" &&
+      !JSON.stringify(switched).includes("tasks") &&
+      !JSON.stringify(switched).includes("router"),
+    switched.models.map((model) => model.id),
+  );
+  check(
+    "a model with no route on the active upstream stays in the catalog by name only, as unavailable",
+    switched.unavailable?.map((model) => model.id).join(",") === "video-one,video-frames" &&
+      switched.unavailable.every(
+        (model) => Object.keys(model).sort().join(",") === "id,kind,name,variant" && model.name.length > 0,
+      ),
+    switched.unavailable,
+  );
+  const holdsBeforeUnrouted = holdCount();
+  const submitsBeforeUnrouted = gateway.submits.length;
+  const unrouted = await failure(
+    service.submit(
+      owner,
+      OWNER,
+      submission("video-frames", { duration: 5 }, [{ role: "first", bytes: PNG, mimeType: "image/png" }]),
+    ),
+  );
+  check(
+    "a model with no route on the active upstream is unavailable, holds nothing and sends no job",
+    unrouted.code === "media_model_unavailable" &&
+      holdCount() === holdsBeforeUnrouted &&
+      gateway.submits.length === submitsBeforeUnrouted,
+    unrouted,
+  );
+
+  const image = await run(service.submit(owner, OWNER, submission("image-one")));
+  check(
+    "after the switch, the next job goes to the new upstream and its hold names it",
+    gateway.submits.at(-1)?.request.upstream === "tasks" && holdUpstream(image.jobId) === "tasks",
+    { image, upstream: holdUpstream(image.jobId) },
+  );
+  gateway.complete(routerProvider, 1);
+  const routerDone = await run(service.job(owner, routerJob.jobId));
+  check(
+    "a job that started before the switch finishes on its first upstream",
+    routerDone.status === "completed" &&
+      gateway.polls.includes(`router/${routerProvider}`) &&
+      !gateway.polls.includes(`tasks/${routerProvider}`),
+    { routerDone, polls: gateway.polls },
+  );
+
+  gateway.route("tasks", "video-one", { specs: { resolutions: ["720p"], defaultResolution: "720p" } });
+  const narrowed = (await run(service.catalog())).models.find((model) => model.id === "video-one");
+  const submitsBeforeNarrowed = gateway.submits.length;
+  const holdsBeforeNarrowed = holdCount();
+  const notOffered = await failure(
+    service.submit(owner, OWNER, submission("video-one", { resolution: "1080p", duration: 5 })),
+  );
+  check(
+    "route specs narrow the options and prices of the catalog, and a job outside them is invalid and holds nothing",
+    JSON.stringify(narrowed?.resolutions) === JSON.stringify(["720p"]) &&
+      narrowed?.prices.map((price) => price.resolution).join(",") === "720p" &&
+      notOffered.code === "media_request_invalid" &&
+      gateway.submits.length === submitsBeforeNarrowed &&
+      holdCount() === holdsBeforeNarrowed,
+    { narrowed, notOffered },
+  );
+
+  gateway.activate("router");
+  const studioRouter = await run(service.submit(studio, null, submission("image-one")));
+  const studioRouterProvider = gateway.lastJobId();
+  gateway.activate("tasks");
+  const studioTasks = await run(service.submit(studio, null, submission("image-one")));
+  const studioTasksProvider = gateway.lastJobId();
+  gateway.complete(studioRouterProvider, 1);
+  gateway.complete(studioTasksProvider, 1);
+  clock += CREDIT_HOLD_FIRST_CHECK_MS;
+  const swept = await run(service.sweep());
+  const sweptRouter = await run(service.job(studio, studioRouter.jobId));
+  const sweptTasks = await run(service.job(studio, studioTasks.jobId));
+  check(
+    "the sweep checks each hold on its own upstream",
+    swept.settled >= 2 &&
+      sweptRouter.status === "completed" &&
+      sweptTasks.status === "completed" &&
+      gateway.polls.includes(`router/${studioRouterProvider}`) &&
+      gateway.polls.includes(`tasks/${studioTasksProvider}`),
+    { swept, sweptRouter, sweptTasks },
+  );
+
+  gateway.activate("router");
+  const legacy = await run(service.submit(owner, OWNER, submission("image-one")));
+  const legacyProvider = gateway.lastJobId();
+  gateway.activate("tasks");
+  database.prepare("UPDATE credit_holds SET upstream = NULL WHERE job_id = ?").run(legacy.jobId);
+  gateway.complete(legacyProvider, 1);
+  const legacyDone = await run(service.job(owner, legacy.jobId));
+  check(
+    "a hold from before the upstream column is checked on the router upstream",
+    legacyDone.status === "completed" && gateway.polls.at(-1) === `router/${legacyProvider}`,
+    { legacyDone, polls: gateway.polls.at(-1) },
+  );
+
+  const forgotten = await run(service.submit(owner, OWNER, submission("image-one")));
+  gateway.forget(gateway.lastJobId());
+  const forgottenJob = await run(service.job(owner, forgotten.jobId));
+  const sweptForgotten = await run(service.submit(studio, null, submission("image-one")));
+  gateway.forget(gateway.lastJobId());
+  clock += CREDIT_HOLD_FIRST_CHECK_MS;
+  await run(service.sweep());
+  const sweptForgottenJob = await run(service.job(studio, sweptForgotten.jobId));
+  check(
+    "a job that the gateway no longer knows (404) fails and frees its hold, on a poll and in the sweep",
+    forgottenJob.status === "failed" &&
+      forgottenJob.credits === 0 &&
+      sweptForgottenJob.status === "failed" &&
+      sweptForgottenJob.credits === 0,
+    { forgottenJob, sweptForgottenJob },
+  );
+
+  const sameJob = submission("image-one");
+  const submitsBefore = gateway.submits.length;
+  const gate = gateway.holdSubmits();
+  const firstSubmit = run(service.submit(owner, OWNER, sameJob));
+  await gate.arrived;
+  const secondSubmit = await run(service.submit(owner, OWNER, sameJob));
+  gate.release();
+  const firstDone = await firstSubmit;
+  gateway.complete(gateway.lastJobId(), 1);
+  const sameDone = await run(service.job(owner, sameJob.request.jobId));
+  check(
+    "a second submit of a job whose first submit is still running sends nothing, waits as queued, and then follows the one job",
+    secondSubmit.status === "queued" &&
+      firstDone.status === "queued" &&
+      gateway.submits.length === submitsBefore + 1 &&
+      sameDone.status === "completed" &&
+      sameDone.credits === firstDone.credits,
+    { secondSubmit, firstDone, submits: gateway.submits.length - submitsBefore, sameDone },
+  );
+
+  gateway.activate("router");
+  const lostReply = submission("image-one");
+  const unroutedReply = submission("video-one", { duration: 5 });
+  gateway.setSubmitStatus(502);
+  const lostFirst = await failure(service.submit(owner, OWNER, lostReply));
+  const unroutedFirst = await failure(service.submit(owner, OWNER, unroutedReply));
+  gateway.setSubmitStatus(200);
+  gateway.activate("tasks");
+  gateway.unroute("tasks", "video-one");
+  const retried = await run(service.submit(owner, OWNER, lostReply));
+  gateway.complete(gateway.lastJobId(), 1);
+  const retriedDone = await run(service.job(owner, lostReply.request.jobId));
+  check(
+    "a retry after a lost submit reply goes to the upstream that got the first request, even after a gateway switch",
+    lostFirst.code === "media_busy" &&
+      retried.status === "queued" &&
+      holdUpstream(lostReply.request.jobId) === "router" &&
+      submitsFor(lostReply.request.jobId).every((entry) => entry.request.upstream === "router") &&
+      submitsFor(lostReply.request.jobId).length === 2 &&
+      retriedDone.status === "completed",
+    { lostFirst, retried, retriedDone },
+  );
+  const unroutedRetry = await run(service.submit(owner, OWNER, unroutedReply));
+  const newJob = await failure(service.submit(owner, OWNER, submission("video-one", { duration: 5 })));
+  check(
+    "a retry of a job pinned before the switch still goes there when the model has no route on the new upstream",
+    unroutedFirst.code === "media_busy" &&
+      unroutedRetry.status === "queued" &&
+      gateway.submits.at(-1)?.request.jobId === unroutedReply.request.jobId &&
+      gateway.submits.at(-1)?.request.upstream === "router" &&
+      newJob.code === "media_model_unavailable",
+    { unroutedFirst, unroutedRetry, newJob },
+  );
+
+  gateway.activate("router");
+  const narrowedReply = submission("video-one", { resolution: "1080p", duration: 10 });
+  gateway.setSubmitStatus(502);
+  const narrowedFirst = await failure(service.submit(owner, OWNER, narrowedReply));
+  gateway.setSubmitStatus(200);
+  gateway.route("tasks", "video-one", {
+    specs: { resolutions: ["720p"], defaultResolution: "720p", durations: [5], defaultDuration: 5 },
+  });
+  gateway.activate("tasks");
+  const narrowedRetry = await run(service.submit(owner, OWNER, narrowedReply));
+  const narrowedSubmit = gateway.submits.at(-1);
+  const narrowedNew = await failure(
+    service.submit(owner, OWNER, submission("video-one", { resolution: "1080p", duration: 10 })),
+  );
+  check(
+    "a retry of a job pinned before the switch is checked against the pinned route, not a new route that narrows the options",
+    narrowedFirst.code === "media_busy" &&
+      narrowedRetry.status === "queued" &&
+      narrowedSubmit?.request.jobId === narrowedReply.request.jobId &&
+      narrowedSubmit.request.upstream === "router" &&
+      narrowedSubmit.request.resolution === "1080p" &&
+      narrowedNew.code === "media_request_invalid",
+    { narrowedFirst, narrowedRetry, submit: narrowedSubmit, narrowedNew },
+  );
+
+  gateway.setModelsStatus(503);
+  const down = await run(service.catalog());
+  const holdsBeforeDown = holdCount();
+  const downSubmit = await failure(service.submit(owner, OWNER, submission("image-one")));
+  gateway.setModelsStatus(200);
+  check(
+    "while the gateway cannot list its routes, the catalog shows every model as unavailable and a job is busy and holds nothing",
+    down.models.length === 0 &&
+      down.unavailable?.map((model) => model.id).join(",") === "image-one,video-one,video-frames" &&
+      downSubmit.code === "media_busy" &&
+      holdCount() === holdsBeforeDown,
+    { down, downSubmit },
+  );
+}
+
+async function welcomeRouteFlow() {
+  const database = migratedDatabase("unissued");
+  addModels(database);
+  const gateway = routedGateway();
+  gateway.route("router", "image-one", { welcome: "tasks" });
+  const service = new CreditMediaService({
+    database: sqliteD1(database),
+    gateway: new HttpMediaGateway(gateway.fetch),
+    now: () => 1_000_000,
+  });
+  const owner: CreditMediaPayer = { wallet: "personal", userId: OWNER };
+  const studio: CreditMediaPayer = { wallet: "server", serverId: SERVER_ID };
+  const hold = (jobId: string) =>
+    database.prepare("SELECT funding, upstream FROM credit_holds WHERE job_id = ?").get(jobId);
+
+  const catalog = await run(service.catalog());
+  const first = await run(service.balance(owner));
+  check(
+    "the catalog marks a model that the gateway gives a free route, never names that route, and the balance shows the free credits",
+    catalog.models.find((model) => model.id === "image-one")?.welcome === true &&
+      catalog.models.filter((model) => model.welcome).length === 1 &&
+      !JSON.stringify(catalog).includes("tasks") &&
+      first.available === 310 &&
+      first.welcome === 10,
+    { catalog, first },
+  );
+
+  const freeJob = submission("image-one", { count: 2 });
+  await run(service.submit(owner, OWNER, freeJob));
+  const freeSubmit = gateway.submits.at(-1)?.request;
+  const afterFree = await run(service.balance(owner));
+  const serverJob = submission("image-one");
+  await run(service.submit(studio, OWNER, serverJob));
+  const serverSubmit = gateway.submits.at(-1)?.request;
+  const unboundJob = submission("video-one", { duration: 5 });
+  await run(service.submit(owner, OWNER, unboundJob));
+  const unboundSubmit = gateway.submits.at(-1)?.request;
+  check(
+    "free credits send a model with free use to its free route as welcome funding, and a server job or a model with no free route is paid",
+    freeSubmit?.funding === "welcome" &&
+      freeSubmit.upstream === "tasks" &&
+      freeSubmit.model === "image-one" &&
+      hold(freeJob.request.jobId)?.funding === "welcome" &&
+      hold(freeJob.request.jobId)?.upstream === "tasks" &&
+      afterFree.welcome === 7 &&
+      serverSubmit?.funding === "paid" &&
+      serverSubmit.upstream === "router" &&
+      hold(serverJob.request.jobId)?.funding === "paid" &&
+      unboundSubmit?.funding === "paid" &&
+      unboundSubmit.upstream === "router" &&
+      hold(unboundJob.request.jobId)?.funding === "paid",
+    { freeSubmit, serverSubmit, unboundSubmit, afterFree },
+  );
+
+  database.prepare("UPDATE credit_grants SET remaining_tenths = 10 WHERE grant_id = ?").run(`welcome:${OWNER}`);
+  const paidJob = submission("image-one");
+  await run(service.submit(owner, OWNER, paidJob));
+  const paidSubmit = gateway.submits.at(-1)?.request;
+  check(
+    "a job that the free credits cannot cover uses paid credits and the paid route",
+    paidSubmit?.funding === "paid" &&
+      paidSubmit.upstream === "router" &&
+      hold(paidJob.request.jobId)?.funding === "paid",
+    paidSubmit,
+  );
 }
 
 let passed = false;
 try {
   await mkdir(OUT, { recursive: true });
-  await fakeUpstreamFlow();
-  if (LIVE) await liveFlow();
+  await gatewayFlow();
+  await routingFlow();
+  await welcomeRouteFlow();
   passed = checks.every((item) => item.passed);
 } finally {
   console.error = consoleError;
   await mkdir(OUT, { recursive: true });
-  await writeFile(join(OUT, "report.json"), `${JSON.stringify({ passed, live: LIVE, checks }, null, 2)}\n`);
+  await writeFile(join(OUT, "report.json"), `${JSON.stringify({ passed, checks }, null, 2)}\n`);
 }
 for (const item of checks) console.log(`${item.passed ? "ok  " : "FAIL"} ${item.name}`);
 console.log(`Report: ${join(OUT, "report.json")}`);

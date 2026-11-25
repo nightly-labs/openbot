@@ -373,7 +373,7 @@ export const messages = {
     "רק הצ'אט ״הודעה לעצמך״ והאנשים שאישרת יכולים לכתוב. אנשים אחרים לא מקבלים תשובה. כשהאפשרות כבויה, OpenBot משיב לאנשים לא מוכרים עם קוד.",
   "connector.whatsapp.workingMessage": "הודעת ״עובד על זה…״",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot שולח אותה בזמן שהסוכן עובד, ואז מחליף אותה בתשובה. בקשה שממתינה לבקשה קודמת מקבלת גם הודעת המתנה. יש לכבות כדי לשלוח רק את התשובה.",
+    "OpenBot שולח אותה בזמן שהסוכן עובד, ואז מחליף אותה בתשובה. בקשה שממתינה לבקשה קודמת מקבלת גם הודעת המתנה. במספר אישי, רק הצ'אט ״הודעה לעצמך״ מקבל את ההודעות האלה. יש לכבות כדי לשלוח רק את התשובה.",
   "connector.whatsapp.statusReactions": "תגובות סטטוס",
   "connector.whatsapp.statusReactionsDescription":
     "OpenBot מגיב עם 👀 כשהודעה מגיעה ועם ✅ כשהתשובה מוכנה. יש לכבות כדי לא לשלוח תגובות.",
@@ -446,6 +446,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "מספר אחד יכול לאשר עד {count} אנשי קשר וקבוצות.",
   "connector.whatsapp.senderGroup": "קבוצה",
   "connector.whatsapp.removeSender": "הסרה",
+  "connector.whatsapp.senderAccess": "גישה עבור {name}",
+  "connector.whatsapp.senderReplies": "יכול לתת משימות",
+  "connector.whatsapp.senderReadOnly": "קריאה בלבד",
   "connector.whatsapp.addContact": "הוספת איש קשר",
   "connector.whatsapp.addGroup": "הוספת קבוצה",
   "connector.whatsapp.contactTitle": "הוספת איש קשר",

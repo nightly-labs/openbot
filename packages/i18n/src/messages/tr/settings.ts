@@ -279,6 +279,9 @@ export const messages = {
   "settings.agentDock.xwayland.unsupported":
     "XWayland olmayan Wayland'de dock diğer uygulamaların üstünde görünemez. OpenBot penceresinde görünür.",
   "settings.agentDock.xwayland.restart": "Yeniden başlat",
+  "settings.agentDock.noCompositor.title": "OpenBot penceresinde",
+  "settings.agentDock.noCompositor.description":
+    "Masaüstünüz saydam pencereleri gösteremiyor, bu yüzden dock OpenBot penceresinde görünüyor. Diğer uygulamaların üstünde göstermek için sistem ayarlarından masaüstü efektlerini (bir kompozitör) açın ve OpenBot'u yeniden başlatın.",
   "settings.agentDock.display.title": "Ekran",
   "settings.agentDock.display.description": "O ekran bağlı değilse yuva, OpenBot penceresinin ekranına geçer.",
   "settings.agentDock.display.window": "OpenBot penceresiyle",

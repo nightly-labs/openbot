@@ -298,6 +298,9 @@ export const messages = {
   "mobile.settings.conversations.fullQualityPhotos": "Foto’s in volle kwaliteit versturen",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Als dit uit staat, verstuurt de app een kleinere kopie van elke foto, tot 2048 pixels aan de lange zijde. Die komt sneller aan op een trage verbinding. Zet dit aan om de originele foto te versturen.",
+  "mobile.settings.conversations.fullScreenCamera": "Camera op volledig scherm gebruiken",
+  "mobile.settings.conversations.fullScreenCameraFooter":
+    "Als dit aan staat, opent Camera de systeemcamera, met zoom en alle lenzen. Als dit uit staat, opent een kleine camera in de chat.",
   "mobile.settings.profile.nameUnsafe": "Verwijder regeleinden en stuurtekens uit je naam.",
   "mobile.settings.profile.nameLength": "Gebruik 3–20 tekens voor je weergavenaam.",
   "mobile.settings.profile.saveFailed": "Kan de wijzigingen niet opslaan. Probeer het opnieuw.",
