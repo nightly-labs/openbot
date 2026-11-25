@@ -12,6 +12,7 @@ export interface ThreadEventCompactionResult {
   threads: number;
   events: number;
   rewritten: number;
+  deleted: number;
   bytesBefore: number;
   bytesAfter: number;
   batches: number;
@@ -27,6 +28,7 @@ export function compactThreadEvents(
       threads: 0,
       events: 0,
       rewritten: 0,
+      deleted: 0,
       bytesBefore: 0,
       bytesAfter: 0,
       batches: 0,
@@ -41,6 +43,7 @@ export function compactThreadEvents(
       result.batches += 1;
       result.events += batch.events;
       result.rewritten += batch.rewritten;
+      result.deleted += batch.deleted;
       result.bytesBefore += batch.bytesBefore;
       result.bytesAfter += batch.bytesAfter;
       if (batch.completedThread) result.threads += 1;
