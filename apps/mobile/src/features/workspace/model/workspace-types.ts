@@ -393,6 +393,7 @@ export interface MobileWorkspaceContextValue {
   setServerHidden: (serverId: string, hidden: boolean) => Promise<void>;
   refreshServers: () => Promise<void>;
   refreshServer: (serverId: string) => Promise<void>;
+  reconnectServer: (serverId: string) => Promise<void>;
   hostedServerStarting: (serverId: string) => void;
   knownServerChecks: (serverId: string) => ServerChecks | null;
   canEditServerIdentity: (serverId: string) => boolean;

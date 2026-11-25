@@ -2088,6 +2088,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         connections.current.get(serverId)?.refresh();
         await refreshHosts();
       },
+      reconnectServer: async (serverId) => {
+        connections.current.get(serverId)?.reconnect();
+        await refreshHosts();
+      },
       hostedServerStarting,
       updateServerIdentity: async (serverId, input) => {
         const server = serversRef.current.find((candidate) => candidate.id === serverId);
