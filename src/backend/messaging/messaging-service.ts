@@ -1988,8 +1988,10 @@ export class MessagingService {
         Effect.gen({ self: this }, function* () {
           const cause = failure instanceof MessagingOperationFailed ? failure.cause : null;
           const partlySent = cause instanceof WhatsAppAnswerPartlySent;
-          if ((partlySent ? cause.cause : cause) instanceof WhatsAppRefusedError)
+          if ((partlySent ? cause.cause : cause) instanceof WhatsAppRefusedError) {
+            if (final.answer || final.replacesAnswer) this.#noteUndelivered(key, final.answer && partlySent);
             return yield* this.#forgetPost(key, post);
+          }
           const quiet = final.answer && this.#quietEnd(live.record.connectionId, post.target);
           if (quiet && partlySent) return yield* this.#forgetPost(key, post);
           const failures = (this.#finalFailures.get(key) ?? 0) + 1;
@@ -1998,7 +2000,12 @@ export class MessagingService {
           if (final.answer) {
             current = {
               ...post,
-              final: { answer: false, text: quiet ? "" : sourceText("status.messaging.failed"), reaction: null },
+              final: {
+                answer: false,
+                text: quiet ? "" : sourceText("status.messaging.failed"),
+                reaction: null,
+                replacesAnswer: true,
+              },
             };
             this.#posts.set(key, current);
             yield* this.#status.save();
@@ -2010,6 +2017,17 @@ export class MessagingService {
     );
     yield* this.#forgetPost(key, post);
   });
+
+  #noteUndelivered(key: string, partlySent: boolean): void {
+    try {
+      this.#threads.noteUndelivered(
+        key.slice(0, key.indexOf(":")),
+        sourceText(partlySent ? "status.messaging.whatsappPartlyDelivered" : "status.messaging.whatsappNotDelivered"),
+      );
+    } catch (error) {
+      this.#warn(error, "Could not mark a WhatsApp answer as not delivered.");
+    }
+  }
 
   readonly #forgetPost = Effect.fn("MessagingService.forgetPost")(function* (
     this: MessagingService,

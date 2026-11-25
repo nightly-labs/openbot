@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
 import { isNarrationItemId, showsNarration } from "@openbot/contracts/conversation-narration";
 import type {
@@ -11,6 +12,7 @@ import {
   CONVERSATION_PLAN_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
   MESSAGING_LIMITS,
+  NO_ANSWER_NOTICE_ITEM_TYPE,
 } from "@openbot/contracts/ipc";
 import type { DiscordEmbed } from "@openbot/contracts/signal-protocol/discord-api";
 import { sourceText } from "@openbot/i18n/source";
@@ -216,6 +218,7 @@ export interface MessagingThreadsHooks {
   interrupt(agentId: string, turnId: string, threadId: string): Effect.Effect<void, MessagingThreadFailed>;
   forgetThread(threadId: string): Effect.Effect<void, MessagingThreadFailed>;
   ownChat(threadId: string): boolean;
+  appendSystemMessage(agentId: string, sideThreadId: string | null, message: ConversationMessage): void;
   contextSession(agentId: string, threadId: string): string | null;
   progressUpdates(agentId: string): AgentProviderRef | null;
 }
@@ -837,6 +840,20 @@ export class MessagingThreads {
       default:
         return false;
     }
+  }
+
+  noteUndelivered(linkId: string, text: string): void {
+    const link = this.store.link(linkId);
+    if (!link) return;
+    this.#hooks.appendSystemMessage(link.agentId, this.#hooks.ownChat(link.threadId) ? null : link.threadId, {
+      id: randomUUID(),
+      author: "system",
+      source: "system",
+      status: "completed",
+      createdAt: new Date().toISOString(),
+      itemType: NO_ANSWER_NOTICE_ITEM_TYPE,
+      text,
+    });
   }
 
   #takes(threadId: string): boolean {

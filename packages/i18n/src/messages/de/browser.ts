@@ -73,6 +73,10 @@ export const messages = {
   "browser.liveView.copyFailed": "Der Text konnte nicht kopiert werden. Klicke auf die Seite und versuche es erneut.",
   "browser.liveView.pageCopied":
     "Die Seite hat Text kopiert. Wähle „Kopieren“, um ihn in deine Zwischenablage zu legen.",
+  "browser.liveView.dialog.site": "{site} meldet",
+  "browser.liveView.dialog.page": "Diese Seite meldet",
+  "browser.liveView.dialog.waiting": "Die Seite wartet auf deine Antwort.",
+  "browser.liveView.dialog.ok": "OK",
   "browser.previews.label": "Browser-Vorschauen",
   "browser.previews.resize": "Größe des rechten Bereichs ändern",
   "browser.previews.empty": "Keine Browser-Tabs",

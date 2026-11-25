@@ -287,6 +287,7 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
     interrupt: unused,
     forgetThread: () => Effect.void,
     ownChat: () => false,
+    appendSystemMessage: () => {},
     contextSession: () => null,
     progressUpdates: () => null,
   });

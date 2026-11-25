@@ -37,6 +37,8 @@ export const messages = {
   "mobile.browser.keyboard.field": "ページへの入力",
   "mobile.browser.reconnect": "再接続",
   "mobile.browser.status.connecting": "ブラウザーに接続しています…",
+  "mobile.browser.dialog.title": "ページにメッセージが表示されています",
+  "mobile.browser.dialog.ok": "OK",
   "mobile.browser.status.ended": "ライブビューが終了しました。",
   "mobile.browser.status.offline": "サーバーに接続されていません。",
   "mobile.browser.status.noTab": "{name} には開いているブラウザータブがありません。",

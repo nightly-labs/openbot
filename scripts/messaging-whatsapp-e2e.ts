@@ -5,7 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Boom } from "@hapi/boom";
-import type { MessagingConnection, WhatsAppLinkState } from "@openbot/contracts/ipc";
+import { type MessagingConnection, NO_ANSWER_NOTICE_ITEM_TYPE, type WhatsAppLinkState } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import {
@@ -196,8 +196,10 @@ class FakeSocket implements WhatsAppSocket {
   async sendMessage(jid: string, content: AnyMessageContent, options?: MiscMessageGenerationOptions) {
     if (this.ended) throw new Error("socket closed");
     const id = options?.messageId ?? `SENT${this.#phone.sent.length}`;
-    if (this.#phone.dropNext === jid) {
+    const dropsText = "text" in content && content.text === this.#phone.dropText;
+    if (this.#phone.dropNext === jid || dropsText) {
       this.#phone.dropNext = null;
+      this.#phone.dropText = null;
       this.#phone.lost.push({ jid, content, id, quotedId: null });
       setTimeout(() => this.close(428), 0);
       return { key: { remoteJid: jid, id, fromMe: true }, message: {} } satisfies WAMessage;
@@ -268,6 +270,7 @@ class FakePhone {
   readonly lookups: string[] = [];
   lookupFails = false;
   dropNext: string | null = null;
+  dropText: string | null = null;
   holdAcks = false;
   readonly lost: Sent[] = [];
   logouts = 0;
@@ -973,6 +976,94 @@ try {
         await until(() => received(agents, OWNER_JID, again.key.id ?? ""), `answer request again ${index}`);
       }
       return { posted };
+    });
+
+    await step("refused answer: the agent's chat says that WhatsApp did not deliver it (#14456)", async () => {
+      const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
+      assert.ok(link, "No conversation for the owner's chat.");
+      const notices = () =>
+        database
+          .readConversation(link.agentId, link.threadId)
+          .messages.filter((message) => message.itemType === NO_ANSWER_NOTICE_ITEM_TYPE);
+      const posts = (text: string) =>
+        phone.sent.filter(
+          (sent) =>
+            sent.jid === OWNER_JID && "text" in sent.content && sent.content.text === text && !("edit" in sent.content),
+        ).length;
+      const finishTurn = async (turnId: string, answer: string) => {
+        const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+        assert.ok(request, "No request waits in the owner's chat.");
+        await runCauseEffect(mailbox.markStarting(request.delivery.id));
+        const scope = Effect.runSync(Scope.make());
+        const turn = { agentId: link.agentId, threadId: link.threadId, turnId };
+        agents.messaging.event({ type: "turn-started", ...turn }, scope);
+        const snapshot = database.readConversation(link.agentId, link.threadId);
+        snapshot.messages.push({
+          id: `${turnId}:answer`,
+          turnId,
+          author: "assistant",
+          text: answer,
+          createdAt: new Date().toISOString(),
+          status: "completed",
+        });
+        database.persistStreamingMessage({ snapshot, messageId: `${turnId}:answer`, eventType: "item.completed" });
+        await runCauseEffect(mailbox.markTerminal(request.delivery.id, "completed", null));
+        agents.messaging.event({ type: "turn-completed", ...turn, status: "completed" }, scope);
+      };
+      const refill = async (label: string) => {
+        for (let index = 1; mailbox.unresolvedMessagingDeliveries(link.linkId).length < 2; index += 1) {
+          const again = message({ chat: OWNER_JID, fromMe: true, text: `${label} ${index}` });
+          phone.current().receive([again]);
+          await until(() => received(agents, OWNER_JID, again.key.id ?? ""), `${label} ${index}`);
+        }
+      };
+
+      const answer = "Your report is ready.";
+      phone.refused.set(OWNER_JID, "463");
+      try {
+        await finishTurn("turn-refused-answer", answer);
+        await until(() => notices().length > 0, "the not-delivered line in the agent's chat");
+      } finally {
+        phone.refused.delete(OWNER_JID);
+      }
+      const [notice] = notices();
+      assert.equal(notices().length, 1, "The refused answer got more than one line.");
+      assert.equal(notice?.author, "system");
+      assert.equal(notice?.text, sourceText("status.messaging.whatsappNotDelivered"));
+      assert.ok(!notice?.text.includes("463"), "The line shows the WhatsApp error code.");
+      assert.equal(posts(answer), 1, "OpenBot posted a refused answer again.");
+      const messages = database.readConversation(link.agentId, link.threadId).messages;
+      assert.equal(messages.at(-1)?.id, notice?.id, "The line is not after the refused answer.");
+      assert.equal(connection(messaging)?.state, "connected", "A refused answer changed the connection state.");
+      await refill("refused request again");
+
+      const lateAnswer = "Your invoice is ready.";
+      const failureText = sourceText("status.messaging.failed");
+      const failuresBefore = posts(failureText);
+      await runCauseEffect(messaging.setWhatsAppWorkingMessage(OWNER, false));
+      phone.dropText = lateAnswer;
+      phone.refused.set(OWNER_JID, "463");
+      try {
+        await finishTurn("turn-refused-after-close", lateAnswer);
+        await until(
+          () => posts(failureText) > failuresBefore,
+          "the failure notice in place of the lost answer",
+          90_000,
+        );
+        await until(() => notices().length > 1, "the not-delivered line after a closed socket", 30_000);
+      } finally {
+        phone.dropText = null;
+        phone.refused.delete(OWNER_JID);
+        await runCauseEffect(messaging.setWhatsAppWorkingMessage(OWNER, true));
+      }
+      assert.equal(notices().length, 2, "A refusal after a closed socket did not add exactly one line.");
+      assert.equal(notices().at(-1)?.text, sourceText("status.messaging.whatsappNotDelivered"));
+      assert.ok(
+        phone.lost.some((sent) => "text" in sent.content && sent.content.text === lateAnswer),
+        "The socket did not drop the first send of the answer.",
+      );
+      await refill("refused after close again");
+      return { notice: notice?.text, posts: posts(answer), afterClose: notices().at(-1)?.text };
     });
 
     await step(

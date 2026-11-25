@@ -2,6 +2,12 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { dirname, join } from "node:path";
+import {
+  BROWSER_VIEW_DIALOG_QUERY,
+  type BrowserViewDialog,
+  decodeBrowserViewHostMessage,
+  encodeBrowserViewInput,
+} from "@openbot/contracts/team-protocol/browser-view-v1";
 import { redactText } from "@openbot/logging";
 import { Effect } from "effect";
 import {
@@ -18,6 +24,7 @@ import { z } from "zod";
 import { BrowserHost } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { DynamicToolCallParams, DynamicToolResult } from "../src/backend/protocol";
+import { BrowserViewGateway } from "../src/main/browser-view-gateway";
 
 const argument = (name: string) => {
   const value = process.argv.find((item) => item.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -32,6 +39,8 @@ const cases: string[] = [];
 const THREAD_ID = "fixture-thread";
 const TURN_ID = "fixture-turn";
 const STATE_WAIT_MS = 10_000;
+const VIEW_TOKEN = "fixture-view-token";
+const VIEW_MEMBER = "fixture-member";
 
 const PAGE = `<!doctype html><meta charset="utf-8"><title>start</title>
 <button id="confirm" onclick="document.title = 'confirm:' + confirm('Delete the test item?')">Confirm</button>
@@ -360,6 +369,106 @@ async function main(): Promise<void> {
       await runCauseEffect(host.close(tabId));
       await waitUntil(async () => shown.aborted);
       recordCases("person-dialog-closed-with-tab");
+    }
+
+    {
+      const { tabId, contents } = await open();
+      const gateway = new BrowserViewGateway({
+        browser: host,
+        authenticate: (token) => (token === VIEW_TOKEN ? { id: VIEW_MEMBER } : null),
+      });
+      const viewServer = createServer();
+      viewServer.on("upgrade", (request, socket, head) => {
+        const url = new URL(request.url ?? "/", "http://127.0.0.1");
+        if (gateway.handlesUpgrade(url)) gateway.handleUpgrade(request, socket, head, url);
+        else socket.destroy();
+      });
+      await new Promise<void>((resolve) => viewServer.listen(0, "127.0.0.1", resolve));
+      const viewAddress = viewServer.address();
+      assert(viewAddress && typeof viewAddress === "object", "View server address missing.");
+      try {
+        const box = nextBox();
+        const opened = agentDialog(await click(tabId, "#confirm", "turn-view"));
+        await box;
+        const session = gateway.createSession({ memberId: VIEW_MEMBER, teamSessionId: "fixture-session", tabId });
+        const socket = new WebSocket(
+          `ws://127.0.0.1:${viewAddress.port}${session.streamPath}?${BROWSER_VIEW_DIALOG_QUERY}=1`,
+          [`openbot-token.${VIEW_TOKEN}`],
+        );
+        socket.binaryType = "arraybuffer";
+        const dialogs: Array<BrowserViewDialog | null> = [];
+        let frames = 0;
+        socket.addEventListener("message", (message) => {
+          if (typeof message.data !== "string") {
+            frames += 1;
+            return;
+          }
+          const hostMessage = decodeBrowserViewHostMessage(message.data);
+          if (hostMessage?.type === "dialog") dialogs.push(hostMessage.dialog);
+        });
+        await waitUntil(async () => dialogs.length > 0);
+        assert.deepEqual(dialogs[0], { id: opened.id, type: "confirm", message: "Delete the test item?" });
+        assert.equal(frames, 0, "The view drew the page while the dialog stopped it.");
+        recordCases("view-shows-open-dialog-before-first-frame");
+
+        socket.send(encodeBrowserViewInput({ type: "dialog", id: opened.id, accept: true }));
+        await waitUntil(async () => frames > 0 && dialogs.at(-1) === null);
+        assert.equal(await title(contents), "confirm:true");
+        assert.equal((await box).aborted, true, "Electron's box stayed open after the person answered.");
+        recordCases("view-answer-starts-the-view");
+
+        const pageBox = nextBox();
+        const shownBefore = dialogs.length;
+        void contents.executeJavaScript("document.getElementById('confirm').click()", true).catch(() => undefined);
+        await waitUntil(async () => dialogs.length > shownBefore);
+        const pageDialog = dialogs.at(-1);
+        assert(pageDialog, "The view got no dialog that the page opened while a person watched.");
+        assert.equal(pageDialog.message, "Delete the test item?");
+        socket.send(encodeBrowserViewInput({ type: "dialog", id: pageDialog.id, accept: false }));
+        await waitUntil(async () => dialogs.at(-1) === null);
+        assert.equal(await title(contents), "confirm:false");
+        assert.equal((await pageBox).aborted, true, "Electron's box stayed open after the person answered.");
+        recordCases("view-shows-dialog-that-opens-while-watched");
+
+        const alertBox = nextBox();
+        const shownBeforeAlert = dialogs.length;
+        const target: { x: number; y: number } = await contents.executeJavaScript(
+          "(() => { const r = document.getElementById('alert').getBoundingClientRect(); return { x: (r.x + r.width / 2) / innerWidth, y: (r.y + r.height / 2) / innerHeight }; })()",
+          true,
+        );
+        for (const action of ["down", "up"] as const)
+          socket.send(
+            encodeBrowserViewInput({
+              type: "pointer",
+              action,
+              ...target,
+              button: "left",
+              clickCount: 1,
+              deltaX: 0,
+              deltaY: 0,
+              modifiers: 0,
+            }),
+          );
+        await waitUntil(async () => dialogs.length > shownBeforeAlert);
+        const personAlert = dialogs.at(-1);
+        assert(personAlert, "The view got no alert that the person's click opened.");
+        assert.equal(personAlert.type, "alert");
+        assert.equal(personAlert.message, "Saved");
+        assert.equal(
+          (await alertBox).aborted,
+          false,
+          "The host answered the person's alert before the view showed it.",
+        );
+        socket.send(encodeBrowserViewInput({ type: "dialog", id: personAlert.id, accept: true }));
+        await waitUntil(async () => (await title(contents)) === "alert:done");
+        assert.equal((await alertBox).aborted, true, "Electron's box stayed open after the person answered.");
+        recordCases("view-person-alert-in-agent-tab-shown");
+        socket.close();
+      } finally {
+        await runCauseEffect(gateway.stop());
+        viewServer.closeAllConnections();
+        await new Promise<void>((resolve) => viewServer.close(() => resolve()));
+      }
     }
 
     {

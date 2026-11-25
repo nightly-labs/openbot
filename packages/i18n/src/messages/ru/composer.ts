@@ -113,6 +113,9 @@ export const messages = {
   "composer.voice.recording": "Запись голоса",
   "composer.voice.limitSoon": "Запись остановится через {seconds} секунд.",
   "composer.voice.limitReached": "Запись остановлена: достигнут лимит в 10 минут. Сказанное уже в сообщении.",
+  "composer.voice.languageNotice":
+    "Диктовка знает 25 европейских языков, например английский. Для других языков нужна модель побольше ({size}), и текст появится после остановки.",
+  "composer.voice.languageNotice.action": "Я говорю на другом языке",
   "composer.send.saveQueued": "Сохранить сообщение в очереди",
   "composer.send.voice": "Отправить голосовое сообщение",
   "composer.send.message": "Отправить сообщение",

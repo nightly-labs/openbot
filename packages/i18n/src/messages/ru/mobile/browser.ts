@@ -42,6 +42,8 @@ export const messages = {
   "mobile.browser.keyboard.field": "Ввод на странице",
   "mobile.browser.reconnect": "Переподключиться",
   "mobile.browser.status.connecting": "Подключение к браузеру…",
+  "mobile.browser.dialog.title": "Страница показывает сообщение",
+  "mobile.browser.dialog.ok": "ОК",
   "mobile.browser.status.ended": "Просмотр в реальном времени завершён.",
   "mobile.browser.status.offline": "Сервер не подключён.",
   "mobile.browser.status.noTab": "У {name} нет открытой вкладки браузера.",
