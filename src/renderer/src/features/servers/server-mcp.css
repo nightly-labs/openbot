@@ -52,6 +52,17 @@
   margin-top: var(--openbot-space-1);
 }
 
+.server-mcp-sign-in-link {
+  display: grid;
+  justify-items: start;
+  gap: var(--openbot-space-2);
+}
+
+.server-mcp-sign-in-link > .mcp-sign-in-relay-form {
+  justify-self: stretch;
+  margin-top: var(--openbot-space-2);
+}
+
 .server-mcp-form {
   display: flex;
   flex-direction: column;
