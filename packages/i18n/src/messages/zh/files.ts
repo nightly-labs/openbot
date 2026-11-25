@@ -58,6 +58,7 @@ export const messages = {
   "files.library.saveFailed": { other: "{count} 个文件无法下载。" },
   "files.library.allFiles": "所有文件",
   "files.library.removedAgents": "已删除的助手",
+  "files.library.otherFiles": "其他文件",
   "files.library.searchIn": "在 {name} 中搜索",
   "files.library.empty": "这里没有文件",
   "files.library.recent": "最近",

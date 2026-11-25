@@ -60,6 +60,7 @@ export const messages = defineMessages("files", {
   },
   "files.library.allFiles": "All files",
   "files.library.removedAgents": "Deleted agents",
+  "files.library.otherFiles": "Other files",
   "files.library.searchIn": "Search in {name}",
   "files.library.empty": "No files here",
   "files.library.recent": "Recent",

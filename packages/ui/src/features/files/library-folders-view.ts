@@ -11,6 +11,7 @@ export type LibraryLocation =
   | { kind: "recent" }
   | { kind: "unsorted" }
   | { kind: "removed" }
+  | { kind: "other" }
   | { kind: "agent"; agentId: string }
   | { kind: "folder"; agentId: string; folderId: string }
   | { kind: "workflowFolder"; folderId: string }
@@ -22,6 +23,7 @@ export const ALL_FILES: LibraryLocation = { kind: "all" };
 export const RECENT_FILES: LibraryLocation = { kind: "recent" };
 export const UNSORTED_FILES: LibraryLocation = { kind: "unsorted" };
 export const REMOVED_AGENTS: LibraryLocation = { kind: "removed" };
+export const OTHER_FILES: LibraryLocation = { kind: "other" };
 
 export function isWorkflowLocation(place: LibraryLocation): place is WorkflowLocation {
   return place.kind === "workflowFolder" || place.kind === "workflow";

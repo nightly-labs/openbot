@@ -168,6 +168,8 @@ export function LibraryPage(props: LibraryPageProps) {
     agentId !== null && agentOf(agentId) !== undefined && (props.canOrganize?.(agentId) ?? true);
   const removedFilesExist = createMemo(() => files().some(fromRemovedAgent));
   const isWorkflowFile = (file: StoredFileRow) => file.agentId === null && file.workflow !== undefined;
+  const isOtherFile = (file: StoredFileRow) => file.agentId === null && file.workflow === undefined;
+  const otherFilesExist = createMemo(() => files().some(isOtherFile));
   function folderOf(file: StoredFileRow): LibraryFolder | undefined {
     const folderId = file.agentId === null && !isWorkflowFile(file) ? undefined : snapshot()?.placement[file.id];
     const folder = folderId === undefined ? undefined : folderById().get(folderId);
@@ -193,6 +195,7 @@ export function LibraryPage(props: LibraryPageProps) {
     if (!folderMode() || at.kind === "all") return ALL_FILES;
     if (at.kind === "recent" || at.kind === "unsorted") return at;
     if (at.kind === "removed") return removedFilesExist() ? at : ALL_FILES;
+    if (at.kind === "other") return otherFilesExist() ? at : ALL_FILES;
     if (isWorkflowLocation(at)) return workflowPlace(at);
     if (!agentOf(at.agentId)) return ALL_FILES;
     if (at.kind === "agent") return at;
@@ -261,8 +264,10 @@ export function LibraryPage(props: LibraryPageProps) {
     let recent = 0;
     let unsorted = 0;
     let removed = 0;
+    let other = 0;
     for (const file of files()) {
       if (fromRemovedAgent(file)) removed += 1;
+      if (isOtherFile(file)) other += 1;
       const holder = holderOf(file);
       if (!agentOf(holder) || holder === null) continue;
       agent.set(holder, (agent.get(holder) ?? 0) + 1);
@@ -274,7 +279,7 @@ export function LibraryPage(props: LibraryPageProps) {
         at = at.parentId === undefined ? undefined : byId.get(at.parentId);
       }
     }
-    return { all: files().length, recent, unsorted, removed, agent, folder };
+    return { all: files().length, recent, unsorted, removed, other, agent, folder };
   });
   const childCounts = createMemo(() => {
     const count = new Map<string, number>();
@@ -306,6 +311,7 @@ export function LibraryPage(props: LibraryPageProps) {
     const at = place();
     if (at.kind === "all") return files();
     if (at.kind === "removed") return files().filter(fromRemovedAgent);
+    if (at.kind === "other") return files().filter(isOtherFile);
     if (at.kind === "recent") {
       const now = props.now ?? new Date();
       return files().filter((file) => agentOf(holderOf(file)) !== undefined && isRecentFile(file.createdAt, now));
@@ -401,6 +407,7 @@ export function LibraryPage(props: LibraryPageProps) {
     const at = place();
     if (at.kind === "all") return t("files.library.allFiles");
     if (at.kind === "removed") return t("files.library.removedAgents");
+    if (at.kind === "other") return t("files.library.otherFiles");
     if (at.kind === "recent") return t("files.library.recent");
     if (at.kind === "unsorted") return t("files.library.unsorted");
     if (at.kind === "folder") return folderById().get(at.folderId)?.name ?? "";
@@ -764,7 +771,7 @@ export function LibraryPage(props: LibraryPageProps) {
     if (item?.kind !== "files" || item.anyAgent || item.agentId === null) return null;
     if (!canCreateFolder() || !organizes(item.agentId)) return null;
     const at = place();
-    if (at.kind === "removed" || isWorkflowLocation(at)) return null;
+    if (at.kind === "removed" || at.kind === "other" || isWorkflowLocation(at)) return null;
     if (at.kind === "folder") {
       return at.agentId === item.agentId && canHoldFolder(folderList(), at.folderId)
         ? { agentId: item.agentId, parentId: at.folderId }
@@ -776,7 +783,7 @@ export function LibraryPage(props: LibraryPageProps) {
   const newFolderPlace = () => {
     const at = place();
     if (!canCreateFolder() || selecting()) return null;
-    if (at.kind === "removed" || isWorkflowLocation(at)) return null;
+    if (at.kind === "removed" || at.kind === "other" || isWorkflowLocation(at)) return null;
     if (at.kind === "agent" || at.kind === "folder") {
       const parentId = at.kind === "folder" ? at.folderId : undefined;
       return organizes(at.agentId) && canHoldFolder(folderList(), parentId) ? "here" : null;
@@ -1383,6 +1390,7 @@ export function LibraryPage(props: LibraryPageProps) {
           canCreate={canCreateFolder()}
           canOrganize={organizes}
           removedFiles={removedFilesExist()}
+          otherFiles={otherFilesExist()}
           workflows={workflowTree()}
           onSearch={setSearch}
           onGo={go}

@@ -66,6 +66,7 @@ export const messages = {
   },
   "files.library.allFiles": "כל הקבצים",
   "files.library.removedAgents": "סוכנים שנמחקו",
+  "files.library.otherFiles": "קבצים אחרים",
   "files.library.searchIn": "חיפוש ב-{name}",
   "files.library.empty": "אין כאן קבצים",
   "files.library.recent": "אחרונים",

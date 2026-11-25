@@ -58,6 +58,7 @@ export const messages = {
   "files.library.saveFailed": { other: "{count}件のファイルをダウンロードできませんでした。" },
   "files.library.allFiles": "すべてのファイル",
   "files.library.removedAgents": "削除したエージェント",
+  "files.library.otherFiles": "その他のファイル",
   "files.library.searchIn": "{name} 内を検索",
   "files.library.empty": "ここにファイルはありません",
   "files.library.recent": "最近",

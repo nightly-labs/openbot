@@ -64,6 +64,7 @@ export const messages = {
   },
   "files.library.allFiles": "Tous les fichiers",
   "files.library.removedAgents": "Agents supprimés",
+  "files.library.otherFiles": "Autres fichiers",
   "files.library.searchIn": "Rechercher dans {name}",
   "files.library.empty": "Aucun fichier ici",
   "files.library.recent": "Récents",
