@@ -531,6 +531,7 @@ interface ProviderModelCatalog {
   readonly partialListAtStart?: true;
   readonly relistAfterStart?: true;
   readonly relistWhileRunning?: true;
+  readonly relistWhenReleased?: true;
   modelName?(id: string): string | null;
   modelFields?(
     model: ModelListResponse["data"][number],
@@ -973,7 +974,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       timeoutMs: 30_000,
       acpLogout: true,
     },
-    catalog: { slowList: true, ownOrder: true, relistWhileRunning: true },
+    catalog: { slowList: true, ownOrder: true, relistWhileRunning: true, relistWhenReleased: true },
     resolveCli: resolveAntigravityCli,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {

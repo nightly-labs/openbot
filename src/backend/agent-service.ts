@@ -2230,6 +2230,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         listAgents: () => this.listAgents(),
         listModels: () => this.listModels(),
+        refreshStaleModels: (provider) => this.#providers.rereadModels(provider),
         hiddenModels: (provider) => this.#hiddenModels?.(provider),
         agentModels: (choice) => this.#agentModels(choice),
         providerAccounts: (provider) => this.getStatus().providers?.find((row) => row.id === provider)?.accounts,
@@ -2962,6 +2963,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   listModels(): AgentModelOption[] {
     return this.#endpoints.available();
+  }
+
+  requestModelsRefresh(): void {
+    this.#providers.requestModelsRefresh();
   }
 
   #agentModels(agent: { provider: AgentProvider; providerAccountId?: string | undefined }): AgentModelOption[] {

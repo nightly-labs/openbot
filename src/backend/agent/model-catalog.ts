@@ -69,10 +69,12 @@ export class ModelCatalog {
     provider: AgentProvider,
     client: AgentClient,
     catalog: ProviderModelCatalog,
+    ownClient = false,
   ) {
     if (!catalog.source) return false;
     const result = yield* Effect.result(catalog.source(client, providerCheckTimeoutMs(5_000)));
-    if (this.#options.client(provider) !== client) return false;
+    if (ownClient ? this.#options.client(provider) !== undefined : this.#options.client(provider) !== client)
+      return false;
     if (Result.isFailure(result)) logger.warn("A provider did not give the source of its models.", { provider });
     const source = Result.isSuccess(result) ? result.success.source : null;
     const startSettings = Result.isSuccess(result) ? result.success.startSettings : null;
@@ -222,14 +224,17 @@ export class ModelCatalog {
   readonly relist = Effect.fn("ModelCatalog.relist")(function* (
     this: ModelCatalog,
     provider: AgentProvider,
-    options: { quiet?: boolean; onQuietFailure?: () => void } = {},
+    options: { client?: AgentClient; quiet?: boolean; onQuietFailure?: () => void } = {},
   ) {
-    const client = this.#options.client(provider);
+    const ownClient = options.client;
+    const client = ownClient ?? this.#options.client(provider);
     const catalog = BUILT_IN_PROVIDER_DRIVERS.find((driver) => driver.id === provider)?.catalog ?? {};
     if (!client) return false;
+    const staleClient = () =>
+      ownClient ? this.#options.client(provider) !== undefined : this.#options.client(provider) !== client;
     const startedAt = performance.now();
     const result = yield* Effect.result(this.read(client, catalog, this.#options.requestTimeoutMs));
-    if (this.#options.client(provider) !== client) return false;
+    if (staleClient()) return false;
     const durationMs = Math.round(performance.now() - startedAt);
     if (Result.isFailure(result)) {
       if (!options.quiet) this.#options.recordProviderError(provider, result.failure.cause);
@@ -244,8 +249,8 @@ export class ModelCatalog {
     const { models, listed } = result.success;
     logger.info("A provider listed its models.", { provider, count: models.length, durationMs });
     if ((catalog.fallback || options.quiet) && listed === 0) return false;
-    yield* this.#readSource(provider, client, catalog);
-    if (this.#options.client(provider) !== client) return false;
+    yield* this.#readSource(provider, client, catalog, ownClient !== undefined);
+    if (staleClient()) return false;
     const current = this.#models;
     this.#models = withPublicIds(
       BUILT_IN_PROVIDER_DRIVERS.flatMap(({ id }) =>
