@@ -277,6 +277,8 @@ export const messages = {
   "error.backend.mcpServerExited": "توقف الخادم قبل أن يُجيب. شغّل الأمر في الطرفية لرؤية الخطأ.",
   "error.backend.mcpServerExitedWithOutput": "توقف الخادم قبل أن يُجيب. كتب: {detail}",
   "error.backend.mcpServerFailedToStart": "لم يبدأ الخادم: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "تعذّر على OpenBot تشغيل خادم MCP {name}، لأن برنامجه غير موجود على هذا الكمبيوتر. ثبّت التطبيق الذي يوفّر {name}، أو أوقف {name} في المتجر، التطبيقات.",
   "error.backend.mcpServerStartAbandoned":
     "توقف {provider} عن الانتظار قبل أن يبدأ الخادم، لذلك لا يحصل وكلاؤه على أدوات هذا الخادم.",
   "error.backend.mcpServerStoppedDuringCall": "توقف خادم MCP قبل أن يرد على هذا الاستدعاء.",

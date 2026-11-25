@@ -289,6 +289,8 @@ export const messages = {
     "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
   "error.backend.mcpServerExitedWithOutput": "Sunucu yanıt vermeden durdu. Yazdığı: {detail}",
   "error.backend.mcpServerFailedToStart": "Sunucu başlamadı: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot, {name} MCP sunucusunu başlatamadı, çünkü programı bu bilgisayarda yok. {name} sağlayan uygulamayı yükleyin veya Pazaryeri, Uygulamalar bölümünde {name} öğesini kapatın.",
   "error.backend.mcpServerStartAbandoned":
     "{provider}, sunucu başlamadan beklemeyi bıraktı. Bu yüzden ajanları bu sunucunun araçlarını almıyor.",
   "error.backend.mcpServerStoppedDuringCall": "MCP sunucusu bu çağrıya yanıt vermeden durdu.",

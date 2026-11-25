@@ -304,6 +304,8 @@ export const messages = {
     "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
   "error.backend.mcpServerExitedWithOutput": "De server is gestopt voordat hij antwoordde. Hij schreef: {detail}",
   "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot kon de MCP-server {name} niet starten, omdat het programma ervan niet op deze computer staat. Installeer de app die {name} levert, of zet {name} uit in Marktplaats, Apps.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} stopte met wachten voordat de server was gestart, dus de agents ervan krijgen de tools van deze server niet.",
   "error.backend.mcpServerStoppedDuringCall": "De MCP-server stopte voordat hij op deze aanroep antwoordde.",

@@ -285,6 +285,8 @@ export const messages = {
   "error.backend.mcpServerExited": "서버가 응답하기 전에 중지되었어요. 터미널에서 명령을 실행해 오류를 확인하세요.",
   "error.backend.mcpServerExitedWithOutput": "서버가 응답하기 전에 중지되었어요. 출력: {detail}",
   "error.backend.mcpServerFailedToStart": "서버가 시작되지 않았어요: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "이 컴퓨터에 MCP 서버 {name}의 프로그램이 없어서 OpenBot이 시작할 수 없었어요. {name}을(를) 제공하는 앱을 설치하거나, 마켓플레이스, 앱에서 {name}을(를) 끄세요.",
   "error.backend.mcpServerStartAbandoned":
     "서버가 시작되기 전에 {provider}가 기다리기를 멈췄어요. 그래서 {provider} 에이전트는 이 서버의 도구를 받지 못해요.",
   "error.backend.mcpServerStoppedDuringCall": "MCP 서버가 이 호출에 응답하기 전에 멈췄어요.",

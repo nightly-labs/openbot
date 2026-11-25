@@ -261,6 +261,8 @@ export const messages = {
   "error.backend.mcpServerExited": "服务器在响应之前就停止了。请在终端中运行该命令以查看错误。",
   "error.backend.mcpServerExitedWithOutput": "服务器在响应之前就停止了。它输出了：{detail}",
   "error.backend.mcpServerFailedToStart": "服务器没有启动：{reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot 无法启动 MCP 服务器 {name}，因为这台电脑上没有它的程序。请安装提供 {name} 的应用，或在 市场、应用 中关闭 {name}。",
   "error.backend.mcpServerStartAbandoned": "服务器启动前 {provider} 已停止等待，因此其智能体无法获得此服务器的工具。",
   "error.backend.mcpServerStoppedDuringCall": "MCP 服务器在响应此次调用前停止了。",
   "error.backend.mcpToolSchemaRefused":
