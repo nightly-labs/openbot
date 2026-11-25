@@ -452,6 +452,7 @@ export interface AcpProviderOptions {
   env: Record<string, string>;
   extraEnv?: () => Record<string, string>;
   confine?(target: SpawnTarget): SpawnTarget;
+  causeLine?: AcpConnectionOptions["causeLine"];
   privateTemp?: AcpConnectionOptions["privateTemp"];
   signInMessage: string;
   servesModel?: ((modelId: string) => boolean) | undefined;
@@ -630,6 +631,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       env: this.options.env,
       extraEnv: this.options.extraEnv,
       confine: this.options.confine,
+      causeLine: this.options.causeLine,
       privateTemp: this.options.privateTemp,
       label: () => this.#label,
       redact: (text) => this.#redact(text),
