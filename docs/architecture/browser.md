@@ -157,7 +157,11 @@ contract version that the host cannot compute. The focused check is
 `bun run test:browser --scenario=identity`; add `--google-live` for the Google identifier check.
 The local identity report is `.openbot-build/browser-identity.json`.
 The tab preload (`src/preload/browser-page.ts`) makes page values agree with Chrome: the outer size,
-the screen position, `window.chrome` and the passkey dialog. Each replaced function is a Proxy that
+the screen position, `window.chrome` and the passkey dialog. It also makes `window.print()` do
+nothing in each window that it installs in: the page, a frame that loads, and a blank frame that the
+page reaches through `contentWindow` or `contentDocument`. Thus a page in an agent tab cannot open the
+system Print dialog over the app, also not for a person in takeover. A blank frame that the page
+reaches only by index or name (`frames[0]`) is not covered. Each replaced function is a Proxy that
 reads as native code. Its `setPrototypeOf` trap throws `Cyclic __proto__ value` as a native function
 does, because V8 stops that check at a Proxy and bot checks find a Proxy that way. CDP calls do not
 turn on the `Runtime` domain: while it is on, Chromium formats each console argument for DevTools,
