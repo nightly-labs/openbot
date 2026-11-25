@@ -1,4 +1,4 @@
-import type { OpenSharedFileInput, OpenWorkspaceFileInput } from "@openbot/contracts/ipc";
+import type { OpenBotDesktopApi, OpenSharedFileInput, OpenWorkspaceFileInput } from "@openbot/contracts/ipc";
 import { matchingSourceKeys } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
 import { normalizeMessage } from "@openbot/user-errors/reference";
@@ -9,6 +9,16 @@ export type ChatFileKind = "shared" | "workspace";
 export interface ChatFileOpener {
   openSharedFile: (input: OpenSharedFileInput) => Promise<void>;
   openWorkspaceFile: (input: OpenWorkspaceFileInput) => Promise<void>;
+}
+
+export function serverChatFileOpener(
+  agent: Pick<OpenBotDesktopApi["agent"], "openSharedFile" | "openWorkspaceFile">,
+  serverId: string,
+): ChatFileOpener {
+  return {
+    openSharedFile: (input) => agent.openSharedFile(input, serverId),
+    openWorkspaceFile: (input) => agent.openWorkspaceFile(input, serverId),
+  };
 }
 
 const MISSING_PATH_KEYS = new Set([
