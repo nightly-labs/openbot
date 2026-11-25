@@ -869,6 +869,7 @@ const OPTIONAL_INSTALLED_CLI_WAIT_MS = 20_000;
 const SKIP_HUNG_INSTALLED_CLI_MS = 10 * 60_000;
 
 interface InstalledCliCheck {
+  readonly settled: Deferred.Deferred<void>;
   waitedOut: boolean;
   hungAt: number | null;
 }
@@ -880,9 +881,15 @@ function isTimeoutFailure(failure: unknown): boolean {
 }
 
 function settleInstalledCliCheck(key: string, check: InstalledCliCheck, hung: boolean): void {
+  Deferred.doneUnsafe(check.settled, Effect.void);
   if (installedCliChecks.get(key) !== check) return;
   if (hung && check.waitedOut) check.hungAt = Date.now();
   else installedCliChecks.delete(key);
+}
+
+function skipsInstalledCli(key: string): boolean {
+  const hungAt = installedCliChecks.get(key)?.hungAt ?? null;
+  return hungAt !== null && Date.now() - hungAt < SKIP_HUNG_INSTALLED_CLI_MS;
 }
 
 function optionalInstalledCli<Cli, E>(
@@ -890,10 +897,24 @@ function optionalInstalledCli<Cli, E>(
   key: string,
   backgroundScope: Scope.Closeable | undefined,
 ) {
+  const withinWait = <A>(effect: Effect.Effect<A>) =>
+    effect.pipe(Effect.timeoutOption(providerCheckTimeoutMs(OPTIONAL_INSTALLED_CLI_WAIT_MS)));
   return Effect.gen(function* () {
-    const kept = installedCliChecks.get(key);
-    if (kept && (kept.hungAt === null || Date.now() - kept.hungAt < SKIP_HUNG_INSTALLED_CLI_MS)) return null;
-    const check: InstalledCliCheck = { waitedOut: false, hungAt: null };
+    if (skipsInstalledCli(key)) return null;
+    const running = installedCliChecks.get(key);
+    if (running && running.hungAt === null) {
+      if (running.waitedOut) return null;
+      const answer = yield* withinWait(
+        Effect.gen(function* () {
+          yield* Deferred.await(running.settled);
+          if (skipsInstalledCli(key)) return null;
+          const own = yield* Effect.result(installed);
+          return Result.isSuccess(own) ? own.success : null;
+        }),
+      );
+      return Option.getOrNull(answer);
+    }
+    const check: InstalledCliCheck = { settled: Deferred.makeUnsafe<void>(), waitedOut: false, hungAt: null };
     installedCliChecks.set(key, check);
     const read = installed.pipe(
       Effect.result,
@@ -902,14 +923,12 @@ function optionalInstalledCli<Cli, E>(
           settleInstalledCliCheck(key, check, Result.isFailure(result) && isTimeoutFailure(result.failure)),
         ),
       ),
-      Effect.onInterrupt(() => Effect.sync(() => settleInstalledCliCheck(key, check, true))),
+      Effect.onInterrupt(() => Effect.sync(() => settleInstalledCliCheck(key, check, false))),
     );
     const fiber = yield* backgroundScope && backgroundScope.state._tag !== "Closed"
       ? Effect.forkIn(read, backgroundScope)
       : Effect.forkChild(read);
-    const answer = yield* Fiber.join(fiber).pipe(
-      Effect.timeoutOption(providerCheckTimeoutMs(OPTIONAL_INSTALLED_CLI_WAIT_MS)),
-    );
+    const answer = yield* withinWait(Fiber.join(fiber));
     if (Option.isNone(answer)) {
       check.waitedOut = true;
       return null;
