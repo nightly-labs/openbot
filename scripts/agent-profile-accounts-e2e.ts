@@ -195,6 +195,7 @@ const report: {
     account: { afterTurn: string | null; afterModelChange: string | null; pinAfterModelOnly: string | null };
     own: { afterTurn: string | null };
     backInPool: { account: string | null; pinned: string | null };
+    leftOutWhileOnIt: { pinned: string | null };
   };
   liveVoice?: { saved: string | null; afterRemove: string | null; automatic: string | null };
   checks: { name: string; passed: boolean }[];
@@ -683,10 +684,14 @@ try {
   const afterOwnTurn = accountOf(pooled.id);
   await runCauseEffect(agents.updateAgent({ agentId: pooled.id, providerAccountId: second.id }));
   const backInPool = storedAgent(pooled.id);
+  await runCauseEffect(accounts.setPool("codex", { leftOut: [second.id] }));
+  await runCauseEffect(agents.updateAgent({ agentId: pooled.id, model: OTHER_MODEL, providerAccountId: second.id }));
+  const leftOutWhileOnIt = storedAgent(pooled.id).pinnedAccountId ?? null;
   report.leftOut = {
     account: { afterTurn: afterAccountTurn, afterModelChange, pinAfterModelOnly },
     own: { afterTurn: afterOwnTurn },
     backInPool: { account: backInPool.providerAccountId ?? null, pinned: backInPool.pinnedAccountId ?? null },
+    leftOutWhileOnIt: { pinned: leftOutWhileOnIt },
   };
   pass(
     "With Pool accounts on, an account out of the pool that a person chooses stays after a turn",
@@ -712,6 +717,11 @@ try {
     "A pool account that a person chooses gives the agent to the pool",
     backInPool.providerAccountId === second.id && backInPool.pinnedAccountId === undefined,
     JSON.stringify(report.leftOut.backInPool),
+  );
+  pass(
+    "A model change on an account that was left out after the pool put the agent there sets no pin",
+    leftOutWhileOnIt === null,
+    JSON.stringify(report.leftOut.leftOutWhileOnIt),
   );
   await runCauseEffect(accounts.setPool("codex", null));
 

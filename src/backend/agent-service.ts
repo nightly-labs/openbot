@@ -3785,12 +3785,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     initiatingAgentId: string | undefined,
     next: AgentModelChoice | undefined,
     chosenByPerson: boolean,
+    previous: AgentSummary | undefined,
   ): string | null | undefined {
     if (move !== null || input.leaveUsageLimit) return undefined;
     if (initiatingAgentId === undefined)
       return input.provider !== undefined || input.model !== undefined || input.providerAccountId !== undefined
         ? chosenByPerson
-          ? this.#leftOutAccountPin(input, next)
+          ? this.#leftOutAccountPin(input, next, previous)
           : null
         : undefined;
     if (input.providerAccountId === undefined) return undefined;
@@ -3799,10 +3800,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return input.providerAccountId === DEFAULT_PROVIDER_ACCOUNT_ID ? DEFAULT_PROVIDER_ACCOUNT_ID : null;
   }
 
-  #leftOutAccountPin(input: AgentUpdate, next: AgentModelChoice | undefined): string | null {
+  #leftOutAccountPin(
+    input: AgentUpdate,
+    next: AgentModelChoice | undefined,
+    previous: AgentSummary | undefined,
+  ): string | null {
     if (input.providerAccountId === undefined || !next) return null;
     const account = next.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
-    return this.#providers.accountPool(next.provider)?.leftOut.includes(account) === true ? account : null;
+    if (this.#providers.accountPool(next.provider)?.leftOut.includes(account) !== true) return null;
+    const stays =
+      previous !== undefined &&
+      providerForAgent(previous) === next.provider &&
+      (agentProviderAccount(previous) ?? DEFAULT_PROVIDER_ACCOUNT_ID) === account;
+    return !stays || previous?.pinnedAccountId === account ? account : null;
   }
 
   #withAccountModel(input: AgentUpdate): AgentUpdate {
@@ -4050,6 +4060,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }
         : undefined,
       chosenByPerson,
+      previous,
     );
     const pin = pinnedAccountId === undefined ? {} : { pinnedAccountId };
     const queue = (pendingRuntime: AgentPendingRuntime) =>
