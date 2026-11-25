@@ -211,8 +211,10 @@
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge[data-window-page-kind="agents"].app-frame-sidebar-compact
-    .conversation-panel
-    > .conversation-header {
+    :is(
+      .conversation-panel > :is(.conversation-header, .first-agent-setup-header),
+      .direct-conversation > .direct-conversation-header
+    ) {
     --conversation-header-shift: max(0px, calc(var(--top-row-tabs-start) - var(--left-panel-width)));
   }
 
@@ -227,13 +229,16 @@
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge[data-window-page-kind="agents"]
-    .conversation-panel
-    > .conversation-header {
+    :is(
+      .conversation-panel > :is(.conversation-header, .first-agent-setup-header),
+      .direct-conversation > .direct-conversation-header
+    ) {
     max-width: calc(100% - var(--conversation-header-shift, 0px));
     margin-inline-start: var(--conversation-header-shift, 0px);
     transition:
       margin-inline-start var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.32, 0.72, 0, 1),
-      max-width var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.32, 0.72, 0, 1);
+      max-width var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.32, 0.72, 0, 1),
+      padding-inline-end var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .app-window > .window-rail:not([hidden]) ~ .app-frame-edge[data-window-page-kind="agents"].app-frame-sidebar-closed {
@@ -268,8 +273,10 @@
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge[data-window-page-kind="agents"].app-frame-sidebar-closed
-    .conversation-panel
-    > .conversation-header {
+    :is(
+      .conversation-panel > :is(.conversation-header, .first-agent-setup-header),
+      .direct-conversation > .direct-conversation-header
+    ) {
     --conversation-header-shift: var(--top-row-tabs-start);
   }
 
@@ -465,7 +472,8 @@
     gap: var(--openbot-space-2);
   }
 
-  .app-window > .app-frame-edge .conversation-header :is(.provider-model-trigger, .header-panel-toggle) {
+  .app-window > .app-frame-edge .conversation-header :is(.provider-model-trigger, .header-panel-toggle),
+  .app-window > .app-frame-edge .side-panel-toggle-slot > .side-panel-toggle {
     height: var(--openbot-control-sm);
     border-color: transparent;
     border-radius: var(--openbot-radius-md);
@@ -474,15 +482,22 @@
     color: var(--openbot-text-secondary);
   }
 
-  .app-window > .app-frame-edge .conversation-header .header-panel-toggle {
+  .app-window
+    > .app-frame-edge
+    :is(.conversation-header .header-panel-toggle, .side-panel-toggle-slot > .side-panel-toggle) {
     width: var(--openbot-control-sm);
     min-width: var(--openbot-control-sm);
     padding: 0;
     color: var(--openbot-text-muted);
   }
 
+  .app-window > .app-frame-edge :is(.side-panel-toggle-slot, .conversation-panel > .side-panel-header) {
+    padding-block: var(--top-row-padding-block, 0);
+  }
+
   @media (hover: hover) and (pointer: fine) {
-    .app-window > .app-frame-edge .conversation-header :is(.provider-model-trigger, .header-panel-toggle):hover {
+    .app-window > .app-frame-edge .conversation-header :is(.provider-model-trigger, .header-panel-toggle):hover,
+    .app-window > .app-frame-edge .side-panel-toggle-slot > .side-panel-toggle:hover {
       border-color: transparent;
       background: var(--openbot-bg-control-hover);
       color: var(--openbot-text-primary);
@@ -501,13 +516,11 @@
     color: var(--openbot-text-primary);
   }
 
-  .app-window > .app-frame-edge .conversation-header-actions > .side-panel-toggle {
-    position: relative;
-    margin-inline-start: calc(var(--openbot-space-2) + 1px);
+  .app-window > .app-frame-edge .side-panel-toggle-slot > .side-panel-toggle {
     overflow: visible;
   }
 
-  .app-window > .app-frame-edge .conversation-header-actions > .side-panel-toggle::before {
+  .app-window > .app-frame-edge .side-panel-toggle-slot > .side-panel-toggle::before {
     position: absolute;
     top: 50%;
     inset-inline-start: calc(-1 * var(--openbot-space-2) - 1px);
@@ -517,6 +530,11 @@
     background: var(--openbot-border-strong);
     content: "";
     pointer-events: none;
+    transition: opacity var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .app-window > .app-frame-edge .side-panel-toggle-slot > .side-panel-toggle[aria-expanded="true"]::before {
+    opacity: 0;
   }
 
   .app-frame-edge > .window-page > :is(.agent-usage, .schedule-pane) {

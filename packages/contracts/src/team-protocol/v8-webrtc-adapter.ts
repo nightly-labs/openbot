@@ -53,6 +53,7 @@ export function encodeTeamProtocolV8WebRtcHttpResponse(
     videoGeneration?: boolean;
     usageTertiary?: boolean;
     usageGroups?: boolean;
+    usageReadFailed?: boolean;
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
     queueHold?: boolean;
@@ -86,10 +87,12 @@ export function createTeamProtocolV8Event(
     backgroundWork?: boolean;
     usageTertiary?: boolean;
     usageGroups?: boolean;
+    usageReadFailed?: boolean;
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
     queueHold?: boolean;
     queueHoldSignIn?: boolean;
+    errorLink?: boolean;
   } = {},
 ): TeamProtocolV2EventFrame {
   const decoded = decodeTeamProtocolV8BaseCurrentEvent(value);

@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "./input-limits";
 import type { AvatarImageInput } from "./ipc-agents";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
+import { isChannelFolderPaths } from "./ipc-channel-folders";
 import { type ConversationMessage, isConversationMessage } from "./ipc-conversation-messages";
 import { optionalHistoryExtent } from "./ipc-decoding";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "./runtime-values";
@@ -93,6 +94,7 @@ export interface Channel extends ChannelDraft {
   revision: number;
   createdAt: string;
   imageUrl?: string | null;
+  folders?: string[];
 }
 
 export interface SetChannelImageInput {
@@ -329,7 +331,8 @@ export function isChannel(value: unknown): value is Channel {
     typeof value.archived === "boolean" &&
     sequence(value.revision) &&
     isBoundedString(value.createdAt, 80) &&
-    (value.imageUrl === undefined || value.imageUrl === null || isBoundedString(value.imageUrl, 2048))
+    (value.imageUrl === undefined || value.imageUrl === null || isBoundedString(value.imageUrl, 2048)) &&
+    (value.folders === undefined || isChannelFolderPaths(value.folders))
   );
 }
 
@@ -356,6 +359,45 @@ export function isChannelTask(value: unknown): value is ChannelTask {
     (value.error === null || isBoundedString(value.error, INPUT_LIMITS.messageText)) &&
     (value.seenDependencies === undefined || identifiers(value.seenDependencies))
   );
+}
+
+function finishedChannelTask(task: ChannelTask): boolean {
+  return task.state === "completed" || task.state === "cancelled";
+}
+
+function linksMessages(messages: readonly ChannelMessage[]): (task: ChannelTask) => boolean {
+  const taskIds = new Set(messages.map((item) => item.taskId));
+  const messageIds = new Set(messages.map((item) => item.id));
+  return (task) => taskIds.has(task.id) || messageIds.has(task.requestMessageId);
+}
+
+export function channelPageTasks(tasks: readonly ChannelTask[], messages: readonly ChannelMessage[]): ChannelTask[] {
+  const openRuns = new Set(tasks.flatMap((task) => (finishedChannelTask(task) ? [] : [task.rootTaskId])));
+  const linked = linksMessages(messages);
+  return tasks.filter((task) => openRuns.has(task.rootTaskId) || linked(task));
+}
+
+export function mergeChannelTasks(
+  newer: readonly ChannelTask[],
+  older: readonly ChannelTask[],
+  messages: readonly ChannelMessage[],
+): ChannelTask[] {
+  const newerIds = new Set(newer.map((task) => task.id));
+  const linked = linksMessages(messages);
+  const kept = older.filter((task) => !newerIds.has(task.id) && finishedChannelTask(task) && linked(task));
+  return kept.length ? [...kept, ...newer] : [...newer];
+}
+
+export function closedChannelTaskSequences(
+  newer: readonly ChannelTask[],
+  older: readonly ChannelTask[],
+  messages: readonly ChannelMessage[],
+): number[] {
+  const newerIds = new Set(newer.map((task) => task.id));
+  const closed = older.filter((task) => !newerIds.has(task.id) && !finishedChannelTask(task));
+  if (!closed.length) return [];
+  const sequences = messages.filter((item) => closed.some(linksMessages([item]))).map((item) => item.sequence);
+  return [...new Set(sequences)].sort((left, right) => right - left);
 }
 
 export function isChannelMessage(value: unknown): value is ChannelMessage {

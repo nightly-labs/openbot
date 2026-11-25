@@ -1,4 +1,9 @@
-import { AGENT_CONTEXT_CATEGORIES, type AgentContextCategory, type AgentContextState } from "@openbot/contracts/ipc";
+import {
+  AGENT_CONTEXT_CATEGORIES,
+  type AgentContextCategory,
+  type AgentContextCompactionReason,
+  type AgentContextState,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
@@ -307,6 +312,7 @@ export function ComposerCompactionNotice(props: {
   startedAt: number;
   expectedMs?: number | undefined;
   status?: ContextCompactionView["status"] | undefined;
+  reason?: AgentContextCompactionReason | undefined;
   onDone?: (() => void) | undefined;
 }) {
   const { t, format } = useText();
@@ -364,7 +370,7 @@ export function ComposerCompactionNotice(props: {
         </Match>
       </Switch>
       <p class="context-compaction-notice-copy">
-        <strong>{t(COMPACTION_LABELS[status()])}</strong>
+        <strong>{t(compactionLabel(status(), props.reason))}</strong>
         <Show when={status() === "failed"}>
           <span> · {t("chat.compaction.continues")}</span>
         </Show>
@@ -402,6 +408,7 @@ export interface ContextCompactionView {
   timestamp: string;
   beforeTokens?: number | undefined;
   afterTokens?: number | undefined;
+  reason?: AgentContextCompactionReason | undefined;
 }
 
 const COMPACTION_LABELS = {
@@ -409,6 +416,19 @@ const COMPACTION_LABELS = {
   completed: "chat.compaction.completed",
   failed: "chat.compaction.failed",
 } as const satisfies Record<ContextCompactionView["status"], AppTextKey>;
+
+const CACHE_EXPIRY_COMPACTION_LABELS = {
+  running: "chat.compaction.cacheExpiryRunning",
+  completed: "chat.compaction.cacheExpiryCompleted",
+  failed: "chat.compaction.failed",
+} as const satisfies Record<ContextCompactionView["status"], AppTextKey>;
+
+function compactionLabel(
+  status: ContextCompactionView["status"],
+  reason: AgentContextCompactionReason | undefined,
+): AppTextKey {
+  return (reason === "cacheExpiry" ? CACHE_EXPIRY_COMPACTION_LABELS : COMPACTION_LABELS)[status];
+}
 
 export function ContextCompactionMarker(props: { compaction: ContextCompactionView }) {
   const { t, format } = useText();
@@ -433,7 +453,9 @@ export function ContextCompactionMarker(props: { compaction: ContextCompactionVi
               <LoaderCircle class="composer-spinner" />
             </Show>
           </span>
-          <span class="chat-action-marker-label">{t(COMPACTION_LABELS[props.compaction.status])}</span>
+          <span class="chat-action-marker-label">
+            {t(compactionLabel(props.compaction.status, props.compaction.reason))}
+          </span>
           <Show when={props.compaction.beforeTokens !== undefined && props.compaction.afterTokens !== undefined}>
             <span class="context-compaction-detail">
               ·{" "}

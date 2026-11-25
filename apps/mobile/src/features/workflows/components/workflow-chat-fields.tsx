@@ -9,6 +9,7 @@ import {
   WORKFLOW_TELEGRAM_EMOJI,
   WORKFLOW_TELEGRAM_TEXT_LIMIT,
   WORKFLOW_TELEGRAM_TRIGGER_CHAT,
+  WORKFLOW_UNLINKED_CONNECTION,
   type WorkflowNode,
 } from "@openbot/contracts/ipc";
 import { Typography } from "heroui-native";
@@ -108,6 +109,18 @@ function TextFilter({ node, limit, editable }: { node: WorkflowNode; limit: numb
   );
 }
 
+type Translate = ReturnType<typeof useText>["t"];
+
+const telegramChatLabel = (t: Translate, connectionId: string) =>
+  connectionId === WORKFLOW_UNLINKED_CONNECTION
+    ? t("mobile.workflow.telegram.chooseChat")
+    : t("mobile.workflow.telegram.oneChat");
+
+const slackWorkspaceLabel = (t: Translate, connectionId: string) =>
+  connectionId === WORKFLOW_UNLINKED_CONNECTION
+    ? t("mobile.workflow.slack.chooseWorkspace")
+    : t("mobile.workflow.slack.oneWorkspace");
+
 const connectionChoices = (connections: readonly RoutineResultConnectionOption[]): Choice[] =>
   connections.map((connection) => ({ value: connection.connectionId, label: connection.connectionName }));
 
@@ -123,6 +136,7 @@ export function TelegramTriggerFields({ node, draft }: { node: WorkflowNode; dra
   const access = useChatAccess(draft);
   const connectionId = fieldText(node, "connectionId");
   const chats = access.options ? telegramChats(access.options) : null;
+  const oneChat = telegramChatLabel(t, connectionId);
   return (
     <>
       <SettingsSection title={t("mobile.workflow.trigger.telegram")}>
@@ -131,13 +145,13 @@ export function TelegramTriggerFields({ node, draft }: { node: WorkflowNode; dra
             label={t("mobile.workflow.telegram.chat")}
             value={connectionId}
             choices={[{ value: "", label: t("mobile.workflow.telegram.anyChat") }, ...connectionChoices(chats)]}
-            missing={t("mobile.workflow.telegram.oneChat")}
+            missing={oneChat}
             onChange={(next) => setFields(node.id, { connectionId: next })}
           />
         ) : (
           <ValueRow
             label={t("mobile.workflow.telegram.chat")}
-            value={connectionId ? t("mobile.workflow.telegram.oneChat") : t("mobile.workflow.telegram.anyChat")}
+            value={connectionId ? oneChat : t("mobile.workflow.telegram.anyChat")}
           />
         )}
         <ValueRow label={t("mobile.workflow.telegram.event")} value={t("mobile.workflow.telegram.event.mention")} />
@@ -157,6 +171,7 @@ export function TelegramOutputFields({ node, draft }: { node: WorkflowNode; draf
   const emoji = fieldOneOf(node, "emoji", WORKFLOW_TELEGRAM_EMOJI, WORKFLOW_TELEGRAM_EMOJI[0]);
   const chats = access.options ? telegramChats(access.options) : null;
   const sameChat = t("mobile.workflow.telegram.sameChat");
+  const oneChat = telegramChatLabel(t, connectionId);
   return (
     <>
       <SettingsSection title={t("mobile.workflow.output.telegram")}>
@@ -165,13 +180,13 @@ export function TelegramOutputFields({ node, draft }: { node: WorkflowNode; draf
             label={t("mobile.workflow.telegram.chat")}
             value={connectionId}
             choices={[{ value: WORKFLOW_TELEGRAM_TRIGGER_CHAT, label: sameChat }, ...connectionChoices(chats)]}
-            missing={t("mobile.workflow.telegram.oneChat")}
+            missing={oneChat}
             onChange={(next) => setFields(node.id, { connectionId: next })}
           />
         ) : (
           <ValueRow
             label={t("mobile.workflow.telegram.chat")}
-            value={connectionId === WORKFLOW_TELEGRAM_TRIGGER_CHAT ? sameChat : t("mobile.workflow.telegram.oneChat")}
+            value={connectionId === WORKFLOW_TELEGRAM_TRIGGER_CHAT ? sameChat : oneChat}
           />
         )}
         {action === "post" ? null : (
@@ -213,6 +228,7 @@ export function SlackTriggerFields({ node, draft }: { node: WorkflowNode; draft:
   const placeId = fieldText(node, "placeId");
   const workspaces = access.options ? slackWorkspaces(access.options) : null;
   const choose = t("mobile.workflow.slack.chooseWorkspace");
+  const oneWorkspace = slackWorkspaceLabel(t, connectionId);
   return (
     <>
       <SettingsSection title={t("mobile.workflow.trigger.slack")}>
@@ -222,7 +238,7 @@ export function SlackTriggerFields({ node, draft }: { node: WorkflowNode; draft:
               label={t("mobile.workflow.slack.workspace")}
               value={connectionId}
               choices={[...(connectionId ? [] : [{ value: "", label: choose }]), ...connectionChoices(workspaces)]}
-              missing={t("mobile.workflow.slack.oneWorkspace")}
+              missing={oneWorkspace}
               onChange={(next) => setFields(node.id, { connectionId: next, placeId: "" })}
             />
             <ValueRow label={t("mobile.workflow.discord.event")} value={t("mobile.workflow.discord.event.mention")} />
@@ -239,10 +255,7 @@ export function SlackTriggerFields({ node, draft }: { node: WorkflowNode; draft:
           </>
         ) : (
           <>
-            <ValueRow
-              label={t("mobile.workflow.slack.workspace")}
-              value={connectionId ? t("mobile.workflow.slack.oneWorkspace") : choose}
-            />
+            <ValueRow label={t("mobile.workflow.slack.workspace")} value={connectionId ? oneWorkspace : choose} />
             <ValueRow label={t("mobile.workflow.discord.event")} value={t("mobile.workflow.discord.event.mention")} />
             <ValueRow
               label={t("mobile.workflow.discord.channel")}
@@ -271,8 +284,8 @@ export function SlackOutputFields({ node, draft }: { node: WorkflowNode; draft: 
   const emoji = fieldOneOf(node, "emoji", WORKFLOW_SLACK_EMOJI, WORKFLOW_SLACK_EMOJI[0]);
   const workspaces = access.options ? slackWorkspaces(access.options) : null;
   const sameWorkspace = t("mobile.workflow.discord.sameServer");
-  const workspaceValue =
-    connectionId === WORKFLOW_SLACK_TRIGGER_WORKSPACE ? sameWorkspace : t("mobile.workflow.slack.oneWorkspace");
+  const oneWorkspace = slackWorkspaceLabel(t, connectionId);
+  const workspaceValue = connectionId === WORKFLOW_SLACK_TRIGGER_WORKSPACE ? sameWorkspace : oneWorkspace;
   const needsPlace = posts && (connectionId === WORKFLOW_SLACK_TRIGGER_WORKSPACE || !placeId);
   return (
     <>
@@ -287,7 +300,7 @@ export function SlackOutputFields({ node, draft }: { node: WorkflowNode; draft: 
                 : [{ value: WORKFLOW_SLACK_TRIGGER_WORKSPACE, label: sameWorkspace }]),
               ...connectionChoices(workspaces),
             ]}
-            missing={t("mobile.workflow.slack.oneWorkspace")}
+            missing={oneWorkspace}
             onChange={(next) => setFields(node.id, { connectionId: next, placeId: "" })}
           />
         ) : (

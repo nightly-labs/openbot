@@ -36,7 +36,7 @@ export const messages = {
     "אפשר ליצור שרת מתארח כדי לשוחח עם הסוכנים שלך מהדפדפן הזה. אפשר גם להפעיל את OpenBot במחשב או להצטרף לשרת באמצעות הזמנה.",
   "webClient.connect.stepInstall": "יש להתקין ולפתוח את OpenBot במחשב.",
   "webClient.connect.stepSignIn": "יש להתחבר באמצעות האימייל.",
-  "webClient.connect.stepRemote": "יש להפעיל גישה מרחוק.",
+  "webClient.connect.stepRemote": "ב-OpenBot יש לפתוח את הגדרות השרת > חברים ולהפעיל את פרסום השרת הזה.",
   "webClient.notice.download": "הורדת OpenBot",
   "webClient.notice.createServer": "יצירת שרת מתארח",
   "webClient.notice.join": "הצטרפות באמצעות הזמנה",

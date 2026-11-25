@@ -36,7 +36,8 @@ serveFakeAcpAgent(
             },
           }
         : {};
-      peer.reply(request, { sessionId: `s-${sessions}`, ...models });
+      const response = { sessionId: `s-${sessions}`, ...models };
+      setTimeout(() => peer.reply(request, response), Number(process.env.FAKE_SESSION_DELAY_MS ?? 0));
     },
     "session/prompt": (request, peer) => {
       const text = (request.params.prompt ?? [])

@@ -18,7 +18,7 @@ export const messages = {
   "mobile.onboarding.server.invitationBody": "הצטרפות לשרת ששיתפו איתך.",
   "mobile.onboarding.server.computerTitle": "חיבור המחשב שלך",
   "mobile.onboarding.server.computerSteps":
-    "יש להתנתק בטלפון הזה. לאחר מכן יש לפתוח את OpenBot במחשב, לעבור אל הגדרות ← Mobile Connect, לבחור Generate QR code ולסרוק אותו בטלפון הזה.",
+    "יש להתנתק בטלפון הזה. לאחר מכן יש לפתוח את OpenBot במחשב, לעבור אל הגדרות ← Mobile Connect, לבחור באפשרות הוספת טלפון ← כן, התחברות, ולסרוק את הקוד בטלפון הזה.",
   "mobile.onboarding.server.signOut": "התנתקות",
   "mobile.onboarding.server.connecting": "מתחבר אל {name}…",
   "mobile.onboarding.agent.title": "בחירת הסוכן הראשון",

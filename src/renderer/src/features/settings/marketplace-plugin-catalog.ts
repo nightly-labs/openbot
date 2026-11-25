@@ -1,3 +1,11 @@
+/**
+ * The plugins the marketplace offers.
+ *
+ * Generated from marketplace/plugin-catalog/ by scripts/build-plugin-catalog.ts.
+ * Do not edit by hand: run bun run marketplace:build:plugins, or
+ * bun run marketplace:build:plugins -- --check to verify.
+ */
+
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 
@@ -4149,6 +4157,46 @@ const DATADOG: MarketplacePluginDetail = {
   featured: false,
   updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/datadog",
+};
+
+const DATADOG_EU: MarketplacePluginDetail = {
+  id: "plugin-datadog-eu",
+  slug: "datadog-eu",
+  name: "Datadog EU",
+  tagline: "Monitoring, logs and traces",
+  description:
+    "Datadog EU lets agents search logs, metrics, traces, monitors, dashboards and incidents in the organization of the signed-in account. Each user signs in to their own Datadog account on the EU site (datadoghq.eu) through the browser.",
+  category: "coding",
+  creatorName: "Datadog",
+  iconUrl: "https://www.datadoghq.com/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-errors", text: "Which services had the most errors in the last hour?" },
+    { id: "prompt-monitor", text: "Why is the checkout latency monitor alerting?" },
+    { id: "prompt-incident", text: "Summarize the open incidents and their status." },
+  ],
+  apps: [
+    {
+      id: "app-datadog-eu-mcp",
+      name: "Datadog EU",
+      description: "Logs, metrics, traces, monitors, and incidents, over Datadog's EU MCP server with browser sign-in.",
+      iconUrl: "https://www.datadoghq.com/favicon.ico",
+      server: {
+        name: "datadog-eu",
+        transport: "http",
+        url: "https://mcp.datadoghq.eu/v1/mcp",
+        auth: [{ id: "datadog-eu-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://www.datadoghq.com",
+  privacyPolicyUrl: "https://www.datadoghq.com/legal/privacy/",
+  termsUrl: "https://www.datadoghq.com/legal/terms/",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/datadog-eu",
 };
 
 const DATAFORSEO: MarketplacePluginDetail = {
@@ -10762,6 +10810,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   CUSTOMERIO,
   DART,
   DATADOG,
+  DATADOG_EU,
   DATAFORSEO,
   DEALROOM,
   DEEPLEDGER,

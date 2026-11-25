@@ -1,5 +1,5 @@
-import { type AgentFolderBrowse, agentFolderName } from "@openbot/contracts/ipc";
-import { ArrowUp, Button, Dialog, Folder, HardDrive, IconButton, X } from "@openbot/ui";
+import { type AgentFolderBrowse, agentFolderName, typedHostFolder } from "@openbot/contracts/ipc";
+import { ArrowUp, Button, Dialog, Folder, HardDrive, IconButton, Input, X } from "@openbot/ui";
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
 
@@ -9,6 +9,7 @@ export interface HostFolderPick {
   mode: HostFolderPickMode;
   agentName: string;
   start: string | null;
+  title?: string | undefined;
 }
 
 export function HostFolderPicker(props: {
@@ -20,9 +21,10 @@ export function HostFolderPicker(props: {
   const [listing, setListing] = createSignal<AgentFolderBrowse | null>(null);
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+  const [typed, setTyped] = createSignal("");
   let request = 0;
 
-  function open(path: string | null, fallbackHome: boolean): void {
+  function open(path: string | null, fallbackHome: boolean, opened?: (path: string) => void): void {
     const id = ++request;
     setLoading(true);
     setError(null);
@@ -31,7 +33,9 @@ export function HostFolderPicker(props: {
       .then((next) => {
         if (id !== request) return;
         setListing(next);
+        setTyped(next.path);
         setLoading(false);
+        opened?.(next.path);
       })
       .catch((failure: unknown) => {
         if (id !== request) return;
@@ -46,6 +50,7 @@ export function HostFolderPicker(props: {
     (pick) => {
       setListing(null);
       setError(null);
+      setTyped("");
       if (pick) open(pick.start, true);
       else ++request;
     },
@@ -54,9 +59,18 @@ export function HostFolderPicker(props: {
   const title = () => {
     const pick = props.request;
     if (!pick) return "";
+    if (pick.title) return pick.title;
     return pick.mode === "exclude"
       ? t("dialog.chooseAgentExclusion", { agent: pick.agentName })
       : t("dialog.chooseAgentFolder", { agent: pick.agentName });
+  };
+  const typedFolder = (place: AgentFolderBrowse) => typedHostFolder(typed(), place) ?? place.path;
+  const choose = () => {
+    const place = listing();
+    if (!place) return;
+    const target = typedFolder(place);
+    if (target === place.path) props.onDone(place.path);
+    else open(target, false, props.onDone);
   };
   const chooseLabel = () => {
     switch (props.request?.mode) {
@@ -104,9 +118,24 @@ export function HostFolderPicker(props: {
                       )}
                     </For>
                   </nav>
-                  <p class="host-folder-picker-path" title={place().path}>
-                    {place().path}
-                  </p>
+                  <form
+                    class="host-folder-picker-path"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      const target = typedFolder(place());
+                      if (target !== place().path) open(target, false);
+                    }}
+                  >
+                    <Input
+                      size="sm"
+                      value={typed()}
+                      onValueChange={setTyped}
+                      aria-label={t("agentSettings.folders.browse.path")}
+                      autocomplete="off"
+                      autocapitalize="off"
+                      spellcheck={false}
+                    />
+                  </form>
                 </>
               )}
             </Show>
@@ -145,13 +174,7 @@ export function HostFolderPicker(props: {
               <Button variant="ghost" onClick={() => props.onDone(null)}>
                 {t("common.cancel")}
               </Button>
-              <Button
-                disabled={loading() || !listing()}
-                onClick={() => {
-                  const place = listing();
-                  if (place) props.onDone(place.path);
-                }}
-              >
+              <Button disabled={loading() || !listing()} onClick={choose}>
                 {chooseLabel()}
               </Button>
             </footer>

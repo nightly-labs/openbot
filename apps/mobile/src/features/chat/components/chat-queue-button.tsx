@@ -57,7 +57,7 @@ export const ChatQueueButton = memo(function ChatQueueButton({
   const waiting = queue.waiting.length > 0;
   const next = rows[0] ?? null;
   const preview = next
-    ? queuedMessagePreview(next)
+    ? queuedMessagePreview(next, t)
     : pending
       ? pending.message.body || (pending.message.attachments ?? []).map((file) => file.name).join(", ")
       : null;

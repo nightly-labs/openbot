@@ -61,6 +61,13 @@ export function confirmBlockOf(prompt: ConversationQuestionPrompt, uiBlock: Conv
   return spec?.type === "confirm" && prompt.questions[0]?.id === UI_CONFIRM_ACTION_QUESTION_ID ? spec : null;
 }
 
+export function formTitleOf(uiBlock: ConversationUiBlock | undefined, question: string | undefined): string | null {
+  const spec = uiBlock?.spec;
+  if (spec?.type !== "form") return null;
+  const title = spec.title.trim();
+  return title && title !== question?.trim() ? title : null;
+}
+
 export function choiceBlockOf(prompt: ConversationQuestionPrompt, uiBlock: ConversationUiBlock | undefined) {
   const spec = uiBlock?.spec;
   const question = prompt.questions[0];
@@ -81,6 +88,11 @@ export function QuestionText({ question, variant }: { question: string; variant:
       selectable={false}
     />
   );
+}
+
+export function QuestionDetail({ detail }: { detail: string }) {
+  const secondaryColor = useCSSVariable("--openbot-text-secondary");
+  return <ChatMarkdown body={detail} color={String(secondaryColor)} compact finished />;
 }
 
 export function PromptStatus({ controller, canSend }: { controller: QuestionPromptController; canSend: boolean }) {
@@ -295,7 +307,11 @@ export function ChatConfirmPrompt({
   const secondsLeft = useSecondsUntil(autoAnswer?.at ? Date.parse(autoAnswer.at) : 0);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [confirming, setConfirming] = useState<UiAction>();
-  const [draft, setDraft] = useState<string>();
+  const [draft, setPreviewDraft] = useState<string>();
+  const setDraft = (text: string) => {
+    setPreviewDraft(text);
+    controller.setUnsentPreview(text.trim() && text !== spec.preview ? text : undefined);
+  };
   const blankDraft = draft !== undefined && !draft.trim();
   const opensEditor = (action: UiAction) =>
     canEditPreview && uiConfirmPreviewEditable(spec) && action.id === UI_CONFIRM_EDIT_ACTION_ID;
@@ -311,7 +327,7 @@ export function ChatConfirmPrompt({
     if (disabled || blankDraft) return;
     setConfirming(undefined);
     if (opensEditor(action)) {
-      setDraft(spec.preview);
+      setPreviewDraft(spec.preview);
       return;
     }
     const values: Record<string, string> = {};
@@ -325,7 +341,7 @@ export function ChatConfirmPrompt({
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
       <View
-        className={`max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] ${card.fillClass} px-4 py-3`}
+        className={`w-full max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] ${card.fillClass} px-4 py-3`}
         style={card.style}
       >
         <View className="min-w-0 flex-1 pt-1">

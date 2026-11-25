@@ -3,6 +3,7 @@ import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/At
 import type { ChannelMemoriesApi } from "../conversation/memories-port";
 import type { EventRoutinesApi } from "../conversation/routine-webhooks-api";
 import type { ChannelRoutinesApi } from "../conversation/routines-port";
+import type { ChannelFoldersApi } from "./channel-folders-port";
 
 export interface ChannelsPort {
   agent: Pick<
@@ -22,6 +23,13 @@ export interface ChannelsPort {
     Partial<Pick<OpenBotDesktopApi["agent"], "discardDraftAttachment" | "downloadAttachments">> &
     Partial<Pick<OpenBotDesktopApi["agent"], "deleteChannelMessage">> &
     Partial<Pick<OpenBotDesktopApi["agent"], "setChannelImage">> &
+    Partial<
+      Pick<
+        OpenBotDesktopApi["agent"],
+        "readMediaApproval" | "respondToMediaApproval" | "respondToCreditsHold" | "setCreditsAskMuted"
+      >
+    > &
+    Partial<ChannelFoldersApi & Pick<OpenBotDesktopApi["agent"], "chooseChannelFolder">> &
     Partial<
       Pick<
         OpenBotDesktopApi["agent"],

@@ -313,7 +313,7 @@ export const ChatHistory: Story = {
 };
 
 export const MobileAppCard: Story = {
-  args: { footer: <SidebarMobileAppCard onOpenInstall={fn()} onDismiss={fn()} /> },
+  args: { footer: <SidebarMobileAppCard agents={STORY_AGENTS} onInstall={fn()} onDismiss={fn()} /> },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
@@ -332,6 +332,7 @@ export const StorageLow: Story = {
         serverName="Acme HQ"
         freeBytes={1.1 * GB}
         totalBytes={12 * GB}
+        hostedPlan
         onFreeUpSpace={fn()}
         onDismiss={fn()}
       />
@@ -348,6 +349,24 @@ export const StorageFull: Story = {
         serverName="Acme HQ"
         freeBytes={0.14 * GB}
         totalBytes={12 * GB}
+        hostedPlan
+        onFreeUpSpace={fn()}
+        onDismiss={fn()}
+      />
+    ),
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+export const StorageThisComputer: Story = {
+  args: {
+    footer: (
+      <SidebarStorageCard
+        level="low"
+        serverName="OpenBot"
+        freeBytes={5_100_000_000}
+        totalBytes={245_000_000_000}
+        thisComputer
         onFreeUpSpace={fn()}
         onDismiss={fn()}
       />

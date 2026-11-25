@@ -339,6 +339,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     muted: () => state.muted,
     talking: () => state.talking,
     error: () => state.error,
+    downloadProgress: () => null,
     levels: () => state.levels,
     toggleMute,
     setTalkMode,

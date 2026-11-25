@@ -36,7 +36,8 @@ export const messages = {
     "Создайте размещённый сервер, чтобы общаться с агентами из этого браузера. Также можно запустить OpenBot на своём компьютере или присоединиться к серверу по приглашению.",
   "webClient.connect.stepInstall": "Установите и откройте OpenBot на своём компьютере.",
   "webClient.connect.stepSignIn": "Войдите с помощью адреса электронной почты.",
-  "webClient.connect.stepRemote": "Включите удалённый доступ.",
+  "webClient.connect.stepRemote":
+    "В OpenBot откройте Настройки сервера > Участники и включите Опубликовать этот сервер.",
   "webClient.notice.download": "Скачать OpenBot",
   "webClient.notice.createServer": "Создать облачный сервер",
   "webClient.notice.join": "Войти по приглашению",

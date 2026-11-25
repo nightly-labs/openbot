@@ -29,6 +29,7 @@ export interface UiBlockPromptProps {
   onOpenLink: (url: string) => void;
   onAnswer?: ((answers: Record<string, string[]>, options?: PromptAnswerOptions) => Promise<boolean>) | undefined;
   canEditPreview?: boolean | undefined;
+  onUnsentPreviewChange?: ((text: string | undefined) => void) | undefined;
   onAnswered?: (() => void) | undefined;
   elementRef?: ((element: HTMLElement | undefined) => void) | undefined;
 }
@@ -58,6 +59,7 @@ interface ApiKeyRequest {
   keyFieldId: string;
   name: string;
   placeholder: string | undefined;
+  submit: string | undefined;
   scope: VaultRequestScope;
 }
 
@@ -73,6 +75,7 @@ function apiKeyRequestOf(block: ConversationUiBlock): ApiKeyRequest | undefined 
     keyFieldId: key.id,
     name: key.label ?? key.id,
     placeholder: "placeholder" in key ? key.placeholder : undefined,
+    submit: spec.submit,
     scope: { label: scope.label ?? scope.id, options: scope.options, value: scope.value ?? first },
   };
 }
@@ -117,13 +120,27 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     props.onAnswered?.();
   }
 
+  let previewDraft: string | undefined;
+  const unsentPreview = () => {
+    const spec = props.block.spec;
+    return spec.type === "confirm" && previewDraft?.trim() && previewDraft !== spec.preview ? previewDraft : undefined;
+  };
+
+  function changePreviewDraft(draft: string | undefined): void {
+    previewDraft = draft;
+    props.onUnsentPreviewChange?.(unsentPreview());
+  }
+
   function respond(response: UiBlockResponse, preview?: string): void {
     const spec = props.block.spec;
     const outcome = uiBlockOutcomeText(spec, response);
+    props.onUnsentPreviewChange?.(undefined);
     void send(uiConfirmAnswersWithPreview(spec, response, preview), {
       status: "answered",
       response,
       ...(outcome.trim() ? { outcome } : {}),
+    }).then(() => {
+      if (state().status === "pending") props.onUnsentPreviewChange?.(unsentPreview());
     });
   }
 
@@ -191,6 +208,7 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
           prefill={prefill()}
           scope={apiKeyRequest()?.scope}
           keyPlaceholder={apiKeyRequest()?.placeholder}
+          submitLabel={apiKeyRequest()?.submit}
           status={state().status}
           closedOutcome={state().outcome}
           saved={props.block.vault?.saved}
@@ -215,6 +233,7 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
         disabled={!props.onAnswer}
         onRespond={respond}
         canEditPreview={props.canEditPreview}
+        onPreviewDraftChange={changePreviewDraft}
         onSkip={props.onAnswer ? skip : undefined}
         elementRef={(element) => props.elementRef?.(element)}
         renderPreview={(markdown) => (

@@ -1,4 +1,11 @@
-import type { AvatarImageInput, ChannelCommand, ChannelPage, ChannelSummary } from "@openbot/contracts/ipc";
+import {
+  type AvatarImageInput,
+  type ChannelCommand,
+  type ChannelPage,
+  type ChannelSummary,
+  closedChannelTaskSequences,
+  mergeChannelTasks,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import type { AgentProfile } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
@@ -15,6 +22,7 @@ function takeOlderWindow(target: ChannelPage, source: ChannelPage): void {
   else target.oldestAt = source.oldestAt;
 }
 
+import type { ChannelFoldersMode } from "./channel-folders-port";
 import type { ChannelsPort } from "./channels-port";
 
 interface ChannelsState {
@@ -46,6 +54,7 @@ export interface ChannelsEnvironment {
   browserSupported: () => boolean;
   pictureSupported: () => boolean;
   contextActionsSupported: () => boolean;
+  foldersMode: () => ChannelFoldersMode | null;
   beforeOpen: () => void;
   canMarkRead: () => boolean;
   onList?: (channels: ChannelSummary[], scope: string) => void;
@@ -182,6 +191,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
       const page = selectedExists && withPage ? await env.port().agent.readChannel({ channelId: selected }) : null;
       if (disposed || account !== env.scopeKey() || id !== refreshId || selected !== state.selectedId) return;
       env.onList?.(channels, account);
+      let closed: number[] = [];
       const readNow = selected !== null && selected === visitRead && env.canMarkRead();
       const listed = readNow
         ? channels.map((channel) =>
@@ -200,8 +210,12 @@ export function createChannelsController(env: ChannelsEnvironment) {
         }
         if (page && state.page?.channel.id === page.channel.id) {
           const merged = mergeChannelPage(state.page.messages, page.messages);
+          const kept = merged.messages.slice(0, merged.messages.length - page.messages.length);
+          const held = snapshot(state.page.tasks);
+          const tasks = mergeChannelTasks(page.tasks, held, kept);
+          closed = closedChannelTaskSequences(page.tasks, held, kept);
           reconcile(merged.messages, "id")(state.page.messages);
-          reconcile(page.tasks, "id")(state.page.tasks);
+          reconcile(tasks, "id")(state.page.tasks);
           Object.assign(state.page, { channel: page.channel, throughSequence: page.throughSequence });
           if (page.waits === undefined) delete state.page.waits;
           else state.page.waits = page.waits;
@@ -210,6 +224,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
         if (withPage || !selectedExists) state.loading = false;
         if (!failedCommand && withPage) state.error = null;
       });
+      if (selected && closed.length) void loadClosedTasks(selected, closed, account);
       if (selected && !selectedExists) env.writeSelection(null);
       if (selected && page && env.canMarkRead()) visitRead = selected;
       if (selected && page && env.canMarkRead() && page.throughSequence > (readThrough.get(selected) ?? 0)) {
@@ -341,6 +356,23 @@ export function createChannelsController(env: ChannelsEnvironment) {
       ? page
       : port.agent.readChannel({ channelId: input.channelId });
   }
+  async function loadClosedTasks(channelId: string, sequences: readonly number[], account: string) {
+    let covered = Number.POSITIVE_INFINITY;
+    for (const sequence of sequences) {
+      if (sequence >= covered) continue;
+      const fetched = await env
+        .port()
+        .agent.readChannel({ channelId, beforeSequence: sequence + 1 })
+        .catch(() => null);
+      if (!fetched || disposed || account !== env.scopeKey() || state.page?.channel.id !== channelId) return;
+      covered = fetched.messages[0]?.sequence ?? sequence;
+      setState((state) => {
+        const page = state.page;
+        if (!page || page.channel.id !== channelId) return;
+        reconcile(mergeChannelTasks(snapshot(page.tasks), fetched.tasks, snapshot(page.messages)), "id")(page.tasks);
+      });
+    }
+  }
   async function loadOlder() {
     const channelId = state.selectedId;
     const beforeSequence = state.page?.olderCursor;
@@ -353,7 +385,10 @@ export function createChannelsController(env: ChannelsEnvironment) {
           const page = state.page;
           if (!page || page.olderCursor !== beforeSequence) return;
           const ids = new Set(page.messages.map((item) => item.id));
-          reconcile([...older.messages.filter((item) => !ids.has(item.id)), ...page.messages], "id")(page.messages);
+          const added = older.messages.filter((item) => !ids.has(item.id));
+          const tasks = mergeChannelTasks(snapshot(page.tasks), older.tasks, added);
+          reconcile([...added, ...page.messages], "id")(page.messages);
+          reconcile(tasks, "id")(page.tasks);
           takeOlderWindow(page, older);
         });
     } catch (error) {
@@ -466,6 +501,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
     deletesAnyMessage: env.deletesAnyMessage,
     deleteMessage,
     pictureSupported: () => supported() && env.pictureSupported() && env.port().agent.setChannelImage !== undefined,
+    foldersMode: () => (supported() && env.port().agent.listChannelFolders !== undefined ? env.foldersMode() : null),
     setImage: (channelId: string, image: AvatarImageInput | null) =>
       perform(async () => {
         const setChannelImage = env.port().agent.setChannelImage;

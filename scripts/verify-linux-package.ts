@@ -76,7 +76,7 @@ await Promise.all([
   access(voiceSessionSettingsPath),
   access(voiceHostPath),
   access(speechHostPath),
-  ...["packages.txt", "openbot-hosted.apparmor", ...HOSTED_UNITS].map((file) =>
+  ...["packages.txt", "optional-packages.txt", "openbot-hosted.apparmor", ...HOSTED_UNITS].map((file) =>
     access(resolve(resourcesPath, "hosting", file)),
   ),
   ...HOSTED_SCRIPTS.map((file) => access(resolve(resourcesPath, "hosting", file), constants.X_OK)),

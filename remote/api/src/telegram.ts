@@ -87,7 +87,7 @@ export class TelegramBotApi {
     this.#webhookSecret = config.webhookSecret;
     this.#webhookOrigin = config.webhookOrigin;
     this.#fetch = options.fetch ?? ((url, init) => fetch(url, init));
-    this.#apiOrigin = options.apiOrigin ?? "https://api.telegram.org";
+    this.#apiOrigin = options.apiOrigin ?? config.apiOrigin ?? "https://api.telegram.org";
   }
 
   hasBot(botId: string): boolean {

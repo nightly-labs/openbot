@@ -4,6 +4,7 @@ import { currentText } from "@openbot/ui/text";
 import { onCleanup } from "solid-js";
 import type { ChannelsPort } from "../channels/channels-port";
 import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
+import { webChannelFoldersApi } from "./web-agent-settings";
 import { createWebAttachmentMedia } from "./web-attachment-media";
 import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import type { WebWorkspaceRuntime } from "./web-runtime";
@@ -86,6 +87,10 @@ export function createWebChannelsPort(
       chooseAttachments: async () => importAttachments(await chooseFiles()),
       openAttachment: ({ attachmentId }) => files.download(attachmentId),
       respondToApproval: (input) => remote.approve(input),
+      readMediaApproval: (input) => remote.readMediaApproval?.(input) ?? Promise.resolve({ media: null, hold: null }),
+      respondToMediaApproval: (input) => remote.respondToMediaApproval?.(input) ?? unavailable(),
+      respondToCreditsHold: (input) => remote.respondToCreditsHold?.(input) ?? unavailable(),
+      setCreditsAskMuted: (input) => remote.setCreditsAskMuted?.(input) ?? unavailable(),
       respondToPrompt: (input) => remote.answer(input),
       respondToBrowserTakeover: (input) => remote.respondToTakeover(input),
       respondToBrowserSecret: (input) => remote.respondToBrowserSecret?.(input) ?? unavailable(),
@@ -95,6 +100,7 @@ export function createWebChannelsPort(
       channelCompactAvailability: (channelId) =>
         remote.channelCompactAvailability?.(channelId) ?? Promise.resolve({ available: true }),
       deleteChannelHistory: (channelId) => remote.deleteHistory?.({ kind: "channel", channelId }) ?? unavailable(),
+      ...(admin ? webChannelFoldersApi(() => admin.request) : {}),
     },
     get eventRoutines() {
       return eventsEnabled() ? eventRoutines : undefined;

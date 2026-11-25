@@ -387,7 +387,7 @@ export const messages = {
   "connector.whatsapp.ownNumberNote":
     "OpenBot получает сообщения из вашего чата «Сообщение себе» и от людей, которым вы разрешили писать.",
   "connector.whatsapp.dedicatedNote":
-    "OpenBot получает сообщения от людей, которым вы разрешили писать. Остальные получают код, который нужно передать вам.",
+    "OpenBot получает сообщения из вашего чата «Сообщение себе» и от людей, которым вы разрешили писать. Остальные получают код, который нужно передать вам.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp удалил этот компьютер из связанных устройств. Привяжите номер заново.",
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp удалил этот сервер из связанных устройств. Привяжите номер заново.",
   "connector.whatsapp.helpError":
@@ -411,7 +411,7 @@ export const messages = {
     "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Другие люди не получают ответа. Если выключено, OpenBot отвечает незнакомым людям кодом.",
   "connector.whatsapp.workingMessage": "Сообщение «Уже работаю…»",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Запрос, который ждёт предыдущий, тоже получает сообщение об ожидании. Выключите, чтобы отправлять только ответ.",
+    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Запрос, который ждёт предыдущий, тоже получает сообщение об ожидании. На личном номере эти сообщения получает только чат «Сообщение себе». Выключите, чтобы отправлять только ответ.",
   "connector.whatsapp.statusReactions": "Реакции статуса",
   "connector.whatsapp.statusReactionsDescription":
     "OpenBot ставит 👀, когда приходит сообщение, и ✅, когда ответ готов. Выключите, чтобы не отправлять реакции.",
@@ -487,6 +487,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "Номер может разрешить не более {count} контактов и групп.",
   "connector.whatsapp.senderGroup": "Группа",
   "connector.whatsapp.removeSender": "Удалить",
+  "connector.whatsapp.senderAccess": "Доступ: {name}",
+  "connector.whatsapp.senderReplies": "Может давать задачи",
+  "connector.whatsapp.senderReadOnly": "Только чтение",
   "connector.whatsapp.addContact": "Добавить контакт",
   "connector.whatsapp.addGroup": "Добавить группу",
   "connector.whatsapp.contactTitle": "Добавить контакт",

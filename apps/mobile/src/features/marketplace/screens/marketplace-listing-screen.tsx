@@ -240,7 +240,7 @@ function AgentPage({
         <Button
           className="bg-action"
           feedbackVariant="scale"
-          onPress={() => router.replace({ pathname: "/chat/[agentId]", params: { agentId: addedId } })}
+          onPress={() => router.replace({ pathname: "/chat/[agentId]", params: { agentId: addedId, serverId } })}
         >
           <Button.Label className="text-action-foreground">{t("mobile.marketplace.agent.openChat")}</Button.Label>
         </Button>

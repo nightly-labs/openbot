@@ -26,3 +26,9 @@ const DEV_SHOW_RATING_ASK = false;
 export function devShowRatingAsk(): boolean {
   return __DEV__ && DEV_SHOW_RATING_ASK;
 }
+
+const DEV_MOCK_CREDITS = false;
+
+export function devMockCredits(): boolean {
+  return __DEV__ && DEV_MOCK_CREDITS;
+}

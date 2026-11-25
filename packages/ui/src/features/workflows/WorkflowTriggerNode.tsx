@@ -19,10 +19,11 @@ import { createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { RoutineSchedulePicker } from "../conversation/RoutineSchedulePicker";
 import { RoutineWebhookSecretField } from "../conversation/RoutineWebhookEndpoint";
+import { AnswerAction, AnswerProblems } from "./workflow-answer-parts";
 import { useBoard } from "./workflow-board";
 import { DISCORD_TRIGGER_DEFAULTS, DiscordIcon, DiscordTriggerRows } from "./workflow-discord-parts";
 import { GITHUB_TRIGGER_DEFAULTS, GitHubIcon, GitHubTriggerRows, useGitHubTriggerReady } from "./workflow-github-parts";
-import { newTriggerSchedule, stableJson } from "./workflow-history";
+import { knownTimeZone, localTimeZone, newTriggerSchedule, stableJson } from "./workflow-history";
 import { type Choice, NodeShell, NodeToolbar, oneOf, useField, useLocked, useStepRun } from "./workflow-node-parts";
 import { PlaceRow, SettingRow, SettingRows, SettingsFoot, StaticRow } from "./workflow-setting-rows";
 import { SLACK_TRIGGER_DEFAULTS, SlackIcon, SlackTriggerRows } from "./workflow-slack-parts";
@@ -136,16 +137,19 @@ export function TriggerNode(props: {
     if (isGitHub()) return board.github()?.runLastEvent(props.id);
     return board.runFrom ? board.runFrom(props.id) : run.start();
   };
-  const nextRun = () =>
-    props.nextRun
-      ? format.date(new Date(props.nextRun), {
-          weekday: "short",
-          day: "numeric",
-          month: "short",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      : undefined;
+  const nextRun = () => {
+    if (!props.nextRun) return undefined;
+    const timeZone = knownTimeZone(board.field(props.id, "timezone"));
+    const shown = timeZone && timeZone !== localTimeZone() ? timeZone : undefined;
+    return format.date(new Date(props.nextRun), {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      ...(shown ? { timeZone: shown, timeZoneName: "short" } : {}),
+    });
+  };
   return (
     <NodeShell
       action={
@@ -167,7 +171,13 @@ export function TriggerNode(props: {
       kind="trigger"
       output="text"
       style={{ "--wfn-width": "320px" }}
-      toolbar={<NodeToolbar id={props.id} name={t("workflow.trigger.name")} locked={locked()} onLock={setLocked} />}
+      toolbar={
+        <NodeToolbar id={props.id} name={t("workflow.trigger.name")} locked={locked()} onLock={setLocked}>
+          <Show when={trigger() === "webhook"}>
+            <AnswerAction id={props.id} field="answer" locked={locked()} />
+          </Show>
+        </NodeToolbar>
+      }
     >
       <SettingRows
         head={
@@ -233,6 +243,9 @@ export function TriggerNode(props: {
               />
             </div>
           </Show>
+        </Show>
+        <Show when={trigger() === "webhook"}>
+          <AnswerProblems id={props.id} />
         </Show>
         <Show when={trigger() === "message"}>
           <PlaceRow

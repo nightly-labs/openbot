@@ -9,6 +9,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES } from "@openbot/contracts/team-protocol/v2";
 import { bytesToBase64 } from "@openbot/team-client/base64";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import { CodedError } from "expo";
 import * as Crypto from "expo-crypto";
 import * as DocumentPicker from "expo-document-picker";
 import { Directory, File, Paths } from "expo-file-system";
@@ -187,12 +188,17 @@ export function useChatAttachments(
   async function readFile(uri: string, name: string): Promise<RemoteFileUpload & { uri: string }> {
     const file = new File(uri);
     const safeName = name.replace(/[/\\]/gu, "_");
+    const unavailable = () => new Error(t("mobile.chat.attachment.unavailable"));
     const size = file.size;
+    if (size === null) throw unavailable();
     if (size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES) throw tooLarge(safeName, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);
     assertSupported(safeName);
     const mimeType = attachmentMimeTypeForName(safeName);
     if (size > MOBILE_ATTACHMENT_BYTES) return { name: safeName, mimeType, base64: "", uri, file: { ref: uri, size } };
-    return { name: safeName, mimeType, base64: await readFileBase64(file), uri };
+    const base64 = await readFileBase64(file).catch(() => {
+      throw unavailable();
+    });
+    return { name: safeName, mimeType, base64, uri };
   }
   async function addFile(uri: string, name: string) {
     if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(limitMessage());
@@ -210,6 +216,15 @@ export function useChatAttachments(
       ? asset.fileName
       : `${video ? "video" : "photo"}.${extension ?? (video ? "mov" : "jpg")}`;
   }
+  async function pickFromLibrary(options: ImagePicker.ImagePickerOptions) {
+    try {
+      return await ImagePicker.launchImageLibraryAsync(options);
+    } catch (error) {
+      if (error instanceof CodedError && error.code === "ERR_FAILED_TO_READ_IMAGE")
+        throw new Error(t("mobile.chat.attachment.photoNotLoaded"));
+      throw error;
+    }
+  }
   function libraryMediaTypes(): ImagePicker.MediaType[] {
     const accepted = support?.();
     return !accepted || accepted.media || accepted.mp4 || accepted.anyFile ? ["images", "videos"] : ["images"];
@@ -219,7 +234,7 @@ export function useChatAttachments(
     if (!current) return;
     let picked: { uri: string; name: string } | null = null;
     if (current.mimeType.startsWith("image/") && current.mimeType !== "image/svg+xml") {
-      const result = await ImagePicker.launchImageLibraryAsync({
+      const result = await pickFromLibrary({
         mediaTypes: ["images"],
         quality: 1,
         preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
@@ -257,9 +272,20 @@ export function useChatAttachments(
     }
     return true;
   }
+  async function takePhoto() {
+    if (!(await requestCamera())) return;
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      quality: 1,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+    });
+    if (result.canceled)
+      mobileAnalytics.track("attachment_action", { action: "select", result: "cancelled", attachment_count: 0 });
+    else for (const asset of result.assets) await addPhotoFile(asset.uri, photoName(asset));
+  }
   async function choosePhotos() {
     if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(limitMessage());
-    const result = await ImagePicker.launchImageLibraryAsync({
+    const result = await pickFromLibrary({
       mediaTypes: libraryMediaTypes(),
       allowsMultipleSelection: true,
       quality: 1,
@@ -364,6 +390,7 @@ export function useChatAttachments(
     addPhoto: (uri: string) => report(() => addPhotoFile(uri, "photo.jpg")),
     choosePhotos: () => report(choosePhotos),
     requestCamera,
+    takePhoto: () => report(takePhoto),
     chooseFiles: () => report(chooseFiles),
     replace: (id: string) => report(() => replaceItem(id)),
     pasteText,
@@ -387,6 +414,7 @@ export function useChatAttachments(
     addPhoto: (uri: string) => latestActions.current.addPhoto(uri),
     choosePhotos: () => latestActions.current.choosePhotos(),
     requestCamera: () => latestActions.current.requestCamera(),
+    takePhoto: () => latestActions.current.takePhoto(),
     chooseFiles: () => latestActions.current.chooseFiles(),
     replace: (id: string) => latestActions.current.replace(id),
     pasteText: (text: string, onText: (text: string) => void) => latestActions.current.pasteText(text, onText),

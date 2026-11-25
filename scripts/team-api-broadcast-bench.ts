@@ -400,9 +400,13 @@ const fakeAgents: TeamApiAgents = {
   compactTaskContext: unused("compactTaskContext"),
   agentIdForRequest: unused("agentIdForRequest"),
   pendingApproval: unused("pendingApproval"),
+  pendingMediaApproval: unused("pendingMediaApproval"),
+  pendingCreditsHold: unused("pendingCreditsHold"),
   pendingPrompts: unused("pendingPrompts"),
   respondToPrompt: unused("respondToPrompt"),
   respondToApproval: unused("respondToApproval"),
+  respondToMediaApproval: unused("respondToMediaApproval"),
+  respondToCreditsHold: unused("respondToCreditsHold"),
   respondToBrowserSecret: unused("respondToBrowserSecret"),
   respondToBrowserTakeover: unused("respondToBrowserTakeover"),
 };

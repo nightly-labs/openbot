@@ -14,6 +14,7 @@ import {
   Switch,
   Text,
 } from "@openbot/ui";
+import { McpSignInLinkCopy } from "@openbot/ui/features/settings/McpSignInDialog";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, Show } from "solid-js";
 import { McpRelaySignIn } from "./McpRelaySignIn";
@@ -25,6 +26,7 @@ import {
   mcpProviderLimitNote,
   mcpStatusLabel,
   mcpStatusVariant,
+  mcpUrlAtAddress,
   normalizeMcpConfig,
 } from "./mcp-servers";
 
@@ -54,6 +56,11 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
     return undefined;
   });
   const waiting = () => (test()?.status === "signing-in" ? state.test?.config : undefined);
+  const otherAddress = () => {
+    const current = test();
+    const row = config();
+    return current?.status === "failed" && row ? mcpUrlAtAddress(row.url, current.address) : undefined;
+  };
 
   async function latch(key: string, action: () => Promise<void>): Promise<void> {
     if (state.busy !== null) return;
@@ -104,6 +111,17 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
           current.error = errorMessage(error, t("mcp.panel.saveFailed"));
         });
       });
+  }
+
+  async function switchAddress(url: string): Promise<void> {
+    const current = config();
+    if (!current) return;
+    let saved = false;
+    await latch("address", async () => {
+      await props.tools.save({ ...current, url });
+      saved = true;
+    });
+    if (saved) void signIn();
   }
 
   function signOut(): void {
@@ -163,6 +181,22 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                   }
                 >
                   {(note) => <ItemDescription class="server-mcp-row-text">{note()}</ItemDescription>}
+                </Show>
+                <Show when={otherAddress()}>
+                  {(address) => (
+                    <div class="server-mcp-row-next">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={state.busy !== null}
+                        loading={state.busy === "address"}
+                        onClick={() => void switchAddress(address())}
+                      >
+                        {t("mcp.panel.useAddress")}
+                      </Button>
+                    </div>
+                  )}
                 </Show>
                 <Show when={waiting()}>
                   {(pending) => (
@@ -228,6 +262,19 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                 />
               </ItemActions>
             </Item>
+            <Show when={waiting() ? props.tools.signIn()?.copyLink : undefined}>
+              {(copy) => (
+                <Item class="settings-modal-row">
+                  <ItemContent class="server-mcp-sign-in-link">
+                    <McpSignInLinkCopy
+                      onCopy={copy()}
+                      onPaste={props.tools.signIn()?.pasteAddress}
+                      waitingNote={false}
+                    />
+                  </ItemContent>
+                </Item>
+              )}
+            </Show>
           </ItemGroup>
           <Show when={state.error}>
             <Text class="server-mcp-runtime-note" variant="caption" tone="danger" role="alert">

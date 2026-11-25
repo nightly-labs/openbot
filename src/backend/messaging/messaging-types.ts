@@ -20,6 +20,7 @@ export interface MessagingPlace {
   id: string;
   name: string;
   kind: "channel" | "private" | "thread" | "chat";
+  readOnly?: true;
 }
 
 export interface MessagingPlaces {

@@ -213,6 +213,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
     content: string;
   } | null>(null);
   const attachmentTooltipId = `composer-file-tooltip-${createUniqueId()}`;
+  const pickerListId = `composer-picker-${createUniqueId()}`;
+  const pickerOptionId = (option: PickerOption) =>
+    `${pickerListId}-${encodeURIComponent(JSON.stringify(pickerOptionKey(option)))}`;
   const [pickerFrame, setPickerFrame] = createSignal<PickerFrame>(
     { mount: undefined, bottom: 0 },
     { equals: (previous, next) => previous.mount === next.mount && previous.bottom === next.bottom },
@@ -393,6 +396,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
   const pickerOpen = createMemo(
     () => mention() !== null && (matchingOptions().length > 0 || pickerStatus() !== null || skillProblems().length > 0),
   );
+  const activePickerOptionId = createMemo(() => {
+    if (!pickerOpen() || pickerStatus() !== null) return undefined;
+    const option = matchingOptions()[activeOption()];
+    return option ? pickerOptionId(option) : undefined;
+  });
   const pickerQuery = () => mention()?.query.trim() ?? "";
   const descriptionMatchQuery = (option: PickerOption) =>
     option.type === "tab" || (option.type === "thread" && option.snippet !== undefined) ? pickerQuery() : "";
@@ -417,6 +425,10 @@ export function ComposerEditor(props: ComposerEditorProps) {
   };
   onCleanup(() => releasePickerList?.());
   let editor: HTMLDivElement | undefined;
+  createEffect(activePickerOptionId, (optionId) => {
+    if (optionId) editor?.setAttribute("aria-activedescendant", optionId);
+    else editor?.removeAttribute("aria-activedescendant");
+  });
   let pickerElement: HTMLDivElement | undefined;
   let lastAgentId: string | undefined;
   let lastAttachmentKey = "";
@@ -1077,6 +1089,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
         aria-label={props.ariaLabel}
         aria-disabled={props.disabled ? "true" : "false"}
         aria-multiline="true"
+        aria-autocomplete={props.disabled ? undefined : "list"}
+        aria-haspopup={props.disabled ? undefined : "listbox"}
+        aria-controls={activePickerOptionId() ? pickerListId : undefined}
         aria-keyshortcuts={props.onSteer ? "Tab" : undefined}
         spellcheck="true"
         data-cuelume-type=""
@@ -1168,6 +1183,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
             <Show when={pickerStatus() === null && matchingOptions().length > 0}>
               <Listbox.Root<PickerOption, PickerSection>
                 as="div"
+                id={pickerListId}
                 ref={bindPickerList}
                 class="mention-picker-list"
                 aria-label={t(
@@ -1208,6 +1224,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
                     <Listbox.Item
                       ref={(element) => pickerOptionElements.set(pickerOptionKey(option), element)}
                       item={item}
+                      id={pickerOptionId(option)}
                       data-option-key={pickerOptionKey(option)}
                       data-filtering={pickerQuery() ? "" : undefined}
                       aria-label={pickerOptionText(option, t)}

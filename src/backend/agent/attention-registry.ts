@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { CreditMediaGenerationKind } from "@openbot/contracts/credit-media";
 import type { FeedbackPhone } from "@openbot/contracts/feedback";
 import type {
   AgentApproval,
@@ -11,9 +12,14 @@ import type {
   BrowserTakeoverRequest,
   BrowserVaultSkipReason,
   ConversationMessageSender,
+  CreditsHold,
   LocalBrowserSecretResponse,
+  MediaApprovalChoice,
+  MediaApprovalOffer,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
+  RespondToCreditsHoldInput,
+  RespondToMediaApprovalInput,
   RespondToPromptInput,
 } from "@openbot/contracts/ipc";
 import {
@@ -76,13 +82,14 @@ import {
   isRecord,
   type RequestId,
 } from "../protocol";
-import type {
-  VaultAgent,
-  VaultAgentChange,
-  VaultAgentResult,
-  VaultEnteredItem,
-  VaultItems,
-  VaultTypedLogin,
+import {
+  type VaultAgent,
+  type VaultAgentChange,
+  type VaultAgentResult,
+  type VaultEnteredItem,
+  type VaultItems,
+  type VaultTypedLogin,
+  vaultClosedText,
 } from "../vault-items";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION, shouldAutoApprove } from "./approval-automation";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -110,8 +117,10 @@ import {
   declinedMcpElicitationText,
   detachedPromptResult,
   dynamicPromptResult,
+  editedPreviewQuestions,
   expiredPromptResult,
   lateAnswerText,
+  locationPromptResult,
   MCP_TOOL_CONSENT_ALLOW_ONCE,
   mcpElicitationQuestions,
   mcpElicitationResult,
@@ -166,6 +175,7 @@ export interface SurfacedUiBlock {
   spec: UiBlockSpec;
   apiKey?: { name: string; vault?: boolean };
   vault?: { kind: UiVaultRequestKind };
+  location?: true;
 }
 
 export interface PromptResponder {
@@ -179,6 +189,48 @@ const AUTOMATIC_RESPONDER: PromptResponder = { privileged: true, automatic: true
 export interface ApprovalResponder {
   owner: boolean;
   phone?: FeedbackPhone;
+  person?: { id: string; canAdminister: boolean };
+}
+
+export interface CreditsHoldCall {
+  kind: CreditMediaGenerationKind;
+  cost: number;
+}
+
+export interface CreditsHoldWallet {
+  agentsAllowed: () => boolean;
+  enableAgents: () => Effect.Effect<void, unknown>;
+  balance: () => Effect.Effect<number | null>;
+}
+
+export type CreditAnswerVia = "local" | "remote" | "automatic";
+
+function answerVia(responder: ApprovalResponder | undefined): CreditAnswerVia {
+  return responder ? "remote" : "local";
+}
+
+export interface CreditsHoldAnswer {
+  action: "continue" | "skip" | "mute";
+  responder?: ApprovalResponder;
+  via?: CreditAnswerVia;
+  enabled?: boolean;
+  stopped?: boolean;
+}
+
+interface PendingCreditsHold {
+  call: CreditsHoldCall;
+  balance: number | null;
+  wallet: CreditsHoldWallet;
+  answer: (answer: CreditsHoldAnswer) => void;
+}
+
+function respondsAsAdmin(responder: ApprovalResponder | undefined): boolean {
+  if (!responder) return true;
+  return responder.person?.canAdminister ?? responder.owner;
+}
+
+function creditsSum(values: readonly number[]): number {
+  return Math.round(values.reduce((total, value) => total + value, 0) * 1000) / 1000;
 }
 
 interface PendingApproval {
@@ -189,13 +241,21 @@ interface PendingApproval {
   approval: AgentApproval;
   executionThreadId: string;
   hostedSiteMutation?: HostedSiteMutationContext;
-  decide?: (decision: ToolApprovalDecision, phone?: FeedbackPhone) => void;
+  decide?: (decision: ToolApprovalDecision, responder?: ApprovalResponder, choice?: MediaApprovalChoice) => void;
+  media?: MediaApprovalOffer;
+  creditsHold?: PendingCreditsHold;
   alwaysAsk?: boolean;
   ownerOnly?: boolean;
   needsPhone?: boolean;
 }
 
 export type ToolApprovalDecision = "accept" | "decline" | "cancel";
+
+interface MediaApprovalAnswer {
+  readonly decision: ToolApprovalDecision;
+  readonly choice?: MediaApprovalChoice;
+  readonly via: CreditAnswerVia;
+}
 
 const TOOL_APPROVAL_METHOD = "openbot/tool-approval";
 const MESSAGING_QUESTION_REFUSED =
@@ -214,6 +274,8 @@ const TAKEOVER_TAB_OF_OTHER_CHAT =
 const USER_ANSWER_LIMIT_MS = 10 * 60_000;
 const TAKEOVER_ALREADY_WAITING = "A takeover of this tab already waits for the user. Wait for it to return.";
 const VAULT_UNAVAILABLE = "No Vault is available on this computer. Ask the user.";
+const ROUTINE_SAVED_LOGIN_NOT_FILLED =
+  "This is a routine run, so nobody can answer a password card. When this text says how to correct the call, correct it and call submit_secret again with the loginId. Else stop the sign-in and say in your report that the user must sign in, and why OpenBot did not fill the saved login. Do not call submit_secret without loginId or request_takeover.";
 const NO_LOGIN_FOR_SITE =
   "No saved login is for the site of this page. A login fits only the site of a website saved in it, with its subdomains, and a sign-in page can be on a different site than the service. When the user says that a login for this account is saved, tell them what to check. In a password manager: add the address of this sign-in page as a website of the login, and keep the login where they share logins with OpenBot; the page of each password manager in Marketplace shows where. In the OpenBot Vault, a login has one website: save a second login for the address of this sign-in page in Server settings > Vault, and let this agent use the login under Agents. Until then, continue as for a site with no saved login.";
 const VAULT_LOGIN_ADD_FIELDS =
@@ -441,6 +503,7 @@ export interface HostedSiteApprovals {
 export interface RoutineAttention {
   markNeedsAttention(turnId: string | null): void;
   markRunningForTurn(turnId: string | null): void;
+  runsTurn(turnId: string): boolean;
 }
 
 export interface AttentionBrowserHost {
@@ -576,6 +639,123 @@ export class AttentionRegistry {
     return pending ? structuredClone(pending.approval) : undefined;
   }
 
+  pendingMediaApproval(agentId: string, requestId: RequestId): MediaApprovalOffer | undefined {
+    const pending = this.#approvals.get(requestId);
+    if (!pending?.media || pending.approval.agentId !== agentId) return undefined;
+    return structuredClone(pending.media);
+  }
+
+  pendingCreditsHold(agentId: string, requestId: RequestId, canEnable: boolean): CreditsHold | undefined {
+    const pending = this.#approvals.get(requestId);
+    if (!pending?.creditsHold || pending.approval.agentId !== agentId) return undefined;
+    return this.#creditsHoldSummary(pending, pending.creditsHold, canEnable);
+  }
+
+  #creditsHoldGroup(pending: PendingApproval): PendingApproval[] {
+    const { agentId, threadId, turnId } = pending.approval;
+    return [...this.#approvals.values()].filter(
+      (other) =>
+        other.creditsHold !== undefined &&
+        other.approval.agentId === agentId &&
+        other.approval.threadId === threadId &&
+        other.approval.turnId === turnId,
+    );
+  }
+
+  #creditsHoldSummary(pending: PendingApproval, hold: PendingCreditsHold, canEnable: boolean): CreditsHold {
+    const calls = this.#creditsHoldGroup(pending).flatMap((other) =>
+      other.creditsHold ? [other.creditsHold.call] : [],
+    );
+    return {
+      reason: hold.wallet.agentsAllowed() ? "balance" : "agentsOff",
+      images: calls.filter((call) => call.kind === "image").length,
+      videos: calls.filter((call) => call.kind === "video").length,
+      cost: creditsSum(calls.map((call) => call.cost)),
+      balance: hold.balance,
+      canEnable,
+    };
+  }
+
+  #resolveCreditsHolds(group: readonly PendingApproval[], answer: CreditsHoldAnswer): void {
+    for (const pending of group) {
+      if (this.#approvals.get(pending.id) !== pending) continue;
+      this.#approvals.delete(pending.id);
+      this.#routines.markRunningForTurn(pending.approval.turnId);
+      this.#emitInputResolved("approval", pending.id, pending.approval.agentId);
+      pending.creditsHold?.answer(answer);
+    }
+    this.#emitRuntimeSnapshot();
+  }
+
+  readonly respondToCreditsHold = Effect.fn("AttentionRegistry.respondToCreditsHold")(function* (
+    this: AttentionRegistry,
+    input: RespondToCreditsHoldInput,
+    responder?: ApprovalResponder,
+    automatic = false,
+  ) {
+    const { pending, hold } = yield* attentionStep(() => {
+      const value = this.#approvals.get(input.requestId);
+      if (!value?.creditsHold || value.approval.agentId !== input.agentId)
+        throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
+      if (input.action === "enable" && !respondsAsAdmin(responder))
+        throw new ForbiddenAttentionAnswer(sourceText("error.backend.creditsHoldAdminOnly"));
+      return { pending: value, hold: value.creditsHold };
+    });
+    const canEnable = respondsAsAdmin(responder);
+    const via = automatic ? "automatic" : answerVia(responder);
+    if (input.action === "skip" || input.action === "mute") {
+      this.#resolveCreditsHolds(this.#creditsHoldGroup(pending), {
+        action: input.action,
+        via,
+        ...(responder ? { responder } : {}),
+      });
+      return null;
+    }
+    if (input.action === "enable" && !hold.wallet.agentsAllowed())
+      yield* hold.wallet.enableAgents().pipe(Effect.mapError((cause) => new AttentionOperationFailed({ cause })));
+    if (!hold.wallet.agentsAllowed()) return this.#creditsHoldSummary(pending, hold, canEnable);
+    const balance = yield* hold.wallet.balance();
+    const group = this.#creditsHoldGroup(pending);
+    const cost = creditsSum(group.flatMap((other) => (other.creditsHold ? [other.creditsHold.call.cost] : [])));
+    if (balance !== null && balance < cost) {
+      for (const other of group) if (other.creditsHold) other.creditsHold.balance = balance;
+      return this.#creditsHoldSummary(pending, hold, canEnable);
+    }
+    this.#resolveCreditsHolds(group, {
+      action: "continue",
+      via,
+      ...(input.action === "enable" ? { enabled: true } : {}),
+      ...(responder ? { responder } : {}),
+    });
+    return null;
+  }, Effect.uninterruptible).bind(this);
+
+  recheckCreditsHolds(): void {
+    const seen = new Set<string>();
+    for (const pending of [...this.#approvals.values()]) {
+      if (!pending.creditsHold) continue;
+      const key = `${pending.approval.agentId}\u0000${pending.approval.threadId}\u0000${pending.approval.turnId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const report = (error: unknown) =>
+        Effect.sync(() => {
+          if (this.#approvals.get(pending.id) === pending)
+            this.#emitError("credits_hold_recheck_failed", error, pending.approval.agentId);
+        });
+      Effect.runFork(
+        this.respondToCreditsHold(
+          {
+            agentId: pending.approval.agentId,
+            requestId: pending.id,
+            action: "continue",
+          },
+          undefined,
+          true,
+        ).pipe(Effect.catch(report), Effect.catchDefect(report)),
+      );
+    }
+  }
+
   hasAttentionFor(agentId: string): boolean {
     return (
       [...this.#prompts.values()].some((pending) => pending.agentId === agentId) ||
@@ -644,7 +824,7 @@ export class AttentionRegistry {
           throw new InactiveAttentionRequest(sourceText("error.backend.promptInactive"));
         });
       }
-      return yield* this.respondToPrompt({ requestId: pending.id, answers: input.answers });
+      return yield* this.respondToPrompt({ requestId: pending.id, answers: input.answers }, { privileged: false });
     }
     const pending = [...this.#approvals.values()].find(
       (entry) => entry.approval.agentId === agentId && this.#localHandles.get(entry) === input.requestId,
@@ -721,21 +901,23 @@ export class AttentionRegistry {
         ? apiKeyPromptResult(pending.uiBlock.blockId, saved?.key ?? null)
         : pending.uiBlock?.vault
           ? vaultPromptResult(pending.uiBlock.blockId, savedItem?.item ?? null)
-          : pending.uiBlock
-            ? uiBlockPromptResult(
-                uiBlockResponse
-                  ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse, preview }
-                  : { status: "skipped", blockId: pending.uiBlock.blockId },
-              )
-            : pending.responseKind === "dynamic-tool"
-              ? dynamicPromptResult(answers)
-              : pending.responseKind === "mcp-elicitation"
-                ? mcpElicitationResult(pending.params, answers)
-                : {
-                    answers: Object.fromEntries(
-                      Object.entries(answers).map(([id, values]) => [id, { answers: values }]),
-                    ),
-                  };
+          : pending.uiBlock?.location
+            ? locationPromptResult(pending.uiBlock.blockId, uiBlockResponse)
+            : pending.uiBlock
+              ? uiBlockPromptResult(
+                  uiBlockResponse
+                    ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse, preview }
+                    : { status: "skipped", blockId: pending.uiBlock.blockId },
+                )
+              : pending.responseKind === "dynamic-tool"
+                ? dynamicPromptResult(answers)
+                : pending.responseKind === "mcp-elicitation"
+                  ? mcpElicitationResult(pending.params, answers)
+                  : {
+                      answers: Object.fromEntries(
+                        Object.entries(answers).map(([id, values]) => [id, { answers: values }]),
+                      ),
+                    };
       if (!pending.detached) pending.client.respond(pending.id, result);
       this.#prompts.delete(input.requestId);
       clearTimeout(pending.autoAnswer?.timer);
@@ -755,6 +937,8 @@ export class AttentionRegistry {
             state.outcome = sourceText("status.agent.vaultAdded", {
               name: savedItem.item.name || (pending.uiBlock.spec.title ?? ""),
             }).slice(0, UI_BLOCK_LIMITS.outcome);
+          else if (pending.uiBlock.location && uiBlockResponse)
+            state.outcome = sourceText("status.agent.location.shared").slice(0, UI_BLOCK_LIMITS.outcome);
           else if (saved && saved.created !== null)
             state.outcome = sourceText(saved.created ? "status.agent.vaultAdded" : "status.agent.vaultUpdated", {
               name: saved.key.name,
@@ -778,7 +962,7 @@ export class AttentionRegistry {
         ? ""
         : pending.uiBlock?.vault
           ? vaultLateAnswerText(pending.uiBlock.spec.title ?? "", savedItem ? savedItem.item.name : null)
-          : lateAnswerText(pending.questions, answers);
+          : lateAnswerText(editedPreviewQuestions(pending.questions, pending.uiBlock?.spec, preview), answers);
       if (pending.detached && lateAnswer)
         this.#sendLateAnswer(pending.agentId, pending.detached, lateAnswer, responder?.sender);
       this.#emitRuntimeSnapshot();
@@ -880,14 +1064,45 @@ export class AttentionRegistry {
     return { pending: answer.pending, item, saved };
   });
 
+  readonly respondToMediaApproval = Effect.fn("AttentionRegistry.respondToMediaApproval")(function* (
+    this: AttentionRegistry,
+    input: RespondToMediaApprovalInput,
+    responder?: ApprovalResponder,
+  ) {
+    yield* attentionStep(() => {
+      if (!this.pendingMediaApproval(input.agentId, input.requestId))
+        throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
+    });
+    yield* this.respondToApproval({ requestId: input.requestId, decision: "accept" }, responder, input.choice);
+  }).bind(this);
+
   readonly respondToApproval = Effect.fn("AttentionRegistry.respondToApproval")(function* (
     this: AttentionRegistry,
     input: RespondToApprovalInput,
     responder?: ApprovalResponder,
+    choice?: MediaApprovalChoice,
   ) {
+    const held = this.#approvals.get(input.requestId);
+    if (held?.creditsHold) {
+      const still = yield* this.respondToCreditsHold(
+        {
+          agentId: held.approval.agentId,
+          requestId: input.requestId,
+          action: input.decision === "accept" ? "continue" : "skip",
+        },
+        responder,
+      );
+      if (still)
+        yield* attentionStep(() => {
+          throw new ForbiddenAttentionAnswer(sourceText("error.backend.creditsHoldShort"));
+        });
+      return;
+    }
     const pending = yield* attentionStep(() => {
       const value = this.#approvals.get(input.requestId);
       if (!value) throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
+      if (choice && !value.media?.models.some((model) => model.id === choice.model))
+        throw new InactiveAttentionRequest(sourceText("error.backend.approvalInactive"));
       if (value.ownerOnly && responder && !responder.owner)
         throw new ForbiddenAttentionAnswer(sourceText("error.backend.approvalOwnerOnly"));
       if (value.needsPhone && input.decision === "accept" && !responder?.phone)
@@ -900,7 +1115,7 @@ export class AttentionRegistry {
 
     const mutation = pending.hostedSiteMutation;
     if (pending.decide) {
-      pending.decide(input.decision, responder?.phone);
+      pending.decide(input.decision, responder, choice);
     } else if (mutation) {
       this.#approvals.delete(input.requestId);
       yield* this.#hostedSites
@@ -950,8 +1165,9 @@ export class AttentionRegistry {
   ) {
     const { pending, secret } = yield* attentionStep(() => {
       const value = this.#takeovers.get(input.requestId);
-      if (!value?.secret || value.request.agentId !== input.agentId || value.submitting)
-        throw new Error(sourceText("error.backend.authRequestInactive"));
+      if (!value?.secret || value.request.agentId !== input.agentId)
+        throw new InactiveAttentionRequest(sourceText("error.backend.authRequestInactive"));
+      if (value.submitting) throw new Error(sourceText("error.backend.authSubmitting"));
       return { pending: value, secret: value.secret };
     });
     if (input.decision === "cancel") {
@@ -988,6 +1204,16 @@ export class AttentionRegistry {
             : undefined;
         if (this.#takeovers.get(input.requestId) !== pending) return;
         this.#resolveBrowserTakeover(input.requestId, pending, "complete", vault);
+        return;
+      }
+      if (pending.vaultLoginId !== undefined && this.#routines.runsTurn(pending.request.turnId)) {
+        const reason = pending.secureInputFailed ? ` ${pending.secureInputFailed}` : "";
+        pending.resolve(
+          browserTakeoverError(
+            `OpenBot could not finish filling saved login ${pending.vaultLoginId}.${reason} ${ROUTINE_SAVED_LOGIN_NOT_FILLED}`,
+          ),
+        );
+        this.#resolveBrowserTakeover(input.requestId, pending, "cancel");
         return;
       }
     }
@@ -1096,6 +1322,47 @@ export class AttentionRegistry {
     return (yield* this.#awaitToolAnswer(client, request, approval, options)).decision;
   }).bind(this);
 
+  readonly awaitMediaApproval = Effect.fn("AttentionRegistry.awaitMediaApproval")(function* (
+    this: AttentionRegistry,
+    client: AgentClient,
+    request: AppServerRequest,
+    approval: AgentApproval,
+    media: MediaApprovalOffer,
+  ) {
+    const answer = yield* this.#awaitToolAnswer(client, request, approval, { alwaysAsk: true, media });
+    const choice = "choice" in answer ? answer.choice : undefined;
+    const via = "via" in answer && answer.via ? answer.via : "local";
+    return { decision: answer.decision, via, ...(choice ? { choice } : {}) } satisfies MediaApprovalAnswer;
+  }).bind(this);
+
+  readonly awaitCreditsHold = Effect.fn("AttentionRegistry.awaitCreditsHold")(function* (
+    this: AttentionRegistry,
+    client: AgentClient,
+    request: AppServerRequest,
+    approval: AgentApproval,
+    hold: { call: CreditsHoldCall; balance: number | null; wallet: CreditsHoldWallet },
+  ) {
+    if (request.signal?.aborted) return { action: "skip" } satisfies CreditsHoldAnswer;
+    const answer = Deferred.makeUnsafe<CreditsHoldAnswer>();
+    const settle = (value: CreditsHoldAnswer) => Deferred.doneUnsafe(answer, Effect.succeed(value));
+    this.#holdApproval({
+      client,
+      id: request.id,
+      method: TOOL_APPROVAL_METHOD,
+      params: request.params,
+      approval,
+      decide: (decision, responder) =>
+        settle(
+          decision === "cancel"
+            ? { action: "skip", stopped: true }
+            : { action: decision === "accept" ? "continue" : "skip", via: answerVia(responder) },
+        ),
+      creditsHold: { ...hold, answer: settle },
+      alwaysAsk: true,
+    });
+    return yield* Deferred.await(answer);
+  }).bind(this);
+
   readonly awaitPhoneFeedbackApproval = Effect.fn("AttentionRegistry.awaitPhoneFeedbackApproval")(function* (
     this: AttentionRegistry,
     client: AgentClient,
@@ -1110,20 +1377,39 @@ export class AttentionRegistry {
     client: AgentClient,
     request: AppServerRequest,
     approval: AgentApproval,
-    options: { readonly alwaysAsk?: boolean; readonly ownerOnly?: boolean; readonly needsPhone?: boolean },
+    options: {
+      readonly alwaysAsk?: boolean;
+      readonly ownerOnly?: boolean;
+      readonly needsPhone?: boolean;
+      readonly media?: MediaApprovalOffer;
+    },
   ) {
     if (request.signal?.aborted) return { decision: "cancel" } as const;
     const alwaysAsk = options.alwaysAsk || options.ownerOnly;
     if (!alwaysAsk && this.#answersForAgent(approval.agentId)) return { decision: "accept" } as const;
-    const answer = Deferred.makeUnsafe<{ decision: ToolApprovalDecision; phone?: FeedbackPhone }>();
+    const answer = Deferred.makeUnsafe<{
+      decision: ToolApprovalDecision;
+      phone?: FeedbackPhone;
+      choice?: MediaApprovalChoice;
+      via?: CreditAnswerVia;
+    }>();
     this.#holdApproval({
       client,
       id: request.id,
       method: TOOL_APPROVAL_METHOD,
       params: request.params,
       approval,
-      decide: (decision, phone) =>
-        Deferred.doneUnsafe(answer, Effect.succeed({ decision, ...(phone ? { phone } : {}) })),
+      decide: (decision, responder, choice) =>
+        Deferred.doneUnsafe(
+          answer,
+          Effect.succeed({
+            decision,
+            via: answerVia(responder),
+            ...(responder?.phone ? { phone: responder.phone } : {}),
+            ...(choice && decision === "accept" ? { choice } : {}),
+          }),
+        ),
+      ...(options.media ? { media: options.media } : {}),
       ...(alwaysAsk ? { alwaysAsk: true } : {}),
       ...(options.ownerOnly ? { ownerOnly: true } : {}),
       ...(options.needsPhone ? { needsPhone: true } : {}),
@@ -1296,6 +1582,13 @@ export class AttentionRegistry {
           if (this.#messagingRequestTurn(agentId, turnId)) {
             pending.resolve(browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED));
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (getString(args, "loginId") && this.#routines.runsTurn(turnId)) {
+            pending.resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped ?? "OpenBot did not fill a saved login: no password manager is connected."} ${ROUTINE_SAVED_LOGIN_NOT_FILLED}`,
+              ),
+            );
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
           } else if (pending.secret?.withCode) {
             pending.resolve(
               browserTakeoverError(
@@ -1307,6 +1600,13 @@ export class AttentionRegistry {
             pending.resolve(
               browserTakeoverError(
                 `${pending.vaultSkipped ?? "OpenBot did not fill a saved login: no password manager is connected."} On an HTTP page, OpenBot fills only a saved login. Use request_takeover so that the user signs in.`,
+              ),
+            );
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (pending.request.vaultSkip === "agent-script") {
+            pending.resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped} When OpenBot still does not fill the saved login, call submit_secret without loginId so that the user types the password, or use request_takeover.`,
               ),
             );
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
@@ -1400,7 +1700,7 @@ export class AttentionRegistry {
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault list request.") });
     const agentId = params.ownerAgentId;
     if (this.#vaultItems && !this.#vaultItems.ready())
-      return browserTakeoverError("The Vault could not be read. Ask the user, or use request_takeover.");
+      return browserTakeoverError(`${vaultClosedText(this.#vaultItems.status())} Or use request_takeover.`);
     const listed = yield* Effect.result(
       attentionStep(() => (agentId ? (this.#vaultItems?.listForAgent(agentId) ?? null) : null)),
     );
@@ -1581,6 +1881,7 @@ export class AttentionRegistry {
     const vault = this.#vaultItems;
     const agentId = params.ownerAgentId;
     if (!vault || !agentId) return browserTakeoverError(VAULT_UNAVAILABLE);
+    if (!vault.ready()) return browserTakeoverError(vaultClosedText(vault.status()));
     const change = vaultChange(call.args);
     if (typeof change === "string") return browserTakeoverError(change);
     const agent = this.#vaultAgent(agentId);
@@ -1618,7 +1919,7 @@ export class AttentionRegistry {
     const call = yield* attentionStep(() => parseBrowserToolCall("request_vault_item", params.arguments));
     if (call.tool !== "request_vault_item")
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault request.") });
-    if (!this.#vaultItems?.ready()) return browserTakeoverError(VAULT_UNAVAILABLE);
+    if (!this.#vaultItems?.ready()) return browserTakeoverError(vaultClosedText(this.#vaultItems?.status()));
     if (this.#messagingThread(params.threadId))
       return browserTakeoverError(
         "request_vault_item does not work in a Slack, Discord or Telegram chat. Ask the user to add the item in Server settings > Vault.",
@@ -1639,6 +1940,7 @@ export class AttentionRegistry {
     const vault = this.#vaultItems;
     const agentId = params.ownerAgentId;
     if (!vault || !agentId) return browserTakeoverError(VAULT_UNAVAILABLE);
+    if (!vault.ready()) return browserTakeoverError(vaultClosedText(vault.status()));
     const deleted = yield* Effect.result(vault.delete(call.args.id, agentId));
     if (Result.isFailure(deleted)) return vaultFailure("delete", deleted.failure);
     if (deleted.success === null) return browserTakeoverError("No Vault item has this id. Call list_vault_items.");
@@ -1771,7 +2073,7 @@ export class AttentionRegistry {
     }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
-    this.#expireDetachedInChat(agentId, publicThreadId);
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
     const pending: PendingPrompt = {
       client,
       id: request.id,
@@ -1820,6 +2122,7 @@ export class AttentionRegistry {
       state: auto ? { status: "pending", autoAnswer: auto } : { status: "pending" },
       ...(block.vault ? { vault: { kind: block.vault.kind } } : {}),
       ...(block.apiKey?.vault ? { apiKey: true } : {}),
+      ...(block.location ? { location: true } : {}),
     });
     if (!threadId || !turnId || !agentId || !publicThreadId || !uiBlock || !validPromptQuestions(questions)) {
       client.respond(request.id, {
@@ -1844,7 +2147,7 @@ export class AttentionRegistry {
     }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions, uiBlock);
-    this.#expireDetachedInChat(agentId, publicThreadId);
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
     let autoAnswerTimer: PendingPrompt["autoAnswer"];
     if (auto && autoAnswer) {
       const timer = setTimeout(() => this.#answerAutomatically(request.id), autoAnswer.afterMs);
@@ -1913,7 +2216,7 @@ export class AttentionRegistry {
       return;
     }
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
-    this.#expireDetachedInChat(agentId, publicThreadId);
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
     const pending: PendingPrompt = {
       client,
       id: request.id,
@@ -1985,7 +2288,7 @@ export class AttentionRegistry {
     }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
-    this.#expireDetachedInChat(agentId, publicThreadId);
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
     this.#prompts.set(request.id, {
       client,
       id: request.id,
@@ -2077,11 +2380,13 @@ export class AttentionRegistry {
     return true;
   }
 
-  #expireDetachedInChat(agentId: string, publicThreadId: string): void {
+  #expireDetachedInChat(agentId: string, publicThreadId: string, turnId: string): void {
+    const routineQuestion = this.#routines.runsTurn(turnId);
     let changed = false;
     for (const [requestId, pending] of this.#prompts) {
       if (!pending.detached || pending.saving) continue;
       if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId) continue;
+      if (routineQuestion && !this.#routines.runsTurn(pending.turnId)) continue;
       this.#expirePrompt(requestId, pending);
       changed = true;
     }
@@ -2137,7 +2442,8 @@ export class AttentionRegistry {
         !takeover.detached &&
         !takeover.released
       ) {
-        this.#resolveBrowserTakeover(key, takeover, "cancel");
+        if (providerStoppedWaiting) this.#releaseBrowserTakeover(key, takeover);
+        else this.#resolveBrowserTakeover(key, takeover, "cancel");
       }
     }
     if (changed) this.#emitRuntimeSnapshot();

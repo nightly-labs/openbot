@@ -12,6 +12,10 @@ export const messages = {
   "error.voice.prepareRequired":
     "Lokale Sprachtranskription ist nicht verfügbar. Führe `bun run voice:prepare` aus und starte OpenBot neu.",
   "error.voice.transcriptionFailed": "OpenBot konnte diese Aufnahme nicht transkribieren.",
+  "error.voice.videoModelMissing":
+    "Unter Einstellungen → Diktat ist kein Spracherkennungsmodell für Aufnahmen eingerichtet.",
+  "error.voice.videoModelMissingServer":
+    "Auf diesem Server ist kein Spracherkennungsmodell eingerichtet. Ein Owner oder Admin kann in den Servereinstellungen unter Spracherkennung ein Modell einrichten.",
   "error.voice.cloud.keyRequired": "Füge deinen {provider}-API-Schlüssel unter Einstellungen → Diktat hinzu.",
   "error.voice.cloud.keyRejected":
     "{provider} hat den API-Schlüssel nicht akzeptiert. Prüfe den Schlüssel unter Einstellungen → Diktat.",
@@ -26,10 +30,13 @@ export const messages = {
   "error.voice.speech.modelRequired": "Lade das Sprachausgabemodell unter Einstellungen → Diktat herunter.",
   "error.voice.speech.timedOut": "Das Vorlesen der Antwort hat zu lange gedauert.",
   "error.voice.speech.failed": "OpenBot konnte die Antwort nicht vorlesen.",
+  "error.voice.speech.providerRefused": "{provider} hat die Audioausgabe abgelehnt: {reason}",
   "error.voice.recordingNotKept": "OpenBot konnte die Sprachaufnahme nicht speichern.",
   "error.voice.live.timedOut": "Codex-Live-Sprache ist nicht rechtzeitig gestartet. Versuche es erneut.",
   "error.voice.live.failed": "Live-Sprache wurde beendet: {reason}",
   "error.voice.live.disconnected": "Live-Sprache wurde getrennt.",
+  "error.voice.live.startFailed":
+    "Live-Sprache konnte nicht starten. Aktualisiere Codex und melde dich auf dem Computer, auf dem der Agent läuft, mit ChatGPT an. Versuche es dann noch einmal. Grund: {reason}",
   "error.voice.live.hostFailed":
     "Codex auf dem Server konnte Live-Sprache nicht starten. Bitte den Eigentümer, Codex auf diesem Computer zu aktualisieren und sich mit ChatGPT anzumelden. Versuche es dann noch einmal.",
   "error.voice.live.signIn": "Melde dich mit deinem ChatGPT-Konto bei Codex an, um Live-Sprache zu nutzen.",
@@ -40,4 +47,6 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI hat den Start der Live-Sprache abgelehnt. Versuche es später erneut, oder schalte die Live-Sprache in den Einstellungen aus, um per Sprache zu sprechen.",
   "error.voice.live.off": "Codex-Live-Sprache ist aus. Schalte sie unter Einstellungen → Diktat ein.",
+  "error.voice.server.modelUnsupported":
+    "{host} kann mit {model} nicht transkribieren. Wähle in den Einstellungen ein anderes Diktatmodell für den Sprachserver.",
 } as const satisfies PartialTranslation<typeof source>;

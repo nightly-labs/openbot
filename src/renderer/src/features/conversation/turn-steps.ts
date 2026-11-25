@@ -1,4 +1,4 @@
-import type { ConversationTurnTrace } from "@openbot/contracts/ipc";
+import { analyticsTokens, type ConversationTurnTrace } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import type { AgentStep, AgentStepsFacts } from "@openbot/ui/features/conversation/AgentSteps";
 import { silentAgentAnswer } from "@openbot/ui/features/conversation/new-message-tally";
@@ -320,7 +320,12 @@ export function createTurnSteps(deps: {
           icon: "agent",
           start: turnStart,
           end: turnEnd,
-          ...(stored?.tokens === undefined ? {} : { tokens: stored.tokens }),
+          ...(stored?.tokens === undefined
+            ? {}
+            : {
+                tokens: analyticsTokens({ processedTokens: stored.tokens, cachedInput: stored.cachedInput ?? null }),
+                ...(stored.cachedInput === undefined ? {} : { cachedInput: stored.cachedInput }),
+              }),
           ...(typeof stored?.costUsd === "number" ? { costUsd: stored.costUsd } : {}),
         },
       ];

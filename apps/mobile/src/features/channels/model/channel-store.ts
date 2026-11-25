@@ -8,12 +8,14 @@ import {
   type ChannelPage,
   type ChannelSummary,
   type CreateChannelRoutineInput,
+  closedChannelTaskSequences,
   decodeChannel,
   decodeChannelMemories,
   decodeChannelPage,
   decodeChannelRoutines,
   decodeChannelSummaries,
   isAttachmentSummary,
+  mergeChannelTasks,
   type RespondToPromptInput,
   type UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
@@ -30,9 +32,18 @@ import {
 } from "@openbot/contracts/team-protocol/channel-picture-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
+import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import {
+  createOnceChannelRoutine,
+  isOnceSchedule,
+  listOnceChannelRoutines,
+  type RoutinesOncePost,
+  requireReleasedScheduleOn,
+  updateChannelRoutineOnce,
+} from "@openbot/team-client/routines-once";
 import { replaceEqualDeep } from "@tanstack/react-query";
 import { answeredPromptResolution } from "../../chat/model/question-prompt";
 import { saveChannelImage, savedChannelImage } from "../../workspace/model/agent-avatar-cache";
@@ -54,6 +65,7 @@ export interface ChannelState {
   canCancelTasks: boolean;
   canSetPicture: boolean;
   canUseContextActions: boolean;
+  canUseOnceRoutines: boolean;
   canCheckCompact: boolean;
   loading: boolean;
   listed: boolean;
@@ -66,6 +78,7 @@ const FLAG_KEYS: readonly (keyof ChannelFlags)[] = [
   "canCancelTasks",
   "canSetPicture",
   "canUseContextActions",
+  "canUseOnceRoutines",
   "canCheckCompact",
   "loading",
   "listed",
@@ -87,6 +100,7 @@ const EMPTY: ChannelState = {
   canCancelTasks: false,
   canSetPicture: false,
   canUseContextActions: false,
+  canUseOnceRoutines: false,
   canCheckCompact: false,
   loading: false,
   listed: false,
@@ -209,6 +223,7 @@ export class MobileChannelStore {
       canCancelTasks: capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
       canSetPicture: capabilities.includes(CHANNEL_PICTURE_CAPABILITY),
       canUseContextActions: capabilities.includes(CHAT_HISTORY_CAPABILITY),
+      canUseOnceRoutines: capabilities.includes(ROUTINES_ONCE_CAPABILITY),
       canCheckCompact: capabilities.includes(CHANNEL_COMPACT_AVAILABILITY_CAPABILITY),
       ...(supported ? {} : { listed: true, channels: [], pages: new Map() }),
     });
@@ -223,6 +238,7 @@ export class MobileChannelStore {
       canCancelTasks: capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
       canSetPicture: capabilities.includes(CHANNEL_PICTURE_CAPABILITY),
       canUseContextActions: capabilities.includes(CHAT_HISTORY_CAPABILITY),
+      canUseOnceRoutines: capabilities.includes(ROUTINES_ONCE_CAPABILITY),
       canCheckCompact: capabilities.includes(CHANNEL_COMPACT_AVAILABILITY_CAPABILITY),
       channels,
       pages: new Map(pages.filter((page) => ids.has(page.channel.id)).map((page) => [page.channel.id, page])),
@@ -372,6 +388,10 @@ export class MobileChannelStore {
               nextPages.set(id, merged);
               this.publish(entry, { pages: nextPages });
             }
+            const first = page.messages[0]?.sequence ?? 0;
+            const held = merged.messages.filter((message) => message.sequence < first);
+            const closed = current ? closedChannelTaskSequences(page.tasks, current.tasks, held) : [];
+            if (closed.length) void this.readClosedTasks(serverId, entry, id, closed).catch(() => undefined);
             this.finishHistory(entry, id, true);
           };
           const results = await Promise.allSettled([
@@ -395,6 +415,27 @@ export class MobileChannelStore {
       entry.pending = null;
     });
     return entry.pending;
+  }
+  private async readClosedTasks(serverId: string, entry: Entry, channelId: string, sequences: number[]) {
+    let covered = Number.POSITIVE_INFINITY;
+    for (const sequence of sequences) {
+      if (sequence >= covered) continue;
+      const page = await this.request(
+        "POST",
+        CHANNEL_ROUTES.read,
+        decodeChannelPage,
+        { channelId, beforeSequence: sequence + 1 },
+        serverId,
+      );
+      covered = page.messages[0]?.sequence ?? sequence;
+      const latest = entry.state.pages.get(channelId);
+      if (!entry.valid || !latest) return;
+      const tasks = mergeChannelTasks(latest.tasks, page.tasks, latest.messages);
+      if (tasks.length === latest.tasks.length) continue;
+      const pages = new Map(entry.state.pages);
+      pages.set(channelId, { ...latest, tasks });
+      this.publish(entry, { pages });
+    }
   }
   private finishHistory(entry: Entry, channelId: string, success: boolean) {
     const waiters = entry.historyWaiters.get(channelId);
@@ -448,10 +489,12 @@ export class MobileChannelStore {
     if (!entry.valid || !latest || latest.olderCursor !== current.olderCursor) return;
     const messages = new Map(page.messages.map((message) => [message.id, message]));
     for (const message of latest.messages) messages.set(message.id, message);
+    const merged = [...messages.values()].sort((a, b) => a.sequence - b.sequence);
     const pages = new Map(entry.state.pages);
     pages.set(channelId, {
       ...latest,
-      messages: [...messages.values()].sort((a, b) => a.sequence - b.sequence),
+      messages: merged,
+      tasks: mergeChannelTasks(latest.tasks, page.tasks, merged),
       olderCursor: page.olderCursor,
     });
     this.publish(entry, { pages });
@@ -619,6 +662,13 @@ export class MobileChannelStore {
   routines(serverId: string, channelId: string) {
     return this.request("POST", CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId }, serverId);
   }
+  async onceRoutines(serverId: string, channelId: string) {
+    if (!this.entry(serverId).state.canUseOnceRoutines) return [];
+    return listOnceChannelRoutines(this.oncePost(serverId), channelId);
+  }
+  private oncePost(serverId: string): RoutinesOncePost {
+    return (path, decode, body) => this.request("POST", path, decode, body, serverId);
+  }
   async saveMemory(serverId: string, channelId: string, text: string, memoryId?: string) {
     await this.request(
       "POST",
@@ -632,6 +682,11 @@ export class MobileChannelStore {
     await this.request("POST", CHANNEL_ROUTES.memoryDelete, () => undefined, { channelId, memoryId }, serverId);
   }
   async createRoutine(serverId: string, input: CreateChannelRoutineInput) {
+    if (isOnceSchedule(input.schedule)) {
+      requireReleasedScheduleOn(input.schedule, this.entry(serverId).state.canUseOnceRoutines);
+      await createOnceChannelRoutine(this.oncePost(serverId), input);
+      return;
+    }
     await this.request(
       "POST",
       CHANNEL_ROUTES.routineCreate,
@@ -641,6 +696,10 @@ export class MobileChannelStore {
     );
   }
   async updateRoutine(serverId: string, input: UpdateChannelRoutineInput) {
+    if (this.entry(serverId).state.canUseOnceRoutines) {
+      await updateChannelRoutineOnce(this.oncePost(serverId), input);
+      return;
+    }
     await this.request(
       "POST",
       CHANNEL_ROUTES.routineUpdate,
@@ -729,9 +788,8 @@ function mergeLatestChannelPage(current: ChannelPage | undefined, page: ChannelP
   if (!current) return page;
   const first = page.messages[0]?.sequence ?? 0;
   const older = current.messages.filter((message) => message.sequence < first);
-  const merged =
-    !older.length || (older.at(-1)?.sequence ?? 0) + 1 < first
-      ? page
-      : { ...page, messages: [...older, ...page.messages], olderCursor: current.olderCursor };
-  return replaceEqualDeep(current, merged);
+  if (!older.length || (older.at(-1)?.sequence ?? 0) + 1 < first) return replaceEqualDeep(current, page);
+  const messages = [...older, ...page.messages];
+  const tasks = mergeChannelTasks(page.tasks, current.tasks, older);
+  return replaceEqualDeep(current, { ...page, messages, tasks, olderCursor: current.olderCursor });
 }

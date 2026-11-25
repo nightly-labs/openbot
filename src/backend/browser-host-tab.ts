@@ -41,6 +41,7 @@ export interface BrowserHostTab {
   pendingOperations: number;
   opening?: boolean;
   crashes?: number;
+  endingSilentPage?: boolean;
   documents: number;
   challengeWait?: { document: number; waitedMs: number };
   challengeClick?: { document: number; waited: boolean };

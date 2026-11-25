@@ -11,6 +11,7 @@ const FRAME_TYPE_BINARY = 2;
 const MAXIMUM_ASSEMBLIES = 16;
 const MAXIMUM_BUFFERED_BYTES = 8 * 1024 * 1024;
 const ASSEMBLY_EXPIRY_MILLISECONDS = 30_000;
+const textEncoder = new TextEncoder();
 
 interface Assembly {
   type: number;
@@ -25,7 +26,7 @@ export function encodeTeamWebRtcPayload(
   messageId = crypto.getRandomValues(new Uint32Array(1))[0] ?? 0,
 ): Array<string | ArrayBuffer> {
   const maximumFrameBytes = normalizedMaximumMessageSize(maximumMessageSize);
-  const bytes = isString(data) ? new TextEncoder().encode(data) : new Uint8Array(data);
+  const bytes = isString(data) ? textEncoder.encode(data) : new Uint8Array(data);
   if (isString(data) && bytes.byteLength <= maximumFrameBytes) return [data];
   if (bytes.byteLength > TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES) {
     throw new Error("The WebRTC payload is larger than the protocol limit.");

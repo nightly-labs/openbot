@@ -1,14 +1,12 @@
-import { classifyFailure } from "@openbot/telemetry";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { useText } from "@openbot/ui/text";
 import { Loading, Show } from "solid-js";
-import { actionToast } from "../../action-toast";
 import { usePlatform } from "../../platform";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { browserSecretVault } from "./browser-secret-vault";
-import { conversationPort } from "./conversation-port";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
+import { openBrowserTabInMainWindow } from "./open-browser-tab-in-main-window";
 
 export function ConversationBrowserTakeover() {
   const {
@@ -22,27 +20,23 @@ export function ConversationBrowserTakeover() {
     localSignIn,
     respondToBrowserTakeover,
   } = useConversationViewScope();
-  const { t, errorMessage } = useText();
+  const { t } = useText();
   const runtime = conversationRuntime(props);
   const platform = usePlatform();
+  const signInStaysOffServer = () =>
+    localSignIn.blockedTakeover() !== undefined || localSignIn.needsDesktopForTakeover();
   const openPage = () => {
     const chatWindow = platform.chatWindow;
     const request = props.browserTakeover;
     if (chatWindow && request) {
       return () =>
-        void conversationPort()
-          .dynamicIsland.openBrowserTakeover({
-            serverId: chatWindow.serverId,
-            agentId: request.agentId,
-            tabId: request.tabId,
-          })
-          .catch((error: unknown) =>
-            actionToast.error(errorMessage(error, t("prompt.browser.openFailed")), {
-              report: { operation: "other", source: "action", cause_code: classifyFailure(error) },
-            }),
-          );
+        openBrowserTabInMainWindow({
+          serverId: chatWindow.serverId,
+          agentId: request.agentId,
+          tabId: request.tabId,
+        });
     }
-    return canOpenBrowserTakeoverTab() ? () => openBrowserTakeoverTab() : undefined;
+    return canOpenBrowserTakeoverTab() && !signInStaysOffServer() ? () => openBrowserTakeoverTab() : undefined;
   };
   const completeHere = () =>
     !(

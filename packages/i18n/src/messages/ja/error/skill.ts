@@ -45,7 +45,8 @@ export const messages = {
   "error.skill.publishUntracked":
     "{name} は正確なバージョン追跡の導入前にインストールされました。公開する前にアップデートまたは修復してください。",
   "error.skill.tooManySkills": "エージェントに追加できるスキルは {limit} 個までです。",
-  "error.skill.unmanagedExists": "管理されていないスキルが {path} にすでに存在します。",
+  "error.skill.ownSkillExists":
+    "このエージェントには {slug} という名前の独自のスキルがすでにあります。エージェントにそのスキルの名前の変更か削除を頼んでから、このスキルをもう一度追加してください。",
   "error.skill.managedSlug":
     "OpenBot はすべてのエージェントに独自の {slug} スキルを提供します。このスキルには別の名前を付けてください。",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md が 64 KB を超えています。公開する前に短くしてください。",

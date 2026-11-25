@@ -1,5 +1,6 @@
 import { agentProviderName, isAgentProvider } from "@openbot/contracts/ipc";
 import { matchingSourceKeys } from "@openbot/i18n";
+import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { currentText } from "@openbot/ui/text";
 
@@ -7,26 +8,59 @@ const RETRY_NOTICE_KEYS: ReadonlySet<string> = new Set([
   "error.backend.providerRetrying",
   "error.backend.providerRetryingLargeContext",
   "error.backend.providerModelAtCapacity",
+  "error.backend.turnStartUnconfirmed",
 ]);
 
-export function createRetryNotices() {
-  const shown = new Map<string, string>();
+export function isRetryNotice(message: string): boolean {
+  return matchingSourceKeys(message.trim()).some((sourceKey) => RETRY_NOTICE_KEYS.has(sourceKey));
+}
+
+export function createTurnErrorBanners() {
+  const retryNotices = new Map<string, string>();
+  const errors = new Map<string, string>();
+  const errorsBeforeTurn = new Map<string, string>();
   return {
     noteError(key: string, message: string, readable: string): void {
-      if (matchingSourceKeys(message.trim()).some((sourceKey) => RETRY_NOTICE_KEYS.has(sourceKey)))
-        shown.set(key, readable);
-      else shown.delete(key);
+      errors.set(key, readable);
+      errorsBeforeTurn.delete(key);
+      if (isRetryNotice(message)) retryNotices.set(key, readable);
+      else retryNotices.delete(key);
     },
-    clearAtTurnEnd<Run extends { message: string }>(
+    noteTurnStarted(key: string): void {
+      const error = errors.get(key);
+      if (error !== undefined) errorsBeforeTurn.set(key, error);
+    },
+    clearAfterOutput<Run extends { message: string }>(
       key: string,
       setErrors: BannerUpdate<string>,
       setRuns: BannerUpdate<Run>,
     ): void {
-      const notice = shown.get(key);
+      const notice = retryNotices.get(key);
       if (notice === undefined) return;
-      shown.delete(key);
+      retryNotices.delete(key);
+      if (errors.get(key) === notice) errors.delete(key);
       setErrors((current) => (current[key] === notice ? withoutBanner(current, key) : current));
       setRuns((current) => (current[key]?.message === notice ? withoutBanner(current, key) : current));
+    },
+    clearAtTurnEnd<Run extends { message: string }>(
+      key: string,
+      newerTurnSucceeded: boolean,
+      setErrors: BannerUpdate<string>,
+      setRuns: BannerUpdate<Run>,
+    ): void {
+      const stale = new Set<string>();
+      const notice = retryNotices.get(key);
+      if (notice !== undefined) stale.add(notice);
+      retryNotices.delete(key);
+      const earlierError = newerTurnSucceeded ? errorsBeforeTurn.get(key) : undefined;
+      if (earlierError !== undefined) {
+        stale.add(earlierError);
+        errorsBeforeTurn.delete(key);
+        if (errors.get(key) === earlierError) errors.delete(key);
+      }
+      if (stale.size === 0) return;
+      setErrors((current) => (stale.has(current[key] ?? "") ? withoutBanner(current, key) : current));
+      setRuns((current) => (stale.has(current[key]?.message ?? "") ? withoutBanner(current, key) : current));
     },
   };
 }
@@ -42,6 +76,12 @@ const ERROR_DESCRIPTION_LIMIT = 300;
 const ERROR_DETAILS_LIMIT = 2_000;
 const ERROR_TOAST_DEDUPE_MS = 30_000;
 const lastErrorToastAt = new Map<string, number>();
+
+export function remoteAgentError(message: string): string {
+  return matchingSourceKeys(message.trim()).includes("error.provider.opencodeOutputLimitEndpoint")
+    ? sourceText("error.provider.opencodeOutputLimit")
+    : message;
+}
 
 export function readableAgentError(message: string): string {
   const { t, errorMessage } = currentText();

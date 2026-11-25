@@ -104,6 +104,16 @@ export function withModelListings<Model extends { provider: string; id: string; 
   });
 }
 
+export function withKeptModels<Model extends { provider: string; id: string; listing?: AgentModelListing }>(
+  models: readonly Model[],
+  kept: readonly AgentSteeringModel[],
+): Model[] {
+  const keys = new Set(kept.map((entry) => `${entry.provider}\u0000${entry.id}`));
+  return models.map((model) =>
+    keys.has(`${model.provider}\u0000${model.id}`) ? { ...model, listing: "kept" } : model,
+  );
+}
+
 export interface AgentSteeringModel {
   provider: AgentProviderRef;
   id: AgentModelId;

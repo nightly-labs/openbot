@@ -14,6 +14,7 @@ import { AndroidBarIcon, viewMenuActions } from "@/features/workflows/components
 import { WorkflowRunRow } from "@/features/workflows/components/workflow-run-row";
 import { WorkflowRunStepRow } from "@/features/workflows/components/workflow-run-step-row";
 import { type WorkflowStepMenu, workflowStepRows } from "@/features/workflows/components/workflow-steps-list";
+import { useMediaCredits } from "@/features/workflows/model/use-media-credits";
 import { useWorkflowCommands } from "@/features/workflows/model/use-workflow-commands";
 import { useWorkflowStepActions } from "@/features/workflows/model/use-workflow-step-actions";
 import { useWorkflowDetail, useWorkflowGitHubHistory, useWorkflowRuns } from "@/features/workflows/model/use-workflows";
@@ -37,6 +38,8 @@ const NO_IDS: readonly string[] = [];
 const LATEST_RUNS = 3;
 const LATEST_EVENTS = 3;
 
+const NO_NODES: readonly WorkflowNode[] = [];
+
 export function WorkflowScreen() {
   const { t, format, errorMessage } = useText();
   const { serverId, workflowId } = useLocalSearchParams<{ serverId: string; workflowId: string }>();
@@ -48,6 +51,7 @@ export function WorkflowScreen() {
     workflowId,
   );
   const { deleteWorkflow } = useMobileWorkspaceActions();
+  const canPause = useMobileWorkspaceSelector((current) => current.canPauseWorkflows(serverId));
   const commands = useWorkflowCommands(serverId);
   const [starting, setStarting] = useState(false);
   const { theme } = useUniwind();
@@ -55,6 +59,7 @@ export function WorkflowScreen() {
   const view = useWorkflowEditorView((state) => state.view);
   const setView = useWorkflowEditorView((state) => state.setView);
   const workflow = detail.data;
+  const { total } = useMediaCredits(serverId, workflow?.graph.nodes ?? NO_NODES);
   const title = workflow?.summary.title ?? t("mobile.app.route.workflow");
   const runList = runs.data?.runs ?? [];
   const latest = runList[0];
@@ -111,17 +116,26 @@ export function WorkflowScreen() {
     ]);
   };
 
+  const paused = workflow?.summary.paused === true;
+  const pauseMenuActions = (): MenuAction[] => {
+    if (!workflow || !canPause) return [];
+    return paused
+      ? [{ id: "resume", title: t("mobile.workflow.action.resume"), image: "play" }]
+      : [{ id: "pause", title: t("mobile.workflow.action.pause"), image: "pause" }];
+  };
   const pinLabel = pinned ? t("mobile.workflow.action.unpin") : t("mobile.workflow.action.pin");
   const menuActions: MenuAction[] = [
     ...(workflow?.needsNewerApp
       ? []
       : [{ id: "edit", title: t("mobile.workflow.action.edit"), image: "pencil" } satisfies MenuAction]),
     { id: "pin", title: pinLabel, image: pinned ? "pin.slash" : "pin" },
+    ...pauseMenuActions(),
     ...viewMenuActions(view, t),
   ];
   const onMenu = (id: string) => {
     if (id === "edit") commands.edit(workflowId);
     else if (id === "pin") commands.togglePin(workflowId);
+    else if (id === "pause" || id === "resume") void commands.setPaused(workflowId, id === "pause");
     else if (id === "view-flow" || id === "view-list") {
       void haptics.selection();
       setView(id === "view-flow" ? "flow" : "list");
@@ -180,7 +194,16 @@ export function WorkflowScreen() {
       ) : null}
       <LargeTitleScrollView
         title={title}
-        caption={workflow ? t("mobile.workflow.detail.steps", { count: workflow.summary.steps }) : undefined}
+        caption={
+          workflow
+            ? total === null
+              ? t("mobile.workflow.detail.steps", { count: workflow.summary.steps })
+              : t("mobile.workflow.detail.stepsAndCredits", {
+                  steps: t("mobile.workflow.detail.steps", { count: workflow.summary.steps }),
+                  credits: t("mobile.workflow.media.credits", { count: total, amount: format.number(total) }),
+                })
+            : undefined
+        }
         contentContainerClassName="gap-7 px-4 pt-3"
         barButtonsRight={2}
       >
@@ -211,7 +234,7 @@ export function WorkflowScreen() {
                 <Typography type="body-xs" className="px-4 text-grouped-secondary">
                   {t("mobile.workflow.detail.stepsTitle")}
                 </Typography>
-                <WorkflowFlowView graph={workflow.graph} agents={serverAgents} menu={stepMenu} />
+                <WorkflowFlowView serverId={serverId} graph={workflow.graph} agents={serverAgents} menu={stepMenu} />
               </View>
             ) : (
               <SettingsSection title={t("mobile.workflow.detail.stepsTitle")}>

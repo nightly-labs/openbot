@@ -138,6 +138,9 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "La modifica dell'identità del server non è supportata da questa connessione.",
   "error.team.hostUpdateUnsupported": "Gli aggiornamenti dell'host non sono supportati da questa connessione.",
   "error.team.hostTimezoneUnsupported": "Questa connessione non supporta il fuso orario del server.",
+  "error.team.hostSignalHomeUnsupported": "Questa connessione non supporta la scelta del server Signal.",
+  "error.team.hostVoiceModelUnsupported":
+    "Questa connessione non supporta il modello di riconoscimento vocale del server.",
   "error.team.hostRestartUnsupported": "Questa connessione non supporta il riavvio del server.",
   "error.team.ownerTransferUnsupported": "Questo server non supporta il trasferimento della proprietà.",
   "error.team.hostKeyRotationUnsupported": "Questa connessione non supporta il cambio della chiave del server.",
@@ -145,6 +148,7 @@ export const messages = {
   "error.team.routineResultsUnsupported": "Questa connessione non supporta le destinazioni delle routine.",
   "error.team.agentMemoryLimitUnsupported": "Questa connessione non supporta il limite di memorie degli agenti.",
   "error.team.agentFoldersUnsupported": "Questa connessione non supporta le cartelle degli agenti.",
+  "error.team.channelFoldersUnsupported": "Questa connessione non supporta le cartelle dei canali.",
   "error.team.folderUnavailable": "Questa cartella non è disponibile sul computer host.",
   "error.team.memoryReviewUnsupported": "Questa connessione non supporta la revisione delle memorie.",
   "error.team.skillLearningUnsupported": "Questa connessione non supporta l’apprendimento delle skill.",
@@ -154,6 +158,11 @@ export const messages = {
     "Questa connessione non supporta l’interruttore della configurazione di Claude Code.",
   "error.team.claudeCompactWindowUnsupported":
     "Questa connessione non supporta la dimensione di compattazione di Claude.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "Questa connessione non supporta la compattazione prima della scadenza della cache.",
+  "error.team.mediaApprovalCreditsUnsupported":
+    "Questa connessione non supporta la soglia di approvazione dei crediti.",
+  "error.team.mediaApprovalCreditsInvalid": "Inserisci un numero intero di crediti da 0 a 100.000.",
   "error.team.providerEnvironmentUnsupported": "Questa connessione non supporta le variabili del provider.",
   "error.team.modelVisibilityUnsupported": "Questa connessione non supporta l'elenco dei modelli.",
   "error.team.providerDefaultUnsupported": "Questa connessione non supporta il provider predefinito.",
@@ -166,6 +175,8 @@ export const messages = {
   "error.team.mcpUnsupported": "I server MCP non sono supportati da questa connessione.",
   "error.team.mcpServerListNeedsUpdate":
     "Aggiorna OpenBot su questo dispositivo per usare più di {limit} server MCP su questo server.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Aggiorna OpenBot su questo dispositivo per usare più di {limit} account di un provider su questo server.",
   "error.team.storageUnsupported": "L'archiviazione non è supportata da questa connessione.",
   "error.team.machineResourcesUnsupported": "L'uso della macchina non è supportato da questa connessione.",
   "error.team.machineAlertMemberInvalid":
@@ -219,4 +230,7 @@ export const messages = {
   "error.team.providerUseUnsupported":
     "Questa connessione non supporta l’attivazione e la disattivazione dei provider.",
   "error.team.providerUseInvalid": "Questo provider non ha un interruttore di attivazione.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "Questo server non supporta la scelta del modello nelle approvazioni dei contenuti multimediali. Aggiorna OpenBot sul server.",
+  "error.team.mediaApprovalChoiceInvalid": "La scelta dell'approvazione multimediale non è valida.",
 } as const satisfies PartialTranslation<typeof source>;

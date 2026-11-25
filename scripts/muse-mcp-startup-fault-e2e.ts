@@ -64,7 +64,7 @@ function brokenServer(): McpServerConfig {
   };
 }
 
-async function run(name: string, cwd: string, servers: McpServerConfig[], resumeId: string | null): Promise<Step> {
+async function run(name: string, cwd: string, servers: McpServerConfig[]): Promise<Step> {
   const step: Step = {
     name,
     sessionId: null,
@@ -88,16 +88,12 @@ async function run(name: string, cwd: string, servers: McpServerConfig[], resume
   try {
     const thread = await bounded(
       runCauseEffect(
-        client.request(
-          resumeId ? "thread/resume" : "thread/start",
-          { cwd, ...(resumeId ? { threadId: resumeId } : {}) },
-          (value) => {
-            assert.ok(isRecord(value));
-            const id = getString(value.thread, "id");
-            assert.ok(id, "The client returns a thread ID.");
-            return id;
-          },
-        ),
+        client.request("thread/start", { cwd }, (value) => {
+          assert.ok(isRecord(value));
+          const id = getString(value.thread, "id");
+          assert.ok(id, "The client returns a thread ID.");
+          return id;
+        }),
       ),
       `${name} open`,
       60_000,
@@ -147,21 +143,15 @@ try {
   root = await realpath(await mkdtemp(join(tmpdir(), "openbot-muse-mcp-fault-")));
   const cwd = join(root, "workspace");
   await mkdir(cwd);
-  const faulted = await run("broken-mcp-start", cwd, [brokenServer()], null);
-  assert.equal(faulted.status, "failed", "A session with a broken MCP server fails its turn.");
-  assert.ok(faulted.refusedFailure, `OpenBot closes the session for this error: ${faulted.error}`);
-  assert.ok(faulted.sessionId);
-  const resumed = await run("resume-without-mcp", cwd, [], faulted.sessionId);
-  assert.equal(resumed.status, "failed", "Muse keeps the fault in the session after a resume.");
-  assert.ok(resumed.refusedFailure, `OpenBot closes the session for this error: ${resumed.error}`);
-  const fresh = await run("new-session-without-mcp", cwd, [], null);
-  assert.equal(fresh.status, "completed", "A new session answers.");
+  const skipped = await run("broken-optional-app", cwd, [brokenServer()]);
+  assert.equal(skipped.status, "completed", `Muse skips a broken optional app and answers: ${skipped.error}`);
+  assert.equal(skipped.refusedFailure, null);
 } catch (error) {
   report.failures.push(message(error));
 } finally {
   if (root) await rm(root, { recursive: true, force: true });
   const failures = report.failures.length + report.steps.reduce((count, step) => count + step.failures.length, 0);
-  report.passed = failures === 0 && report.steps.length === 3;
+  report.passed = failures === 0 && report.steps.length === 1;
   await mkdir(out, { recursive: true });
   await writeFile(join(out, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify({ passed: report.passed, report: join(out, "report.json") })}\n`);

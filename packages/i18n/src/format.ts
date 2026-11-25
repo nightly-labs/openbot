@@ -14,11 +14,12 @@ export interface AppFormat {
   list: (items: readonly string[]) => string;
   fileSize: (bytes: number) => string;
   fileSizeAmount: (bytes: number, total: number) => string;
+  diskSize: (bytes: number) => string;
 }
 
-function fileSizeExponent(bytes: number): number {
+function fileSizeExponent(bytes: number, base = 1024): number {
   let exponent = 0;
-  while (exponent < 4 && bytes >= 1024 ** (exponent + 1)) exponent += 1;
+  while (exponent < 4 && bytes >= base ** (exponent + 1)) exponent += 1;
   return exponent;
 }
 
@@ -75,10 +76,19 @@ export function createFormat(locale: TranslatedLocale, intlLocale: string | null
   const t = createTranslate({ source: en, translation, locale, sourceLocale: "en" });
   const oneDecimal = (value: number) =>
     numberFormat(tag, { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false }).format(value);
-  const fileSizeAmount = (bytes: number, exponent: number) => {
+  const fileSizeAmount = (bytes: number, exponent: number, base = 1024) => {
     if (exponent === 0) return String(bytes);
-    if (exponent === 1) return String(Math.round(bytes / 1024));
-    return oneDecimal(bytes / 1024 ** exponent);
+    if (exponent === 1) return String(Math.round(bytes / base));
+    return oneDecimal(bytes / base ** exponent);
+  };
+  const sizeText = (bytes: number, base: number) => {
+    const exponent = fileSizeExponent(bytes, base);
+    const size = fileSizeAmount(bytes, exponent, base);
+    if (exponent === 0) return t("format.fileSize.bytes", { size });
+    if (exponent === 1) return t("format.fileSize.kilobytes", { size });
+    if (exponent === 2) return t("format.fileSize.megabytes", { size });
+    if (exponent === 3) return t("format.fileSize.gigabytes", { size });
+    return t("format.fileSize.terabytes", { size });
   };
 
   const format: AppFormat = {
@@ -101,16 +111,9 @@ export function createFormat(locale: TranslatedLocale, intlLocale: string | null
       const last = items.at(-1) ?? "";
       return t("format.list.last", { items: items.slice(0, -1).join(t("format.list.separator")), last });
     },
-    fileSize: (bytes) => {
-      const exponent = fileSizeExponent(bytes);
-      const size = fileSizeAmount(bytes, exponent);
-      if (exponent === 0) return t("format.fileSize.bytes", { size });
-      if (exponent === 1) return t("format.fileSize.kilobytes", { size });
-      if (exponent === 2) return t("format.fileSize.megabytes", { size });
-      if (exponent === 3) return t("format.fileSize.gigabytes", { size });
-      return t("format.fileSize.terabytes", { size });
-    },
+    fileSize: (bytes) => sizeText(bytes, 1024),
     fileSizeAmount: (bytes, total) => fileSizeAmount(bytes, fileSizeExponent(total)),
+    diskSize: (bytes) => sizeText(bytes, 1000),
   };
   if (translation) formats.set(cacheKey, format);
   return format;

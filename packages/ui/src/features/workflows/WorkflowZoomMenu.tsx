@@ -1,6 +1,6 @@
 import type { AppTextKey } from "@openbot/i18n";
-import { buttonVariants, DropdownMenu, Kbd, MapIcon, Minus, Plus, Scan } from "@openbot/ui";
-import { For } from "solid-js";
+import { buttonVariants, DropdownMenu, Kbd, MapIcon, Minus, Network, Plus, Scan } from "@openbot/ui";
+import { For, Show } from "solid-js";
 import { useText } from "../../text";
 import { HudButton, hudBarRect } from "./WorkflowCanvasHud";
 import { MOD_KEY } from "./workflow-board";
@@ -23,11 +23,15 @@ export const ZOOM_KEYS: Record<ZoomAction, readonly string[]> = {
   fit: ["⇧", "1"],
 };
 
+export const TIDY_KEYS: readonly string[] = ["⇧", "T"];
+
 export function WorkflowZoomMenu(props: {
   scale: number;
   minScale: number;
   maxScale: number;
   minimap: boolean;
+  canTidy: boolean;
+  onTidy: () => void;
   onZoom: (action: ZoomAction) => void;
   onZoomTo: (scale: number) => void;
   onToggleMinimap: () => void;
@@ -97,6 +101,11 @@ export function WorkflowZoomMenu(props: {
       <HudButton label={t(ZOOM_LABEL.fit)} keys={ZOOM_KEYS.fit} onClick={() => props.onZoom("fit")}>
         <Scan />
       </HudButton>
+      <Show when={props.canTidy}>
+        <HudButton label={t("workflow.canvas.action.tidy")} keys={TIDY_KEYS} onClick={props.onTidy}>
+          <Network />
+        </HudButton>
+      </Show>
       <HudButton
         label={props.minimap ? t("workflow.canvas.minimap.close") : t("workflow.canvas.minimap.open")}
         pressed={props.minimap}
