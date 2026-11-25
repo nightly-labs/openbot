@@ -4,10 +4,10 @@ import {
   CREDIT_MODEL_COSTS,
   CREDIT_MODEL_MAKERS,
   type CreditMediaKind,
-  type CreditModelCost,
+  type CreditModelMaker,
 } from "@openbot/contracts/credits";
 import { CreditIcon } from "@openbot/ui/features/credits/CreditIcon";
-import { MakerLogo } from "@openbot/ui/features/credits/MakerLogo";
+import { creditModelMakerNamed, MakerLogo } from "@openbot/ui/features/credits/MakerLogo";
 import { Search } from "@openbot/ui/icons";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { landingAnalytics } from "../../lib/analytics";
@@ -20,13 +20,22 @@ import "./CreditsPage.css";
 
 type CreditsFilter = "all" | CreditMediaKind;
 
+interface CreditsModel {
+  id: string;
+  kind: CreditMediaKind;
+  name: string;
+  maker: CreditModelMaker | undefined;
+  makerName: string;
+  variant: string | undefined;
+}
+
 interface CreditsEntry {
-  model: CreditModelCost;
+  model: CreditsModel;
   live: CreditMediaModel | undefined;
 }
 
 interface CreditsLiveEntry {
-  model: CreditModelCost;
+  model: CreditsModel;
   live: CreditMediaModel;
 }
 
@@ -62,16 +71,52 @@ function sectionUnit(kind: CreditMediaKind, entries: readonly CreditsLiveEntry[]
   return kind === "image" ? text.perImage : text.perGeneration;
 }
 
-function CreditsModelIdentity(props: { model: CreditModelCost }) {
+function staticModels(): CreditsModel[] {
+  return CREDIT_MODEL_COSTS.map((model) => ({
+    id: model.modelId,
+    kind: model.kind,
+    name: model.name,
+    maker: model.maker,
+    makerName: CREDIT_MODEL_MAKERS[model.maker],
+    variant: model.variant,
+  }));
+}
+
+function catalogModel(model: CreditMediaModel): CreditsModel {
+  return {
+    id: model.id,
+    kind: model.kind,
+    name: model.name,
+    maker: creditModelMakerNamed(model.maker),
+    makerName: model.maker,
+    variant: model.variant ?? undefined,
+  };
+}
+
+function creditsEntries(catalog: readonly CreditMediaModel[]): CreditsEntry[] {
+  const live = new Map(catalog.map((model) => [model.id, model]));
+  const known = staticModels();
+  const knownIds = new Set(known.map((model) => model.id));
+  return [
+    ...known.map((model) => ({ model, live: live.get(model.id) })),
+    ...catalog.filter((model) => !knownIds.has(model.id)).map((model) => ({ model: catalogModel(model), live: model })),
+  ];
+}
+
+function CreditsMakerLogo(props: { maker: CreditModelMaker | undefined }) {
+  return <Show when={props.maker}>{(maker) => <MakerLogo maker={maker()} />}</Show>;
+}
+
+function CreditsModelIdentity(props: { model: CreditsModel }) {
   return (
     <div class="credits-model">
       <span class="credits-logo" aria-hidden="true">
-        <MakerLogo maker={props.model.maker} />
+        <CreditsMakerLogo maker={props.model.maker} />
       </span>
       <div class="credits-model-body">
         <span class="credits-model-name">{props.model.name}</span>
         <span class="credits-model-maker">
-          {CREDIT_MODEL_MAKERS[props.model.maker]}
+          {props.model.makerName}
           <Show when={props.model.variant}>{(variant) => <span class="credits-model-variant">{variant()}</span>}</Show>
         </span>
       </div>
@@ -149,7 +194,7 @@ function CreditsTable(props: CreditsPriceProps & { titleId: string; entries: rea
   );
 }
 
-function CreditsSoon(props: { models: readonly CreditModelCost[]; text: CreditsPageText }) {
+function CreditsSoon(props: { models: readonly CreditsModel[]; text: CreditsPageText }) {
   return (
     <div class="credits-soon">
       <span class="credits-soon-label">{props.text.soon}</span>
@@ -158,7 +203,7 @@ function CreditsSoon(props: { models: readonly CreditModelCost[]; text: CreditsP
           {(model) => (
             <li class="credits-soon-model">
               <span class="credits-soon-logo" aria-hidden="true">
-                <MakerLogo maker={model.maker} />
+                <CreditsMakerLogo maker={model.maker} />
               </span>
               {model.name}
             </li>
@@ -198,14 +243,8 @@ function CreditsSection(props: CreditsPriceProps & { kind: CreditMediaKind; entr
   );
 }
 
-function modelMatches(model: CreditModelCost, query: string, text: CreditsPageText): boolean {
-  return matchesMarketplaceQuery(
-    query,
-    model.name,
-    CREDIT_MODEL_MAKERS[model.maker],
-    text[model.kind],
-    model.variant ?? "",
-  );
+function modelMatches(model: CreditsModel, query: string, text: CreditsPageText): boolean {
+  return matchesMarketplaceQuery(query, model.name, model.makerName, text[model.kind], model.variant ?? "");
 }
 
 export function CreditsPage(props: { text: CreditsPageText; lang: string; catalog: readonly CreditMediaModel[] }) {
@@ -214,10 +253,7 @@ export function CreditsPage(props: { text: CreditsPageText; lang: string; catalo
   const [filter, setFilter] = createSignal<CreditsFilter>("all");
   const numberFormat = createMemo(() => new Intl.NumberFormat(props.lang));
   const format = (value: number) => numberFormat().format(value);
-  const entries = createMemo(() => {
-    const live = new Map(props.catalog.map((model) => [model.id, model]));
-    return CREDIT_MODEL_COSTS.map((model) => ({ model, live: live.get(model.modelId) }));
-  });
+  const entries = createMemo(() => creditsEntries(props.catalog));
   const matches = createMemo(() => entries().filter((entry) => modelMatches(entry.model, query(), props.text)));
   const countFor = (kind: CreditsFilter) =>
     kind === "all" ? matches().length : matches().filter((entry) => entry.model.kind === kind).length;
