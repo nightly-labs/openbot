@@ -1,6 +1,7 @@
-import { Badge, Check, DropdownMenu, Folder, Inbox, SlidersHorizontal, SlidingTabs } from "@openbot/ui";
+import { Badge, DropdownMenu, Folder, Inbox, SlidersHorizontal, SlidingTabs } from "@openbot/ui";
 import { createEffect, createSignal, For, type ParentProps, Show } from "solid-js";
 import { useText } from "../../text";
+import { MenuMark } from "./SidebarFilterMenu";
 import { SIDEBAR_NO_LIST_FILTER, sidebarFolderTreeIds } from "./sidebar-list-filter";
 import { useSidebarScope } from "./sidebar-scope";
 import { SIDEBAR_ALL_TAB_ID, SIDEBAR_UNREAD_TAB_ID, type SidebarTab, sidebarFolderTabId } from "./sidebar-tabs";
@@ -22,16 +23,6 @@ function scrollTabsWithWheel(event: WheelEvent) {
   if (scroller.scrollWidth <= scroller.clientWidth) return;
   event.preventDefault();
   scroller.scrollLeft += event.deltaY;
-}
-
-function MenuMark(props: { on: boolean }) {
-  return (
-    <span class="ui-menu-check" data-checked={props.on ? "" : undefined} aria-hidden="true">
-      <Show when={props.on}>
-        <Check />
-      </Show>
-    </span>
-  );
 }
 
 function SidebarEditTabsMenu() {

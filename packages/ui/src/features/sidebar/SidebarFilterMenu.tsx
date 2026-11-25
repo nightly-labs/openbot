@@ -15,7 +15,7 @@ import {
 import { useSidebarScope } from "./sidebar-scope";
 import { SIDEBAR_CHAT_ORDER_LABEL, SIDEBAR_CHAT_ORDERS } from "./sidebar-types";
 
-function MenuMark(props: { on: boolean; mixed?: boolean }) {
+export function MenuMark(props: { on: boolean; mixed?: boolean }) {
   return (
     <span class="ui-menu-check" data-checked={props.on || props.mixed ? "" : undefined} aria-hidden="true">
       <Show when={props.mixed} fallback={<Show when={props.on}>{<Check />}</Show>}>
