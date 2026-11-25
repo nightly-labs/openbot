@@ -4008,6 +4008,14 @@ export async function createApplicationServices({
       sendToRenderer(contents && BrowserWindow.fromWebContents(contents), IPC_ENDPOINTS.browser.liveViewEvent, event);
     },
     writeClipboard: (text) => clipboard.writeText(text),
+    frameSize: (owner) => {
+      const contents = webContents.fromId(owner);
+      const window = contents && BrowserWindow.fromWebContents(contents);
+      if (!window || window.isDestroyed()) return null;
+      const [width = 0, height = 0] = window.getContentSize();
+      const { scaleFactor } = screen.getDisplayMatching(window.getBounds());
+      return { width: width * scaleFactor, height: height * scaleFactor };
+    },
   });
   teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => runCauseEffect(browserView.stop()));
   const remoteDesktop = new RemoteDesktopManager({
