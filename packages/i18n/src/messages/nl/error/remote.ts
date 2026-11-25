@@ -19,6 +19,8 @@ export const messages = {
     "Extern bureaublad op Linux heeft een X11-sessie nodig. Wayland wordt niet ondersteund.",
   "error.remote.runtimeMissing":
     "De runtime van Sunshine en Moonlight Web ontbreekt of wordt niet ondersteund op deze host. Installeer de volledige release van OpenBot op een Mac, een Windows x64-host of een Linux x64-host en start OpenBot opnieuw.",
+  "error.remote.runtimeMissingOnHost":
+    "De runtime van Sunshine en Moonlight Web ontbreekt of wordt niet ondersteund op deze host. Installeer de volledige release van OpenBot op een Mac, een Windows x64-host of een Linux x64- of ARM64-host en start OpenBot opnieuw.",
   "error.remote.testActive": "Er loopt een test van extern bureaublad. Probeer het opnieuw als die klaar is.",
   "error.remote.screenRecordingDenied":
     "De host heeft OpenBot niet toegestaan het scherm op te nemen. Geef toestemming voor schermopname op de host en probeer het opnieuw.",

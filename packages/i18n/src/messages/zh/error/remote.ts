@@ -18,6 +18,8 @@ export const messages = {
   "error.remote.linuxNeedsX11": "Linux 上的远程桌面需要 X11 会话，不支持 Wayland。",
   "error.remote.runtimeMissing":
     "缺少 Sunshine 与 Moonlight Web 运行时，或该主机不受支持。请在 Mac、Windows x64 主机或 Linux x64 主机上安装完整的 OpenBot 正式版，然后重启 OpenBot。",
+  "error.remote.runtimeMissingOnHost":
+    "缺少 Sunshine 与 Moonlight Web 运行时，或该主机不受支持。请在 Mac、Windows x64 主机或 Linux x64 或 ARM64 主机上安装完整的 OpenBot 正式版，然后重启 OpenBot。",
   "error.remote.testActive": "远程桌面测试正在进行，请等它结束后重试。",
   "error.remote.screenRecordingDenied": "主机未允许 OpenBot 录制屏幕。请在主机上授予屏幕录制权限后重试。",
   "error.remote.windowsSessionDisconnected":
