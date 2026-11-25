@@ -50,7 +50,7 @@ export interface AcpMcpServerFailure {
   readonly reason: string;
 }
 
-export interface AcpTaskTurns {
+interface AcpTaskTurns {
   readonly startsTask: (toolCallId: string, input: unknown) => boolean;
   readonly toolCallKey: (toolCallId: string) => string;
 }
