@@ -7,7 +7,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { Cause, Effect, Schema } from "effect";
+import { Cause, Duration, Effect, Schema } from "effect";
 import { type AgentProvider, MissingPiSessionError, RequestTimeoutError } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
@@ -36,6 +36,7 @@ type UnresolvedDelivery = DeliveryContext["delivery"];
 
 const logger = createOpenBotLogger("provider-history");
 const eventLogger = createOpenBotLogger("thread-event-compaction");
+const THREAD_EVENT_COMPACTION_INTERVAL = Duration.hours(6);
 
 export interface BootRecoveryHooks {
   executionThreads?(): Array<{ id: string; threadId: string; channelId?: string }>;
@@ -561,19 +562,20 @@ export class BootRecovery {
     yield* compactThreadEvents(this.#store.database).pipe(
       Effect.tap((result) =>
         Effect.sync(() => {
-          if (result.rewritten > 0 || Object.keys(result.failedThreads).length > 0)
+          if (result.rewritten > 0 || result.deleted > 0 || Object.keys(result.failedThreads).length > 0)
             eventLogger.info("Compacted old thread events.", toLogValue(result));
         }),
       ),
       Effect.catch((failure) =>
         Effect.sync(() => {
-          this.#threadEventsCompacted = false;
           const cause = failure.cause;
           eventLogger.warn("Could not compact old thread events.", {
             name: cause instanceof Error ? cause.name : typeof cause,
           });
         }),
       ),
+      Effect.andThen(Effect.sleep(THREAD_EVENT_COMPACTION_INTERVAL)),
+      Effect.forever,
     );
   });
 

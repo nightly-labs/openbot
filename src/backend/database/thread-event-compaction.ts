@@ -1,11 +1,13 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
-import type { DynamicRecord } from "@openbot/contracts/runtime-values";
-import type { DatabaseCore } from "./database-core";
+import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { CONVERSATION_UPDATED, GENERATED_UPDATE_COMMAND, updateActivityId } from "./conversation-writer";
+import { type DatabaseCore, deleteReceiptsOf } from "./database-core";
 import { databaseRow, objectValue, requiredNumberColumn, requiredStringColumn } from "./database-rows";
 import { withTransaction } from "./sqlite-transaction";
 import {
   mergeReplayedLiveMessage,
+  type ThreadEventBranch,
   type ThreadEventMessages,
   ThreadMessageFold,
   threadEventMessages,
@@ -19,10 +21,21 @@ export interface ThreadEventCompactionBatch {
   done: boolean;
   events: number;
   rewritten: number;
+  deleted: number;
   bytesBefore: number;
   bytesAfter: number;
   completedThread: boolean;
   failedThread: string | null;
+}
+
+interface MessageUpdate {
+  sequence: number;
+  keys: string[];
+}
+
+interface SupersededUpdates {
+  lastUpdate: Map<string, MessageUpdate>;
+  openItems: Map<number, number>;
 }
 
 const BATCH_EVENTS = 256;
@@ -39,6 +52,11 @@ interface ThreadProgress {
   lastSequence: number;
   deletedMessages: number;
   restarts: number;
+  updates: SupersededUpdates;
+}
+
+function supersededUpdates(): SupersededUpdates {
+  return { lastUpdate: new Map(), openItems: new Map() };
 }
 
 export class ThreadEventCompaction {
@@ -56,6 +74,7 @@ export class ThreadEventCompaction {
       done: false,
       events: 0,
       rewritten: 0,
+      deleted: 0,
       bytesBefore: 0,
       bytesAfter: 0,
       completedThread: false,
@@ -81,7 +100,13 @@ export class ThreadEventCompaction {
         .prepare(
           `SELECT t.thread_id, t.agent_id FROM projection_threads t
            WHERE t.thread_id > ?
-             AND NOT EXISTS (SELECT 1 FROM thread_event_compaction c WHERE c.thread_id = t.thread_id)
+             AND NOT EXISTS (
+               SELECT 1 FROM thread_event_compaction c
+               WHERE c.thread_id = t.thread_id AND c.through_sequence >= (
+                 SELECT coalesce(max(e.sequence), 0) FROM orchestration_events e
+                 WHERE e.aggregate_type = 'thread' AND e.aggregate_id = t.thread_id
+               )
+             )
            ORDER BY t.thread_id LIMIT 1`,
         )
         .get(this.#afterThreadId),
@@ -100,6 +125,7 @@ export class ThreadEventCompaction {
       lastSequence,
       deletedMessages: deletedMessageCount(db, threadId),
       restarts: 0,
+      updates: supersededUpdates(),
     };
   }
 
@@ -108,6 +134,7 @@ export class ThreadEventCompaction {
       done: false,
       events: 0,
       rewritten: 0,
+      deleted: 0,
       bytesBefore: 0,
       bytesAfter: 0,
       completedThread: false,
@@ -135,6 +162,7 @@ export class ThreadEventCompaction {
         lastSequence,
         deletedMessages: deletedMessageCount(db, progress.threadId),
         restarts: progress.restarts + 1,
+        updates: supersededUpdates(),
       });
     }
 
@@ -145,6 +173,7 @@ export class ThreadEventCompaction {
        ORDER BY sequence`,
     );
     const rewrites: Array<{ row: DynamicRecord; payload: string }> = [];
+    const superseded: number[] = [];
     let bytes = 0;
     let reachedEnd = true;
     for (const value of select.iterate(progress.threadId, progress.through, progress.cutoff)) {
@@ -160,15 +189,25 @@ export class ThreadEventCompaction {
       batch.events += 1;
       const record = objectValue(JSON.parse(payloadJson));
       const messages = threadEventMessages(record);
-      if (record && progress.fold.branchOf(messages) === "changes") {
+      const branch = progress.fold.branchOf(messages);
+      const deletable =
+        requiredStringColumn(row, "event_type") === CONVERSATION_UPDATED &&
+        GENERATED_UPDATE_COMMAND.test(requiredStringColumn(row, "command_id"));
+      let storedMessages = messages;
+      if (record && branch === "changes") {
         const kept = keptChangedMessages(progress.fold.latest, record, messages);
         if (kept) {
-          const compacted = JSON.stringify({ ...record, changedMessages: kept });
+          const compactedRecord = { ...record, changedMessages: kept };
+          const compacted = JSON.stringify(compactedRecord);
           rewrites.push({ row, payload: compacted });
           batch.bytesBefore += Buffer.byteLength(payloadJson);
           batch.bytesAfter += Buffer.byteLength(compacted);
+          storedMessages = threadEventMessages(compactedRecord);
         }
       }
+      superseded.push(
+        ...trackSupersededUpdates(progress.updates, progress.fold.latest, sequence, branch, storedMessages, deletable),
+      );
       progress.fold.apply(sequence, messages);
       progress.through = sequence;
       progress.count += 1;
@@ -195,6 +234,7 @@ export class ThreadEventCompaction {
       );
     }
     batch.rewritten = rewrites.length;
+    batch.deleted = deleteSupersededUpdates(db, progress, superseded);
 
     progress.lastSequence = threadLastSequence(db, progress.threadId);
     progress.deletedMessages = deletedMessageCount(db, progress.threadId);
@@ -227,6 +267,82 @@ export class ThreadEventCompaction {
       requiredNumberColumn(row, "sequences") === progress.sequenceSum
     );
   }
+}
+
+function trackSupersededUpdates(
+  updates: SupersededUpdates,
+  latest: ConversationSnapshot | null,
+  sequence: number,
+  branch: ThreadEventBranch,
+  messages: ThreadEventMessages,
+  deletable: boolean,
+): number[] {
+  if (branch === "snapshot") {
+    updates.lastUpdate.clear();
+    return [];
+  }
+  if (branch !== "changes") {
+    const touched = messages.streamedMessage ?? messages.appendedMessage ?? messages.importedMessage;
+    if (touched) updates.lastUpdate.delete(touched.id);
+    return [];
+  }
+  const removed = new Set(messages.removedMessageIds);
+  for (const id of removed) updates.lastUpdate.delete(id);
+  const shownTimes = countIds(latest?.messages ?? []);
+  const changedTimes = countIds(messages.changedMessages);
+  const singleUpdate = (id: string) => changedTimes.get(id) === 1 && shownTimes.get(id) === 1 && !removed.has(id);
+  const setsActiveTurn = isString(messages.activeTurnId) || messages.activeTurnId === null;
+  const tracked =
+    deletable &&
+    removed.size === 0 &&
+    messages.changedMessages.length > 0 &&
+    messages.changedEntries.every((entry) => entry !== null) &&
+    messages.changedMessages.every((message) => singleUpdate(message.id));
+  const done: number[] = [];
+  for (const message of messages.changedMessages) {
+    const previous = updates.lastUpdate.get(message.id);
+    updates.lastUpdate.delete(message.id);
+    if (!singleUpdate(message.id)) continue;
+    const keys = definedKeys(message);
+    if (previous && setsActiveTurn && previous.keys.every((key) => keys.includes(key))) {
+      const open = (updates.openItems.get(previous.sequence) ?? 0) - 1;
+      if (open > 0) updates.openItems.set(previous.sequence, open);
+      else if (updates.openItems.delete(previous.sequence)) done.push(previous.sequence);
+    }
+    if (tracked) updates.lastUpdate.set(message.id, { sequence, keys });
+  }
+  if (tracked) updates.openItems.set(sequence, messages.changedMessages.length);
+  return done;
+}
+
+function deleteSupersededUpdates(db: DatabaseSync, progress: ThreadProgress, sequences: readonly number[]): number {
+  const remove = db.prepare(
+    `DELETE FROM orchestration_events
+     WHERE sequence = ? AND aggregate_type = 'thread' AND aggregate_id = ? AND event_type = ?
+     RETURNING command_id`,
+  );
+  const removeActivity = db.prepare("DELETE FROM projection_thread_activities WHERE activity_id = ?");
+  const commandIds: string[] = [];
+  for (const sequence of sequences) {
+    const row = databaseRow(remove.get(sequence, progress.threadId, CONVERSATION_UPDATED));
+    if (!row) continue;
+    commandIds.push(requiredStringColumn(row, "command_id"));
+    removeActivity.run(updateActivityId(sequence));
+    progress.count -= 1;
+    progress.sequenceSum -= sequence;
+  }
+  deleteReceiptsOf(db, commandIds);
+  return commandIds.length;
+}
+
+function countIds(messages: readonly ConversationMessage[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const message of messages) counts.set(message.id, (counts.get(message.id) ?? 0) + 1);
+  return counts;
+}
+
+function definedKeys(message: ConversationMessage): string[] {
+  return Object.entries(message).flatMap(([key, value]) => (value === undefined ? [] : [key]));
 }
 
 function keptChangedMessages(

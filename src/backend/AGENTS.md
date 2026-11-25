@@ -85,9 +85,11 @@ hash, in small transactions, only at schema 64 or later: an older release cannot
 the marker migration 64 makes it refuse the file. The file keeps its size; SQLite uses the free pages again.
 After that, it removes from each old thread event the `changedMessages` items that a replay does not
 need (`database/thread-event-compaction.ts`): one thread at a time, in small transactions, with each
-done thread in `thread_event_compaction` (migration 65, which older releases refuse). Each event row
-stays. The rule uses the replay's own fold (`database/thread-message-fold.ts`). When you change the
-fold, run `bun scripts/thread-event-compaction-e2e.ts`.
+done thread in `thread_event_compaction` (migration 65, which older releases refuse). It also deletes a
+generated `conversation.snapshot-updated` row when, for each message of the row, a later update of that
+message has all its keys, so the replay gives the same chat. It runs at start and every 6 hours, on each
+thread with events after its `through_sequence`. The rule uses the replay's own fold
+(`database/thread-message-fold.ts`). When you change the fold, run `bun scripts/thread-event-compaction-e2e.ts`.
 
 - Do not rebuild, rewrite every row of, or `VACUUM` because of a large table unless the change needs
   it. Prefer `ADD COLUMN` with no default or a constant default, a new table, or a partial index.
