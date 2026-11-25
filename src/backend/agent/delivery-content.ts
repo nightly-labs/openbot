@@ -725,7 +725,7 @@ export function finishCheckContinuationPrompt(gap: string, count: number, limit:
     "OpenBot note, not a message from the user. A check of your last turn found that the request is not finished yet:",
     gap,
     "Do this work now, and continue until the request is done. Do not repeat finished work. Do not ask whether to continue. Before you say that the request is done, check the result. This note does not approve a risky action.",
-    "The user already sees your last answer. Do not write it again, also not in different words. At the end, write only what this work found or changed. If it confirms your last answer, say so in one short line. If the check is wrong and the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+    "The user already sees your last answer. Do not write it again, also not in different words. At the end, write only what this work found or changed. The user does not see this note or the check: do not mention them, and do not say that a check or a verification is right or wrong. If this work confirms your last answer, or the request is already done, tell the user in one short line that you checked again and your last answer stays correct, and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
     USER_LANGUAGE_LINE,
     ...continuationCountLines(count, limit),
   ].join("\n");
