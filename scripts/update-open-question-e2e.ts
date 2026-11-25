@@ -46,7 +46,7 @@ type CardState = NonNullable<ConversationMessage["questionPrompt"]>["resolution"
 interface Report {
   passed: boolean;
   answered?: {
-    waitingFor?: string[];
+    waitingFor?: string[] | undefined;
     teamApiWaitingFor?: string[];
     installsWhileOpen?: number;
     installsAfterAnswer?: number;
@@ -54,13 +54,13 @@ interface Report {
     lateAnswers?: number;
   };
   unanswered?: {
-    waitingFor?: string[];
+    waitingFor?: string[] | undefined;
     installsBeforeLimit?: number;
     installsAfterLimit?: number;
     cardAtInstall?: CardState;
   };
   hosted?: {
-    waitingFor?: string[];
+    waitingFor?: string[] | undefined;
     installsAfterMaximumWait?: number;
     cardAtInstall?: CardState;
     managedHostSafeToRestart?: boolean;
