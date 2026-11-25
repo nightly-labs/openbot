@@ -4010,6 +4010,10 @@ export class ProviderRuntime implements ProviderPort {
         stderrLogger.warn("Codex logged a diagnostic.", { provider: client.provider, message });
         return;
       }
+      if (client.provider === "grok") {
+        stderrLogger.warn("Grok logged a diagnostic.", { provider: client.provider, message });
+        return;
+      }
       if (client.provider === "hermes") {
         stderrLogger.warn("Hermes logged a diagnostic.", { provider: client.provider, message });
         return;
