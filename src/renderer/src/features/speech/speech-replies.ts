@@ -33,7 +33,7 @@ import {
 } from "./speech-playback";
 import { speechPort } from "./speech-port";
 import { loadSpeechSpeed } from "./speech-speed";
-import { voiceServer } from "./voice-server";
+import { voiceServer, voiceServerLoaded } from "./voice-server";
 
 const DICTATION_LIFETIME_MS = 10 * 60_000;
 const ANSWER_LOOKUP_LIMIT = 50;
@@ -459,6 +459,11 @@ async function speak(
   const own = { serverId: source.serverId, agentId: source.agentId };
   const analytics = desktopAnalytics.scope();
   try {
+    if (voiceServer() === undefined) {
+      const generation = readingsGeneration;
+      await voiceServerLoaded();
+      if (generation !== readingsGeneration) return;
+    }
     const input = speechInput(markdown, fallback);
     if (!input) {
       if (markdown && speechTextFromMarkdown(markdown)) reportUnreadableLanguage();
