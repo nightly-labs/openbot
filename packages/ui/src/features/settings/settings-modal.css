@@ -477,14 +477,8 @@
   width: 220px;
 }
 
-.ui-select-item-label:has(.settings-font-option) {
+.ui-select-item-label:has(> .settings-font-option) {
   flex: 1;
-}
-
-.settings-font-option {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
   content-visibility: auto;
   contain-intrinsic-block-size: auto var(--openbot-leading-sm);
 }
