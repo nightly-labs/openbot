@@ -149,6 +149,8 @@ const logger = createOpenBotLogger("provider-runtime");
 const stderrLogger = createOpenBotLogger("provider-stderr");
 
 const ACCOUNT_USAGE_READ_TIMEOUT_MS = 30_000;
+const START_ACCOUNT_READ_TIMEOUT_MS = 5_000;
+const CODEX_START_ACCOUNT_READ_TIMEOUT_MS = 20_000;
 const CUSTOM_AGENT_USAGE_REUSE_MS = 60_000;
 const CUSTOM_AGENT_USAGE_WAKE_MS = 60 * 60_000;
 const USAGE_RESET_PROVIDERS: ReadonlySet<AgentProvider> = new Set(["codex"]);
@@ -3727,7 +3729,9 @@ export class ProviderRuntime implements ProviderPort {
               "account/read",
               { refreshToken: false },
               accountReadDecoder(provider),
-              providerCheckTimeoutMs(5_000),
+              providerCheckTimeoutMs(
+                provider === "codex" ? CODEX_START_ACCOUNT_READ_TIMEOUT_MS : START_ACCOUNT_READ_TIMEOUT_MS,
+              ),
             )
             .pipe(toProviderOperationFailed);
           if (!account.account) {
