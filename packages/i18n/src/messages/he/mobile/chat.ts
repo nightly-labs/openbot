@@ -101,6 +101,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "החלק הבא",
   "mobile.chat.preview.pdfFailed": "לא ניתן להציג את ה-PDF הזה.",
   "mobile.chat.preview.spreadsheetFailed": "לא ניתן לקרוא את הגיליון הזה.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "הגיליון גדול מדי לתצוגה מקדימה. אפשר לשתף אותו כדי לפתוח אותו באפליקציה אחרת.",
   "mobile.chat.preview.spreadsheetTruncated":
     "התצוגה המקדימה מוגבלת ל-{rows} השורות הראשונות ול-{columns} העמודות הראשונות.",
   "mobile.chat.copyFailedMessage": "יש לנסות שוב.",

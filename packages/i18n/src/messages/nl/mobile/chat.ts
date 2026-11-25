@@ -89,6 +89,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Volgend deel",
   "mobile.chat.preview.pdfFailed": "Kan deze PDF niet tonen.",
   "mobile.chat.preview.spreadsheetFailed": "Kan deze spreadsheet niet lezen.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Deze spreadsheet is te groot voor een voorvertoning. Deel hem om hem in een andere app te openen.",
   "mobile.chat.preview.spreadsheetTruncated": "Voorvertoning beperkt tot de eerste {rows} rijen en {columns} kolommen.",
   "mobile.chat.copyFailedMessage": "Probeer het opnieuw.",
   "mobile.chat.message.copyFailed": "Kan bericht niet kopiëren",

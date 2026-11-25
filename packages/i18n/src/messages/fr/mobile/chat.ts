@@ -98,6 +98,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Partie suivante",
   "mobile.chat.preview.pdfFailed": "Impossible d’afficher ce PDF.",
   "mobile.chat.preview.spreadsheetFailed": "Impossible de lire cette feuille de calcul.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Cette feuille de calcul est trop volumineuse pour l’aperçu. Partagez-la pour l’ouvrir dans une autre app.",
   "mobile.chat.preview.spreadsheetTruncated":
     "Aperçu limité aux {rows} premières lignes et aux {columns} premières colonnes.",
   "mobile.chat.copyFailedMessage": "Veuillez réessayer.",

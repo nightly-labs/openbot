@@ -96,6 +96,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.preview.nextPart": "Next part",
   "mobile.chat.preview.pdfFailed": "Could not show this PDF.",
   "mobile.chat.preview.spreadsheetFailed": "Could not read this spreadsheet.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "This spreadsheet is too large to preview. Share it to open it in another app.",
   "mobile.chat.preview.spreadsheetTruncated": "Preview limited to the first {rows} rows and {columns} columns.",
   "mobile.chat.copyFailedMessage": "Please try again.",
   "mobile.chat.message.copyFailed": "Could not copy message",

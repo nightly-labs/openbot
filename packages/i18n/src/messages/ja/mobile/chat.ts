@@ -97,6 +97,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "次のパート",
   "mobile.chat.preview.pdfFailed": "この PDF を表示できませんでした。",
   "mobile.chat.preview.spreadsheetFailed": "このスプレッドシートを読み込めませんでした。",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "このスプレッドシートは大きすぎてプレビューできません。共有して別のアプリで開いてください。",
   "mobile.chat.preview.spreadsheetTruncated": "プレビューは最初の {rows} 行と {columns} 列までです。",
   "mobile.chat.copyFailedMessage": "もう一度お試しください。",
   "mobile.chat.message.copyFailed": "メッセージをコピーできませんでした",

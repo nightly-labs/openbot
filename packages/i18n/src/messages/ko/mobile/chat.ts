@@ -96,6 +96,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "다음 부분",
   "mobile.chat.preview.pdfFailed": "이 PDF를 표시할 수 없어요.",
   "mobile.chat.preview.spreadsheetFailed": "이 스프레드시트를 읽을 수 없어요.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "이 스프레드시트는 너무 커서 미리 볼 수 없어요. 공유해서 다른 앱에서 여세요.",
   "mobile.chat.preview.spreadsheetTruncated": "미리보기는 처음 {rows}행, {columns}열까지만 표시해요.",
   "mobile.chat.copyFailedMessage": "다시 시도해 주세요.",
   "mobile.chat.message.copyFailed": "메시지를 복사할 수 없어요",

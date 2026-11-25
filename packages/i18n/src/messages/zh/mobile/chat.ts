@@ -94,6 +94,7 @@ export const messages = {
   "mobile.chat.preview.nextPart": "下一部分",
   "mobile.chat.preview.pdfFailed": "无法显示该 PDF。",
   "mobile.chat.preview.spreadsheetFailed": "无法读取该电子表格。",
+  "mobile.chat.preview.spreadsheetTooLarge": "该表格太大，无法预览。请分享到其他应用中打开。",
   "mobile.chat.preview.spreadsheetTruncated": "预览仅显示前 {rows} 行和 {columns} 列。",
   "mobile.chat.copyFailedMessage": "请重试。",
   "mobile.chat.message.copyFailed": "无法复制消息",

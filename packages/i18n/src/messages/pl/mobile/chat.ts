@@ -152,6 +152,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Następna część",
   "mobile.chat.preview.pdfFailed": "Nie udało się wyświetlić tego pliku PDF.",
   "mobile.chat.preview.spreadsheetFailed": "Nie udało się odczytać tego arkusza kalkulacyjnego.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Ten arkusz kalkulacyjny jest za duży na podgląd. Udostępnij go, aby otworzyć go w innej aplikacji.",
   "mobile.chat.preview.spreadsheetTruncated":
     "Podgląd ograniczony do pierwszych wierszy ({rows}) i kolumn ({columns}).",
   "mobile.chat.copyFailedMessage": "Spróbuj ponownie.",
