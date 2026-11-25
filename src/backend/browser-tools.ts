@@ -213,7 +213,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
         .literal("chrome")
         .optional()
         .describe(
-          "Only when the person sent this message from the OpenBot extension in their own Chrome. Otherwise omit it: the OpenBot browser opens the page.",
+          "Only when this turn says that the person's own Chrome is shared with you. Otherwise omit it, also when the person asks for Chrome: the OpenBot browser opens the page.",
         ),
     },
   }),
