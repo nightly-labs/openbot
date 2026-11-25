@@ -130,7 +130,6 @@ const markdown = new Marked({
     },
   ],
 });
-// Bold and struck text also close next to Chinese, Japanese or Korean punctuation, as in `**待办：**说明`.
 markdown.use(markedCjkFriendly());
 
 const VOID_HTML_ELEMENTS = new Set([
