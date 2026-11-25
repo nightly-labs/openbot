@@ -14,6 +14,7 @@ import {
   queueHoldWorker,
   routineRunsTurn,
   savedCustomModelId,
+  VOICE_MODELS,
 } from "@openbot/contracts/ipc";
 import {
   TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
@@ -137,6 +138,9 @@ export function ConversationComposer() {
     voiceLevels,
     voiceLimitNotice,
     dismissVoiceLimitNotice,
+    voiceLanguageNotice,
+    dismissVoiceLanguageNotice,
+    chooseOtherVoiceLanguage,
     voiceLiveText,
     voicePhase: sharedVoicePhase,
     voiceThreadKey,
@@ -681,6 +685,23 @@ export function ConversationComposer() {
               />
             )}
           </ComposerStackCard>
+          <ComposerStackCard when={voiceLanguageNotice()}>
+            {() => (
+              <ComposerNotice
+                tone="info"
+                body={t("composer.voice.languageNotice", { size: format.fileSize(whisperModelBytes()) })}
+                action={
+                  <Button type="button" size="sm" onClick={() => void chooseOtherVoiceLanguage()}>
+                    {t("composer.voice.languageNotice.action")}
+                  </Button>
+                }
+                onDismiss={() => {
+                  dismissVoiceLanguageNotice();
+                  setComposerFocusRequest((current) => current + 1);
+                }}
+              />
+            )}
+          </ComposerStackCard>
           <ComposerStackCard when={replyTarget()}>
             {(message) => (
               <ComposerReplyPreview
@@ -944,3 +965,10 @@ function openWaitItems(waits: readonly AgentWait[], queue: QueueSnapshot | undef
 const QueuePanel = lazy(() =>
   import("@openbot/ui/features/conversation/QueuePanel").then((module) => ({ default: module.QueuePanel })),
 );
+
+function whisperModelBytes(): number {
+  return (
+    VOICE_MODELS.flatMap((model) => (model.kind === "local" && model.id === "whisper-turbo" ? [model.bytes] : []))[0] ??
+    0
+  );
+}

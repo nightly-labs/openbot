@@ -59,6 +59,10 @@ export const messages = {
     "Ein anderer OpenBot ist mit dieser WhatsApp-Nummer verknüpft, darum bekommst du vielleicht zwei Antworten. Öffne dazu in WhatsApp auf deinem Handy „Verknüpfte Geräte“ und melde den OpenBot ab, den du nicht nutzt.",
   "status.messaging.whatsappPaused":
     "OpenBot antwortet hier 10 Minuten lang nicht: In kurzer Zeit kamen zu viele Nachrichten. Wenn ein anderer OpenBot mit dieser Nummer verknüpft ist, öffne in WhatsApp auf deinem Handy „Verknüpfte Geräte“ und melde den OpenBot ab, den du nicht nutzt.",
+  "status.messaging.whatsappNotDelivered":
+    "WhatsApp hat diese Antwort nicht angenommen, daher hat die Person sie nicht erhalten.",
+  "status.messaging.whatsappPartlyDelivered":
+    "WhatsApp hat diese Antwort nicht vollständig angenommen, daher hat die Person nur einen Teil erhalten.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp-Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Antwortet in WhatsApp und fragt das Team",
 } as const satisfies PartialTranslation<typeof source>;

@@ -269,6 +269,7 @@ export function createStableConversationState(
   const [voiceThreadKey, setVoiceThreadKey] = createSignal<string | undefined>(undefined);
   const [voiceLevels, setVoiceLevels] = createSignal<number[]>([]);
   const [voiceLimitReached, setVoiceLimitReached] = createSignal<ConversationTarget | null>(null);
+  const [voiceLanguageChoice, setVoiceLanguageChoice] = createSignal<ConversationTarget | null>(null);
   const [browserPipBounds, setBrowserPipBounds] = createSignal<BrowserBounds | null>(
     readStoredBounds(BROWSER_PIP_STORAGE_KEY),
   );
@@ -419,6 +420,8 @@ export function createStableConversationState(
     setVoiceLevels,
     voiceLimitReached,
     setVoiceLimitReached,
+    voiceLanguageChoice,
+    setVoiceLanguageChoice,
     browserPipBounds,
     setBrowserPipBounds,
     browserWindowOpen,
