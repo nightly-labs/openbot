@@ -665,13 +665,24 @@ function taggedAgentsNote(
   ].join(" ");
 }
 
+function continuationCountLines(count: number, limit: number): string[] {
+  return [
+    `Automatic continuation ${count} of ${limit}.`,
+    ...(count >= limit
+      ? [
+          "This can be the last automatic continuation of this request. If work is still left when you end this turn, end your answer with what is done, what is left, and what the user can send to continue.",
+        ]
+      : []),
+  ];
+}
+
 export function planContinuationPrompt(steps: readonly ConversationPlanStep[], count: number, limit: number): string {
   return [
     "OpenBot note, not a message from the user. Your last turn ended while your plan still had open steps:",
     ...steps.map((step) => `- [${step.status === "inProgress" ? "in progress" : "pending"}] ${step.text}`),
     "Continue the work now, from where you stopped. Do not repeat finished work or restate the plan. Keep the plan current and mark each step done when you finish it. If a step is already done, mark it done; if it no longer applies, remove it. Do not ask whether to continue. This note does not approve a risky action. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
     USER_LANGUAGE_LINE,
-    `Automatic continuation ${count} of ${limit}.`,
+    ...continuationCountLines(count, limit),
   ].join("\n");
 }
 
@@ -690,7 +701,7 @@ export function nextStepContinuationPrompt(count: number, limit: number): string
     "OpenBot note, not a message from the user. Your last turn ended before the next step: you named the step or asked whether to continue, but you did not do it.",
     "Do the next step now, and continue until the request is done. Do not repeat finished work or restate earlier answers. Do not ask whether to continue. This note does not approve a risky action. If the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
     USER_LANGUAGE_LINE,
-    `Automatic continuation ${count} of ${limit}.`,
+    ...continuationCountLines(count, limit),
   ].join("\n");
 }
 
@@ -701,7 +712,7 @@ export function finishCheckContinuationPrompt(gap: string, count: number, limit:
     "Do this work now, and continue until the request is done. Do not repeat finished work. Do not ask whether to continue. Before you say that the request is done, check the result. This note does not approve a risky action.",
     "The user already sees your last answer. Do not write it again, also not in different words. At the end, write only what this work found or changed. If it confirms your last answer, say so in one short line. If the check is wrong and the request is already done, say so in one short line and end your turn. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
     USER_LANGUAGE_LINE,
-    `Automatic continuation ${count} of ${limit}.`,
+    ...continuationCountLines(count, limit),
   ].join("\n");
 }
 

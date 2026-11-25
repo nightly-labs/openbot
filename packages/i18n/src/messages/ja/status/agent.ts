@@ -114,6 +114,8 @@ export const messages = {
   "status.agent.planContinues": "プランに未完了のステップがあります。エージェントが続けます（{current}/{limit}）。",
   "status.agent.planStopped":
     "プランに未完了のステップを残してエージェントが停止しました。続けるにはメッセージを送信してください。",
+  "status.agent.continuationLimitReached":
+    "リクエストが完了する前にエージェントが停止しました。エージェントはこれ以上自動で続けられません。続けるにはメッセージを送信してください。",
   "status.agent.compactionContinues":
     "エージェントがコンテキストを圧縮している間に接続が切れました。エージェントは続行します。",
   "status.agent.providerExitContinues": "エージェントは回答を終える前に停止しました。エージェントは続行します。",

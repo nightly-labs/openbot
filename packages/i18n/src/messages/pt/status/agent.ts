@@ -116,6 +116,8 @@ export const messages = {
   "status.agent.nextStepContinues": "O agente parou antes da próxima etapa. Ele continua ({current} de {limit}).",
   "status.agent.planContinues": "O plano tem etapas abertas. O agente continua ({current} de {limit}).",
   "status.agent.planStopped": "O agente parou com etapas abertas no plano. Envie uma mensagem para continuar.",
+  "status.agent.continuationLimitReached":
+    "O agente parou antes de terminar o pedido. Ele não pode continuar sozinho outra vez. Envie uma mensagem para continuar.",
   "status.agent.compactionContinues": "A conexão parou enquanto o agente compactava o contexto. O agente continua.",
   "status.agent.providerExitContinues": "O agente parou antes de terminar a resposta. O agente continua.",
   "status.agent.branchTitle": "Chat ramificado",
