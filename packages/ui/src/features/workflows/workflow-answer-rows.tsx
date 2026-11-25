@@ -18,7 +18,9 @@ import {
   X,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { type Accessor, createEffect, createSignal, For, type Setter, Show, untrack } from "solid-js";
+import { type Accessor, createEffect, createSignal, For, onCleanup, type Setter, Show, untrack } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 
 interface AnswerRowValue {
@@ -126,9 +128,12 @@ export function AnswerRows(props: { value: string; locked: boolean; onChange: (v
   let saved = untrack(() => props.value);
   let container: HTMLDivElement | undefined;
   const [rows, setRows] = createSignal<AnswerRow[]>(list);
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
   const show = (next: AnswerRow[]) => {
     list = next;
     setRows(next);
+    fades.remeasure();
   };
   const save = () => {
     saved = answerSpecText(list);
@@ -160,11 +165,12 @@ export function AnswerRows(props: { value: string; locked: boolean; onChange: (v
         container = element;
       }}
     >
-      <div class="wfn-answer-rows">
+      <div ref={(element) => fades.bind(element)} class={["wfn-answer-rows", fades.classes()]} onScroll={fades.measure}>
         <For each={rows()}>
           {(row) => <AnswerFieldRow row={row} locked={props.locked} onChange={save} onRemove={() => remove(row)} />}
         </For>
       </div>
+      <ScrollEdgeBlur fades={fades} />
       <Show when={!props.locked}>
         <Button variant="ghost" size="sm" class="wfn-answer-add" onClick={add}>
           <Plus aria-hidden="true" />

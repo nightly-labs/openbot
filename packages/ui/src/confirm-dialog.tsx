@@ -1,8 +1,10 @@
 import type { JSX } from "@solidjs/web";
-import { createSignal, onSettled, Show } from "solid-js";
+import { createSignal, onCleanup, onSettled, Show } from "solid-js";
 import { Alert, AlertContent, AlertDescription, AlertIcon } from "./alert";
 import { Button } from "./button";
 import { AlertDialog } from "./complex";
+import { createScrollFades } from "./components/createScrollFades";
+import { ScrollEdgeBlur } from "./components/ScrollEdgeBlur";
 import { ShieldCheck, Trash2, TriangleAlert } from "./icons";
 import { useText } from "./text";
 
@@ -42,6 +44,8 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
   let body: HTMLDivElement | undefined;
   let restoreTarget: HTMLElement | undefined;
   let restoreFrame: number | undefined;
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
   onSettled(() => () => {
     if (restoreFrame !== undefined) cancelAnimationFrame(restoreFrame);
   });
@@ -91,7 +95,11 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
               });
             }}
           >
-            <div class="ui-confirm-dialog-main">
+            <div
+              class={["ui-confirm-dialog-main", fades.classes()]}
+              ref={(element) => fades.bind(element)}
+              onScroll={fades.measure}
+            >
               <Show
                 when={props.media}
                 fallback={
@@ -102,7 +110,7 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
               >
                 <div class="ui-confirm-dialog-media">{props.media}</div>
               </Show>
-              <div class="ui-confirm-dialog-content">
+              <div class="ui-confirm-dialog-content" ref={(element) => fades.watch(element)}>
                 <AlertDialog.Title as="h2" class="ui-confirm-dialog-title">
                   {props.title}
                 </AlertDialog.Title>
@@ -128,6 +136,7 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
                 </Show>
               </div>
             </div>
+            <ScrollEdgeBlur fades={fades} />
             <footer class="ui-confirm-dialog-actions">
               <Show when={!props.hideCancel}>
                 <Button

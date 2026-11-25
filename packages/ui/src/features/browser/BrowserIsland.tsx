@@ -8,7 +8,9 @@ import { ApprovalCard } from "@openbot/ui/features/conversation/ConversationProm
 import { RichMessageText } from "@openbot/ui/features/conversation/RichMessageText";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { useText } from "@openbot/ui/text";
-import { Match, Show, Switch } from "solid-js";
+import { createEffect, Match, onCleanup, Show, Switch } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import type { MediaApprovalControls } from "../conversation/MediaApprovalCard";
 
 export type BrowserIslandContent = BrowserDockIsland;
@@ -55,6 +57,19 @@ export function BrowserIslandFace(props: BrowserIslandFaceProps) {
   const prompt = () => (props.content.kind === "prompt" ? props.content : undefined);
   const approval = () => (props.content.kind === "approval" ? props.content : undefined);
   const reply = () => (props.content.kind === "reply" ? props.content : undefined);
+  const cardFades = createScrollFades();
+  const replyFades = createScrollFades();
+  onCleanup(() => {
+    cardFades.stop();
+    replyFades.stop();
+  });
+  createEffect(
+    () => props.content,
+    () => {
+      cardFades.remeasure();
+      replyFades.remeasure();
+    },
+  );
   const statusText = () => {
     const current = activity();
     if (!current) return "";
@@ -104,48 +119,58 @@ export function BrowserIslandFace(props: BrowserIslandFaceProps) {
       </Match>
       <Match when={prompt()}>
         {(current) => (
-          <section
-            class="browser-dock-island-face browser-dock-island-card"
-            aria-label={t("browser.dock.needsAnswer", { name: props.agent.name })}
-          >
-            <header class="browser-dock-reply-header">
-              <AgentAvatar agent={props.agent} class="browser-dock-avatar" />
-              <strong>{t("browser.dock.needsAnswer", { name: props.agent.name })}</strong>
-            </header>
-            <Show keyed when={browserIslandKey(current())}>
-              {(_attempt) => (
-                <QuestionPromptBubble
-                  questions={current().questions}
-                  sendShortcut={props.sendShortcut}
-                  onSubmit={(answers) => props.onAnswerPrompt(current().requestId, answers)}
-                  onOpenLink={props.onOpenLink}
-                />
-              )}
-            </Show>
-          </section>
+          <>
+            <section
+              ref={(element) => cardFades.bind(element)}
+              class={["browser-dock-island-face", "browser-dock-island-card", cardFades.classes()]}
+              onScroll={cardFades.measure}
+              aria-label={t("browser.dock.needsAnswer", { name: props.agent.name })}
+            >
+              <header class="browser-dock-reply-header">
+                <AgentAvatar agent={props.agent} class="browser-dock-avatar" />
+                <strong>{t("browser.dock.needsAnswer", { name: props.agent.name })}</strong>
+              </header>
+              <Show keyed when={browserIslandKey(current())}>
+                {(_attempt) => (
+                  <QuestionPromptBubble
+                    questions={current().questions}
+                    sendShortcut={props.sendShortcut}
+                    onSubmit={(answers) => props.onAnswerPrompt(current().requestId, answers)}
+                    onOpenLink={props.onOpenLink}
+                  />
+                )}
+              </Show>
+            </section>
+            <ScrollEdgeBlur fades={cardFades} />
+          </>
         )}
       </Match>
       <Match when={approval()}>
         {(current) => (
-          <section
-            class="browser-dock-island-face browser-dock-island-card"
-            aria-label={t("browser.dock.needsApproval", { name: props.agent.name })}
-          >
-            <header class="browser-dock-reply-header">
-              <AgentAvatar agent={props.agent} class="browser-dock-avatar" />
-              <strong>{t("browser.dock.needsApproval", { name: props.agent.name })}</strong>
-            </header>
-            <Show keyed when={browserIslandKey(current())}>
-              {(_attempt) => (
-                <ApprovalCard
-                  approval={current().approval}
-                  onApprove={() => props.onRespondApproval(current().approval.requestId, "accept")}
-                  onReject={() => props.onRespondApproval(current().approval.requestId, "decline")}
-                  media={props.media}
-                />
-              )}
-            </Show>
-          </section>
+          <>
+            <section
+              ref={(element) => cardFades.bind(element)}
+              class={["browser-dock-island-face", "browser-dock-island-card", cardFades.classes()]}
+              onScroll={cardFades.measure}
+              aria-label={t("browser.dock.needsApproval", { name: props.agent.name })}
+            >
+              <header class="browser-dock-reply-header">
+                <AgentAvatar agent={props.agent} class="browser-dock-avatar" />
+                <strong>{t("browser.dock.needsApproval", { name: props.agent.name })}</strong>
+              </header>
+              <Show keyed when={browserIslandKey(current())}>
+                {(_attempt) => (
+                  <ApprovalCard
+                    approval={current().approval}
+                    onApprove={() => props.onRespondApproval(current().approval.requestId, "accept")}
+                    onReject={() => props.onRespondApproval(current().approval.requestId, "decline")}
+                    media={props.media}
+                  />
+                )}
+              </Show>
+            </section>
+            <ScrollEdgeBlur fades={cardFades} />
+          </>
         )}
       </Match>
       <Match when={reply()}>
@@ -168,7 +193,11 @@ export function BrowserIslandFace(props: BrowserIslandFaceProps) {
                 <X aria-hidden="true" />
               </Button>
             </header>
-            <div class="browser-dock-reply-body">
+            <div
+              ref={(element) => replyFades.bind(element)}
+              class={["browser-dock-reply-body", replyFades.classes()]}
+              onScroll={replyFades.measure}
+            >
               <RichMessageText
                 body={current().body}
                 agents={props.agents}
@@ -176,6 +205,7 @@ export function BrowserIslandFace(props: BrowserIslandFaceProps) {
                 onOpenLink={props.onOpenLink}
               />
             </div>
+            <ScrollEdgeBlur fades={replyFades} />
             <Show when={current().answerInChat && props.onOpenChat}>
               {(openChat) => (
                 <div class="browser-dock-reply-actions">

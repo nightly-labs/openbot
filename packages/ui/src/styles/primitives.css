@@ -741,7 +741,9 @@ html.ui-textarea-resizing {
   z-index: var(--openbot-layer-popover);
   max-height: 320px;
   min-width: 144px;
-  overflow: hidden auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: 0;
   border-radius: var(--openbot-radius-md);
   background: var(--openbot-bg-surface-raised);
@@ -755,7 +757,10 @@ html.ui-textarea-resizing {
 }
 
 .ui-select-listbox {
+  min-height: 0;
+  flex: 1 1 auto;
   margin: 0;
+  overflow-y: auto;
   padding: var(--openbot-space-1);
   outline: 0;
 }
@@ -798,12 +803,6 @@ html.ui-textarea-resizing {
   flex-direction: column;
 }
 
-.ui-search-select-content .ui-select-listbox {
-  min-height: 0;
-  flex: 1 1 auto;
-  overflow-y: auto;
-}
-
 .ui-search-select-empty {
   margin: 0;
   padding: var(--openbot-space-2) var(--openbot-space-3);
@@ -813,6 +812,7 @@ html.ui-textarea-resizing {
 }
 
 .ui-select-footer {
+  flex: 0 0 auto;
   border-top: 1px solid var(--openbot-border);
   padding: var(--openbot-space-1);
 }
@@ -1226,7 +1226,7 @@ html.ui-textarea-resizing {
   background: var(--openbot-bg-control);
 }
 
-.ui-item-group > :not(:first-child) {
+.ui-item-group > :not(:first-child, .scroll-edge-blur) {
   border-top: 1px solid var(--openbot-border);
 }
 

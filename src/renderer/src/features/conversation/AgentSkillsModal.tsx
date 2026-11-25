@@ -23,6 +23,7 @@ import {
   X,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { SkillGlyph } from "@openbot/ui/features/conversation/SkillGlyph";
 import { SkillLibraryToolbar } from "@openbot/ui/features/conversation/SkillLibraryToolbar";
 import { useText } from "@openbot/ui/text";
@@ -574,77 +575,81 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
                                       )}
                                     </For>
                                   </div>
+                                  <ScrollEdgeBlur fades={scrollFades} />
                                 </Show>
                               }
                             >
                               {(skill) => (
-                                <div
-                                  ref={scrollFades.bind}
-                                  class={["agent-skill-detail", "t-page", scrollFades.classes()]}
-                                  data-page-id="2"
-                                  onScroll={scrollFades.measure}
-                                >
-                                  <Show when={isFolderSkill(skill())}>
-                                    <Show when={skill().problem}>
-                                      {(problem) => <p class="agent-memory-error">{sourceText(problem())}</p>}
-                                    </Show>
-                                    <Show when={!detail() && skill().description}>
-                                      {(description) => <p class="agent-memory-state">{description()}</p>}
-                                    </Show>
-                                    <p class="agent-memory-state">
-                                      {t("skill.folderSkill", { location: skill().location ?? "" })}
-                                    </p>
-                                  </Show>
-                                  <Show
-                                    when={!catalogCalls() && !isFolderSkill(skill()) && !detail() && !detailLoading()}
+                                <>
+                                  <div
+                                    ref={scrollFades.bind}
+                                    class={["agent-skill-detail", "t-page", scrollFades.classes()]}
+                                    data-page-id="2"
+                                    onScroll={scrollFades.measure}
                                   >
-                                    <p class="agent-memory-state">{skill().description ?? skillMeta(skill(), t)}</p>
-                                  </Show>
-                                  <Show when={detailLoading()}>
-                                    <p class="agent-memory-state">{t("skill.loadingDetails")}</p>
-                                  </Show>
-                                  <Show when={detail()}>
-                                    {(current) => (
-                                      <SkillPreview
-                                        skill={current()}
-                                        onTry={
-                                          mutable() &&
-                                          skill().state !== "needs-repair" &&
-                                          skill().installedVersion === current().version &&
-                                          savingId() !== skill().skillId &&
-                                          props.onTrySkill
-                                            ? async () => {
-                                                const selected = skill();
-                                                const preview = current();
-                                                const agentId = props.agentId;
-                                                if (!isSkillEnabled(selected) && !(await setEnabled(selected, true)))
-                                                  return;
-                                                if (
-                                                  !props.open ||
-                                                  props.agentId !== agentId ||
-                                                  selectedId() !== selected.skillId
-                                                )
-                                                  return;
-                                                props.onTrySkill?.(preview);
-                                                props.onOpenChange(false);
-                                              }
-                                            : undefined
-                                        }
-                                        unavailableReason={
-                                          !mutable()
-                                            ? t("skill.unavailable.readOnly")
-                                            : skill().state === "needs-repair"
-                                              ? t("skill.unavailable.repair")
-                                              : skill().installedVersion !== current().version
-                                                ? t("skill.unavailable.updateVersion")
-                                                : savingId() === skill().skillId
-                                                  ? t("skill.unavailable.saving")
-                                                  : t("skill.unavailable.composer")
-                                        }
-                                      />
-                                    )}
-                                  </Show>
-                                </div>
+                                    <Show when={isFolderSkill(skill())}>
+                                      <Show when={skill().problem}>
+                                        {(problem) => <p class="agent-memory-error">{sourceText(problem())}</p>}
+                                      </Show>
+                                      <Show when={!detail() && skill().description}>
+                                        {(description) => <p class="agent-memory-state">{description()}</p>}
+                                      </Show>
+                                      <p class="agent-memory-state">
+                                        {t("skill.folderSkill", { location: skill().location ?? "" })}
+                                      </p>
+                                    </Show>
+                                    <Show
+                                      when={!catalogCalls() && !isFolderSkill(skill()) && !detail() && !detailLoading()}
+                                    >
+                                      <p class="agent-memory-state">{skill().description ?? skillMeta(skill(), t)}</p>
+                                    </Show>
+                                    <Show when={detailLoading()}>
+                                      <p class="agent-memory-state">{t("skill.loadingDetails")}</p>
+                                    </Show>
+                                    <Show when={detail()}>
+                                      {(current) => (
+                                        <SkillPreview
+                                          skill={current()}
+                                          onTry={
+                                            mutable() &&
+                                            skill().state !== "needs-repair" &&
+                                            skill().installedVersion === current().version &&
+                                            savingId() !== skill().skillId &&
+                                            props.onTrySkill
+                                              ? async () => {
+                                                  const selected = skill();
+                                                  const preview = current();
+                                                  const agentId = props.agentId;
+                                                  if (!isSkillEnabled(selected) && !(await setEnabled(selected, true)))
+                                                    return;
+                                                  if (
+                                                    !props.open ||
+                                                    props.agentId !== agentId ||
+                                                    selectedId() !== selected.skillId
+                                                  )
+                                                    return;
+                                                  props.onTrySkill?.(preview);
+                                                  props.onOpenChange(false);
+                                                }
+                                              : undefined
+                                          }
+                                          unavailableReason={
+                                            !mutable()
+                                              ? t("skill.unavailable.readOnly")
+                                              : skill().state === "needs-repair"
+                                                ? t("skill.unavailable.repair")
+                                                : skill().installedVersion !== current().version
+                                                  ? t("skill.unavailable.updateVersion")
+                                                  : savingId() === skill().skillId
+                                                    ? t("skill.unavailable.saving")
+                                                    : t("skill.unavailable.composer")
+                                          }
+                                        />
+                                      )}
+                                    </Show>
+                                  </div>
+                                  <ScrollEdgeBlur fades={scrollFades} />
+                                </>
                               )}
                             </Show>
                           </Show>

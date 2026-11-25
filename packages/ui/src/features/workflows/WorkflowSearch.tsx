@@ -1,6 +1,8 @@
 import type { WorkflowNodeKind } from "@openbot/contracts/ipc";
 import { Button, Input, Search, X } from "@openbot/ui";
-import { For, Show } from "solid-js";
+import { createEffect, For, onCleanup, Show } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import { AddItemLabel, addItem } from "./WorkflowAddMenu";
 import { HudButton } from "./WorkflowCanvasHud";
@@ -26,6 +28,14 @@ export function WorkflowSearch(props: {
   onClose: () => void;
 }) {
   const { t } = useText();
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
+  createEffect(
+    () => props.matches,
+    () => {
+      fades.remeasure();
+    },
+  );
   const show = (id: string) => {
     props.onShow(id);
     props.onClose();
@@ -59,7 +69,11 @@ export function WorkflowSearch(props: {
             <p class="wfn-search-empty">{t("workflow.canvas.search.noMatch", { query: props.query.trim() })}</p>
           }
         >
-          <ul class="wfn-search-results">
+          <ul
+            ref={(element) => fades.bind(element)}
+            class={["wfn-search-results", fades.classes()]}
+            onScroll={fades.measure}
+          >
             <For each={props.matches}>
               {(entry) => (
                 <li>
@@ -71,6 +85,7 @@ export function WorkflowSearch(props: {
               )}
             </For>
           </ul>
+          <ScrollEdgeBlur fades={fades} />
         </Show>
       </Show>
     </search>

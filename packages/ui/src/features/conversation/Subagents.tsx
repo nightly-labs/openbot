@@ -26,7 +26,9 @@ import {
 import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, createUniqueId, For, Match, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, Match, onCleanup, Show, Switch } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { ActivityShine } from "./ActivityShine";
 
 const STATE_LABEL = {
@@ -366,6 +368,8 @@ export function SubagentPanel(props: SubagentPanelProps) {
   const { t } = useText();
   const duration = useDuration();
   const now = createClock(() => props.subagent?.status === "running");
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
   return (
     <aside
       id="subagent-panel"
@@ -387,63 +391,71 @@ export function SubagentPanel(props: SubagentPanelProps) {
       </header>
       <Show when={props.subagent}>
         {(subagent) => (
-          <section class="subagents-panel-detail" aria-label={subagent().title}>
-            <div class="subagents-panel-head">
-              <SubagentStatus status={subagent().status} />
-              <h3 dir="auto">{subagent().title}</h3>
-            </div>
-            <p class="subagents-panel-meta">
-              {[
-                subagent().agentType === GENERAL_AGENT_TYPE ? null : subagent().agentType,
-                t(STATE_LABEL[subagent().status]),
-                duration(elapsedMs(subagent(), now())),
-                t("chat.subagents.stepCount", { count: subagent().steps.length }),
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-            <div class="subagents-steps">
-              <Show when={subagent().prompt}>
-                {(prompt) => (
-                  <p class="subagents-prompt">
-                    <span class="subagents-prompt-label">
-                      {t("chat.subagents.taskFrom", { name: props.agentName })}
-                    </span>
-                    <span dir="auto">{prompt()}</span>
-                  </p>
-                )}
-              </Show>
-              <ol class="subagents-step-list" aria-label={t("chat.subagents.steps", { title: subagent().title })}>
-                <For each={subagent().steps} keyed={(step) => step.id}>
-                  {(step, index) => {
-                    const live = () => subagent().status === "running" && index() === subagent().steps.length - 1;
-                    return (
-                      <li class="subagents-step" data-kind={step().kind}>
-                        <StepGlyph kind={step().kind} class="subagents-step-glyph" />
-                        <span
-                          class={["subagents-step-text", { "agent-activity-label": live() }]}
-                          dir={step().kind === "command" ? "ltr" : "auto"}
-                        >
-                          {step().text}
-                          <Show when={live()}>
-                            <ActivityShine text={step().text} />
-                          </Show>
-                        </span>
-                      </li>
-                    );
-                  }}
-                </For>
-              </ol>
-              <Show when={subagent().error}>
-                {(error) => (
-                  <p class="subagents-error">
-                    <TriangleAlert class="subagents-error-icon" aria-hidden="true" />
-                    {error()}
-                  </p>
-                )}
-              </Show>
-            </div>
-          </section>
+          <>
+            <section
+              class={["subagents-panel-detail", fades.classes()]}
+              aria-label={subagent().title}
+              ref={(element) => fades.bind(element)}
+              onScroll={fades.measure}
+            >
+              <div class="subagents-panel-head">
+                <SubagentStatus status={subagent().status} />
+                <h3 dir="auto">{subagent().title}</h3>
+              </div>
+              <p class="subagents-panel-meta">
+                {[
+                  subagent().agentType === GENERAL_AGENT_TYPE ? null : subagent().agentType,
+                  t(STATE_LABEL[subagent().status]),
+                  duration(elapsedMs(subagent(), now())),
+                  t("chat.subagents.stepCount", { count: subagent().steps.length }),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+              <div class="subagents-steps" ref={fades.watch}>
+                <Show when={subagent().prompt}>
+                  {(prompt) => (
+                    <p class="subagents-prompt">
+                      <span class="subagents-prompt-label">
+                        {t("chat.subagents.taskFrom", { name: props.agentName })}
+                      </span>
+                      <span dir="auto">{prompt()}</span>
+                    </p>
+                  )}
+                </Show>
+                <ol class="subagents-step-list" aria-label={t("chat.subagents.steps", { title: subagent().title })}>
+                  <For each={subagent().steps} keyed={(step) => step.id}>
+                    {(step, index) => {
+                      const live = () => subagent().status === "running" && index() === subagent().steps.length - 1;
+                      return (
+                        <li class="subagents-step" data-kind={step().kind}>
+                          <StepGlyph kind={step().kind} class="subagents-step-glyph" />
+                          <span
+                            class={["subagents-step-text", { "agent-activity-label": live() }]}
+                            dir={step().kind === "command" ? "ltr" : "auto"}
+                          >
+                            {step().text}
+                            <Show when={live()}>
+                              <ActivityShine text={step().text} />
+                            </Show>
+                          </span>
+                        </li>
+                      );
+                    }}
+                  </For>
+                </ol>
+                <Show when={subagent().error}>
+                  {(error) => (
+                    <p class="subagents-error">
+                      <TriangleAlert class="subagents-error-icon" aria-hidden="true" />
+                      {error()}
+                    </p>
+                  )}
+                </Show>
+              </div>
+            </section>
+            <ScrollEdgeBlur fades={fades} />
+          </>
         )}
       </Show>
     </aside>

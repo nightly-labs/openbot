@@ -72,6 +72,7 @@ import {
   providerUsable,
   splitServiceName,
 } from "./provider-model-options";
+import { ScrollEdgeBlur } from "./ScrollEdgeBlur";
 import { SwapLabel, type SwapMotion } from "./SwapLabel";
 
 interface ProviderModelPickerProps {
@@ -1226,6 +1227,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         </Show>
                       </Show>
                     </div>
+                    <ScrollEdgeBlur fades={fades} />
                     <Show when={effortOptions().length > 0}>
                       <div class="provider-model-effort">
                         <span>{t("provider.picker.effort")}</span>

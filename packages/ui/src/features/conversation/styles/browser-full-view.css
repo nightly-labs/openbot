@@ -586,6 +586,7 @@ body[data-browser-full-view] .app-frame {
 }
 
 .browser-full-switch-menu {
+  position: relative;
   display: flex;
   width: min(360px, calc(100vw - 2 * var(--openbot-space-3)));
   max-height: min(480px, 70dvh);

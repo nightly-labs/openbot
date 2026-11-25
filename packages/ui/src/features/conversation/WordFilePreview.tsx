@@ -1,5 +1,5 @@
 import { Dynamic, type JSX } from "@solidjs/web";
-import { createMemo, For, Show } from "solid-js";
+import { createEffect, createMemo, For, Show } from "solid-js";
 import { ScrollEdges } from "../../components/ScrollEdges";
 import { useText } from "../../text";
 import { parseWordDocument, type WordBlock, type WordRun, type WordTableRow } from "./word-document";
@@ -9,6 +9,7 @@ export interface WordFilePreviewProps {
   loading?: boolean;
   error?: string | null;
   class?: string;
+  onTruncatedChange: (truncated: boolean) => void;
 }
 
 function styledRun(run: WordRun): JSX.Element {
@@ -124,6 +125,12 @@ export function WordFilePreview(props: WordFilePreviewProps) {
     }
   });
   const blocks = () => parsed()?.blocks ?? [];
+  createEffect(
+    () => parsed()?.truncated === true,
+    (truncated) => {
+      props.onTruncatedChange(truncated);
+    },
+  );
   const status = () => {
     if (props.loading) return t("common.loading");
     if (props.error) return props.error;
@@ -139,9 +146,6 @@ export function WordFilePreview(props: WordFilePreviewProps) {
             <For each={blocks()}>{(block) => blockElement(block)}</For>
           </Show>
         </article>
-        <Show when={parsed()?.truncated}>
-          <p class="file-preview-truncated">{t("preview.document.truncated")}</p>
-        </Show>
       </Show>
     </div>
   );

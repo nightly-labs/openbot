@@ -23,6 +23,8 @@ import {
 import { motionDuration, prefersReducedMotion } from "@openbot/ui/utils";
 import type { UserErrorDetails } from "@openbot/user-errors";
 import { createSignal, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 
 interface JoinServerDialogProps {
@@ -73,7 +75,9 @@ export function JoinServerDialog(props: JoinServerDialogProps) {
     if (inviteUrl().trim()) void reviewInvite();
   });
 
+  const fades = createScrollFades();
   onCleanup(() => {
+    fades.stop();
     if (openFrame !== undefined) window.cancelAnimationFrame(openFrame);
     if (closeTimer !== undefined) window.clearTimeout(closeTimer);
     if (inputShakeTimer !== undefined) window.clearTimeout(inputShakeTimer);
@@ -209,9 +213,14 @@ export function JoinServerDialog(props: JoinServerDialogProps) {
               <X />
             </IconButton>
 
-            <div class="join-server-content">
+            <div
+              class={["join-server-content", fades.classes()]}
+              ref={(element) => fades.bind(element)}
+              onScroll={fades.measure}
+            >
               <div
                 class="join-server-pages t-page-slide"
+                ref={(element) => fades.watch(element)}
                 data-page={page()}
                 data-preview-error={previewError() ? "" : undefined}
                 data-error={joinError() ? "" : undefined}
@@ -357,6 +366,7 @@ export function JoinServerDialog(props: JoinServerDialogProps) {
                 </form>
               </div>
             </div>
+            <ScrollEdgeBlur fades={fades} />
           </Dialog.Content>
         </Dialog.Overlay>
       </Dialog.Portal>

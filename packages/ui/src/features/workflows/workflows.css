@@ -224,7 +224,7 @@
   color: var(--openbot-text-muted);
 }
 
-.wfn-canvas[data-frame="window"] > :not(.wfn-empty) {
+.wfn-canvas[data-frame="window"] > :not(.wfn-empty, .scroll-edge-blur) {
   pointer-events: auto;
 }
 

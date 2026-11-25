@@ -3,6 +3,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import { Button, Download, File, FileInput, Input, Maximize2, Popover, Search, SlidingTabs, Upload } from "@openbot/ui";
 import { createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
 import { usePictureShape } from "./picture-shape";
@@ -220,6 +221,7 @@ function LibraryGrid(props: {
           </div>
         </Show>
       </div>
+      <ScrollEdgeBlur fades={fades} />
       <Show when={thumb.size > 0}>
         <div
           class="wfn-scroll-track"

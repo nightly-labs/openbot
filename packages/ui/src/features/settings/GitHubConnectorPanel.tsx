@@ -27,7 +27,9 @@ import {
   TriangleAlert,
   UserAvatar,
 } from "@openbot/ui";
-import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import { GitHubTile } from "./brand-marks";
 import {
@@ -224,6 +226,12 @@ function RepositoriesSection(props: {
     const all = props.repositories?.repositories ?? [];
     return needle ? all.filter((repository) => repository.fullName.toLowerCase().includes(needle)) : all;
   });
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
+  createEffect(
+    () => matches().length,
+    () => fades.remeasure(),
+  );
   return (
     <SettingsSection
       title={t("connector.github.repositoriesTitle")}
@@ -282,7 +290,12 @@ function RepositoriesSection(props: {
                     </Text>
                   }
                 >
-                  <ul class="github-connector-repository-list" aria-label={t("connector.github.repositoriesTitle")}>
+                  <ul
+                    class={["github-connector-repository-list", fades.classes()]}
+                    aria-label={t("connector.github.repositoriesTitle")}
+                    ref={(element) => fades.bind(element)}
+                    onScroll={fades.measure}
+                  >
                     <For each={matches()} keyed={(repository) => repository.fullName}>
                       {(repository) => {
                         const slash = () => repository().fullName.indexOf("/");
@@ -305,6 +318,7 @@ function RepositoriesSection(props: {
                       }}
                     </For>
                   </ul>
+                  <ScrollEdgeBlur fades={fades} />
                 </Show>
               </div>
               <Show when={list().total > list().repositories.length}>

@@ -17,6 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@openbot/ui";
+import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { AgentUsageReport } from "@openbot/ui/features/usage/AgentUsageReport";
 import {
   type UsageAgentLabel,
@@ -32,7 +34,7 @@ import { PageHeader } from "@openbot/ui/features/window/PageHeader";
 import { useText } from "@openbot/ui/text";
 import { errorReference } from "@openbot/user-errors";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createStore, onSettled, Show } from "solid-js";
+import { createEffect, createStore, onCleanup, onSettled, Show } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createPageHeaderFrame } from "../window/page-header-frame";
 import { type UsagePort, usagePort } from "./usage-port";
@@ -161,6 +163,12 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     };
   };
   let reportBody: HTMLDivElement | undefined;
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
+  createEffect(
+    () => ({ phase: state.phase, result: state.result, metric: state.metric }),
+    () => fades.remeasure(),
+  );
   const headerFrame = createPageHeaderFrame();
   return (
     <section class="agent-usage" aria-label={t("usage.panel.label")}>
@@ -246,7 +254,14 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
           </IconButton>
         </div>
       </PageHeader>
-      <div ref={reportBody} class="agent-usage-body">
+      <div
+        ref={(element) => {
+          reportBody = element;
+          fades.bind(element);
+        }}
+        class={["agent-usage-body", fades.classes()]}
+        onScroll={fades.measure}
+      >
         <Show when={state.phase === "loading"}>
           <div class="agent-usage-loading" role="status">
             <span>{t("usage.panel.loading")}</span>
@@ -286,11 +301,13 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
               agentLabel={agentLabel}
               onReady={() => {
                 if (reportBody) reportBody.scrollTop = 0;
+                fades.remeasure();
               }}
             />
           )}
         </Show>
       </div>
+      <ScrollEdgeBlur fades={fades} />
     </section>
   );
 }

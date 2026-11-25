@@ -4,6 +4,7 @@ import { Button, Gauge, RefreshCw } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import {
   type AccountUsageProviderRow,
@@ -116,6 +117,7 @@ export function AccountUsageDetails(props: {
             )}
           </For>
         </ul>
+        <ScrollEdgeBlur fades={fades} />
       </Show>
       <Show when={props.error}>{(message) => <p class="account-usage-popover-error">{message()}</p>}</Show>
     </>

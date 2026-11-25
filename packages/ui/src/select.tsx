@@ -6,8 +6,10 @@ import type { ComponentProps, JSX, ValidComponent } from "@solidjs/web";
 import Check from "lucide-solid/icons/check";
 import ChevronsUpDown from "lucide-solid/icons/chevrons-up-down";
 import Search from "lucide-solid/icons/search";
-import { children, createMemo, createSignal, createUniqueId, omit, onSettled, Show } from "solid-js";
+import { children, createMemo, createSignal, createUniqueId, omit, onCleanup, onSettled, Show } from "solid-js";
 import { Combobox, Popover } from "./complex";
+import { createScrollFades } from "./components/createScrollFades";
+import { ScrollEdgeBlur } from "./components/ScrollEdgeBlur";
 import { Input } from "./form";
 import { useText } from "./text";
 import { createPressedPopupCue, cx } from "./utils";
@@ -82,18 +84,17 @@ export type SelectContentProps = PolymorphicProps<"div", SelectPrimitive.SelectC
 export function SelectContent(props: SelectContentProps): JSX.Element {
   const others = omit(props, "class", "mount", "footer");
   const footer = children(() => props.footer);
-  let contentElement: HTMLElement | undefined;
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
   return (
     <SelectPrimitive.Portal mount={props.mount ?? document.body}>
-      <SelectPrimitive.Content
-        ref={(element) => {
-          contentElement = element;
-        }}
-        class={cx("ui-select-content", props.class)}
-        data-slot="select-content"
-        {...others}
-      >
-        <SelectPrimitive.Listbox class="ui-select-listbox" scrollRef={() => contentElement} />
+      <SelectPrimitive.Content class={cx("ui-select-content", props.class)} data-slot="select-content" {...others}>
+        <SelectPrimitive.Listbox
+          class={cx("ui-select-listbox", fades.classes())}
+          ref={(element: HTMLUListElement) => fades.bind(element)}
+          onScroll={fades.measure}
+        />
+        <ScrollEdgeBlur fades={fades} />
         <Show when={footer.toArray().length > 0}>
           <div class="ui-select-footer">{footer()}</div>
         </Show>
@@ -167,6 +168,8 @@ export function SearchSelect<Option>(props: SearchSelectProps<Option>): JSX.Elem
   const valueId = `ui-search-select-value-${createUniqueId()}`;
   let input: HTMLInputElement | undefined;
   const press = createPressedPopupCue();
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
   const key = (option: Option) => encodeURIComponent(props.optionValue?.(option) ?? String(option));
   const isCurrent = (option: Option) => props.value !== null && key(option) === key(props.value);
   const matches = createMemo(() => {
@@ -288,10 +291,13 @@ export function SearchSelect<Option>(props: SearchSelectProps<Option>): JSX.Elem
             </Combobox.Control>
             {props.value !== null && <ActiveCurrentRow key={key(props.value)} />}
             <Combobox.Listbox
-              class="ui-select-listbox"
+              class={cx("ui-select-listbox", fades.classes())}
+              ref={(element: HTMLUListElement) => fades.bind(element)}
+              onScroll={fades.measure}
               aria-label={props["aria-label"]}
               aria-labelledby={props["aria-labelledby"]}
             />
+            <ScrollEdgeBlur fades={fades} />
             <Show when={matches().length === 0}>
               <p class="ui-search-select-empty" role="status">
                 {t("common.noMatches")}

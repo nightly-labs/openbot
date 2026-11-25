@@ -16,6 +16,7 @@ import {
 import { createEffect, createSignal, createStore, For, onCleanup, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import { type ServerActionCallbacks, ServerActionItems, serverMuteDescription } from "./ServerActionItems";
 import { ServerPlanCount, serverPlanDaysLeft, serverPlanStatusLabels } from "./ServerPlanEnd";
@@ -497,6 +498,7 @@ export function ServerRail(props: ServerRailProps) {
           {announcement()}
         </span>
       </div>
+      <ScrollEdgeBlur fades={scrollFades} />
     </aside>
   );
 }

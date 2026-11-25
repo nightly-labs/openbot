@@ -10,6 +10,11 @@
   animation: create-local-server-dialog-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
 }
 
+.create-local-server-dialog + .scroll-edge-blur {
+  overflow: hidden;
+  border-radius: var(--openbot-radius-xl);
+}
+
 .create-local-server-header {
   display: flex;
   flex-direction: column;

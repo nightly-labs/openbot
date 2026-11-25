@@ -15,7 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@openbot/ui";
-import { createEffect, createMemo, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ServerLogo } from "../servers/ServerLogo";
@@ -100,6 +102,26 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
   const allChecked = () => agents().length > 0 && selected().length === agents().length;
   const doneResult = () => (done() ? props.result : null);
   const doneVariant = () => (props.onOpenServer ? "ghost" : "default");
+  const mainFades = createScrollFades();
+  const fromFades = createScrollFades();
+  const toFades = createScrollFades();
+  onCleanup(() => {
+    mainFades.stop();
+    fromFades.stop();
+    toFades.stop();
+  });
+  createEffect(
+    () => [props.fromAgents, visible().length, query()],
+    () => fromFades.remeasure(),
+  );
+  createEffect(
+    () => [to(), props.toAgents, selected().length, done()],
+    () => toFades.remeasure(),
+  );
+  createEffect(
+    () => [props.loadError, props.error, uploading(), doneResult(), props.fromAgents, props.toAgents],
+    () => mainFades.remeasure(),
+  );
 
   const dialog = (
     <Dialog.Root
@@ -111,12 +133,23 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
     >
       <Dialog.Portal>
         <Dialog.Overlay class="ui-dialog-overlay">
-          <Dialog.Content as="section" class="ui-dialog-content ui-confirm-dialog copy-agents-dialog">
-            <div class="copy-agents-main" aria-busy={busy() ? "true" : undefined}>
+          <Dialog.Content
+            as="section"
+            class="ui-dialog-content ui-confirm-dialog copy-agents-dialog"
+            ref={(element: HTMLElement) => {
+              setMount(element);
+            }}
+          >
+            <div
+              class={["copy-agents-main", mainFades.classes()]}
+              aria-busy={busy() ? "true" : undefined}
+              ref={(element) => mainFades.bind(element)}
+              onScroll={mainFades.measure}
+            >
               <Dialog.Title as="h2" class="ui-confirm-dialog-title">
                 {t("settings.transfer.copy.title")}
               </Dialog.Title>
-              <div class="copy-agents-panes" ref={setMount}>
+              <div class="copy-agents-panes">
                 <section class="copy-agents-pane" aria-labelledby={`${id}-from`}>
                   <span id={`${id}-from`} class="copy-agents-side-label">
                     {t("settings.transfer.copy.from")}
@@ -139,8 +172,10 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
                     />
                   </Show>
                   <ul
-                    class="storage-rows copy-agents-list"
+                    class={["storage-rows copy-agents-list", fromFades.classes()]}
                     aria-label={t("settings.transfer.copy.agentsOn", { server: from()?.name ?? "" })}
+                    ref={(element) => fromFades.bind(element)}
+                    onScroll={fromFades.measure}
                   >
                     <Show when={props.fromAgents} fallback={<Loading />}>
                       <Show when={agents().length > 0} fallback={<Empty />}>
@@ -183,6 +218,7 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
                       </Show>
                     </Show>
                   </ul>
+                  <ScrollEdgeBlur fades={fromFades} />
                 </section>
                 <ArrowRight class="copy-agents-arrow" aria-hidden="true" />
                 <section class="copy-agents-pane" aria-labelledby={`${id}-to`}>
@@ -199,38 +235,43 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
                   />
                   <Show when={to()}>
                     {(server) => (
-                      <ul
-                        class="storage-rows copy-agents-list"
-                        aria-label={t("settings.transfer.copy.agentsOn", { server: server().name })}
-                      >
-                        <Show when={props.toAgents} fallback={<Loading />}>
-                          {(toAgents) => (
-                            <>
-                              <Show when={!done()}>
-                                <For each={selected()}>
+                      <>
+                        <ul
+                          class={["storage-rows copy-agents-list", toFades.classes()]}
+                          aria-label={t("settings.transfer.copy.agentsOn", { server: server().name })}
+                          ref={(element) => toFades.bind(element)}
+                          onScroll={toFades.measure}
+                        >
+                          <Show when={props.toAgents} fallback={<Loading />}>
+                            {(toAgents) => (
+                              <>
+                                <Show when={!done()}>
+                                  <For each={selected()}>
+                                    {(agent) => (
+                                      <li class="storage-row agent-import-row">
+                                        <AgentName agent={agent} />
+                                        <span class="instance-transfer-chip">
+                                          {takenNames().has(agent.name.toLowerCase())
+                                            ? t("settings.transfer.import.nameExists")
+                                            : t("settings.transfer.copy.new")}
+                                        </span>
+                                      </li>
+                                    )}
+                                  </For>
+                                </Show>
+                                <For each={toAgents()}>
                                   {(agent) => (
                                     <li class="storage-row agent-import-row">
                                       <AgentName agent={agent} />
-                                      <span class="instance-transfer-chip">
-                                        {takenNames().has(agent.name.toLowerCase())
-                                          ? t("settings.transfer.import.nameExists")
-                                          : t("settings.transfer.copy.new")}
-                                      </span>
                                     </li>
                                   )}
                                 </For>
-                              </Show>
-                              <For each={toAgents()}>
-                                {(agent) => (
-                                  <li class="storage-row agent-import-row">
-                                    <AgentName agent={agent} />
-                                  </li>
-                                )}
-                              </For>
-                            </>
-                          )}
-                        </Show>
-                      </ul>
+                              </>
+                            )}
+                          </Show>
+                        </ul>
+                        <ScrollEdgeBlur fades={toFades} />
+                      </>
                     )}
                   </Show>
                 </section>
@@ -246,6 +287,7 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
                 {(result) => <CopyResult result={result()} server={to()?.name ?? ""} />}
               </Show>
             </div>
+            <ScrollEdgeBlur fades={mainFades} />
             <footer class="ui-confirm-dialog-actions">
               <Show
                 when={done()}

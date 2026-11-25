@@ -4,19 +4,26 @@
 
 .provider-code-login-dialog {
   position: relative;
+  display: flex;
   width: min(420px, 100%);
   max-height: calc(100dvh - var(--openbot-space-6) * 2);
-  overflow-y: auto;
+  flex-direction: column;
+  overflow: hidden;
   outline: 0;
   border-radius: var(--openbot-radius-xl);
   background: var(--openbot-bg-control);
-  padding: var(--openbot-space-6);
   color: var(--openbot-text-primary);
   animation: provider-code-login-dialog-in var(--openbot-duration-slow) var(--openbot-ease-out) both;
 }
 
 .provider-code-login-dialog[data-page] {
   width: min(720px, 100%);
+}
+
+.provider-code-login-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--openbot-space-6);
 }
 
 .provider-code-login-header {

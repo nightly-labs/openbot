@@ -2,7 +2,7 @@ import type { AvatarImageInput, CentralAuthUser } from "@openbot/contracts/ipc";
 import { Button, Dialog, Field, IconButton, ImageRemoveButton, Input, Pencil, Text, UserAvatar, X } from "@openbot/ui";
 import { createSignal, Show } from "solid-js";
 import { useText } from "../../text";
-import { blobDataUrl } from "./ProfileShareDialog";
+import { blobDataUrl, ProfileDialogFrame } from "./ProfileShareDialog";
 import type { SettingsProfileStore } from "./stores/profile-store";
 
 interface PhotoDraft {
@@ -19,17 +19,27 @@ export function ProfileEditDialog(props: {
   return (
     <Dialog.Root open={props.open} onOpenChange={props.onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay class="ui-confirm-dialog-overlay">
-          <Dialog.Content as="section" class="ui-dialog-content profile-dialog profile-edit">
-            <ProfileEditForm store={props.store} account={props.account} onClose={() => props.onOpenChange(false)} />
-          </Dialog.Content>
-        </Dialog.Overlay>
+        <ProfileDialogFrame class="profile-edit">
+          {(watch) => (
+            <ProfileEditForm
+              store={props.store}
+              account={props.account}
+              watch={watch}
+              onClose={() => props.onOpenChange(false)}
+            />
+          )}
+        </ProfileDialogFrame>
       </Dialog.Portal>
     </Dialog.Root>
   );
 }
 
-function ProfileEditForm(props: { store: SettingsProfileStore; account: CentralAuthUser; onClose: () => void }) {
+function ProfileEditForm(props: {
+  store: SettingsProfileStore;
+  account: CentralAuthUser;
+  watch: (element: Element) => void;
+  onClose: () => void;
+}) {
   const { t, errorMessage } = useText();
   const [photo, setPhoto] = createSignal<PhotoDraft | undefined>();
   const [photoBusy, setPhotoBusy] = createSignal(false);
@@ -72,7 +82,12 @@ function ProfileEditForm(props: { store: SettingsProfileStore; account: CentralA
   }
 
   return (
-    <form class="profile-edit-form" onSubmit={(event) => void save(event)} novalidate>
+    <form
+      class="profile-edit-form"
+      ref={(element) => props.watch(element)}
+      onSubmit={(event) => void save(event)}
+      novalidate
+    >
       <header class="profile-dialog-header">
         <Dialog.Title as="h2" class="profile-dialog-title">
           {t("settings.profile.edit.title")}

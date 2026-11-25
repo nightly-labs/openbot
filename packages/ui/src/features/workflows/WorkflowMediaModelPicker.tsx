@@ -20,6 +20,7 @@ import {
 } from "@openbot/ui";
 import { createSignal, For, Show } from "solid-js";
 import { isApiKeyAccount, providerAccountName } from "../../components/provider-accounts";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import { creditModelMakerNamed, MakerLogo } from "../credits/MakerLogo";
 import { createPickerFades, type PickerChip, type PickerOption, PickerRow, pickerMatches } from "./WorkflowPicker";
@@ -320,6 +321,7 @@ function RowList(props: {
           </Listbox.Item>
         )}
       />
+      <ScrollEdgeBlur fades={fades} />
     </Show>
   );
 }

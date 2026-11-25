@@ -197,6 +197,12 @@
   white-space: pre-wrap;
 }
 
+.agent-template-skill-text + .scroll-edge-blur {
+  --scroll-edge-blur-size: calc(var(--openbot-space-1) * 6);
+  overflow: hidden;
+  border-radius: var(--openbot-radius-md);
+}
+
 .agent-template-row > svg[class~="lucide-chevron-right"]:dir(rtl),
 .agent-template-skill-toggle > svg[class~="lucide-chevron-right"]:dir(rtl),
 .agent-template-detail-header .ui-icon-button > svg[class~="lucide-arrow-left"]:dir(rtl) {

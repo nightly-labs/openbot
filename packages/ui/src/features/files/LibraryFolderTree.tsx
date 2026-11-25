@@ -26,7 +26,9 @@ import {
 import type { AgentProfile } from "@openbot/ui/data";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, For, Show, untrack } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AgentPicker } from "../agents/AgentPicker";
 import type { LibraryDropMark } from "./library-folder-drag";
@@ -104,6 +106,7 @@ interface TreeRows {
   isFavorite: (key: string) => boolean;
   current: (place: LibraryLocation) => boolean;
   go: (place: LibraryLocation, branch?: string) => void;
+  watch: (element: Element) => void;
 }
 
 const NO_FOLDERS: readonly LibraryFolder[] = [];
@@ -268,7 +271,7 @@ function SideSection(props: {
 }) {
   const collapsed = () => props.rows.props.isCollapsed(props.key);
   return (
-    <section class="library-section" aria-label={props.title}>
+    <section class="library-section" aria-label={props.title} ref={props.rows.watch}>
       <header class="library-section-head" data-library-spring={props.key}>
         <Button
           type="button"
@@ -620,6 +623,8 @@ function WorkflowSection(props: { rows: TreeRows }) {
 
 export function LibraryFolderTree(props: LibraryFolderTreeProps) {
   const { t } = useText();
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
   const byParent = createMemo(() => {
     const map = new Map<string, LibraryFolder[]>();
     for (const folder of props.folders) {
@@ -641,6 +646,7 @@ export function LibraryFolderTree(props: LibraryFolderTreeProps) {
       if (branch !== undefined && current(place)) props.onOpenChange(branch, props.isCollapsed(branch));
       else props.onGo(place);
     },
+    watch: fades.watch,
   };
 
   const [picked, setPicked] = createSignal<readonly string[]>([]);
@@ -677,8 +683,13 @@ export function LibraryFolderTree(props: LibraryFolderTreeProps) {
           />
         </label>
       </div>
-      <div class="library-side-scroll" data-library-autoscroll="">
-        <ul class="library-side-list">
+      <div
+        class={["library-side-scroll", fades.classes()]}
+        data-library-autoscroll=""
+        ref={(element) => fades.bind(element)}
+        onScroll={fades.measure}
+      >
+        <ul class="library-side-list" ref={fades.watch}>
           <li>
             <SideRow
               icon={<GalleryVerticalEnd aria-hidden="true" />}
@@ -772,7 +783,7 @@ export function LibraryFolderTree(props: LibraryFolderTreeProps) {
           <WorkflowSection rows={rows} />
         </Show>
         <Show when={props.removedFiles}>
-          <ul class="library-side-list">
+          <ul class="library-side-list" ref={fades.watch}>
             <li>
               <SideRow
                 icon={<Archive aria-hidden="true" />}
@@ -786,6 +797,7 @@ export function LibraryFolderTree(props: LibraryFolderTreeProps) {
           </ul>
         </Show>
       </div>
+      <ScrollEdgeBlur fades={fades} />
     </nav>
   );
 }

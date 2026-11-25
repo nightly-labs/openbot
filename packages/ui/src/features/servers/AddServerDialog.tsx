@@ -44,6 +44,8 @@ import {
   Switch,
   untrack,
 } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import {
   guessHostedCurrency,
@@ -235,8 +237,10 @@ export function AddServerDialog(props: AddServerDialogProps) {
     return !(input.license && props.licenseOffer && input.license.users < minPeople());
   }
 
+  const fades = createScrollFades();
   onCleanup(() => {
     if (closeTimer !== undefined) window.clearTimeout(closeTimer);
+    fades.stop();
   });
 
   function focusHeading(): void {
@@ -335,12 +339,19 @@ export function AddServerDialog(props: AddServerDialogProps) {
               />
             </Show>
 
-            <div class="join-server-content">
+            <div
+              class={["join-server-content", fades.classes()]}
+              ref={(element) => fades.bind(element)}
+              onScroll={fades.measure}
+            >
               <Switch>
                 <Match when={step() === "pricing"}>
                   <div
                     class="add-server-step add-server-pricing"
-                    ref={(element: HTMLDivElement) => (pricing = element)}
+                    ref={(element: HTMLDivElement) => {
+                      pricing = element;
+                      fades.watch(element);
+                    }}
                   >
                     <header class="join-server-header add-server-intro">
                       <Heading as="h2" size="lg">
@@ -460,7 +471,11 @@ export function AddServerDialog(props: AddServerDialogProps) {
                 </Match>
 
                 <Match when={step() === "progress"}>
-                  <div class="add-server-step add-server-progress" data-status={props.setupStatus ?? "creating"}>
+                  <div
+                    class="add-server-step add-server-progress"
+                    data-status={props.setupStatus ?? "creating"}
+                    ref={(element) => fades.watch(element)}
+                  >
                     <div
                       ref={(element: HTMLDivElement) => (progressLogo = element)}
                       class="add-server-ring"
@@ -584,6 +599,7 @@ export function AddServerDialog(props: AddServerDialogProps) {
                 </Match>
               </Switch>
             </div>
+            <ScrollEdgeBlur fades={fades} />
           </Dialog.Content>
         </Dialog.Overlay>
       </Dialog.Portal>

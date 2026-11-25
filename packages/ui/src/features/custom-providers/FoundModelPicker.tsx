@@ -3,6 +3,7 @@ import { Check, ChevronsUpDown, DropdownMenu, Input, Search } from "@openbot/ui"
 import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
 import { createMenuSearch } from "../../components/createMenuSearch";
 import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import type { DiscoveredModel } from "./custom-provider-form";
 
@@ -104,6 +105,7 @@ export function FoundModelPicker(props: {
               )}
             </For>
           </div>
+          <ScrollEdgeBlur fades={fades} />
           <DropdownMenu.Separator />
           <DropdownMenu.Item
             closeOnSelect={false}

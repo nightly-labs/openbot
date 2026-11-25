@@ -1236,3 +1236,7 @@
 .composer[data-rows-resizing] > .composer-input-label {
   align-self: start;
 }
+
+.mention-picker-list + .scroll-edge-blur {
+  --scroll-edge-blur-size: calc(var(--openbot-space-1) * 6);
+}

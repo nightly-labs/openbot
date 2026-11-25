@@ -35,6 +35,8 @@ import { useText } from "@openbot/ui/text";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createStore, createUniqueId, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { createComposerRowsResize } from "../conversation/createComposerRowsResize";
 import { TasksEmptyBoard, TasksEmptyPitch } from "./TasksEmpty";
 
@@ -503,10 +505,17 @@ export function TasksPage(props: TasksPageProps) {
   const { t } = useText();
   const headingId = createUniqueId();
   const empty = () => props.loaded === true && props.tasks.length === 0;
+  const fades = createScrollFades({ stuck: ".tasks-page-composer" });
+  onCleanup(() => fades.stop());
   return (
     <section class="tasks-page" aria-labelledby={headingId} data-empty={empty() ? "" : undefined}>
-      <div class="tasks-page-scroll">
-        <div class="tasks-page-column">
+      <div
+        class={["tasks-page-scroll", fades.classes()]}
+        style={{ "--tasks-page-stuck-height": `${fades.stuckHeight()}px` }}
+        ref={(element) => fades.bind(element)}
+        onScroll={fades.measure}
+      >
+        <div class="tasks-page-column" ref={fades.watch}>
           <PageHeader
             class="tasks-page-header"
             title={t("conversation.tasks.title")}
@@ -528,6 +537,7 @@ export function TasksPage(props: TasksPageProps) {
           </Show>
         </div>
       </div>
+      <ScrollEdgeBlur fades={fades} />
       <TasksSidePanel
         tasks={props.tasks}
         taskId={props.selectedId}

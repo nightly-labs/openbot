@@ -1,7 +1,9 @@
 import { Button, buttonVariants, Globe2, Popover, X } from "@openbot/ui";
 import { PlusIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { useText } from "@openbot/ui/text";
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { BrowserTabIcon, useBrowserTabTitle } from "./BrowserTabIcon";
 import type { BrowserFullViewProps } from "./browser-full-view-types";
 import { useBrowserPageCover } from "./browser-page-cover";
@@ -16,6 +18,12 @@ export function BrowserTabSwitcher(props: {
   const tabTitle = useBrowserTabTitle();
   const [open, setOpen] = createSignal(false);
   useBrowserPageCover(open);
+  const listFades = createScrollFades();
+  onCleanup(() => listFades.stop());
+  createEffect(
+    () => props.view.tabs.length,
+    () => listFades.remeasure(),
+  );
   let keepFocus = false;
   const active = () => props.view.activeTab;
   const canClose = () => props.view.canCloseTabs !== false;
@@ -73,7 +81,11 @@ export function BrowserTabSwitcher(props: {
           }}
         >
           <Popover.Title class="sr-only">{t("browser.tabs.label")}</Popover.Title>
-          <ul class="browser-full-switch-list">
+          <ul
+            ref={(element: HTMLUListElement) => listFades.bind(element)}
+            class={["browser-full-switch-list", listFades.classes()]}
+            onScroll={listFades.measure}
+          >
             <For each={props.view.tabs} keyed={(tab) => tab.id}>
               {(tab) => (
                 <li class="browser-full-switch-row">
@@ -109,6 +121,7 @@ export function BrowserTabSwitcher(props: {
               )}
             </For>
           </ul>
+          <ScrollEdgeBlur fades={listFades} />
           <div class="browser-full-switch-actions">
             <Button
               variant="ghost"

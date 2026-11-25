@@ -1,9 +1,11 @@
 import type { ConversationMemoryChange } from "@openbot/contracts/ipc";
 import { countConversationMemoryChanges } from "@openbot/contracts/ipc";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createSignal, createUniqueId, For, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, onSettled, Show } from "solid-js";
 import { Badge } from "../../badge";
 import { Button } from "../../button";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { Brain, ChevronRight, Puzzle, Sparkles } from "../../icons";
 import { type TextValue, useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
@@ -34,6 +36,8 @@ export function AgentStepList(props: {
 }) {
   const { t } = useText();
   const [contentHeight, setContentHeight] = createSignal(0);
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
   let content: HTMLOListElement | undefined;
   onSettled(() => {
     const element = content;
@@ -53,31 +57,46 @@ export function AgentStepList(props: {
   const capped = () => contentHeight() > STEPS_MAX_HEIGHT;
   const scrolls = () => !props.live && capped();
   const offset = () => (props.live && capped() ? STEPS_MAX_HEIGHT - contentHeight() : 0);
+  createEffect(scrolls, () => fades.remeasure());
   return (
-    <section
-      id={props.id}
-      class="agent-steps-viewport"
-      aria-label={t("chat.steps.list")}
-      data-capped={capped() ? "" : undefined}
-      data-scrolls={scrolls() ? "" : undefined}
-      tabindex={scrolls() ? 0 : undefined}
-    >
-      <ol ref={content} class="agent-steps-list" style={{ transform: `translateY(${offset()}px)` }}>
-        <For each={props.steps} keyed={(step) => step.id}>
-          {(step, index) => (
-            <li
-              class="agent-step"
-              data-kind={step().kind}
-              data-step-id={step().id}
-              data-focused={props.focus?.id === step().id ? "" : undefined}
-            >
-              <StepIcon kind={step().kind} />
-              <StepBody step={step()} newest={props.live && index() === props.steps.length - 1} />
-            </li>
-          )}
-        </For>
-      </ol>
-    </section>
+    <>
+      <section
+        ref={(element) => fades.bind(element)}
+        id={props.id}
+        class={["agent-steps-viewport", scrolls() && fades.classes()]}
+        aria-label={t("chat.steps.list")}
+        data-capped={capped() ? "" : undefined}
+        data-scrolls={scrolls() ? "" : undefined}
+        tabindex={scrolls() ? 0 : undefined}
+        onScroll={fades.measure}
+      >
+        <ol
+          ref={(element) => {
+            content = element;
+            fades.watch(element);
+          }}
+          class="agent-steps-list"
+          style={{ transform: `translateY(${offset()}px)` }}
+        >
+          <For each={props.steps} keyed={(step) => step.id}>
+            {(step, index) => (
+              <li
+                class="agent-step"
+                data-kind={step().kind}
+                data-step-id={step().id}
+                data-focused={props.focus?.id === step().id ? "" : undefined}
+              >
+                <StepIcon kind={step().kind} />
+                <StepBody step={step()} newest={props.live && index() === props.steps.length - 1} />
+              </li>
+            )}
+          </For>
+        </ol>
+      </section>
+      <Show when={scrolls()}>
+        <ScrollEdgeBlur fades={fades} />
+      </Show>
+    </>
   );
 }
 

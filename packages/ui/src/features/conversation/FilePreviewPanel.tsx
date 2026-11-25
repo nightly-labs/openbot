@@ -34,7 +34,8 @@ import { useText } from "@openbot/ui/text";
 import { holdFlag } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
-
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { MediaFilePreview } from "./MediaFilePreview";
 
 const PANEL_MIN = SETTINGS_PANEL_DEFAULT;
@@ -83,6 +84,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
   const [previewUrl, setPreviewUrl] = createSignal<string | null>(null);
   const [revealed, setRevealed] = createSignal(false);
   const [rawSource, setRawSource] = createSignal(false);
+  const [documentTruncated, setDocumentTruncated] = createSignal(false);
   const [wrapLines, setWrapLines] = createSignal(untrack(() => props.readWrapLines()));
   let currentPreviewUrl: string | null = null;
   let revealFrame: number | undefined;
@@ -164,6 +166,26 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
     if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
     if (revealFrame !== undefined) cancelAnimationFrame(revealFrame);
   });
+
+  const fades = createScrollFades();
+  const contentChildren = new MutationObserver(() => watchContentChildren());
+  let content!: HTMLDivElement;
+  const watchContentChildren = () => {
+    for (const child of content.children) fades.watch(child);
+  };
+  const bindContent = (element: HTMLDivElement) => {
+    content = element;
+    fades.bind(element);
+    contentChildren.observe(element, { childList: true });
+  };
+  onSettled(watchContentChildren);
+  onCleanup(() => {
+    contentChildren.disconnect();
+    fades.stop();
+  });
+  const sourceTruncated = () =>
+    text().truncated &&
+    ((previewKind() === "markdown" && !rawSource()) || (previewKind() === "text" && showsSourceText()));
 
   let panel!: HTMLElement;
   onSettled(() => {
@@ -291,7 +313,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
           <X class="browser-toolbar-icon" />
         </HeaderButton>
       </header>
-      <div class="file-preview-content">
+      <div class={["file-preview-content", fades.classes()]} ref={bindContent} onScroll={fades.measure}>
         <Show when={props.directory}>
           {(directory) => (
             <Show
@@ -324,11 +346,6 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
                   )}
                 </For>
               </ul>
-              <Show when={directory().truncated}>
-                <p class="file-preview-truncated">
-                  {t("preview.folder.truncated", { limit: format.number(directory().entries.length) })}
-                </p>
-              </Show>
             </Show>
           )}
         </Show>
@@ -340,7 +357,6 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
             truncatedClass="file-preview-truncated"
             selectionQuoteId={props.selectionQuoteId}
             body={text().value}
-            truncated={text().truncated}
             agents={props.agents}
             onSelectAgent={() => undefined}
             onOpenLink={props.onOpenLink}
@@ -370,9 +386,6 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
             wrap={wrapLines()}
             selectionQuoteId={props.selectionQuoteId}
           />
-          <Show when={previewKind() === "text" && text().truncated}>
-            <p class="file-preview-truncated">{t("preview.truncated", { limit: format.number(TEXT_LIMIT) })}</p>
-          </Show>
         </Show>
         <Show when={previewKind() === "image" && previewUrl()}>
           <div class="file-preview-image-wrap">
@@ -394,7 +407,11 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
           <SpreadsheetFilePreview class="file-preview-spreadsheet" bytes={file()?.bytes ?? null} />
         </Show>
         <Show when={previewKind() === "document"}>
-          <WordFilePreview class="file-preview-markdown" bytes={file()?.bytes ?? null} />
+          <WordFilePreview
+            class="file-preview-markdown"
+            bytes={file()?.bytes ?? null}
+            onTruncatedChange={setDocumentTruncated}
+          />
         </Show>
         <Show when={previewKind() === "none"}>
           <div class="file-preview-unsupported">
@@ -409,6 +426,22 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
           </div>
         </Show>
       </div>
+      <ScrollEdgeBlur fades={fades} />
+      <Show when={props.directory}>
+        {(directory) => (
+          <Show when={directory().entries.length > 0 && directory().truncated}>
+            <p class="file-preview-truncated">
+              {t("preview.folder.truncated", { limit: format.number(directory().entries.length) })}
+            </p>
+          </Show>
+        )}
+      </Show>
+      <Show when={previewKind() === "document" && documentTruncated()}>
+        <p class="file-preview-truncated">{t("preview.document.truncated")}</p>
+      </Show>
+      <Show when={sourceTruncated()}>
+        <p class="file-preview-truncated">{t("preview.truncated", { limit: format.number(TEXT_LIMIT) })}</p>
+      </Show>
     </aside>
   );
 }

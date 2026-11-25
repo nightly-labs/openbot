@@ -1,8 +1,10 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { Button, ChevronRight, Spinner } from "@openbot/ui";
+import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { ServerMark } from "@openbot/ui/features/servers/ServerRail";
 import { useText } from "@openbot/ui/text";
-import { For, Show } from "solid-js";
+import { For, onCleanup, Show } from "solid-js";
 import { ConsentNotice } from "./AnalyticsConsent";
 
 export type FirstRunServer = Pick<ServerSummary, "id" | "name" | "state" | "logoUrl" | "appearance">;
@@ -19,6 +21,8 @@ export interface FirstRunExistingServersProps {
 
 export function FirstRunExistingServers(props: FirstRunExistingServersProps) {
   const { t } = useText();
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
   const detail = (server: FirstRunServer) =>
     server.state === "online" || server.state === "connecting"
       ? t("onboarding.existing.openDetail")
@@ -29,7 +33,11 @@ export function FirstRunExistingServers(props: FirstRunExistingServersProps) {
         {t("onboarding.existing.title")}
       </h1>
       <p class="onboarding-description">{t("onboarding.existing.description")}</p>
-      <div class="first-run-choice-rows first-run-existing-servers">
+      <div
+        ref={(element) => fades.bind(element)}
+        class={["first-run-choice-rows first-run-existing-servers", fades.classes()]}
+        onScroll={fades.measure}
+      >
         <For each={props.servers}>
           {(server) => (
             <Button
@@ -57,6 +65,7 @@ export function FirstRunExistingServers(props: FirstRunExistingServersProps) {
           )}
         </For>
       </div>
+      <ScrollEdgeBlur fades={fades} />
       <div class="first-run-choice-rows first-run-existing-new">
         <Button
           type="button"

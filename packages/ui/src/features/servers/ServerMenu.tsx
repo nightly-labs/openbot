@@ -16,7 +16,9 @@ import {
   Server,
 } from "@openbot/ui";
 import { SwapLabel } from "@openbot/ui/components/SwapLabel";
-import { createEffect, createSignal, For, Show, untrack } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import { CreditAmount, CreditIcon } from "../credits/CreditIcon";
 import type { CreditsMenu } from "../credits/credits-store";
@@ -117,6 +119,12 @@ export function ServerMenu(props: ServerMenuProps) {
   const { t, format } = useText();
   const [menuOpen, setMenuOpen] = createSignal(false);
   const rail = untrack(() => props.rail === true);
+  const listFades = createScrollFades();
+  onCleanup(() => listFades.stop());
+  createEffect(
+    () => [props.servers.length, props.hiddenServers?.length ?? 0],
+    () => listFades.remeasure(),
+  );
   let anchor: HTMLElement | undefined;
   let trigger: HTMLElement | undefined;
   const activeServer = () => props.servers.find((server) => server.active);
@@ -316,7 +324,11 @@ export function ServerMenu(props: ServerMenuProps) {
               <div class="ui-menu-label" aria-hidden="true">
                 {t("server.rail.label")}
               </div>
-              <div class="server-menu-list">
+              <div
+                class={["server-menu-list", listFades.classes()]}
+                ref={(element) => listFades.bind(element)}
+                onScroll={listFades.measure}
+              >
                 <For each={props.servers} keyed={(server) => server.id}>
                   {(server) => (
                     <DropdownMenu.Sub>
@@ -383,6 +395,7 @@ export function ServerMenu(props: ServerMenuProps) {
                 </For>
                 <HiddenServerFolderItem servers={props.hiddenServers ?? []} />
               </div>
+              <ScrollEdgeBlur fades={listFades} />
               <Show when={props.onAdd}>
                 <DropdownMenu.Item class="server-menu-add" onSelect={() => props.onAdd?.()}>
                   <span class="server-menu-add-circle" aria-hidden="true">

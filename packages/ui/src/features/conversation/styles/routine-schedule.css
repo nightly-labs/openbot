@@ -816,8 +816,14 @@ code.routine-webhook-secret {
 }
 
 .routine-trigger-menu {
+  display: flex;
   width: 300px;
   max-height: min(560px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 560px));
+  flex-direction: column;
+}
+
+.routine-trigger-menu-list {
+  min-height: 0;
   overflow-y: auto;
 }
 

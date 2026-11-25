@@ -2,24 +2,6 @@
   background: var(--openbot-bg-canvas);
 }
 
-.server-settings-modal-shell .settings-modal-scroll-frame::before {
-  background: linear-gradient(
-    to bottom,
-    var(--openbot-bg-canvas) 0%,
-    var(--openbot-bg-canvas) 28%,
-    var(--openbot-bg-canvas-clear) 100%
-  );
-}
-
-.server-settings-modal-shell .settings-modal-scroll-frame::after {
-  background: linear-gradient(
-    to top,
-    var(--openbot-bg-canvas) 0%,
-    var(--openbot-bg-canvas) 28%,
-    var(--openbot-bg-canvas-clear) 100%
-  );
-}
-
 .server-settings-panel {
   width: 100%;
   gap: var(--openbot-space-6);

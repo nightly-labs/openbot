@@ -44,6 +44,8 @@ import {
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createStore, For, Match, onCleanup, Show, Switch, untrack } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import { WhatsAppTile } from "./brand-marks";
 import {
@@ -775,6 +777,12 @@ function GroupDialog(props: {
     return query ? view.groups.filter((group) => group.name.toLocaleLowerCase().includes(query)) : view.groups;
   };
   const added = (groupId: string) => props.allowed.some((sender) => sender.id === groupId);
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
+  createEffect(
+    () => shown().length,
+    () => fades.remeasure(),
+  );
   return (
     <WizardDialog
       open={props.workspaceId !== null}
@@ -833,7 +841,12 @@ function GroupDialog(props: {
               </Text>
             }
           >
-            <ul class="whatsapp-groups" aria-label={t("connector.whatsapp.groupTitle")}>
+            <ul
+              class={["whatsapp-groups", fades.classes()]}
+              aria-label={t("connector.whatsapp.groupTitle")}
+              ref={(element) => fades.bind(element)}
+              onScroll={fades.measure}
+            >
               <For each={shown()}>
                 {(group) => (
                   <li class="whatsapp-group-row">
@@ -860,6 +873,7 @@ function GroupDialog(props: {
                 )}
               </For>
             </ul>
+            <ScrollEdgeBlur fades={fades} />
           </Show>
         </Match>
       </Switch>

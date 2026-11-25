@@ -11,7 +11,7 @@ import {
   Text,
   X,
 } from "@openbot/ui";
-import { createEffect, createMemo, createSignal, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, onCleanup, Show } from "solid-js";
 import {
   McpSignInPage,
   McpSignInPageNote,
@@ -21,6 +21,8 @@ import {
   relayDescriptionKey,
 } from "../features/settings/McpSignInPage";
 import { useText } from "../text";
+import { createScrollFades } from "./createScrollFades";
+import { ScrollEdgeBlur } from "./ScrollEdgeBlur";
 
 export type ProviderCodeLoginState =
   | { phase: "starting" }
@@ -96,6 +98,8 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
       return t("provider.codeLogin.relayStarting", { name: props.providerName, host: relayed.hostName });
     return t(relayDescriptionKey(relayed.page), { page: relayed.page.authorizeHost, host: relayed.hostName });
   };
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
   const remaining = createCountdown(() => waiting()?.expiresAt ?? pasting()?.expiresAt ?? linking()?.expiresAt ?? null);
 
   return (
@@ -108,255 +112,262 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
       <Dialog.Portal>
         <Dialog.Overlay class="provider-code-login-backdrop">
           <Dialog.Content class="provider-code-login-dialog" data-page={hostPage() ? "" : undefined} as="section">
-            <header class="provider-code-login-header">
-              <Dialog.Title class="provider-code-login-title">
-                {linking() && !linkOnThisComputer()
-                  ? t("provider.codeLogin.linkTitle", { name: props.providerName })
-                  : hostPage() || relay() || linking() || addressPaste()
-                    ? t("provider.codeLogin.pageTitle", { name: props.providerName })
-                    : t("provider.codeLogin.title", { name: props.providerName })}
-              </Dialog.Title>
-              <Dialog.Description class="provider-code-login-description">{descriptionText()}</Dialog.Description>
-            </header>
+            <div
+              class={["provider-code-login-scroll", fades.classes()]}
+              ref={(element) => fades.bind(element)}
+              onScroll={fades.measure}
+            >
+              <header class="provider-code-login-header">
+                <Dialog.Title class="provider-code-login-title">
+                  {linking() && !linkOnThisComputer()
+                    ? t("provider.codeLogin.linkTitle", { name: props.providerName })
+                    : hostPage() || relay() || linking() || addressPaste()
+                      ? t("provider.codeLogin.pageTitle", { name: props.providerName })
+                      : t("provider.codeLogin.title", { name: props.providerName })}
+                </Dialog.Title>
+                <Dialog.Description class="provider-code-login-description">{descriptionText()}</Dialog.Description>
+              </header>
 
-            <div class="provider-code-login-body">
-              <Show when={props.state.phase === "starting"}>
-                <div class="provider-code-login-pending" role="status">
-                  <Spinner size="sm" />
-                  <Text as="span" tone="muted">
-                    {t("provider.codeLogin.starting", { name: props.providerName })}
-                  </Text>
-                </div>
-              </Show>
-
-              <Show when={waiting()}>
-                {(code) => (
-                  <div class="provider-code-login-code" role="status">
-                    <QrCode
-                      value={code().verificationUrlComplete ?? code().verificationUrl}
-                      label={t("provider.codeLogin.qrLabel", { name: props.providerName })}
-                      size={160}
-                    />
-
-                    <ol class="provider-code-login-steps">
-                      <Show when={props.setupStep}>
-                        {(step) => (
-                          <li>
-                            <Text as="span">{step()}</Text>
-                          </li>
-                        )}
-                      </Show>
-                      <li>
-                        <Text as="span">{t("provider.codeLogin.open")}</Text>{" "}
-                        <Button
-                          class="provider-code-login-url"
-                          type="button"
-                          variant="link"
-                          onClick={() => props.onOpenVerificationUrl(code().verificationUrl)}
-                        >
-                          {code().verificationUrl}
-                          <ExternalLink aria-hidden="true" />
-                        </Button>
-                      </li>
-                      <li>
-                        <Text as="span">{t("provider.codeLogin.enterCode")}</Text>
-                      </li>
-                    </ol>
-
-                    <div class="provider-code-login-value">
-                      <output
-                        class="provider-code-login-digits"
-                        aria-label={t("provider.codeLogin.codeLabel", { code: spellOut(code().userCode) })}
-                      >
-                        {code().userCode}
-                      </output>
-                      <CopyButton
-                        class="provider-code-login-copy"
-                        value={code().userCode}
-                        label={t("provider.codeLogin.copyCode")}
-                        copiedLabel={t("common.copied")}
-                        variant="outline"
-                      />
-                    </div>
-
-                    <Text class="provider-code-login-expiry" as="p" variant="caption" tone="muted" aria-live="off">
-                      <Show when={remaining() > 0} fallback={t("provider.codeLogin.expired")}>
-                        {t("provider.codeLogin.expiresIn", { time: formatCountdown(remaining()) })}
-                      </Show>
+              <div class="provider-code-login-body" ref={(element) => fades.watch(element)}>
+                <Show when={props.state.phase === "starting"}>
+                  <div class="provider-code-login-pending" role="status">
+                    <Spinner size="sm" />
+                    <Text as="span" tone="muted">
+                      {t("provider.codeLogin.starting", { name: props.providerName })}
                     </Text>
                   </div>
-                )}
-              </Show>
+                </Show>
 
-              <Show when={pasting()}>
-                {(paste) => (
-                  <div class="provider-code-login-code">
-                    <QrCode
-                      value={paste().verificationUrl}
-                      label={t("provider.codeLogin.qrLabel", { name: props.providerName })}
-                      size={160}
-                    />
-
-                    <ol class="provider-code-login-steps">
-                      <li>
-                        <Text as="span">{t("provider.codeLogin.open")}</Text>{" "}
-                        <Button
-                          class="provider-code-login-url"
-                          type="button"
-                          variant="link"
-                          onClick={() => props.onOpenVerificationUrl(paste().verificationUrl)}
-                        >
-                          {shortUrl(paste().verificationUrl)}
-                          <ExternalLink aria-hidden="true" />
-                        </Button>
-                      </li>
-                      <li>
-                        <Text as="span">{t("provider.codeLogin.pasteStep", { name: props.providerName })}</Text>
-                      </li>
-                    </ol>
-
-                    <form
-                      class="provider-code-login-paste"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        const code = pastedCode().trim();
-                        if (code && !paste().submitting) props.onSubmitCode?.(code);
-                      }}
-                    >
-                      <Field label={t("provider.codeLogin.pasteLabel")} error={paste().error}>
-                        <Input
-                          value={pastedCode()}
-                          autocomplete="off"
-                          spellcheck={false}
-                          disabled={paste().submitting}
-                          onValueChange={setPastedCode}
-                        />
-                      </Field>
-                      <Button type="submit" disabled={!pastedCode().trim() || paste().submitting}>
-                        {t("provider.codeLogin.pasteSubmit")}
-                      </Button>
-                    </form>
-
-                    <Text class="provider-code-login-expiry" as="p" variant="caption" tone="muted" aria-live="off">
-                      <Show when={remaining() > 0} fallback={t("provider.codeLogin.pasteExpired")}>
-                        {t("provider.codeLogin.pasteExpiresIn", { time: formatCountdown(remaining()) })}
-                      </Show>
-                    </Text>
-                  </div>
-                )}
-              </Show>
-
-              <Show when={linking()}>
-                {(link) => (
-                  <div class="provider-code-login-code" role="status">
-                    <Show when={!link().onThisComputer}>
+                <Show when={waiting()}>
+                  {(code) => (
+                    <div class="provider-code-login-code" role="status">
                       <QrCode
-                        value={link().verificationUrl}
+                        value={code().verificationUrlComplete ?? code().verificationUrl}
                         label={t("provider.codeLogin.qrLabel", { name: props.providerName })}
                         size={160}
                       />
-                    </Show>
 
-                    <ol class="provider-code-login-steps">
-                      <li>
-                        <Text as="span">{t("provider.codeLogin.open")}</Text>{" "}
-                        <Button
-                          class="provider-code-login-url"
-                          type="button"
-                          variant="link"
-                          onClick={() => props.onOpenVerificationUrl(link().verificationUrl)}
+                      <ol class="provider-code-login-steps">
+                        <Show when={props.setupStep}>
+                          {(step) => (
+                            <li>
+                              <Text as="span">{step()}</Text>
+                            </li>
+                          )}
+                        </Show>
+                        <li>
+                          <Text as="span">{t("provider.codeLogin.open")}</Text>{" "}
+                          <Button
+                            class="provider-code-login-url"
+                            type="button"
+                            variant="link"
+                            onClick={() => props.onOpenVerificationUrl(code().verificationUrl)}
+                          >
+                            {code().verificationUrl}
+                            <ExternalLink aria-hidden="true" />
+                          </Button>
+                        </li>
+                        <li>
+                          <Text as="span">{t("provider.codeLogin.enterCode")}</Text>
+                        </li>
+                      </ol>
+
+                      <div class="provider-code-login-value">
+                        <output
+                          class="provider-code-login-digits"
+                          aria-label={t("provider.codeLogin.codeLabel", { code: spellOut(code().userCode) })}
                         >
-                          {shortUrl(link().verificationUrl)}
-                          <ExternalLink aria-hidden="true" />
-                        </Button>
-                      </li>
-                      <li>
-                        <Text as="span">{t("provider.codeLogin.linkStep", { name: props.providerName })}</Text>
-                      </li>
-                    </ol>
+                          {code().userCode}
+                        </output>
+                        <CopyButton
+                          class="provider-code-login-copy"
+                          value={code().userCode}
+                          label={t("provider.codeLogin.copyCode")}
+                          copiedLabel={t("common.copied")}
+                          variant="outline"
+                        />
+                      </div>
 
-                    <Show when={link().onThisComputer}>
-                      <CopyButton
-                        class="provider-code-login-copy"
-                        value={link().verificationUrl}
-                        label={t("provider.codeLogin.copyLink")}
-                        copiedLabel={t("common.copied")}
-                        variant="outline"
+                      <Text class="provider-code-login-expiry" as="p" variant="caption" tone="muted" aria-live="off">
+                        <Show when={remaining() > 0} fallback={t("provider.codeLogin.expired")}>
+                          {t("provider.codeLogin.expiresIn", { time: formatCountdown(remaining()) })}
+                        </Show>
+                      </Text>
+                    </div>
+                  )}
+                </Show>
+
+                <Show when={pasting()}>
+                  {(paste) => (
+                    <div class="provider-code-login-code">
+                      <QrCode
+                        value={paste().verificationUrl}
+                        label={t("provider.codeLogin.qrLabel", { name: props.providerName })}
+                        size={160}
                       />
-                    </Show>
 
-                    <Text class="provider-code-login-expiry" as="p" variant="caption" tone="muted" aria-live="off">
-                      <Show when={remaining() > 0} fallback={t("provider.codeLogin.pasteExpired")}>
-                        {t("provider.codeLogin.pasteExpiresIn", { time: formatCountdown(remaining()) })}
+                      <ol class="provider-code-login-steps">
+                        <li>
+                          <Text as="span">{t("provider.codeLogin.open")}</Text>{" "}
+                          <Button
+                            class="provider-code-login-url"
+                            type="button"
+                            variant="link"
+                            onClick={() => props.onOpenVerificationUrl(paste().verificationUrl)}
+                          >
+                            {shortUrl(paste().verificationUrl)}
+                            <ExternalLink aria-hidden="true" />
+                          </Button>
+                        </li>
+                        <li>
+                          <Text as="span">{t("provider.codeLogin.pasteStep", { name: props.providerName })}</Text>
+                        </li>
+                      </ol>
+
+                      <form
+                        class="provider-code-login-paste"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          const code = pastedCode().trim();
+                          if (code && !paste().submitting) props.onSubmitCode?.(code);
+                        }}
+                      >
+                        <Field label={t("provider.codeLogin.pasteLabel")} error={paste().error}>
+                          <Input
+                            value={pastedCode()}
+                            autocomplete="off"
+                            spellcheck={false}
+                            disabled={paste().submitting}
+                            onValueChange={setPastedCode}
+                          />
+                        </Field>
+                        <Button type="submit" disabled={!pastedCode().trim() || paste().submitting}>
+                          {t("provider.codeLogin.pasteSubmit")}
+                        </Button>
+                      </form>
+
+                      <Text class="provider-code-login-expiry" as="p" variant="caption" tone="muted" aria-live="off">
+                        <Show when={remaining() > 0} fallback={t("provider.codeLogin.pasteExpired")}>
+                          {t("provider.codeLogin.pasteExpiresIn", { time: formatCountdown(remaining()) })}
+                        </Show>
+                      </Text>
+                    </div>
+                  )}
+                </Show>
+
+                <Show when={linking()}>
+                  {(link) => (
+                    <div class="provider-code-login-code" role="status">
+                      <Show when={!link().onThisComputer}>
+                        <QrCode
+                          value={link().verificationUrl}
+                          label={t("provider.codeLogin.qrLabel", { name: props.providerName })}
+                          size={160}
+                        />
                       </Show>
+
+                      <ol class="provider-code-login-steps">
+                        <li>
+                          <Text as="span">{t("provider.codeLogin.open")}</Text>{" "}
+                          <Button
+                            class="provider-code-login-url"
+                            type="button"
+                            variant="link"
+                            onClick={() => props.onOpenVerificationUrl(link().verificationUrl)}
+                          >
+                            {shortUrl(link().verificationUrl)}
+                            <ExternalLink aria-hidden="true" />
+                          </Button>
+                        </li>
+                        <li>
+                          <Text as="span">{t("provider.codeLogin.linkStep", { name: props.providerName })}</Text>
+                        </li>
+                      </ol>
+
+                      <Show when={link().onThisComputer}>
+                        <CopyButton
+                          class="provider-code-login-copy"
+                          value={link().verificationUrl}
+                          label={t("provider.codeLogin.copyLink")}
+                          copiedLabel={t("common.copied")}
+                          variant="outline"
+                        />
+                      </Show>
+
+                      <Text class="provider-code-login-expiry" as="p" variant="caption" tone="muted" aria-live="off">
+                        <Show when={remaining() > 0} fallback={t("provider.codeLogin.pasteExpired")}>
+                          {t("provider.codeLogin.pasteExpiresIn", { time: formatCountdown(remaining()) })}
+                        </Show>
+                      </Text>
+                    </div>
+                  )}
+                </Show>
+
+                <Show when={hostPage()}>
+                  {(host) => (
+                    <Show
+                      when={host().page}
+                      fallback={
+                        <div class="provider-code-login-pending" role="status">
+                          <Spinner size="sm" />
+                          <Text as="span" tone="muted">
+                            {t("provider.codeLogin.pageOpening", { name: props.providerName, host: host().hostName })}
+                          </Text>
+                        </div>
+                      }
+                    >
+                      {(page) => (
+                        <>
+                          <McpSignInPage page={page()} />
+                          <McpSignInPageNote hostName={host().hostName} />
+                        </>
+                      )}
+                    </Show>
+                  )}
+                </Show>
+
+                <Show when={relay()}>
+                  {(relayed) => (
+                    <Show
+                      when={relayed().page}
+                      fallback={
+                        <div class="provider-code-login-pending" role="status">
+                          <Spinner size="sm" />
+                        </div>
+                      }
+                    >
+                      {(page) => (
+                        <>
+                          <McpSignInRelayControls
+                            page={page()}
+                            onOpen={() => props.onOpenRelayPage?.()}
+                            onPaste={(address) => props.onPasteRelayAddress?.(address) ?? Promise.resolve()}
+                          />
+                          <McpSignInPageNote hostName={relayed().hostName} />
+                        </>
+                      )}
+                    </Show>
+                  )}
+                </Show>
+
+                <Show when={addressPaste()}>
+                  <McpSignInRelayControls
+                    page={BROWSER_ADDRESS_PAGE}
+                    onPaste={(address) => props.onPasteRelayAddress?.(address) ?? Promise.resolve()}
+                  />
+                </Show>
+
+                <Show when={props.state.phase === "verifying"}>
+                  <div class="provider-code-login-pending" role="status">
+                    <Spinner size="sm" />
+                    <Text as="span" tone="muted">
+                      {t("provider.codeLogin.verifying", { name: props.providerName })}
                     </Text>
                   </div>
-                )}
-              </Show>
-
-              <Show when={hostPage()}>
-                {(host) => (
-                  <Show
-                    when={host().page}
-                    fallback={
-                      <div class="provider-code-login-pending" role="status">
-                        <Spinner size="sm" />
-                        <Text as="span" tone="muted">
-                          {t("provider.codeLogin.pageOpening", { name: props.providerName, host: host().hostName })}
-                        </Text>
-                      </div>
-                    }
-                  >
-                    {(page) => (
-                      <>
-                        <McpSignInPage page={page()} />
-                        <McpSignInPageNote hostName={host().hostName} />
-                      </>
-                    )}
-                  </Show>
-                )}
-              </Show>
-
-              <Show when={relay()}>
-                {(relayed) => (
-                  <Show
-                    when={relayed().page}
-                    fallback={
-                      <div class="provider-code-login-pending" role="status">
-                        <Spinner size="sm" />
-                      </div>
-                    }
-                  >
-                    {(page) => (
-                      <>
-                        <McpSignInRelayControls
-                          page={page()}
-                          onOpen={() => props.onOpenRelayPage?.()}
-                          onPaste={(address) => props.onPasteRelayAddress?.(address) ?? Promise.resolve()}
-                        />
-                        <McpSignInPageNote hostName={relayed().hostName} />
-                      </>
-                    )}
-                  </Show>
-                )}
-              </Show>
-
-              <Show when={addressPaste()}>
-                <McpSignInRelayControls
-                  page={BROWSER_ADDRESS_PAGE}
-                  onPaste={(address) => props.onPasteRelayAddress?.(address) ?? Promise.resolve()}
-                />
-              </Show>
-
-              <Show when={props.state.phase === "verifying"}>
-                <div class="provider-code-login-pending" role="status">
-                  <Spinner size="sm" />
-                  <Text as="span" tone="muted">
-                    {t("provider.codeLogin.verifying", { name: props.providerName })}
-                  </Text>
-                </div>
-              </Show>
+                </Show>
+              </div>
             </div>
+            <ScrollEdgeBlur fades={fades} />
 
             <IconButton
               class="provider-code-login-close"

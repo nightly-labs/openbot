@@ -23,7 +23,9 @@ import {
   Zap,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { For, Show } from "solid-js";
+import { createEffect, For, onCleanup, Show } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import { PickerActions, type PickerGroup, PickerHeading, type PickerOption, PickerRow } from "./WorkflowPicker";
 import type { PortRef, WfnFields, WfnPortType } from "./workflow-board";
@@ -179,6 +181,14 @@ export function WorkflowDropMenu(props: {
   const choices = () => props.groups.flatMap((group) => group.items);
   const label = () => (props.connected ? t("workflow.canvas.add.connected") : t("workflow.canvas.add.node"));
   let search: HTMLInputElement | undefined;
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
+  createEffect(
+    () => props.groups,
+    () => {
+      fades.remeasure();
+    },
+  );
   return (
     <Popover.Root
       open={props.open}
@@ -237,7 +247,11 @@ export function WorkflowDropMenu(props: {
           when={choices().length > 0}
           fallback={<p class="wfn-search-empty">{t("workflow.canvas.add.noMatch", { query: props.query.trim() })}</p>}
         >
-          <div class="wfn-search-results">
+          <div
+            ref={(element) => fades.bind(element)}
+            class={["wfn-search-results", fades.classes()]}
+            onScroll={fades.measure}
+          >
             <For each={props.groups}>
               {(group) => (
                 <fieldset class="wfn-picker-group" aria-label={t(group.label)}>
@@ -263,6 +277,7 @@ export function WorkflowDropMenu(props: {
               )}
             </For>
           </div>
+          <ScrollEdgeBlur fades={fades} />
         </Show>
       </Popover.Content>
     </Popover.Root>

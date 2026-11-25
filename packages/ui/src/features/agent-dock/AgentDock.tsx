@@ -28,6 +28,7 @@ import { AmbientMotion, useAmbientMotion } from "../../ambient-motion";
 import type { AvatarMood } from "../../bloub-avatar";
 import { createMenuSearch } from "../../components/createMenuSearch";
 import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import type { ComposerAgent } from "../../data";
 import {
   createMotion,
@@ -1352,6 +1353,7 @@ export function AgentDock(props: AgentDockProps) {
               </For>
             </div>
           </div>
+          <ScrollEdgeBlur fades={seatFades} />
           <div
             class="agent-dock-seat"
             ref={(element) => (addSeat = element)}
@@ -1431,6 +1433,7 @@ export function AgentDock(props: AgentDockProps) {
                           )}
                         </For>
                       </div>
+                      <ScrollEdgeBlur fades={addFades} />
                       <Show when={props.onOpenSettings}>
                         {(open) => (
                           <>

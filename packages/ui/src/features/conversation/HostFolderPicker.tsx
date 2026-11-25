@@ -1,6 +1,8 @@
 import { type AgentFolderBrowse, agentFolderName, typedHostFolder } from "@openbot/contracts/ipc";
 import { ArrowUp, Button, Dialog, Folder, HardDrive, IconButton, Input, X } from "@openbot/ui";
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 
 export type HostFolderPickMode = "add" | "exclude" | "locate";
@@ -23,6 +25,12 @@ export function HostFolderPicker(props: {
   const [error, setError] = createSignal<string | null>(null);
   const [typed, setTyped] = createSignal("");
   let request = 0;
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
+  createEffect(
+    () => [listing(), error()],
+    () => fades.remeasure(),
+  );
 
   function open(path: string | null, fallbackHome: boolean, opened?: (path: string) => void): void {
     const id = ++request;
@@ -139,7 +147,12 @@ export function HostFolderPicker(props: {
                 </>
               )}
             </Show>
-            <div class="provider-more-list" aria-busy={loading() ? "true" : "false"}>
+            <div
+              class={["provider-more-list", fades.classes()]}
+              aria-busy={loading() ? "true" : "false"}
+              ref={(element) => fades.bind(element)}
+              onScroll={fades.measure}
+            >
               <Show when={listing()?.parentPath}>
                 {(parent) => (
                   <Button variant="ghost" class="provider-more-row" onClick={() => open(parent(), false)}>
@@ -170,6 +183,7 @@ export function HostFolderPicker(props: {
               </Show>
               <Show when={error()}>{(message) => <p class="host-folder-picker-note">{message()}</p>}</Show>
             </div>
+            <ScrollEdgeBlur fades={fades} />
             <footer class="host-folder-picker-footer">
               <Button variant="ghost" onClick={() => props.onDone(null)}>
                 {t("common.cancel")}

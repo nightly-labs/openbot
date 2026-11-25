@@ -29,7 +29,21 @@ import {
   X,
 } from "@openbot/ui";
 import { PageHeader, type PageHeaderFrame } from "@openbot/ui/features/window/PageHeader";
-import { createMemo, createSignal, createStore, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  createStore,
+  For,
+  Match,
+  onCleanup,
+  onSettled,
+  Show,
+  Switch,
+  untrack,
+} from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -299,6 +313,12 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
   });
 
   const empty = () => (props.state ?? "ready") === "ready" && props.routines.length === 0;
+  const bodyFades = createScrollFades();
+  onCleanup(() => bodyFades.stop());
+  createEffect(
+    () => [state.view, state.anchor, entriesByDay(), upcoming(), props.state],
+    () => bodyFades.remeasure(),
+  );
   const emptyMonth = createMemo(() => daysFor(today(), "month"));
 
   return (
@@ -376,7 +396,12 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
 
       <Switch>
         <Match when={(props.state ?? "ready") === "loading"}>
-          <div class="routine-planner-body" aria-busy="true">
+          <div
+            ref={(element) => bodyFades.bind(element)}
+            class={["routine-planner-body", bodyFades.classes()]}
+            aria-busy="true"
+            onScroll={bodyFades.measure}
+          >
             <p class="sr-only" role="status">
               {t("routine.calendar.loading")}
             </p>
@@ -395,6 +420,7 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
               </div>
             </div>
           </div>
+          <ScrollEdgeBlur fades={bodyFades} />
         </Match>
         <Match when={props.state === "error"}>
           <Alert tone="danger" class="routine-planner-error">
@@ -419,7 +445,11 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
           />
         </Match>
         <Match when={true}>
-          <div class="routine-planner-body">
+          <div
+            ref={(element) => bodyFades.bind(element)}
+            class={["routine-planner-body", bodyFades.classes()]}
+            onScroll={bodyFades.measure}
+          >
             <Show
               when={state.view !== "day"}
               fallback={
@@ -551,6 +581,7 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
               </Show>
             </aside>
           </div>
+          <ScrollEdgeBlur fades={bodyFades} />
         </Match>
       </Switch>
       <Show when={props.create}>

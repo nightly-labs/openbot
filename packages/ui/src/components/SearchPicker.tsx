@@ -1,5 +1,6 @@
 import { ActiveCurrentRow, Check, Combobox, Popover, Search } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, onCleanup, Show } from "solid-js";
@@ -170,6 +171,7 @@ export function SearchPicker<Option>(props: SearchPickerProps<Option>) {
               onScroll={fades.measure}
               aria-label={props.label}
             />
+            <ScrollEdgeBlur fades={fades} />
             <Show when={matches().length === 0}>
               <p class="search-picker-empty" role="status">
                 {props.emptyText(query().trim())}

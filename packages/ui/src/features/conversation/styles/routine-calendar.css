@@ -564,8 +564,14 @@
 }
 
 .routine-planner-empty-menu {
+  display: flex;
   min-width: 14rem;
   max-height: min(520px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 520px));
+  flex-direction: column;
+}
+
+.routine-planner-empty-menu-list {
+  min-height: 0;
   overflow-y: auto;
 }
 

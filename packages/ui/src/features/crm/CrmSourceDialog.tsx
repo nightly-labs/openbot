@@ -16,7 +16,9 @@ import { FileSearch } from "@openbot/ui/features/files/FileList";
 import { StripeTile } from "@openbot/ui/features/settings/brand-marks";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { SOURCE_ERROR_KEY, SOURCE_KEY, timeAgo } from "./crm-model";
 import type { CrmViewModel } from "./crm-state";
 
@@ -25,13 +27,26 @@ const SOURCE_MARK = { stripe: StripeTile } as const satisfies Record<CrmSourceKi
 const KEY_FORM = /^rk_(live|test)_[A-Za-z0-9]+$/u;
 const KEY_MAX = 255;
 
-function SourceFrame(props: { crm: CrmViewModel; children: JSX.Element }) {
+function SourceFrame(props: { crm: CrmViewModel; page: unknown; children: JSX.Element }) {
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
+  createEffect(
+    () => props.page,
+    () => fades.remeasure(),
+  );
   return (
     <Dialog.Root open onOpenChange={(open: boolean) => !open && props.crm.closeForm()}>
       <Dialog.Portal>
         <Dialog.Overlay class="ui-confirm-dialog-overlay">
           <Dialog.Content as="section" class="ui-confirm-dialog crm-form">
-            <div class="crm-form-body">{props.children}</div>
+            <div
+              class={["crm-form-body", fades.classes()]}
+              ref={(element) => fades.bind(element)}
+              onScroll={fades.measure}
+            >
+              {props.children}
+            </div>
+            <ScrollEdgeBlur fades={fades} />
           </Dialog.Content>
         </Dialog.Overlay>
       </Dialog.Portal>
@@ -60,6 +75,12 @@ function ConnectorList(props: { crm: CrmViewModel; onOpen: (kind: CrmSourceKind)
     const words = query().trim().toLocaleLowerCase(locale());
     return CRM_SOURCE_KINDS.filter((kind) => t(SOURCE_KEY[kind]).toLocaleLowerCase(locale()).includes(words));
   };
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
+  createEffect(
+    () => shown().length,
+    () => fades.remeasure(),
+  );
   const status = (source: CrmSource) => {
     if (source.state === "error") return t("crm.source.failed");
     if (source.state === "syncing" || source.syncedAt === null) return t("crm.source.syncing");
@@ -71,33 +92,36 @@ function ConnectorList(props: { crm: CrmViewModel; onOpen: (kind: CrmSourceKind)
       <Show when={CRM_SOURCE_KINDS.length >= SEARCH_FROM}>
         <FileSearch label={t("crm.connectors.search")} value={query()} onChange={setQuery} />
       </Show>
-      <ul class="crm-connectors">
-        <For each={shown()} fallback={<li class="crm-connectors-empty">{t("common.noMatches")}</li>}>
-          {(kind) => {
-            const Mark = SOURCE_MARK[kind];
-            const source = () => props.crm.source(kind);
-            return (
-              <li>
-                <Button type="button" variant="ghost" class="crm-connector" onClick={() => props.onOpen(kind)}>
-                  <span class="crm-connector-mark">
-                    <Mark />
-                  </span>
-                  <span class="crm-connector-name">{t(SOURCE_KEY[kind])}</span>
-                  <Show when={source()}>
-                    {(connected) => (
-                      <span class="crm-connector-state" data-state={connected().state}>
-                        <span class="crm-source-dot" aria-hidden="true" />
-                        {status(connected())}
-                      </span>
-                    )}
-                  </Show>
-                  <ChevronRight class="crm-connector-go" aria-hidden="true" />
-                </Button>
-              </li>
-            );
-          }}
-        </For>
-      </ul>
+      <div>
+        <ul class={["crm-connectors", fades.classes()]} ref={(element) => fades.bind(element)} onScroll={fades.measure}>
+          <For each={shown()} fallback={<li class="crm-connectors-empty">{t("common.noMatches")}</li>}>
+            {(kind) => {
+              const Mark = SOURCE_MARK[kind];
+              const source = () => props.crm.source(kind);
+              return (
+                <li>
+                  <Button type="button" variant="ghost" class="crm-connector" onClick={() => props.onOpen(kind)}>
+                    <span class="crm-connector-mark">
+                      <Mark />
+                    </span>
+                    <span class="crm-connector-name">{t(SOURCE_KEY[kind])}</span>
+                    <Show when={source()}>
+                      {(connected) => (
+                        <span class="crm-connector-state" data-state={connected().state}>
+                          <span class="crm-source-dot" aria-hidden="true" />
+                          {status(connected())}
+                        </span>
+                      )}
+                    </Show>
+                    <ChevronRight class="crm-connector-go" aria-hidden="true" />
+                  </Button>
+                </li>
+              );
+            }}
+          </For>
+        </ul>
+        <ScrollEdgeBlur fades={fades} />
+      </div>
       <div class="crm-form-actions">
         <Button variant="ghost" onClick={() => props.crm.closeForm()}>
           {t("common.close")}
@@ -268,8 +292,12 @@ function SourceState(props: { crm: CrmViewModel; source: CrmSource; onBack: () =
 export function CrmSourceDialog(props: { crm: CrmViewModel; kind: CrmSourceKind | null }) {
   const [kind, setKind] = createSignal(props.kind);
   const back = () => setKind(null);
+  const page = () => {
+    const open = kind();
+    return open === null ? null : props.crm.source(open);
+  };
   return (
-    <SourceFrame crm={props.crm}>
+    <SourceFrame crm={props.crm} page={page()}>
       <Show when={kind()} keyed fallback={<ConnectorList crm={props.crm} onOpen={setKind} />}>
         {(open) => (
           <Show when={props.crm.source(open)} fallback={<ConnectForm crm={props.crm} kind={open} onBack={back} />}>

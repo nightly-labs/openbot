@@ -28,6 +28,8 @@ import type { AgentProfile } from "@openbot/ui/data";
 import { useText } from "@openbot/ui/text";
 import { type JSX, Portal } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { AgentPicker } from "../agents/AgentPicker";
 import { type AttachmentMediaSource, fileBadge } from "../conversation/AttachmentCards";
 import { attachmentReferenceBadge, attachmentReferenceTone } from "../conversation/AttachmentReference";
@@ -152,6 +154,8 @@ export function LibraryPage(props: LibraryPageProps) {
   });
   const pictureUrl = (file: StoredFileRow) => props.pictureUrl?.(file) ?? file.previewUrl;
   const mosaic = createLibraryMosaic();
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
   const agents = () => props.agents ?? NO_AGENTS;
   const agentById = createMemo(() => new Map(agents().map((agent) => [agent.id, agent])));
   const agentOf = (agentId: string | null) => (agentId ? agentById().get(agentId) : undefined);
@@ -1057,16 +1061,30 @@ export function LibraryPage(props: LibraryPageProps) {
   const tileSource = (file: StoredFileRow) =>
     folderLine(file) ?? file.conversation?.title ?? agentName(file.agentId) ?? workflowLine(file);
 
+  createEffect(
+    () => ({
+      view: view(),
+      files: shown().length,
+      folders: tileFolders().length,
+      loading: props.loading,
+      error: props.error,
+      pill: pillOpen(),
+    }),
+    () => fades.remeasure(),
+  );
+
   const frame = (): JSX.Element => (
     <div class="library-frame" data-pill={pillOpen() ? "" : undefined}>
       <div
-        class="library-page"
+        class={["library-page", fades.classes()]}
         data-library-autoscroll
         data-library-here
         ref={(element) => {
           marquee.attach(element);
           pictures.attach(element);
+          fades.bind(element);
         }}
+        onScroll={fades.measure}
       >
         <Show when={!folderMode()}>
           <header class="library-head">
@@ -1153,7 +1171,14 @@ export function LibraryPage(props: LibraryPageProps) {
                 />
               }
             >
-              <ul ref={mosaic.attach} class="library-grid" data-layout={view()}>
+              <ul
+                ref={(element) => {
+                  mosaic.attach(element);
+                  fades.watch(element);
+                }}
+                class="library-grid"
+                data-layout={view()}
+              >
                 <For each={shown()} keyed={(file) => file.id}>
                   {(file) => {
                     const id = untrack(() => file().id);
@@ -1290,6 +1315,7 @@ export function LibraryPage(props: LibraryPageProps) {
           )}
         </Show>
       </div>
+      <ScrollEdgeBlur fades={fades} />
       <LibrarySelectionPill
         open={pillOpen()}
         step={step()}

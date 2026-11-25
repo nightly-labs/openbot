@@ -1,8 +1,21 @@
 import type { AppLogoVariant } from "@openbot/brand";
 import type { AgentModelId, AgentProviderId, AppSetupState, DesktopPlatform } from "@openbot/contracts/ipc";
 import { Button, ErrorReference } from "@openbot/ui";
+import { createScrollFades } from "@openbot/ui/components/createScrollFades";
+import { ScrollEdgeBlur } from "@openbot/ui/components/ScrollEdgeBlur";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, createStore, createUniqueId, For, Match, Show, Switch, untrack } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  createStore,
+  createUniqueId,
+  For,
+  Match,
+  onCleanup,
+  Show,
+  Switch,
+  untrack,
+} from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { ComputerUseSetup } from "../computer-use/ComputerUseSetup";
 import { FirstRunChoice, FirstRunTeam } from "./FirstRunChoice";
@@ -313,6 +326,8 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
     });
   });
   const stepsShown = () => !launchShown();
+  const screenFades = createScrollFades();
+  onCleanup(() => screenFades.stop());
   const freeStatus = () => (state.path === "free" ? option(FREE_PROVIDER)?.runtimeStatus : undefined);
   const logoVariant = () => props.logoVariant ?? "production";
   const freeDownloading = () => freeStatus()?.phase === "downloading";
@@ -351,114 +366,129 @@ export function FirstRunFlow(props: FirstRunFlowProps) {
           />
         }
       >
-        <div class="onboarding-shell">
-          <Show when={state.step !== "choose"}>
-            <nav
-              class="onboarding-progress"
-              aria-label={t("onboarding.progress", { step: stepNumber(), total: steps().length })}
-            >
-              <For each={steps()}>
-                {(_item, index) => (
-                  <span
-                    class={index() + 1 === stepNumber() ? "is-active" : index() + 1 < stepNumber() ? "is-complete" : ""}
-                  />
-                )}
-              </For>
-            </nav>
-          </Show>
+        <div
+          ref={(element) => screenFades.bind(element)}
+          class={["onboarding-scroller", screenFades.classes()]}
+          onScroll={screenFades.measure}
+        >
+          <div class="onboarding-shell" ref={(element) => screenFades.watch(element)}>
+            <Show when={state.step !== "choose"}>
+              <nav
+                class="onboarding-progress"
+                aria-label={t("onboarding.progress", { step: stepNumber(), total: steps().length })}
+              >
+                <For each={steps()}>
+                  {(_item, index) => (
+                    <span
+                      class={
+                        index() + 1 === stepNumber() ? "is-active" : index() + 1 < stepNumber() ? "is-complete" : ""
+                      }
+                    />
+                  )}
+                </For>
+              </nav>
+            </Show>
 
-          <div class="onboarding-step" data-step={shownStep()}>
-            <Switch>
-              <Match when={state.step === "choose"}>
-                <section class="first-run-choice" aria-labelledby="onboarding-title">
-                  <FirstRunTeam team={team} />
-                  <Show
-                    when={existingShown()}
-                    fallback={
-                      <FirstRunChoice
-                        team={team}
+            <div class="onboarding-step" data-step={shownStep()}>
+              <Switch>
+                <Match when={state.step === "choose"}>
+                  <section class="first-run-choice" aria-labelledby="onboarding-title">
+                    <FirstRunTeam team={team} />
+                    <Show
+                      when={existingShown()}
+                      fallback={
+                        <FirstRunChoice
+                          team={team}
+                          disabled={busy()}
+                          loading={busy()}
+                          reason={blockedReason()}
+                          onStartFree={startFree}
+                          onUsePlan={usePlan}
+                          analytics={state.analytics}
+                          onAnalyticsChange={(enabled) =>
+                            setState((current) => {
+                              current.analytics = enabled;
+                              current.analyticsTouched = true;
+                            })
+                          }
+                          onOpenTerms={() => void onboardingPort().openUrl(TERMS_URL)}
+                          onOpenPrivacy={() => void onboardingPort().openUrl(PRIVACY_URL)}
+                        />
+                      }
+                    >
+                      <FirstRunExistingServers
+                        servers={props.existingServers ?? []}
+                        opening={state.openingServer}
                         disabled={busy()}
-                        loading={busy()}
-                        reason={blockedReason()}
-                        onStartFree={startFree}
-                        onUsePlan={usePlan}
-                        analytics={state.analytics}
-                        onAnalyticsChange={(enabled) =>
-                          setState((current) => {
-                            current.analytics = enabled;
-                            current.analyticsTouched = true;
-                          })
-                        }
+                        onOpen={(server) => void openServer(server)}
+                        onStartNew={startNew}
                         onOpenTerms={() => void onboardingPort().openUrl(TERMS_URL)}
                         onOpenPrivacy={() => void onboardingPort().openUrl(PRIVACY_URL)}
                       />
-                    }
-                  >
-                    <FirstRunExistingServers
-                      servers={props.existingServers ?? []}
-                      opening={state.openingServer}
-                      disabled={busy()}
-                      onOpen={(server) => void openServer(server)}
-                      onStartNew={startNew}
-                      onOpenTerms={() => void onboardingPort().openUrl(TERMS_URL)}
-                      onOpenPrivacy={() => void onboardingPort().openUrl(PRIVACY_URL)}
-                    />
-                  </Show>
-                </section>
-              </Match>
+                    </Show>
+                  </section>
+                </Match>
 
-              <Match when={state.step === "plan"}>
-                <FirstRunPlanStep providers={providers} disabled={busy()} menuMount={screenElement()} />
-              </Match>
+                <Match when={state.step === "plan"}>
+                  <FirstRunPlanStep providers={providers} disabled={busy()} menuMount={screenElement()} />
+                </Match>
 
-              <Match when={state.step === "computer"}>
-                <section class="onboarding-panel onboarding-panel-computer" aria-labelledby="onboarding-title">
-                  <h1 id="onboarding-title">{t("onboarding.computer.title")}</h1>
-                  <OnboardingComputerVisual avatar={computerAvatar} />
-                  <ComputerUseSetup variant="compact" />
-                </section>
-              </Match>
-            </Switch>
-          </div>
-
-          <Show when={providers.error()}>
-            <p class="onboarding-error" role="alert">
-              {providers.error()}
-              <ErrorReference reference={providers.errorReference()} />
-            </p>
-          </Show>
-
-          <Show when={state.step !== "choose"}>
-            <div class="onboarding-actions">
-              <Button type="button" variant="outline" class="onboarding-back" disabled={busy()} onClick={previousStep}>
-                {t("common.back")}
-              </Button>
-              <Button
-                type="button"
-                variant="default"
-                class="onboarding-next"
-                aria-describedby={blockedReason() ? nextReasonId : undefined}
-                loading={busy()}
-                loadingLabel={t("onboarding.opening")}
-                onClick={nextStep}
-              >
-                {mainLabel()}
-              </Button>
-              <Show when={blockedReason()}>
-                {(reason) => (
-                  <p class="onboarding-next-reason" id={nextReasonId}>
-                    {reason()}
-                  </p>
-                )}
-              </Show>
-              <Show when={state.step === "plan"}>
-                <Button type="button" variant="ghost" disabled={busy()} onClick={startFree}>
-                  {t("onboarding.choice.startFreeInstead")}
-                </Button>
-              </Show>
+                <Match when={state.step === "computer"}>
+                  <section class="onboarding-panel onboarding-panel-computer" aria-labelledby="onboarding-title">
+                    <h1 id="onboarding-title">{t("onboarding.computer.title")}</h1>
+                    <OnboardingComputerVisual avatar={computerAvatar} />
+                    <ComputerUseSetup variant="compact" />
+                  </section>
+                </Match>
+              </Switch>
             </div>
-          </Show>
+
+            <Show when={providers.error()}>
+              <p class="onboarding-error" role="alert">
+                {providers.error()}
+                <ErrorReference reference={providers.errorReference()} />
+              </p>
+            </Show>
+
+            <Show when={state.step !== "choose"}>
+              <div class="onboarding-actions">
+                <Button
+                  type="button"
+                  variant="outline"
+                  class="onboarding-back"
+                  disabled={busy()}
+                  onClick={previousStep}
+                >
+                  {t("common.back")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="default"
+                  class="onboarding-next"
+                  aria-describedby={blockedReason() ? nextReasonId : undefined}
+                  loading={busy()}
+                  loadingLabel={t("onboarding.opening")}
+                  onClick={nextStep}
+                >
+                  {mainLabel()}
+                </Button>
+                <Show when={blockedReason()}>
+                  {(reason) => (
+                    <p class="onboarding-next-reason" id={nextReasonId}>
+                      {reason()}
+                    </p>
+                  )}
+                </Show>
+                <Show when={state.step === "plan"}>
+                  <Button type="button" variant="ghost" disabled={busy()} onClick={startFree}>
+                    {t("onboarding.choice.startFreeInstead")}
+                  </Button>
+                </Show>
+              </div>
+            </Show>
+          </div>
         </div>
+        <ScrollEdgeBlur fades={screenFades} />
       </Show>
     </main>
   );

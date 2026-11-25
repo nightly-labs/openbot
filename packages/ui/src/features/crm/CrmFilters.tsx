@@ -24,6 +24,7 @@ import { createMemo, createSignal, For, flush, onCleanup, Show } from "solid-js"
 import { createMenuSearch } from "../../components/createMenuSearch";
 import { createScrollFades } from "../../components/createScrollFades";
 import { MatchedName, matchByName, nameRank } from "../../components/name-match";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import type { CrmIcon } from "./CrmSheet";
 import { MenuMark } from "./CrmSheet";
 import {
@@ -396,6 +397,7 @@ function FilterMenu(props: {
               }}
             </For>
           </div>
+          <ScrollEdgeBlur fades={fades} />
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

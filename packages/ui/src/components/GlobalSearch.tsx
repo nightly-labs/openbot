@@ -40,6 +40,7 @@ import { createScrollFades } from "./createScrollFades";
 import { GlobalSearchPlush } from "./GlobalSearchPlush";
 import { playDialogExit, trackResultHighlight, trackResultsHeight } from "./global-search-motion";
 import { matchParts, normalizedSearchText, snippetAround } from "./global-search-text";
+import { ScrollEdgeBlur } from "./ScrollEdgeBlur";
 import { VirtualListbox, type VirtualRowProps } from "./VirtualListbox";
 
 const SEARCH_TABS = ["all", "agents", "channels", "messages", "files", "routines"] as const;
@@ -942,6 +943,7 @@ export function GlobalSearch(props: GlobalSearchProps) {
                 </Show>
               </ResultsBody>
             </Combobox.Content>
+            <ScrollEdgeBlur fades={scrollFades} />
           </Combobox.Root>
           <div class="global-search-footer" aria-hidden="true">
             <span class="global-search-hint">

@@ -10,7 +10,9 @@ import {
 import type { AppTranslate } from "@openbot/i18n";
 import { Button, CopyButton, Popover, Skeleton, SlidersHorizontal } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createStore, For, Match, Show, Switch } from "solid-js";
+import { createStore, For, Match, onCleanup, Show, Switch } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
+import { ScrollEdgeBlur } from "../../components/ScrollEdgeBlur";
 import { useText } from "../../text";
 import { PORT_NAME, useBoard, type WfnBoard, type WfnFields, type WfnResult } from "./workflow-board";
 import { optionNameKey, optionValueKey, readableName } from "./workflow-media-step";
@@ -168,9 +170,9 @@ function sourceName(t: AppTranslate, settings: WorkflowFields, source: WorkflowS
   return t(PORT_NAME.image);
 }
 
-function TextBlock(props: { title: JSX.Element; value: string }) {
+function TextBlock(props: { title: JSX.Element; value: string; ref?: (element: HTMLElement) => void }) {
   return (
-    <section class="wfn-step-block">
+    <section class="wfn-step-block" ref={(element) => props.ref?.(element)}>
       <div class="wfn-step-block-head">
         <h3 class="wfn-step-block-title">{props.title}</h3>
         <CopyButton class="wfn-step-block-copy" value={props.value} iconOnly size="icon-xs" />
@@ -220,6 +222,8 @@ export function StepSettingsAction(props: { id: string; kind: WorkflowNodeKind }
   });
   const known = new Map<string, WorkflowStepSettings>();
   let trigger: HTMLButtonElement | undefined;
+  const fades = createScrollFades();
+  onCleanup(() => fades.stop());
   const available = () => board.catalogs().stepSettings !== undefined && board.shown(props.id) !== undefined;
   const load = (result: WfnResult) => {
     const read = board.catalogs().stepSettings;
@@ -338,9 +342,13 @@ export function StepSettingsAction(props: { id: string; kind: WorkflowNodeKind }
                 <p class="wfn-step-settings-body wfn-step-settings-note">{t("workflow.node.settings.notRecorded")}</p>
               </Match>
               <Match when={view.phase === "ready"}>
-                <div class="wfn-step-settings-body">
+                <div
+                  ref={(element) => fades.bind(element)}
+                  class={["wfn-step-settings-body", fades.classes()]}
+                  onScroll={fades.measure}
+                >
                   <Show when={facts().length > 0}>
-                    <dl class="wfn-step-facts">
+                    <dl class="wfn-step-facts" ref={(element) => fades.watch(element)}>
                       <For each={facts()}>
                         {(line) => (
                           <div class="wfn-step-fact">
@@ -351,9 +359,13 @@ export function StepSettingsAction(props: { id: string; kind: WorkflowNodeKind }
                       </For>
                     </dl>
                   </Show>
-                  <For each={texts()}>{(line) => <TextBlock title={line.label} value={line.value} />}</For>
+                  <For each={texts()}>
+                    {(line) => (
+                      <TextBlock title={line.label} value={line.value} ref={(element) => fades.watch(element)} />
+                    )}
+                  </For>
                   <Show when={sources().length > 0}>
-                    <section class="wfn-step-sources">
+                    <section class="wfn-step-sources" ref={(element) => fades.watch(element)}>
                       <h3 class="wfn-step-sources-title">{t("workflow.node.settings.inputs")}</h3>
                       <ul>
                         <For each={sources()}>
@@ -363,6 +375,7 @@ export function StepSettingsAction(props: { id: string; kind: WorkflowNodeKind }
                     </section>
                   </Show>
                 </div>
+                <ScrollEdgeBlur fades={fades} />
                 <footer class="wfn-step-settings-foot">
                   <Button size="sm" variant="secondary" disabled={!usable()} onClick={use}>
                     {t("workflow.node.settings.use")}

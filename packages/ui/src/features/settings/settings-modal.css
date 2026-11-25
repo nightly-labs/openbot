@@ -126,44 +126,6 @@
   overflow: hidden;
 }
 
-.settings-modal-scroll-frame::before,
-.settings-modal-scroll-frame::after {
-  position: absolute;
-  inset-inline-end: var(--openbot-space-2);
-  inset-inline-start: 0;
-  z-index: 1;
-  height: var(--openbot-space-8);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--openbot-duration-normal) ease;
-  content: "";
-}
-
-.settings-modal-scroll-frame::before {
-  top: 0;
-  background: linear-gradient(
-    to bottom,
-    var(--openbot-bg-canvas) 0%,
-    var(--openbot-bg-canvas) 28%,
-    var(--openbot-bg-canvas-clear) 100%
-  );
-}
-
-.settings-modal-scroll-frame::after {
-  bottom: 0;
-  background: linear-gradient(
-    to top,
-    var(--openbot-bg-canvas) 0%,
-    var(--openbot-bg-canvas) 28%,
-    var(--openbot-bg-canvas-clear) 100%
-  );
-}
-
-.settings-modal-scroll-frame[data-scroll-up]::before,
-.settings-modal-scroll-frame[data-scroll-down]::after {
-  opacity: 1;
-}
-
 .settings-modal-content {
   height: 100%;
   min-height: 0;
@@ -217,12 +179,12 @@
   padding: var(--openbot-space-3) var(--openbot-space-4);
 }
 
-.settings-modal-card > :not(:first-child) {
+.settings-modal-card > :not(:first-child, .scroll-edge-blur) {
   position: relative;
   border-top: 0;
 }
 
-.settings-modal-card > :not(:first-child)::before {
+.settings-modal-card > :not(:first-child, .scroll-edge-blur)::before {
   position: absolute;
   top: 0;
   right: var(--openbot-space-4);
@@ -793,11 +755,6 @@
 @media (prefers-reduced-motion: reduce) {
   .settings-modal {
     animation: none;
-  }
-
-  .settings-modal-scroll-frame::before,
-  .settings-modal-scroll-frame::after {
-    transition: none;
   }
 
   .settings-modal-tab-panel {
