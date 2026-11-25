@@ -540,6 +540,7 @@ export class BrowserHost {
   #pictureInPictureShortcuts = false;
   #pictureInPictureOverlayView: WebContentsView | null = null;
   #mainPageListener: ((page: BrowserMainPage | null) => void) | null = null;
+  #mainPageBottomRoom = 0;
   #target: BrowserViewTarget = "main";
   readonly #mountedViews = new Map<WebContentsView, BrowserWindow>();
   #backgroundWindow: BaseWindow | null = null;
@@ -961,6 +962,13 @@ export class BrowserHost {
 
   setMainPageListener(listener: ((page: BrowserMainPage | null) => void) | null): void {
     this.#mainPageListener = listener;
+    this.#syncAttachedView();
+  }
+
+  keepMainPageBottomRoom(height: number): void {
+    const room = Math.max(0, Math.round(height));
+    if (room === this.#mainPageBottomRoom) return;
+    this.#mainPageBottomRoom = room;
     this.#syncAttachedView();
   }
 
@@ -4130,7 +4138,9 @@ export class BrowserHost {
       width: this.#bounds.width * zoomFactor,
       height: this.#bounds.height * zoomFactor,
     });
-    tab.view.setBounds(bounds);
+    tab.view.setBounds(
+      this.#target === "main" ? { ...bounds, height: Math.max(1, bounds.height - this.#mainPageBottomRoom) } : bounds,
+    );
     this.#unthrottle(tab);
     tab.view.setVisible(true);
     this.#attachedViewShown = true;

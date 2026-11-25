@@ -28,6 +28,7 @@ export interface BrowserDockOverlayOptions {
   preloadPath: string;
   load: (contents: WebContents) => Promise<void>;
   forwardShortcut: (input: Input) => boolean;
+  keepPageBottomRoom: (height: number) => void;
 }
 
 export interface BrowserDockLayout {
@@ -91,6 +92,8 @@ export class BrowserDockOverlay {
   #seq = -1;
   #shrinkTimer: ReturnType<typeof setTimeout> | null = null;
   #shown = false;
+  #dockHeight = 0;
+  #pageBottomRoom = 0;
   #destroyed = false;
 
   constructor(options: BrowserDockOverlayOptions) {
@@ -140,6 +143,7 @@ export class BrowserDockOverlay {
     this.#glass = frame.glass;
     this.#anchor = frame.anchor ?? null;
     const height = Math.ceil(frame.height / HEIGHT_STEP) * HEIGHT_STEP;
+    if (frame.height < BROWSER_DOCK_LIMITS.frameSize) this.#dockHeight = height;
     if (height >= this.#height) {
       this.#cancelShrink();
       this.#height = height;
@@ -219,6 +223,7 @@ export class BrowserDockOverlay {
       this.#loaded = false;
       this.#seq = -1;
       this.#height = INITIAL_HEIGHT;
+      this.#dockHeight = 0;
       this.#glass = [];
       this.#anchor = null;
     }
@@ -246,6 +251,7 @@ export class BrowserDockOverlay {
         view.setVisible(false);
       }
       this.#setShown(false);
+      this.#keepPageBottomRoom(0);
       return;
     }
     const layout = browserDockLayout(page, this.#height, this.#glass, this.#anchor);
@@ -263,6 +269,14 @@ export class BrowserDockOverlay {
     window.contentView.addChildView(view);
     if (view.webContents.getZoomFactor() !== page.zoomFactor) view.webContents.setZoomFactor(page.zoomFactor);
     this.#setShown(true);
+    const dockHeight = Math.min(Math.round(this.#dockHeight * page.zoomFactor), layout.overlay.height);
+    this.#keepPageBottomRoom(userActsOnPage(this.#presentation) ? dockHeight : 0);
+  }
+
+  #keepPageBottomRoom(height: number): void {
+    if (this.#pageBottomRoom === height) return;
+    this.#pageBottomRoom = height;
+    this.#options.keepPageBottomRoom(height);
   }
 
   #glassView(index: number): View {
@@ -279,6 +293,11 @@ export class BrowserDockOverlay {
     this.#shown = shown;
     sendToRenderer(this.#options.mainWindow, IPC_ENDPOINTS.browserDock.shown, shown);
   }
+}
+
+function userActsOnPage(presentation: BrowserDockPresentation | null): boolean {
+  const island = presentation?.island;
+  return island?.kind === "activity" && island.control !== "agent";
 }
 
 function rendererOf(view: WebContentsView) {
