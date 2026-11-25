@@ -61,6 +61,8 @@ export const messages = {
   "error.import.hermesSkillCodeAdded": "프로필을 읽은 후에 코드가 추가되었어요. 허용하려면 프로필을 다시 읽어 주세요.",
   "error.import.hermesLinkNotSaved":
     "{name}: 이 프로필에서 만든 에이전트를 OpenBot이 저장하지 못해서, 다음 가져오기에서는 새 에이전트로 추가돼요.",
+  "error.import.hermesNameNotSaved":
+    "{name}: OpenBot이 에이전트 이름을 지침에 추가하지 못했어요. 에이전트가 다른 이름을 쓰면 지침에 이름을 추가하세요.",
   "error.import.transferRemoteTooLarge":
     "참여 중인 서버용 이전 파일은 100 MB 이하여야 해요. 워크스페이스 파일을 끄거나 에이전트를 더 적게 내보내 주세요.",
   "error.import.transferNotFile": "이 파일은 OpenBot 이전 파일이 아니에요.",

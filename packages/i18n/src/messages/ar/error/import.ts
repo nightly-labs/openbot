@@ -58,6 +58,8 @@ export const messages = {
     "تحتوي على شيفرة لم تكن فيها عند قراءة ملفات التعريف. اقرأها مرة أخرى للسماح بها.",
   "error.import.hermesLinkNotSaved":
     "{name}: تعذّر على OpenBot حفظ الوكيل الذي جاء من ملف التعريف هذا، لذا يضيفه الاستيراد التالي كوكيل جديد.",
+  "error.import.hermesNameNotSaved":
+    "{name}: تعذّر على OpenBot إضافة اسم الوكيل إلى تعليماته. إذا استخدم الوكيل اسمًا آخر، فأضف اسمه هناك.",
   "error.import.transferRemoteTooLarge":
     "يجب أن يكون حجم ملف النقل لخادم منضم إليه أقل من 100 MB. أوقف ملفات مساحة العمل، أو صدّر عددًا أقل من الوكلاء.",
   "error.import.transferNotFile": "هذا الملف ليس ملف نقل OpenBot.",

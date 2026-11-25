@@ -66,6 +66,8 @@ export const messages = {
     "Er staat code in die er niet was toen de profielen werden gelezen. Lees ze opnieuw om dit toe te staan.",
   "error.import.hermesLinkNotSaved":
     "{name}: OpenBot kon niet opslaan welke agent uit dit profiel kwam, dus bij de volgende import wordt het een nieuwe agent.",
+  "error.import.hermesNameNotSaved":
+    "{name}: OpenBot kon de naam van de agent niet aan de instructies toevoegen. Gebruikt de agent een andere naam, voeg de naam dan daar toe.",
   "error.import.transferRemoteTooLarge":
     "Een overdrachtsbestand voor een server waaraan je deelneemt, moet kleiner zijn dan 100 MB. Zet werkruimtebestanden uit, of exporteer minder agents.",
   "error.import.transferNotFile": "Dit bestand is geen overdrachtsbestand van OpenBot.",

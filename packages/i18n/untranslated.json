@@ -1322,6 +1322,7 @@
   "error.connector.linkUnreachable": ["de", "es", "fr", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "zh"],
   "error.import.hermesClosed": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "error.import.hermesLinkNotSaved": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
+  "error.import.hermesNameNotSaved": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "error.import.hermesNoProfiles": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "error.import.hermesProfileMissing": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],
   "error.import.hermesSkillCodeAdded": ["de", "es", "fr", "it", "ja", "pl", "pt", "ru", "tr"],

@@ -54,6 +54,8 @@ export const messages = {
   "error.import.hermesSkillSkipped": "{name}：已跳过技能“{skill}”。{reason}",
   "error.import.hermesSkillCodeAdded": "它含有读取这些配置时还没有的代码。请重新读取以允许它。",
   "error.import.hermesLinkNotSaved": "{name}：OpenBot 无法保存哪个助手来自该配置，因此下次导入会把它作为新助手添加。",
+  "error.import.hermesNameNotSaved":
+    "{name}：OpenBot 无法把助手的名字加入其指令。如果助手使用了其他名字，请在指令中加入它的名字。",
   "error.import.transferRemoteTooLarge":
     "已加入服务器的迁移文件必须小于 100 MB。请关闭工作区文件，或减少导出的助手数量。",
   "error.import.transferNotFile": "该文件不是 OpenBot 迁移文件。",
