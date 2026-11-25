@@ -100,14 +100,42 @@ const listSymbolFonts = Effect.fn("InstalledFonts.listSymbolFonts")(function* (p
   return symbolFontsCache;
 });
 
-export const listInstalledFonts = Effect.fn("InstalledFonts.list")(function* (
-  platform: NodeJS.Platform = process.platform,
-) {
+let fontListCache: string[] | null = null;
+let fontListScan: Effect.Effect<string[]> | null = null;
+
+const scanFontList = Effect.fn("InstalledFonts.scanFontList")(function* (platform: NodeJS.Platform) {
   const [listed, symbolFonts] = yield* Effect.all(
     [Effect.result(runFontCommand(fontListCommand(platform))), listSymbolFonts(platform)],
     { concurrency: "unbounded" },
   );
-  if (Result.isSuccess(listed)) return parseFontFamilies(listed.success).filter((family) => !symbolFonts.has(family));
+  if (Result.isSuccess(listed)) {
+    fontListCache = parseFontFamilies(listed.success).filter((family) => !symbolFonts.has(family));
+    return fontListCache;
+  }
   logger.warn("The list of installed fonts did not load.", toLogValue(listed.failure.cause));
-  return [];
+  return fontListCache ?? [];
+});
+
+function sharedFontListScan(platform: NodeJS.Platform): Effect.Effect<string[]> {
+  fontListScan ??= Effect.runSync(
+    Effect.cached(
+      scanFontList(platform).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            fontListScan = null;
+          }),
+        ),
+      ),
+    ),
+  );
+  return fontListScan;
+}
+
+export const listInstalledFonts = Effect.fn("InstalledFonts.list")(function* (
+  platform: NodeJS.Platform = process.platform,
+) {
+  const scan = sharedFontListScan(platform);
+  if (fontListCache === null) return yield* scan;
+  yield* Effect.forkDetach(scan);
+  return fontListCache;
 });
