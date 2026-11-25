@@ -216,6 +216,8 @@ const ATTACHED_FILES_HEADER = "\n\nAttached local files:\n";
 const NO_ANSWER_FROM = "No answer comes from ";
 const USER_LANGUAGE_LINE =
   "Write each line for the user in the language of the user's chat messages, not in the language of OpenBot notes or other agents.";
+const ROUTINE_LANGUAGE_LINE =
+  "Write each line for the user, also the first one, in the language that the routine task names, else the language that your instructions name, else the language of the routine task. Do not use the language of this OpenBot note.";
 const RESULT_FORMAT =
   "Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>.";
 const NO_ANSWER_REASON = ": the request to them ended before they answered. Do not wait for them.";
@@ -573,6 +575,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
             `A stop that the user asked for is not a failure. When the user paused this routine, or asked to stop or skip this run, and did not turn it on again, do not do the task and do not call the ${ROUTINE_REPORT_FAILURE_TOOL} tool: call the ${ROUTINE_NO_UPDATE_TOOL} tool instead of a written answer.`,
           ]),
       `When the task could not be done, call the ${ROUTINE_REPORT_FAILURE_TOOL} tool with a short reason, then give your answer as usual.`,
+      ROUTINE_LANGUAGE_LINE,
       ROUTINE_TASK_START,
       displayText,
     ].join("\n");
