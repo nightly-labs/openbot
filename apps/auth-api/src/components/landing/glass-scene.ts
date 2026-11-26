@@ -1,4 +1,4 @@
-import type { GlassPoint } from "./fluid-glass";
+import type { GlassPoint } from "./glass-lens";
 
 const WORD = /\S+/g;
 const SVG_NS = "http://www.w3.org/2000/svg";
