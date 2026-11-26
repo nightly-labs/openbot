@@ -477,6 +477,10 @@ install_packages() {
   install_packages_of "$(cat)"
 }
 
+keyring_files_present() {
+  [ -s "$USER_HOME/.config/openbot-hosted/keyring-password" ] && [ -s "$KEYRING_HOME/keyrings/login.keyring" ]
+}
+
 export_data() {
   [ "$#" -ge 1 ] || fail "usage: $0 export <archive | -> [<folder>...]"
   local archive=$1 copy=$1 version folder
@@ -495,7 +499,7 @@ export_data() {
   id "$SERVICE_USER" >/dev/null 2>&1 || fail "This machine has no user $SERVICE_USER. It is not a boat sandbox."
   is_hosted_install || fail "This machine is not a hosted server of the user $SERVICE_USER."
   [ -s "$USER_HOME/.config/OpenBot/openbot.db" ] || fail "The home of $SERVICE_USER has no OpenBot database."
-  [ -s "$USER_HOME/.config/openbot-hosted/keyring-password" ] && [ -s "$KEYRING_HOME/keyrings/login.keyring" ] ||
+  keyring_files_present || [ -s "$KEYRING_BACKUP/login.keyring" ] ||
     fail "The server keyring or its password file is missing. The server could not sign in after the move."
   local waited=0
   while [ -e /var/lib/ascii-lazy/active ] && [ ! -e /var/lib/ascii-lazy/hydration-done ]; do
@@ -514,6 +518,8 @@ export_data() {
   if openbot_runs; then fail "OpenBot still runs. Nothing was archived."; fi
   [ ! -x /opt/OpenBot/hosted/openbot-hosted-keyring ] || /opt/OpenBot/hosted/openbot-hosted-keyring start ||
     echo "The keyring check did not complete. The archive has the keyring as it is." >&2
+  keyring_files_present ||
+    fail "The server keyring or its password file is missing, and its copy did not restore it. OpenBot stays stopped. Nothing was archived."
 
   local tree trees="" members=() commands name notes
   while read -r tree; do

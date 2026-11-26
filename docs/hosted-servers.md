@@ -746,7 +746,8 @@ daemon). `openbot-hosted-keyring` (root) prevents this:
 - `start` waits 15 s at most for an hourly check that runs. Then it changes nothing, so the start
   stays in the 90 s start time-out of `openbot.service`.
 - `move-from-boat.sh export` runs `start` after it stops OpenBot, so the archive has the restored
-  keyring, not a damaged one.
+  keyring, not a damaged one. When a keyring file is missing, `export` continues only when the copy
+  exists, and it archives only when the guard restored the file.
 
 A server gets the guard with its first update to a release that has it. The old `apply` installs the
 new units, so `openbot.service` has the new `ExecStartPre` at once. The old `HOSTED_FILES` does not
