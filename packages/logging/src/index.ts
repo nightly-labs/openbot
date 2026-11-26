@@ -86,7 +86,7 @@ const secretGroups = new Map<string, Set<string>>();
 
 export function replaceSecretValueGroup(group: string, sets: readonly SecretValueSet[]): void {
   const forms = new Set<string>();
-  for (const { values, allowShort } of sets) addSecretForms(forms, values, { allowShort });
+  for (const set of sets) addSecretForms(forms, set.values, set);
   if (forms.size > 0) secretGroups.set(group, forms);
   else if (!secretGroups.delete(group)) return;
   rebuildRegisteredSecretPattern();
