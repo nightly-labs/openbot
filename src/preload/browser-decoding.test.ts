@@ -42,9 +42,11 @@ const fullTab = {
   diagnosticErrorCount: 2,
   openerTabId: "tab-0",
   popupFailure: { id: "popup-1", message: "The popup was blocked." },
+  permissionRequest: { id: "request-1", origin: "https://maps.example.test", permission: "geolocation" },
   userControl: true,
   canGoBack: true,
   canGoForward: false,
+  httpSignIn: { origin: "https://files.example.com", refused: true },
 } satisfies BrowserTab;
 
 const bounds = { x: 10, y: 20, width: 480, height: 270 } satisfies BrowserBounds;
@@ -133,6 +135,20 @@ describe("browser decoders", () => {
       { type: "stopped", tabId: "tab-1", reason: "The live view of this page ended." } satisfies BrowserLiveViewEvent,
     ],
     [
+      "live view dialog",
+      decodeBrowserLiveViewEvent,
+      {
+        type: "dialog",
+        tabId: "tab-1",
+        dialog: { id: "dialog-1", type: "confirm", message: "Pay now?" },
+      } satisfies BrowserLiveViewEvent,
+    ],
+    [
+      "closed live view dialog",
+      decodeBrowserLiveViewEvent,
+      { type: "dialog", tabId: "tab-1", dialog: null } satisfies BrowserLiveViewEvent,
+    ],
+    [
       "picture-in-picture move",
       decodeBrowserPictureInPictureEvent,
       { type: "bounds-changed", bounds } satisfies BrowserPictureInPictureEvent,
@@ -175,6 +191,31 @@ describe("browser decoders", () => {
     ["browser tab with a text error count", decodeBrowserTab, { ...tab, diagnosticErrorCount: "2" }],
     ["browser tab with a text canGoBack", decodeBrowserTab, { ...tab, canGoBack: "true" }],
     ["browser tab with a numeric canGoForward", decodeBrowserTab, { ...tab, canGoForward: 1 }],
+    [
+      "browser tab with an unknown permission request",
+      decodeBrowserTab,
+      { ...tab, permissionRequest: { id: "request-1", origin: "https://example.test", permission: "camera" } },
+    ],
+    [
+      "browser tab with a permission request without an origin",
+      decodeBrowserTab,
+      { ...tab, permissionRequest: { id: "request-1", permission: "geolocation" } },
+    ],
+    [
+      "browser tab with a site sign-in over HTTP",
+      decodeBrowserTab,
+      { ...tab, httpSignIn: { origin: "http://files.example.com" } },
+    ],
+    [
+      "browser tab with a site sign-in path",
+      decodeBrowserTab,
+      { ...tab, httpSignIn: { origin: "https://files.example.com/login" } },
+    ],
+    [
+      "browser tab with a false site sign-in refusal",
+      decodeBrowserTab,
+      { ...tab, httpSignIn: { origin: "https://files.example.com", refused: false } },
+    ],
     ["browser tab list that is not an array", decodeBrowserTabs, tab],
     ["browser display state without tabs", decodeBrowserDisplayState, { activeTabId: null }],
     [
@@ -185,6 +226,17 @@ describe("browser decoders", () => {
     ["browser bounds without a height", decodeBrowserBounds, { x: 0, y: 0, width: 1 }],
     ["live view frame with a text image", decodeBrowserLiveViewEvent, { ...frame, image: "jpeg" }],
     ["live view event of an unknown type", decodeBrowserLiveViewEvent, { type: "paused", tabId: "tab-1" }],
+    [
+      "live view dialog of an unknown type",
+      decodeBrowserLiveViewEvent,
+      { type: "dialog", tabId: "tab-1", dialog: { id: "dialog-1", type: "prompt", message: "Name?" } },
+    ],
+    [
+      "live view dialog without a message",
+      decodeBrowserLiveViewEvent,
+      { type: "dialog", tabId: "tab-1", dialog: { id: "dialog-1", type: "alert" } },
+    ],
+    ["live view dialog event without a dialog", decodeBrowserLiveViewEvent, { type: "dialog", tabId: "tab-1" }],
     ["picture-in-picture move without bounds", decodeBrowserPictureInPictureEvent, { type: "bounds-changed" }],
     ["picture-in-picture event of an unknown type", decodeBrowserPictureInPictureEvent, { type: "grow" }],
     [

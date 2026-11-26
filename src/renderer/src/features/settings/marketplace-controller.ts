@@ -890,7 +890,7 @@ export function createMarketplaceController(
           status: status === "unavailable" ? "idle" : status,
         };
       }),
-      ...(props.xApp && X_EXTENSION_URL
+      ...(props.xApp
         ? [
             {
               kind: "x",
@@ -1276,6 +1276,12 @@ export function createMarketplaceController(
         signInsRead += 1;
         setSignIns(mcpSignInRecord(states));
       }
+    },
+    get copyLink() {
+      return props.pluginHostName || !calls().copySignInLink ? undefined : copySignInLink;
+    },
+    get pasteAddress() {
+      return props.pluginHostName || !calls().signInRelay ? undefined : pasteSignInAddress;
     },
     get relay() {
       const relay = signInRelay();

@@ -394,14 +394,19 @@ const fakeAgents: TeamApiAgents = {
   deleteAgentHistory: unused("deleteAgentHistory"),
   clearChannelContext: unused("clearChannelContext"),
   compactChannelContext: unused("compactChannelContext"),
+  channelCompactAvailable: unused("channelCompactAvailable"),
   deleteChannelHistory: unused("deleteChannelHistory"),
   compactAgentContext: unused("compactAgentContext"),
   compactTaskContext: unused("compactTaskContext"),
   agentIdForRequest: unused("agentIdForRequest"),
   pendingApproval: unused("pendingApproval"),
+  pendingMediaApproval: unused("pendingMediaApproval"),
+  pendingCreditsHold: unused("pendingCreditsHold"),
   pendingPrompts: unused("pendingPrompts"),
   respondToPrompt: unused("respondToPrompt"),
   respondToApproval: unused("respondToApproval"),
+  respondToMediaApproval: unused("respondToMediaApproval"),
+  respondToCreditsHold: unused("respondToCreditsHold"),
   respondToBrowserSecret: unused("respondToBrowserSecret"),
   respondToBrowserTakeover: unused("respondToBrowserTakeover"),
 };
@@ -414,6 +419,7 @@ const browser: TeamApiBrowser = {
   navigate: unused("navigate"),
   reload: unused("reload"),
   stop: unused("stop"),
+  answerPermission: unused("answerPermission"),
   takeUserControl: unused("takeUserControl"),
   releaseUserControl: unused("releaseUserControl"),
   startTeach: unused("startTeach"),
@@ -429,7 +435,9 @@ const browser: TeamApiBrowser = {
   startView: unused("startView"),
   dispatchViewInput: unused("dispatchViewInput"),
   copyViewSelection: unused("copyViewSelection"),
+  answerViewDialog: unused("answerViewDialog"),
   importSignIn: unused("importSignIn"),
+  answerHttpSignIn: unused("answerHttpSignIn"),
 };
 
 const mailbox: TeamApiMailbox = { resolveAttachment: () => Effect.succeed(null) };

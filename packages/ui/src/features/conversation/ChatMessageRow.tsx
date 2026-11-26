@@ -17,6 +17,7 @@ import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import type { AttachmentDownloads, AttachmentMediaSource } from "./AttachmentCards";
 import { chatBubbleColor, useBackdropBubbles } from "./BackdropBubbles";
+import type { ImageCopies } from "./ImageLightbox";
 import type { MessageImageFile } from "./MarkdownMessageText";
 import { conversationBubbleVariant, MessageBody } from "./MessageRendering";
 import { solidBubbleTakesDarkText } from "./own-bubble";
@@ -67,6 +68,7 @@ export interface ChatMessageRowProps {
   onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   mediaSource?: AttachmentMediaSource | undefined;
+  imageCopies?: ImageCopies | undefined;
   downloads?: AttachmentDownloads | undefined;
   loadImageFile?: ((file: MessageImageFile) => Promise<string | null>) | undefined;
   onDownloadImageFile?: ((file: MessageImageFile) => void) | undefined;
@@ -184,6 +186,7 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
       onOpenTag={props.onOpenTag}
       onDownload={props.onDownload}
       mediaSource={props.mediaSource}
+      imageCopies={props.imageCopies}
       downloads={props.downloads}
       loadImageFile={props.loadImageFile}
       onDownloadImageFile={props.onDownloadImageFile}

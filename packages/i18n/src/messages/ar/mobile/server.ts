@@ -622,6 +622,16 @@ export const messages = {
   "mobile.server.settings.memoryLimitLoadFailed": "تعذّر تحميل حد الذاكرة لهذا الخادم.",
   "mobile.server.settings.memoryLimitSaveFailed": "تعذّر حفظ حد الذاكرة. أعد المحاولة.",
   "mobile.server.settings.memoryLimitUnsupported": "حدّث OpenBot على هذا الخادم لتغيير حد الذاكرة من هنا.",
+  "mobile.server.settings.mediaApprovalCredits": "اسأل قبل إنفاق أكثر من",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "رصيد",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed": "تعذّر تحميل حد الموافقة على الأرصدة لهذا الخادم.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed": "تعذّر حفظ حد الموافقة على الأرصدة. أعد المحاولة.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "حدّث OpenBot على هذا الخادم لتغيير حد الموافقة على الأرصدة من هنا.",
+  "mobile.server.settings.mediaApprovalAgents": "يمكن للوكلاء استخدام الأرصدة",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed": "تعذّر تغيير استخدام الوكلاء للأرصدة. أعد المحاولة.",
+  "mobile.server.settings.mediaApprovalAsk": "اسأل عند الحاجة إلى أرصدة",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "تعذّر تغيير طلبات الأرصدة. أعد المحاولة.",
   "mobile.server.settings.memoryReview": "مراجعة الذاكرة",
   "mobile.server.settings.memoryReviewDescription":
     "عدد المرات التي يحفظ فيها وكلاء هذا الخادم الحقائق الدائمة من دردشاتهم في الخلفية.",

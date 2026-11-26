@@ -316,6 +316,8 @@ export const messages = {
     "Il modello OpenCode ha scritto le sue azioni come testo e non le ha eseguite. Riprova o scegli un altro modello.",
   "error.provider.acpNoAnswer":
     "{provider} ha terminato il turno senza risposta. Invia di nuovo il messaggio o avvia una nuova chat.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} ha ricevuto i risultati dai compagni di squadra, poi ha terminato il turno senza risposta. Chiedi all'agente di continuare.",
   "error.provider.noAnswerAfterSteps":
     "{provider} ha eseguito alcuni passaggi, poi ha chiuso il turno senza risposta. Chiedi all'agente cosa ha fatto prima di inviare di nuovo la stessa richiesta.",
   "error.provider.acpRefusedNoReason": "{provider} si è fermato senza risposta. Invia di nuovo il messaggio.",
@@ -360,6 +362,8 @@ export const messages = {
     "Gemini non è riuscito a leggere la cronologia salvata di questa chat. OpenBot ha avviato una nuova sessione Gemini con la cronologia della chat. Invia di nuovo il messaggio.",
   "error.provider.acpTurnStuck":
     "{provider} non ha terminato il turno precedente, quindi non ha accettato questo messaggio. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Invia di nuovo il messaggio.",
+  "error.provider.antigravityLicenseRefused":
+    "Google indica che il tuo account non ha una licenza per usare questo modello. Scegli un altro modello, poi invia di nuovo il messaggio.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google non consente a Gemini di funzionare dalla posizione di rete del computer che esegue questo agente. Usa Gemini su un altro computer oppure scegli un altro provider per questo agente.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -381,6 +385,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Accedi con Cursor o imposta CURSOR_API_KEY per usare Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor non è riuscito a connettersi al suo server con il tuo accesso. Controlla la connessione a Internet, poi accedi di nuovo a Cursor.",
+  "error.provider.cursorNoModels":
+    "Cursor non ha inviato l’elenco dei modelli. Scegli «Connetti» per accedere di nuovo a Cursor. Se questo messaggio resta, controlla che il tuo piano Cursor includa dei modelli.",
   "error.provider.clineArchivePath": "L'archivio di Cline ha un percorso inatteso.",
   "error.provider.clinePackageMismatch": "Il pacchetto di Cline non corrisponde al catalogo dei runtime.",
   "error.provider.clineChecksum": "Checksum del runtime di Cline non corrispondente.",
@@ -424,6 +430,8 @@ export const messages = {
     "La chiave API di Anthropic non ha credito API. Un piano Claude non paga le richieste fatte con una chiave API. Aggiungi credito nella Anthropic Console, oppure accedi a Claude nelle Impostazioni e seleziona l'account Claude nel menu dei modelli dell'agente.",
   "error.provider.claudeAccountNoCredit":
     "Il saldo crediti del tuo account Claude è troppo basso. Alcune richieste, come la modalità veloce, usano crediti di utilizzo anche se il tuo piano Claude non è esaurito. Aggiungi crediti nel tuo account Claude, oppure scegli un altro modello nel menu dei modelli dell'agente.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code invia le richieste a {host}, non ad Anthropic: le impostazioni di Claude Code o le variabili d'ambiente definiscono questo indirizzo API. {host} ha rifiutato la richiesta per il saldo dell'account, non per il tuo piano Claude. Aggiungi fondi al tuo account {host}, oppure scegli un altro modello nel menu dei modelli dell'agente.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Il servizio di Claude ha bloccato questa richiesta. Di solito è un breve problema di Claude, non del tuo account. Invia di nuovo il messaggio tra qualche minuto.",
   "error.provider.foreignReasoning":
@@ -448,6 +456,8 @@ export const messages = {
     "Il modello non ha accettato un'immagine in questa chat perché l'immagine è troppo grande. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.imageCountLimit":
     "Il modello non ha accettato questa chat perché contiene troppe immagini. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
+  "error.provider.imageCountLimitRepeated":
+    "Il modello di nuovo non ha accettato questa chat: contiene troppe immagini. Un'attività apre più immagini di quante questo modello ne accetti, e una nuova sessione non aiuta. Scegli Nuova chat e chiedi all'agente di aprire meno immagini per passaggio, oppure un modello che accetta più immagini.",
   "error.provider.imageUnreadable":
     "Il modello non è riuscito a leggere un'immagine in questa chat. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova. Se hai inviato un'immagine, inviane un'altra.",
   "error.provider.requestTooLarge":
@@ -462,6 +472,8 @@ export const messages = {
     "Muse non è riuscito ad avviare un server MCP e ha bloccato MCP in questa sessione. OpenBot ha avviato una nuova sessione Muse con la cronologia della chat. Riprova. Se l’errore continua, disattiva Controllo del computer o il server MCP non riuscito per questo agente.",
   "error.provider.claudeSessionMissing":
     "Claude Code non ha trovato la sessione salvata di questa chat. OpenBot ha avviato una nuova sessione di Claude Code con la cronologia della chat. Riprova.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode non ha trovato la sessione salvata di questa chat. OpenBot ha avviato una nuova sessione di OpenCode con la cronologia della chat. Riprova.",
   "error.provider.grokSignIn": "Esegui `grok login` o imposta XAI_API_KEY per usare Grok.",
   "error.provider.acpSignInNoStart":
     "Il provider non si è avviato, quindi l’accesso non è potuto iniziare. Riprova o riavvia OpenBot.",
@@ -573,7 +585,10 @@ export const messages = {
   "error.provider.piOutdated":
     "Pi {version} è troppo vecchio. Installa Pi 1.1.0 o successivo per il supporto nativo a RPC e MCP.",
   "error.provider.nativeMissing": "La CLI di {provider} non è installata. Scaricala in Impostazioni.",
-  "error.provider.nativeNotStarted": "Impossibile avviare la CLI di {provider}.",
+  "error.provider.nativeNotStarted":
+    "OpenBot ha trovato il {provider} che hai installato, ma non si è avviato. Aggiorna o reinstalla {provider}, poi riprova.",
+  "error.provider.nativeManagedNotStarted":
+    "{provider} non si è avviato sul computer che esegue questo server. Riavvia OpenBot su quel computer. Se ancora non si avvia, scegli Aiuto > Segnala un problema.",
   "error.provider.nativeVersionUnreadable": "Impossibile leggere la versione della CLI di {provider}.",
   "error.provider.piSessionBusy": "Attendi che il turno attuale di Pi finisca.",
   "error.provider.acpSessionBusy": "{provider} sta ancora finendo un turno interrotto. Riprova tra un attimo.",

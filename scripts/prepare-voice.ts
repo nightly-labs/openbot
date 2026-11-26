@@ -4,12 +4,22 @@ import { copyFileSync, createReadStream, existsSync, readFileSync, writeFileSync
 import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
-import { PARAKEET_MODEL_FILES, VOICE_RUNTIME_ADDON, VOICE_SESSION_CONFIGS } from "../src/main/voice-model-service";
+import {
+  PARAKEET_MODEL_FILES,
+  VOICE_RUNTIME_ADDON,
+  VOICE_SESSION_CONFIGS,
+  VOICE_SPEECH_DETECTOR,
+} from "../src/main/voice-model-service";
 import { elfSearchPaths, ORIGIN_SEARCH_PATH } from "./elf-search-paths";
 
 const logger = createOpenBotLogger("prepare-voice");
 
 const SHERPA_ONNX_VERSION = "2.0.3";
+const SPEECH_DETECTOR_FILE = {
+  url: `https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/${VOICE_SPEECH_DETECTOR}`,
+  bytes: 2_313_101,
+  sha256: "6b99cbfd39246b6706f98ec13c7c50c6b299181f2474fa05cbc8046acc274396",
+};
 
 interface RuntimePackage {
   name: string;
@@ -62,6 +72,7 @@ if (!runtimePackage) {
 requireCommand("tar", ["--version"]);
 await prepareRuntime(runtimePackage);
 await writeSessionConfigs();
+await prepareSpeechDetector();
 if (!runtimeOnly) await prepareModel();
 logger.info(`Prepared voice assets in ${buildRoot}`);
 
@@ -107,23 +118,34 @@ async function writeSessionConfigs(): Promise<void> {
   );
 }
 
+async function prepareSpeechDetector(): Promise<void> {
+  await downloadVerified(join(runtimeRoot, VOICE_SPEECH_DETECTOR), {
+    name: VOICE_SPEECH_DETECTOR,
+    ...SPEECH_DETECTOR_FILE,
+  });
+}
+
 async function prepareModel(): Promise<void> {
   await mkdir(modelRoot, { recursive: true });
   await removeOtherModels();
-  for (const file of PARAKEET_MODEL_FILES) {
-    const path = join(modelRoot, file.name);
-    if (await isExpectedFile(path, file.bytes, file.sha256)) continue;
-    logger.info(`Downloading ${file.name}…`);
-    const response = await fetch(file.url);
-    if (!response.ok) throw new Error(`Unable to download ${file.name} (${response.status}).`);
-    const partialPath = `${path}.part`;
-    await writeFile(partialPath, Buffer.from(await response.arrayBuffer()));
-    if (!(await isExpectedFile(partialPath, file.bytes, file.sha256))) {
-      await rm(partialPath, { force: true });
-      throw new Error(`The downloaded ${file.name} failed its size or SHA-256 check.`);
-    }
-    await rename(partialPath, path);
+  for (const file of PARAKEET_MODEL_FILES) await downloadVerified(join(modelRoot, file.name), file);
+}
+
+async function downloadVerified(
+  path: string,
+  file: { name: string; url: string; bytes: number; sha256: string },
+): Promise<void> {
+  if (await isExpectedFile(path, file.bytes, file.sha256)) return;
+  logger.info(`Downloading ${file.name}…`);
+  const response = await fetch(file.url);
+  if (!response.ok) throw new Error(`Unable to download ${file.name} (${response.status}).`);
+  const partialPath = `${path}.part`;
+  await writeFile(partialPath, Buffer.from(await response.arrayBuffer()));
+  if (!(await isExpectedFile(partialPath, file.bytes, file.sha256))) {
+    await rm(partialPath, { force: true });
+    throw new Error(`The downloaded ${file.name} failed its size or SHA-256 check.`);
   }
+  await rename(partialPath, path);
 }
 
 async function removeOtherModels(): Promise<void> {

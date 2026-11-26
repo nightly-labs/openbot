@@ -295,6 +295,25 @@ const CASES: Case[] = [
       "Top causes from the start profile: 1) the plugin scan reads 400 manifests before the window shows (1.1 s); 2) the database migration check runs twice (0.4 s); 3) the font cache is rebuilt each start (0.3 s). I did not change code, as you asked.",
     ),
   },
+  {
+    name: "continuation-after-wrong-check",
+    label: "stop",
+    verdict: "done",
+    input: input(
+      "Lunch 18 EUR on Monday, a taxi 25 EUR on Tuesday, and a hotel night 90 EUR on Tuesday. Record them.",
+      [tool("expenses list --week")],
+      "I checked again, and my last answer stays correct: all three expenses are recorded, and there is nothing on Wednesday.",
+      {
+        continuations: 1,
+        earlierAnswers: [
+          "I recorded your expenses:\n1. Monday: lunch 18 EUR.\n2. Tuesday: a taxi 25 EUR and a hotel night 90 EUR.",
+        ],
+        earlierGaps: [
+          "The answer lists only two of the three expenses. Check whether there is an expense on Wednesday.",
+        ],
+      },
+    ),
+  },
 ];
 
 type Provider = "claude" | "codex";

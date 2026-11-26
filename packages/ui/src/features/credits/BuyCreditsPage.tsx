@@ -1,16 +1,16 @@
 import type { BillingCurrency } from "@openbot/contracts/billing";
 import {
+  CREDIT_CLIP_SECONDS,
   CREDIT_PACK_INDEXES,
   CREDIT_POPULAR_INDEX,
   CREDIT_STOP_COUNT,
   CREDIT_TIER_START_INDEX,
   type CreditCheckoutRequest,
-  type CreditModelCost,
+  type CreditEstimate,
   type CreditStop,
   type CreditsState,
   type CreditTier,
-  creditEstimateModels,
-  creditModelCharge,
+  creditEstimates,
   creditRegularPrice,
   creditStopAt,
   creditStopPrice,
@@ -189,24 +189,24 @@ function SaveChip(props: { stop: CreditStop }) {
   );
 }
 
-const ESTIMATE_MODELS = creditEstimateModels();
+const ESTIMATES = creditEstimates();
 
 function Facts(props: { credits: number }) {
-  const { t } = useText();
+  const { t, format } = useText();
   const credit = useCreditFormat();
-  const estimate = (model: CreditModelCost) => {
-    const count = Math.floor(creditTenths(props.credits) / creditTenths(creditModelCharge(model)));
-    const params = { count, amount: credit.count(count), model: model.name };
+  const estimate = ({ model, resolution, charge }: CreditEstimate) => {
+    const count = Math.floor(creditTenths(props.credits) / creditTenths(charge));
+    const params = { count, amount: credit.count(count), model: model.name, resolution };
     if (model.kind === "image") return t("billing.credits.images", params);
-    return t("billing.credits.videos", params);
+    return t("billing.credits.videos", { ...params, seconds: format.number(CREDIT_CLIP_SECONDS) });
   };
   return (
     <ul class="credit-facts">
-      <For each={ESTIMATE_MODELS}>
-        {(model) => (
+      <For each={ESTIMATES}>
+        {(entry) => (
           <li>
             <Check aria-hidden="true" />
-            <span>{estimate(model)}</span>
+            <span>{estimate(entry)}</span>
           </li>
         )}
       </For>

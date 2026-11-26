@@ -24,6 +24,8 @@ export const messages = {
   "preview.tooLarge.description":
     "Die Vorschau endet bei 100 MB. Du kannst diese Datei in ihrer Standardanwendung öffnen.",
   "preview.spreadsheet.readFailed": "Diese Tabelle konnte nicht gelesen werden.",
+  "preview.spreadsheet.tooLarge":
+    "Diese Tabelle ist zu groß für die Vorschau. Öffne die Datei oder lade sie herunter, um alles zu sehen.",
   "preview.spreadsheet.truncated": "Vorschau auf die ersten {rows} Zeilen und {columns} Spalten begrenzt.",
   "preview.document.readFailed": "Dieses Dokument konnte nicht gelesen werden.",
   "preview.document.empty": "Dieses Dokument enthält keinen Text zum Anzeigen.",

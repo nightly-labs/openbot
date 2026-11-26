@@ -11,6 +11,10 @@ const RETRY_NOTICE_KEYS: ReadonlySet<string> = new Set([
   "error.backend.turnStartUnconfirmed",
 ]);
 
+export function isRetryNotice(message: string): boolean {
+  return matchingSourceKeys(message.trim()).some((sourceKey) => RETRY_NOTICE_KEYS.has(sourceKey));
+}
+
 export function createTurnErrorBanners() {
   const retryNotices = new Map<string, string>();
   const errors = new Map<string, string>();
@@ -19,13 +23,24 @@ export function createTurnErrorBanners() {
     noteError(key: string, message: string, readable: string): void {
       errors.set(key, readable);
       errorsBeforeTurn.delete(key);
-      if (matchingSourceKeys(message.trim()).some((sourceKey) => RETRY_NOTICE_KEYS.has(sourceKey)))
-        retryNotices.set(key, readable);
+      if (isRetryNotice(message)) retryNotices.set(key, readable);
       else retryNotices.delete(key);
     },
     noteTurnStarted(key: string): void {
       const error = errors.get(key);
       if (error !== undefined) errorsBeforeTurn.set(key, error);
+    },
+    clearAfterOutput<Run extends { message: string }>(
+      key: string,
+      setErrors: BannerUpdate<string>,
+      setRuns: BannerUpdate<Run>,
+    ): void {
+      const notice = retryNotices.get(key);
+      if (notice === undefined) return;
+      retryNotices.delete(key);
+      if (errors.get(key) === notice) errors.delete(key);
+      setErrors((current) => (current[key] === notice ? withoutBanner(current, key) : current));
+      setRuns((current) => (current[key]?.message === notice ? withoutBanner(current, key) : current));
     },
     clearAtTurnEnd<Run extends { message: string }>(
       key: string,

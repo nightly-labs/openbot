@@ -8,6 +8,13 @@ export const messages = {
   "composer.feedbackFix.body":
     "Correction du rapport #{number}. Envoyez la demande, ou annulez pour garder le rapport tel quel.",
   "composer.feedbackFix.cancel": "Annuler",
+  "composer.browserTab.opened": "{name} a ouvert {title} dans le navigateur.",
+  "composer.browserTab.openedMany": {
+    one: "{name} a ouvert {count} page dans le navigateur.",
+    other: "{name} a ouvert {count} pages dans le navigateur.",
+  },
+  "composer.browserTab.open": "Ouvrir la page",
+  "composer.browserTab.hide": "Masquer",
   "composer.providerWait.offlineTitle": "Pas de connexion Internet",
   "composer.providerWait.offline":
     "{provider} ne peut pas répondre tant que cet ordinateur n’est pas de nouveau en ligne.",
@@ -108,6 +115,9 @@ export const messages = {
   "composer.voice.limitSoon": "L’enregistrement s’arrête dans {seconds} secondes.",
   "composer.voice.limitReached":
     "L’enregistrement s’est arrêté à la limite de 10 minutes. Ce que vous avez dit est dans le message.",
+  "composer.voice.languageNotice":
+    "La dictée connaît 25 langues européennes, comme l’anglais. Les autres langues demandent un modèle plus grand ({size}), et le texte s’affiche après l’arrêt.",
+  "composer.voice.languageNotice.action": "Je parle une autre langue",
   "composer.send.saveQueued": "Enregistrer le message en attente",
   "composer.send.voice": "Envoyer le message vocal",
   "composer.send.message": "Envoyer le message",

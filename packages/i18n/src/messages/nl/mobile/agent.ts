@@ -379,11 +379,12 @@ export const messages = {
   "mobile.agent.backupModels.remove": "{model} verwijderen",
   "mobile.agent.backupModels.unavailable": "Nu niet beschikbaar · overgeslagen",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Als een gebruikslimiet {name} stopt nadat het werk is begonnen, gaat {name} met hetzelfde werk verder op het eerste beschikbare model in de volgorde. Het gaat terug naar {model} als de limiet afloopt, of 10 minuten na een fout van de aanbieder.",
   "mobile.agent.busyMessage.label": "Tijdens werk",
   "mobile.agent.busyMessage.footer":
-    "Wat een bericht doet als je het stuurt terwijl de agent werkt. Wachtrij bewaart het tot de beurt eindigt. Bijsturen geeft het tijdens de beurt aan de agent.",
+    "Wat een bericht van jou of een andere agent doet als het binnenkomt terwijl de agent werkt. Wachtrij bewaart het tot de beurt eindigt. Bijsturen geeft het tijdens de beurt aan de agent.",
   "mobile.agent.busyMessage.queue": "Wachtrij",
   "mobile.agent.busyMessage.steer": "Bijsturen",
   "mobile.agent.busyMessage.hostDefaultQueue": "Hoststandaard (Wachtrij)",
@@ -695,6 +696,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Niet uitsluiten",
   "mobile.agent.folders.browseTitle": "Map kiezen",
   "mobile.agent.folders.places": "Ga naar",
+  "mobile.agent.folders.path": "Mappad",
   "mobile.agent.folders.home": "Thuismap",
   "mobile.agent.folders.parent": "Omhoog naar {folder}",
   "mobile.agent.folders.browseFailed": "Kan deze map niet openen.",

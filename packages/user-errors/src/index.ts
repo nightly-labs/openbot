@@ -71,7 +71,8 @@ export function classifyUserError(error: unknown): UserErrorKind {
   if (
     code === "ETIMEDOUT" ||
     code === "ERR_CONNECTION_TIMED_OUT" ||
-    (error instanceof Error && error.name === "TimeoutError")
+    (error instanceof Error && error.name === "TimeoutError") ||
+    errorReference(error) === "error/TimeoutError"
   ) {
     return "timeout";
   }

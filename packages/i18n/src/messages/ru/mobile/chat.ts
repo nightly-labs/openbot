@@ -151,6 +151,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Следующая часть",
   "mobile.chat.preview.pdfFailed": "Не удалось показать этот PDF.",
   "mobile.chat.preview.spreadsheetFailed": "Не удалось прочитать эту таблицу.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Эта таблица слишком большая для просмотра. Поделитесь ею, чтобы открыть в другом приложении.",
   "mobile.chat.preview.spreadsheetTruncated": "Просмотр ограничен первыми {rows} строками и {columns} столбцами.",
   "mobile.chat.copyFailedMessage": "Повторите попытку.",
   "mobile.chat.message.copyFailed": "Не удалось скопировать сообщение",
@@ -185,6 +187,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "Удерживайте кнопку, чтобы подтвердить.",
   "mobile.chat.question.preview": "Предпросмотр",
   "mobile.chat.question.showAllPreview": "Показать всё",
+  "mobile.chat.question.copyPreviewFailed": "Не удалось скопировать черновик",
   "mobile.chat.question.sendChoice": "Отправить",
   "mobile.chat.question.selectedCount": {
     one: "Выбран {count}",
@@ -283,7 +286,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "Сервер не подключён. Разговор продолжится, когда он снова подключится.",
   "mobile.chat.liveVoice.speakFailed": "Не удалось прочитать ответ вслух.",
   "mobile.chat.liveVoice.voiceNotReady": "Выберите голос ответов в Настройки > Голос.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 не читает этот язык.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 не читает этот язык. Выберите другой голос ответов в Настройки > Голос.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs не принял ключ API.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "У ключа ElevenLabs нет нужного разрешения. Проверьте его в Настройки > Голос.",
@@ -529,6 +533,7 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "Загрузка",
   "mobile.chat.outbox.sendsWhenOnline": "Отправится, когда сервер будет в сети",
   "mobile.chat.outbox.waiting": "Ожидает отправки",
+  "mobile.chat.outbox.waitingForFailed": "Ожидает неотправленное сообщение",
   "mobile.chat.outbox.failed": "Не отправлено",
   "mobile.chat.outbox.failedHold": "Не отправлено. Нажмите и удерживайте сообщение, чтобы повторить.",
   "mobile.chat.outbox.cancelSend": "Не отправлять",
@@ -602,6 +607,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Подключение к серверу",
   "mobile.chat.history.loading": "Загрузка истории чата",
   "mobile.chat.history.waiting": "Ожидание подключения",
+  "mobile.chat.history.syncing": "Проверка новых сообщений",
   "mobile.chat.history.loadFailed": "Не удалось загрузить историю чата",
   "mobile.chat.scrollToLatest": "К последнему сообщению",
   "mobile.chat.agentUnavailable.title": "Агент недоступен",
@@ -629,6 +635,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "Ожидание ответов",
   "mobile.chat.queue.providerRestart": "Ожидание перезапуска {provider}",
   "mobile.chat.queue.signIn": "Ожидание входа в {provider}",
+  "mobile.chat.queue.usageLimit": "Лимит использования исчерпан",
+  "mobile.chat.queue.usageLimitResets": "Лимит использования исчерпан · Сброс: {time}",
   "mobile.chat.providerSignIn.title": "Вход в {provider} не выполнен",
   "mobile.chat.providerSignIn.action": "Войти",
   "mobile.chat.providerSignIn.open": "{label}. Открыть настройки провайдера",

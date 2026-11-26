@@ -175,6 +175,7 @@ export const messages = {
   "chat.marker.settingLink": "הציג הגדרה",
   "chat.settingLink.desktopOnly": "יש לפתוח אותה באפליקציית OpenBot במחשב שלך.",
   "chat.settingLink.agentChatOnly": "יש לפתוח אותה בצ'אט שלך עם הסוכן הזה.",
+  "chat.settingLink.adminOnly": "רק הבעלים או מנהל של השרת יכולים לשנות את ההגדרה הזו.",
   "chat.marker.skillSuggestion": "הציע מיומנות",
   "chat.marker.mcpSignIn": "ביקש להתחבר לשרת MCP",
   "chat.marker.serverInstall": "יצר פקודה להתקנת שרת",

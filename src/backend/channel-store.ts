@@ -384,11 +384,10 @@ export class ChannelStore {
 
   messages(channelId: string, before = Number.MAX_SAFE_INTEGER, limit?: number): ChannelMessage[] {
     const rows = databaseRows(
-      this.database.connection
-        .prepare(
-          `SELECT message_json FROM projection_channel_messages WHERE channel_id = ? AND sequence < ? AND ${SHOWN_MESSAGE_SQL} ORDER BY sequence DESC, message_id DESC LIMIT ?`,
-        )
-        .all(channelId, before, limit ?? -1),
+      cachedStatement(
+        this.database.connection,
+        `SELECT message_json FROM projection_channel_messages WHERE channel_id = ? AND sequence < ? AND ${SHOWN_MESSAGE_SQL} ORDER BY sequence DESC, message_id DESC LIMIT ?`,
+      ).all(channelId, before, limit ?? -1),
     );
     return rows.reverse().map((row) => {
       const value = JSON.parse(requiredStringColumn(row, "message_json"));

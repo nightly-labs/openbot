@@ -7,6 +7,7 @@ import {
   CHALLENGE_WAIT_MS,
   type DetectedChallenge,
   describeChallenge,
+  httpSignInChallenge,
   TURNSTILE_SELF_PASS_MS,
 } from "./browser-challenge";
 import { type BrowserOperationError, browserFailure, browserSync } from "./browser-effects";
@@ -278,6 +279,7 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
       afterTakeover,
     );
     if (challenge) result.snapshot.challenge = challenge;
+    else if (tab.httpSignIn) result.snapshot.challenge = httpSignInChallenge();
   }
   const recalled = siteMemories && !tab.secret ? recallSiteMemories(tab, result.snapshot.url, siteMemories) : null;
   if (recalled?.memories.length) result.snapshot.siteMemories = recalled.memories;

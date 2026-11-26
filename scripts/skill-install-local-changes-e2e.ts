@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
@@ -256,6 +256,38 @@ await scenario("L A file inside a runtime folder still refuses", async (context)
   const revise = await reviseFrom(context, 1, "source");
   assert.ok(revise?.includes(REFUSED), "The file stops the install.");
   return { before, revise };
+});
+
+async function replaceWithOwnCopy(context: Context, text: string): Promise<string> {
+  await Effect.runPromise(context.service.uninstall({ agentId: AGENT_ID, skillId: context.skillId }));
+  const ownFile = join(context.workspace, ".claude/skills", context.slug, "SKILL.md");
+  await mkdir(dirname(ownFile), { recursive: true });
+  await writeFile(ownFile, text);
+  return ownFile;
+}
+
+await scenario("M An own copy with the same files as the skill installs over it", async (context) => {
+  const installedText = await readFile(join(context.workspace, ".claude/skills", context.slug, "SKILL.md"), "utf8");
+  await replaceWithOwnCopy(context, installedText);
+  const install = await failure(
+    context.service.install({ agentId: AGENT_ID, skillId: context.skillId, replaceModified: false }),
+  );
+  assert.equal(install, null);
+  const after = await installedState(context);
+  assert.equal(after, "installed@1");
+  return { install, after };
+});
+
+await scenario("N An own skill with the same name and other files stays and names the skill", async (context) => {
+  const ownText = skillMarkdown("First.", "The agent's own skill.");
+  const ownFile = await replaceWithOwnCopy(context, ownText);
+  const install = await failure(
+    context.service.install({ agentId: AGENT_ID, skillId: context.skillId, replaceModified: false }),
+  );
+  assert.equal(install, sourceText("error.skill.ownSkillExists", { slug: context.slug }));
+  const kept = await readFile(ownFile, "utf8");
+  assert.equal(kept, ownText);
+  return { install, kept: kept === ownText ? "unchanged" : "changed" };
 });
 
 await mkdir(".openbot-build", { recursive: true });

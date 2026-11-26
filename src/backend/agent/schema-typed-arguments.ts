@@ -10,21 +10,53 @@ export function withSchemaTypes(args: DynamicRecord, schema: DynamicRecord): Dyn
 function typedValue<Value>(value: Value, schema: DynamicRecord): Value | TypedText {
   const typed = typeof value === "string" ? typedText(value, acceptedTypes(schema)) : value;
   if (Array.isArray(typed)) {
-    const items = subschema(schema, (branch) => (isDynamicRecord(branch.items) ? [branch.items] : []));
+    const items = itemsSchema(schema);
     return items === undefined ? typed : typed.map((item) => typedValue(item, items));
   }
   if (!isDynamicRecord(typed)) return typed;
   return Object.fromEntries(
     Object.entries(typed).map(([key, item]) => {
-      const property = subschema(schema, (branch) => {
-        if (isDynamicRecord(branch.properties) && Object.hasOwn(branch.properties, key))
-          return [branch.properties[key]];
-        if (isDynamicRecord(branch.additionalProperties)) return [branch.additionalProperties];
-        return isDynamicRecord(branch.properties) && branch.additionalProperties !== false ? [{}] : [];
-      });
+      const property = propertySchema(schema, key);
       return [key, property === undefined ? item : typedValue(item, property)];
     }),
   );
+}
+
+export function nullStructuredItemPaths(args: DynamicRecord, schema: DynamicRecord): string[] {
+  return nullPaths(args, schema, []);
+}
+
+function needsStructure(schema: DynamicRecord): boolean {
+  const types = acceptedTypes(schema);
+  return types !== null && !types.has("null") && (types.has("object") || types.has("array"));
+}
+
+function nullPaths(value: unknown, schema: DynamicRecord, path: readonly string[]): string[] {
+  if (Array.isArray(value)) {
+    const items = itemsSchema(schema);
+    if (items === undefined) return [];
+    return value.flatMap((item, index) => {
+      const itemPath = [...path, String(index)];
+      return item === null ? (needsStructure(items) ? [itemPath.join(".")] : []) : nullPaths(item, items, itemPath);
+    });
+  }
+  if (!isDynamicRecord(value)) return [];
+  return Object.entries(value).flatMap(([key, item]) => {
+    const property = propertySchema(schema, key);
+    return property === undefined ? [] : nullPaths(item, property, [...path, key]);
+  });
+}
+
+function itemsSchema(schema: DynamicRecord): DynamicRecord | undefined {
+  return subschema(schema, (branch) => (isDynamicRecord(branch.items) ? [branch.items] : []));
+}
+
+function propertySchema(schema: DynamicRecord, key: string): DynamicRecord | undefined {
+  return subschema(schema, (branch) => {
+    if (isDynamicRecord(branch.properties) && Object.hasOwn(branch.properties, key)) return [branch.properties[key]];
+    if (isDynamicRecord(branch.additionalProperties)) return [branch.additionalProperties];
+    return isDynamicRecord(branch.properties) && branch.additionalProperties !== false ? [{}] : [];
+  });
 }
 
 function unionOf(schema: DynamicRecord): unknown[] {

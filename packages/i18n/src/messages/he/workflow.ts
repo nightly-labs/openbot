@@ -117,6 +117,8 @@ export const messages = {
   "workflow.agent.removedLabel": "הסוכן הוסר. בחירת סוכן",
   "workflow.agent.list": "סוכנים",
   "workflow.agent.search": "חיפוש סוכנים",
+  "workflow.agentMade.title": "תהליך עבודה חדש מ־{agent}",
+  "workflow.agentMade.open": "פתיחה",
   "workflow.model.label": "מודל: {name}",
   "workflow.model.title": "מודלים",
   "workflow.model.providers": "ספקים",

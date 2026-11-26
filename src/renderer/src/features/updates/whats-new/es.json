@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.79.0",
+    "date": "2026-11-25",
+    "notices": [
+      "Actualiza también a esta versión cada servidor al que te has unido. Las herramientas de imagen y video con créditos, las solicitudes de ubicación y muchas de las correcciones de abajo solo funcionan en un servidor cuando el servidor tiene esta versión."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Los agentes pueden crear imágenes y videos con créditos de OpenBot, y editar tus imágenes. La tarjeta de aprobación muestra el modelo, el precio y el prompt. Puedes elegir otro modelo antes de permitirlo. El elemento Credits de la barra izquierda muestra tu saldo. Un propietario o un administrador puede activar o desactivar «Los agentes pueden usar créditos».",
+          "Los agentes pueden pagar en sitios con cripto desde una cartera de NEAR Intents. Conéctala en Ajustes del servidor › Vault › Cripto con una llave de acceso y luego haz un depósito. Cada pago espera tu aprobación en el chat, a menos que elijas «Permitir siempre» para ese sitio. Un presupuesto diario limita lo que pueden gastar los agentes. La cartera es solo para este equipo, y los pagos usan fondos reales.",
+          "Cada cuenta recibe 10 créditos gratis de bienvenida. También puedes canjear un código de crédito en la página Credits con Redeem code.",
+          "La pestaña del navegador de un agente puede pedir tu ubicación. El chat te pregunta primero, y eliges Bloquear, Permitir siempre o Permitir. Antes, el navegador siempre bloqueaba la solicitud.",
+          "La barra lateral tiene pestañas encima de la lista de chats: Todos, No leídos y las carpetas que elijas. Cada pestaña muestra sus chats no leídos."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Un nuevo paso de flujo de trabajo ahora empieza con un modelo que puede ejecutarse. Un paso de texto usa tu modelo preferido, o el modelo habitual de un proveedor conectado.",
+          "Cuando solo tienes créditos gratis, la lista de modelos de una tarjeta de aprobación marca con «Créditos gratis» los modelos que pagan los créditos gratis.",
+          "El panel lateral puede dividirse en hasta tres grupos, uno encima de otro. Arrastra la línea entre dos grupos para cambiar su altura."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "La app se congela menos, sobre todo en Windows. Guarda los resultados de las comprobaciones lentas durante un corto tiempo y hace el trabajo lento en segundo plano.",
+          "Cuando un agente de Claude termina un plan en modo plan, el chat ahora muestra el plan con Aprobar y Stop planning. Antes, no aparecía ninguna aprobación y el agente empezaba a construir.",
+          "Un mensaje de otro agente o de una rutina ya no detiene el trabajo de un agente de Claude ocupado.",
+          "Una alerta de un sitio web en la pestaña del navegador de un agente ya no cubre la ventana de OpenBot hasta que haces clic en Aceptar. La alerta se cierra sola y el agente recibe su texto.",
+          "En un escritorio Linux X11, escribir en OpenBot ya no se detiene después de que un agente use Uso del equipo en otra app. Si ya se había detenido, cierra sesión y vuelve a entrar una vez."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.78.0",
     "date": "2026-11-24",
     "notices": [

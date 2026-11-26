@@ -95,6 +95,8 @@ export const messages = {
   "error.remote.connectionServiceUnreachable":
     "لا يستطيع هذا الكمبيوتر الوصول إلى خدمة اتصال OpenBot. تحقّق من اتصاله بالإنترنت. يعيد OpenBot الاتصال تلقائيًا.",
   "error.remote.serverAnswerTimeout": "لم يستجب الخادم في الوقت المحدد. يعيد OpenBot الاتصال تلقائيًا.",
+  "error.remote.signInConnectionClosed":
+    "أُغلق الاتصال بالخادم أثناء تسجيل الدخول. إذا تكرر ذلك، فتأكد من صحة التاريخ والوقت على الخادم وعلى هذا الجهاز.",
   "error.remote.connectionCancelled": "أُلغي الاتصال البعيد.",
   "error.remote.hostDisconnected": "انقطع الاتصال بالخادم. تحقق مما إذا اكتمل الإجراء، ثم أعد المحاولة.",
   "error.remote.eventGap": "يوجد انقطاع في تسلسل أحداث المضيف.",

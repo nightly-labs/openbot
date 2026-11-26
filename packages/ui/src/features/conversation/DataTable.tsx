@@ -36,7 +36,11 @@ export type MessageContentBlock = ComparisonTableBlock | DataTableBlock | Messag
 
 type DataTableFormat = "markdown" | "csv";
 
-export function DataTable(props: { table: DataTableBlock; renderCell?: (text: string) => JSX.Element }) {
+export function DataTable(props: {
+  table: DataTableBlock;
+  renderCell?: (text: string) => JSX.Element;
+  selectionMessageId?: string | undefined;
+}) {
   const { t } = useText();
   const [copied, setCopied] = createSignal<DataTableFormat | null>(null);
   let copiedTimer: ReturnType<typeof setTimeout> | undefined;
@@ -86,6 +90,7 @@ export function DataTable(props: { table: DataTableBlock; renderCell?: (text: st
           ref={(element) => (table = element)}
           class="message-data-table"
           style={`--message-data-table-columns: ${props.table.headers.length}`}
+          data-selection-message-id={props.selectionMessageId}
           dir={firstTextDirection([...props.table.headers, ...props.table.rows.flat()])}
         >
           <thead>
