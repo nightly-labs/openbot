@@ -1,4 +1,5 @@
 import type { SettingLinkId } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
 import {
   AGENT_SETTING_LINK_ROWS,
@@ -88,8 +89,12 @@ function SettingRowChatCard(props: SettingLinkChatCardProps) {
       return {
         title: t(row.title),
         path,
-        open: agent && !adminOnly ? () => props.onOpenAgentSetting(agent.id, settingId) : undefined,
-        note: !agent ? t("chat.settingLink.agentChatOnly") : adminOnly ? t("chat.settingLink.adminOnly") : undefined,
+        open: !agent
+          ? undefined
+          : adminOnly
+            ? () => toast.info(t("chat.settingLink.adminOnly"))
+            : () => props.onOpenAgentSetting(agent.id, settingId),
+        note: agent ? undefined : t("chat.settingLink.agentChatOnly"),
       };
     }
     if (settingId === "credits.explainer") return { title: "", path: [], open: undefined, note: undefined };
