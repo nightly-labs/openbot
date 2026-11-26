@@ -46,6 +46,7 @@ export interface GlassLens {
 }
 
 type Rgb = readonly [number, number, number];
+type Rotation = readonly [number, number, number, number];
 
 interface Morph {
   from: GlassShape;
@@ -61,23 +62,27 @@ interface Spring {
 }
 
 const SHAPE_ID: Record<GlassShape, number> = { lens: 0, blob: 1, pill: 2, torus: 3, prism: 4, diamond: 5 };
-const SPIN: Record<GlassShape, { yaw: number; roll: number }> = {
-  lens: { yaw: 0, roll: 0 },
-  blob: { yaw: 0, roll: 0.12 },
-  pill: { yaw: 0, roll: 0.25 },
-  torus: { yaw: 0, roll: 0 },
-  prism: { yaw: 0, roll: 0.3 },
-  diamond: { yaw: 0.27, roll: 0 },
+const SPIN: Record<GlassShape, { tumble: number; sway: number }> = {
+  lens: { tumble: 0, sway: 0 },
+  blob: { tumble: 1, sway: 0 },
+  pill: { tumble: 0, sway: 0 },
+  torus: { tumble: 0, sway: 1 },
+  prism: { tumble: 1, sway: 0 },
+  diamond: { tumble: 1, sway: 0 },
 };
-const TILT: Record<GlassShape, number> = { lens: 0.35, blob: 0.5, pill: 0.6, torus: 0.7, prism: 0.8, diamond: 0.7 };
-const POSE: Record<GlassShape, readonly [number, number]> = {
-  lens: [0, 0],
-  blob: [0.2, 0],
-  pill: [0, 0],
-  torus: [-0.5, 0.18],
-  prism: [-0.3, 0.45],
-  diamond: [-0.35, 0.5],
+const POSE: Record<GlassShape, readonly [number, number, number]> = {
+  lens: [0, 0, 0],
+  blob: [0.2, 0, 0],
+  pill: [0, 0, 0],
+  torus: [-0.5, 0.18, 0],
+  prism: [-0.3, 0.45, 0],
+  diamond: [-0.35, 0.5, 0],
 };
+const SPIN_RATE = 0.3;
+const SMOOTHING = Math.sqrt(0.18);
+const FOLLOW_DAMPING = 0.86;
+const TILT_GAIN = 0.00045;
+const TILT_LIMIT = 0.7;
 const TURN = Math.PI * 2;
 const PIXEL_BUDGET = 5e6;
 const MAX_RATIO = 2;
@@ -90,7 +95,8 @@ const TAP_SLOP = 6;
 const DOUBLE_TAP_MS = 400;
 const THROW_SPEED = 60;
 const REST_SPEED = 30;
-const MORPH_SECONDS = 0.7;
+const MORPH_SECONDS = 0.85;
+const FADE_SECONDS = 0.5;
 const INTERACTIVE = "a, button, input, select, textarea, [role='button']";
 const EXTENT: Record<GlassShape, number> = { lens: 1.03, blob: 1.08, pill: 1.02, torus: 1, prism: 1.18, diamond: 1.05 };
 const FLOOR = 0.75;
@@ -111,6 +117,8 @@ const UNIFORMS = [
   "uStretch",
   "uTurn",
   "uTime",
+  "uRipple",
+  "uPresence",
   "uIor",
   "uColor",
   "uTint",
@@ -141,6 +149,8 @@ uniform vec2 uAxis;
 uniform float uStretch;
 uniform mat3 uTurn;
 uniform float uTime;
+uniform float uRipple;
+uniform float uPresence;
 uniform float uIor;
 uniform vec3 uColor;
 uniform float uTint;
@@ -232,9 +242,13 @@ float map(vec3 p) {
   float along = dot(p.xy, uAxis);
   vec2 across = p.xy - uAxis * along;
   p.xy = uAxis * (along / uStretch) + across * sqrt(uStretch);
+  p.z *= sqrt(uStretch);
   vec3 o = uTurn * p;
   float d = body(uShapes.x, o);
   if (uMorph > 0.0) d = mix(d, body(uShapes.y, o), uMorph);
+  if (uRipple > 0.0) {
+    d += uRipple * sin(o.x * 3.2 + uTime * 2.2) * sin(o.y * 3.3 - uTime * 2.0) * sin(o.z * 3.0 + uTime * 1.7);
+  }
   return d / max(1.0 / uStretch, sqrt(uStretch));
 }
 
@@ -418,40 +432,62 @@ void main() {
     }
     color *= 0.25;
   }
-  outColor = color;
+  outColor = mix(back, color, uPresence);
 }`;
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
-const orientation = (yaw: number, pitch: number, roll: number) => {
-  const [cy, sy, cp, sp, cr, sr] = [
-    Math.cos(yaw),
-    Math.sin(yaw),
-    Math.cos(pitch),
-    Math.sin(pitch),
-    Math.cos(roll),
-    Math.sin(roll),
-  ];
-  return new Float32Array([
-    cr * cy,
-    cr * sy * sp - sr * cp,
-    cr * sy * cp + sr * sp,
-    sr * cy,
-    sr * sy * sp + cr * cp,
-    sr * sy * cp - cr * sp,
-    -sy,
-    cy * sp,
-    cy * cp,
+const IDENTITY: Rotation = [0, 0, 0, 1];
+
+const around = (x: number, y: number, z: number, angle: number): Rotation => {
+  const s = Math.sin(angle / 2);
+  return [x * s, y * s, z * s, Math.cos(angle / 2)];
+};
+
+const compose = (a: Rotation, b: Rotation): Rotation => [
+  a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+  a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+  a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+  a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
+];
+
+const fromAngles = ([x, y, z]: readonly [number, number, number]) =>
+  compose(compose(around(0, 0, 1, z), around(0, 1, 0, y)), around(1, 0, 0, x));
+
+const blend = (a: Rotation, b: Rotation, t: number): Rotation => {
+  const cosine = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
+  const sign = cosine < 0 ? -1 : 1;
+  const near = Math.abs(cosine);
+  let wa = 1 - t;
+  let wb = t * sign;
+  if (near < 0.9995) {
+    const theta = Math.acos(near);
+    const sine = Math.sin(theta);
+    wa = Math.sin((1 - t) * theta) / sine;
+    wb = (Math.sin(t * theta) / sine) * sign;
+  }
+  const mixed: Rotation = [a[0] * wa + b[0] * wb, a[1] * wa + b[1] * wb, a[2] * wa + b[2] * wb, a[3] * wa + b[3] * wb];
+  const length = Math.hypot(...mixed) || 1;
+  return [mixed[0] / length, mixed[1] / length, mixed[2] / length, mixed[3] / length];
+};
+
+const inverseMatrix = ([x, y, z, w]: Rotation) =>
+  new Float32Array([
+    1 - 2 * (y * y + z * z),
+    2 * (x * y - z * w),
+    2 * (x * z + y * w),
+    2 * (x * y + z * w),
+    1 - 2 * (x * x + z * z),
+    2 * (y * z - x * w),
+    2 * (x * z - y * w),
+    2 * (y * z + x * w),
+    1 - 2 * (x * x + y * y),
   ]);
-};
 
-const unwind = (angle: number, rate: number, dt: number) => {
-  if (rate > 0) return angle + dt * rate;
-  const home = Math.round(angle / TURN) * TURN;
-  return angle + (home - angle) * Math.min(1, dt * 3);
+const ease = (t: number) => {
+  const x = clamp(t, 0, 1);
+  return x * x * x * (x * (x * 6 - 15) + 10);
 };
-
-const ease = (t: number) => t * t * (3 - 2 * t);
 
 const pull = (spring: Spring, target: number, omega: number, ratio: number, dt: number) => {
   for (let left = dt; left > 0; left -= STEP) {
@@ -561,10 +597,16 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
   const lens = { x: first.home.x, y: first.home.y, vx: 0, vy: 0, restX: first.home.x, restY: first.home.y };
   const axis = { x: 1, y: 0 };
   const pointer = { x: 0, y: 0, inside: false, down: false, grabbed: false, grabX: 0, grabY: 0, startX: 0, startY: 0 };
+  const fading = intro && !reduced;
   const jelly: Spring = { value: 1, speed: 0 };
-  const grow: Spring = { value: intro && !reduced ? 0 : 1, speed: 0 };
+  const tiltX: Spring = { value: 0, speed: 0 };
+  const tiltY: Spring = { value: 0, speed: 0 };
+  const grow: Spring = { value: fading ? 0 : 1, speed: 0 };
   const morph: Morph = { from: first.shape, to: first.shape, t: 1, next: null, asked: first.shape };
-  const spin = { yaw: 0, roll: 0 };
+  let presence = fading ? 0 : 1;
+  let ripple = 0;
+  let spin = 0;
+  let idleClock = 0;
   let sceneKey = "";
   let sceneReady = false;
   let placed = false;
@@ -590,8 +632,8 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
   const drift = (size: number) => {
     if (reduced) return { x: 0, y: 0 };
     return {
-      x: (Math.sin(clock * 0.37) * 0.18 + Math.sin(clock * 0.83 + 1.7) * 0.06) * size,
-      y: (Math.cos(clock * 0.29) * 0.1 + Math.sin(clock * 0.61 + 0.4) * 0.04) * size,
+      x: (Math.sin(idleClock * 0.37) * 0.35 + Math.sin(idleClock * 0.71 + 1.3) * 0.12) * size,
+      y: (Math.sin(idleClock * 0.29 + 0.8) * 0.2 + Math.cos(idleClock * 0.53) * 0.08) * size,
     };
   };
 
@@ -666,7 +708,7 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
         morph.from = morph.to;
         morph.to = morph.next;
         morph.t = 0;
-        kick(2);
+        kick(2.5);
       }
       morph.next = null;
     }
@@ -678,12 +720,12 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
   const bounce = (wall: ReturnType<typeof bounds>, keep: number) => {
     if (lens.x < wall.left || lens.x > wall.right) {
       lens.x = clamp(lens.x, wall.left, wall.right);
-      kick(Math.min(3, Math.abs(lens.vx) * 0.0016));
+      kick(Math.min(4, Math.abs(lens.vx) * 0.0016));
       lens.vx *= -keep;
     }
     if (lens.y < wall.top || lens.y > wall.bottom) {
       lens.y = clamp(lens.y, wall.top, wall.bottom);
-      kick(Math.min(3, Math.abs(lens.vy) * 0.0016));
+      kick(Math.min(4, Math.abs(lens.vy) * 0.0016));
       lens.vy *= -keep;
     }
   };
@@ -723,11 +765,11 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     }
     goalX = clamp(goalX, wall.left, wall.right);
     goalY = clamp(goalY, wall.top, wall.bottom);
-    const omega = (pointer.grabbed ? 26 : 12) * (reduced ? 1.6 : 1);
+    const omega = (pointer.grabbed ? 34 : 24) * SMOOTHING * (reduced ? 1.6 : 1);
     for (let left = dt; left > 0; left -= STEP) {
       const h = Math.min(STEP, left);
-      lens.vx += (omega * omega * (goalX - lens.x) - 1.7 * omega * lens.vx) * h;
-      lens.vy += (omega * omega * (goalY - lens.y) - 1.7 * omega * lens.vy) * h;
+      lens.vx += (omega * omega * (goalX - lens.x) - 2 * FOLLOW_DAMPING * omega * lens.vx) * h;
+      lens.vy += (omega * omega * (goalY - lens.y) - 2 * FOLLOW_DAMPING * omega * lens.vy) * h;
       lens.x += lens.vx * h;
       lens.y += lens.vy * h;
       bounce(wall, SOFT_BOUNCE);
@@ -737,14 +779,20 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
 
   const advanceJelly = (s: GlassLensSettings, dt: number) => {
     const speed = Math.hypot(lens.vx, lens.vy);
-    if (speed > 20) {
+    if (speed > 1) {
       axis.x = lens.vx / speed;
       axis.y = lens.vy / speed;
     }
-    const target = reduced ? 1 : 1 + Math.min(speed / 2200, 0.4) * clamp(s.wobble, 0, 1);
-    const wobbling = pull(jelly, target, 14, 0.35, dt);
-    const growing = pull(grow, 1, 9, 0.55, dt);
-    return wobbling || growing;
+    const wobble = reduced ? 0 : clamp(s.wobble, 0, 1);
+    const gain = reduced ? 0 : TILT_GAIN;
+    const wobbling = pull(jelly, 1 + clamp(speed / 1800, 0, 0.55) * wobble, 13, 0.32, dt);
+    const leaningX = pull(tiltX, clamp(lens.vy * gain, -TILT_LIMIT, TILT_LIMIT), 9, 0.5, dt);
+    const leaningY = pull(tiltY, clamp(lens.vx * gain, -TILT_LIMIT, TILT_LIMIT), 9, 0.5, dt);
+    const growing = pull(grow, 1, 11, 0.52, dt);
+    presence = Math.min(1, presence + dt / FADE_SECONDS);
+    const shaking = morph.t < 1 ? 0.05 * wobble * Math.sin(Math.PI * morph.t) : 0;
+    ripple += (shaking - ripple) * (1 - Math.exp(-dt / 0.08));
+    return wobbling || leaningX || leaningY || growing || presence < 1 || ripple > 1e-4;
   };
 
   const placeHandle = (size: number) => {
@@ -755,22 +803,25 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     handle.style.transform = `translate3d(${(lens.x - reach / 2).toFixed(1)}px, ${(lens.y - reach / 2).toFixed(1)}px, 0)`;
   };
 
-  const advanceSpin = (dt: number) => {
-    const rate = SPIN[morph.to];
-    spin.yaw = unwind(spin.yaw, reduced ? 0 : rate.yaw, dt);
-    spin.roll = unwind(spin.roll, reduced ? 0 : rate.roll, dt);
+  const advanceIdle = (dt: number) => {
+    if (reduced) return false;
+    if (!pointer.grabbed) idleClock += dt;
+    spin += dt * SPIN_RATE;
+    return true;
   };
 
   const turn = () => {
     const mixed = ease(morph.t);
-    const tilt = reduced ? 0 : TILT[morph.from] + (TILT[morph.to] - TILT[morph.from]) * mixed;
-    const leanX = reduced ? 0 : clamp(lens.vx * 0.00035, -0.5, 0.5);
-    const leanY = reduced ? 0 : clamp(lens.vy * 0.00035, -0.5, 0.5);
-    const pose = (index: 0 | 1) => POSE[morph.from][index] + (POSE[morph.to][index] - POSE[morph.from][index]) * mixed;
-    const yaw = spin.yaw + pose(1) + leanX + tilt * Math.sin(clock * 0.7) * 0.2;
-    const pitch = pose(0) + leanY + tilt * Math.cos(clock * 0.53) * 0.16;
-    const roll = spin.roll + tilt * Math.sin(clock * 0.31 + 1.2) * 0.12 - leanX * 0.3;
-    return orientation(yaw, pitch, roll);
+    const between = (pick: (rate: (typeof SPIN)[GlassShape]) => number) =>
+      pick(SPIN[morph.from]) + (pick(SPIN[morph.to]) - pick(SPIN[morph.from])) * mixed;
+    const tumble = between((rate) => rate.tumble);
+    const sway = between((rate) => rate.sway);
+    const angle = spin % TURN;
+    const pose = blend(fromAngles(POSE[morph.from]), fromAngles(POSE[morph.to]), mixed);
+    const nod = around(1, 0, 0, Math.sin(spin * 0.6) * 0.18 * tumble);
+    const spun = compose(compose(nod, blend(IDENTITY, around(0, 1, 0, angle), tumble)), pose);
+    const swayed = compose(blend(IDENTITY, around(0, 0, 1, angle), sway), spun);
+    return inverseMatrix(compose(fromAngles([tiltX.value, tiltY.value, 0]), swayed));
   };
 
   const draw = (s: GlassLensSettings, size: number) => {
@@ -778,8 +829,8 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     const [red, green, blue] = toRgb(s.color);
     const extent = EXTENT[morph.from] + (EXTENT[morph.to] - EXTENT[morph.from]) * mixed;
     const unit = (size * Math.max(0, grow.value)) / extent;
-    const stretch = clamp(jelly.value, 0.6, 1.6);
-    const reach = 1.3 * Math.max(stretch, 1);
+    const stretch = Math.max(0.2, jelly.value);
+    const reach = 1.3 * Math.max(stretch, 1 / Math.sqrt(stretch));
     const focal = Math.max(view.width, view.height) * FOCAL;
     const height = unit * FLOOR;
     const depth = (focal - height) / focal;
@@ -803,7 +854,9 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     gl.uniform2f(at("uAxis"), axis.x, -axis.y);
     gl.uniform1f(at("uStretch"), stretch);
     gl.uniformMatrix3fv(at("uTurn"), false, turn());
-    gl.uniform1f(at("uTime"), clock);
+    gl.uniform1f(at("uTime"), reduced ? 0 : clock);
+    gl.uniform1f(at("uRipple"), ripple);
+    gl.uniform1f(at("uPresence"), presence);
     gl.uniform1f(at("uIor"), 1 + 0.5 * clamp(s.refraction, 0, 2));
     gl.uniform3f(at("uColor"), red, green, blue);
     gl.uniform1f(at("uTint"), clamp(s.tint, 0, 1));
@@ -828,11 +881,11 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     const shaping = advanceShape(s, dt);
     const moving = advanceLens(s, dt);
     const wobbling = advanceJelly(s, dt);
-    advanceSpin(dt);
+    const idling = advanceIdle(dt);
     const size = radius();
     draw(s, size);
     placeHandle(size);
-    if (shaping || moving || wobbling || !reduced) schedule();
+    if (shaping || moving || wobbling || idling) schedule();
   }
 
   const wake = () => {
