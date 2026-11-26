@@ -597,9 +597,9 @@ and spend no credits; `list_media_models` still works. When `askWhenBlocked` is 
 not hold: the tool tells the agent that it skipped the step. When
 one `generate_image` or `generate_video` call costs more credits than this limit, the user must approve
 it. When the agent names no model, the call uses the default model of its kind if that model takes the
-input pictures. With no default model set, it uses the preferred model
-(`CREDIT_MEDIA_PREFERRED_MODELS`: `gpt-image-2.6` for images, `seedance-2.5` for videos), and
-`list_media_models` gives these as `defaultModels`. Only owners and admins can use them (else 403); the host refuses a value outside the
+input pictures. With no default model set, it uses the first preferred model in the catalog that
+takes the input pictures (`CREDIT_MEDIA_PREFERRED_MODELS`: `gpt-image-2.6` for images; `magi-2`, then
+`seedance-2.5` for videos), and `list_media_models` gives the first available one as `defaultModels`. Only owners and admins can use them (else 403); the host refuses a value outside the
 range, not whole, or a model ID that is not valid with 400. A change applies to the next call.
 `src/main/team-api/route-media-approval-credits.ts` owns them. Without the capability a client hides
 the row for that host.

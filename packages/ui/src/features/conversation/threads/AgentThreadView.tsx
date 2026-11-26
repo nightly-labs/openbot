@@ -633,6 +633,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     message.kind !== "plan" &&
     message.kind !== "subagents" &&
     message.kind !== "memory-changes" &&
+    message.kind !== "near-payment" &&
     message.questionPrompt === undefined &&
     !agentMessageMarker(message) &&
     !changeMarker(message);

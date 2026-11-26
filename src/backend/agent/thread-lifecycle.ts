@@ -142,6 +142,14 @@ const CODEX_BROWSER_PLUGINS_OFF = {
 } as const;
 
 const CODEX_MCP_STARTUP_GRACE_MS = 10_000;
+const CODEX_WAIT_FOR_MCP_STARTUP_MS = 0;
+
+function waitingForMcpStartup(params: DynamicRecord): DynamicRecord {
+  const config = params.config;
+  return isDynamicRecord(config)
+    ? { ...params, config: { ...config, mcp_optional_startup_grace_ms: CODEX_WAIT_FOR_MCP_STARTUP_MS } }
+    : params;
+}
 
 const CODEX_DIRECT_ONLY_NAMESPACES = [...visibleDynamicTools("codex").map((namespace) => namespace.name), "image_gen"];
 
@@ -562,7 +570,11 @@ export class ThreadLifecycle {
     });
     const { params } = yield* this.#startParams(owner, client, publicThreadId);
     const response = yield* client
-      .request("thread/start", { ...params, ephemeral: false, persistSession: false }, decodeThreadResponse)
+      .request(
+        "thread/start",
+        { ...waitingForMcpStartup(params), ephemeral: false, persistSession: false },
+        decodeThreadResponse,
+      )
       .pipe(toThreadOperationFailed);
     const externalThreadId = response.thread.id;
     this.#conversation.bindThread(externalThreadId, owner.id, publicThreadId);

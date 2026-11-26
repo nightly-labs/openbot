@@ -22,6 +22,27 @@ const bloubAssetFolder = path.join(path.dirname(require.resolve("@norbert_bodzio
 const TOPIC_SUBSCRIPTION_SHIM = path.resolve(__dirname, "src/shims/expo-notifications-topic-subscription.ts");
 const EXPO_NOTIFICATIONS_BUILD = path.join("node_modules", "expo-notifications", "build");
 
+const EXPO_CRYPTO_BUILD = path.join("node_modules", "expo-crypto", "build");
+const expoCryptoNativeShims = [
+  {
+    folder: EXPO_CRYPTO_BUILD,
+    request: "./ExpoCrypto",
+    shim: path.resolve(__dirname, "src/shims/expo-crypto-native.ts"),
+  },
+  {
+    folder: path.join(EXPO_CRYPTO_BUILD, "aes"),
+    request: "./ExpoCryptoAES",
+    shim: path.resolve(__dirname, "src/shims/expo-crypto-aes-native.ts"),
+  },
+];
+
+function expoCryptoNativeShim(originModulePath, moduleName) {
+  const folder = path.dirname(originModulePath);
+  return (
+    expoCryptoNativeShims.find((entry) => entry.request === moduleName && folder.endsWith(entry.folder))?.shim ?? null
+  );
+}
+
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   const shim = nativeModuleShims.get(moduleName);
   if (shim) return { filePath: shim, type: "sourceFile" };
@@ -32,6 +53,8 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   ) {
     return { filePath: TOPIC_SUBSCRIPTION_SHIM, type: "sourceFile" };
   }
+  const cryptoShim = platform === "web" ? null : expoCryptoNativeShim(context.originModulePath, moduleName);
+  if (cryptoShim) return { filePath: cryptoShim, type: "sourceFile" };
   if (moduleName.startsWith(BLOUB_ASSETS)) {
     return context.resolveRequest(
       context,
