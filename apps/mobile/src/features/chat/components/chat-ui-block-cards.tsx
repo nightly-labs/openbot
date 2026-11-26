@@ -1,4 +1,3 @@
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentPromptResolution, ConversationQuestionPrompt } from "@openbot/contracts/ipc";
 import {
   type ConversationUiBlock,
@@ -24,7 +23,7 @@ import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
 import X from "lucide-react-native/icons/x";
 import { type ReactNode, useEffect, useState } from "react";
-import { AccessibilityInfo, View } from "react-native";
+import { AccessibilityInfo, StyleSheet, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
@@ -196,24 +195,39 @@ function CopyPreviewButton({ markdown }: { markdown: string }) {
   );
 }
 
-function FieldRow({ index, label, children }: { index: number; label: string; children: ReactNode }) {
+function FieldRow({
+  label,
+  last,
+  compact,
+  children,
+}: {
+  label: string;
+  last: boolean;
+  compact: boolean;
+  children: ReactNode;
+}) {
   return (
-    <View className="flex-row gap-3">
-      <View
-        className="h-6 w-6 items-center justify-center rounded-full bg-control"
-        style={{ borderCurve: "continuous" }}
-      >
-        <Typography type="body-xs" weight="medium" className="text-text-secondary">
-          {String(index + 1)}
-        </Typography>
-      </View>
-      <View className="min-w-0 flex-1 gap-0.5">
-        <Typography type="body-xs" weight="medium" className="text-text-secondary">
-          {label}
-        </Typography>
-        {children}
-      </View>
+    <View
+      className={`min-h-11 flex-row items-center gap-3 py-1.5 ${last ? "" : "border-separator"}`}
+      style={last ? undefined : { borderBottomWidth: StyleSheet.hairlineWidth }}
+    >
+      <Typography type={compact ? "body-sm" : undefined} className="max-w-[50%] shrink">
+        {label}
+      </Typography>
+      <View className="min-w-0 flex-1 flex-row justify-end">{children}</View>
     </View>
+  );
+}
+
+function FieldValue({ value, compact }: { value: string; compact: boolean }) {
+  return (
+    <Typography
+      type={compact ? "body-sm" : undefined}
+      className="min-w-0 shrink text-right text-grouped-secondary"
+      numberOfLines={compact ? 2 : undefined}
+    >
+      {value}
+    </Typography>
   );
 }
 
@@ -225,6 +239,7 @@ export function ConfirmBody({
   disabled = false,
   closed = false,
   previewEditor,
+  titleAccessory,
 }: {
   spec: UiConfirmBlock;
   compact?: boolean;
@@ -233,65 +248,48 @@ export function ConfirmBody({
   selectValue: (field: Extract<UiConfirmField, { select: string }>) => string;
   onSelect?: (select: string, option: string) => void;
   disabled?: boolean;
+  titleAccessory?: ReactNode;
 }) {
   const { theme } = useUniwind();
+  const fields = spec.fields ?? [];
   return (
-    <View className="gap-3">
-      <Typography weight="medium" className={spec.danger && !closed ? "text-danger-text" : undefined}>
-        {spec.title}
-      </Typography>
-      {(spec.fields?.length ?? 0) > 0 ? (
-        <View className="gap-2.5">
-          {spec.fields?.map((field, index) =>
-            "select" in field ? (
-              <FieldRow key={`select\n${field.select}`} index={index} label={field.label}>
-                {onSelect && !compact && field.options.length > INPUT_LIMITS.promptOptions ? (
-                  <View className="flex-row pt-0.5">
-                    <SettingsPicker<string>
-                      value={selectValue(field)}
-                      options={field.options.map((option) => ({ value: option, label: option }))}
-                      enabled={!disabled}
-                      dark={theme === "dark"}
-                      label={field.label}
-                      onChange={(option) => {
-                        void haptics.selection();
-                        onSelect(field.select, option);
-                      }}
-                    />
-                  </View>
-                ) : onSelect && !compact ? (
-                  <View className="flex-row flex-wrap gap-1.5 pt-0.5">
-                    {field.options.map((option) => (
-                      <Button
-                        key={option}
-                        size="sm"
-                        variant={selectValue(field) === option ? "primary" : "tertiary"}
-                        className="rounded-full"
-                        isDisabled={disabled}
-                        accessibilityState={{ selected: selectValue(field) === option }}
-                        onPress={() => {
-                          void haptics.selection();
-                          onSelect(field.select, option);
-                        }}
-                      >
-                        <Button.Label>{option}</Button.Label>
-                      </Button>
-                    ))}
-                  </View>
+    <View className="gap-2">
+      <View className="flex-row items-center gap-2">
+        <Typography weight="medium" className={`min-w-0 flex-1 ${spec.danger && !closed ? "text-danger-text" : ""}`}>
+          {spec.title}
+        </Typography>
+        {titleAccessory}
+      </View>
+      {fields.length > 0 ? (
+        <View>
+          {fields.map((field, index) => {
+            const last = index === fields.length - 1;
+            if (!("select" in field))
+              return (
+                <FieldRow key={`${field.label}\n${field.value}`} label={field.label} last={last} compact={compact}>
+                  <FieldValue value={field.value} compact={compact} />
+                </FieldRow>
+              );
+            return (
+              <FieldRow key={`select\n${field.select}`} label={field.label} last={last} compact={compact}>
+                {onSelect && !compact ? (
+                  <SettingsPicker<string>
+                    value={selectValue(field)}
+                    options={field.options.map((option) => ({ value: option, label: option }))}
+                    enabled={!disabled}
+                    dark={theme === "dark"}
+                    label={field.label}
+                    onChange={(option) => {
+                      void haptics.selection();
+                      onSelect(field.select, option);
+                    }}
+                  />
                 ) : (
-                  <Typography type="body-sm" numberOfLines={compact ? 2 : undefined}>
-                    {selectValue(field)}
-                  </Typography>
+                  <FieldValue value={selectValue(field)} compact={compact} />
                 )}
               </FieldRow>
-            ) : (
-              <FieldRow key={`${field.label}\n${field.value}`} index={index} label={field.label}>
-                <Typography type="body-sm" numberOfLines={compact ? 2 : undefined}>
-                  {field.value}
-                </Typography>
-              </FieldRow>
-            ),
-          )}
+            );
+          })}
         </View>
       ) : null}
       {previewEditor ??
@@ -380,122 +378,125 @@ export function ChatConfirmPrompt({
     void submit(uiConfirmAnswersWithPreview(spec, response, draft));
   }
 
+  const closeButton = autoAnswer ? null : (
+    <Button
+      variant="ghost"
+      size="sm"
+      isIconOnly
+      className="-my-1.5 -mr-2"
+      accessibilityLabel={t("mobile.chat.question.cancelForm")}
+      isDisabled={disabled}
+      onPress={() => void submit({})}
+    >
+      <X color={String(muted)} size={18} />
+    </Button>
+  );
+
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
       <View
-        className={`w-full max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] ${card.fillClass} px-4 py-3`}
+        className={`w-full max-w-[92%] gap-3 self-start rounded-[20px] ${card.fillClass} px-4 py-3`}
         style={card.style}
       >
-        <View className="min-w-0 flex-1 pt-1">
-          <ConfirmBody
-            spec={spec}
-            selectValue={selectValue}
-            disabled={disabled}
-            onSelect={(select, option) => setSelected((current) => ({ ...current, [select]: option }))}
-            previewEditor={
-              draft === undefined ? undefined : (
-                <SheetFormField
-                  label={t("mobile.chat.question.preview")}
-                  hideLabel
-                  multiline
-                  tall
-                  autoFocus
-                  editable={!disabled}
-                  maxLength={UI_BLOCK_LIMITS.preview}
-                  value={draft}
-                  onChangeText={setDraft}
-                />
-              )
-            }
-          />
-        </View>
-        {autoAnswer ? null : (
-          <Button
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            accessibilityLabel={t("mobile.chat.question.cancelForm")}
-            isDisabled={disabled}
-            onPress={() => void submit({})}
-          >
-            <X color={String(muted)} size={18} />
-          </Button>
+        <ConfirmBody
+          spec={spec}
+          selectValue={selectValue}
+          disabled={disabled}
+          titleAccessory={closeButton}
+          onSelect={(select, option) => setSelected((current) => ({ ...current, [select]: option }))}
+          previewEditor={
+            draft === undefined ? undefined : (
+              <SheetFormField
+                label={t("mobile.chat.question.preview")}
+                hideLabel
+                multiline
+                tall
+                autoFocus
+                editable={!disabled}
+                maxLength={UI_BLOCK_LIMITS.preview}
+                value={draft}
+                onChangeText={setDraft}
+              />
+            )
+          }
+        />
+        {confirming ? (
+          <View className="gap-2">
+            <Typography type="body-sm" weight="medium">
+              {t("mobile.chat.question.confirmAction", { action: confirming.label })}
+            </Typography>
+            <View className="flex-row flex-wrap justify-end gap-2">
+              <Button size="sm" variant="ghost" className="rounded-full" onPress={() => setConfirming(undefined)}>
+                <Button.Label>{t("common.cancel")}</Button.Label>
+              </Button>
+              <Button
+                size="sm"
+                variant={BUTTON_VARIANT[actionStyle(confirming)]}
+                className="rounded-full"
+                isDisabled={disabled || blankDraft}
+                onPress={() => {
+                  void haptics.selection();
+                  respond(confirming);
+                }}
+              >
+                <Button.Label className="font-sans font-semibold">
+                  {t("mobile.chat.question.confirmAccept")}
+                </Button.Label>
+              </Button>
+            </View>
+          </View>
+        ) : (
+          <>
+            <View className="flex-row flex-wrap justify-end gap-2">
+              {[...spec.actions].reverse().map((action) => {
+                if (draft !== undefined && opensEditor(action)) return null;
+                const held = isHeld(action);
+                return (
+                  <Button
+                    key={action.id}
+                    size="sm"
+                    variant={BUTTON_VARIANT[actionStyle(action)]}
+                    className="rounded-full"
+                    isDisabled={disabled || blankDraft}
+                    accessibilityHint={held && !screenReader ? t("mobile.chat.question.holdHint") : undefined}
+                    delayLongPress={held ? holdMs : undefined}
+                    onLongPress={
+                      held
+                        ? () => {
+                            void haptics.notification("success");
+                            respond(action);
+                          }
+                        : undefined
+                    }
+                    onPress={() => {
+                      if (held && !screenReader) return void haptics.notification("warning");
+                      void haptics.selection();
+                      if (held || action.confirm === true) setConfirming(action);
+                      else respond(action);
+                    }}
+                  >
+                    <Button.Label className="font-sans font-semibold">
+                      {autoAnswer?.actionId !== action.id || secondsLeft <= 0
+                        ? action.label
+                        : secondsLeft < 60
+                          ? t("mobile.chat.question.autoAction", { action: action.label, seconds: secondsLeft })
+                          : t("mobile.chat.question.autoActionClock", {
+                              action: action.label,
+                              time: countdownClock(secondsLeft),
+                            })}
+                    </Button.Label>
+                  </Button>
+                );
+              })}
+            </View>
+            {spec.actions.some(isHeld) && !screenReader ? (
+              <Typography type="body-xs" className="text-right text-text-secondary">
+                {t("mobile.chat.question.holdHint")}
+              </Typography>
+            ) : null}
+          </>
         )}
       </View>
-      {confirming ? (
-        <View className="gap-2">
-          <Typography type="body-sm" weight="medium">
-            {t("mobile.chat.question.confirmAction", { action: confirming.label })}
-          </Typography>
-          <View className="flex-row flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant={BUTTON_VARIANT[actionStyle(confirming)]}
-              className="rounded-full"
-              isDisabled={disabled || blankDraft}
-              onPress={() => {
-                void haptics.selection();
-                respond(confirming);
-              }}
-            >
-              <Button.Label className="font-sans font-semibold">{t("mobile.chat.question.confirmAccept")}</Button.Label>
-            </Button>
-            <Button size="sm" variant="ghost" className="rounded-full" onPress={() => setConfirming(undefined)}>
-              <Button.Label>{t("common.cancel")}</Button.Label>
-            </Button>
-          </View>
-        </View>
-      ) : (
-        <>
-          <View className="flex-row flex-wrap gap-2">
-            {spec.actions.map((action) => {
-              if (draft !== undefined && opensEditor(action)) return null;
-              const held = isHeld(action);
-              return (
-                <Button
-                  key={action.id}
-                  size="sm"
-                  variant={BUTTON_VARIANT[actionStyle(action)]}
-                  className="rounded-full"
-                  isDisabled={disabled || blankDraft}
-                  accessibilityHint={held && !screenReader ? t("mobile.chat.question.holdHint") : undefined}
-                  delayLongPress={held ? holdMs : undefined}
-                  onLongPress={
-                    held
-                      ? () => {
-                          void haptics.notification("success");
-                          respond(action);
-                        }
-                      : undefined
-                  }
-                  onPress={() => {
-                    if (held && !screenReader) return void haptics.notification("warning");
-                    void haptics.selection();
-                    if (held || action.confirm === true) setConfirming(action);
-                    else respond(action);
-                  }}
-                >
-                  <Button.Label className="font-sans font-semibold">
-                    {autoAnswer?.actionId !== action.id || secondsLeft <= 0
-                      ? action.label
-                      : secondsLeft < 60
-                        ? t("mobile.chat.question.autoAction", { action: action.label, seconds: secondsLeft })
-                        : t("mobile.chat.question.autoActionClock", {
-                            action: action.label,
-                            time: countdownClock(secondsLeft),
-                          })}
-                  </Button.Label>
-                </Button>
-              );
-            })}
-          </View>
-          {spec.actions.some(isHeld) && !screenReader ? (
-            <Typography type="body-xs" className="text-text-secondary">
-              {t("mobile.chat.question.holdHint")}
-            </Typography>
-          ) : null}
-        </>
-      )}
       <PromptStatus controller={controller} canSend={canSend} />
     </View>
   );
