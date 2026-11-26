@@ -7,6 +7,52 @@ the [root changelog](../../CHANGELOG.md).
 
 ## [Unreleased]
 
+## [1.4.14.1] - 2026-11-26
+
+### Changed
+
+- A confirm card from an agent shows each field on one row, with the name on the left and the value
+  on the right, as on the computer. Each list field is one menu that you open to pick a value, also
+  when it has only 2 options. The card buttons are in the card, at the bottom right, with the main
+  action last.
+- A channel with new messages now shows the number of unread messages on its picture, as an agent does, in place of a dot.
+- When an over-the-air update is ready, Home shows a smaller banner, "Quick update ready", with the
+  changes in the update, the app version and the update ID. "Show all" shows the full list, which
+  scrolls when it is long. Restart installs the update. Before, the banner showed only "A new OpenBot
+  is ready" and no changes.
+
+### Fixed
+
+- An agent with backup models set to "Automatic" now moves to its next backup model when Google
+  says that the account has no valid license for a Gemini model, before the agent starts work.
+  Before, the chat showed "Gemini stopped because of an error", and each new message failed on the
+  same model. The server must be on the new OpenBot version.
+- A message to an OpenCode agent no longer fails with "OpenCode does not offer … now" right after OpenCode starts on the server, when the model is still available. The fix is on the server: the server must be on the OpenBot version with this fix.
+- When a Devin or custom ACP agent on a server cannot open a saved chat because its own session file is damaged, the server now starts a new session for the agent and gives it the chat history. Before, every message that you sent to that agent from the phone failed with "Internal error". The server must be on the new OpenBot version for this fix.
+- When you ask an agent on the phone about parallel threads, it now tells you where the thread limits are: Parallel threads in the agent's settings > Advanced > Behavior, and Parallel threads per agent and Threads at the same time in Server settings > Agents. Before, the agent found no setting and explained chat threads. The server must also be on the new version.
+- When you reply to an agent message that has only files, such as a video and its cover, the agent now gets the names of those files and knows which one you mean. Before, the agent got an empty quote and often picked the wrong file. The computer or server that runs the agent must be on the new OpenBot version.
+- When a message in a chat is not sent, the later messages of that chat show "Waits for the message
+  that was not sent". Before, they showed only "Waiting to send", and it was not clear why they did
+  not go to the agent. Touch and hold the message that was not sent to try again or remove it.
+- A display formula (`$$…$$` or `\[…\]`) on the same line as text in a chat message now shows on its
+  own line, as on the desktop. Before, a tall formula, for example a fraction, covered the text lines
+  above and below it.
+- When a usage limit holds an agent, the queued message in the chat now shows "Usage limit reached" and the reset time. Before, the message stayed queued with no reason.
+- After OpenBot on the computer found a damaged sidebar layout file and made a new one, the phone kept showing the old sections and ignored new section changes. The phone now shows the new sections at once. The computer or server must also be on the newest OpenBot version.
+- When you open the app, a server reconnects at once. Before, a server could show as offline for up to 30 seconds after you opened the app, because it kept the long retry wait of tries that it made in the background.
+- A confirmation card with a draft preview now has a **Copy** button under the preview. It copies
+  the full draft, inline code included. Before, when you selected and copied the preview text on an
+  iPhone, the paste did not have the inline code.
+- Settings > Credits: Move credits now offers only the credits that can move to a server. Free
+  credits stay in Your credits. Before, the screen offered the free credits too, and the move failed
+  with "There are not enough credits for this move."
+- The note under "While working" in agent settings now says that the setting also controls messages from other agents, not only your messages.
+- A confirm card from an agent shows a list of more than 5 options, such as stations or times, as one
+  menu that you open to pick a value. Before, the card showed one button for each option, so you had
+  to look through many buttons. A list of 5 options or fewer still shows as buttons.
+- When you were signed in and opened an OpenBot link (an invitation, a plugin link or a pairing QR code), the app could open its main screens a second time. Then the phone kept two connections to each server, and they closed each other, so the app showed "Reconnecting" again and again until you closed it. The app now goes back to the screens that are already open.
+- When you tap Sign in on an MCP server card in a chat, the MCP server page now shows the Sign in action. Before, the page acted as if you had changed the server, so it hid Sign in, showed Save, and asked you to discard changes when you went back.
+
 ## [1.4.14] - 2026-11-26
 
 ### Added
