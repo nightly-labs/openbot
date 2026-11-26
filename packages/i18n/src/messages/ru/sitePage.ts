@@ -359,6 +359,8 @@ export const messages = {
   "sitePage.landing.pricing.yourPlans": "Использует подписки на ИИ, за которые вы уже платите",
   "sitePage.landing.pricing.download": "Скачать",
   "sitePage.landing.pricing.license": "Лицензия для работы",
+  "sitePage.landing.pricing.eggs.smallPrint": "никакого мелкого шрифта. правда.",
+  "sitePage.landing.pricing.eggs.forever": "навсегда",
   "sitePage.landing.teams.title": "OpenBot для команд",
   "sitePage.landing.teams.statement": "ИИ-коллеги для всей компании.",
   "sitePage.landing.teams.description":

@@ -337,6 +337,8 @@ export const messages = {
   "sitePage.landing.pricing.yourPlans": "使用你已付费的 AI 套餐",
   "sitePage.landing.pricing.download": "下载",
   "sitePage.landing.pricing.license": "商用许可证",
+  "sitePage.landing.pricing.eggs.smallPrint": "没有隐藏条款。真的。",
+  "sitePage.landing.pricing.eggs.forever": "永久",
   "sitePage.landing.teams.title": "OpenBot 团队版",
   "sitePage.landing.teams.statement": "为整个公司配备 AI 同事。",
   "sitePage.landing.teams.description": "我们在托管服务器上运行 OpenBot，并围绕你的团队和工具完成配置。",

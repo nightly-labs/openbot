@@ -343,6 +343,8 @@ export const messages = {
   "sitePage.landing.pricing.yourPlans": "يستخدم خطط الذكاء الاصطناعي التي تدفع لها أصلًا",
   "sitePage.landing.pricing.download": "تنزيل",
   "sitePage.landing.pricing.license": "ترخيص للعمل",
+  "sitePage.landing.pricing.eggs.smallPrint": "لا شروط خفية. حقًا.",
+  "sitePage.landing.pricing.eggs.forever": "للأبد",
   "sitePage.landing.teams.title": "OpenBot للفرق",
   "sitePage.landing.teams.statement": "زملاء عمل بالذكاء الاصطناعي لشركتك كلها.",
   "sitePage.landing.teams.description": "نشغّل OpenBot على خوادم مُدارة ونُعدّه بما يناسب فريقك وأدواتك.",

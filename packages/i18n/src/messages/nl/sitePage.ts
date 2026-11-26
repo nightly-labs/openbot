@@ -361,6 +361,8 @@ export const messages = {
   "sitePage.landing.pricing.yourPlans": "Gebruikt de AI-abonnementen die je al betaalt",
   "sitePage.landing.pricing.download": "Downloaden",
   "sitePage.landing.pricing.license": "Licentie voor werk",
+  "sitePage.landing.pricing.eggs.smallPrint": "geen kleine lettertjes. echt.",
+  "sitePage.landing.pricing.eggs.forever": "voor altijd",
   "sitePage.landing.teams.title": "OpenBot voor Teams",
   "sitePage.landing.teams.statement": "AI-collega’s voor je hele bedrijf.",
   "sitePage.landing.teams.description":

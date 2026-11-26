@@ -355,6 +355,8 @@ export const messages = {
   "sitePage.landing.pricing.yourPlans": "Zaten ödediğiniz yapay zekâ planlarını kullanır",
   "sitePage.landing.pricing.download": "İndir",
   "sitePage.landing.pricing.license": "İş için lisans",
+  "sitePage.landing.pricing.eggs.smallPrint": "küçük harfli şart yok. gerçekten.",
+  "sitePage.landing.pricing.eggs.forever": "sonsuza dek",
   "sitePage.landing.teams.title": "Ekipler için OpenBot",
   "sitePage.landing.teams.statement": "Tüm şirketiniz için yapay zekâ iş arkadaşları.",
   "sitePage.landing.teams.description":

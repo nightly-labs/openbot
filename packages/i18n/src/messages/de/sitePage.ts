@@ -364,6 +364,8 @@ export const messages = {
   "sitePage.landing.pricing.yourPlans": "Nutzt die KI-Abos, die du schon bezahlst",
   "sitePage.landing.pricing.download": "Herunterladen",
   "sitePage.landing.pricing.license": "Lizenz für die Arbeit",
+  "sitePage.landing.pricing.eggs.smallPrint": "kein Kleingedrucktes. wirklich.",
+  "sitePage.landing.pricing.eggs.forever": "für immer",
   "sitePage.landing.teams.title": "OpenBot für Teams",
   "sitePage.landing.teams.statement": "KI-Kollegen für dein ganzes Unternehmen.",
   "sitePage.landing.teams.description":
