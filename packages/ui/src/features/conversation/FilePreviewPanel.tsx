@@ -63,6 +63,7 @@ interface FilePreviewPanelProps {
   sourceUrl?: string | null;
   pageUrl?: string | null | undefined;
   pageHtml?: string | null | undefined;
+  onOpenPageFile?: ((path: string) => void) | undefined;
   selectionQuoteId?: string | undefined;
   onPageQuote?: ((text: string) => void) | undefined;
   onPageContext?: ((text: string) => void) | undefined;
@@ -355,6 +356,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
             html={pageHtml() ?? undefined}
             title={title()}
             onOpenLink={props.onOpenLink}
+            onOpenFile={props.onOpenPageFile}
             onQuote={props.onPageQuote}
             onContext={props.onPageContext}
             onMessage={props.onPageMessage}

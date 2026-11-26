@@ -749,6 +749,15 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     else openInWorkspace();
   }
 
+  function openPreviewPageFile(link: string) {
+    const source = deps.sidebarFilePreview()?.source;
+    if (source?.kind !== "shared" && source?.kind !== "workspace") return;
+    const path = pageLinkPath(source.path, link);
+    if (path === null) return;
+    if (source.kind === "shared") openSharedFile(path);
+    else openWorkspaceFile(path, undefined, source.agentId);
+  }
+
   const turnStep = createMemo(() => {
     if (!filePreviewOpen()) return undefined;
     const turnId = deps.props.activeTurnId;
@@ -934,6 +943,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     openWorkspaceFile,
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
+    openPreviewPageFile,
     previewQuoteId,
     previewFileKey,
     previewWorkspaceAgentId,
@@ -969,6 +979,20 @@ const MISSING_PATH_KEYS = new Set([
   "error.backend.workspacePathMissing",
   "error.backend.workspacePathMissingForMember",
 ]);
+
+function pageLinkPath(documentPath: string, link: string): string | null {
+  const relative = decodedPath(link.split(/[?#]/u, 1)[0] ?? "");
+  if (!relative || /[\0\r\n]/u.test(relative)) return null;
+  const parts = documentPath.split(/[/\\]/u).slice(0, -1);
+  const isRoot = () => parts.length === 1 && /^(?:|~|[A-Za-z]:)$/u.test(parts[0] ?? "");
+  for (const part of relative.split(/[/\\]/u)) {
+    if (part === "" || part === ".") continue;
+    if (part !== "..") parts.push(part);
+    else if (parts.length > 0 && !isRoot() && parts.at(-1) !== "..") parts.pop();
+    else return null;
+  }
+  return parts.join(documentPath.includes("/") || !documentPath.includes("\\") ? "/" : "\\");
+}
 
 function sharedSiblingPath(documentPath: string, link: string): string | null {
   if (/^(?:[/\\~]|[A-Za-z]:)/u.test(link) || SHARED_FOLDER_PATH.test(link)) return null;

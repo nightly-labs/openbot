@@ -13,6 +13,7 @@ export const CHAT_VISUAL_THEME_FRAGMENT = "openbot-theme=";
 export const CHAT_VISUAL_SIZE_CHANGED = "ui/notifications/size-changed";
 export const CHAT_VISUAL_HOST_CONTEXT_CHANGED = "ui/notifications/host-context-changed";
 export const CHAT_VISUAL_OPEN_LINK = "ui/open-link";
+export const CHAT_VISUAL_OPEN_FILE = "openbot/open-file";
 export const CHAT_VISUAL_REQUEST_DISPLAY_MODE = "ui/request-display-mode";
 export const CHAT_VISUAL_MESSAGE = "ui/message";
 export const CHAT_VISUAL_UPDATE_MODEL_CONTEXT = "ui/update-model-context";
@@ -29,6 +30,7 @@ const IMAGE_SOURCE_LIMIT = 8 * 1_024 * 1_024;
 const DATA_IMAGE = /^data:image\/(?:png|jpeg|gif|webp|avif|svg\+xml)[;,]/iu;
 const KEY_LIMIT = 32;
 const CONTENT_BLOCK_LIMIT = 32;
+const NOT_FILE_LINK = /^(?:[a-z][a-z\d+.-]*:|[/\\?#~]|$)|[\0\r\n]/iu;
 
 export const CHAT_VISUAL_ITEM_TYPE_PREFIX = "visual-reply:";
 export const CHAT_VISUAL_HTML_LIMIT = 512_000;
@@ -195,6 +197,7 @@ export interface ChatVisualRect {
 export type ChatVisualMessage =
   | { type: "size"; height: number }
   | { type: "open-link"; id: number | string; url: string }
+  | { type: "open-file"; id: number | string; path: string }
   | { type: "display-mode"; id: number | string; mode: ChatVisualDisplayMode }
   | { type: "message"; id: number | string; text: string }
   | { type: "context"; id: number | string; text: string }
@@ -258,6 +261,11 @@ export function parseChatVisualMessage(data: unknown): ChatVisualMessage | null 
       const id = requestId(data.id);
       const url = isBoundedString(params.url, INPUT_LIMITS.browserUrl) ? webUrl(params.url) : null;
       return url && id !== null ? { type: "open-link", id, url } : refused(id);
+    }
+    case CHAT_VISUAL_OPEN_FILE: {
+      const id = requestId(data.id);
+      const path = isBoundedString(params.path, INPUT_LIMITS.path) ? params.path : "";
+      return id !== null && !NOT_FILE_LINK.test(path) ? { type: "open-file", id, path } : refused(id);
     }
     case CHAT_VISUAL_REQUEST_DISPLAY_MODE: {
       const id = requestId(data.id);
@@ -423,21 +431,26 @@ document.addEventListener("click",(event)=>{
 if(event.button!==0||!(event.target instanceof Element))return;
 const link=event.target.closest("a[href],area[href]");
 if(!link)return;
-const href=link.getAttribute("href")||"";
+const href=(link.getAttribute("href")||"").trim();
 if(href.startsWith("#")){
 event.preventDefault();
 jump(href);
 return;
 }
 if(!event.isTrusted)return;
-let url;
-try{url=new URL(link.getAttribute("href"),document.baseURI);}catch{return;}
-if(url.hash&&url.href.split("#")[0]===location.href.split("#")[0]){
+let url=null;
+try{url=new URL(href,document.baseURI);}catch{}
+if(url&&url.hash&&url.href.split("#")[0]===location.href.split("#")[0]){
 event.preventDefault();
 jump(url.hash);
 return;
 }
-if(url.protocol!=="http:"&&url.protocol!=="https:")return;
+if(!${NOT_FILE_LINK}.test(href)){
+event.preventDefault();
+send({id:nextId++,method:"${CHAT_VISUAL_OPEN_FILE}",params:{path:href}});
+return;
+}
+if(!url||(url.protocol!=="http:"&&url.protocol!=="https:"))return;
 event.preventDefault();
 send({id:nextId++,method:"${CHAT_VISUAL_OPEN_LINK}",params:{url:url.href}});
 },true);
