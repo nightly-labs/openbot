@@ -35,6 +35,8 @@ export const messages = {
   "error.voice.live.timedOut": "Codex-Live-Sprache ist nicht rechtzeitig gestartet. Versuche es erneut.",
   "error.voice.live.failed": "Live-Sprache wurde beendet: {reason}",
   "error.voice.live.disconnected": "Live-Sprache wurde getrennt.",
+  "error.voice.live.connectionLost":
+    "Live-Sprache hat die Verbindung verloren. Hebe die Stummschaltung des Mikrofons auf, um sie neu zu starten.",
   "error.voice.live.startFailed":
     "Live-Sprache konnte nicht starten. Aktualisiere Codex und melde dich auf dem Computer, auf dem der Agent läuft, mit ChatGPT an. Versuche es dann noch einmal. Grund: {reason}",
   "error.voice.live.hostFailed":
