@@ -1,5 +1,5 @@
 import { X_EXTENSION_URL } from "@openbot/contracts/browser-extension-x";
-import { OPENBOT_X_HANDLE, type PageSocialImage, siteUrlForPage } from "../lib/site-metadata";
+import { OPENBOT_X_HANDLE, type PageSocialImage, pageSocialImageMeta, siteUrlForPage } from "../lib/site-metadata";
 
 const EXTENSION_TITLE = "OpenBot for Chrome";
 const EXTENSION_DESCRIPTION =
@@ -18,10 +18,18 @@ function metaTag(key: "name" | "property", id: string, content: string): string 
   return `<meta ${key}="${id}" content="${escapeAttribute(content)}">`;
 }
 
+function socialImageTags(siteUrl: string) {
+  const image = pageSocialImageMeta(EXTENSION_SOCIAL_IMAGE, siteUrl);
+  return {
+    openGraph: image.openGraph.map((tag) => metaTag("property", tag.property, tag.content)),
+    twitter: image.twitter.map((tag) => metaTag("name", tag.name, tag.content)),
+  };
+}
+
 export function extensionLinkResponse(request: Request): Response {
   const siteUrl = siteUrlForPage(new URL(request.url));
   const pageUrl = new URL("/chrome-extension", siteUrl).toString();
-  const imageUrl = new URL(EXTENSION_SOCIAL_IMAGE.path, siteUrl).toString();
+  const imageTags = socialImageTags(siteUrl);
   const storeUrl = escapeAttribute(X_EXTENSION_URL);
   const html = [
     "<!doctype html>",
@@ -40,17 +48,12 @@ export function extensionLinkResponse(request: Request): Response {
     metaTag("property", "og:url", pageUrl),
     metaTag("property", "og:title", EXTENSION_TITLE),
     metaTag("property", "og:description", EXTENSION_DESCRIPTION),
-    metaTag("property", "og:image", imageUrl),
-    metaTag("property", "og:image:type", "image/jpeg"),
-    metaTag("property", "og:image:width", "1600"),
-    metaTag("property", "og:image:height", "900"),
-    metaTag("property", "og:image:alt", EXTENSION_SOCIAL_IMAGE.alt),
+    ...imageTags.openGraph,
     metaTag("name", "twitter:card", "summary_large_image"),
     metaTag("name", "twitter:site", OPENBOT_X_HANDLE),
     metaTag("name", "twitter:title", EXTENSION_TITLE),
     metaTag("name", "twitter:description", EXTENSION_DESCRIPTION),
-    metaTag("name", "twitter:image", imageUrl),
-    metaTag("name", "twitter:image:alt", EXTENSION_SOCIAL_IMAGE.alt),
+    ...imageTags.twitter,
     "</head>",
     '<body style="background:#1a1a1a;color:#f5f5f5;font-family:system-ui,sans-serif">',
     `<p><a href="${storeUrl}" style="color:inherit">${escapeAttribute(EXTENSION_TITLE)}</a></p>`,
