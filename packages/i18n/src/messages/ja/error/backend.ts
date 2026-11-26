@@ -218,6 +218,8 @@ export const messages = {
   "error.backend.videoGenerationFailed": "動画の生成に失敗しました。",
   "error.backend.videoGenerationNoVideo": "動画の生成で動画が返されませんでした。",
   "error.backend.videoGenerationInterrupted": "動画の生成が中断されました。",
+  "error.backend.grokVideoNoQuota":
+    "この Grok アカウントでは動画を作成できません。代わりにクレジットで動画を生成してください。",
   "error.backend.attachmentNotRegularFile": "添付できるのは通常のファイルだけです: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot は {name} をコピーできませんでした。",
   "error.backend.routineNameRequired": "ルーティン名が必要です。",

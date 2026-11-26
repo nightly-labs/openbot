@@ -210,6 +210,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "Не удалось создать видео.",
   "error.backend.videoGenerationNoVideo": "Создание видео не вернуло видео.",
   "error.backend.videoGenerationInterrupted": "Создание видео прервано.",
+  "error.backend.grokVideoNoQuota": "Ваш аккаунт Grok не может создавать видео. Создайте видео за кредиты.",
   "error.backend.attachmentNotRegularFile": "Прикреплять можно только обычные файлы: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot не смог скопировать {name}.",
   "error.backend.routineNameRequired": "Нужно название регулярной задачи.",

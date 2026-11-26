@@ -201,6 +201,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "동영상을 생성하지 못했어요.",
   "error.backend.videoGenerationNoVideo": "동영상 생성 결과로 동영상이 오지 않았어요.",
   "error.backend.videoGenerationInterrupted": "동영상 생성이 중단됐어요.",
+  "error.backend.grokVideoNoQuota": "이 Grok 계정으로는 동영상을 만들 수 없어요. 대신 크레딧으로 동영상을 생성하세요.",
   "error.backend.attachmentNotRegularFile": "일반 파일만 첨부할 수 있어요: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot이 {name}을(를) 복사할 수 없었어요.",
   "error.backend.routineNameRequired": "루틴 이름이 필요해요.",

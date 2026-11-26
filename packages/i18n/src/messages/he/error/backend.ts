@@ -192,6 +192,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "יצירת הסרטון נכשלה.",
   "error.backend.videoGenerationNoVideo": "יצירת הסרטון לא החזירה סרטון.",
   "error.backend.videoGenerationInterrupted": "יצירת הסרטון הופסקה.",
+  "error.backend.grokVideoNoQuota": "חשבון ה-Grok הזה לא יכול ליצור סרטונים. אפשר ליצור את הסרטון באמצעות קרדיטים.",
   "error.backend.attachmentNotRegularFile": "אפשר לצרף רק קבצים רגילים: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot לא הצליח להעתיק את {name}.",
   "error.backend.routineNameRequired": "נדרש שם לשגרה.",
