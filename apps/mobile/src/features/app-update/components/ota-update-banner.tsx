@@ -23,8 +23,8 @@ import {
   dismissAppUpdate,
   installAppUpdate,
   MOBILE_CHANGELOG_URL,
-  markOtaNotesSeen,
   newestReleaseVersion,
+  rememberShownOtaNotes,
   useOtaUpdateNotes,
 } from "@/features/app-update/model/app-update";
 import { BloubEyes, EYES_HEIGHT, EYES_WIDTH } from "@/shared/components/bloub-stage/bloub-eyes";
@@ -46,6 +46,7 @@ const BOTTOM_PADDING = 20;
 const NOTES_GAP = 12;
 const NOTES_BOTTOM_GAP = 8;
 const NOTES_PREVIEW = 132;
+const TOGGLE_ESTIMATE = 28;
 const NOTES_MAX_SHARE = 0.42;
 const EDGE_FADE = 56;
 const EDGE_INSET = 4;
@@ -106,7 +107,7 @@ function mergedGroups(releases: readonly MobileReleaseNotes[] | undefined) {
   for (const release of releases ?? []) {
     for (const group of release.groups) {
       const entry = groups.get(group.type) ?? { type: group.type, heading: group.heading, items: [] };
-      entry.items.push(...group.items);
+      for (const item of group.items) if (!entry.items.includes(item)) entry.items.push(item);
       groups.set(group.type, entry);
     }
   }
@@ -319,6 +320,8 @@ export function OtaUpdateBlock({
   const [headerHeight, setHeaderHeight] = useState(0);
   const [toggleHeight, setToggleHeight] = useState(0);
   const [footerHeight, setFooterHeight] = useState(0);
+  const [placed, setPlaced] = useState(false);
+  const [underStatusBar, setUnderStatusBar] = useState(false);
   const drop = useSharedValue(0);
   const reveal = useSharedValue(0);
   const contentHeight = useSharedValue(0);
@@ -333,9 +336,10 @@ export function OtaUpdateBlock({
   const maxNotes = Math.round(window.height * NOTES_MAX_SHARE);
   const canExpand = natural > NOTES_PREVIEW;
   const scrolls = natural > maxNotes;
-  const measured = headerHeight > 0 && footerHeight > 0 && natural >= 0 && (!canExpand || toggleHeight > 0);
+  const measured = placed || (headerHeight > 0 && footerHeight > 0 && natural >= 0);
+  if (measured && !placed) setPlaced(true);
   const top = scroll.headerHeight + TOP_GAP;
-  const fixed = top + headerHeight + (canExpand ? toggleHeight : 0) + footerHeight + BOTTOM_PADDING;
+  const fixed = top + headerHeight + (canExpand ? toggleHeight || TOGGLE_ESTIMATE : 0) + footerHeight + BOTTOM_PADDING;
   const barHeight = scroll.headerHeight;
   const newestNotes = notes.data ? newestReleaseVersion(notes.data) : null;
 
@@ -347,6 +351,16 @@ export function OtaUpdateBlock({
   const below = useDerivedValue(() => contentHeight.get() - clipHeight.get() - scrollY.get());
   const rows: RowScroll = { scrollY, viewport: clipHeight, below, reduced };
 
+  useAnimatedReaction(
+    () => {
+      const total = fixed + clipHeight.get();
+      const bottom = total - (1 - drop.get()) * (total + 20) - Math.max(0, scroll.scrolled.get());
+      return measured && bottom > scroll.barTop;
+    },
+    (next, previous) => {
+      if (next !== previous) scheduleOnRN(setUnderStatusBar, next);
+    },
+  );
   useAnimatedReaction(
     () => (measured ? drop.get() * Math.max(0, fixed + clipHeight.get() - barHeight + LIST_GAP) : 0),
     (next) => pushDown.set(next),
@@ -368,8 +382,9 @@ export function OtaUpdateBlock({
   }, [clear, drop, measured, reduced, shown, update]);
 
   useEffect(() => {
-    if (shown && newestNotes) void markOtaNotesSeen(newestNotes).catch(() => undefined);
-  }, [newestNotes, shown]);
+    const updateId = update?.updateId;
+    if (shown && updateId && newestNotes) void rememberShownOtaNotes(updateId, newestNotes).catch(() => undefined);
+  }, [newestNotes, shown, update?.updateId]);
   useEffect(() => {
     reveal.set(reduced ? (expanded ? 1 : 0) : withTiming(expanded ? 1 : 0, REVEAL));
     if (!expanded) scrollRef.current?.scrollTo({ y: 0, animated: !reduced });
@@ -445,7 +460,7 @@ export function OtaUpdateBlock({
         blockStyle,
       ]}
     >
-      {hidden ? null : <StatusBar style="dark" />}
+      {underStatusBar && !hidden ? <StatusBar style="dark" /> : null}
       <View
         className="flex-row items-center gap-3 px-5"
         onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}
@@ -519,7 +534,11 @@ export function OtaUpdateBlock({
             onPress={toggle}
           >
             <Typography.Paragraph type="body-sm" className="font-semibold" style={{ color: colors.eye }}>
-              {expanded ? t("mobile.app.update.showLess") : t("mobile.app.update.showAll", { count })}
+              {expanded
+                ? t("mobile.app.update.showLess")
+                : count === 1
+                  ? t("mobile.app.update.showMore")
+                  : t("mobile.app.update.showAll", { count })}
             </Typography.Paragraph>
             <Animated.View style={chevronStyle}>
               <ChevronDown size={16} color={colors.eye} strokeWidth={2.2} />

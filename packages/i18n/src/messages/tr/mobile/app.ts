@@ -70,7 +70,11 @@ export const messages = {
   "mobile.app.update.fullChangelog": "Tüm değişiklikler",
   "mobile.app.update.quickTitle": "Hızlı güncelleme hazır",
   "mobile.app.update.restart": "Yeniden başlat",
-  "mobile.app.update.showAll": { one: "Daha fazla göster", other: "{count} değişikliğin tümünü göster" },
+  "mobile.app.update.showAll": {
+    one: "{count} değişikliğin tümünü göster",
+    other: "{count} değişikliğin tümünü göster",
+  },
+  "mobile.app.update.showMore": "Daha fazla göster",
   "mobile.app.update.showLess": "Daha az göster",
   "mobile.app.rate.title": "OpenBot'u beğendin mi?",
   "mobile.app.rate.body": "Bir puan, diğer ekiplerin OpenBot'u bulmasına yardım eder.",

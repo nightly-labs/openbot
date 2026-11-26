@@ -71,11 +71,12 @@ export const messages = {
   "mobile.app.update.quickTitle": "Szybka aktualizacja gotowa",
   "mobile.app.update.restart": "Uruchom ponownie",
   "mobile.app.update.showAll": {
-    one: "Pokaż więcej",
+    one: "Pokaż wszystkie {count}",
     few: "Pokaż wszystkie {count}",
     many: "Pokaż wszystkie {count}",
     other: "Pokaż wszystkie {count}",
   },
+  "mobile.app.update.showMore": "Pokaż więcej",
   "mobile.app.update.showLess": "Pokaż mniej",
   "mobile.app.rate.title": "Podoba Ci się OpenBot?",
   "mobile.app.rate.body": "Ocena pomaga innym zespołom znaleźć OpenBot.",

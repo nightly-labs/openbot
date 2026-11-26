@@ -71,6 +71,7 @@ export const messages = {
   "mobile.app.update.quickTitle": "빠른 업데이트 준비 완료",
   "mobile.app.update.restart": "다시 시작",
   "mobile.app.update.showAll": { other: "{count}개 모두 보기" },
+  "mobile.app.update.showMore": "더 보기",
   "mobile.app.update.showLess": "간단히 보기",
   "mobile.app.rate.title": "OpenBot이 마음에 드세요?",
   "mobile.app.rate.body": "평가는 다른 팀이 OpenBot을 찾는 데 도움이 됩니다.",

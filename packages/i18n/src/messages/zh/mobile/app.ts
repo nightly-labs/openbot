@@ -70,6 +70,7 @@ export const messages = {
   "mobile.app.update.quickTitle": "快速更新已就绪",
   "mobile.app.update.restart": "重启",
   "mobile.app.update.showAll": { other: "显示全部 {count} 项" },
+  "mobile.app.update.showMore": "显示更多",
   "mobile.app.update.showLess": "收起",
   "mobile.app.rate.title": "喜欢 OpenBot 吗？",
   "mobile.app.rate.body": "你的评分能帮助其他团队找到 OpenBot。",

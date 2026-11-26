@@ -71,6 +71,7 @@ export const messages = {
   "mobile.app.update.quickTitle": "クイックアップデートの準備ができました",
   "mobile.app.update.restart": "再起動",
   "mobile.app.update.showAll": { other: "{count} 件をすべて表示" },
+  "mobile.app.update.showMore": "さらに表示",
   "mobile.app.update.showLess": "表示を減らす",
   "mobile.app.rate.title": "OpenBot はいかがですか？",
   "mobile.app.rate.body": "評価は、ほかのチームが OpenBot を見つける助けになります。",

@@ -4,6 +4,7 @@ import {
   type MobileReleaseNotes,
   parseMobileReleaseNotes,
 } from "@openbot/contracts/mobile-features";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { useQuery } from "@tanstack/react-query";
 import * as SecureStore from "expo-secure-store";
 import * as Updates from "expo-updates";
@@ -11,6 +12,7 @@ import { useEffect } from "react";
 import { AppState, Linking } from "react-native";
 import { create } from "zustand";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { storedFields } from "@/features/settings/model/stored-fields";
 import { supportLog } from "@/features/support/model/support-log";
 import { devLatestAppVersion } from "@/shared/lib/dev-feature-overrides";
 import { currentAppVersion, useLatestAppVersion, useMobileFeaturesRefresh } from "@/shared/lib/mobile-features";
@@ -30,7 +32,7 @@ const NOTES_TIMEOUT_MS = 10_000;
 const NOTES_STALE_MS = 10 * 60_000;
 
 const key = "openbot.mobile.appUpdate.dismissed.v1";
-const otaNotesSeenKey = "openbot.mobile.appUpdate.otaNotesSeen.v1";
+const otaNotesKey = "openbot.mobile.appUpdate.otaNotes.v1";
 
 const UPDATE_CHECK_INTERVAL_MS = 15 * 60_000;
 let lastUpdateCheck = Date.now();
@@ -71,19 +73,51 @@ export async function dismissAppUpdate(update: AppUpdate): Promise<void> {
   await SecureStore.setItemAsync(key, update.id);
 }
 
+interface OtaNotesRecord {
+  seen: string | null;
+  pending: { updateId: string; version: string } | null;
+}
+
 const useOtaNotesSeen = create<{ seen: string | null; ready: boolean }>(() => ({ seen: null, ready: false }));
+let otaNotesRecord: OtaNotesRecord = { seen: null, pending: null };
+
+function parseOtaNotesRecord(raw: string | null): OtaNotesRecord {
+  const fields = storedFields(raw);
+  const seen = fields?.get("seen");
+  const pending = fields?.get("pending");
+  return {
+    seen: isString(seen) ? seen : null,
+    pending:
+      isDynamicRecord(pending) && isString(pending.updateId) && isString(pending.version)
+        ? { updateId: pending.updateId, version: pending.version }
+        : null,
+  };
+}
 
 async function loadOtaNotesSeen(): Promise<void> {
   if (useOtaNotesSeen.getState().ready) return;
   try {
-    useOtaNotesSeen.setState({ seen: await SecureStore.getItemAsync(otaNotesSeenKey) });
+    const record = parseOtaNotesRecord(await SecureStore.getItemAsync(otaNotesKey));
+    const running = Updates.isEmbeddedLaunch ? null : Updates.updateId;
+    const installed = record.pending && running && record.pending.updateId.toLowerCase() === running.toLowerCase();
+    otaNotesRecord = installed && record.pending ? { seen: record.pending.version, pending: null } : record;
+    if (installed) await SecureStore.setItemAsync(otaNotesKey, JSON.stringify(otaNotesRecord));
+    useOtaNotesSeen.setState({ seen: otaNotesRecord.seen });
+  } catch (error) {
+    supportLog.add(
+      "warn",
+      "app",
+      `The update notes state could not load: ${error instanceof Error ? error.message : String(error)}`,
+    );
   } finally {
     useOtaNotesSeen.setState({ ready: true });
   }
 }
 
-export async function markOtaNotesSeen(version: string): Promise<void> {
-  await SecureStore.setItemAsync(otaNotesSeenKey, version);
+export async function rememberShownOtaNotes(updateId: string, version: string): Promise<void> {
+  if (!useOtaNotesSeen.getState().ready) return;
+  otaNotesRecord = { ...otaNotesRecord, pending: { updateId, version } };
+  await SecureStore.setItemAsync(otaNotesKey, JSON.stringify(otaNotesRecord));
 }
 
 let rollbackFetched = false;
