@@ -1,3 +1,0 @@
-### Fixed
-
-- When you move your agents and server settings to another computer, a Marketplace app such as Linear, Todoist or ElevenLabs now keeps its full address. Before, the file kept only the start of the address (for example `https://mcp.linear.app` instead of `https://mcp.linear.app/mcp`), so turning the app on failed until you typed the full address again. A file that an earlier version made also gets the full address of each Marketplace app when you import it. Connect each app again and turn it on in Marketplace, Apps. Other MCP servers still keep only the start of their address, because the rest can hold a secret.

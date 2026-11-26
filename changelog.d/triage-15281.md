@@ -1,3 +1,0 @@
-### Fixed
-
-- An OpenCode agent with no OpenCode sign-in no longer tries to make images or videos with OpenCode's own tools, which always failed with "Invalid credential" or "Missing API key". OpenCode offered its paid image and video models to the free models, and the OpenCode service refused each request. Now OpenBot turns off these OpenCode tools until OpenCode has a key that can pay for them. The agent then makes the picture or video with OpenBot credits, or tells you at once that it cannot. The OpenCode Go key does not change this: OpenCode Go has no image or video models. On a joined server, the server must also be on this version.
