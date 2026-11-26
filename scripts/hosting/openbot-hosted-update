@@ -162,6 +162,7 @@ stage_release() {
   rm -f "$INSTALL/staged.ready"
   copy_release "$1" "$INSTALL/staged"
   version_of "$INSTALL/staged" >"$INSTALL/staged.ready"
+  sync -f "$INSTALL"
 }
 
 recover() {

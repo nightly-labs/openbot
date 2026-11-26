@@ -135,14 +135,18 @@ function stageScenario(directory: string) {
   writeRelease(source, NEW_VERSION);
 
   const events = runStep("stage", install, work, snapshots, source);
-  assert.equal(events.length, 1, "Staging must write the staged release to disk once.");
+  assert.equal(events.length, 2, "Staging must write the staged release, then staged.ready, to disk.");
   const durable = join(snapshots, "0");
   assert.ok(
     sameTree(source, join(durable, "staged")),
     "The staged release was not complete when it was written to disk.",
   );
   assert.ok(!existsSync(join(durable, "staged.ready")), "staged.ready existed before the staged release was on disk.");
-  assert.equal(readFileSync(join(install, "staged.ready"), "utf8").trim(), NEW_VERSION);
+  assert.equal(
+    readFileSync(join(snapshots, "1", "staged.ready"), "utf8").trim(),
+    NEW_VERSION,
+    "staged.ready was not on disk when staging ended.",
+  );
   return { events };
 }
 
