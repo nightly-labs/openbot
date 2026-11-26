@@ -22,6 +22,7 @@ import {
   WORKFLOW_CREDIT_MODEL_PREFIX,
   WORKFLOW_GITHUB_EVENTS,
   WORKFLOW_PICTURE_TYPES,
+  WORKFLOW_STEP_NAME_FIELD,
   type WorkflowCatalogSource,
   type WorkflowDetail,
   type WorkflowGitHubHistory,
@@ -860,15 +861,27 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           if (attachmentIds.length > INPUT_LIMITS.attachments)
             return Result.fail(sourceText("error.backend.attachLimit", { limit: INPUT_LIMITS.attachments }));
           const files: MessagingAnswerFile[] = [];
+          const missing: string[] = [];
           for (const attachmentId of attachmentIds) {
             const file = dependencies.attachmentFile
               ? yield* dependencies.attachmentFile(attachmentId).pipe(Effect.orElseSucceed(() => null))
               : null;
-            if (!file) return Result.fail(sourceText("error.workflow.mediaInputMissing"));
-            files.push(file);
+            if (file) files.push(file);
+            else if (found) missing.push(outputInputName(found.graph, found.latest, attachmentId));
           }
-          return Result.succeed(files);
+          return Result.succeed({ files, missing });
         });
+
+        const postOutput = (output: WorkflowOutputDelivery, inputs: OutputFiles) =>
+          dependencies
+            .post(output.connectionId, output.placeId, output.text, inputs.files)
+            .pipe(
+              Effect.map((result) =>
+                "posted" in result && inputs.missing.length > 0
+                  ? { ...result, skippedFiles: [...(result.skippedFiles ?? []), ...inputs.missing] }
+                  : result,
+              ),
+            );
 
         const sendOutput = Effect.fn("Workflows.sendOutput")(function* (step: StoredWorkflowStep, node: WorkflowNode) {
           const connectionId = fieldText(node, "connectionId");
@@ -883,8 +896,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             return;
           }
           const text = step.input.trim() ? resultText(titleOf(step.workflowId), step.input) : "";
-          if (!text && files.success.length === 0) {
-            settle(step, { status: "done", output: "" });
+          if (!text && files.success.files.length === 0) {
+            settle(
+              step,
+              files.success.missing.length > 0
+                ? { status: "failed", error: sourceText("error.workflow.mediaInputMissing") }
+                : { status: "done", output: "" },
+            );
             return;
           }
           if (!dependencies.connectionOn(connectionId)) {
@@ -893,8 +911,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           }
           runs.addOutput({ stepId: step.id, connectionId, placeId, text }, now());
           const output = runs.output(step.id);
-          if (output)
-            yield* startPost(step, output, dependencies.post(connectionId, placeId, output.text, files.success));
+          if (output) yield* startPost(step, output, postOutput(output, files.success));
         });
 
         const sendChannelNote = Effect.fn("Workflows.sendChannelNote")(function* (
@@ -1207,10 +1224,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               runs.endOutput(step.id, "failed", null, now());
               return settle(step, { status: "failed", error: files.failure });
             }
-            return yield* resumeOutput(
-              step,
-              dependencies.post(output.connectionId, output.placeId, output.text, files.success),
-            );
+            return yield* resumeOutput(step, postOutput(output, files.success));
           }
           if (!node || fieldText(node, "target") !== "github") return yield* resumeOutput(step);
           yield* sendGitHub(step, node, run);
@@ -2442,6 +2456,25 @@ export const createWorkflows = Effect.fn("createWorkflows")(function* (dependenc
   const service = Context.get(context, Workflows);
   return { ...service, close: () => runtime.disposeEffect } satisfies WorkflowsHandle;
 });
+
+interface OutputFiles {
+  files: readonly MessagingAnswerFile[];
+  missing: readonly string[];
+}
+
+function outputInputName(
+  graph: WorkflowGraph,
+  latest: ReadonlyMap<string, StoredWorkflowStep>,
+  attachmentId: string,
+): string {
+  const source = graph.nodes.find(
+    (node) =>
+      (node.kind === "asset" && fieldText(node, "fileId") === attachmentId) ||
+      (node.kind === "image" && latest.get(node.id)?.output === attachmentId),
+  );
+  if (!source) return attachmentId;
+  return fieldText(source, "file") || fieldText(source, WORKFLOW_STEP_NAME_FIELD) || source.kind;
+}
 
 function sentOutput(input: string, skippedFiles: string | null): string {
   if (!skippedFiles) return input;

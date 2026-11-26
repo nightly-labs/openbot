@@ -51,7 +51,7 @@ const toPlace = { connectionId: CONNECTION, placeId: PLACE };
 const pictureGraph = (text: string | null, fileId: string): WorkflowGraph => ({
   nodes: [
     ...(text === null ? [] : [{ id: "prompt", kind: "prompt" as const, at: { x: 0, y: 0 }, fields: { text } }]),
-    { id: "picture", kind: "asset", at: { x: 0, y: 200 }, fields: { fileId } },
+    { id: "picture", kind: "asset", at: { x: 0, y: 200 }, fields: { fileId, file: "old-menu.png" } },
     { id: "output", kind: "output", at: { x: 300, y: 0 }, fields: { target: "channel", ...toPlace } },
   ],
   edges: [
@@ -268,10 +268,21 @@ try {
   );
 
   const lost = await workflowWith(workflows, "Lost picture", pictureGraph("New menu.", "deleted-file"));
-  const postsLost = report.posts.length;
   step = await outputStep(workflows, (await runOnce(workflows, lost)).id, ended);
   check(
-    "a picture that is not in the library fails the step and posts nothing",
+    "a picture that is not in the library leaves the text sent and names the picture in the note",
+    step.status === "done" &&
+      step.output === `New menu.\n\n${sourceText("status.messaging.filesSkipped", { names: "old-menu.png" })}` &&
+      report.posts.at(-1)?.markdown === "**Lost picture**\n\nNew menu." &&
+      report.posts.at(-1)?.files.length === 0,
+    { step, post: report.posts.at(-1) },
+  );
+
+  const lostOnly = await workflowWith(workflows, "Lost picture only", pictureGraph(null, "deleted-file"));
+  const postsLost = report.posts.length;
+  step = await outputStep(workflows, (await runOnce(workflows, lostOnly)).id, ended);
+  check(
+    "a lost picture with no text fails the step and posts nothing",
     step.status === "failed" &&
       step.error === sourceText("error.workflow.mediaInputMissing") &&
       report.posts.length === postsLost,
