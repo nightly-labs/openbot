@@ -675,6 +675,46 @@ async function main(): Promise<void> {
       assert.equal(policyOf(fakeAgent).owner_approval, false, "the change keeps auto-pay");
     });
 
+    await scenario("removing the last rule turns the owner approval on again", async (details) => {
+      const fakeAgent = api.agents.get(wallet.store.read().wallet?.agentId ?? "");
+      assert.ok(fakeAgent);
+      const visits = page.visits.length;
+      const other = decoded(
+        parseNearRuleInput({ domain: "other.example.com", recipients: [SHOP], dailyUsd: 5 }),
+        "rule",
+      );
+      await Effect.runPromise(wallet.service.saveRule(other));
+      const kept = await Effect.runPromise(wallet.service.removeRule(other.domain));
+      details.set("afterOtherRule", { error: kept.error, rules: kept.rules.map((rule) => rule.domain) });
+      assert.equal(kept.error, null);
+      assert.deepEqual(
+        page.visits.slice(visits).map((visit) => visit.fragment.action),
+        [],
+        "a rule that is not the last one needs no signature",
+      );
+      assert.equal(policyOf(fakeAgent).owner_approval, false);
+
+      const removed = await Effect.runPromise(wallet.service.removeRule(DOMAIN));
+      const actions = page.visits.slice(visits).map((visit) => visit.fragment.action);
+      details.set("removed", {
+        error: removed.error,
+        rules: removed.rules,
+        ownerApproval: removed.account?.ownerApproval,
+      });
+      details.set("signedActions", actions);
+      assert.equal(removed.error, null);
+      assert.deepEqual(removed.rules, []);
+      assert.deepEqual(actions, ["manual-pay"]);
+      assert.equal(policyOf(fakeAgent).owner_approval, true);
+      assert.equal(wallet.store.read().wallet?.ownerApproval, true);
+      assert.equal(removed.account?.ownerApproval, true);
+
+      const ask = await wallet.prepare(payment("pay-no-rule", { amount: "1" }));
+      details.set("ask", ask);
+      assert.deepEqual(ask, { kind: "ask", amount: "1", symbol: "USDC" });
+      wallet.service.drop("pay-no-rule");
+    });
+
     await scenario("secrets stay out of the store file, statuses, answers, logs and requests", async (details) => {
       const token = wallet.store.read().wallet?.grant?.token ?? "";
       grantToken = token;

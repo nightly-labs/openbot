@@ -65,6 +65,7 @@ export const messages = defineMessages("sitePage", {
   "sitePage.nearSign.action.freeze": "Pause payments",
   "sitePage.nearSign.action.unfreeze": "Resume payments",
   "sitePage.nearSign.action.autoPay": "Turn on automatic payments",
+  "sitePage.nearSign.action.manualPay": "Turn off automatic payments",
   "sitePage.nearSign.action.approvePayment": "Approve a payment",
   "sitePage.nearSign.action.checkBackup": "Check the passkey backup",
   "sitePage.nearSign.createPasskey": "Create passkey",

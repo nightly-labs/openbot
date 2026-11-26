@@ -67,6 +67,7 @@ export const messages = {
   "sitePage.nearSign.action.freeze": "Sospendi i pagamenti",
   "sitePage.nearSign.action.unfreeze": "Riprendi i pagamenti",
   "sitePage.nearSign.action.autoPay": "Attiva i pagamenti automatici",
+  "sitePage.nearSign.action.manualPay": "Disattiva i pagamenti automatici",
   "sitePage.nearSign.action.approvePayment": "Approva un pagamento",
   "sitePage.nearSign.action.checkBackup": "Verifica il backup della passkey",
   "sitePage.nearSign.createPasskey": "Crea passkey",

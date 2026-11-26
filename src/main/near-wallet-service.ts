@@ -331,7 +331,15 @@ export class NearWalletService implements NearWallet {
 
   readonly removeRule = Effect.fn("NearWallet.removeRule")(function* (this: NearWalletService, domain: string) {
     return yield* this.#ownerStep(
-      this.#store.update((record) => ({ ...record, rules: record.rules.filter((rule) => rule.domain !== domain) })),
+      Effect.gen({ self: this }, function* () {
+        const rules = this.#store.read().rules;
+        const removesLastRule = rules.length === 1 && rules[0]?.domain === domain;
+        if (removesLastRule) yield* this.#askForEachPayment();
+        yield* this.#store.update((record) => ({
+          ...record,
+          rules: record.rules.filter((rule) => rule.domain !== domain),
+        }));
+      }),
     );
   }).bind(this);
 
@@ -722,9 +730,22 @@ export class NearWalletService implements NearWallet {
     );
   });
 
+  readonly #askForEachPayment = Effect.fn("NearWallet.askForEachPayment")(function* (this: NearWalletService) {
+    const wallet = this.#store.read().wallet;
+    if (!wallet || wallet.ownerApproval) return;
+    yield* this.#updatePolicy(
+      "manual-pay",
+      (policy) => ({ ...policy, owner_approval: true }),
+      sourceText("status.agent.nearSummaryManualPay"),
+    );
+    yield* this.#store.update((record) =>
+      record.wallet ? { ...record, wallet: { ...record.wallet, ownerApproval: true } } : record,
+    );
+  });
+
   readonly #updatePolicy = Effect.fn("NearWallet.updatePolicy")(function* (
     this: NearWalletService,
-    action: "budget" | "auto-pay",
+    action: "budget" | "auto-pay" | "manual-pay",
     change: (policy: Policy) => Policy,
     summary: string,
   ) {

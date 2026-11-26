@@ -85,6 +85,8 @@ export const messages = {
   "status.agent.nearSummaryBudget": "Zmień budżet dzienny portfela na {amount} USD.",
   "status.agent.nearSummaryAutoPay":
     "Pozwól OpenBot płacić bez twojego podpisu, gdy pozwala na to reguła płatności. O inne płatności nadal zapytamy cię na czacie.",
+  "status.agent.nearSummaryManualPay":
+    "Nie ma już żadnej reguły płatności. OpenBot znów poprosi o twój podpis przy każdej płatności.",
   "status.agent.nearSummaryPayment": "Zatwierdź płatność {amount} dla odbiorcy {recipient}.",
   "status.agent.nearSummaryFreeze": "Agenci nie mogą płacić z tego portfela, dopóki nie wznowisz płatności.",
   "status.agent.nearSummaryUnfreeze": "Agenci znów mogą płacić z tego portfela, zgodnie z twoimi regułami.",

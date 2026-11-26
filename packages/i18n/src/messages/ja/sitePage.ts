@@ -65,6 +65,7 @@ export const messages = {
   "sitePage.nearSign.action.freeze": "支払いを一時停止",
   "sitePage.nearSign.action.unfreeze": "支払いを再開",
   "sitePage.nearSign.action.autoPay": "自動支払いをオンにする",
+  "sitePage.nearSign.action.manualPay": "自動支払いをオフにする",
   "sitePage.nearSign.action.approvePayment": "支払いを承認",
   "sitePage.nearSign.action.checkBackup": "パスキーのバックアップを確認",
   "sitePage.nearSign.createPasskey": "パスキーを作成",

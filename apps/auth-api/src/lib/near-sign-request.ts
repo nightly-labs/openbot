@@ -32,6 +32,7 @@ const OWNER_ACTIONS = {
   freeze: true,
   unfreeze: true,
   "auto-pay": true,
+  "manual-pay": true,
   "approve-payment": true,
   "check-backup": true,
 } as const satisfies Record<NearOwnerAction, true>;

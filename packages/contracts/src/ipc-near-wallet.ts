@@ -13,6 +13,7 @@ export type NearOwnerAction =
   | "freeze"
   | "unfreeze"
   | "auto-pay"
+  | "manual-pay"
   | "approve-payment"
   | "check-backup";
 export const NEAR_OWNER_ACTIONS = [
@@ -23,6 +24,7 @@ export const NEAR_OWNER_ACTIONS = [
   "freeze",
   "unfreeze",
   "auto-pay",
+  "manual-pay",
   "approve-payment",
   "check-backup",
 ] as const satisfies NearOwnerAction[];
