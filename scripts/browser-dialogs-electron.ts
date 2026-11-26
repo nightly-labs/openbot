@@ -8,6 +8,7 @@ import {
   decodeBrowserViewHostMessage,
   encodeBrowserViewInput,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { Effect } from "effect";
 import {
@@ -484,6 +485,98 @@ async function main(): Promise<void> {
         recordCases("view-person-alert-in-agent-tab-shown");
         socket.close();
       } finally {
+        await runCauseEffect(gateway.stop());
+        viewServer.closeAllConnections();
+        await new Promise<void>((resolve) => viewServer.close(() => resolve()));
+      }
+    }
+
+    {
+      const { tabId, contents } = await open();
+      await contents.executeJavaScript(
+        "(() => { const paint = () => { document.body.style.opacity = String(0.9 + (Date.now() % 1000) / 10000); requestAnimationFrame(paint); }; paint(); })()",
+        true,
+      );
+      const pageDebugger = contents.debugger;
+      const originalSendCommand = pageDebugger.sendCommand;
+      const sendCommand = originalSendCommand.bind(pageDebugger);
+      let detachesLeft = 0;
+      let rejected = 0;
+      pageDebugger.sendCommand = (method, params, sessionId) => {
+        const answer = sendCommand(method, params, sessionId);
+        if (method !== "Page.enable" || detachesLeft === 0) return answer;
+        detachesLeft -= 1;
+        pageDebugger.detach();
+        return answer.catch((error: unknown) => {
+          rejected += 1;
+          throw error;
+        });
+      };
+      const gateway = new BrowserViewGateway({
+        browser: host,
+        authenticate: (token) => (token === VIEW_TOKEN ? { id: VIEW_MEMBER } : null),
+      });
+      const viewServer = createServer();
+      viewServer.on("upgrade", (request, socket, head) => {
+        const url = new URL(request.url ?? "/", "http://127.0.0.1");
+        if (gateway.handlesUpgrade(url)) gateway.handleUpgrade(request, socket, head, url);
+        else socket.destroy();
+      });
+      await new Promise<void>((resolve) => viewServer.listen(0, "127.0.0.1", resolve));
+      const viewAddress = viewServer.address();
+      assert(viewAddress && typeof viewAddress === "object", "View server address missing.");
+      const watch = (detaches: number) => {
+        detachesLeft = 0;
+        if (pageDebugger.isAttached()) pageDebugger.detach();
+        detachesLeft = detaches;
+        const session = gateway.createSession({ memberId: VIEW_MEMBER, teamSessionId: "fixture-session", tabId });
+        const socket = new WebSocket(
+          `ws://127.0.0.1:${viewAddress.port}${session.streamPath}?${BROWSER_VIEW_DIALOG_QUERY}=1`,
+          [`openbot-token.${VIEW_TOKEN}`],
+        );
+        socket.binaryType = "arraybuffer";
+        const view: { socket: WebSocket; frames: number; closed: { code: number; reason: string } | null } = {
+          socket,
+          frames: 0,
+          closed: null,
+        };
+        socket.addEventListener("message", (message) => {
+          if (typeof message.data !== "string") view.frames += 1;
+        });
+        socket.addEventListener("close", (event) => {
+          view.closed = { code: event.code, reason: event.reason };
+        });
+        return view;
+      };
+      try {
+        const view = watch(2);
+        await waitUntil(async () => view.frames > 0 || view.closed !== null);
+        assert.equal(view.closed, null, "The view ended when the debugger detached during its start.");
+        assert.equal(rejected, 2, "The debugger detach did not reject the view's start commands.");
+        recordCases("view-starts-after-debugger-detaches");
+
+        detachesLeft = 1;
+        const framesBefore = view.frames;
+        pageDebugger.detach();
+        await waitUntil(async () => view.frames > framesBefore + 2 || view.closed !== null);
+        assert.equal(view.closed, null, "The view ended when the debugger detached during its restart.");
+        assert.equal(rejected, 3, "The debugger detach did not reject the restarted view's command.");
+        recordCases("view-continues-after-debugger-detaches");
+        view.socket.close();
+        await waitUntil(async () => view.closed !== null && !pageDebugger.isAttached());
+
+        const failing = watch(10);
+        await waitUntil(async () => failing.closed !== null);
+        assert.equal(failing.frames, 0, "A view whose start kept failing drew the page.");
+        assert.equal(
+          failing.closed?.reason,
+          sourceText("error.backend.browserViewFailed"),
+          "A view whose start kept failing did not end with the catalog text.",
+        );
+        assert(detachesLeft > 0, "The view kept starting again after each debugger detach.");
+        recordCases("view-start-failure-ends-with-catalog-text");
+      } finally {
+        pageDebugger.sendCommand = originalSendCommand;
         await runCauseEffect(gateway.stop());
         viewServer.closeAllConnections();
         await new Promise<void>((resolve) => viewServer.close(() => resolve()));

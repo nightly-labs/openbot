@@ -17,6 +17,7 @@ export const messages = {
   "error.backend.browserViewLimit": "这台主机上打开的浏览器视图过多。",
   "error.backend.browserViewEnded": "该页面的实时视图已结束。",
   "error.backend.browserViewFailed": "该页面的实时视图失败。",
+  "error.backend.browserViewStopped": "此页面的实时视图已停止。请再次选择该标签页以显示它。",
   "error.backend.windowTemporarilyUnavailable": "OpenBot 窗口暂时不可用。",
   "error.backend.windowUnavailable": "OpenBot 窗口不可用。",
   "error.backend.sunshineApiHttp": "Sunshine API 失败，HTTP {status}。",

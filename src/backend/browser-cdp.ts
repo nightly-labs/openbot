@@ -14,7 +14,7 @@ import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } fr
 import { BROWSER_VIEW_MAX_CLIPBOARD_TEXT } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
-import { Deferred, Effect, Exit, Fiber, Option, Scope } from "effect";
+import { Deferred, Effect, Exit, Fiber, Option, Result, Scope } from "effect";
 import type { NativeImage, WebContents } from "electron";
 import {
   BROWSER_CARD_FIELDS,
@@ -118,6 +118,8 @@ const MAX_SNAPSHOT_FRAMES = 12;
 const DOM_QUIET_MS = 250;
 const CHOOSER_WAIT_MS = 5_000;
 const DROP_FRAME_WAIT_MS = 1_500;
+const VIEW_DETACH_RETRIES = 3;
+const VIEW_DETACH_RETRY_MS = 250;
 const DROP_FRAME_SCRIPT = "new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)))";
 const NEW_PAGE_MS = 1_500;
 const NEW_PAGE_FRAME_SCRIPT = `performance.now() - (performance.getEntriesByType("navigation")[0]?.responseStart ?? 0) < ${NEW_PAGE_MS} && ${DROP_FRAME_SCRIPT}`;
@@ -941,6 +943,7 @@ export class BrowserCdpEngine {
   #disposed = false;
   readonly #scope = Scope.makeUnsafe();
   #activeLeases = 0;
+  #debuggerDetaches = 0;
   readonly #dialogWatches = new Set<DialogWatch>();
   #dialog: (BrowserDialog & { owner: BrowserDialogOwner | undefined }) | undefined;
   #dialogChanged = Deferred.makeUnsafe<void>();
@@ -1008,6 +1011,7 @@ export class BrowserCdpEngine {
       }
     });
     contents.debugger.on("detach", () => {
+      this.#debuggerDetaches += 1;
       this.#clearDebuggerSessions();
       this.#restoreLocation();
     });
@@ -2596,12 +2600,14 @@ export class BrowserCdpEngine {
     const running = yield* Effect.forkIn(
       Effect.gen({ self: this }, function* () {
         yield* Effect.gen({ self: this }, function* () {
+          let detachFailures = 0;
           while (!stopRequested) {
             const detached = Deferred.makeUnsafe<void>();
             const onDetach = () => {
               Deferred.doneUnsafe(detached, Effect.void);
             };
-            yield* this.#leaseEffect(
+            const detachesBefore = this.#debuggerDetaches;
+            const attempt = yield* this.#leaseEffect(
               (send) =>
                 Effect.gen({ self: this }, function* () {
                   this.#contents.debugger.on("message", listener);
@@ -2615,6 +2621,7 @@ export class BrowserCdpEngine {
                       everyNthFrame: 1,
                     });
                     live = true;
+                    detachFailures = 0;
                     started();
                     const ended = Effect.raceFirst(Deferred.await(stopped), Deferred.await(detached));
                     const onPageCopy = options.onPageCopy;
@@ -2638,7 +2645,11 @@ export class BrowserCdpEngine {
                   );
                 }),
               false,
-            );
+            ).pipe(Effect.result);
+            if (Result.isSuccess(attempt)) continue;
+            if (!this.#detachedWhileOpen(detachesBefore) || ++detachFailures > VIEW_DETACH_RETRIES)
+              return yield* Effect.fail(attempt.failure);
+            yield* Effect.raceFirst(Effect.sleep(VIEW_DETACH_RETRY_MS * detachFailures), Deferred.await(stopped));
           }
         }).pipe(
           Effect.ensuring(
@@ -3915,6 +3926,11 @@ export class BrowserCdpEngine {
   #mayEmulateIdleFocus(): boolean {
     if (!this.#ownsDebugger || this.#activeLeases > 0 || this.#disposed || this.#closing) return false;
     return !this.#contents.isDestroyed() && this.#contents.debugger.isAttached();
+  }
+
+  #detachedWhileOpen(detachesBefore: number): boolean {
+    if (this.#debuggerDetaches === detachesBefore) return false;
+    return !this.#disposed && !this.#closing && !this.#contents.isDestroyed();
   }
 
   #detachOwnedDebugger(): void {

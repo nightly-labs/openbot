@@ -18,6 +18,7 @@ export const messages = {
   "error.backend.browserViewLimit": "יותר מדי תצוגות דפדפן פתוחות במארח הזה.",
   "error.backend.browserViewEnded": "התצוגה החיה של הדף הזה הסתיימה.",
   "error.backend.browserViewFailed": "התצוגה החיה של הדף הזה נכשלה.",
+  "error.backend.browserViewStopped": "התצוגה החיה של הדף הזה נעצרה. יש לבחור שוב בכרטיסייה כדי להציג אותה.",
   "error.backend.windowTemporarilyUnavailable": "חלון OpenBot אינו זמין זמנית.",
   "error.backend.windowUnavailable": "חלון OpenBot אינו זמין.",
   "error.backend.sunshineApiHttp": "ה-API של Sunshine נכשל עם HTTP {status}.",

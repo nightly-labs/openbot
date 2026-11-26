@@ -2894,7 +2894,84 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
   })()`,
     true,
   );
+  await runLiveViewDetachRecovery(browser, tabId, contents);
   await runLiveViewPageCopy(browser, tabId, contents);
+}
+
+async function runLiveViewDetachRecovery(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
+  await contents.executeJavaScript(
+    `(() => {
+    const probe = document.createElement('div');
+    probe.id = 'live-view-detach-probe';
+    probe.style.cssText = 'position:fixed;left:10px;top:10px;width:120px;height:120px;background:#36c;z-index:2147483647';
+    document.body.append(probe);
+    const paint = () => {
+      probe.style.opacity = String(0.4 + (Date.now() % 1000) / 2000);
+      window.__liveViewDetachProbe = requestAnimationFrame(paint);
+    };
+    paint();
+  })()`,
+    true,
+  );
+  const pageDebugger = contents.debugger;
+  const originalSendCommand = pageDebugger.sendCommand;
+  const sendCommand = originalSendCommand.bind(pageDebugger);
+  let detachesLeft = 2;
+  let rejected = 0;
+  pageDebugger.sendCommand = (method, params, sessionId) => {
+    const answer = sendCommand(method, params, sessionId);
+    if (method !== "Page.enable" || detachesLeft === 0) return answer;
+    detachesLeft -= 1;
+    pageDebugger.detach();
+    return answer.catch((error: unknown) => {
+      rejected += 1;
+      throw error;
+    });
+  };
+  const rejections = () => rejected;
+  let frames = 0;
+  const endings: string[] = [];
+  const framesAfter = async (count: number, failure: string) => {
+    const deadline = Date.now() + 10_000;
+    while (frames < count && endings.length === 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    if (endings.length > 0) throw new Error(`${failure} The view ended: ${endings.join(" ")}`);
+    if (frames < count) throw new Error(`${failure} No new frames arrived.`);
+  };
+  try {
+    const stopView = await runCauseEffect(
+      browser.startView(
+        tabId,
+        () => {
+          frames += 1;
+        },
+        (reason) => endings.push(reason),
+        { onDialog: () => {} },
+      ),
+    );
+    try {
+      if (rejections() !== 2)
+        throw new Error(`The debugger detach rejected ${rejections()} view start commands instead of 2.`);
+      await framesAfter(3, "The live view did not start after the debugger detached during its start.");
+      detachesLeft = 1;
+      const before = frames;
+      pageDebugger.detach();
+      await framesAfter(before + 3, "The live view did not continue after the debugger detached during its restart.");
+      if (rejections() !== 3) throw new Error("The debugger detach did not reject the restarted view's command.");
+    } finally {
+      await Effect.runPromise(stopView());
+    }
+  } finally {
+    pageDebugger.sendCommand = originalSendCommand;
+    await contents.executeJavaScript(
+      `(() => {
+      cancelAnimationFrame(window.__liveViewDetachProbe);
+      document.getElementById('live-view-detach-probe')?.remove();
+    })()`,
+      true,
+    );
+  }
 }
 
 async function runLiveViewPageCopy(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {

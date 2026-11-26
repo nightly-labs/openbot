@@ -19,6 +19,7 @@ export const messages = {
   "error.backend.browserViewLimit": "يوجد عدد كبير جدًا من عروض المتصفح المفتوحة على هذا المضيف.",
   "error.backend.browserViewEnded": "انتهى العرض المباشر لهذه الصفحة.",
   "error.backend.browserViewFailed": "فشل العرض المباشر لهذه الصفحة.",
+  "error.backend.browserViewStopped": "توقّف العرض المباشر لهذه الصفحة. اختر علامة التبويب مرة أخرى لعرضها.",
   "error.backend.windowTemporarilyUnavailable": "نافذة OpenBot غير متاحة مؤقتًا.",
   "error.backend.windowUnavailable": "نافذة OpenBot غير متاحة.",
   "error.backend.sunshineApiHttp": "فشل Sunshine API برمز HTTP {status}.",

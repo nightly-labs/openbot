@@ -28,8 +28,8 @@ import {
   isBrowserViewUserAction,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { REMOTE_DESKTOP_MAX_SIGNAL_BYTES } from "@openbot/contracts/team-protocol/remote-stream-v1";
-import { sourceText } from "@openbot/i18n/source";
-import { redactText } from "@openbot/logging";
+import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Context, Deferred, Effect, Layer, Result, Semaphore } from "effect";
 import type * as Ws from "ws";
 import type { BrowserScreencastFrame } from "../backend/browser-cdp";
@@ -39,6 +39,7 @@ import { RemoteWorkflowError, remoteDecode } from "./remote-service-effects";
 import { rawDataSize, rawDataText } from "./ws-raw-data";
 
 const requireModule = createRequire(import.meta.url);
+const logger = createOpenBotLogger("browser-view-gateway");
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
 
 const MAX_BUFFERED_FRAME_BYTES = 4 * 1024 * 1024;
@@ -97,6 +98,11 @@ class BrowserViewPort extends Context.Service<
       }),
     );
   }
+}
+
+function viewStartFailure(error: unknown): string {
+  const message = redactText(String(error instanceof Error ? error.message : error));
+  return matchingSourceKeys(message).length > 0 ? message : sourceText("error.backend.browserViewFailed");
 }
 
 type ViewInput = Parameters<BrowserHost["dispatchViewInput"]>[1];
@@ -356,7 +362,8 @@ export class BrowserViewGateway {
     }).pipe(
       Effect.catch(({ cause: error }) =>
         Effect.gen({ self: this }, function* () {
-          client.close(1011, redactText(String(error instanceof Error ? error.message : error)).slice(0, 120));
+          logger.warn("A browser view did not start.", { error: toLogValue(error) });
+          client.close(1011, viewStartFailure(error).slice(0, 120));
           yield* this.#detach(session, client);
         }),
       ),
