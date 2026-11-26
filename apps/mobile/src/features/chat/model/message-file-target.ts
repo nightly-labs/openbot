@@ -78,7 +78,22 @@ function workspaceLinkPath(value: string): string | null {
   return path;
 }
 
-export function messageLinkFileTarget(href: string, agentId: string | undefined): MessageFileTarget | null {
+function withoutLinkFragment(href: string): string {
+  const fragment = href.indexOf("#");
+  return fragment > 0 ? href.slice(0, fragment) : href;
+}
+
+export function messageLinkFileTargets(
+  href: string,
+  agentId: string | undefined,
+): { file: MessageFileTarget; written: MessageFileTarget | null } | null {
+  const linked = withoutLinkFragment(href);
+  const file = messageLinkFileTarget(linked, agentId);
+  if (!file) return null;
+  return { file, written: linked === href ? null : messageLinkFileTarget(href, agentId) };
+}
+
+function messageLinkFileTarget(href: string, agentId: string | undefined): MessageFileTarget | null {
   if (webLink(href)) return null;
   const fileUrl = fileUrlPath(href);
   const shared = decodedFileUrlPath(fileUrl ?? href).trim();
@@ -106,7 +121,7 @@ export function messageChipFileNames(body: string, agentId: string | undefined):
   walkChatMarkdown(parseFinishedChatMarkdown(body), (token) => {
     const file =
       token.type === "link" && typeof token.href === "string"
-        ? messageLinkFileTarget(token.href, agentId)
+        ? (messageLinkFileTargets(token.href, agentId)?.file ?? null)
         : token.type === "codespan" && typeof token.text === "string"
           ? (messageFileTarget(token.text, directory, agentId)?.file ?? null)
           : null;
