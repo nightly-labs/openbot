@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { once } from "node:events";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { dirname, join } from "node:path";
@@ -26,7 +27,7 @@ const VIEW_BOUNDS = { x: 0, y: 0, width: 800, height: 600 };
 const OWNERS = [{ id: "fixture-agent", threadId: "fixture-thread" }];
 
 const TIMER_PAGE = `<!doctype html><meta charset="utf-8"><title>tick 0</title>
-<main><p id="out">Idle timer page</p></main>
+<main><p id="out">Idle timer page</p><button onclick="document.getElementById('out').textContent = 'activated'">Memory check</button></main>
 <script>
   let ticks = 0;
   window.lifecycle = [];
@@ -188,6 +189,51 @@ async function main(): Promise<void> {
     );
     recordCases("restored-tab-answers-agent");
 
+    phase("accessibility-cache-released");
+    await assertAccessibilityReleased(shown);
+    recordCases("snapshot-releases-accessibility-cache");
+    const missing = await call(restored, "click", {
+      tabId: tab.id,
+      target: { kind: "role", role: "button", name: "Missing memory check", exact: true },
+    });
+    assert.equal(missing.success, false, "The missing button was not refused.");
+    await assertAccessibilityReleased(shown);
+    recordCases("failed-target-search-releases-accessibility-cache");
+    const clicked = await call(restored, "click", {
+      tabId: tab.id,
+      target: { kind: "role", role: "button", name: "Memory check", exact: true },
+    });
+    assert.equal(clicked.success, true, text(clicked));
+    assert.equal(await shown.executeJavaScript("document.getElementById('out').textContent"), "activated");
+    await assertAccessibilityReleased(shown);
+    recordCases("semantic-click-works-after-accessibility-release");
+
+    phase("closed-popup-opener-unloads");
+    const popupUrl = `${timerUrl}?popup`;
+    await shown.executeJavaScript(
+      `localStorage.setItem("idle-memory-fixture", "kept"); window.open(${JSON.stringify(popupUrl)}, "idle-memory-popup"); true`,
+      true,
+    );
+    const popupContents = await waitForContents(popupUrl, "The popup did not load.");
+    const popup = restored.listTabs().find((candidate) => candidate.openerTabId === tab.id);
+    assert(popup, "The popup did not keep its opener.");
+    await runCauseEffect(restored.releaseIdleTabs(new Set()));
+    await runCauseEffect(restored.screenshot(tab.id));
+    assert(!shown.isDestroyed() && !popupContents.isDestroyed(), "A connected popup or opener was unloaded.");
+    recordCases("open-popup-keeps-opener-loaded");
+    await runCauseEffect(restored.close(popup.id));
+    await Promise.all([
+      once(shown, "destroyed", { signal: AbortSignal.timeout(STATE_DEADLINE_MS) }),
+      runCauseEffect(restored.releaseIdleTabs(new Set())),
+    ]);
+    assert(restored.listTabs().some((candidate) => candidate.id === tab.id && candidate.url === timerUrl));
+    measurements.closedPopupOpenerUnloaded = shown.isDestroyed();
+    recordCases("closed-popup-opener-unloads");
+    await runCauseEffect(restored.screenshot(tab.id));
+    const reloaded = await waitForContents(timerUrl, "The sleeping opener did not load again.");
+    assert.equal(await reloaded.executeJavaScript('localStorage.getItem("idle-memory-fixture")'), "kept");
+    recordCases("closed-popup-opener-restores-session");
+
     const report = {
       status: "passed",
       runId,
@@ -218,6 +264,14 @@ async function main(): Promise<void> {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     app.exit(Number(process.exitCode ?? 0));
   }
+}
+
+async function assertAccessibilityReleased(contents: WebContents): Promise<void> {
+  assert(contents.debugger.isAttached(), "The debugger detached before the accessibility check.");
+  await assert.rejects(
+    contents.debugger.sendCommand("Accessibility.getRootAXNode"),
+    /Accessibility has not been enabled/u,
+  );
 }
 
 function liveContents(): WebContents[] {

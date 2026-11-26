@@ -3853,8 +3853,13 @@ export class BrowserCdpEngine {
       this.#ownsDebugger = true;
     }
     this.#activeLeases += 1;
+    let accessibilitySessions: Set<string | undefined> | undefined;
     const send: SendCommand = (method, params = {}, sessionId) =>
       Effect.gen({ self: this }, function* () {
+        if (method.startsWith("Accessibility.")) {
+          accessibilitySessions ??= new Set();
+          accessibilitySessions.add(sessionId);
+        }
         const result = yield* browserCall(() => this.#contents.debugger.sendCommand(method, params, sessionId)).pipe(
           Effect.tapError((failure) =>
             Effect.sync(() => {
@@ -3892,6 +3897,13 @@ export class BrowserCdpEngine {
       }
       return yield* operation(send);
     }).pipe(
+      Effect.ensuring(
+        Effect.gen(function* () {
+          if (!accessibilitySessions) return;
+          for (const sessionId of accessibilitySessions)
+            yield* send("Accessibility.disable", {}, sessionId).pipe(Effect.ignore);
+        }),
+      ),
       Effect.ensuring(
         Effect.sync(() => {
           this.#activeLeases -= 1;
