@@ -332,6 +332,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
   function dispose(): void {
     if (disposed) return;
     disposed = true;
+    toast.dismiss(endedToastId);
     stopEvents();
     release();
   }
