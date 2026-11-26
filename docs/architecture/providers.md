@@ -736,11 +736,13 @@ a subagent and git, and that the user's `config.toml` value wins.
 The pinned runtime is OpenCode 2 (`@opencode/cli`). Its platform tarballs carry no licence file, so
 the stage step copies `LICENSE` from the `opencode-ai` tarball that `licensePackage` in
 `native-runtime.lock.json` names. Every OpenCode install on the computer shares
-`~/.local/share/opencode/opencode.db`. When OpenCode 2 migrates a database of OpenCode 1, it adds
-`session_v2` and keeps `session`, so OpenCode 1 can still open it. A database that OpenCode 2
-creates has no `session` table, and OpenCode 1 then refuses to start with "Database is not empty and
-has no session table" (OpenCode issue #53221); `ProviderRuntime` replaces that exit text with
-`error.provider.opencodeDatabaseNewer`. OpenBot does
+`~/.local/share/opencode/opencode.db`. OpenCode 2 renames the `session` table of an OpenCode 1
+database to `session_v2` (2.4.2 has this migration), and a database that it creates has no `session`
+table. OpenCode 1 then refuses to start with "Database is not empty and has no session table"
+(OpenCode issues #53221 and #61106); `ProviderRuntime` replaces that exit text with
+`error.provider.opencodeDatabaseNewer`. When OpenBot's copy fails three starts in a row, the
+installed CLI runs in its place only when it has the same major version: an installed OpenCode 1
+does not run after OpenBot's OpenCode 2, and the user can still select it in Settings. OpenBot does
 not move OpenCode to a separate database, because the threads would lose their sessions. OpenCode 2
 differs from OpenCode 1 on the wire in three places that `acp-client.ts` handles: a missing session
 is `-32602` "session not found: <id>" instead of an `-32603` service failure; `session/resume` can

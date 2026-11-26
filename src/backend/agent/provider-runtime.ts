@@ -63,6 +63,7 @@ import {
   cliPathEnvironment,
   cliSpawnTarget,
   forgetWindowsLookups,
+  isVersion,
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
 import { CUSTOM_AGENT_MODELS_LISTED } from "./../custom-acp-agents-client";
@@ -194,6 +195,10 @@ function fromAnotherDevice(provider: AgentProvider, atHost: boolean): boolean {
 }
 const START_FAILURE_LIMIT = 3;
 const STABLE_RUN_MS = 2 * 60_000;
+
+function sameMajorVersion(copy: string, installed: string): boolean {
+  return isVersion(copy) && isVersion(installed) && copy.split(".")[0] === installed.split(".")[0];
+}
 
 function userMustFixStart(reason: string | null | undefined): reason is string {
   return (
@@ -4237,6 +4242,17 @@ export class ProviderRuntime implements ProviderPort {
       this.#installedFallback.has(cliProvider)
     )
       return false;
+    if (cliProvider === "opencode" && !sameMajorVersion(cli.version, installed.version)) {
+      logger.warn(
+        "OpenBot's OpenCode did not start, and the installed OpenCode of another major version does not run.",
+        {
+          provider,
+          version: cli.version,
+          installedVersion: installed.version,
+        },
+      );
+      return false;
+    }
     logger.warn("OpenBot's provider CLI did not start, so the installed CLI runs.", {
       provider,
       version: cli.version,
