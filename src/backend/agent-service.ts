@@ -1992,6 +1992,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
         liveVoiceRelayed: (deliveryId) => this.#liveVoiceRelayed.get(deliveryId) ?? null,
         fromChrome: (deliveryId) => this.#fromChrome.has(deliveryId),
+        turnSession: (turnId) => this.#turn.turnSession(turnId),
       },
     });
     this.#turn = new TurnLifecycle({
