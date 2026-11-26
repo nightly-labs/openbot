@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "这台主机不支持事件。",
   "error.backend.databaseIntegrity": "OpenBot 数据库未通过完整性校验。",
+  "error.backend.creditsHoldAdminOnly": "只有此服务器的所有者或管理员可以允许助手使用积分。",
+  "error.backend.creditsHoldShort": "积分还不够。",
   "error.backend.webhookRouteLimit": "一台主机最多可有 {limit} 个 Webhook 自动化任务。",
   "error.backend.webhookSettingsInvalid": "请检查 Webhook 设置后重试。",
   "error.backend.webhookSenderSecretInvalid": "请粘贴发送方提供的完整签名密钥。它包含 16 到 1024 个字符，且没有空格。",
@@ -52,6 +54,11 @@ export const messages = {
   "error.backend.browserSignInLoadFailed": "OpenBot 无法在登录窗口中加载页面。请检查网络连接，然后再次打开登录窗口。",
   "error.backend.browserSignInReadFailed": "OpenBot 无法从窗口读取登录信息。",
   "error.backend.browserStopUnsupported": "该远程主机无法停止页面加载。",
+  "error.backend.browserLocationFailed": "无法为页面设置位置。",
+  "error.backend.browserPermissionsUnsupported": "此远程主机无法回应位置请求。",
+  "error.backend.browserLocationRequired": "发送设备位置以允许此请求。",
+  "error.backend.browserHttpSignInInactive": "此网站不再要求登录。请重新加载页面后重试。",
+  "error.backend.browserHttpSignInUnsupported": "该远程主机无法接收网站登录。",
   "error.backend.sharedDataLocalOnly": "共享数据在运行这些助手的电脑上管理。",
   "error.backend.browserUrlProtocol": "只允许使用 HTTP(S) 浏览器地址。",
   "error.backend.sunshineNotReady": "Sunshine 未能就绪。",
@@ -61,6 +68,11 @@ export const messages = {
     "压缩无法缩小这个聊天：压缩两次后，它仍占用模型上下文窗口的 {percent}%，所以 OpenBot 停止自动压缩。窗口的大部分被工具和指令占用。请关闭这个智能体不需要的 MCP 服务器或电脑操作，或选择窗口更大的模型。然后开始新的聊天。",
   "error.backend.contextCompactionStopped":
     "此对话的压缩连续失败了两次，因此 OpenBot 停止自动压缩它。每次尝试都会把整个对话发送给模型，并消耗你的套餐额度。选择“立即压缩”重试，或开始新对话。",
+  "error.backend.contextCompactionRetrying":
+    "提供方未能压缩此对话，正在重试。此对话中的新消息会等待压缩结束。如果压缩不能很快结束，OpenBot 会停止它并发送你的消息。",
+  "error.backend.contextCompactionFailed": "压缩此对话失败。对话没有变化。等待中的消息现在会发送给智能体。",
+  "error.backend.contextCompactionTimedOut":
+    "压缩此对话超时，因此 OpenBot 已停止它。对话没有变化。等待中的消息现在会发送给智能体。",
   "error.backend.providerModelAtCapacity":
     "该模型已满载。提供方会在几分钟后重试。要立即继续，请停止本轮并选择其他模型。",
   "error.backend.providerRetrying":
@@ -96,6 +108,11 @@ export const messages = {
   "error.backend.channelRoutingFailed": "分派失败。请选择一位成员，或重试。",
   "error.backend.channelLeadTimedOut": "频道主责没有及时回答。请选择一位成员，或重试。",
   "error.backend.channelLeadFailed": "频道主责无法分派这条消息。请选择一位成员，或重试。",
+  "error.backend.channelLeadBusy": "频道主责的模型现在繁忙。请几分钟后重试，或选择一位成员。",
+  "error.backend.channelLeadOffline": "频道主责的模型连接中断。请重试，或选择一位成员。",
+  "error.backend.channelLeadSignIn": "频道主责的提供方登录已过期。请重新登录，或选择一位成员。",
+  "error.backend.channelLeadModelGone": "频道主责的模型不可用。请为主责选择其他模型，或选择一位成员。",
+  "error.backend.channelLeadRefused": "频道主责的模型拒绝了此请求。请选择一位成员，或为主责选择其他模型。",
   "error.backend.channelRequestMemberRequired": "请为该请求选择一位成员。",
   "error.backend.channelDeliveryNotCreated": "未创建频道投递。",
   "error.backend.channelAssignmentStopped": "该频道派活已被停止或替换。",
@@ -164,6 +181,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "视频生成失败。",
   "error.backend.videoGenerationNoVideo": "视频生成没有返回视频。",
   "error.backend.videoGenerationInterrupted": "视频生成已中断。",
+  "error.backend.grokVideoNoQuota": "你的 Grok 账号无法生成视频。请改用积分生成视频。",
   "error.backend.attachmentNotRegularFile": "只能附加普通文件：{name}",
   "error.backend.attachmentCopyFailed": "OpenBot 无法复制 {name}。",
   "error.backend.routineNameRequired": "需要填写自动化任务名称。",
@@ -242,6 +260,8 @@ export const messages = {
     "登录服务器尚未接受 OpenBot 作为应用，这与你的账号无关。请改用其他连接方式，例如本地 MCP 服务器。",
   "error.backend.mcpRegistrationUnavailable":
     "登录服务器无法将 OpenBot 注册为应用，这与你的账号无关。要连接，请在 市场、应用 中保存此服务器，然后为它添加登录应用。",
+  "error.backend.mcpSignInAppNeeded":
+    "登录服务器无法将 OpenBot 注册为应用，这与你的账号无关。要连接，请在 市场、应用 中打开此服务器，点击 测试连接，然后添加登录应用。",
   "error.backend.mcpSignInAbandonedGeneric": "登录已放弃。",
   "error.backend.mcpSignInForgotten": "MCP 登录在运行过程中被遗忘。",
   "error.backend.mcpSignInAbandoned": "MCP 登录已放弃。",
@@ -260,6 +280,7 @@ export const messages = {
     "登录服务器发送了 OpenBot 无法读取的响应。如果该服务为你提供了 API 密钥或令牌，请将其添加到该服务器的设置中，然后重新测试连接。",
   "error.backend.mcpServerExited": "服务器在响应之前就停止了。请在终端中运行该命令以查看错误。",
   "error.backend.mcpServerExitedWithOutput": "服务器在响应之前就停止了。它输出了：{detail}",
+  "error.backend.mcpServerDownloadFailed": "服务器没有启动，因为下载失败。请检查网络连接，然后重试。",
   "error.backend.mcpServerFailedToStart": "服务器没有启动：{reason}",
   "error.backend.mcpServerProgramMissing":
     "OpenBot 无法启动 MCP 服务器 {name}，因为运行 OpenBot 的电脑上没有安装它的程序。请在那台电脑上安装提供 {name} 的应用，或在 市场、应用 中关闭 {name}。",
@@ -376,6 +397,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "代理 {name} 拒绝了登录，因此页面没有打开。",
   "error.backend.browserSystemProxyFailed":
     "运行 OpenBot 的计算机设置中的代理没有响应或拒绝了连接，因此页面没有打开。请检查该计算机的代理设置。",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "网站或运行 OpenBot 的计算机设置中的代理没有应答就关闭了连接，因此页面没有打开。如果所有网站都打不开，请检查该计算机的代理设置。",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "网站或此浏览器配置文件的代理没有应答就关闭了连接，因此页面没有打开。如果所有网站都打不开，请检查该配置文件的代理。",
   "error.backend.browserProxyComputerUnreachable": "此配置文件使用的计算机没有响应，因此页面没有打开。",
   "error.backend.browserProxyComputerLocalAddress":
     "此配置文件使用的计算机只打开公共网站。它不打开本地网络上的地址，因此页面没有打开。",

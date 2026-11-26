@@ -175,8 +175,9 @@ export function useServerActions() {
     canDelete: (serverId) => hostedServerIds().has(serverId) || onThisComputer(serverId),
     onRestart: requestRestartServer,
     canRestart: (serverId) => {
-      if (hostedServerIds().has(serverId) || onThisComputer(serverId)) return true;
+      if (onThisComputer(serverId)) return true;
       const server = servers().find((candidate) => candidate.id === serverId);
+      if (hostedServerIds().has(serverId) && server?.restartAvailable !== false) return true;
       return server?.state === "online" && serverSupportsCapability(server, "host-restart-v1");
     },
     onHide: (serverId) => void hide(serverId),

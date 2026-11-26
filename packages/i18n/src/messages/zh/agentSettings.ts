@@ -183,6 +183,9 @@ export const messages = {
     "此对话的所有消息和文件都会从 OpenBot 中删除，智能体也会忘记它们。此操作无法撤销。侧边线程、指令、模型、工具、记忆、工作区和浏览器不会改变。",
   "agentSettings.deleteHistory.confirm": "删除历史记录",
   "agentSettings.deleteHistory.failed": "无法删除历史记录。",
+  "agentSettings.deleteAgent.title": "删除助手",
+  "agentSettings.deleteAgent.description": "助手及其对话、记忆、自动化任务和工作区将从 OpenBot 中删除。",
+  "agentSettings.deleteAgent.button": "删除",
 
   "agentSettings.fullAccess.title": "授予该助手完全访问权限？",
   "agentSettings.fullAccess.askTitle": "允许该助手在其工作区之外工作？",

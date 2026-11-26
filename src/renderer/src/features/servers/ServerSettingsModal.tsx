@@ -48,6 +48,7 @@ import type { LicenseCalls } from "@openbot/ui/features/billing/license-store";
 import type { ProviderSettingsDetail } from "@openbot/ui/features/settings/ProviderSettingsPage";
 import {
   SaveBarDock,
+  type SettingsCrumb,
   SettingsDialogShell,
   SettingsNavGroupLabel,
   type SettingsPagePlacement,
@@ -88,6 +89,7 @@ import {
   type ServerImportOptions,
   ServerImportPanel,
 } from "./ServerImportPanel";
+import type { ServerMediaApprovalOptions } from "./ServerMediaApprovalSetting";
 import { createServerMembersSection } from "./ServerMembersSection";
 import type { ServerMemoryLimitOptions } from "./ServerMemoryLimitSetting";
 import type { ServerMemoryReviewOptions } from "./ServerMemoryReviewSetting";
@@ -146,6 +148,7 @@ export interface ServerSettingsModalProps {
   hostVoiceModel?: ServerVoiceModelOptions | undefined;
   hostSignalHome?: ServerSignalHomeOptions | undefined;
   hostTurnLimits?: ServerTurnLimitsOptions | undefined;
+  mediaApprovalCredits?: ServerMediaApprovalOptions | undefined;
   hostPersonality?: ServerPersonalityOptions | undefined;
   hostMemoryLimit?: ServerMemoryLimitOptions | undefined;
   memoryReview?: ServerMemoryReviewOptions | undefined;
@@ -239,6 +242,8 @@ const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
     "server.settings.turnLimit",
     "server.settings.voiceModel.section",
     "server.settings.agentTaskLimit",
+    "server.settings.mediaApprovalAgents",
+    "server.settings.mediaApprovalCredits",
     "agentSettings.automation.title",
     "agentSettings.agentNewChat.title",
     "agentSettings.quickAcknowledgement.title",
@@ -295,7 +300,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   );
   const [providerDetail, setProviderDetail] = createSignal<ProviderSettingsDetail | null>(null);
   const [importDetail, setImportDetail] = createSignal<ServerImportDetail | null>(null);
+  const [vaultDetail, setVaultDetail] = createSignal<SettingsCrumb | null>(null);
   const crumbDetail = () => {
+    if (section() === "vault") return vaultDetail();
     if (section() === "import") return importDetail();
     if (section() === "roles") return roles.crumb();
     if (section() === "agents") return agents.crumb();
@@ -806,7 +813,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Show when={props.vault}>
           {(vault) => (
             <Tabs.Content value="vault" class="settings-modal-tab-panel server-settings-panel" data-tab="vault">
-              <ServerVaultPanel {...vault()} menuMount={modalElement()} />
+              <ServerVaultPanel {...vault()} menuMount={modalElement()} onDetailChange={setVaultDetail} />
             </Tabs.Content>
           )}
         </Show>

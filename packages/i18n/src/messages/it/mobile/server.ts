@@ -545,6 +545,19 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Impossibile salvare il limite di memorie. Riprova.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Aggiorna OpenBot su questo server per cambiarne qui il limite di memorie.",
+  "mobile.server.settings.mediaApprovalCredits": "Chiedi prima di spendere più di",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "crediti",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed":
+    "Impossibile caricare la soglia di approvazione dei crediti di questo server.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed":
+    "Impossibile salvare la soglia di approvazione dei crediti. Riprova.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "Aggiorna OpenBot su questo server per modificarne qui la soglia di approvazione dei crediti.",
+  "mobile.server.settings.mediaApprovalAgents": "Gli agenti possono usare crediti",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed":
+    "Impossibile modificare l’uso dei crediti da parte degli agenti. Riprova.",
+  "mobile.server.settings.mediaApprovalAsk": "Chiedi quando servono crediti",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "Impossibile modificare le richieste di crediti. Riprova.",
   "mobile.server.settings.memoryReview": "Revisione delle memorie",
   "mobile.server.settings.memoryReviewDescription":
     "Ogni quanto gli agenti di questo server salvano in background i fatti duraturi delle loro chat.",

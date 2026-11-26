@@ -1,4 +1,4 @@
-import { X_AGENT_LISTING_ID } from "@openbot/contracts/browser-extension-x";
+import { X_AGENT_LISTING_ID, X_EXTENSION_URL } from "@openbot/contracts/browser-extension-x";
 import {
   AVATAR_HUES,
   type ClientAgentSummary,
@@ -10,10 +10,12 @@ import {
   type MarketplaceSkillSummary,
   type McpServerAccess,
   type McpServerConfig,
+  type McpSignInApp,
   type McpSignInState,
   type SkillCategory,
 } from "@openbot/contracts/ipc";
 import type { McpConnectFlow } from "@openbot/contracts/mcp-connect-flows";
+import { sourceText } from "@openbot/i18n";
 import { CONNECTOR_LISTINGS } from "@openbot/ui/features/connectors/connector-catalog";
 import { Marketplace } from "@openbot/ui/features/marketplace/Marketplace";
 import { AgentsDialog } from "@openbot/ui/features/marketplace/MarketplaceAgentsDialog";
@@ -39,6 +41,7 @@ import { createSignal, createStore, onSettled, Show, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import { McpServerControls } from "../src/features/servers/McpServerControls";
 import { McpServerForm } from "../src/features/servers/McpServerForm";
+import type { McpPanelSignInApp } from "../src/features/servers/McpSignInAppSection";
 import type { McpServerTools } from "../src/features/servers/mcp-server-tools";
 import { MARKETPLACE_PLUGINS } from "../src/features/settings/marketplace-plugin-catalog";
 import {
@@ -246,6 +249,8 @@ function startSkills(agents: readonly ClientAgentSummary[]): Record<string, Inst
 
 type HeldState = "connected" | "signInNeeded";
 
+const STORY_SIGN_IN_CALLBACK = "http://127.0.0.1:47823/mcp/callback";
+
 export interface StoryProps {
   member?: boolean;
   blocked?: MarketplaceAppsBlock;
@@ -259,6 +264,7 @@ export interface StoryProps {
   catalog?: readonly string[];
   manyAgents?: boolean;
   noSkills?: boolean;
+  signInAppNeeded?: boolean;
   dialogSkill?: string;
   agentStates?: Readonly<Record<string, "added" | "update">>;
   xAgent?: boolean;
@@ -307,7 +313,7 @@ function storyXApp(agent: MarketplaceAgent | null): MarketplaceApp {
     category: "productivity",
     status: agent ? "connected" : "idle",
     agent,
-    extensionUrl: "https://chromewebstore.google.com/detail/openbot",
+    extensionUrl: X_EXTENSION_URL,
   };
 }
 
@@ -354,6 +360,7 @@ export function MarketplaceStory(props: StoryProps) {
     catalog = [],
     manyAgents,
     noSkills,
+    signInAppNeeded,
     dialogSkill,
     agentStates,
     xAgent,
@@ -410,12 +417,12 @@ export function MarketplaceStory(props: StoryProps) {
           ),
         };
       }),
-      ...STORY_MCP_SERVERS.slice(0, 1).map(
+      ...STORY_MCP_SERVERS.slice(signInAppNeeded ? 1 : 0, signInAppNeeded ? 2 : 1).map(
         (server): MarketplaceApp => ({
           kind: "custom",
           id: `custom:${server.id}`,
           name: server.name,
-          tagline: server.command,
+          tagline: server.transport === "stdio" ? server.command : server.url,
           status: "connected",
           server,
         }),
@@ -531,6 +538,26 @@ export function MarketplaceStory(props: StoryProps) {
   const [dialogOpen, setDialogOpen] = createSignal(true);
 
   const [signIns, setSignIns] = createSignal<Record<string, McpSignInState>>({});
+  const [savedSignInApp, setSavedSignInApp] = createSignal<McpSignInApp | null>(null);
+  const storySignInAppState = () => ({ redirectUrl: STORY_SIGN_IN_CALLBACK, app: savedSignInApp() });
+  const storySignInApp: McpPanelSignInApp | undefined = signInAppNeeded
+    ? {
+        load: async () => storySignInAppState(),
+        save: async (input) => {
+          setSavedSignInApp({
+            clientId: input.clientId,
+            secretSaved:
+              input.clientSecret === null ? (savedSignInApp()?.secretSaved ?? false) : input.clientSecret !== "",
+            scope: input.scope,
+          });
+          return storySignInAppState();
+        },
+        remove: async () => {
+          setSavedSignInApp(null);
+          return storySignInAppState();
+        },
+      }
+    : undefined;
   const customServers = () => state.apps.flatMap((app) => (app.kind === "custom" ? [app.server] : []));
   const putServer = (server: McpServerConfig) =>
     setState((draft) => {
@@ -554,7 +581,10 @@ export function MarketplaceStory(props: StoryProps) {
       putServer(saved);
       return saved;
     },
-    test: async () => ({ toolCount: 3, error: null }),
+    test: async () => ({
+      toolCount: 3,
+      error: signInAppNeeded ? sourceText("error.backend.mcpSignInAppNeeded") : null,
+    }),
     setEnabled: async (id, enabled) => {
       const server = customServers().find((candidate) => candidate.id === id);
       if (server) putServer({ ...server, enabled });
@@ -569,6 +599,7 @@ export function MarketplaceStory(props: StoryProps) {
       signOut: async (id) => {
         setSignIns((held) => ({ ...held, [id]: { mcpServerId: id, signedIn: false } }));
       },
+      app: storySignInApp,
     }),
     signInRequest: () => null,
     endSignInRequest: () => {},

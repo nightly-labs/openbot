@@ -38,8 +38,9 @@ import {
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
+import { isFixedSourceText, matchingSourceKeys, type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import type { CauseCode } from "@openbot/telemetry";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { isTextAnswer } from "./agent/routine-quiet-runs";
 import { setChannelFolderSource } from "./agent/workspace-sandbox";
@@ -3947,6 +3948,23 @@ function routingRequest(text: string): string {
 
 function routingTimedOut(error: unknown): boolean {
   return error instanceof Error && error.message === sourceText("error.agent.profileTimedOut");
+}
+
+const CHANNEL_LEAD_FAILURE_KEYS = [
+  ["provider_unavailable", "error.backend.channelLeadBusy"],
+  ["rate_limit", "error.backend.channelLeadBusy"],
+  ["network", "error.backend.channelLeadOffline"],
+  ["authentication", "error.backend.channelLeadSignIn"],
+  ["model_not_found", "error.backend.channelLeadModelGone"],
+  ["invalid_request", "error.backend.channelLeadRefused"],
+] as const satisfies readonly (readonly [CauseCode, keyof SourceMessages])[];
+const CHANNEL_LEAD_FAILURES = new Map<CauseCode, (typeof CHANNEL_LEAD_FAILURE_KEYS)[number][1]>(
+  CHANNEL_LEAD_FAILURE_KEYS,
+);
+
+export function channelLeadFailureText(causeCode: CauseCode): string | null {
+  const key = CHANNEL_LEAD_FAILURES.get(causeCode);
+  return key ? sourceText(key) : null;
 }
 
 function routingFailureText(error: unknown): string | null {

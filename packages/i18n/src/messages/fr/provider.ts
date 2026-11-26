@@ -67,6 +67,7 @@ export const messages = {
   "provider.aria.install": "Installer {name}",
   "provider.aria.signIn": "Se connecter à {name}",
   "provider.aria.codeFallback": "Se connecter à {name} avec un code",
+  "provider.aria.addressFallback": "Coller l’adresse de connexion pour {name}",
   "provider.aria.moreActions": "Autres actions pour {name}",
 
   "provider.aria.use": "Utiliser {name} dans OpenBot",
@@ -94,10 +95,15 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "En attente. Cette connexion s’arrête dans {time}.",
   "provider.codeLogin.linkTitle": "Connectez-vous à {name} sur un autre appareil",
   "provider.codeLogin.pageTitle": "Se connecter à {name}",
+  "provider.codeLogin.addressDescription":
+    "Terminez la connexion dans votre navigateur. Cette fenêtre se ferme quand la connexion est terminée.",
   "provider.codeLogin.pageDescription": "Cette page est ouverte dans le navigateur de {host}. Connectez-vous ici.",
   "provider.codeLogin.relayStarting": "Démarrage de la connexion à {name} sur {host}…",
   "provider.codeLogin.pageOpening": "Ouverture de la page de connexion de {name} sur {host}…",
   "provider.codeLogin.linkStep": "Connectez-vous à {name}. OpenBot continue tout seul.",
+  "provider.codeLogin.thisComputerDescription":
+    "Ouvrez ce lien dans un navigateur sur cet ordinateur. OpenBot attend ici.",
+  "provider.codeLogin.copyLink": "Copier le lien",
   "provider.codeLogin.chatgptDeviceSetting":
     "Dans ChatGPT sur un ordinateur, ouvrez les paramètres de sécurité et activez la connexion par code d’appareil pour Codex. Pour un compte professionnel, l’administrateur de votre espace de travail l’active.",
   "provider.useApp.title": "Connectez {name} dans l’app OpenBot",
@@ -232,6 +238,7 @@ export const messages = {
   "provider.account.apiKey": "Clé API",
   "provider.account.listLabel": "Comptes {name}",
   "provider.account.usedBy": "Utilisé par {agents}",
+  "provider.account.sameEmail": "Même e-mail que {name}",
   "provider.account.failed": "Échec de la connexion",
   "provider.account.moreActions": "Autres actions pour {name}",
   "provider.account.renameLabel": "Nom de {name}",

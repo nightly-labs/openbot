@@ -761,7 +761,7 @@ function ProviderAccountsSection({
         </SettingsRow>
       ) : null}
       {accounts.map((account, index) => {
-        const name = accountName(account, index);
+        const name = accountName(account, index, accounts);
         const member = account.id !== CLAUDE_API_KEY_ACCOUNT_ID && !isProviderKeyAccount(provider, account.id);
         const leftOut = member && pool?.leftOut.includes(account.id) === true;
         const inUse = member && !leftOut && pool?.inUse === account.id;

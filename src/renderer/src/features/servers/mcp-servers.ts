@@ -17,7 +17,15 @@ export { isMcpHeaderName, mcpConfigErrors, mcpConfigIsValid, normalizeMcpConfig 
 
 export type McpStatusVariant = "success-light" | "destructive-light" | "warning-light" | "secondary";
 
-export type McpFailureKind = "sign-in" | "refused" | "url" | "timeout" | "startup" | "unreachable" | "other";
+export type McpFailureKind =
+  | "sign-in"
+  | "sign-in-app"
+  | "refused"
+  | "url"
+  | "timeout"
+  | "startup"
+  | "unreachable"
+  | "other";
 
 const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
   "error.backend.mcpSignInRequired": "sign-in",
@@ -25,6 +33,8 @@ const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
   "error.backend.mcpSignInTimedOut": "sign-in",
   "error.backend.mcpSignInRefused": "sign-in",
   "error.mcp.signInOnHost": "sign-in",
+  "error.backend.mcpSignInAppNeeded": "sign-in-app",
+  "error.backend.mcpRegistrationUnavailable": "sign-in-app",
   "error.backend.mcpSignInNotAccepted": "refused",
   "error.backend.mcpSignInAccountRefused": "refused",
   "error.backend.mcpServerHttpCredentials": "refused",
@@ -38,6 +48,7 @@ const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
   "error.backend.mcpSignInResponseTimedOut": "timeout",
   "error.backend.mcpServerExited": "startup",
   "error.backend.mcpServerExitedWithOutput": "startup",
+  "error.backend.mcpServerDownloadFailed": "startup",
   "error.backend.mcpCommandNotFound": "startup",
   "error.backend.mcpRemoteBridge": "startup",
   "error.backend.mcpServerUnreachable": "unreachable",
@@ -45,6 +56,7 @@ const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
 
 const FAILURE_LABELS = {
   "sign-in": "mcp.status.signInNeeded",
+  "sign-in-app": "mcp.status.signInAppNeeded",
   refused: "mcp.status.refused",
   url: "mcp.status.checkUrl",
   timeout: "mcp.status.noAnswer",
@@ -153,7 +165,8 @@ export function mcpStatusLabel(config: McpServerConfig, t: AppTranslate, test?: 
 }
 
 export function mcpStatusVariant(test?: McpTestState): McpStatusVariant {
-  if (test?.status === "failed") return test.kind === "sign-in" ? "warning-light" : "destructive-light";
+  if (test?.status === "failed")
+    return test.kind === "sign-in" || test.kind === "sign-in-app" ? "warning-light" : "destructive-light";
   if (test?.status === "passed") return "success-light";
   return "secondary";
 }

@@ -87,8 +87,8 @@ export type Report = typeof Report.Type;
 export type ReportContext = Pick<Report, "surface" | "app_version" | "platform" | "event_schema_version">;
 
 export const ANALYTICS_GENERATIONS = {
-  desktop_host: 21,
-  desktop: 13,
+  desktop_host: 22,
+  desktop: 14,
   web: 2,
   mobile: 5,
 } as const satisfies Record<Report["surface"], number>;

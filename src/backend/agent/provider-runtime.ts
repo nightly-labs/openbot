@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { statSync } from "node:fs";
 import { basename } from "node:path";
@@ -61,6 +61,7 @@ import {
   chooseInstalledFirst,
   cliPathEnvironment,
   cliSpawnTarget,
+  forgetWindowsLookups,
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
 import { CUSTOM_AGENT_MODELS_LISTED } from "./../custom-acp-agents-client";
@@ -103,7 +104,7 @@ import { stopProcessTree } from "../windows-process-tree";
 import { normalizeAccountUsage, usageWindowHasReset, usageWindowResetSince } from "./account-usage";
 import { captureBrowser, signInPageByOpenBot } from "./browser-capture";
 import { CliCodeLoginFailed, type CliCodePrompt, PROMPT_TIMEOUT_MS, startCliCodeLogin } from "./cli-code-login";
-import { CliLoginFailed, CliLoginFlow, toCliLoginFailed } from "./cli-login-flow";
+import { CliLoginFailed, CliLoginFlow, type CliLoginProcess, toCliLoginFailed } from "./cli-login-flow";
 import { CodexLoginFlow, toCodexLoginFailed } from "./codex-login";
 import { readCodexRoutesToOpenai } from "./codex-model-source";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -159,8 +160,13 @@ const accountReadDecoder = (provider: AgentProvider) =>
   provider === "codex" ? decodeCodexAccountReadResult : decodeAccountReadResult;
 const LONG_START_TIMEOUT_MS = 180_000;
 const PROVIDER_IDLE_RELEASE_MS = 10 * 60_000;
+const CODEX_MCP_TOOL_LIST_REUSE_MS = 30 * 60_000;
 const PROVIDER_UNASSIGNED_RELEASE_MS = 60_000;
 const PROVIDER_IDLE_CHECK_MS = 60_000;
+
+function assignedProviderIdleReleaseMs(provider: AgentProvider): number {
+  return provider === "codex" ? CODEX_MCP_TOOL_LIST_REUSE_MS : PROVIDER_IDLE_RELEASE_MS;
+}
 const LAUNCH_START_CONCURRENCY = 2;
 const SIGN_IN_FILE_POLL_MS = 2_000;
 const SIGN_IN_RECHECK_DELAYS_MS: readonly number[] = [5_000, 10_000, 20_000];
@@ -775,6 +781,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#bundledExecutables[cliProvider],
         preferInstalled,
         this.#installedChosen.has(cliProvider) || this.#installedFallback.has(cliProvider),
+        this.#scope,
       ).pipe(toProviderOperationFailed);
       this.#cliSources.set(provider, cli);
       if (passedOver) this.#passedOverClis.set(provider, passedOver);
@@ -848,7 +855,7 @@ export class ProviderRuntime implements ProviderPort {
         continue;
       }
       const limit = this.#hooks.isProviderAssigned(provider)
-        ? PROVIDER_IDLE_RELEASE_MS
+        ? assignedProviderIdleReleaseMs(provider)
         : PROVIDER_UNASSIGNED_RELEASE_MS;
       if (now - lastUsed < limit) continue;
       logger.info("Stopped an idle provider CLI.", { provider });
@@ -1554,7 +1561,10 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
     options: { automatic: boolean },
   ) {
-    if (!options.automatic) this.#startFailures.clear();
+    if (!options.automatic) {
+      this.#startFailures.clear();
+      forgetWindowsLookups();
+    }
     if (
       options.automatic &&
       (this.#codexLogin.pending || this.#cliLogin.size > 0 || this.#providerConnectionCommands.size > 0)
@@ -1658,29 +1668,7 @@ export class ProviderRuntime implements ProviderPort {
           .start(provider, (cli) =>
             Effect.gen(function* () {
               const browser = signInPageByOpenBot(onHost, signIn.command) ? yield* captureBrowser(openExternal) : {};
-              const { argv, savedSignIn } = signIn.command;
-              const target = cliSpawnTarget(
-                cli.executable,
-                typeof argv === "function" ? yield* argv(cli, region) : argv,
-              );
-              const env = { ...process.env, ...signIn.command.env(cli, region), ...browser };
-              const watch = yield* watchSavedSignIn(savedSignIn?.(cli, env));
-              const child = yield* Effect.acquireRelease(
-                Effect.try({
-                  try: () =>
-                    spawn(target.command, target.args, {
-                      cwd: process.cwd(),
-                      env,
-                      stdio: signIn.command.failureText ? ["ignore", "pipe", "pipe"] : "ignore",
-                      shell: false,
-                      windowsHide: process.platform === "win32",
-                      windowsVerbatimArguments: target.windowsVerbatimArguments,
-                    }),
-                  catch: (cause) => new CliLoginFailed({ cause }),
-                }),
-                (child) => stopProcessTree(child).pipe(Effect.orDie),
-              );
-              return { child, done: orNewSavedSignIn(waitForSignInProcess(child, signIn.command), watch, undefined) };
+              return yield* spawnCliSignIn(cli, signIn.command, region, browser);
             }),
           )
           .pipe(toProviderOperationFailed);
@@ -1743,7 +1731,7 @@ export class ProviderRuntime implements ProviderPort {
           .pipe(toProviderOperationFailed);
         return this.status();
       case "muse-device": {
-        const started = yield* this.#startProviderCode(provider, signIn);
+        const started = yield* this.#startProviderCode(provider, signIn, false);
         if (started.kind !== "code") return this.status();
         yield* Effect.tryPromise({
           try: () => openExternal(started.verificationUrlComplete ?? started.verificationUrl),
@@ -1995,8 +1983,7 @@ export class ProviderRuntime implements ProviderPort {
 
   #extraModels(provider: AgentProvider, account: ProviderAccountStatus): ProviderAccountStatus {
     if (!account.models) return account;
-    const catalogue = this.#modelCatalog.list().filter((model) => model.provider === provider);
-    const models = account.models.filter((model) => !catalogue.some((listed) => listed.id === model.id));
+    const models = account.models.filter((model) => !this.#modelCatalog.lists(provider, model.id));
     return { ...account, models };
   }
 
@@ -2056,6 +2043,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly startProviderCodeLogin = Effect.fn("ProviderRuntime.startProviderCodeLogin")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
+    onThisComputer = false,
   ) {
     const codeSignIn = requireProviderDriver(provider).codeSignIn;
     if (!codeSignIn) {
@@ -2063,7 +2051,9 @@ export class ProviderRuntime implements ProviderPort {
     }
     const start = this.#providerStarts.get(provider);
     if (start) yield* Deferred.await(start);
-    return yield* this.#runProviderConnectionCommand(provider, () => this.#startProviderCode(provider, codeSignIn));
+    return yield* this.#runProviderConnectionCommand(provider, () =>
+      this.#startProviderCode(provider, codeSignIn, onThisComputer),
+    );
   }).bind(this);
 
   readonly saveCodexApiKey = Effect.fn("ProviderRuntime.saveCodexApiKey")(function* (
@@ -2078,6 +2068,7 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
     provider: AgentProvider,
     codeSignIn: NonNullable<ReturnType<typeof requireProviderDriver>["codeSignIn"]>,
+    onThisComputer: boolean,
   ): Effect.fn.Return<ProviderCodeLoginStart, ProviderOperationFailed> {
     if (codeSignIn.kind === "codex-device") {
       yield* this.#codexLogin.cancel(null);
@@ -2095,7 +2086,6 @@ export class ProviderRuntime implements ProviderPort {
     }
     if (codeSignIn.kind === "acp-delegated") {
       const page = Deferred.makeUnsafe<string>();
-      const noLink = () => new CliCodeLoginFailed({ cause: new Error(sourceText("error.provider.codeLoginNoLink")) });
       return yield* this.#cliLogin
         .startCode(
           provider,
@@ -2107,29 +2097,15 @@ export class ProviderRuntime implements ProviderPort {
               methodId: codeSignIn.methodId,
               timeoutMs: codeSignIn.timeoutMs,
               onSignInUrl: (url) => Deferred.doneUnsafe(page, Effect.succeed(url)),
-            }).pipe(
-              Effect.map(({ child, done }) => ({
-                child,
-                done,
-                prompt: Effect.raceFirst(
-                  Deferred.await(page).pipe(
-                    Effect.map((verificationUrl): CliCodePrompt => ({ flow: "link", verificationUrl })),
-                  ),
-                  done.pipe(
-                    Effect.as(null),
-                    Effect.mapError((cause) => new CliCodeLoginFailed({ cause })),
-                  ),
-                ).pipe(
-                  Effect.timeoutOrElse({ duration: PROMPT_TIMEOUT_MS, orElse: () => Effect.fail(noLink()) }),
-                  Effect.tapError(() => stopProcessTree(child).pipe(Effect.ignore)),
-                ),
-                submit() {
-                  throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
-                },
-              })),
-            ),
+            }).pipe(Effect.map(({ child, done }) => linkSignIn(page, child, done))),
           codeSignIn.timeoutMs,
         )
+        .pipe(toProviderOperationFailed);
+    }
+    const signIn = requireProviderDriver(provider).signIn;
+    if (onThisComputer && signIn.kind === "cli-command" && capturedLinkSignIn(provider)) {
+      return yield* this.#cliLogin
+        .startCode(provider, (cli) => startCapturedLinkSignIn(cli, signIn.command), signIn.command.timeoutMs)
         .pipe(toProviderOperationFailed);
     }
     const { command, flow } = codeSignIn;
@@ -2369,8 +2345,18 @@ export class ProviderRuntime implements ProviderPort {
     );
     this.#countActivation(provider);
     this.#forgetUsage(provider);
-    return yield* this.#reprobeProvider(provider);
+    return yield* this.#reprobeProvider(provider, { releaseOldClientOnFailure: true });
   }, Effect.uninterruptible);
+
+  readonly #releaseClientWithOldCredential = Effect.fn("ProviderRuntime.releaseClientWithOldCredential")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+  ) {
+    const client = this.#clients.get(provider);
+    if (!client || this.#hooks.isProviderBusy(provider)) return;
+    logger.info("Stopped a provider CLI that still uses the previous credential.", { provider });
+    yield* this.#releaseClient(provider, client);
+  });
 
   updateProviderCli(
     provider: AgentProvider,
@@ -2470,6 +2456,7 @@ export class ProviderRuntime implements ProviderPort {
           if (!idle) return false;
           const executable = yield* install();
           installed = true;
+          forgetWindowsLookups();
           this.#bundledExecutables[provider] = executable;
           const cli = yield* this.#resolveProviderCli(provider, { preferInstalled: false });
           if (cli.source !== "managed" || cli.executable !== executable)
@@ -3554,6 +3541,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #reprobeProvider = Effect.fn("ProviderRuntime.reprobeProvider")(function* (
     this: ProviderRuntime,
     provider: AgentProvider,
+    options: { releaseOldClientOnFailure?: boolean } = {},
   ) {
     if (this.#hooks.isProviderBusy(provider)) {
       return yield* new ProviderOperationFailed({
@@ -3598,8 +3586,19 @@ export class ProviderRuntime implements ProviderPort {
               return this.status();
             });
           }),
+          Effect.tapError(() =>
+            options.releaseOldClientOnFailure ? this.#releaseClientWithOldCredential(provider) : Effect.void,
+          ),
           Effect.tapError((failure) =>
-            Effect.sync(() => this.#setProviderConnectionFailure(provider, failure.cause, cli?.version)),
+            Effect.sync(() =>
+              this.#setProviderConnectionFailure(
+                provider,
+                failure.cause,
+                cli?.version,
+                undefined,
+                options.releaseOldClientOnFailure,
+              ),
+            ),
           ),
         ),
       () =>
@@ -4613,6 +4612,76 @@ export class ProviderOperationFailed extends Schema.TaggedError<ProviderOperatio
   cause: Schema.Defect(),
 }) {}
 const { sync: providerStep, rewrap: toProviderOperationFailed } = causeHelpers(ProviderOperationFailed);
+
+type CliSignInCommand = Extract<ReturnType<typeof requireProviderDriver>["signIn"], { kind: "cli-command" }>["command"];
+
+const spawnCliSignIn = Effect.fnUntraced(function* (
+  cli: AgentCliInfo,
+  command: CliSignInCommand,
+  region: SignInRegion,
+  browser: Readonly<Record<string, string>>,
+) {
+  const { argv, savedSignIn } = command;
+  const target = cliSpawnTarget(cli.executable, typeof argv === "function" ? yield* argv(cli, region) : argv);
+  const env = { ...process.env, ...command.env(cli, region), ...browser };
+  const watch = yield* watchSavedSignIn(savedSignIn?.(cli, env));
+  const child = yield* Effect.acquireRelease(
+    Effect.try({
+      try: () =>
+        spawn(target.command, target.args, {
+          cwd: process.cwd(),
+          env,
+          stdio: command.failureText ? ["ignore", "pipe", "pipe"] : "ignore",
+          shell: false,
+          windowsHide: process.platform === "win32",
+          windowsVerbatimArguments: target.windowsVerbatimArguments,
+        }),
+      catch: (cause) => new CliLoginFailed({ cause }),
+    }),
+    (child) => stopProcessTree(child).pipe(Effect.orDie),
+  );
+  return { child, done: orNewSavedSignIn(waitForSignInProcess(child, command), watch, undefined) };
+});
+
+function capturedLinkSignIn(provider: AgentProvider): boolean {
+  return process.platform === "win32" && agentProviderDescriptor(provider).windowsCodeSignIn === "link";
+}
+
+const startCapturedLinkSignIn = Effect.fnUntraced(function* (cli: AgentCliInfo, command: CliSignInCommand) {
+  const page = Deferred.makeUnsafe<string>();
+  const browser = yield* captureBrowser((url) => {
+    Deferred.doneUnsafe(page, Effect.succeed(url));
+    return Promise.resolve();
+  });
+  const { child, done } = yield* spawnCliSignIn(cli, command, "global", browser);
+  const waiting = yield* Effect.forkScoped(done);
+  return linkSignIn(page, child, Fiber.join(waiting));
+});
+
+function linkSignIn(
+  page: Deferred.Deferred<string>,
+  child: ChildProcess,
+  done: CliLoginProcess["done"],
+): CliLoginProcess {
+  const noLink = () => new CliCodeLoginFailed({ cause: new Error(sourceText("error.provider.codeLoginNoLink")) });
+  return {
+    child,
+    done,
+    prompt: Effect.raceFirst(
+      Deferred.await(page).pipe(Effect.map((verificationUrl): CliCodePrompt => ({ flow: "link", verificationUrl }))),
+      done.pipe(
+        Effect.as(null),
+        Effect.mapError((cause) => new CliCodeLoginFailed({ cause })),
+      ),
+    ).pipe(
+      Effect.timeoutOrElse({ duration: PROMPT_TIMEOUT_MS, orElse: () => Effect.fail(noLink()) }),
+      Effect.tapError(() => stopProcessTree(child).pipe(Effect.ignore)),
+    ),
+    submit() {
+      throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
+    },
+  };
+}
 
 function readFailedLimit(provider: AgentProvider): AccountUsageLimit {
   return { id: provider, primary: null, secondary: null, readFailed: true };

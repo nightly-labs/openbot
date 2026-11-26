@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "Auf diesem Host sind keine Ereignisse verfügbar.",
   "error.backend.databaseIntegrity": "Die OpenBot-Datenbank hat die Integritätsprüfung nicht bestanden.",
+  "error.backend.creditsHoldAdminOnly":
+    "Nur ein Eigentümer oder Admin dieses Servers kann Agenten erlauben, Credits zu verwenden.",
+  "error.backend.creditsHoldShort": "Es sind noch nicht genug Credits vorhanden.",
   "error.backend.webhookRouteLimit": "Ein Host kann höchstens {limit} Webhook-Routinen haben.",
   "error.backend.webhookSettingsInvalid": "Prüfe die Webhook-Einstellungen und versuche es erneut.",
   "error.backend.webhookSenderSecretInvalid":
@@ -60,6 +63,13 @@ export const messages = {
     "OpenBot konnte die Seite im Anmeldefenster nicht laden. Prüfe die Internetverbindung und öffne das Anmeldefenster dann erneut.",
   "error.backend.browserSignInReadFailed": "OpenBot konnte die Anmeldung im Fenster nicht lesen.",
   "error.backend.browserStopUnsupported": "Dieser entfernte Host kann das Laden einer Seite nicht stoppen.",
+  "error.backend.browserLocationFailed": "Der Standort für die Seite konnte nicht festgelegt werden.",
+  "error.backend.browserPermissionsUnsupported": "Dieser entfernte Host kann Standortanfragen nicht beantworten.",
+  "error.backend.browserLocationRequired": "Sende den Gerätestandort, um die Anfrage zu erlauben.",
+  "error.backend.browserHttpSignInInactive":
+    "Diese Website fragt nicht mehr nach einer Anmeldung. Lade die Seite neu, um es noch einmal zu versuchen.",
+  "error.backend.browserHttpSignInUnsupported":
+    "Dieser entfernte Host kann keine Anmeldung bei einer Website übernehmen.",
   "error.backend.sharedDataLocalOnly":
     "Geteilte Daten werden auf dem Computer verwaltet, auf dem diese Agenten laufen.",
   "error.backend.browserUrlProtocol": "Im Browser sind nur HTTP(S)-URLs erlaubt.",
@@ -70,6 +80,12 @@ export const messages = {
     "Die Komprimierung macht diesen Chat nicht kleiner: Nach zwei Komprimierungen nutzt er noch {percent}% des Kontextfensters des Modells, daher komprimiert OpenBot ihn nicht mehr. Tools und Anweisungen nutzen den größten Teil des Fensters. Schalte die MCP-Server oder die Computersteuerung aus, die dieser Agent nicht braucht, oder wähle ein Modell mit größerem Fenster. Starte dann einen neuen Chat.",
   "error.backend.contextCompactionStopped":
     "Zwei Komprimierungen dieses Chats sind nacheinander fehlgeschlagen, daher komprimiert OpenBot ihn nicht mehr automatisch. Jeder Versuch sendet den ganzen Chat an das Modell und verbraucht dein Planlimit. Wähle „Jetzt komprimieren“, um es erneut zu versuchen, oder starte einen neuen Chat.",
+  "error.backend.contextCompactionRetrying":
+    "Der Anbieter konnte diesen Chat nicht komprimieren und versucht es erneut. Neue Nachrichten in diesem Chat warten, bis die Komprimierung endet. Wenn sie nicht bald endet, stoppt OpenBot sie und sendet deine Nachrichten.",
+  "error.backend.contextCompactionFailed":
+    "Die Komprimierung dieses Chats ist fehlgeschlagen. Der Chat wurde nicht geändert. Wartende Nachrichten gehen jetzt an den Agenten.",
+  "error.backend.contextCompactionTimedOut":
+    "Die Komprimierung dieses Chats hat zu lange gedauert, daher hat OpenBot sie gestoppt. Der Chat wurde nicht geändert. Wartende Nachrichten gehen jetzt an den Agenten.",
   "error.backend.providerModelAtCapacity":
     "Das Modell ist ausgelastet. Der Anbieter versucht es in einigen Minuten erneut. Um sofort weiterzumachen, stoppe den Durchlauf und wähle ein anderes Modell.",
   "error.backend.providerRetrying":
@@ -117,6 +133,16 @@ export const messages = {
     "Die Kanalleitung hat nicht rechtzeitig geantwortet. Wähle ein Mitglied oder versuche es erneut.",
   "error.backend.channelLeadFailed":
     "Die Kanalleitung konnte diese Nachricht nicht zuweisen. Wähle ein Mitglied oder versuche es erneut.",
+  "error.backend.channelLeadBusy":
+    "Das Modell der Kanalleitung ist gerade ausgelastet. Versuche es in ein paar Minuten erneut, oder wähle ein Mitglied.",
+  "error.backend.channelLeadOffline":
+    "Das Modell der Kanalleitung hat die Verbindung verloren. Versuche es erneut, oder wähle ein Mitglied.",
+  "error.backend.channelLeadSignIn":
+    "Die Anmeldung beim Anbieter der Kanalleitung ist abgelaufen. Melde dich erneut an, oder wähle ein Mitglied.",
+  "error.backend.channelLeadModelGone":
+    "Das Modell der Kanalleitung ist nicht verfügbar. Wähle ein anderes Modell für die Leitung, oder wähle ein Mitglied.",
+  "error.backend.channelLeadRefused":
+    "Das Modell der Kanalleitung hat diese Anfrage abgelehnt. Wähle ein Mitglied oder ein anderes Modell für die Leitung.",
   "error.backend.channelRequestMemberRequired": "Wähle ein Mitglied für diese Anfrage.",
   "error.backend.channelDeliveryNotCreated": "Die Kanalzustellung wurde nicht erstellt.",
   "error.backend.channelAssignmentStopped": "Dieser Kanalauftrag wurde gestoppt oder ersetzt.",
@@ -198,6 +224,8 @@ export const messages = {
   "error.backend.videoGenerationFailed": "Die Videoerstellung ist fehlgeschlagen.",
   "error.backend.videoGenerationNoVideo": "Die Videoerstellung hat kein Video zurückgegeben.",
   "error.backend.videoGenerationInterrupted": "Die Videoerstellung wurde unterbrochen.",
+  "error.backend.grokVideoNoQuota":
+    "Dein Grok-Konto kann keine Videos erstellen. Erstelle das Video stattdessen mit Credits.",
   "error.backend.attachmentNotRegularFile": "Nur reguläre Dateien können angehängt werden: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot konnte {name} nicht kopieren.",
   "error.backend.routineNameRequired": "Ein Name für die Routine ist erforderlich.",
@@ -292,6 +320,8 @@ export const messages = {
     "Der Anmeldeserver akzeptiert OpenBot noch nicht als Anwendung. Dein Konto ist nicht die Ursache. Verwende eine andere Verbindungsmethode, etwa einen lokalen MCP-Server.",
   "error.backend.mcpRegistrationUnavailable":
     "Der Anmeldeserver kann OpenBot nicht als Anwendung registrieren. Dein Konto ist nicht die Ursache. Speichere zum Verbinden diesen Server unter Marketplace, Apps und füge ihm dann eine Anmelde-App hinzu.",
+  "error.backend.mcpSignInAppNeeded":
+    "Der Anmeldeserver kann OpenBot nicht als Anwendung registrieren. Dein Konto ist nicht die Ursache. Öffne zum Verbinden diesen Server unter Marketplace, Apps, klicke auf Verbindung testen und füge dann eine Anmelde-App hinzu.",
   "error.backend.mcpSignInAbandonedGeneric": "Die Anmeldung wurde abgebrochen.",
   "error.backend.mcpSignInForgotten": "Die MCP-Anmeldung wurde während ihrer Ausführung verworfen.",
   "error.backend.mcpSignInAbandoned": "Die MCP-Anmeldung wurde abgebrochen.",
@@ -316,6 +346,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Der Server wurde beendet, bevor er geantwortet hat. Führe den Befehl in einem Terminal aus, um seinen Fehler zu sehen.",
   "error.backend.mcpServerExitedWithOutput": "Der Server wurde beendet, bevor er geantwortet hat. Er schrieb: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "Der Server ist nicht gestartet, weil sein Download fehlgeschlagen ist. Prüfe die Internetverbindung und versuche es dann erneut.",
   "error.backend.mcpServerFailedToStart": "Der Server ist nicht gestartet: {reason}",
   "error.backend.mcpServerProgramMissing":
     "OpenBot konnte den MCP-Server {name} nicht starten, weil sein Programm nicht auf dem Computer installiert ist, auf dem OpenBot läuft. Installiere die App, die {name} bereitstellt, auf diesem Computer, oder schalte {name} unter Marketplace, Apps aus.",
@@ -443,6 +475,10 @@ export const messages = {
     "Der Proxy {name} hat die Anmeldung abgelehnt, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserSystemProxyFailed":
     "Der Proxy in den Einstellungen des Computers, auf dem OpenBot läuft, antwortet nicht oder hat die Verbindung abgelehnt, daher wurde die Seite nicht geöffnet. Prüfe die Proxy-Einstellungen dieses Computers.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "Die Website oder der Proxy in den Einstellungen des Computers, auf dem OpenBot läuft, hat die Verbindung ohne Antwort geschlossen, daher wurde die Seite nicht geöffnet. Wenn sich keine Website öffnet, prüfe die Proxy-Einstellungen dieses Computers.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "Die Website oder der Proxy dieses Browserprofils hat die Verbindung ohne Antwort geschlossen, daher wurde die Seite nicht geöffnet. Wenn sich keine Website öffnet, prüfe den Proxy des Profils.",
   "error.backend.browserProxyComputerUnreachable":
     "Der Computer dieses Profils antwortet nicht, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserProxyComputerLocalAddress":

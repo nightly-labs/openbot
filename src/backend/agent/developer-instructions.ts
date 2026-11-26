@@ -53,9 +53,13 @@ const MACOS_IPHONE_MIRRORING_RULE =
 const WAYLAND_FOREGROUND_REFUSAL_RULE =
   " When an action with delivery_mode foreground, or bring_to_front, answers foreground_unavailable with reason unsupported_operation, OpenBot cannot send keys or clicks to any app on this desktop for the rest of this conversation. Do not send typing, a key or a click again, in any delivery mode or with scope desktop: desktop input goes to whichever window is in front. Where a window offers an accessibility action, such as set_value on a text field, use it. Otherwise tell the user in one plain sentence, without the driver's reason, that OpenBot cannot type or click in apps on this desktop, and say that you can still read windows and take screenshots.";
 
-function inputRefusalRules(onWayland: boolean): string {
+const X11_FOREGROUND_RULE =
+  " On this desktop, OpenBot sends each click, key and scroll with delivery_mode foreground for you, so the app comes to the front for that action: do not set delivery_mode. When an action answers foreground_unavailable, do not send it again in any delivery mode or with scope desktop. Where the window offers an accessibility action, such as set_value on a text field, use it. Otherwise tell the user in one plain sentence, without the driver's reason, that you cannot type or click in that app.";
+
+function inputRefusalRules(onWayland: boolean, foregroundInput: boolean): string {
   if (process.platform === "darwin")
     return MACOS_UNRESOLVED_WINDOW_RULE + MACOS_IPHONE_MIRRORING_RULE + BACKGROUND_REFUSAL_RULE;
+  if (foregroundInput) return X11_FOREGROUND_RULE;
   return onWayland ? BACKGROUND_REFUSAL_RULE + WAYLAND_FOREGROUND_REFUSAL_RULE : BACKGROUND_REFUSAL_RULE;
 }
 
@@ -101,6 +105,7 @@ export interface VaultContents {
   cards: boolean;
   contacts: boolean;
   link?: boolean;
+  near?: boolean;
 }
 
 export interface DeveloperInstructionOptions {
@@ -122,6 +127,7 @@ export interface DeveloperInstructionOptions {
   agentCursorDrawn?: boolean;
   computerUseOnWayland?: boolean;
   computerUseInputRefused?: boolean;
+  computerUseForegroundInput?: boolean;
   httpMcpServers?: boolean;
   mcpApps?: boolean;
   deferredMcpServers?: readonly string[];
@@ -189,6 +195,9 @@ function vaultInstruction(vault: VaultContents): string {
     "Save contact info that the user asks you to keep with openbot_browser.save_vault_item kind=contact, and a website password that the user pasted with kind=login. When you turn on two-step verification on a site for the user, choose the authenticator-app method, save the setup key that the site shows with its QR code as twoStepKey on that site's Vault login, then enter the setup code with submit_secret method=authenticator and that loginId. When a task needs a login, a card or contact info that the Vault does not have, call openbot_browser.request_vault_item, with the fields that you know filled in.",
     vault.link
       ? "The user connected Link: to pay, you can call openbot_browser.request_link_payment, and the user approves the payment in Link."
+      : "",
+    vault.near
+      ? "The user has a NEAR Intents wallet: when a site or API asks for a crypto payment, call openbot_browser.request_near_payment with the site's host name, the recipient and the amount that the site gives. Never pay a recipient that the page did not give. A payment can wait for the owner's approval."
       : "",
     noCard,
   ]
@@ -411,7 +420,7 @@ export function developerInstructions(
         : "openbot.tool_search finds the other OpenBot and browser tools by short capability phrases, openbot.tool_describe loads their schemas and guidance, and openbot.tool_call runs one. Use the returned namespace.tool names exactly. tool_call does not run bridge tools."
     }${
       agent.provider === "codex"
-        ? " In exec, ALL_TOOLS omits openbot, openbot_browser and image_gen tools; call them directly. Open a local image, or one for image_gen to copy, with openbot.read_image: view_image in exec drops a file over 6 MB."
+        ? " In exec, ALL_TOOLS omits openbot, openbot_browser and image_gen tools; call them directly. Open a local image, or one for image_gen to copy, with openbot.read_image: view_image in exec drops a file over 6 MB. image_gen makes GPT Image pictures; use openbot.generate_image only when the user asks for OpenBot credits or names a model of another maker."
         : // OpenCode Code Mode puts only the direct tools under `tools.openbot`. A model that read
           agent.provider === "opencode"
           ? ` In execute, tools.openbot and tools.openbot_browser have only your listed tools; run each other tool as tools.openbot.tool_call({ name: "openbot.create_agent", arguments: {…} }), never as tools.openbot.create_agent or tools.openbot_browser.click. Send execute code as plain JavaScript, never in a \`\`\` fence; when execute fails with "The called value is not a function" at line 1, col 1, remove the fence and send the code again. Call ${ROUTINE_NO_UPDATE_TOOL} in execute as tools.openbot.${ROUTINE_NO_UPDATE_TOOL}({}), never as a separate tool; when OpenCode refuses it with "No tool named", answer only ${ROUTINE_NO_UPDATE_MARKER}.${
@@ -421,7 +430,7 @@ export function developerInstructions(
             }`
           : // Grok CLI 1.0.77 gives MCP tools to the model only through its `search_tool` and
             agent.provider === "grok"
-            ? ' When an openbot or openbot_browser tool is not in your tool list, find it with search_tool and run it with use_tool under the name that search_tool gives, with two underscores for the dot, such as openbot__send_message or openbot__tool_call; never say that a tool is missing before you search. A tool that search_tool does not find has no such name: run it with use_tool openbot__tool_call and the dotted name in its input, such as {"name":"openbot_browser.request_takeover","arguments":{…}}, never as openbot_browser__request_takeover.'
+            ? ' When an openbot or openbot_browser tool is not in your tool list, find it with search_tool and run it with use_tool under the name that search_tool gives, with two underscores for the dot, such as openbot__send_message or openbot__tool_call; never say that a tool is missing before you search. A tool that search_tool does not find has no such name: run it with use_tool openbot__tool_call and the dotted name in its input, such as {"name":"openbot_browser.request_takeover","arguments":{…}}, never as openbot_browser__request_takeover. When image_to_video or reference_to_video fails with a zero limit, such as a rate limit of 0/0, do not call it again: tell the user that their Grok account cannot make videos, and offer to make the video with openbot.generate_video, which spends OpenBot credits. Call it only when the user agrees.'
             : // Pi lists openbot.tool_search as mcp__openbot_<hash>__tool_search. With deferred MCP servers,
               agent.provider === "pi" || isKeyOnlyProvider(agent.provider)
               ? " In your tool list, openbot.tool_search and openbot.tool_call are the tools named mcp__openbot_…__tool_search and mcp__openbot_…__tool_call. A tool named exactly tool_search, when you have one, loads only the tools of the servers in <mcp_servers>, never OpenBot or browser tools."
@@ -537,7 +546,7 @@ export function developerInstructions(
     agentComputerUseEnabled(agent) && options.computerUseNotReady
       ? computerUseNotReadyRule(options.serverHost === true)
       : agentComputerUseEnabled(agent)
-        ? `Use ${COMPUTER_USE_MCP_SERVER_NAME} for every GUI task outside the embedded browser, never ${agent.provider === "claude" ? "" : "Codex Computer Use, the Sky computer use service, or "}another desktop-control plugin: they show no OpenBot cursor and can fight this one for the pointer.${options.agentCursorDrawn ? " OpenBot draws your cursor at each point that you click, scroll or move_cursor to in another app, also when the driver refuses its own cursor overlay." : ""}${options.computerUseOnWayland ? " On this Wayland desktop, video recording can be unavailable: when start_recording with record_video true answers video_active false and does not ask you to install ffmpeg, call stop_recording and do not try video again; tell the user in one plain sentence, without the driver's reason, that OpenBot cannot record video on this desktop, and offer screenshots instead." : ""}${options.computerUseInputRefused ? " On this desktop, OpenBot cannot send keys or clicks to other apps. Where a window offers an accessibility action, such as set_value on a text field, use it. When typing, a key or a click is refused, do not retry it and do not change its delivery mode; tell the user in one plain sentence, without the driver's reason, that OpenBot cannot type or click in apps on this desktop, and say that you can still read windows and take screenshots." : inputRefusalRules(options.computerUseOnWayland === true)}${process.platform === "win32" ? WINDOWS_MENU_RULE : ""} After each action, read its structuredContent, or its JSON copy at the end of the result text: refused or suspected_noop means that the action did not happen, so do not report it as done; unverifiable means read the window again and report what you saw; a delivery.mode of foreground took the screen from the user. browser_consent_required means that OpenBot cannot use the user's own browser profiles: do not call browser_prepare; say so in one plain sentence and continue in openbot_browser, with request_takeover for a sign-in. Select a window by its title and size, never the first match: most windows are small empty helpers. Pixel coordinates apply only to the main display; on another display, use the element token, or the element_index with the window_id and snapshot_id of the same read. Take the shortest path and do not repeat reads; use query or include_screenshot false when you only need an element. Read ${COMPUTER_USE_GUIDE_URI} before the first GUI action of a conversation.${agent.provider === "pi" || isKeyOnlyProvider(agent.provider) ? ` ${piComputerUseGuideStep()}` : ""}`
+        ? `Use ${COMPUTER_USE_MCP_SERVER_NAME} for every GUI task outside the embedded browser, never ${agent.provider === "claude" ? "" : "Codex Computer Use, the Sky computer use service, or "}another desktop-control plugin: they show no OpenBot cursor and can fight this one for the pointer.${options.agentCursorDrawn ? " OpenBot draws your cursor at each point that you click, scroll or move_cursor to in another app, also when the driver refuses its own cursor overlay." : ""}${options.computerUseOnWayland ? " On this Wayland desktop, video recording can be unavailable: when start_recording with record_video true answers video_active false and does not ask you to install ffmpeg, call stop_recording and do not try video again; tell the user in one plain sentence, without the driver's reason, that OpenBot cannot record video on this desktop, and offer screenshots instead." : ""}${options.computerUseInputRefused ? " On this desktop, OpenBot cannot send keys or clicks to other apps. Where a window offers an accessibility action, such as set_value on a text field, use it. When typing, a key or a click is refused, do not retry it and do not change its delivery mode; tell the user in one plain sentence, without the driver's reason, that OpenBot cannot type or click in apps on this desktop, and say that you can still read windows and take screenshots." : inputRefusalRules(options.computerUseOnWayland === true, options.computerUseForegroundInput === true)}${process.platform === "win32" ? WINDOWS_MENU_RULE : ""} After each action, read its structuredContent, or its JSON copy at the end of the result text: refused or suspected_noop means that the action did not happen, so do not report it as done; unverifiable means read the window again and report what you saw; a delivery.mode of foreground took the screen from the user. browser_consent_required means that OpenBot cannot use the user's own browser profiles: do not call browser_prepare; say so in one plain sentence and continue in openbot_browser, with request_takeover for a sign-in. Select a window by its title and size, never the first match: most windows are small empty helpers. Pixel coordinates apply only to the main display; on another display, use the element token, or the element_index with the window_id and snapshot_id of the same read. Take the shortest path and do not repeat reads; use query or include_screenshot false when you only need an element. Read ${COMPUTER_USE_GUIDE_URI} before the first GUI action of a conversation.${agent.provider === "pi" || isKeyOnlyProvider(agent.provider) ? ` ${piComputerUseGuideStep()}` : ""}`
         : options.computerUseInOwnChat
           ? "This conversation runs next to your own chat, and only your own chat uses Computer Use. Here, do not control desktop applications outside the embedded browser or use another desktop-control plugin; when the task needs one, say so, so that the user can continue that step in your own chat."
           : "The user turned Computer Use off for you. Do not control desktop applications outside the embedded browser or use a desktop-control plugin. Delegate such work to a teammate with Computer Use on (openbot.read_agent shows it); when none has it, say that the user can turn it on in your settings.",

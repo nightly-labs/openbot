@@ -281,6 +281,7 @@ function server(summary: DynamicRecord): ServerSummary {
     hostedIssue,
     hostedStart,
     memberLimit,
+    licenseRaisesMemberLimit,
     hosted,
     restartAvailable,
     storageGb,
@@ -297,6 +298,9 @@ function server(summary: DynamicRecord): ServerSummary {
   if (connectionSequence !== undefined && !isNumber(connectionSequence)) throw new Error("Invalid connectionSequence.");
   if (memberLimit !== undefined && !(isNumber(memberLimit) && Number.isSafeInteger(memberLimit) && memberLimit >= 1)) {
     throw new Error("Invalid memberLimit.");
+  }
+  if (licenseRaisesMemberLimit !== undefined && !isBoolean(licenseRaisesMemberLimit)) {
+    throw new Error("Invalid licenseRaisesMemberLimit.");
   }
   if (hosted !== undefined && !isBoolean(hosted)) throw new Error("Invalid hosted.");
   if (restartAvailable !== undefined && !isBoolean(restartAvailable)) throw new Error("Invalid restartAvailable.");
@@ -344,6 +348,7 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(hostedIssue === undefined ? {} : { hostedIssue: decodeHostedIssue(hostedIssue) }),
     ...(hostedStart === undefined ? {} : { hostedStart: decodeHostedStart(hostedStart) }),
     ...(memberLimit === undefined ? {} : { memberLimit }),
+    ...(licenseRaisesMemberLimit === undefined ? {} : { licenseRaisesMemberLimit }),
     ...(hosted === undefined ? {} : { hosted }),
     ...(restartAvailable === undefined ? {} : { restartAvailable }),
     ...(storageGb === undefined ? {} : { storageGb }),

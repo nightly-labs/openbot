@@ -255,6 +255,20 @@ export function declinedMcpElicitationText(params: unknown): string {
   });
 }
 
+export function codexAppNeedsAutoReview(item: unknown): boolean {
+  if (getString(item, "type") !== "mcpToolCall" || getString(item, "server") !== CODEX_APPS_MCP_SERVER_NAME)
+    return false;
+  if (getString(item, "status") !== "failed") return false;
+  const texts = [
+    getString(getRecord(item, "error"), "message"),
+    ...getArray(getRecord(item, "result"), "content").map((part) => getString(part, "text")),
+  ];
+  return texts.some((text) => {
+    const lower = text?.toLowerCase() ?? "";
+    return lower.includes("automatic approval review") && lower.includes("full access");
+  });
+}
+
 const CODEX_MCP_TOOL_CALL_APPROVAL_KIND = "mcp_tool_call";
 
 export const MCP_TOOL_CONSENT_ALLOW_ONCE: Record<string, string[]> = {

@@ -126,7 +126,7 @@ function useBackupModelOptions(models: readonly AgentModelOption[] | undefined, 
         showsAccount && account
           ? t("mobile.agent.backupModels.withAccount", {
               model: modelName,
-              account: accountName(account, accountIndex),
+              account: accountName(account, accountIndex, providerAccounts ?? []),
             })
           : modelName,
       ready:

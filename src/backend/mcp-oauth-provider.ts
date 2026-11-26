@@ -112,6 +112,7 @@ export const mcpOAuthRecordSchema = z.object({
     })
     .optional(),
   lostAt: z.number().optional(),
+  neededScope: z.string().optional(),
 });
 
 export type McpOAuthRecord = z.infer<typeof mcpOAuthRecordSchema>;
@@ -155,6 +156,8 @@ const TOKEN_REFRESH_MARGIN_MS = 60_000;
 
 const MCP_REVOCATION_TIMEOUT_MS = 5_000;
 
+const MAX_NEEDED_SCOPE_LENGTH = 1_024;
+
 export type McpSignInOffer = "none" | "offered" | "refused";
 
 export interface McpSignIn {
@@ -182,6 +185,7 @@ export interface McpOAuthAuthority {
   accessToken: (url: string) => Effect.Effect<string | null, McpOperationError>;
   refreshAccessToken: (url: string, rejected: string) => Effect.Effect<string | null, McpOperationError>;
   endRefusedSignIn: (url: string, rejected: string) => Effect.Effect<boolean, McpOperationError>;
+  recordScopeRefusal: (url: string, rejected: string, scope: string | null) => Effect.Effect<void, McpOperationError>;
   signIn: (url: string, open?: McpSignInOpener, deepLinkRedirectUrl?: string) => McpSignIn | null;
   cancelSignIn: (url: string) => boolean;
   signInLink: (url: string) => string | null;
@@ -255,6 +259,20 @@ export class McpOAuth implements McpOAuthAuthority {
   ): Effect.fn.Return<boolean, McpOperationError> {
     const key = mcpOAuthAccountKey(url);
     return key !== null && (yield* this.#end(key, rejected)) === null;
+  }).bind(this);
+
+  readonly recordScopeRefusal = Effect.fn("McpOAuth.recordScopeRefusal")(function* (
+    this: McpOAuth,
+    url: string,
+    rejected: string,
+    scope: string | null,
+  ): Effect.fn.Return<void, McpOperationError> {
+    const key = mcpOAuthAccountKey(url);
+    const stored = key === null ? null : yield* mcpSync(() => this.#options.storage.read(key));
+    if (key === null || stored?.tokens?.access_token !== rejected) return;
+    const union = scopeUnion(stored.neededScope, scope);
+    const neededScope = union.length <= MAX_NEEDED_SCOPE_LENGTH ? union : (stored.neededScope ?? "");
+    if (neededScope !== stored.neededScope) yield* this.#options.storage.write(key, { ...stored, neededScope });
   }).bind(this);
 
   readonly #end = Effect.fn("McpOAuth.end")(function* (this: McpOAuth, key: string, rejected: string) {
@@ -379,7 +397,8 @@ export class McpOAuth implements McpOAuthAuthority {
       provider,
       begin: () =>
         Effect.gen({ self: this }, function* () {
-          if (cancelled || abandoned || this.#options.storage.read(key)?.tokens) return false;
+          const stored = this.#options.storage.read(key);
+          if (cancelled || abandoned || (stored?.tokens && stored.neededScope === undefined)) return false;
           const controller = new AbortController();
           const fetchFn = provider.watchRegistration(this.#fetch(key, controller.signal));
           return yield* withTimeout(
@@ -520,13 +539,14 @@ export class McpOAuth implements McpOAuthAuthority {
   needsSignIn(url: string): boolean {
     const key = mcpOAuthAccountKey(url);
     const record = key === null ? undefined : this.#options.storage.read(key);
-    return record?.lostAt !== undefined && !record.tokens;
+    if (record?.tokens) return record.neededScope !== undefined;
+    return record?.lostAt !== undefined || record?.app !== undefined;
   }
 
   hasSignIn(url: string): boolean {
     const key = mcpOAuthAccountKey(url);
     const record = key === null ? undefined : this.#options.storage.read(key);
-    return record?.tokens !== undefined || record?.lostAt !== undefined;
+    return record?.tokens !== undefined || record?.lostAt !== undefined || record?.app !== undefined;
   }
 
   readonly signInOffer = Effect.fn("McpOAuth.signInOffer")(function* (this: McpOAuth, url: string) {
@@ -1066,7 +1086,13 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         const authorized = this.#authorizedClient;
         const replaced = authorized && this.#record().client?.client_id !== authorized.client_id;
         const client = this.#registeredClient ?? (replaced ? authorized : undefined);
-        yield* this.#save({ ...(client ? { client } : {}), tokens, obtainedAt: Date.now(), lostAt: undefined });
+        yield* this.#save({
+          ...(client ? { client } : {}),
+          tokens,
+          obtainedAt: Date.now(),
+          lostAt: undefined,
+          ...(this.#exchangingCode ? { neededScope: undefined } : {}),
+        });
         this.#registeredClient = undefined;
       }),
     );
@@ -1150,11 +1176,16 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         if (!this.#options.state) return yield* mcpFailure(new Error(sourceText("error.backend.mcpSignInNoBrowser")));
         if (!isAuthorizationUrlSafe(authorizationUrl))
           return yield* mcpFailure(new Error(sourceText("error.backend.mcpSignInNotWebPage")));
-        const { app } = this.#record();
+        const { app, neededScope, tokens } = this.#record();
+        const serverPromptUrl = withServerPrompt(authorizationUrl);
         const url = withGoogleOfflineAccess(
-          app?.scope
-            ? withAppScope(authorizationUrl, app)
-            : withOfflineAccess(authorizationUrl, this.#discoveryState?.authorizationServerMetadata),
+          withNeededScope(
+            app?.scope
+              ? withAppScope(serverPromptUrl, app)
+              : withOfflineAccess(serverPromptUrl, this.#discoveryState?.authorizationServerMetadata),
+            neededScope,
+            tokens?.scope,
+          ),
         );
         const clientId = url.searchParams.get("client_id");
         this.#authorizedClient = app
@@ -1403,12 +1434,32 @@ function describeUnusableRedirectUrl(redirectUrl: string): string | null {
   return null;
 }
 
+function withServerPrompt(authorizationUrl: URL): URL {
+  const [serverPrompt, ...addedPrompts] = authorizationUrl.searchParams.getAll("prompt");
+  if (serverPrompt === undefined || addedPrompts.length === 0) return authorizationUrl;
+  const url = new URL(authorizationUrl);
+  url.searchParams.set("prompt", serverPrompt);
+  return url;
+}
+
 function withAppScope(authorizationUrl: URL, app: McpOAuthApp | undefined): URL {
   if (!app?.scope) return authorizationUrl;
   const url = new URL(authorizationUrl);
   url.searchParams.set("scope", app.scope);
   if (app.scope.split(/\s+/).includes("offline_access") && !url.searchParams.has("prompt"))
     url.searchParams.set("prompt", "consent");
+  return url;
+}
+
+function scopeUnion(...scopes: ReadonlyArray<string | null | undefined>): string {
+  return [...new Set(scopes.flatMap((scope) => scope?.split(/\s+/).filter(Boolean) ?? []))].join(" ");
+}
+
+function withNeededScope(authorizationUrl: URL, needed: string | undefined, granted: string | undefined): URL {
+  const base = authorizationUrl.searchParams.get("scope") || granted;
+  if (!needed || !base) return authorizationUrl;
+  const url = new URL(authorizationUrl);
+  url.searchParams.set("scope", scopeUnion(base, needed));
   return url;
 }
 

@@ -63,7 +63,7 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
   };
   const codeFallback = createCodeSignInFallback(connecting);
   const codeFallbackOffered = () =>
-    browserConnect() && alternative() === "code" && !off() && state() !== "available" && codeFallback.offered();
+    browserConnect() && alternative() !== null && !off() && state() !== "available" && codeFallback.offered();
   const signInAlternative = () => {
     codeFallback.startedWithCode();
     host.connection?.alternative(option().id);

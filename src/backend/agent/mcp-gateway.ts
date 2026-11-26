@@ -121,6 +121,7 @@ export class McpGateway {
       settings: credentials.mcpOAuthProxySettings ?? null,
       target: (route) => this.#proxyTarget(route),
       refresh: (url, rejected) => (oauth ? oauth.refreshAccessToken(url, rejected) : Effect.succeed(null)),
+      scopeRefused: (url, rejected, scope) => (oauth ? oauth.recordScopeRefusal(url, rejected, scope) : Effect.void),
       signInEnded: (url) => !oauth?.signedIn(url),
       ...(credentials.appVersion
         ? {
@@ -205,6 +206,10 @@ export class McpGateway {
       !config.headers.some((pair) => pair.key.trim().toLowerCase() === "authorization") &&
       oauth.hasSignIn(config.url)
     );
+  }
+
+  #awaitsSignIn(config: McpServerConfig): boolean {
+    return this.#proxied(config) && this.#oauth?.needsSignIn(config.url) === true;
   }
 
   #proxyTarget(route: string): Effect.Effect<McpOAuthProxyTarget | null, McpOperationError> {
@@ -317,7 +322,13 @@ export class McpGateway {
     const outcome = yield* this.#probeStoredSignIn(config, silent, options.signInPlace ?? null);
     yield* this.#refreshForTestedTools(config, outcome);
     const refused = outcome.error === null && (yield* this.signInOffer(config)) === "refused";
-    const error = refused ? sourceText("error.backend.mcpRegistrationUnavailable") : outcome.error;
+    const error = refused
+      ? sourceText("error.backend.mcpSignInAppNeeded")
+      : outcome.error === null && this.#awaitsSignIn(config)
+        ? sourceText(
+            options.signInPlace === "host" ? "error.backend.mcpSignInOnHost" : "error.backend.mcpSignInRequired",
+          )
+        : outcome.error;
     return { toolCount: outcome.toolCount, error };
   });
 
@@ -387,7 +398,8 @@ export class McpGateway {
   ) {
     const github = config.id === GITHUB_CONNECTOR_MCP_SERVER_ID ? yield* this.#githubAuthorization() : null;
     const stored = this.#oauth;
-    return yield* callMcpServerTool(
+    const sent: { token: string | null } = { token: null };
+    const outcome = yield* callMcpServerTool(
       config,
       name,
       args,
@@ -395,9 +407,22 @@ export class McpGateway {
       config.id === GITHUB_CONNECTOR_MCP_SERVER_ID
         ? { accessToken: () => Effect.succeed(github) }
         : stored
-          ? { accessToken: (url) => stored.accessToken(url) }
+          ? {
+              accessToken: (url) =>
+                stored.accessToken(url).pipe(
+                  Effect.tap((token) =>
+                    Effect.sync(() => {
+                      sent.token = token;
+                    }),
+                  ),
+                ),
+            }
           : undefined,
     ).pipe(toMcpGatewayFailed);
+    const refusedScope = "refusedScope" in outcome ? outcome.refusedScope : undefined;
+    if (refusedScope === undefined || !stored || sent.token === null) return outcome;
+    yield* stored.recordScopeRefusal(config.url, sent.token, refusedScope).pipe(toMcpGatewayFailed);
+    return { error: sourceText("error.backend.mcpOAuthScopeNeeded") };
   });
 
   readonly signIn = Effect.fnUntraced(function* (
@@ -474,10 +499,11 @@ export class McpGateway {
       return yield* new McpGatewayFailed({
         cause: new McpServerError(sourceText("error.backend.mcpSignInAppClientId")),
       });
+    const proxied = this.#proxied(config);
     const dropped = yield* oauth
       .saveSignInApp(config.url, { clientId: input.clientId, clientSecret: input.clientSecret, scope: input.scope })
       .pipe(toMcpGatewayFailed);
-    if (dropped) yield* this.#hooks.refreshAllAgentRuntimes("now");
+    if (dropped || this.#proxied(config) !== proxied) yield* this.#hooks.refreshAllAgentRuntimes("now");
     return this.signInApp(input);
   }, Effect.uninterruptible);
 
@@ -511,11 +537,14 @@ export class McpGateway {
     return this.#servers
       .list()
       .filter((config) => config.transport === "http")
-      .map((config) => ({
-        mcpServerId: config.id,
-        signedIn: oauth?.signedIn(config.url) ?? false,
-        needsSignIn: oauth?.needsSignIn(config.url) ?? false,
-      }));
+      .map((config) => {
+        const needsSignIn = this.#awaitsSignIn(config);
+        return {
+          mcpServerId: config.id,
+          signedIn: !needsSignIn && (oauth?.signedIn(config.url) ?? false),
+          needsSignIn,
+        };
+      });
   }
 
   serviceSignIns(host: string): McpServiceSignIn[] {

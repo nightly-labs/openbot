@@ -50,6 +50,11 @@ export interface AcpMcpServerFailure {
   readonly reason: string;
 }
 
+interface AcpTaskTurns {
+  readonly startsTask: (toolCallId: string, input: unknown) => boolean;
+  readonly toolCallKey: (toolCallId: string) => string;
+}
+
 export interface AcpFlavor {
   mediaTools?: {
     kind(update: {
@@ -96,6 +101,7 @@ export interface AcpFlavor {
   lostServerUntilRestart?(error: unknown): boolean;
   serverLost?(error: unknown): boolean;
   sessionBusy?(error: unknown): boolean;
+  sessionStillActive?(error: unknown): boolean;
   configConflict?(error: unknown): boolean;
   staleSession?(error: unknown): boolean;
   keepModelsOnRefreshFailure?: true;
@@ -103,6 +109,7 @@ export interface AcpFlavor {
   processWideModel?: true;
   setsConfigOnlyOnChange?: true;
   modelSetUnsaved?(error: RequestError): boolean;
+  modelNotOffered?(error: RequestError): boolean;
   modelConfigId?: string;
   configSetUnsaved?(error: RequestError): boolean;
   closeKeepsSession?: true;
@@ -140,6 +147,7 @@ export interface AcpFlavor {
   promptOpenForBackgroundTasks?: true;
   silentTurnLimitMs?: number;
   unsentBackgroundTurns?: true;
+  unsentTaskTurns?: AcpTaskTurns;
   wakesAfterPromptEnds?: true;
   restartNoticeOnReload?: true;
   selfWakeTools?: RegExp;
@@ -465,6 +473,16 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   enableMcpServers: enableCursorMcpServers,
 };
 
+const KIMI_CODE_TOOL_CALL_TURN = /^\d+:/u;
+
+const KIMI_TASK_TURNS: AcpTaskTurns = {
+  startsTask: (toolCallId, input) =>
+    KIMI_CODE_TOOL_CALL_TURN.test(toolCallId) &&
+    isRecord(input) &&
+    (input.run_in_background === true || typeof input.task_id === "string"),
+  toolCallKey: (toolCallId) => toolCallId.replace(KIMI_CODE_TOOL_CALL_TURN, ""),
+};
+
 export const KIMI_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: (error) =>
     error.code === -32602 ? isRecord(error.data) && error.data.session_id === "Session not found" : null,
@@ -479,6 +497,9 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
   mcpToolsFixedAtStart: true,
   turnStallMs: 12 * 60_000,
   staleSession: kimiStaleSession,
+  unsentBackgroundTurns: true,
+  unsentTaskTurns: KIMI_TASK_TURNS,
+  messagePerId: true,
 };
 
 export const DEVIN_ACP_FLAVOR: AcpFlavor = {
@@ -518,6 +539,12 @@ function customSessionNotFound(error: RequestError, sessionId: string): boolean 
   return geminiCliSessionNotFound(error, sessionId) ?? ompSessionNotFound(error, sessionId);
 }
 
+function customSessionStillActive(error: unknown): boolean {
+  return (
+    error instanceof RequestError && error.code === -32602 && /\bsession is already active\b/iu.test(errorText(error))
+  );
+}
+
 function customEmptyAnswerFailure({ answered }: { answered: boolean }, label: string): string | null {
   return answered ? null : sourceText("error.provider.acpNoAnswer", { provider: label });
 }
@@ -551,6 +578,7 @@ const OMP_ACP_FLAVOR: AcpFlavor = {
 
 const CUSTOM_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: customSessionNotFound,
+  sessionStillActive: customSessionStillActive,
   emptyAnswerFailure: customEmptyAnswerFailure,
   turnFailure: customTurnFailure,
   failureCause: customFailureCause,
@@ -576,7 +604,14 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     failureReport: HERMES_FAILURE_SUMMARY,
     catalogAsMcpTools: true,
   },
-  kimi: { ...CUSTOM_ACP_FLAVOR, mcpToolsFixedAtStart: true, staleSession: kimiStaleSession },
+  kimi: {
+    ...CUSTOM_ACP_FLAVOR,
+    mcpToolsFixedAtStart: true,
+    staleSession: kimiStaleSession,
+    unsentBackgroundTurns: true,
+    unsentTaskTurns: KIMI_TASK_TURNS,
+    messagePerId: true,
+  },
   "kiro-cli": { ...CUSTOM_ACP_FLAVOR, mcpToolCallLimitMs: 120_000, modelConfigId: "model" },
 };
 

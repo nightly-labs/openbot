@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "Events zijn niet beschikbaar op deze host.",
   "error.backend.databaseIntegrity": "De database van OpenBot heeft de integriteitscontrole niet doorstaan.",
+  "error.backend.creditsHoldAdminOnly":
+    "Alleen een eigenaar of beheerder van deze server kan agents credits laten gebruiken.",
+  "error.backend.creditsHoldShort": "Er zijn nog niet genoeg credits.",
   "error.backend.webhookRouteLimit": "Een host kan maximaal {limit} webhookroutines hebben.",
   "error.backend.webhookSettingsInvalid": "Controleer de webhookinstellingen en probeer het opnieuw.",
   "error.backend.webhookSenderSecretInvalid":
@@ -61,6 +64,12 @@ export const messages = {
     "OpenBot kon de pagina in het inlogvenster niet laden. Controleer de internetverbinding en open het inlogvenster daarna opnieuw.",
   "error.backend.browserSignInReadFailed": "OpenBot kon de inlog niet uit het venster lezen.",
   "error.backend.browserStopUnsupported": "Deze externe host kan het laden van een pagina niet stoppen.",
+  "error.backend.browserLocationFailed": "Kan de locatie voor de pagina niet instellen.",
+  "error.backend.browserPermissionsUnsupported": "Deze externe host kan geen locatieverzoeken beantwoorden.",
+  "error.backend.browserLocationRequired": "Stuur de locatie van het apparaat om het verzoek toe te staan.",
+  "error.backend.browserHttpSignInInactive":
+    "Deze site vraagt niet meer om in te loggen. Laad de pagina opnieuw om het nog eens te proberen.",
+  "error.backend.browserHttpSignInUnsupported": "Deze externe host kan geen login voor een site overnemen.",
   "error.backend.sharedDataLocalOnly": "Gedeelde gegevens worden beheerd op de computer waarop deze agents draaien.",
   "error.backend.browserUrlProtocol": "Alleen HTTP(S)-URL’s zijn toegestaan in de browser.",
   "error.backend.sunshineNotReady": "Sunshine is niet klaar geworden.",
@@ -70,6 +79,12 @@ export const messages = {
     "Comprimeren maakt deze chat niet kleiner: na twee keer comprimeren gebruikt hij nog {percent}% van het contextvenster van het model, dus OpenBot stopt met comprimeren. Tools en instructies gebruiken het grootste deel van het venster. Zet de MCP-servers of computerbediening uit die deze agent niet nodig heeft, of kies een model met een groter venster. Start daarna een nieuwe chat.",
   "error.backend.contextCompactionStopped":
     "Twee compressies van deze chat zijn na elkaar mislukt, dus OpenBot comprimeert hem niet meer automatisch. Elke poging stuurt de hele chat naar het model en gebruikt je abonnementslimiet. Kies ‘Nu comprimeren’ om het opnieuw te proberen, of start een nieuwe chat.",
+  "error.backend.contextCompactionRetrying":
+    "De provider kon deze chat niet comprimeren en probeert het opnieuw. Nieuwe berichten in deze chat wachten tot het comprimeren klaar is. Als het niet snel klaar is, stopt OpenBot het en verstuurt je berichten.",
+  "error.backend.contextCompactionFailed":
+    "Het comprimeren van deze chat is mislukt. De chat is niet gewijzigd. Wachtende berichten gaan nu naar de agent.",
+  "error.backend.contextCompactionTimedOut":
+    "Het comprimeren van deze chat duurde te lang, dus OpenBot heeft het gestopt. De chat is niet gewijzigd. Wachtende berichten gaan nu naar de agent.",
   "error.backend.providerModelAtCapacity":
     "Het model zit aan zijn capaciteit. De provider probeert het over een paar minuten opnieuw. Stop de beurt en kies een ander model om nu door te gaan.",
   "error.backend.providerRetrying":
@@ -113,6 +128,16 @@ export const messages = {
   "error.backend.channelLeadTimedOut": "De kanaalleider reageerde niet op tijd. Kies een lid of probeer het opnieuw.",
   "error.backend.channelLeadFailed":
     "De kanaalleider kon dit bericht niet doorsturen. Kies een lid of probeer het opnieuw.",
+  "error.backend.channelLeadBusy":
+    "Het model van de kanaalleider is nu bezet. Probeer het over een paar minuten opnieuw, of kies een lid.",
+  "error.backend.channelLeadOffline":
+    "Het model van de kanaalleider verloor de verbinding. Probeer het opnieuw, of kies een lid.",
+  "error.backend.channelLeadSignIn":
+    "De aanmelding bij de provider van de kanaalleider is verlopen. Meld je opnieuw aan, of kies een lid.",
+  "error.backend.channelLeadModelGone":
+    "Het model van de kanaalleider is niet beschikbaar. Kies een ander model voor de leider, of kies een lid.",
+  "error.backend.channelLeadRefused":
+    "Het model van de kanaalleider weigerde dit verzoek. Kies een lid, of een ander model voor de leider.",
   "error.backend.channelRequestMemberRequired": "Kies een lid voor dit verzoek.",
   "error.backend.channelDeliveryNotCreated": "De bezorging in het kanaal is niet gemaakt.",
   "error.backend.channelAssignmentStopped": "Deze kanaalopdracht is gestopt of vervangen.",
@@ -191,6 +216,8 @@ export const messages = {
   "error.backend.videoGenerationFailed": "Het maken van de video is mislukt.",
   "error.backend.videoGenerationNoVideo": "Het maken van de video gaf geen video terug.",
   "error.backend.videoGenerationInterrupted": "Het maken van de video is onderbroken.",
+  "error.backend.grokVideoNoQuota":
+    "Je Grok-account kan geen video's maken. Maak de video in plaats daarvan met credits.",
   "error.backend.attachmentNotRegularFile": "Alleen gewone bestanden kunnen worden bijgevoegd: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot kon {name} niet kopiëren.",
   "error.backend.routineNameRequired": "Een naam voor de routine is verplicht.",
@@ -280,6 +307,8 @@ export const messages = {
     "De inlogserver accepteert OpenBot nog niet als app. Dit ligt niet aan je account. Gebruik een andere manier om te verbinden, zoals een lokale MCP-server.",
   "error.backend.mcpRegistrationUnavailable":
     "De inlogserver kan OpenBot niet als app registreren. Dit ligt niet aan je account. Sla deze server op in Marktplaats, Apps, en voeg er daarna een inlog-app aan toe om te verbinden.",
+  "error.backend.mcpSignInAppNeeded":
+    "De inlogserver kan OpenBot niet als app registreren. Dit ligt niet aan je account. Open deze server in Marktplaats, Apps, klik op Verbinding testen en voeg daarna een inlog-app toe om te verbinden.",
   "error.backend.mcpSignInAbandonedGeneric": "Het inloggen is afgebroken.",
   "error.backend.mcpSignInForgotten": "De MCP-inlog is vergeten terwijl deze bezig was.",
   "error.backend.mcpSignInAbandoned": "Het inloggen bij MCP is afgebroken.",
@@ -303,6 +332,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
   "error.backend.mcpServerExitedWithOutput": "De server is gestopt voordat hij antwoordde. Hij schreef: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "De server is niet gestart, omdat de download is mislukt. Controleer de internetverbinding en probeer het opnieuw.",
   "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
   "error.backend.mcpServerProgramMissing":
     "OpenBot kon de MCP-server {name} niet starten, omdat het programma ervan niet is geïnstalleerd op de computer waarop OpenBot draait. Installeer de app die {name} levert op die computer, of zet {name} uit in Marktplaats, Apps.",
@@ -429,6 +460,10 @@ export const messages = {
     "De proxy {name} heeft de aanmelding geweigerd, dus de pagina is niet geopend.",
   "error.backend.browserSystemProxyFailed":
     "De proxy in de instellingen van de computer waarop OpenBot draait reageert niet of heeft de verbinding geweigerd, dus de pagina is niet geopend. Controleer de proxy-instellingen van die computer.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "De site of de proxy in de instellingen van de computer waarop OpenBot draait heeft de verbinding zonder antwoord gesloten, dus de pagina is niet geopend. Als geen enkele site opent, controleer dan de proxy-instellingen van die computer.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "De site of de proxy van dit browserprofiel heeft de verbinding zonder antwoord gesloten, dus de pagina is niet geopend. Als geen enkele site opent, controleer dan de proxy van het profiel.",
   "error.backend.browserProxyComputerUnreachable":
     "De computer van dit profiel reageert niet, dus de pagina is niet geopend.",
   "error.backend.browserProxyComputerLocalAddress":

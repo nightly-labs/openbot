@@ -398,6 +398,7 @@ const Providers = createSimpleContext({
         },
         connectWithCode: async (provider, accountId) => connection.connectAccountWithCode(provider, accountId),
         pasteCodeSignIn: pasteCodeSignInSupported(appInfo()?.platform ?? ""),
+        windowsCodeSignIn: appInfo()?.platform === "win32",
         connectKey: (provider, accountId, key) =>
           apply(providersPort().connectProviderAccountKey({ provider, accountId, key })),
         cancel: async (provider, accountId) => {
@@ -554,6 +555,8 @@ const Providers = createSimpleContext({
               start: (provider) => providersPort().startProviderCodeLogin(provider),
               submit: (provider, code) => providerAdmin().submitCodeLogin({ provider, code }, LOCAL_SERVER_ID),
               cancel: (provider) => providersPort().cancelProviderCodeLogin(provider),
+              pasteAddress: (provider, address) =>
+                providerAdmin().pasteRelaySignIn({ provider, address }, LOCAL_SERVER_ID),
               accountCode: accountCode(LOCAL_SERVER_ID),
             };
       },

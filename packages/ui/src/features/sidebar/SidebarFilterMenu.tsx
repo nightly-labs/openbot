@@ -9,14 +9,13 @@ import {
   type SidebarListFilter,
   sidebarFolderMark,
   sidebarFolderTreeIds,
-  sidebarListFilterParts,
   sidebarSelectedFolders,
   sidebarToggleFolder,
 } from "./sidebar-list-filter";
 import { useSidebarScope } from "./sidebar-scope";
 import { SIDEBAR_CHAT_ORDER_LABEL, SIDEBAR_CHAT_ORDERS } from "./sidebar-types";
 
-function MenuMark(props: { on: boolean; mixed?: boolean }) {
+export function MenuMark(props: { on: boolean; mixed?: boolean }) {
   return (
     <span class="ui-menu-check" data-checked={props.on || props.mixed ? "" : undefined} aria-hidden="true">
       <Show when={props.mixed} fallback={<Show when={props.on}>{<Check />}</Show>}>
@@ -87,10 +86,11 @@ function FolderEntries(props: { nodes: readonly SidebarFolderNode[] }) {
 }
 
 export function SidebarFilterMenu() {
-  const { filterFolders, listFilter, listFilterCount, listFiltered, props, setListFilter } = useSidebarScope();
+  const { filterFolders, listFilter, listFilterCount, listFiltered, props, setListFilter, sidebarTabs } =
+    useSidebarScope();
   const { t } = useText();
   const set = (patch: Partial<SidebarListFilter>) => setListFilter({ ...listFilter(), ...patch });
-  const parts = () => sidebarListFilterParts(listFilter());
+  const parts = () => sidebarTabs.listFilterPartsBeyondTab();
   const picked = () => sidebarSelectedFolders(filterFolders(), listFilter().folders).length;
   return (
     <DropdownMenu.Root placement="bottom-end" gutter={4}>

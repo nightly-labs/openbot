@@ -327,6 +327,8 @@ export const messages = {
     "Le modèle OpenCode a écrit ses actions sous forme de texte sans les exécuter. Réessayez ou choisissez un autre modèle.",
   "error.provider.acpNoAnswer":
     "{provider} a terminé le tour sans réponse. Renvoyez le message ou démarrez une nouvelle discussion.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} a reçu les résultats de ses coéquipiers, puis a terminé le tour sans réponse. Demandez à l'agent de continuer.",
   "error.provider.noAnswerAfterSteps":
     "{provider} a effectué quelques étapes, puis a terminé le tour sans réponse. Demandez à l'agent ce qu'il a fait avant d'envoyer à nouveau la même demande.",
   "error.provider.acpRefusedNoReason": "{provider} s’est arrêté sans réponse. Renvoyez le message.",
@@ -371,6 +373,8 @@ export const messages = {
     "Gemini n’a pas pu lire l’historique enregistré de cette conversation. OpenBot a démarré une nouvelle session Gemini avec l’historique de la conversation. Renvoyez votre message.",
   "error.provider.acpTurnStuck":
     "{provider} n’a pas terminé son tour précédent et n’a donc pas accepté ce message. OpenBot a démarré une nouvelle session {provider} avec l’historique de la conversation. Renvoyez votre message.",
+  "error.provider.antigravityLicenseRefused":
+    "Google indique que votre compte n’a pas de licence pour utiliser ce modèle. Choisissez un autre modèle, puis renvoyez votre message.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google n’autorise pas Gemini depuis l’emplacement réseau de l’ordinateur qui exécute cet agent. Utilisez Gemini sur un autre ordinateur, ou choisissez un autre fournisseur pour cet agent.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -466,6 +470,8 @@ export const messages = {
     "Le modèle n'a pas accepté une image de ce chat, car l'image est trop grande. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.imageCountLimit":
     "Le modèle n'a pas accepté ce chat, car il contient trop d'images. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
+  "error.provider.imageCountLimitRepeated":
+    "Le modèle n'a de nouveau pas accepté ce chat : il contient trop d'images. Une tâche ouvre plus d'images que ce modèle n'en accepte, donc une nouvelle session n'aide pas. Choisissez Nouvelle discussion et demandez à l'agent d'ouvrir moins d'images par étape, ou un modèle qui accepte plus d'images.",
   "error.provider.imageUnreadable":
     "Le modèle n'a pas pu lire une image de ce chat. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez. Si vous avez envoyé une image, envoyez-en une autre.",
   "error.provider.requestTooLarge":
@@ -480,6 +486,8 @@ export const messages = {
     "Muse n’a pas pu démarrer un serveur MCP et a bloqué MCP dans cette session. OpenBot a démarré une nouvelle session Muse avec l’historique de la conversation. Réessayez. Si l’erreur persiste, désactivez Computer Use ou le serveur MCP en échec pour cet agent.",
   "error.provider.claudeSessionMissing":
     "Claude Code n’a pas trouvé la session enregistrée de cette conversation. OpenBot a ouvert une nouvelle session Claude Code avec l’historique de la conversation. Réessayez.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode n’a pas trouvé la session enregistrée de cette conversation. OpenBot a ouvert une nouvelle session OpenCode avec l’historique de la conversation. Réessayez.",
   "error.provider.grokSignIn": "Exécutez `grok login` ou définissez XAI_API_KEY pour utiliser Grok.",
   "error.provider.acpSignInNoStart":
     "Le fournisseur n’a pas démarré, donc la connexion n’a pas pu commencer. Réessayez ou redémarrez OpenBot.",
@@ -592,7 +600,10 @@ export const messages = {
   "error.provider.piOutdated":
     "Pi {version} est trop ancien. Installez Pi 1.1.0 ou une version ultérieure pour la prise en charge native de RPC et MCP.",
   "error.provider.nativeMissing": "La CLI {provider} n’est pas installée. Téléchargez-la dans les Réglages.",
-  "error.provider.nativeNotStarted": "La CLI {provider} n’a pas pu démarrer.",
+  "error.provider.nativeNotStarted":
+    "OpenBot a trouvé le {provider} que vous avez installé, mais il n’a pas démarré. Mettez à jour ou réinstallez {provider}, puis réessayez.",
+  "error.provider.nativeManagedNotStarted":
+    "{provider} n’a pas démarré sur l’ordinateur qui exécute ce serveur. Redémarrez OpenBot sur cet ordinateur. S’il ne démarre toujours pas, choisissez Aide > Signaler un problème.",
   "error.provider.nativeVersionUnreadable": "Impossible de lire la version de la CLI {provider}.",
   "error.provider.piSessionBusy": "Attendez la fin du tour Pi en cours.",
   "error.provider.acpSessionBusy": "{provider} termine encore un tour arrêté. Réessayez dans un instant.",

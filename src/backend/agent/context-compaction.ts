@@ -14,6 +14,7 @@ import { causeHelpers } from "../effect-boundary";
 import { decodeRecordResponse, getRecord } from "../protocol";
 import { finiteNumberOrNull } from "./account-usage";
 import { CacheExpiryCompaction } from "./cache-expiry-compaction";
+import type { FailureContext } from "./failure-signal";
 import type { ProviderPort } from "./provider-runtime";
 import type { ThreadOperationFailed } from "./thread-lifecycle";
 
@@ -68,6 +69,7 @@ const RETRY_COMPACTION_SHARE = 0.5;
 const CHARACTERS_PER_TOKEN = 4;
 const CONTEXT_COMPACTION_TIMEOUT_MS = 120_000;
 const CONTEXT_COMPACTION_RUN_FACTOR = 10;
+const CONTEXT_COMPACTION_RETRY_FACTOR = 5;
 export const USAGE_CHANGE_DELAY_MS = 250;
 
 export interface ContextCompactionOptions {
@@ -76,7 +78,7 @@ export interface ContextCompactionOptions {
   cacheExpiryEnabled?: (() => boolean) | undefined;
   store: AgentStore;
   providers: ProviderPort;
-  emitError(code: string, error: unknown, agentId?: string): void;
+  emitError(code: string, error: unknown, agentId?: string, context?: FailureContext): void;
   scheduleDrain(agentId: string): void;
   rotateSession(
     agentId: string,
@@ -122,7 +124,7 @@ interface RefusalHold {
 export class ContextCompaction {
   readonly #store: AgentStore;
   readonly #providers: ProviderPort;
-  readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
+  readonly #emitError: (code: string, error: unknown, agentId?: string, context?: FailureContext) => void;
   readonly #scheduleDrain: (agentId: string) => void;
   readonly #rotateSession: ContextCompactionOptions["rotateSession"];
   readonly #loadSession: ContextCompactionOptions["loadSession"];
@@ -133,6 +135,7 @@ export class ContextCompaction {
   readonly #refusals = new Map<string, RefusalHold>();
   readonly #timeoutMs: number;
   readonly #runTimeoutMs: number;
+  readonly #retryTimeoutMs: number;
   readonly #graceMs: number;
   readonly #display = new Map<string, Omit<AgentContextState, "agentId" | "threadId">>();
   readonly #awaitingPostCompaction = new Set<string>();
@@ -142,6 +145,8 @@ export class ContextCompaction {
   readonly #changed: () => void;
   readonly #compacted: (threadId: string) => void;
   readonly #timers = new Map<string, NodeJS.Timeout>();
+  readonly #deadlines = new Map<string, number>();
+  readonly #retriedThreads = new Set<string>();
   readonly #reasons = new Map<string, AgentContextCompactionReason>();
   readonly #cacheExpiry: CacheExpiryCompaction;
   #usageTimer: NodeJS.Timeout | null = null;
@@ -151,6 +156,7 @@ export class ContextCompaction {
     this.#compacted = options.compacted ?? (() => {});
     this.#timeoutMs = options.timeoutMs ?? CONTEXT_COMPACTION_TIMEOUT_MS;
     this.#runTimeoutMs = this.#timeoutMs * CONTEXT_COMPACTION_RUN_FACTOR;
+    this.#retryTimeoutMs = this.#timeoutMs * CONTEXT_COMPACTION_RETRY_FACTOR;
     this.#graceMs = Math.ceil(this.#timeoutMs / 4);
     this.#store = options.store;
     this.#providers = options.providers;
@@ -596,6 +602,28 @@ export class ContextCompaction {
     return this.#budgets.get(threadId)?.compactionTurnId === turnId;
   }
 
+  providerRetried(agentId: string, threadId: string, turnId: string): boolean {
+    if (!this.isCompactionTurn(threadId, turnId)) return false;
+    const hold = this.#compacting.get(threadId);
+    if (
+      this.#budgets.get(threadId)?.phase !== "running" ||
+      hold?.agentId !== agentId ||
+      !hold.client ||
+      this.#retriedThreads.has(threadId)
+    )
+      return true;
+    this.#retriedThreads.add(threadId);
+    const deadline = this.#deadlines.get(threadId);
+    if (deadline === undefined || deadline - Date.now() > this.#retryTimeoutMs)
+      this.#armDeadline(agentId, threadId, hold.client, this.#retryTimeoutMs);
+    this.#emitError("context_compaction_retrying", sourceText("error.backend.contextCompactionRetrying"), agentId, {
+      provider: hold.client.provider,
+      turnId,
+      severity: "warning",
+    });
+    return true;
+  }
+
   markCompacted(threadId: string): void {
     const budget = this.#budgets.get(threadId);
     if (!budget) return;
@@ -610,7 +638,8 @@ export class ContextCompaction {
     if (budget && status !== "completed") {
       budget.lastCompactedTokens = budget.usedTokens;
       if (budget.phase !== "stopping") {
-        this.#emitError("context_compaction_failed", `Codex context compaction ended with status ${status}.`, agentId);
+        logger.warn("A compaction turn did not complete.", { status });
+        this.#emitError("context_compaction_failed", sourceText("error.backend.contextCompactionFailed"), agentId);
         this.#countFailure(threadId, agentId);
       }
     }
@@ -626,6 +655,7 @@ export class ContextCompaction {
     this.#awaitingPostCompaction.delete(threadId);
     this.#usageWhileCompacting.delete(threadId);
     this.#estimating.delete(threadId);
+    this.#retriedThreads.delete(threadId);
     this.#cacheExpiry.cancel(threadId);
     if (displayed) this.#emitChanged();
     this.#clearTimer(threadId);
@@ -674,6 +704,8 @@ export class ContextCompaction {
     this.#usageTimer = null;
     for (const timer of this.#timers.values()) clearTimeout(timer);
     this.#timers.clear();
+    this.#deadlines.clear();
+    this.#retriedThreads.clear();
     this.#compacting.clear();
     for (const hold of this.#refusals.values()) clearTimeout(hold.timer);
     this.#refusals.clear();
@@ -750,11 +782,7 @@ export class ContextCompaction {
   #armDeadline(agentId: string, threadId: string, client: AgentClient, ms: number): void {
     this.#clearTimer(threadId);
     const timer = setTimeout(() => {
-      this.#emitError(
-        "context_compaction_timeout",
-        "Codex context compaction timed out; queued work will continue.",
-        agentId,
-      );
+      this.#emitError("context_compaction_timeout", sourceText("error.backend.contextCompactionTimedOut"), agentId);
       this.#countFailure(threadId, agentId);
       const budget = this.#budgets.get(threadId);
       if (budget) budget.lastCompactedTokens = budget.usedTokens;
@@ -764,6 +792,7 @@ export class ContextCompaction {
     }, ms);
     timer.unref?.();
     this.#timers.set(threadId, timer);
+    this.#deadlines.set(threadId, Date.now() + ms);
   }
 
   #abandon(agentId: string, threadId: string): void {
@@ -782,6 +811,7 @@ export class ContextCompaction {
 
   #release(agentId: string, threadId: string): void {
     this.#clearTimer(threadId);
+    this.#retriedThreads.delete(threadId);
     this.#reasons.delete(threadId);
     const budget = this.#budgets.get(threadId);
     if (budget) {
@@ -796,6 +826,7 @@ export class ContextCompaction {
     const timer = this.#timers.get(threadId);
     if (timer) clearTimeout(timer);
     this.#timers.delete(threadId);
+    this.#deadlines.delete(threadId);
   }
 }
 

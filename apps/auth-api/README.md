@@ -77,6 +77,15 @@ D1 keeps only SHA-256 hashes of the counted keys in `credit_code_limits`, and th
 old hours.
 Without `--apply` the script makes no change. `--local` (the default) and `--test` work the same way.
 
+Each account gets 10 welcome credits once, with no end date. They pay only for the models that the
+media gateway gives a welcome route. The Worker reaches the media generation processor only through
+the private Worker `openbot-media-gateway` (service binding `MEDIA_GATEWAY`, production only). D1 keeps
+the models, prices, holds and ledger; the gateway keeps the adapters, routes and keys. Its source is
+in the private repository [`nightly-labs/openbot-media-gateway`](https://github.com/nightly-labs/openbot-media-gateway):
+change processors, routes and welcome routes there, then deploy that Worker. Without the
+binding, as in local development, every credits model is unavailable. `bun run test:credit-media`
+checks the service against a fake gateway.
+
 The optional Worker variable `VIES_REQUESTER_VAT_ID` is the seller's EU VAT ID (for example
 `PL1234567890`). With it, the EU VIES check of a buyer's VAT ID returns a consultation number, which the
 Stripe customer keeps as proof of the check. Without it, the check works and has no number.

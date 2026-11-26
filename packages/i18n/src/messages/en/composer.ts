@@ -5,6 +5,13 @@ export const messages = defineMessages("composer", {
   "composer.queueEdit.cancel": "Cancel edit",
   "composer.feedbackFix.body": "Correcting report #{number}. Send the request, or cancel to keep the report as it is.",
   "composer.feedbackFix.cancel": "Cancel",
+  "composer.browserTab.opened": "{name} opened {title} in the browser.",
+  "composer.browserTab.openedMany": {
+    one: "{name} opened {count} page in the browser.",
+    other: "{name} opened {count} pages in the browser.",
+  },
+  "composer.browserTab.open": "Open page",
+  "composer.browserTab.hide": "Hide",
   "composer.providerWait.offlineTitle": "No internet connection",
   "composer.providerWait.offline": "{provider} cannot reply until this computer is online again.",
   "composer.providerWait.silent": "{provider} has sent no update for {duration}.",
@@ -100,6 +107,9 @@ export const messages = defineMessages("composer", {
   "composer.voice.recording": "Voice recording",
   "composer.voice.limitSoon": "Recording stops in {seconds} seconds.",
   "composer.voice.limitReached": "Recording stopped at the 10-minute limit. What you said is in the message.",
+  "composer.voice.languageNotice":
+    "Dictation knows 25 European languages, such as English. Other languages need a larger model ({size}), and the text shows after you stop.",
+  "composer.voice.languageNotice.action": "I speak another language",
   "composer.send.saveQueued": "Save queued message",
   "composer.send.voice": "Send voice message",
   "composer.send.message": "Send message",

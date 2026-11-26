@@ -1551,13 +1551,25 @@ export function createRemoteTeamPeer(
       if (state.channels[kind] !== channel) return;
       failPeer(
         state,
-        referenced(sourceText("error.remote.dataChannelFailed", { kind }), referenceFrom("webrtc", "channel", kind)),
+        state.binding && !state.authenticated
+          ? referenced(sourceText("error.remote.signInConnectionClosed"), "webrtc/channel/sign_in_closed")
+          : referenced(
+              sourceText("error.remote.dataChannelFailed", { kind }),
+              referenceFrom("webrtc", "channel", kind),
+            ),
         actions,
       );
     };
     channel.onclose = () => {
-      if (state.authenticated && state.channels[kind] === channel)
+      if (state.channels[kind] !== channel) return;
+      if (state.authenticated)
         failPeer(state, referenced(sourceText("error.remote.desktopOffline"), "webrtc/channel/closed"), actions);
+      else if (state.binding)
+        failPeer(
+          state,
+          referenced(sourceText("error.remote.signInConnectionClosed"), "webrtc/channel/sign_in_closed"),
+          actions,
+        );
     };
   }
 
