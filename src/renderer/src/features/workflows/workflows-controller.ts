@@ -419,12 +419,6 @@ export function createWorkflowsController(
       readGitHubHistory(workflowId),
     ]);
 
-  const settleOpen = (ticket: number) => {
-    if (ticket !== opens) return;
-    setOpening(undefined);
-    setUpdating(false);
-  };
-
   const readOpening = async (workflowId: string, ticket: number, listed?: readonly WorkflowSummary[]) => {
     const shownId = stored()?.detail.summary.id;
     const savedCopyShown = shownId === workflowId;
@@ -439,12 +433,16 @@ export function createWorkflowsController(
       return await read(workflowId, undefined, listed, ticket);
     } finally {
       clearTimeout(slow);
-      settleOpen(ticket);
+      if (ticket === opens) {
+        setOpening(undefined);
+        setUpdating(false);
+      }
     }
   };
 
-  const load = async (workflowId: string, listed?: readonly WorkflowSummary[], ticket = ++opens) => {
-    if (disposed || ticket !== opens) return;
+  const load = async (workflowId: string, listed?: readonly WorkflowSummary[]) => {
+    if (disposed) return;
+    const ticket = ++opens;
     current = workflowId;
     limit = RUN_PAGE;
     const known = cached(workflowId);
@@ -452,12 +450,8 @@ export function createWorkflowsController(
     await readOpening(workflowId, ticket, listed);
   };
 
-  const loadAfterWrites = (task: (ticket: number) => Promise<unknown>) => {
-    const ticket = ++opens;
-    writes
-      .then(() => task(ticket))
-      .catch(report)
-      .finally(() => settleOpen(ticket));
+  const loadAfterWrites = (task: () => Promise<unknown>) => {
+    writes.then(task).catch(report);
   };
 
   const save = async (
@@ -516,7 +510,7 @@ export function createWorkflowsController(
   const open = (workflowId: string) => {
     flush();
     closePreview();
-    loadAfterWrites((ticket) => load(workflowId, undefined, ticket));
+    loadAfterWrites(() => load(workflowId));
   };
 
   const keepTabs = (next: readonly string[]) => {
@@ -846,9 +840,9 @@ export function createWorkflowsController(
       if (workflowId === current) return;
       flush();
       closePreview();
-      loadAfterWrites(async (ticket) => {
+      loadAfterWrites(async () => {
         const list = await host.workflows.list();
-        if (list.some((summary) => summary.id === workflowId)) await load(workflowId, list, ticket);
+        if (list.some((summary) => summary.id === workflowId)) await load(workflowId, list);
       });
     },
   );
@@ -1020,16 +1014,12 @@ export function createWorkflowsController(
     },
     onCreate: (input) => {
       flush();
-      const ticket = ++opens;
       return queued(() => tracked("create", () => host.workflows.create(input))).then(
         async (created) => {
-          await load(created.summary.id, undefined, ticket).catch(report);
+          await load(created.summary.id).catch(report);
           return true;
         },
-        () => {
-          settleOpen(ticket);
-          return false;
-        },
+        () => false,
       );
     },
     onRename: (workflowId, title) => {
