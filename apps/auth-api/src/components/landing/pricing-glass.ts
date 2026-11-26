@@ -24,13 +24,12 @@ const KONAMI = [
   "a",
 ];
 const CYCLE: readonly GlassShape[] = ["lens", "diamond", "prism", "torus", "blob", "pill"];
-const PALETTE_TOKENS = ["--openbot-logo-production", "--openbot-logo-dev", "--openbot-logo-preview"];
+const PARTY_TOKEN = "--openbot-logo-production";
 const WHITE = "#ffffff";
 const SHAKE_TRAVEL = 30;
 const SHAKE_FLIPS = 4;
 const SHAKE_WINDOW_MS = 1500;
 const PARTY_MS = 3600;
-const PARTY_STEP_MS = 140;
 const STILL_MS = 2600;
 const SMALL_PRINT_MS = 7000;
 const SMALL_PRINT_PX = 13;
@@ -67,7 +66,6 @@ interface ShakeState {
 
 interface EggState {
   party: boolean;
-  hue: number;
   smallPrint: boolean;
   robot: boolean;
   forever: boolean;
@@ -83,19 +81,16 @@ const isEditable = (target: EventTarget | null) =>
 
 export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingGlassText): () => void {
   const { section, amount, layer } = parts;
-  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const styles = getComputedStyle(section);
-  const palette = PALETTE_TOKENS.map((token) => styles.getPropertyValue(token).trim()).filter(Boolean);
+  const partyColor = styles.getPropertyValue(PARTY_TOKEN).trim() || WHITE;
   const state: EggState = {
     party: false,
-    hue: 0,
     smallPrint: false,
     robot: false,
     forever: false,
     interaction: "follow",
   };
   const timers = new Set<ReturnType<typeof setTimeout>>();
-  let partyLoop: ReturnType<typeof setInterval> | undefined;
   let stillTimer: ReturnType<typeof setTimeout> | undefined;
   let shake: ShakeState = { lastX: Number.NaN, dir: 0, travel: 0, flips: [] };
   let keys: string[] = [];
@@ -151,7 +146,7 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
       cycle: CYCLE,
       size: amountSize * (state.forever ? FOREVER_SCALE : 1),
       refraction: state.forever ? 2 : 1,
-      color: state.party ? (palette[state.hue % Math.max(1, palette.length)] ?? WHITE) : WHITE,
+      color: state.party ? partyColor : WHITE,
       tint: state.party ? 0.7 : 0,
       wobble: state.party ? 1 : 0.5,
       interaction: state.interaction,
@@ -183,16 +178,11 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
     glass.refresh();
   };
 
-  const stopParty = () => {
-    clearInterval(partyLoop);
-    partyLoop = undefined;
-    update({ party: false, hue: 0 });
-  };
+  const stopParty = () => update({ party: false });
 
   const startParty = () => {
     if (state.party) return;
     update({ party: true });
-    if (!reduced) partyLoop = setInterval(() => update({ hue: state.hue + 1 }), PARTY_STEP_MS);
     later(PARTY_MS, stopParty);
   };
 
@@ -287,7 +277,6 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
   return () => {
     for (const id of timers) clearTimeout(id);
     timers.clear();
-    clearInterval(partyLoop);
     sizeObserver.disconnect();
     copyObserver.disconnect();
     visibility.disconnect();
