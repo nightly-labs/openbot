@@ -401,9 +401,10 @@ export class McpOAuth implements McpOAuthAuthority {
           if (cancelled || abandoned || (stored?.tokens && stored.neededScope === undefined)) return false;
           const controller = new AbortController();
           const fetchFn = provider.watchRegistration(this.#fetch(key, controller.signal));
+          const serverLookup = stored?.neededScope === undefined ? lookup : "this-server-or-origin";
           return yield* withTimeout(
             Effect.gen(function* () {
-              if (!(yield* namesAuthorizationServer(resource, fetchFn, lookup))) return false;
+              if (!(yield* namesAuthorizationServer(resource, fetchFn, serverLookup))) return false;
               return (yield* mcpCall(() => auth(provider, { serverUrl: resource, fetchFn }))) === "REDIRECT";
             }),
             this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,

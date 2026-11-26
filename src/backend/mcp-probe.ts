@@ -260,7 +260,7 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
   if (!signIn) return failure(first.failure.cause);
   if (first.failure.cause instanceof UnauthorizedError) return yield* afterSignIn(signIn);
   if (httpStatus(first.failure.cause) !== 403 || hasCredentialHeader(config)) return failure(first.failure.cause);
-  const begun = yield* Effect.result(signIn.begin(lookupAfterRefusal(seen.challenge)));
+  const begun = yield* Effect.result(signIn.begin("this-server"));
   if (Result.isFailure(begun)) return failure(begun.failure.cause);
   return begun.success ? yield* afterSignIn(signIn) : failure(first.failure.cause);
 });
