@@ -52,10 +52,6 @@ function railEntryKey(entry: RailEntry): string {
   return entry.key;
 }
 
-function RailUnreadDot() {
-  return <View pointerEvents="none" className="absolute top-1 right-1 size-2.5 rounded-full bg-accent" />;
-}
-
 const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
   const { t } = useText();
   const background = useChatRowBackground(agent.id);
@@ -121,8 +117,12 @@ const RailChannel = memo(function RailChannel({
         className="size-14 items-center justify-center rounded-2xl"
         style={{ backgroundColor: background, borderCurve: "continuous" }}
       >
-        <ChannelAvatar channel={channel} agents={agents} size={AVATAR_SIZE} serverId={serverId} />
-        {unread ? <RailUnreadDot /> : null}
+        <View>
+          <ChannelAvatar channel={channel} agents={agents} size={AVATAR_SIZE} serverId={serverId} />
+          {unread ? (
+            <AgentUnreadBadge count={channel.unreadCount} avatarSize={AVATAR_SIZE} ringColor={background} />
+          ) : null}
+        </View>
       </ChatLinkPressable>
     </Link>
   );
