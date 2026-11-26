@@ -410,6 +410,8 @@ export const messages = {
   "sitePage.landing.download.googlePlay": "Google Play에서 다운로드",
   "sitePage.landing.download.pages": "시스템 요구 사항 및 설치 방법:",
   "sitePage.landing.download.apk": "APK 받기",
+  "sitePage.landing.download.chromeDescription": "Chrome 웹 스토어 · 어떤 페이지 옆에서든 에이전트와",
+  "sitePage.landing.download.chromeAction": "Chrome에 추가",
   "sitePage.referral.invitedBy": "{name}님이 OpenBot에 초대했어요",
   "sitePage.referral.invited": "OpenBot 초대가 도착했어요",
   "sitePage.referral.offer": "{percent} 할인",

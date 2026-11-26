@@ -426,4 +426,5 @@ export type ExternalDestination =
   | "grok-bot-export"
   | "hosted-server-contact"
   | "download"
+  | "chrome-extension"
   | "mac-screen-recording";

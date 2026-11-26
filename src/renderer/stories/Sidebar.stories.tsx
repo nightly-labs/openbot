@@ -3,9 +3,11 @@ import { Button } from "@openbot/ui";
 import type { AvatarMood } from "@openbot/ui/bloub-avatar";
 import type { ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
+import { SidebarChromeExtensionCard } from "@openbot/ui/features/sidebar/SidebarChromeExtensionCard";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
 import { SidebarMachineCard } from "@openbot/ui/features/sidebar/SidebarMachineCard";
 import { SidebarMobileAppCard } from "@openbot/ui/features/sidebar/SidebarMobileAppCard";
+import { SidebarPromoDeck } from "@openbot/ui/features/sidebar/SidebarPromoDeck";
 import { SidebarStorageCard } from "@openbot/ui/features/sidebar/SidebarStorageCard";
 import { normalizeSidebarPinnedItems, type SidebarPinnedItem } from "@openbot/ui/features/sidebar/sidebar-pins";
 import {
@@ -321,6 +323,33 @@ export const ChatHistory: Story = {
 
 export const MobileAppCard: Story = {
   args: { footer: <SidebarMobileAppCard agents={STORY_AGENTS} onInstall={fn()} onDismiss={fn()} /> },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+export const ChromeExtensionCard: Story = {
+  args: { footer: <SidebarChromeExtensionCard agents={STORY_AGENTS} onAdd={fn()} onDismiss={fn()} /> },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+export const PromoDeck: Story = {
+  args: {
+    footer: (
+      <SidebarPromoDeck
+        cards={[
+          {
+            id: "chrome-extension",
+            label: "Your agents, in Chrome",
+            content: () => <SidebarChromeExtensionCard agents={STORY_AGENTS} onAdd={fn()} onDismiss={fn()} />,
+          },
+          {
+            id: "mobile-app",
+            label: "Your agents, in your pocket",
+            content: () => <SidebarMobileAppCard agents={STORY_AGENTS} onInstall={fn()} onDismiss={fn()} />,
+          },
+        ]}
+      />
+    ),
+  },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
