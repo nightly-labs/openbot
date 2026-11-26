@@ -219,13 +219,14 @@ export class McpOAuthProxy {
       Effect.onExit((exit) =>
         Effect.sync(() => {
           if (initialize) {
-            if (Exit.isSuccess(exit) && exchange.answered) this.#broken.delete(path);
+            if (exchange.answered) this.#broken.delete(path);
             else this.#broken.set(path, false);
             return;
           }
+          if (method !== "POST" || onlyToolCalls(read)) return;
           const clientLeft = response.destroyed && !response.writableFinished;
           const lost = exchange.lost || (Exit.isFailure(exit) && !clientLeft);
-          if (method === "POST" && lost && !this.#broken.has(path)) this.#broken.set(path, false);
+          if (lost && !this.#broken.has(path)) this.#broken.set(path, false);
         }),
       ),
     );
@@ -560,6 +561,17 @@ function refuseRequests(
   }
   response.writeHead(200, { "content-type": "application/json" });
   response.end(JSON.stringify(batch ? errors : errors[0]));
+}
+
+function onlyToolCalls(body: Buffer | null): boolean {
+  let parsed: unknown = null;
+  try {
+    parsed = body && body.length > 0 ? JSON.parse(body.toString("utf8")) : null;
+  } catch {
+    return false;
+  }
+  const messages = Array.isArray(parsed) ? parsed : [parsed];
+  return messages.length > 0 && messages.every((item) => isDynamicRecord(item) && item.method === "tools/call");
 }
 
 function notificationMethods(body: Buffer | null): string[] | null {

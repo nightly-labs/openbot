@@ -270,7 +270,7 @@ export class McpGateway {
       try: () => this.#servers.setEnabled(input.mcpServerId, input.enabled),
       catch: (cause) => new McpGatewayFailed({ cause }),
     });
-    if (input.enabled && changed) this.#restartConnections(changed);
+    if (input.enabled && changed && !changed.enabled) this.#restartConnections(changed);
     return yield* this.changed(input.enabled ? "after-background-work" : "now", [changed?.name]);
   }, Effect.uninterruptible);
 

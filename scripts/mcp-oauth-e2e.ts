@@ -872,8 +872,18 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       () => null,
       (error: unknown) => error,
     );
-    servers.setEnabled(direct.id, true);
     assert.ok(offCall instanceof McpError, "The call to a turned-off server did not fail.");
+    assert.deepEqual(
+      await endpointOf(gateway, direct, "agent-break"),
+      brokenRoute,
+      "A refused tool call moved the address.",
+    );
+    const offList = await brokenClient.listTools().then(
+      () => null,
+      (error: unknown) => error,
+    );
+    servers.setEnabled(direct.id, true);
+    assert.ok(offList instanceof McpError, "The tool list of a turned-off server did not fail.");
     const afterBreak = { ...brokenRoute, url: `${brokenRoute.url}?attempt=1` };
     assert.deepEqual(await endpointOf(gateway, direct, "agent-break"), afterBreak);
     assert.deepEqual(
@@ -886,6 +896,12 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     const turnedOnClient = await connect(turnedOnRoute.url, turnedOnRoute.bearer);
     assert.equal(textOf(await turnedOnClient.callTool({ name: "echo", arguments: { text: "on" } })), "on");
     const movedBeforeTurnOn = await endpointOf(gateway, moved);
+    await runCauseEffect(gateway.setEnabled({ mcpServerId: direct.id, enabled: true }));
+    assert.deepEqual(
+      await endpointOf(gateway, direct, "agent-turn-on"),
+      turnedOnRoute,
+      "Turning on a server that is on moved it.",
+    );
     await runCauseEffect(gateway.setEnabled({ mcpServerId: direct.id, enabled: false }));
     await runCauseEffect(gateway.setEnabled({ mcpServerId: direct.id, enabled: true }));
     assert.deepEqual(await endpointOf(gateway, direct, "agent-turn-on"), {
@@ -897,7 +913,13 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       movedBeforeTurnOn,
       "Turning one server on moved another server.",
     );
-    const reconnectedAfterBreak = { breakMovesAddressOnce: true, turnOnMovesAddress: true, otherServersKept: true };
+    const reconnectedAfterBreak = {
+      breakMovesAddressOnce: true,
+      refusedToolCallKeepsAddress: true,
+      turnOnMovesAddress: true,
+      turnOnWhileOnKeepsAddress: true,
+      otherServersKept: true,
+    };
 
     await runCauseEffect(gateway.signOut({ mcpServerId: direct.id }));
     const hitsAtSignOut = resource.hits.length;
