@@ -492,6 +492,7 @@ export const messages = {
   "workflow.canvas.label": "Workflowcanvas: {name}",
   "workflow.canvas.untitled": "Naamloze workflow",
   "workflow.canvas.opening": "Workflow openen…",
+  "workflow.canvas.updating": "Bijwerken…",
   "workflow.canvas.copyOf": "{name} kopie",
   "workflow.canvas.step": "Stap",
   "workflow.canvas.kind.note": "Plaknotitie",

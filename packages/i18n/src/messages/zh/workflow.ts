@@ -505,6 +505,7 @@ export const messages = {
   "workflow.canvas.label": "工作流画布：{name}",
   "workflow.canvas.untitled": "未命名工作流",
   "workflow.canvas.opening": "正在打开工作流…",
+  "workflow.canvas.updating": "正在更新…",
   "workflow.canvas.copyOf": "{name} 副本",
   "workflow.canvas.step": "步骤",
   "workflow.canvas.kind.note": "便签",

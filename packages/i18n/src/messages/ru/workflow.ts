@@ -546,6 +546,7 @@ export const messages = {
   "workflow.canvas.label": "Холст рабочего процесса: {name}",
   "workflow.canvas.untitled": "Рабочий процесс без названия",
   "workflow.canvas.opening": "Открытие рабочего процесса…",
+  "workflow.canvas.updating": "Обновление…",
   "workflow.canvas.copyOf": "{name} (копия)",
   "workflow.canvas.step": "Шаг",
   "workflow.canvas.kind.note": "Стикер",

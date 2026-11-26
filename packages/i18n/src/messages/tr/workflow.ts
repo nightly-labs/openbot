@@ -509,6 +509,7 @@ export const messages = {
   "workflow.canvas.label": "İş akışı tuvali: {name}",
   "workflow.canvas.untitled": "Adsız iş akışı",
   "workflow.canvas.opening": "İş akışı açılıyor…",
+  "workflow.canvas.updating": "Güncelleniyor…",
   "workflow.canvas.copyOf": "{name} kopyası",
   "workflow.canvas.step": "Adım",
   "workflow.canvas.kind.note": "Yapışkan not",
