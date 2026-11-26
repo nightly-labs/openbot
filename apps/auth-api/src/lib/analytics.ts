@@ -487,7 +487,7 @@ function isSafeLandingProperty(name: LandingEventName, key: string, value: unkno
   if (key === "depth") return isOneOf(["start", "half", "end"] as const, value);
   if (key === "platform") {
     if (name === "join_page_action") return isOneOf(DOWNLOAD_PLATFORM_ORDER, value);
-    return isOneOf(["linux", "macos", "windows", "ios", "android"] as const, value);
+    return isOneOf(["linux", "macos", "windows", "ios", "android", "chrome"] as const, value);
   }
   if (key === "placement") return isOneOf(LANDING_PLACEMENTS, value);
   if (key === "destination") return [...LINK_DESTINATIONS.values()].some((destination) => destination === value);

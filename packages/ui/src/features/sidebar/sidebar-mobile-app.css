@@ -378,7 +378,7 @@
 .sidebar-chrome-agent {
   position: absolute;
   z-index: 1;
-  right: 8px;
+  inset-inline-end: 8px;
   bottom: -5px;
   display: inline-flex;
   animation:

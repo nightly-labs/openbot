@@ -157,42 +157,45 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     window.localStorage.getItem(CHROME_EXTENSION_DISMISSED_STORAGE_KEY) === "true",
   );
   const { centralAuth } = useAuth();
-  const promoCards = createMemo(() => {
-    const cards: SidebarPromoCard[] = [];
-    if (centralAuth().status === "signed_in" && !chromeExtensionDismissed()) {
-      cards.push({
-        id: "chrome-extension",
-        label: t("sidebar.chromeExtension.title"),
-        content: () => (
-          <SidebarChromeExtensionCard
-            agents={mobileAppCrew()}
-            onAdd={() => void appPort().openExternal("chrome-extension")}
-            onDismiss={() => {
-              window.localStorage.setItem(CHROME_EXTENSION_DISMISSED_STORAGE_KEY, "true");
-              setChromeExtensionDismissed(true);
-            }}
-          />
-        ),
-      });
-    }
-    if (!mobileAppDismissed()) {
-      cards.push({
-        id: "mobile-app",
-        label: t("sidebar.mobileApp.pocketTitle"),
-        content: () => (
-          <SidebarMobileAppCard
-            agents={mobileAppCrew()}
-            onInstall={(phone) => openMobileInstall(phone)}
-            onDismiss={() => {
-              window.localStorage.setItem(MOBILE_APP_DISMISSED_STORAGE_KEY, "true");
-              setMobileAppDismissed(true);
-            }}
-          />
-        ),
-      });
-    }
-    return cards;
-  });
+  const chromeExtensionCard: SidebarPromoCard = {
+    id: "chrome-extension",
+    get label() {
+      return t("sidebar.chromeExtension.title");
+    },
+    content: () => (
+      <SidebarChromeExtensionCard
+        agents={mobileAppCrew()}
+        onAdd={() => void appPort().openExternal("chrome-extension")}
+        onDismiss={() => {
+          window.localStorage.setItem(CHROME_EXTENSION_DISMISSED_STORAGE_KEY, "true");
+          setChromeExtensionDismissed(true);
+        }}
+      />
+    ),
+  };
+  const mobileAppPromoCard: SidebarPromoCard = {
+    id: "mobile-app",
+    get label() {
+      return t("sidebar.mobileApp.pocketTitle");
+    },
+    content: () => (
+      <SidebarMobileAppCard
+        agents={mobileAppCrew()}
+        onInstall={(phone) => openMobileInstall(phone)}
+        onDismiss={() => {
+          window.localStorage.setItem(MOBILE_APP_DISMISSED_STORAGE_KEY, "true");
+          setMobileAppDismissed(true);
+        }}
+      />
+    ),
+  };
+  const chromeExtensionCardShown = createMemo(
+    () => centralAuth().status === "signed_in" && !chromeExtensionDismissed(),
+  );
+  const promoCards = createMemo(() => [
+    ...(chromeExtensionCardShown() ? [chromeExtensionCard] : []),
+    ...(mobileAppDismissed() ? [] : [mobileAppPromoCard]),
+  ]);
   const communityCard = createCommunityCardVisibility();
   const alertCards = createSidebarAlertCards(activeServer);
   createEffect(serverSettingsOpen, (open, wasOpen) => {
