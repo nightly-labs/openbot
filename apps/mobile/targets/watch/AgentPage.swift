@@ -363,7 +363,11 @@ extension View {
   }
 
   func agentBackground(_ agent: WatchAgent) -> some View {
-    let color = Color(hex: agent.color) ?? .accentColor
+    colorBackground(agent.color)
+  }
+
+  func colorBackground(_ hex: String) -> some View {
+    let color = Color(hex: hex) ?? .accentColor
     return containerBackground(
       LinearGradient(colors: [color.opacity(0.55), .black], startPoint: .top, endPoint: .bottom),
       for: .navigation)

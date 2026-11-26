@@ -22,5 +22,9 @@
   or closed, and when the iPhone is not near. The iPhone pairs the watch one time. Your server must be
   on the new version; for an older server the watch uses the iPhone. The watch also works with the app
   lock on, and a sign-out on the iPhone deletes the agents and keys from the watch.
+- The watch shows your channels next to the agents, in the folders and order of the iPhone app. A
+  channel shows its member agents, its unread messages and the last message with its author. Open a
+  channel to read the last message, listen to it, or send a message by dictation. Opening a channel
+  marks it as read.
 - Opening an agent on the watch marks its chat as read. Agents with unread messages show a count and
   stay near the top of the list.

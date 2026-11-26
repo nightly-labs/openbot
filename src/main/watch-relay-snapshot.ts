@@ -1,23 +1,29 @@
 import { createHash } from "node:crypto";
 import { ARTICLE_GRADIENT_BRAND_HEXES } from "@openbot/brand/article-gradient";
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import {
   type AgentApproval,
   type AgentRuntimePrompt,
   type AgentRuntimeSnapshot,
   type AgentSummary,
+  type ChannelSummary,
   type ConversationReadState,
   SIDEBAR_UNASSIGNED_SECTION_ID,
   type SidebarLayoutSnapshot,
   sidebarFolderParents,
   sidebarFolderPath,
 } from "@openbot/contracts/ipc";
+import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import {
   WATCH_AGENT_LIMIT,
   WATCH_APPROVAL_LIMIT,
+  WATCH_CHANNEL_LIMIT,
+  WATCH_CHANNEL_MEMBERS,
   WATCH_PROTOCOL_VERSION,
   WATCH_REPLY_LIMIT,
   type WatchAgent,
+  type WatchChannel,
   type WatchQuestion,
   type WatchSnapshot,
   type WatchWait,
@@ -126,6 +132,7 @@ export interface HostWatchSnapshotInput {
   reads: Readonly<Record<string, ConversationReadState>>;
   pinned: readonly string[];
   layout: SidebarLayoutSnapshot | null;
+  channels: readonly ChannelSummary[];
   avatar: (agentId: string) => string | null;
   text: WatchText;
   now: number;
@@ -253,28 +260,44 @@ function activeTurnId(agentId: string, runtime: AgentRuntimeSnapshot): string | 
   return work ? work.turnId : null;
 }
 
+type SidebarChat =
+  | { kind: "agent"; id: string; agent: AgentSummary }
+  | { kind: "channel"; id: string; channel: ChannelSummary };
+
+interface PlacedChat {
+  chat: SidebarChat;
+  folder: string | null;
+}
+
 interface PlacedAgent {
   agent: AgentSummary;
   folder: string | null;
+  position: number;
+}
+
+interface PlacedChannel {
+  channel: ChannelSummary;
+  folder: string | null;
+  position: number;
 }
 
 function sidebarOrder(
   layout: SidebarLayoutSnapshot | null,
-  agents: readonly AgentSummary[],
+  chats: readonly SidebarChat[],
   t: WatchText["t"],
-): PlacedAgent[] {
+): PlacedChat[] {
   const positions = new Map(layout?.agentOrder.map((id, index) => [id, index]));
   const placed = layout
-    ? [...agents].sort((a, b) => (positions.get(a.id) ?? positions.size) - (positions.get(b.id) ?? positions.size))
-    : [...agents];
-  if (!layout) return placed.map((agent) => ({ agent, folder: null }));
+    ? [...chats].sort((a, b) => (positions.get(a.id) ?? positions.size) - (positions.get(b.id) ?? positions.size))
+    : [...chats];
+  if (!layout) return placed.map((chat) => ({ chat, folder: null }));
   const sections = new Set(layout.sections.map((section) => section.id));
-  const groups = new Map<string, AgentSummary[]>();
-  for (const agent of placed) {
-    const assigned = layout.agentAssignments[agent.id];
+  const groups = new Map<string, SidebarChat[]>();
+  for (const chat of placed) {
+    const assigned = layout.agentAssignments[chat.id];
     const sectionId = assigned && sections.has(assigned) ? assigned : SIDEBAR_UNASSIGNED_SECTION_ID;
     const group = groups.get(sectionId) ?? [];
-    group.push(agent);
+    group.push(chat);
     groups.set(sectionId, group);
   }
   const parents = sidebarFolderParents(layout);
@@ -283,20 +306,55 @@ function sidebarOrder(
     const folder = sections.has(id)
       ? sidebarFolderPath(layout, parents, id).join(" / ")
       : t("mobile.workspace.section.agents");
-    return (groups.get(id) ?? []).map((agent) => ({ agent, folder }));
+    return (groups.get(id) ?? []).map((chat) => ({ chat, folder }));
   });
 }
 
-function appOrder(input: HostWatchSnapshotInput): PlacedAgent[] {
+function appOrder(input: HostWatchSnapshotInput): { agents: PlacedAgent[]; channels: PlacedChannel[] } {
   const byId = new Map(input.agents.map((agent) => [agent.id, agent]));
   const pinned = input.pinned.flatMap((id) => byId.get(id) ?? []);
   const pinnedIds = new Set(pinned.map((agent) => agent.id));
-  const rest = sidebarOrder(
-    input.layout,
-    input.agents.filter((agent) => !pinnedIds.has(agent.id)),
-    input.text.t,
-  );
-  return [...pinned.map((agent) => ({ agent, folder: null })), ...rest];
+  const agents: PlacedAgent[] = pinned.map((agent, index) => ({ agent, folder: null, position: index }));
+  const channels: PlacedChannel[] = [];
+  let position = pinned.length;
+  const chats: SidebarChat[] = [
+    ...input.channels.map((channel): SidebarChat => ({ kind: "channel", id: channel.id, channel })),
+    ...input.agents
+      .filter((agent) => !pinnedIds.has(agent.id))
+      .map((agent): SidebarChat => ({ kind: "agent", id: agent.id, agent })),
+  ];
+  for (const { chat, folder } of sidebarOrder(input.layout, chats, input.text.t)) {
+    if (chat.kind === "agent") agents.push({ agent: chat.agent, folder, position: position++ });
+    else channels.push({ channel: chat.channel, folder, position: position++ });
+  }
+  return { agents, channels };
+}
+
+function hostChannel(input: HostWatchSnapshotInput, placed: PlacedChannel): WatchChannel {
+  const { channel, folder, position } = placed;
+  const members = channel.members.map((member) => member.agentId);
+  const lead = input.agents.find((agent) => agent.id === members[0]);
+  const last = channel.lastMessage;
+  const localize = (value: string) => localizeSourceText(value, input.text.locale);
+  return {
+    serverId: input.hostId,
+    id: channel.id,
+    name: channel.name,
+    server: input.serverName,
+    color: lead
+      ? avatarHeadColor(lead.avatarSeed, lead.avatarHue, lead.avatarColor ?? null)
+      : ARTICLE_GRADIENT_BRAND_HEXES["--openbot-accent"],
+    members: members.slice(0, WATCH_CHANNEL_MEMBERS),
+    ...(folder ? { folder } : {}),
+    position,
+    unread: channel.unreadCount,
+    working: channel.activeTasks > 0,
+    updated: updatedLabel(last?.at ?? channel.createdAt, input.text.format, input.now),
+    author: last?.authorName ?? null,
+    reply: last
+      ? watchText(markdownPreviewText(coordinatorText(last.author, last.text, localize)), WATCH_REPLY_LIMIT)
+      : null,
+  };
 }
 
 function withinLimit(agents: readonly WatchAgent[]): WatchAgent[] {
@@ -331,7 +389,8 @@ export function buildHostWatchSnapshot(input: HostWatchSnapshotInput): WatchSnap
   );
   const pinned = new Set(input.pinned);
   const listed: WatchAgent[] = [];
-  for (const { agent, folder } of appOrder(input)) {
+  const placed = appOrder(input);
+  for (const { agent, folder, position } of placed.agents) {
     const waiting = agentWait(agent, input);
     const turnId = waiting?.turnId ?? activeTurnId(agent.id, runtime);
     const state = waiting ? "waiting" : turnId ? "working" : "idle";
@@ -346,6 +405,7 @@ export function buildHostWatchSnapshot(input: HostWatchSnapshotInput): WatchSnap
       ...(avatar ? { avatar } : {}),
       pinned: pinned.has(agent.id),
       ...(folder ? { folder } : {}),
+      position,
       unread: unreadCounts.get(agent.id) ?? 0,
       state,
       detail: watchText(state === "working" ? null : agent.preview, 160),
@@ -368,6 +428,7 @@ export function buildHostWatchSnapshot(input: HostWatchSnapshotInput): WatchSnap
     text: watchTexts(text.t, waiting),
     servers: [{ id: input.hostId, name: input.serverName, online: true, watchKey: input.watchKey }],
     agents: shown,
+    channels: placed.channels.slice(0, WATCH_CHANNEL_LIMIT).map((item) => hostChannel(input, item)),
   };
 }
 

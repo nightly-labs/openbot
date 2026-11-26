@@ -686,6 +686,7 @@ export class TeamApiServer {
       serverName: () => store.getIdentity()?.serverName ?? null,
       agents,
       layout: () => this.#options.sidebarLayout.getSnapshot(),
+      listChannels: (memberId) => this.#options.channels?.store.list(memberId) ?? [],
       pinnedAgentIds: (memberId, hidden) =>
         this.#options.sidebarPins
           ?.snapshot(memberId, hidden)

@@ -148,6 +148,11 @@ final class WatchSession: NSObject, ObservableObject {
     return ready.agents.first { $0.key == key }
   }
 
+  func channel(_ key: AgentKey) -> WatchChannel? {
+    guard case .ready(let ready) = snapshot else { return nil }
+    return ready.channels?.first { $0.key == key }
+  }
+
   var live: Bool {
     if case .ready(let ready) = snapshot { return ready.live }
     return false
@@ -408,6 +413,11 @@ final class WatchSession: NSObject, ObservableObject {
     _ = await route(.read(serverId: agent.serverId, agentId: agent.id))
   }
 
+  func markRead(_ channel: WatchChannel) async {
+    guard (channel.unread ?? 0) > 0, canAct else { return }
+    _ = await route(.readChannel(serverId: channel.serverId, channelId: channel.id))
+  }
+
   private func loadMissingAvatars(phoneAllowed: Bool) async {
     let names = missingAvatars
     guard !names.isEmpty, let ready = readySnapshot else { return }
@@ -455,7 +465,8 @@ final class WatchSession: NSObject, ObservableObject {
     if result.ok {
       markFresh()
       WKInterfaceDevice.current().play(.success)
-      show(WatchFeedback(text: done, success: true, color: command.agentKey.flatMap(agent)?.color))
+      let color = command.agentKey.flatMap(agent)?.color ?? command.channelKey.flatMap(channel)?.color
+      show(WatchFeedback(text: done, success: true, color: color))
     } else {
       WKInterfaceDevice.current().play(.failure)
       let message = result.message.flatMap { $0.isEmpty ? nil : $0 } ?? text(TextKey.error(result.error ?? .failed))

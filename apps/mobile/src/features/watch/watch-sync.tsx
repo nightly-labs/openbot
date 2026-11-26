@@ -101,6 +101,10 @@ function WatchLinkSync({ servers, serversReady, agents, preferences, capabilitie
         conversation: (agentId) => actions.conversationStore.get(agentId),
         avatar: watchAvatar,
         faces: watchFaces,
+        channels: (serverId) => {
+          const state = actions.channelStore.get(serverId);
+          return state.supported ? state.channels : [];
+        },
         online: showsOnline,
         watchKey: knownWatchKey,
         account: session ? accountScope(session.apiUrl, session.user.id) : undefined,
@@ -165,9 +169,11 @@ function WatchLinkSync({ servers, serversReady, agents, preferences, capabilitie
     };
     schedule();
     const unsubscribe = liveState.subscribe(schedule);
+    const channelUnsubscribes = servers.map((server) => actions.channelStore.subscribe(server.id, schedule));
     return () => {
       stopped = true;
       unsubscribe();
+      for (const stop of channelUnsubscribes) stop();
       if (timer) clearTimeout(timer);
     };
   }, [watchInstalled, serversReady, liveState, servers, actions, capabilities, teamApi]);
@@ -219,6 +225,31 @@ function WatchLinkSync({ servers, serversReady, agents, preferences, capabilitie
       if (command.type === "refresh") {
         await connected(() => readWorkspace().servers.some(showsOnline));
         return done();
+      }
+      if (command.type === "sendChannel" || command.type === "readChannel") {
+        const { serverId, channelId } = command;
+        const channel = actions.channelStore.get(serverId).channels.find((item) => item.id === channelId);
+        if (!channel) return failure("inactive", t("mobile.watch.error.inactive"));
+        if (!(await connected(() => serverOnline(serverId))))
+          return failure("offline", t("mobile.watch.error.offline"));
+        try {
+          if (command.type === "readChannel") {
+            await actions.channelStore.markRead(serverId, channelId, () => Crypto.randomUUID());
+          } else {
+            await actions.channelStore.command(serverId, {
+              type: "send",
+              operationId: command.messageId ?? Crypto.randomUUID(),
+              channelId,
+              text: command.text,
+              recipientAgentId: null,
+              replyToMessageId: null,
+              attachmentDraftIds: [],
+            });
+          }
+          return done();
+        } catch (error) {
+          return failure("failed", errorMessage(error, t("mobile.watch.error.failed")));
+        }
       }
       const { serverId, agentId } = command;
       const agent = readWorkspace().agents.find((item) => item.id === agentId && item.serverId === serverId);

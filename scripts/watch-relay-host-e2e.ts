@@ -48,6 +48,8 @@ import type { ApprovalResponder, PromptResponder } from "../src/backend/agent/at
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { AgentService } from "../src/backend/agent-service";
 import { AgentStore } from "../src/backend/agent-store";
+import { ChannelImages } from "../src/backend/channel-images";
+import { ChannelService } from "../src/backend/channel-service";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -213,6 +215,8 @@ let service: AgentService | undefined;
 let server: InstanceType<typeof TeamApiServer> | undefined;
 let relay: InstanceType<typeof WatchRelayService> | undefined;
 let commands: InstanceType<typeof WatchRelayCommands> | null = null;
+let channels: ChannelService | null = null;
+const CHANNEL_NAME = "Launch room";
 
 interface Recorded {
   approvals: { requestId: string | number; decision: string; owner: boolean | null }[];
@@ -395,6 +399,50 @@ try {
       const watcher = await runCauseEffect(team.acceptInvite(invite.token, WATCHER.username, WATCHER.password));
       const hostId = team.getIdentity()?.serverId;
       assert.ok(hostId, "The host has no identity.");
+      const ownerId = team.getOwnerMemberId();
+      assert.ok(ownerId, "The host has no owner.");
+      channels = new ChannelService(database, mailbox, new ChannelImages(join(root, "channel-images")), {
+        agents: () => real.listAgents(),
+        generate: () => Effect.die(new Error("No routing runs in this check.")),
+        schedule: () => {},
+        interrupt: () => Effect.void,
+        busy: () => false,
+        changed: () => {},
+        error: () => {},
+      });
+      const channelId = randomUUID();
+      const owner = { id: ownerId, name: "Owner" };
+      await runCauseEffect(
+        channels.command(
+          {
+            type: "save",
+            operationId: randomUUID(),
+            channelId,
+            draft: {
+              name: CHANNEL_NAME,
+              title: "Ship the release",
+              instructions: "",
+              members: [{ agentId: approver.id }, { agentId: asker.id }],
+              leadAgentId: approver.id,
+            },
+          },
+          owner,
+        ),
+      );
+      await runCauseEffect(
+        channels.command(
+          {
+            type: "send",
+            operationId: randomUUID(),
+            channelId,
+            text: "Check the release notes, please.",
+            recipientAgentId: approver.id,
+            replyToMessageId: null,
+            attachmentDraftIds: [],
+          },
+          owner,
+        ),
+      );
 
       const threadOf = (agentId: string) =>
         real.listAgents().find((agent) => agent.id === agentId)?.threadId ?? agentId;
@@ -494,6 +542,7 @@ try {
         sidebarLayout: sidebar,
         appVersion: APP_VERSION,
         watchRelay: relay,
+        channels,
       });
       const port = await Effect.runPromise(server.start());
       await Effect.runPromise(relay.start());
@@ -504,11 +553,12 @@ try {
         signing,
         watcher: { id: watcher.member.id, token: watcher.sessionToken },
         agents: { approver: approver.id, longAsker: longAsker.id, asker: asker.id, worker: worker.id },
+        channelId,
       };
     },
     (value) => ({ port: value.port, hostId: value.hostId }),
   );
-  const { port, hostId, signing, watcher, agents } = setup;
+  const { port, hostId, signing, watcher, agents, channelId } = setup;
   const forwarded = encodeTeamCapabilitiesV10([...TEAM_CURRENT_CAPABILITIES]);
 
   async function wire(path: string, token?: string): Promise<{ status: number; body: unknown }> {
@@ -745,6 +795,41 @@ try {
     });
     assert.equal(ready(snapshot).agents.find((agent) => agent.id === agents.approver)?.unread, 0);
     return recorded.reads[0];
+  });
+
+  await step("Refresh lists the channels of the member with their place and unread count", async () => {
+    const { result, snapshot } = await send({ type: "refresh" });
+    assert.equal(result.ok, true);
+    const channel = ready(snapshot).channels?.find((item) => item.id === channelId);
+    assert.ok(channel, "The channel is missing from the snapshot.");
+    assert.equal(channel.name, CHANNEL_NAME);
+    assert.deepEqual(channel.members, [agents.approver, agents.asker]);
+    assert.equal(channel.unread, 1);
+    assert.equal(channel.author, "Owner");
+    assert.equal(channel.reply, "Check the release notes, please.");
+    assert.equal(typeof channel.position, "number");
+    return channel;
+  });
+
+  await step("Send to a channel posts the text as the member", async () => {
+    const messageId = randomUUID();
+    const text = "Ship it after the notes are done.";
+    const { result } = await send({ type: "sendChannel", serverId: hostId, channelId, text, messageId });
+    assert.equal(result.ok, true);
+    const page = channels?.store.pageWithoutExtent(channelId, undefined, 20);
+    const sent = page?.messages.at(-1);
+    assert.equal(sent?.message.text, text);
+    assert.equal(sent?.author.id, watcher.id);
+    return { text: sent?.message.text, author: sent?.author };
+  });
+
+  await step("Read a channel clears its unread count for the member", async () => {
+    const { result, snapshot } = await send({ type: "readChannel", serverId: hostId, channelId });
+    assert.equal(result.ok, true);
+    assert.equal(ready(snapshot).channels?.find((item) => item.id === channelId)?.unread, 0);
+    const unknown = await send({ type: "readChannel", serverId: hostId, channelId: "no-such-channel" });
+    assert.equal(unknown.result.ok, false);
+    return { unread: 0, unknown: unknown.result };
   });
 
   await step("Stop ends the turn", async () => {

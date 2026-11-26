@@ -6,6 +6,8 @@ export const WATCH_TEXT_LIMIT = 600;
 export const WATCH_APPROVAL_LIMIT = 1_500;
 export const WATCH_REPLY_LIMIT = 1_200;
 export const WATCH_AGENT_LIMIT = 40;
+export const WATCH_CHANNEL_LIMIT = 20;
+export const WATCH_CHANNEL_MEMBERS = 4;
 
 export type WatchAgentState = "waiting" | "working" | "idle";
 
@@ -46,6 +48,22 @@ export interface WatchFaces {
   working?: string;
 }
 
+export interface WatchChannel {
+  serverId: string;
+  id: string;
+  name: string;
+  server: string;
+  color: string;
+  members: string[];
+  folder?: string;
+  position?: number;
+  unread: number;
+  working: boolean;
+  updated: string | null;
+  author: string | null;
+  reply: string | null;
+}
+
 export interface WatchAgent {
   serverId: string;
   id: string;
@@ -56,6 +74,7 @@ export interface WatchAgent {
   faces?: WatchFaces;
   pinned: boolean;
   folder?: string;
+  position?: number;
   unread: number;
   state: WatchAgentState;
   detail: string | null;
@@ -100,6 +119,7 @@ export type WatchSnapshot =
       text: Record<string, string>;
       servers: WatchServer[];
       agents: WatchAgent[];
+      channels?: WatchChannel[];
     }
   | {
       version: typeof WATCH_PROTOCOL_VERSION;
@@ -121,7 +141,9 @@ export type WatchCommand =
   | { type: "answer"; serverId: string; agentId: string; requestId: string; answers: Record<string, string[]> }
   | { type: "send"; serverId: string; agentId: string; text: string; messageId?: string }
   | { type: "stop"; serverId: string; agentId: string; turnId: string }
-  | { type: "open" | "read"; serverId: string; agentId: string };
+  | { type: "open" | "read"; serverId: string; agentId: string }
+  | { type: "sendChannel"; serverId: string; channelId: string; text: string; messageId?: string }
+  | { type: "readChannel"; serverId: string; channelId: string };
 
 export type WatchErrorCode = "inactive" | "offline" | "locked" | "failed" | "timeout" | "asleep";
 
@@ -157,6 +179,10 @@ export function decodeWatchCommand(text: string): WatchCommand | null {
       : null;
   }
   if (type === "avatars") return decodeAvatarRequest(value.names);
+  if (type === "sendChannel" || type === "readChannel") {
+    const { channelId, text, messageId } = value;
+    return decodeChannelCommand(type, { serverId, channelId, text, messageId });
+  }
   if (!boundedString(serverId) || !boundedString(agentId)) return null;
   switch (type) {
     case "approve":
@@ -183,6 +209,26 @@ export function decodeWatchCommand(text: string): WatchCommand | null {
     default:
       return null;
   }
+}
+
+interface ChannelCommandFields {
+  readonly serverId: unknown;
+  readonly channelId: unknown;
+  readonly text: unknown;
+  readonly messageId: unknown;
+}
+
+function decodeChannelCommand(
+  type: "sendChannel" | "readChannel",
+  { serverId, channelId, text, messageId }: ChannelCommandFields,
+): WatchCommand | null {
+  if (!boundedString(serverId) || !boundedString(channelId)) return null;
+  if (type === "readChannel") return { type, serverId, channelId };
+  if (!boundedString(text, COMMAND_TEXT_LIMIT) || !text.trim()) return null;
+  if (messageId === undefined) return { type, serverId, channelId, text };
+  return isString(messageId) && MESSAGE_ID.test(messageId)
+    ? { type, serverId, channelId, text, messageId: messageId.toLowerCase() }
+    : null;
 }
 
 function decodeAvatarRequest(names: unknown): WatchCommand | null {

@@ -93,6 +93,30 @@ struct AgentKey: Hashable {
   var id: String
 }
 
+struct WatchChannel: Codable, Hashable, Identifiable {
+  var serverId: String
+  var id: String
+  var name: String
+  var server: String
+  var color: String
+  var members: [String]
+  var folder: String?
+  var position: Int?
+  var unread: Int?
+  var working: Bool?
+  var updated: String?
+  var author: String?
+  var reply: String?
+
+  var key: AgentKey { AgentKey(serverId: serverId, id: id) }
+  var isWorking: Bool { working ?? false }
+  var message: String? {
+    guard let reply else { return nil }
+    guard let author, !author.isEmpty else { return reply }
+    return "\(author): \(reply)"
+  }
+}
+
 struct WatchFaces: Codable, Hashable {
   var waiting: String?
   var working: String?
@@ -108,6 +132,7 @@ struct WatchAgent: Codable, Hashable, Identifiable {
   var faces: WatchFaces?
   var pinned: Bool?
   var folder: String?
+  var position: Int?
   var unread: Int?
   var state: WatchAgentState
   var detail: String?
@@ -162,6 +187,7 @@ struct WatchReadySnapshot: Codable, Hashable {
   var text: [String: String]
   var servers: [WatchServer]
   var agents: [WatchAgent]
+  var channels: [WatchChannel]?
 }
 
 struct WatchLockedSnapshot: Codable, Hashable {
@@ -240,9 +266,11 @@ enum WatchCommand: Encodable, Hashable {
   case stop(serverId: String, agentId: String, turnId: String)
   case open(serverId: String, agentId: String)
   case read(serverId: String, agentId: String)
+  case sendChannel(serverId: String, channelId: String, text: String, messageId: String)
+  case readChannel(serverId: String, channelId: String)
 
   private enum CodingKeys: String, CodingKey {
-    case type, serverId, agentId, requestId, answers, text, turnId, messageId, names, language, publicKey
+    case type, serverId, agentId, channelId, requestId, answers, text, turnId, messageId, names, language, publicKey
   }
 
   func encode(to encoder: Encoder) throws {
@@ -292,6 +320,16 @@ enum WatchCommand: Encodable, Hashable {
       try container.encode("read", forKey: .type)
       try container.encode(serverId, forKey: .serverId)
       try container.encode(agentId, forKey: .agentId)
+    case .sendChannel(let serverId, let channelId, let text, let messageId):
+      try container.encode("sendChannel", forKey: .type)
+      try container.encode(serverId, forKey: .serverId)
+      try container.encode(channelId, forKey: .channelId)
+      try container.encode(text, forKey: .text)
+      try container.encode(messageId, forKey: .messageId)
+    case .readChannel(let serverId, let channelId):
+      try container.encode("readChannel", forKey: .type)
+      try container.encode(serverId, forKey: .serverId)
+      try container.encode(channelId, forKey: .channelId)
     }
   }
 
@@ -306,14 +344,24 @@ enum WatchCommand: Encodable, Hashable {
     switch self {
     case .refresh, .pair, .avatars: return nil
     case .approve(let serverId, _, _), .deny(let serverId, _, _), .answer(let serverId, _, _, _),
-      .send(let serverId, _, _, _), .stop(let serverId, _, _), .open(let serverId, _), .read(let serverId, _):
+      .send(let serverId, _, _, _), .stop(let serverId, _, _), .open(let serverId, _), .read(let serverId, _),
+      .sendChannel(let serverId, _, _, _), .readChannel(let serverId, _):
       return serverId
+    }
+  }
+
+  var channelKey: AgentKey? {
+    switch self {
+    case .sendChannel(let serverId, let channelId, _, _), .readChannel(let serverId, let channelId):
+      return AgentKey(serverId: serverId, id: channelId)
+    default:
+      return nil
     }
   }
 
   var agentKey: AgentKey? {
     switch self {
-    case .refresh, .pair, .avatars: return nil
+    case .refresh, .pair, .avatars, .sendChannel, .readChannel: return nil
     case .approve(let serverId, let agentId, _), .deny(let serverId, let agentId, _),
       .answer(let serverId, let agentId, _, _), .send(let serverId, let agentId, _, _),
       .stop(let serverId, let agentId, _), .open(let serverId, let agentId), .read(let serverId, let agentId):

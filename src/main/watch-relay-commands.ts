@@ -1,9 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { itemTypeCountsAsUnread } from "@openbot/contracts/conversation-read";
-import { AGENT_RUNTIME_TEXT_LIMIT, type SidebarLayoutSnapshot, type TeamMemberSummary } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import {
+  AGENT_RUNTIME_TEXT_LIMIT,
+  type ChannelCommand,
+  type ChannelSummary,
+  canAdministerServer,
+  type SidebarLayoutSnapshot,
+  type TeamMemberSummary,
+} from "@openbot/contracts/ipc";
+import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { encodeTeamCapabilitiesV10, TEAM_CURRENT_CAPABILITIES } from "@openbot/contracts/team-protocol/current";
 import {
   TEAM_APP_VERSION_HEADER,
@@ -15,6 +23,7 @@ import type { WatchCommand, WatchErrorCode, WatchResult, WatchSnapshot } from "@
 import { localizeSourceText } from "@openbot/i18n/mobile";
 import { Effect, Option, Result, Schema } from "effect";
 import type { TeamApiAgents } from "./team-api/dependencies";
+import { seesChannel } from "./team-api/route-channels";
 import { buildHostWatchSnapshot, type WatchText, watchAvatarName, watchTextFor } from "./watch-relay-snapshot";
 
 const AVATAR_REPLY_LIMIT = 48_000;
@@ -47,6 +56,7 @@ export interface WatchRelayTeamApi {
     | "resolveAvatar"
   >;
   layout(): SidebarLayoutSnapshot | null;
+  listChannels(memberId: string): ChannelSummary[];
   pinnedAgentIds(memberId: string, hidden: ReadonlySet<string>): readonly string[];
   hiddenAgentIds(member: Pick<TeamMemberSummary, "id" | "role">): ReadonlySet<string>;
   openSession(input: {
@@ -80,11 +90,14 @@ type LoopbackBody =
   | { requestId: string | number; decision: "accept" | "decline" }
   | { requestId: string | number; answers: Record<string, string[]> }
   | { text: string; attachmentDraftIds: string[]; replyToMessageId: null; clientMessageId: string }
-  | { turnId: string };
+  | { turnId: string }
+  | { channelId: string }
+  | ChannelCommand;
 
 interface LoopbackReply {
   status: number;
   error: string | null;
+  body: unknown;
 }
 
 export interface WatchCommandReply {
@@ -136,6 +149,7 @@ export class WatchRelayCommands {
       ),
       pinned: this.#api.pinnedAgentIds(member.id, hidden),
       layout: this.#api.layout(),
+      channels: this.#visibleChannels(member),
       avatar: (agentId) => this.#avatarName(agentId),
       text,
       now: this.#now(),
@@ -156,6 +170,15 @@ export class WatchRelayCommands {
     if (command.type === "avatars")
       return { result: { ok: true, avatars: yield* this.#avatars(member, command.names) }, snapshot: null };
     if (command.type === "pair" || command.type === "open") return failure("failed", "");
+    if (command.type === "sendChannel" || command.type === "readChannel") {
+      const channelReply = yield* this.#channelCommand(member, command);
+      if (channelReply === "inactive") return failure("inactive", t("mobile.watch.error.inactive"));
+      if (channelReply.status >= 200 && channelReply.status < 300) return done();
+      const message = channelReply.error
+        ? localizeSourceText(channelReply.error, text.locale)
+        : t("mobile.watch.error.failed");
+      return failure("failed", message);
+    }
     const { agentId } = command;
     const shown = this.snapshot(member, context, text);
     const agent = shown.state === "ready" ? shown.agents.find((item) => item.id === agentId) : undefined;
@@ -252,6 +275,44 @@ export class WatchRelayCommands {
     }
   });
 
+  readonly #channelCommand = Effect.fn("WatchRelayCommands.channelCommand")(function* (
+    this: WatchRelayCommands,
+    member: WatchRelayMember,
+    command: Extract<WatchCommand, { type: "sendChannel" | "readChannel" }>,
+  ) {
+    const { channelId } = command;
+    if (!this.#visibleChannels(member).some((channel) => channel.id === channelId)) return "inactive" as const;
+    if (command.type === "sendChannel") {
+      return yield* this.#call(member, CHANNEL_ROUTES.command, {
+        type: "send",
+        operationId: command.messageId ?? randomUUID(),
+        channelId,
+        text: command.text,
+        recipientAgentId: null,
+        replyToMessageId: null,
+        attachmentDraftIds: [],
+      });
+    }
+    const page = yield* this.#call(member, CHANNEL_ROUTES.read, { channelId });
+    const throughSequence = isDynamicRecord(page.body) ? page.body.throughSequence : undefined;
+    if (page.status !== 200 || !isNumber(throughSequence)) return page;
+    return yield* this.#call(member, CHANNEL_ROUTES.command, {
+      type: "read",
+      operationId: randomUUID(),
+      channelId,
+      throughSequence,
+    });
+  });
+
+  #visibleChannels(member: WatchRelayMember): ChannelSummary[] {
+    const hidden = canAdministerServer(member.role)
+      ? new Set<string>()
+      : this.#api.hiddenAgentIds({ id: member.id, role: member.role });
+    return this.#api
+      .listChannels(member.id)
+      .filter((channel) => !channel.archived && seesChannel(channel.members, hidden));
+  }
+
   readonly #readBoundary = Effect.fn("WatchRelayCommands.readBoundary")(function* (
     this: WatchRelayCommands,
     member: WatchRelayMember,
@@ -306,7 +367,7 @@ export class WatchRelayCommands {
     body: LoopbackBody,
   ): Effect.fn.Return<LoopbackReply> {
     const port = this.#api.port();
-    if (port === null) return { status: 503, error: null };
+    if (port === null) return { status: 503, error: null, body: null };
     const sessionId = `watch-${randomUUID()}`;
     return yield* Effect.acquireUseRelease(
       Effect.sync(() =>
@@ -341,10 +402,11 @@ export class WatchRelayCommands {
             return {
               status: response.status,
               error: isDynamicRecord(parsed) && isString(parsed.error) ? parsed.error : null,
+              body: parsed,
             };
           },
           catch: (cause) => new WatchLoopbackError({ cause }),
-        }).pipe(Effect.catch(() => Effect.succeed<LoopbackReply>({ status: 503, error: null }))),
+        }).pipe(Effect.catch(() => Effect.succeed<LoopbackReply>({ status: 503, error: null, body: null }))),
       () => Effect.sync(() => this.#api.closeSession(sessionId)),
     );
   });

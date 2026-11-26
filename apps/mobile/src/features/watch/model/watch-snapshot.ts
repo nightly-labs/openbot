@@ -1,11 +1,16 @@
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
-import type { ConversationMessage, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
+import type { ChannelSummary, ConversationMessage, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import {
   WATCH_AGENT_LIMIT,
   WATCH_APPROVAL_LIMIT,
+  WATCH_CHANNEL_LIMIT,
+  WATCH_CHANNEL_MEMBERS,
   WATCH_PROTOCOL_VERSION,
   WATCH_REPLY_LIMIT,
   type WatchAgent,
+  type WatchChannel,
   type WatchFaces,
   type WatchQuestion,
   type WatchSnapshot,
@@ -21,6 +26,7 @@ import { approvalIsPartial, type PendingApproval } from "@/features/workspace/mo
 import { mobileSidebarItems } from "@/features/workspace/model/sidebar-layout";
 import type { MobileThreadWait } from "@/features/workspace/model/thread-waits";
 import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
+import { formatUpdatedAt } from "@/shared/lib/format-updated-at";
 import type { MobileText } from "@/shared/lib/text";
 
 const WATCH_TEXT_KEYS = [
@@ -103,6 +109,7 @@ export interface WatchSnapshotInput {
   conversation: (agentId: string) => MobileConversation | undefined;
   avatar: (agent: MobileAgent) => string | undefined;
   faces: (agent: MobileAgent) => WatchFaces | undefined;
+  channels: (serverId: string) => readonly ChannelSummary[];
   online: (server: MobileServer) => boolean;
   watchKey: (serverId: string) => string | undefined;
   account: string | undefined;
@@ -210,26 +217,67 @@ function stateOf(wait: WatchWait | null, activity: MobileAgentActivity | undefin
 interface PlacedAgent {
   agent: MobileAgent;
   folder: string | null;
+  position: number;
 }
 
-function appOrder(input: WatchSnapshotInput, server: MobileServer): PlacedAgent[] {
+interface PlacedChannel {
+  channel: ChannelSummary;
+  folder: string | null;
+  position: number;
+}
+
+function appOrder(
+  input: WatchSnapshotInput,
+  server: MobileServer,
+): { agents: PlacedAgent[]; channels: PlacedChannel[] } {
   const hidden = new Set(input.hidden(server.id));
   const visible = input.agents.filter((agent) => agent.serverId === server.id && !hidden.has(agent.id));
   const byId = new Map(visible.map((agent) => [agent.id, agent]));
   const pinned = input.pinned(server.id).flatMap((id) => byId.get(id) ?? []);
   const pinnedIds = new Set(pinned.map((agent) => agent.id));
   let folder: string | null = null;
-  const rest = mobileSidebarItems(
+  let position = pinned.length;
+  const agents: PlacedAgent[] = pinned.map((agent, index) => ({ agent, folder: null, position: index }));
+  const channels: PlacedChannel[] = [];
+  for (const item of mobileSidebarItems(
     input.layout(server.id),
     visible.filter((agent) => !pinnedIds.has(agent.id)),
-    [],
+    input.channels(server.id).filter((channel) => !channel.archived),
     undefined,
     input.text.t,
-  ).flatMap((item): PlacedAgent[] => {
+  )) {
     if (item.kind === "section") folder = item.name;
-    return item.kind === "agent" ? [{ agent: item.agent, folder }] : [];
-  });
-  return [...pinned.map((agent) => ({ agent, folder: null })), ...rest];
+    if (item.kind === "agent") agents.push({ agent: item.agent, folder, position: position++ });
+    if (item.kind === "channel") channels.push({ channel: item.channel, folder, position: position++ });
+  }
+  return { agents, channels };
+}
+
+function watchChannel(input: WatchSnapshotInput, server: MobileServer, placed: PlacedChannel): WatchChannel {
+  const { channel, folder, position } = placed;
+  const members = channel.members.map((member) => member.agentId);
+  const lead = input.agents.find((agent) => agent.serverId === server.id && agent.id === members[0]);
+  const last = channel.lastMessage;
+  return {
+    serverId: server.id,
+    id: channel.id,
+    name: channel.name,
+    server: server.name,
+    color: lead ? avatarHeadColor(lead.avatarSeed, lead.avatarHue, lead.avatarColor) : input.accent,
+    members: members.slice(0, WATCH_CHANNEL_MEMBERS),
+    ...(folder ? { folder } : {}),
+    position,
+    unread: channel.unreadCount,
+    working: channel.activeTasks > 0,
+    updated: formatUpdatedAt(last?.at ?? channel.createdAt, input.text.format) || null,
+    author: last?.authorName ?? null,
+    reply: last
+      ? watchText(
+          markdownPreviewText(coordinatorText(last.author, last.text, input.text.sourceText)),
+          WATCH_REPLY_LIMIT,
+        )
+      : null,
+  };
 }
 
 function withinLimit(agents: readonly WatchAgent[]): WatchAgent[] {
@@ -245,12 +293,15 @@ function withinLimit(agents: readonly WatchAgent[]): WatchAgent[] {
 export function buildWatchSnapshot(input: WatchSnapshotInput): WatchSnapshot {
   const { servers, live, text } = input;
   const listed: WatchAgent[] = [];
+  const channels: WatchChannel[] = [];
   for (const server of servers) {
     const pinned = new Set(input.pinned(server.id));
     const approvals = live.approvalRequests[server.id] ?? [];
     const waits = live.threadWaitsByServer[server.id] ?? [];
     const activities = live.activityByServer[server.id] ?? {};
-    for (const { agent, folder } of appOrder(input, server)) {
+    const placed = appOrder(input, server);
+    for (const item of placed.channels) channels.push(watchChannel(input, server, item));
+    for (const { agent, folder, position } of placed.agents) {
       const conversation = input.conversation(agent.id);
       const activity = activities[agent.id];
       const wait = agentWait(agent, approvals, waits, conversation, text) ?? waitingActivity(activity);
@@ -267,6 +318,7 @@ export function buildWatchSnapshot(input: WatchSnapshotInput): WatchSnapshot {
         ...(faces ? { faces } : {}),
         pinned: pinned.has(agent.id),
         ...(folder ? { folder } : {}),
+        position,
         unread: live.unreadAgentIds.includes(agent.id) ? Math.max(1, live.unreadCounts[agent.id] ?? 1) : 0,
         state,
         detail: watchText(state === "working" ? (activity?.detail ?? null) : agent.preview, 160),
@@ -294,6 +346,7 @@ export function buildWatchSnapshot(input: WatchSnapshotInput): WatchSnapshot {
       return { id: server.id, name: server.name, online: input.online(server), ...(watchKey ? { watchKey } : {}) };
     }),
     agents: shown,
+    channels: channels.slice(0, WATCH_CHANNEL_LIMIT),
   };
 }
 

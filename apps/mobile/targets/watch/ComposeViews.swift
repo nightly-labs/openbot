@@ -17,14 +17,14 @@ struct DictateLink<Content: View>: View {
 struct ReviewView: View {
   @EnvironmentObject private var session: WatchSession
   @Environment(\.watchText) private var text
-  let agent: WatchAgent
+  let recipient: WatchRecipient
   let target: ComposeTarget
   @State var draft: String
   @State private var messageId = UUID().uuidString
   @Binding var path: [WatchRoute]
 
-  init(agent: WatchAgent, target: ComposeTarget, text: String, path: Binding<[WatchRoute]>) {
-    self.agent = agent
+  init(recipient: WatchRecipient, target: ComposeTarget, text: String, path: Binding<[WatchRoute]>) {
+    self.recipient = recipient
     self.target = target
     _draft = State(initialValue: text)
     _path = path
@@ -34,9 +34,9 @@ struct ReviewView: View {
     ScrollView {
       VStack(spacing: 8) {
         HStack(spacing: 6) {
-          AgentAvatar(agent: agent, size: 22)
+          RecipientAvatar(recipient: recipient, size: 22)
           VStack(alignment: .leading, spacing: 0) {
-            Text(agent.name)
+            Text(recipient.name)
               .font(.footnote.weight(.semibold))
               .lineLimit(1)
             Text(subtitle)
@@ -58,7 +58,7 @@ struct ReviewView: View {
           Label(text(TextKey.send), systemImage: "checkmark")
             .frame(maxWidth: .infinity)
         }
-        .tint(Color(hex: agent.color) ?? .blue)
+        .tint(Color(hex: recipient.color) ?? .blue)
         .disabled(!session.canAct)
         .primaryActionShortcut()
         TextFieldLink {
@@ -76,22 +76,26 @@ struct ReviewView: View {
 
   private var subtitle: String {
     switch target {
-    case .message: return "\(text(TextKey.newMessage)) · \(agent.server)"
-    case .answer: return "\(text(TextKey.answer)) · \(agent.server)"
+    case .message, .channel: return "\(text(TextKey.newMessage)) · \(recipient.server)"
+    case .answer: return "\(text(TextKey.answer)) · \(recipient.server)"
     }
   }
 
   private func send() async {
     let done: Bool
     switch target {
-    case .message:
+    case .message(let key):
       done = await session.perform(
-        .send(serverId: agent.serverId, agentId: agent.id, text: draft, messageId: messageId),
-        done: text(TextKey.doneSent, ["name": agent.name]))
-    case .answer(_, let requestId, let questionId):
+        .send(serverId: key.serverId, agentId: key.id, text: draft, messageId: messageId),
+        done: text(TextKey.doneSent, ["name": recipient.name]))
+    case .answer(let key, let requestId, let questionId):
       done = await session.perform(
-        .answer(serverId: agent.serverId, agentId: agent.id, requestId: requestId, answers: [questionId: [draft]]),
+        .answer(serverId: key.serverId, agentId: key.id, requestId: requestId, answers: [questionId: [draft]]),
         done: text(TextKey.doneAnswered))
+    case .channel(let key):
+      done = await session.perform(
+        .sendChannel(serverId: key.serverId, channelId: key.id, text: draft, messageId: messageId),
+        done: text(TextKey.doneSent, ["name": recipient.name]))
     }
     if done { path = [] }
   }

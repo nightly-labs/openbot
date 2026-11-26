@@ -1,11 +1,52 @@
 import SwiftUI
 
+enum ListEntry: Identifiable {
+  case agent(WatchAgent)
+  case channel(WatchChannel)
+
+  var id: String {
+    switch self {
+    case .agent(let agent): return "agent-\(agent.serverId)-\(agent.id)"
+    case .channel(let channel): return "channel-\(channel.serverId)-\(channel.id)"
+    }
+  }
+
+  var serverId: String {
+    switch self {
+    case .agent(let agent): return agent.serverId
+    case .channel(let channel): return channel.serverId
+    }
+  }
+
+  var server: String {
+    switch self {
+    case .agent(let agent): return agent.server
+    case .channel(let channel): return channel.server
+    }
+  }
+
+  var folder: String? {
+    switch self {
+    case .agent(let agent): return agent.folder
+    case .channel(let channel): return channel.folder
+    }
+  }
+
+  var position: Int {
+    switch self {
+    case .agent(let agent): return agent.position ?? Int.max
+    case .channel(let channel): return channel.position ?? Int.max
+    }
+  }
+}
+
 struct AgentGroup: Identifiable {
   static let pinnedId = "pinned"
 
   let id: String
   let title: String
-  var agents: [WatchAgent]
+  var pinned: [WatchAgent] = []
+  var entries: [ListEntry] = []
 }
 
 struct AgentListView: View {
@@ -15,7 +56,7 @@ struct AgentListView: View {
   let open: (AgentKey) -> Void
 
   var body: some View {
-    if snapshot.agents.isEmpty {
+    if snapshot.isEmpty {
       EmptyAgentsView(live: snapshot.live)
     } else {
       List {
@@ -26,7 +67,7 @@ struct AgentListView: View {
         ForEach(groups) { group in
           if group.id == AgentGroup.pinnedId {
             Section {
-              PinnedGrid(agents: group.agents, open: open)
+              PinnedGrid(agents: group.pinned, open: open)
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
             } header: {
@@ -36,9 +77,15 @@ struct AgentListView: View {
             }
           } else {
             Section {
-              ForEach(Array(group.agents.enumerated()), id: \.element.id) { index, agent in
-                AgentRow(agent: agent, divided: index > 0)
-                  .listRowBackground(Color.clear)
+              ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
+                switch entry {
+                case .agent(let agent):
+                  AgentRow(agent: agent, divided: index > 0)
+                    .listRowBackground(Color.clear)
+                case .channel(let channel):
+                  ChannelRow(channel: channel, divided: index > 0)
+                    .listRowBackground(Color.clear)
+                }
               }
             } header: {
               Text(group.title)
@@ -54,36 +101,47 @@ struct AgentListView: View {
   private var groups: [AgentGroup] {
     let pinned = snapshot.agents.filter(\.isPinned)
     let others = snapshot.agents.filter { !$0.isPinned }
+    let channels = snapshot.channels ?? []
     let waiting = others.filter { $0.state == .waiting }
-    let unread = others.filter { $0.state != .waiting && ($0.unread ?? 0) > 0 }
-    let rest = others.filter { $0.state != .waiting && ($0.unread ?? 0) == 0 }
+    let unreadAgents = others.filter { $0.state != .waiting && ($0.unread ?? 0) > 0 }
+    let unreadChannels = channels.filter { ($0.unread ?? 0) > 0 }
+    let unread = byPosition(unreadAgents.map(ListEntry.agent) + unreadChannels.map(ListEntry.channel))
+    let rest = byPosition(
+      others.filter { $0.state != .waiting && ($0.unread ?? 0) == 0 }.map(ListEntry.agent)
+        + channels.filter { ($0.unread ?? 0) == 0 }.map(ListEntry.channel))
     var result: [AgentGroup] = []
     if !pinned.isEmpty {
-      result.append(AgentGroup(id: AgentGroup.pinnedId, title: text(TextKey.pinned), agents: pinned))
+      result.append(AgentGroup(id: AgentGroup.pinnedId, title: text(TextKey.pinned), pinned: pinned))
     }
     if !unread.isEmpty {
-      result.append(AgentGroup(id: "unread", title: text(TextKey.unread), agents: unread))
+      result.append(AgentGroup(id: "unread", title: text(TextKey.unread), entries: unread))
     }
     if !waiting.isEmpty {
-      result.append(AgentGroup(id: "waiting", title: text(TextKey.needsYou), agents: waiting))
+      result.append(AgentGroup(id: "waiting", title: text(TextKey.needsYou), entries: waiting.map(ListEntry.agent)))
     }
-    let manyServers = Set(snapshot.agents.map(\.serverId)).count > 1
+    let manyServers = Set(rest.map(\.serverId)).count > 1
     var folders: [AgentGroup] = []
-    for agent in rest {
-      let id = "folder-\(agent.serverId)-\(agent.folder ?? "")"
+    for entry in rest {
+      let id = "folder-\(entry.serverId)-\(entry.folder ?? "")"
       if let index = folders.firstIndex(where: { $0.id == id }) {
-        folders[index].agents.append(agent)
+        folders[index].entries.append(entry)
       } else {
-        folders.append(AgentGroup(id: id, title: folderTitle(agent, manyServers: manyServers), agents: [agent]))
+        folders.append(AgentGroup(id: id, title: folderTitle(entry, manyServers: manyServers), entries: [entry]))
       }
     }
     return result + folders
   }
 }
 
-private func folderTitle(_ agent: WatchAgent, manyServers: Bool) -> String {
-  guard let folder = agent.folder, !folder.isEmpty else { return agent.server }
-  return manyServers ? "\(agent.server) · \(folder)" : folder
+private func byPosition(_ entries: [ListEntry]) -> [ListEntry] {
+  entries.enumerated()
+    .sorted { ($0.element.position, $0.offset) < ($1.element.position, $1.offset) }
+    .map(\.element)
+}
+
+private func folderTitle(_ entry: ListEntry, manyServers: Bool) -> String {
+  guard let folder = entry.folder, !folder.isEmpty else { return entry.server }
+  return manyServers ? "\(entry.server) · \(folder)" : folder
 }
 
 struct AgentRow: View {

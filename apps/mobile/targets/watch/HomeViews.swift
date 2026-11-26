@@ -35,11 +35,16 @@ extension WatchReadySnapshot {
     servers.first { $0.id == id } ?? servers.first
   }
 
+  var isEmpty: Bool {
+    agents.isEmpty && (channels ?? []).isEmpty
+  }
+
   func forServer(_ id: String) -> WatchReadySnapshot {
     guard servers.count > 1, let server = chosenServer(id) else { return self }
     var copy = self
     copy.servers = [server]
     copy.agents = agents.filter { $0.serverId == server.id }
+    copy.channels = channels?.filter { $0.serverId == server.id }
     return copy
   }
 }
@@ -49,10 +54,10 @@ struct AgentCounts {
   let unread: Int
   let working: Int
 
-  init(_ agents: [WatchAgent]) {
+  init(_ agents: [WatchAgent], channels: [WatchChannel] = []) {
     waiting = agents.filter { $0.state == .waiting }.count
-    unread = agents.filter { ($0.unread ?? 0) > 0 }.count
-    working = agents.filter { $0.state == .working }.count
+    unread = agents.filter { ($0.unread ?? 0) > 0 }.count + channels.filter { ($0.unread ?? 0) > 0 }.count
+    working = agents.filter { $0.state == .working }.count + channels.filter(\.isWorking).count
   }
 
   func line(_ text: WatchText) -> String? {
@@ -80,12 +85,12 @@ struct SummaryView: View {
             ConnectionNote()
           }
           title
-          if snapshot.agents.isEmpty {
+          if snapshot.isEmpty {
             Text(text(TextKey.empty))
               .font(.footnote)
               .foregroundStyle(.secondary)
           } else {
-            let counts = AgentCounts(snapshot.agents)
+            let counts = AgentCounts(snapshot.agents, channels: snapshot.channels ?? [])
             CountLine(count: counts.waiting, title: text(TextKey.needsYou), color: .orange)
             CountLine(count: counts.unread, title: text(TextKey.unread), color: .blue)
             CountLine(count: counts.working, title: text(TextKey.stateWorking), color: .green)
@@ -198,7 +203,10 @@ struct ServerPickerView: View {
             Text(server.name)
               .font(.headline)
               .lineLimit(1)
-            if let line = AgentCounts(snapshot.agents.filter { $0.serverId == server.id }).line(text) {
+            if let line = AgentCounts(
+              snapshot.agents.filter { $0.serverId == server.id },
+              channels: (snapshot.channels ?? []).filter { $0.serverId == server.id }
+            ).line(text) {
               Text(line)
                 .font(.caption2)
                 .foregroundStyle(.secondary)

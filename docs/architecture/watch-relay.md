@@ -91,6 +91,15 @@ JSON body `WatchRelayHttpRequest { v: 1, ts, sealed, proof }`, at most `WATCH_RE
 - Agents come in the stored sidebar order: pinned agents first, then each folder in layout order, each agent
   with `folder` (the folder path, such as `Parent / Child`). The order does not change with unread state
   or recent activity. The watch shows Pinned, Unread and Needs you sections, then one section per folder.
+- `channels` (optional, `WatchChannel[]`) lists the channels that the member sees on the sidebar, not
+  archived, at most `WATCH_CHANNEL_LIMIT`. Each channel has its `folder` and a `position` in the same
+  sidebar order as the agents, its first `WATCH_CHANNEL_MEMBERS` member agent IDs, `unread`, `working`,
+  and the last message (`author`, `reply`). An admin sees all channels; another member does not see a
+  channel with a hidden agent. Agents and channels share the `position` order inside a folder.
+- `sendChannel { serverId, channelId, text, messageId? }` posts as the member through
+  `CHANNEL_ROUTES.command` (`send`). `readChannel { serverId, channelId }` reads the channel up to its
+  last message (`CHANNEL_ROUTES.read`, then the `read` command with `throughSequence`). Both fail for a
+  channel that the member does not see. A watch on an older snapshot has no `channels` and sends neither.
 - `avatars` returns the agent pictures that the host's snapshot names. `open` is not supported on
   the direct link (the watch uses the phone for it).
 

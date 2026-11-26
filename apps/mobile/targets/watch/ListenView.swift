@@ -6,11 +6,12 @@ struct ListenView: View {
   @Environment(\.watchText) private var text
   @Environment(\.dismiss) private var dismiss
   @StateObject private var reader = ReplyReader()
-  let agent: WatchAgent
+  let recipient: WatchRecipient
+  let reply: String
 
   var body: some View {
     VStack(spacing: 8) {
-      AgentAvatar(agent: agent, size: 40)
+      RecipientAvatar(recipient: recipient, size: 40)
       Label(text(TextKey.listenReading), systemImage: "speaker.wave.2")
         .font(.footnote.weight(.semibold))
         .symbolEffect(.variableColor.iterative, isActive: reader.speaking)
@@ -21,9 +22,9 @@ struct ListenView: View {
         Label(text(TextKey.stop), systemImage: "stop.fill")
       }
     }
-    .navigationTitle(agent.name)
+    .navigationTitle(recipient.name)
     .onAppear {
-      reader.read(agent.reply ?? "", language: session.language)
+      reader.read(reply, language: session.language)
     }
     .onDisappear {
       reader.stop()

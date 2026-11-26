@@ -2388,7 +2388,9 @@ works when the iPhone app is in the background or closed.
 
 The watch shows the agents that the chat list of the iPhone app shows: their names, server names,
 picture colours and pictures, their state, the number of unread messages, the request or question
-that an agent waits on, and the start of the last reply. It does not get hidden chats, attachments,
+that an agent waits on, and the start of the last reply. It also shows the channels of that list:
+their names, member agents, the number of unread messages, if an agent works in them, and the start
+of the last message with the name of its author. It does not get hidden chats, attachments,
 files or the phone's session. The watch keeps the last copy in the storage of the OpenBot watch app,
 for the watch face complication and the next time the app opens. It also keeps it when the app lock
 of the phone is on. A sign-out on the phone tells the watch to delete its copy, its pictures and its
@@ -2405,7 +2407,7 @@ and the server. Signal reads only the ticket (your user ID, the server ID and th
 the time and the size, and passes the encrypted request to the server. It does not keep or log the
 request, the answer or the ticket. If a hosted server sleeps, a watch request wakes it.
 
-An answer on the watch, such as Allow, Deny, a choice or a dictated message, goes to the server on the
+An answer on the watch, such as Allow, Deny, a choice or a dictated message to an agent or a channel, goes to the server on the
 direct link, or through the iPhone app, which sends it over its encrypted host connection, as a tap
 in the app does. Dictation on the watch uses the dictation of watchOS. Listen reads the reply with the
 speech voices of watchOS on the watch.

@@ -14,6 +14,7 @@ enum WatchMerge {
 
     var servers: [WatchServer] = []
     var agents: [WatchAgent] = []
+    var channels: [WatchChannel] = []
     for id in order {
       let known = listed?.servers.first { $0.id == id }
       if let part = parts[id] {
@@ -30,9 +31,16 @@ enum WatchMerge {
           if copy.faces == nil { copy.faces = faces(for: copy, known: [phone, previous]) }
           return copy
         }
+        let partChannels = part.channels?.map { channel in
+          var copy = channel
+          copy.serverId = id
+          return copy
+        }
+        channels += partChannels ?? (listed?.channels ?? []).filter { $0.serverId == id }
       } else if let listed, let known {
         servers.append(known)
         agents += listed.agents.filter { $0.serverId == id }
+        channels += (listed.channels ?? []).filter { $0.serverId == id }
       }
     }
 
@@ -56,7 +64,8 @@ enum WatchMerge {
       language: base.language,
       text: text,
       servers: servers,
-      agents: shown)
+      agents: shown,
+      channels: channels)
   }
 
   static func picture(

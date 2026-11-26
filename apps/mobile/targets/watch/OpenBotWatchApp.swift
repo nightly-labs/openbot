@@ -28,6 +28,9 @@ struct OpenBotWatchApp: App {
 enum WatchRoute: Hashable {
   case servers
   case agent(AgentKey)
+  case channel(AgentKey)
+  case channelDetail(AgentKey)
+  case channelListen(AgentKey)
   case detail(AgentKey)
   case questions(AgentKey)
   case review(ComposeTarget, String)
@@ -38,13 +41,7 @@ enum WatchRoute: Hashable {
 enum ComposeTarget: Hashable {
   case message(AgentKey)
   case answer(AgentKey, requestId: String, questionId: String)
-
-  var agent: AgentKey {
-    switch self {
-    case .message(let key): return key
-    case .answer(let key, _, _): return key
-    }
-  }
+  case channel(AgentKey)
 }
 
 struct RootView: View {
@@ -115,10 +112,28 @@ struct RootView: View {
       AgentScreen(key: key) { agent in AgentDetailView(agent: agent, path: $path) }
     case .questions(let key):
       AgentScreen(key: key) { agent in QuestionFlowView(agent: agent, path: $path) }
-    case .review(let target, let text):
-      AgentScreen(key: target.agent) { agent in ReviewView(agent: agent, target: target, text: text, path: $path) }
+    case .channel(let key):
+      ChannelScreen(key: key) { channel in ChannelPage(channel: channel, path: $path) }
+    case .channelDetail(let key):
+      ChannelScreen(key: key) { channel in ChannelDetailView(channel: channel) }
+    case .channelListen(let key):
+      ChannelScreen(key: key) { channel in ListenView(recipient: .channel(channel), reply: channel.message ?? "") }
+    case .review(.channel(let key), let text):
+      ChannelScreen(key: key) { channel in
+        ReviewView(recipient: .channel(channel), target: .channel(key), text: text, path: $path)
+      }
+    case .review(.message(let key), let text):
+      AgentScreen(key: key) { agent in
+        ReviewView(recipient: .agent(agent), target: .message(key), text: text, path: $path)
+      }
+    case .review(.answer(let key, let requestId, let questionId), let text):
+      AgentScreen(key: key) { agent in
+        ReviewView(
+          recipient: .agent(agent), target: .answer(key, requestId: requestId, questionId: questionId), text: text,
+          path: $path)
+      }
     case .listen(let key):
-      AgentScreen(key: key) { agent in ListenView(agent: agent) }
+      AgentScreen(key: key) { agent in ListenView(recipient: .agent(agent), reply: agent.reply ?? "") }
     case .stop(let key):
       AgentScreen(key: key) { agent in StopConfirmView(agent: agent, path: $path) }
     }
@@ -135,6 +150,22 @@ struct AgentScreen<Content: View>: View {
       content(agent)
     } else {
       Image(systemName: "person.crop.circle.badge.questionmark")
+        .font(.title)
+        .foregroundStyle(.secondary)
+    }
+  }
+}
+
+struct ChannelScreen<Content: View>: View {
+  @EnvironmentObject private var session: WatchSession
+  let key: AgentKey
+  @ViewBuilder let content: (WatchChannel) -> Content
+
+  var body: some View {
+    if let channel = session.channel(key) {
+      content(channel)
+    } else {
+      Image(systemName: "number.circle")
         .font(.title)
         .foregroundStyle(.secondary)
     }
