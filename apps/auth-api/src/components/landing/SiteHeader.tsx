@@ -43,7 +43,7 @@ export function SiteHeader(props: SiteHeaderProps) {
   const stuckAttribute = () => (stuck() ? "" : undefined);
   let pageTop: HTMLSpanElement | undefined;
   onSettled(() => {
-    if (!pageTop) return;
+    if (!pageTop || !globalThis.IntersectionObserver) return;
     const observer = new IntersectionObserver(([entry]) => {
       if (entry) setStuck(!entry.isIntersecting);
     });
