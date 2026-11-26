@@ -4,7 +4,9 @@ import type {
   FileAction,
   OpenAttachmentInput,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import type { AttachmentDownloadState, AttachmentDownloads } from "@openbot/ui/features/conversation/AttachmentCards";
+import { normalizeMessage } from "@openbot/user-errors/reference";
 import { createStore, onCleanup } from "solid-js";
 
 export interface AttachmentDownloadCalls {
@@ -20,6 +22,8 @@ interface TrackedDownload {
 
 const LOCAL_SERVER_ID = "local";
 
+const NO_APP_OPENED_FILE = sourceText("error.attachment.noApp");
+
 function downloadKey(serverId: string, attachmentId: string): string {
   return JSON.stringify([serverId, attachmentId]);
 }
@@ -31,7 +35,8 @@ export function createAttachmentDownloads<Target>(options: {
   onError: (error: unknown, target: Target) => void;
 }): { downloads: AttachmentDownloads; open(attachment: AttachmentSummary, action: FileAction): void } {
   const [tracked, setTracked] = createStore<Record<string, TrackedDownload>>({});
-  const unsubscribe = options.calls().subscribe?.((progress) => {
+  const initial = options.calls();
+  const unsubscribe = initial.subscribe?.((progress) => {
     const key = downloadKey(progress.serverId, progress.attachmentId);
     setTracked((draft) => {
       const state = draft[key]?.state;
@@ -49,7 +54,8 @@ export function createAttachmentDownloads<Target>(options: {
     const key = downloadKey(serverId, attachment.id);
     const running = tracked[key];
     if (running?.state.phase === "downloading" && running.action === action) return;
-    const shows = serverId !== LOCAL_SERVER_ID && calls.stop !== undefined && running?.state.phase !== "downloading";
+    const shows =
+      serverId !== LOCAL_SERVER_ID && calls.subscribe !== undefined && running?.state.phase !== "downloading";
     if (shows) {
       setTracked((draft) => {
         draft[key] = { action, state: { phase: "downloading", received: 0, total: attachment.size } };
@@ -65,6 +71,10 @@ export function createAttachmentDownloads<Target>(options: {
       (error: unknown) => {
         if (shows)
           setTracked((draft) => {
+            if (normalizeMessage(error) === NO_APP_OPENED_FILE) {
+              delete draft[key];
+              return;
+            }
             const entry = draft[key];
             if (entry) entry.state = { phase: "failed" };
             else draft[key] = { action, state: { phase: "failed" } };
@@ -76,12 +86,14 @@ export function createAttachmentDownloads<Target>(options: {
 
   const downloads: AttachmentDownloads = {
     state: (attachmentId) => tracked[downloadKey(options.serverId(), attachmentId)]?.state,
-    stop: (attachment) => {
-      void options
-        .calls()
-        .stop?.(attachment.id)
-        .catch((error: unknown) => options.onError(error, options.target()));
-    },
+    stop: initial.stop
+      ? (attachment) => {
+          void options
+            .calls()
+            .stop?.(attachment.id)
+            .catch((error: unknown) => options.onError(error, options.target()));
+        }
+      : undefined,
     retry: (attachment) =>
       open(attachment, tracked[downloadKey(options.serverId(), attachment.id)]?.action ?? "download"),
   };

@@ -1,4 +1,5 @@
 import type { SkillSuggestionEvent } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
 import {
   MarketplaceSuggestionCard,
@@ -47,24 +48,32 @@ export interface SkillSuggestionChatCardProps {
 
 export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
   const { t } = useText();
-  const [press, setPress] = createSignal<"pending" | "saved" | null>(null);
+  const [press, setPress] = createSignal<"pending" | "sent" | "saved" | null>(null);
   const state = () => {
     if (props.outcome === "saved" || press() === "saved") return "connected";
-    if (props.outcome === "working" || (press() === "pending" && props.outcome === "open")) return "busy";
+    if (press() === "pending" || (press() === "sent" && props.outcome === "working")) return "busy";
     return "available";
   };
+  const handedToChat = () => press() === "sent" && state() !== "busy";
   const save = async () => {
-    if (press() !== null) return;
+    if (state() !== "available" || handedToChat()) return;
     setPress("pending");
     const reply =
       props.suggestion.action === "create" ? t("chat.suggestion.saveReply") : t("chat.suggestion.updateReply");
     const result = await props.onSave?.(reply);
     if (result === "saved") setPress("saved");
-    else if (!result) setPress(null);
+    else if (result === "sent") setPress("sent");
+    else {
+      setPress(null);
+      toast.error(t("chat.suggestion.saveFailed"), {
+        id: `skill-suggestion-save:${props.messageId}`,
+        report: { operation: "memory", source: "action", cause_code: "unknown" },
+      });
+    }
   };
   const skillAction = (): MarketplaceSuggestionSkillAction =>
     props.suggestion.action === "create" ? "save" : "update";
-  const onSave = () => (props.outcome === "answered" || !props.onSave ? undefined : () => void save());
+  const onSave = () => (handedToChat() || !props.onSave ? undefined : () => void save());
   const openSkill = () => {
     const suggestion = props.suggestion;
     const open = props.onOpenSkill;
@@ -74,7 +83,7 @@ export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
     <MarketplaceSuggestionCard
       kind="skill"
       skillAction={skillAction()}
-      saving={press() === "pending"}
+      saving={state() === "busy"}
       name={props.suggestion.skillName}
       description={props.suggestion.question}
       fullDescription

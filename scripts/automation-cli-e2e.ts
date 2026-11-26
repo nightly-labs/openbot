@@ -11,6 +11,7 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
+import { registerSecretValue } from "@openbot/logging";
 import { Effect } from "effect";
 import { AgentSettingsRefused } from "../src/backend/agent/agent-settings-refused";
 import { AutomationServer, type UpdatedAgent } from "../src/main/automation-server";
@@ -63,11 +64,13 @@ const models = [
   model("claude", "claude-sonnet-5-5", "high", ["low", "medium", "high"]),
   model("claude", "claude-opus-5-5", "high", ["low", "medium", "high", "max"]),
   model("codex", "gpt-5.5", "medium", ["low", "medium"]),
+  model("opencode", "opencode/big-pickle", "medium", ["low", "medium"]),
 ];
 const deliveries = new Map<string, FakeDelivery>();
 const updates: UpdateAgentInput[] = [];
 const cleared: string[] = [];
 let busy = false;
+let approvalCommand: string | null = null;
 let automationRunsPerHour = DEFAULT_AGENT_DEFAULTS.automationRunsPerHour;
 
 function deliveryState(
@@ -89,6 +92,7 @@ const options: ConstructorParameters<typeof AutomationServer>[0] = {
   listAgents: () => agents,
   agentDefaults: () => ({ ...DEFAULT_AGENT_DEFAULTS, automationRunsPerHour }),
   listModels: () => models,
+  providerStatuses: () => [{ id: "opencode", state: "not-installed", message: null }],
   listRoutines: () => [],
   runRoutine: () => Effect.die(new Error("No routine runs in this test.")),
   sendMessage: (input) => {
@@ -117,7 +121,23 @@ const options: ConstructorParameters<typeof AutomationServer>[0] = {
     const waiting = newest?.agentId === agentId && (newest.outcome === "person" || newest.outcome === "behind");
     return {
       prompts: [],
-      approvals: [],
+      approvals:
+        waiting && approvalCommand
+          ? [
+              {
+                requestId: "approval-1",
+                agentId,
+                threadId: "thread-ada",
+                turnId: "turn-ada",
+                kind: "command" as const,
+                command: approvalCommand,
+                cwd: null,
+                reason: null,
+                grantRoot: null,
+                permissions: null,
+              },
+            ]
+          : [],
       browserTakeovers: waiting ? [{ requestId: "takeover-1", requiresOpenBot: true }] : [],
     };
   },
@@ -288,6 +308,12 @@ try {
     (run) => run.stderr.includes("max") && updates.length === updateCount,
   );
   await check(
+    "a model of a provider that is not installed exits 1 with the reason",
+    ["agent", "set-model", "Ada", "opencode/big-pickle"],
+    1,
+    (run) => run.stderr.includes("OpenCode is not installed.") && updates.length === updateCount,
+  );
+  await check(
     "an unexpected update failure exits 1 without its detail",
     ["agent", "set-account", "Ada", "a0000000000000000"],
     1,
@@ -311,6 +337,24 @@ try {
   await check("a raised limit accepts the next message at once", ["run", "Ada", "hello"], 0, () => {
     return deliveries.size === beforeLimit + 1;
   });
+  automationRunsPerHour = 10;
+  const shortVaultPassword = "nt-ad";
+  registerSecretValue(shortVaultPassword, { allowShort: true });
+  registerSecretValue("gentI", { allowShort: true });
+  approvalCommand = `echo ${shortVaultPassword}`;
+  await check("a short saved secret inside an agent ID keeps the ID in the list", ["list", "--json"], 0, (run) => {
+    return parsed(run).agents[0]?.id === "agent-ada";
+  });
+  await check(
+    "a short saved secret inside an agent ID still finds the agent by ID and redacts the approval",
+    ["run", "agent-ada", "ask me", "--wait", "--json"],
+    3,
+    (run) => {
+      const approval = parsed(run).pending.approvals[0];
+      return approval?.agentId === "agent-ada" && approval.command === "echo [redacted]";
+    },
+  );
+  approvalCommand = null;
   busy = true;
   await check("a refused update exits 1 with its reason", ["agent", "set-account", "Ada", "default"], 1, (run) => {
     return run.stderr.includes("Wait until the agent is idle.");

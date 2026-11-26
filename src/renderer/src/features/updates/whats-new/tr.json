@@ -1,5 +1,191 @@
 [
   {
+    "version": "0.79.0",
+    "date": "2026-11-25",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Kredili resim ve video araçları, konum istekleri ve aşağıdaki birçok düzeltme bir sunucuda yalnızca sunucu bu sürümdeyse çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ajanlar OpenBot kredileriyle resim ve video oluşturabilir ve resimlerinizi düzenleyebilir. Onay kartı modeli, fiyatı ve istemi gösterir. İzin vermeden önce başka bir model seçebilirsiniz. Sol şeritteki \"Credits\" öğesi bakiyenizi gösterir. Bir sahip veya yönetici \"Ajanlar kredi kullanabilir\" seçeneğini açabilir veya kapatabilir.",
+          "Ajanlar, bir NEAR Intents cüzdanından sitelere kripto ile ödeme yapabilir. Cüzdanı Sunucu ayarları › Vault › Kripto bölümünde geçiş anahtarıyla bağlayın, sonra para yatırın. Her ödeme sohbette onayınızı bekler; ancak o site için \"Her zaman izin ver\" seçeneğini seçerseniz beklemez. Günlük bütçe ajanların harcayabileceği tutarı sınırlar. Cüzdan yalnızca bu bilgisayar içindir ve ödemelerde gerçek para kullanılır.",
+          "Her hesap 10 ücretsiz hoş geldin kredisi alır. Ayrıca Credits sayfasında Redeem code ile bir kredi kodunu kullanabilirsiniz.",
+          "Bir ajanın tarayıcı sekmesi konumunuzu isteyebilir. Sohbet önce size sorar; Engelle, Her zaman izin ver veya İzin ver seçersiniz. Önceden tarayıcı isteği her zaman engelliyordu.",
+          "Kenar çubuğunda sohbet listesinin üstünde sekmeler var: \"Tümü\", \"Okunmamış\" ve sizin seçtiğiniz klasörler. Her sekme, o sekmenin okunmamış sohbetlerini gösterir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Yeni bir iş akışı adımı artık çalışabilen bir modelle başlar. Metin adımı tercih ettiğiniz modeli veya bağlı bir sağlayıcının olağan modelini kullanır.",
+          "Yalnızca ücretsiz krediniz olduğunda, onay kartındaki model listesi ücretsiz kredilerle ödenen modelleri \"Ücretsiz kredi\" ile işaretler.",
+          "Yan panel, en fazla üç grubu üst üste bölebilir. Bir grubun yüksekliğini değiştirmek için iki grup arasındaki çizgiyi sürükleyin."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Uygulama daha az donar, çoğunlukla Windows'ta. Yavaş denetimlerin sonuçlarını kısa süre tutar ve yavaş işi arka planda yapar.",
+          "Bir Claude ajanı plan modunda bir planı bitirdiğinde, sohbet artık planı Onayla ve Stop planning ile gösterir. Önceden onay görünmüyor ve ajan yapmaya başlıyordu.",
+          "Başka bir ajanın veya bir rutinin iletisi artık meşgul bir Claude ajanının işini durdurmaz.",
+          "Bir ajanın tarayıcı sekmesindeki bir web sitesinin uyarısı, siz \"Tamam\"a tıklayana kadar OpenBot penceresini kaplamaz. Uyarı kendiliğinden kapanır ve ajan metnini alır.",
+          "Linux X11 masaüstünde, bir ajan başka bir uygulamada Bilgisayar Kullanımı'nı kullandıktan sonra OpenBot'ta yazmak artık durmaz. Yazma zaten durduysa bir kez çıkış yapıp yeniden giriş yapın."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Aşağıdaki düzeltmelerin çoğu bir sunucuda yalnızca sunucu bu sürümdeyse çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kanallarda ses kullanın. Bir kanala sesle ileti dikte ettiğinizde uygulama bir ajanın yanıtını sesli okur. Kanalın ileti kutusundan sesli bir konuşma da başlatabilirsiniz.",
+          "Bir sunucuyu sunucu çubuğundan gizleyin. Sunucu diğer bilgisayarlarınızda da gizli olur. Yeniden göstermek için \"Gizli sunucular\" klasöründe seçin."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Görevler sayfası artık Mesaj dizileri olarak adlandırılıyor; telefon uygulamasında ve sohbet yan panelinde olduğu gibi.",
+          "Akış halindeki yanıtlar ve aynı anda çalışan iş akışları daha az CPU kullanır; web istemcisi bir sunucuyu daha hızlı açar."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "macOS'te Claude için Bağlan ve Hesap ekle artık OpenBot'tan Claude oturum açma sayfasını açar.",
+          "Katıldığınız bir sunucuyla bağlantı veri göndermeyi durdurduğunda uygulama artık kendiliğinden yeniden bağlanır.",
+          "Katıldığınız bir sunucuda uzun kanallar daha hızlı açılır ve güncellenir.",
+          "Bir iş akışının \"Bildirim\" çıktısı veya onay bekleyen bir adım artık telefona bildirim gönderir.",
+          "Bir Gemini sohbeti, Google bir araç sonucunu reddettikten sonra devam eder. Önceden sonraki her ileti başarısız oluyordu."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.77.0",
+    "date": "2026-11-23",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuda, OpenBot kredi modelleri, duraklatılmış ve dışa aktarılmış iş akışları, WhatsApp salt okunur sohbetleri, konum istekleri ve Signal sunucu seçimi yalnızca sunucu bu sürümdeyse çalışır.",
+      "Bu güncellemeden sonra OpenBot'un eski bir sürümü verilerinizi açamaz."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kendiniz veya bir sunucu için OpenBot kredisi satın alın. Sayfa çubuğundaki \"Credits\" düğmesini veya Ayarlar → Faturalandırma bölümünü kullanın. Ücretli lisans ayrıca her ay ücretsiz kredi verir.",
+          "İş akışındaki resim ve video adımları, kredilerinizin karşıladığı OpenBot modellerini başka bir oturum açma olmadan kullanabilir. Bir adımda Adet ayarını yapın; aynı anda en fazla 4 sonuç alın.",
+          "İş akışı menüsünden bir iş akışını duraklatın. Ayrıca bir iş akışını dosyaya aktarabilir ve başka bir bilgisayarda veya sunucuda içe aktarabilirsiniz.",
+          "Önceki bir adımdan alan eklemek için bir iş akışı adımına {{ yazın. Zamanlama, GitHub, Discord, Telegram ve Slack tetikleyicileri artık alan da verir.",
+          "Bir istek buna ihtiyaç duyduğunda, örneğin \"yakınımdaki restoranlar\" gibi, ajan konumunuzu isteyebilir. Siz yanıt verene kadar hiçbir şey gönderilmez.",
+          "İzin verilen bir WhatsApp kişisini veya grubunu salt okunur yapın. Ajanlarınız sohbeti okuyabilir, OpenBot ise sohbete hiçbir zaman yazmaz."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Bağlamı 200K veya daha fazla token olan boşta bir Claude veya Pi sohbeti, 1 saatlik istem önbelleği dolmadan önce kendini sıkıştırır. Bu, tüm bağlamı yeniden okumaktan daha az maliyetlidir. Bunu Sunucu ayarları → Sağlayıcılar bölümünden kapatın.",
+          "Bir sunucunun Signal sunucusunu Sunucu ayarları → Genel bölümünden seçin. \"Otomatik\" en yakın olanı tutar.",
+          "\"Tam erişim\" ile çalışan Gemini ajanları, bellek, tarayıcı ve kanallar gibi OpenBot araçlarını onay kartı olmadan kullanır."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Bir Claude ajanı çalışırken ona gönderdiğiniz ileti artık hemen ajana ulaşır; alt ajan veya uzun bir araç çalışırken de.",
+          "\"Önce sor\" olarak ayarlanmış bir ChatGPT (Codex) ajanı, artık bir komut çalıştırmadan veya bir dosyayı değiştirmeden önce size sorar.",
+          "Yanıt vermeyi bırakan barındırılan veya kendi kendine barındırılan bir sunucu artık 10 dakika sonra kendiliğinden yeniden başlar.",
+          "macOS'te ajan yuvası artık OpenBot'u ve tüm bilgisayarı yavaşlatmaz.",
+          "Uzun sohbetler yumuşak kayar. Önceden 100'den fazla iletisi olan bir sohbet, kaydırırken takılıyordu."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuda, aynı anda çalışan görevler, canlı ses hesabı, OpenBot bellek anahtarı, iş akışı klasörleri, türü tanımlı iş akışı yanıtları ve bir sağlayıcının 10'dan fazla hesabı yalnızca sunucu bu sürümdeyse çalışır.",
+      "Bu güncellemeden sonra OpenBot'un eski bir sürümü verilerinizi açamaz."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Bir ajan, birbirinden bağımsız işleri aynı anda çalışan görevlere ayırabilir. Her sonuç ana sohbete geri döner ve ajan sonuçları sizin için birleştirir.",
+          "Yan panelin yeni Mesaj dizileri sekmesinde bir ajanın açık tüm mesaj dizilerini görün. Sekme, sizi bekleyen mesaj dizilerinin sayısını gösterir.",
+          "Kısayollarınızı Ayarlar'ın yeni Klavye sekmesinde değiştirin. Yeni kısayollar yeni bir mesaj dizisi başlatır ve sonraki ile önceki mesaj dizisine geçer.",
+          "İş akışları sekmelerde açılır ve iş akışı adımları türü tanımlı yanıt verebilir. Bir yanıtı sonraki bir adımda kullanmak için {{name}} yazın.",
+          "Ayarlar > Görünüm bölümünden pencere arka planı olarak MP4 veya WebM videosu yükleyin.",
+          "Ayarlar > Ses bölümünden GPT canlı sesinin kullandığı ChatGPT hesabını seçin."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Bir sağlayıcı 20 hesaba kadar tutar. Önceden sınır 10'du.",
+          "Dikte en fazla 10 dakika kaydeder. Önceden 2 dakikada duruyordu.",
+          "Yukarı kaydırdığınızda bir mesaj dizisi eski mesajları yükler. Bir düğmeye tıklamanız gerekmez."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Zamanlanmış bir rutin, bir çalıştırmanın bildirecek bir şeyi olmadığında artık sessizce kendini kapatmaz.",
+          "Uzun bir sohbet, bir yanıt akarken tüm mesajlarını doğru sırada tutar.",
+          "Bağlı bir WhatsApp numarası hâlâ \"Bağlandı\" yazarken mesaj almayı artık durdurmaz.",
+          "Windows'ta OpenCode ajanları komutları yeniden çalıştırır. Önceden sık sık \"opencode-pty request timed out\" hatasıyla başarısız oluyordu.",
+          "Sessize aldığınız bir ajan, bir kanalda yanıt verdiğinde artık size bildirim göndermez."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Sunucuda, iş akışı adım ayarları, Bu adımdan çalıştır, sahiplik devri, Tümünü güncelle düğmesi ve ajanlarla ilgili birçok düzeltme yalnızca sunucu bu sürümdeyse çalışır.",
+      "Bu güncellemeden sonra OpenBot'un eski bir sürümü verilerinizi açamaz."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Ajanla Bas konuş ile konuşun. Konuşurken konuşma düğmesini veya konuşma tuşunu basılı tutun. Bıraktığınızda OpenBot söylediklerinizi gönderir. Tuşu Ayarlar > Ses bölümünden değiştirin.",
+          "Bir iş akışını tek bir adımdan yeniden başlatın. Adım menüsünde Bu adımdan çalıştır seçin. Önceki adımlar yanıtlarını korur ve yeniden çalışmaz.",
+          "Bir iş akışı adımının sonucunu oluşturan ayarları ve girdileri görün. Adımda Ayarlar'ı seçin, sonra aynı şekilde yeniden çalıştırmak için Bu ayarları kullan'ı seçin.",
+          "Sunucunuzu başka bir OpenBot hesabına devredin. Sunucu ayarları > Üyeler bölümünde yeni sahibin e-postasını girin. Yeni sahip kabul ettiğinde sunucu el değiştirir.",
+          "Tüm sağlayıcıları aynı anda güncelleyin. Ayarlar > Sağlayıcılar, bir veya daha fazla sağlayıcının güncellemesi olduğunda Tümünü güncelle düğmesini gösterir."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot, indirdiği sağlayıcı CLI'lerini yeni sürüm varsa her saat günceller. Güncelleme ajanlar boşta olana kadar bekler.",
+          "Bir ajanın her ileti dizisi, ana sohbetin veya o ajanın başka bir ileti dizisinin açtığı tarayıcı sekmelerini kullanabilir.",
+          "Rutinler sekmesi kenar çubuğundan kaldırıldı. Rutinler yine çalışır. Bunları ajan ayarlarında, Zamanlama sayfasında ve Sunucu ayarları > Rutinler bölümünde yönetin."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "İndirilmiş bir güncelleme için yeniden başlatma artık ajanlar boşta olana kadar bekler; \"Yeniden başlatmayı iptal et\" seçeneği vardır. Önceden OpenBot hemen kapanır ve ajanın görevini durdururdu.",
+          "Bir ajan, yeniden başlatmadan ya da kullanım sınırından sonra artık \"Çalışıyor\" durumunda, iletileri beklerken kalmaz. Durdurulan tur Kesildi olarak gösterilir ve bekleyen iletiler başlar.",
+          "Çok sayıda ajanı ve bağlı cihazı olan meşgul bir sunucu artık bellek sorunu yaşamaz ve bir sonraki turu seçerken donmaz.",
+          "Bir duraklamadan sonra gönderdiğiniz ileti, Claude oturum açıkken artık \"Gönderilmedi\" ve \"Devam etmek için Claude sağlayıcısını bağlayın.\" durumunda kalmaz.",
+          "Kimsenin kullanmadığı ajan tarayıcı sekmeleri 2 dakika sonra işlemciyi kullanmayı bırakır."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.74.0",
     "date": "2026-11-19",
     "notices": [

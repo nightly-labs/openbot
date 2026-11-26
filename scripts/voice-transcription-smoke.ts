@@ -44,7 +44,35 @@ const FAILURES: readonly VoiceTranscriptionFailure[] = ["runtime-unavailable", "
 
 const logger = createOpenBotLogger("voice-transcription-smoke");
 
-const SAMPLES: readonly { name: string; text: string; voice: string; language: VoiceLanguage }[] = [
+const BRIEFING_SENTENCES = [
+  "Please open the settings and turn on dark mode.",
+  "Read the latest reply from the team and summarize it for me.",
+  "Yes, send the report to everyone on the project.",
+  "Can you check why the build failed on the main branch this morning? I think the new test for the login page is flaky, so please run it again and tell me what you find.",
+];
+const NO_SPEECH_SECONDS = 3;
+const noise = (index: number) => (Math.sin(index * 12.9898) * 43_758.5453) % 1;
+const NO_SPEECH_SAMPLES: Readonly<Record<string, (index: number) => number>> = {
+  silence: () => 0,
+  "room noise": (index) => 0.02 * noise(index),
+  hum: (index) => 0.1 * Math.sin((2 * Math.PI * 120 * index) / 16_000) + 0.01 * noise(index),
+  "noise bursts": (index) => (Math.floor(index / 3_200) % 3 === 0 ? 0.3 : 0.005) * noise(index),
+};
+const NO_SPEECH_LANGUAGES: readonly VoiceLanguage[] = ["pt", AUTOMATIC_VOICE_LANGUAGE];
+const BRIEFING = Array.from({ length: 27 }, () => BRIEFING_SENTENCES).flat();
+const BRIEFING_MINIMUM_SECONDS = 500;
+const WAV_BYTES_PER_SECOND = 32_000;
+
+interface Sample {
+  name: string;
+  text: string;
+  spoken?: string;
+  minimumSeconds?: number;
+  voice: string;
+  language: VoiceLanguage;
+}
+
+const SAMPLES: readonly Sample[] = [
   {
     name: "settings",
     text: "Please open the settings and turn on dark mode.",
@@ -81,6 +109,14 @@ const SAMPLES: readonly { name: string; text: string; voice: string; language: V
     voice: "Ewa",
     language: "pl",
   },
+  {
+    name: "briefing",
+    text: BRIEFING.join(" "),
+    spoken: BRIEFING.join(" [[slnc 700]] "),
+    minimumSeconds: BRIEFING_MINIMUM_SECONDS,
+    voice: "Samantha",
+    language: AUTOMATIC_VOICE_LANGUAGE,
+  },
 ];
 
 function spawnHost(): VoiceTranscriptionHostProcess {
@@ -113,6 +149,7 @@ function responseFromJson(message: unknown): VoiceTranscriptionResponse {
     if (!failure) throw new Error("The host sent an unknown error.");
     return { id: message.id, error: failure };
   }
+  if ("speech" in message && typeof message.speech === "boolean") return { id: message.id, speech: message.speech };
   if (!("text" in message) || typeof message.text !== "string") throw new Error("The host sent no text.");
   return { id: message.id, text: message.text };
 }
@@ -154,6 +191,14 @@ function wav(pcm: Uint8Array): Uint8Array {
   file.set(new Uint8Array(header.buffer), 0);
   file.set(pcm, 44);
   return file;
+}
+
+function noSpeechWav(sample: (index: number) => number): Uint8Array {
+  const pcm = new Uint8Array(NO_SPEECH_SECONDS * WAV_BYTES_PER_SECOND);
+  const view = new DataView(pcm.buffer);
+  for (let index = 0; index < pcm.byteLength / 2; index += 1)
+    view.setInt16(index * 2, Math.round(Math.max(-1, Math.min(1, sample(index))) * 32_767), true);
+  return wav(pcm);
 }
 
 function words(text: string): string[] {
@@ -215,7 +260,8 @@ async function main(): Promise<void> {
       if (status.phase !== "ready") throw new Error(`${modelId} is not ready: ${status.phase} ${status.message ?? ""}`);
       const downloadMs = Date.now() - downloadStartedAt;
       for (const sample of samples) {
-        const wavBytes = audio.get(sample.name) ?? (await spokenWav(sample.text, sample.voice, temporary));
+        const wavBytes =
+          audio.get(sample.name) ?? (await spokenWav(sample.spoken ?? sample.text, sample.voice, temporary));
         audio.set(sample.name, wavBytes);
         await Effect.runPromise(voice.setSettings({ modelId, language: sample.language }));
         const startedAt = Date.now();
@@ -223,7 +269,9 @@ async function main(): Promise<void> {
         const transcriptionMs = Date.now() - startedAt;
         const wer = wordErrorRate(sample.text, text);
         const firstWord = words(text)[0] === words(sample.text)[0];
-        const ok = wer <= MAXIMUM_WORD_ERROR_RATE && firstWord;
+        const audioSeconds = (wavBytes.byteLength - 44) / WAV_BYTES_PER_SECOND;
+        const longEnough = audioSeconds >= (sample.minimumSeconds ?? 0);
+        const ok = wer <= MAXIMUM_WORD_ERROR_RATE && firstWord && longEnough;
         failed ||= !ok;
         results.push({
           modelId,
@@ -233,11 +281,26 @@ async function main(): Promise<void> {
           text,
           wer,
           firstWord,
+          audioSeconds,
+          longEnough,
           ok,
           transcriptionMs,
           downloadMs,
         });
-        logger.info(`${modelId} ${sample.name}: "${text}" (WER ${(wer * 100).toFixed(1)} %, ${transcriptionMs} ms)`);
+        logger.info(
+          `${modelId} ${sample.name} ${audioSeconds.toFixed(1)} s: "${text}" (WER ${(wer * 100).toFixed(1)} %, ${transcriptionMs} ms)`,
+        );
+      }
+      if (!modelId.startsWith("whisper")) continue;
+      for (const language of NO_SPEECH_LANGUAGES) {
+        await Effect.runPromise(voice.setSettings({ modelId, language }));
+        for (const [name, sample] of Object.entries(NO_SPEECH_SAMPLES)) {
+          const { text } = await Effect.runPromise(voice.transcribe(noSpeechWav(sample)));
+          const ok = text === "";
+          failed ||= !ok;
+          results.push({ modelId, sample: name, language, expected: "", text, ok });
+          logger.info(`${modelId} ${name} (${language}) with no speech: "${text}"`);
+        }
       }
     }
     await writeFile(
@@ -249,7 +312,10 @@ async function main(): Promise<void> {
     await Effect.runPromise(voice.shutdown());
     await rm(temporary, { recursive: true, force: true });
   }
-  if (failed) throw new Error("A transcription missed its first word or had too many word errors.");
+  if (failed)
+    throw new Error(
+      "A transcription missed its first word, had too many word errors, had too little audio, or wrote words from a recording with no speech.",
+    );
 }
 
 await main();

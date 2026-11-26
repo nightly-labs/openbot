@@ -159,9 +159,14 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
         ...(host.appearance === undefined ? {} : { appearance: host.appearance }),
         role: host.role,
         ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
+        ...(host.licenseRaisesMemberLimit === undefined
+          ? {}
+          : { licenseRaisesMemberLimit: host.licenseRaisesMemberLimit }),
         ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
         ...(host.restartAvailable === undefined ? {} : { restartAvailable: host.restartAvailable }),
         ...(host.storageGb === undefined ? {} : { storageGb: host.storageGb }),
+        ...(host.paymentRequired ? { paymentRequired: true } : {}),
+        ...(host.customPlan ? { customPlan: host.customPlan } : {}),
         transport: "webrtc-v2",
       };
     });

@@ -24,7 +24,7 @@ export interface OpenWaitsProps {
 const MARK_STATE: Record<OpenWaitState, TaskMarkState> = {
   waiting: "pending",
   resuming: "active",
-  woken: "failed",
+  woken: "pending",
 };
 
 const STATE_LABEL = {

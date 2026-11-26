@@ -37,6 +37,7 @@ function endsQuietResume(status: RemoteRecoveryStatus): boolean {
 export interface ServerConnectionHandle {
   client: RemoteTeamTransportRef;
   refresh(): void;
+  reconnect(): void;
   quietStart(): void;
 }
 
@@ -50,6 +51,7 @@ interface Props {
   hostId: string;
   publicKey: string;
   active: boolean;
+  background: boolean;
   directory: RemoteTeamDirectoryClient;
   register(hostId: string, handle: ServerConnectionHandle | null): void;
   load(hostId: string, publicKey: string, client: RemoteTeamTransportRef, context: ServerLoadContext): Promise<void>;
@@ -68,6 +70,7 @@ export const ServerConnection = memo(function ServerConnection({
   hostId,
   publicKey,
   active,
+  background,
   directory,
   register,
   load,
@@ -82,6 +85,8 @@ export const ServerConnection = memo(function ServerConnection({
   const controller = useRef<ReturnType<typeof createRemoteConnectionRecovery> | null>(null);
   const activeRef = useRef(active);
   activeRef.current = active;
+  const backgroundRef = useRef(background);
+  backgroundRef.current = background;
   const generation = useRef(0);
   const [analytics] = useState(() => new MobileConnectionAnalytics(mobileAnalytics, phoneVpn));
   const membershipRefreshPending = useRef(false);
@@ -145,7 +150,7 @@ export const ServerConnection = memo(function ServerConnection({
       if (update.hostOffline && activeRef.current) onUnavailableRef.current?.(hostId);
       if (update.state === "online" && update.lostAfterMs !== undefined) lostAfterMs.current = update.lostAfterMs;
       if (update.state === "offline") {
-        if (activeRef.current) analytics.lost();
+        if (activeRef.current && !backgroundRef.current) analytics.lost();
         if (update.code === "session_revoked") {
           if (activeRef.current) void onMembershipChangedRef.current?.().catch(() => undefined);
           else membershipRefreshPending.current = true;
@@ -173,18 +178,18 @@ export const ServerConnection = memo(function ServerConnection({
           isCurrent: () => !disposed && activeRef.current && attempt === generation.current,
           check,
         };
-        const finish = analytics.attempt();
+        const finish = backgroundRef.current ? null : analytics.attempt();
         const initiatingContext = context;
         const started = Date.now();
         supportLog.add("info", "connection", `${hostId} attempt ${attempt} started${check ? ", check" : ""}`);
         return load(hostId, publicKey, client, initiatingContext).then(
           () => {
-            if (initiatingContext.isCurrent()) finish("succeeded", initiatingContext.stage);
+            if (initiatingContext.isCurrent()) finish?.("succeeded", initiatingContext.stage);
             supportLog.add("info", "connection", `${hostId} attempt ${attempt} loaded (${Date.now() - started} ms)`);
           },
           (error) => {
             if (initiatingContext.isCurrent()) {
-              finish("failed", initiatingContext.stage);
+              finish?.("failed", initiatingContext.stage);
               onUnavailableRef.current?.(hostId);
             }
             const reference = errorReference(error);
@@ -222,7 +227,15 @@ export const ServerConnection = memo(function ServerConnection({
       },
     );
     controller.current = recovery;
-    register(hostId, { client, refresh: () => recovery.refresh(), quietStart });
+    register(hostId, {
+      client,
+      refresh: () => recovery.refresh(),
+      reconnect: () => {
+        if (activeRef.current && lastStatus.current && lastStatus.current.status.phase !== "online") client.newPage();
+        recovery.refresh();
+      },
+      quietStart,
+    });
     recovery.setActive(activeRef.current);
     return () => {
       disposed = true;
@@ -266,6 +279,13 @@ export const ServerConnection = memo(function ServerConnection({
       void onMembershipChanged?.().catch(() => undefined);
     }
   }, [active, hostId, onMembershipChanged, analytics, endResume]);
+
+  const wasBackground = useRef(background);
+  useEffect(() => {
+    const opened = wasBackground.current && !background;
+    wasBackground.current = background;
+    if (opened) controller.current?.resetBackoff();
+  }, [background]);
 
   return (
     <RemoteTeamTransport

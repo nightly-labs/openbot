@@ -1,10 +1,10 @@
 {
-  "version": "1.4.12",
+  "version": "1.4.14",
   "highlights": [
-    "Added chat backdrops with animated scenes or your own photo, and a redesigned Appearance screen.",
-    "Added side questions: ask an agent about a chat without adding to it.",
-    "Added an Open Agent shortcut for the iPhone Home Screen and Action button.",
-    "Redesigned the chat header and made chats faster and smoother while agents reply.",
-    "Improved server connections, with clear reasons when a server cannot start or is too old."
+    "Hide a server from your server list. It stays hidden on all your devices.",
+    "Make a one-time routine: in \"When to run\", select \"Once\".",
+    "New option: use the full-screen camera, with zoom and all lenses.",
+    "Home has larger avatars and shorter rows, so you see more chats.",
+    "Better connection: the app connects again by itself after a network change, and sent messages no longer disappear."
   ]
 }

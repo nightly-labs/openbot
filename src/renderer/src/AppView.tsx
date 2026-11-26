@@ -21,6 +21,7 @@ import { useI18n } from "./i18n-context";
 import { AccountLogin, FirstRunFlow, InitialSetup, LanguageStep } from "./lazy-views";
 import { usePlatform } from "./platform";
 import { reportWorkspaceReady } from "./renderer-timing";
+import { startupLoadingScene } from "./startup-animation-preference";
 import { WorkspaceShell } from "./WorkspaceShell";
 
 let startupSplashPlayed = false;
@@ -55,7 +56,10 @@ export function AppAccessGate() {
   const languageLoaded = createMemo<boolean>((was) => was === true || i18n.ready());
   const started = () => setup.setupLoaded() && platform.appInfo() !== null && languageLoaded();
   const [splashShown, setSplashShown] = createSignal(!platform.landingPreview && !startsAfterRestart());
-  const splashPlaysThrough = !startupSplashPlayed && platform.chatWindow === null;
+  const splashExit = () => {
+    if (platform.chatWindow !== null) return undefined;
+    return !startupSplashPlayed && setup.setupState()?.completed !== true ? "playToEnd" : "fade";
+  };
   const [splashOpen, setSplashOpen] = createSignal(false);
   const splashMoving = () => splashShown() && !splashOpen();
   const [workspaceReady, setWorkspaceReady] = createSignal(false);
@@ -203,8 +207,10 @@ export function AppAccessGate() {
       <Show when={splashShown()}>
         <AppLoadingScreen
           label={t("app.loading")}
+          title={t("app.loading")}
+          scene={startupLoadingScene()}
           ready={splashReady()}
-          quickExit={!splashPlaysThrough}
+          exit={splashExit()}
           onMountViews={() => setSplashOpen(true)}
           onExited={() => {
             startupSplashPlayed = true;

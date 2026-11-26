@@ -8,14 +8,20 @@ export function useLockedAction() {
   const locked = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  async function perform(operation: () => Promise<void>, failure?: (error: unknown) => string): Promise<void> {
+  async function perform(
+    operation: (cancel: () => void) => Promise<void>,
+    failure?: (error: unknown) => string,
+  ): Promise<void> {
     if (locked.current) return;
     locked.current = true;
     setBusy(true);
     setError(null);
     try {
-      await operation();
-      void haptics.notification("success");
+      let cancelled = false;
+      await operation(() => {
+        cancelled = true;
+      });
+      if (!cancelled) void haptics.notification("success");
     } catch (caught) {
       setError(failure?.(caught) ?? t("mobile.server.settings.updateFailed"));
       void haptics.notification("error");

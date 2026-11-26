@@ -1,4 +1,5 @@
 import { env, waitUntil } from "cloudflare:workers";
+import { CREDIT_MEDIA_HOST_HEADER, CREDIT_MEDIA_HOST_TOKEN_HEADER } from "@openbot/contracts/credit-media";
 import { FEEDBACK_REPOSITORY } from "@openbot/contracts/feedback";
 import { HOSTING_DEVELOPER_KEY_HEADER } from "@openbot/contracts/hosted-servers";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -9,10 +10,12 @@ import { adminTokenMatches } from "./admin-token";
 import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
 import { AgentTemplates } from "./agent-templates";
 import { type FcmRelaySender, sharedFcmSender } from "./android-notification-relay";
-import { AuthOperationError, AuthService, AuthServiceError } from "./auth-service";
+import { AuthOperationError, AuthService, AuthServiceError, readStoreReviewSignIn } from "./auth-service";
 import { BillingError, type BillingService } from "./billing-service";
 import { CompanySignInError, CompanySignInService } from "./company-sign-in";
 import type { ContactMessageServices } from "./contact-message";
+import { type CreditMediaPayer, CreditMediaService } from "./credit-media-service";
+import { CustomServerOffers } from "./custom-server-offers";
 import { D1AuthRepository } from "./d1-auth-repository";
 import { DiscordAppError, DiscordAppService } from "./discord-app";
 import { runApiEffect } from "./effect-runtime";
@@ -33,6 +36,7 @@ import { GitHubInstallationTokens, GitHubInstallationTokensError } from "./githu
 import { createHostedBilling } from "./hosted-billing";
 import { type HostedServerService, HostedServerServiceError } from "./hosted-server-service";
 import { HostedSiteInputError } from "./hosted-site-contract";
+import { HostedSiteStorageError } from "./hosted-site-effects";
 import { enforceHostedSiteReportRateLimit as enforceReportRateLimit } from "./hosted-site-request-policy";
 import { adoptUnlinkedHostedSites, resolveHostedSiteScope } from "./hosted-site-server";
 import { HostedSiteService } from "./hosted-site-service";
@@ -44,6 +48,13 @@ import {
   type MarketplaceMutationKind,
   MarketplaceRateLimitError,
 } from "./marketplace-request-policy";
+import { mediaGatewayFromBinding } from "./media-gateway";
+import {
+  type NearIntentsOwner,
+  NearIntentsRelay,
+  NearIntentsRelayError,
+  nearIntentsRelayErrorResponse,
+} from "./near-intents-relay";
 import { Referrals } from "./referrals";
 import {
   deliverPendingRemoteAuthEvents,
@@ -84,6 +95,7 @@ export function requestAuthService(): AuthService {
     repository: new D1AuthRepository(bindings.DB),
     delivery: exposeDevelopmentCode ? null : createEmailCodeDelivery(bindings, analytics),
     exposeDevelopmentCode,
+    storeReviewSignIn: readStoreReviewSignIn(bindings.STORE_REVIEW_EMAIL, bindings.STORE_REVIEW_CODE),
     flushSessionRevocations: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
     profileChanged: (userId) => notifyAccountProfileChanged(bindings, userId, schedule),
     analytics,
@@ -153,8 +165,82 @@ export function requestReferrals(): Referrals {
   return new Referrals({ database: requireWorkerBindings(env).DB });
 }
 
+export function requestCreditMedia(): CreditMediaService {
+  const bindings = requireWorkerBindings(env);
+  return new CreditMediaService({
+    database: bindings.DB,
+    gateway: mediaGatewayFromBinding(bindings.MEDIA_GATEWAY),
+    now: () => Date.now(),
+    analytics: accountAnalytics(bindings),
+  });
+}
+
+export const requestCreditMediaPayer = Effect.fn("CreditMedia.requestPayer")(function* (request: Request) {
+  const hostId = request.headers.get(CREDIT_MEDIA_HOST_HEADER);
+  const machineToken = request.headers.get(CREDIT_MEDIA_HOST_TOKEN_HEADER);
+  if (hostId || machineToken) {
+    if (!hostId || !machineToken || hostId.length > 200 || machineToken.length > 512)
+      return yield* new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
+    yield* requestRemoteControlPlane().authenticateHost(hostId, machineToken);
+    const payer: CreditMediaPayer = { wallet: "server", serverId: hostId };
+    return { payer, actorUserId: null };
+  }
+  const user = yield* requestUser(request);
+  if (!user) return null;
+  const payer: CreditMediaPayer = { wallet: "personal", userId: user.id };
+  return { payer, actorUserId: user.id };
+});
+
+export const requestNearIntentsOwner = Effect.fn("NearIntents.requestOwner")(function* (request: Request) {
+  const hostId = request.headers.get(CREDIT_MEDIA_HOST_HEADER);
+  const machineToken = request.headers.get(CREDIT_MEDIA_HOST_TOKEN_HEADER);
+  if (hostId || machineToken) {
+    if (!hostId || !machineToken || hostId.length > 200 || machineToken.length > 512)
+      return yield* new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
+    yield* requestRemoteControlPlane().authenticateHost(hostId, machineToken);
+    const owner: NearIntentsOwner = { kind: "server", serverId: hostId };
+    return owner;
+  }
+  const user = yield* requestUser(request);
+  if (!user) return null;
+  const owner: NearIntentsOwner = { kind: "user", userId: user.id };
+  return owner;
+});
+
+export function requestNearIntentsRelay(): NearIntentsRelay {
+  const bindings = requireWorkerBindings(env);
+  return new NearIntentsRelay({
+    database: bindings.DB,
+    partnerKey: bindings.NEAR_INTENTS_PARTNER_KEY,
+    upstream: bindings.NEAR_INTENTS_AGENT_API_URL,
+  });
+}
+
+export function nearIntentsErrorResponse(error: unknown): Response {
+  if (error instanceof NearIntentsRelayError) return nearIntentsRelayErrorResponse(error);
+  if (error instanceof RemoteControlPlaneError)
+    return nearIntentsRelayErrorResponse(new NearIntentsRelayError(error.status, error.code, error.message));
+  console.error("near-intents: the relay failed");
+  return nearIntentsRelayErrorResponse(
+    new NearIntentsRelayError(503, "wallet_service_unavailable", "The crypto wallet service is not available."),
+  );
+}
+
+export function creditMediaErrorResponse(error: unknown): Response {
+  if (error instanceof BillingError) {
+    const response = apiError(error.status, error.code, error.message);
+    if (error.code === "media_busy") response.headers.set("Retry-After", "10");
+    return response;
+  }
+  return remoteControlPlaneErrorResponse(error);
+}
+
 export function requestBillingService(): BillingService | null {
   return requestHostedBilling().billing;
+}
+
+export function requestCustomServerOffers(): CustomServerOffers {
+  return new CustomServerOffers({ database: requireWorkerBindings(env).DB, billing: requestBillingService() });
 }
 
 export function billingErrorResponse(error: unknown): Response {
@@ -177,8 +263,33 @@ export function requireSitePublishingEnabled(): void {
 }
 
 export function hostedSiteErrorResponse(error: unknown): Response {
-  if (error instanceof HostedSiteInputError) return apiError(error.status, error.code, error.message);
+  if (error instanceof HostedSiteInputError) {
+    const response = apiError(error.status, error.code, error.message);
+    if (error.retryAfterSeconds !== undefined) response.headers.set("Retry-After", String(error.retryAfterSeconds));
+    return response;
+  }
+  if (error instanceof HostedSiteStorageError) return siteStorageUnavailableResponse(error);
   return authErrorResponse(error);
+}
+
+const SITE_STORAGE_RETRY_AFTER_SECONDS = 60;
+
+function siteStorageUnavailableResponse(error: HostedSiteStorageError): Response {
+  const reference = requestFailureReference();
+  console.error("Site storage request failed:", reference, error._tag);
+  const response = json(
+    {
+      error: {
+        code: "site_storage_unavailable",
+        message:
+          "Site storage did not answer for a short time. A site that is online stays online. Try again in about 1 minute.",
+        reference,
+      },
+    },
+    503,
+  );
+  response.headers.set("Retry-After", String(SITE_STORAGE_RETRY_AFTER_SECONDS));
+  return response;
 }
 
 let githubInstallationTokens: { key: string; service: GitHubInstallationTokens } | null = null;
@@ -533,12 +644,16 @@ export function authErrorResponse(error: unknown): Response {
     }
     return response;
   }
-  const reference = `auth/${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
+  const reference = requestFailureReference();
   console.error("Account service request failed:", reference, errorType(error));
   return json(
     { error: { code: "internal_error", message: "The account service could not complete the request.", reference } },
     500,
   );
+}
+
+function requestFailureReference(): string {
+  return `auth/${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
 }
 
 function errorType(error: unknown): string {

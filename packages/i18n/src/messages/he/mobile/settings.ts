@@ -292,6 +292,9 @@ export const messages = {
   "mobile.settings.conversations.fullQualityPhotos": "שליחת תמונות באיכות מלאה",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "כשהאפשרות כבויה, האפליקציה שולחת עותק קטן יותר של כל תמונה, עד 2048 פיקסלים בצלע הארוכה. הוא מגיע מהר יותר בחיבור איטי. הפעילו אותה כדי לשלוח את התמונה המקורית.",
+  "mobile.settings.conversations.fullScreenCamera": "שימוש במצלמה במסך מלא",
+  "mobile.settings.conversations.fullScreenCameraFooter":
+    "כשהאפשרות פועלת, ״מצלמה״ פותחת את מצלמת המערכת, עם זום וכל העדשות. כשהיא כבויה, נפתחת מצלמה קטנה בתוך הצ׳אט.",
   "mobile.settings.profile.nameUnsafe": "יש להסיר מהשם מעברי שורה ותווי בקרה.",
   "mobile.settings.profile.nameLength": "שם התצוגה חייב להכיל 3–20 תווים.",
   "mobile.settings.profile.saveFailed": "לא ניתן לשמור את השינויים. אפשר לנסות שוב.",
@@ -456,6 +459,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "שרתים",
   "mobile.settings.voice.gptLive.serversFooter":
     "הקישו על שרת שצריך כניסה כדי לחבר את Codex לחשבון ChatGPT. רק בעלים או מנהל רואים את הכניסה של שרת.",
+  "mobile.settings.voice.gptLive.account": "חשבון לקול חי של GPT",
   "mobile.settings.voice.gptLive.status.ready": "מוכן",
   "mobile.settings.voice.gptLive.status.supported": "נתמך",
   "mobile.settings.voice.gptLive.status.offline": "לא מחובר",

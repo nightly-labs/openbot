@@ -14,7 +14,8 @@ description: "Turn role requirements into competencies, structured questions for
 ## Inputs
 
 1. **Role requirements.** First look for a signed-in tab with the job description or the hiring plan
-   (`openbot_browser.list_tabs`), or an installed plugin such as Notion (`tool_search`). Else ask the user to
+   (`openbot_browser.list_tabs`), or the tools of an installed plugin such as Notion, which
+   `openbot.tool_search` does not list. Else ask the user to
    paste the job description and the level.
 2. **Real work.** Two or three tasks the person will do in the first 90 days. If the user gives none, ask once
    with `ask_user`. Competencies come from this work, not from the job title.

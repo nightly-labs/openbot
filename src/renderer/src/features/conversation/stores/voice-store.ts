@@ -1,28 +1,35 @@
-import { VOICE_AUDIO_LIMITS, VOICE_MODELS, VOICE_STREAM_LIMITS, type VoiceModelId } from "@openbot/contracts/ipc";
+import {
+  DEFAULT_VOICE_MODEL_ID,
+  VOICE_AUDIO_LIMITS,
+  VOICE_MODELS,
+  VOICE_STREAM_LIMITS,
+  type VoiceModelId,
+} from "@openbot/contracts/ipc";
 import { VOICE_LIMIT_WARNING_SECONDS } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { currentText } from "@openbot/ui/text";
+import {
+  appendVoiceTranscript,
+  encodePcm16,
+  recordingToSamples,
+  recordingToWav,
+  startVoiceMeter as startLevelMeter,
+} from "@openbot/ui/voice-recording";
 import { onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
 import { unlockCompletionSound } from "../../../completion-sound";
 import { playVoiceLimitStop, playVoiceLimitWarning } from "../../../voice-limit-sound";
-import { appendVoiceTranscript, encodePcm16, recordingToSamples, recordingToWav } from "../../../voice-recording";
 import { forgetDictatedMessage, noteDictatedMessage, stopSpokenReply } from "../../speech/speech-replies";
 import { EMPTY_DRAFT } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationTarget, VoiceLiveTranscript } from "../conversation-types";
 import { voiceCaptureError, voiceTranscriptionError } from "../voice-status";
+import { conversationOwnerId } from "./composer-store";
 
 const LIVE_TRANSCRIPT_INTERVAL_MS = 1_000;
 const STREAM_INTERVAL_MS = 250;
 
-export const VOICE_LEVEL_COUNT = 24;
-const VOICE_LEVEL_INTERVAL_MS = 80;
-const VOICE_DIGITAL_SILENCE_DB = -90;
-const VOICE_NOISE_RISE_DB = 0.1;
-const VOICE_NOISE_MARGIN_DB = 6;
-const VOICE_PEAK_FALL_DB = 0.05;
-const VOICE_MIN_RANGE_DB = 12;
+export { VOICE_LEVEL_COUNT } from "@openbot/ui/voice-recording";
 
 export interface VoiceCloudStream {
   streamId: string;
@@ -46,6 +53,7 @@ interface VoiceSubmitHooks {
 
 type VoiceStoreProps = Pick<ConversationProps, "runtime"> & {
   agent: Pick<NonNullable<ConversationProps["agent"]>, "id"> | undefined;
+  channel?: Pick<NonNullable<ConversationProps["channel"]>, "id"> | undefined;
   server: Pick<NonNullable<ConversationProps["server"]>, "id"> | undefined;
 };
 
@@ -92,12 +100,14 @@ export interface VoiceStoreDeps {
   setConversationError: (target: ConversationTarget, message: string) => void;
   viewIsMounted: () => boolean;
   setVoiceLimitReached?: (target: ConversationTarget, reached: boolean) => void;
+  offerVoiceLanguageChoice?: (target: ConversationTarget) => void;
   hooks: VoiceSubmitHooks;
   thread?: VoiceThreadHooks;
 }
 
 interface VoiceThreadHooks {
   openDraftKey: () => string | undefined;
+  besideDraftKey?: () => string | undefined;
   appendTranscript: (key: string, text: string) => void;
   send: (key: string) => Promise<void>;
   reportError: (message: string) => void;
@@ -108,9 +118,10 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
   const { resources } = deps;
   let preparingModelId: VoiceModelId | null = null;
   let stoppedAtLimit = false;
+  let usesDefaultParakeet = false;
 
   async function startVoiceRecording(threadKey?: string): Promise<void> {
-    const agentId = deps.props.agent?.id;
+    const agentId = conversationOwnerId(deps.props);
     const serverId = deps.props.server?.id ?? "local";
     if (!agentId || deps.voicePhase() !== "idle") return;
     deps.setVoiceThreadKey(threadKey);
@@ -120,7 +131,10 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     const destination = { ...target, threadKey };
     const fail = (message: string) =>
       threadKey === undefined ? deps.setConversationError(target, message) : deps.thread?.reportError(message);
-    const stillOpen = () => deps.viewIsMounted() && deps.thread?.openDraftKey() === threadKey;
+    const stillOpen = () =>
+      deps.viewIsMounted() &&
+      (deps.thread?.openDraftKey() === threadKey ||
+        (threadKey !== undefined && deps.thread?.besideDraftKey?.() === threadKey));
     if (threadKey === undefined) {
       deps.setVoiceLimitReached?.(target, false);
       deps.clearConversationError(target);
@@ -129,7 +143,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     resources.voiceSubmitRequest = undefined;
     const generation = ++resources.voiceRequestGeneration;
     deps.setVoicePhase("preparing");
-    deps.setVoiceModelProgress(0);
+    deps.setVoiceModelProgress(null);
     let stream: MediaStream | undefined;
     let cloud: VoiceCloudStream | undefined;
     try {
@@ -142,6 +156,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
           const model = VOICE_MODELS.find((candidate) => candidate.id === settings.modelId);
           const own = server?.routes.dictation === true;
           livePreview = !own && (model?.livePreview ?? true);
+          usesDefaultParakeet = !own && !settings.saved && settings.modelId === DEFAULT_VOICE_MODEL_ID;
           streamed = !own && model?.kind === "cloud" && model.provider === "elevenlabs";
         }),
         voice.prepareModel(),
@@ -276,7 +291,8 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
   }
 
   const removeVoiceModelListener = conversationRuntime(deps.props).voice.onModelStatus((status) => {
-    if (deps.voicePhase() !== "preparing" || status.modelId !== preparingModelId) return;
+    if (deps.voicePhase() !== "preparing" || status.modelId !== preparingModelId || status.phase !== "downloading")
+      return;
     deps.setVoiceModelProgress(status.progress);
   });
   onCleanup(removeVoiceModelListener);
@@ -325,43 +341,10 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
 
   function startVoiceMeter(stream: MediaStream): void {
     resources.voiceMeterStop?.();
-    let levels: number[] = new Array(VOICE_LEVEL_COUNT).fill(0);
-    deps.setVoiceLevels(levels);
-    let context: AudioContext | undefined;
-    let analyser: AnalyserNode;
-    try {
-      context = new AudioContext();
-      analyser = context.createAnalyser();
-      analyser.fftSize = 512;
-      context.createMediaStreamSource(stream).connect(analyser);
-    } catch {
-      void context?.close();
-      return;
-    }
-    const samples = new Float32Array(analyser.fftSize);
-    let noiseDb = Number.POSITIVE_INFINITY;
-    let peakDb = Number.NEGATIVE_INFINITY;
-    let shown = 0;
-    const timer = setInterval(() => {
-      analyser.getFloatTimeDomainData(samples);
-      let sum = 0;
-      for (const sample of samples) sum += sample * sample;
-      const db = 20 * Math.log10(Math.max(Math.sqrt(sum / samples.length), 1e-5));
-      if (db > VOICE_DIGITAL_SILENCE_DB) {
-        noiseDb = db < noiseDb ? db : Math.min(db, noiseDb + VOICE_NOISE_RISE_DB);
-        peakDb = Math.max(db, peakDb - VOICE_PEAK_FALL_DB);
-      }
-      const range = Math.max(VOICE_MIN_RANGE_DB, peakDb - noiseDb - VOICE_NOISE_MARGIN_DB);
-      const loudness = Math.min(1, Math.max(0, (db - noiseDb - VOICE_NOISE_MARGIN_DB) / range));
-      const level = loudness * loudness;
-      shown += (level - shown) * (level > shown ? 0.7 : 0.45);
-      levels = [...levels.slice(1), shown];
-      deps.setVoiceLevels(levels);
-    }, VOICE_LEVEL_INTERVAL_MS);
-    const meterContext = context;
+    const stop = startLevelMeter(stream, deps.setVoiceLevels);
+    if (!stop) return;
     resources.voiceMeterStop = () => {
-      clearInterval(timer);
-      void meterContext.close();
+      stop();
       resources.voiceMeterStop = undefined;
     };
   }
@@ -387,6 +370,8 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     const submitRequest = resources.voiceSubmitRequest;
     const atLimit = stoppedAtLimit;
     stoppedAtLimit = false;
+    const offerLanguageChoice = usesDefaultParakeet;
+    usesDefaultParakeet = false;
     const cloud = resources.voiceCloudStream;
     resources.voiceCloudStream = undefined;
     resources.voiceRecorder = undefined;
@@ -447,9 +432,10 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       const draft = submitRequest?.draft ?? deps.drafts()[composerDraftKey(recordingTarget)] ?? EMPTY_DRAFT;
       const transcribedDraft = { ...draft, text: appendVoiceTranscript(draft.text, result.text) };
       const spokenReply = !deps.props.runtime;
+      const inChannel = (agentId: string) => ({ channel: deps.props.channel?.id === agentId });
       if (submitRequest) {
         const target = { agentId: submitRequest.agentId, serverId: submitRequest.serverId };
-        if (spokenReply) noteDictatedMessage(target, result.text);
+        if (spokenReply) noteDictatedMessage(target, result.text, inChannel(target.agentId));
         let delivered: boolean;
         if (submitRequest.queuedEdit) {
           delivered = await deps.hooks.saveEdit(
@@ -468,14 +454,18 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
           deps.hooks.restoreTranscript(target, result.text);
         }
       } else {
-        if (spokenReply) noteDictatedMessage(recordingTarget, result.text);
+        if (spokenReply) noteDictatedMessage(recordingTarget, result.text, inChannel(targetAgentId));
         const key = composerDraftKey(recordingTarget);
         deps.setDrafts((current) => ({ ...current, [key]: transcribedDraft }));
         if (atLimit) deps.setVoiceLimitReached?.(recordingTarget, true);
-        if (deps.props.agent?.id === targetAgentId && (deps.props.server?.id ?? "local") === targetServerId) {
+        if (
+          conversationOwnerId(deps.props) === targetAgentId &&
+          (deps.props.server?.id ?? "local") === targetServerId
+        ) {
           deps.setComposerFocusRequest((current) => current + 1);
         }
       }
+      if (offerLanguageChoice) deps.offerVoiceLanguageChoice?.(recordingTarget);
     } catch (error) {
       analytics.track("voice_transcription", {
         result: "failed",

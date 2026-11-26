@@ -1,5 +1,5 @@
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
-import type { AgentEvent, DynamicIslandAgentIdentity, TeamRealtimeEvent } from "@openbot/contracts/ipc";
+import type { AgentEvent, AvatarColor, DynamicIslandAgentIdentity, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   LIVE_ACTIVITY_PUSH_ROUTES,
@@ -17,6 +17,7 @@ import {
   type LiveActivityAction,
   type LiveActivityMood,
   liveActivityBloubFile,
+  liveActivityBloubName,
   liveActivityFileName,
   liveActivityIslandText,
   liveActivityView,
@@ -42,6 +43,14 @@ import { usePushEnvironment } from "@/shared/lib/push-environment";
 import { currentLocale, currentText } from "@/shared/lib/text";
 import { agentLiveActivity } from "./agent-live-activity";
 import type { AgentLiveActivityNative } from "./agent-live-activity.types";
+import {
+  emptyLiveActivityDismissals,
+  type LiveActivityDismissals,
+  type LiveActivityFailure,
+  loadLiveActivityDismissals,
+  sameLiveActivityFailure,
+  saveLiveActivityDismissals,
+} from "./model/live-activity-dismissals";
 import { useLiveActivityHost } from "./model/live-activity-host";
 import { liveActivityHostKeys, loadLiveActivitySecret, resetLiveActivitySecret } from "./model/live-activity-keys";
 import {
@@ -50,13 +59,16 @@ import {
   resetLiveActivityActions,
   setLiveActivityLinkKeys,
 } from "./model/live-activity-link";
-import { LiveActivitySync } from "./model/live-activity-sync";
+import { LiveActivitySync, RESTART_AFTER_MS } from "./model/live-activity-sync";
 
 const STALE_AFTER_BACKGROUND_MS = 5 * 60 * 1000;
 const PUBLISH_DELAY_MS = 1000;
 const BACKGROUND_PUBLISH_INTERVAL_MS = 1000;
 const BLOUBS_PER_PAUSE = 4;
+const AWAY_COLOR_MOOD: LiveActivityMood = "idle";
 const MAX_TIMER_MS = 2_147_483_647;
+
+type BloubAgent = Pick<DynamicIslandAgentIdentity, "avatarSeed" | "avatarHue" | "avatarColor">;
 
 interface LiveActivityInput {
   servers: readonly Pick<MobileServer, "id" | "state">[];
@@ -106,6 +118,7 @@ export function useLiveActivity({
   hiddenRef.current = hidden;
   const foregroundRef = useRef(foreground);
   foregroundRef.current = foreground;
+  const pushServerRef = useRef<string | null>(null);
   const staleDate = useRef<Date | undefined>(undefined);
   const lastPublish = useRef<{ mode: string | null; at: number }>({ mode: null, at: 0 });
   const [resumed, setResumed] = useState(foreground);
@@ -130,18 +143,66 @@ export function useLiveActivity({
     return registrationQueue.current;
   }, []);
 
-  const syncFor = useCallback((native: AgentLiveActivityNative) => {
-    sync.current ??= new LiveActivitySync(
-      native.starter,
-      (token, startedAt) => {
-        if (disposed.current) return;
-        setPushToken(token);
-        setActivityStartedAt(startedAt);
-      },
-      (action) => mobileAnalytics.track("live_activity_action", { action }),
-    );
-    return sync.current;
+  const dismissals = useRef<LiveActivityDismissals | null>(null);
+  const shownFailures = useRef(new WeakMap<AgentLiveActivityProps, LiveActivityFailure>());
+  const savedDismissals = useCallback(() => {
+    dismissals.current ??= loadLiveActivityDismissals();
+    return dismissals.current;
   }, []);
+  const [unacknowledged, setUnacknowledged] = useState<readonly LiveActivityFailure[]>(() =>
+    live ? savedDismissals().dismissed : [],
+  );
+  const updateDismissals = useCallback((next: LiveActivityDismissals) => {
+    dismissals.current = next;
+    saveLiveActivityDismissals(next);
+    setUnacknowledged(next.dismissed);
+  }, []);
+  const hideDismissedFailures = useCallback(() => {
+    if (!live) return;
+    for (const failure of savedDismissals().dismissed) {
+      live.coordinator.resolveAction({ type: "dismiss-failure", ...failure });
+    }
+  }, [live, savedDismissals]);
+
+  const syncFor = useCallback(
+    (native: AgentLiveActivityNative) => {
+      sync.current ??= new LiveActivitySync(native.starter, {
+        pushToken: (token, startedAt) => {
+          if (disposed.current) return;
+          setPushToken(token);
+          setActivityStartedAt(startedAt);
+        },
+        change: (action) => mobileAnalytics.track("live_activity_action", { action }),
+        shown: (props, startedAt) => {
+          if (disposed.current) return;
+          const failure = props ? shownFailures.current.get(props) : undefined;
+          const pushServer = pushServerRef.current;
+          const otherServerPushes = !foregroundRef.current && pushServer !== null && pushServer !== failure?.serverId;
+          const shown = failure && startedAt !== null && !otherServerPushes ? { failure, startedAt } : null;
+          const saved = savedDismissals();
+          if (JSON.stringify(shown) === JSON.stringify(saved.shown)) return;
+          updateDismissals({ ...saved, shown });
+        },
+        dismissed: (startedAt) => {
+          if (disposed.current) return;
+          const saved = savedDismissals();
+          const shown = saved.shown;
+          const swiped =
+            shown !== null &&
+            (startedAt === null || startedAt === shown.startedAt) &&
+            Date.now() - shown.startedAt < RESTART_AFTER_MS;
+          if (swiped) {
+            const known = saved.dismissed.some((failure) => sameLiveActivityFailure(failure, shown.failure));
+            updateDismissals({ shown: null, dismissed: known ? saved.dismissed : [...saved.dismissed, shown.failure] });
+            hideDismissedFailures();
+          }
+          void Promise.resolve().then(() => publishRef.current());
+        },
+      });
+      return sync.current;
+    },
+    [savedDismissals, updateDismissals, hideDismissedFailures],
+  );
 
   const keptAvatars = useRef(0);
   const keepAvatars = useCallback(() => {
@@ -151,9 +212,10 @@ export function useLiveActivity({
 
   const publishRef = useRef<() => void>(() => undefined);
   const drawBloub = useCallback(
-    async (agent: Pick<DynamicIslandAgentIdentity, "avatarSeed" | "avatarHue">, mood: LiveActivityMood) => {
+    async (agent: BloubAgent, mood: LiveActivityMood) => {
       if (!live) return;
-      const file = liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood);
+      const color = agent.avatarColor ?? null;
+      const file = liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood, color);
       if (avatars.current.has(file)) return;
       if (live.native.hasAvatar(file)) {
         avatars.current.set(file, file);
@@ -162,9 +224,9 @@ export function useLiveActivity({
       avatars.current.set(file, null);
       let written: string | null = null;
       try {
-        const dataUrl = await live.native.renderBloub(agent.avatarSeed, agent.avatarHue, mood);
+        const dataUrl = await live.native.renderBloub(agent.avatarSeed, agent.avatarHue, mood, color);
         if (disposed.current) return;
-        const base = liveActivityFileName(["bloub", agent.avatarSeed, String(agent.avatarHue ?? ""), mood]);
+        const base = liveActivityBloubName(agent.avatarSeed, agent.avatarHue, mood, color);
         written = live.native.saveAvatar(base, dataUrl);
       } catch {}
       avatars.current.set(file, written);
@@ -174,12 +236,24 @@ export function useLiveActivity({
   );
 
   const bloubFile = useCallback(
-    (agent: Pick<DynamicIslandAgentIdentity, "avatarSeed" | "avatarHue">, mood: LiveActivityMood): string => {
-      const file = liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood);
+    (agent: BloubAgent, mood: LiveActivityMood): string => {
+      const file = liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood, agent.avatarColor ?? null);
       const saved = avatars.current.get(file);
       if (saved !== undefined) return saved ?? "";
       void drawBloub(agent, mood);
       return avatars.current.get(file) ?? "";
+    },
+    [drawBloub],
+  );
+
+  const drawAwayFace = useCallback(
+    (agent: BloubAgent) => {
+      const file = awayFaceFile(agent);
+      if (!file) return;
+      void drawBloub(agent, AWAY_COLOR_MOOD).then(() => {
+        const written = avatars.current.get(file);
+        if (written) setPhotos((current) => (current[file] === written ? current : { ...current, [file]: written }));
+      });
     },
     [drawBloub],
   );
@@ -206,7 +280,8 @@ export function useLiveActivity({
       const servers = new Set(shownOrder);
       const props = liveActivityView(presentation, {
         t: currentText().t,
-        agentColor: avatarHeadColor,
+        agentColor: (agent) =>
+          avatarHeadColor(agent.avatarSeed, agent.avatarHue, agentAvatarColor(presentation.serverId, agent)),
         avatar,
         unreadAgents: agentsRef.current
           .filter(
@@ -236,27 +311,41 @@ export function useLiveActivity({
         return;
       }
       lastPublish.current = { mode, at: Date.now() };
-      void syncFor(live.native).show(
-        props && fitLiveActivityProps(props),
-        foregroundRef.current ? undefined : staleDate.current,
-      );
+      const fitted = props && fitLiveActivityProps(props);
+      if (fitted && presentation.mode === "failed") {
+        shownFailures.current.set(fitted, {
+          serverId: presentation.serverId,
+          agentId: presentation.item.agent.id,
+          turnId: presentation.item.turnId,
+        });
+      }
+      void syncFor(live.native).show(fitted, foregroundRef.current ? undefined : staleDate.current);
 
       function workingThread(): string | null {
         const working = live?.coordinator.workingTurn(presentation);
         return working ? sideThreadOfTurnRef.current(presentation.serverId, working.agentId, working.turnId) : null;
       }
 
+      function agentAvatarColor(serverId: string, shown: DynamicIslandAgentIdentity): AvatarColor | null {
+        const known = agentsRef.current.find((agent) => agent.serverId === serverId && agent.id === shown.id);
+        return known?.avatarColor ?? shown.avatarColor ?? null;
+      }
+
       function avatar(serverId: string, agent: DynamicIslandAgentIdentity, mood: LiveActivityMood): string {
         if (!live) return "";
-        if (!agent.avatarUrl) return bloubFile(agent, mood);
+        const colored = { ...agent, avatarColor: agentAvatarColor(serverId, agent) };
+        if (!agent.avatarUrl) {
+          drawAwayFace(colored);
+          return bloubFile(colored, mood);
+        }
         const name = photoName(serverId, agent.id, agent.avatarUrl);
         const saved = avatars.current.get(name);
         if (saved) return saved;
         if (saved === undefined) loadPhotoRef.current(serverId, agent.id, agent.avatarUrl);
-        return bloubFile(agent, mood);
+        return bloubFile(colored, mood);
       }
     },
-    [live, liveState, syncFor, bloubFile, keepAvatars],
+    [live, liveState, syncFor, bloubFile, drawAwayFace, keepAvatars],
   );
   publishRef.current = () => {
     if (!foregroundRef.current) publish();
@@ -297,10 +386,35 @@ export function useLiveActivity({
       if (!live || !isAgentEvent(event)) return;
       received.current = true;
       live.coordinator.applyEvent({ serverId, event }, serverId);
+      hideDismissedFailures();
       schedule();
     },
-    [live, schedule],
+    [live, schedule, hideDismissedFailures],
   );
+
+  const acknowledging = useRef(new Set<string>());
+  useEffect(() => {
+    if (!live || !foreground) return;
+    for (const failure of unacknowledged) {
+      const key = JSON.stringify([failure.serverId, failure.agentId, failure.turnId]);
+      const server = servers.find((candidate) => candidate.id === failure.serverId);
+      if (server?.state !== "online" || acknowledging.current.has(key)) continue;
+      acknowledging.current.add(key);
+      void post(failure.serverId, TEAM_API_ROUTES.agent.failuresAcknowledge(failure.agentId), {
+        turnId: failure.turnId,
+      })
+        .then(
+          () => {
+            if (disposed.current) return;
+            const saved = savedDismissals();
+            const dismissed = saved.dismissed.filter((other) => !sameLiveActivityFailure(other, failure));
+            updateDismissals({ ...saved, dismissed });
+          },
+          () => undefined,
+        )
+        .finally(() => acknowledging.current.delete(key));
+    }
+  }, [live, foreground, unacknowledged, servers, post, savedDismissals, updateDismissals]);
 
   useEffect(() => {
     if (!live) return;
@@ -477,6 +591,12 @@ export function useLiveActivity({
     supportsPush(activeServerId)
       ? activeServerId
       : null;
+  pushServerRef.current = pushServerId;
+  useEffect(() => {
+    if (!live || foreground || !pushServerId) return;
+    const saved = savedDismissals();
+    if (saved.shown && saved.shown.failure.serverId !== pushServerId) updateDismissals({ ...saved, shown: null });
+  }, [live, foreground, pushServerId, savedDismissals, updateDismissals]);
   useEffect(() => {
     useLiveActivityHost.setState({ serverId: pushServerId, startedAt: pushServerId ? activityStartedAt : null });
     return () => useLiveActivityHost.setState({ serverId: null, startedAt: null });
@@ -497,9 +617,10 @@ export function useLiveActivity({
       let drawn = 0;
       for (const agent of serverAgents) {
         if (agent.avatarUrl) loadPhotoRef.current(pushServerId, agent.id, agent.avatarUrl);
+        else drawAwayFace(agent);
         for (const mood of LIVE_ACTIVITY_MOODS) {
           if (avatars.current.has(liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood))) continue;
-          await drawBloub(agent, mood);
+          await drawBloub({ avatarSeed: agent.avatarSeed, avatarHue: agent.avatarHue }, mood);
           drawn += 1;
           if (drawn % BLOUBS_PER_PAUSE === 0) await new Promise((resolve) => setTimeout(resolve, 0));
           if (cancelled) return;
@@ -514,7 +635,12 @@ export function useLiveActivity({
         locale: currentLocale(),
         away: !foreground,
         photos: serverAgents.flatMap((agent) => {
-          const file = agent.avatarUrl ? photos[photoName(pushServerId, agent.id, agent.avatarUrl)] : undefined;
+          const awayFace = awayFaceFile(agent);
+          const file = agent.avatarUrl
+            ? photos[photoName(pushServerId, agent.id, agent.avatarUrl)]
+            : awayFace
+              ? photos[awayFace]
+              : undefined;
           return file ? [{ agentId: agent.id, file }] : [];
         }),
       };
@@ -546,6 +672,7 @@ export function useLiveActivity({
     photos,
     post,
     drawBloub,
+    drawAwayFace,
     keepAvatars,
     enqueueRegistration,
   ]);
@@ -569,8 +696,9 @@ export function useLiveActivity({
       keptAvatars.current = 0;
       setPhotos({});
       void syncFor(live.native).show(null);
+      updateDismissals(emptyLiveActivityDismissals());
     };
-  }, [live, syncFor, enqueueRegistration]);
+  }, [live, syncFor, enqueueRegistration, updateDismissals]);
 
   return applyTeamEvent;
 }
@@ -631,6 +759,12 @@ function performAction(
         decision: action.decision,
       });
   }
+}
+
+function awayFaceFile(agent: BloubAgent): string | null {
+  return agent.avatarColor
+    ? liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, AWAY_COLOR_MOOD, agent.avatarColor)
+    : null;
 }
 
 function photoName(serverId: string, agentId: string, avatarUrl: string): string {

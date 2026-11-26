@@ -213,6 +213,18 @@
   z-index: 1;
 }
 
+.agent-dock-seat[data-temporary-start]:not([data-dragging])::before {
+  position: absolute;
+  top: -6px;
+  left: 10px;
+  width: 24px;
+  height: 2px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-text-dim);
+  content: "";
+  pointer-events: none;
+}
+
 .agent-dock-seat[data-dragging] .agent-dock-seat-button {
   color: var(--openbot-text-primary);
   cursor: grabbing;
@@ -376,6 +388,36 @@
   overflow: hidden;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-dock-thread-switcher {
+  position: relative;
+  max-width: 100%;
+  align-self: flex-start;
+  justify-content: flex-start;
+  height: auto;
+  gap: var(--openbot-space-1);
+  margin-block: calc(var(--openbot-space-0-5) * -1);
+  margin-inline-start: calc(var(--openbot-space-1-5) * -1);
+  padding: var(--openbot-space-0-5) var(--openbot-space-1-5);
+  border-width: 0;
+  border-radius: var(--openbot-radius-sm);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+  line-height: var(--openbot-leading-sm);
+}
+
+.agent-dock-thread-switcher > svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+.agent-dock-thread-switcher-label {
+  overflow: hidden;
+  min-width: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -593,6 +635,19 @@
 .agent-dock-text {
   margin: 0;
   white-space: pre-wrap;
+}
+
+.agent-dock-visual {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.agent-dock-visual > .agent-dock-text {
+  min-width: 0;
+  flex: 1;
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .agent-dock-markdown {
@@ -816,7 +871,7 @@
   scale: -1 1;
 }
 
-.agent-dock[data-ambient-motion="paused"] .agent-row-thinking-dots i {
+.agent-dock[data-ambient-motion="paused"] :is(.agent-row-thinking-dots i, .agent-dock-typing-dots i) {
   animation-play-state: paused;
 }
 

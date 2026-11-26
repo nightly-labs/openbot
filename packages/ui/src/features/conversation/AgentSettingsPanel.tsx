@@ -22,6 +22,7 @@ import {
   agentAutomationAllowed,
   agentBrowserProfile,
   agentComputerUseEnabled,
+  agentMemoryEnabled,
   agentNewChatAllowed,
   agentNextProviderAccountId,
   agentPermissionLevel,
@@ -66,6 +67,7 @@ import {
   SlidingTabs,
   Switch,
   Text,
+  toast,
 } from "@openbot/ui";
 import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import {
@@ -119,6 +121,7 @@ import { useText } from "../../text";
 import { avatarColorChoiceLabel } from "../agents/avatar-hue-label";
 import { SERVER_NOTIFICATION_LEVEL_LABELS } from "../servers/ServerActionItems";
 import { AgentChatColorRow } from "../settings/ChatColorSetting";
+import { AgentDeleteDialog } from "./AgentDeleteDialog";
 import { AgentDeleteHistoryDialog } from "./AgentDeleteHistoryDialog";
 import { type AgentFolderCalls, AgentFoldersPage, AgentFoldersRow, createAgentFolders } from "./AgentFolders";
 import { AgentNewChatDialog } from "./AgentNewChatDialog";
@@ -154,6 +157,7 @@ export interface AgentSettingsPanelProps {
   automationEditable?: boolean;
   newChatEditable?: boolean;
   quickAcknowledgementEditable?: boolean;
+  builtinMemoryEditable?: boolean;
   fastMode?: boolean | undefined;
   ultrafast?: boolean | undefined;
   onFastModeChange?: ((fastMode: boolean, ultrafast: boolean) => void) | undefined;
@@ -195,6 +199,7 @@ export interface AgentSettingsPanelProps {
   onUnshownSaveError?: ((message: string) => void) | undefined;
   onStartNewChat?: (() => Promise<void>) | undefined;
   onDeleteHistory?: (() => Promise<void>) | undefined;
+  onDeleteAgent?: ((agentId: string) => Promise<void>) | undefined;
 }
 
 export interface AgentBrowserProfileOptions {
@@ -244,6 +249,7 @@ interface AgentSettingsDraft {
   allowAutomation: boolean;
   allowNewChat: boolean;
   quickAcknowledgement: boolean;
+  memory: boolean;
   browserProfile: BrowserProfileChoice;
   browserProfileMoved: boolean;
   busyMessage: BusyMessageChoice;
@@ -266,6 +272,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const agentDefaults = () => props.agentDefaults ?? DEFAULT_AGENT_DEFAULTS;
   const [newChatOpen, setNewChatOpen] = createSignal(false);
   const [deleteHistoryOpen, setDeleteHistoryOpen] = createSignal(false);
+  const [agentToDelete, setAgentToDelete] = createSignal<AgentProfile | null>(null);
   const [draft, setDraft] = createStore<AgentSettingsDraft>({
     avatar: {
       hue: null,
@@ -281,6 +288,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     allowAutomation: false,
     allowNewChat: false,
     quickAcknowledgement: false,
+    memory: true,
     browserProfile: "shared",
     browserProfileMoved: false,
     busyMessage: "default",
@@ -438,6 +446,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           String(agentAutomationAllowed(agent, agentDefaults())),
           String(agentNewChatAllowed(agent, agentDefaults())),
           String(agentQuickAcknowledgementEnabled(agent, agentDefaults())),
+          String(agentMemoryEnabled(agent)),
           browserProfile,
           agent.busyMessageMode ?? "default",
           JSON.stringify(agent.backupModels ?? null),
@@ -480,6 +489,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.allowAutomation = agentAutomationAllowed(agent, agentDefaults());
           state.allowNewChat = agentNewChatAllowed(agent, agentDefaults());
           state.quickAcknowledgement = agentQuickAcknowledgementEnabled(agent, agentDefaults());
+          state.memory = agentMemoryEnabled(agent);
           state.browserProfile = browserProfile;
           if (agentChanged) state.browserProfileMoved = false;
           state.busyMessage = agent.busyMessageMode ?? "default";
@@ -932,6 +942,19 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     if (!disposed && props.agent.id === agentId && draft.quickAcknowledgement === next) {
       setDraft((state) => {
         state.quickAcknowledgement = !next;
+      });
+    }
+  }
+
+  async function saveMemory(next: boolean): Promise<void> {
+    const agentId = props.agent.id;
+    setDraft((state) => {
+      state.memory = next;
+    });
+    if (await saveAgentPatch({ memory: next }, agentId)) return;
+    if (!disposed && props.agent.id === agentId && draft.memory === next) {
+      setDraft((state) => {
+        state.memory = !next;
       });
     }
   }
@@ -1553,8 +1576,13 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     type="button"
                     aria-label={t("agentSettings.newChat.confirm")}
                     aria-haspopup="dialog"
-                    disabled={props.working}
-                    onClick={() => setNewChatOpen(true)}
+                    onClick={() => {
+                      if (props.working) {
+                        toast.info(t("agentSettings.newChat.busy"), { id: "agent-new-chat-busy" });
+                        return;
+                      }
+                      setNewChatOpen(true);
+                    }}
                   >
                     {t("agentSettings.newChat.button")}
                   </Button>
@@ -1606,6 +1634,20 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   />
                 </div>
               </Show>
+              <Show when={props.builtinMemoryEditable}>
+                <div class="agent-settings-notifications">
+                  <div>
+                    <strong>{t("agentSettings.builtinMemory.title")}</strong>
+                    <span>{t("agentSettings.builtinMemory.description")}</span>
+                  </div>
+                  <Switch
+                    size="sm"
+                    aria-label={t("agentSettings.builtinMemory.title")}
+                    checked={draft.memory}
+                    onChange={(next) => void saveMemory(next)}
+                  />
+                </div>
+              </Show>
               <Show when={props.browserProfiles}>
                 {(options) => (
                   <div class="agent-settings-notifications">
@@ -1622,6 +1664,23 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     </Button>
                   </div>
                 )}
+              </Show>
+              <Show when={props.onDeleteAgent}>
+                <div class="agent-settings-notifications">
+                  <div>
+                    <strong>{t("agentSettings.deleteAgent.title")}</strong>
+                    <span>{t("agentSettings.deleteAgent.description")}</span>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    type="button"
+                    aria-label={t("agentSettings.deleteAgent.title")}
+                    aria-haspopup="dialog"
+                    onClick={() => setAgentToDelete({ ...props.agent })}
+                  >
+                    {t("agentSettings.deleteAgent.button")}
+                  </Button>
+                </div>
               </Show>
             </Show>
             <Show when={draft.saveError}>
@@ -1651,6 +1710,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               open={deleteHistoryOpen()}
               onClose={() => setDeleteHistoryOpen(false)}
               remove={() => remove()()}
+            />
+          )}
+        </Show>
+        <Show when={props.onDeleteAgent && agentToDelete()}>
+          {(agent) => (
+            <AgentDeleteDialog
+              agent={agent()}
+              onClose={() => setAgentToDelete(null)}
+              remove={() => props.onDeleteAgent?.(agent().id) ?? Promise.resolve()}
             />
           )}
         </Show>

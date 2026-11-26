@@ -9,6 +9,7 @@ import type {
 import {
   agentAutomationAllowed,
   agentComputerUseEnabled,
+  agentMemoryEnabled,
   agentQuickAcknowledgementEnabled,
   decodeSaveAgentProfileResult,
   workspaceAccessEnforced,
@@ -169,6 +170,7 @@ export function standingProfileChanged(
     (previous.additionalFolders ?? []).join("\n") !== (agent.additionalFolders ?? []).join("\n") ||
     (previous.excludedFolders ?? []).join("\n") !== (agent.excludedFolders ?? []).join("\n") ||
     agentComputerUseEnabled(previous) !== agentComputerUseEnabled(agent) ||
+    agentMemoryEnabled(previous) !== agentMemoryEnabled(agent) ||
     agentAutomationAllowed(previous, previousDefaults) !== agentAutomationAllowed(agent, defaults) ||
     agentQuickAcknowledgementEnabled(previous, previousDefaults) !==
       agentQuickAcknowledgementEnabled(agent, defaults) ||

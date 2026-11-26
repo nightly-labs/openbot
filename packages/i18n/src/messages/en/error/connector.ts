@@ -8,6 +8,8 @@ export const messages = defineMessages("error.connector", {
   "error.connector.githubClientUnknown": "GitHub does not know the Client ID of this GitHub App.",
   "error.connector.githubUnexpected": "GitHub sent an unexpected answer: {detail}",
   "error.connector.githubUnreachable": "OpenBot cannot reach GitHub: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot cannot reach GitHub. Check the internet connection and the DNS settings of the computer or server that runs OpenBot, then try again.",
   "error.connector.githubExpired": "The GitHub connection expired. Connect GitHub again.",
   "error.connector.githubFileUnreadable": "The GitHub connection file is unreadable.",
   "error.connector.githubFileTooLarge": "The GitHub connection file is too large.",
@@ -20,6 +22,40 @@ export const messages = defineMessages("error.connector", {
   "error.connector.linkNoCard": "The Link account has no card. Add a card in Link.",
   "error.connector.linkFileUnreadable": "The Link connection file is unreadable.",
   "error.connector.linkFileTooLarge": "The Link connection file is too large.",
+  "error.connector.nearSignIn": "Sign in to OpenBot to use the crypto wallet.",
+  "error.connector.nearServiceUnavailable": "The crypto wallet service is not available. Try again later.",
+  "error.connector.nearWalletNotFound": "This wallet does not belong to this OpenBot account or server.",
+  "error.connector.nearWalletLimit": "Too many new wallets today. Try again tomorrow.",
+  "error.connector.nearProviderBusy": "NEAR Intents does not answer at the moment. Try again in a few minutes.",
+  "error.connector.nearNoWallet": "No crypto wallet is set up. Set it up in Server settings > Vault > Crypto.",
+  "error.connector.nearWalletExists": "A crypto wallet is already set up.",
+  "error.connector.nearFrozen":
+    "Payments from the crypto wallet are paused. Resume them in Server settings > Vault > Crypto.",
+  "error.connector.nearAgentNotAllowed":
+    "This agent cannot pay from the crypto wallet. Turn it on in Server settings > Vault > Crypto.",
+  "error.connector.nearGrantExpired":
+    "OpenBot has no payment grant for the crypto wallet. Renew it in Server settings > Vault > Crypto.",
+  "error.connector.nearUnknownAsset": "The crypto wallet has no asset {asset}.",
+  "error.connector.nearAmountInvalid": "{amount} is not a valid amount of {asset}.",
+  "error.connector.nearRecipientInvalid": "{recipient} is not a NEAR account or a chain:address.",
+  "error.connector.nearRefused": "The NEAR Intents Agent API refused the request: {detail}",
+  "error.connector.nearUnexpected": "The NEAR Intents Agent API sent an unexpected answer: {detail}",
+  "error.connector.nearUnreachable": "OpenBot cannot reach the NEAR Intents Agent API: {detail}",
+  "error.connector.nearFileUnreadable": "The crypto wallet file is unreadable.",
+  "error.connector.nearFileTooLarge": "The crypto wallet file is too large.",
+  "error.connector.nearSigningCanceled": "The signature was canceled.",
+  "error.connector.nearSigningExpired": "The signature did not arrive in time. Try again.",
+  "error.connector.nearSigningInvalid": "The signature from the browser is not valid.",
+  "error.connector.nearSigningBusy": "Another signature waits in the browser. Finish or cancel it first.",
+  "error.connector.nearPolicyCooldown": "You can change the wallet rules again at {time}.",
+  "error.connector.nearPolicyPending": "The policy change did not finish. Try again in a few minutes.",
+  "error.connector.nearDeclined": "The owner declined the payment.",
+  "error.connector.nearUncertain":
+    "OpenBot does not know if the payment was sent. Do not pay again. The owner can check the wallet history.",
+  "error.connector.nearPaymentFailed": "The payment failed: {detail}",
+  "error.connector.nearPaymentUnknown": "This payment does not wait for an answer any more.",
+  "error.connector.nearRuleFull": "A payment rule can have at most {limit} recipients.",
+  "error.connector.nearRulesFull": "The wallet can have at most {limit} payment rules.",
   "error.connector.onePasswordCliMissing":
     "OpenBot cannot find the 1Password CLI. Install it and turn on its integration in the 1Password app, or use a service account token.",
   "error.connector.onePasswordCliInstallFailed":
@@ -38,6 +74,8 @@ export const messages = defineMessages("error.connector", {
   "error.connector.onePasswordRateLimited": "1Password received too many requests. Wait a few minutes, then try again.",
   "error.connector.onePasswordNoVault":
     "The service account cannot read a vault. Give it access to a vault, then try again.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot cannot read your logins in 1Password. Disconnect 1Password, then connect it again.",
   "error.connector.onePasswordFileUnreadable": "The 1Password connection file is unreadable.",
   "error.connector.onePasswordFileTooLarge": "The 1Password connection file is too large.",
   "error.connector.bitwardenFailed":
@@ -50,6 +88,10 @@ export const messages = defineMessages("error.connector", {
     "Enter an HTTPS server address, the API key client_id and client_secret, and the master password.",
   "error.connector.bitwardenHostFailed":
     "Could not open Bitwarden on this server. Check the server address, the API key and the master password, and make sure that one folder is named Shared with OpenBot. Then connect again.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Could not sign in to Bitwarden on this server. Check the server address and the API key, then connect again.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Could not unlock Bitwarden on this server. Check the master password, then connect again.",
   "error.connector.bitwardenCliInstallFailed":
     "Could not install the Bitwarden CLI on this server. Check its network connection, then connect again.",
   "error.connector.bitwardenFileUnreadable": "The Bitwarden connection file is unreadable.",

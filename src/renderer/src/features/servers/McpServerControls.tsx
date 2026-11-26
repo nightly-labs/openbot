@@ -14,9 +14,11 @@ import {
   Switch,
   Text,
 } from "@openbot/ui";
+import { McpSignInLinkCopy } from "@openbot/ui/features/settings/McpSignInDialog";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, Show } from "solid-js";
 import { McpRelaySignIn } from "./McpRelaySignIn";
+import { McpSignInAppSection } from "./McpSignInAppSection";
 import { asksForSignIn, type McpServerTools, type SettledTest, useMcpRuns } from "./mcp-server-tools";
 import {
   type McpServerConfig,
@@ -25,6 +27,7 @@ import {
   mcpProviderLimitNote,
   mcpStatusLabel,
   mcpStatusVariant,
+  mcpUrlAtAddress,
   normalizeMcpConfig,
 } from "./mcp-servers";
 
@@ -32,17 +35,20 @@ interface ControlsState {
   busy: string | null;
   error: string;
   test: { test: McpTestState; config: McpServerConfig } | null;
+  signInAppShown: boolean;
 }
 
 export function McpServerControls(props: { tools: McpServerTools; id: string }) {
   const { t, errorMessage } = useText();
   const runs = useMcpRuns(() => props.tools);
-  const [state, setState] = createStore<ControlsState>({ busy: null, error: "", test: null });
+  const [state, setState] = createStore<ControlsState>({ busy: null, error: "", test: null, signInAppShown: false });
   let run = 0;
   let testButton: HTMLButtonElement | undefined;
 
   const config = createMemo(() => props.tools.servers().find((candidate) => candidate.id === props.id));
   const signedIn = () => Boolean(props.tools.signIns()[props.id]?.signedIn);
+  const transport = createMemo(() => config()?.transport);
+  const signInApp = createMemo(() => (transport() === "http" ? props.tools.signIn()?.app : undefined));
 
   const test = createMemo((): McpTestState | undefined => {
     const current = config();
@@ -54,6 +60,11 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
     return undefined;
   });
   const waiting = () => (test()?.status === "signing-in" ? state.test?.config : undefined);
+  const otherAddress = () => {
+    const current = test();
+    const row = config();
+    return current?.status === "failed" && row ? mcpUrlAtAddress(row.url, current.address) : undefined;
+  };
 
   async function latch(key: string, action: () => Promise<void>): Promise<void> {
     if (state.busy !== null) return;
@@ -89,6 +100,7 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
     if (mine !== run) return;
     setState((draft) => {
       draft.test = result ? { test: result, config: tested } : null;
+      if (result?.status === "failed" && result.kind === "sign-in-app") draft.signInAppShown = true;
     });
   }
 
@@ -106,6 +118,17 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
       });
   }
 
+  async function switchAddress(url: string): Promise<void> {
+    const current = config();
+    if (!current) return;
+    let saved = false;
+    await latch("address", async () => {
+      await props.tools.save({ ...current, url });
+      saved = true;
+    });
+    if (saved) void signIn();
+  }
+
   function signOut(): void {
     const tools = props.tools.signIn();
     if (!tools) return;
@@ -119,6 +142,22 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
   }
 
   createEffect(
+    () => ({ api: signInApp(), mcpServerId: props.id }),
+    ({ api, mcpServerId }) => {
+      if (!api) return;
+      api
+        .load(mcpServerId)
+        .then((stored) => {
+          if (stored.app)
+            setState((current) => {
+              current.signInAppShown = true;
+            });
+        })
+        .catch(() => undefined);
+    },
+  );
+
+  createEffect(
     () => {
       const current = config();
       return current && props.tools.signInRequest() === props.id ? current : undefined;
@@ -130,7 +169,7 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
     },
   );
 
-  return (
+  const connection = (
     <Show when={config()}>
       {(server) => (
         <SettingsSection
@@ -163,6 +202,22 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                   }
                 >
                   {(note) => <ItemDescription class="server-mcp-row-text">{note()}</ItemDescription>}
+                </Show>
+                <Show when={otherAddress()}>
+                  {(address) => (
+                    <div class="server-mcp-row-next">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={state.busy !== null}
+                        loading={state.busy === "address"}
+                        onClick={() => void switchAddress(address())}
+                      >
+                        {t("mcp.panel.useAddress")}
+                      </Button>
+                    </div>
+                  )}
                 </Show>
                 <Show when={waiting()}>
                   {(pending) => (
@@ -228,6 +283,19 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                 />
               </ItemActions>
             </Item>
+            <Show when={waiting() ? props.tools.signIn()?.copyLink : undefined}>
+              {(copy) => (
+                <Item class="settings-modal-row">
+                  <ItemContent class="server-mcp-sign-in-link">
+                    <McpSignInLinkCopy
+                      onCopy={copy()}
+                      onPaste={props.tools.signIn()?.pasteAddress}
+                      waitingNote={false}
+                    />
+                  </ItemContent>
+                </Item>
+              )}
+            </Show>
           </ItemGroup>
           <Show when={state.error}>
             <Text class="server-mcp-runtime-note" variant="caption" tone="danger" role="alert">
@@ -251,5 +319,22 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
         </SettingsSection>
       )}
     </Show>
+  );
+  return (
+    <>
+      {connection}
+      <Show when={state.signInAppShown ? signInApp() : undefined}>
+        {(api) => (
+          <McpSignInAppSection
+            api={api()}
+            mcpServerId={props.id}
+            urlChanged={false}
+            hostName={props.tools.signIn()?.relay?.hostName}
+            relayed={props.tools.signIn()?.relay !== undefined}
+            disabled={state.busy !== null}
+          />
+        )}
+      </Show>
+    </>
   );
 }

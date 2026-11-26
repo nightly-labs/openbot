@@ -19,6 +19,10 @@ import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-upd
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
+import {
+  addPromptQuestionDetails,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
+} from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { addSkillSuggestionNames, SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { TEAM_PROTOCOL_V1_WEBSOCKET } from "@openbot/contracts/team-protocol/v1";
 import {
@@ -26,6 +30,7 @@ import {
   type TeamProtocolV1CurrentClientEvent,
 } from "@openbot/contracts/team-protocol/v1-adapter";
 import { decodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
+import type { WorkflowSpotControl } from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { referenceFrom } from "@openbot/user-errors";
 import { Effect, Exit, Result, Scope } from "effect";
@@ -76,6 +81,7 @@ export interface RemoteEventAgentState {
 
 export interface RemoteEventLiveTransport {
   connect(hostId: string): Effect.Effect<void, RemoteWorkflowError>;
+  retry(hostId: string): Effect.Effect<void, RemoteWorkflowError>;
   requestRuntimeSnapshot(hostId: string): Effect.Effect<void, RemoteWorkflowError>;
 }
 
@@ -212,6 +218,12 @@ export class RemoteEventStream {
     socket.send(encodeTeamProtocolV1CurrentClientEvent(event));
   }
 
+  sendWorkflowSpot(serverId: string, control: WorkflowSpotControl): void {
+    const socket = this.#sockets.get(serverId);
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify(control));
+  }
+
   syncScopes(): void {
     for (const [serverId, socket] of this.#sockets) this.#sendEventScope(serverId, socket);
   }
@@ -300,7 +312,7 @@ export class RemoteEventStream {
     for (const server of this.#servers.servers) {
       if (this.#authenticationPaused.has(server.id)) continue;
       this.clearReconnectBackoff(server.id);
-      if (server.transport === "webrtc-v2") yield* this.ensure(server.id);
+      if (server.transport === "webrtc-v2") yield* this.ensure(server.id, true);
       else yield* this.restart(server.id);
     }
   }).bind(this);
@@ -358,7 +370,11 @@ export class RemoteEventStream {
     this.#sockets.delete(serverId);
   }
 
-  readonly ensure = Effect.fn("RemoteEventStream.ensure")(function* (this: RemoteEventStream, serverId: string) {
+  readonly ensure = Effect.fn("RemoteEventStream.ensure")(function* (
+    this: RemoteEventStream,
+    serverId: string,
+    checkLiveConnection = false,
+  ) {
     const server = this.#servers.find(serverId);
     if (server?.transport === "webrtc-v2") {
       if (
@@ -372,7 +388,7 @@ export class RemoteEventStream {
       const transport = this.#transport;
       if (transport)
         yield* Effect.forkIn(
-          transport.connect(serverId).pipe(
+          (checkLiveConnection ? transport.retry(serverId) : transport.connect(serverId)).pipe(
             Effect.catch(() => Effect.sync(() => this.scheduleReconnect(serverId))),
             Effect.ensuring(
               Effect.sync(() => {
@@ -541,6 +557,7 @@ export class RemoteEventStream {
             }
             const event = decoded.event;
             if (this.#advertises(serverId, SKILL_LEARNING_CAPABILITY)) addSkillSuggestionNames(event, value);
+            if (this.#advertises(serverId, TEAM_PROMPT_DETAIL_CAPABILITY)) addPromptQuestionDetails(event, value);
             if (event.type === "team-identity") {
               this.#onServerIdentity(serverId, { serverName: event.serverName, logoVersion: event.logoVersion });
             } else if (event.type === "team-presence") {
@@ -557,6 +574,7 @@ export class RemoteEventStream {
               this.#onMachineAlert(serverId, event);
             } else if (event.type === "live-voice") {
               this.#onLiveVoice(serverId, event);
+            } else if (event.type === "client-browser-command") {
             } else {
               if (!agentEventsReady) {
                 if (bufferedAgentEvents.length >= REMOTE_EVENT_INITIAL_BUFFER_LIMIT) {

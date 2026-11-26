@@ -4,6 +4,7 @@ import { createTranslate, type Message, type MessageCatalog, type PartialTransla
 export interface SourceLocalizer {
   localize: (text: string, locale: TranslatedLocale) => string;
   matchingKeys: (text: string) => readonly string[];
+  values: (text: string, key: string) => Readonly<Record<string, string>> | null;
 }
 
 interface Template {
@@ -139,5 +140,12 @@ export function createSourceLocalizer(input: {
       candidates(text)
         .filter((template) => template.pattern.test(text))
         .map((template) => template.key),
+    values: (text, key) => {
+      for (const template of candidates(text)) {
+        const match = template.key === key ? template.pattern.exec(text) : null;
+        if (match) return Object.fromEntries(template.names.map((name, position) => [name, match[position + 1] ?? ""]));
+      }
+      return null;
+    },
   };
 }

@@ -7,6 +7,7 @@ import {
   CHALLENGE_WAIT_MS,
   type DetectedChallenge,
   describeChallenge,
+  httpSignInChallenge,
   TURNSTILE_SELF_PASS_MS,
 } from "./browser-challenge";
 import { type BrowserOperationError, browserFailure, browserSync } from "./browser-effects";
@@ -23,6 +24,8 @@ import { TimeoutError, withTimeout } from "./with-timeout";
 const ACTION_POST_DISPATCH_TIMEOUT_MS = 10_000;
 const OPERATION_UNWIND_GRACE_MS = 1_000;
 const OPERATION_DEADLINE_BACKSTOP_MS = 250;
+const SILENT_PAGE_ADVICE =
+  "The page does not answer because a script on it keeps running. Reload the tab with navigate direction=reload, which ends the stuck page first, or close the tab.";
 
 export const BrowserToolHold = Context.Reference<(tabId: string) => boolean>("openbot/BrowserToolHold", {
   defaultValue: () => () => false,
@@ -142,7 +145,7 @@ function queueWaitError(tab: BrowserHostTab, turn: BrowserDialogOwner | undefine
   if (dialog && turn && tab.engine.dialogOwnedBy(turn))
     return `An earlier action on this tab still waits for a page ${dialog.type} dialog. Answer it first with handle_dialog, dialogId ${dialog.id}, then try again.`;
   if (dialog)
-    return "An earlier action on this tab still waits for a page dialog that only a person can answer. Ask the user to answer it, then read the tab again.";
+    return `An earlier action on this tab still waits for a page ${dialog.type} dialog that only a person can answer: ${JSON.stringify(dialog.message)}. Ask the user to answer it, then read the tab again.`;
   return "An earlier action on this tab did not finish, so this call did not run. Open the page in a new tab, or try again later.";
 }
 
@@ -276,6 +279,7 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
       afterTakeover,
     );
     if (challenge) result.snapshot.challenge = challenge;
+    else if (tab.httpSignIn) result.snapshot.challenge = httpSignInChallenge();
   }
   const recalled = siteMemories && !tab.secret ? recallSiteMemories(tab, result.snapshot.url, siteMemories) : null;
   if (recalled?.memories.length) result.snapshot.siteMemories = recalled.memories;
@@ -352,12 +356,16 @@ export const boundEngineOperation = Effect.fn("BrowserTab.boundOperation")(funct
         keepQueueBlocked(Fiber.await(completion));
       }),
     ),
-    Effect.catch((error) => {
-      if (isTimeoutError(error instanceof TimeoutError ? error : error.cause)) {
+    Effect.catch((error) =>
+      Effect.gen(function* () {
+        if (!isTimeoutError(error instanceof TimeoutError ? error : error.cause))
+          return yield* Effect.fail(error instanceof TimeoutError ? browserFailure(error) : error);
         keepQueueBlocked(unwindStalledOperation(tab, completion));
-      }
-      return Effect.fail(error instanceof TimeoutError ? browserFailure(error) : error);
-    }),
+        const answers = yield* tab.engine.pageAnswers().pipe(Effect.orElseSucceed(() => true));
+        if (!answers) return yield* browserFailure(new Error(`${timeoutMessage} ${SILENT_PAGE_ADVICE}`));
+        return yield* Effect.fail(error instanceof TimeoutError ? browserFailure(error) : error);
+      }),
+    ),
   );
 });
 

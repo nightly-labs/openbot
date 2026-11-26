@@ -16,16 +16,19 @@ import {
   type RemoveProviderAccountInput,
   type RenameProviderAccountInput,
   type ResetProviderUsageInput,
+  type SetLiveVoiceAccountInput,
   type SetProviderAccountPoolInput,
   type SetProviderApiKeyInput,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { decodeLiveVoiceAccount } from "@openbot/contracts/team-protocol/live-voice-account-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
 import { Effect } from "effect";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { SignInRegion } from "../../backend/kimi-region";
+import type { LocalSignInPages } from "../local-sign-in-pages";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import { parseProviderId } from "./app-inputs";
@@ -39,6 +42,7 @@ export interface ProviderIpcDependencies {
   providerRuntimes: ProviderRuntimeManager;
   credentials: ProviderCredentialStore;
   openLink: (url: string) => Promise<void>;
+  signInPages: Pick<LocalSignInPages, "opened" | "forget">;
 }
 
 export function providerIpcHandlers({
@@ -46,15 +50,18 @@ export function providerIpcHandlers({
   providerRuntimes,
   credentials,
   openLink,
+  signInPages,
 }: ProviderIpcDependencies): Pick<IpcGroupHandlers, "providers" | "providerRuntimes"> {
   async function connect(provider: AgentProviderId, region: SignInRegion) {
     await runCauseEffect(providerRuntimes.ensureKeyProviderCli(provider));
+    signInPages.forget(provider);
     return runCauseEffect(
       service.connectProvider(
         provider,
         async (value) => {
           const url = new URL(value);
           if (url.protocol !== "https:") throw new Error(sourceText("error.provider.httpsSignInLinkOnly"));
+          signInPages.opened(provider, url.toString());
           await openLink(url.toString());
         },
         region,
@@ -76,9 +83,10 @@ export function providerIpcHandlers({
         }
         return connect(provider, "mainland-cn");
       }),
-      cancelProviderSignIn: payloadHandler(parseProviderId, (provider) =>
-        runCauseEffect(service.cancelProviderSignIn(provider)),
-      ),
+      cancelProviderSignIn: payloadHandler(parseProviderId, (provider) => {
+        signInPages.forget(provider);
+        return runCauseEffect(service.cancelProviderSignIn(provider));
+      }),
       updateProviderCli: payloadHandler(parseManagedProviderId, async (provider) => {
         await runCauseEffect(providerRuntimes.downloadAndWait(provider));
         return service.getStatus();
@@ -94,7 +102,7 @@ export function providerIpcHandlers({
         runCauseEffect(service.chooseInstalledCli(provider, installed)),
       ),
       startProviderCodeLogin: payloadHandler(parseProviderId, (provider) =>
-        runCauseEffect(service.startProviderCodeLogin(provider)),
+        runCauseEffect(service.startProviderCodeLogin(provider, true)),
       ),
       cancelProviderCodeLogin: payloadHandler(parseProviderId, (provider) =>
         runCauseEffect(service.cancelProviderCodeLogin(provider)),
@@ -150,6 +158,9 @@ export function providerIpcHandlers({
       ),
       setProviderAccountPool: payloadHandler(parseSetProviderAccountPoolInput, ({ provider, enabled, leftOut }) =>
         runCauseEffect(service.setProviderAccountPool(provider, enabled, leftOut)),
+      ),
+      setLiveVoiceAccount: payloadHandler(parseSetLiveVoiceAccountInput, ({ accountId }) =>
+        runCauseEffect(service.setLiveVoiceAccount(accountId)),
       ),
       signOutProvider: payloadHandler(parseProviderId, (provider) => runCauseEffect(service.signOutProvider(provider))),
       providerUsageResets: payloadHandler(parseProviderId, (provider) =>
@@ -249,6 +260,10 @@ export function parseSetProviderAccountPoolInput(value: unknown): SetProviderAcc
   )
     throw new Error("Invalid provider account pool.");
   return { provider: parseProviderId(value.provider), enabled: value.enabled, leftOut: value.leftOut };
+}
+
+export function parseSetLiveVoiceAccountInput(value: unknown): SetLiveVoiceAccountInput {
+  return { accountId: decodeLiveVoiceAccount(value) };
 }
 
 export function parseResetProviderUsageInput(value: unknown): ResetProviderUsageInput {

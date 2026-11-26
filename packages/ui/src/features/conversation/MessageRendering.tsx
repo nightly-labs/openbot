@@ -4,6 +4,7 @@ import { removeAttachmentReferences } from "@openbot/contracts/attachment-refere
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import type { AttachmentSummary, InstalledSkill, MessageReaction } from "@openbot/contracts/ipc";
 import { canPreviewAttachment, MESSAGE_REACTIONS, MORE_MESSAGE_REACTIONS } from "@openbot/contracts/ipc";
+import { markdownImageName } from "@openbot/contracts/markdown-preview-text";
 import { parseSelectionInstruction } from "@openbot/contracts/selection-instruction";
 import {
   AudioLines,
@@ -56,12 +57,17 @@ import { createSmoothHeightResize } from "./createSmoothHeightResize";
 import { DataTable, type MessageContentBlock, messageContentBlocks, reuseUnchangedBlocks } from "./DataTable";
 import { messageFileReferences } from "./FileReference";
 import { ImageGeneration } from "./ImageGeneration";
-import { ImageGallery, ImageLightbox, type ImageLightboxOpening, isLightboxImage } from "./ImageLightbox";
+import {
+  type ImageCopies,
+  ImageGallery,
+  ImageLightbox,
+  type ImageLightboxOpening,
+  isLightboxImage,
+} from "./ImageLightbox";
 import {
   MarkdownInlineText,
   MarkdownMessageText,
   type MessageImageFile,
-  markdownImageName,
   messageImageFiles,
 } from "./MarkdownMessageText";
 import { ReplyQuote } from "./ReplyQuote";
@@ -306,6 +312,7 @@ export function MessageBody(props: {
   onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   mediaSource?: AttachmentMediaSource | undefined;
+  imageCopies?: ImageCopies | undefined;
   downloads?: AttachmentDownloads | undefined;
   frame?: ((content: JSX.Element, imagesOnly: () => boolean) => JSX.Element) | undefined;
   loadImageFile?: ((file: MessageImageFile) => Promise<string | null>) | undefined;
@@ -374,12 +381,13 @@ export function MessageBody(props: {
           .map((reference) => reference.attachment.id),
       ),
   );
+  const imageSource = createMemo(() => props.imageCopies?.mediaSource ?? props.mediaSource);
   const mediaImages = new Map<string, AttachmentSummary>();
   const sentImages = new Map<string, AttachmentSummary>();
   const shownAttachments = createMemo<AttachmentSummary[]>((previous = []) =>
     (props.message.attachments ?? []).map((attachment, index) => {
       if (attachment.previewUrl || attachment.previewKind !== "image") return attachment;
-      const url = props.mediaSource?.url(attachment.id);
+      const url = imageSource()?.url(attachment.id);
       if (!url) {
         const sent = sentImages.get(attachment.id);
         if (sent) return sent;
@@ -403,19 +411,6 @@ export function MessageBody(props: {
       return shown;
     }),
   );
-  const standaloneAttachments = createMemo(() => {
-    const referencedIds = referencedAttachmentIds();
-    const generatedAttachmentId =
-      generatedImageShown() || generatedVideoShown() ? props.message.attachments?.[0]?.id : undefined;
-    const showsReferencedImages = props.message.author === "you";
-    return shownAttachments().filter(
-      (attachment) =>
-        (!referencedIds.has(attachment.id) ||
-          (showsReferencedImages && attachment.kind === "image") ||
-          playableMediaKind(attachment.mimeType || attachmentMimeTypeForName(attachment.name)) !== null) &&
-        attachment.id !== generatedAttachmentId,
-    );
-  });
   const namedImageFiles = createMemo(
     () => {
       if (props.message.author !== "agent" || props.message.streaming || !props.loadImageFile) return [];
@@ -433,6 +428,7 @@ export function MessageBody(props: {
     { equals: (previous, next) => imageFileKeys(previous) === imageFileKeys(next) },
   );
   const [fileImages, setFileImages] = createSignal<AttachmentSummary[]>([]);
+  const [settledImageFiles, setSettledImageFiles] = createSignal<readonly MessageImageFile[] | null>(null);
   createEffect(
     () => ({ files: namedImageFiles(), load: untrack(() => props.loadImageFile) }),
     ({ files, load }) => {
@@ -449,18 +445,41 @@ export function MessageBody(props: {
           ),
         ),
       ).then((images) => {
-        if (current) setFileImages(images.filter((image) => image !== null));
+        if (!current) return;
+        setFileImages(images.filter((image) => image !== null));
+        setSettledImageFiles(files);
       });
       return () => {
         current = false;
       };
     },
   );
+  const namedImageFilesSettled = () => namedImageFiles().length === 0 || settledImageFiles() === namedImageFiles();
+  const isPlayableMedia = (attachment: AttachmentSummary) =>
+    playableMediaKind(attachment.mimeType || attachmentMimeTypeForName(attachment.name)) !== null;
+  const isRevealedAgentImage = (attachment: AttachmentSummary) =>
+    props.message.author === "agent" && referencedAttachmentIds().has(attachment.id) && !isPlayableMedia(attachment);
+  const showsReferencedImage = (attachment: AttachmentSummary) =>
+    attachment.kind === "image" &&
+    (props.message.author === "you" ||
+      (!props.message.streaming &&
+        namedImageFilesSettled() &&
+        !fileImages().some((image) => image.name === attachment.name)));
+  const standaloneAttachments = createMemo(() => {
+    const referencedIds = referencedAttachmentIds();
+    const generatedAttachmentId =
+      generatedImageShown() || generatedVideoShown() ? props.message.attachments?.[0]?.id : undefined;
+    return shownAttachments().filter(
+      (attachment) =>
+        (!referencedIds.has(attachment.id) || showsReferencedImage(attachment) || isPlayableMedia(attachment)) &&
+        attachment.id !== generatedAttachmentId,
+    );
+  });
   const [unloadedImages, setUnloadedImages] = createSignal<ReadonlySet<string>>(new Set());
   const loadLimit = (attachment: AttachmentSummary) =>
     props.message.imageGeneration && props.message.attachments?.[0]?.id === attachment.id ? "generated" : "thumbnail";
   const arrivingImage = (attachment: AttachmentSummary) => {
-    const source = props.mediaSource;
+    const source = imageSource();
     return (
       source !== undefined &&
       attachment.previewKind === "image" &&
@@ -477,13 +496,19 @@ export function MessageBody(props: {
   });
   const standaloneFileAttachments = createMemo(() => {
     const images = new Set(standaloneImageAttachments());
-    return standaloneAttachments().filter((attachment) => !images.has(attachment));
+    return standaloneAttachments().filter((attachment) => !images.has(attachment) && !isRevealedAgentImage(attachment));
   });
   const loadedImages = new Set<string>();
+  const loadingImages = new Set<string>();
+  let loadingSource = untrack(imageSource);
   createEffect(
     () => standaloneImageAttachments().filter((attachment) => !attachment.previewUrl),
     (arriving) => {
-      const source = props.mediaSource;
+      const source = imageSource();
+      if (source !== loadingSource) {
+        loadingImages.clear();
+        loadingSource = source;
+      }
       const unloaded = (attachment: AttachmentSummary) =>
         setUnloadedImages((current) => new Set(current).add(attachment.id));
       for (const attachment of arriving) {
@@ -491,13 +516,21 @@ export function MessageBody(props: {
           unloaded(attachment);
           continue;
         }
-        void source?.load(attachment, loadLimit(attachment)).then(
-          (shown) => {
-            if (shown) loadedImages.add(attachment.id);
-            else unloaded(attachment);
-          },
-          () => unloaded(attachment),
-        );
+        if (!source) continue;
+        const limit = loadLimit(attachment);
+        const loading = `${attachment.id}:${limit}`;
+        if (loadingImages.has(loading)) continue;
+        loadingImages.add(loading);
+        void source
+          .load(attachment, limit)
+          .then(
+            (shown) => {
+              if (shown) loadedImages.add(attachment.id);
+              else unloaded(attachment);
+            },
+            () => unloaded(attachment),
+          )
+          .finally(() => loadingImages.delete(loading));
       }
     },
   );
@@ -542,9 +575,11 @@ export function MessageBody(props: {
     if (file) props.onDownloadImageFile?.(file);
     else props.onDownload?.(image);
   };
-  const [lightbox, setLightbox] = createSignal<(ImageLightboxOpening & { markdown?: boolean }) | null>(null);
+  const [lightbox, setLightbox] = createSignal<
+    (ImageLightboxOpening & { markdown?: boolean; copies?: boolean }) | null
+  >(null);
   const lightboxImages = createMemo(() => shownAttachments().filter(isLightboxImage));
-  const openAttachment = (attachment: AttachmentSummary, origin?: HTMLElement) => {
+  const openAttachment = (attachment: AttachmentSummary, origin?: HTMLElement, fromGallery = false) => {
     if (isLightboxImage(attachment)) {
       const named = fileImages().some((image) => image.id === attachment.id);
       const siblings = named ? fileImages() : lightboxImages();
@@ -554,6 +589,7 @@ export function MessageBody(props: {
         index: images.findIndex((image) => image.id === attachment.id),
         origin,
         markdown: named,
+        copies: !named && (fromGallery || props.imageCopies?.mediaSource !== undefined),
       });
     } else if (canPreviewAttachment(attachment)) {
       props.onPreview(attachment);
@@ -612,7 +648,12 @@ export function MessageBody(props: {
   const imageBlock = () => (
     <Switch>
       <Match when={standaloneImageAttachments().length > 1}>
-        <ImageGallery images={standaloneImageAttachments()} onOpen={openAttachment} onDownload={props.onDownload} />
+        <ImageGallery
+          images={standaloneImageAttachments()}
+          onOpen={(attachment, origin) => openAttachment(attachment, origin, true)}
+          onDownload={props.onDownload}
+          copies={props.imageCopies}
+        />
       </Match>
       <Match when={standaloneImageAttachments().length === 1}>
         <div class="message-image-attachments">
@@ -624,6 +665,7 @@ export function MessageBody(props: {
                 prompt={attachment().name}
                 aspectRatio="square"
                 attachment={attachment()}
+                copyUrl={props.imageCopies?.copyUrl(attachment())}
                 loading={!attachment().previewUrl}
                 onPreview={openAttachment}
                 onDownload={props.onDownload}
@@ -647,6 +689,7 @@ export function MessageBody(props: {
               : !opening().markdown && Boolean(props.onDownload)
           }
           macWindowControls={props.macWindowControls}
+          copies={opening().copies ? props.imageCopies : undefined}
           onClose={() => setLightbox(null)}
         />
       )}
@@ -709,10 +752,22 @@ export function MessageBody(props: {
                 {(block, index) => (
                   <Switch>
                     <Match when={comparisonTableContent(block())}>
-                      {(table) => <ComparisonTable table={table()} renderCell={renderMarkdownInline} />}
+                      {(table) => (
+                        <ComparisonTable
+                          table={table()}
+                          renderCell={renderMarkdownInline}
+                          selectionMessageId={props.message.streaming !== true ? props.message.id : undefined}
+                        />
+                      )}
                     </Match>
                     <Match when={dataTableContent(block())}>
-                      {(table) => <DataTable table={table()} renderCell={renderMarkdownInline} />}
+                      {(table) => (
+                        <DataTable
+                          table={table()}
+                          renderCell={renderMarkdownInline}
+                          selectionMessageId={props.message.streaming !== true ? props.message.id : undefined}
+                        />
+                      )}
                     </Match>
                     <Match when={codeContent(block())}>
                       {(code) => (
@@ -844,7 +899,7 @@ export function MessageBody(props: {
         <div class="message-attachments-group">
           <AttachmentCards
             attachments={standaloneFileAttachments()}
-            mediaSource={props.mediaSource}
+            mediaSource={imageSource()}
             downloads={props.downloads}
             onPreview={openAttachment}
             onAction={props.onAttachmentAction}

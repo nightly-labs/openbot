@@ -36,6 +36,8 @@ export const messages = defineMessages("status.messaging", {
     "No agent can answer here yet. In OpenBot, open Marketplace > Apps > Telegram and click Add agent.",
   "status.messaging.telegramLinked":
     "OpenBot is connected to this chat. Mention {bot} or reply to a message of OpenBot to ask the agents.",
+  "status.messaging.telegramNotLinked":
+    "OpenBot is not connected to this chat. To connect it, open the OpenBot app, go to Marketplace → Apps → Telegram, and select Add to a group or Open a direct chat.",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Answers in Telegram and asks the team",
   "status.messaging.whatsappNoAgent": "No agent can answer here yet. Add the WhatsApp Orchestrator in OpenBot.",
@@ -53,6 +55,9 @@ export const messages = defineMessages("status.messaging", {
     "Another OpenBot is linked to this WhatsApp number, so you can get two answers. To fix this, open Linked devices in WhatsApp on your phone and log out the OpenBot that you do not use.",
   "status.messaging.whatsappPaused":
     "OpenBot stopped answering here for 10 minutes: too many messages came in a short time. If another OpenBot is linked to this number, open Linked devices in WhatsApp on your phone and log out the OpenBot that you do not use.",
+  "status.messaging.whatsappNotDelivered": "WhatsApp did not accept this answer, so the person did not get it.",
+  "status.messaging.whatsappPartlyDelivered":
+    "WhatsApp did not accept all of this answer, so the person got only a part of it.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Answers in WhatsApp and asks the team",
 });

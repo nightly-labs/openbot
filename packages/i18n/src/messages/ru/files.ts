@@ -106,6 +106,8 @@ export const messages = {
     other: "Все агенты ({count})",
   },
   "files.library.folders": "Папки",
+  "files.library.workflows": "Процессы",
+  "files.library.workflowsOf": "Процессы в {name}",
   "files.library.favorite": "{name} в избранное",
   "files.folder.new": "Новая папка",
   "files.folder.name": "Имя папки",
@@ -250,6 +252,8 @@ export const messages = {
   "files.conversation.title": "Файлы",
   "files.conversation.summary": "{files} · чат: {size}",
   "files.conversation.close": "Закрыть файлы",
+  "files.conversation.workspace": "Папка рабочего пространства",
+  "files.conversation.workspaces": "Папки рабочих пространств",
   "files.conversation.emptyTitle": "В этом чате нет файлов",
   "files.conversation.emptyDescription":
     "Здесь появятся файлы, которые вы прикрепляете, и файлы, которые создаёт агент.",

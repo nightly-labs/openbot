@@ -348,7 +348,7 @@ export const messages = {
   "connector.whatsapp.linkNumber": "番号をリンク",
   "connector.whatsapp.ownNumberNote": "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。",
   "connector.whatsapp.dedicatedNote":
-    "許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
+    "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp がこのコンピューターをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
   "connector.whatsapp.helpLoggedOutHost":
@@ -374,7 +374,7 @@ export const messages = {
     "あなたの「自分にメッセージ」チャットと、許可した人だけが書き込めます。それ以外の人には返信しません。オフにすると、OpenBot は知らない人にコードを返信します。",
   "connector.whatsapp.workingMessage": "「対応しています…」メッセージ",
   "connector.whatsapp.workingMessageDescription":
-    "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。前のリクエストを待っているリクエストには、待機中のメッセージも送信します。回答だけを送信するにはオフにしてください。",
+    "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。前のリクエストを待っているリクエストには、待機中のメッセージも送信します。個人の番号では、あなたの「自分にメッセージ」チャットだけがこれらのメッセージを受け取ります。回答だけを送信するにはオフにしてください。",
   "connector.whatsapp.statusReactions": "ステータスのリアクション",
   "connector.whatsapp.statusReactionsDescription":
     "メッセージが届くと OpenBot が 👀 で、回答の準備ができると ✅ でリアクションします。リアクションを送信しないにはオフにしてください。",
@@ -453,6 +453,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "1 つの番号で許可できる連絡先とグループは最大 {count} 件です。",
   "connector.whatsapp.senderGroup": "グループ",
   "connector.whatsapp.removeSender": "削除",
+  "connector.whatsapp.senderAccess": "{name} のアクセス",
+  "connector.whatsapp.senderReplies": "仕事を頼める",
+  "connector.whatsapp.senderReadOnly": "読み取り専用",
   "connector.whatsapp.addContact": "連絡先を追加",
   "connector.whatsapp.addGroup": "グループを追加",
   "connector.whatsapp.contactTitle": "連絡先を追加",

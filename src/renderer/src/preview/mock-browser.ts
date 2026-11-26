@@ -6,8 +6,11 @@ import type {
   BrowserPictureInPictureEvent,
   BrowserPreview,
   BrowserTab,
+  BrowserWindowEvent,
+  BrowserWindowModel,
   OpenBotDesktopApi,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import browserTakeoverPreviewUrl from "../../stories/assets/browser-takeover-preview.svg";
 import { STORY_BROWSER_CONTROL, STORY_BROWSER_TABS } from "./fixtures";
 import { clone, type Listener, type MockRuntime } from "./mock-support";
@@ -34,6 +37,9 @@ export function createMockBrowser(
   const browserDisplayListeners = new Set<Listener<{ tabs: BrowserTab[]; activeTabId: string | null }>>();
   const browserLiveViewListeners = new Set<Listener<BrowserLiveViewEvent>>();
   const browserPictureInPictureListeners = new Set<Listener<BrowserPictureInPictureEvent>>();
+  const browserWindowListeners = new Set<Listener<BrowserWindowEvent>>();
+  const browserWindowModelListeners = new Set<Listener<BrowserWindowModel>>();
+  let browserWindowModel: BrowserWindowModel | null = null;
 
   const setUserControl = (tabId: string, held: boolean) => {
     browserTabs = browserTabs.map((tab) => {
@@ -71,6 +77,7 @@ export function createMockBrowser(
     activate: async (tabId) => {
       activeBrowserTabId = tabId;
       emit(browserDisplayListeners, { tabs: browserTabs, activeTabId: activeBrowserTabId });
+      emitAgentEvent({ type: "browser-changed", tabs: browserTabs, activeTabId: activeBrowserTabId });
     },
     navigate: async (input) => {
       if (!("url" in input)) return;
@@ -82,6 +89,15 @@ export function createMockBrowser(
     },
     reload: async () => undefined,
     stop: async () => undefined,
+    answerPermission: async ({ tabId, requestId }) => {
+      browserTabs = browserTabs.map((tab) => {
+        if (tab.id !== tabId || tab.permissionRequest?.id !== requestId) return tab;
+        const { permissionRequest: _, ...rest } = tab;
+        return rest;
+      });
+      emit(browserDisplayListeners, { tabs: browserTabs, activeTabId: activeBrowserTabId });
+      emitAgentEvent({ type: "browser-changed", tabs: browserTabs, activeTabId: activeBrowserTabId });
+    },
     takeControl: async (tabId) => setUserControl(tabId, true),
     releaseControl: async (tabId) => setUserControl(tabId, false),
     startTeach: async (tabId) => setUserControl(tabId, true),
@@ -139,6 +155,17 @@ export function createMockBrowser(
     closePictureInPicture: async () => undefined,
     openLocalSignIn: async () => ({ signedIn: false }),
     finishLocalSignIn: async ({ send }) => (send ? { cookies: 12, signedIn: true } : null),
+    answerHttpSignIn: async ({ tabId }) => {
+      if (!browserTabs.some((tab) => tab.id === tabId && tab.httpSignIn))
+        throw new Error(sourceText("error.backend.browserHttpSignInInactive"));
+      browserTabs = browserTabs.map((tab) => {
+        if (tab.id !== tabId) return tab;
+        const { httpSignIn: _signIn, ...rest } = tab;
+        return rest;
+      });
+      emit(browserDisplayListeners, { tabs: browserTabs, activeTabId: activeBrowserTabId });
+      emitAgentEvent({ type: "browser-changed", tabs: browserTabs, activeTabId: activeBrowserTabId });
+    },
     dockPictureInPicture: async () => {
       emit(browserPictureInPictureListeners, { type: "dock" });
     },
@@ -149,6 +176,28 @@ export function createMockBrowser(
       browserPictureInPictureListeners.add(listener);
       return () => browserPictureInPictureListeners.delete(listener);
     },
+    openWindow: async (bounds) => bounds ?? { x: 0, y: 0, width: 1200, height: 820 },
+    closeWindow: async () => undefined,
+    focusWindow: async () => undefined,
+    dockWindow: async () => {
+      emit(browserWindowListeners, { type: "dock" });
+    },
+    publishWindowModel: async (model) => {
+      browserWindowModel = clone(model);
+      emit(browserWindowModelListeners, clone(model));
+    },
+    getWindowModel: async () => (browserWindowModel ? clone(browserWindowModel) : null),
+    sendWindowAction: async (action) => {
+      emit(browserWindowListeners, { type: "action", action });
+    },
+    onWindowModel: (listener) => {
+      browserWindowModelListeners.add(listener);
+      return () => browserWindowModelListeners.delete(listener);
+    },
+    onWindowEvent: (listener) => {
+      browserWindowListeners.add(listener);
+      return () => browserWindowListeners.delete(listener);
+    },
   };
 
   return {
@@ -157,6 +206,8 @@ export function createMockBrowser(
       browserDisplayListeners.clear();
       browserLiveViewListeners.clear();
       browserPictureInPictureListeners.clear();
+      browserWindowListeners.clear();
+      browserWindowModelListeners.clear();
     },
   };
 }

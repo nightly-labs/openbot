@@ -37,6 +37,7 @@ export interface AgentWaitsHooks {
   ownsRoutine(agentId: string, routineId: string): boolean;
   hasRoutine(agentId: string): boolean;
   requireKnownAgent(agentId: string): void;
+  isSideThread(agentId: string, taskId: string): boolean;
 }
 
 export interface AgentWaitsOptions {
@@ -70,15 +71,36 @@ export class AgentWaits {
     this.#changed(agentId);
   }
 
-  wakeForRun(run: { agentId: string; routineId: string }, deliveryId: string, waitId: string | null): void {
+  sideThreadOfWait(agentId: string, waitId: string): string | null {
+    const wait = this.#store.get(agentId, waitId);
+    if (!wait || (wait.wakeDeliveryId && this.#isPending(wait.wakeDeliveryId))) return null;
+    return this.#sideThreadOf(wait);
+  }
+
+  wakeForRun(
+    run: { agentId: string; routineId: string },
+    deliveryId: string,
+    waitId: string | null,
+    runTaskId: string | null,
+  ): Map<string | null, string[]> {
     const named = waitId ? this.#store.get(run.agentId, waitId) : null;
     const candidates = waitId ? (named ? [named] : []) : this.#store.forRoutineRun(run.agentId, run.routineId);
-    const woken = candidates
-      .filter((wait) => !wait.wakeDeliveryId || !this.#isPending(wait.wakeDeliveryId))
-      .map((wait) => wait.id);
-    if (woken.length === 0) return;
-    this.#store.markWoken(run.agentId, woken, deliveryId);
-    this.#changed(run.agentId);
+    const inRun: string[] = [];
+    const inRequestChats = new Map<string | null, string[]>();
+    for (const wait of candidates) {
+      if (wait.wakeDeliveryId && this.#isPending(wait.wakeDeliveryId)) continue;
+      const requestChat = this.#requestChatOf(wait);
+      if (requestChat === undefined || requestChat === runTaskId) inRun.push(wait.id);
+      else inRequestChats.set(requestChat, [...(inRequestChats.get(requestChat) ?? []), wait.id]);
+    }
+    this.markWoken(run.agentId, inRun, deliveryId);
+    return inRequestChats;
+  }
+
+  markWoken(agentId: string, waitIds: readonly string[], deliveryId: string): void {
+    if (waitIds.length === 0) return;
+    this.#store.markWoken(agentId, waitIds, deliveryId);
+    this.#changed(agentId);
   }
 
   countByAgent(): Map<string, number> {
@@ -159,7 +181,7 @@ export class AgentWaits {
         ? `The next run of routine ${wait.routineId} wakes this wait, or a script event that names it.`
         : "The next run of any of your routines wakes this wait, or a script event that names it.",
       scriptEvent: `A local script names the wait with "waitId": "${wait.id}" next to "payload" in the body of its routine run request.`,
-      next: "End your turn now. The run that wakes the wait repeats the request and your note. Close the wait with openbot.close_wait when the request is done.",
+      next: "Say in one short sentence what you wait for, then end your turn. The run that wakes the wait repeats the request and your note in the chat where you opened the wait. Close the wait with openbot.close_wait when the request is done.",
     });
   }
 
@@ -192,6 +214,18 @@ export class AgentWaits {
       throw new AgentWaitError(error instanceof Error ? error.message : String(error));
     }
     return agentId;
+  }
+
+  #requestChatOf(wait: AgentWait): string | null | undefined {
+    if (!this.#mailbox.getDelivery(wait.requestMessageId)) return undefined;
+    const taskId = this.#mailbox.taskIdForDelivery(wait.requestMessageId);
+    if (taskId === null) return null;
+    return this.#hooks.isSideThread(wait.agentId, taskId) ? taskId : undefined;
+  }
+
+  #sideThreadOf(wait: AgentWait): string | null {
+    const taskId = this.#mailbox.taskIdForDelivery(wait.requestMessageId);
+    return taskId !== null && this.#hooks.isSideThread(wait.agentId, taskId) ? taskId : null;
   }
 
   #isPending(deliveryId: string): boolean {

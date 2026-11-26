@@ -2,6 +2,7 @@ import { dirname, join } from "node:path";
 import {
   DEFAULT_AGENT_DEFAULTS,
   DEFAULT_MACHINE_ALERT_SETTINGS,
+  DEFAULT_MEDIA_APPROVAL_CREDITS_SETTING,
   type HostTurnLimitsInput,
 } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
@@ -19,6 +20,7 @@ export function emptyInstanceTransferService(
   uploadDirectory: string,
   exported: readonly AgentSummary[] = [],
   ownerMemberId?: () => string | null,
+  settingsOverrides: Partial<InstanceTransferOptions["settings"]> = {},
 ): InstanceTransferService {
   const forExported =
     <T>(operation: string, value: T) =>
@@ -145,6 +147,7 @@ export function emptyInstanceTransferService(
     routineFlowLinks: (_agentId) => Effect.fail(unexpected("routineFlowLinks")),
     connectRoutineFlow: (_input) => Effect.fail(unexpected("connectRoutineFlow")),
     signedInProviders: () => [],
+    ...settingsOverrides,
   };
   const preference = <T>(name: string, value: T) => ({
     get: () => value,
@@ -162,6 +165,8 @@ export function emptyInstanceTransferService(
     ownerNotificationLevel: preference<"all" | "needs-me" | "nothing" | null>("ownerNotificationLevel", "needs-me"),
     browsingMemory: preference("browsingMemory", { enabled: true }),
     claudeUserSetup: preference("claudeUserSetup", false),
+    cacheExpiryCompaction: preference("cacheExpiryCompaction", true),
+    mediaApprovalCredits: preference("mediaApprovalCredits", DEFAULT_MEDIA_APPROVAL_CREDITS_SETTING),
     claudeCompactWindow: preference<number | null>("claudeCompactWindow", null),
     machineAlerts: preference("machineAlerts", DEFAULT_MACHINE_ALERT_SETTINGS),
     modelVisibility: preference<{ provider: string; hidden: string[] }[]>("modelVisibility", []),

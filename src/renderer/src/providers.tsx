@@ -3,6 +3,7 @@ import {
   type ManagedProviderId,
   pasteCodeSignInSupported,
 } from "@openbot/contracts/agent-providers";
+import { providerCliSource } from "@openbot/contracts/cli-version";
 import {
   type AgentProviderId,
   type AgentStatus,
@@ -11,10 +12,12 @@ import {
   isManagedRuntimeProvider,
   LOCAL_SERVER_ID,
   type ProviderRuntimeDownload,
+  type ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
+import { LIVE_VOICE_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-account-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
@@ -23,6 +26,11 @@ import {
   providerAccountRelay,
 } from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import {
+  PROVIDER_FROZEN_ACCOUNTS_LIMIT,
+  PROVIDER_MANY_ACCOUNTS_CAPABILITY,
+  PROVIDER_MANY_ACCOUNTS_LIMIT,
+} from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
 import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
@@ -59,9 +67,9 @@ const Providers = createSimpleContext({
     const { activeServer } = useServers();
     const { appInfo } = usePlatform();
     const [refreshingProviders, setRefreshingProviders] = createSignal(false);
-    function systemCliVersion(provider: AgentProviderId): string | null {
+    function systemCliVersion(provider: AgentProviderId, runtime: ProviderRuntimeStatus): string | null {
       const row = agentStatus().providers?.find((candidate) => candidate.id === provider);
-      return row?.cliSource === "system" && !row.cliIncomplete ? (row.version ?? null) : null;
+      return row && providerCliSource(row, runtime) === "system" && !row.cliIncomplete ? row.version : null;
     }
     const providerAdminServerId = createMemo(() => remoteAdminServer(activeServer(), "providers-v1")?.id);
     const providerAdmin = () => providersPort().providerAdmin;
@@ -311,6 +319,9 @@ const Providers = createSimpleContext({
     const accountCodeServerId = createMemo(
       () => remoteAdminServer(activeServer(), PROVIDER_ACCOUNT_CODE_CAPABILITY)?.id,
     );
+    const liveVoiceAccountServerId = createMemo(
+      () => remoteAdminServer(activeServer(), LIVE_VOICE_ACCOUNT_CAPABILITY)?.id,
+    );
     const accountKeysServerId = createMemo(
       () => remoteAdminServer(activeServer(), PROVIDER_ACCOUNT_KEYS_CAPABILITY)?.id,
     );
@@ -332,6 +343,9 @@ const Providers = createSimpleContext({
             changed(providerAdmin().renameAccount({ provider, accountId, label }, hostServerId)),
           remove: (provider, accountId) =>
             changed(providerAdmin().removeAccount({ provider, accountId }, hostServerId)),
+          maxAccounts: serverSupportsCapability(activeServer(), PROVIDER_MANY_ACCOUNTS_CAPABILITY)
+            ? PROVIDER_MANY_ACCOUNTS_LIMIT
+            : PROVIDER_FROZEN_ACCOUNTS_LIMIT,
           ...(usageResetServerId() === hostServerId
             ? {
                 usageResets: (provider: AgentProviderId) => providerAdmin().usageResets(provider, hostServerId),
@@ -349,6 +363,12 @@ const Providers = createSimpleContext({
             ? {
                 setPool: (provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) =>
                   changed(providerAdmin().setAccountPool({ provider, enabled, leftOut: [...leftOut] }, hostServerId)),
+              }
+            : {}),
+          ...(liveVoiceAccountServerId() === hostServerId
+            ? {
+                setLiveVoiceAccount: (accountId: string | null) =>
+                  changed(providerAdmin().setLiveVoiceAccount({ accountId }, hostServerId)),
               }
             : {}),
           ...(accountCodeServerId() === hostServerId
@@ -378,6 +398,7 @@ const Providers = createSimpleContext({
         },
         connectWithCode: async (provider, accountId) => connection.connectAccountWithCode(provider, accountId),
         pasteCodeSignIn: pasteCodeSignInSupported(appInfo()?.platform ?? ""),
+        windowsCodeSignIn: appInfo()?.platform === "win32",
         connectKey: (provider, accountId, key) =>
           apply(providersPort().connectProviderAccountKey({ provider, accountId, key })),
         cancel: async (provider, accountId) => {
@@ -391,6 +412,7 @@ const Providers = createSimpleContext({
         signOut: (provider) => apply(providersPort().signOutProvider(provider)),
         setPool: (provider, enabled, leftOut) =>
           apply(providersPort().setProviderAccountPool({ provider, enabled, leftOut: [...leftOut] })),
+        setLiveVoiceAccount: (accountId) => apply(providersPort().setLiveVoiceAccount({ accountId })),
         local: true,
       };
     });
@@ -533,6 +555,8 @@ const Providers = createSimpleContext({
               start: (provider) => providersPort().startProviderCodeLogin(provider),
               submit: (provider, code) => providerAdmin().submitCodeLogin({ provider, code }, LOCAL_SERVER_ID),
               cancel: (provider) => providersPort().cancelProviderCodeLogin(provider),
+              pasteAddress: (provider, address) =>
+                providerAdmin().pasteRelaySignIn({ provider, address }, LOCAL_SERVER_ID),
               accountCode: accountCode(LOCAL_SERVER_ID),
             };
       },

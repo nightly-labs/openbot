@@ -246,7 +246,8 @@ so it survives a restart. Each chat sends its messages one at a time and in orde
 online. An agent message carries a `clientMessageId` when the host advertises `message-client-id-v1`,
 and a channel message uses the same id as its `operationId`, so a repeat after a lost reply stores
 the message once. A message that the host refused shows `Not sent`, and its menu adds Retry; it holds
-the later messages of its chat. A message that the host may have stored is not repeated when
+the later messages of its chat, which show `Waits for the message that was not sent`. A refused message writes its failure kind,
+its file count and its size to the support log, without the error text, which can name a file. A message that the host may have stored is not repeated when
 the host cannot drop a repeat, or 12 hours after its first attempt; it shows `Not confirmed`. This
 visual state is derived only in the mobile UI: it never changes the agent's synced avatar profile or
 sends appearance updates over RTC.
@@ -284,6 +285,37 @@ of the app is visible, so permission and biometric dialogs do not lock it. On An
 recent apps show a blank card. The lock screen draws in `FullWindowOverlay` on iOS and in a `Modal` on
 Android, above sheets. Notification, Live Activity, quick action and share navigation waits until
 the user unlocks. Expo Go does not have the module: it measures with the phone clock and cannot see a phone lock.
+
+## Background refresh
+
+While the user is signed in, the phone asks the system for a background refresh at most once every
+15 minutes. The system decides when it runs. In a refresh, the workspace makes the server connections
+active for at most 25 seconds. It waits until each server loads with its channels and open chats, or
+stops at the retry cooldown, then saves the encrypted workspace copy and makes the connections
+inactive again. The app stays "away" for the hosts, so they continue to send notifications, and a
+chat on screen is not marked as read. A refresh sends no connection analytics.
+
+- iOS uses `BGAppRefreshTask` with the identifier `run.openbot.mobile.refresh` (`UIBackgroundModes`
+  `fetch` in `app.json`). The local `modules/background-refresh` module registers the task at launch
+  and gives each run to JavaScript. iOS lists the app in Settings > General > Background App Refresh.
+- Android uses `expo-background-task` (WorkManager). `package.json` excludes it, `expo-task-manager`
+  and `unimodules-app-loader` from iOS autolinking, because that package schedules only an idle
+  processing task on iOS.
+- The server connections run in a web view, so a refresh needs the React tree. When the system
+  starts the app in the background with no window, React Native does not start (iOS) or no component
+  mounts (Android). The run then ends with no network work, and the refresh stops until the user
+  opens the app again.
+- The support log shows `Background refresh: available` (or the iOS status), and for each run the
+  number of servers that loaded, or why the run did nothing (`Background refresh skipped: ...`). On
+  iOS, the device log (subsystem `run.openbot.mobile`, category `BackgroundRefresh`) shows when iOS
+  started the task and when it ended.
+- Test on a device. iOS has no background tasks in the Simulator. Attach Xcode to `OpenBot`, put
+  the app in the background and pause it. Select a thread that is not the main thread
+  (`thread select <n>`): on the main thread the command does not return. Then run
+  `e -l objc -- @import Foundation`, `e -l objc -- @import BackgroundTasks` and
+  `e -l objc -- (void)[[BGTaskScheduler sharedScheduler] performSelector:NSSelectorFromString(@"_simulateLaunchForTaskWithIdentifier:") withObject:@"run.openbot.mobile.refresh"]`,
+  and continue. Wait before you open the app: a run with the app in the foreground does nothing.
+  On Android, `adb shell cmd jobscheduler run -f run.openbot.mobile <job id>` starts the job.
 
 ## iOS shortcuts
 

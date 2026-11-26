@@ -13,6 +13,7 @@ import type {
   AttachmentSummary,
   ConversationSnapshot,
   DraftAttachment,
+  ResponseStyle,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { plainTaskTitle, taskApproval } from "@openbot/team-client/agent-tasks";
@@ -21,11 +22,14 @@ import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import type { AgentTaskWait } from "@openbot/ui/features/conversation/AgentTasks";
 import type { AttachmentDownloads, AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
 import type { ComposerPasteResult, ComposerSelection } from "@openbot/ui/features/conversation/ComposerEditor";
+import type { MediaApprovalControls } from "@openbot/ui/features/conversation/MediaApprovalCard";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { AgentThreadView, type AgentThreadVoice } from "@openbot/ui/features/conversation/threads/AgentThreadView";
 import { TaskAnswerCard, TaskPanel } from "@openbot/ui/features/tasks/TaskPanel";
 import { TASKS_SIDE_DEFAULT, TASKS_SIDE_MIN, TasksPage, type TasksVoice } from "@openbot/ui/features/tasks/TasksPage";
 import { currentText } from "@openbot/ui/text";
+import { appendVoiceTranscript } from "@openbot/ui/voice-recording";
+import type { JSX } from "@solidjs/web";
 import {
   createEffect,
   createMemo,
@@ -43,12 +47,13 @@ import { toAgentMessages } from "../../app-message-projection";
 import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { readPanelWidth, savePanelWidth } from "../../components/panel-width-storage";
 import { usePlatform } from "../../platform";
-import { appendVoiceTranscript } from "../../voice-recording";
 import { readAgentSelection, writeAgentSelection } from "../agents/agent-selection";
 import { insertAtSelection, insertPastedText, rowAttachments } from "../conversation/composer-draft";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
+import { naturalThreadRows } from "../conversation/narration-rows";
 import { importPastedFiles, type PastePreview, pastePreviewTracker } from "../conversation/stores/composer-actions";
 import { createTurnSteps } from "../conversation/turn-steps";
+import { createTurnStreamHold } from "../conversation/turn-stream-hold";
 import { useTurnTrace } from "../conversation/turn-trace";
 import { createPageHeaderFrame } from "../window/page-header-frame";
 import type { TaskEvent, TasksSource } from "./tasks-port";
@@ -85,6 +90,7 @@ export type TasksVoiceAdapter = TasksVoice & {
 interface TasksViewProps {
   serverId: string;
   hostName: string;
+  failureText?: ((error: string) => string) | undefined;
   onBack?: (() => void) | undefined;
   source: TasksSource;
   agents: AgentProfile[];
@@ -96,10 +102,13 @@ interface TasksViewProps {
   downloads?: AttachmentDownloads | undefined;
   approvals: readonly AgentApproval[];
   onRespondApproval: (approval: AgentApproval, decision: "accept" | "decline") => Promise<boolean>;
+  mediaApproval?: MediaApprovalControls | undefined;
+  approvalCard?: ((approval: AgentApproval) => JSX.Element | undefined) | undefined;
   onRead?: ((input: AgentTaskInput, messageId: string) => void) | undefined;
   waitsForAnswer?: ((task: AgentTask) => boolean) | undefined;
   onOpenInChat?: ((task: AgentTask) => void) | undefined;
   sendShortcut?: SendShortcut | undefined;
+  responseStyle?: ResponseStyle | undefined;
 }
 
 interface PendingStart {
@@ -709,6 +718,12 @@ export function TasksView(props: TasksViewProps) {
       [],
       { key: "id" },
     );
+    const streamHeld = createTurnStreamHold(() => hosted()?.activeTurnId);
+    const shownMessages = createMemo(() =>
+      props.responseStyle === "natural"
+        ? naturalThreadRows(messages, (owner() ?? props.agents[0])?.provider, streamHeld)
+        : messages,
+    );
     const turnSteps = createTurnSteps({
       messages: () => messages,
       lines: () => undefined,
@@ -784,11 +799,13 @@ export function TasksView(props: TasksViewProps) {
               limit={state.snapshots[task()?.agentId ?? ""]?.limit ?? 1}
               agent={agent()}
               bubbleStyle={bubbleStyle()}
+              responseStyle={props.responseStyle}
               agents={props.agents}
-              messages={messages}
+              messages={shownMessages()}
               draft={state.drafts[taskId] ?? ""}
               draftAttachments={filesOf(taskId)}
               rowAttachments={rowFilesOf(taskId)}
+              failureText={props.failureText}
               pendingImages={pendingImagesOf(taskId)}
               onRemoveAttachment={filesAccepted() ? (attachment) => removeFile(taskId, attachment) : undefined}
               onPasteFiles={
@@ -813,6 +830,8 @@ export function TasksView(props: TasksViewProps) {
               mediaSource={props.mediaSource}
               downloads={props.downloads}
               approval={approval()}
+              media={props.mediaApproval}
+              approvalCard={props.approvalCard}
               onRespondApproval={async (decision) => {
                 const current = approval();
                 return current ? props.onRespondApproval(current, decision) : false;

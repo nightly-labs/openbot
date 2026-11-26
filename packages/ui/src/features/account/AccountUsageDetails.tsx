@@ -94,7 +94,9 @@ export function AccountUsageDetails(props: {
                             ? t("account.usage.providerNotReported")
                             : props.loading
                               ? t("account.usage.window.limit")
-                              : t("account.usage.notReported")}
+                              : row().readFailed
+                                ? t("account.usage.readFailed")
+                                : t("account.usage.notReported")}
                         </span>
                       </span>
                       <strong class="account-usage-provider-remaining">

@@ -64,6 +64,7 @@ export const messages = {
   "provider.aria.install": "{name} sağlayıcısını yükle",
   "provider.aria.signIn": "{name} sağlayıcısında oturum aç",
   "provider.aria.codeFallback": "{name} için kodla oturum aç",
+  "provider.aria.addressFallback": "{name} için oturum açma adresini yapıştır",
   "provider.aria.moreActions": "{name} için diğer eylemler",
 
   "provider.aria.use": "OpenBot'ta {name} kullan",
@@ -92,10 +93,15 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "Sizi bekliyor. Bu oturum açma işlemi {time} içinde sona erecek.",
   "provider.codeLogin.linkTitle": "Başka bir cihazda {name} hesabında oturum açın",
   "provider.codeLogin.pageTitle": "{name} hesabında oturum açın",
+  "provider.codeLogin.addressDescription":
+    "Oturum açmayı tarayıcınızda tamamlayın. Oturum açma bitince bu pencere kapanır.",
   "provider.codeLogin.pageDescription": "Bu sayfa {host} üzerindeki tarayıcıda açık. Burada oturum açın.",
   "provider.codeLogin.relayStarting": "{name} oturum açma işlemi {host} üzerinde başlatılıyor…",
   "provider.codeLogin.pageOpening": "{name} oturum açma sayfası {host} üzerinde açılıyor…",
   "provider.codeLogin.linkStep": "{name} hesabında oturum açın. OpenBot kendiliğinden devam eder.",
+  "provider.codeLogin.thisComputerDescription":
+    "Bu bağlantıyı bu bilgisayardaki bir tarayıcıda açın. OpenBot burada bekler.",
+  "provider.codeLogin.copyLink": "Bağlantıyı kopyala",
   "provider.codeLogin.chatgptDeviceSetting":
     "Bir bilgisayarda ChatGPT'de güvenlik ayarlarını açın ve Codex için cihaz koduyla oturum açmayı açın. İş hesabında bunu çalışma alanı yöneticiniz açar.",
   "provider.useApp.title": "{name} bağlantısını OpenBot uygulamasında yapın",
@@ -117,11 +123,14 @@ export const messages = {
   "provider.picker.download": "{name} indirmesi",
   "provider.picker.search": "Modellerde ara",
   "provider.picker.noMatches": "Aramanızla eşleşen model yok.",
+  "provider.picker.openrouterNoMatches":
+    "Aramanızla eşleşen model yok. openrouter.ai üzerindeki gizlilik, sağlayıcı ve koruma (guardrail) ayarlarınız bu listedeki bazı modelleri gizleyebilir.",
   "provider.picker.workspaceOnlyUnavailable":
     'Bu modeller Windows ve Linux\'ta "Yalnızca çalışma alanı" ile çalışmaz. Kullanmak için ajan ayarlarında "İzinler"i değiştirin.',
   "provider.picker.olderModels": "Eski modeller",
   "provider.picker.olderModelsList": "Eski {name} modelleri",
-  "provider.picker.noModels": "{name} sağlayıcısından kullanılabilir model yok.",
+  "provider.picker.noModels":
+    "Burada {name} modeli görünmüyor. Kapalıysalar, bir yönetici bunları Sunucu ayarları > Sağlayıcılar > {name} > Modeller bölümünden açabilir.",
   "provider.picker.endpointModelsInCustom": "{name} özel uç noktalarınızı çalıştırıyor. Modelleri Özel sekmesinde.",
   "provider.picker.showCustomModels": "Modelleri göster",
   "provider.picker.museNoModels":
@@ -141,6 +150,7 @@ export const messages = {
   "provider.picker.effort": "Efor",
   "provider.picker.effortLabel": "Ajan akıl yürütme eforu",
   "provider.picker.effortFixed": "{effort}, {provider} tarafından sabit",
+  "provider.picker.effortLimited": "Claude ayarların veya kuruluşun eforu {effort} ile sınırlıyor.",
   "provider.picker.fast": "Hızlı",
   "provider.picker.fastText": "Daha hızlı yanıtlar, daha fazla kullanım",
   "provider.picker.speed": "Hız",
@@ -225,6 +235,7 @@ export const messages = {
   "provider.account.apiKey": "API anahtarı",
   "provider.account.listLabel": "{name} hesapları",
   "provider.account.usedBy": "Kullanan: {agents}",
+  "provider.account.sameEmail": "{name} ile aynı e-posta",
   "provider.account.failed": "Oturum açılamadı",
   "provider.account.moreActions": "{name} için diğer eylemler",
   "provider.account.renameLabel": "{name} adı",
@@ -265,6 +276,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot sunucuda {provider} oturumunu kapatır.",
   "provider.settings.geminiKeyReplacesAccount":
     "Google oturumu yerine kayıtlı bir Gemini API anahtarı kullanılıyor. Bir Google planını ve modellerini kullanmak için anahtarı kaldır.",
+  "provider.settings.museKeyInUse":
+    "Muse oturum açmanızı değil, bu anahtarı kullanır. Oturum açmanızı kullanmak için anahtarı kaldırın.",
   "provider.settings.versionInstalledByUser": "{version} · senin yüklediğin",
   "provider.settings.versionDownloaded": "{version} · OpenBot tarafından indirildi",
   "provider.settings.otherVersionInstalledByUser": "Kullanılmıyor: {version} · senin yüklediğin",
@@ -276,10 +289,14 @@ export const messages = {
   "provider.settings.cache": "Önbellek",
   "provider.settings.promptCache": "İstem önbelleği",
   "provider.settings.promptCacheDescription":
-    "Claude'un bir ajanın bağlamını turlar arasında önbellekte ne kadar tuttuğu.",
+    "Claude ve Pi'nin bir ajanın bağlamını turlar arasında önbellekte ne kadar tuttuğu.",
   "provider.settings.promptCacheHour": "1 saat",
-  "provider.settings.promptCacheDefault": "Claude Code varsayılanı",
+  "provider.settings.promptCacheDefault": "Sağlayıcı varsayılanı",
   "provider.settings.promptCacheLoadFailed": "Bu sunucunun istem önbelleği süresi yüklenemedi.",
+  "provider.settings.cacheExpiryCompaction": "Önbelleğin süresi dolmadan sıkıştır",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "200K veya daha fazla token bağlamı olan bir sohbet 1 saatlik önbellekle boşta olduğunda, ajan önbelleğin süresi dolmadan bağlamı sıkıştırır. Böylece sonraki mesaj tüm bağlamı önbelleksiz yeniden okumaz.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "Bu sunucunun sıkıştırma ayarı yüklenemedi.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Kendi Claude Code kurulumumu kullan",
   "provider.settings.claudeUserSetupDescription":

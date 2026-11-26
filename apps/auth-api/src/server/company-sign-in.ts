@@ -18,6 +18,7 @@ const RATE_WINDOW_MS = 15 * 60_000;
 const START_EMAIL_LIMIT = 5;
 const START_IP_LIMIT = 20;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
+const BROWSER_EXTENSION_ID_PATTERN = /^[a-p]{32}$/u;
 const RETURN_PATTERN = /^http:\/\/(?:127\.0\.0\.1|localhost):[0-9]{2,5}\/company-sign-in$/u;
 export const WEB_RETURN_PATH = "/api/browser/company/return";
 const DOMAIN_RECORD_PREFIX = "_openbot";
@@ -202,6 +203,7 @@ export class CompanySignInService {
   readonly #database: D1Database;
   readonly #secret: string | null;
   readonly #development: boolean;
+  readonly #browserExtensionIds: ReadonlySet<string>;
   readonly #fetch: Fetch;
   readonly #now: () => number;
   readonly #flushSessionRevocations: () => Effect.Effect<void, RemoteFailure>;
@@ -213,7 +215,10 @@ export class CompanySignInService {
   readonly #joinServer: JoinServer;
 
   constructor(
-    bindings: Pick<WorkerBindings, "DB" | "COMPANY_SIGN_IN_SECRET" | "AUTH_EXPOSE_DEVELOPMENT_CODE">,
+    bindings: Pick<
+      WorkerBindings,
+      "DB" | "COMPANY_SIGN_IN_SECRET" | "AUTH_EXPOSE_DEVELOPMENT_CODE" | "BROWSER_EXTENSION_IDS"
+    >,
     options: {
       fetch?: Fetch;
       now?: () => number;
@@ -230,6 +235,12 @@ export class CompanySignInService {
     this.#database = bindings.DB;
     this.#secret = secret && new TextEncoder().encode(secret).byteLength >= 32 ? secret : null;
     this.#development = bindings.AUTH_EXPOSE_DEVELOPMENT_CODE === "true";
+    this.#browserExtensionIds = new Set(
+      (bindings.BROWSER_EXTENSION_IDS ?? "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => BROWSER_EXTENSION_ID_PATTERN.test(id)),
+    );
     this.#fetch = options.fetch ?? ((input, init) => fetch(input, init));
     this.#now = options.now ?? Date.now;
     this.#flushSessionRevocations = options.flushSessionRevocations ?? (() => Effect.void);
@@ -721,6 +732,37 @@ export class CompanySignInService {
       return yield* new CompanySignInError(403, "company_account_disabled", "Your company turned this account off.");
     }
     yield* this.#join(flow.host_id, userId, { restore: false });
+    return { code: yield* this.#issueCode(userId, flow.client_challenge) };
+  });
+
+  readonly issueBrowserExtensionCode = Effect.fn("CompanySignIn.issueBrowserExtensionCode")(function* (
+    this: CompanySignInService,
+    userId: string,
+    input: { extensionId: string; clientChallenge: string },
+  ): Effect.fn.Return<{ code: string }, CompanySignInFailure> {
+    const listed = this.#development || this.#browserExtensionIds.has(input.extensionId);
+    if (!BROWSER_EXTENSION_ID_PATTERN.test(input.extensionId) || !listed) {
+      return yield* new CompanySignInError(
+        403,
+        "browser_extension_not_allowed",
+        "This browser extension cannot sign in to OpenBot.",
+      );
+    }
+    if (!TOKEN_PATTERN.test(input.clientChallenge)) {
+      return yield* new CompanySignInError(
+        400,
+        "invalid_company_sign_in_code",
+        "The sign-in did not finish. Try again.",
+      );
+    }
+    return { code: yield* this.#issueCode(userId, input.clientChallenge) };
+  });
+
+  readonly #issueCode = Effect.fn("CompanySignIn.issueCode")(function* (
+    this: CompanySignInService,
+    userId: string,
+    clientChallenge: string,
+  ): Effect.fn.Return<string, CompanySignInFailure> {
     const exchangeCode = randomToken(32);
     const codeHash = yield* sha256(exchangeCode).pipe(Effect.mapError(() => new CompanySignInOperationError({})));
     const now = this.#now();
@@ -730,10 +772,10 @@ export class CompanySignInService {
           `INSERT INTO company_sign_in_codes(code_hash, user_id, client_challenge, created_at, expires_at)
            VALUES (?, ?, ?, ?, ?)`,
         )
-        .bind(codeHash, userId, flow.client_challenge, now, now + CODE_TTL_MS)
+        .bind(codeHash, userId, clientChallenge, now, now + CODE_TTL_MS)
         .run(),
     );
-    return { code: exchangeCode };
+    return exchangeCode;
   });
 
   readonly #join = Effect.fn("CompanySignIn.join")(function* (

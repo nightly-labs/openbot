@@ -471,6 +471,18 @@ the whole copy when the next snapshot comes (`keepWholeApprovals` in
 404, a member needs `chat` on the agent (else 403), and a request that no longer waits, or a request of
 another agent, gets 409.
 
+The optional `pending-prompts-v1` capability (protocol 10 only) adds `POST /v1/agent-prompts/list`
+(empty body). It returns `{ prompts }`: every question that an agent waits on, oldest first, up to 200
+and up to the byte limit of a runtime snapshot (`pendingPromptsWithinLimits`), in the form of a runtime
+snapshot entry. A runtime snapshot holds at most 4 questions, approvals and
+browser takeovers of all agents together, and sets `attentionComplete: false` when it leaves some out.
+A client that gets such a snapshot reads this list. It shows each listed question in its chat, in
+place of an older question that the list does not confirm, and keeps the listed questions until a
+complete snapshot comes. Without the read, a question that came while the client was away had no card after a restart, a
+reload or a reconnect, and the agent waited (#13486). `src/main/team-api/route-pending-prompts.ts`
+leaves out the questions of a hidden or missing agent and of an agent that the member cannot see.
+The phone draws a question card from the chat messages, so it does not read this list.
+
 The optional `phone-feedback-v1` capability (protocol 9 only) adds
 `POST /v1/agent-approvals/send-phone-feedback` (`requestId`, `phone`). `phone` is what only the phone
 has: `platform` (`iOS` or `Android`), `appVersion`, `system`, `network` (the kind of connection and
@@ -572,6 +584,55 @@ admins can use them (else 403); the wire codec refuses a size outside the range 
 applies to the Claude processes that start after it, and the host sends the provider status event, so
 open settings pages read it again. `src/main/team-api/route-claude-compact-window.ts` owns them.
 Without the capability a client hides the row for that host.
+
+The optional `media-approval-credits-v1` capability (protocol 10 only) adds
+`POST /v1/admin/host/media-approval-credits` (empty request) and
+`POST /v1/admin/host/media-approval-credits/update` (`agents` and `askWhenBlocked`: booleans;
+`credits`: a whole number from 0 to 100,000; `imageModel` and `videoModel`: a model ID or `null`; each
+field is optional and a missing field stays). Both give
+`{ agents, askWhenBlocked, credits, imageModel, videoModel }`; the default is agents on, asks on,
+50 credits and no default model. When `agents` is false, or the balance is less than the price,
+`generate_image` and `generate_video` hold the call with a credits hold (see `media-approval-choice-v1`)
+and spend no credits; `list_media_models` still works. When `askWhenBlocked` is false, the call does
+not hold: the tool tells the agent that it skipped the step. When
+one `generate_image` or `generate_video` call costs more credits than this limit, the user must approve
+it. When the agent names no model, the call uses the default model of its kind if that model takes the
+input pictures. With no default model set, it uses the first preferred model in the catalog that
+takes the input pictures (`CREDIT_MEDIA_PREFERRED_MODELS`: `gpt-image-2.6` for images; `magi-2`, then
+`seedance-2.5` for videos), and `list_media_models` gives the first available one as `defaultModels`. Only owners and admins can use them (else 403); the host refuses a value outside the
+range, not whole, or a model ID that is not valid with 400. A change applies to the next call.
+`src/main/team-api/route-media-approval-credits.ts` owns them. Without the capability a client hides
+the row for that host.
+
+The optional `media-approval-choice-v1` capability (protocol 10 only) lets a member change the request
+in a pending media approval. The approval itself stays a `permissions` approval with no command, folder
+or permissions, so an older client shows the plain Allow card. `POST /v1/agent-approvals/media/read`
+(`agentId`, `requestId`) gives `{ media }`: `null` when the request is not a pending media approval,
+else the kind, the prompt, the agent's model and settings (`choice`), the default model, at most 200
+models that take the input pictures, and `canSetDefault` (true for owners and admins).
+`POST /v1/agent-approvals/media/respond` (`agentId`, `requestId`, `choice`: `model`, `aspect`,
+`resolution`, `duration`, `audio`) allows the approval with that choice and gives 204. The host plans
+the job again with the choice; when the new price is higher, it checks the balance again. A member
+needs the chat level on the agent. An unknown or hidden agent gets 404, a request that is not valid
+400, a request that is no longer pending 409. To decline, the client uses the normal approval route.
+"Set as default" uses `media-approval-credits-v1`. `src/main/team-api/route-media-approval-choice.ts`
+owns the routes. Without the capability a client shows the plain Allow card.
+
+The same capability carries the credits hold. The read also gives `hold`: `null`, or the hold of the
+turn with `reason` (`balance` or `agentsOff`), the number of held `images` and `videos`, their total
+`cost`, the `balance` (`null` for `agentsOff`) and `canEnable` (true for owners and admins). All held
+calls of one turn share one approval, so one answer answers all of them.
+`POST /v1/agent-approvals/media/hold` (`agentId`, `requestId`, `action`: `continue`, `enable`, `skip`
+or `mute`) gives `{ hold }`. `continue` checks the balance again: when it is enough, the calls continue
+and `hold` is `null`; else `hold` has the new balance. `enable` turns agent use of credits on (owners
+and admins only, else 403), then continues. `skip` and `mute` end the hold with no charge. `mute` from
+an owner or an admin sets `askWhenBlocked` to false; from a member, it stops the asks for the turns
+that member starts. `POST /v1/agent-approvals/media/muted` (`muted`: a boolean) gives 204 and sets the
+same mute (the client's Undo and the switch in the Credits rail hover card).
+`POST /v1/agent-approvals/media/muted/read` (empty body) gives `{ muted }`: for an owner or an admin,
+`askWhenBlocked` is false; for a member, that member muted the asks. The host keeps the muted members in
+`openbot-credit-asks-muted-v1.json`. An older client shows the hold as a plain approval card: Allow
+continues and Decline skips.
 
 The optional `provider-environment-v1` capability (protocol 9 only) adds
 `POST /v1/admin/host/provider-environment` (`provider`: `claude`, `codex` or `antigravity`) and

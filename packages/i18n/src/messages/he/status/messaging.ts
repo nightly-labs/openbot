@@ -37,6 +37,8 @@ export const messages = {
     "עדיין אין סוכן שיכול לענות כאן. ב-OpenBot, יש לפתוח את חנות > אפליקציות > Telegram וללחוץ על הוספת סוכן.",
   "status.messaging.telegramLinked":
     "OpenBot מחובר לצ'אט הזה. אפשר לתייג את {bot} או להשיב להודעה של OpenBot כדי לשאול את הסוכנים.",
+  "status.messaging.telegramNotLinked":
+    "OpenBot לא מחובר לצ'אט הזה. כדי לחבר אותו, יש לפתוח את אפליקציית OpenBot, לעבור אל חנות ← אפליקציות ← Telegram ולבחור „הוספה לקבוצה” או „פתיחת צ'אט ישיר”.",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "עונה ב-Telegram ושואל את הצוות",
   "status.messaging.whatsappNoAgent": "עדיין אין סוכן שיכול לענות כאן. יש להוסיף את WhatsApp Orchestrator ב-OpenBot.",
@@ -54,6 +56,8 @@ export const messages = {
     "OpenBot נוסף מקושר למספר הוואטסאפ הזה, ולכן ייתכן שיתקבלו שתי תשובות. כדי לתקן זאת, יש לפתוח את 'מכשירים מקושרים' בוואטסאפ בטלפון ולהתנתק מה-OpenBot שאינו בשימוש.",
   "status.messaging.whatsappPaused":
     "OpenBot הפסיק לענות כאן למשך 10 דקות: הגיעו יותר מדי הודעות בזמן קצר. אם OpenBot נוסף מקושר למספר הזה, יש לפתוח את 'מכשירים מקושרים' בוואטסאפ בטלפון ולהתנתק מה-OpenBot שאינו בשימוש.",
+  "status.messaging.whatsappNotDelivered": "וואטסאפ לא קיבל את התשובה הזו, ולכן האדם לא קיבל אותה.",
+  "status.messaging.whatsappPartlyDelivered": "וואטסאפ לא קיבל את כל התשובה הזו, ולכן האדם קיבל רק חלק ממנה.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "עונה ב-WhatsApp ושואל את הצוות",
 } as const satisfies PartialTranslation<typeof source>;

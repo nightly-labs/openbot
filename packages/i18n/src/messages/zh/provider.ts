@@ -64,6 +64,7 @@ export const messages = {
   "provider.aria.install": "安装 {name}",
   "provider.aria.signIn": "登录 {name}",
   "provider.aria.codeFallback": "用验证码登录 {name}",
+  "provider.aria.addressFallback": "粘贴 {name} 的登录地址",
   "provider.aria.moreActions": "{name} 的更多操作",
 
   "provider.aria.use": "在 OpenBot 中使用 {name}",
@@ -91,10 +92,13 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "等待你的操作，本次登录将在 {time} 后终止。",
   "provider.codeLogin.linkTitle": "在另一台设备上登录 {name}",
   "provider.codeLogin.pageTitle": "登录 {name}",
+  "provider.codeLogin.addressDescription": "请在浏览器中完成登录。登录完成后，此窗口会自动关闭。",
   "provider.codeLogin.pageDescription": "该页面已在 {host} 的浏览器中打开，请在这里登录。",
   "provider.codeLogin.relayStarting": "正在 {host} 上启动 {name} 登录…",
   "provider.codeLogin.pageOpening": "正在 {host} 上打开 {name} 登录页面…",
   "provider.codeLogin.linkStep": "登录 {name}，OpenBot 会自动继续。",
+  "provider.codeLogin.thisComputerDescription": "请在这台电脑的浏览器中打开此链接。OpenBot 会在这里等待。",
+  "provider.codeLogin.copyLink": "复制链接",
   "provider.codeLogin.chatgptDeviceSetting":
     "在电脑上的 ChatGPT 中打开安全设置，为 Codex 开启设备代码登录。工作账号由工作区管理员开启。",
 
@@ -117,11 +121,14 @@ export const messages = {
   "provider.picker.download": "{name} 下载",
   "provider.picker.search": "搜索模型",
   "provider.picker.noMatches": "没有匹配的模型。",
+  "provider.picker.openrouterNoMatches":
+    "没有匹配的模型。你在 openrouter.ai 上的隐私、提供商和防护设置可能会在此列表中隐藏部分模型。",
   "provider.picker.workspaceOnlyUnavailable":
     "在 Windows 和 Linux 上，这些模型无法以“仅工作区”运行。要使用它们，请在助手设置中更改“权限”。",
   "provider.picker.olderModels": "旧版模型",
   "provider.picker.olderModelsList": "旧版 {name} 模型",
-  "provider.picker.noModels": "{name} 没有可用的模型。",
+  "provider.picker.noModels":
+    "这里没有显示 {name} 模型。如果它们已关闭，管理员可以在“服务器设置 > 服务商 > {name} > 模型”中开启它们。",
   "provider.picker.endpointModelsInCustom": "{name} 运行你的自定义端点。它们的模型在“自定义”标签页中。",
   "provider.picker.showCustomModels": "查看模型",
   "provider.picker.museNoModels":
@@ -140,6 +147,7 @@ export const messages = {
   "provider.picker.effort": "强度",
   "provider.picker.effortLabel": "助手推理强度",
   "provider.picker.effortFixed": "{effort}（由 {provider} 固定）",
+  "provider.picker.effortLimited": "你的 Claude 设置或组织将推理强度限制为 {effort}。",
   "provider.picker.fast": "快速",
   "provider.picker.fastText": "响应更快，用量更多",
   "provider.picker.speed": "速度",
@@ -218,6 +226,7 @@ export const messages = {
   "provider.account.numbered": "账号 {number}",
   "provider.account.listLabel": "{name} 的账号",
   "provider.account.usedBy": "被 {agents} 使用",
+  "provider.account.sameEmail": "与 {name} 的邮箱相同",
   "provider.account.failed": "登录失败",
   "provider.account.moreActions": "{name} 的更多操作",
   "provider.account.renameLabel": "{name} 的名称",
@@ -287,6 +296,7 @@ export const messages = {
   "provider.settings.geminiKeyInUse": "Gemini 使用该密钥，而不是你的 Google AI 套餐。不显示该套餐的用量。",
   "provider.settings.geminiKeyReplacesAccount":
     "已保存的 Gemini API 密钥代替 Google 登录使用。要使用 Google 套餐及其模型，请删除该密钥。",
+  "provider.settings.museKeyInUse": "Muse 使用此密钥，而不是你的登录。要使用你的登录，请移除该密钥。",
   "provider.settings.addKey": "添加密钥",
   "provider.settings.changeKey": "更换密钥",
   "provider.settings.runtime": "运行时",
@@ -304,10 +314,14 @@ export const messages = {
   "provider.settings.diagnostics": "诊断",
   "provider.settings.cache": "缓存",
   "provider.settings.promptCache": "提示缓存",
-  "provider.settings.promptCacheDescription": "Claude 在两轮对话之间把助手的上下文保留在缓存中的时长。",
+  "provider.settings.promptCacheDescription": "Claude 和 Pi 在两轮之间将智能体上下文保留在缓存中的时间。",
   "provider.settings.promptCacheHour": "1 小时",
-  "provider.settings.promptCacheDefault": "Claude Code 默认",
+  "provider.settings.promptCacheDefault": "提供商默认值",
   "provider.settings.promptCacheLoadFailed": "无法加载该服务器的提示缓存时长。",
+  "provider.settings.cacheExpiryCompaction": "在缓存过期前压缩",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "当上下文达到 20 万个令牌或更多的聊天在 1 小时缓存下处于空闲状态时，智能体会在缓存过期前压缩上下文。这样下一条消息就不会在没有缓存的情况下重新读取完整上下文。",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "无法加载此服务器的压缩设置。",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "使用我的 Claude Code 配置",
   "provider.settings.claudeUserSetupDescription":

@@ -1,5 +1,191 @@
 [
   {
+    "version": "0.79.0",
+    "date": "2026-11-25",
+    "notices": [
+      "Aggiorna anche ogni server a cui ti sei unito a questa versione. Gli strumenti per immagini e video con crediti, le richieste di posizione e molte delle correzioni qui sotto funzionano su un server solo se il server ha questa versione."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Gli agenti possono creare immagini e video con i crediti di OpenBot e modificare le tue foto. La scheda di approvazione mostra il modello, il prezzo e il prompt. Puoi scegliere un altro modello prima di consentire. La voce Credits nella barra a sinistra mostra il tuo saldo. Un proprietario o un amministratore può attivare o disattivare «Gli agenti possono usare crediti».",
+          "Gli agenti possono pagare i siti in crypto da un wallet NEAR Intents. Collegalo in Impostazioni server › Vault › Crypto con una passkey, poi fai un deposito. Ogni pagamento attende la tua approvazione nella chat, a meno che tu non scelga «Consenti sempre» per quel sito. Un budget giornaliero limita quanto possono spendere gli agenti. Il wallet vale solo per questo computer e i pagamenti usano fondi reali.",
+          "Ogni account riceve 10 crediti gratuiti di benvenuto. Puoi anche riscattare un codice nella pagina Credits con Redeem code.",
+          "La scheda del browser di un agente può chiedere la tua posizione. La chat ti chiede prima, e tu scegli Blocca, Consenti sempre o Consenti. Prima il browser bloccava sempre la richiesta.",
+          "La barra laterale ha schede sopra l’elenco delle chat: Tutte, Non lette e le cartelle che scegli. Ogni scheda mostra le sue chat non lette."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Un nuovo passaggio di un flusso di lavoro ora parte con un modello che può funzionare. Un passaggio di testo usa il tuo modello preferito, o il modello abituale di un provider collegato.",
+          "Se hai solo crediti gratuiti, l’elenco dei modelli di una scheda di approvazione contrassegna con «Crediti gratuiti» i modelli che pagano con i crediti gratuiti.",
+          "Il pannello laterale può dividersi in massimo tre gruppi, uno sopra l’altro. Trascina la linea tra due gruppi per cambiarne le altezze."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "L’app si blocca meno spesso, soprattutto su Windows. Conserva per poco tempo i risultati dei controlli lenti e svolge il lavoro lento in background.",
+          "Quando un agente Claude finisce un piano in modalità piano, la chat ora mostra il piano con Approva e Stop planning. Prima non compariva nessuna approvazione e l’agente iniziava a costruire.",
+          "Un messaggio di un altro agente o di una routine non ferma più il lavoro di un agente Claude occupato.",
+          "Un avviso di un sito nella scheda del browser di un agente non copre più la finestra di OpenBot finché non clicchi OK. L’avviso si chiude da solo e l’agente riceve il suo testo.",
+          "Su un desktop Linux X11, digitare in OpenBot non si interrompe più dopo che un agente usa Controllo del computer in un’altra app. Se la digitazione si è già interrotta, esci e rientra una volta."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Aggiorna anche ogni server a cui ti sei unito a questa versione. Molte delle correzioni qui sotto funzionano su un server solo se il server ha questa versione."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Usa la voce nei canali. Quando detti un messaggio a un canale, l’app legge ad alta voce la risposta di un agente. Puoi anche avviare una conversazione vocale dalla casella dei messaggi del canale.",
+          "Nascondi un server dalla barra dei server. Il server è nascosto anche sugli altri tuoi computer. Selezionalo nella cartella «Server nascosti» per mostrarlo di nuovo."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "La pagina Attività ora si chiama Thread, come nell’app per il telefono e nel pannello laterale della chat.",
+          "Le risposte in streaming e i flussi di lavoro che girano nello stesso momento usano meno CPU, e il client web apre un server più in fretta."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Su Mac, Connetti e Aggiungi account per Claude ora aprono la pagina di accesso di Claude da OpenBot.",
+          "Quando la connessione a un server a cui ti sei unito smette di inviare dati, l’app si riconnette da sola.",
+          "I canali lunghi di un server a cui ti sei unito si aprono e si aggiornano più in fretta.",
+          "Un output «Notifica» di un flusso di lavoro o un passaggio che aspetta un’approvazione ora invia una notifica sul telefono.",
+          "Una chat con Gemini continua dopo che Google rifiuta un risultato di uno strumento. Prima, ogni messaggio successivo falliva."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.77.0",
+    "date": "2026-11-23",
+    "notices": [
+      "Aggiorna a questa versione anche ogni server a cui ti sei unito. Su un server, i modelli OpenBot che usano crediti, i flussi di lavoro in pausa ed esportati, le chat WhatsApp in sola lettura, le richieste di posizione e la scelta del server Signal funzionano solo se il server ha questa versione.",
+      "Dopo questo aggiornamento, una versione precedente di OpenBot non può aprire i tuoi dati."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Acquista crediti OpenBot per te o per un server dal pulsante Credits nella barra delle pagine o in Impostazioni → Fatturazione. Una licenza a pagamento dà anche crediti gratuiti ogni mese.",
+          "I passaggi di immagini e video di un flusso di lavoro possono usare i modelli OpenBot pagati dai tuoi crediti, senza un altro accesso. Imposta Lotto su un passaggio per ottenere fino a 4 risultati nello stesso momento.",
+          "Metti in pausa un flusso di lavoro dal menu del flusso di lavoro. Puoi anche esportare un flusso di lavoro in un file e importarlo su un altro computer o server.",
+          "Scrivi {{ in un passaggio del flusso di lavoro per aggiungere un campo di un passaggio precedente. Anche i trigger Pianificazione, GitHub, Discord, Telegram e Slack ora forniscono campi.",
+          "Un agente può chiedere la tua posizione quando una richiesta la richiede, ad esempio «ristoranti vicino a me». Non viene inviato nulla finché non rispondi.",
+          "Imposta un contatto o un gruppo WhatsApp consentito in sola lettura. I tuoi agenti possono leggere la chat, e OpenBot non ci scrive mai."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Una chat inattiva di Claude o Pi con 200K o più token di contesto si compatta da sola prima che scada la sua cache dei prompt di 1 ora. Costa meno che rileggere tutto il contesto. Disattivala in Impostazioni server → Provider.",
+          "Scegli il server Signal di un server in Impostazioni server → Generali. «Automatico» mantiene quello più vicino.",
+          "Gli agenti Gemini con Accesso completo usano gli strumenti di OpenBot, come memoria, browser e canali, senza una scheda di approvazione."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un messaggio che invii a un agente Claude mentre lavora ora arriva subito all’agente, anche mentre esegue un subagente o uno strumento lungo.",
+          "Un agente ChatGPT (Codex) impostato su Chiedi prima ora ti chiede conferma prima di eseguire un comando o modificare un file.",
+          "Un server ospitato o self-hosted che smette di rispondere ora riparte da solo dopo 10 minuti.",
+          "Su macOS, il dock degli agenti non rende più lenti OpenBot e tutto il computer.",
+          "Le chat lunghe scorrono in modo fluido. Prima una chat con più di 100 messaggi scattava mentre scorrevi."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Aggiorna a questa versione anche ogni server a cui ti sei unito. Su un server, le attività eseguite in parallelo, l’account della voce dal vivo, l’interruttore della memoria di OpenBot, le cartelle dei flussi di lavoro, le risposte tipizzate dei flussi di lavoro e più di 10 account dello stesso provider funzionano solo se il server ha questa versione.",
+      "Dopo questo aggiornamento, una versione precedente di OpenBot non può aprire i tuoi dati."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Un agente può dividere il lavoro non correlato in attività che vengono eseguite in parallelo. Ogni risultato torna alla chat principale, e l’agente combina i risultati per te.",
+          "Vedi tutti i thread aperti di un agente nella nuova scheda Thread del pannello laterale. La scheda mostra il numero di thread che ti aspettano.",
+          "Cambia le scorciatoie da tastiera nella nuova scheda Tastiera delle Impostazioni. Le nuove scorciatoie avviano un thread e passano al thread successivo e a quello precedente.",
+          "I flussi di lavoro si aprono in schede, e i passaggi possono dare risposte tipizzate. Scrivi {{name}} per inserire una risposta in un passaggio successivo.",
+          "Carica un video MP4 o WebM come sfondo della finestra in Impostazioni > Aspetto.",
+          "Scegli l’account ChatGPT che usa la voce dal vivo di GPT in Impostazioni > Voce."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Un provider mantiene fino a 20 account. Prima il limite era 10.",
+          "La dettatura registra fino a 10 minuti. Prima si fermava dopo 2 minuti.",
+          "Un thread carica i messaggi più vecchi quando scorri vicino alla parte alta. Non devi cliccare un pulsante."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Una routine pianificata non si spegne più in silenzio quando un’esecuzione non ha nulla da segnalare.",
+          "Una chat lunga conserva tutti i suoi messaggi, nell’ordine corretto, mentre arriva una risposta.",
+          "Un numero WhatsApp collegato non smette più di ricevere messaggi mentre mostra ancora «Connesso».",
+          "Su Windows, gli agenti OpenCode eseguono di nuovo i comandi. Prima spesso fallivano con «opencode-pty request timed out».",
+          "Un agente che hai silenziato non ti invia più notifiche quando risponde in un canale."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Aggiorna a questa versione anche ogni server a cui ti sei unito. Su un server, le impostazioni dei passaggi del flusso di lavoro, Esegui da questo passo, il passaggio di proprietà, il pulsante Aggiorna tutti e molte correzioni per gli agenti funzionano solo se il server ha questa versione.",
+      "Dopo questo aggiornamento, una versione precedente di OpenBot non può aprire i tuoi dati."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Parla con un agente con Premi per parlare. Tieni premuto il pulsante per parlare o il tasto per parlare mentre parli. OpenBot invia ciò che hai detto quando rilasci. Cambia il tasto in Impostazioni > Voce.",
+          "Avvia di nuovo un flusso di lavoro da un passaggio. Nel menu del passaggio, seleziona Esegui da questo passo. I passaggi precedenti mantengono le loro risposte e non vengono eseguiti di nuovo.",
+          "Vedi le impostazioni e gli input che hanno prodotto il risultato di un passaggio del flusso di lavoro. Seleziona Impostazioni sul passaggio, poi Usa queste impostazioni per eseguirlo di nuovo allo stesso modo.",
+          "Passa il tuo server a un altro account OpenBot. In Impostazioni server > Membri, inserisci l’email del nuovo proprietario. Il server cambia proprietario quando lo accetta.",
+          "Aggiorna tutti i provider insieme. Impostazioni > Provider mostra Aggiorna tutti quando uno o più provider hanno un aggiornamento."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot aggiorna ogni ora le CLI dei provider che ha scaricato, quando è disponibile una nuova versione. L’aggiornamento attende che gli agenti siano inattivi.",
+          "Ogni thread di un agente può usare le schede del browser che la chat principale o un altro thread di quell’agente ha aperto.",
+          "La scheda Routine è scomparsa dalla barra laterale. Le routine continuano a essere eseguite. Gestiscile nelle impostazioni dell’agente, nella pagina Pianificazione e in Impostazioni server > Routine."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Il riavvio per un aggiornamento scaricato ora attende che gli agenti siano inattivi, con Annulla riavvio. Prima OpenBot si chiudeva subito e interrompeva l’attività dell’agente.",
+          "Un agente non resta più su «In lavorazione» con i messaggi in attesa dopo un riavvio o un limite di utilizzo. Il turno interrotto appare come interrotto, e i messaggi in attesa partono.",
+          "Un server carico con molti agenti e dispositivi collegati non esaurisce più la memoria e non si blocca quando seleziona il turno successivo.",
+          "Un messaggio che invii dopo una pausa non resta più su «Non inviato» con «Connetti Claude per continuare.» quando Claude è connesso.",
+          "Le schede del browser degli agenti che nessuno usa smettono di usare il processore dopo 2 minuti."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.74.0",
     "date": "2026-11-19",
     "notices": [

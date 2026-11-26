@@ -64,6 +64,7 @@ export interface HostedSiteCoordinatorOptions {
   conversation: ConversationRuntime;
   hostedSites: AgentHostedSites | null;
   emitError(code: string, error: unknown, agentId?: string): void;
+  reportFailure(code: string, error: unknown, agentId: string): void;
   isStopping(): boolean;
   redact(text: string): string;
 }
@@ -86,6 +87,7 @@ export class HostedSiteCoordinator {
   readonly #conversation: ConversationRuntime;
   readonly #hostedSites: AgentHostedSites | null;
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
+  readonly #reportFailure: (code: string, error: unknown, agentId: string) => void;
   readonly #isStopping: () => boolean;
   readonly #redact: (text: string) => string;
   readonly #pendingTerminalEvents = new Map<string, PendingHostedSiteTerminalEvent>();
@@ -97,6 +99,7 @@ export class HostedSiteCoordinator {
     this.#conversation = options.conversation;
     this.#hostedSites = options.hostedSites;
     this.#emitError = options.emitError;
+    this.#reportFailure = options.reportFailure;
     this.#isStopping = options.isStopping;
     this.#redact = options.redact;
   }
@@ -191,7 +194,7 @@ export class HostedSiteCoordinator {
       this.#recordTerminalEvent(mutation, "failed", mutation.eventDetails, () => {
         target.client.respond(target.id, this.#failureResult(error));
       });
-      this.#emitError("server_request_failed", error, target.agentId);
+      this.#reportFailure("server_request_failed", error, target.agentId);
     }
     if (Result.isSuccess(result)) {
       const succeeded = result.success;

@@ -13,6 +13,7 @@ type AgentRecordPart =
   | "task-limit"
   | "new-chat"
   | "plan-card"
+  | "builtin-memory"
   | "fast-mode"
   | "instructions"
   | "publish"
@@ -26,6 +27,7 @@ export const AGENT_SETTINGS_PARTS: readonly string[] = [
   "task-limit",
   "new-chat",
   "plan-card",
+  "builtin-memory",
   "fast-mode",
   "session-settings",
   "provider-accounts",
@@ -38,6 +40,8 @@ export const queryKeys = {
   accountSessions: (...scope: [QueryScope] | []) => ["account-sessions", ...(scope[0] ?? [])],
   hostedServerPlans: (...scope: [QueryScope] | []) => ["hosted-server-plans", ...(scope[0] ?? [])],
   billing: (...scope: [QueryScope] | []) => ["billing", ...(scope[0] ?? [])],
+  credits: (...scope: [QueryScope] | []) => ["credits", ...(scope[0] ?? [])],
+  creditActivity: (...scope: [QueryScope] | []) => ["credit-activity", ...(scope[0] ?? [])],
   referrals: (...scope: [QueryScope] | []) => ["referrals", ...(scope[0] ?? [])],
   ownerHostedServerIds: (scope: QueryScope) => ["owner-hosted-server-ids", ...scope],
   agentTemplate: (apiUrl: string | null, templateId: string | null) => ["agent-template", apiUrl, templateId],
@@ -68,6 +72,10 @@ export const queryKeys = {
     ...queryKeys.agentRecord(scope, serverId, agentId, "routines"),
     "events",
   ],
+  agentOnceRoutines: (scope: QueryScope, serverId: string, agentId: string) => [
+    ...queryKeys.agentRecord(scope, serverId, agentId, "routines"),
+    "once",
+  ],
   agentRoutineResultOptions: (scope: QueryScope, serverId: string, agentId: string) => [
     ...queryKeys.agentRecord(scope, serverId, agentId, "routines"),
     "result-options",
@@ -95,16 +103,22 @@ export const queryKeys = {
     agentId,
     path,
   ],
-  agentDefaults: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "agent-defaults"],
-  backgroundProcesses: (scope: QueryScope, serverId: string) => ["background-processes", ...scope, serverId],
-  sharedTables: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "tables"],
-  channelInfo: (scope: QueryScope, serverId: string, channelId: string, ...part: [] | ["memories" | "routines"]) => [
-    "channel-info",
+  channelFolderBrowse: (scope: QueryScope, serverId: string, channelId: string, path: string | null) => [
+    "channel-folder-browse",
     ...scope,
     serverId,
     channelId,
-    ...part,
+    path,
   ],
+  agentDefaults: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "agent-defaults"],
+  backgroundProcesses: (scope: QueryScope, serverId: string) => ["background-processes", ...scope, serverId],
+  sharedTables: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "tables"],
+  channelInfo: (
+    scope: QueryScope,
+    serverId: string,
+    channelId: string,
+    ...part: [] | ["memories" | "routines" | "folders"]
+  ) => ["channel-info", ...scope, serverId, channelId, ...part],
   agentAvatar: (
     scope: QueryScope,
     serverId: string | undefined,
@@ -121,8 +135,12 @@ export const queryKeys = {
   serverInvites: (scope: QueryScope, serverId: string) => ["server-invites", ...scope, serverId],
   ownerTransfer: (scope: QueryScope, serverId: string) => ["owner-transfer", ...scope, serverId],
   serverTimezone: (scope: QueryScope, serverId: string) => ["server-timezone", ...scope, serverId],
+  serverTurnLimits: (scope: QueryScope, serverId: string) => ["server-turn-limits", ...scope, serverId],
+  serverVoiceModel: (scope: QueryScope, serverId: string) => ["server-voice-model", ...scope, serverId],
+  serverSignalHome: (scope: QueryScope, serverId: string) => ["server-signal-home", ...scope, serverId],
   localServers: (scope: QueryScope, serverId: string) => ["local-servers", ...scope, serverId],
   agentMemoryLimit: (scope: QueryScope, serverId: string) => ["agent-memory-limit", ...scope, serverId],
+  mediaApprovalCredits: (scope: QueryScope, serverId: string) => ["media-approval-credits", ...scope, serverId],
   memoryReview: (scope: QueryScope, serverId: string) => ["memory-review", ...scope, serverId],
   skillLearning: (scope: QueryScope, serverId: string) => ["skill-learning", ...scope, serverId],
   browsingMemory: (scope: QueryScope, serverId: string) => ["browsing-memory", ...scope, serverId],
@@ -161,6 +179,11 @@ export const queryKeys = {
     ...provider,
   ],
   providerPromptCache: (scope: QueryScope, serverId: string) => ["provider-prompt-cache", ...scope, serverId],
+  providerCacheExpiryCompaction: (scope: QueryScope, serverId: string) => [
+    "provider-cache-expiry-compaction",
+    ...scope,
+    serverId,
+  ],
   providerCompactWindow: (scope: QueryScope, serverId: string) => ["provider-compact-window", ...scope, serverId],
   providerEnvironment: (scope: QueryScope, serverId: string, provider: string) => [
     "provider-environment",
@@ -192,6 +215,7 @@ export const queryKeys = {
     ...logo,
   ],
   planLimits: (scope: QueryScope, serverId: string) => ["plan-limits", ...scope, serverId],
+  agentUsageLimits: (scope: QueryScope, serverId: string) => ["agent-usage-limits", ...scope, serverId],
   machineMetrics: (scope: QueryScope, serverId: string) => ["machine-metrics", ...scope, serverId],
   serverUsage: (scope: QueryScope, serverId: string, range: unknown) => ["server-usage", ...scope, serverId, range],
   profileActivity: (scope: QueryScope, serverId: string, range: unknown) => [
@@ -247,6 +271,15 @@ export const queryKeys = {
     "github-catalog",
   ],
   workflowChats: (scope: QueryScope, serverId: string) => [...queryKeys.serverWorkflows(scope, serverId), "chats"],
+  workflowMediaModels: (scope: QueryScope, serverId: string) => ["workflow-media", ...scope, serverId, "models"],
+  workflowMediaPrice: (scope: QueryScope, serverId: string, request: string) => [
+    "workflow-media",
+    ...scope,
+    serverId,
+    "price",
+    request,
+  ],
+  workflowCreditBalance: (scope: QueryScope, serverId: string) => ["workflow-media", ...scope, serverId, "balance"],
   workflowGitHubOptions: (scope: QueryScope, serverId: string, repository: string) => [
     ...queryKeys.serverWorkflows(scope, serverId),
     "github-options",
@@ -266,4 +299,5 @@ export const queryKeys = {
   chatQueue: (...target: [] | [serverId: string] | [serverId: string, agentId: string]) => ["chat-queue", ...target],
   chatAttachment: (serverId: string, attachmentId: string) => ["chat-attachment", serverId, attachmentId],
   chatMediaFile: (serverId: string, attachmentId: string) => ["chat-media-file", serverId, attachmentId],
+  chatMediaFiles: (serverId: string) => ["chat-media-file", serverId],
 };

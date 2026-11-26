@@ -15,6 +15,13 @@ const OPENCODE_AGENT_DEFAULTS = {
   opencode_read_mcp_resource: "deny",
 } as const satisfies Readonly<Record<string, OpenCodeAction>>;
 
+const OPENCODE_APPROVAL_TOOLS = [
+  { tool: "bash", names: ["bash", "shell"] },
+  { tool: "edit", names: ["edit", "write", "patch"] },
+] as const;
+
+type ApprovalDefaults = Partial<Record<(typeof OPENCODE_APPROVAL_TOOLS)[number]["tool"], "ask">>;
+
 const OPENCODE_SKILL_DEFAULTS = { report: "deny", opencode: "deny" } as const satisfies Readonly<
   Record<string, OpenCodeAction>
 >;
@@ -27,10 +34,13 @@ const GLOBAL_CONFIG_FILES = ["config.json", "opencode.json", "opencode.jsonc"] a
 
 const DEFAULTS_FILE = "openbot-agent-defaults.json";
 
+const APPROVAL_DEFAULTS_FILE = "openbot-agent-approval-defaults.json";
+
 interface UserRules {
   readonly tools: string[];
   readonly skills: string[];
   readonly webSearch: boolean;
+  readonly allTools: boolean;
 }
 
 function matches(pattern: string, name: string): boolean {
@@ -104,12 +114,14 @@ const UserConfig = Schema.Struct({
 
 const decodeUserConfig = Schema.decodeUnknownOption(Schema.fromJsonString(UserConfig));
 
-function collectRules(config: PermissionRules, rules: { tools: string[]; skills: string[] }): void {
+function collectRules(config: PermissionRules, rules: { tools: string[]; skills: string[]; allTools: boolean }): void {
   const addTool = (pattern: string) => {
     if (pattern !== "*") rules.tools.push(pattern);
+    else rules.allTools = true;
   };
   const { permission } = config;
-  if (permission && typeof permission !== "string") {
+  if (typeof permission === "string") rules.allTools = true;
+  else if (permission) {
     for (const [tool, rule] of Object.entries(permission)) {
       if (tool !== "skill") addTool(tool);
       else if (typeof rule === "string") rules.skills.push("*");
@@ -133,7 +145,12 @@ function globalConfigFolders(env: NodeJS.ProcessEnv, home: string): string[] {
 }
 
 function readUserRules(env: NodeJS.ProcessEnv, home: string): UserRules | null {
-  const rules: { tools: string[]; skills: string[]; webSearch: boolean } = { tools: [], skills: [], webSearch: false };
+  const rules: { tools: string[]; skills: string[]; webSearch: boolean; allTools: boolean } = {
+    tools: [],
+    skills: [],
+    webSearch: false,
+    allTools: false,
+  };
   for (const folder of globalConfigFolders(env, home)) {
     for (const name of GLOBAL_CONFIG_FILES) {
       const file = join(folder, name);
@@ -159,6 +176,43 @@ function readUserRules(env: NodeJS.ProcessEnv, home: string): UserRules | null {
   return rules;
 }
 
+const UserMediaSetup = Schema.Struct({
+  provider: Schema.optional(
+    Schema.Record(
+      Schema.String,
+      Schema.Struct({ options: Schema.optional(Schema.Struct({ apiKey: Schema.optional(Schema.String) })) }),
+    ),
+  ),
+  experimental: Schema.optional(
+    Schema.Struct({ image_generate: Schema.optional(Schema.Unknown), video_generate: Schema.optional(Schema.Unknown) }),
+  ),
+});
+
+const decodeUserMediaSetup = Schema.decodeUnknownOption(Schema.fromJsonString(UserMediaSetup));
+
+function configHasMediaSetup(text: string): boolean {
+  const config = decodeUserMediaSetup(stripJsonc(text));
+  if (Option.isNone(config)) return true;
+  const { provider, experimental } = config.value;
+  return (
+    experimental?.image_generate !== undefined ||
+    experimental?.video_generate !== undefined ||
+    Object.values(provider ?? {}).some((entry) => Boolean(entry.options?.apiKey?.trim()))
+  );
+}
+
+export function openCodeUserConfigHasMediaSetup(env: NodeJS.ProcessEnv, home = homedir()): boolean {
+  const userFile = env.OPENCODE_CONFIG?.trim();
+  const files = [
+    ...globalConfigFolders(env, home).flatMap((folder) => GLOBAL_CONFIG_FILES.map((name) => join(folder, name))),
+    ...(userFile ? [userFile] : []),
+  ];
+  return files.some((file) => {
+    const text = readTextOrNull(file);
+    return text !== null && configHasMediaSetup(text);
+  });
+}
+
 function readTextOrNull(file: string): string | null {
   try {
     return readFileSync(file, "utf8");
@@ -181,18 +235,34 @@ function hasWebSearchAnswer(env: NodeJS.ProcessEnv, home: string): boolean | nul
   }
 }
 
+type ToolDefaults = Partial<typeof OPENCODE_AGENT_DEFAULTS> & ApprovalDefaults;
+
 interface DefaultsLayer {
-  readonly permission?: Partial<typeof OPENCODE_AGENT_DEFAULTS> & {
+  readonly permission?: ToolDefaults & {
     readonly skill?: Partial<typeof OPENCODE_SKILL_DEFAULTS>;
   };
   readonly websearch?: typeof OPENCODE_WEB_SEARCH_DEFAULT;
 }
 
-function defaultsLayer(rules: UserRules, webSearch: boolean): DefaultsLayer | null {
-  const named = (patterns: readonly string[], name: string) => patterns.some((pattern) => matches(pattern, name));
-  const tools: Partial<typeof OPENCODE_AGENT_DEFAULTS> = Object.fromEntries(
-    Object.entries(OPENCODE_AGENT_DEFAULTS).filter(([tool]) => !named(rules.tools, tool)),
+function approvalDefaults(
+  rules: UserRules,
+  named: (patterns: readonly string[], name: string) => boolean,
+): ApprovalDefaults {
+  if (rules.allTools) return {};
+  return Object.fromEntries(
+    OPENCODE_APPROVAL_TOOLS.filter(({ names }) => !names.some((name) => named(rules.tools, name))).map(({ tool }) => [
+      tool,
+      "ask",
+    ]),
   );
+}
+
+function defaultsLayer(rules: UserRules, webSearch: boolean, asksBeforeChanges: boolean): DefaultsLayer | null {
+  const named = (patterns: readonly string[], name: string) => patterns.some((pattern) => matches(pattern, name));
+  const tools: ToolDefaults = {
+    ...Object.fromEntries(Object.entries(OPENCODE_AGENT_DEFAULTS).filter(([tool]) => !named(rules.tools, tool))),
+    ...(asksBeforeChanges ? approvalDefaults(rules, named) : {}),
+  };
   const skill: Partial<typeof OPENCODE_SKILL_DEFAULTS> = Object.fromEntries(
     Object.entries(OPENCODE_SKILL_DEFAULTS).filter(([id]) => !named(rules.skills, id)),
   );
@@ -208,16 +278,18 @@ export function openCodeAgentDefaultsEnv(
   stateDirectory: string | undefined,
   env: NodeJS.ProcessEnv,
   cliVersion: string,
+  approvals: "provider-asks" | "confined",
   home = homedir(),
 ): Record<string, string> {
   if (!stateDirectory || env.OPENCODE_CONFIG?.trim()) return {};
   const rules = readUserRules(env, home);
-  const webSearch =
-    Number.parseInt(cliVersion, 10) >= 2 && rules?.webSearch === false && hasWebSearchAnswer(env, home) === false;
-  const layer = rules && defaultsLayer(rules, webSearch);
+  const secondMajor = Number.parseInt(cliVersion, 10) >= 2;
+  const webSearch = secondMajor && rules?.webSearch === false && hasWebSearchAnswer(env, home) === false;
+  const asksBeforeChanges = secondMajor && approvals === "provider-asks";
+  const layer = rules && defaultsLayer(rules, webSearch, asksBeforeChanges);
   if (!layer) return {};
   const folder = join(stateDirectory, "opencode");
-  const file = join(folder, DEFAULTS_FILE);
+  const file = join(folder, asksBeforeChanges ? APPROVAL_DEFAULTS_FILE : DEFAULTS_FILE);
   const content = `${JSON.stringify(layer, null, 2)}\n`;
   try {
     if (readTextOrNull(file) !== content) {

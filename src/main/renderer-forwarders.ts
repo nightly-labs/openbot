@@ -58,6 +58,7 @@ import {
   desktopAgentEventLevel,
   type NotificationChat,
   RETAINED_NOTIFICATION_LIMIT,
+  releaseWhenNotificationGone,
   showRetainedNotification,
 } from "./desktop-notifications";
 import type { HostService } from "./host-service";
@@ -172,9 +173,7 @@ export function createRendererForwarders({
       shown.delete(notification);
       if (shown.size === 0 && chatNotifications.get(key) === shown) chatNotifications.delete(key);
     };
-    notification.on("click", release);
-    notification.on("close", release);
-    notification.on("failed", release);
+    releaseWhenNotificationGone(notification, release);
   }
 
   function closeChatNotifications(serverId: string, chat: NotificationChat): void {
@@ -239,12 +238,15 @@ export function createRendererForwarders({
     if (level() !== "all" || newChannelReplies(previous, next).length === 0) return;
     const agentLookup = notificationAgents(serverId);
     const agents = agentLookup instanceof Promise ? await agentLookup : agentLookup;
+    const levelLookup = agentNotificationLevels(serverId);
+    const agentLevels = levelLookup instanceof Promise ? await levelLookup : levelLookup;
     const current = level();
     if (!current) return;
     const replies = channelReplyNotifications(previous, next, {
       agents,
       translate: getTranslate(),
       level: current,
+      agentLevels,
       redact: notificationPreviewEnabled() ? redactText : null,
     });
     for (const reply of replies) {
@@ -256,10 +258,8 @@ export function createRendererForwarders({
       const release = () => {
         if (channelNotifications.get(key) === notification) channelNotifications.delete(key);
       };
-      notification.on("close", release);
-      notification.on("failed", release);
+      releaseWhenNotificationGone(notification, release);
       notification.on("click", () => {
-        release();
         const window = getMainWindow();
         if (!window || window.isDestroyed()) return;
         showMainWindow(window);
@@ -434,9 +434,7 @@ export function createRendererForwarders({
       const release = () => {
         if (requestNotifications.get(requestKey) === notification) requestNotifications.delete(requestKey);
       };
-      notification.on("click", release);
-      notification.on("close", release);
-      notification.on("failed", release);
+      releaseWhenNotificationGone(notification, release);
     }
     notification.on("click", () => {
       const current = getMainWindow();
@@ -592,6 +590,10 @@ export function createRendererForwarders({
     for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.linkAccount.changed, status);
   }
 
+  function forwardNearWalletStatus(status: import("@openbot/contracts/ipc").NearWalletStatus): void {
+    for (const window of appWindows()) sendToRenderer(window, IPC_ENDPOINTS.nearWallet.changed, status);
+  }
+
   function forwardOnePasswordConnectorStatus(
     status: import("@openbot/contracts/ipc").OnePasswordConnectorStatus,
   ): void {
@@ -695,6 +697,7 @@ export function createRendererForwarders({
     forwardProviderRuntimeStatus,
     forwardGitHubConnectorStatus,
     forwardLinkAccountStatus,
+    forwardNearWalletStatus,
     forwardOnePasswordConnectorStatus,
     forwardBitwardenConnectorStatus,
     forwardPasswordManagerStatus,

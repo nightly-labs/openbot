@@ -4,13 +4,18 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { sourceText } from "@openbot/i18n/source";
 import { AcpAgentClient } from "../src/backend/acp-client";
-import { type AcpCustomEndpoint, type AcpFlavor, DEFAULT_ACP_FLAVOR } from "../src/backend/acp-flavor";
+import {
+  type AcpCustomEndpoint,
+  type AcpFlavor,
+  customAgentFlavor,
+  DEFAULT_ACP_FLAVOR,
+} from "../src/backend/acp-flavor";
 import { ANTIGRAVITY_ACP_FLAVOR } from "../src/backend/acp-flavor-antigravity";
 import { OPENCODE_ACP_FLAVOR } from "../src/backend/acp-flavor-opencode";
-import type { AgentClient } from "../src/backend/agent-client";
+import { type AgentClient, ProviderSessionBusyError } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { AppServerNotification } from "../src/backend/protocol";
-import { installFakeAgent, readJsonl, runTurn, startThread, stopClients } from "./provider-fakes/host";
+import { installFakeAgent, readJsonl, runTurn, startThread, stopClients, type TurnResult } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/acp-turn-stall-e2e");
 const STALL_MS = 1_500;
@@ -38,15 +43,36 @@ interface Report {
   slowEndpoint?: { status: string | null; reply: string; elapsedMs: number };
   slowFlavor?: { quietStatus: string | null; hangStatus: string | null; hangElapsedMs: number };
   tool?: { status: string | null; elapsedMs: number };
+  openTool?: { longToolStatus: string | null; hangStatus: string | null; error: string | null; elapsedMs: number };
   stop?: { status: string | null; elapsedMs: number; next: string | null };
   stream?: { deltaBeforeCompletion: boolean; reply: string };
   antigravity?: { stalled: boolean; stopStatus: string | null };
+  antigravitySilent?: { status: string | null; error: string | null; elapsedMs: number };
+  antigravityOpenStep?: {
+    longStepStatus: string | null;
+    hangStatus: string | null;
+    error: string | null;
+    elapsedMs: number;
+  };
+  antigravityLogged?: { status: string | null; error: string | null; elapsedMs: number };
   lostPrompt?: { status: string | null; reply: string; prompts: number; cancels: number; resumes: number };
   lostTwice?: { status: string | null; error: string | null; elapsedMs: number; next: string | null };
   quiet?: { status: string | null; reply: string; prompts: number };
   noLoad?: { stopStatus: string | null; next: string | null; sessionsOpened: number; loads: number };
   silentNew?: { error: string; elapsedMs: number };
+  heldSession?: ActiveSessionReport;
+  closedHeldSession?: ActiveSessionReport;
   failure?: string;
+}
+
+interface ActiveSessionReport {
+  stalledStatus: string | null;
+  busyWhileOpen?: boolean;
+  nextStatus: string | null;
+  nextReply: string;
+  refusedRestores: number;
+  closes: number;
+  sameSession: boolean;
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-acp-turn-stall-e2e-"));
@@ -61,6 +87,7 @@ async function open(
   customEndpoint?: (modelId: string | null) => AcpCustomEndpoint | null,
   firstUpdateMs?: number,
   turnStallMs: number | null = STALL_MS,
+  argv: readonly string[] = ["acp"],
 ): Promise<AgentClient> {
   const executable = join(root, provider, "bin", provider);
   await installFakeAgent(executable, "stall", {
@@ -72,7 +99,7 @@ async function open(
   const client = new AcpAgentClient({ executable, version: "99.0.0", source: "managed" }, 20_000, {
     provider,
     flavor,
-    argv: ["acp"],
+    argv,
     env: {},
     signInMessage: "Sign in to the fake agent.",
     ...(turnStallMs !== null ? { turnStallMs } : {}),
@@ -82,6 +109,46 @@ async function open(
   clients.push(client);
   client.start();
   return client;
+}
+
+async function openStrict(name: string, env: Readonly<Record<string, string>>): Promise<AgentClient> {
+  const executable = join(root, name, "bin", "strict-agent");
+  await installFakeAgent(executable, "strict-session", { FAKE_LOG: join(root, `${name}.jsonl`), ...env });
+  const client = new AcpAgentClient({ executable, version: "", source: "system" }, 20_000, {
+    provider: "acp",
+    flavor: customAgentFlavor("strict-agent"),
+    label: "Strict Agent",
+    allowNoModels: true,
+    argv: [],
+    env: {},
+    signInMessage: "Sign in to the fake agent.",
+    turnStallMs: STALL_MS,
+  });
+  clients.push(client);
+  client.start();
+  return client;
+}
+
+async function activeSessionReport(
+  log: string,
+  stalled: TurnResult,
+  next: TurnResult,
+  busyWhileOpen?: boolean,
+): Promise<ActiveSessionReport> {
+  const entries = await readJsonl<LogEntry>(log);
+  const prompts = entries.filter((entry) => entry.event === "prompt");
+  const session = prompts[0]?.sessionId;
+  return {
+    stalledStatus: stalled.status,
+    ...(busyWhileOpen === undefined ? {} : { busyWhileOpen }),
+    nextStatus: next.status,
+    nextReply: next.reply,
+    refusedRestores: entries.filter(
+      (entry) => (entry.event === "session/load" || entry.event === "session/resume") && entry.text === "refused",
+    ).length,
+    closes: entries.filter((entry) => entry.event === "session/close" && entry.sessionId === session).length,
+    sameSession: prompts.length >= 2 && prompts.every((entry) => entry.sessionId === session),
+  };
 }
 
 async function timed<T>(run: () => Promise<T>): Promise<{ value: T; elapsedMs: number }> {
@@ -243,6 +310,29 @@ try {
   assert.equal(tool.value.status, "completed", "A long tool call does not stall the turn.");
   assert.ok(tool.elapsedMs >= TOOL_MS, "The tool call ran for its whole time.");
 
+  const openToolLog = join(root, "opencode-open-tool.jsonl");
+  const openToolClient = await open("opencode", { ...OPENCODE_ACP_FLAVOR, openToolStallMs: TOOL_MS * 2 }, openToolLog);
+  const openToolThread = await startThread(openToolClient, { cwd: workspace });
+  const longTool = await runTurn(openToolClient, openToolThread, { text: "tool" });
+  const openTool = await timed(() =>
+    runTurn(openToolClient, openToolThread, { text: "tool-hang", timeoutMs: TOOL_MS * 10 }),
+  );
+  report.openTool = {
+    longToolStatus: longTool.status,
+    hangStatus: openTool.value.status,
+    error: openTool.value.error,
+    elapsedMs: openTool.elapsedMs,
+  };
+  assert.equal(longTool.status, "completed", "A tool call shorter than the open tool limit still completes.");
+  assert.equal(openTool.value.status, "failed", "A tool call that never ends fails the turn.");
+  assert.equal(
+    openTool.value.error,
+    sourceText("error.agent.turnStalled", { provider: "OpenCode" }),
+    "A tool call that never ends names the stall.",
+  );
+  assert.ok(openTool.elapsedMs >= TOOL_MS * 2, "The open tool call was ended at the open tool limit, not before.");
+  assert.ok(openTool.elapsedMs < TOOL_MS * 6, "The open tool call did not hold the turn much past its limit.");
+
   const stopThread = await startThread(client, { cwd: workspace });
   const stopping = timed(() => runTurn(client, stopThread, { text: "hang", timeoutMs: 30_000 }));
   await waitForEntry(
@@ -285,6 +375,78 @@ try {
   report.antigravity = { stalled: antigravityStalled, stopStatus: antigravityStop.status };
   assert.equal(antigravityStalled, false, "A silent Antigravity prompt is not ended as stalled.");
   assert.equal(antigravityStop.status, "interrupted", "A stop still ends the Antigravity turn.");
+
+  const silentFlavor: AcpFlavor = { ...ANTIGRAVITY_ACP_FLAVOR, silentTurnLimitMs: STALL_MS * 2 };
+  const silentLog = join(root, "antigravity-silent.jsonl");
+  const silent = await open("antigravity", silentFlavor, silentLog);
+  const silentThread = await startThread(silent, { cwd: workspace });
+  const silentTurn = await timed(() => runTurn(silent, silentThread, { text: "hang", timeoutMs: STALL_MS * 20 }));
+  report.antigravitySilent = {
+    status: silentTurn.value.status,
+    error: silentTurn.value.error,
+    elapsedMs: silentTurn.elapsedMs,
+  };
+  assert.equal(silentTurn.value.status, "failed", "A silent Antigravity prompt ends at its silent limit.");
+  assert.ok(silentTurn.elapsedMs >= STALL_MS * 2, "The silent prompt is not ended before its silent limit.");
+
+  const openStepFlavor: AcpFlavor = { ...silentFlavor, openToolStallMs: TOOL_MS * 2 };
+  const openStep = await open("antigravity", openStepFlavor, join(root, "antigravity-open-step.jsonl"));
+  const openStepThread = await startThread(openStep, { cwd: workspace });
+  const longStep = await runTurn(openStep, openStepThread, { text: "tool" });
+  const hungStep = await timed(() => runTurn(openStep, openStepThread, { text: "tool-hang", timeoutMs: TOOL_MS * 10 }));
+  report.antigravityOpenStep = {
+    longStepStatus: longStep.status,
+    hangStatus: hungStep.value.status,
+    error: hungStep.value.error,
+    elapsedMs: hungStep.elapsedMs,
+  };
+  assert.equal(longStep.status, "completed", "An Antigravity step longer than the silent limit still completes.");
+  assert.equal(hungStep.value.status, "failed", "An Antigravity step that never ends fails the turn.");
+  assert.equal(
+    hungStep.value.error,
+    sourceText("error.agent.turnStalled", { provider: "Gemini" }),
+    "An Antigravity step that never ends names the stall.",
+  );
+  assert.ok(
+    hungStep.elapsedMs >= TOOL_MS * 2,
+    "The open Antigravity step was ended at the open tool limit, not before.",
+  );
+
+  const geminiDir = join(root, "gemini");
+  const agyLogs = join(geminiDir, "antigravity-acp", "log");
+  await mkdir(agyLogs, { recursive: true });
+  const loggedLog = join(root, "antigravity-logged.jsonl");
+  const logged = await open("antigravity", silentFlavor, loggedLog, {}, undefined, undefined, STALL_MS, [
+    "acp",
+    `--gemini-dir=${geminiDir}`,
+    "--app-data-dir=antigravity-acp",
+  ]);
+  const loggedThread = await startThread(logged, { cwd: workspace });
+  const loggedTurn = timed(() => runTurn(logged, loggedThread, { text: "hang", timeoutMs: STALL_MS * 20 }));
+  await waitForEntry(loggedLog, (entry) => entry.event === "prompt" && entry.text === "hang");
+  const prompt = (await readJsonl<LogEntry>(loggedLog)).find((entry) => entry.event === "prompt");
+  await writeFile(
+    join(agyLogs, "acp-server.log"),
+    [
+      `I1123 10:00:00.000000 server.go:10] Sending user message to conversation ${prompt?.sessionId ?? ""}`,
+      "E1123 10:00:01.000000 executor.go:20] agent executor error: Error 502, Message: Bad Gateway, Status: 502 Bad Gateway, Details: []",
+      "I1123 10:00:02.000000 server.go:10] Sending user message to conversation other-session",
+      "E1123 10:00:03.000000 executor.go:20] agent executor error: Error 429, Message: Resource exhausted, Status: 429 Too Many Requests, Details: []",
+      "",
+    ].join("\n"),
+  );
+  const loggedEnd = await loggedTurn;
+  report.antigravityLogged = {
+    status: loggedEnd.value.status,
+    error: loggedEnd.value.error,
+    elapsedMs: loggedEnd.elapsedMs,
+  };
+  assert.equal(loggedEnd.value.status, "failed", "A silent prompt with a logged error ends at its silent limit.");
+  assert.equal(
+    loggedEnd.value.error,
+    sourceText("error.provider.antigravityServiceFailure", { detail: "Bad Gateway" }),
+    "The turn shows its own error from the agy log, not a generic stall or the error of another session.",
+  );
 
   const firstLog = join(root, "antigravity-first.jsonl");
   const first = await open(
@@ -379,6 +541,37 @@ try {
     "A session start that the agent never answers fails after the stall limit.",
   );
   assert.ok(silentStart.elapsedMs >= STALL_MS, "The session start waits for the stall limit first.");
+
+  const heldLog = join(root, "held-session.jsonl");
+  const held = await openStrict("held-session", { FAKE_HANG_MS: String(STALL_MS * 4) });
+  const heldThread = await startThread(held, { cwd: workspace });
+  const heldStall = await runTurn(held, heldThread, { text: "hang", timeoutMs: STALL_MS * 10 });
+  const heldBusy = await runTurn(held, heldThread, { timeoutMs: 10_000 }).then(
+    () => false,
+    (error: unknown) => error instanceof ProviderSessionBusyError,
+  );
+  await waitForEntry(heldLog, (entry) => entry.event === "prompt-ended", 15_000);
+  const heldNext = await runTurn(held, heldThread, { timeoutMs: 10_000 });
+  report.heldSession = await activeSessionReport(heldLog, heldStall, heldNext, heldBusy);
+  assert.equal(heldStall.status, "failed", "A silent turn of a strict agent fails at the stall limit.");
+  assert.equal(heldBusy, true, "While the stopped prompt still runs, the message waits as for a busy session.");
+  assert.equal(heldNext.status, "completed", "The next message uses the session that the agent still holds.");
+  assert.equal(heldNext.reply, "ok", "The agent answers in the held session.");
+  assert.equal(report.heldSession.sameSession, true, "No new session replaces the chat.");
+  assert.ok(report.heldSession.refusedRestores >= 2, "The agent refused to open the held session again.");
+
+  const closedLog = join(root, "closed-held-session.jsonl");
+  const closed = await openStrict("closed-held-session", { FAKE_CLOSE: "1", FAKE_RESUME: "1" });
+  const closedThread = await startThread(closed, { cwd: workspace });
+  const closedStall = await runTurn(closed, closedThread, { text: "hang", timeoutMs: STALL_MS * 10 });
+  const closedNext = await runTurn(closed, closedThread, { timeoutMs: 10_000 });
+  report.closedHeldSession = await activeSessionReport(closedLog, closedStall, closedNext);
+  assert.equal(closedStall.status, "failed", "A silent turn of a strict agent fails at the stall limit.");
+  assert.equal(closedNext.status, "completed", "The next message works after OpenBot closes the held session.");
+  assert.equal(closedNext.reply, "ok", "The agent answers after the session opens again.");
+  assert.equal(report.closedHeldSession.refusedRestores, 1, "The agent refused only the first resume.");
+  assert.equal(report.closedHeldSession.closes, 1, "OpenBot closes the refused session once.");
+  assert.equal(report.closedHeldSession.sameSession, true, "No new session replaces the chat.");
 
   report.passed = true;
 } catch (error) {

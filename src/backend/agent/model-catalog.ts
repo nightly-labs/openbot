@@ -22,6 +22,16 @@ type ProviderModelCatalog = NonNullable<BuiltInProviderDriver["catalog"]>;
 const logger = createOpenBotLogger("provider-runtime");
 const MODEL_METADATA_FALLBACKS = [...FALLBACK_MODELS, ...OPENCODE_FREE_MODEL_FALLBACKS];
 
+function isOlderListing(
+  server: ModelListResponse["data"][number],
+  listed: ReadonlyMap<string, ModelListResponse["data"][number]>,
+): boolean {
+  if (server.hidden === true) return true;
+  if (server.upgrade === undefined || server.upgrade === server.model) return false;
+  const replacement = listed.get(server.upgrade);
+  return replacement !== undefined && replacement.hidden !== true;
+}
+
 function withPublicIds(models: AgentModelOption[]): AgentModelOption[] {
   registerPublicValues(models.map((model) => model.id));
   return models;
@@ -47,6 +57,10 @@ export class ModelCatalog {
 
   list(): AgentModelOption[] {
     return structuredClone(this.#models);
+  }
+
+  lists(provider: AgentProvider, id: string): boolean {
+    return this.#models.some((model) => model.provider === provider && model.id === id);
   }
 
   source(provider: AgentProvider): ProviderModelSource | undefined {
@@ -103,7 +117,7 @@ export class ModelCatalog {
           logger.warn("A provider reported a model id that is not valid.", { provider: client.provider, id });
           continue;
         }
-        serverModels.set(id, { ...item, model: id });
+        serverModels.set(id, { ...item, model: id, ...(response.steersTurns ? { steersTurns: true } : {}) });
       }
       cursor = catalog.paged ? response.nextCursor : undefined;
       if (cursor && cursors.has(cursor))
@@ -132,6 +146,7 @@ export class ModelCatalog {
           : (fallback?.defaultReasoningEffort ?? "medium"),
         supportedReasoningEfforts: efforts.length ? efforts : (fallback?.supportedReasoningEfforts ?? ["medium"]),
         ...(server.reasoningEffortConfigurable === false ? { reasoningEffortConfigurable: false } : {}),
+        ...(isOlderListing(server, serverModels) ? { listing: "older" as const } : {}),
         ...catalog.modelFields?.(server),
       });
     }

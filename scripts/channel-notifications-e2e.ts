@@ -248,6 +248,7 @@ const teamBrowser: TeamApiBrowser = {
   navigate: unused,
   reload: unused,
   stop: unused,
+  answerPermission: unused,
   takeUserControl: unused,
   startTeach: unused,
   stopTeach: () => [],
@@ -263,7 +264,9 @@ const teamBrowser: TeamApiBrowser = {
   startView: unused,
   dispatchViewInput: unused,
   copyViewSelection: unused,
+  answerViewDialog: unused,
   importSignIn: unused,
+  answerHttpSignIn: unused,
 };
 const cipher = {
   encrypt: (value: string) => Buffer.from(value, "utf8"),
@@ -1085,6 +1088,7 @@ try {
       decodeChannelPage(codec.response(CHANNEL_ROUTES.read, 200, body, options)).waits ?? null;
     const released = V9_PEER_CAPABILITIES.filter((item) => item !== CHANNEL_TASK_WAITS_CAPABILITY);
 
+    await runCauseEffect(agentStore.updateAgent({ agentId: agent.id, taskLimit: 1 }));
     const busyTask = queued(agent.id);
     const otherTask: ChannelTask = { ...queued(agent.id, other.id), state: "running", assignmentCount: 1 };
     const otherWork = running(otherTask);
@@ -1094,6 +1098,7 @@ try {
     channelResponse(CHANNEL_ROUTES.read, 200, releasedBody);
     const busy = { released: waitsOf(releasedBody), current: waitsOf(await read(V9_PEER_CAPABILITIES)) };
     const local = channels.page(channel.id).waits ?? null;
+    await runCauseEffect(agentStore.updateAgent({ agentId: agent.id, taskLimit: null }));
     channels.store.update(channels.store.get(other.id), {
       tasks: [{ ...otherTask, state: "completed" }],
       assignments: [{ ...otherWork, state: "completed" }],

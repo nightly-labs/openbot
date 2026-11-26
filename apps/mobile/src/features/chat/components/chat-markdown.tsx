@@ -8,7 +8,7 @@ import {
 import { chatMathStart } from "@openbot/contracts/chat-math";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
-import { markdownInlinePlainText } from "@openbot/contracts/markdown-preview-text";
+import { isWordStarEmphasis, markdownInlinePlainText } from "@openbot/contracts/markdown-preview-text";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import * as Linking from "expo-linking";
 import { Typography } from "heroui-native";
@@ -49,6 +49,8 @@ import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference } from "@/shared/lib/motion";
 import { currentText, useText } from "@/shared/lib/text";
 import {
+  CODE_LAYOUT_STYLE,
+  CODE_TEXT_STYLE,
   type DirectionMark,
   directionMark,
   layoutDirection,
@@ -126,6 +128,7 @@ interface TextPresentation {
   outside: boolean;
   tableFrame: ((card: ReactNode) => ReactNode) | undefined;
   align: "start" | "end";
+  literalWordStars: boolean;
 }
 
 function blockDirectionStyle(source: string, presentation: TextPresentation): TextStyle {
@@ -187,6 +190,8 @@ function inlineChipStyle(presentation: TextPresentation, height: number, inRow: 
 }
 
 const WORD_JOINER = "\u2060";
+const LEFT_TO_RIGHT_ISOLATE = "\u2066";
+const POP_DIRECTIONAL_ISOLATE = "\u2069";
 
 function sourceEntries<T>(values: T[], source: (value: T) => string) {
   let offset = 0;
@@ -358,19 +363,12 @@ function codePieces(text: string): string[] {
   });
 }
 
-function CodeSpan({
-  text,
-  presentation,
-  inRow = false,
-}: {
-  text: string;
-  presentation: TextPresentation;
-  inRow?: boolean;
-}) {
+function CodeSpan({ text, presentation, row }: { text: string; presentation: TextPresentation; row?: TextDirection }) {
+  const inRow = row !== undefined;
   if (isFileReference(text.trim())) return <CodeFileReference text={text} presentation={presentation} inRow={inRow} />;
   const pieces = codePieces(text);
   const chipStyle = inlineChipStyle(presentation, codeChipHeight(presentation), inRow);
-  return sourceEntries(pieces, (piece) => piece).map(({ value: piece, offset }, index) => (
+  const chips = sourceEntries(pieces, (piece) => piece).map(({ value: piece, offset }, index) => (
     <View
       key={offset}
       collapsable={false}
@@ -383,13 +381,32 @@ function CodeSpan({
         style={[
           presentation.style,
           CHAT_CODE_STYLES[presentation.type === "body-sm" ? "small" : "body"],
+          CODE_TEXT_STYLE,
           { color: presentation.codeColor, lineHeight: codeChipLineHeight(presentation) },
         ]}
       >
+        {directionMark(piece, "ltr")}
         {piece}
       </Text>
     </View>
   ));
+  if (!inRow) {
+    return (
+      <>
+        {LEFT_TO_RIGHT_ISOLATE}
+        {chips}
+        {POP_DIRECTIONAL_ISOLATE}
+      </>
+    );
+  }
+  if (row === "rtl") {
+    return (
+      <View className="min-w-0 max-w-full flex-row flex-wrap items-center gap-y-1" style={CODE_LAYOUT_STYLE}>
+        {chips}
+      </View>
+    );
+  }
+  return chips;
 }
 
 function mentionChip(presentation: TextPresentation) {
@@ -490,8 +507,23 @@ function openMessageLink(url: string): void {
   });
 }
 
+const WORD_STAR: Tokens.Text = { type: "text", raw: "*", text: "*", escaped: false };
+
+function withLiteralWordStars(tokens: Token[]): Token[] {
+  return tokens.flatMap((token, index) =>
+    tokenIs(token, "em") && isWordStarEmphasis(token, tokens[index - 1]?.raw ?? "", tokens[index + 1]?.raw ?? "")
+      ? [WORD_STAR, ...token.tokens, WORD_STAR]
+      : [token],
+  );
+}
+
+function shownTokens(tokens: Token[], presentation: TextPresentation): Token[] {
+  return presentation.literalWordStars ? withLiteralWordStars(tokens) : tokens;
+}
+
 function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNode {
-  return sourceEntries(tokens, (token) => token.raw).map(({ value: token, offset }) => {
+  const shown = shownTokens(tokens, parentPresentation);
+  return sourceEntries(shown, (token) => token.raw).map(({ value: token, offset }) => {
     const presentation = { ...parentPresentation, animateTail: parentPresentation.animateTail };
     if (token.type === "agentMention") {
       const reference = chatTagReferences(token.raw)[0];
@@ -615,7 +647,7 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
   let run: Token[] = [];
   let line: Token[][] = [run];
   const lines: Token[][][] = [line];
-  for (const token of tokens) {
+  for (const token of shownTokens(tokens, presentation)) {
     if (token.type === "checkbox") continue;
     if (token.type === "br") {
       run = [];
@@ -648,7 +680,7 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
             const [token] = run;
             if (!token) return null;
             if (tokenIs(token, "codespan")) {
-              return <CodeSpan key={offset} text={token.text} presentation={presentation} inRow />;
+              return <CodeSpan key={offset} text={token.text} presentation={presentation} row={direction} />;
             }
             if (isFileLink(token)) {
               return (
@@ -878,6 +910,57 @@ function TableCopyActions({
   );
 }
 
+function isDisplayMath(token: Token): token is MathToken {
+  return tokenIs(token, "inlineMath") && token.display;
+}
+
+function isBlankInline(token: Token): boolean {
+  return token.type === "br" || token.type === "checkbox" || (tokenIs(token, "text") && !token.text.trim());
+}
+
+function trimmedEdge(token: Token | undefined, trim: (text: string) => string): Token[] {
+  if (!token) return [];
+  if (!tokenIs(token, "text") || token.tokens) return [token];
+  return [{ ...token, text: trim(token.text) }];
+}
+
+function textRun(token: Tokens.Paragraph | Tokens.Text, run: Token[]): Token[] {
+  const start = run.findIndex((child) => !isBlankInline(child));
+  if (start < 0) return [];
+  const end = run.findLastIndex((child) => !isBlankInline(child));
+  const edges = run.slice(start, end + 1);
+  const first = trimmedEdge(edges[0], (text) => text.trimStart());
+  const tokens =
+    edges.length === 1
+      ? trimmedEdge(first[0], (text) => text.trimEnd())
+      : [...first, ...edges.slice(1, -1), ...trimmedEdge(edges.at(-1), (text) => text.trimEnd())];
+  const raw = tokens.map((child) => child.raw).join("");
+  return [{ ...token, raw, text: raw, tokens }];
+}
+
+const displayMathSplits = new WeakMap<Token, Token[]>();
+
+function withDisplayMathBlocks(tokens: Token[]): Token[] {
+  return tokens.flatMap((token) => {
+    if (!(tokenIs(token, "paragraph") || tokenIs(token, "text")) || !token.tokens?.some(isDisplayMath)) return [token];
+    const cached = displayMathSplits.get(token);
+    if (cached) return cached;
+    const blocks: Token[] = [];
+    let run: Token[] = [];
+    for (const child of token.tokens) {
+      if (!isDisplayMath(child)) {
+        run.push(child);
+        continue;
+      }
+      blocks.push(...textRun(token, run), { ...child, type: "blockMath" });
+      run = [];
+    }
+    blocks.push(...textRun(token, run));
+    displayMathSplits.set(token, blocks);
+    return blocks;
+  });
+}
+
 function MarkdownBlocks({
   tokens,
   presentation,
@@ -887,9 +970,10 @@ function MarkdownBlocks({
   presentation: TextPresentation;
   inList?: boolean;
 }) {
+  const blocks = useMemo(() => withDisplayMathBlocks(tokens), [tokens]);
   return (
     <View className={inList ? "min-w-0 gap-1.5" : "min-w-0 gap-2.5"}>
-      {sourceEntries(tokens, (token) => token.raw).map(({ value: token, offset }) => (
+      {sourceEntries(blocks, (token) => token.raw).map(({ value: token, offset }) => (
         <MarkdownBlock key={offset} token={token} presentation={presentation} inList={inList} />
       ))}
     </View>
@@ -1084,6 +1168,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   renderTable,
   tableFrame,
   align = "start",
+  literalWordStars = false,
 }: {
   body: string;
   color: ColorValue | undefined;
@@ -1092,6 +1177,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   renderTable?: (table: ReactNode, key: string) => ReactNode;
   tableFrame?: (card: ReactNode) => ReactNode;
   align?: "start" | "end";
+  literalWordStars?: boolean;
   fontWeight?: TextStyle["fontWeight"];
   inline?: boolean;
   compact?: boolean;
@@ -1145,6 +1231,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       outside: false,
       tableFrame: undefined,
       align,
+      literalWordStars,
     }),
     [
       linkFavicons,
@@ -1162,6 +1249,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       tone,
       chipBackground,
       align,
+      literalWordStars,
     ],
   );
   const screenPresentation = useMemo<TextPresentation>(

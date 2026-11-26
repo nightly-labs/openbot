@@ -82,7 +82,8 @@
     .server-onboarding-screen,
     .sidebar-agent-drag-preview,
     .sidebar-person-drag-preview,
-    .sidebar-section-drag-preview
+    .sidebar-section-drag-preview,
+    .crm-drawer
   ) {
   --openbot-bg-canvas: var(--window-solid-canvas);
   --openbot-bg-sidebar: var(--window-solid-sidebar);
@@ -100,6 +101,17 @@
   --openbot-queue-surface: var(--openbot-bg-surface);
   --background: var(--openbot-bg-canvas);
   --surface: var(--openbot-bg-surface);
+}
+
+:root[data-openbot-window-glass] .app-window .crm-sheet-scroll[data-fade-top] .crm-sheet thead :is(th, td),
+:root[data-openbot-window-glass] .app-window .crm-sheet-scroll[data-fade-bottom] .crm-sheet tfoot td,
+:root[data-openbot-window-glass]
+  .app-window
+  .crm-sheet-scroll[data-fade-left]
+  .crm-sheet
+  :is(.crm-sheet-index, :is(th, td):nth-child(2)),
+:root[data-openbot-window-glass] .app-window .crm-sheet-scroll[data-fade-right] .crm-sheet .crm-sheet-action {
+  --crm-sheet-bg: var(--window-solid-canvas);
 }
 
 :root[data-openbot-window-glass] .app-window :is(.agent-row-agent-status, .ui-bubble-reactions) {
@@ -182,6 +194,14 @@
 }
 
 :root[data-openbot-window-glass] .app-window .tasks-page-composer.composer-wrap {
+  background: transparent;
+}
+
+:root[data-openbot-window-glass]
+  .app-window
+  .tasks-page:not([data-empty])
+  > .tasks-page-scroll[data-composer-stuck]
+  .tasks-page-composer.composer-wrap {
   background: var(--window-glass-card);
 }
 
@@ -199,7 +219,7 @@
     .sidebar-folder > header,
     .marketplace-skill-group-bar,
     .agent-instructions-bar,
-    .tasks-page-composer.composer-wrap,
+    .tasks-page:not([data-empty]) > .tasks-page-scroll[data-composer-stuck] .tasks-page-composer.composer-wrap,
     .trace-row[data-parent],
     .trace-axis-row
   ) {

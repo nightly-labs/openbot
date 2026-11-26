@@ -1,5 +1,5 @@
 import { SIGNAL_NO_READY_CLOSE_CODE } from "@openbot/contracts/signal-protocol/messages";
-import { ticketNamesSignalHome } from "@openbot/contracts/signal-protocol/ticket";
+import { ticketNamesSignalHome, ticketSignalHome } from "@openbot/contracts/signal-protocol/ticket";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime, Scope } from "effect";
@@ -16,6 +16,8 @@ interface TeamWebRtcHostGatewayOptions extends TeamWebRtcHostPeerOptions {
   onSignalRecoveryFailure?: (error: Error, reason: string) => void;
   onSignalLost?: (lost: boolean) => void;
   privateNetwork?: () => boolean;
+  preferredSignalHome?: () => string | null;
+  signalHomeAnswers?: (home: string) => Effect.Effect<boolean>;
 }
 
 const logger = createOpenBotLogger("team-webrtc-host");
@@ -23,6 +25,8 @@ const logger = createOpenBotLogger("team-webrtc-host");
 const SIGNAL_MOVE_AFTER_MS = 20_000;
 const SIGNAL_MOVE_LIMIT_MS = 10 * 60_000;
 const SIGNAL_LOST_REPORT_AFTER_MS = 3 * 60_000;
+const SIGNAL_HOME_RETURN_CHECK_MS = 15 * 60_000;
+const SIGNAL_HOME_FOLLOW_DELAY_MS = 1_000;
 
 class HostSignal extends Context.Service<
   HostSignal,
@@ -106,6 +110,9 @@ export class TeamWebRtcHostGateway {
   #lastSignalEnd: string | null = null;
   #localApiPort: number | null = null;
   #signalUrl: string | null = null;
+  #signalHome: string | null = null;
+  #signalHomeReturnTimer: ReturnType<typeof setInterval> | null = null;
+  #signalHomeFollowTimer: ReturnType<typeof setTimeout> | null = null;
   #signalMoveTimer: ReturnType<typeof setTimeout> | null = null;
   #signalLostTimer: ReturnType<typeof setTimeout> | null = null;
   #signalLostReported = false;
@@ -155,9 +162,11 @@ export class TeamWebRtcHostGateway {
     this.#signalUrl = input.signalUrl;
     this.#signalEnded = false;
     this.#signalHomed = ticketNamesSignalHome(input.ticket);
+    this.#signalHome = ticketSignalHome(input.ticket);
     this.#signalMoves = 0;
     this.#signalRenewalRefused = false;
     this.#localApiPort = input.localApiPort;
+    this.#startSignalHomeReturnCheck();
     const connecting = yield* Effect.forkIn(
       this.#provide(HostSignal.use((signal) => signal.connect(input.hostId, input.signalUrl, input.ticket))),
       this.#connectionScope,
@@ -187,8 +196,11 @@ export class TeamWebRtcHostGateway {
       this.#signalLostReported = false;
       this.#localApiPort = null;
       this.#signalUrl = null;
+      this.#signalHome = null;
       this.#signalMoves = 0;
       this.#signalRenewalRefused = false;
+      this.#stopSignalHomeReturnCheck();
+      this.#cancelSignalHomeFollow();
       this.#cancelSignalMove();
       this.#cancelSignalLostReport();
       if (this.#connecting) yield* Fiber.interrupt(this.#connecting);
@@ -205,6 +217,89 @@ export class TeamWebRtcHostGateway {
       ),
     );
   }, Effect.uninterruptible).bind(this);
+
+  signalHome(): string | null {
+    return this.#hostId ? this.#signalHome : null;
+  }
+
+  readonly #followSignalHome = Effect.fn("HostGateway.followSignalHome")(function* (this: TeamWebRtcHostGateway) {
+    const hostId = this.#hostId;
+    if (!hostId || this.#signalRenewalRefused || !this.#options.renewSignal) return;
+    if (this.#connecting || this.#signalRecovery) {
+      this.scheduleSignalHomeFollow();
+      return;
+    }
+    const signalUrlBefore = this.#signalUrl;
+    const fiber = this.#runtime.runFork(
+      this.#recoverSignal(hostId, undefined, true).pipe(
+        Effect.catch(({ cause }) =>
+          Effect.sync(() => {
+            if (this.#hostId !== hostId) return;
+            const refused = this.#noteRenewalRefused(cause);
+            if (this.#signalEnded) {
+              this.#options.onSignalRecoveryFailure?.(
+                cause instanceof Error ? cause : new Error(sourceText("error.remote.signalRecoveryFailed")),
+                `home change ${refused ? "refused" : "failed"}`,
+              );
+              return;
+            }
+            if (this.#signalUrl === signalUrlBefore) {
+              logger.warn("Host Signal home change failed; the host keeps its Signal.");
+              return;
+            }
+            logger.warn("Host Signal home change failed; the host asks for another home.");
+            this.#scheduleSignalMove();
+            this.#scheduleSignalLostReport();
+          }),
+        ),
+      ),
+    );
+    this.#signalRecovery = fiber;
+    fiber.addObserver(() => {
+      if (this.#signalRecovery === fiber) this.#signalRecovery = null;
+    });
+    yield* Fiber.join(fiber);
+  }).bind(this);
+
+  scheduleSignalHomeFollow(): void {
+    this.#cancelSignalHomeFollow();
+    if (!this.#hostId) return;
+    this.#signalHomeFollowTimer = setTimeout(this.#followSignalHomeNow, SIGNAL_HOME_FOLLOW_DELAY_MS);
+  }
+
+  #cancelSignalHomeFollow(): void {
+    if (this.#signalHomeFollowTimer !== null) clearTimeout(this.#signalHomeFollowTimer);
+    this.#signalHomeFollowTimer = null;
+  }
+
+  readonly #followSignalHomeNow = (): void => {
+    this.#signalHomeFollowTimer = null;
+    const fiber = this.#runtime.runFork(this.#followSignalHome());
+    this.#operations.add(fiber);
+    fiber.addObserver(() => this.#operations.delete(fiber));
+  };
+
+  #startSignalHomeReturnCheck(): void {
+    this.#stopSignalHomeReturnCheck();
+    if (!this.#options.preferredSignalHome) return;
+    this.#signalHomeReturnTimer = setInterval(this.#checkSignalHomeReturn, SIGNAL_HOME_RETURN_CHECK_MS);
+  }
+
+  #stopSignalHomeReturnCheck(): void {
+    if (this.#signalHomeReturnTimer !== null) clearInterval(this.#signalHomeReturnTimer);
+    this.#signalHomeReturnTimer = null;
+  }
+
+  readonly #checkSignalHomeReturn = (): void => {
+    const preferred = this.#options.preferredSignalHome?.() ?? null;
+    if (preferred === null || preferred === this.#signalHome || this.#signalEnded || !this.#signalHomed) return;
+    const answers = this.#options.signalHomeAnswers?.(preferred) ?? Effect.succeed(true);
+    const fiber = this.#runtime.runFork(
+      answers.pipe(Effect.flatMap((answered) => (answered ? this.#followSignalHome() : Effect.void))),
+    );
+    this.#operations.add(fiber);
+    fiber.addObserver(() => this.#operations.delete(fiber));
+  };
 
   readonly applyNetworkRoute = Effect.fn("HostGateway.applyNetworkRoute")(function* (this: TeamWebRtcHostGateway) {
     if (this.#hostId) yield* this.#bridge.setPrivateNetwork(this.#hostId, this.#options.privateNetwork?.() ?? false);
@@ -449,18 +544,21 @@ export class TeamWebRtcHostGateway {
     this: TeamWebRtcHostGateway,
     hostId: string,
     failedSignalUrl?: string,
+    onlyToMove = false,
   ): Effect.fn.Return<void, RemoteWorkflowError, HostSignal> {
     const renew = this.#options.renewSignal;
     if (!renew) return;
     const bootstrap = yield* renew(hostId, failedSignalUrl);
     if (this.#hostId !== hostId) return;
     if (failedSignalUrl !== undefined && bootstrap.signalUrl === failedSignalUrl && !this.#signalEnded) return;
+    if (onlyToMove && bootstrap.signalUrl === this.#signalUrl && !this.#signalEnded) return;
     yield* this.#clearPeers();
     yield* HostSignal.use((signal) => signal.disconnect(hostId)).pipe(Effect.catch(() => Effect.void));
     if (this.#hostId !== hostId) return;
     this.#signalUrl = bootstrap.signalUrl;
     this.#signalEnded = false;
     this.#signalHomed = ticketNamesSignalHome(bootstrap.ticket);
+    this.#signalHome = ticketSignalHome(bootstrap.ticket);
     yield* HostSignal.use((signal) => signal.connect(hostId, bootstrap.signalUrl, bootstrap.ticket));
     if (this.#hostId !== hostId)
       yield* HostSignal.use((signal) => signal.disconnect(hostId)).pipe(Effect.catch(() => Effect.void));

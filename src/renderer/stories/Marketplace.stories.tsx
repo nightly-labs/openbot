@@ -1,3 +1,4 @@
+import { X_APP_ID } from "@openbot/ui/features/marketplace/marketplace-model";
 import type { MarketplaceNavigation } from "@openbot/ui/features/marketplace/marketplace-view";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import {
@@ -87,6 +88,13 @@ export const CustomServer = at((nav) => {
   nav.go({ kind: "app", id: `custom:${STORY_MCP_SERVERS[0]?.id ?? ""}` });
 });
 
+export const CustomServerSignInApp = at(
+  (nav) => {
+    nav.go({ kind: "app", id: `custom:${STORY_MCP_SERVERS[1]?.id ?? ""}` });
+  },
+  { signInAppNeeded: true },
+);
+
 export const CustomServerAdd = at((nav) => {
   nav.go({ kind: "server", id: null });
 });
@@ -153,6 +161,12 @@ export const PluginAppChecking = at(plugin("cloudflare"), {
 });
 
 const connector = (id: string) => at((nav) => nav.go({ kind: "app", id }), { connected: true });
+
+export const XApp = at((nav) => nav.go({ kind: "app", id: X_APP_ID }));
+
+export const XAppSetup = at((nav) => nav.go({ kind: "app", id: X_APP_ID, setup: true }));
+
+export const XAppAdded = at((nav) => nav.go({ kind: "app", id: X_APP_ID }), { xAgent: true });
 
 export const SlackConnected = connector("slack");
 

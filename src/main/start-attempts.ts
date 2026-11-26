@@ -204,3 +204,12 @@ export function takeForcedStartFailure(environment: NodeJS.ProcessEnv, isPackage
   if (isPackaged) return null;
   return value === "crash" || value === "hang" ? value : null;
 }
+
+type ForcedRendererStop = "first-load" | "recovery";
+
+export function takeForcedRendererStop(environment: NodeJS.ProcessEnv, isPackaged: boolean): ForcedRendererStop | null {
+  const value = environment.OPENBOT_E2E_STOP_RENDERER;
+  delete environment.OPENBOT_E2E_STOP_RENDERER;
+  if (isPackaged) return null;
+  return value === "first-load" || value === "recovery" ? value : null;
+}

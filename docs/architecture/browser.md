@@ -135,7 +135,13 @@ tokens. They keep the installed Chromium major version and host platform, and gi
 parts as `0.0.0` (`Chrome/156.0.0.0`), as Chrome does: some bot checks refuse the full version that
 Electron sends. The `Accept-Language` header adds the base language of each regional language
 (`en-GB,en;q=0.9`), also as Chrome does. The session sets it, not the request hook, so a value that
-a page sets on its own request stays: a site can sign that header. Requests to `accounts.google.com`
+a page sets on its own request stays: a site can sign that header. The header leaves out a system
+language that is not a valid language tag. On Linux, Electron gives `c` for the `C.UTF-8` locale and
+`posix` for `POSIX`, and adds them to `navigator.languages` of each page, where `Intl` throws on them.
+When the system list has such a value, the main process sets `LANGUAGE` at `ready`, before the
+first window, to the valid languages of the list, or to the app locale (`en_US`) when none is valid.
+A `C.UTF-8` server then gives pages `["en-US","en"]`. A list with only valid languages stays as it
+is. Child processes inherit the new `LANGUAGE`. Requests to `accounts.google.com`
 keep the `Electron/` token because Google rejects the account identifier step without it. This
 exception does not change the page identity or the identity sent to other sites.
 Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and
@@ -151,7 +157,11 @@ contract version that the host cannot compute. The focused check is
 `bun run test:browser --scenario=identity`; add `--google-live` for the Google identifier check.
 The local identity report is `.openbot-build/browser-identity.json`.
 The tab preload (`src/preload/browser-page.ts`) makes page values agree with Chrome: the outer size,
-the screen position, `window.chrome` and the passkey dialog. Each replaced function is a Proxy that
+the screen position, `window.chrome` and the passkey dialog. It also makes `window.print()` do
+nothing in each window that it installs in: the page, a frame that loads, and a blank frame that the
+page reaches through `contentWindow` or `contentDocument`. Thus a page in an agent tab cannot open the
+system Print dialog over the app, also not for a person in takeover. A blank frame that the page
+reaches only by index or name (`frames[0]`) is not covered. Each replaced function is a Proxy that
 reads as native code. Its `setPrototypeOf` trap throws `Cyclic __proto__ value` as a native function
 does, because V8 stops that check at a Proxy and bot checks find a Proxy that way. CDP calls do not
 turn on the `Runtime` domain: while it is on, Chromium formats each console argument for DevTools,
@@ -453,10 +463,11 @@ task takes fewer turns.
 
 `run_script` takes JavaScript that awaits helpers named after the action tools (`navigate`, `click`,
 `type`, `press`, `hover`, `scroll`, `selectOption`, `setChecked`, `waitFor`, `evaluate`, and
-`snapshot`), or `step({ action, ...fields })` with the fields of that tool and no `tabId`. Each
-helper sends one step to the host. The script returns a JSON value of at most 64 KB. An `evaluate`
-step gives its value to the script, not to the model, so it can return up to 1 MB, such as the whole
-text of a page.
+`snapshot`), or `step({ action, ...fields })` with the fields of that tool and no `tabId`. `action`
+is the name of a helper in snake_case, such as `select_option`, or `sleep`. Other tools, such as
+`screenshot`, do not work in a script. Each helper sends one step to the host. The script returns
+a JSON value of at most 64 KB. An `evaluate` step gives its value to the script, not to the model,
+so it can return up to 1 MB, such as the whole text of a page.
 
 An earlier `run_steps` tool took a fixed list of steps. A benchmark with Claude Haiku 5.5 on 10 public
 site tasks (3 repeats) gave `run_script` 118k median input tokens and 30 of 30 correct answers, and
@@ -577,7 +588,11 @@ sign-in that the relay records, or an HTTP proxy sign-in that the `login` handle
 marks it `signIn`; Chromium reports that last one as a failed tunnel. The next page that loads
 clears the mark. The page error takes the mark that the network error recorded, and it reads the
 Chromium code when a failed load gives no error name. A page error names the proxy (`browserProxyUnreachable`, `browserProxySignInRefused`,
-`browserProxyComputerUnreachable`); each change sends `browser-profiles-changed`. A change of a profile's proxy, or of a
+`browserProxyComputerUnreachable`); each change sends `browser-profiles-changed`. `ERR_EMPTY_RESPONSE` (-324) is not a proxy
+error: a site that sends nothing gives it too, with or without a proxy. When `resolveProxy` gives a proxy for the page, the
+page error says that the site or the proxy closed the connection (`browserSystemProxyOrSiteClosed`,
+`browserProfileProxyOrSiteClosed`) and does not mark the proxy. A page with no proxy keeps the Chromium error. The check
+uses the address that the load asked for, not the address of a redirect. A change of a profile's proxy, or of a
 proxy that profiles use, closes their tabs; the settings ask first when tabs are open. A delete moves the profiles to Automatic (foreign key
 `ON DELETE CASCADE`). Changes run one at a time. Two admins can still change one proxy: a save sends
 the address that the dialog opened with, and a delete sends the profiles that the question showed.
@@ -650,11 +665,46 @@ again, because a reload could send a form again or lose the work of the person.
 `bun run test:browser-steps` covers the crash, the settle wait and the bot check, and writes
 `.openbot-build/browser-steps-e2e/report.json`.
 
+### Location requests
+
+A page that asks for the location (`geolocation`) waits for a person. `BrowserLocationRequests`
+(`src/backend/browser-location.ts`) keeps one pending request for each tab, and `BrowserTab`
+carries it as `permissionRequest` (`{ id, origin, permission: "geolocation" }`). The chat of the
+agent that owns the tab, and the phone (browser screen and chat), show "<site> wants to know your
+location" with Block, Allow always and Allow. The browser panel and the detached browser window do not show it, and
+the web client does not show it. A tab that no agent or thread owns gets Block at once, because no
+chat can show its request. The answer holds for the tab while it stays on the same origin. A load of another origin, a
+close or a sleep of the tab blocks the pending request and forgets the answer. A secret tab, a
+private session tab, a closing tab and a page that is not `http` or `https` get Block at once. A tab
+with a pending request does not sleep. A request with no answer after 10 minutes gets Block, so a
+client that does not show the question (the web client or an older client) does not keep the tab awake.
+
+Allow always from the computer that runs the browser grants the origin in every tab that an agent or
+thread owns, and answers the pending requests of that origin in those tabs. An answer for a tab clears
+an earlier Block of that origin in the other tabs. A remote Allow always carries the location of the
+member's device, so it grants the origin only in the tabs of the same agent (or thread), and the host
+sets that location on each of those tabs that the origin asks from. The host keeps these grants in
+memory only, so a restart of the app or the server forgets them. When the client cannot read the
+location of its device, it sends no answer, and the request stays open.
+
+An answer from the computer that runs the browser lets Chromium read the location of that computer.
+An answer from a joined server (desktop or phone) sends the location of the member's
+device. The host sets it on the tab with `Emulation.setGeolocationOverride` before it grants the
+request, and keeps the debugger attached while the override is set. If the debugger detaches, the
+host attaches again and sets the override again. A load of another origin clears the override. A
+remote Allow without a location gets HTTP 400, so a page on a server never gets the location of the
+server. If the host cannot set the override, the request gets Block.
+
 ### Page dialogs
 
-A page `alert` or `confirm` that an agent action opens goes to that agent; every other dialog stays in
-Electron's native box for a person. `runTabAction` watches for a dialog only while the agent's own
-input action runs (`BrowserDialogTurn` names the thread and turn), and until the page settles after it.
+A page `alert` or `confirm` that an agent action opens goes to that agent. An `alert` that the page
+opens by itself in a tab that an agent runs (not a person's tab, a takeover, person control or a
+sign-in) gets OK at once, and its redacted text goes to the agent as a `console` warning in the next
+snapshot. An alert in the 5 s after a person presses the mouse or a key in the tab stays for the
+person: the engine counts that input only while no agent command holds the debugger, because CDP
+input also fires `before-mouse-event`. Electron shows that box on the main window, so it would block the whole app. Every other
+dialog stays in Electron's native box for a person. `runTabAction` watches for a dialog only while
+the agent's own input action runs (`BrowserDialogTurn` names the thread and turn), and until the page settles after it.
 The engine then sends `Page.enable` on its own debugger and keeps the debugger attached while a watch
 runs, so it also sees a dialog that a page load or a timer opens with no command in flight. A tab
 queue drain ends the watch. `Page.javascriptDialogOpening` ends the action with the dialog:
@@ -667,18 +717,44 @@ Electron shows its own box for the same dialog, after the CDP event. After the C
 emits Electron's internal `-cancel-dialogs` on the tab, which aborts the box without its callback. The
 agent gets a dialog only when the engine owns the debugger and Electron has a `-cancel-dialogs`
 listener. Otherwise, for example under an external debugger, the result says that a person must answer.
+For a page's own `alert` with no watch, the engine calls the reply callback of Electron's internal
+`-run-dialog` event with OK, then emits `-cancel-dialogs`, so it needs no debugger.
 `scripts/browser-dialogs-e2e.ts` fails if an Electron upgrade changes these internal events.
 
 | Event | Dialog |
 | --- | --- |
-| Person's click, or a tool that is not an input action | Native box. The agent is not told. |
+| Page's own `alert` in an agent tab, with no agent action and no person input in the last 5 s | OK at once. The agent gets the text in its next snapshot. |
+| Person's click, or a `confirm` from a tool that is not an input action, or any dialog in a person's tab | Native box. The agent is not told. A live view with `browser-view-dialog-v1` shows it (below). |
 | Turn ends | Handed off: the box stays for a person, and the agent can no longer answer it. |
 | Person answers first | `handle_dialog` fails with "This dialog is closed". |
 | Tab closed or browser destroyed | The engine detaches its debugger, so the tab queue drains. Then it cancels every box of the tab, a person's box too, also a box that shows after the close: Electron keeps a box open after its page closes. |
 | `prompt()` or `beforeunload` | Electron answers `prompt` with no box, and `will-prevent-unload` handles `beforeunload`. Not intercepted. |
 
-The agent never gets a dialog that an `evaluate`, `wait_for`, or `fill_fields` call opens, or one in a
-cross-origin frame: those dialogs stay native.
+The agent never gets a dialog id for a dialog that an `evaluate`, `wait_for`, or `fill_fields` call opens,
+or one in a cross-origin frame. A `confirm` there stays native. An `alert` there in an agent tab gets
+OK at once, as above, and the agent gets its text in the next snapshot.
+
+A member on a joined server cannot see the native box: it opens on the host's screen. While a dialog
+is open, the page answers no CDP command that needs its renderer, so a live view that starts then
+waits in the lease before `Page.startScreencast`, and the client showed "Connecting" with no end
+(#12651). A host with `browser-view-dialog-v1` sends the open dialog (id, type, message, the same
+redacted text that the agent gets) as a `dialog` message to a socket opened with `dialog=1`, and
+`dialog: null` when it closes. `startView` sends it before the screencast starts, so the member sees
+it while the start waits. The member answers with a `dialog` input. The gateway handles that input
+when it arrives, not in the input queue, because queued input waits behind the dialog too. The answer
+uses the same CDP answer and `-cancel-dialogs` as `handle_dialog`, with no turn check: a person can
+answer every dialog. Then the waiting start continues. While a view runs, the engine keeps `Page`
+events on, so it also sees a dialog that the member's own click opens. A pointer or key press from a
+view with `dialog=1` counts as person input, so a page `alert` that it opens in an agent tab stays for
+the member and is not answered with OK at once. A view without `dialog=1` cannot show the alert, so
+its input does not count. A dialog that opened while
+the engine did not watch stays unknown: `Page.enable` waits behind it and reports nothing. While a
+dialog is open, the gateway drops pointer and key input and answers `copy` with no text. The desktop
+and web clients show the dialog as a sheet at the top of the page area, named after the site of the
+tab ("openbot.run says"). It dims only the page: the tabs, the address and the chat box stay usable.
+A click outside it does not answer it, and OK has the focus. Escape answers Cancel only when the focus
+is on the sheet or the page, not in the chat box or the address. Before the first
+frame, the page area says that the page waits for the answer. The phone shows it in `Alert.alert`.
 
 A member on a remote server cannot see the host's tab, because the tab is a native view on the host's
 own screen. `browser-view-gateway.ts` answers that with a session and a websocket: `BrowserHost`

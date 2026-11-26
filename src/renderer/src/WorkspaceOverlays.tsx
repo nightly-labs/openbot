@@ -76,6 +76,7 @@ import { useUpdates } from "./features/updates/updates-context";
 import { useWhatsNew } from "./features/updates/whats-new-context";
 import { usePlanLimitRows } from "./features/usage/plan-limit-rows";
 import { createLinkAccountStore } from "./features/vault/stores/link-account-store";
+import { createNearWalletStore } from "./features/vault/stores/near-wallet-store";
 import { createVaultStore } from "./features/vault/stores/vault-store";
 import { desktopVaultCalls, hostVaultCalls } from "./features/vault/vault-port";
 import { useWindowPage } from "./features/window/window-page-context";
@@ -225,11 +226,11 @@ export function SkillsMarketplace() {
 
 function PlanReminder() {
   const platform = usePlatform();
-  const { orderedServers, callbacks } = useServerActions();
+  const { allServers, callbacks } = useServerActions();
   return (
     <Show when={platform.chatWindow === null}>
       <ServerPlanReminder
-        servers={orderedServers()}
+        servers={allServers()}
         planDeletesAt={callbacks.planDeletesAt}
         onRenew={callbacks.onRenewPlan}
       />
@@ -609,6 +610,7 @@ function ServerSettings() {
   });
   const vaultApiKeys = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_V2_CAPABILITY));
   const vaultTwoStep = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_V3_CAPABILITY));
+  const nearAgents = () => (activeServer()?.kind === "local" ? agentList() : undefined);
   const vaultImport = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_IMPORT_CAPABILITY));
   const vault = createMemo(() => {
     const serverId = vaultServerId();
@@ -619,6 +621,8 @@ function ServerSettings() {
       apiKeys: vaultApiKeys(),
       twoStep: vaultTwoStep(),
       link: local ? createLinkAccountStore() : undefined,
+      near: local ? createNearWalletStore() : undefined,
+      nearAgents,
       listAgents: () => appPort().agent.listAgents(serverId),
     };
   });
@@ -910,7 +914,10 @@ function ServerSettings() {
           }
           hostUpdate={{}}
           hostTimezone={{}}
+          hostVoiceModel={{}}
+          hostSignalHome={{}}
           hostTurnLimits={{}}
+          mediaApprovalCredits={{}}
           hostPersonality={{}}
           hostMemoryLimit={{}}
           memoryReview={{}}
@@ -1008,12 +1015,26 @@ function AppSettings(props: AccountProps) {
   });
   const codexLiveAccess = () =>
     activeServer()?.kind === "local" ? codexLiveAccessOf(agentStatus().providers) : undefined;
+  const { providerAccounts } = useProviders();
+  const liveVoiceAccount = () => {
+    const choose = providerAccounts()?.setLiveVoiceAccount;
+    const codex = agentStatus().providers?.find((row) => row.id === "codex");
+    if (!choose || !codex?.accounts) return undefined;
+    return {
+      accounts: codex.accounts,
+      accountId: codex.liveVoiceAccount ?? null,
+      defaultUsesKey: codex.apiKeyInUse === true,
+      choose,
+    };
+  };
   const {
     appSettingsOpen,
     notificationFocusRequest,
     setAppSettingsOpen,
     appSettingsTab,
     hostedServerDeleteRequest,
+    mobileInstallRequest,
+    clearMobileInstallRequest,
     generalSettings,
     builtInDisplayGeometry,
     updateGeneralSettings,
@@ -1050,6 +1071,7 @@ function AppSettings(props: AccountProps) {
         onCancelScheduledRestart={updates.cancelScheduledRestart}
         onRestartWhenIdle={updates.restartWhenIdle}
         onCancelIdleRestart={updates.cancelIdleRestart}
+        onRestartNow={updates.restartNow}
         account={props.account()}
         onUpdateAccountName={auth.updateAccountName}
         onUpdateAccountAvatar={auth.updateAccountAvatar}
@@ -1069,6 +1091,9 @@ function AppSettings(props: AccountProps) {
         billingApi={appPort().billing}
         referralApi={appPort().referral}
         licenseApi={appPort().license}
+        creditsApi={appPort().credits}
+        onCreditsChange={windowPage.adoptCredits}
+        onBuyCredits={(serverId) => windowPage.openCredits(serverId)}
         onContactUs={() => void appPort().openExternal("hosted-server-contact")}
         hostedServersApi={appPort().hostedServers}
         onAddHostedServer={() => {
@@ -1076,6 +1101,7 @@ function AppSettings(props: AccountProps) {
           setAddServerOpen(true, "settings_billing");
         }}
         codexLiveAccess={codexLiveAccess()}
+        liveVoiceAccount={liveVoiceAccount()}
         onConnectCodex={() => {
           setAppSettingsOpen(false);
           openServerSettings(LOCAL_SERVER_ID, null, "providers");
@@ -1088,6 +1114,8 @@ function AppSettings(props: AccountProps) {
         restoreFocusTarget={appSettingsRestoreTarget()}
         openTab={appSettingsTab()}
         hostedServerDeleteRequest={hostedServerDeleteRequest()}
+        mobileInstallRequest={mobileInstallRequest()}
+        onMobileInstallRequestHandled={clearMobileInstallRequest}
       />
     </Loading>
   );

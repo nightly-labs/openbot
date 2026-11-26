@@ -332,6 +332,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Aucun modèle disponible pour ce fournisseur.",
   "mobile.agent.runtime.searchModels": "Rechercher des modèles",
   "mobile.agent.runtime.noMatches": "Aucun modèle ne correspond à votre recherche.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Aucun modèle ne correspond à votre recherche. Vos réglages de confidentialité, de fournisseurs et de garde-fous sur openrouter.ai peuvent masquer des modèles de cette liste.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Ce fournisseur ne fonctionne pas avec « Espace de travail uniquement » sous Windows et Linux. Pour l’utiliser, modifiez d’abord les « Autorisations ».",
   "mobile.agent.runtime.usageLimit": "Limite d’utilisation atteinte",
@@ -386,11 +388,12 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Retirer {model}",
   "mobile.agent.backupModels.unavailable": "Indisponible pour le moment · ignoré",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Si une limite d’utilisation arrête {name} après le début du travail, {name} poursuit le même travail avec le premier modèle disponible dans l’ordre. Il revient à {model} quand la limite prend fin, ou 10 minutes après une erreur du fournisseur.",
   "mobile.agent.busyMessage.label": "Pendant le travail",
   "mobile.agent.busyMessage.footer":
-    "Ce que devient un message envoyé pendant que l’agent travaille. « File d’attente » le garde jusqu’à la fin du tour. « Orienter » le donne à l’agent pendant le tour.",
+    "Ce que devient un message de vous ou d’un autre agent qui arrive pendant que l’agent travaille. « File d’attente » le garde jusqu’à la fin du tour. « Orienter » le donne à l’agent pendant le tour.",
   "mobile.agent.busyMessage.queue": "File d’attente",
   "mobile.agent.busyMessage.steer": "Orienter",
   "mobile.agent.busyMessage.hostDefaultQueue": "Par défaut de l’hôte (File d’attente)",
@@ -416,6 +419,9 @@ export const messages = {
   "mobile.agent.planCard.label": "Montrer le plan avant les longues tâches",
   "mobile.agent.planCard.footer":
     "Avant une longue tâche, l’agent montre son plan. Il commence après 10 s ou quand vous appuyez sur Démarrer.",
+  "mobile.agent.builtinMemory.label": "Mémoire OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "L’agent enregistre et lit ses propres souvenirs. Désactivez-la pour utiliser seulement une app de mémoire, comme Mem0. Les souvenirs enregistrés restent.",
   "mobile.agent.workspace.title": "Dossier de l’espace de travail",
   "mobile.agent.workspace.footer": "Le dossier de cet agent sur l’ordinateur hôte.",
   "mobile.agent.advanced.behavior": "Comportement",
@@ -501,6 +507,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Cet hôte ne peut pas publier d’agents depuis un appareil distant.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Jetons hors lectures du cache",
   "mobile.agent.usage.estimatedCost": "Coût estimé",
+  "mobile.agent.usage.noCostEstimate": "Aucune estimation de coût",
   "mobile.agent.usage.daily": "Utilisation quotidienne",
   "mobile.agent.usage.tokens": "Jetons",
   "mobile.agent.usage.cost": "Coût",
@@ -535,6 +542,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Collecte commencée {started}. Mise à jour {updated}.",
   "mobile.agent.usage.never": "jamais",
   "mobile.agent.record.time": "Heure",
+  "mobile.agent.record.date": "Date",
   "mobile.agent.section.changeFailed": "Impossible de modifier le dossier",
   "mobile.agent.section.tryAgain": "Veuillez réessayer.",
   "mobile.agent.section.moveUp": "Monter",
@@ -622,13 +630,13 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Impossible de charger vos serveurs",
   "mobile.agent.home.serversFailedBody": "Vérifiez que l’application de bureau fonctionne, puis réessayez.",
   "mobile.agent.home.noServers": "Aucun serveur disponible",
-  "mobile.agent.home.noServersBody": "Reconnectez l’application de bureau ou rejoignez un serveur distant.",
+  "mobile.agent.home.noServersBody":
+    "Ouvrez OpenBot sur votre ordinateur avec ce compte et activez Publier ce serveur dans Réglages du serveur → Membres. Ou rejoignez un serveur distant.",
   "mobile.agent.home.chooseServer": "Choisir un serveur",
   "mobile.agent.home.openServers": "Ouvrir les serveurs",
   "mobile.agent.home.noChatOpen": "Aucune discussion ouverte",
   "mobile.agent.home.noChatOpenBody": "Choisissez une discussion dans la liste.",
   "mobile.agent.home.chatListWidth": "Largeur de la liste des discussions",
-  "mobile.agent.home.serverTitle": "{name}, ouvrir les serveurs",
   "mobile.agent.home.waiting": "En attente de connexion",
   "mobile.agent.home.waitingBody": "La liste des agents se chargera une fois ce serveur connecté.",
   "mobile.agent.home.noAgents": "Aucun agent sur ce serveur",
@@ -701,6 +709,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Ne plus exclure",
   "mobile.agent.folders.browseTitle": "Choisir un dossier",
   "mobile.agent.folders.places": "Aller à",
+  "mobile.agent.folders.path": "Chemin du dossier",
   "mobile.agent.folders.home": "Dossier personnel",
   "mobile.agent.folders.parent": "Remonter à {folder}",
   "mobile.agent.folders.browseFailed": "Impossible d’ouvrir ce dossier.",

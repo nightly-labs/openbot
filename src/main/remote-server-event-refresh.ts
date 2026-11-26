@@ -4,6 +4,8 @@ import {
   type AgentRuntimeSnapshot,
   type AgentStatus,
   type AvatarColor,
+  type BrowserHttpSignIn,
+  type BrowserPermissionRequest,
   type BrowserTab,
   type ChatColors,
   type ClientAgentSummary,
@@ -14,6 +16,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_USAGE_LIMIT_ROUTES, type AgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import { AGENT_WAITS_ROUTES, decodeAgentWaitsResponse } from "@openbot/contracts/team-protocol/agent-waits-v1";
 import { PROVIDER_MODEL_SOURCE_ROUTES } from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import { Deferred, Effect, Result } from "effect";
 import { decodeAgentSummaries, decodeQueueSnapshot, decodeRemoteAgentUsageLimits } from "./remote-agent-decoding";
@@ -42,6 +45,7 @@ export interface RemoteEventRefreshOptions {
   onMemberChatColors?: (serverId: string) => void;
   hasUsageLimits?: (serverId: string) => boolean;
   hasModelSources?: (serverId: string) => boolean;
+  hasAgentWaits?: (serverId: string) => boolean;
 }
 
 export class RemoteEventRefresh {
@@ -52,12 +56,16 @@ export class RemoteEventRefresh {
   readonly #onMemberChatColors: (serverId: string) => void;
   readonly #hasUsageLimits: (serverId: string) => boolean;
   readonly #hasModelSources: (serverId: string) => boolean;
+  readonly #hasAgentWaits: (serverId: string) => boolean;
   readonly #conversations = new Map<string, ConversationRefresh>();
   readonly #queues = new Map<string, QueueRefresh>();
+  readonly #waitReads = new Map<string, QueueRefresh>();
   readonly #generations = new Map<string, number>();
   readonly #rosterLoads = new Map<string, Deferred.Deferred<void, RemoteWorkflowError>>();
   readonly #browserHolds = new Map<string, ReadonlySet<string>>();
   readonly #browserPageStates = new Map<string, ReadonlyMap<string, { canGoBack: boolean; canGoForward: boolean }>>();
+  readonly #browserPermissions = new Map<string, ReadonlyMap<string, BrowserPermissionRequest>>();
+  readonly #browserHttpSignIns = new Map<string, ReadonlyMap<string, BrowserHttpSignIn>>();
   readonly #browserStates = new Map<string, { tabs: BrowserTab[]; activeTabId: string | null }>();
   readonly #agentColors = new Map<string, ReadonlyMap<string, AvatarColor>>();
   readonly #agentRosters = new Map<string, ClientAgentSummary[]>();
@@ -78,6 +86,7 @@ export class RemoteEventRefresh {
     this.#onMemberChatColors = options.onMemberChatColors ?? (() => undefined);
     this.#hasUsageLimits = options.hasUsageLimits ?? (() => false);
     this.#hasModelSources = options.hasModelSources ?? (() => false);
+    this.#hasAgentWaits = options.hasAgentWaits ?? (() => false);
   }
 
   readonly forward = Effect.fn("RemoteEvents.forward")(function* (
@@ -99,9 +108,27 @@ export class RemoteEventRefresh {
       this.rememberChatColors(serverId, event);
     } else if (event.type === "agents-changed") {
       this.#emitRoster(serverId, addRemotePreviewUrls(event.agents, serverId), bufferedLive);
-    } else if (event.type === "browser-user-control-changed" || event.type === "browser-page-state-changed") {
+    } else if (
+      event.type === "browser-user-control-changed" ||
+      event.type === "browser-page-state-changed" ||
+      event.type === "browser-permissions-changed" ||
+      event.type === "browser-http-sign-in-changed"
+    ) {
       if (event.type === "browser-user-control-changed") this.#browserHolds.set(serverId, new Set(event.tabIds));
-      else this.#browserPageStates.set(serverId, new Map(event.tabs.map(({ tabId, ...state }) => [tabId, state])));
+      else if (event.type === "browser-page-state-changed")
+        this.#browserPageStates.set(serverId, new Map(event.tabs.map(({ tabId, ...state }) => [tabId, state])));
+      else if (event.type === "browser-permissions-changed")
+        this.#browserPermissions.set(
+          serverId,
+          new Map(event.requests.map(({ tabId, ...request }) => [tabId, request])),
+        );
+      else
+        this.#browserHttpSignIns.set(
+          serverId,
+          new Map(
+            event.tabs.map(({ tabId, origin, refused }) => [tabId, { origin, ...(refused ? { refused: true } : {}) }]),
+          ),
+        );
       this.#emit(serverId, event);
       const state = this.#browserStates.get(serverId);
       if (state) this.#emit(serverId, addRemotePreviewUrls(this.#withBrowserHolds(serverId, state), serverId));
@@ -123,6 +150,9 @@ export class RemoteEventRefresh {
       if (bufferedLive) this.#emit(serverId, remoteEvent, true);
       else this.#emit(serverId, remoteEvent);
     }
+    if ((event.type === "turn-started" || event.type === "turn-completed") && this.#hasAgentWaits(serverId)) {
+      yield* this.#refreshWaits(serverId, event.agentId);
+    }
   }).bind(this);
 
   #withBrowserHolds(
@@ -131,13 +161,26 @@ export class RemoteEventRefresh {
   ): Extract<AgentEvent, { type: "browser-changed" }> {
     const held = this.#browserHolds.get(serverId);
     const pageStates = this.#browserPageStates.get(serverId);
+    const permissions = this.#browserPermissions.get(serverId);
+    const httpSignIns = this.#browserHttpSignIns.get(serverId);
     const tabs = state.tabs.map((tab) => {
-      const { userControl: _, canGoBack: _back, canGoForward: _forward, ...rest } = tab;
+      const {
+        userControl: _,
+        canGoBack: _back,
+        canGoForward: _forward,
+        permissionRequest: _permissionRequest,
+        httpSignIn: _signIn,
+        ...rest
+      } = tab;
       const pageState = pageStates?.get(tab.id);
+      const permissionRequest = permissions?.get(tab.id);
+      const httpSignIn = httpSignIns?.get(tab.id);
       return {
         ...rest,
         ...(held?.has(tab.id) ? { userControl: true as const } : {}),
         ...(pageState ? { canGoBack: pageState.canGoBack, canGoForward: pageState.canGoForward } : {}),
+        ...(permissionRequest ? { permissionRequest } : {}),
+        ...(httpSignIn ? { httpSignIn } : {}),
       };
     });
     return { type: "browser-changed", tabs, activeTabId: state.activeTabId };
@@ -340,6 +383,8 @@ export class RemoteEventRefresh {
     this.#memberChatColors.delete(serverId);
     this.#browserHolds.delete(serverId);
     this.#browserPageStates.delete(serverId);
+    this.#browserPermissions.delete(serverId);
+    this.#browserHttpSignIns.delete(serverId);
     this.#browserStates.delete(serverId);
     this.#runtimeSnapshots.delete(serverId);
     this.#usageLimits.delete(serverId);
@@ -354,6 +399,9 @@ export class RemoteEventRefresh {
     for (const key of this.#queues.keys()) {
       if (key.startsWith(`${serverId}\0`)) this.#queues.delete(key);
     }
+    for (const key of this.#waitReads.keys()) {
+      if (key.startsWith(`${serverId}\0`)) this.#waitReads.delete(key);
+    }
   }
 
   clear(): void {
@@ -364,6 +412,8 @@ export class RemoteEventRefresh {
     this.#memberChatColors.clear();
     this.#browserHolds.clear();
     this.#browserPageStates.clear();
+    this.#browserPermissions.clear();
+    this.#browserHttpSignIns.clear();
     this.#browserStates.clear();
     this.#runtimeSnapshots.clear();
     this.#usageLimits.clear();
@@ -371,6 +421,7 @@ export class RemoteEventRefresh {
     this.#generations.clear();
     this.#conversations.clear();
     this.#queues.clear();
+    this.#waitReads.clear();
   }
 
   readonly #refreshConversationPage = Effect.fn("RemoteEvents.refreshConversationPage")(function* (
@@ -416,40 +467,63 @@ export class RemoteEventRefresh {
     );
   });
 
-  readonly #refreshQueue = Effect.fn("RemoteEvents.refreshQueue")(function* (
+  readonly #refreshAgentRead = Effect.fn("RemoteEvents.refreshAgentRead")(function* (
     this: RemoteEventRefresh,
+    reads: Map<string, QueueRefresh>,
     serverId: string,
     agentId: string,
+    read: Effect.Effect<AgentEvent, RemoteWorkflowError>,
   ) {
     const key = `${serverId}\0${agentId}`;
-    const pending = this.#queues.get(key);
+    const pending = reads.get(key);
     if (pending) {
       pending.dirty = true;
       return;
     }
     const request = { dirty: false };
-    this.#queues.set(key, request);
+    reads.set(key, request);
     yield* Effect.gen({ self: this }, function* () {
       do {
         request.dirty = false;
-        const result = yield* this.#request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot).pipe(
-          Effect.result,
-        );
+        const result = yield* read.pipe(Effect.result);
         if (Result.isFailure(result)) {
           if (request.dirty) continue;
           return;
         }
         if (!this.#hasServer(serverId)) return;
-        this.#emit(serverId, { type: "queue-changed", snapshot: result.success });
+        this.#emit(serverId, result.success);
       } while (request.dirty);
     }).pipe(
       Effect.ensuring(
         Effect.sync(() => {
-          if (this.#queues.get(key) === request) this.#queues.delete(key);
+          if (reads.get(key) === request) reads.delete(key);
         }),
       ),
     );
   });
+
+  #refreshQueue(serverId: string, agentId: string) {
+    return this.#refreshAgentRead(
+      this.#queues,
+      serverId,
+      agentId,
+      this.#request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot).pipe(
+        Effect.map((snapshot): AgentEvent => ({ type: "queue-changed", snapshot })),
+      ),
+    );
+  }
+
+  #refreshWaits(serverId: string, agentId: string) {
+    return this.#refreshAgentRead(
+      this.#waitReads,
+      serverId,
+      agentId,
+      this.#request(serverId, AGENT_WAITS_ROUTES.list, decodeAgentWaitsResponse, {
+        method: "POST",
+        body: { agentId },
+      }).pipe(Effect.map((snapshot): AgentEvent => ({ type: "waits-changed", snapshot }))),
+    );
+  }
 
   readonly #conversationPageEffect = Effect.fn("RemoteEvents.conversationPage")(
     (serverId: string, agentId: string, limit: number) =>

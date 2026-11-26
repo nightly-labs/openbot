@@ -273,6 +273,10 @@ export function createMockChannels(
     compactChannelContext: async (channelId: string): Promise<void> => {
       requireChannel(channelId);
     },
+    channelCompactAvailability: async (channelId: string): Promise<{ available: boolean }> => {
+      requireChannel(channelId);
+      return { available: true };
+    },
     deleteChannelHistory: async (channelId: string): Promise<void> => {
       const channel = requireChannel(channelId);
       if ((tasks.get(channelId) ?? []).some((task) => ["queued", "running", "waiting"].includes(task.state)))

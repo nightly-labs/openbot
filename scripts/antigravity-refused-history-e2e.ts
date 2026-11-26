@@ -44,6 +44,12 @@ const text = (sessionId, value) => update(sessionId, { sessionUpdate: "agent_mes
 const poisoned = new Map();
 const INVALID = "INVALID_ARGUMENT (code 400): Request contains an invalid argument.";
 const OVERSIZED = "FAILED_PRECONDITION (code 400): The message size exceeds 30.000MB limit";
+const UNENCODABLE = "Agent execution error: agent executor error: generating and executing: proto: field google.protobuf.Value.string_value contains invalid UTF-8";
+const MEDIA = "INVALID_ARGUMENT (code 400): Unable to process input: the file or media data is empty, corrupted, or malformed";
+const UNSIGNED = 'Error 400, Message: {"type":"error","error":{"type":"invalid_request_error","message":"messages.1.content.0.thinking.signature: Field required"}}, Status: INVALID_ARGUMENT, Details: []';
+const MODIFIED = "INVALID_ARGUMENT (code 400): invalid_request_error: messages.187.content.1: \\u0060thinking\\u0060 or \\u0060redacted_thinking\\u0060 blocks in the latest assistant message cannot be modified. These blocks must remain as they were in the original response.";
+const UNLINKED = "Agent execution error: agent executor error: generating and executing: Error 400, Message: The referenced name #/$defs/ModelInputLimits in function_response.response does not match to a display_name in the function_response.parts., Status: INVALID_ARGUMENT, Details: []";
+const answer = (failure) => (failure.startsWith("Agent execution error: ") ? failure : NL + "\\u26A0 " + failure);
 let sessions = 0;
 let tools = 0;
 function handle(message) {
@@ -57,6 +63,11 @@ function handle(message) {
     const prompt = params.prompt.map((block) => block.text ?? "").join("");
     if (prompt.includes("POISON") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, INVALID);
     if (prompt.includes("OVERSIZE") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, OVERSIZED);
+    if (prompt.includes("UNENCODABLE") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, UNENCODABLE);
+    if (prompt.includes("MEDIA") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, MEDIA);
+    if (prompt.includes("UNSIGNED") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, UNSIGNED);
+    if (prompt.includes("MODIFIED") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, MODIFIED);
+    if (prompt.includes("UNLINKED") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, UNLINKED);
     const refused = poisoned.has(params.sessionId);
     const tool = refused && prompt.includes("TOOL") && !prompt.includes("PELICAN");
     log({ sessionId: params.sessionId, refused, tool, text: prompt });
@@ -65,7 +76,7 @@ function handle(message) {
       update(params.sessionId, { sessionUpdate: "tool_call", toolCallId, title: "Read broken.png", kind: "read", status: "in_progress" });
       update(params.sessionId, { sessionUpdate: "tool_call_update", toolCallId, status: "completed" });
     }
-    text(params.sessionId, refused ? NL + "\\u26A0 " + poisoned.get(params.sessionId) : "Done.");
+    text(params.sessionId, refused ? answer(poisoned.get(params.sessionId)) : "Done.");
     return write({ id: message.id, result: { stopReason: "end_turn" } });
   }
   write({ id: message.id, result: {} });
@@ -249,6 +260,134 @@ try {
     oversizedTool.error,
     sourceText("error.provider.requestTooLarge", { provider: providerLabel("antigravity") }),
     "The message shows the too-large-chat text.",
+  );
+
+  const handedOff = await send(agent.id, "Are you back?");
+  assert.equal(handedOff.status, "completed", `The message after the too large chat answers: ${handedOff.error ?? ""}`);
+
+  const media = await send(agent.id, "MEDIA in this session.");
+  assert.equal(
+    media.status,
+    "completed",
+    `A refused image in the history runs again and answers: ${media.error ?? ""}`,
+  );
+  assert.deepEqual(
+    media.prompts.map(({ refused }) => refused),
+    [true, false],
+    "The message ran two times: refused on the old session, then answered.",
+  );
+  assert.notEqual(media.prompts[0]?.sessionId, media.prompts[1]?.sessionId, "It ran on a new session.");
+
+  const mediaTool = await send(agent.id, "MEDIA with a TOOL step.");
+  assert.equal(mediaTool.status, "failed", "A refused image after a tool step fails the message.");
+  assert.equal(
+    mediaTool.error,
+    sourceText("error.provider.imageUnreadable", { provider: providerLabel("antigravity") }),
+    "The message shows the unreadable-image text.",
+  );
+  const afterMedia = await send(agent.id, "Are you here?");
+  assert.equal(afterMedia.status, "completed", `The next message answers: ${afterMedia.error ?? ""}`);
+  assert.notEqual(
+    afterMedia.prompts[0]?.sessionId,
+    mediaTool.prompts[0]?.sessionId,
+    "The next message runs on a new session.",
+  );
+
+  const unsigned = await send(agent.id, "UNSIGNED thinking in this session.");
+  assert.equal(
+    unsigned.status,
+    "completed",
+    `A history with an unsigned thinking block runs again and answers: ${unsigned.error ?? ""}`,
+  );
+  assert.deepEqual(
+    unsigned.prompts.map(({ refused }) => refused),
+    [true, false],
+    "The message ran two times: refused on the old session, then answered.",
+  );
+  assert.notEqual(unsigned.prompts[0]?.sessionId, unsigned.prompts[1]?.sessionId, "It ran on a new session.");
+
+  const modified = await send(agent.id, "MODIFIED thinking in this session.");
+  assert.equal(
+    modified.status,
+    "completed",
+    `A history with a changed thinking block runs again and answers: ${modified.error ?? ""}`,
+  );
+  assert.deepEqual(
+    modified.prompts.map(({ refused }) => refused),
+    [true, false],
+    "The message ran two times: refused on the old session, then answered.",
+  );
+  assert.notEqual(modified.prompts[0]?.sessionId, modified.prompts[1]?.sessionId, "It ran on a new session.");
+
+  const modifiedTool = await send(agent.id, "MODIFIED thinking with a TOOL step.");
+  assert.equal(modifiedTool.status, "failed", "A changed thinking block after a tool step fails the message.");
+  assert.equal(
+    modifiedTool.error,
+    sourceText("error.provider.antigravityHistoryUnreadable"),
+    "The message shows the unreadable-history text.",
+  );
+  const afterModified = await send(agent.id, "Are you still here?");
+  assert.equal(afterModified.status, "completed", `The next message answers: ${afterModified.error ?? ""}`);
+  assert.notEqual(
+    afterModified.prompts[0]?.sessionId,
+    modifiedTool.prompts[0]?.sessionId,
+    "The next message runs on a new session.",
+  );
+
+  const unencodable = await send(agent.id, "UNENCODABLE text in this session.");
+  assert.equal(
+    unencodable.status,
+    "completed",
+    `A history that Gemini cannot encode runs again and answers: ${unencodable.error ?? ""}`,
+  );
+  assert.deepEqual(
+    unencodable.prompts.map(({ refused }) => refused),
+    [true, false],
+    "The message ran two times: refused on the old session, then answered.",
+  );
+  assert.notEqual(unencodable.prompts[0]?.sessionId, unencodable.prompts[1]?.sessionId, "It ran on a new session.");
+
+  const unencodableTool = await send(agent.id, "UNENCODABLE text with a TOOL step.");
+  assert.equal(unencodableTool.status, "failed", "An encoding failure after a tool step fails the message.");
+  assert.equal(
+    unencodableTool.error,
+    sourceText("error.provider.antigravityHistoryUnreadable"),
+    "The message shows the unreadable-history text.",
+  );
+  const afterUnencodable = await send(agent.id, "Are you still there?");
+  assert.equal(afterUnencodable.status, "completed", `The next message answers: ${afterUnencodable.error ?? ""}`);
+  assert.notEqual(
+    afterUnencodable.prompts[0]?.sessionId,
+    unencodableTool.prompts[0]?.sessionId,
+    "The next message runs on a new session.",
+  );
+
+  const unlinked = await send(agent.id, "UNLINKED schema result in this session.");
+  assert.equal(
+    unlinked.status,
+    "completed",
+    `A tool result that Gemini reads as a file link runs again and answers: ${unlinked.error ?? ""}`,
+  );
+  assert.deepEqual(
+    unlinked.prompts.map(({ refused }) => refused),
+    [true, false],
+    "The message ran two times: refused on the old session, then answered.",
+  );
+  assert.notEqual(unlinked.prompts[0]?.sessionId, unlinked.prompts[1]?.sessionId, "It ran on a new session.");
+
+  const unlinkedTool = await send(agent.id, "UNLINKED schema result with a TOOL step.");
+  assert.equal(unlinkedTool.status, "failed", "A refused tool result after a tool step fails the message.");
+  assert.equal(
+    unlinkedTool.error,
+    sourceText("error.provider.antigravityHistoryUnreadable"),
+    "The message shows the unreadable-history text.",
+  );
+  const afterUnlinked = await send(agent.id, "Are you still with me?");
+  assert.equal(afterUnlinked.status, "completed", `The next message answers: ${afterUnlinked.error ?? ""}`);
+  assert.notEqual(
+    afterUnlinked.prompts[0]?.sessionId,
+    unlinkedTool.prompts[0]?.sessionId,
+    "The next message runs on a new session.",
   );
   report.passed = true;
 } catch (error) {

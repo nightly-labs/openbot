@@ -2,6 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentEvent,
   type AskSideQuestionInput,
+  type AttachmentDownloadProgress,
   type AttachmentImportEvent,
   type AttachmentSummary,
   decodeSaveSkillSuggestionResult,
@@ -27,7 +28,11 @@ import {
   ROUTINE_RUN_COMMAND_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-run-command-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
-import { decodeSideQuestionResponse, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
+import {
+  decodeSideQuestionResponse,
+  SIDE_QUESTION_ROUTES,
+  SIDE_QUESTION_THREADS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/side-question-v1";
 import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
 import { runTeamEffect } from "@openbot/team-client";
@@ -43,6 +48,7 @@ import {
   resetAgentSessionSetting,
   setAgentSessionSetting,
   setAgentSkillEnabled,
+  testMcpServer,
   uninstallAgentSkill,
   unpublishAgentTemplate,
 } from "@openbot/team-client/team-admin-requests";
@@ -170,12 +176,14 @@ export function createWebConversationRuntime(
   canAdminister?: (capability: string) => boolean,
   storageCalls?: () => FilesPort,
   skillCatalog?: () => SkillCatalogCalls,
+  imageCopiesSupported?: () => boolean | undefined,
 ): ConversationRuntime {
   const routinesOnceEnabled = () => hasCapability?.(ROUTINES_ONCE_CAPABILITY) === true;
   const routinePauseReasonsEnabled = () => hasCapability?.(ROUTINE_PAUSE_REASONS_CAPABILITY) === true;
   const webLiveVoice = useWebLiveVoice();
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
-  const attachmentMedia = createWebAttachmentMedia(remote, hostId);
+  const downloadListeners = new Set<(progress: AttachmentDownloadProgress) => void>();
+  const attachmentMedia = createWebAttachmentMedia(remote, hostId, undefined, imageCopiesSupported);
   const files = createWebAttachmentFiles(remote, hostId, attachmentMedia);
   let importing: { cancelled: boolean; serverId: string } | undefined;
   let importBusy = false;
@@ -347,6 +355,14 @@ export function createWebConversationRuntime(
           ? runTeamEffect(listMcpServers(adminRequest()).pipe(Effect.mapError((error) => error.cause)))
           : [];
       },
+      ...(adminRequest
+        ? {
+            testMcpServer: async (input, serverId) => {
+              if (serverId !== hostId()) throw new Error(currentText().t("webClient.error.hostChanged"));
+              return runTeamEffect(testMcpServer(adminRequest(), input).pipe(Effect.mapError((error) => error.cause)));
+            },
+          }
+        : {}),
       listWorkspaceDirectory: ({ agentId, path }) => remote.workspaceDirectory(agentId, path),
       onAttachmentImport(listener) {
         listeners.add(listener);
@@ -363,11 +379,31 @@ export function createWebConversationRuntime(
       discardAttachmentImport(requestId) {
         failedImports.delete(requestId);
       },
-      openAttachment: ({ attachmentId }) => files.download(attachmentId),
+      openAttachment: ({ attachmentId, size }) => {
+        const serverId = hostId();
+        return files.download(
+          attachmentId,
+          size === undefined
+            ? undefined
+            : {
+                size,
+                onProgress: (received, total) => {
+                  for (const listener of downloadListeners) listener({ serverId, attachmentId, received, total });
+                },
+              },
+        );
+      },
+      onAttachmentDownload(listener) {
+        downloadListeners.add(listener);
+        return () => {
+          downloadListeners.delete(listener);
+        };
+      },
       openSharedFile: ({ path }) => files.saveShared(path),
       openWorkspaceFile: ({ agentId, path }) => files.saveWorkspace(agentId, path),
       previewSharedFile: ({ path }) => files.previewShared(path),
-      previewWorkspaceFile: ({ agentId, path }) => files.previewWorkspace(agentId, path),
+      previewWorkspaceFile: ({ agentId, path, exactPath }) =>
+        files.previewWorkspace(agentId, path, exactPath ? { exactPath } : {}),
       respondToBrowserSecret: remote.respondToBrowserSecret
         ? (input) => remote.respondToBrowserSecret?.(input) ?? Promise.resolve()
         : unavailable,
@@ -376,12 +412,21 @@ export function createWebConversationRuntime(
     browser: {
       capturePreview: remote.browserPreview ?? unavailable,
       closePictureInPicture: async () => {},
+      closeWindow: async () => {},
+      focusWindow: async () => {},
       navigate: (input) => remote.navigateBrowserTab(input),
       onPictureInPictureEvent: () => () => {},
+      onWindowEvent: () => () => {},
       open: (input) => remote.openBrowserTab(input),
       openPictureInPicture: unavailable,
+      openWindow: unavailable,
+      publishWindowModel: async () => {},
       reload: (tabId) => remote.reloadBrowserTab(tabId),
       stop: (tabId) => remote.stopBrowserTab(tabId),
+      answerPermission: async () => {
+        throw new Error(currentText().t("error.backend.browserPermissionsUnsupported"));
+      },
+      answerHttpSignIn: (input) => remote.answerBrowserHttpSignIn(input),
       takeControl: (tabId) => remote.takeBrowserControl(tabId),
       releaseControl: (tabId) => remote.releaseBrowserControl(tabId),
       startTeach: (tabId) => remote.startBrowserTeach(tabId),
@@ -390,9 +435,11 @@ export function createWebConversationRuntime(
     },
     voice: {
       getSettings: unavailable,
+      setSettings: unavailable,
       getServer: async () => null,
       onModelStatus: () => () => {},
       prepareModel: unavailable,
+      downloadModel: unavailable,
       transcribe: unavailable,
       startStream: unavailable,
       appendStream: unavailable,
@@ -411,12 +458,19 @@ export function createWebConversationRuntime(
     },
     get askSideQuestion() {
       if (!adminRequest || sideQuestionEnabled?.() !== true) return undefined;
-      return async (input: AskSideQuestionInput) =>
-        adminRequest()("POST", SIDE_QUESTION_ROUTES.ask, decodeSideQuestionResponse, {
+      return async (input: AskSideQuestionInput) => {
+        if (input.taskId !== undefined && hasCapability?.(SIDE_QUESTION_THREADS_CAPABILITY) !== true)
+          throw new Error(currentText().t("error.team.sideQuestionUnsupported"));
+        return adminRequest()("POST", SIDE_QUESTION_ROUTES.ask, decodeSideQuestionResponse, {
           agentId: input.agentId,
           question: input.question,
           earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
+          ...(input.taskId === undefined ? {} : { taskId: input.taskId }),
         });
+      };
+    },
+    get sideQuestionThreads() {
+      return hasCapability?.(SIDE_QUESTION_THREADS_CAPABILITY) === true;
     },
     get withdrawFeedback() {
       if (!adminRequest || hasCapability?.(FEEDBACK_WITHDRAW_CAPABILITY) !== true) return undefined;
@@ -464,6 +518,12 @@ export function createWebConversationRuntime(
     },
     previewAttachment: files.preview,
     attachmentMedia,
+    imageCopies: {
+      mediaSource: attachmentMedia.withCopies,
+      copyUrl: (image) => attachmentMedia.copyUrl(image.id),
+      fullUrl: (image) => attachmentMedia.url(image.id),
+      loadFull: (image) => attachmentMedia.load(image, "generated"),
+    },
     visualPage: files.visualPage,
     async importFiles(files) {
       if (files.length > 0) await importPick(files);

@@ -9,6 +9,7 @@ import {
   FlowLanes,
 } from "@/features/workflows/components/workflow-flow-canvas";
 import { FlowStepCard } from "@/features/workflows/components/workflow-flow-view";
+import { type NodeCredits, useMediaCredits } from "@/features/workflows/model/use-media-credits";
 import { openAddStep, openStep, useWorkflowStepMenu } from "@/features/workflows/model/use-workflow-step-menu";
 import type { WorkflowDraft } from "@/features/workflows/model/workflow-draft";
 import type { FlowList, WorkflowOutline } from "@/features/workflows/model/workflow-outline";
@@ -25,11 +26,13 @@ function FlowStep({
   draft,
   agents,
   problem,
+  credits,
 }: {
   node: WorkflowNode;
   draft: WorkflowDraft;
   agents: readonly MobileAgent[];
   problem: string | undefined;
+  credits: NodeCredits | undefined;
 }) {
   const { t } = useText();
   const { structural, actions, onAction } = useWorkflowStepMenu(node, draft);
@@ -38,6 +41,7 @@ function FlowStep({
       node={node}
       agents={agents}
       problem={problem}
+      credits={credits}
       press={{
         kind: "edit",
         actions: structural ? actions : [],
@@ -62,9 +66,12 @@ export function WorkflowFlow({
 }) {
   const { t } = useText();
   const byId = new Map(draft.graph.nodes.map((node) => [node.id, node]));
+  const { byNode } = useMediaCredits(draft.serverId, draft.graph.nodes);
   const step = (id: string) => {
     const node = byId.get(id);
-    return node ? <FlowStep node={node} draft={draft} agents={agents} problem={problems.get(id)} /> : null;
+    return node ? (
+      <FlowStep node={node} draft={draft} agents={agents} problem={problems.get(id)} credits={byNode.get(id)} />
+    ) : null;
   };
   const list = (name: FlowList) => (
     <>

@@ -25,11 +25,12 @@ import { SettingsField, SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/c
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { InstructionsLimit, instructionsTooLong } from "@openbot/ui/features/agents/InstructionsLimit";
 import { ChannelContextActions } from "@openbot/ui/features/channels/ChannelContextActions";
+import { type ChannelFolders, ChannelFoldersRow } from "@openbot/ui/features/channels/ChannelFolders";
 import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
 import { ChannelPictureEditor } from "@openbot/ui/features/channels/ChannelPictureEditor";
 import { ContentExitMotion } from "@openbot/ui/menu-motion";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createStore, For, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show } from "solid-js";
 import { useChannels } from "./channels-context";
 import { matchesAgentSearch, toggleChannelMember } from "./channels-draft";
 
@@ -38,6 +39,8 @@ interface ChannelEditorProps {
   routineCount: number;
   onOpenMemories: () => void;
   onOpenRoutines: () => void;
+  folders?: ChannelFolders | undefined;
+  onOpenFolders: () => void;
 }
 
 export function ChannelEditor(props: ChannelEditorProps) {
@@ -49,6 +52,33 @@ export function ChannelEditor(props: ChannelEditorProps) {
     if (!channels.historyDeletionSupported()) return undefined;
     return () => channels.deleteHistory(channelId);
   }
+  const [compactBlocked, setCompactBlocked] = createSignal<string | null>(null);
+  let compactSignature = "";
+  createEffect(
+    () => {
+      const current = channel();
+      if (!current) return undefined;
+      const providers = new Map(agentList().map((agent) => [agent.id, agent.provider]));
+      const members = current.members.map((member) => `${member.agentId}:${providers.get(member.agentId) ?? ""}`);
+      return { id: current.id, members: members.join(",") };
+    },
+    (next) => {
+      const signature = next ? `${next.id}:${next.members}` : "";
+      if (signature === compactSignature) return;
+      compactSignature = signature;
+      if (!next) return;
+      void channels.compactAvailable(next.id).then(
+        (available) => {
+          if (compactSignature === signature) setCompactBlocked(available ? null : next.id);
+        },
+        () => {
+          if (compactSignature !== signature) return;
+          compactSignature = "";
+          setCompactBlocked(null);
+        },
+      );
+    },
+  );
   const [fields, setFields] = createStore({ name: "", title: "", instructions: "" });
   const [dirty, setDirty] = createStore({ name: false, title: false, instructions: false });
   let lastSignature = "";
@@ -388,13 +418,16 @@ export function ChannelEditor(props: ChannelEditorProps) {
           value={t("channel.settings.routineCount", { count: props.routineCount })}
           onClick={props.onOpenRoutines}
         />
+        <Show when={props.folders}>
+          {(folders) => <ChannelFoldersRow folders={folders()} onOpen={props.onOpenFolders} />}
+        </Show>
       </SettingsLinkGroup>
       <Show when={channels.contextActionsSupported() && !channel()?.archived && channel()}>
         {(current) => (
           <ChannelContextActions
             channelName={current().name}
             startNewConversation={() => channels.clearContext(current().id)}
-            compact={() => channels.compactContext(current().id)}
+            compact={compactBlocked() === current().id ? undefined : () => channels.compactContext(current().id)}
             deleteHistory={deleteHistoryAction(current().id)}
           />
         )}

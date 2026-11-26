@@ -20,6 +20,8 @@ export const messages = {
     "Инструмент не запущен. tool_call не нашёл инструмент с таким именем. Используйте точное полное имя из tool_search, например openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "Инструмент не запущен. tool_call не нашёл инструмент с таким именем. Возможно, полное имя — {name}. Если это так, отправьте вызов снова с этим именем.",
+  "error.agent.toolCallNullValue":
+    "Инструмент не запущен. {name} требует объект или список в {paths}, но каждый из этих элементов списка пришёл как null. Отправьте вызов снова и передайте каждый из этих элементов как строку с его JSON.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe не нашёл инструмент OpenBot с именем {names}. Он описывает только инструменты OpenBot и браузера из списка openbot.tool_search, а не инструменты MCP.",
   "error.agent.toolDescribeDiscoveryNames": "Вызовите {names} напрямую. tool_describe не описывает инструменты поиска.",
@@ -157,6 +159,8 @@ export const messages = {
   "error.agent.busyMessageModeLocalOnly":
     "Поведение сообщений, пока агент работает, можно задать только на компьютере, где он работает.",
   "error.agent.backupModelsLocalOnly": "Резервные модели можно задать только на компьютере, где работает агент.",
+  "error.agent.backupModelsAtLimit":
+    "Сейчас ни одна резервная модель не может продолжить: каждая достигла лимита использования или недавно завершилась с ошибкой. Модели одного аккаунта могут делить один лимит. Чтобы продолжить сейчас, добавьте резервную модель другого провайдера или другого аккаунта либо дождитесь сброса лимита.",
   "error.agent.taskLimitLocalOnly": "Лимит задач можно задать только на компьютере, где работает агент.",
   "error.agent.localScriptsOff": "Этот агент не разрешает локальные скрипты.",
   "error.agent.localScriptsRateLimited":
@@ -187,6 +191,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "Снимки экрана не работают в диалогах Slack, Discord или Telegram, потому что их файлы получают другие люди.",
   "error.agent.screenCaptureDeclined": "Пользователь не разрешил этот снимок экрана. Ничего не снято.",
+  "error.agent.creditMediaDeclined": "Пользователь не разрешил эту генерацию. Кредиты не списаны.",
+  "error.agent.creditMediaNotSaved": "Файл создан, но OpenBot не смог сохранить его в чате.",
   "error.agent.mcpToolDeclined": "Пользователь не разрешил этот вызов инструмента MCP. Инструмент не был запущен.",
   "error.agent.screenCaptureWindowMissing":
     "Это окно сейчас не открыто. Вызовите list_capture_sources, чтобы получить текущие ID окон.",

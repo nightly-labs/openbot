@@ -13,16 +13,20 @@ import {
   vaultExpiryText,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { decodeSharedLocationAnswer } from "@openbot/contracts/team-protocol/ui-block-location-v1";
 import {
   normalizeUiBlockSpec,
   UI_API_KEY_SCOPE_FIELD_ID,
+  UI_CONFIRM_ACTION_QUESTION_ID,
   UI_CONFIRM_EDIT_ACTION_ID,
+  UI_LOCATION_FIELD_ID,
   UI_VAULT_REQUEST_FIELDS,
   UI_VAULT_SECRET_FIELDS,
   type UiBlockResponse,
   type UiBlockSpec,
   type UiFormField,
   type UiVaultRequestField,
+  uiBlockFallbackQuestions,
 } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
 import type { SavedApiKey } from "../agent-api-keys";
@@ -251,6 +255,20 @@ export function declinedMcpElicitationText(params: unknown): string {
   });
 }
 
+export function codexAppNeedsAutoReview(item: unknown): boolean {
+  if (getString(item, "type") !== "mcpToolCall" || getString(item, "server") !== CODEX_APPS_MCP_SERVER_NAME)
+    return false;
+  if (getString(item, "status") !== "failed") return false;
+  const texts = [
+    getString(getRecord(item, "error"), "message"),
+    ...getArray(getRecord(item, "result"), "content").map((part) => getString(part, "text")),
+  ];
+  return texts.some((text) => {
+    const lower = text?.toLowerCase() ?? "";
+    return lower.includes("automatic approval review") && lower.includes("full access");
+  });
+}
+
 const CODEX_MCP_TOOL_CALL_APPROVAL_KIND = "mcp_tool_call";
 
 export const MCP_TOOL_CONSENT_ALLOW_ONCE: Record<string, string[]> = {
@@ -378,10 +396,18 @@ export function promptResolution(
   };
 }
 
-export function dynamicPromptResult(answers: Record<string, string[]>): DynamicToolResult {
+export function dynamicPromptResult(
+  questions: AgentPromptQuestion[],
+  answers: Record<string, string[]>,
+): DynamicToolResult {
+  const responses = questions.map((question) => {
+    const values = answers[question.id] ?? [];
+    const asked = { id: question.id, question: question.question };
+    return values.length > 0 ? { ...asked, status: "answered", answer: values } : { ...asked, status: "skipped" };
+  });
   return {
     success: true,
-    contentItems: [{ type: "inputText", text: JSON.stringify(answers) }],
+    contentItems: [{ type: "inputText", text: JSON.stringify({ responses }) }],
   };
 }
 
@@ -404,6 +430,19 @@ export function lateAnswerText(questions: AgentPromptQuestion[], answers: Record
       return [`${quoted(question.question)}\n\n${values.join(", ")}`];
     })
     .join("\n\n");
+}
+
+export function editedPreviewQuestions(
+  questions: AgentPromptQuestion[],
+  spec: UiBlockSpec | undefined,
+  preview: string | undefined,
+): AgentPromptQuestion[] {
+  if (preview === undefined || spec?.type !== "confirm") return questions;
+  return uiBlockFallbackQuestions({ ...spec, preview: "" }).map((question) =>
+    question.id === UI_CONFIRM_ACTION_QUESTION_ID
+      ? { ...question, question: `${question.question}\n\n${preview}` }
+      : question,
+  );
 }
 
 export function vaultLateAnswerText(title: string, savedName: string | null): string {
@@ -529,6 +568,42 @@ export function apiKeyPromptResult(blockId: string, saved: SavedApiKey | null): 
         ...(saved.source ? { source: saved.source } : {}),
       }
     : { status: "skipped", blockId };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
+export function locationFormSpec(reason: string): UiBlockSpec | null {
+  return normalizeUiBlockSpec({
+    type: "form",
+    title: reason,
+    fields: [
+      {
+        id: UI_LOCATION_FIELD_ID,
+        kind: "text",
+        label: sourceText("status.agent.location.field"),
+        placeholder: sourceText("status.agent.location.placeholder"),
+        secret: true,
+      },
+    ],
+    submit: sourceText("status.agent.location.submit"),
+  });
+}
+
+const LOCATION_USE =
+  "Use it only for this request. Do not repeat the coordinates unless the user asks, and do not save them to memory, files, or messages.";
+
+export function locationPromptResult(blockId: string, response: UiBlockResponse | null): DynamicToolResult {
+  const answer = response?.values?.[UI_LOCATION_FIELD_ID];
+  const text = typeof answer === "string" ? answer.trim() : "";
+  const location = text ? decodeSharedLocationAnswer(text) : null;
+  const value = location
+    ? { status: "shared", blockId, ...location, next: LOCATION_USE }
+    : text
+      ? { status: "shared", blockId, place: text, next: LOCATION_USE }
+      : {
+          status: "declined",
+          blockId,
+          next: "Do not ask again in this turn. Ask the user for a place if you still need one.",
+        };
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 

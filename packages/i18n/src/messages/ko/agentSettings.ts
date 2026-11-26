@@ -47,6 +47,7 @@ export const messages = {
   "agentSettings.folders.missing": "{folder}은(는) 이 컴퓨터의 폴더가 아니에요",
   "agentSettings.folders.limit": { other: "폴더는 최대 {count}개까지 추가할 수 있어요" },
   "agentSettings.folders.browse.places": "이동",
+  "agentSettings.folders.browse.path": "폴더 경로",
   "agentSettings.folders.browse.home": "홈 폴더",
   "agentSettings.folders.browse.parent": "상위 폴더: {folder}",
   "agentSettings.folders.browse.failed": "이 폴더를 열 수 없어요.",
@@ -90,6 +91,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "사용 한도 도달 · 건너뜀",
   "agentSettings.backupModels.unavailable": "지금 사용할 수 없음 · 건너뜀",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "작업을 시작한 뒤 사용 한도로 {name}이(가) 멈추면, 순서에서 처음으로 사용 가능한 모델로 같은 작업을 이어가요. 한도가 끝나거나 제공자 오류 후 10분이 지나면 {model}(으)로 돌아가요.",
   "agentSettings.groups.brain": "두뇌",
@@ -173,6 +175,7 @@ export const messages = {
     "에이전트가 새로 시작하지만, 필요하면 이 채팅을 찾아볼 수 있어요. 메시지는 구분선 위에 계속 표시돼요. 지침, 모델, 도구, 메모리, 워크스페이스, 브라우저는 바뀌지 않아요.",
   "agentSettings.newChat.confirm": "새 채팅 시작",
   "agentSettings.newChat.failed": "새 채팅을 시작할 수 없어요.",
+  "agentSettings.newChat.busy": "에이전트가 작업 중이에요. 새 채팅을 시작하려면 끝날 때까지 기다리거나 중지하세요.",
   "agentSettings.deleteHistory.title": "기록 삭제",
   "agentSettings.deleteHistory.description": "이 채팅의 메시지가 삭제되고 에이전트도 잊어요. 설정은 그대로예요.",
   "agentSettings.deleteHistory.button": "삭제",
@@ -181,6 +184,9 @@ export const messages = {
     "이 채팅의 모든 메시지와 파일이 OpenBot에서 삭제되고 에이전트도 잊어요. 되돌릴 수 없어요. 사이드 스레드, 지침, 모델, 도구, 메모리, 작업 공간, 브라우저는 바뀌지 않아요.",
   "agentSettings.deleteHistory.confirm": "기록 삭제",
   "agentSettings.deleteHistory.failed": "기록을 삭제할 수 없어요.",
+  "agentSettings.deleteAgent.title": "에이전트 삭제",
+  "agentSettings.deleteAgent.description": "에이전트와 채팅, 메모리, 루틴, 워크스페이스가 OpenBot에서 삭제돼요.",
+  "agentSettings.deleteAgent.button": "삭제",
   "agentSettings.fullAccess.title": "이 에이전트에 전체 접근 권한을 줄까요?",
   "agentSettings.fullAccess.askTitle": "이 에이전트가 워크스페이스 밖에서 작업하도록 허용할까요?",
   "agentSettings.fullAccess.description":
@@ -218,6 +224,9 @@ export const messages = {
     "채팅이 길어지면 에이전트가 새 채팅을 시작하도록 허용해요. 먼저 메모를 저장해요.",
   "agentSettings.quickAcknowledgement.title": "긴 작업 전에 계획 표시",
   "agentSettings.quickAcknowledgement.description": "긴 작업 전에 에이전트가 계획을 보여줘요.",
+  "agentSettings.builtinMemory.title": "OpenBot 메모리",
+  "agentSettings.builtinMemory.description":
+    "에이전트가 자신의 메모리를 저장하고 읽어요. Mem0 같은 메모리 앱만 쓰려면 끄세요. 저장된 메모리는 그대로 남아요.",
   "agentSettings.browserProfile.label": "브라우저 프로필",
   "agentSettings.browserProfile.shared": "공유",
   "agentSettings.browserProfile.agent": "이 에이전트만",

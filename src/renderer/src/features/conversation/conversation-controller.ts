@@ -9,9 +9,15 @@ import type {
 import type { AgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import { currentText } from "@openbot/ui/text";
 import type { UserErrorDetails } from "@openbot/user-errors";
-import { createEffect, createSignal, createStore, onCleanup } from "solid-js";
+import { createEffect, createSignal, createStore, onCleanup, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { readSidePanelWidth } from "../../components/side-panel-width";
+import {
+  BROWSER_PIP_STORAGE_KEY,
+  BROWSER_WINDOW_STORAGE_KEY,
+  readStoredBounds,
+  storeBounds,
+} from "./browser-bounds-storage";
 import type { ChatSearchMatch } from "./chat-search";
 import {
   appendDraftText,
@@ -27,7 +33,7 @@ import {
 } from "./composer-draft";
 import { type StoredComposerDrafts, writeComposerDraftsOnChange } from "./composer-draft-storage";
 import { composerDraftKey } from "./conversation-keys";
-import { releaseFilePreviewPage } from "./conversation-port";
+import { conversationPort, releaseFilePreviewPage } from "./conversation-port";
 import type {
   ComposerDraft,
   ConversationProps,
@@ -45,16 +51,6 @@ import { createPendingSendStore } from "./stores/pending-send-store";
 import type { SideQuestionState } from "./stores/side-question-store";
 import { createVoiceSessions } from "./stores/voice-session-store";
 import type { VoiceCloudStream } from "./stores/voice-store";
-
-const BROWSER_PIP_STORAGE_KEY = "openbot:browser-pip-native-bounds";
-
-function readBrowserPipBounds(): BrowserBounds | null {
-  const values = (window.localStorage.getItem(BROWSER_PIP_STORAGE_KEY) ?? "")
-    .split(",")
-    .map((value) => Number.parseFloat(value));
-  const [x = Number.NaN, y = Number.NaN, width = Number.NaN, height = Number.NaN] = values;
-  return values.length === 4 && [x, y, width, height].every(Number.isFinite) ? { x, y, width, height } : null;
-}
 
 export interface FeedbackFix {
   number: number;
@@ -170,7 +166,7 @@ export function createStableConversationState(
   const attachmentUploads = createAttachmentUploadStore();
   const [conversationErrors, setConversationErrors] = createSignal<Record<string, string>>({});
   const [conversationErrorRuns, setConversationErrorRuns] = createSignal<
-    Record<string, { message: string; run: string | null; link?: string; details?: string }>
+    Record<string, { message: string; run: string | null; link?: string; details?: string; notice?: true }>
   >({});
   createEffect(
     () => {
@@ -273,7 +269,14 @@ export function createStableConversationState(
   const [voiceThreadKey, setVoiceThreadKey] = createSignal<string | undefined>(undefined);
   const [voiceLevels, setVoiceLevels] = createSignal<number[]>([]);
   const [voiceLimitReached, setVoiceLimitReached] = createSignal<ConversationTarget | null>(null);
-  const [browserPipBounds, setBrowserPipBounds] = createSignal<BrowserBounds | null>(readBrowserPipBounds());
+  const [voiceLanguageChoice, setVoiceLanguageChoice] = createSignal<ConversationTarget | null>(null);
+  const [browserPipBounds, setBrowserPipBounds] = createSignal<BrowserBounds | null>(
+    readStoredBounds(BROWSER_PIP_STORAGE_KEY),
+  );
+  const [browserWindowOpen, setBrowserWindowOpen] = createSignal(false);
+  const [browserWindowBounds, setBrowserWindowBounds] = createSignal<BrowserBounds | null>(
+    readStoredBounds(BROWSER_WINDOW_STORAGE_KEY),
+  );
   const [sidePanelWidth, setSidePanelWidth] = createSignal(readSidePanelWidth());
   const resources: ConversationResources = {
     agentActivityLabels: new Map(),
@@ -417,8 +420,14 @@ export function createStableConversationState(
     setVoiceLevels,
     voiceLimitReached,
     setVoiceLimitReached,
+    voiceLanguageChoice,
+    setVoiceLanguageChoice,
     browserPipBounds,
     setBrowserPipBounds,
+    browserWindowOpen,
+    setBrowserWindowOpen,
+    browserWindowBounds,
+    setBrowserWindowBounds,
     sidePanelWidth,
     setSidePanelWidth,
     resources,
@@ -440,6 +449,7 @@ export function createServerConversationState(keepSidePanelFiles = false) {
   } | null>(null);
   const [sidePanels, setSidePanels] = createStore<SidePanelsState>({
     side: storedSidePanels.side,
+    splits: {},
     subagents: {},
     threads: {},
   });
@@ -469,6 +479,7 @@ export function createServerConversationState(keepSidePanelFiles = false) {
   const [chatSearchTotal, setChatSearchTotal] = createSignal(0);
   const [hiddenAwaitingReplyIds, setHiddenAwaitingReplyIds] = createSignal<ReadonlySet<string>>(new Set());
   const [sideQuestions, setSideQuestions] = createStore<Record<string, SideQuestionState>>({});
+  const [chatBrowserWindowBridges, setChatBrowserWindowBridges] = createSignal(0);
   const voiceSessions = createVoiceSessions();
 
   return {
@@ -524,8 +535,38 @@ export function createServerConversationState(keepSidePanelFiles = false) {
     setHiddenAwaitingReplyIds,
     sideQuestions,
     setSideQuestions,
+    chatBrowserWindowBridges,
+    setChatBrowserWindowBridges,
     voiceSessions,
   };
+}
+
+type StableConversationState = ReturnType<typeof createStableConversationState>;
+
+export function followBrowserWindowEvents(
+  state: Pick<StableConversationState, "setBrowserWindowOpen" | "setBrowserWindowBounds">,
+) {
+  onCleanup(
+    conversationPort().browser.onWindowEvent((event) => {
+      if (event.type === "action") return;
+      if (event.type === "bounds-changed") {
+        state.setBrowserWindowBounds(event.bounds);
+        storeBounds(BROWSER_WINDOW_STORAGE_KEY, event.bounds);
+        return;
+      }
+      state.setBrowserWindowOpen(false);
+    }),
+  );
+}
+
+export function closeBrowserWindowWithServerScope(
+  state: Pick<StableConversationState, "browserWindowOpen" | "setBrowserWindowOpen">,
+) {
+  onCleanup(() => {
+    if (!untrack(state.browserWindowOpen)) return;
+    state.setBrowserWindowOpen(false);
+    void conversationPort().browser.closeWindow();
+  });
 }
 
 export function createConversationController(props: Pick<ConversationProps, "onTypingChange">, persistDrafts = true) {

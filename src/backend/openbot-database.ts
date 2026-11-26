@@ -71,6 +71,9 @@ export type {
   ProviderHistoryStageResult,
   ProviderHistoryTurnCursor,
 } from "./database/provider-history-store";
+
+import { perfTimed } from "./perf-probe-hooks";
+
 export type { ProviderSession } from "./database/provider-sessions";
 export type { ThreadEventCompactionBatch } from "./database/thread-event-compaction";
 export type { StoredThreadSummary } from "./database/thread-summaries";
@@ -207,6 +210,14 @@ export class OpenBotDatabase {
     return this.#conversations.readConversation(agentId, threadId);
   }
 
+  readTurnConversation(agentId: string, threadId: string, turnId: string): ConversationSnapshot {
+    return this.#conversations.readTurnConversation(agentId, threadId, turnId);
+  }
+
+  readLatestTurnId(turnIds: string[]): string | null {
+    return this.#conversations.readLatestTurnId(turnIds);
+  }
+
   readTurnAssistantMessages(agentId: string, turnId: string): ConversationMessage[] {
     return this.#conversations.readTurnAssistantMessages(agentId, turnId);
   }
@@ -312,11 +323,13 @@ export class OpenBotDatabase {
     payload: unknown = {},
     commandId = `conversation:${eventType}:${randomUUID()}`,
   ): ConversationSnapshot {
-    return this.#conversationWrites.persistConversation(snapshot, eventType, payload, commandId);
+    return perfTimed("db.persistConversation", () =>
+      this.#conversationWrites.persistConversation(snapshot, eventType, payload, commandId),
+    );
   }
 
   persistStreamingMessage(input: StreamingMessageWrite): number {
-    return this.#conversationWrites.persistStreamingMessage(input);
+    return perfTimed("db.persistStreamingMessage", () => this.#conversationWrites.persistStreamingMessage(input));
   }
 
   persistStreamingMessages(inputs: readonly StreamingMessageWrite[]): StreamingMessageResult[] {
@@ -651,8 +664,9 @@ export class OpenBotDatabase {
     changes: MailboxProjectionChanges,
     eventType: string,
     fileDeletions: string[] = [],
+    writeIdempotency = true,
   ): boolean {
-    return this.#mailbox.applyMailboxChanges(commandId, state, changes, eventType, fileDeletions);
+    return this.#mailbox.applyMailboxChanges(commandId, state, changes, eventType, fileDeletions, writeIdempotency);
   }
 
   pendingFileDeletions(): Array<{ id: string; path: string }> {

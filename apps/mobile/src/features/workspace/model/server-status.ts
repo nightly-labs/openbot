@@ -109,8 +109,19 @@ export function serverFromHost(
     role: host.role,
     ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
     ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
+    ...(host.hidden ? { hidden: host.hidden } : {}),
     ...(host.storageGb === undefined ? {} : { storageGb: host.storageGb }),
     ...(host.restartAvailable === undefined ? {} : { restartAvailable: host.restartAvailable }),
     ...(host.keyChangedAt === undefined ? {} : { keyChangedAt: host.keyChangedAt }),
   };
+}
+
+export function hostWithHidden(host: RemoteTeamHost, hidden: boolean): RemoteTeamHost {
+  const { hidden: _hidden, ...shown } = host;
+  return hidden ? { ...shown, hidden: true } : shown;
+}
+
+export function serverWithHidden(server: MobileServer, hidden: boolean): MobileServer {
+  const { hidden: _hidden, ...shown } = server;
+  return hidden ? { ...shown, hidden: true } : shown;
 }

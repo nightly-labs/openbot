@@ -2,7 +2,7 @@ import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { type PlanLimits, withUsageEvent } from "@openbot/team-client/plan-limits";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import { type QueryClient, replaceEqualDeep } from "@tanstack/react-query";
-import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
+import { decodeMobileBrowserTabs, mobileHttpSignIns } from "@/features/browser/model/browser-tabs";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
 import { AGENT_SETTINGS_PARTS, type QueryScope, queryKeys } from "./query-keys";
 import { applyMobileQueueEvent } from "./queue-cache";
@@ -42,7 +42,18 @@ export function applyBrowserEvent(liveState: LiveWorkspaceStore, serverId: strin
       ...current,
       [serverId]: { tabs, activeTabId: event.activeTabId },
     }));
+  } else if (event.type === "browser-permissions-changed") {
+    liveState.update("browserPermissions", (current) => ({ ...current, [serverId]: event.requests }));
+  } else if (event.type === "browser-http-sign-in-changed") {
+    liveState.update("browserHttpSignIns", (current) => ({ ...current, [serverId]: mobileHttpSignIns(event.tabs) }));
   }
+}
+
+async function refreshAgentUsageLimits(queryClient: QueryClient, scope: QueryScope, serverId: string): Promise<void> {
+  const filters = { queryKey: queryKeys.agentUsageLimits(scope, serverId), exact: true };
+  const readInProgress = queryClient.isFetching(filters) > 0;
+  await queryClient.invalidateQueries(filters, { cancelRefetch: false });
+  if (readInProgress) await queryClient.invalidateQueries(filters, { cancelRefetch: false });
 }
 
 export function syncEventQueries(
@@ -55,6 +66,7 @@ export function syncEventQueries(
     void applyMobileQueueEvent(queryClient, serverId, event);
   }
   applyTaskEvent(queryClient, scope, serverId, event);
+  if (event.type === "runtime-snapshot") void refreshAgentUsageLimits(queryClient, scope, serverId);
   if (event.type === "usage-changed") {
     queryClient.setQueryData<PlanLimits>(queryKeys.planLimits(scope, serverId), (current) =>
       current ? { ...current, usage: withUsageEvent(current.usage, event.usage) } : current,
@@ -106,6 +118,10 @@ export function syncEventQueries(
   if (event.type === "library-folders-changed") {
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverLibraryFolders(scope, serverId) });
   }
+  if (event.type === "host-turn-limits-changed") {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.serverTurnLimits(scope, serverId) });
+    return;
+  }
   if (event.type === "usage-credits-changed") {
     void queryClient.invalidateQueries({ queryKey: queryKeys.planLimits(scope, serverId) });
     return;
@@ -123,6 +139,7 @@ export function syncEventQueries(
       queryKeys.providerStatus(scope, serverId),
       queryKeys.providerModels(scope, serverId),
       queryKeys.providerPromptCache(scope, serverId),
+      queryKeys.providerCacheExpiryCompaction(scope, serverId),
       queryKeys.providerCompactWindow(scope, serverId),
       queryKeys.agentModels(scope, serverId),
     ])

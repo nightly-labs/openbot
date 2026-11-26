@@ -99,6 +99,8 @@ export const messages = defineMessages("error.import", {
   "error.import.transferAgentEnv": "{name}: enter the values of {names} again in Settings.",
   "error.import.transferMcpValues":
     "{name}: the MCP server is added turned off. Check its command, enter its values and full address again, and turn it on in Marketplace, Apps.",
+  "error.import.transferMcpSignIn":
+    "{name}: the app is added turned off. Connect it again and turn it on in Marketplace, Apps.",
   "error.import.transferValuesCleared":
     "{name}: values that can hold a secret were removed from its arguments or address. Enter them again in Settings.",
   "error.import.transferSharedKept":
@@ -114,6 +116,11 @@ export const messages = defineMessages("error.import", {
     "{name}: the workflow needs a new webhook address. Open it, make the address again, and give it to the sender.",
   "error.import.transferWorkflowConnection":
     "{name}: choose the Slack, Discord, or Telegram connection of the workflow again after you connect it here.",
+  "error.import.transferWorkflowNewer":
+    "{name}: some steps need a newer version of OpenBot. They are kept as locked notes.",
+  "error.import.transferWorkflowNewerSettings":
+    "{name}: some settings need a newer version of OpenBot. Open the workflow and examine its steps.",
+  "error.import.transferWorkflowPaused": "The imported workflows are paused. Examine each workflow, then resume it.",
   "error.import.transferHistorySkipped": "{name}: the chat history in the file is invalid, so it is not imported.",
   "error.import.transferChatsSkipped": {
     one: "{name}: {count} chat is not imported.",

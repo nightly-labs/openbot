@@ -1,11 +1,27 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { type BrowserControlState, canAdministerServer, type TeamRole } from "@openbot/contracts/ipc";
+import {
+  type BrowserControlState,
+  browserHttpSignInPrompts,
+  canAdministerServer,
+  type TeamRole,
+} from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  BROWSER_HTTP_SIGN_IN_CAPABILITY,
+  BROWSER_HTTP_SIGN_IN_ROUTES,
+  decodeBrowserHttpSignInAnswer,
+} from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
 import {
   BROWSER_PAGE_STATE_CAPABILITY,
   BROWSER_PAGE_STATE_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-page-state-v1";
+import {
+  BROWSER_PERMISSIONS_CAPABILITY,
+  BROWSER_PERMISSIONS_ROUTES,
+  browserPermissionRequests,
+  decodeBrowserPermissionAnswer,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import {
   BROWSER_SIGN_IN_STORAGE_CAPABILITY,
   BROWSER_SIGN_IN_STORAGE_ROUTES,
@@ -201,6 +217,38 @@ export async function routeBrowser(
         .filter((tab) => !hidden(tab.id))
         .map((tab) => ({ tabId: tab.id, canGoBack: tab.canGoBack === true, canGoForward: tab.canGoForward === true })),
     });
+  }
+
+  if (method === "POST" && Object.values(BROWSER_PERMISSIONS_ROUTES).some((path) => path === url.pathname)) {
+    if (!capabilities.has(BROWSER_PERMISSIONS_CAPABILITY))
+      throw new HttpError(400, sourceText("error.backend.browserPermissionsUnsupported"));
+    const body = await readJson(request);
+    if (url.pathname === BROWSER_PERMISSIONS_ROUTES.answer) {
+      const answer = decodeBrowserPermissionAnswer({ ...body, tabId: tabId(body) });
+      if (answer.allow && !answer.location)
+        throw new HttpError(400, sourceText("error.backend.browserLocationRequired"));
+      await runCauseEffect(browser.answerPermission(answer));
+    }
+    return json(200, {
+      requests: browserPermissionRequests(browser.listTabs().filter((tab) => !hidden(tab.id))),
+    });
+  }
+
+  if (method === "POST" && Object.values(BROWSER_HTTP_SIGN_IN_ROUTES).some((path) => path === url.pathname)) {
+    if (!capabilities.has(BROWSER_HTTP_SIGN_IN_CAPABILITY))
+      throw new HttpError(400, sourceText("error.backend.browserHttpSignInUnsupported"));
+    const body = await readJson(request);
+    if (url.pathname === BROWSER_HTTP_SIGN_IN_ROUTES.answer) {
+      const id = tabId(body);
+      let answer: ReturnType<typeof decodeBrowserHttpSignInAnswer>;
+      try {
+        answer = decodeBrowserHttpSignInAnswer({ ...body, tabId: id });
+      } catch {
+        throw new HttpError(400, "Invalid browser HTTP sign-in answer.");
+      }
+      await runCauseEffect(browser.answerHttpSignIn(answer));
+    }
+    return json(200, { tabs: browserHttpSignInPrompts(browser.listTabs().filter((tab) => !hidden(tab.id))) });
   }
 
   if (method === "POST" && url.pathname === BROWSER_SIGN_IN_ROUTES.import) {

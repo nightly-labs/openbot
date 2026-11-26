@@ -44,6 +44,8 @@ export const AGENT_DOCK_LIMITS = {
   backupModelLabel: 200,
   pageTitle: 500,
   pageOrigin: 2048,
+  threads: 50,
+  threadTime: 64,
 } as const;
 
 export type AgentDockSeatRef = { kind: "agent"; id: string } | { kind: "channel"; id: string };
@@ -95,6 +97,7 @@ export interface AgentDockMessage {
   kind: "text" | "error";
   body: string;
   attachments: AttachmentSummary[];
+  visual?: boolean;
 }
 
 export interface AgentDockApproval {
@@ -149,8 +152,34 @@ export interface AgentDockUsageLimit {
   attempt: number;
 }
 
+export interface AgentDockThread {
+  taskId: string;
+  title: string;
+}
+
+export const AGENT_DOCK_THREAD_STATES = ["idle", "working", "queued", "awaiting", "failed"] as const;
+
+export type AgentDockThreadStatus =
+  | { kind: (typeof AGENT_DOCK_THREAD_STATES)[number] }
+  | { kind: "waiting"; reason: AgentDockWaitReason };
+
+export interface AgentDockThreadChoice {
+  id: string;
+  title: string;
+  updatedAt: string;
+  status: AgentDockThreadStatus;
+  unread: number;
+}
+
+export interface AgentDockThreadChoices {
+  activeId: string;
+  threads: AgentDockThreadChoice[];
+}
+
 export interface AgentDockChat {
   seat: AgentDockSeatRef;
+  thread?: AgentDockThread | null;
+  threads?: AgentDockThreadChoices | null;
   messages: AgentDockMessage[];
   working: boolean;
   wait: AgentDockWaitReason | null;
@@ -230,8 +259,19 @@ export type AgentDockAction =
   | { type: "add"; serverId: string; seat: AgentDockSeatRef }
   | { type: "remove"; serverId: string; seat: AgentDockSeatRef }
   | { type: "move"; serverId: string; seat: AgentDockSeatRef; before: AgentDockSeatRef | null }
-  | { type: "send"; serverId: string; seat: AgentDockSeatRef; text: string; clientMessageId: string }
+  | {
+      type: "send";
+      serverId: string;
+      seat: AgentDockSeatRef;
+      taskId?: string;
+      text: string;
+      clientMessageId: string;
+    }
+  | { type: "open-thread"; serverId: string; agentId: string; threadId: string; started?: boolean }
+  | { type: "new-thread"; serverId: string; agentId: string }
+  | { type: "start-thread"; serverId: string; agentId: string; text: string; clientMessageId: string }
   | { type: "open-agent"; serverId: string; agentId: string }
+  | { type: "open-browser-takeover"; serverId: string; agentId: string; tabId: string }
   | { type: "open-channel"; serverId: string; channelId: string }
   | { type: "open-window"; serverId: string; agentId: string }
   | {
@@ -263,7 +303,7 @@ export type AgentDockAction =
   | { type: "open-settings" }
   | { type: "hide" };
 
-export type AboveAppsSupport = "restart" | "unsupported";
+export type AboveAppsSupport = "restart" | "unsupported" | "no-compositor";
 
 export interface SetAgentDockXWaylandInput {
   enabled: boolean;
@@ -279,6 +319,12 @@ export interface AgentDockInputRect {
   y: number;
   width: number;
   height: number;
+}
+
+export interface AgentDockExtent {
+  inward: number;
+  above: number;
+  below: number;
 }
 
 export function isAgentDockPresentation(value: unknown): value is AgentDockPresentation {
@@ -315,7 +361,23 @@ export function isAgentDockAction(value: unknown): value is AgentDockAction {
       return isSeatRef(value.seat) && (value.before === null || isSeatRef(value.before));
     case "open-agent":
     case "open-window":
+    case "new-thread":
       return isIdentifier(value.agentId);
+    case "open-thread":
+      return (
+        isIdentifier(value.agentId) &&
+        isIdentifier(value.threadId) &&
+        (value.started === undefined || isBoolean(value.started))
+      );
+    case "start-thread":
+      return (
+        isIdentifier(value.agentId) &&
+        isBoundedString(value.text, INPUT_LIMITS.messageText) &&
+        value.text.trim().length > 0 &&
+        isIdentifier(value.clientMessageId)
+      );
+    case "open-browser-takeover":
+      return isIdentifier(value.agentId) && isIdentifier(value.tabId);
     case "open-channel":
       return isIdentifier(value.channelId);
     case "respond-approval":
@@ -350,6 +412,7 @@ export function isAgentDockAction(value: unknown): value is AgentDockAction {
     case "send":
       return (
         isSeatRef(value.seat) &&
+        (value.taskId === undefined || (value.seat.kind === "agent" && isIdentifier(value.taskId))) &&
         isBoundedString(value.text, INPUT_LIMITS.messageText) &&
         value.text.trim().length > 0 &&
         isIdentifier(value.clientMessageId)
@@ -369,6 +432,16 @@ export function isAgentDockInteractive(value: unknown): value is SetAgentDockInt
 
 export function isAgentDockXWayland(value: unknown): value is SetAgentDockXWaylandInput {
   return isDynamicRecord(value) && isBoolean(value.enabled);
+}
+
+export function isAgentDockExtent(value: unknown): value is AgentDockExtent | null {
+  return (
+    value === null ||
+    (isDynamicRecord(value) &&
+      integerInRange(value.inward, 0, AGENT_DOCK_LIMITS.inputExtent) &&
+      integerInRange(value.above, 0, AGENT_DOCK_LIMITS.inputExtent) &&
+      integerInRange(value.below, 0, AGENT_DOCK_LIMITS.inputExtent))
+  );
 }
 
 export function isAgentDockInputRegion(value: unknown): value is AgentDockInputRect[] {
@@ -497,6 +570,8 @@ function isChat(value: unknown): value is AgentDockChat {
   return (
     isDynamicRecord(value) &&
     isSeatRef(value.seat) &&
+    (value.thread === undefined || value.thread === null || isThread(value.thread)) &&
+    (value.threads === undefined || value.threads === null || isThreadChoices(value.threads)) &&
     isList(value.messages, AGENT_DOCK_LIMITS.messages, isMessage) &&
     isBoolean(value.working) &&
     (value.wait === null || isOneOf(AGENT_DOCK_WAIT_REASONS, value.wait)) &&
@@ -505,6 +580,40 @@ function isChat(value: unknown): value is AgentDockChat {
     (value.takeover === null || isTakeover(value.takeover)) &&
     (value.usageLimit === null || isUsageLimit(value.usageLimit))
   );
+}
+
+function isThread(value: unknown): value is AgentDockThread {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.taskId) &&
+    isBoundedString(value.title, INPUT_LIMITS.agentTaskTitle) &&
+    value.title.length > 0
+  );
+}
+
+function isThreadChoices(value: unknown): value is AgentDockThreadChoices {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.activeId) &&
+    isList(value.threads, AGENT_DOCK_LIMITS.threads, isThreadChoice)
+  );
+}
+
+function isThreadChoice(value: unknown): value is AgentDockThreadChoice {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.id) &&
+    isBoundedString(value.title, INPUT_LIMITS.agentTaskTitle) &&
+    isBoundedString(value.updatedAt, AGENT_DOCK_LIMITS.threadTime) &&
+    isThreadStatus(value.status) &&
+    isCount(value.unread)
+  );
+}
+
+function isThreadStatus(value: unknown): value is AgentDockThreadStatus {
+  if (!isDynamicRecord(value)) return false;
+  if (value.kind === "waiting") return isOneOf(AGENT_DOCK_WAIT_REASONS, value.reason);
+  return isOneOf(AGENT_DOCK_THREAD_STATES, value.kind);
 }
 
 function isApproval(value: unknown): value is AgentDockApproval {
@@ -589,7 +698,8 @@ function isMessage(value: unknown): value is AgentDockMessage {
     (value.senderMember === null || isConversationMessageSender(value.senderMember)) &&
     isOneOf(["text", "error"] as const, value.kind) &&
     isBoundedString(value.body, INPUT_LIMITS.messageText) &&
-    isList(value.attachments, INPUT_LIMITS.attachments, isAttachmentSummary)
+    isList(value.attachments, INPUT_LIMITS.attachments, isAttachmentSummary) &&
+    (value.visual === undefined || isBoolean(value.visual))
   );
 }
 

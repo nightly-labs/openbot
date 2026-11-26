@@ -19,6 +19,7 @@ export const messages = {
   "computerUse.ready.title": "Управление компьютером готово",
   "computerUse.ready.description":
     "OpenBot может видеть приложения на этом компьютере и работать с ними. Эта система не запрашивает дополнительных разрешений.",
+  "computerUse.limited.title": "Управление компьютером на этом рабочем столе ограничено",
   "computerUse.openSettingsFailed.title": "Не удалось открыть «Системные настройки»",
   "computerUse.restartRequired.title": "Нужен перезапуск",
   "computerUse.restartRequired.description":

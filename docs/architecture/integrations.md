@@ -180,6 +180,7 @@ three start routes, and `provider-account-relay-v1` and `-v2` add one more each.
 | --- | --- | --- |
 | `mcp/start` | A URL MCP server, from the Marketplace | It gives the code to `McpOAuth` (owned flow). |
 | `provider/start` | The CLI of a provider in `SIGN_IN_RELAY_PROVIDERS`: Codex, Claude, Gemini (`antigravity`) and Muse | It replays the query to the CLI's own loopback listener on the host. A Muse device page has no callback: the client only opens it. |
+| `provider/v2/start` | The CLI of a provider in `PROVIDER_SIGN_IN_RELAY_V2_PROVIDERS`: Devin. The separate capability `provider-sign-in-relay-v2` adds this route ([`provider-sign-in-relay-v2.ts`](../../packages/contracts/src/team-protocol/provider-sign-in-relay-v2.ts)). Only a Linux host advertises it, with v1: on macOS the CLI runs `/usr/bin/open` by its absolute path, and on Windows OpenBot has no `open` command that the CLI uses, so OpenBot cannot take the page there. `provider-sign-in-relays.ts` gives a client the route that takes a provider | As for `provider/start`. |
 | `link/start` | A sign-in page that an agent of the host printed in its conversation | It replays the query to the loopback address of that page. |
 | `provider-account/start` | An account after the first of Codex or Claude (`PROVIDER_ACCOUNT_RELAY_PROVIDERS`), new or signed out. The separate capability `provider-account-relay-v1` adds this route ([`provider-account-relay-v1.ts`](../../packages/contracts/src/team-protocol/provider-account-relay-v1.ts)) | It replays the query to the loopback listener of the account's CLI on the host, as for `provider/start`. |
 | `provider-account/v2/start` | An account after the first of Codex, Claude or Gemini (`PROVIDER_ACCOUNT_RELAY_V2_PROVIDERS`), new or signed out. The separate capability `provider-account-relay-v2` adds this route ([`provider-account-relay-v2.ts`](../../packages/contracts/src/team-protocol/provider-account-relay-v2.ts)). A host advertises it with v1, and a client uses the newest one that the host advertises | As for `provider-account/start`. |
@@ -439,8 +440,9 @@ loopback too. Its client is the OpenBot Meta app 1479376854168579, with no secre
 listener of the computer where the browser runs, and a joined server uses the
 [callback relay](#remote-sign-in-the-callback-relay) as before. The relay always names port 28417:
 when another program holds that port, the sign-in cannot finish. A sign-in app that the admin saves
-replaces the built-in client and uses the loopback address. The Meta app must list the relay address
-in "Valid OAuth Redirect URIs", and a user who has no role on the app can sign in only after Meta's
+replaces the built-in client, but it keeps the built-in client's redirect: Meta refuses the loopback
+address for every app (#13663). The "Sign-in app" section shows that redirect as its callback URL.
+The Meta app must list the relay address in "Valid OAuth Redirect URIs", and a user who has no role on the app can sign in only after Meta's
 App Review puts the app in Live mode. `bun run test:mcp-sign-in-https-relay` checks the Meta page,
 the relay, and that another server that names Meta's issuer does not get the app.
 
@@ -591,6 +593,22 @@ off, only the answer shows that OpenBot read the message. A client reads this li
 the released overview (`withWhatsAppStatusReactions`), and hides the switch while the host does not
 have the capability. Only protocol 9 peers get it.
 
+Each allowed contact and group has a mode: “Can give work” (`reply`, the default) or “Read only”
+(`read`), in the `mode` column of `projection_messaging_allowed_senders` (migration 69). A message
+from a read-only chat gets the `save` sender decision (`whatsapp-senders.ts`): OpenBot saves it, with
+its author and files, for `messaging_history`, and starts no turn, also for a mention or a reply to
+an OpenBot post. `WhatsAppSession` refuses each send to a read-only chat (`place_read_only`) right
+before the socket sends it, so a reply, a reaction, a “Working on it…” line, a deletion, a
+`messaging_post` and a send that waited in the chat queue when the mode changed all stay out of the
+chat. `messaging_list_places` marks the place with `readOnly`, and `messaging_post` tells the agent
+to answer in its own conversation. An older release refuses a database at version 69, so a downgrade
+cannot make a read-only chat answer again. The optional capability `whatsapp-read-only-v1`
+([`whatsapp-read-only-v1.ts`](../../packages/contracts/src/team-protocol/whatsapp-read-only-v1.ts),
+host route [`route-whatsapp-read-only.ts`](../../src/main/team-api/route-whatsapp-read-only.ts))
+lists the read-only sender ids of each number and sets the mode of one sender; owners and admins
+only. A client merges the list into the released overview (`withWhatsAppReadOnly`), and shows the
+mode only while the host has the capability. Only protocol 10 peers get it.
+
 The phone uses the same routes in Marketplace › Apps › WhatsApp
 (`apps/mobile/src/features/servers/components/whatsapp-connector-page.tsx`). It links only with a
 pairing code, because the WhatsApp app on the same phone cannot scan a QR code on its own screen. The
@@ -664,6 +682,35 @@ pins, with a SHA-256 per target, into `<userData>/provider-state/protonpass-cli`
 the record and the session; the agent access key stays on the Proton account until it ends or the
 user removes it there.
 
+## NEAR Intents wallet
+
+The Crypto tab of the Vault connects one NEAR Intents agent account (Agent API, SDK
+`@near-intents-agent-api/sdk`) for agent payments. Main owns it:
+[`near-wallet-service.ts`](../../src/main/near-wallet-service.ts) and
+[`near-wallet-store.ts`](../../src/main/near-wallet-store.ts). The renderer, the backend and the
+agent processes never get the partner key, the grant token or a signature.
+
+- **Owner.** A passkey. OpenBot does not support an EVM wallet owner. Each owner action (register, create, grant, budget, freeze,
+  unfreeze, auto-pay, a vote on a payment) opens `/near/sign` of the account service in the system
+  browser ([`near-wallet-signing.ts`](../../src/main/near-wallet-signing.ts)). The request is in the
+  URL fragment, which no server gets. The page returns the signature with
+  `openbot://near-signature?nonce=…&data=…`; a development build uses a loopback listener. Main takes
+  only the result of the one waiting nonce (32 random bytes, used once) and checks its shape and the
+  passkey key type.
+- **Grant.** OpenBot holds an agent grant for 30 days. Payments use it; Renew signs a new one.
+- **Payments.** An agent calls `request_near_payment`
+  ([`attention-registry.ts`](../../src/backend/agent/attention-registry.ts)). All agents can ask, also
+  agents made later, until the owner chooses a list on the wallet page; a wallet stored with a list
+  keeps it. A new wallet's daily budget is $25. A request from a Slack, Discord or Telegram chat is
+  refused. A payment that no rule allows waits for the owner on the chat card. A rule of "Pay without asking" allows a
+  recipient for a domain up to a daily USD limit; the first rule turns off `owner_approval` with one
+  signature. The Agent API keeps the daily budget of all payments.
+- **No double payment.** A payment is stored with its idempotency key before it is sent. A lost
+  answer is `uncertain`: OpenBot sends it again with the same key, also after a restart, for one hour.
+- **Test.** `bun run test:near-wallet-e2e` runs the service against a fake Agent API on 127.0.0.1
+  with a real P-256 passkey owner key. The real Agent API has no test network; do not run payments
+  against it without the owner's consent.
+
 ## Add a Team API capability
 
 A new remote feature is a new optional capability. Do not change a shipped capability: released
@@ -719,9 +766,157 @@ Use `bun run dev:automation` for snapshots and screenshots. Do not drive another
 | --- | --- |
 | A sign-in that returns to a public `https:` address of the provider | The provider finishes it by itself. The host only waits. Nothing comes back to a loopback port. |
 | A sign-in that opens an app on the host, such as Pi, which opens Terminal | The step happens on the host's screen. There is no page address to open somewhere else. |
+| The owner signature of the NEAR Intents wallet | The passkey belongs to the `api.openbot.run` page on the host's browser, and the Agent API checks its origin. The wallet is on this computer only; a joined server has no Crypto tab. |
 | A vault that approves in its desktop app, such as 1Password or Bitwarden | The approval is in the vault app on the host. A relay cannot approve for it. 1Password on a joined server uses a service account token (`onepassword-connector-v1`); Bitwarden uses an API key and the master password (`bitwarden-connector-v1`). Proton Pass signs in on the host and the client opens Proton's page (`password-managers-v1`). |
 | The Slack development return address (`returnUrl`) | Development builds only. It returns to `http://127.0.0.1:<port>/...` on the host, and the relay does not carry it. Use the hosted install. |
 | An agent link for a member who is not an admin | The relay routes are admin only. The link opens as it is, and its callback cannot reach the host. |
 | An agent link in a command, tool output or commentary | The host relays only a link that the text of an agent message holds. |
 | A CLI that opens its own browser and honors no `BROWSER` | The host never gets the page address. Grok, Cursor and Cline use a code kind. |
 | The iPhone app | It does not take relayed sign-ins. It keeps its current behavior. |
+
+## The browser extension on X
+
+The extension (`apps/browser-extension`) sends a post from X to the user's X agent
+(`X_AGENT_LISTING_ID` in `packages/contracts/src/browser-extension-x.ts`, a Marketplace Agent in
+`marketplace/production-catalog`). On desktop and web, the user adds this agent with the X app of
+the Marketplace (`MarketplaceXAppPage` in `packages/ui/src/features/marketplace`), not from the Agents
+tab. Its setup has two steps, as a chat app has: get the extension (`X_EXTENSION_URL`), then add the
+agent through the usual Marketplace install. `X_EXTENSION_URL` is the Chrome Web Store page of the
+extension (ID `eggdpikcggoicfcfdpdihfkinajchpfj`, also in `BROWSER_EXTENSION_IDS` of
+`apps/auth-api/wrangler.jsonc`). The X app shows on this computer, and on a joined server only for an
+admin that can install agents (`agent-install-v1`), as Discord and the other chat apps do.
+There are three parts:
+
+- **Content script** (`src/x-content.ts`, built as one IIFE file, `x-content.js`). It finds the parts of
+  an X page with CSS selectors only. When a reply mentions @OpenBot_ and the server answers `ready`, it
+  sets `data-openbot-x` on the reply button, and CSS gives the button the OpenBot look and motion. A
+  click (or Cmd/Ctrl+Enter) is stopped in the capture phase. The script reads the post, the posts above
+  it and the author's next posts (no replies by other people), gives them to the worker, and clicks the
+  button again with `data-openbot-x-pass`, so X posts the reply at once.
+  Each part has selectors for the earlier X web app (`data-testid`) and for the X web app of November
+  2026, which has no test ids: its text box is a `textarea`, so the script reads its value. That app
+  shows no `<time datetime>`, so the time comes from the status ID in the post link (an X ID holds its
+  creation time). In the reply dialog the post has no link; the script then takes the ID from
+  `in_reply_to` in the page address when the address has one.
+- **Worker** (`src/background.ts`). It answers the selectors, and keeps each post in a queue
+  (`src/x-outbox.ts`, `chrome.storage.local`) until the server has it. Each post keeps one
+  `clientMessageId`, and the host answers a repeated id with the first receipt for a day, so a retry
+  makes no second thread. A failed send waits 30 s, then longer, up to 30 minutes (`chrome.alarms`
+  wakes the worker). A browser start (`onStartup`, or `onInstalled` for an extension that Chrome loads
+  again) and a side panel that has connected send every waiting post at once. Each failure says whether it may have
+  reached the server (`XSendResult.reached`): a post that no attempt can have sent waits up to 7 days,
+  and one that an attempt may have sent is tried only for 23 hours after that attempt. Nothing of
+  OpenBot shows on X for a post that waits; a post that arrives after a failed attempt, or that is
+  dropped, gets a browser notification. The worker cannot load a language, so it keeps the texts that the last
+  `status` answer brought. The side panel shows the posts that wait, with "Send now". The selectors come from the account service (`X_PAGE_RULES_ROUTE`, at most once an
+  hour, by hash) and stay in `chrome.storage.local`. A copy whose hash does not match is dropped. The
+  content script tries the served selectors first, then the built-in ones (`X_PAGE_RULES_DEFAULT`).
+- **One connection at a time.** The account service gives a sign-in one logical session per server
+  (`startSession` in `apps/auth-api/src/server/remote-control-plane.ts`), and the server keeps one
+  connection per session, so a second connection of the same sign-in takes the session of the first.
+  Each open side panel holds a port (`PANEL_PORT`) to the worker. While a panel is open, the worker
+  passes `status` and `send` to it (`src/x-agent.ts` with the panel's connection), closes the offscreen
+  page, and does not open a second panel. With no panel, the offscreen page (`offscreen.html`,
+  `src/offscreen.tsx`) makes the connection. Chrome gives an offscreen page `chrome.runtime` only, so it
+  reads and writes storage through the worker, which takes these requests only from that page. It
+  closes after 10 minutes with no work. Two panels in two windows still take the session from each
+  other.
+
+The E2E (`scripts/browser-extension-e2e.ts`, step 7) uses a local copy of an X post page whose reply
+button has a test id that only the served selectors know, then a local page in the markup of the new X
+web app that only the new selectors find.
+
+## Agents on the member's Chrome (host side)
+
+A member can share tabs of the member's own Chrome with the agents of a server, through the OpenBot
+Chrome extension (`client-browser-v1`, `packages/contracts/src/team-protocol/client-browser-v1.ts`).
+The extension is a remote client, so no new data channel is necessary:
+
+- **Presence.** The extension sends `POST /v1/client-browser/presence` (`{ sharing, tabs }`, at most 50
+  tabs) when sharing starts or changes, and every 30 s. `ClientBrowserHub` (`src/main/client-browser-hub.ts`)
+  keeps it per member and logical session. It ends at `sharing: false`, when the last event connection
+  of the session closes (`team-api-server.ts`), or after 75 s with no presence. The newest session of a
+  member that started to share gets the commands.
+- **Commands.** The hub sends each command as the `client-browser-command` event to the event
+  connections of that session that read the capability, and to no other member. The extension answers
+  with `POST /v1/client-browser/result`. The hub accepts the answer only from the same member and
+  session, waits at most 120 s (the person's approval included), and stops waiting when the tool call
+  is cancelled. A command that the contract decoder refuses never leaves the host, because the client
+  closes its event stream on a malformed event.
+- **Tools** (`src/backend/agent/client-browser-tools.ts`). A shared tab has the id
+  `chrome:<member key>:<Chrome key>:<tab id>`; the member key is a short hash of the member id, and the
+  Chrome key a short hash of the session that shares the tab, so a command reaches only the Chrome that
+  listed the tab (else `not-found`). Only a turn with a message from a session that shares Chrome tabs
+  reaches a Chrome: the Team API request context sets `fromChrome` from the hub, the routes pass it to
+  `sendMessage` and `startTask`, and the agent service keeps those delivery ids in memory (the newest
+  200; a message that waits through a host restart counts as an app message). Such a turn gets a note
+  in its prompt to work in that Chrome, and `list_tabs` adds the shared tabs of each Chrome of the one
+  person who requested it (`#turnRequesters`). `open` with `browser: "chrome"` opens a tab in that
+  person's newest shared Chrome. A message from the OpenBot app or the web app, a routine run, or a
+  message from another agent reaches no Chrome, and the agent instructions do not mention Chrome.
+  On a Chrome tab, only `snapshot`, `screenshot`, `navigate`, `click`, `type`, `press`, `scroll`,
+  `wait_for` and `close_tab` run; each other tool (Vault, secrets, takeover, uploads, `evaluate`,
+  `run_script`) gets a refusal, and so do a role target and `nth`.
+
+### The extension side
+
+The extension (`apps/browser-extension`) shares the user's open web tabs while the user is signed in.
+There is no switch to stop it. A tab that an agent works in joins the Chrome tab group "OpenBot" of its
+window.
+
+- **Worker** (`src/client-browser-worker.ts`). Only the worker can use `chrome.debugger`, so it owns the
+  group, the approvals and the commands. Sharing is always on; `openbot.client-browser.sharing.v1` keeps
+  only the ID of the OpenBot group, and the worker ignores an `{ off: true }` that an older version
+  stored. The worker
+  answers the presence (the open web tabs, the active tab first, at most 50), and tells the page with
+  the connection when a tab opens, closes or changes. A command groups its tab on attach, unless the tab
+  is in another group.
+- **Connection** (`src/client-browser-link.ts`). The page that holds the server connection (the side
+  panel, else the offscreen page) sends the presence when it changes (at most once in 5 s, and an
+  unchanged presence only every 30 s) and at once after a reconnection. It passes each `client-browser-command` event to the worker and posts the worker's
+  answer to `/v1/client-browser/result`. The offscreen page does not close when it is idle, and the
+  worker opens it when the last panel closes or the browser starts.
+- **Commands** (`src/client-browser-executor.ts`). CDP 1.3 on any open web tab: it attaches on demand,
+  puts the tab into the OpenBot group of its window, and detaches after 30 s with no command. Page
+  scripts run in one isolated world per tab, made again after a navigation. `snapshot` keeps a map from
+  each `ref` to its element in that world, where page scripts cannot change it. A command gets `not-found` for a closed tab. The X agent's chat of each post is kept for its notification (`openbot.x-chats.v1`,
+  the newest 20), and becomes the chat to open only when the user clicks that notification.
+- **Approvals.** Before a command, the worker checks the site (origin) of the tab or address. A site
+  that is not in `openbot.client-browser.sites.v1` gets a card in the side panel (Allow once / Always
+  for this site / Deny), or a notification when no panel is open. The card waits 100 s, then the
+  command fails with `timeout`. A command also has a deadline 10 s before the host gives up on it
+  (120 s from its arrival): after the deadline it does not act, so the agent is never told "timeout"
+  for an action that then runs. These ask every time, also on an allowed site, and have no "Always":
+  typing into a password field, a field with `autocomplete="cc-*"`, or a field inside a frame or a closed shadow root, which the extension cannot see into (card and login fields are often there); fields in an open shadow root are checked as usual; a download; and a click, key,
+  `navigate` or `open` on an address whose path has `oauth` or `authorize` and that has a `client_id`
+  parameter. `chrome.debugger` cannot stop downloads (`Page.setDownloadBehavior` is a browser-level
+  command that an extension may not send), so the worker uses `chrome.downloads.onDeterminingFilename`:
+  for 30 s after an agent acts on a site, Chrome holds each new download from that site (by referrer or
+  address) until the person answers. Allow once lets it go on; Deny or no answer cancels it. A download
+  link asks before the click. A download that the person starts on such a site in those 30 s asks too.
+  A browser that Playwright drives skips the listener, so this check runs in a Chrome that Playwright
+  only connects to.
+
+While an agent works in a tab, the executor draws an overlay in the page (`pageOverlay`): a glow
+around the page with "<agent> is using this tab", and a cursor that glides to each click or field
+(350 ms) with a ripple on the click. It is a shadow root on `<html>` with `pointer-events: none`, so
+snapshots (which read `document.body`) and clicks do not see it, and it is hidden while the agent takes
+a screenshot. Styles go through the CSSOM and motion through the Web Animations API, which a page's
+CSP and Trusted Types allow. It is removed when the debugger detaches, and fades out by itself 36 s
+after the last command, also when Chrome's Cancel bar detached the debugger first.
+
+The extension E2E (`scripts/browser-extension-e2e.ts`, step 6b) shares a local page and lets the agent
+click its button through the card.
+
+Chrome Web Store permission notes (for the store listing):
+
+| Permission | Justification |
+| --- | --- |
+| `debugger` | When the user shares tabs, the user's own agents read and use the user's open tabs (page text, screenshots, clicks and typing), after the user allows each site. Chrome shows its debugging bar while it is attached. |
+| `tabs` | Lists the address and title of the user's open tabs for the user's agents, and opens or closes a tab when an agent asks. |
+| `tabGroups` | Puts the tabs that an agent works in into the "OpenBot" tab group, so the user sees them. |
+| `downloads` | Holds a download that starts on a site where the user's agent works until the user allows it in the side panel, and cancels it when the user denies it. The extension does not read, open or list the user's files. |
+
+The Team API E2E (`scripts/team-api-routes-e2e.ts`, "A member's shared Chrome tabs") checks the
+capability, presence, delivery to one session, foreign and late answers, denial, timeout, refusals,
+and the end of a presence.

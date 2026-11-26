@@ -8,7 +8,7 @@ RELEASES=https://github.com/nightly-labs/openbot/releases
 LOCK=/run/openbot-update.lock
 SCRATCH=/var/tmp
 RESTORE=/var/lib/ascii-lazy
-HOSTED_FILES=(openbot-hosted-server openbot-hosted-env openbot-hosted-update openbot)
+HOSTED_FILES=(openbot-hosted-server openbot-hosted-env openbot-hosted-update openbot-hosted-keyring openbot)
 REQUESTS=/run/openbot
 STATE=/run/openbot-update.state
 UNIT_DIRECTORY=/etc/systemd/system
@@ -21,7 +21,7 @@ START_LOOP_STATUS=78
 SAFE_MODE_MARKER=$REQUESTS/server-safe-mode
 STAGE_STAMP=/run/openbot-update.staged
 STAGE_INTERVAL_MINUTES=360
-RELEASE_FILES=(packages.txt openbot-hosted.apparmor openbot-boat-pre-stop "${HOSTED_FILES[@]}" "${UNITS[@]}")
+RELEASE_FILES=(packages.txt optional-packages.txt openbot-hosted.apparmor openbot-boat-pre-stop "${HOSTED_FILES[@]}" "${UNITS[@]}")
 
 fail() {
   echo "$*" >&2
@@ -78,16 +78,21 @@ available_package() {
   [ -n "$candidate" ] && [ "$candidate" != "(none)" ]
 }
 
+apt_install() {
+  apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends --no-remove "$@"
+}
+
 install_packages() {
-  local package missing=() available=()
+  local optional=${2:-} package missing=() available=()
   while read -r package; do
     [[ -z $package || $package == \#* ]] && continue
     [[ $package =~ ^[a-z0-9][a-z0-9.+-]+$ ]] || fail "The package name is not valid: $package"
+    [ -n "$optional" ] && command -v "$package" >/dev/null && continue
     installed_package "$package" || installed_package "${package%t64}" || missing+=("$package")
   done <"$1"
   [ "${#missing[@]}" -eq 0 ] && return 0
   dpkg --configure -a
-  apt-get -o DPkg::Lock::Timeout=600 update
+  apt-get -o DPkg::Lock::Timeout=600 -o Acquire::AllowReleaseInfoChange::Label=true update
   for package in "${missing[@]}"; do
     if available_package "$package"; then
       available+=("$package")
@@ -98,8 +103,22 @@ install_packages() {
     fi
   done
   [ "${#available[@]}" -eq 0 ] && return 0
-  apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends "${available[@]}"
+  if [ -z "$optional" ]; then
+    apt_install "${available[@]}"
+  else
+    for package in "${available[@]}"; do
+      if apt_install --simulate "$package" >/dev/null 2>&1; then
+        apt_install "$package"
+      else
+        echo "This system cannot install $package without removing other packages. OpenBot continues without it." >&2
+      fi
+    done
+  fi
   apt-get clean
+}
+
+install_optional_packages() {
+  install_packages "$1" optional
 }
 
 unpack() {
@@ -161,6 +180,9 @@ stage_due() {
 
 check() {
   local staged=0 stopped=0 safe_mode=0
+  if [ -x "$INSTALL/hosted/openbot-hosted-keyring" ]; then
+    "$INSTALL/hosted/openbot-hosted-keyring" backup || echo "The copy of the keyring is not refreshed." >&2
+  fi
   if start_loop_stopped || safe_mode_running; then stopped=1; fi
   if [ "$stopped" -eq 1 ] || stage_due; then
     set +e
@@ -223,18 +245,34 @@ allow_sandbox_capabilities() {
   echo "The AppArmor rule for the Claude sandbox is not installed." >&2
 }
 
+apparmor_predates_abi_4() {
+  [ ! -e /etc/apparmor.d/abi/4.0 ] && command -v apparmor_parser >/dev/null &&
+    ! apparmor_parser --skip-kernel-load --skip-cache "$1" >/dev/null 2>&1
+}
+
+install_hosted_file() {
+  local source=$1 file=$2
+  install -m 0755 "$source/$file" "$INSTALL/hosted/.$file.new"
+  mv -f "$INSTALL/hosted/.$file.new" "$INSTALL/hosted/$file"
+}
+
 install_hosting() {
   local source=$1 user file unit changed=0
   user=$(<"$INSTALL/hosted/service-user")
   [[ $user =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]] || fail "The service user is not valid."
   for file in "${HOSTED_FILES[@]}"; do
-    install -m 0755 "$source/$file" "$INSTALL/hosted/.$file.new"
-    mv -f "$INSTALL/hosted/.$file.new" "$INSTALL/hosted/$file"
+    install_hosted_file "$source" "$file"
   done
-  install -m 0644 "$source/openbot-hosted.apparmor" /etc/apparmor.d/openbot-hosted
+  if apparmor_predates_abi_4 "$source/openbot-hosted.apparmor"; then
+    rm -f /etc/apparmor.d/openbot-hosted
+  else
+    install -m 0644 "$source/openbot-hosted.apparmor" /etc/apparmor.d/openbot-hosted
+  fi
   if command -v apparmor_parser >/dev/null && [ -d /sys/kernel/security/apparmor ]; then
-    apparmor_parser --replace /etc/apparmor.d/openbot-hosted ||
-      echo "The AppArmor profile is not loaded." >&2
+    if [ -e /etc/apparmor.d/openbot-hosted ]; then
+      apparmor_parser --replace /etc/apparmor.d/openbot-hosted ||
+        echo "The AppArmor profile is not loaded." >&2
+    fi
     allow_sandbox_capabilities
   fi
   for unit in "${UNITS[@]}"; do
@@ -342,6 +380,7 @@ stage() {
   done
   prepare_release "$work/squashfs-root"
   install_packages "$work/squashfs-root/resources/hosting/packages.txt"
+  install_optional_packages "$work/squashfs-root/resources/hosting/optional-packages.txt"
   stage_release "$work/squashfs-root"
   echo "OpenBot $version starts at the next start of the server."
 }
@@ -379,9 +418,19 @@ boot() {
   apply
 }
 
+install_missing_hosted_files() {
+  local source=$1 file
+  for file in "${HOSTED_FILES[@]}"; do
+    if [ ! -e "$INSTALL/hosted/$file" ] && [ -f "$source/$file" ]; then
+      install_hosted_file "$source" "$file"
+    fi
+  done
+}
+
 trigger() {
   local source=$INSTALL/app/resources/hosting unit changed=0
   repair_release_modes || echo "The modes of the release are not repaired." >&2
+  install_missing_hosted_files "$source" || echo "The server files of the release are not installed." >&2
   for unit in "${REQUEST_UNITS[@]}"; do
     if [ ! -e "$UNIT_DIRECTORY/$unit" ] && [ -f "$source/$unit" ]; then
       install -m 0644 "$source/$unit" "$UNIT_DIRECTORY/$unit"

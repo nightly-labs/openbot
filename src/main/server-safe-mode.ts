@@ -9,6 +9,7 @@ import { Effect, Exit, Schema, Scope } from "effect";
 import { app, session } from "electron";
 import { createCentralAuthManager } from "./account-service-access";
 import { isFinalClientError } from "./central-auth-manager";
+import { readSignalHomeChoice, SIGNAL_HOME_PREFERENCE_FILE } from "./host-signal-home";
 import { HOSTED_RUNTIME_DIRECTORY, HOSTED_UPDATE_TRIGGER } from "./hosted-update-adapter";
 import { listenLoopback } from "./listen-loopback";
 import { toRemoteWorkflowError } from "./remote-service-effects";
@@ -82,7 +83,10 @@ const open = Effect.fn("ServerSafeMode.open")(function* (options: ServerSafeMode
     (manager) => manager.dispose().pipe(Effect.ignore),
   );
   yield* centralAuth.initialize().pipe(Effect.mapError(unavailable));
-  const bootstrap = yield* centralAuth.issueRemoteHostTicket(identity.serverId, {}).pipe(Effect.mapError(unavailable));
+  const preferredSignalHome = yield* readSignalHomeChoice(join(options.userDataPath, SIGNAL_HOME_PREFERENCE_FILE));
+  const bootstrap = yield* centralAuth
+    .issueRemoteHostTicket(identity.serverId, { preferredSignalHome })
+    .pipe(Effect.mapError(unavailable));
 
   if (!session.defaultSession.protocol.isProtocolHandled("openbot-app")) configureApplicationProtocol();
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;
@@ -107,7 +111,10 @@ const open = Effect.fn("ServerSafeMode.open")(function* (options: ServerSafeMode
           transferDirectory: join(app.getPath("temp"), "openbot-safe-mode-transfers"),
           renewSignal: (hostId, failedSignalUrl) =>
             centralAuth
-              .issueRemoteHostTicket(hostId, failedSignalUrl === undefined ? {} : { failedSignalUrl })
+              .issueRemoteHostTicket(
+                hostId,
+                failedSignalUrl === undefined ? { preferredSignalHome } : { failedSignalUrl, preferredSignalHome },
+              )
               .pipe(toRemoteWorkflowError),
           renewalRefused: isFinalClientError,
           verifyClientTicket: (ticket) => centralAuth.verifyRemoteSessionTicket(ticket).pipe(toRemoteWorkflowError),

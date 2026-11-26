@@ -96,7 +96,7 @@ export class MailboxProjection {
     fileDeletions: string[] = [],
     _rebaseHistory = false,
   ): boolean {
-    return this.#write(commandId, state, eventType, fileDeletions, (db, statements, sequence) => {
+    return this.#write(commandId, state, eventType, fileDeletions, true, (db, statements, sequence) => {
       const attachments = mailboxAttachmentRows(state);
       deleteRowsNotIn(
         db,
@@ -136,8 +136,9 @@ export class MailboxProjection {
     changes: MailboxProjectionChanges,
     eventType: string,
     fileDeletions: string[] = [],
+    writeIdempotency = true,
   ): boolean {
-    return this.#write(commandId, state, eventType, fileDeletions, (_db, statements, sequence) => {
+    return this.#write(commandId, state, eventType, fileDeletions, writeIdempotency, (_db, statements, sequence) => {
       const messages = changedRows(state.messages, changes.messageIds, (message) => String(message.id));
       const deliveries = changedRows(state.deliveries, changes.deliveryIds, (delivery) => String(delivery.id));
       const reactions = changedRows(state.reactions, changes.reactionKeys, (reaction) => rowKey(reactionKey(reaction)));
@@ -180,6 +181,7 @@ export class MailboxProjection {
     state: MailboxProjectionState,
     eventType: string,
     fileDeletions: string[],
+    writeIdempotency: boolean,
     writeRows: (db: DatabaseSync, statements: MailboxStatements, sequence: number) => void,
   ): boolean {
     let wrote = false;
@@ -202,12 +204,13 @@ export class MailboxProjection {
         deleteReceiptsOf(db, olderCommandIds);
         writeRows(db, statements, sequence);
         statements.queueStateDelete.run(JSON.stringify([MAILBOX_METADATA_ROW, ...state.pausedAgentIds]));
-        statements.queueUpsert.run(
-          MAILBOX_METADATA_ROW,
-          0,
-          JSON.stringify({ idempotency: state.idempotency }),
-          sequence,
-        );
+        if (writeIdempotency)
+          statements.queueUpsert.run(
+            MAILBOX_METADATA_ROW,
+            0,
+            JSON.stringify({ idempotency: state.idempotency }),
+            sequence,
+          );
         for (const agentId of state.pausedAgentIds) statements.queueUpsert.run(agentId, 1, "{}", sequence);
         for (const path of fileDeletions) {
           statements.outboxInsert.run(randomUUID(), path, eventType, new Date().toISOString());

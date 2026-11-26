@@ -31,6 +31,8 @@ export const messages = {
   "settings.movingFaces.title": "Visages d’agents animés",
   "settings.movingFaces.description":
     "Les visages des agents clignent et bougent. Immobiles au départ sur un ordinateur sans GPU.",
+  "settings.startupAnimation.title": "Animation de démarrage",
+  "settings.startupAnimation.description": "Affiche l’animation des agents pendant l’ouverture d’OpenBot.",
   "settings.logoColor.title": "Couleur du logo",
   "settings.logoColor.description": "Affichée dans le Dock, la barre des tâches et l’îlot dynamique.",
   "settings.logoColor.buildNote":
@@ -53,7 +55,7 @@ export const messages = {
   "settings.chatBackground.default": "Par défaut",
   "settings.chatBackdrop.title": "Arrière-plan de la fenêtre",
   "settings.chatBackdrop.description":
-    "Une scène, une image ou un GIF derrière toute la fenêtre sur cet appareil. Demandez une scène à un agent, puis choisissez « Utiliser comme arrière-plan » sur sa réponse.",
+    "Une scène, une image, un GIF ou une vidéo derrière toute la fenêtre sur cet appareil. Demandez une scène à un agent, puis choisissez « Utiliser comme arrière-plan » sur sa réponse.",
   "settings.chatBackdrop.none": "Aucun",
   "settings.chatBackdrop.pond": "Bassin à koïs",
   "settings.chatBackdrop.jellyfish": "Méduses",
@@ -61,8 +63,9 @@ export const messages = {
   "settings.chatBackdrop.snowfall": "Chute de neige",
   "settings.chatBackdrop.fireflies": "Lucioles",
   "settings.chatBackdrop.coast": "Côte néon",
-  "settings.chatBackdrop.upload": "Importer une image…",
-  "settings.chatBackdrop.uploadRefused": "Utilisez une image PNG, JPEG, GIF, WebP ou AVIF de 20 Mo au plus.",
+  "settings.chatBackdrop.upload": "Importer…",
+  "settings.chatBackdrop.uploadRefused":
+    "Utilisez une image PNG, JPEG, GIF, WebP ou AVIF de 20 Mo au plus, ou une vidéo MP4 ou WebM de 100 Mo au plus.",
   "settings.chatBackdrop.saveFailed": "L’arrière-plan n’a pas été enregistré.",
   "settings.chatBackdrop.removeFailed": "L’arrière-plan n’a pas été supprimé.",
   "settings.chatColor.title": "Couleur du chat",
@@ -114,7 +117,7 @@ export const messages = {
   "settings.quitGuard.never": "Jamais",
   "settings.externalLinks.title": "Ouvrir les liens externes dans",
   "settings.externalLinks.description":
-    "Les liens des discussions, des pages de connexion et de facturation s’ouvrent ici.",
+    "Les liens des discussions, des pages de connexion et de facturation s’ouvrent ici. Avec OpenBot, seuls les liens des discussions de la fenêtre principale avec des agents de cet ordinateur s’ouvrent dans OpenBot. Les autres liens s’ouvrent dans le navigateur par défaut.",
   "settings.externalLinks.defaultBrowser": "Navigateur par défaut",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Navigateur par défaut ({name})",
@@ -251,7 +254,7 @@ export const messages = {
   "settings.notch.xwayland.description":
     "Sous Wayland, OpenBot doit utiliser XWayland pour afficher l’îlot dynamique au-dessus des autres apps. D’ici là, l’îlot ne s’affiche pas.",
   "settings.notch.xwayland.unsupported":
-    "Sous Wayland sans XWayland, l’îlot dynamique ne peut pas s’afficher au-dessus des autres apps.",
+    "Sur ce bureau Wayland, l’îlot dynamique ne peut pas s’afficher au-dessus des autres apps.",
   "settings.notch.xwayland.restart": "Redémarrer",
   "settings.notch.idle.title": "Afficher l’îlot au repos",
   "settings.notch.idle.description": "Afficher le logo OpenBot et un message d’accueil lorsqu’aucun état n’est actif.",
@@ -282,8 +285,11 @@ export const messages = {
   "settings.agentDock.xwayland.description":
     "Sous Wayland, OpenBot doit utiliser XWayland pour afficher le dock au-dessus des autres apps. D’ici là, le dock s’affiche dans la fenêtre OpenBot.",
   "settings.agentDock.xwayland.unsupported":
-    "Sous Wayland sans XWayland, le dock ne peut pas s’afficher au-dessus des autres apps. Il s’affiche dans la fenêtre OpenBot.",
+    "Sur ce bureau Wayland, le dock ne peut pas s’afficher au-dessus des autres apps. Il s’affiche dans la fenêtre OpenBot.",
   "settings.agentDock.xwayland.restart": "Redémarrer",
+  "settings.agentDock.noCompositor.title": "Dans la fenêtre OpenBot",
+  "settings.agentDock.noCompositor.description":
+    "Votre bureau ne peut pas afficher de fenêtres transparentes : le dock s’affiche donc dans la fenêtre OpenBot. Pour l’afficher au-dessus des autres apps, activez les effets de bureau (un compositeur) dans les réglages du système, puis redémarrez OpenBot.",
   "settings.agentDock.display.title": "Écran",
   "settings.agentDock.display.description":
     "Si cet écran n’est pas connecté, le dock passe sur l’écran de la fenêtre OpenBot.",
@@ -747,7 +753,37 @@ export const messages = {
   "settings.voice.talkKey.recording": "Appuyez sur les touches",
   "settings.voice.talkKey.refused": "Ajoutez une autre touche",
   "settings.voice.talkKey.reset": "Rétablir",
+  "settings.tab.keyboard.title": "Clavier",
+  "settings.tab.keyboard.description": "Modifiez les raccourcis clavier sur cet appareil.",
+  "settings.shortcuts.section": "Raccourcis",
+  "settings.shortcuts.fixed.section": "Raccourcis fixes",
+  "settings.shortcuts.command.newThread": "Nouveau fil",
+  "settings.shortcuts.command.previousThread": "Fil précédent",
+  "settings.shortcuts.command.nextThread": "Fil suivant",
+  "settings.shortcuts.command.newAgent": "Nouvel agent",
+  "settings.shortcuts.command.globalSearch": "Tout rechercher",
+  "settings.shortcuts.command.searchChat": "Rechercher dans le chat",
+  "settings.shortcuts.command.focusComposer": "Aller à la zone de message",
+  "settings.shortcuts.command.back": "Précédent",
+  "settings.shortcuts.command.forward": "Suivant",
+  "settings.shortcuts.command.toggleSidebar": "Afficher ou masquer la barre latérale",
+  "settings.shortcuts.command.showShortcuts": "Afficher les raccourcis clavier",
+  "settings.shortcuts.command.openSettings": "Ouvrir les réglages",
+  "settings.shortcuts.command.stopAllAgents": "Arrêter tous les agents",
+  "settings.shortcuts.command.switchServer": "Changer de serveur",
+  "settings.shortcuts.command.zoom": "Zoom",
+  "settings.shortcuts.refused.invalid": "Ajoutez une touche de modification",
+  "settings.shortcuts.refused.reserved": "Le système utilise ce raccourci",
+  "settings.shortcuts.refused.taken": "Utilisé par {command}",
+  "settings.shortcuts.recording": "Appuyez sur les touches",
+  "settings.shortcuts.change": "Modifier le raccourci de {command}",
+  "settings.shortcuts.reset": "Rétablir",
+  "settings.shortcuts.resetAll": "Tout rétablir",
   "settings.voice.live.signIn": "Connectez-vous à Codex avec votre compte ChatGPT pour utiliser la voix en direct.",
+  "settings.voice.live.account": "Compte",
+  "settings.voice.live.accountAutomatic": "Automatique",
+  "settings.voice.live.accountDescription":
+    "Le compte ChatGPT qu'utilise la voix en direct. Choisissez un compte dont l'abonnement inclut la voix.",
   "settings.transfer.title": "Déplacer ce serveur vers un autre ordinateur",
   "settings.transfer.lede":
     "Vos agents, leurs compétences, routines, souvenirs et fichiers sont réunis dans un seul fichier.",

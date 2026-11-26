@@ -1,4 +1,5 @@
 import type { SidebarWaitReason } from "@openbot/ui/features/sidebar/sidebar-types";
+import type { JSX } from "@solidjs/web";
 
 export type ThreadStatus =
   | { kind: "idle" }
@@ -41,11 +42,22 @@ export interface ThreadHeaderProps {
   onCloseOthers: (id: string) => void;
   onCloseToTheRight: (id: string) => void;
   onMove: (id: string, index: number) => void;
-  onArchive: (id: string) => void;
+  onArchive?: ((id: string) => void) | undefined;
   onRestore: (id: string) => void;
+  olderArchived?: { loading: boolean } | undefined;
+  onShowOlderArchived?: (() => void) | undefined;
   onRename?: ((id: string, title: string) => void) | undefined;
   onDelete?: ((id: string) => void) | undefined;
   onMoveToSide?: ((id: string) => void) | undefined;
+  tabText?: ThreadTabText | undefined;
+  tabIcon?: (() => JSX.Element) | undefined;
+}
+
+export interface ThreadTabText {
+  list: string;
+  actions: string;
+  name: string;
+  limit: number;
 }
 
 export const MAIN_THREAD_ID = "main";

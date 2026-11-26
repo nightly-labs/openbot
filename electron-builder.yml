@@ -36,6 +36,7 @@ asarUnpack:
   - out/main/agent-database-host.js
   - out/main/voice-transcription-host.js
   - out/main/voice-speech-host.js
+  - out/main/process-launcher-host.js
   - node_modules/effect/**/*
   - node_modules/@koromix/koffi-*/**/*
 extraResources:
@@ -115,8 +116,15 @@ mac:
     CFBundleIconName: Icon
     ElectronTeamID: ZTRDTUL87R
     NSMicrophoneUsageDescription: OpenBot uses the microphone to transcribe voice prompts locally on this Mac.
+    NSLocationUsageDescription: OpenBot shares the location of this Mac with a page in the OpenBot browser only when you allow it.
+    NSLocationWhenInUseUsageDescription: OpenBot shares the location of this Mac with a page in the OpenBot browser only when you allow it.
     NSScreenCaptureUsageDescription: OpenBot captures the screen so an agent can see the app windows you ask it to control.
     NSAppleEventsUsageDescription: OpenBot sends Automation events so an agent can control the apps you ask it to control.
+    NSCalendarsFullAccessUsageDescription: OpenBot lets the commands that an agent runs read and change your calendar events.
+    NSCalendarsWriteOnlyAccessUsageDescription: OpenBot lets the commands that an agent runs add events to your calendars.
+    NSCalendarsUsageDescription: OpenBot lets the commands that an agent runs use your calendars.
+    NSRemindersFullAccessUsageDescription: OpenBot lets the commands that an agent runs read and change your reminders.
+    NSRemindersUsageDescription: OpenBot lets the commands that an agent runs use your reminders.
     NSUserActivityTypes:
       - NSUserActivityTypeBrowsingWeb
   target:

@@ -1493,3 +1493,29 @@ html:active-view-transition-type(marketplace-group) [data-marketplace-shared] .m
   color: var(--openbot-text-dim);
   font-size: var(--openbot-text-sm);
 }
+
+.marketplace-x-how {
+  display: grid;
+  gap: var(--openbot-space-3);
+  margin: 0;
+  padding: var(--openbot-space-4);
+  list-style: none;
+}
+
+.marketplace-x-how > li {
+  display: flex;
+  gap: var(--openbot-space-3);
+  align-items: flex-start;
+}
+
+.marketplace-x-how-index {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}

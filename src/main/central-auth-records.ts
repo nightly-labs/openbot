@@ -1,3 +1,4 @@
+import { type CustomServerPlan, optionalCustomServerPayment } from "@openbot/contracts/custom-server-plans";
 import { type HostKeyHandover, optionalHostKeyHandovers } from "@openbot/contracts/host-key-handover";
 import { inviteUseCount, isPermanentInvite } from "@openbot/contracts/invite-links";
 import {
@@ -32,9 +33,13 @@ export interface RemoteHostSummary {
   membershipId: string;
   role: "owner" | "admin" | "member";
   memberLimit?: number;
+  licenseRaisesMemberLimit?: boolean;
   hosted?: boolean;
   restartAvailable?: boolean;
   storageGb?: number;
+  paymentRequired?: true;
+  customPlan?: CustomServerPlan;
+  hidden?: true;
 }
 
 export interface RemoteInviteRecord {
@@ -185,9 +190,12 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       membershipId: requiredString(host, "membershipId"),
       role: host.role,
       ...(validLimit ? { memberLimit } : {}),
+      ...(isBoolean(host.licenseRaisesMemberLimit) ? { licenseRaisesMemberLimit: host.licenseRaisesMemberLimit } : {}),
       ...(isBoolean(host.hosted) ? { hosted: host.hosted } : {}),
       ...(isBoolean(host.restartAvailable) ? { restartAvailable: host.restartAvailable } : {}),
       ...(validStorage ? { storageGb } : {}),
+      ...optionalCustomServerPayment(host),
+      ...(host.hidden === true ? { hidden: true as const } : {}),
     };
   });
 }

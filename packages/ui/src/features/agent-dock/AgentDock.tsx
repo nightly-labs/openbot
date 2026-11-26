@@ -24,7 +24,7 @@ import {
   Show,
   untrack,
 } from "solid-js";
-import { AmbientMotion } from "../../ambient-motion";
+import { AmbientMotion, useAmbientMotion } from "../../ambient-motion";
 import type { AvatarMood } from "../../bloub-avatar";
 import { createMenuSearch } from "../../components/createMenuSearch";
 import { createScrollFades } from "../../components/createScrollFades";
@@ -94,6 +94,7 @@ import {
 
 export type { AgentDockChatAnswers, AgentDockChatModel } from "./AgentDockChat";
 export type { AgentDockShelfResult } from "./AgentDockShelf";
+export type { AgentDockThreadChoices } from "./AgentDockThreadMenu";
 
 export interface AgentDockSeatRef {
   kind: "agent" | "channel";
@@ -189,6 +190,8 @@ export interface AgentDockProps {
   onSend: (seat: AgentDockSeatRef, text: string) => Promise<AgentDockSendResult>;
   onOpenInMain: (seat: AgentDockSeatRef) => void;
   onOpenWindow?: ((agentId: string) => void) | undefined;
+  onOpenThread?: ((seat: AgentDockSeatRef, id: string) => void) | undefined;
+  onNewThread?: ((seat: AgentDockSeatRef) => void) | undefined;
   agents: ComposerAgent[];
   onSelectAgent?: ((agentId: string) => void) | undefined;
   onOpenLink?: ((url: string) => void) | undefined;
@@ -303,6 +306,10 @@ export function AgentDock(props: AgentDockProps) {
     return next;
   });
   const seatFor = (id: string) => seatProps().get(id);
+  const firstTemporaryAfterSaved = createMemo(() => {
+    const index = state.seats.findIndex((id) => seatFor(id)?.temporary === true);
+    return index > 0 ? state.seats[index] : undefined;
+  });
   const seatAgent = (agentId: string) => {
     const seat = seatFor(agentDockSeatKey({ kind: "agent", id: agentId }));
     return seat?.kind === "agent" ? seat.agent : undefined;
@@ -357,7 +364,8 @@ export function AgentDock(props: AgentDockProps) {
   const tuck = motion.spring(untrack(() => props.tucked) ? TUCK_DISTANCE : 0, TUCK);
   const [dragging, setDragging] = createSignal(false);
   const [pointerOn, setPointerOn] = createSignal(false);
-  const ambientMotion = () => pointerOn() || dragging() || state.open !== null;
+  const windowMotion = useAmbientMotion();
+  const ambientMotion = () => windowMotion() && (pointerOn() || dragging() || state.open !== null);
   const seatMotion = new Map<string, { y: Spring; scale: Spring }>();
 
   function seatSprings(id: string, y = PANEL_HEIGHT / 2) {
@@ -924,7 +932,8 @@ export function AgentDock(props: AgentDockProps) {
     if (!props.onMove || event.button !== 0 || endSeatDrag || leaving.has(id) || !state.seats.includes(id)) return;
     const element = event.currentTarget;
     const pointerId = event.pointerId;
-    const startY = event.clientY;
+    const stageTop = () => stage.getBoundingClientRect().top;
+    const startY = event.clientY - stageTop();
     const springs = seatSprings(id);
     const initial = [...state.seats];
     let order = initial;
@@ -950,8 +959,9 @@ export function AgentDock(props: AgentDockProps) {
     };
     const scroll = () => {
       const view = seatScroll.getBoundingClientRect();
-      const above = view.top + SEAT_FADE - pointerY;
-      const below = pointerY - (view.bottom - SEAT_FADE);
+      const top = stageTop();
+      const above = view.top - top + SEAT_FADE - pointerY;
+      const below = pointerY - (view.bottom - top - SEAT_FADE);
       const step = above > 0 ? -above : below > 0 ? below : 0;
       const before = seatScroll.scrollTop;
       if (step !== 0) seatScroll.scrollTop = before + step * SEAT_DRAG_SCROLL;
@@ -969,7 +979,7 @@ export function AgentDock(props: AgentDockProps) {
     };
     const move = (moved: PointerEvent) => {
       if (moved.pointerId !== pointerId) return;
-      pointerY = moved.clientY;
+      pointerY = moved.clientY - stageTop();
       if (!started && Math.abs(pointerY - startY) < SEAT_DRAG_START) return;
       if (!started) start();
       follow();
@@ -1254,6 +1264,7 @@ export function AgentDock(props: AgentDockProps) {
                     }}
                     style={{ left: `${DOCK_PAD}px` }}
                     data-dragging={draggedSeat() === id ? "" : undefined}
+                    data-temporary-start={firstTemporaryAfterSaved() === id ? "" : undefined}
                   >
                     <Show when={seatFor(id)}>
                       {(seat) => (
@@ -1504,7 +1515,17 @@ export function AgentDock(props: AgentDockProps) {
                       closeChat(false);
                       props.onOpenInMain(refOfKey(id));
                     }}
+                    onOpenTakeover={(takeover) => {
+                      closeChat(false);
+                      const openTakeover = props.answers?.openTakeover;
+                      if (openTakeover) openTakeover(takeover);
+                      else props.onOpenInMain(refOfKey(id));
+                    }}
                     onOpenWindow={openWindowFor(id)}
+                    onOpenThread={
+                      props.onOpenThread ? (threadId) => props.onOpenThread?.(refOfKey(id), threadId) : undefined
+                    }
+                    onNewThread={props.onNewThread ? () => props.onNewThread?.(refOfKey(id)) : undefined}
                     voice={chatVoice(id)}
                     agents={props.agents}
                     onSelectAgent={(agentId) => {

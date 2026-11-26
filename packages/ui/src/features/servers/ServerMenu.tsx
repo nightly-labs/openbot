@@ -9,7 +9,6 @@ import {
   ChevronsUpDown,
   ContextMenu,
   DropdownMenu,
-  Eye,
   Moon,
   MotionTooltip,
   PanelLeft,
@@ -19,6 +18,8 @@ import {
 import { SwapLabel } from "@openbot/ui/components/SwapLabel";
 import { createEffect, createSignal, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { CreditAmount, CreditIcon } from "../credits/CreditIcon";
+import type { CreditsMenu } from "../credits/credits-store";
 import { type ServerActionCallbacks, ServerActionItems } from "./ServerActionItems";
 import {
   ServerPlanBanner,
@@ -30,7 +31,8 @@ import {
 } from "./ServerPlanEnd";
 import {
   addServerLabel,
-  type HiddenLocalServer,
+  type HiddenServer,
+  HiddenServerFolderItem,
   ServerMark,
   ServerSleepDot,
   serverHostedSleep,
@@ -61,9 +63,10 @@ export interface ServerMenuProps extends ServerActionCallbacks {
   addCreatesServer?: boolean | undefined;
   onCreateLocal?: (() => void) | undefined;
   onInstallServer?: (() => void) | undefined;
-  hiddenLocal?: HiddenLocalServer | undefined;
+  hiddenServers?: HiddenServer[] | undefined;
   compact?: boolean;
   rail?: boolean;
+  credits?: CreditsMenu | undefined;
 }
 
 function isContextMenuKey(event: KeyboardEvent): boolean {
@@ -77,6 +80,34 @@ function CheckCircle(props: { checked: boolean }) {
         <Check />
       </Show>
     </span>
+  );
+}
+
+function CreditsCard(props: { label: string; buyLabel: string; balance: number; onOpen: () => void }) {
+  const { t, format } = useText();
+  return (
+    <div class="server-menu-credits-card">
+      <DropdownMenu.Item
+        class="server-menu-credits-line"
+        aria-label={[
+          props.label,
+          t("billing.credits.amount", { count: props.balance, amount: format.number(props.balance) }),
+        ].join(", ")}
+        onSelect={props.onOpen}
+      >
+        <span class="server-menu-credits-label">{props.label}</span>
+        <CreditAmount credits={props.balance} class="ui-menu-trailing server-menu-credit-value" />
+      </DropdownMenu.Item>
+      <div class="server-menu-credits-buy">
+        <CreditIcon class="server-menu-credits-buy-icon" tile />
+        <span class="server-menu-credits-buy-label" aria-hidden="true">
+          {t("billing.credits.buy")}
+        </span>
+        <DropdownMenu.Item class="server-menu-credits-get" aria-label={props.buyLabel} onSelect={props.onOpen}>
+          {t("billing.credits.get")}
+        </DropdownMenu.Item>
+      </div>
+    </div>
   );
 }
 
@@ -96,6 +127,34 @@ export function ServerMenu(props: ServerMenuProps) {
   };
   const planEnds = () => serverPlanEnds(props.servers, props.planDeletesAt);
   const planDeletesAt = (serverId: string) => props.planDeletesAt?.(serverId) ?? null;
+  const credits = () => {
+    const state = props.credits?.state;
+    return state?.available ? state : null;
+  };
+  const walletId = (server: ServerSummary) => (server.kind === "local" ? props.credits?.localServerId : server.id);
+  const serverWallet = (server: ServerSummary) => {
+    const id = walletId(server);
+    return id ? (credits()?.servers.find((wallet) => wallet.serverId === id) ?? null) : null;
+  };
+  function openCredits(serverId: string | null): void {
+    props.credits?.onOpen(serverId);
+  }
+  const creditsCard = () => (
+    <Show when={credits()}>
+      {(state) => (
+        <CreditsCard
+          label={t("billing.credits.yours")}
+          buyLabel={t("billing.credits.buy")}
+          balance={state().balance}
+          onOpen={() => openCredits(null)}
+        />
+      )}
+    </Show>
+  );
+  function changeMenuOpen(open: boolean): void {
+    setMenuOpen(open);
+    if (open) props.credits?.onRefresh();
+  }
   const planCount = () => {
     const first = props.view === "menu" ? planEnds()[0] : undefined;
     return first ? serverPlanDaysLeft(first.deleteAt) : null;
@@ -208,7 +267,7 @@ export function ServerMenu(props: ServerMenuProps) {
     <>
       <DropdownMenu.Root
         open={menuOpen()}
-        onOpenChange={setMenuOpen}
+        onOpenChange={changeMenuOpen}
         placement={rail ? "right-end" : "bottom-start"}
         gutter={rail ? 10 : 6}
       >
@@ -222,25 +281,28 @@ export function ServerMenu(props: ServerMenuProps) {
             <Show
               when={props.view === "menu"}
               fallback={
-                <Show when={props.onOpenSettings ? activeServer() : undefined}>
-                  {(server) => (
-                    <ServerActionItems
-                      menu={DropdownMenu}
-                      server={server()}
-                      trigger={() => trigger ?? null}
-                      onOpenSettings={props.onOpenSettings}
-                      onLeave={props.onLeave}
-                      onDelete={props.onDelete}
-                      canDelete={props.canDelete}
-                      onRestart={props.onRestart}
-                      canRestart={props.canRestart}
-                      onRemove={props.onRemove}
-                      canRemove={props.canRemove}
-                      onHide={props.onHide}
-                      canHide={props.canHide}
-                    />
-                  )}
-                </Show>
+                <>
+                  {creditsCard()}
+                  <Show when={props.onOpenSettings ? activeServer() : undefined}>
+                    {(server) => (
+                      <ServerActionItems
+                        menu={DropdownMenu}
+                        server={server()}
+                        trigger={() => trigger ?? null}
+                        onOpenSettings={props.onOpenSettings}
+                        onLeave={props.onLeave}
+                        onDelete={props.onDelete}
+                        canDelete={props.canDelete}
+                        onRestart={props.onRestart}
+                        canRestart={props.canRestart}
+                        onRemove={props.onRemove}
+                        canRemove={props.canRemove}
+                        onHide={props.onHide}
+                        canHide={props.canHide}
+                      />
+                    )}
+                  </Show>
+                </>
               }
             >
               <Show when={props.onRenewPlan}>
@@ -250,66 +312,77 @@ export function ServerMenu(props: ServerMenuProps) {
                   </For>
                 )}
               </Show>
+              {creditsCard()}
               <div class="ui-menu-label" aria-hidden="true">
                 {t("server.rail.label")}
               </div>
-              <For each={props.servers} keyed={(server) => server.id}>
-                {(server) => (
-                  <DropdownMenu.Sub>
-                    <DropdownMenu.SubTrigger
-                      class="server-menu-row"
-                      aria-label={[
-                        server().name,
-                        ...serverStatusLabels(server(), t),
-                        ...serverPlanStatusLabels(server(), planDeletesAt(server().id), t, format),
-                      ].join(", ")}
-                      aria-current={server().active ? "true" : undefined}
-                      data-cuelume-navigate=""
-                      onClick={() => selectServer(server())}
-                      ref={(row) => selectOnKey(row, server)}
-                    >
-                      <CheckCircle checked={server().active} />
-                      <span class="server-menu-mark" aria-hidden="true">
-                        <ServerMark server={server()} />
-                      </span>
-                      <span class="server-menu-name">{server().name}</span>
-                      <ServerSleepDot server={server()} class="server-menu-sleep" />
-                      <Show when={server().notificationsMuted}>
-                        <BellOff class="server-menu-muted size-3" aria-hidden="true" />
-                      </Show>
-                      <ServerPlanChip server={server()} deleteAt={planDeletesAt(server().id)} />
-                      <ChevronRight class="agent-context-submenu-chevron size-4" aria-hidden="true" />
-                    </DropdownMenu.SubTrigger>
-                    <DropdownMenu.Portal>
-                      <DropdownMenu.SubContent
-                        class="ui-action-menu agent-context-menu"
-                        aria-label={t("server.rail.actions")}
+              <div class="server-menu-list">
+                <For each={props.servers} keyed={(server) => server.id}>
+                  {(server) => (
+                    <DropdownMenu.Sub>
+                      <DropdownMenu.SubTrigger
+                        class="server-menu-row"
+                        aria-label={[
+                          server().name,
+                          ...serverStatusLabels(server(), t),
+                          ...serverPlanStatusLabels(server(), planDeletesAt(server().id), t, format),
+                        ].join(", ")}
+                        aria-current={server().active ? "true" : undefined}
+                        data-cuelume-navigate=""
+                        onClick={() => selectServer(server())}
+                        ref={(row) => selectOnKey(row, server)}
                       >
-                        <div class="ui-menu-label" aria-hidden="true">
-                          {server().name}
-                        </div>
-                        <ServerActionItems
-                          menu={DropdownMenu}
-                          server={server()}
-                          trigger={() => trigger ?? null}
-                          onSetMuted={props.onSetMuted}
-                          onOpenNotificationSettings={props.onOpenNotificationSettings}
-                          onOpenSettings={props.onOpenSettings}
-                          onLeave={props.onLeave}
-                          onDelete={props.onDelete}
-                          canDelete={props.canDelete}
-                          onRestart={props.onRestart}
-                          canRestart={props.canRestart}
-                          onRemove={props.onRemove}
-                          canRemove={props.canRemove}
-                          onHide={props.onHide}
-                          canHide={props.canHide}
-                        />
-                      </DropdownMenu.SubContent>
-                    </DropdownMenu.Portal>
-                  </DropdownMenu.Sub>
-                )}
-              </For>
+                        <CheckCircle checked={server().active} />
+                        <span class="server-menu-mark" aria-hidden="true">
+                          <ServerMark server={server()} />
+                        </span>
+                        <span class="server-menu-name">{server().name}</span>
+                        <ServerSleepDot server={server()} class="server-menu-sleep" />
+                        <Show when={server().notificationsMuted}>
+                          <BellOff class="server-menu-muted size-3" aria-hidden="true" />
+                        </Show>
+                        <ServerPlanChip server={server()} deleteAt={planDeletesAt(server().id)} />
+                        <ChevronRight class="agent-context-submenu-chevron size-4" aria-hidden="true" />
+                      </DropdownMenu.SubTrigger>
+                      <DropdownMenu.Portal>
+                        <DropdownMenu.SubContent
+                          class="ui-action-menu agent-context-menu server-submenu"
+                          aria-label={t("server.rail.actions")}
+                        >
+                          <Show when={serverWallet(server())}>
+                            {(wallet) => (
+                              <CreditsCard
+                                label={t("billing.credits.serversTitle")}
+                                buyLabel={t("billing.credits.buyFor", { name: server().name })}
+                                balance={wallet().balance}
+                                onOpen={() => openCredits(wallet().serverId)}
+                              />
+                            )}
+                          </Show>
+                          <ServerActionItems
+                            menu={DropdownMenu}
+                            server={server()}
+                            trigger={() => trigger ?? null}
+                            onSetMuted={props.onSetMuted}
+                            onOpenNotificationSettings={props.onOpenNotificationSettings}
+                            onOpenSettings={props.onOpenSettings}
+                            onLeave={props.onLeave}
+                            onDelete={props.onDelete}
+                            canDelete={props.canDelete}
+                            onRestart={props.onRestart}
+                            canRestart={props.canRestart}
+                            onRemove={props.onRemove}
+                            canRemove={props.canRemove}
+                            onHide={props.onHide}
+                            canHide={props.canHide}
+                          />
+                        </DropdownMenu.SubContent>
+                      </DropdownMenu.Portal>
+                    </DropdownMenu.Sub>
+                  )}
+                </For>
+                <HiddenServerFolderItem servers={props.hiddenServers ?? []} />
+              </div>
               <Show when={props.onAdd}>
                 <DropdownMenu.Item class="server-menu-add" onSelect={() => props.onAdd?.()}>
                   <span class="server-menu-add-circle" aria-hidden="true">
@@ -335,16 +408,6 @@ export function ServerMenu(props: ServerMenuProps) {
                       <Server />
                     </span>
                     <span>{t("server.install.title")}</span>
-                  </DropdownMenu.Item>
-                )}
-              </Show>
-              <Show when={props.hiddenLocal}>
-                {(hiddenLocal) => (
-                  <DropdownMenu.Item class="server-menu-add" onSelect={() => hiddenLocal().show()}>
-                    <span class="server-menu-add-circle" aria-hidden="true">
-                      <Eye />
-                    </span>
-                    <span>{t("server.rail.showLocal", { name: hiddenLocal().name })}</span>
                   </DropdownMenu.Item>
                 )}
               </Show>

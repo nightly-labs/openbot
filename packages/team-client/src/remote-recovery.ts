@@ -87,6 +87,9 @@ const SAFE_CONNECTION_ERRORS = new Set(
       "error.remote.signalClosed",
       "error.remote.relayUnavailable",
       "error.remote.iceFailed",
+      "error.remote.connectionServiceUnreachable",
+      "error.remote.serverAnswerTimeout",
+      "error.remote.signInConnectionClosed",
       "error.remote.iceDisconnected",
       "error.remote.directoryUnreachable",
       "error.remote.directoryTimeout",
@@ -348,6 +351,19 @@ export function createRemoteConnectionRecovery(
       cancelTimer();
       if (running || !active) refreshRequested = true;
       else startRun();
+    },
+    resetBackoff() {
+      if (disposed || suspended) return;
+      attempt = 0;
+      retryDelay = null;
+      if (retryAt === null) return;
+      if (running) {
+        retryAt = Math.min(retryAt, Date.now() + remoteRetryDelay(0));
+        return;
+      }
+      retryAt = null;
+      cancelTimer();
+      if (active) startRun();
     },
     dispose() {
       disposed = true;

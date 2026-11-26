@@ -21,6 +21,7 @@ const WAIT_MS = 5_000;
 const AGENTS = new Set(["agent-research"]);
 const TITLE_ANSWER = "A red bicycle at dawn";
 const CALLER = "agent-builder";
+const REQUESTER_TIMEZONE = "Europe/Warsaw";
 
 const created = z.object({ workflowId: z.string(), ids: z.record(z.string(), z.string()) });
 const workflowRead = z.object({
@@ -153,7 +154,16 @@ async function call(
   const resolved = resolveDeferredTool(params("tool_call", { name: `openbot.${name}`, arguments: args }), "codex");
   assert.ok(resolved, `tool_call refused openbot.${name}`);
   const response = await runCauseEffect(
-    handleWorkflowTool(resolved.tool, resolved.arguments, workflows, CALLER, callKey, AGENTS, confirmDelete),
+    handleWorkflowTool(
+      resolved.tool,
+      resolved.arguments,
+      workflows,
+      CALLER,
+      callKey,
+      AGENTS,
+      REQUESTER_TIMEZONE,
+      confirmDelete,
+    ),
   );
   assert.ok(response, `no handler for ${name}`);
   const item = response.contentItems[0];
@@ -196,7 +206,7 @@ try {
   const ready = search.tools.filter((tool) => "inputSchema" in tool).map((tool) => tool.name);
   check(
     "a workflow search gives all 6 workflow tools with schemas, and the guidance",
-    ready.filter((name) => name.includes("workflow")).length === 6 &&
+    ready.filter((name) => name.includes("workflow") && !name.endsWith(".workflow_answer")).length === 6 &&
       (search.guidance ?? []).some((text) => text.includes("Fields by kind")),
     search,
   );
@@ -209,7 +219,9 @@ try {
   const canvas = discoverTools(params("tool_search", { query: "create a canvas" }), "claude");
   check(
     "a canvas search gives all 6 workflow tools with schemas",
-    canvas.tools.filter((tool) => tool.name.includes("workflow") && "inputSchema" in tool).length === 6,
+    canvas.tools.filter(
+      (tool) => tool.name.includes("workflow") && !tool.name.endsWith(".workflow_answer") && "inputSchema" in tool,
+    ).length === 6,
     canvas.tools.map((tool) => tool.name),
   );
   const otherReady = ["click canvas", "connect routine agents canvas"].flatMap((query) =>
@@ -254,7 +266,7 @@ try {
   const built = await call("create", "edit_workflow", {
     title: "Morning news",
     ops: [
-      { op: "add", ref: "start", kind: "trigger", fields: { trigger: "manual" } },
+      { op: "add", ref: "start", kind: "trigger", fields: { trigger: "manual", stepName: " Morning start " } },
       {
         op: "add",
         ref: "news",
@@ -280,6 +292,11 @@ try {
   const read = await call("read", "read_workflow", { workflowId });
   const graph = workflowRead.parse(read.value);
   check("read_workflow has the 6 nodes and 4 edges", graph.nodes.length === 6 && graph.edges.length === 4, graph);
+  check(
+    "read_workflow gives the step name, trimmed",
+    graph.nodes.some((node) => node.id === ids.start && node.fields.stepName === "Morning start"),
+    graph,
+  );
   const textBoolean = await call("read-layout-text", "read_workflow", { workflowId, layout: "true" });
   check(
     "tool_call gives a boolean sent as text its type",
@@ -539,19 +556,9 @@ try {
     prTrigger,
   );
   assert.ok(prTrigger);
-  const storedBad = await runCauseEffect(
-    workflows.saveGraph({
-      workflowId: reviewId,
-      baseRevision: reviewDetail.revision,
-      graph: {
-        ...reviewDetail.graph,
-        nodes: reviewDetail.graph.nodes.map((node) =>
-          node.id === prTrigger.id ? { ...node, fields: { ...node.fields, event: "pull_request.opened" } } : node,
-        ),
-      },
-    }),
-  );
-  assert.ok(storedBad.ok);
+  database.connection
+    .prepare("UPDATE workflow_nodes SET fields_json = ? WHERE workflow_id = ? AND node_id = ?")
+    .run(JSON.stringify({ ...prTrigger.fields, event: "pull_request.opened" }), reviewId, prTrigger.id);
   const otherField = await call("event-kept", "edit_workflow", {
     workflowId: reviewId,
     ops: [{ op: "update", node: prTrigger.id, fields: { filters: "notBot" } }],
@@ -614,6 +621,13 @@ try {
       .steps.some((step) => step.nodeId === ids.news && step.kind === "agent" && step.label === "agent-research"),
     runs.value,
   );
+  check(
+    "a run read gives the step name as the label of a named step",
+    runRead
+      .parse(runs.value)
+      .steps.some((step) => step.nodeId === ids.start && step.kind === "trigger" && step.label === "Morning start"),
+    runs.value,
+  );
   const triggerInput = "Shipment 4418: review the packet from the supplier in Poznan.";
   const fromTrigger = await call(
     "run-from-trigger",
@@ -668,6 +682,26 @@ try {
     "an unknown media kind is refused",
     !badMedia.ok && JSON.stringify(badMedia.value).includes("video"),
     badMedia.value,
+  );
+  const badEffort = await call("failure-effort", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "add", kind: "llm", fields: { prompt: "Say hi.", effort: "turbo" } }],
+  });
+  check(
+    "an unknown registry value is refused with the values to use",
+    !badEffort.ok &&
+      JSON.stringify(badEffort.value).includes("Set effort to one of: ") &&
+      JSON.stringify(badEffort.value).includes("high"),
+    badEffort.value,
+  );
+  const badAction = await call("failure-action", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "add", kind: "output", fields: { target: "discord", action: "edit" } }],
+  });
+  check(
+    "an unknown output action is refused",
+    !badAction.ok && JSON.stringify(badAction.value).includes("Set action to one of: "),
+    badAction.value,
   );
   const media = await call("media", "edit_workflow", {
     workflowId,
@@ -780,11 +814,26 @@ try {
     workflowId,
     ops: [{ op: "update", node: ids.start, schedule: { kind: "daily", time: "08:00" } }],
   });
-  const trigger = (await runCauseEffect(workflows.get(workflowId))).graph.nodes.find((node) => node.id === ids.start);
+  const scheduledDetail = await runCauseEffect(workflows.get(workflowId));
+  const trigger = scheduledDetail.graph.nodes.find((node) => node.id === ids.start);
   check(
     "a schedule on a manual trigger makes it a schedule trigger",
     scheduled.ok && trigger?.fields.trigger === "schedule" && JSON.stringify(trigger.schedule).includes("08:00"),
     trigger,
+  );
+  const nextDueAt = scheduledDetail.triggers.find((state) => state.nodeId === ids.start)?.nextDueAt;
+  const requesterClock =
+    nextDueAt &&
+    new Intl.DateTimeFormat("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: REQUESTER_TIMEZONE,
+    }).format(new Date(nextDueAt));
+  check(
+    "a schedule that an agent sets runs at that time in the requester's time zone, not the host's",
+    trigger?.fields.timezone === REQUESTER_TIMEZONE && requesterClock === "08:00",
+    { timezone: trigger?.fields.timezone, nextDueAt },
   );
 
   deleteAnswer = false;
@@ -800,6 +849,34 @@ try {
   check("delete_workflow removes it after the approval", removed.ok && deleteAsked.length === 2, removed.value);
   const gone = await call("failure-missing", "read_workflow", { workflowId });
   check("a deleted workflow reads as a tool failure", !gone.ok, gone.value);
+
+  const untriggered = await call("create-no-trigger", "edit_workflow", {
+    title: "Poster title",
+    ops: [
+      { op: "add", ref: "idea", kind: "prompt", fields: { text: "A bicycle poster for a spring sale." } },
+      { op: "add", ref: "title", kind: "llm", from: "idea", fields: { prompt: "Write a title for this poster." } },
+    ],
+  });
+  check("edit_workflow makes a workflow with no trigger", untriggered.ok, untriggered.value);
+  const plain = created.parse(untriggered.value);
+  const plainRun = await call("run-no-trigger", "run_workflow", { workflowId: plain.workflowId });
+  check("run_workflow runs a workflow with no trigger", plainRun.ok, plainRun.value);
+  const plainRunId = runStarted.parse(plainRun.value).runId;
+  const plainDeadline = Date.now() + WAIT_MS;
+  const plainTitle = async () =>
+    runRead
+      .parse(
+        (await call("runs-no-trigger", "read_workflow_runs", { workflowId: plain.workflowId, runId: plainRunId }))
+          .value,
+      )
+      .steps.find((step) => step.nodeId === plain.ids.title);
+  let titled = await plainTitle();
+  while (titled?.status !== "done") {
+    if (Date.now() > plainDeadline) throw new Error(`The run with no trigger did not end: ${JSON.stringify(titled)}`);
+    await new Promise((done) => setImmediate(done));
+    titled = await plainTitle();
+  }
+  check("each step of a run with no trigger runs", titled.output === TITLE_ANSWER, titled);
 
   report.passed = true;
 } catch (error) {

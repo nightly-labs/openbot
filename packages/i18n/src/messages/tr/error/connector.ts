@@ -9,9 +9,45 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub bu GitHub Uygulamasının İstemci Kimliğini (Client ID) bilmiyor.",
   "error.connector.githubUnexpected": "GitHub beklenmeyen bir yanıt gönderdi: {detail}",
   "error.connector.githubUnreachable": "OpenBot GitHub'a ulaşamıyor: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot GitHub'a ulaşamıyor. OpenBot'u çalıştıran bilgisayarın veya sunucunun internet bağlantısını ve DNS ayarlarını kontrol edin, sonra tekrar deneyin.",
   "error.connector.githubExpired": "GitHub bağlantısının süresi doldu. GitHub'a tekrar bağlanın.",
   "error.connector.githubFileUnreadable": "GitHub bağlantı dosyası okunamıyor.",
   "error.connector.githubFileTooLarge": "GitHub bağlantı dosyası çok büyük.",
+  "error.connector.nearSignIn": "Kripto cüzdanı kullanmak için OpenBot'ta oturum açın.",
+  "error.connector.nearServiceUnavailable": "Kripto cüzdan hizmeti kullanılamıyor. Daha sonra tekrar deneyin.",
+  "error.connector.nearWalletNotFound": "Bu cüzdan bu OpenBot hesabına veya sunucusuna ait değil.",
+  "error.connector.nearWalletLimit": "Bugün çok fazla yeni cüzdan oluşturuldu. Yarın tekrar deneyin.",
+  "error.connector.nearProviderBusy": "NEAR Intents şu anda yanıt vermiyor. Birkaç dakika sonra tekrar deneyin.",
+  "error.connector.nearNoWallet": "Kurulu bir kripto cüzdan yok. Sunucu ayarları > Vault > Kripto bölümünden kurun.",
+  "error.connector.nearWalletExists": "Bir kripto cüzdan zaten kurulu.",
+  "error.connector.nearFrozen":
+    "Kripto cüzdandan ödemeler duraklatıldı. Sunucu ayarları > Vault > Kripto bölümünden sürdürün.",
+  "error.connector.nearAgentNotAllowed":
+    "Bu ajan kripto cüzdandan ödeme yapamaz. Sunucu ayarları > Vault > Kripto bölümünden açın.",
+  "error.connector.nearGrantExpired":
+    "OpenBot'un kripto cüzdan için ödeme izni yok. Sunucu ayarları > Vault > Kripto bölümünden yenileyin.",
+  "error.connector.nearUnknownAsset": "Kripto cüzdanda {asset} varlığı yok.",
+  "error.connector.nearAmountInvalid": "{amount}, geçerli bir {asset} miktarı değil.",
+  "error.connector.nearRecipientInvalid": "{recipient}, bir NEAR hesabı veya chain:address değil.",
+  "error.connector.nearRefused": "NEAR Intents Agent API isteği reddetti: {detail}",
+  "error.connector.nearUnexpected": "NEAR Intents Agent API beklenmeyen bir yanıt gönderdi: {detail}",
+  "error.connector.nearUnreachable": "OpenBot, NEAR Intents Agent API'ye ulaşamıyor: {detail}",
+  "error.connector.nearFileUnreadable": "Kripto cüzdan dosyası okunamıyor.",
+  "error.connector.nearFileTooLarge": "Kripto cüzdan dosyası çok büyük.",
+  "error.connector.nearSigningCanceled": "İmza iptal edildi.",
+  "error.connector.nearSigningExpired": "İmza zamanında gelmedi. Tekrar deneyin.",
+  "error.connector.nearSigningInvalid": "Tarayıcıdan gelen imza geçerli değil.",
+  "error.connector.nearSigningBusy": "Tarayıcıda başka bir imza bekliyor. Önce onu tamamlayın veya iptal edin.",
+  "error.connector.nearPolicyCooldown": "Cüzdan kurallarını {time} itibarıyla yeniden değiştirebilirsiniz.",
+  "error.connector.nearPolicyPending": "Politika değişikliği tamamlanmadı. Birkaç dakika sonra tekrar deneyin.",
+  "error.connector.nearDeclined": "Sahip ödemeyi reddetti.",
+  "error.connector.nearUncertain":
+    "OpenBot ödemenin gönderilip gönderilmediğini bilmiyor. Tekrar ödeme yapmayın. Sahip, cüzdan geçmişini kontrol edebilir.",
+  "error.connector.nearPaymentFailed": "Ödeme başarısız oldu: {detail}",
+  "error.connector.nearPaymentUnknown": "Bu ödeme artık bir yanıt beklemiyor.",
+  "error.connector.nearRuleFull": "Bir ödeme kuralında en fazla {limit} alıcı olabilir.",
+  "error.connector.nearRulesFull": "Cüzdanda en fazla {limit} ödeme kuralı olabilir.",
   "error.connector.onePasswordCliMissing":
     "OpenBot 1Password CLI'yi bulamıyor. Yükleyin ve 1Password uygulamasında entegrasyonunu açın ya da bir hizmet hesabı belirteci kullanın.",
   "error.connector.onePasswordCliInstallFailed":
@@ -31,6 +67,8 @@ export const messages = {
     "1Password çok fazla istek aldı. Birkaç dakika bekleyin, ardından tekrar deneyin.",
   "error.connector.onePasswordNoVault":
     "Hizmet hesabı bir kasayı okuyamıyor. Ona bir kasaya erişim verin, ardından tekrar deneyin.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot, 1Password'deki girişlerinizi okuyamıyor. 1Password bağlantısını kesin, ardından yeniden bağlayın.",
   "error.connector.onePasswordFileUnreadable": "1Password bağlantı dosyası okunamıyor.",
   "error.connector.onePasswordFileTooLarge": "1Password bağlantı dosyası çok büyük.",
   "error.connector.bitwardenFailed":
@@ -43,6 +81,10 @@ export const messages = {
     "Bir HTTPS sunucu adresi, API anahtarının client_id ve client_secret değerlerini ve ana parolayı girin.",
   "error.connector.bitwardenHostFailed":
     "Bu sunucuda Bitwarden açılamadı. Sunucu adresini, API anahtarını ve ana parolayı kontrol edin ve bir klasörün adının Shared with OpenBot olduğundan emin olun. Sonra tekrar bağlanın.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Bu sunucuda Bitwarden'da oturum açılamadı. Sunucu adresini ve API anahtarını kontrol edin, sonra tekrar bağlanın.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Bu sunucuda Bitwarden kilidi açılamadı. Ana parolayı kontrol edin, sonra tekrar bağlanın.",
   "error.connector.bitwardenCliInstallFailed":
     "Bu sunucuya Bitwarden CLI yüklenemedi. Ağ bağlantısını kontrol edin, sonra tekrar bağlanın.",
   "error.connector.bitwardenFileUnreadable": "Bitwarden bağlantı dosyası okunamıyor.",

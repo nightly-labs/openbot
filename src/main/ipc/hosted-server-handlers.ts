@@ -1,4 +1,8 @@
 import {
+  type CustomServerCheckoutRequest,
+  parseCustomServerCheckoutRequest,
+} from "@openbot/contracts/custom-server-plans";
+import {
   type CreateHostedServerInput,
   type DeleteHostedServerInput,
   parseCreateHostedServerInput,
@@ -35,6 +39,9 @@ export function hostedServerIpcHandlers({
         (value) => requireString(value, "serverId", INPUT_LIMITS.identifier),
         (serverId) => runCauseEffect(hostedServers.openCheckout(serverId)),
       ),
+      openCustomCheckout: payloadHandler(parseCustomCheckout, (input) =>
+        runCauseEffect(hostedServers.openCustomCheckout(input)),
+      ),
       delete: payloadHandler(parseDelete, (input) => runCauseEffect(hostedServers.delete(input))),
       wake: payloadHandler(
         (value) => requireString(value, "serverId", INPUT_LIMITS.identifier),
@@ -47,6 +54,12 @@ export function hostedServerIpcHandlers({
       createServerClaim: handler(() => runCauseEffect(hostedServers.createServerClaim())),
     },
   };
+}
+
+function parseCustomCheckout(value: unknown): CustomServerCheckoutRequest {
+  const input = parseCustomServerCheckoutRequest(value);
+  if (!input) throw new Error("Invalid custom server checkout request.");
+  return input;
 }
 
 function parseCreate(value: unknown): CreateHostedServerInput {
