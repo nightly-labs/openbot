@@ -83,6 +83,10 @@ const logger = createOpenBotLogger("provider-runtime");
 
 const extensionModels = new Set<string>();
 
+class PiSetupTimeoutError extends TimeoutError {
+  readonly code = "timeout";
+}
+
 function piSetupRequest(
   rpc: PiRpc,
   provider: "pi" | KeyOnlyProviderId,
@@ -94,7 +98,7 @@ function piSetupRequest(
       if (!(failure.cause instanceof RequestTimeoutError)) return Effect.fail(failure);
       logger.warn("Pi did not answer a request before the turn in time.", { provider, request: failure.cause.method });
       const message = sourceText("error.provider.acpSettingsTimedOut", { provider: agentProviderName(provider) });
-      return Effect.fail(providerFailure(new TimeoutError(message)));
+      return Effect.fail(providerFailure(new PiSetupTimeoutError(message)));
     }),
   );
 }

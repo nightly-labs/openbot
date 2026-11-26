@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { sourceText } from "@openbot/i18n/source";
+import { classifyFailure } from "@openbot/telemetry";
 import { userErrorMessage } from "@openbot/user-errors";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { PiAgentClient } from "../src/backend/pi-client";
@@ -48,6 +49,7 @@ interface Report {
   expected: string;
   error: string | null;
   bannerText: string | null;
+  causeCode: string | null;
   namesRequest: boolean;
   prompts: number;
   silentRequests: string[];
@@ -60,6 +62,7 @@ const report: Report = {
   expected,
   error: null,
   bannerText: null,
+  causeCode: null,
   namesRequest: false,
   prompts: 0,
   silentRequests: [],
@@ -100,6 +103,7 @@ try {
       );
     } catch (cause) {
       report.error = cause instanceof Error ? cause.message : String(cause);
+      report.causeCode = classifyFailure(cause);
     }
   } finally {
     await runCauseEffect(client.stop());
@@ -116,6 +120,7 @@ try {
   report.passed =
     report.error === expected &&
     report.bannerText === expected &&
+    report.causeCode === "timeout" &&
     !report.namesRequest &&
     report.prompts === 0 &&
     report.silentRequests.includes("set_model");
