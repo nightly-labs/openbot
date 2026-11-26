@@ -34,8 +34,15 @@ import { checkoutTax } from "./billing-tax";
 import { creditActivity } from "./credit-activity";
 import { CreditAudit, creditAuditCode } from "./credit-audit";
 import { type CreditCodeAttempt, redeemCreditCode } from "./credit-codes";
-import { consumeGrantsSql, creditExpiring, expiringGrantsSql, moveGrantsSql } from "./credit-grants";
-import { availableTenthsSql, overdueGrantTenthsSql } from "./credit-spending";
+import {
+  CreditGrants,
+  consumeGrantsSql,
+  creditExpiring,
+  expiringGrantsSql,
+  moveGrantsSql,
+  welcomeTenthsSql,
+} from "./credit-grants";
+import { availableTenthsSql, overdueGrantTenthsSql, paidTenthsSql } from "./credit-spending";
 import {
   EARLY_START_METADATA,
   isBillingCurrency,
@@ -51,7 +58,7 @@ const PRICE_TTL_MS = 5 * 60 * 1_000;
 const priceCache = new Map<string, { expiresAt: number; prices: ReadonlyMap<string, StripePrice> }>();
 const SERVER_ROLES: readonly CreditServerRole[] = ["owner", "admin", "member"];
 function movedGrantsSql(nowParam: string): string {
-  return `SELECT ?1 AS user_id, ?2 AS server_id, ?3 AS tenths, ${nowParam} AS created_at
+  return `SELECT ?1 AS user_id, ?2 AS server_id, 'paid' AS funding, ?3 AS tenths, ${nowParam} AS created_at
     WHERE EXISTS (SELECT 1 FROM credit_ledger WHERE entry_id = ?4)`;
 }
 function ownedServerSql(serverParam: string, userParam: string): string {
@@ -94,6 +101,7 @@ interface ServerRow {
 
 interface WalletRow {
   balance_tenths: number;
+  welcome_tenths: number;
   expiring_tenths: number;
   expiring_at: number | null;
 }
@@ -201,11 +209,16 @@ export class CreditService {
         }),
     );
     const currency = locked ?? (currencies.includes("eur") ? "eur" : (currencies[0] ?? "eur"));
+    yield* new CreditGrants({ database: this.#database, now: this.#now, analytics: this.#analytics })
+      .welcome(userId)
+      .pipe(Effect.orElseSucceed(() => false));
     const now = this.#now();
     const personal = yield* billingCall(() =>
       this.#database
         .prepare(
-          `SELECT ${availableTenthsSql("user_id", "?1")} AS balance_tenths, ${expiringGrantsSql("user_id", "?1", "?2")}`,
+          `SELECT ${availableTenthsSql("user_id", "?1")} AS balance_tenths,
+                  ${welcomeTenthsSql("user_id", "?1")} AS welcome_tenths,
+                  ${expiringGrantsSql("user_id", "?1", "?2")}`,
         )
         .bind(userId, now)
         .first<WalletRow>(),
@@ -247,6 +260,8 @@ export class CreditService {
     };
     const expiring = personal ? creditExpiring(personal, balanceTenths) : null;
     if (expiring) state.expiring = expiring;
+    const welcomeTenths = Math.min(balanceTenths, Math.max(0, personal?.welcome_tenths ?? 0));
+    if (welcomeTenths > 0) state.welcome = creditsFromTenths(welcomeTenths);
     return state;
   }).bind(this);
 
@@ -374,7 +389,7 @@ export class CreditService {
                entry_id, user_id, server_id, amount_tenths, kind, actor_user_id, reference, created_at
              )
              SELECT ?1, ?2, ?3, ?4, 'transfer', ?5, ?6, ?7
-              WHERE ${availableTenthsSql(sourceColumn, "?8")} - ${overdueGrantTenthsSql(sourceColumn, "?8", "?7")} >= ?9
+              WHERE ${paidTenthsSql(sourceColumn, "?8")} - ${overdueGrantTenthsSql(sourceColumn, "?8", "?7")} >= ?9
                 AND ${ownedServerSql("?10", "?5")}`,
           )
           .bind(
@@ -512,7 +527,7 @@ export class CreditService {
              entry_id, user_id, server_id, amount_tenths, kind, actor_user_id, reference, created_at
            )
            SELECT ?1, ?2, ?3, -MIN(?4, balance), 'reversal', NULL, ?5, ?6
-             FROM (SELECT ${availableTenthsSql(column, "?7")} AS balance)
+             FROM (SELECT ${paidTenthsSql(column, "?7")} AS balance)
             WHERE balance > 0 AND ?4 > 0
               AND (?2 IS NULL OR EXISTS (SELECT 1 FROM users WHERE id = ?2))
            RETURNING amount_tenths`,

@@ -343,6 +343,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:crm-team-api
 
+      - name: Run the account activity reporter E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:account-activity-reporter
+
       - name: Run the release version comparator E2E test
         if: ${{ !cancelled() }}
         run: bun scripts/release-version-comparator-e2e.ts
@@ -768,6 +772,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:credit-media-workflow
 
+      - name: Run the credit media agent tools E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:credit-media-agent-tools
+
+      - name: Run the credit media analytics E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:credit-media-analytics
+
       - name: Run the workflow paid media E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-paid-media
@@ -997,6 +1009,8 @@ jobs:
             .openbot-build/antigravity-verification-link-e2e/
             .openbot-build/workflow-model-steps-e2e/
             .openbot-build/credit-media-workflow-e2e/
+            .openbot-build/credit-media-agent-tools-e2e/
+            .openbot-build/credit-media-analytics-e2e/
             .openbot-build/workflow-paid-media-e2e/
             .openbot-build/credit-media-payer-switch-e2e/
             .openbot-build/workflow-discord-e2e/

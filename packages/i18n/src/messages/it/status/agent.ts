@@ -14,6 +14,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} non ha più crediti. Passaggio a {model}. Per usarlo di nuovo, aggiungi crediti e poi selezionalo.",
   "status.agent.modelReturnedAfterError": "Tornato a {model} dopo l’errore del provider.",
+  "status.agent.modelSwitchedForRemovedModel": "{previous} non è più disponibile. Passato a {model}.",
   "status.agent.marketplaceSuggested": "Ha suggerito un'app del Marketplace: {app}.",
   "status.agent.settingShown": "Ha mostrato un'impostazione: {setting}.",
   "status.agent.channelMemberAdded": "{agent} ha aggiunto {member} al canale. Lo ha chiesto {person}.",
@@ -28,6 +29,12 @@ export const messages = {
     "Acquisizione dello schermo principale e invio dell'immagine al modello dell'agente.",
   "status.agent.screenCaptureChannel":
     "L'immagine appare nel canale {channel} e ogni membro di questo server che legge il canale può vederla.",
+  "status.agent.creditImageApproval": "Genera un’immagine con {model}. Costa {credits} crediti.",
+  "status.agent.creditVideoApproval": "Genera un video con {model}. Costa {credits} crediti.",
+  "status.agent.creditMediaChannel":
+    "Il risultato appare nel canale {channel} e ogni membro di questo server che legge il canale può vederlo.",
+  "status.agent.creditsHoldBalance": "Usa {credits} crediti e il saldo è di {balance} crediti.",
+  "status.agent.creditsHoldAgentsOff": "Gli agenti di questo server non possono usare i crediti.",
   "status.agent.screenCapturePermissionNext":
     "Poi macOS può chiederti di consentire a OpenBot la registrazione dello schermo.",
   "status.agent.screenCaptureDisplay":
@@ -66,6 +73,19 @@ export const messages = {
   "status.agent.workflowDelete":
     "Elimina il flusso di lavoro {title} con le sue esecuzioni e versioni. I suoi passaggi aperti si fermano.",
   "status.agent.deleteAgents": "Elimina {agents} con le loro chat e i loro file. Non puoi annullare l'operazione.",
+  "status.agent.nearSignatureReceived": "OpenBot ha ricevuto la firma. Puoi chiudere questa scheda.",
+  "status.agent.nearSignatureUnknown": "OpenBot non sta aspettando questa firma. Avviala di nuovo in OpenBot.",
+  "status.agent.nearPayment": "Pagamento di {amount} {symbol} a {recipient} dal wallet crypto, per {domain}: {reason}",
+  "status.agent.nearSummaryCreate":
+    "Tutti gli agenti possono pagare fino a {amount} USD al giorno. Puoi cambiarlo in seguito in OpenBot.",
+  "status.agent.nearSummaryGrant":
+    "Consenti a questa app OpenBot di pagare dal wallet per {days} giorni, entro le tue regole.",
+  "status.agent.nearSummaryBudget": "Imposta il budget giornaliero del wallet a {amount} USD.",
+  "status.agent.nearSummaryAutoPay":
+    "Consenti a OpenBot di pagare senza la tua firma quando una regola di pagamento lo permette. Per gli altri pagamenti ti viene comunque chiesto in chat.",
+  "status.agent.nearSummaryPayment": "Approva il pagamento di {amount} a {recipient}.",
+  "status.agent.nearSummaryFreeze": "Gli agenti non possono pagare da questo wallet finché non riprendi i pagamenti.",
+  "status.agent.nearSummaryUnfreeze": "Gli agenti possono di nuovo pagare da questo wallet, entro le tue regole.",
   "status.agent.screenCaptureProgress": "Richiesta di acquisizione dello schermo…",
   "status.agent.screenCaptureReviewing": "Analisi dell'acquisizione dello schermo…",
   "status.agent.browserOpening": "Apertura di una pagina web…",
@@ -73,6 +93,7 @@ export const messages = {
   "status.agent.browserClicking": "Clic sulla pagina web…",
   "status.agent.browserTyping": "Digitazione nella pagina web…",
   "status.agent.browserActing": "Uso della pagina web…",
+  "status.agent.browserPaying": "Invio del pagamento…",
   "status.agent.browserReviewing": "Analisi della pagina web…",
   "status.agent.memoriesSearching": "Ricerca nelle sue memorie…",
   "status.agent.chatsSearching": "Ricerca nelle sue chat precedenti…",
@@ -117,16 +138,18 @@ export const messages = {
     "Memorie: {saved} salvate, {updated} aggiornate, {forgotten} dimenticate, {notChanged} non modificate perché un altro thread le ha modificate prima.",
   "status.agent.mcpToolCall": "Eseguire lo strumento {tool} del server MCP {name}.",
   "status.agent.uiBlockClosedByMessage": "Chiuso da un nuovo messaggio",
-  "status.agent.nextStepContinues":
-    "L'agente si è fermato prima del passaggio successivo. Continua ({current} di {limit}).",
-  "status.agent.planContinues": "Il piano ha passaggi aperti. L'agente continua ({current} di {limit}).",
-  "status.agent.planStopped": "L'agente si è fermato con passaggi aperti nel piano. Invia un messaggio per continuare.",
-  "status.agent.compactionContinues":
-    "La connessione si è interrotta mentre l'agente compattava il contesto. L'agente continua.",
-  "status.agent.providerExitContinues": "L'agente si è fermato prima di finire la risposta. L'agente continua.",
-  "status.agent.branchTitle": "Chat ramificata",
   "status.agent.location.field": "La tua posizione",
   "status.agent.location.placeholder": "Città, indirizzo o luogo",
   "status.agent.location.submit": "Condividi",
   "status.agent.location.shared": "Posizione condivisa",
+  "status.agent.nextStepContinues":
+    "L'agente si è fermato prima del passaggio successivo. Continua ({current} di {limit}).",
+  "status.agent.planContinues": "Il piano ha passaggi aperti. L'agente continua ({current} di {limit}).",
+  "status.agent.planStopped": "L'agente si è fermato con passaggi aperti nel piano. Invia un messaggio per continuare.",
+  "status.agent.continuationLimitReached":
+    "L'agente si è fermato prima di finire la richiesta. Non può più continuare da solo. Invia un messaggio per continuare.",
+  "status.agent.compactionContinues":
+    "La connessione si è interrotta mentre l'agente compattava il contesto. L'agente continua.",
+  "status.agent.providerExitContinues": "L'agente si è fermato prima di finire la risposta. L'agente continua.",
+  "status.agent.branchTitle": "Chat ramificata",
 } as const satisfies PartialTranslation<typeof source>;

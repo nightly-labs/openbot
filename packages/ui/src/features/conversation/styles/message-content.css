@@ -684,16 +684,21 @@
 .message-entry-agent
   .ui-bubble:has(
     .message-content-blocks :is(.message-data-table-scroll, .message-markdown-table-scroll, .message-markdown-image)
-  )
+  ) {
+  --message-wide-block-contain: inline-size;
+}
+
+.message-entry-agent
+  .ui-bubble
   :is(
     .message-content-blocks
       > :not(.message-markdown, .message-data-table-frame, .message-table-frame, .message-show-full),
     .message-markdown > :not(.message-table-frame, :has(.message-markdown-image, .message-table-frame)),
     .message-markdown
-      :has(.message-table-frame)
+      [data-holds-table]
       > :not(.message-table-frame, :has(.message-markdown-image, .message-table-frame))
   ) {
-  contain: inline-size;
+  contain: var(--message-wide-block-contain, none);
 }
 
 .message-entry-agent

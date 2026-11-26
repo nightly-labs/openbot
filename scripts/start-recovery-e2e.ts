@@ -100,12 +100,18 @@ function removeNewerSchemaRow(): void {
   } catch {}
 }
 
-function startStack(run: number, mode: RunReport["mode"]): { child: ChildProcess; exit: Promise<number | null> } {
+function startStack(
+  run: number,
+  mode: RunReport["mode"],
+  rendererStop: "first-load" | "recovery" | null = null,
+): { child: ChildProcess; exit: Promise<number | null> } {
   const logFile = openSync(join(OUT, `run-${run}.log`), "w");
   const env: NodeJS.ProcessEnv = { ...process.env, OPENBOT_DEV_INSTANCE_ID: instanceId };
   delete env.ELECTRON_RUN_AS_NODE;
   if (mode === "none") delete env.OPENBOT_E2E_FORCE_START_FAILURE;
   else env.OPENBOT_E2E_FORCE_START_FAILURE = mode;
+  if (rendererStop) env.OPENBOT_E2E_STOP_RENDERER = rendererStop;
+  else delete env.OPENBOT_E2E_STOP_RENDERER;
   const child = spawn("bun", ["run", "dev"], { cwd: ROOT, env, stdio: ["ignore", logFile, logFile] });
   const exit = new Promise<number | null>((done) => child.once("exit", (code) => done(code)));
   void exit.then(() => closeSync(logFile));
@@ -157,6 +163,7 @@ let recovery: {
   latestScreenshot: string;
 } | null = null;
 let newerData: string | null = null;
+let rendererStop: { firstLoadRetry: string; recoveryDialog: string } | null = null;
 let passed = false;
 let error: string | undefined;
 const stack: { running: ReturnType<typeof startStack> | null } = { running: null };
@@ -334,6 +341,62 @@ try {
     "0",
     "the test removed its schema row",
   );
+
+  const logLine = (run: number, text: string) =>
+    readFileSync(join(OUT, `run-${run}.log`), "utf8")
+      .split("\n")
+      .find((line) => line.includes(text)) ?? null;
+
+  editAttempts((record) => ({
+    ...record,
+    consecutiveFailures: 0,
+    lastFailure: null,
+    loopVersion: null,
+    attempt: null,
+  }));
+  const firstLoadStartedAt = Date.now();
+  stack.running = startStack(8, "none", "first-load");
+  await waitFor("run 8 records its attempt", () => startedAfter(firstLoadStartedAt));
+  const firstLoad = await waitFor("run 8 finishes its start after its first renderer stopped", () => {
+    const attempts = readAttempts();
+    return attempts && attempts.attempt === null ? attempts : null;
+  });
+  assert.equal(firstLoad.consecutiveFailures, 0, "a start that loads on the second try is not a failure");
+  assert.ok(logLine(8, "The main window renderer stopped."), "the log records the renderer exit");
+  const firstLoadRetry = logLine(8, "The main window did not load (attempt 1 of 3). Loading it again.");
+  assert.ok(firstLoadRetry, "the first load is tried again");
+  stopStack();
+  runs.push({ run: 8, mode: "none", exitCode: await stack.running.exit, attemptsAfter: readAttempts() });
+  stack.running = null;
+
+  editAttempts((record) => ({
+    ...record,
+    consecutiveFailures: 3,
+    lastFailure: "error",
+    loopVersion: record.appVersion,
+    attempt: null,
+  }));
+  const dialogStartedAt = Date.now();
+  stack.running = startStack(9, "none", "recovery");
+  const dialogBegun = await waitFor("run 9 records its attempt", () => startedAfter(dialogStartedAt));
+  assert.equal(dialogBegun.consecutiveFailures, 3, "run 9 starts in the start loop");
+  const recoveryDialog = await waitFor(
+    "the recovery dialog replaces the recovery window that cannot show",
+    () => logLine(9, "Showing the recovery dialog."),
+    60_000,
+  );
+  assert.equal(readAttempts()?.attempt?.state, "starting", "the start waits for the choice in the dialog");
+  rendererStop = { firstLoadRetry, recoveryDialog };
+  stopStack();
+  runs.push({ run: 9, mode: "none", exitCode: await stack.running.exit, attemptsAfter: readAttempts() });
+  stack.running = null;
+  editAttempts((record) => ({
+    ...record,
+    consecutiveFailures: 0,
+    lastFailure: null,
+    loopVersion: null,
+    attempt: null,
+  }));
   passed = true;
 } catch (cause) {
   error = cause instanceof Error ? cause.message : String(cause);
@@ -346,7 +409,17 @@ try {
   writeFileSync(
     join(OUT, "report.json"),
     `${JSON.stringify(
-      { passed, appVersion, schemaVersion: LATEST_SCHEMA_VERSION, instanceId, runs, recovery, newerData, error },
+      {
+        passed,
+        appVersion,
+        schemaVersion: LATEST_SCHEMA_VERSION,
+        instanceId,
+        runs,
+        recovery,
+        newerData,
+        rendererStop,
+        error,
+      },
       null,
       2,
     )}\n`,

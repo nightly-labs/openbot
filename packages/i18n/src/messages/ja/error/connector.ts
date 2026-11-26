@@ -14,6 +14,42 @@ export const messages = {
   "error.connector.githubExpired": "GitHub の接続の有効期限が切れました。もう一度 GitHub に接続してください。",
   "error.connector.githubFileUnreadable": "GitHub の接続ファイルを読み取れません。",
   "error.connector.githubFileTooLarge": "GitHub の接続ファイルが大きすぎます。",
+  "error.connector.nearSignIn": "暗号資産ウォレットを使うには OpenBot にサインインしてください。",
+  "error.connector.nearServiceUnavailable":
+    "暗号資産ウォレットのサービスを利用できません。しばらくしてからもう一度お試しください。",
+  "error.connector.nearWalletNotFound": "このウォレットは、この OpenBot アカウントまたはサーバーのものではありません。",
+  "error.connector.nearWalletLimit": "今日作成された新しいウォレットが多すぎます。明日もう一度お試しください。",
+  "error.connector.nearProviderBusy": "NEAR Intents が現在応答しません。数分後にもう一度お試しください。",
+  "error.connector.nearNoWallet":
+    "暗号資産ウォレットが設定されていません。サーバー設定 > Vault > 暗号資産 で設定してください。",
+  "error.connector.nearWalletExists": "暗号資産ウォレットはすでに設定されています。",
+  "error.connector.nearFrozen":
+    "暗号資産ウォレットからの支払いは一時停止中です。サーバー設定 > Vault > 暗号資産 で再開してください。",
+  "error.connector.nearAgentNotAllowed":
+    "このエージェントは暗号資産ウォレットから支払えません。サーバー設定 > Vault > 暗号資産 でオンにしてください。",
+  "error.connector.nearGrantExpired":
+    "OpenBot には暗号資産ウォレットの支払い許可がありません。サーバー設定 > Vault > 暗号資産 で更新してください。",
+  "error.connector.nearUnknownAsset": "暗号資産ウォレットに資産 {asset} はありません。",
+  "error.connector.nearAmountInvalid": "{amount} は {asset} の有効な金額ではありません。",
+  "error.connector.nearRecipientInvalid": "{recipient} は NEAR アカウントでも chain:address でもありません。",
+  "error.connector.nearRefused": "NEAR Intents Agent API がリクエストを拒否しました: {detail}",
+  "error.connector.nearUnexpected": "NEAR Intents Agent API から予期しない応答がありました: {detail}",
+  "error.connector.nearUnreachable": "OpenBot は NEAR Intents Agent API に接続できません: {detail}",
+  "error.connector.nearFileUnreadable": "暗号資産ウォレットのファイルを読み取れません。",
+  "error.connector.nearFileTooLarge": "暗号資産ウォレットのファイルが大きすぎます。",
+  "error.connector.nearSigningCanceled": "署名はキャンセルされました。",
+  "error.connector.nearSigningExpired": "署名が時間内に届きませんでした。もう一度お試しください。",
+  "error.connector.nearSigningInvalid": "ブラウザーからの署名が無効です。",
+  "error.connector.nearSigningBusy": "別の署名がブラウザーで待機中です。先にそれを完了するか、キャンセルしてください。",
+  "error.connector.nearPolicyCooldown": "ウォレットのルールは {time} 以降にもう一度変更できます。",
+  "error.connector.nearPolicyPending": "ポリシーの変更が完了しませんでした。数分後にもう一度お試しください。",
+  "error.connector.nearDeclined": "オーナーが支払いを拒否しました。",
+  "error.connector.nearUncertain":
+    "OpenBot は支払いが送信されたかどうかを確認できません。もう一度支払わないでください。オーナーはウォレットの履歴を確認できます。",
+  "error.connector.nearPaymentFailed": "支払いに失敗しました: {detail}",
+  "error.connector.nearPaymentUnknown": "この支払いはもう応答を待っていません。",
+  "error.connector.nearRuleFull": "1 つの支払いルールに設定できる受取人は最大 {limit} 件です。",
+  "error.connector.nearRulesFull": "ウォレットに設定できる支払いルールは最大 {limit} 件です。",
   "error.connector.onePasswordCliMissing":
     "OpenBot は 1Password CLI を見つけられません。インストールして 1Password アプリで連携をオンにするか、サービスアカウントのトークンを使用してください。",
   "error.connector.onePasswordCliInstallFailed":

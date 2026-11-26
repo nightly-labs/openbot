@@ -33,6 +33,7 @@ export const messages = {
   "error.voice.live.timedOut": "A voz ao vivo do Codex não começou a tempo. Tente novamente.",
   "error.voice.live.failed": "A voz ao vivo parou: {reason}",
   "error.voice.live.disconnected": "A voz ao vivo foi desligada.",
+  "error.voice.live.connectionLost": "A voz ao vivo perdeu a conexão. Ative o microfone para iniciá-la de novo.",
   "error.voice.live.startFailed":
     "Não foi possível iniciar a voz ao vivo. Atualize o Codex e entre com o ChatGPT no computador que executa o agente, e tente novamente. Motivo: {reason}",
   "error.voice.live.hostFailed":

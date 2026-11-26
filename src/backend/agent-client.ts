@@ -14,6 +14,15 @@ import type { ReadProviderHistory } from "./provider-history";
 
 export type AgentProvider = AgentProviderId;
 
+export const CLAUDE_CONTEXT_COMPACTION = "native";
+export const CUSTOM_ACP_CONTEXT_COMPACTION = "unsupported";
+
+export function fixedContextCompaction(provider: AgentProvider): AgentClient["contextCompaction"] {
+  if (provider === "claude") return CLAUDE_CONTEXT_COMPACTION;
+  if (provider === "acp") return CUSTOM_ACP_CONTEXT_COMPACTION;
+  return undefined;
+}
+
 export interface DiagnosticOrigin {
   readonly duringStop: boolean;
   readonly stderr?: boolean;

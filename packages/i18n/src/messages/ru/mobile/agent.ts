@@ -407,11 +407,12 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Убрать {model}",
   "mobile.agent.backupModels.unavailable": "Сейчас недоступна · пропущена",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Если лимит использования остановит {name} после начала работы, {name} продолжит ту же работу на первой доступной модели из списка. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
   "mobile.agent.busyMessage.label": "Во время работы",
   "mobile.agent.busyMessage.footer":
-    "Что происходит с сообщением, которое вы отправляете во время работы агента. «Очередь» хранит его до конца хода. «Направлять» передаёт его агенту во время хода.",
+    "Что происходит с сообщением от вас или другого агента, которое приходит во время работы агента. «Очередь» хранит его до конца хода. «Направлять» передаёт его агенту во время хода.",
   "mobile.agent.busyMessage.queue": "Очередь",
   "mobile.agent.busyMessage.steer": "Направлять",
   "mobile.agent.busyMessage.hostDefaultQueue": "Очередь (по умолчанию на хосте)",
@@ -761,6 +762,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Не исключать",
   "mobile.agent.folders.browseTitle": "Выбор папки",
   "mobile.agent.folders.places": "Перейти",
+  "mobile.agent.folders.path": "Путь к папке",
   "mobile.agent.folders.home": "Домашняя папка",
   "mobile.agent.folders.parent": "Вверх: {folder}",
   "mobile.agent.folders.browseFailed": "Не удалось открыть эту папку.",

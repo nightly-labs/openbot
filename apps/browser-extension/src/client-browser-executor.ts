@@ -12,6 +12,9 @@ import type { AskKind } from "./client-browser-messages";
 const ATTACH_IDLE_MS = 30_000;
 const LOAD_WAIT_MS = 15_000;
 const SCREENSHOT_WAIT_MS = 15_000;
+const SEND_WAIT_MS = 20_000;
+const TAB_NOT_ANSWERING =
+  "The tab did not answer in time, so OpenBot stopped this action. The action may have happened: read the page before you try again.";
 const SNAPSHOT_TEXT = 40_000;
 const SNAPSHOT_ELEMENTS = 400;
 
@@ -83,12 +86,33 @@ function errorText(error: unknown): string {
 
 type ProtocolParams = chrome.debugger.Params;
 
-async function send(tabId: number, method: string, params?: ProtocolParams): Promise<DynamicRecord> {
+class TabNotAnswering extends BrowserCommandError {}
+
+async function letGo(tabId: number): Promise<void> {
+  forget(tabId);
+  await chrome.debugger.detach({ tabId }).catch(() => undefined);
+}
+
+async function send(
+  tabId: number,
+  method: string,
+  params?: ProtocolParams,
+  waitMs = SEND_WAIT_MS,
+): Promise<DynamicRecord> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const silent = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new TabNotAnswering("failed", TAB_NOT_ANSWERING)), waitMs);
+  });
   let answer: unknown;
   try {
-    answer = await chrome.debugger.sendCommand({ tabId }, method, params);
+    answer = await Promise.race([chrome.debugger.sendCommand({ tabId }, method, params), silent]);
   } catch (error) {
-    throw new BrowserCommandError("failed", `${method} failed: ${errorText(error)}`);
+    if (!(error instanceof TabNotAnswering))
+      throw new BrowserCommandError("failed", `${method} failed: ${errorText(error)}`);
+    await letGo(tabId);
+    throw error;
+  } finally {
+    clearTimeout(timer);
   }
   return isDynamicRecord(answer) ? answer : {};
 }
@@ -113,7 +137,9 @@ async function attach(tabId: number): Promise<Attached> {
 type OverlayInput = Parameters<typeof pageOverlay>[0];
 
 async function overlay(tabId: number, input: OverlayInput): Promise<void> {
-  await inPage(tabId, pageOverlay, input).catch(() => undefined);
+  await inPage(tabId, pageOverlay, input).catch((error: unknown) => {
+    if (error instanceof TabNotAnswering) throw error;
+  });
 }
 
 function release(tabId: number): void {
@@ -124,9 +150,8 @@ function release(tabId: number): void {
 }
 
 async function detach(tabId: number): Promise<void> {
-  if (attached.has(tabId)) await overlay(tabId, { step: "remove", label: "", x: 0, y: 0 });
-  forget(tabId);
-  await chrome.debugger.detach({ tabId }).catch(() => undefined);
+  if (attached.has(tabId)) await overlay(tabId, { step: "remove", label: "", x: 0, y: 0 }).catch(() => undefined);
+  await letGo(tabId);
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -153,7 +178,10 @@ async function inPage<I>(tabId: number, script: (input: I) => object, input: I):
       returnByValue: true,
       awaitPromise: true,
     });
-  const answer = await evaluate(false).catch(() => evaluate(true));
+  const answer = await evaluate(false).catch((error: unknown) => {
+    if (error instanceof TabNotAnswering) throw error;
+    return evaluate(true);
+  });
   if (isDynamicRecord(answer.exceptionDetails)) {
     const detail = isString(answer.exceptionDetails.text) ? answer.exceptionDetails.text : "";
     throw new BrowserCommandError("failed", `The page script failed. ${detail}`.trim());
@@ -335,7 +363,7 @@ async function screenshot(id: number, tab: chrome.tabs.Tab): Promise<ClientBrows
   try {
     return await capture(id, size);
   } finally {
-    await overlay(id, { step: "show", label: workingLabel, x: 0, y: 0 });
+    await overlay(id, { step: "show", label: workingLabel, x: 0, y: 0 }).catch(() => undefined);
   }
 }
 
@@ -357,12 +385,10 @@ async function capture(
             quality: step.quality,
             clip: { x: size.x, y: size.y, width: size.width, height: size.height, scale: step.scale },
           };
-    const answer = await Promise.race([
-      send(id, "Page.captureScreenshot", params),
-      sleep(SCREENSHOT_WAIT_MS).then(() => {
-        throw new BrowserCommandError("failed", "The tab did not paint. Ask the person to show the tab.");
-      }),
-    ]);
+    const answer = await send(id, "Page.captureScreenshot", params, SCREENSHOT_WAIT_MS).catch((error: unknown) => {
+      if (!(error instanceof TabNotAnswering)) throw error;
+      throw new BrowserCommandError("failed", "The tab did not paint. Ask the person to show the tab.");
+    });
     const data = isString(answer.data) ? answer.data : "";
     if (data && data.length <= CLIENT_BROWSER_LIMITS.image) {
       const scaled = step.scale === 1 ? "" : `, scaled to ${Math.round(step.scale * 100)} %`;
@@ -524,7 +550,12 @@ async function focusInClosedShadow(tabId: number): Promise<boolean> {
   });
   const objectId = isDynamicRecord(focused.result) ? focused.result.objectId : null;
   if (!isString(objectId)) return false;
-  const described = await send(tabId, "DOM.describeNode", { objectId, depth: 1, pierce: true }).catch(() => null);
+  const described = await send(tabId, "DOM.describeNode", { objectId, depth: 1, pierce: true }).catch(
+    (error: unknown) => {
+      if (error instanceof TabNotAnswering) throw error;
+      return null;
+    },
+  );
   const roots = described && isDynamicRecord(described.node) ? described.node.shadowRoots : null;
   return Array.isArray(roots) && roots.some((root) => isDynamicRecord(root) && root.shadowRootType === "closed");
 }

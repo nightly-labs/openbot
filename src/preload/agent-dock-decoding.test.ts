@@ -6,6 +6,7 @@ import {
   type AgentDockPresentation,
   type AgentDockPrompt,
   type AgentDockTakeover,
+  type AgentDockThreadChoices,
   type AgentDockUsageLimit,
 } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
@@ -181,6 +182,62 @@ describe("agent dock decoding", () => {
     expect(() => decodeAgentDockPresentation({ ...PRESENTATION, display: { kind: "each" } })).toThrow(
       "Invalid agent dock presentation.",
     );
+  });
+
+  it("accepts the thread that an agent chat shows and rejects a thread without a title", () => {
+    const [agentChat, ...others] = PRESENTATION.chats;
+    if (!agentChat) throw new Error("The presentation has no agent chat.");
+    const thread = { taskId: "task-1", title: "Launch checklist" };
+    const shown: AgentDockPresentation = { ...PRESENTATION, chats: [{ ...agentChat, thread }, ...others] };
+    expect(decodeAgentDockPresentation(shown)).toEqual(shown);
+    const untitled = [{ ...agentChat, thread: { ...thread, title: "" } }, ...others];
+    expect(() => decodeAgentDockPresentation({ ...PRESENTATION, chats: untitled })).toThrow(
+      "Invalid agent dock presentation.",
+    );
+    const long = [
+      { ...agentChat, thread: { ...thread, title: "a".repeat(INPUT_LIMITS.agentTaskTitle + 1) } },
+      ...others,
+    ];
+    expect(() => decodeAgentDockPresentation({ ...PRESENTATION, chats: long })).toThrow(
+      "Invalid agent dock presentation.",
+    );
+  });
+
+  it("accepts the chats that an agent chat can change to and rejects an unknown thread state", () => {
+    const [agentChat, ...others] = PRESENTATION.chats;
+    if (!agentChat) throw new Error("The presentation has no agent chat.");
+    const threads = {
+      activeId: "draft",
+      threads: [
+        {
+          id: "task-1",
+          title: "Launch checklist",
+          updatedAt: "2026-11-25T10:00:00.000Z",
+          status: { kind: "working" },
+          unread: 0,
+        },
+        {
+          id: "task-2",
+          title: "Pricing page copy",
+          updatedAt: "2026-11-25T09:00:00.000Z",
+          status: { kind: "waiting", reason: "question" },
+          unread: 2,
+        },
+      ],
+    } satisfies AgentDockThreadChoices;
+    const shown: AgentDockPresentation = { ...PRESENTATION, chats: [{ ...agentChat, threads }, ...others] };
+    expect(decodeAgentDockPresentation(shown)).toEqual(shown);
+    const unknown = { ...threads, threads: [{ ...threads.threads[0], status: { kind: "sleeping" } }] };
+    expect(() =>
+      decodeAgentDockPresentation({ ...PRESENTATION, chats: [{ ...agentChat, threads: unknown }, ...others] }),
+    ).toThrow("Invalid agent dock presentation.");
+    const many = {
+      ...threads,
+      threads: Array.from({ length: AGENT_DOCK_LIMITS.threads + 1 }, () => threads.threads[0]),
+    };
+    expect(() =>
+      decodeAgentDockPresentation({ ...PRESENTATION, chats: [{ ...agentChat, threads: many }, ...others] }),
+    ).toThrow("Invalid agent dock presentation.");
   });
 
   it("accepts a temporary seat and rejects a seat that does not say whether it is temporary", () => {

@@ -30,6 +30,7 @@ import {
   type TeamProtocolV1CurrentClientEvent,
 } from "@openbot/contracts/team-protocol/v1-adapter";
 import { decodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
+import type { WorkflowSpotControl } from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { referenceFrom } from "@openbot/user-errors";
 import { Effect, Exit, Result, Scope } from "effect";
@@ -215,6 +216,12 @@ export class RemoteEventStream {
     const socket = this.#sockets.get(serverId);
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     socket.send(encodeTeamProtocolV1CurrentClientEvent(event));
+  }
+
+  sendWorkflowSpot(serverId: string, control: WorkflowSpotControl): void {
+    const socket = this.#sockets.get(serverId);
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify(control));
   }
 
   syncScopes(): void {

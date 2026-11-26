@@ -9,6 +9,8 @@ import { useAgents } from "../agents/agents-context";
 import { useBrowserTabs } from "../browser/browser-context";
 import { useConnectors } from "../connectors/connectors-context";
 import { Conversation } from "../conversation/Conversation";
+import { creditsHoldControls } from "../conversation/credits-hold-controls";
+import { desktopMediaApprovalDefault } from "../conversation/media-approval-default";
 import { trackUsageLimitShown, useUsageLimitAsk } from "../conversation/usage-limit-ask";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import {
@@ -49,7 +51,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
   const { selectAgent, messageFocusRequest, globalSearchOpen } = useNavigation();
   const auth = useAuth();
   const { teamPresence, readerMemberId } = usePresence();
-  const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
+  const { activeServer, activeServerId, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { serverSettingsOpen } = useServerSettings();
   const {
     appSettingsOpen,
@@ -192,6 +194,18 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       onTypingChange={() => {}}
       onAnswerPrompt={view.onAnswerPrompt}
       onRespondToApproval={view.onRespondToApproval}
+      mediaApproval={{
+        ...view.mediaApproval,
+        setDefault: desktopMediaApprovalDefault(activeServerId),
+        hold: creditsHoldControls({
+          agents: agentList,
+          credits: windowPage.creditsMenu,
+          walletId: () =>
+            activeServer()?.kind === "local" ? (windowPage.creditsMenu().localServerId ?? null) : activeServerId(),
+          serverId: () => activeServer()?.id,
+          ...view.creditsHold,
+        }),
+      }}
       onRespondToBrowserTakeover={view.onRespondToBrowserTakeover}
       onCancelQueuedMessage={() => {}}
       onSteerQueuedMessage={() => {}}

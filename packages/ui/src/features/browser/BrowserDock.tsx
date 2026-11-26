@@ -11,6 +11,7 @@ import { EASE_OUT, ISLAND_CLOSE, ISLAND_OPEN, type Spring, springKeyframes } fro
 import { useText } from "@openbot/ui/text";
 import { mix, prefersReducedMotion } from "@openbot/ui/utils";
 import { createEffect, createSignal, flush, onSettled, Show, untrack } from "solid-js";
+import type { MediaApprovalControls } from "../conversation/MediaApprovalCard";
 import { type BrowserIslandContent, BrowserIslandFace, browserIslandKey } from "./BrowserIsland";
 import {
   ISLAND_DURATION_MS,
@@ -47,6 +48,10 @@ function needsAnswer(island: BrowserIslandContent | null | undefined): boolean {
   return island.kind === "secret" || island.kind === "prompt" || island.kind === "approval";
 }
 
+function asksForPage(island: BrowserIslandContent | null | undefined): boolean {
+  return island?.kind === "activity" && island.control === "request";
+}
+
 function px(value: number): string {
   return `${value}px`;
 }
@@ -80,6 +85,7 @@ export interface BrowserDockProps {
   onRespondSecret: (input: LocalBrowserSecretResponse) => Promise<void>;
   onAnswerPrompt: (requestId: string | number, answers: Record<string, string[]>) => Promise<boolean>;
   onRespondApproval: (requestId: string | number, decision: "accept" | "decline") => Promise<boolean>;
+  media?: MediaApprovalControls | undefined;
   onDismissReply: (id: string) => void;
   onOpenChat?: (() => void) | undefined;
   onSelectAgent: (agentId: string) => void;
@@ -134,18 +140,23 @@ export function BrowserDock(props: BrowserDockProps) {
       }, ISLAND_DURATION_MS);
     },
   );
-  const [phase, setPhase] = createSignal<DockPhase>("open");
+  let foldedForStep = untrack(() => asksForPage(props.island) && !props.value.trim());
+  const [phase, setPhase] = createSignal<DockPhase>(foldedForStep ? "hidden" : "open");
   const tucked = () => phase() === "hidden";
   let tab: HTMLDivElement | undefined;
   let tabButton: HTMLButtonElement | undefined;
   let reopen = false;
+  let reopenFocus = true;
   let showing = false;
 
-  function requestShow() {
+  function requestShow(focusField = true) {
     queueMicrotask(() => {
       const current = untrack(phase);
-      if (current === "hidden") void show();
-      else if (current === "hiding") reopen = true;
+      if (current === "hidden") void show(focusField);
+      else if (current === "hiding") {
+        reopen = true;
+        reopenFocus = focusField;
+      }
     });
   }
 
@@ -156,6 +167,23 @@ export function BrowserDock(props: BrowserDockProps) {
     },
     (key) => {
       if (key) requestShow();
+    },
+  );
+  createEffect(
+    () => asksForPage(props.island),
+    (asks) => {
+      if (!asks) {
+        if (foldedForStep) {
+          foldedForStep = false;
+          requestShow(false);
+        }
+        return;
+      }
+      queueMicrotask(() => {
+        if (untrack(phase) !== "open" || untrack(() => !asksForPage(props.island) || props.value.trim())) return;
+        foldedForStep = true;
+        void tuck(false);
+      });
     },
   );
   let focusSeen = untrack(() => props.focusRequest);
@@ -217,15 +245,16 @@ export function BrowserDock(props: BrowserDockProps) {
     });
   }
 
-  async function tuck() {
+  async function tuck(byUser = true) {
     if (untrack(phase) !== "open") return;
+    const focusTab = byUser || Boolean(dock?.contains(document.activeElement));
     clearTimeout(closeTimer);
     if (dock) dock.style.setProperty("--browser-dock-open-width", px(dock.offsetWidth));
     const from = form?.getBoundingClientRect();
     if (!from || !tab || prefersReducedMotion()) {
       setPhase("hidden");
       flush();
-      tabButton?.focus({ preventScroll: true });
+      if (focusTab) tabButton?.focus({ preventScroll: true });
       return;
     }
     setPhase("hiding");
@@ -246,30 +275,31 @@ export function BrowserDock(props: BrowserDockProps) {
     done();
     for (const fade of fades) fade.cancel();
     fadeIn(tabParts(), REVEAL_STAGGER_MS);
-    tabButton?.focus({ preventScroll: true });
+    if (focusTab) tabButton?.focus({ preventScroll: true });
     if (reopen) {
       reopen = false;
-      void show();
+      void show(reopenFocus);
     }
   }
 
-  async function show() {
+  async function show(focusField = true) {
     if (untrack(phase) !== "hidden" || showing) return;
     showing = true;
+    foldedForStep = false;
     try {
-      await grow();
+      await grow(focusField);
     } finally {
       showing = false;
     }
   }
 
-  async function grow() {
+  async function grow(focusField: boolean) {
     reopen = false;
     const from = tab?.getBoundingClientRect();
     if (!from || !form || prefersReducedMotion()) {
       setPhase("open");
       flush();
-      fieldText()?.focus({ preventScroll: true });
+      if (focusField) fieldText()?.focus({ preventScroll: true });
       closeLater(false);
       return;
     }
@@ -294,7 +324,7 @@ export function BrowserDock(props: BrowserDockProps) {
     flush();
     fadeIn(boxParts(), 0);
     done();
-    fieldText()?.focus({ preventScroll: true });
+    if (focusField) fieldText()?.focus({ preventScroll: true });
     closeLater(false);
   }
 
@@ -317,9 +347,8 @@ export function BrowserDock(props: BrowserDockProps) {
     }
   };
   const agentActs = () => props.island?.kind === "activity" && props.island.control === "agent";
-  const stepDone = () =>
-    props.island?.kind === "activity" && props.island.control === "request" ? props.onHandoff : undefined;
-  const unread = () => props.island?.kind === "reply" || needsAnswer(props.island);
+  const stepDone = () => (asksForPage(props.island) ? props.onHandoff : undefined);
+  const unread = () => props.island?.kind === "reply" || needsAnswer(props.island) || asksForPage(props.island);
 
   let tabWidth = 0;
   createEffect(tabLabel, () => {
@@ -459,12 +488,15 @@ export function BrowserDock(props: BrowserDockProps) {
     props.onSteer?.(id);
   };
 
-  onSettled(() => () => {
-    mounted = false;
-    clearTimeout(closeTimer);
-    clearTimeout(queueCloseTimer);
-    settleIsland?.();
-    takePending();
+  onSettled(() => {
+    if (untrack(phase) === "hidden" && dock) dock.style.setProperty("--browser-dock-open-width", px(dock.offsetWidth));
+    return () => {
+      mounted = false;
+      clearTimeout(closeTimer);
+      clearTimeout(queueCloseTimer);
+      settleIsland?.();
+      takePending();
+    };
   });
 
   const placeholder = () =>
@@ -557,6 +589,7 @@ export function BrowserDock(props: BrowserDockProps) {
               onRespondSecret={props.onRespondSecret}
               onAnswerPrompt={props.onAnswerPrompt}
               onRespondApproval={props.onRespondApproval}
+              media={props.media}
               onDismissReply={props.onDismissReply}
               onOpenChat={props.onOpenChat}
               onSelectAgent={props.onSelectAgent}

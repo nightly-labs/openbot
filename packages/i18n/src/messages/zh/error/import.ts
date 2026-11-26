@@ -88,6 +88,7 @@ export const messages = {
   "error.import.transferAgentEnv": "{name}：请在设置中重新输入 {names} 的值。",
   "error.import.transferMcpValues":
     "{name}：MCP 服务器以关闭状态添加。请检查其命令，重新输入其取值和完整地址，然后在 市场、应用 中开启。",
+  "error.import.transferMcpSignIn": "{name}：应用以关闭状态添加。请重新连接，然后在 市场、应用 中开启。",
   "error.import.transferValuesCleared": "{name}：可能包含密钥的取值已从其参数或地址中移除，请在设置中重新输入。",
   "error.import.transferSharedKept": "共享文件夹中已有 {number} 个同名文件，因此保持原样。",
   "error.import.transferPartSkipped": "文件的部分内容无法导入。其他部分已在此服务器上，请不要再次导入该文件。",

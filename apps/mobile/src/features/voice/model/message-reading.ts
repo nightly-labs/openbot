@@ -19,12 +19,12 @@ export function useReadingAloud(messageId: string): boolean {
 function showReadAloudFailure(failure: ReplyVoiceFailure, reason: string | null): void {
   const { t } = currentText();
   const title = t("mobile.chat.message.readAloudFailed");
-  if (failure !== "not-ready") {
+  if (failure !== "not-ready" && failure !== "language") {
     Alert.alert(title, replyVoiceFailureText(failure, reason));
     return;
   }
   const message =
-    useVoiceSettings.getState().engine === "supertonic"
+    failure === "not-ready" && useVoiceSettings.getState().engine === "supertonic"
       ? t("mobile.chat.message.readAloudModelMissing")
       : replyVoiceFailureText(failure, reason);
   Alert.alert(title, message, [

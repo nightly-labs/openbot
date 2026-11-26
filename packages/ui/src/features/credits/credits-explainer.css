@@ -1,0 +1,507 @@
+@property --credits-explainer-tone {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: transparent;
+}
+
+.credits-explainer {
+  --credits-explainer-tone: var(--openbot-credit-plus);
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      70% 45% at 50% -5%,
+      color-mix(in srgb, var(--credits-explainer-tone) 24%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(40% 40% at 0% 0%, color-mix(in srgb, var(--openbot-credit-basic) 10%, transparent), transparent 70%),
+    radial-gradient(40% 40% at 100% 0%, color-mix(in srgb, var(--openbot-credit-max) 8%, transparent), transparent 70%),
+    var(--openbot-bg-sidebar);
+  transition: --credits-explainer-tone var(--openbot-duration-island-content) var(--openbot-ease-in-out);
+}
+
+.credits-explainer[data-scene="chat"] {
+  --credits-explainer-tone: var(--openbot-success);
+}
+
+.credits-explainer[data-scene="models"] {
+  --credits-explainer-tone: var(--openbot-credit-basic);
+}
+
+.credits-explainer[data-scene="get"] {
+  --credits-explainer-tone: var(--openbot-credit-max);
+}
+
+.hosted-upsell-modal.credits-explainer {
+  width: min(520px, 100%);
+  gap: 0;
+  padding: 0;
+}
+
+.credits-explainer-close {
+  position: absolute;
+  z-index: 1;
+  top: var(--openbot-space-3);
+  right: var(--openbot-space-3);
+}
+
+.credits-explainer-scene {
+  position: relative;
+  display: grid;
+  height: 260px;
+  place-items: center;
+  padding: var(--openbot-space-6);
+  border-bottom: 1px solid var(--openbot-border);
+  background:
+    radial-gradient(
+      45% 60% at 50% 55%,
+      color-mix(in srgb, var(--credits-explainer-tone) 16%, transparent),
+      transparent 70%
+    ),
+    color-mix(in srgb, var(--openbot-bg-surface) 60%, transparent);
+}
+
+.credits-explainer-scene-in {
+  display: grid;
+  width: 100%;
+  place-items: center;
+}
+
+.credits-explainer-orb {
+  position: relative;
+  display: grid;
+  width: 88px;
+  height: 88px;
+  place-items: center;
+}
+
+.credits-explainer-orb-glow {
+  position: absolute;
+  inset: 4px;
+  border-radius: var(--openbot-radius-pill);
+  background: conic-gradient(
+    var(--openbot-credit-basic),
+    var(--openbot-credit-plus),
+    var(--openbot-credit-max),
+    var(--openbot-credit-basic)
+  );
+  filter: blur(18px);
+  opacity: 0.6;
+  animation: credits-explainer-spin 9s linear infinite;
+}
+
+.credits-explainer .credits-explainer-orb-tile {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  animation: credit-pop var(--openbot-duration-island-content) var(--openbot-ease-out) both;
+}
+
+@keyframes credits-explainer-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+
+@keyframes credits-explainer-spin-back {
+  to {
+    rotate: -1turn;
+  }
+}
+
+.credits-explainer-orbit {
+  position: relative;
+  display: grid;
+  width: 212px;
+  height: 212px;
+  place-items: center;
+}
+
+.credits-explainer-orbit-path {
+  position: absolute;
+  inset: 22px;
+  border: 1px dashed var(--openbot-border-strong);
+  border-radius: var(--openbot-radius-pill);
+  animation: credit-pop var(--openbot-duration-island-content) var(--openbot-ease-out) both;
+}
+
+.credits-explainer-orbit-ring {
+  position: absolute;
+  inset: 0;
+  animation: credits-explainer-spin 24s linear infinite;
+}
+
+.credits-explainer-orbit-item {
+  --tone: var(--openbot-credit-basic);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  transform: rotate(calc(var(--item) * 120deg - 90deg)) translateX(84px) rotate(calc(var(--item) * -120deg + 90deg));
+}
+
+.credits-explainer-orbit-item[data-kind="video"] {
+  --tone: var(--openbot-credit-max);
+}
+
+.credits-explainer-orbit-item[data-kind="voice"] {
+  --tone: var(--openbot-credit-plus);
+}
+
+.credits-explainer-orbit-tile {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--tone) 35%, transparent);
+  border-radius: var(--openbot-radius-lg);
+  background: color-mix(in srgb, var(--tone) 16%, var(--openbot-bg-sidebar));
+  color: var(--tone);
+  animation:
+    credit-pop var(--openbot-duration-island-content) var(--openbot-ease-out) both,
+    credits-explainer-spin-back 24s linear infinite;
+  animation-delay: calc(var(--item) * 90ms + 120ms), 0s;
+}
+
+.credits-explainer-orbit-tile svg {
+  width: 20px;
+  height: 20px;
+}
+
+.credits-explainer-thread {
+  display: grid;
+  width: min(320px, 100%);
+  gap: var(--openbot-space-2);
+}
+
+.credits-explainer-thread-bubble {
+  display: grid;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-bubble);
+  background: var(--openbot-bg-surface);
+  animation: credit-rise var(--openbot-duration-island-content) var(--openbot-ease-out) both;
+}
+
+.credits-explainer-thread-bubble[data-side="user"] {
+  width: 58%;
+  justify-self: end;
+  background: color-mix(in srgb, var(--openbot-text-primary) 8%, var(--openbot-bg-surface));
+}
+
+.credits-explainer-thread-bubble[data-side="agent"] {
+  width: 82%;
+  animation-delay: 140ms;
+}
+
+.credits-explainer-thread-line {
+  width: var(--line);
+  height: 6px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-border-strong);
+}
+
+.credits-explainer-zero {
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: var(--openbot-space-2);
+  margin-top: var(--openbot-space-2);
+  padding: var(--openbot-space-1) var(--openbot-space-3);
+  border: 1px solid color-mix(in srgb, var(--openbot-success) 40%, transparent);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-success-soft);
+  color: var(--openbot-success-text);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-sm);
+  animation: credit-pop var(--openbot-duration-island-content) var(--openbot-ease-out) both;
+  animation-delay: 320ms;
+}
+
+.credits-explainer-zero svg {
+  width: 16px;
+  height: 16px;
+}
+
+.credits-explainer-bars {
+  display: grid;
+  width: 100%;
+  gap: var(--openbot-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.credits-explainer-bars li {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 132px;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  animation: credit-rise var(--openbot-duration-island-content) var(--openbot-ease-out) both;
+  animation-delay: calc(var(--item) * 70ms);
+}
+
+.credits-explainer-bar-name {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  white-space: nowrap;
+}
+
+.credits-explainer .credits-explainer-maker {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.credits-explainer-bar-track {
+  height: 6px;
+  border-radius: var(--openbot-radius-pill);
+  background: color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
+}
+
+.credits-explainer-bar-fill {
+  display: block;
+  width: calc(var(--share) * 100%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--openbot-credit-basic);
+  transform-origin: left center;
+  animation: credit-strike var(--openbot-duration-island-content) var(--openbot-ease-out) both;
+  animation-delay: calc(var(--item) * 70ms + 140ms);
+}
+
+.credits-explainer-bar-fill[data-kind="video"] {
+  background: var(--openbot-credit-max);
+}
+
+.credits-explainer-bar-cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.credits-explainer-bar-cost .credit-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.credits-explainer-bar-unit {
+  color: var(--openbot-text-muted);
+  font-weight: var(--openbot-weight-regular);
+}
+
+.credits-explainer-get {
+  display: grid;
+  justify-items: center;
+  gap: var(--openbot-space-4);
+}
+
+.credits-explainer-pack {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-3);
+  padding: var(--openbot-space-3) var(--openbot-space-6);
+  border: 1px solid color-mix(in srgb, var(--openbot-credit-max) 35%, var(--openbot-border));
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-surface);
+  font-size: var(--openbot-text-display);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-display);
+  font-variant-numeric: tabular-nums;
+  animation: credit-pop var(--openbot-duration-island-content) var(--openbot-ease-out) both;
+}
+
+.credits-explainer .credits-explainer-pack-arrow {
+  width: 22px;
+  height: 22px;
+  color: var(--openbot-text-muted);
+}
+
+.credits-explainer-pack-credits {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2em;
+  background: linear-gradient(90deg, var(--openbot-credit-plus), var(--openbot-credit-max));
+  background-clip: text;
+  color: var(--openbot-transparent);
+}
+
+.credits-explainer-pack-credits .credit-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.credits-explainer-pack-credits .credit-star {
+  fill: var(--openbot-credit-max);
+}
+
+.credits-explainer-gifts {
+  display: grid;
+  justify-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.credits-explainer-gift {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  animation: credit-rise var(--openbot-duration-island-content) var(--openbot-ease-out) both;
+  animation-delay: 200ms;
+}
+
+.credits-explainer-gift svg {
+  width: 16px;
+  height: 16px;
+  color: var(--openbot-credit-max);
+}
+
+.credits-explainer-text {
+  display: grid;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-6) var(--openbot-space-6) 0;
+}
+
+.credits-explainer-scene-in,
+.credits-explainer-text {
+  animation: credit-from-end var(--openbot-duration-island-content) var(--openbot-ease-out) both;
+}
+
+.credits-explainer[data-direction="back"] .credits-explainer-scene-in,
+.credits-explainer[data-direction="back"] .credits-explainer-text {
+  animation-name: credit-from-start;
+}
+
+.credits-explainer-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.credits-explainer-kicker .credit-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.credits-explainer-count {
+  padding-left: var(--openbot-space-2);
+  border-left: 1px solid var(--openbot-border-strong);
+  color: var(--openbot-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.credits-explainer .credits-explainer-title {
+  margin: 0;
+  font-size: var(--openbot-text-3xl);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-3xl);
+  text-wrap: balance;
+}
+
+.credits-explainer .credits-explainer-lead {
+  min-height: calc(var(--openbot-leading-md) * 2);
+  max-width: 44ch;
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  line-height: var(--openbot-leading-md);
+  text-wrap: pretty;
+}
+
+.credits-explainer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--openbot-space-6);
+}
+
+.credits-explainer-buttons {
+  display: flex;
+  gap: var(--openbot-space-2);
+}
+
+.credits-explainer .credits-explainer-primary {
+  min-width: 112px;
+}
+
+.credits-explainer-dots {
+  display: flex;
+  gap: var(--openbot-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.credits-explainer-dot {
+  width: 24px;
+  height: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-border-strong);
+  cursor: pointer;
+  transition:
+    width var(--openbot-duration-normal) var(--openbot-ease-out),
+    background-color var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.credits-explainer-dot[data-seen] {
+  background: color-mix(in srgb, var(--credits-explainer-tone) 45%, var(--openbot-border-strong));
+}
+
+.credits-explainer-dot[aria-current="step"] {
+  width: 40px;
+  background: var(--credits-explainer-tone);
+}
+
+.setting-link-icon .credit-icon {
+  width: 16px;
+  height: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .credits-explainer,
+  .credits-explainer *,
+  .credits-explainer *::before {
+    animation: none;
+    transition: none;
+  }
+}
+
+.credits-explainer .credits-explainer-prices {
+  position: absolute;
+  right: var(--openbot-space-4);
+  bottom: var(--openbot-space-3);
+  gap: var(--openbot-space-1);
+  color: var(--openbot-text-muted);
+  animation: credit-rise var(--openbot-duration-island-content) var(--openbot-ease-out) both;
+  animation-delay: 280ms;
+}
+
+.credits-explainer .credits-explainer-prices svg {
+  width: 14px;
+  height: 14px;
+  transition: translate var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .credits-explainer .credits-explainer-prices:hover svg {
+    translate: 2px 0;
+  }
+}

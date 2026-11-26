@@ -40,6 +40,15 @@ export const messages = {
   "error.workflow.providerBusy": "المزوّد مشغول. انتظر بضع دقائق، ثم شغّل الخطوة مرة أخرى.",
   "error.workflow.providerOffline":
     "تعذّر على OpenBot الوصول إلى المزوّد. تحقّق من الاتصال بالإنترنت، ثم شغّل الخطوة مرة أخرى.",
+  "error.workflow.providerBilling":
+    "لا يوجد رصيد في الحساب، أو أن خطته لا تشمل هذا النموذج. تحقّق من الخطة، أو اختر نموذجًا آخر.",
+  "error.workflow.modelRefused": "لا يسمح المزوّد بهذا النموذج لهذا الحساب. اختر نموذجًا آخر.",
+  "error.workflow.modelRefusedReason": 'اختر نموذجًا آخر. لا يسمح المزوّد بهذا النموذج لهذا الحساب: "{reason}"',
+  "error.workflow.contentBlocked": "حظر المزوّد المُدخل. غيّر المُدخل أو الطلب، ثم شغّل الخطوة مرة أخرى.",
+  "error.workflow.inputTooLong": "المُدخل طويل جدًا على هذا النموذج. اجعله أقصر، أو اختر نموذجًا آخر.",
+  "error.workflow.requestRefused": "لم يقبل المزوّد هذه الخطوة. اختر نموذجًا آخر.",
+  "error.workflow.requestRefusedReason": 'اختر نموذجًا آخر. لم يقبل المزوّد هذه الخطوة: "{reason}"',
+  "error.workflow.providerRefused": 'اختر نموذجًا آخر، أو شغّل الخطوة مرة أخرى. قال المزوّد: "{reason}"',
   "error.workflow.modelBusy": "يجري تنفيذ طلب نموذج آخر. شغّل الخطوة مرة أخرى بعد قليل.",
   "error.workflow.mediaFailed": "تعذّر على النموذج إنشاء الصورة أو الفيديو. شغّل الخطوة مرة أخرى.",
   "error.workflow.mediaNotMade": "لم يُنشئ النموذج الصورة أو الفيديو. قال: {answer}",

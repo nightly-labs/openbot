@@ -51,6 +51,19 @@ export const messages = {
     "Der Anbieter ist ausgelastet. Warte einige Minuten und führe den Schritt dann erneut aus.",
   "error.workflow.providerOffline":
     "OpenBot konnte den Anbieter nicht erreichen. Prüfe die Internetverbindung und führe den Schritt dann erneut aus.",
+  "error.workflow.providerBilling":
+    "Das Konto hat kein Guthaben, oder sein Tarif enthält dieses Modell nicht. Prüfe den Tarif, oder wähle ein anderes Modell.",
+  "error.workflow.modelRefused": "Der Anbieter erlaubt dieses Modell für dieses Konto nicht. Wähle ein anderes Modell.",
+  "error.workflow.modelRefusedReason":
+    'Wähle ein anderes Modell. Der Anbieter erlaubt dieses Modell für dieses Konto nicht: "{reason}"',
+  "error.workflow.contentBlocked":
+    "Der Anbieter hat die Eingabe blockiert. Ändere die Eingabe oder den Prompt und führe den Schritt dann erneut aus.",
+  "error.workflow.inputTooLong": "Die Eingabe ist für dieses Modell zu lang. Kürze sie, oder wähle ein anderes Modell.",
+  "error.workflow.requestRefused": "Der Anbieter hat diesen Schritt nicht angenommen. Wähle ein anderes Modell.",
+  "error.workflow.requestRefusedReason":
+    'Wähle ein anderes Modell. Der Anbieter hat diesen Schritt nicht angenommen: "{reason}"',
+  "error.workflow.providerRefused":
+    'Wähle ein anderes Modell, oder führe den Schritt erneut aus. Der Anbieter sagt: "{reason}"',
   "error.workflow.modelBusy": "Eine andere Modellanfrage läuft. Führe den Schritt bald erneut aus.",
   "error.workflow.mediaFailed": "Das Modell konnte das Bild oder Video nicht erstellen. Führe den Schritt erneut aus.",
   "error.workflow.mediaNotMade": "Das Modell hat das Bild oder Video nicht erstellt. Es schrieb: {answer}",

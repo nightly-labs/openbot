@@ -92,6 +92,7 @@ export function createTeamProtocolV8Event(
     memoryChanges?: boolean;
     queueHold?: boolean;
     queueHoldSignIn?: boolean;
+    errorLink?: boolean;
   } = {},
 ): TeamProtocolV2EventFrame {
   const decoded = decodeTeamProtocolV8BaseCurrentEvent(value);

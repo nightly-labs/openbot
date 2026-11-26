@@ -49,6 +49,20 @@ export const messages = {
   "error.workflow.providerBusy": "Il provider è occupato. Attendi qualche minuto, poi esegui di nuovo il passaggio.",
   "error.workflow.providerOffline":
     "OpenBot non è riuscito a raggiungere il provider. Controlla la connessione a internet, poi esegui di nuovo il passaggio.",
+  "error.workflow.providerBilling":
+    "L’account non ha credito, oppure il suo piano non include questo modello. Controlla il piano, oppure scegli un altro modello.",
+  "error.workflow.modelRefused": "Il provider non permette questo modello per questo account. Scegli un altro modello.",
+  "error.workflow.modelRefusedReason":
+    'Scegli un altro modello. Il provider non permette questo modello per questo account: "{reason}"',
+  "error.workflow.contentBlocked":
+    "Il provider ha bloccato l’input. Modifica l’input o il prompt, poi esegui di nuovo il passaggio.",
+  "error.workflow.inputTooLong":
+    "L’input è troppo lungo per questo modello. Accorcialo, oppure scegli un altro modello.",
+  "error.workflow.requestRefused": "Il provider non ha accettato questo passaggio. Scegli un altro modello.",
+  "error.workflow.requestRefusedReason":
+    'Scegli un altro modello. Il provider non ha accettato questo passaggio: "{reason}"',
+  "error.workflow.providerRefused":
+    'Scegli un altro modello, oppure esegui di nuovo il passaggio. Il provider ha detto: "{reason}"',
   "error.workflow.modelBusy": "È in corso un’altra richiesta al modello. Esegui di nuovo il passaggio tra poco.",
   "error.workflow.mediaFailed": "Il modello non ha potuto creare l’immagine o il video. Esegui di nuovo il passaggio.",
   "error.workflow.mediaNotMade": "Il modello non ha creato l’immagine o il video. Ha risposto: {answer}",

@@ -50,6 +50,7 @@ export const messages = {
     other: "En fazla {count} klasör ekleyebilirsiniz",
   },
   "agentSettings.folders.browse.places": "Git",
+  "agentSettings.folders.browse.path": "Klasör yolu",
   "agentSettings.folders.browse.home": "Ana klasör",
   "agentSettings.folders.browse.parent": "Yukarı: {folder}",
   "agentSettings.folders.browse.failed": "Bu klasör açılamadı.",
@@ -96,6 +97,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Kullanım sınırına ulaşıldı · atlandı",
   "agentSettings.backupModels.unavailable": "Şu an uygun değil · atlandı",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Bir kullanım sınırı {name} işe başladıktan sonra onu durdurursa, {name} aynı işe sıradaki ilk kullanılabilir modelle devam eder. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
   "agentSettings.groups.brain": "Beyin",
@@ -190,6 +192,9 @@ export const messages = {
     "Bu sohbetin tüm mesajları ve dosyaları OpenBot'tan silinir ve ajan onları unutur. Bu işlem geri alınamaz. Yan konular, talimatlar, model, araçlar, anılar, çalışma alanı ve tarayıcı değişmez.",
   "agentSettings.deleteHistory.confirm": "Geçmişi sil",
   "agentSettings.deleteHistory.failed": "Geçmiş silinemedi.",
+  "agentSettings.deleteAgent.title": "Ajanı sil",
+  "agentSettings.deleteAgent.description": "Ajan, sohbeti, bellekleri, rutinleri ve çalışma alanı OpenBot’tan silinir.",
+  "agentSettings.deleteAgent.button": "Sil",
   "agentSettings.fullAccess.title": "Bu ajana tam erişim verilsin mi?",
   "agentSettings.fullAccess.askTitle": "Bu ajan çalışma alanının dışında çalışabilsin mi?",
   "agentSettings.fullAccess.description":
