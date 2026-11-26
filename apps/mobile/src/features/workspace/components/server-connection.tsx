@@ -280,6 +280,13 @@ export const ServerConnection = memo(function ServerConnection({
     }
   }, [active, hostId, onMembershipChanged, analytics, endResume]);
 
+  const wasBackground = useRef(background);
+  useEffect(() => {
+    const opened = wasBackground.current && !background;
+    wasBackground.current = background;
+    if (opened) controller.current?.resetBackoff();
+  }, [background]);
+
   return (
     <RemoteTeamTransport
       ref={attach}
