@@ -22,6 +22,7 @@ import {
   WORKFLOW_CREDIT_MODEL_PREFIX,
   WORKFLOW_GITHUB_EVENTS,
   WORKFLOW_PICTURE_TYPES,
+  WORKFLOW_STEP_NAME_FIELD,
   type WorkflowCatalogSource,
   type WorkflowDetail,
   type WorkflowGitHubHistory,
@@ -79,6 +80,7 @@ import { isNoUpdateAnswer } from "../agent/routine-quiet-runs";
 import type { AgentProvider } from "../agent-client";
 import { coalescedPasses } from "../coalesced-passes";
 import type {
+  MessagingAnswerFile,
   MessagingDiscordMention,
   MessagingDiscordSend,
   MessagingMentionResult,
@@ -313,6 +315,7 @@ export interface WorkflowsDependencies {
     idempotencyKey: string;
   }): Effect.Effect<string, { readonly cause: unknown }>;
   filePath?: (attachmentId: string) => Effect.Effect<string | null, { readonly cause: unknown }>;
+  attachmentFile?: (attachmentId: string) => Effect.Effect<MessagingAnswerFile | null, { readonly cause: unknown }>;
   stopDelivery(agentId: string, deliveryId: string): Effect.Effect<void, { readonly cause: unknown }>;
   generateText(request: WorkflowTextRequest): Effect.Effect<string, { readonly message: string }>;
   chooseTextModel?: (
@@ -334,7 +337,8 @@ export interface WorkflowsDependencies {
     connectionId: string,
     placeId: string,
     markdown: string,
-  ): Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>;
+    files: readonly MessagingAnswerFile[],
+  ): Effect.Effect<{ posted: true; skippedFiles?: readonly string[] } | { failure: MessagingPostFailure }>;
   channelPost?: (input: {
     operationId: string;
     channelId: string;
@@ -812,7 +816,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
         const startPost = (
           step: StoredWorkflowStep,
           output: WorkflowOutputDelivery,
-          send = dependencies.post(output.connectionId, output.placeId, output.text),
+          send: Effect.Effect<
+            { posted: true; skippedFiles?: readonly string[] } | { failure: MessagingPostFailure }
+          > = dependencies.post(output.connectionId, output.placeId, output.text, []),
         ): Effect.Effect<void> => {
           const post = Effect.gen(function* () {
             if (!runs.claimOutput(step.id, now())) return;
@@ -833,8 +839,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               ),
             );
             if ("posted" in result) {
-              runs.endOutput(step.id, "sent", null, now());
-              settle(step, { status: "done", output: step.input });
+              const skipped = result.skippedFiles?.length ? result.skippedFiles.join(", ") : null;
+              runs.endOutput(step.id, "sent", skipped, now());
+              settle(step, { status: "done", output: sentOutput(step.input, skipped) });
             } else {
               logger.warn("A workflow output was not posted.", { stepId: step.id, failure: result.failure });
               runs.endOutput(step.id, result.failure === "unknown" ? "uncertain" : "failed", result.failure, now());
@@ -848,28 +855,64 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           );
         };
 
-        const sendOutput = (step: StoredWorkflowStep, node: WorkflowNode): Effect.Effect<void> => {
+        const outputFiles = Effect.fn("Workflows.outputFiles")(function* (step: StoredWorkflowStep) {
+          const found = stepGraph(step, step.runId ? runs.run(step.runId) : null);
+          const attachmentIds = found ? agentFileInputs(found.graph, step.nodeId, found.latest) : [];
+          if (attachmentIds.length > INPUT_LIMITS.attachments)
+            return Result.fail(sourceText("error.backend.attachLimit", { limit: INPUT_LIMITS.attachments }));
+          const files: MessagingAnswerFile[] = [];
+          const missing: string[] = [];
+          for (const attachmentId of attachmentIds) {
+            const file = dependencies.attachmentFile
+              ? yield* dependencies.attachmentFile(attachmentId).pipe(Effect.orElseSucceed(() => null))
+              : null;
+            if (file) files.push(file);
+            else if (found) missing.push(outputInputName(found.graph, found.latest, attachmentId));
+          }
+          return Result.succeed({ files, missing });
+        });
+
+        const postOutput = (output: WorkflowOutputDelivery, inputs: OutputFiles) =>
+          dependencies
+            .post(output.connectionId, output.placeId, output.text, inputs.files)
+            .pipe(
+              Effect.map((result) =>
+                "posted" in result && inputs.missing.length > 0
+                  ? { ...result, skippedFiles: [...(result.skippedFiles ?? []), ...inputs.missing] }
+                  : result,
+              ),
+            );
+
+        const sendOutput = Effect.fn("Workflows.sendOutput")(function* (step: StoredWorkflowStep, node: WorkflowNode) {
           const connectionId = fieldText(node, "connectionId");
           const placeId = fieldText(node, "placeId");
           if (!connectionId || !placeId) {
             settle(step, { status: "failed", error: sourceText("error.workflow.outputPlaceMissing") });
-            return Effect.void;
+            return;
           }
-          if (!step.input.trim()) {
-            settle(step, { status: "done", output: "" });
-            return Effect.void;
+          const files = yield* outputFiles(step);
+          if (Result.isFailure(files)) {
+            settle(step, { status: "failed", error: files.failure });
+            return;
+          }
+          const text = step.input.trim() ? resultText(titleOf(step.workflowId), step.input) : "";
+          if (!text && files.success.files.length === 0) {
+            settle(
+              step,
+              files.success.missing.length > 0
+                ? { status: "failed", error: sourceText("error.workflow.mediaInputMissing") }
+                : { status: "done", output: "" },
+            );
+            return;
           }
           if (!dependencies.connectionOn(connectionId)) {
             settle(step, { status: "failed", error: outputError("gone") });
-            return Effect.void;
+            return;
           }
-          runs.addOutput(
-            { stepId: step.id, connectionId, placeId, text: resultText(titleOf(step.workflowId), step.input) },
-            now(),
-          );
+          runs.addOutput({ stepId: step.id, connectionId, placeId, text }, now());
           const output = runs.output(step.id);
-          return output ? startPost(step, output) : Effect.void;
-        };
+          if (output) yield* startPost(step, output, postOutput(output, files.success));
+        });
 
         const sendChannelNote = Effect.fn("Workflows.sendChannelNote")(function* (
           step: StoredWorkflowStep,
@@ -922,7 +965,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
 
         const resumeOutput = (
           step: StoredWorkflowStep,
-          send?: Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>,
+          send?: Effect.Effect<{ posted: true; skippedFiles?: readonly string[] } | { failure: MessagingPostFailure }>,
         ): Effect.Effect<boolean> => {
           const output = runs.output(step.id);
           if (!output)
@@ -931,7 +974,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             case "pending":
               return startPost(step, output, send).pipe(Effect.as(false));
             case "sent":
-              return Effect.succeed(settle(step, { status: "done", output: step.input }));
+              return Effect.succeed(settle(step, { status: "done", output: sentOutput(step.input, output.reason) }));
             case "failed":
               return Effect.succeed(settle(step, { status: "failed", error: outputError(output.reason) }));
             case "sending":
@@ -1172,6 +1215,16 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           if (node && fieldText(node, "target") === "chat-channel") {
             yield* sendChannelNote(step, node);
             return runs.step(step.id)?.status !== "running";
+          }
+          if (node && fieldText(node, "target") === "channel") {
+            const output = runs.output(step.id);
+            if (output?.status !== "pending") return yield* resumeOutput(step);
+            const files = yield* outputFiles(step);
+            if (Result.isFailure(files)) {
+              runs.endOutput(step.id, "failed", null, now());
+              return settle(step, { status: "failed", error: files.failure });
+            }
+            return yield* resumeOutput(step, postOutput(output, files.success));
           }
           if (!node || fieldText(node, "target") !== "github") return yield* resumeOutput(step);
           yield* sendGitHub(step, node, run);
@@ -2403,6 +2456,31 @@ export const createWorkflows = Effect.fn("createWorkflows")(function* (dependenc
   const service = Context.get(context, Workflows);
   return { ...service, close: () => runtime.disposeEffect } satisfies WorkflowsHandle;
 });
+
+interface OutputFiles {
+  files: readonly MessagingAnswerFile[];
+  missing: readonly string[];
+}
+
+function outputInputName(
+  graph: WorkflowGraph,
+  latest: ReadonlyMap<string, StoredWorkflowStep>,
+  attachmentId: string,
+): string {
+  const source = graph.nodes.find(
+    (node) =>
+      (node.kind === "asset" && fieldText(node, "fileId") === attachmentId) ||
+      (node.kind === "image" && latest.get(node.id)?.output === attachmentId),
+  );
+  if (!source) return attachmentId;
+  return fieldText(source, "file") || fieldText(source, WORKFLOW_STEP_NAME_FIELD) || source.kind;
+}
+
+function sentOutput(input: string, skippedFiles: string | null): string {
+  if (!skippedFiles) return input;
+  const note = sourceText("status.messaging.filesSkipped", { names: skippedFiles });
+  return input.trim() ? `${input}\n\n${note}` : note;
+}
 
 function outputError(reason: string | null): string {
   switch (reason) {

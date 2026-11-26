@@ -2500,6 +2500,7 @@ export async function createApplicationServices({
       sendHandoff: (input) => service.enqueueRoutineHandoff(input),
       filePath: (attachmentId) =>
         mailbox.resolveAttachment(attachmentId).pipe(Effect.map((file) => file?.path ?? null)),
+      attachmentFile: (attachmentId) => mailbox.resolveAttachment(attachmentId),
       stopDelivery: stopHandoff,
       generateText: (request) =>
         service.generateWorkflowText(request).pipe(
@@ -2552,7 +2553,8 @@ export async function createApplicationServices({
         forwardWorkflowNotice(notice);
       },
       connectionOn: (connectionId) => service.messaging.store.connection(connectionId)?.enabled === true,
-      post: (connectionId, placeId, markdown) => service.messaging.deliver(connectionId, placeId, markdown),
+      post: (connectionId, placeId, markdown, files) =>
+        service.messaging.deliver(connectionId, placeId, markdown, files),
       channelPost: (input) => service.channels.postNote(input),
       discordSend: (connectionId, send) => service.messaging.discordSend(connectionId, send),
       telegramSend: (connectionId, send) => service.messaging.telegramSend(connectionId, send),

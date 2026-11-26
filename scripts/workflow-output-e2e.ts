@@ -22,7 +22,7 @@ const WAIT_MS = 5_000;
 
 interface Report {
   checks: string[];
-  posts: { connectionId: string; placeId: string; markdown: string }[];
+  posts: { connectionId: string; placeId: string; markdown: string; files: string[] }[];
   passed: boolean;
   failure?: string;
 }
@@ -33,8 +33,11 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
   report.checks.push(name);
 };
 
+type PostAnswer = { posted: true; skippedFiles?: readonly string[] } | { failure: MessagingPostFailure };
+
 let answer: "posted" | MessagingPostFailure | "hang" = "posted";
 let postStarted = false;
+let skipped: string[] = [];
 
 const graphOf = (text: string, output: WorkflowNode["fields"]): WorkflowGraph => ({
   nodes: [
@@ -45,6 +48,18 @@ const graphOf = (text: string, output: WorkflowNode["fields"]): WorkflowGraph =>
   strokes: [],
 });
 const toPlace = { connectionId: CONNECTION, placeId: PLACE };
+const pictureGraph = (text: string | null, fileId: string): WorkflowGraph => ({
+  nodes: [
+    ...(text === null ? [] : [{ id: "prompt", kind: "prompt" as const, at: { x: 0, y: 0 }, fields: { text } }]),
+    { id: "picture", kind: "asset", at: { x: 0, y: 200 }, fields: { fileId, file: "old-menu.png" } },
+    { id: "output", kind: "output", at: { x: 300, y: 0 }, fields: { target: "channel", ...toPlace } },
+  ],
+  edges: [
+    ...(text === null ? [] : [{ id: "edge", from: "prompt", to: "output", type: "text" as const }]),
+    { id: "picture-edge", from: "picture", to: "output", type: "image" },
+  ],
+  strokes: [],
+});
 
 const directory = await mkdtemp(join(tmpdir(), "openbot-workflow-output-"));
 let database = new OpenBotDatabase(directory);
@@ -68,12 +83,24 @@ async function open() {
         database.connection
           .prepare("SELECT 1 FROM projection_messaging_connections WHERE connection_id = ? AND enabled = 1")
           .get(connectionId) !== undefined,
-      post: (connectionId, placeId, markdown) =>
+      attachmentFile: (attachmentId) =>
+        Effect.succeed(
+          attachmentId === "picture-file"
+            ? { name: "menu.png", path: join(directory, "menu.png"), mimeType: "image/png" }
+            : null,
+        ),
+      post: (connectionId, placeId, markdown, files) =>
         Effect.suspend(() => {
           postStarted = true;
-          report.posts.push({ connectionId, placeId, markdown });
+          report.posts.push({ connectionId, placeId, markdown, files: files.map((file) => file.name) });
           if (answer === "hang") return Effect.never;
-          return Effect.succeed(answer === "posted" ? { posted: true as const } : { failure: answer });
+          const result: PostAnswer =
+            answer !== "posted"
+              ? { failure: answer }
+              : skipped.length
+                ? { posted: true, skippedFiles: skipped }
+                : { posted: true };
+          return Effect.succeed(result);
         }),
       changed: () => {},
       rearm: () => {},
@@ -206,6 +233,62 @@ try {
     );
   }
 
+  answer = "posted";
+  const pictured = await workflowWith(workflows, "Lunch", pictureGraph("New menu.", "picture-file"));
+  step = await outputStep(workflows, (await runOnce(workflows, pictured)).id, ended);
+  check(
+    "a picture input goes to the place with the text",
+    step.status === "done" &&
+      step.output === "New menu." &&
+      report.posts.at(-1)?.markdown === "**Lunch**\n\nNew menu." &&
+      report.posts.at(-1)?.files.join() === "menu.png",
+    { step, post: report.posts.at(-1) },
+  );
+  const pictureDone = step;
+
+  skipped = ["menu.png"];
+  step = await outputStep(workflows, (await runOnce(workflows, pictured)).id, ended);
+  const skippedNote = sourceText("status.messaging.filesSkipped", { names: "menu.png" });
+  check(
+    "a picture that the place did not take keeps the step done with a note",
+    step.status === "done" &&
+      step.output === `New menu.\n\n${skippedNote}` &&
+      deliveryOf(step.id)?.status === "sent" &&
+      deliveryOf(step.id)?.reason === "menu.png",
+    { step, row: deliveryOf(step.id) },
+  );
+  skipped = [];
+
+  const pictureOnly = await workflowWith(workflows, "Picture only", pictureGraph(null, "picture-file"));
+  step = await outputStep(workflows, (await runOnce(workflows, pictureOnly)).id, ended);
+  check(
+    "a picture with no text is sent alone",
+    step.status === "done" && report.posts.at(-1)?.markdown === "" && report.posts.at(-1)?.files.join() === "menu.png",
+    { step, post: report.posts.at(-1) },
+  );
+
+  const lost = await workflowWith(workflows, "Lost picture", pictureGraph("New menu.", "deleted-file"));
+  step = await outputStep(workflows, (await runOnce(workflows, lost)).id, ended);
+  check(
+    "a picture that is not in the library leaves the text sent and names the picture in the note",
+    step.status === "done" &&
+      step.output === `New menu.\n\n${sourceText("status.messaging.filesSkipped", { names: "old-menu.png" })}` &&
+      report.posts.at(-1)?.markdown === "**Lost picture**\n\nNew menu." &&
+      report.posts.at(-1)?.files.length === 0,
+    { step, post: report.posts.at(-1) },
+  );
+
+  const lostOnly = await workflowWith(workflows, "Lost picture only", pictureGraph(null, "deleted-file"));
+  const postsLost = report.posts.length;
+  step = await outputStep(workflows, (await runOnce(workflows, lostOnly)).id, ended);
+  check(
+    "a lost picture with no text fails the step and posts nothing",
+    step.status === "failed" &&
+      step.error === sourceText("error.workflow.mediaInputMissing") &&
+      report.posts.length === postsLost,
+    step,
+  );
+
   answer = "not-running";
   run = await runOnce(workflows, digest);
   const failed = await outputStep(workflows, run.id, ended);
@@ -265,6 +348,15 @@ try {
        VALUES (?, ?, ?, 'Kept before the restart.', 'pending', ?, ?)`,
     )
     .run(waiting.id, CONNECTION, PLACE, now, now);
+  database.connection
+    .prepare("UPDATE workflow_steps SET status = 'running', ended_at = NULL, output = NULL WHERE step_id = ?")
+    .run(pictureDone.id);
+  database.connection
+    .prepare("UPDATE workflow_runs SET status = 'running', ended_at = NULL WHERE run_id = ?")
+    .run(pictureDone.runId);
+  database.connection
+    .prepare("UPDATE workflow_output_deliveries SET status = 'pending', sent_at = NULL WHERE step_id = ?")
+    .run(pictureDone.id);
   database.connection.prepare("UPDATE workflow_output_deliveries SET status = 'sending' WHERE step_id = ?").run(cut.id);
   database.close();
   database = new OpenBotDatabase(directory);
@@ -286,6 +378,15 @@ try {
     "after a restart a post that did not start is sent",
     step.status === "done" &&
       report.posts.slice(postsRestart).some((post) => post.markdown === "Kept before the restart."),
+    { step, posts: report.posts.slice(postsRestart) },
+  );
+  step = await outputStep(workflows, pictureDone.runId ?? "", ended);
+  check(
+    "after a restart a picture post that did not start is sent with its picture",
+    step.status === "done" &&
+      report.posts
+        .slice(postsRestart)
+        .some((post) => post.markdown === "**Lunch**\n\nNew menu." && post.files.join() === "menu.png"),
     { step, posts: report.posts.slice(postsRestart) },
   );
   check("both runs end", (await runEnd(workflows, cutRun.id)) === "failed");
