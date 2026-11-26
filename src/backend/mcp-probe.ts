@@ -28,6 +28,7 @@ import { Effect, Result, Schema } from "effect";
 import { z } from "zod";
 import { causeHelpers } from "./effect-boundary";
 import {
+  type AuthorizationServerLookup,
   isLoopback,
   MCP_TOKEN_TIMEOUT_MS,
   type McpOAuthAuthority,
@@ -246,7 +247,10 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
         keyOnly: (yield* advertisesOAuth(config.url, lookupMs, signInMetadata(config.url))) === false,
       };
     else if (unexplained.status === 403 && !server.authorization)
-      seen.challenge = { ...unexplained, bearer: yield* offersSignIn(config.url, lookupMs) };
+      seen.challenge = {
+        ...unexplained,
+        bearer: yield* offersSignIn(config.url, lookupMs, lookupAfterRefusal(unexplained)),
+      };
   }
   const remainingMs = timeoutMs - (Date.now() - startedAt);
   if (!signIn && config.transport === "http" && httpStatus(first.failure.cause) === 400 && remainingMs > 0) {
@@ -256,7 +260,7 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
   if (!signIn) return failure(first.failure.cause);
   if (first.failure.cause instanceof UnauthorizedError) return yield* afterSignIn(signIn);
   if (httpStatus(first.failure.cause) !== 403 || hasCredentialHeader(config)) return failure(first.failure.cause);
-  const begun = yield* Effect.result(signIn.begin());
+  const begun = yield* Effect.result(signIn.begin("this-server"));
   if (Result.isFailure(begun)) return failure(begun.failure.cause);
   return begun.success ? yield* afterSignIn(signIn) : failure(first.failure.cause);
 });
@@ -581,11 +585,15 @@ const advertisesOAuth = Effect.fnUntraced(function* (url: string, remainingMs: n
   return found.includes(null) ? null : false;
 });
 
-const offersSignIn = Effect.fnUntraced(function* (url: string, remainingMs: number) {
+function lookupAfterRefusal(challenge: McpChallenge | null): AuthorizationServerLookup {
+  return challenge?.insufficientScope ? "this-server-or-origin" : "this-server";
+}
+
+const offersSignIn = Effect.fnUntraced(function* (url: string, remainingMs: number, lookup: AuthorizationServerLookup) {
   if (remainingMs <= 0) return false;
   const controller = new AbortController();
   const fetchFn: FetchLike = (input, init) => fetch(input, { ...init, signal: controller.signal });
-  return yield* namesAuthorizationServer(normalizeResource(url) ?? url, fetchFn).pipe(
+  return yield* namesAuthorizationServer(normalizeResource(url) ?? url, fetchFn, lookup).pipe(
     Effect.map((issuer) => issuer !== null),
     Effect.timeoutOrElse({ duration: remainingMs, orElse: () => Effect.succeed(false) }),
     Effect.catch(() => Effect.succeed(false)),
