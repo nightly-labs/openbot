@@ -267,11 +267,14 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
   };
 
   const sizeObserver = new ResizeObserver(relayout);
+  const copyObserver = new MutationObserver(relayout);
   const visibility = new IntersectionObserver((entries) => {
     visible = entries.some((entry) => entry.isIntersecting);
   });
   sizeObserver.observe(section);
   sizeObserver.observe(amount);
+  for (const element of parts.copy)
+    copyObserver.observe(element, { childList: true, characterData: true, subtree: true });
   visibility.observe(section);
   section.addEventListener("pointermove", onMove, { passive: true });
   section.addEventListener("pointerleave", onLeave);
@@ -287,6 +290,7 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
     timers.clear();
     clearInterval(partyLoop);
     sizeObserver.disconnect();
+    copyObserver.disconnect();
     visibility.disconnect();
     section.removeEventListener("pointermove", onMove);
     section.removeEventListener("pointerleave", onLeave);
