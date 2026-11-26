@@ -105,6 +105,7 @@ import {
   readOpenCodeRefusalStatus,
   readOpenCodeStoredKey,
 } from "./opencode-usage";
+import { openCodeWindowsShellEnv } from "./opencode-windows-shell";
 import { PiAgentClient } from "./pi-client";
 import {
   antigravityStatePaths,
@@ -883,6 +884,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           return {
             ...agentEnvironment,
             ...opencodeEnv(cli),
+            ...openCodeWindowsShellEnv({ ...process.env, ...cliPathEnvironment(cli), ...agentEnvironment }),
             ...openCodeAgentDefaultsEnv(
               context.providerStateDirectory,
               { ...process.env, ...agentEnvironment },

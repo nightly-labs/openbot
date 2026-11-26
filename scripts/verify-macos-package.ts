@@ -77,6 +77,7 @@ await Promise.all([
   access(resolve(resourcesPath, "licenses/Supertone-Supertonic-3-LICENSE")),
   ...voiceRuntimeLibraries.map((name) => access(resolve(voiceRuntimePath, name))),
   access(voiceSessionSettingsPath),
+  access(resolve(voiceRuntimePath, "silero_vad_v5.onnx")),
   access(databaseHostPath),
   access(voiceHostPath),
   access(speechHostPath),

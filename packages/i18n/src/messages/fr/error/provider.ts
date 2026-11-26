@@ -482,6 +482,8 @@ export const messages = {
     "Muse n’a pas pu démarrer un serveur MCP et a bloqué MCP dans cette session. OpenBot a démarré une nouvelle session Muse avec l’historique de la conversation. Réessayez. Si l’erreur persiste, désactivez Computer Use ou le serveur MCP en échec pour cet agent.",
   "error.provider.claudeSessionMissing":
     "Claude Code n’a pas trouvé la session enregistrée de cette conversation. OpenBot a ouvert une nouvelle session Claude Code avec l’historique de la conversation. Réessayez.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode n’a pas trouvé la session enregistrée de cette conversation. OpenBot a ouvert une nouvelle session OpenCode avec l’historique de la conversation. Réessayez.",
   "error.provider.grokSignIn": "Exécutez `grok login` ou définissez XAI_API_KEY pour utiliser Grok.",
   "error.provider.acpSignInNoStart":
     "Le fournisseur n’a pas démarré, donc la connexion n’a pas pu commencer. Réessayez ou redémarrez OpenBot.",

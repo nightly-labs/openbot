@@ -59,6 +59,10 @@ export class ModelCatalog {
     return structuredClone(this.#models);
   }
 
+  lists(provider: AgentProvider, id: string): boolean {
+    return this.#models.some((model) => model.provider === provider && model.id === id);
+  }
+
   source(provider: AgentProvider): ProviderModelSource | undefined {
     const source = this.#sources.get(provider);
     return source ? structuredClone(source) : undefined;
