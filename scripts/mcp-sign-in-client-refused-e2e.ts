@@ -265,6 +265,8 @@ async function runCase(
     scopes = {},
     registrationForbidden = null,
     storedClient = null,
+    storedClientRedirects = DROPBOX_REDIRECTS,
+    storedClientLost = false,
     relayDeepLink,
     accountRefused = null,
     tokenForbidden = false,
@@ -277,6 +279,8 @@ async function runCase(
     scopes?: ScopeMetadata;
     registrationForbidden?: RegistrationForbidden | null;
     storedClient?: string | null;
+    storedClientRedirects?: string[];
+    storedClientLost?: boolean;
     relayDeepLink?: string | null;
     accountRefused?: AccountRefusal | null;
     tokenForbidden?: boolean;
@@ -300,9 +304,10 @@ async function runCase(
       client: {
         client_id: storedClient,
         token_endpoint_auth_method: "none",
-        redirect_uris: DROPBOX_REDIRECTS,
+        redirect_uris: storedClientRedirects,
         issuer: new URL(server.url).origin,
       },
+      ...(storedClientLost ? { lostAt: Date.now() } : {}),
     });
   if (storedTokens)
     records.set(server.url, {
@@ -536,13 +541,7 @@ async function main(): Promise<void> {
     check(dropbox, dropbox.attempts[0]?.toolCount === 1, "the tools were not listed after the sign-in");
     check(
       dropbox,
-      dropbox.redirects.join() ===
-        [
-          "register http://127.0.0.1:28417/mcp-auth",
-          `register ${callback}`,
-          `page ${callback}`,
-          `token ${callback}`,
-        ].join(),
+      dropbox.redirects.join() === [`register ${callback}`, `page ${callback}`, `token ${callback}`].join(),
       `the addresses were ${dropbox.redirects.join()}`,
     );
     check(dropbox, dropbox.storedClient, "no client is stored after the sign-in");
@@ -566,23 +565,103 @@ async function main(): Promise<void> {
     check(dropboxStored, dropboxStored.signedIn, "no token is stored after the sign-in");
     report.cases.push(dropboxStored);
 
+    const unfinished = await runCase("unfinished-client-registers-callback", ["none"], 1, {
+      storedClient: "e2e-unfinished-client",
+      storedClientRedirects: ["http://127.0.0.1:28417/mcp-auth"],
+    });
+    check(unfinished, unfinished.attempts[0]?.error === null, `the sign-in failed: ${unfinished.attempts[0]?.error}`);
+    check(
+      unfinished,
+      unfinished.redirects.join() === [`register ${callback}`, `page ${callback}`, `token ${callback}`].join(),
+      `the addresses were ${unfinished.redirects.join()}`,
+    );
+    check(unfinished, unfinished.signedIn, "no token is stored after the sign-in");
+    report.cases.push(unfinished);
+
+    const signedInBefore = "http://127.0.0.1:28417/mcp-auth";
+    const lost = await runCase("lost-sign-in-keeps-its-address", ["none"], 1, {
+      storedClient: "e2e-lost-client",
+      storedClientRedirects: [signedInBefore],
+      storedClientLost: true,
+    });
+    check(lost, lost.attempts[0]?.error === null, `the sign-in failed: ${lost.attempts[0]?.error}`);
+    check(
+      lost,
+      lost.redirects.join() === [`page ${signedInBefore}`, `token ${signedInBefore}`].join(),
+      `the addresses were ${lost.redirects.join()}`,
+    );
+    check(lost, lost.signedIn, "no token is stored after the sign-in");
+    report.cases.push(lost);
+
+    const ownListener = "http://127.0.0.1:28417/mcp-auth";
+    const openedElsewhere = await runCase("opened-elsewhere-keeps-mcp-auth", ["none"], 1, {
+      storedClient: "e2e-unfinished-callback-client",
+      storedClientRedirects: [callback],
+      relayDeepLink: null,
+    });
+    check(
+      openedElsewhere,
+      openedElsewhere.attempts[0]?.error === null,
+      `the sign-in failed: ${openedElsewhere.attempts[0]?.error}`,
+    );
+    check(
+      openedElsewhere,
+      openedElsewhere.redirects.join() ===
+        [`register ${ownListener}`, `page ${ownListener}`, `token ${ownListener}`].join(),
+      `the addresses were ${openedElsewhere.redirects.join()}`,
+    );
+    check(openedElsewhere, openedElsewhere.signedIn, "no token is stored after the sign-in");
+    report.cases.push(openedElsewhere);
+
+    const lostElsewhere = await runCase("opened-elsewhere-after-lost-callback-sign-in", ["none"], 1, {
+      storedClient: "e2e-lost-callback-client",
+      storedClientRedirects: [callback],
+      storedClientLost: true,
+      relayDeepLink: null,
+    });
+    check(
+      lostElsewhere,
+      lostElsewhere.attempts[0]?.error === null,
+      `the sign-in failed: ${lostElsewhere.attempts[0]?.error}`,
+    );
+    check(
+      lostElsewhere,
+      lostElsewhere.redirects.join() ===
+        [`register ${ownListener}`, `page ${ownListener}`, `token ${ownListener}`].join(),
+      `the addresses were ${lostElsewhere.redirects.join()}`,
+    );
+    check(lostElsewhere, lostElsewhere.signedIn, "no token is stored after the sign-in");
+    report.cases.push(lostElsewhere);
+
     const namecheap = await runCase("registration-replaces-address-except-callback", ["none"], 1, {
       registrationForbidden: "namecheap",
     });
     check(namecheap, namecheap.attempts[0]?.error === null, `the sign-in failed: ${namecheap.attempts[0]?.error}`);
     check(
       namecheap,
-      namecheap.redirects.join() ===
-        [
-          "register http://127.0.0.1:28417/mcp-auth",
-          `register ${callback}`,
-          `page ${callback}`,
-          `token ${callback}`,
-        ].join(),
+      namecheap.redirects.join() === [`register ${callback}`, `page ${callback}`, `token ${callback}`].join(),
       `the addresses were ${namecheap.redirects.join()}`,
     );
     check(namecheap, namecheap.signedIn, "no token is stored after the sign-in");
     report.cases.push(namecheap);
+
+    const namecheapElsewhere = await runCase("opened-elsewhere-registration-replaces-address", ["none"], 1, {
+      registrationForbidden: "namecheap",
+      relayDeepLink: null,
+    });
+    check(
+      namecheapElsewhere,
+      namecheapElsewhere.attempts[0]?.error === null,
+      `the sign-in failed: ${namecheapElsewhere.attempts[0]?.error}`,
+    );
+    check(
+      namecheapElsewhere,
+      namecheapElsewhere.redirects.join() ===
+        [`register ${ownListener}`, `register ${callback}`, `page ${callback}`, `token ${callback}`].join(),
+      `the addresses were ${namecheapElsewhere.redirects.join()}`,
+    );
+    check(namecheapElsewhere, namecheapElsewhere.signedIn, "no token is stored after the sign-in");
+    report.cases.push(namecheapElsewhere);
 
     const forbidden = await runCase("registration-forbidden", ["none"], 1, { registrationForbidden: "forbidden" });
     check(
