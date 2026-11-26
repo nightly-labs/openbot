@@ -1,3 +1,4 @@
+import type { CreditMediaModel } from "@openbot/contracts/credit-media";
 import { ArrowLeftRight, Button, CircleQuestionMark, Gift, Popover, Switch } from "@openbot/ui";
 import { type MotionPlace, useMenuMotion } from "@openbot/ui/menu-motion";
 import { useText } from "@openbot/ui/text";
@@ -24,6 +25,7 @@ export interface CreditsRailChipProps {
   walletName?: string | null | undefined;
   onMove?: (() => void) | undefined;
   onOpenPrices?: (() => void) | undefined;
+  creditModels?: readonly CreditMediaModel[] | undefined;
   onBuy: () => void;
 }
 
@@ -294,7 +296,12 @@ export function CreditsRailChip(props: CreditsRailChipProps) {
           </CreditsCardContent>
         </Popover.Portal>
       </Popover.Root>
-      <CreditsExplainerDialog open={explaining()} onOpenChange={setExplaining} onOpenPrices={props.onOpenPrices} />
+      <CreditsExplainerDialog
+        open={explaining()}
+        onOpenChange={setExplaining}
+        onOpenPrices={props.onOpenPrices}
+        models={props.creditModels}
+      />
     </>
   );
 }

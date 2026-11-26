@@ -1,4 +1,5 @@
 import type { BillingCurrency } from "@openbot/contracts/billing";
+import { type CreditMediaModel, creditEstimatesLive } from "@openbot/contracts/credit-media";
 import {
   CREDIT_CLIP_SECONDS,
   CREDIT_PACK_INDEXES,
@@ -67,6 +68,7 @@ export interface BuyCreditsPageProps {
   initialServerId?: string | null | undefined;
   headerFrame?: PageHeaderFrame | undefined;
   billingDetails?: BillingDetailsCalls | undefined;
+  models?: readonly CreditMediaModel[] | undefined;
   onClose: () => void;
 }
 
@@ -100,6 +102,7 @@ interface Purchase {
   credits: CreditsState;
   target: CreditTarget;
   pending: boolean;
+  estimates: readonly CreditEstimate[];
   onPay: (stop: CreditStop, button: HTMLElement | undefined) => void;
 }
 
@@ -191,9 +194,7 @@ function SaveChip(props: { stop: CreditStop }) {
   );
 }
 
-const ESTIMATES = creditEstimates();
-
-function Facts(props: { credits: number }) {
+function Facts(props: { credits: number; estimates: readonly CreditEstimate[] }) {
   const { t, format } = useText();
   const credit = useCreditFormat();
   const estimate = ({ model, resolution, charge }: CreditEstimate) => {
@@ -204,7 +205,7 @@ function Facts(props: { credits: number }) {
   };
   return (
     <ul class="credit-facts">
-      <For each={ESTIMATES}>
+      <For each={props.estimates}>
         {(entry) => (
           <li>
             <Check aria-hidden="true" />
@@ -338,7 +339,7 @@ function PackCard(props: { purchase: Purchase; index: number; order: number }) {
         <PopularBadge index={props.index} />
       </div>
       <div class="credit-pack-body">
-        <Facts credits={stop().credits} />
+        <Facts credits={stop().credits} estimates={props.purchase.estimates} />
         <PayButton
           purchase={props.purchase}
           stop={stop()}
@@ -415,6 +416,9 @@ export function BuyCreditsPage(props: BuyCreditsPageProps): JSX.Element {
   const [moving, setMoving] = createSignal(false);
   const [redeeming, setRedeeming] = createSignal(false);
   const credits = () => props.store.state.credits;
+  const estimates = createMemo(() =>
+    props.models && props.models.length > 0 ? creditEstimatesLive(props.models) : creditEstimates(),
+  );
   const targets = createMemo(() => creditTargets(credits(), t("billing.credits.you")));
   const target = createMemo(
     (): CreditTarget | undefined => targets().find((item) => item.serverId === serverId()) ?? targets()[0],
@@ -550,6 +554,7 @@ export function BuyCreditsPage(props: BuyCreditsPageProps): JSX.Element {
                         credits: state(),
                         target: selected(),
                         pending: props.store.state.pending !== null,
+                        estimates: estimates(),
                         onPay: pay,
                       }}
                       index={index()}

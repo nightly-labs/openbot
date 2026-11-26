@@ -3,6 +3,7 @@ import type { JSX } from "@solidjs/web";
 import { type ParentProps, Show, untrack } from "solid-js";
 import { AnsweredPromptsProvider } from "./answered-prompts";
 import { AppBootstrap } from "./app-bootstrap";
+import { appPort } from "./app-port";
 import { AuthProvider } from "./features/account/account-context";
 import { AgentTasksProvider } from "./features/agent-tasks/agent-tasks-context";
 import { AgentThreadsProvider } from "./features/agent-threads/agent-threads-context";
@@ -23,6 +24,7 @@ import {
 } from "./features/conversation/conversation-controller";
 import { ConversationControllerProvider } from "./features/conversation/conversation-controller-context";
 import { DirectMessagesProvider } from "./features/conversation/direct-messages-context";
+import { CreditModelsProvider, createCreditModels } from "./features/credits/credits-context";
 import { CustomAgentsProvider } from "./features/custom-agents/custom-agents-context";
 import { CustomProvidersProvider } from "./features/custom-providers/custom-providers-context";
 import { ProviderDetectionProvider } from "./features/custom-providers/provider-detection-context";
@@ -64,6 +66,7 @@ export function AppProviders(props: ParentProps<AppProps>): JSX.Element {
     readStoredComposerDrafts(),
   );
   if (!props.chatWindow) followBrowserWindowEvents(stableConversation);
+  const creditModels = createCreditModels(() => appPort().credits.getCatalog());
   return (
     <PlatformProvider
       landingPreview={props.landingPreview}
@@ -88,16 +91,18 @@ export function AppProviders(props: ParentProps<AppProps>): JSX.Element {
                                     <AnsweredPromptsProvider>
                                       <UiErrorsProvider>
                                         <UsageProvider>
-                                          <WindowPageProvider>
-                                            <AgentReadTrackingProvider>
-                                              <Show when={!props.chatWindow}>
-                                                <AppBootstrap />
-                                              </Show>
-                                              <ServerScopeBoundary stableConversation={stableConversation}>
-                                                {props.children}
-                                              </ServerScopeBoundary>
-                                            </AgentReadTrackingProvider>
-                                          </WindowPageProvider>
+                                          <CreditModelsProvider models={creditModels}>
+                                            <WindowPageProvider>
+                                              <AgentReadTrackingProvider>
+                                                <Show when={!props.chatWindow}>
+                                                  <AppBootstrap />
+                                                </Show>
+                                                <ServerScopeBoundary stableConversation={stableConversation}>
+                                                  {props.children}
+                                                </ServerScopeBoundary>
+                                              </AgentReadTrackingProvider>
+                                            </WindowPageProvider>
+                                          </CreditModelsProvider>
                                         </UsageProvider>
                                       </UiErrorsProvider>
                                     </AnsweredPromptsProvider>

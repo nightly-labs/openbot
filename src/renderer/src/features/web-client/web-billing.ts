@@ -1,5 +1,6 @@
 import { parseBillingSessionUrl, parseBillingState } from "@openbot/contracts/billing";
 import { parseBillingDetails } from "@openbot/contracts/billing-details";
+import { type CreditMediaCatalog, parseCreditMediaCatalog } from "@openbot/contracts/credit-media";
 import {
   parseCreditActivity,
   parseCreditCheckoutUrl,
@@ -124,6 +125,16 @@ export function createWebCreditsCalls(
       return result;
     },
   };
+}
+
+export async function readCreditCatalog(accountFetch: typeof fetch): Promise<CreditMediaCatalog> {
+  const response = await accountFetch("/v1/media/models", {
+    credentials: "omit",
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  const catalog = response.ok ? parseCreditMediaCatalog(await response.json().catch(() => null)) : null;
+  if (!catalog) throw new Error(currentText().sourceText("error.billing.invalidResponse"));
+  return catalog;
 }
 
 export function createWebReferralCalls(accountFetch: typeof fetch): ReferralCalls {
