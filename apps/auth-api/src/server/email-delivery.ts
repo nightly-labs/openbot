@@ -36,6 +36,8 @@ export type EmailDeliveryBindings = Pick<
   | "EMAIL_SMTP_PORT"
   | "EMAIL_SMTP_USERNAME"
   | "EMAIL_SMTP_PASSWORD"
+  | "EMAIL_SMTP_OVERFLOW_USERNAME"
+  | "EMAIL_SMTP_OVERFLOW_PASSWORD"
   | "EMAIL_FROM"
   | "EMAIL_REPLY_TO"
   | "EMAIL_LICENSE_FROM"
@@ -48,6 +50,7 @@ export type EmailDeliveryBindings = Pick<
 
 interface EmailSenders {
   smtp: SmtpEmailConfig;
+  overflow: SmtpEmailConfig | null;
   fallback: SendEmail | null;
   inbox: string;
 }
@@ -151,11 +154,13 @@ const deliver = Effect.fn("EmailDelivery.deliver")(function* (
   }
   const message = withInboxReply(senders, prepared.success);
   const startedAt = Date.now();
-  const smtp = yield* Effect.result(tracked(analytics, "email_sent", kind, sendPrivateEmail(senders.smtp, message)));
+  const primary = yield* Effect.result(tracked(analytics, "email_sent", kind, sendPrivateEmail(senders.smtp, message)));
+  if (Result.isSuccess(primary)) return;
+  const smtp = yield* Effect.result(sendThroughOverflow(analytics, kind, senders, message, primary.failure, startedAt));
   if (Result.isSuccess(smtp)) return;
   if (!senders.fallback || !canFallBack(smtp.failure.message)) return yield* smtp.failure;
   const remainingMs = EMAIL_CODE_DELIVERY_BUDGET_MS - (Date.now() - startedAt);
-  if (remainingMs < CLOUDFLARE_MIN_SEND_MS) return yield* smtp.failure;
+  if (remainingMs < MIN_SEND_MS) return yield* smtp.failure;
   console.warn("Email delivery falls back to Cloudflare:", { kind, reason: smtp.failure.message });
   const fallback = yield* Effect.result(
     tracked(
@@ -174,6 +179,31 @@ const deliver = Effect.fn("EmailDelivery.deliver")(function* (
   return yield* AMBIGUOUS_DELIVERY_ERRORS.has(fallback.failure.message) ? fallback.failure : smtp.failure;
 });
 
+const sendThroughOverflow = Effect.fn("EmailDelivery.overflow")(function* (
+  analytics: AccountAnalytics,
+  kind: EmailKind,
+  senders: EmailSenders,
+  message: PreparedEmailMessage,
+  primaryFailure: SmtpFailure,
+  startedAt: number,
+): Effect.fn.Return<void, SmtpFailure | EmailDeliveryError> {
+  const remainingMs = EMAIL_CODE_DELIVERY_BUDGET_MS - (Date.now() - startedAt);
+  if (!senders.overflow || primaryFailure.message !== RATE_LIMITED_DELIVERY_ERROR || remainingMs < MIN_SEND_MS) {
+    return yield* primaryFailure;
+  }
+  yield* tracked(
+    analytics,
+    "email_sent",
+    kind,
+    sendPrivateEmail(senders.overflow, message).pipe(
+      Effect.timeoutOrElse({
+        duration: remainingMs,
+        orElse: () => Effect.fail(new EmailDeliveryError({ message: "email_delivery_unknown" })),
+      }),
+    ),
+  );
+});
+
 function canFallBack(message: string): boolean {
   return (
     !AMBIGUOUS_DELIVERY_ERRORS.has(message) &&
@@ -184,7 +214,7 @@ function canFallBack(message: string): boolean {
 }
 
 const CLOUDFLARE_SEND_TIMEOUT_MS = 10_000;
-const CLOUDFLARE_MIN_SEND_MS = 2_000;
+const MIN_SEND_MS = 2_000;
 
 const sendThroughCloudflare = Effect.fn("EmailDelivery.cloudflare")(function* (
   binding: SendEmail,
@@ -246,7 +276,14 @@ function readEmailSenders(bindings: EmailDeliveryBindings): EmailSenders | null 
   const smtp = readSmtpConfig(bindings);
   if (!smtp) return null;
   const inbox = bindings.EMAIL_REPLY_TO?.trim() || smtp.from;
-  return { smtp, fallback: bindings.EMAIL_FALLBACK ?? null, inbox };
+  return { smtp, overflow: readOverflowSmtpConfig(bindings, smtp), fallback: bindings.EMAIL_FALLBACK ?? null, inbox };
+}
+
+function readOverflowSmtpConfig(bindings: EmailDeliveryBindings, primary: SmtpEmailConfig): SmtpEmailConfig | null {
+  const username = bindings.EMAIL_SMTP_OVERFLOW_USERNAME?.trim();
+  const password = bindings.EMAIL_SMTP_OVERFLOW_PASSWORD;
+  if (!username || !password) return null;
+  return { ...primary, username, password, from: username };
 }
 
 function withInboxReply(senders: EmailSenders, message: PreparedEmailMessage): PreparedEmailMessage {

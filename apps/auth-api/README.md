@@ -246,6 +246,14 @@ make it an alias of the `EMAIL_SMTP_USERNAME` mailbox. An empty value uses `EMAI
 does. A reply goes to `EMAIL_LICENSE_REPLY_TO` (`licenses@openbot.run` in production), or to the
 license sender when it is empty.
 
+When the `no_reply@openbot.run` mailbox reaches its sender limit (500 messages an hour), the email goes
+again from the overflow mailbox `EMAIL_SMTP_OVERFLOW_USERNAME` (`hello@openbot.run` in production),
+with that address as the sender. Its password is the `EMAIL_SMTP_OVERFLOW_PASSWORD` secret, in the
+same places as `EMAIL_SMTP_PASSWORD`; it is optional, and without it the overflow mailbox is off.
+When the overflow mailbox also reaches its limit, Cloudflare Email Service sends the email from
+`EMAIL_FROM` (`EMAIL_FALLBACK`). Cloudflare also has a daily quota: past it, the binding refuses with
+`E_DAILY_LIMIT_EXCEEDED`.
+
 `bun run env:set:smtp` encrypts the app password into `.env.production` only.
 
 Production does not open the SMTP socket itself. From some Cloudflare locations, such as FSD, a

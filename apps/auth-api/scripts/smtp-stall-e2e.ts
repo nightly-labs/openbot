@@ -23,6 +23,7 @@ const CONFIG = {
   password: "relay-password",
   from: "sender@example.com",
 };
+const OVERFLOW = { username: "overflow@example.com", password: "overflow-password" };
 
 type Behavior = "normal" | "silent" | "stall_after_data" | "sender_limit";
 type Route = "direct" | "relay" | "relay_unreachable" | "relay_crashed";
@@ -37,6 +38,7 @@ interface CaseReport {
 
 interface FallbackCaseReport extends CaseReport {
   fallbackSends: number;
+  mailFrom: string[];
   events: string[];
 }
 
@@ -48,7 +50,8 @@ interface Report {
 
 async function startRelay(behaviors: Behavior[]) {
   const sockets = new Set<Socket>();
-  const stats = { connections: 0, messages: 0 };
+  const mailFrom: string[] = [];
+  const stats = { connections: 0, messages: 0, mailFrom };
   const servers = new Map<Behavior, Server>();
   for (const behavior of new Set(behaviors)) {
     const server = createServer({ allowHalfOpen: true }, (socket) => {
@@ -94,7 +97,11 @@ async function startRelay(behaviors: Behavior[]) {
   return { connector, stats, stop };
 }
 
-function serveSmtp(socket: Socket, behavior: Exclude<Behavior, "silent">, stats: { messages: number }): void {
+function serveSmtp(
+  socket: Socket,
+  behavior: Exclude<Behavior, "silent">,
+  stats: { messages: number; mailFrom: string[] },
+): void {
   let buffer = "";
   let inData = false;
   socket.write("220 relay.example.com ESMTP\r\n");
@@ -117,7 +124,10 @@ function serveSmtp(socket: Socket, behavior: Exclude<Behavior, "silent">, stats:
       buffer = buffer.slice(lineEnd + 2);
       if (line.startsWith("EHLO")) socket.write("250-relay.example.com\r\n250-PIPELINING\r\n250 AUTH PLAIN LOGIN\r\n");
       else if (line.startsWith("AUTH PLAIN")) socket.write("235 2.7.0 ok\r\n");
-      else if (line.startsWith("MAIL FROM") || line.startsWith("RCPT TO")) socket.write("250 2.1.0 ok\r\n");
+      else if (line.startsWith("MAIL FROM")) {
+        stats.mailFrom.push(line.slice("MAIL FROM:".length));
+        socket.write("250 2.1.0 ok\r\n");
+      } else if (line.startsWith("RCPT TO")) socket.write("250 2.1.0 ok\r\n");
       else if (line === "DATA" && behavior === "sender_limit") {
         socket.write(
           "554 5.7.1 <DATA>: Data command rejected: Reject: too many messages from sender in last 60 minutes\r\n",
@@ -199,6 +209,7 @@ async function runFallbackCase(
   outcome: "accept" | "daily_limit",
   code = "ABCD-EFGH",
   replyTo?: string,
+  overflow = false,
 ): Promise<FallbackCaseReport & { sent: EmailMessageBuilder[] }> {
   const relay = await startRelay(behaviors);
   const handler = createEmailRelayHandler(relay.connector);
@@ -212,6 +223,9 @@ async function runFallbackCase(
       EMAIL_SMTP_PASSWORD: CONFIG.password,
       EMAIL_FROM: CONFIG.from,
       ...(replyTo ? { EMAIL_REPLY_TO: replyTo } : {}),
+      ...(overflow
+        ? { EMAIL_SMTP_OVERFLOW_USERNAME: OVERFLOW.username, EMAIL_SMTP_OVERFLOW_PASSWORD: OVERFLOW.password }
+        : {}),
       EMAIL_RELAY: {
         fetch: (input, init) => handler.fetch(new Request(input, init)),
         connect: () => {
@@ -235,6 +249,7 @@ async function runFallbackCase(
       messages: relay.stats.messages,
       elapsedMs: Date.now() - startedAt,
       fallbackSends: cloudflare.sent.length,
+      mailFrom: relay.stats.mailFrom,
       events: events.map((event) => `${event.name}:${"result" in event ? event.result : ""}`),
     };
     process.stdout.write(`${JSON.stringify(report)}\n`);
@@ -349,6 +364,54 @@ try {
   assert.equal(noFallbackAfterBudget.connections, 3);
   assert.equal(noFallbackAfterBudget.fallbackSends, 0);
   assert.deepEqual(noFallbackAfterBudget.events, ["email_sent:failed"]);
+
+  const overflowSent = await runFallbackCase(
+    "overflow_after_sender_limit",
+    ["sender_limit", "normal"],
+    "accept",
+    "ABCD-EFGH",
+    undefined,
+    true,
+  );
+  report.cases.push(overflowSent);
+  assert.equal(overflowSent.result, "sent");
+  assert.equal(overflowSent.messages, 1);
+  assert.equal(overflowSent.fallbackSends, 0);
+  assert.deepEqual(overflowSent.mailFrom, [`<${CONFIG.from}>`, `<${OVERFLOW.username}>`]);
+  assert.deepEqual(overflowSent.events, ["email_sent:rate_limited", "email_sent:accepted"]);
+
+  const overflowLimited = await runFallbackCase(
+    "fallback_after_overflow_limit",
+    ["sender_limit", "sender_limit"],
+    "accept",
+    "ABCD-EFGH",
+    undefined,
+    true,
+  );
+  const { sent: overflowFallbackMessages, ...overflowLimitedReport } = overflowLimited;
+  report.cases.push(overflowLimitedReport);
+  assert.equal(overflowLimited.result, "sent");
+  assert.equal(overflowLimited.connections, 2);
+  assert.equal(overflowLimited.fallbackSends, 1);
+  assert.deepEqual(overflowFallbackMessages[0]?.from, { name: "OpenBot", email: CONFIG.from });
+  assert.deepEqual(overflowLimited.events, [
+    "email_sent:rate_limited",
+    "email_sent:rate_limited",
+    "email_fallback_sent:accepted",
+  ]);
+
+  const noOverflowAfterUnknown = await runFallbackCase(
+    "no_overflow_after_unknown",
+    ["stall_after_data", "normal"],
+    "accept",
+    "ABCD-EFGH",
+    undefined,
+    true,
+  );
+  report.cases.push(noOverflowAfterUnknown);
+  assert.equal(noOverflowAfterUnknown.result, "smtp_delivery_unknown");
+  assert.equal(noOverflowAfterUnknown.connections, 1);
+  assert.deepEqual(noOverflowAfterUnknown.events, ["email_sent:unknown"]);
 
   report.passed = true;
 } catch (error) {
