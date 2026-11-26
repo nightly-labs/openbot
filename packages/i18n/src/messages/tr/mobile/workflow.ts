@@ -326,6 +326,10 @@ export const messages = {
   "mobile.workflow.github.alert.readOnly":
     "OpenBot, {repository} deposundaki sorunları ve çekme isteklerini değiştiremez.",
   "mobile.workflow.github.alert.eventsOff": "GitHub henüz {repository} deposundan olay göndermiyor.",
+  "mobile.workflow.github.alert.relayWaiting":
+    "{repository} olayları şu an OpenBot'a ulaşamıyor. OpenBot yeniden deniyor.",
+  "mobile.workflow.github.alert.relayUnrouted":
+    "OpenBot henüz {repository} olaylarını almıyor. OpenBot yeniden deniyor.",
   "mobile.workflow.github.alert.noEvent":
     "Tetikleyici bir GitHub olayı değil. Bir depo seçin ve numarayı girdiden alın.",
   "mobile.workflow.github.alert.pullRequestOnly":

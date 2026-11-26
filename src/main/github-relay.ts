@@ -1,3 +1,4 @@
+import type { WorkflowGitHubRelay } from "@openbot/contracts/ipc";
 import type { GitHubDeliveryStatus } from "@openbot/contracts/signal-protocol/github-route";
 import { Effect, Result } from "effect";
 import type { WorkflowsHandle } from "../backend/workflows/workflows";
@@ -18,13 +19,17 @@ export interface GitHubRelayOptions {
   account: GitHubRelayAccount;
   githubToken(): Effect.Effect<string | null, unknown>;
   ingress(): SignalIngress;
+  now?: () => number;
 }
+
+const ROUTE_REFRESH_MS = 5 * 60_000;
 
 export class GitHubRelay {
   readonly #options: GitHubRelayOptions;
   #repositories: readonly string[] = [];
   #release: (() => void) | null = null;
   #routed = new Map<string, GitHubRouteTicketRepository>();
+  #refreshedAt = Number.NEGATIVE_INFINITY;
 
   constructor(options: GitHubRelayOptions) {
     this.#options = options;
@@ -51,6 +56,21 @@ export class GitHubRelay {
 
   routed(fullName: string): GitHubRouteTicketRepository | null {
     return this.#routed.get(fullName.toLowerCase()) ?? null;
+  }
+
+  status(visible: readonly string[]): WorkflowGitHubRelay {
+    const ready = this.connected();
+    const routed = [...this.#routed.keys()];
+    const stale = visible.some((name) => {
+      const key = name.toLowerCase();
+      return this.#repositories.includes(key) && !this.#routed.has(key);
+    });
+    const now = (this.#options.now ?? Date.now)();
+    if (ready && stale && now - this.#refreshedAt >= ROUTE_REFRESH_MS) {
+      this.#refreshedAt = now;
+      this.#options.ingress().reconnect();
+    }
+    return { ready, watched: [...this.#repositories], routed };
   }
 
   handle(handler: GitHubIngressHandler | null): void {

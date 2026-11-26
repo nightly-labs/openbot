@@ -318,6 +318,10 @@ export const messages = defineMessages("mobile.workflow", {
   "mobile.workflow.github.alert.missing": "OpenBot cannot see {repository} on GitHub.",
   "mobile.workflow.github.alert.readOnly": "OpenBot cannot change issues and pull requests in {repository}.",
   "mobile.workflow.github.alert.eventsOff": "GitHub does not send events from {repository} yet.",
+  "mobile.workflow.github.alert.relayWaiting":
+    "Events from {repository} cannot reach OpenBot now. OpenBot tries again.",
+  "mobile.workflow.github.alert.relayUnrouted":
+    "OpenBot does not get events from {repository} yet. OpenBot tries again.",
   "mobile.workflow.github.alert.noEvent":
     "The trigger is not a GitHub event. Choose a repository, and take the number from the input.",
   "mobile.workflow.github.alert.pullRequestOnly": "{action} works only on pull requests. The trigger starts on issues.",

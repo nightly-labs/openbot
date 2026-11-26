@@ -15,6 +15,7 @@ import {
   type WorkflowSaveResult,
   type WorkflowStep,
   type WorkflowSummary,
+  workflowGitHubRelayPending,
 } from "@openbot/contracts/ipc";
 import {
   WORKFLOW_PRESENCE_LIMITS,
@@ -56,6 +57,7 @@ const RUN_PAGE = 20;
 const CACHED_WORKFLOWS = 20;
 const SAVE_DELAY_MS = 400;
 const REFRESH_DELAY_MS = 50;
+const GITHUB_RELAY_REREAD_MS = 30_000;
 
 const NO_OPTIONS: WorkflowGitHubRepositoryOptions = { labels: [], people: [] };
 
@@ -327,12 +329,16 @@ export function createWorkflowsController(
   );
   const askedOptions = new Set<string>();
   let catalogRead = 0;
+  let relayTimer: ReturnType<typeof setTimeout> | undefined;
   const readGitHubCatalog = () => {
     if (!host.githubSupported()) return;
     const request = ++catalogRead;
+    clearTimeout(relayTimer);
     host.workflows.githubCatalog().then(
       (next) => {
-        if (!disposed && request === catalogRead) setGitHubCatalog(next);
+        if (disposed || request !== catalogRead) return;
+        setGitHubCatalog(next);
+        if (workflowGitHubRelayPending(next)) relayTimer = setTimeout(readGitHubCatalog, GITHUB_RELAY_REREAD_MS);
       },
       () => undefined,
     );
@@ -768,6 +774,7 @@ export function createWorkflowsController(
       window.removeEventListener("pagehide", leaveSpot);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       if (refreshTimer !== undefined) clearTimeout(refreshTimer);
+      clearTimeout(relayTimer);
       flush();
       disposed = true;
     };

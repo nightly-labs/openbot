@@ -398,6 +398,8 @@ export const messages = {
   "workflow.github.alert.missing": "OpenBot, GitHub'da {repository} deposunu göremiyor.",
   "workflow.github.alert.readOnly": "OpenBot, {repository} deposundaki sorunları ve çekme isteklerini değiştiremez.",
   "workflow.github.alert.eventsOff": "GitHub henüz {repository} deposundan olay göndermiyor.",
+  "workflow.github.alert.relayWaiting": "{repository} olayları şu an OpenBot'a ulaşamıyor. OpenBot yeniden deniyor.",
+  "workflow.github.alert.relayUnrouted": "OpenBot henüz {repository} olaylarını almıyor. OpenBot yeniden deniyor.",
   "workflow.github.alert.noEvent": "Tetikleyici bir GitHub olayı değil. Bir depo seçin ve numarayı girdiden alın.",
   "workflow.github.alert.pullRequestOnly":
     "“{action}” yalnızca çekme isteklerinde çalışır. Tetikleyici sorunlarda başlar.",

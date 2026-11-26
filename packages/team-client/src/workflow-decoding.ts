@@ -4,6 +4,7 @@ import {
   isWorkflowFileHostExport,
   isWorkflowGitHubCatalog,
   isWorkflowGitHubHistory,
+  isWorkflowGitHubRelay,
   isWorkflowGitHubRepositoryOptions,
   isWorkflowGraph,
   isWorkflowMediaAccountCredits,
@@ -31,6 +32,8 @@ import {
   WORKFLOW_TRIGGER_TYPES,
   WORKFLOW_VERSION_KINDS,
   type WorkflowCatalogProvider,
+  type WorkflowGitHubCatalog,
+  type WorkflowGitHubRelay,
   type WorkflowMediaAccountCredits,
   type WorkflowMediaCatalog,
   type WorkflowMediaCreditBalance,
@@ -301,6 +304,15 @@ export const decodeRemoteWorkflowGitHubCatalog = guardedDecoder(
   isWorkflowGitHubCatalog,
   "remote workflow GitHub catalog",
 );
+export const decodeRemoteWorkflowGitHubRelay = guardedDecoder(isWorkflowGitHubRelay, "remote workflow GitHub relay");
+
+export async function withGitHubRelay(
+  catalog: Promise<WorkflowGitHubCatalog>,
+  relay: Promise<WorkflowGitHubRelay> | null,
+): Promise<WorkflowGitHubCatalog> {
+  const [found, state] = await Promise.all([catalog, relay?.catch(() => undefined)]);
+  return state ? { ...found, relay: state } : found;
+}
 export const decodeRemoteWorkflowGitHubOptions = guardedDecoder(
   isWorkflowGitHubRepositoryOptions,
   "remote workflow GitHub options",

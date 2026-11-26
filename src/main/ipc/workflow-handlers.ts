@@ -24,6 +24,10 @@ import {
   WORKFLOWS_CREDIT_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
 import {
+  WORKFLOWS_GITHUB_RELAY_CAPABILITY,
+  WORKFLOWS_GITHUB_RELAY_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-github-relay-v1";
+import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
@@ -77,6 +81,7 @@ import {
   decodeRemoteWorkflowGitHubCatalog,
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
+  decodeRemoteWorkflowGitHubRelay,
   decodeRemoteWorkflowList,
   decodeRemoteWorkflowMediaCatalog,
   decodeRemoteWorkflowMediaCredits,
@@ -93,6 +98,7 @@ import {
   decodeRemoteWorkflowSummary,
   decodeRemoteWorkflowVersionGraph,
   decodeRemoteWorkflowVersions,
+  withGitHubRelay,
   workflowMediaCreditsOf,
   workflowMediaProvidersOf,
 } from "@openbot/team-client/workflow-decoding";
@@ -138,6 +144,7 @@ interface WorkflowRemoteServers {
     capability:
       | typeof WORKFLOWS_CAPABILITY
       | typeof WORKFLOWS_GITHUB_CAPABILITY
+      | typeof WORKFLOWS_GITHUB_RELAY_CAPABILITY
       | typeof WORKFLOWS_MEDIA_CAPABILITY
       | typeof WORKFLOWS_SUNRA_CAPABILITY
       | typeof WORKFLOWS_HIGGSFIELD_CAPABILITY
@@ -353,9 +360,14 @@ export function workflowIpcHandlers({
           remote(serverId, WORKFLOWS_ROUTES.rotateWebhookSecret, decodeRemoteWorkflowSecret, input),
       }),
       githubCatalog: scopedQueryHandler({
-        local: () => runCauseEffect(github.catalog()),
+        local: () => runCauseEffect(github.relayCatalog()),
         remote: (serverId) =>
-          remoteGitHub(serverId, WORKFLOWS_GITHUB_ROUTES.catalog, decodeRemoteWorkflowGitHubCatalog, {}),
+          withGitHubRelay(
+            remoteGitHub(serverId, WORKFLOWS_GITHUB_ROUTES.catalog, decodeRemoteWorkflowGitHubCatalog, {}),
+            remoteServers.supportsCapability(serverId, WORKFLOWS_GITHUB_RELAY_CAPABILITY)
+              ? remoteGitHub(serverId, WORKFLOWS_GITHUB_RELAY_ROUTES.status, decodeRemoteWorkflowGitHubRelay, {})
+              : null,
+          ),
       }),
       githubOptions: scopedHandler(parseWorkflowGitHubRepository, {
         local: (input) => runCauseEffect(github.options(input.repository)),

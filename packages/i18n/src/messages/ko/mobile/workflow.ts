@@ -317,6 +317,10 @@ export const messages = {
   "mobile.workflow.github.alert.missing": "OpenBot이 GitHub에서 {repository}을(를) 볼 수 없어요.",
   "mobile.workflow.github.alert.readOnly": "OpenBot이 {repository}의 이슈와 풀 리퀘스트를 변경할 수 없어요.",
   "mobile.workflow.github.alert.eventsOff": "GitHub가 아직 {repository}의 이벤트를 보내지 않아요.",
+  "mobile.workflow.github.alert.relayWaiting":
+    "{repository}의 이벤트가 지금 OpenBot에 닿지 않아요. OpenBot이 다시 시도해요.",
+  "mobile.workflow.github.alert.relayUnrouted":
+    "OpenBot이 아직 {repository}의 이벤트를 받지 못해요. OpenBot이 다시 시도해요.",
   "mobile.workflow.github.alert.noEvent":
     "트리거가 GitHub 이벤트가 아니에요. 저장소를 선택하고, 번호는 입력에서 가져오세요.",
   "mobile.workflow.github.alert.pullRequestOnly":

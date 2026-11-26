@@ -13,6 +13,8 @@ import {
   WORKFLOW_GROUP_FIELDS,
   WORKFLOW_STEP_NAME_FIELD,
   type WorkflowDetail,
+  type WorkflowGitHubCatalog,
+  type WorkflowGitHubRelay,
   type WorkflowGraph,
   type WorkflowMediaAccountCredits,
   type WorkflowMediaCatalogModel,
@@ -21,6 +23,7 @@ import {
   type WorkflowMediaUnavailableModel,
   type WorkflowNode,
   workflowFileAssetBytes,
+  workflowGitHubRelayProblem,
   workflowVideoLengthChoices,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -66,6 +69,12 @@ import {
   WORKFLOWS_CREDIT_MEDIA_CODECS,
   WORKFLOWS_CREDIT_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
+import {
+  WORKFLOWS_GITHUB_RELAY_CAPABILITY,
+  WORKFLOWS_GITHUB_RELAY_CODECS,
+  WORKFLOWS_GITHUB_RELAY_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-github-relay-v1";
+import { WORKFLOWS_GITHUB_ROUTES } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import {
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CODECS,
@@ -124,6 +133,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import {
   decodeRemoteWorkflowDetail,
+  decodeRemoteWorkflowGitHubRelay,
   decodeRemoteWorkflowMediaUnavailable,
   decodeRemoteWorkflowRunDetail,
   decodeRemoteWorkflowVersions,
@@ -231,6 +241,14 @@ const CREDIT_UNAVAILABLE: WorkflowMediaUnavailableModel = {
   kinds: ["video"],
 };
 let creditUnavailable: readonly WorkflowMediaUnavailableModel[] = [];
+const GITHUB_CATALOG: WorkflowGitHubCatalog = {
+  connected: true,
+  repositories: [
+    { fullName: "acme/app", private: true, canWrite: true, events: true },
+    { fullName: "acme/new", private: true, canWrite: true, events: true },
+  ],
+};
+const GITHUB_RELAY: WorkflowGitHubRelay = { ready: true, watched: ["acme/app", "acme/new"], routed: ["acme/app"] };
 let creditBalance: { available: number; quota: number | null } | null = null;
 const sizeRequests: { attachmentId: string; width: number; height: number }[] = [];
 let sizeFails = false;
@@ -624,6 +642,11 @@ async function startHost(): Promise<Host> {
           ),
         ),
       rotateWorkflowSecret: () => Effect.succeed({ secret: SECRET }),
+      github: {
+        catalog: () => Effect.succeed(GITHUB_CATALOG),
+        relayCatalog: () => Effect.succeed({ ...GITHUB_CATALOG, relay: GITHUB_RELAY }),
+        options: unused,
+      },
       files: createWorkflowFileExporter({
         agents: () => agents.listAgents(),
         channelName: () => null,
@@ -2873,6 +2896,44 @@ try {
         creditModels = [];
         creditUnavailable = [];
       }
+    },
+  );
+
+  await step(
+    "github relay: the host advertises workflows-github-relay-v1 to protocol 10; an owner reads which watched repositories reach the host, a member and a peer without the capability are refused, and the v1 catalog does not change",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        decodeTeamProtocolSupportExpanded((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body)
+          .capabilities;
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_GITHUB_RELAY_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_GITHUB_RELAY_CAPABILITY));
+      const route = WORKFLOWS_GITHUB_RELAY_ROUTES.status;
+      const codec = WORKFLOWS_GITHUB_RELAY_CODECS.get(route);
+      assert.ok(codec, `No codec for ${route}.`);
+      const raw = async (path: string, token: string, capabilities: readonly string[] = TEAM_CURRENT_CAPABILITIES) =>
+        call("POST", path, { token, body: {}, protocol: TEAM_PROTOCOL_V10, capabilities });
+      codec.request({});
+      const response = await raw(route, ownerToken);
+      assert.equal(response.status, 200, JSON.stringify(response.body));
+      assert.deepEqual(codec.response(response.status, response.body), GITHUB_RELAY);
+      const relay = decodeRemoteWorkflowGitHubRelay(response.body);
+      assert.equal(workflowGitHubRelayProblem(relay, "acme/app"), undefined);
+      assert.equal(workflowGitHubRelayProblem(relay, "Acme/New"), "unrouted");
+      assert.equal(workflowGitHubRelayProblem({ ...relay, ready: false }, "acme/app"), "waiting");
+      assert.equal(workflowGitHubRelayProblem(relay, "acme/other"), undefined);
+      const catalog = await raw(WORKFLOWS_GITHUB_ROUTES.catalog, ownerToken);
+      assert.equal(catalog.status, 200, JSON.stringify(catalog.body));
+      assert.deepEqual(catalog.body, GITHUB_CATALOG);
+      const asMember = await raw(route, member);
+      assert.equal(asMember.status, 403, JSON.stringify(asMember.body));
+      const old = await raw(
+        route,
+        ownerToken,
+        TEAM_CURRENT_CAPABILITIES.filter((capability) => capability !== WORKFLOWS_GITHUB_RELAY_CAPABILITY),
+      );
+      assert.equal(old.status, 400, JSON.stringify(old.body));
+      assert.ok(JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")), JSON.stringify(old.body));
+      return { relay, member: asMember.status, old: old.status };
     },
   );
 

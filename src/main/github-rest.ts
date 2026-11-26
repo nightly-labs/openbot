@@ -3,6 +3,7 @@ import type {
   WorkflowGitHubCloseReason,
   WorkflowGitHubEvent,
   WorkflowGitHubLabel,
+  WorkflowGitHubRelay,
   WorkflowGitHubRepositoryOptions,
 } from "@openbot/contracts/ipc";
 import { WORKFLOW_GITHUB_OPTION_LIMIT } from "@openbot/contracts/ipc";
@@ -503,15 +504,24 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
 
 export interface WorkflowGitHubDirectory {
   catalog(): Effect.Effect<WorkflowGitHubCatalog, GitHubOperationError>;
+  relayCatalog(): Effect.Effect<WorkflowGitHubCatalog & { relay: WorkflowGitHubRelay }, GitHubOperationError>;
   options(repository: string): Effect.Effect<WorkflowGitHubRepositoryOptions, GitHubOperationError>;
 }
 
 export function workflowGitHubDirectory(
   catalog: () => Effect.Effect<WorkflowGitHubCatalog, GitHubOperationError>,
   api: Pick<WorkflowGitHubApi, "options">,
+  relay: (visible: readonly string[]) => WorkflowGitHubRelay,
 ): WorkflowGitHubDirectory {
   return {
     catalog,
+    relayCatalog: () =>
+      catalog().pipe(
+        Effect.map((found) => ({
+          ...found,
+          relay: relay(found.repositories.filter((entry) => entry.events).map((entry) => entry.fullName)),
+        })),
+      ),
     options: (repository) =>
       api.options(repository).pipe(
         Effect.mapError(

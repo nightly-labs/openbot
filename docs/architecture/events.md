@@ -149,6 +149,12 @@ triggers, and the `ingress` socket sends it to Signal. The account service check
 with the host's GitHub sign-in; D1 keeps none of them. Signal gives each event to every host that
 watches its repository, and the host answers with `github-delivery-result`.
 
+The trigger step shows the relay state (`GitHubRelay.status`): a warning while the `ingress` socket
+is not ready for GitHub, and a warning for each watched repository that the last route ticket does not
+name. The workflow screen reads the state again every 30 seconds while a warning shows. When a watched
+repository is in the GitHub catalog with its events on but not in the route, for example after the
+user installs OpenBotGit on it, reading the state asks for a new ticket, at most once in 5 minutes.
+
 `Workflows.receiveGitHub` records each delivery in `workflow_github_deliveries`, without the body,
 the newest 50 per trigger (`WORKFLOW_GITHUB_DELIVERY_LIMIT`). A delivery ID that is there already
 records nothing. A delivery is `started`, `waiting` (its item has an open run), or `skipped` with a
@@ -268,7 +274,10 @@ owner or admin changes a Slack node (`route-workflows.ts`).
   (`rotate-webhook-secret`). Only an owner or admin sees the URL or makes a new secret.
 - Workflow GitHub triggers and outputs: the `workflows` IPC group and the `workflows-github-v1` Team
   API capability (`WORKFLOWS_GITHUB_ROUTES`: catalog, options, history, run with last event). All
-  routes need a host administrator. A client without the capability does not offer GitHub.
+  routes need a host administrator. A client without the capability does not offer GitHub. The
+  `workflows-github-relay-v1` capability (protocol 10) adds `WORKFLOWS_GITHUB_RELAY_ROUTES.status`:
+  whether GitHub events reach the host, and which watched repositories its route names. A client
+  without it shows no relay warning.
 - Workflow Discord, Telegram and Slack triggers and outputs: no route of their own, and the `workflows-v1`
   graph save refuses a change from a member. The desktop that hosts the workflows offers all three. With
   `workflows-chats-v1`, an owner or admin of a joined server also adds and changes Telegram and Slack

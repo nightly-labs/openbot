@@ -310,6 +310,8 @@ export const messages = {
   "mobile.workflow.github.alert.missing": "OpenBot 在 GitHub 上看不到 {repository}。",
   "mobile.workflow.github.alert.readOnly": "OpenBot 无法更改 {repository} 中的议题和拉取请求。",
   "mobile.workflow.github.alert.eventsOff": "GitHub 尚未发送来自 {repository} 的事件。",
+  "mobile.workflow.github.alert.relayWaiting": "{repository} 的事件现在无法到达 OpenBot。OpenBot 会重试。",
+  "mobile.workflow.github.alert.relayUnrouted": "OpenBot 尚未收到 {repository} 的事件。OpenBot 会重试。",
   "mobile.workflow.github.alert.noEvent": "该触发器不是 GitHub 事件。选择一个仓库，并从输入中获取编号。",
   "mobile.workflow.github.alert.pullRequestOnly": "{action} 仅适用于拉取请求。该触发器在议题上启动。",
   "mobile.workflow.github.runLastEvent": "用最近的事件运行",
