@@ -3901,9 +3901,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#endpoints
       .runExclusive(() => {
         const before = this.#store.get(input.agentId);
-        return this.#applyAgentUpdate(this.#withAccountModel(input), initiatingAgentId, null, queueWhileBusy).pipe(
-          Effect.tap((agent) => Effect.sync(() => this.#modelChosen(before, agent))),
-        );
+        return this.#applyAgentUpdate(
+          this.#withAccountModel(input),
+          initiatingAgentId,
+          null,
+          queueWhileBusy,
+          initiatingAgentId === undefined,
+        ).pipe(Effect.tap((agent) => Effect.sync(() => this.#modelChosen(before, agent))));
       })
       .pipe(Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "updateAgent", cause: failure.cause })));
   }
@@ -3919,16 +3923,35 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     move: ModelMove | null,
     initiatingAgentId: string | undefined,
     next: AgentModelChoice | undefined,
+    chosenByPerson: boolean,
+    previous: AgentSummary | undefined,
   ): string | null | undefined {
     if (move !== null || input.leaveUsageLimit) return undefined;
     if (initiatingAgentId === undefined)
       return input.provider !== undefined || input.model !== undefined || input.providerAccountId !== undefined
-        ? null
+        ? chosenByPerson
+          ? this.#leftOutAccountPin(input, next, previous)
+          : null
         : undefined;
     if (input.providerAccountId === undefined) return undefined;
     if (!next || !this.#pooled(next)) return null;
     if (next.providerAccountId) return next.providerAccountId;
     return input.providerAccountId === DEFAULT_PROVIDER_ACCOUNT_ID ? DEFAULT_PROVIDER_ACCOUNT_ID : null;
+  }
+
+  #leftOutAccountPin(
+    input: AgentUpdate,
+    next: AgentModelChoice | undefined,
+    previous: AgentSummary | undefined,
+  ): string | null {
+    if (input.providerAccountId === undefined || !next) return null;
+    const account = next.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
+    if (this.#providers.accountPool(next.provider)?.leftOut.includes(account) !== true) return null;
+    const stays =
+      previous !== undefined &&
+      providerForAgent(previous) === next.provider &&
+      (agentProviderAccount(previous) ?? DEFAULT_PROVIDER_ACCOUNT_ID) === account;
+    return !stays || previous?.pinnedAccountId === account ? account : null;
   }
 
   #withAccountModel(input: AgentUpdate): AgentUpdate {
@@ -4056,6 +4079,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     initiatingAgentId?: string,
     move: ModelMove | null = null,
     queueWhileBusy = false,
+    chosenByPerson = false,
   ) {
     const returning = move === "return";
     const failingOver = move === "provider-error";
@@ -4188,6 +4212,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             ...(requestedAccount ? { providerAccountId: requestedAccount } : {}),
           }
         : undefined,
+      chosenByPerson,
+      previous,
     );
     const pin = pinnedAccountId === undefined ? {} : { pinnedAccountId };
     const queue = (pendingRuntime: AgentPendingRuntime) =>

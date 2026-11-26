@@ -179,6 +179,7 @@ export interface AgentSettingsPanelProps {
   onConnectProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   canConnectProvider?: ((provider: AgentProviderId) => boolean) | undefined;
   onManageProviders?: ((trigger: HTMLElement) => void) | undefined;
+  leftOutAccountChoice?: boolean | undefined;
   maxWidth: () => number;
   onClose: () => void;
   width: number;
@@ -1328,6 +1329,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   onManageProviders={props.onManageProviders}
                   disabledReason={t("agentSettings.runtime.modelUnavailable")}
                   accountChoice
+                  leftOutAccountChoice={props.leftOutAccountChoice}
                   providerAccountId={agentNextProviderAccountId(props.agent)}
                   workspaceOnly={workspaceAccessEnforced(props.agent)}
                   onChange={(nextModel, provider, accountId, effort) =>

@@ -100,6 +100,7 @@ interface ProviderModelPickerProps {
   onAddCustomProvider?: ((trigger: HTMLElement) => void) | undefined;
   onManageProviders?: ((trigger: HTMLElement) => void) | undefined;
   accountChoice?: boolean;
+  leftOutAccountChoice?: boolean | undefined;
   providerAccountId?: string | null | undefined;
   accountUsage?: AccountUsage | null | undefined;
   workspaceOnly?: boolean | undefined;
@@ -187,36 +188,56 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const summary = t("provider.account.poolCount", { accounts: accountsText });
     return {
       inUse: pool.inUse,
+      leftOut: pool.leftOut,
+      members,
       summary:
         pool.inUse && accounts.some((account) => account.id === pool.inUse)
           ? t("provider.account.poolInUse", { pool: summary, name: providerAccountName(t, accounts, pool.inUse) })
           : summary,
     };
   };
+  const providerAccounts = (rail: RailId): readonly ProviderAccountStatus[] =>
+    (rail === CUSTOM_RAIL ? undefined : props.agentStatus?.providers?.find((status) => status.id === rail)?.accounts) ??
+    [];
   const railAccounts = (rail: RailId): readonly ProviderAccountStatus[] => {
     if (!props.accountChoice || rail === CUSTOM_RAIL) return [];
-    const accounts = props.agentStatus?.providers?.find((status) => status.id === rail)?.accounts ?? [];
-    if (railPool(rail)) return accounts.filter((account) => isApiKeyAccount(account.id, rail));
+    const accounts = providerAccounts(rail);
+    const pool = railPool(rail);
+    if (pool)
+      return accounts.filter(
+        (account) =>
+          isApiKeyAccount(account.id, rail) ||
+          (props.leftOutAccountChoice === true && pool.leftOut.includes(account.id)),
+      );
     return accounts.length > 1 ? accounts : [];
   };
   const railKeys = createMemo<RailKey[]>(() =>
     visibleProviders().flatMap((rail): RailKey[] => {
       const accounts = railAccounts(rail);
       if (!accounts.length || rail === CUSTOM_RAIL) return [rail];
+      const pooled = railPool(rail) !== null;
       const keys = accounts.map((account) =>
-        account.id === DEFAULT_PROVIDER_ACCOUNT_ID ? rail : (`${rail}:${account.id}` as const),
+        account.id === DEFAULT_PROVIDER_ACCOUNT_ID && !pooled ? rail : (`${rail}:${account.id}` as const),
       );
-      return railPool(rail) ? [rail, ...keys] : keys;
+      return pooled ? [rail, ...keys] : keys;
     }),
   );
+  const poolAccount = (provider: AgentProviderId): string | null | undefined => {
+    const pool = railPool(provider);
+    const account = pool?.members.find((member) => member.id === pool.inUse) ?? pool?.members[0];
+    if (!account) return undefined;
+    return account.id !== DEFAULT_PROVIDER_ACCOUNT_ID ? account.id : null;
+  };
   const chosenAccount = (provider: AgentProviderId, accountId: string | null): string | null | undefined => {
     if (!railAccounts(provider).length) return undefined;
-    const keepsPoolPick = railPool(provider) && accountId === null && currentAccount() === null;
-    return keepsPoolPick ? undefined : accountId;
+    if (accountId === DEFAULT_PROVIDER_ACCOUNT_ID) return null;
+    if (accountId !== null || !railPool(provider)) return accountId;
+    return provider === props.provider && currentAccount() === null ? undefined : poolAccount(provider);
   };
   const currentAccount = (): string | null => {
-    const id = props.providerAccountId;
-    return id && railAccounts(props.provider).some((account) => account.id === id) ? id : null;
+    const id = props.providerAccountId || DEFAULT_PROVIDER_ACCOUNT_ID;
+    if (id === DEFAULT_PROVIDER_ACCOUNT_ID && !railPool(props.provider)) return null;
+    return railAccounts(props.provider).some((account) => account.id === id) ? id : null;
   };
   const customIds = createMemo(() => customProviderIds(props.customProviders ?? []));
   const modelOption = (provider: string, id: string) =>
@@ -290,11 +311,12 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   };
   const entryAccount = (key: RailKey) => {
     const rail = railOf(key);
-    const accounts = railAccounts(rail);
+    if (key === rail && railPool(rail)) return null;
     const id = key === rail ? DEFAULT_PROVIDER_ACCOUNT_ID : key.slice(rail.length + 1);
-    const index = accounts.findIndex((account) => account.id === id);
-    const account = accounts[index];
-    return account ? { account, number: index + 1, name: providerAccountName(t, accounts, id) } : null;
+    const account = railAccounts(rail).find((candidate) => candidate.id === id);
+    if (!account) return null;
+    const accounts = providerAccounts(rail);
+    return { account, number: accounts.indexOf(account) + 1, name: providerAccountName(t, accounts, id) };
   };
   const entryModelOptions = (key: RailKey): ClientAgentModelOption[] => {
     const shared = railModelOptions(railOf(key));
@@ -543,7 +565,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     if (props.foreignProvider !== undefined) return null;
     const accounts = railAccounts(props.provider);
     if (!accounts.length || (railPool(props.provider) && currentAccount() === null)) return null;
-    return providerAccountName(t, accounts, currentAccount() ?? DEFAULT_PROVIDER_ACCOUNT_ID);
+    return providerAccountName(t, providerAccounts(props.provider), currentAccount() ?? DEFAULT_PROVIDER_ACCOUNT_ID);
   };
   const savedSpeed = (): Speed =>
     props.fastMode !== true ? "standard" : props.ultrafast === true ? "ultrafast" : "fast";
@@ -791,7 +813,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 const account = () => entryAccount(key);
                 const accountId = () => {
                   const id = account()?.account.id;
-                  return id && id !== DEFAULT_PROVIDER_ACCOUNT_ID ? id : null;
+                  return id && (id !== DEFAULT_PROVIDER_ACCOUNT_ID || railPool(provider) !== null) ? id : null;
                 };
                 const status = () => entryStatus(key);
                 const models = createMemo(() => pickerModels(entryModelOptions(key), props.customProviders));
@@ -996,7 +1018,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 const runtimeAction = () => {
                   if (runtime()?.phase === "downloading") return "Cancel" as const;
                   if (available() || status().connectionState === "connecting") return undefined;
-                  if (accountId()) return undefined;
+                  if (accountId() && accountId() !== DEFAULT_PROVIDER_ACCOUNT_ID) return undefined;
                   if (runtime()?.phase === "ready") return "Connect" as const;
                   if (runtime()?.phase === "download-error") return "Retry" as const;
                   if (runtime()?.phase === "not-downloaded") return "Download" as const;

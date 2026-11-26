@@ -2,6 +2,7 @@ import { LOCAL_SERVER_ID, type ServerSummary } from "@openbot/contracts/ipc";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { PROVIDER_ACCOUNT_POOL_LEFT_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-left-out-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "@openbot/contracts/team-protocol/routine-run-command-v1";
 import { WORKSPACE_DIRECTORY_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-directory-v1";
 import { classifyFailure } from "@openbot/telemetry";
@@ -796,6 +797,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
             <AgentSettingsPanel
               remoteClient={Boolean(props.runtime)}
               localHost={props.server?.kind === "local"}
+              leftOutAccountChoice={serverSupportsCapability(props.server, PROVIDER_ACCOUNT_POOL_LEFT_OUT_CAPABILITY)}
               routineRunPlace={
                 props.server?.kind === "remote" && serverSupportsCapability(props.server, "routine-run-place-v1")
               }

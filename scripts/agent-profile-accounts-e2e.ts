@@ -191,6 +191,12 @@ const report: {
   stored?: Pick<AgentSummary, "providerAccountId" | "backupModels">;
   deletedAgent?: { ownProcessStopped: boolean; workspaceRemoved: boolean };
   pool?: { second: string | null; default: string | null; null: string | null };
+  leftOut?: {
+    account: { afterTurn: string | null; afterModelChange: string | null; pinAfterModelOnly: string | null };
+    own: { afterTurn: string | null };
+    backInPool: { account: string | null; pinned: string | null };
+    leftOutWhileOnIt: { pinned: string | null };
+  };
   liveVoice?: { saved: string | null; afterRemove: string | null; automatic: string | null };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
@@ -654,6 +660,68 @@ try {
     "With Pool accounts on, a null account gives the agent to the pool",
     pooledAgain.success && afterNull.providerAccountId === undefined && afterNull.pinnedAccountId === undefined,
     pooledAgain.text,
+  );
+
+  const talk = async (agentId: string, text: string) => {
+    const sent = await runCauseEffect(agents.sendMessage({ agentId, text }));
+    const sentId = sent.deliveries[0]?.id;
+    assert.ok(sentId, `${text}: no delivery`);
+    await waitFor(text, () => mailbox.getDelivery(sentId)?.delivery.status === "completed");
+  };
+  const accountOf = (agentId: string) => storedAgent(agentId).providerAccountId ?? "default";
+  await runCauseEffect(accounts.setPool("codex", { leftOut: [second.id] }));
+  await runCauseEffect(agents.updateAgent({ agentId: pooled.id, providerAccountId: second.id }));
+  await talk(pooled.id, "Hello on the account out of the pool.");
+  const afterAccountTurn = accountOf(pooled.id);
+  await runCauseEffect(agents.updateAgent({ agentId: pooled.id, model: OTHER_MODEL, providerAccountId: second.id }));
+  await talk(pooled.id, "Hello on another model.");
+  const afterModelChange = accountOf(pooled.id);
+  await runCauseEffect(agents.updateAgent({ agentId: pooled.id, model: MODEL }));
+  const pinAfterModelOnly = storedAgent(pooled.id).pinnedAccountId ?? null;
+  await runCauseEffect(accounts.setPool("codex", { leftOut: ["default"] }));
+  await runCauseEffect(agents.updateAgent({ agentId: pooled.id, providerAccountId: null }));
+  await talk(pooled.id, "Hello on the own sign-in out of the pool.");
+  const afterOwnTurn = accountOf(pooled.id);
+  await runCauseEffect(agents.updateAgent({ agentId: pooled.id, providerAccountId: second.id }));
+  const backInPool = storedAgent(pooled.id);
+  await runCauseEffect(accounts.setPool("codex", { leftOut: [second.id] }));
+  await runCauseEffect(agents.updateAgent({ agentId: pooled.id, model: OTHER_MODEL, providerAccountId: second.id }));
+  const leftOutWhileOnIt = storedAgent(pooled.id).pinnedAccountId ?? null;
+  report.leftOut = {
+    account: { afterTurn: afterAccountTurn, afterModelChange, pinAfterModelOnly },
+    own: { afterTurn: afterOwnTurn },
+    backInPool: { account: backInPool.providerAccountId ?? null, pinned: backInPool.pinnedAccountId ?? null },
+    leftOutWhileOnIt: { pinned: leftOutWhileOnIt },
+  };
+  pass(
+    "With Pool accounts on, an account out of the pool that a person chooses stays after a turn",
+    afterAccountTurn === second.id,
+    JSON.stringify(report.leftOut.account),
+  );
+  pass(
+    "A model change keeps the agent on the account out of the pool",
+    afterModelChange === second.id,
+    JSON.stringify(report.leftOut.account),
+  );
+  pass(
+    "A model change without the account, as an older client sends it, gives the agent back to the pool",
+    pinAfterModelOnly === null,
+    JSON.stringify(report.leftOut.account),
+  );
+  pass(
+    "The own sign-in out of the pool that a person chooses stays after a turn",
+    afterOwnTurn === "default",
+    JSON.stringify(report.leftOut.own),
+  );
+  pass(
+    "A pool account that a person chooses gives the agent to the pool",
+    backInPool.providerAccountId === second.id && backInPool.pinnedAccountId === undefined,
+    JSON.stringify(report.leftOut.backInPool),
+  );
+  pass(
+    "A model change on an account that was left out after the pool put the agent there sets no pin",
+    leftOutWhileOnIt === null,
+    JSON.stringify(report.leftOut.leftOutWhileOnIt),
   );
   await runCauseEffect(accounts.setPool("codex", null));
 
