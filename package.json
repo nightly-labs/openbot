@@ -233,6 +233,7 @@
     "test:update-rollout": "bun scripts/update-rollout-e2e.ts",
     "test:update-host-takeover": "bun scripts/update-host-takeover-e2e.ts",
     "test:hosted-update-idle-wait": "bun scripts/hosted-update-idle-wait-e2e.ts",
+    "test:hosted-update-durability": "bun scripts/hosting/hosted-update-durability-e2e.ts",
     "test:hosted-watchdog": "bun scripts/hosted-watchdog-e2e.ts",
     "test:browser-steps": "bun scripts/browser-steps-e2e.ts",
     "test:browser-dialogs": "bun scripts/browser-dialogs-e2e.ts",

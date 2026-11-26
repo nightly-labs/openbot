@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -71,8 +80,19 @@ function runStep(
   return readFileSync(events, "utf8").split("\n").filter(Boolean);
 }
 
+function filesIn(directory: string): string[] {
+  return readdirSync(directory, { recursive: true, encoding: "utf8" }).sort();
+}
+
 function sameTree(expected: string, actual: string): boolean {
-  return spawnSync("diff", ["-rq", expected, actual]).status === 0;
+  if (!existsSync(actual)) return false;
+  const files = filesIn(expected);
+  if (JSON.stringify(files) !== JSON.stringify(filesIn(actual))) return false;
+  return files.every((file) => {
+    const path = join(expected, file);
+    if (statSync(path).isDirectory()) return statSync(join(actual, file)).isDirectory();
+    return readFileSync(path).equals(readFileSync(join(actual, file)));
+  });
 }
 
 function markersIn(install: string): string[] {
