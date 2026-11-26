@@ -31,6 +31,7 @@ class ControlPlaneError extends Schema.TaggedError<ControlPlaneError>()("Control
 
 const RESUME_CHECK_CONCURRENCY = 64;
 const RESUME_CHECK_DEADLINE = "7 seconds";
+const HOST_WAKE_DEADLINE_MILLISECONDS = 10_000;
 
 const ResumeValidation = Schema.Struct({ valid: Schema.Boolean });
 const SlackValidation = Schema.Struct({ teams: Schema.Array(Schema.String) });
@@ -76,6 +77,7 @@ class ControlPlane extends Context.Service<
     discordGuildRemoved(guildId: string): Effect.Effect<void, ControlPlaneError>;
     routeWake(route: IngressRoute, wake: boolean): Effect.Effect<RouteWake, ControlPlaneError>;
     supportsRouteWake(): Effect.Effect<boolean>;
+    hostWake(hostId: string): Effect.Effect<RouteWake, ControlPlaneError>;
     reconcileDiscordGuilds(guildIds: string[], before: number): Effect.Effect<void, ControlPlaneError>;
   }
 >()("@openbot/remote-api/ControlPlane") {
@@ -217,6 +219,22 @@ class ControlPlane extends Context.Service<
           releaseResponse,
         ),
       ),
+      hostWake: Effect.fn("ControlPlane.hostWake")((hostId) =>
+        Effect.acquireUseRelease(
+          ask("/v2/remote/host-wake", { hostId, wake: true }, HOST_WAKE_DEADLINE_MILLISECONDS),
+          (response) =>
+            Effect.gen(function* () {
+              if (response.status === 404) return { hostId: null, state: "not_hosted" as const };
+              if (!response.ok)
+                return yield* new ControlPlaneError({ message: "The account service did not answer the host wake." });
+              return yield* readJson(response).pipe(
+                Effect.flatMap(Schema.decodeUnknownEffect(RouteWakeAnswer)),
+                Effect.mapError(() => new ControlPlaneError({ message: "The account service response is invalid." })),
+              );
+            }),
+          releaseResponse,
+        ),
+      ),
       supportsRouteWake: Effect.fn("ControlPlane.supportsRouteWake")(() =>
         Effect.acquireUseRelease(
           ask("/v2/remote/route-wake", { route: { platform: "slack", appId: "A0", teamId: "T0" }, wake: false }),
@@ -334,6 +352,7 @@ const signal = new SignalService(
     routeWaker: (await controlPlane.runPromise(controlPlaneService.supportsRouteWake()))
       ? (route, wake) => controlPlaneService.routeWake(route, wake).pipe(Effect.catch(() => Effect.succeed(null)))
       : null,
+    hostWaker: (hostId) => controlPlaneService.hostWake(hostId).pipe(Effect.catch(() => Effect.succeed(null))),
     fork: (work) => void signalRuntime.runFork(work),
     isEntry: () => entry.isEntry,
   },

@@ -1,0 +1,38 @@
+diff --git a/node_modules/@bacons/apple-targets/.bun-tag-cdba7b6ece14e1ca b/.bun-tag-cdba7b6ece14e1ca
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/build/with-xcode-changes.js b/build/with-xcode-changes.js
+index 96ded68c694a0eaae6e4068f09a55c50b119bc0c..ec894cbb803d3d4651025f02604d4f1d5d88f91d 100644
+--- a/build/with-xcode-changes.js
++++ b/build/with-xcode-changes.js
+@@ -218,23 +218,24 @@ async function applyXcodeChanges(config, project, props) {
+         }
+     }
+     if (targetToUpdate) {
++        const previousConfigurationList = targetToUpdate.props.buildConfigurationList;
++        const nextConfigurationList = (0, configuration_list_1.createConfigurationListForType)(project, props);
+         // Remove existing build phases
+-        targetToUpdate.props.buildConfigurationList.props.buildConfigurations.forEach((config) => {
++        [...previousConfigurationList.props.buildConfigurations].forEach((config) => {
+             config.getReferrers().forEach((ref) => {
+                 ref.removeReference(config.uuid);
+             });
+             config.removeFromProject();
+         });
+         // Remove existing build configuration list
+-        targetToUpdate.props.buildConfigurationList
++        previousConfigurationList
+             .getReferrers()
+             .forEach((ref) => {
+-            ref.removeReference(targetToUpdate.props.buildConfigurationList.uuid);
++            ref.removeReference(previousConfigurationList.uuid);
+         });
+-        targetToUpdate.props.buildConfigurationList.removeFromProject();
++        previousConfigurationList.removeFromProject();
+         // Create new build phases
+-        targetToUpdate.props.buildConfigurationList =
+-            (0, configuration_list_1.createConfigurationListForType)(project, props);
++        targetToUpdate.props.buildConfigurationList = nextConfigurationList;
+     }
+     else {
+         const productType = (0, target_1.productTypeForType)(props.type);

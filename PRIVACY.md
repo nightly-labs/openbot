@@ -2380,6 +2380,36 @@ approves it.
 Settings > Notifications > Live Activities turns this off. The phone then removes its token from the
 host.
 
+## Apple Watch app
+
+The Apple Watch app gets your agents in two ways: from the iPhone app on the same Apple ID, through
+Apple's WatchConnectivity link between the two devices, and directly from your servers, so that it
+works when the iPhone app is in the background or closed.
+
+The watch shows the agents that the chat list of the iPhone app shows: their names, server names,
+picture colours and pictures, their state, the number of unread messages, the request or question
+that an agent waits on, and the start of the last reply. It does not get hidden chats, attachments,
+files or the phone's session. The watch keeps the last copy in the storage of the OpenBot watch app,
+for the watch face complication and the next time the app opens. It also keeps it when the app lock
+of the phone is on. A sign-out on the phone tells the watch to delete its copy, its pictures and its
+keys.
+
+For the direct link, the iPhone app gives the watch its own watch session from the OpenBot account
+service. It is linked to the phone's session: a sign-out on the phone ends it, and you can see and
+revoke it in your connected devices. The watch makes its own signing key, which does not leave the
+watch, and keeps the session token and the public watch keys of your servers in its Keychain.
+
+To reach a server, the watch asks the account service for a ticket for that server, then sends the
+request to Signal over HTTPS. The request and the answer are encrypted end to end between the watch
+and the server. Signal reads only the ticket (your user ID, the server ID and the watch session ID),
+the time and the size, and passes the encrypted request to the server. It does not keep or log the
+request, the answer or the ticket. If a hosted server sleeps, a watch request wakes it.
+
+An answer on the watch, such as Allow, Deny, a choice or a dictated message, goes to the server on the
+direct link, or through the iPhone app, which sends it over its encrypted host connection, as a tap
+in the app does. Dictation on the watch uses the dictation of watchOS. Listen reads the reply with the
+speech voices of watchOS on the watch.
+
 ## iPhone notifications
 
 The iPhone app can show a notification when an agent finishes a task, stops with an error, or needs

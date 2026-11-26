@@ -335,6 +335,7 @@ import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "@openbot/contracts/team-protocol
 import { encodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
 import { TEAM_PROTOCOL_V10, type TeamProtocolSupportV10 } from "@openbot/contracts/team-protocol/v10";
 import { VOICE_TRANSCRIPTION_CAPABILITY } from "@openbot/contracts/team-protocol/voice-transcription-v1";
+import { WATCH_RELAY_TEAM_CAPABILITY } from "@openbot/contracts/team-protocol/watch-relay-v1";
 import { WHATSAPP_READ_ONLY_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-read-only-v1";
 import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
@@ -529,6 +530,7 @@ import { routeUsageCredits } from "./team-api/route-usage-credits";
 import { routeVault } from "./team-api/route-vault";
 import { routeVaultImport } from "./team-api/route-vault-import";
 import { routeVoiceTranscription } from "./team-api/route-voice-transcription";
+import { routeWatchRelay } from "./team-api/route-watch-relay";
 import { routeWhatsAppConnector } from "./team-api/route-whatsapp-connector";
 import { routeWhatsAppReadOnly } from "./team-api/route-whatsapp-read-only";
 import { routeWhatsAppStatusReactions } from "./team-api/route-whatsapp-status-reactions";
@@ -538,6 +540,7 @@ import { routeWorkflows } from "./team-api/route-workflows";
 import { routeWorkspaceDirectory } from "./team-api/route-workspace-directory";
 import { visibleWorkflowIds } from "./team-api/workflow-visibility";
 import { TeamStoreError } from "./team-store";
+import type { WatchRelayTeamApi } from "./watch-relay-commands";
 
 const EVENT_PAYLOAD_LIMIT = 256 * 1_024;
 const TYPING_TIMEOUT_MS = 5_000;
@@ -660,6 +663,29 @@ export class TeamApiServer {
 
   get port(): number | null {
     return this.#port;
+  }
+
+  watchTeamApi(): WatchRelayTeamApi {
+    const { agents, store } = this.#options;
+    const hostHidden = () => this.#options.hiddenAgents?.listHiddenAgents().agents.map((agent) => agent.agentId) ?? [];
+    return {
+      port: () => this.#port,
+      appVersion: () => this.#options.appVersion ?? "0.0.0",
+      serverName: () => store.getIdentity()?.serverName ?? null,
+      agents,
+      layout: () => this.#options.sidebarLayout.getSnapshot(),
+      pinnedAgentIds: (memberId, hidden) =>
+        this.#options.sidebarPins
+          ?.snapshot(memberId, hidden)
+          .items.flatMap((pin) => (pin.kind === "agent" ? [pin.id] : [])) ?? [],
+      hiddenAgentIds: (member) =>
+        new Set([
+          ...this.hiddenAgentIds(TEAM_PROTOCOL_V10, new Set(TEAM_CURRENT_CAPABILITIES), member),
+          ...hostHidden(),
+        ]),
+      openSession: (input) => store.openRemoteSession(input),
+      closeSession: (sessionId) => store.closeRemoteSession(sessionId),
+    };
   }
 
   start(): Effect.Effect<number, RemoteWorkflowError> {
@@ -1481,6 +1507,7 @@ export class TeamApiServer {
       )
         return;
       if ((await routePushNotifications(context, this.#options.pushNotifications)) === "handled") return;
+      if ((await routeWatchRelay(context, this.#options.watchRelay)) === "handled") return;
       if ((await routeComputerActivity(context, this.#options.pushNotifications)) === "handled") return;
       if (
         (await routeFocusUse(context, this.#options.focusUse ? (id) => this.#recordFocusUse(id) : undefined)) ===
@@ -3027,6 +3054,7 @@ export class TeamApiServer {
         if (capability === AGENT_NOTIFICATION_LEVELS_CAPABILITY)
           return this.#options.agentNotificationLevels !== undefined;
         if (capability === SIDEBAR_PINS_CAPABILITY) return this.#options.sidebarPins !== undefined;
+        if (capability === WATCH_RELAY_TEAM_CAPABILITY) return this.#options.watchRelay?.available() === true;
         return true;
       },
     );

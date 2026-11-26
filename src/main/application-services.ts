@@ -517,6 +517,9 @@ import { spawnVoiceSpeechHost } from "./voice-speech-host-process";
 import { VoiceSpeechService } from "./voice-speech-service";
 import { spawnVoiceTranscriptionHost } from "./voice-transcription-host-process";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
+import { WatchRelayCommands } from "./watch-relay-commands";
+import { createWatchRelayWantedStore, loadWatchRelayKey } from "./watch-relay-key";
+import { WatchRelayService } from "./watch-relay-service";
 import { WebhookRelay } from "./webhook-relay";
 import { WindowsTopmostKeeper } from "./windows-topmost-keeper";
 import { createWorkflowFileExporter, type WorkflowFileExporter } from "./workflow-file-export";
@@ -573,6 +576,8 @@ const CUSTOM_PROVIDERS_FILE = "openbot-custom-providers-v1.json";
 const PROVIDER_CREDENTIAL_FILE = "openbot-provider-credentials-v1.json";
 const MESSAGING_CREDENTIAL_FILE = "openbot-messaging-credentials-v1.json";
 const INGRESS_QUEUE_KEY_FILE = "openbot-ingress-queue-key-v1.json";
+const WATCH_RELAY_KEY_FILE = "openbot-watch-relay-key-v1.json";
+const WATCH_RELAY_WANTED_FILE = "openbot-watch-relay-v1.json";
 const MCP_OAUTH_FILE = "openbot-mcp-oauth-v1.json";
 const MCP_OAUTH_PROXY_FILE = "openbot-mcp-oauth-proxy-v1.json";
 const GITHUB_CONNECTOR_FILE = "openbot-github-connector-v1.json";
@@ -625,6 +630,7 @@ const TEARDOWN_ORDER = {
   routineResults: 84,
   messaging: 85,
   hostEvents: 85.5,
+  watchRelay: 85.75,
   signalIngress: 86,
   host: 90,
   clientBrowser: 98,
@@ -3335,7 +3341,22 @@ export async function createApplicationServices({
   service.on("event", (event) => {
     if (event.type === "turn-started") accountActivity.turnStarted();
   });
+  let watchCommands: WatchRelayCommands | null = null;
+  const watchRelay = new WatchRelayService({
+    hostId: () => teamStore.getIdentity()?.serverId ?? null,
+    key: loadWatchRelayKey(join(app.getPath("userData"), WATCH_RELAY_KEY_FILE), secretCipher),
+    wanted: createWatchRelayWantedStore(join(app.getPath("userData"), WATCH_RELAY_WANTED_FILE)),
+    ingress: signalIngress,
+    verifyTicket: (ticket) => centralAuth.verifyWatchTicket(ticket),
+    member: (membershipId, role) => {
+      const ownerId = role === "owner" ? teamStore.getOwnerMemberId() : null;
+      return teamStore.getMember(membershipId) ?? (ownerId ? teamStore.getMember(ownerId) : null);
+    },
+    commands: () => watchCommands,
+  });
+  teardown.push(TEARDOWN_ORDER.watchRelay, "the Apple Watch relay", () => Effect.runPromise(watchRelay.dispose()));
   const host = new HostService({
+    watchRelay,
     onMemberUse: (memberId) => accountActivity.memberUsed(memberId),
     appVersion: app.getVersion(),
     store: teamStore,
@@ -3689,6 +3710,9 @@ export async function createApplicationServices({
       }),
   });
   teardown.push(TEARDOWN_ORDER.host, "the local host", () => runCauseEffect(host.shutdown()));
+  watchCommands = new WatchRelayCommands(host.watchTeamApi());
+  signalIngress.handleWatch((delivery) => watchRelay.deliver(delivery));
+  Effect.runFork(watchRelay.start());
   const signedInState = centralAuth.getState();
   if (localServerChild) {
   } else if (signedInState.status === "signed_in") {

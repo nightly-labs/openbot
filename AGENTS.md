@@ -56,6 +56,11 @@ adding a module or moving ownership between workspaces.
   The phone also keeps the newest backdrop page that an agent set for its user with `set_backdrop`
   (`apps/mobile/src/features/settings/model/chat-backdrop.ts`); sign-out, session expiry and server
   removal delete it too.
+  The paired Apple Watch keeps a copy of the agents, their states and the requests they wait on
+  (`apps/mobile/src/features/watch/`), also with the app lock on. It gets them from the iPhone app or
+  directly from the host through Signal, end to end encrypted (`docs/architecture/watch-relay.md`).
+  It keeps a watch session token and the hosts' public watch keys in its Keychain. Sign-out deletes
+  all of it. Decided by the developer on 2026-11-25.
   A desktop or browser client also keeps a copy of the agent and channel pictures that it loaded from a
   joined server (`src/main/remote-picture-cache.ts`,
   `src/renderer/src/features/web-client/web-agent-pictures.ts`), so the saved workspace shows the agent

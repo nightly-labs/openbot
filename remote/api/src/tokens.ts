@@ -24,6 +24,11 @@ import {
   type TelegramRouteChat,
 } from "@openbot/contracts/signal-protocol/telegram-route";
 import {
+  WATCH_TICKET_AUDIENCE,
+  WATCH_TICKET_TTL_SECONDS,
+  type WatchTicketClaims,
+} from "@openbot/contracts/signal-protocol/watch-relay";
+import {
   WEBHOOK_ROUTE_AUDIENCE,
   WEBHOOK_ROUTES_LIMIT,
   type WebhookRoute,
@@ -73,6 +78,20 @@ const remoteTicketClaimsSchema = z.object({
   iat: z.number().int().nonnegative(),
   exp: z.number().int().nonnegative(),
 });
+const watchTicketClaimsSchema = z.object({
+  aud: z.literal(WATCH_TICKET_AUDIENCE),
+  jti: z.string().min(1).max(256),
+  watchSessionId: z.string().min(1).max(256),
+  hostId: z.string().min(1).max(256),
+  userId: z.string().min(1).max(256),
+  membershipId: z.string().min(1).max(256),
+  role: z.enum(["owner", "admin", "member"]),
+  authEpoch: z.number().int().nonnegative(),
+  clientPublicKey: z.string().min(1).max(256),
+  signal: z.string().min(1).max(64).optional(),
+  iat: z.number().int().nonnegative(),
+  exp: z.number().int().nonnegative(),
+}) satisfies z.ZodType<WatchTicketClaims>;
 const identifierSchema = z
   .string()
   .min(1)
@@ -246,6 +265,29 @@ export class RemoteTokenService {
         }),
       );
       return yield* tokenDecode(() => decodeTicketClaims(payload, now, this.#signalId));
+    }),
+  );
+
+  readonly verifyWatchTicket = Effect.fn("RemoteTokens.verifyWatchTicket")((token: string, now = new Date()) =>
+    Effect.gen({ self: this }, function* () {
+      const { payload } = yield* tokenCall(() =>
+        jwtVerify(token, this.#ticketKey, {
+          audience: WATCH_TICKET_AUDIENCE,
+          algorithms: ["ES256"],
+          requiredClaims: ["exp", "iat", "jti"],
+          currentDate: now,
+        }),
+      );
+      const claims = yield* tokenDecode(() => watchTicketClaimsSchema.parse(payload));
+      if (this.#signalId && claims.signal !== undefined && claims.signal !== this.#signalId)
+        return yield* new RemoteTokenError({ message: "The ticket belongs to another Signal." });
+      if (
+        claims.iat > Math.floor(now.getTime() / 1_000) + 60 ||
+        claims.exp <= claims.iat ||
+        claims.exp - claims.iat > WATCH_TICKET_TTL_SECONDS
+      )
+        return yield* new RemoteTokenError({ message: "The watch ticket timestamps are invalid." });
+      return claims;
     }),
   );
 

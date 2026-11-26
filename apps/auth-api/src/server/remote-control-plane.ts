@@ -48,6 +48,11 @@ import {
   type RemoteTicketClaims,
 } from "@openbot/contracts/signal-protocol/ticket";
 import {
+  WATCH_TICKET_AUDIENCE,
+  WATCH_TICKET_TTL_SECONDS,
+  type WatchTicketClaims,
+} from "@openbot/contracts/signal-protocol/watch-relay";
+import {
   WEBHOOK_ROUTE_AUDIENCE,
   WEBHOOK_ROUTE_ID_PATTERN,
   WEBHOOK_ROUTE_TTL_SECONDS,
@@ -412,6 +417,29 @@ export class RemoteTicketSigner {
         .setIssuedAt(issuedAt)
         .setExpirationTime(expiresAt)
         .setAudience(REMOTE_TICKET_AUDIENCE)
+        .sign(signingKey),
+    );
+    return { ticket, expiresAt: expiresAt * 1_000 };
+  }).bind(this);
+
+  readonly issueWatch = Effect.fn("RemoteTicketSigner.issueWatch")(function* (
+    this: RemoteTicketSigner,
+    input: {
+      claims: Omit<WatchTicketClaims, "aud" | "jti" | "iat" | "exp">;
+      sessionExpiresAt: number;
+      now: number;
+    },
+  ) {
+    const issuedAt = Math.floor(input.now / 1_000);
+    const expiresAt = Math.min(issuedAt + WATCH_TICKET_TTL_SECONDS, Math.floor(input.sessionExpiresAt / 1_000));
+    const signingKey = yield* this.#signingKey();
+    const ticket = yield* remoteCall(() =>
+      new SignJWT({ ...input.claims })
+        .setProtectedHeader({ alg: "ES256", typ: "JWT", kid: this.#keyId })
+        .setJti(crypto.randomUUID())
+        .setIssuedAt(issuedAt)
+        .setExpirationTime(expiresAt)
+        .setAudience(WATCH_TICKET_AUDIENCE)
         .sign(signingKey),
     );
     return { ticket, expiresAt: expiresAt * 1_000 };
@@ -2378,6 +2406,52 @@ export class RemoteControlPlane {
         clientPublicKey: boundClientPublicKey,
         ...(home ? { signal: home.id } : {}),
         now,
+      });
+      return { ...issued, signalUrl: home?.url ?? signal.entryUrl };
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly issueWatchTicket = Effect.fn("RemoteControlPlane.issueWatchTicket")(
+    function* (
+      this: RemoteControlPlane,
+      input: {
+        watchSessionId: string;
+        userId: string;
+        hostId: string;
+        clientPublicKey: string;
+        sessionExpiresAt: number;
+      },
+    ) {
+      const dependencies = yield* RemoteDependencies;
+      const membership = yield* remoteCall(() =>
+        dependencies.database
+          .prepare(
+            `SELECT m.membership_id, m.host_id, m.user_id, m.role, m.status, h.auth_epoch, h.signal_home
+         FROM remote_memberships m
+         JOIN remote_hosts h ON h.host_id = m.host_id
+         WHERE m.host_id = ? AND m.user_id = ? AND m.status = 'active' LIMIT 1`,
+          )
+          .bind(input.hostId, input.userId)
+          .first<RemoteMembershipRow & { auth_epoch: number; signal_home: string | null }>(),
+      );
+      const member = yield* remoteValidate(() => this.#assertRole(membership, ["owner", "admin", "member"]));
+      const signal = dependencies.signal;
+      if (!signal) return yield* remoteSignalNotConfigured();
+      const home = configuredSignalHome(signal, member.signal_home);
+      const issued = yield* dependencies.signer.issueWatch({
+        claims: {
+          watchSessionId: input.watchSessionId,
+          hostId: member.host_id,
+          userId: input.userId,
+          membershipId: member.membership_id,
+          role: member.role,
+          authEpoch: member.auth_epoch,
+          clientPublicKey: input.clientPublicKey,
+          ...(home ? { signal: home.id } : {}),
+        },
+        sessionExpiresAt: input.sessionExpiresAt,
+        now: dependencies.now(),
       });
       return { ...issued, signalUrl: home?.url ?? signal.entryUrl };
     },

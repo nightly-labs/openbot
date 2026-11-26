@@ -14,6 +14,9 @@
 // to one of them would keep `runtimeVersion`, and an over-the-air update could go to a binary that
 // has the old native file.
 //
+// `@bacons/apple-targets` adds the Apple Watch app and its complication from the Swift files in
+// `targets/`. They are in the binary, so they change `runtimeVersion` too.
+//
 // `plugins/with-app-icons.js` builds the app icons from the desktop logo colors, so their file changes
 // `runtimeVersion` too.
 //
@@ -28,6 +31,7 @@ module.exports = {
     { type: "dir", filePath: "plugins/notification-service", reasons: ["notificationService"] },
     { type: "dir", filePath: "plugins/shortcuts", reasons: ["shortcuts"] },
     { type: "dir", filePath: "assets/sounds", reasons: ["notificationSounds"] },
+    { type: "dir", filePath: "targets", reasons: ["watchApp"] },
     { type: "dir", filePath: "certs", reasons: ["updateSigningCertificate"] },
     { type: "file", filePath: "../../packages/contracts/src/app-logo-color.ts", reasons: ["appIcons"] },
     { type: "file", filePath: "src/features/share/extension/share-sender.ts", reasons: ["shareExtension"] },
