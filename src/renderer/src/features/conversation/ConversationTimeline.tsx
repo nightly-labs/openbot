@@ -1176,6 +1176,11 @@ export function ConversationTimeline() {
                                     {(suggestion) => (
                                       <SkillSuggestionChatCard
                                         messageId={message()?.id ?? initialMessage.id}
+                                        pressKey={{
+                                          serverId: props.server?.id ?? "local",
+                                          agentId: props.agent?.id ?? "",
+                                          messageId: message()?.id ?? initialMessage.id,
+                                        }}
                                         suggestion={suggestion()}
                                         outcome={skillSuggestionOutcome(
                                           timelineMessages(),
