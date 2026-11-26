@@ -95,6 +95,8 @@ export const messages = {
   "error.import.transferAgentEnv": "{name}: wpisz ponownie wartości {names} w Ustawieniach.",
   "error.import.transferMcpValues":
     "{name}: serwer MCP został dodany jako wyłączony. Sprawdź jego polecenie, wpisz ponownie wartości i pełny adres, a potem włącz go w Marketplace, Aplikacje.",
+  "error.import.transferMcpSignIn":
+    "{name}: aplikacja została dodana jako wyłączona. Połącz ją ponownie, a potem włącz w Marketplace, Aplikacje.",
   "error.import.transferValuesCleared":
     "{name}: z argumentów lub adresu usunięto wartości, które mogą zawierać sekret. Wpisz je ponownie w Ustawieniach.",
   "error.import.transferSharedKept":

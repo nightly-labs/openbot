@@ -20,6 +20,7 @@ export function emptyInstanceTransferService(
   uploadDirectory: string,
   exported: readonly AgentSummary[] = [],
   ownerMemberId?: () => string | null,
+  settingsOverrides: Partial<InstanceTransferOptions["settings"]> = {},
 ): InstanceTransferService {
   const forExported =
     <T>(operation: string, value: T) =>
@@ -146,6 +147,7 @@ export function emptyInstanceTransferService(
     routineFlowLinks: (_agentId) => Effect.fail(unexpected("routineFlowLinks")),
     connectRoutineFlow: (_input) => Effect.fail(unexpected("connectRoutineFlow")),
     signedInProviders: () => [],
+    ...settingsOverrides,
   };
   const preference = <T>(name: string, value: T) => ({
     get: () => value,
