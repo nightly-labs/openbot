@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import {
   type AgentEvent,
@@ -163,20 +164,18 @@ export class MailboxSync {
       threadId: page.threadId,
       activeTurnId: page.activeTurnId,
       revision: page.revision,
-      messages: page.messages,
+      messages: page.messages.map((message) => ({ ...message })),
     };
-    const previousMessageIds = new Set(persisted.messages.map((message) => message.id));
-    const previousSignature = conversationContentSignature(persisted);
     const oldest = persisted.messages[0]?.createdAt;
     this.syncMailboxMessages(
       persisted,
       this.#mailbox.conversationMessages(agent.id, oldest === undefined ? {} : { fromCreatedAt: oldest }),
     );
-    if (conversationContentSignature(persisted) === previousSignature) return;
-    const changedMessages = this.#database.changedConversationMessages(agent.threadId, persisted.messages);
-    const removedMessageIds = [...previousMessageIds].filter(
-      (messageId) => !persisted.messages.some((message) => message.id === messageId),
-    );
+    if (isDeepStrictEqual(JSON.parse(JSON.stringify(persisted.messages)), page.messages)) return;
+    const stored = new Map(page.messages.map((message) => [message.id, message]));
+    const changedMessages = this.#database.changedConversationMessages(agent.threadId, persisted.messages, stored);
+    const keptMessageIds = new Set(persisted.messages.map((message) => message.id));
+    const removedMessageIds = [...stored.keys()].filter((messageId) => !keptMessageIds.has(messageId));
     if (changedMessages.length > 0 || removedMessageIds.length > 0) {
       this.#database.persistConversationChanges({
         agentId: agent.id,

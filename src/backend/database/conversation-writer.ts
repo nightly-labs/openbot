@@ -382,22 +382,28 @@ export class ConversationWriter {
     return result.revision;
   }
 
-  changedConversationMessages(threadId: string, written: readonly ConversationMessage[]): ConversationMessage[] {
+  changedConversationMessages(
+    threadId: string,
+    written: readonly ConversationMessage[],
+    known: ReadonlyMap<string, ConversationMessage> = new Map(),
+  ): ConversationMessage[] {
     const messages = withoutDeletedMessages(this.#core.connection, threadId, written);
     if (messages.length === 0) return [];
-    const stored = new Map(
-      databaseRows(
+    const unknown = messages.filter((message) => !known.has(message.id));
+    const stored = new Map<string, ConversationMessage | null>(known);
+    if (unknown.length > 0)
+      for (const row of databaseRows(
         this.#core.connection
           .prepare(
             `SELECT message_id, message_json FROM projection_thread_messages
-             WHERE thread_id = ? AND message_id IN (${messages.map(() => "?").join(", ")})`,
+             WHERE thread_id = ? AND message_id IN (${unknown.map(() => "?").join(", ")})`,
           )
-          .all(threadId, ...messages.map((message) => message.id)),
-      ).map((row) => [
-        requiredStringColumn(row, "message_id"),
-        currentConversationMessage(JSON.parse(requiredStringColumn(row, "message_json"))),
-      ]),
-    );
+          .all(threadId, ...unknown.map((message) => message.id)),
+      ))
+        stored.set(
+          requiredStringColumn(row, "message_id"),
+          currentConversationMessage(JSON.parse(requiredStringColumn(row, "message_json"))),
+        );
     return messages.filter((message) => {
       const existing = stored.get(message.id);
       if (!existing) return true;
