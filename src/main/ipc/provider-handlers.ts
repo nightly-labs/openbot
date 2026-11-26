@@ -11,6 +11,7 @@ import {
   type ConnectProviderAccountInput,
   type ConnectProviderAccountKeyInput,
   isProviderAccountId,
+  isProviderAccountPoolStrategy,
   MAX_PROVIDER_ACCOUNTS,
   PROVIDER_ACCOUNT_LABEL_MAX_LENGTH,
   type RemoveProviderAccountInput,
@@ -156,8 +157,10 @@ export function providerIpcHandlers({
       removeProviderAccount: payloadHandler(parseRemoveProviderAccountInput, ({ provider, accountId }) =>
         runCauseEffect(service.removeProviderAccount(provider, accountId)),
       ),
-      setProviderAccountPool: payloadHandler(parseSetProviderAccountPoolInput, ({ provider, enabled, leftOut }) =>
-        runCauseEffect(service.setProviderAccountPool(provider, enabled, leftOut)),
+      setProviderAccountPool: payloadHandler(
+        parseSetProviderAccountPoolInput,
+        ({ provider, enabled, leftOut, strategy }) =>
+          runCauseEffect(service.setProviderAccountPool(provider, enabled, leftOut, strategy)),
       ),
       setLiveVoiceAccount: payloadHandler(parseSetLiveVoiceAccountInput, ({ accountId }) =>
         runCauseEffect(service.setLiveVoiceAccount(accountId)),
@@ -256,10 +259,16 @@ export function parseSetProviderAccountPoolInput(value: unknown): SetProviderAcc
     typeof value.enabled !== "boolean" ||
     !Array.isArray(value.leftOut) ||
     value.leftOut.length > MAX_PROVIDER_ACCOUNTS ||
-    !value.leftOut.every(isProviderAccountId)
+    !value.leftOut.every(isProviderAccountId) ||
+    (value.strategy !== undefined && !isProviderAccountPoolStrategy(value.strategy))
   )
     throw new Error("Invalid provider account pool.");
-  return { provider: parseProviderId(value.provider), enabled: value.enabled, leftOut: value.leftOut };
+  return {
+    provider: parseProviderId(value.provider),
+    enabled: value.enabled,
+    leftOut: value.leftOut,
+    ...(value.strategy === undefined ? {} : { strategy: value.strategy }),
+  };
 }
 
 export function parseSetLiveVoiceAccountInput(value: unknown): SetLiveVoiceAccountInput {

@@ -241,6 +241,8 @@ function providerAccounts(store: ProviderAccountStore): TeamApiProviderAccounts 
     },
     setPool: (provider, enabled, leftOut) =>
       store.setPool(provider === "acp" ? PROVIDER : provider, enabled ? { leftOut } : null).pipe(Effect.orDie),
+    poolStrategies: () => ({ strategies: [] }),
+    setPoolStrategy: unused,
     liveVoiceAccount: () => ({ accountId: null }),
     setLiveVoiceAccount: unused,
     usage: unused,

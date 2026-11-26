@@ -282,6 +282,11 @@ export const messages = {
   "provider.account.pool": "Объединить аккаунты",
   "provider.account.poolDescription":
     "Агенты используют один аккаунт, пока он не приблизится к лимиту, а затем аккаунт, чей лимит сбросится раньше всех.",
+  "provider.account.poolStrategy": "Использование аккаунтов",
+  "provider.account.poolFillFirst": "Сначала заполнять",
+  "provider.account.poolSpread": "Распределять",
+  "provider.account.poolSpreadDescription":
+    "Агенты распределяются по аккаунтам, у которых осталось больше всего лимита. Агент меняет аккаунт, только когда у другого аккаунта намного больше запаса.",
   "provider.account.inUse": "Используется",
   "provider.account.notInPool": "Вне пула",
   "provider.account.leaveOutOfPool": "Исключить из пула",
