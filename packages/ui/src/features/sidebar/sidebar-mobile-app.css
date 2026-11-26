@@ -67,7 +67,7 @@
   position: absolute;
   z-index: 2;
   top: var(--openbot-space-1-5);
-  right: var(--openbot-space-1-5);
+  inset-inline-end: var(--openbot-space-1-5);
   margin: 0;
   color: color-mix(in srgb, var(--openbot-logo-eye) 60%, transparent);
 }
