@@ -475,7 +475,7 @@ function upstreamFetch(
   });
 }
 
-function notConnected(error: unknown): boolean {
+export function notConnected(error: unknown): boolean {
   for (let current = error, depth = 0; current instanceof Error && depth < 4; current = current.cause, depth += 1) {
     if (isDynamicRecord(current)) {
       const { code, syscall } = current;
