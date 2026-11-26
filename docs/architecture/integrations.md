@@ -76,10 +76,12 @@ message tags the account with `@<row name>`.
 | Address | The first account keeps the listing URL and name, so a released client still finds it. Add account adds `#account-<id>` to the URL ([`mcp-accounts.ts`](../../packages/contracts/src/mcp-accounts.ts)). A row from before accounts has no fragment and keeps its sign-in. |
 | Sign-in | `McpOAuth` keeps one record for each address with its fragment (`mcpOAuthAccountKey`). Discovery, registration, tokens and revocation use the address without the fragment, so the fragment never leaves the computer. |
 | Provider | `McpGateway.endpoint` removes the fragment. The proxy target keeps it, so a token refresh reads the sign-in of that account, and the proxy removes it before each request. The proxy route is a digest of the row id and its URL, so each account has its own route. |
+| Own sign-in | A new row on an address that another row signs in with gets its own `#account-<id>`, so it never takes the sign-in of the other row. The MCP server form and the Marketplace install add it to the draft before the first test or sign-in (`withOwnMcpAccount`). `McpGateway.accountConfig` applies the same rule at each save and before the agent tool `save_mcp_server` tests a server, so a plain address from an older client also gets its own account. An edit keeps the account of the row unless the row moves to an address that another row uses. Rows that already share an address keep their shared sign-in. To split them, edit one row and add `#account-<name>` to its address. |
 | Catalog | `isPluginAppConfig` gives each row with an account fragment to the catalog app, whatever its name. A row with no fragment needs the catalog name, so it has no Rename. Disconnect removes all accounts of the app. |
 | Joined server | The client offers Add account only when the host sends `mcp-accounts-v1`. An older host keys sign-ins by the address without the fragment, so two accounts would share one sign-in. |
 
-Run `bun scripts/mcp-oauth-store-e2e.ts` to check that two accounts keep separate sign-ins.
+Run `bun scripts/mcp-oauth-store-e2e.ts` to check that two accounts keep separate sign-ins, and
+`bun run test:mcp-own-sign-in` to check that a new row on a used address gets its own account.
 
 ### Members and the MCP servers of a joined server
 
