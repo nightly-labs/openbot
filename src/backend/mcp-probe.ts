@@ -404,7 +404,7 @@ const countOverEffect = Effect.fnUntraced(function* (timeoutMs: number, open: ()
     Effect.try({ try: open, catch: (cause) => new McpProbeFailure({ cause }) }),
     ({ client, transport, connect }) =>
       Effect.gen(function* () {
-        yield* probeIo(connect).pipe(Effect.mapError(unreadableInitialize));
+        yield* probeIo(connect).pipe(Effect.mapError((failure) => unreadableInitialize(failure, transport)));
         return yield* countToolsEffect(client);
       }).pipe(
         Effect.timeoutOrElse({
@@ -623,8 +623,8 @@ class McpInitializeUnreadable extends Error {
   }
 }
 
-function unreadableInitialize(failure: McpProbeFailure): McpProbeFailure {
-  return failure.cause instanceof z.core.$ZodError
+function unreadableInitialize(failure: McpProbeFailure, transport: Pick<Transport, "close">): McpProbeFailure {
+  return !(transport instanceof TailedStdioTransport) && failure.cause instanceof z.core.$ZodError
     ? new McpProbeFailure({ cause: new McpInitializeUnreadable() })
     : failure;
 }
