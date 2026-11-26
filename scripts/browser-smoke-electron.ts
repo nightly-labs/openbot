@@ -130,6 +130,15 @@ const server = createServer((request, response) => {
     response.end("local download");
     return;
   }
+  if (url.pathname === "/stalled-download") {
+    response.writeHead(200, {
+      "content-type": "application/octet-stream",
+      "content-length": "1048576",
+      "content-disposition": 'attachment; filename="openbot-stalled.bin"',
+    });
+    response.write("stalled download");
+    return;
+  }
   if (url.pathname === "/settle") {
     response.setHeader("content-type", "text/plain; charset=utf-8");
     setTimeout(() => response.end("settled"), 100);
@@ -491,6 +500,7 @@ const server = createServer((request, response) => {
 });
 
 const HANG_LIMIT_MS = 10 * 60_000;
+const STALLED_DOWNLOAD_MS = 2_000;
 
 const SCENARIOS = [
   "identity",
@@ -566,6 +576,7 @@ async function main(): Promise<void> {
       recordingDurationMs: 500,
       recordingMaxConcurrent: 1,
       recordingMaxAggregateBytes: 100 * 1024 * 1024,
+      downloadStallMs: STALLED_DOWNLOAD_MS,
     });
     if (!scenario || scenario === "background") await runBackgroundScenario(browser, origin);
     await runCauseEffect(browser.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
@@ -1990,6 +2001,24 @@ async function main(): Promise<void> {
     await expectDownloadedFile(await secondDownload, join(downloadsRoot, "openbot-smoke (2).txt"), "second");
     process.stdout.write("BrowserHost: download passed.\n");
 
+    const stalledDownloads = nextDownloadsDone(downloadContents, 4, "the stalled browser downloads");
+    for (let index = 0; index < 4; index += 1) downloadContents.downloadURL(`${origin}/stalled-download?n=${index}`);
+    const stalledStates = (await stalledDownloads).map((finished) => finished.state);
+    if (stalledStates.some((state) => state !== "cancelled")) {
+      throw new Error(`Stalled browser downloads did not stop: ${stalledStates.join(", ")}.`);
+    }
+    const freedDownloadSnapshot = await runCauseEffect(browser.snapshot(downloadPage.id));
+    const freedDownload = freedDownloadSnapshot.elements.find((element) => element.name === "Download");
+    if (!freedDownload) throw new Error("Download link disappeared after the stalled downloads.");
+    const thirdDownload = nextDownloadDone(downloadContents, "the browser download after the stalled downloads");
+    await runCauseEffect(
+      browser.act(downloadPage.id, freedDownloadSnapshot.revision, {
+        type: "click",
+        ref: freedDownload.ref,
+      }),
+    );
+    await expectDownloadedFile(await thirdDownload, join(downloadsRoot, "openbot-smoke (3).txt"), "third");
+
     const toolResult = await runCauseEffect(
       browser.handleDynamicTool({
         threadId: "smoke-thread",
@@ -2002,6 +2031,10 @@ async function main(): Promise<void> {
       }),
     );
     if (!toolResult.success) throw new Error("Dynamic browser tool failed.");
+    if (!JSON.stringify(toolResult.contentItems).includes("the site sent no data")) {
+      throw new Error("The agent did not get a note that the stalled downloads stopped.");
+    }
+    process.stdout.write("BrowserHost: stalled download release passed.\n");
     await runToolBoundaryScenario(browser, origin);
     await runPopupScenario(browser, origin);
     await runSecretHandoffScenario(browser, origin);
@@ -4715,6 +4748,30 @@ function nextDownloadDone(contents: WebContents, step: string): Promise<Finished
       reject(new Error(`Timed out waiting for ${step}.`));
     }, 30_000);
     session.on("will-download", started);
+  });
+}
+
+function nextDownloadsDone(contents: WebContents, count: number, step: string): Promise<FinishedDownload[]> {
+  const { session } = contents;
+  return new Promise((resolve, reject) => {
+    const finished: FinishedDownload[] = [];
+    let started = 0;
+    const onStarted = (_event: ElectronEvent, item: DownloadItem, source: WebContents) => {
+      if (source !== contents) return;
+      started += 1;
+      if (started === count) session.off("will-download", onStarted);
+      item.once("done", (_doneEvent, state) => {
+        finished.push({ state, path: item.getSavePath() });
+        if (finished.length < count) return;
+        clearTimeout(timer);
+        resolve(finished);
+      });
+    };
+    const timer = setTimeout(() => {
+      session.off("will-download", onStarted);
+      reject(new Error(`Timed out waiting for ${step}.`));
+    }, 30_000);
+    session.on("will-download", onStarted);
   });
 }
 
