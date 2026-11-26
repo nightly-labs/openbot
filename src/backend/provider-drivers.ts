@@ -86,20 +86,22 @@ import type { McpOAuthAuthority } from "./mcp-oauth-provider";
 import type { McpOAuthProxySettingsStore } from "./mcp-oauth-proxy";
 import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntimeSource } from "./mcp-provider-shapes";
 import { MuseAgentClient } from "./muse-client";
-import { openCodeAgentDefaultsEnv } from "./opencode-agent-defaults";
+import { openCodeAgentDefaultsEnv, openCodeUserConfigHasMediaSetup } from "./opencode-agent-defaults";
 import {
   CUSTOM_ENDPOINT_SILENCE_MS,
   type CustomProviderSource,
   clearedInheritedOpenCodeKeyEnv,
   customProvidersOn,
-  OPENCODE_AGENT_CONFIG,
+  hasCustomProviderCredentials,
   OPENCODE_GO_PROVIDER,
   OPENCODE_PROFILE_CONFIG,
+  openCodeAgentConfig,
   openCodeConfigEnv,
   openCodeModelName,
   openCodeSignInMessage,
 } from "./opencode-config";
 import {
+  hasOpenCodeMediaSignIn,
   hasOpenCodeProviderKey,
   readOpenCodeGoUsage,
   readOpenCodeRefusalStatus,
@@ -883,6 +885,12 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, openCodeStatePaths()) } : {}),
         extraEnv: () => {
           const agentEnvironment = context.agentEnvironment?.();
+          const keyEnv = clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode"));
+          const processEnv = { ...process.env, ...agentEnvironment, ...keyEnv };
+          const mediaSignIn =
+            hasCustomProviderCredentials(openCodeEndpoints(context)()) ||
+            openCodeUserConfigHasMediaSetup(processEnv) ||
+            Effect.runSync(hasOpenCodeMediaSignIn(processEnv));
           return {
             ...agentEnvironment,
             ...opencodeEnv(cli),
@@ -893,8 +901,12 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
               cli.version,
               confinement ? "confined" : "provider-asks",
             ),
-            ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
-            ...clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode")),
+            ...openCodeConfigEnv(
+              openCodeAgentConfig(mediaSignIn),
+              openCodeEndpoints(context),
+              context.apiKey("opencode"),
+            ),
+            ...keyEnv,
             ...(confinement ? OPENCODE_CONFINED_ENV : {}),
           };
         },

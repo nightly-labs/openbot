@@ -782,6 +782,25 @@ to Zen in OpenCode itself (`opencode auth login`). That sign-in buys the model, 
 each model that OpenCode lists. Checked in OpenCode 2.2.5 and 2.3.0: a key on `opencode-go` lists
 the Go models and no paid Zen model (#6185).
 
+The anonymous-key filter of OpenCode turns off only a model whose token price has an input cost
+above 0. A Zen image or video model has its price under `cost.image`, so OpenCode lists it as `input
+0`, keeps it, and offers its `generate_image` (2.2 and 2.3: `experimental_image_generate`) and
+`generate_video` tools to a free model. The OpenCode service refuses each request with "Invalid
+credential" or "Missing API key" (#15281, #6432). OpenCode Go has no image or video model, so the
+Go key does not help. When `hasOpenCodeMediaSignIn` finds no sign-in that can pay for these models,
+`openCodeAgentConfig` sends `experimental.image_generate` and `experimental.video_generate` as
+`false`, which removes both tools. OpenBot's own `generate_image` and `generate_video` (OpenBot
+credits) stay, and their guidance sends an agent to them when it has no media tool of its own. The check counts a non-empty environment variable whose name ends in
+`_API_KEY` (`OPENCODE_API_KEY` after `clearedInheritedOpenCodeKeyEnv`, or a provider key such as
+`OPENAI_API_KEY`: 291 of the 326 key variables in the OpenCode 2.4.2 catalog end so), and an
+`auth.json` entry or an active `credential` row for any provider except `opencode-go`. It also counts
+a custom endpoint with a key or headers (`hasCustomProviderCredentials`), and a user OpenCode config
+(the global config files or `OPENCODE_CONFIG`) that sets a provider `apiKey` or
+`experimental.image_generate`/`video_generate`, or that OpenBot cannot decode. A key for another
+provider keeps the tools, because that provider can have its own image models: a custom endpoint
+with the id `openai` and a key gets the OpenAI image models of the catalog in OpenCode 2.4.2. Checked with the real OpenCode 2.4.0 and 2.4.2 on a free
+model; 2.2.5 and 2.3.2 have the same switch. `test:opencode-expired-key` checks the config.
+
 OpenCode first lists the models of a cached or built-in catalog and fetches the new catalog in the
 background, about 3 s later. A first start of OpenCode 2.2.5 listed 80 of 88 models. The OpenCode
 driver thus sets `catalog.relistAfterStart`: the list is read again 5 s after each start, and agents
