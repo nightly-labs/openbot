@@ -42,6 +42,12 @@ const SCHEMAS: Partial<Record<string, SavedTool[]>> = {
       parameters: { type: "object", properties: { limit: { type: "number", enum: [10, 50] } } },
     },
   ],
+  openmotion: [
+    {
+      name: "openmotion_restore_version",
+      parameters: { type: "object", properties: { presentation: { enum: ["slides", "video"] } } },
+    },
+  ],
   atlas: [
     { name: "search", parameters: { type: "object", properties: { tags: { type: "string" } } } },
     {
@@ -66,6 +72,8 @@ const GOOGLE_REFUSALS: Partial<Record<string, string>> = {
   ].join("\n"),
   bling:
     "* GenerateContentRequest.tools[20].function_declarations[0].parameters.properties[situacoes].items: field predicate failed: $type == Type.ARRAY",
+  openmotion:
+    "Unable to submit request because `mcp_openmotion_openmotion_restore_version` functionDeclaration `parameters.presentation` schema didn't specify the schema type field. Learn more: https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/function-calling",
   aave: [
     "* GenerateContentRequest.tools[23].function_declarations[0].parameters.properties[limit].enum[0]: cannot be empty",
     "* GenerateContentRequest.tools[23].function_declarations[0].parameters.properties[limit].enum[1]: cannot be empty",

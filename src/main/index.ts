@@ -110,6 +110,7 @@ import { marketplaceLinkIpcHandlers } from "./ipc/marketplace-link-handlers";
 import { mcpServerIpcHandlers } from "./ipc/mcp-server-handlers";
 import { memoryIpcHandlers } from "./ipc/memory-handlers";
 import { messagingIpcHandlers } from "./ipc/messaging-handlers";
+import { nearWalletIpcHandlers } from "./ipc/near-wallet-handlers";
 import { notificationIpcHandlers } from "./ipc/notification-handlers";
 import { onePasswordConnectorIpcHandlers } from "./ipc/onepassword-connector-handlers";
 import { passwordManagersIpcHandlers } from "./ipc/password-managers-handlers";
@@ -182,7 +183,7 @@ import { applyServerTimezone, SERVER_TIMEZONE_PREFERENCE_FILE } from "./server-t
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { singleInstanceExitMessage, singleInstanceOwnerPid } from "./single-instance-owner";
-import { StartAttempts, takeForcedStartFailure } from "./start-attempts";
+import { StartAttempts, takeForcedRendererStop, takeForcedStartFailure } from "./start-attempts";
 import { compatiblePreviousRelease, readDatabaseSchemaVersion } from "./start-recovery-release";
 import { openStartRecoveryWindow, type StartRecovery } from "./start-recovery-window";
 import { trustSystemCertificates } from "./system-certificates";
@@ -194,6 +195,7 @@ import { macShipItDirectory, shipItInstallInProgress } from "./update-install-gu
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
 import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance";
 import { placeWindowButtons } from "./window-buttons";
+import { clearEarlierWindowsNotifications } from "./windows-notification-history";
 import { restartOutsideWindowsPackage } from "./windows-package-restart";
 
 guardConsoleOutput([process.stdout, process.stderr], () => {
@@ -208,6 +210,7 @@ let startAttempts: StartAttempts | null = null;
 let previousStartHalt: StartHaltRecord | null = null;
 let startHaltExitCode: number | null = null;
 let serverSafeMode: ServerSafeMode | null = null;
+let openStartRecovery: StartRecovery | null = null;
 const SERVER_SAFE_MODE_LIFETIME_MS = 60 * 60 * 1_000;
 process.on("unhandledRejection", (reason) => reportMainProcessFailure("unhandledRejection", reason));
 process.on("uncaughtExceptionMonitor", (error, origin) => reportMainProcessFailure(origin, error));
@@ -279,6 +282,7 @@ const serverMode = takeServerModeEnvironment(process.env, app.isPackaged, proces
 const localServerChildEnvironment = takeLocalServerChildEnvironment(process.env, commandLineUserDataDirectory);
 const localServerChild = serverMode || hostedServer ? null : localServerChildEnvironment;
 const forcedStartFailure = takeForcedStartFailure(process.env, app.isPackaged);
+const forcedRendererStop = takeForcedRendererStop(process.env, app.isPackaged);
 const serverStartGuard =
   serverMode !== null || hostedServer !== null || takeServerStartGuardTest(process.env, app.isPackaged);
 const localServerControl = localServerChild
@@ -325,8 +329,8 @@ const systemTimezone =
     ? applyServerTimezone(join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE), process.env)
     : localTimezone;
 app.enableSandbox();
-if (process.platform === "win32")
-  app.setAppUserModelId(app.isPackaged ? "app.openbot.desktop" : "app.openbot.desktop.dev");
+const WINDOWS_APP_USER_MODEL_ID = app.isPackaged ? "app.openbot.desktop" : "app.openbot.desktop.dev";
+if (process.platform === "win32") app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID);
 if (
   app.isPackaged &&
   !(serverMode || hostedServer || localServerChildEnvironment) &&
@@ -487,7 +491,10 @@ let systemSessionEnding = false;
 let systemSessionEndFlushStarted = false;
 let relaunchRequested = false;
 let quitStarted = false;
-type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" | "slack-workspace" | "discord-guild" }>;
+type RendererDeepLink = Exclude<
+  DeepLink,
+  { kind: "mcp-auth" | "slack-workspace" | "discord-guild" | "near-signature" }
+>;
 
 let pendingDeepLink: RendererDeepLink | null = takeRendererDeepLink(findDeepLink(process.argv, inviteLinkOptions));
 let deepLinkReceiverReady = false;
@@ -534,6 +541,7 @@ const {
   forwardProviderRuntimeStatus,
   forwardGitHubConnectorStatus,
   forwardLinkAccountStatus,
+  forwardNearWalletStatus,
   forwardOnePasswordConnectorStatus,
   forwardBitwardenConnectorStatus,
   forwardPasswordManagerStatus,
@@ -584,6 +592,7 @@ const windows = createMainWindowController({
   developmentProfile,
   developmentRemoteRole,
   developmentTestClientEnabled,
+  stopsFirstRenderer: forcedRendererStop === "first-load",
   isQuitting: () => isQuitting,
   keepRunningInBackground: () => services?.appBehavior.keepRunningInBackground ?? false,
   getServices: () => services,
@@ -709,6 +718,7 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
 function registerIpcHandlers({
   service,
   signInRelayClient,
+  localSignInPages,
   relayedMessagingInstalls,
   providerRuntimes,
   providerCredentials,
@@ -757,6 +767,8 @@ function registerIpcHandlers({
   promptCacheTtl,
   claudeUserSetup,
   cacheExpiryCompaction,
+  mediaApprovalCredits,
+  creditAsks,
   claudeCompactWindow,
   providerEnvironment,
   modelVisibility,
@@ -778,6 +790,7 @@ function registerIpcHandlers({
   hostedSites,
   githubConnector,
   linkAccount,
+  nearWallet,
   onePasswordConnector,
   bitwardenConnector,
   passwordManagers,
@@ -891,6 +904,7 @@ function registerIpcHandlers({
       providerRuntimes,
       credentials: providerCredentials,
       openLink,
+      signInPages: localSignInPages,
     }),
     ...voiceIpcHandlers({
       voice,
@@ -923,6 +937,7 @@ function registerIpcHandlers({
     }),
     ...githubConnectorIpcHandlers({ githubConnector, remoteServers, openExternal: openLink }),
     ...linkAccountIpcHandlers({ linkAccount }),
+    ...nearWalletIpcHandlers({ nearWallet }),
     ...onePasswordConnectorIpcHandlers({ onePasswordConnector, remoteServers }),
     ...bitwardenConnectorIpcHandlers({ bitwardenConnector, remoteServers }),
     ...passwordManagersIpcHandlers({ passwordManagers, remoteServers, openExternal: openLink }),
@@ -997,6 +1012,7 @@ function registerIpcHandlers({
     ...routineIpcHandlers({ service, remoteServers }),
     ...workflowIpcHandlers({
       workflows,
+      host,
       events,
       github: workflowGitHub,
       workflowFolders: workflowFoldersService,
@@ -1035,6 +1051,7 @@ function registerIpcHandlers({
       promptCacheTtl,
       claudeUserSetup,
       cacheExpiryCompaction,
+      mediaApprovalCredits,
       claudeCompactWindow,
       providerEnvironment,
       modelVisibility,
@@ -1056,6 +1073,7 @@ function registerIpcHandlers({
       customProviders: customProviderChanges,
       remoteServers,
       relay: signInRelayClient,
+      signInPages: localSignInPages,
     }),
     ...messagingIpcHandlers({
       messaging,
@@ -1110,6 +1128,7 @@ function registerIpcHandlers({
       openExternal: openLink,
       modelVisibility,
       closeChatNotifications,
+      creditAsks,
     }),
     ...browserIpcHandlers({
       browserPictureInPicture,
@@ -1196,8 +1215,11 @@ async function recoverFromStartLoop(): Promise<
     translate: translateFor(locale),
     iconPath: appIconPath,
     showWithoutFocus: windowsOpenInBackground(),
+    stopsRenderer: forcedRendererStop === "recovery",
   });
+  openStartRecovery = recovery;
   const choice = await recovery.choice;
+  openStartRecovery = null;
   logger.info(`Recovery window choice: ${choice}.`);
   return choice === "quit" ? "quit" : recovery;
 }
@@ -1317,6 +1339,10 @@ function acceptDeepLink(link: DeepLink): void {
     receiveMessagingInstall(link);
     return;
   }
+  if (link.kind === "near-signature") {
+    receiveNearSignature(link);
+    return;
+  }
   pendingDeepLink = link;
   const window = windowHolder.current;
   if (!window || window.isDestroyed() || !deepLinkReceiverReady) return;
@@ -1355,9 +1381,24 @@ function isDeepLinkKind<Kind extends RendererDeepLink["kind"]>(
 }
 
 function takeRendererDeepLink(link: DeepLink | null): RendererDeepLink | null {
-  return link && link.kind !== "mcp-auth" && link.kind !== "slack-workspace" && link.kind !== "discord-guild"
+  return link &&
+    link.kind !== "mcp-auth" &&
+    link.kind !== "slack-workspace" &&
+    link.kind !== "discord-guild" &&
+    link.kind !== "near-signature"
     ? link
     : null;
+}
+
+function receiveNearSignature(link: Extract<DeepLink, { kind: "near-signature" }>): void {
+  const current = services;
+  if (!current) return;
+  if (!current.nearWallet.receiveSignature(link.nonce, link.data)) {
+    logger.warn("A NEAR signature link was not accepted: no signature of this run waits for it.");
+    return;
+  }
+  const window = windowHolder.current;
+  if (window && !window.isDestroyed()) showMainWindow(window);
 }
 
 function receiveMessagingInstall(link: Extract<DeepLink, { kind: "slack-workspace" | "discord-guild" }>): void {
@@ -1426,6 +1467,10 @@ if (!hasSingleInstanceLock) {
   app.on("second-instance", (_event, argv) => {
     const deepLink = findDeepLink(argv, inviteLinkOptions);
     if (deepLink) acceptDeepLink(deepLink);
+    if (openStartRecovery) {
+      openStartRecovery.present();
+      return;
+    }
     const window = windowHolder.current;
     const hasMainWindow = Boolean(window && !window.isDestroyed());
     const response = secondLaunchResponse({
@@ -1462,7 +1507,10 @@ if (!hasSingleInstanceLock) {
         app.quit();
         return;
       }
-      if (!localServerChild && !serverMode && !hostedServer) await presentApplication();
+      if (!localServerChild && !serverMode && !hostedServer) {
+        clearEarlierWindowsNotifications(WINDOWS_APP_USER_MODEL_ID);
+        await presentApplication();
+      }
       const recovery = await recoverFromStartLoop();
       if (recovery === "quit") {
         quitFor("quit");
@@ -1606,6 +1654,7 @@ if (!hasSingleInstanceLock) {
       });
       service.on("toolUsage", (usage) => built.analytics.handleToolUsage(usage));
       service.on("workflowRun", (end) => built.analytics.handleWorkflowRun(end));
+      service.on("creditMedia", (report) => built.analytics.handleCreditMedia(report));
       service.on("liveVoice", forwardVoiceLiveEvent);
       built.browser.onSiteVisited((visit) => built.analytics.handleSiteVisit(visit));
       sidebarLayout.on("changed", (layout) => forwardAgentEvent("local", { type: "sidebar-layout-changed", layout }));
@@ -1627,9 +1676,11 @@ if (!hasSingleInstanceLock) {
       host.on("presence", (snapshot) => forwardTeamPresence("local", snapshot));
       host.on("directMessage", (event) => forwardDirectMessage("local", event));
       host.on("directTyping", (event) => forwardDirectTyping("local", event));
+      host.on("workflowSpot", (event) => forwardAgentEvent("local", event));
       remoteDesktop.on("changed", forwardRemoteDesktopSessions);
       built.githubConnector.onChanged(forwardGitHubConnectorStatus);
       built.linkAccount.onChanged(forwardLinkAccountStatus);
+      built.nearWallet.onChanged(forwardNearWalletStatus);
       built.onePasswordConnector.onChanged(forwardOnePasswordConnectorStatus);
       built.bitwardenConnector.onChanged(forwardBitwardenConnectorStatus);
       built.passwordManagers.onChanged(forwardPasswordManagerStatus);

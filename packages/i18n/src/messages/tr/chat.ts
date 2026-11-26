@@ -179,6 +179,7 @@ export const messages = {
   "chat.marker.settingLink": "Bir ayar gösterildi",
   "chat.settingLink.desktopOnly": "Bilgisayarınızdaki OpenBot uygulamasında açın.",
   "chat.settingLink.agentChatOnly": "Bu ajanla sohbetinizde açın.",
+  "chat.settingLink.adminOnly": "Bu ayarı yalnızca sunucu sahibi veya bir yönetici değiştirebilir.",
   "chat.marker.skillSuggestion": "Bir beceri önerildi",
   "chat.marker.serverInstall": "Sunucu kurmak için bir komut oluşturdu",
   "chat.marker.skill.created": "Beceri oluşturuldu",

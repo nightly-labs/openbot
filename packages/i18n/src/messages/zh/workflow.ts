@@ -112,6 +112,8 @@ export const messages = {
   "workflow.agent.removedLabel": "助手已移除。选择助手",
   "workflow.agent.list": "助手",
   "workflow.agent.search": "搜索助手",
+  "workflow.agentMade.title": "{agent} 创建了一个工作流",
+  "workflow.agentMade.open": "打开",
 
   "workflow.model.label": "模型：{name}",
   "workflow.model.title": "模型",

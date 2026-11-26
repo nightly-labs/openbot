@@ -71,6 +71,7 @@ const report: {
   passed: boolean;
   restartWithLateList?: { setups: string[][]; model: string | undefined };
   restartDuringWait?: { setups: string[][]; model: string | undefined };
+  oneStartWithoutModel?: { setups: string[][]; model: string | undefined };
   restartWithoutModel?: { setups: string[][]; model: string | undefined };
   error?: string;
 } = { passed: false };
@@ -93,9 +94,9 @@ const idle = (agentId: string) =>
   !agents.listQueue(agentId).deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
 const setups = async () => (await readJsonl<SetupLine>(logPath)).filter((line) => line.event === "setup");
 
-async function restartGrok(partial: number): Promise<Set<number>> {
+async function restartGrok(partial: number, markLists = false): Promise<Set<number>> {
   const before = new Set((await setups()).map((line) => line.pid));
-  writeFileSync(controlPath, JSON.stringify({ partial }));
+  writeFileSync(controlPath, JSON.stringify({ partial, markLists }));
   await runCauseEffect(agents.restartProvider("grok"));
   await waitFor("the restart to end", async () => {
     const row = agents.getStatus().providers?.find((provider) => provider.id === "grok");
@@ -113,6 +114,7 @@ async function listsAfter(label: string, before: Set<number>, done: (lines: Setu
 }
 
 const hasModel = (lines: SetupLine[]) => lines.some((line) => line.models.includes(MODEL));
+const listMark = () => agents.listModels().find((model) => model.id.startsWith("grok-list-"))?.id;
 
 try {
   await runCauseEffect(agents.initialize());
@@ -150,11 +152,20 @@ try {
   report.restartDuringWait = { setups: secondLists, model: modelOf(agent.id) };
   assert.equal(report.restartDuringWait.model, MODEL, "A replaced process's activation does not move the agent.");
 
+  const once = await restartGrok(Number.MAX_SAFE_INTEGER, true);
+  const startMark = await waitFor("the first list of the start", async () => listMark());
+  await waitFor("OpenBot to read the list again", async () => {
+    const mark = listMark();
+    return mark !== undefined && mark !== startMark;
+  });
+  const onceLists = (await setups()).filter((line) => !once.has(line.pid)).map((line) => line.models);
   const gone = await restartGrok(Number.MAX_SAFE_INTEGER);
+  report.oneStartWithoutModel = { setups: onceLists, model: modelOf(agent.id) };
+  assert.equal(report.oneStartWithoutModel.model, MODEL, "One start whose lists all lack the model keeps it.");
   const goneLists = await listsAfter("the agent to move", gone, () => modelOf(agent.id) !== MODEL);
   report.restartWithoutModel = { setups: goneLists, model: modelOf(agent.id) };
-  assert.equal(report.restartWithoutModel.model, FALLBACK, "A model that every list lacks still moves.");
-  assert.ok(report.restartWithoutModel.setups.length >= 3, "The agent moves only after Grok is asked again.");
+  assert.equal(report.restartWithoutModel.model, FALLBACK, "A model that two starts lack still moves.");
+  assert.ok(report.restartWithoutModel.setups.length >= 2, "The agent moves only after Grok is asked again.");
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

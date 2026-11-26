@@ -1,17 +1,13 @@
-import { execFile } from "node:child_process";
 import { constants } from "node:fs";
 import { access, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { extname, isAbsolute, join } from "node:path";
-import { promisify } from "node:util";
 import { CUSTOM_AGENT_LIMITS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
-import { loginSearchPath } from "./cli";
+import { loginSearchPath, windowsWhere } from "./cli";
 import { pickWindowsExecutable } from "./mcp-provider-shapes";
 import { providerCall, providerFailure } from "./provider-client-effects";
-
-const execFileAsync = promisify(execFile);
 
 const AGENT_COMMAND_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/;
 
@@ -79,8 +75,8 @@ export const resolveAgentCommand = Effect.fn("AcpAgentCommand.resolve")(function
 });
 
 const whereExe = Effect.fn("AcpAgentCommand.whereExe")((command: string) =>
-  providerCall(() => execFileAsync("where.exe", [command], { timeout: 5_000, maxBuffer: 64 * 1024 })).pipe(
-    Effect.map(({ stdout }) => pickWindowsExecutable(stdout, process.env.PATHEXT)),
+  providerCall(() => windowsWhere(command, null)).pipe(
+    Effect.map((stdout) => pickWindowsExecutable(stdout, process.env.PATHEXT)),
     Effect.catch(() => Effect.succeed(null)),
   ),
 );

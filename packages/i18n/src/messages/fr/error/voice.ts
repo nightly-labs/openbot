@@ -34,6 +34,7 @@ export const messages = {
   "error.voice.live.timedOut": "La voix en direct Codex n’a pas démarré à temps. Réessayez.",
   "error.voice.live.failed": "La voix en direct s’est arrêtée : {reason}",
   "error.voice.live.disconnected": "La voix en direct est déconnectée.",
+  "error.voice.live.connectionLost": "La voix en direct a perdu la connexion. Réactivez le micro pour la relancer.",
   "error.voice.live.startFailed":
     "La voix en direct n’a pas pu démarrer. Mettez à jour Codex et connectez-vous avec ChatGPT sur l’ordinateur qui exécute l’agent, puis réessayez. Raison : {reason}",
   "error.voice.live.hostFailed":

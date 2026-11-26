@@ -48,6 +48,20 @@ export const messages = {
   "error.workflow.providerBusy": "プロバイダーが混み合っています。数分待ってから、ステップをもう一度実行してください。",
   "error.workflow.providerOffline":
     "OpenBot がプロバイダーに接続できませんでした。インターネット接続を確認してから、ステップをもう一度実行してください。",
+  "error.workflow.providerBilling":
+    "アカウントにクレジットがないか、プランにこのモデルが含まれていません。プランを確認するか、別のモデルを選んでください。",
+  "error.workflow.modelRefused":
+    "プロバイダーはこのアカウントでこのモデルを許可していません。別のモデルを選んでください。",
+  "error.workflow.modelRefusedReason":
+    "別のモデルを選んでください。プロバイダーはこのアカウントでこのモデルを許可していません:「{reason}」",
+  "error.workflow.contentBlocked":
+    "プロバイダーが入力をブロックしました。入力またはプロンプトを変えてから、ステップをもう一度実行してください。",
+  "error.workflow.inputTooLong": "入力がこのモデルには長すぎます。短くするか、別のモデルを選んでください。",
+  "error.workflow.requestRefused": "プロバイダーがこのステップを受け付けませんでした。別のモデルを選んでください。",
+  "error.workflow.requestRefusedReason":
+    "別のモデルを選んでください。プロバイダーがこのステップを受け付けませんでした:「{reason}」",
+  "error.workflow.providerRefused":
+    "別のモデルを選ぶか、ステップをもう一度実行してください。プロバイダーの応答:「{reason}」",
   "error.workflow.modelBusy": "別のモデルリクエストが実行中です。しばらくしてからステップを再実行してください。",
   "error.workflow.mediaFailed": "モデルが画像または動画を作成できませんでした。ステップをもう一度実行してください。",
   "error.workflow.mediaNotMade": "モデルは画像または動画を作成しませんでした。モデルの回答: {answer}",

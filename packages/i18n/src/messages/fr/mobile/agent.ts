@@ -388,11 +388,12 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Retirer {model}",
   "mobile.agent.backupModels.unavailable": "Indisponible pour le moment · ignoré",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Si une limite d’utilisation arrête {name} après le début du travail, {name} poursuit le même travail avec le premier modèle disponible dans l’ordre. Il revient à {model} quand la limite prend fin, ou 10 minutes après une erreur du fournisseur.",
   "mobile.agent.busyMessage.label": "Pendant le travail",
   "mobile.agent.busyMessage.footer":
-    "Ce que devient un message envoyé pendant que l’agent travaille. « File d’attente » le garde jusqu’à la fin du tour. « Orienter » le donne à l’agent pendant le tour.",
+    "Ce que devient un message de vous ou d’un autre agent qui arrive pendant que l’agent travaille. « File d’attente » le garde jusqu’à la fin du tour. « Orienter » le donne à l’agent pendant le tour.",
   "mobile.agent.busyMessage.queue": "File d’attente",
   "mobile.agent.busyMessage.steer": "Orienter",
   "mobile.agent.busyMessage.hostDefaultQueue": "Par défaut de l’hôte (File d’attente)",
@@ -708,6 +709,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Ne plus exclure",
   "mobile.agent.folders.browseTitle": "Choisir un dossier",
   "mobile.agent.folders.places": "Aller à",
+  "mobile.agent.folders.path": "Chemin du dossier",
   "mobile.agent.folders.home": "Dossier personnel",
   "mobile.agent.folders.parent": "Remonter à {folder}",
   "mobile.agent.folders.browseFailed": "Impossible d’ouvrir ce dossier.",

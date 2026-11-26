@@ -36,6 +36,7 @@ import { GitHubInstallationTokens, GitHubInstallationTokensError } from "./githu
 import { createHostedBilling } from "./hosted-billing";
 import { type HostedServerService, HostedServerServiceError } from "./hosted-server-service";
 import { HostedSiteInputError } from "./hosted-site-contract";
+import { HostedSiteStorageError } from "./hosted-site-effects";
 import { enforceHostedSiteReportRateLimit as enforceReportRateLimit } from "./hosted-site-request-policy";
 import { adoptUnlinkedHostedSites, resolveHostedSiteScope } from "./hosted-site-server";
 import { HostedSiteService } from "./hosted-site-service";
@@ -47,7 +48,13 @@ import {
   type MarketplaceMutationKind,
   MarketplaceRateLimitError,
 } from "./marketplace-request-policy";
-import { mediaUpstreamsFromBindings } from "./media-upstream-bindings";
+import { mediaGatewayFromBinding } from "./media-gateway";
+import {
+  type NearIntentsOwner,
+  NearIntentsRelay,
+  NearIntentsRelayError,
+  nearIntentsRelayErrorResponse,
+} from "./near-intents-relay";
 import { Referrals } from "./referrals";
 import {
   deliverPendingRemoteAuthEvents,
@@ -162,7 +169,7 @@ export function requestCreditMedia(): CreditMediaService {
   const bindings = requireWorkerBindings(env);
   return new CreditMediaService({
     database: bindings.DB,
-    upstreams: mediaUpstreamsFromBindings(bindings),
+    gateway: mediaGatewayFromBinding(bindings.MEDIA_GATEWAY),
     now: () => Date.now(),
     analytics: accountAnalytics(bindings),
   });
@@ -183,6 +190,41 @@ export const requestCreditMediaPayer = Effect.fn("CreditMedia.requestPayer")(fun
   const payer: CreditMediaPayer = { wallet: "personal", userId: user.id };
   return { payer, actorUserId: user.id };
 });
+
+export const requestNearIntentsOwner = Effect.fn("NearIntents.requestOwner")(function* (request: Request) {
+  const hostId = request.headers.get(CREDIT_MEDIA_HOST_HEADER);
+  const machineToken = request.headers.get(CREDIT_MEDIA_HOST_TOKEN_HEADER);
+  if (hostId || machineToken) {
+    if (!hostId || !machineToken || hostId.length > 200 || machineToken.length > 512)
+      return yield* new RemoteControlPlaneError(401, "host_unauthorized", "The host credential is invalid.");
+    yield* requestRemoteControlPlane().authenticateHost(hostId, machineToken);
+    const owner: NearIntentsOwner = { kind: "server", serverId: hostId };
+    return owner;
+  }
+  const user = yield* requestUser(request);
+  if (!user) return null;
+  const owner: NearIntentsOwner = { kind: "user", userId: user.id };
+  return owner;
+});
+
+export function requestNearIntentsRelay(): NearIntentsRelay {
+  const bindings = requireWorkerBindings(env);
+  return new NearIntentsRelay({
+    database: bindings.DB,
+    partnerKey: bindings.NEAR_INTENTS_PARTNER_KEY,
+    upstream: bindings.NEAR_INTENTS_AGENT_API_URL,
+  });
+}
+
+export function nearIntentsErrorResponse(error: unknown): Response {
+  if (error instanceof NearIntentsRelayError) return nearIntentsRelayErrorResponse(error);
+  if (error instanceof RemoteControlPlaneError)
+    return nearIntentsRelayErrorResponse(new NearIntentsRelayError(error.status, error.code, error.message));
+  console.error("near-intents: the relay failed");
+  return nearIntentsRelayErrorResponse(
+    new NearIntentsRelayError(503, "wallet_service_unavailable", "The crypto wallet service is not available."),
+  );
+}
 
 export function creditMediaErrorResponse(error: unknown): Response {
   if (error instanceof BillingError) {
@@ -226,7 +268,28 @@ export function hostedSiteErrorResponse(error: unknown): Response {
     if (error.retryAfterSeconds !== undefined) response.headers.set("Retry-After", String(error.retryAfterSeconds));
     return response;
   }
+  if (error instanceof HostedSiteStorageError) return siteStorageUnavailableResponse(error);
   return authErrorResponse(error);
+}
+
+const SITE_STORAGE_RETRY_AFTER_SECONDS = 60;
+
+function siteStorageUnavailableResponse(error: HostedSiteStorageError): Response {
+  const reference = requestFailureReference();
+  console.error("Site storage request failed:", reference, error._tag);
+  const response = json(
+    {
+      error: {
+        code: "site_storage_unavailable",
+        message:
+          "Site storage did not answer for a short time. A site that is online stays online. Try again in about 1 minute.",
+        reference,
+      },
+    },
+    503,
+  );
+  response.headers.set("Retry-After", String(SITE_STORAGE_RETRY_AFTER_SECONDS));
+  return response;
 }
 
 let githubInstallationTokens: { key: string; service: GitHubInstallationTokens } | null = null;
@@ -581,12 +644,16 @@ export function authErrorResponse(error: unknown): Response {
     }
     return response;
   }
-  const reference = `auth/${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
+  const reference = requestFailureReference();
   console.error("Account service request failed:", reference, errorType(error));
   return json(
     { error: { code: "internal_error", message: "The account service could not complete the request.", reference } },
     500,
   );
+}
+
+function requestFailureReference(): string {
+  return `auth/${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
 }
 
 function errorType(error: unknown): string {

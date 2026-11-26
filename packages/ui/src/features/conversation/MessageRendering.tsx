@@ -57,7 +57,13 @@ import { createSmoothHeightResize } from "./createSmoothHeightResize";
 import { DataTable, type MessageContentBlock, messageContentBlocks, reuseUnchangedBlocks } from "./DataTable";
 import { messageFileReferences } from "./FileReference";
 import { ImageGeneration } from "./ImageGeneration";
-import { ImageGallery, ImageLightbox, type ImageLightboxOpening, isLightboxImage } from "./ImageLightbox";
+import {
+  type ImageCopies,
+  ImageGallery,
+  ImageLightbox,
+  type ImageLightboxOpening,
+  isLightboxImage,
+} from "./ImageLightbox";
 import {
   MarkdownInlineText,
   MarkdownMessageText,
@@ -306,6 +312,7 @@ export function MessageBody(props: {
   onOpenTag?: ((kind: "tab" | "thread", id: string) => void) | undefined;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
   mediaSource?: AttachmentMediaSource | undefined;
+  imageCopies?: ImageCopies | undefined;
   downloads?: AttachmentDownloads | undefined;
   frame?: ((content: JSX.Element, imagesOnly: () => boolean) => JSX.Element) | undefined;
   loadImageFile?: ((file: MessageImageFile) => Promise<string | null>) | undefined;
@@ -374,12 +381,13 @@ export function MessageBody(props: {
           .map((reference) => reference.attachment.id),
       ),
   );
+  const imageSource = createMemo(() => props.imageCopies?.mediaSource ?? props.mediaSource);
   const mediaImages = new Map<string, AttachmentSummary>();
   const sentImages = new Map<string, AttachmentSummary>();
   const shownAttachments = createMemo<AttachmentSummary[]>((previous = []) =>
     (props.message.attachments ?? []).map((attachment, index) => {
       if (attachment.previewUrl || attachment.previewKind !== "image") return attachment;
-      const url = props.mediaSource?.url(attachment.id);
+      const url = imageSource()?.url(attachment.id);
       if (!url) {
         const sent = sentImages.get(attachment.id);
         if (sent) return sent;
@@ -471,7 +479,7 @@ export function MessageBody(props: {
   const loadLimit = (attachment: AttachmentSummary) =>
     props.message.imageGeneration && props.message.attachments?.[0]?.id === attachment.id ? "generated" : "thumbnail";
   const arrivingImage = (attachment: AttachmentSummary) => {
-    const source = props.mediaSource;
+    const source = imageSource();
     return (
       source !== undefined &&
       attachment.previewKind === "image" &&
@@ -492,11 +500,11 @@ export function MessageBody(props: {
   });
   const loadedImages = new Set<string>();
   const loadingImages = new Set<string>();
-  let loadingSource = props.mediaSource;
+  let loadingSource = untrack(imageSource);
   createEffect(
     () => standaloneImageAttachments().filter((attachment) => !attachment.previewUrl),
     (arriving) => {
-      const source = props.mediaSource;
+      const source = imageSource();
       if (source !== loadingSource) {
         loadingImages.clear();
         loadingSource = source;
@@ -567,9 +575,11 @@ export function MessageBody(props: {
     if (file) props.onDownloadImageFile?.(file);
     else props.onDownload?.(image);
   };
-  const [lightbox, setLightbox] = createSignal<(ImageLightboxOpening & { markdown?: boolean }) | null>(null);
+  const [lightbox, setLightbox] = createSignal<
+    (ImageLightboxOpening & { markdown?: boolean; copies?: boolean }) | null
+  >(null);
   const lightboxImages = createMemo(() => shownAttachments().filter(isLightboxImage));
-  const openAttachment = (attachment: AttachmentSummary, origin?: HTMLElement) => {
+  const openAttachment = (attachment: AttachmentSummary, origin?: HTMLElement, fromGallery = false) => {
     if (isLightboxImage(attachment)) {
       const named = fileImages().some((image) => image.id === attachment.id);
       const siblings = named ? fileImages() : lightboxImages();
@@ -579,6 +589,7 @@ export function MessageBody(props: {
         index: images.findIndex((image) => image.id === attachment.id),
         origin,
         markdown: named,
+        copies: !named && (fromGallery || props.imageCopies?.mediaSource !== undefined),
       });
     } else if (canPreviewAttachment(attachment)) {
       props.onPreview(attachment);
@@ -637,7 +648,12 @@ export function MessageBody(props: {
   const imageBlock = () => (
     <Switch>
       <Match when={standaloneImageAttachments().length > 1}>
-        <ImageGallery images={standaloneImageAttachments()} onOpen={openAttachment} onDownload={props.onDownload} />
+        <ImageGallery
+          images={standaloneImageAttachments()}
+          onOpen={(attachment, origin) => openAttachment(attachment, origin, true)}
+          onDownload={props.onDownload}
+          copies={props.imageCopies}
+        />
       </Match>
       <Match when={standaloneImageAttachments().length === 1}>
         <div class="message-image-attachments">
@@ -649,6 +665,7 @@ export function MessageBody(props: {
                 prompt={attachment().name}
                 aspectRatio="square"
                 attachment={attachment()}
+                copyUrl={props.imageCopies?.copyUrl(attachment())}
                 loading={!attachment().previewUrl}
                 onPreview={openAttachment}
                 onDownload={props.onDownload}
@@ -672,6 +689,7 @@ export function MessageBody(props: {
               : !opening().markdown && Boolean(props.onDownload)
           }
           macWindowControls={props.macWindowControls}
+          copies={opening().copies ? props.imageCopies : undefined}
           onClose={() => setLightbox(null)}
         />
       )}
@@ -734,10 +752,22 @@ export function MessageBody(props: {
                 {(block, index) => (
                   <Switch>
                     <Match when={comparisonTableContent(block())}>
-                      {(table) => <ComparisonTable table={table()} renderCell={renderMarkdownInline} />}
+                      {(table) => (
+                        <ComparisonTable
+                          table={table()}
+                          renderCell={renderMarkdownInline}
+                          selectionMessageId={props.message.streaming !== true ? props.message.id : undefined}
+                        />
+                      )}
                     </Match>
                     <Match when={dataTableContent(block())}>
-                      {(table) => <DataTable table={table()} renderCell={renderMarkdownInline} />}
+                      {(table) => (
+                        <DataTable
+                          table={table()}
+                          renderCell={renderMarkdownInline}
+                          selectionMessageId={props.message.streaming !== true ? props.message.id : undefined}
+                        />
+                      )}
                     </Match>
                     <Match when={codeContent(block())}>
                       {(code) => (
@@ -869,7 +899,7 @@ export function MessageBody(props: {
         <div class="message-attachments-group">
           <AttachmentCards
             attachments={standaloneFileAttachments()}
-            mediaSource={props.mediaSource}
+            mediaSource={imageSource()}
             downloads={props.downloads}
             onPreview={openAttachment}
             onAction={props.onAttachmentAction}

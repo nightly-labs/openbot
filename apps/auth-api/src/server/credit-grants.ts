@@ -1,15 +1,25 @@
-import { type CreditExpiring, creditsFromTenths, creditTenths } from "@openbot/contracts/credits";
+import { CREDIT_WELCOME, type CreditExpiring, creditsFromTenths, creditTenths } from "@openbot/contracts/credits";
 import { LICENSE_TIERS, licenseMonthlyCredits } from "@openbot/contracts/license";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { type AccountAnalytics, NO_ACCOUNT_ANALYTICS } from "./account-analytics";
 import { type BillingError, type BillingOperationError, billingCall } from "./billing-errors";
 
+export function welcomeTenthsSql(column: WalletColumn, idParam: string): string {
+  return `MAX(0, (SELECT COALESCE(SUM(remaining_tenths), 0) FROM credit_grants
+      WHERE ${column} = ${idParam} AND scope = 'welcome' AND status = 'active')
+    - (SELECT COALESCE(SUM(credits_tenths), 0) FROM credit_holds
+      WHERE ${column} = ${idParam} AND status = 'held' AND funding = 'welcome'))`;
+}
+
 type Failure = BillingError | BillingOperationError;
-type WalletColumn = "user_id" | "server_id";
+export type WalletColumn = "user_id" | "server_id";
 
 const ISSUE_BATCH = 100;
 const EXPIRE_BATCH = 50;
+const WELCOME_TENTHS = creditTenths(CREDIT_WELCOME);
+const WELCOME_SOURCE = "welcome";
+const WELCOME_ENDS_AT = Date.UTC(9999, 11, 31);
 
 export interface CreditGrantsOptions {
   database: D1Database;
@@ -91,6 +101,7 @@ function orderedGrantsSql(spent: string): string {
       FROM credit_grants g, spent
      WHERE g.status = 'active' AND g.remaining_tenths > 0 AND spent.tenths > 0
        AND g.expires_at > spent.created_at
+       AND g.scope = CASE WHEN spent.funding = 'welcome' THEN 'welcome' ELSE 'all' END
        AND (g.user_id = spent.user_id OR g.server_id = spent.server_id)
   )`;
 }
@@ -119,7 +130,7 @@ export function moveGrantsSql(
 }
 
 export function expiringGrantsSql(column: WalletColumn, idParam: string, nowParam: string): string {
-  const live = `${column} = ${idParam} AND status = 'active' AND remaining_tenths > 0`;
+  const live = `${column} = ${idParam} AND status = 'active' AND scope = 'all' AND remaining_tenths > 0`;
   const firstExpiry = `(SELECT MIN(expires_at) FROM credit_grants WHERE ${live} AND expires_at > ${nowParam})`;
   return `(SELECT COALESCE(SUM(remaining_tenths), 0) FROM credit_grants WHERE ${live} AND expires_at = ${firstExpiry}) AS expiring_tenths,
     ${firstExpiry} AS expiring_at`;
@@ -212,6 +223,51 @@ export class CreditGrants {
     return issued;
   }).bind(this);
 
+  readonly welcome = Effect.fn("CreditGrants.welcome")(function* (
+    this: CreditGrants,
+    userId: string,
+  ): Effect.fn.Return<boolean, Failure> {
+    const grantId = `${WELCOME_SOURCE}:${userId}`;
+    const issued = yield* billingCall(() =>
+      this.#database.prepare("SELECT 1 AS issued FROM credit_grants WHERE grant_id = ?1").bind(grantId).first(),
+    );
+    if (issued) return false;
+    const now = this.#now();
+    const [inserted] = yield* billingCall(() =>
+      this.#database.batch([
+        this.#database
+          .prepare(
+            `INSERT INTO credit_grants(
+               grant_id, user_id, server_id, credits_tenths, remaining_tenths, source, scope, starts_at, expires_at,
+               created_at
+             )
+             SELECT ?1, ?2, NULL, ?3, ?3, ?4, 'welcome', ?5, ?6, ?5
+              WHERE EXISTS (SELECT 1 FROM users WHERE id = ?2)
+             ON CONFLICT(grant_id) DO NOTHING`,
+          )
+          .bind(grantId, userId, WELCOME_TENTHS, WELCOME_SOURCE, now, WELCOME_ENDS_AT),
+        this.#database
+          .prepare(
+            `INSERT INTO credit_ledger(
+               entry_id, user_id, server_id, amount_tenths, kind, actor_user_id, reference, created_at
+             )
+             SELECT 'grant:' || grant_id, user_id, NULL, credits_tenths, 'grant', NULL, grant_id, created_at
+               FROM credit_grants WHERE grant_id = ?1
+             ON CONFLICT(entry_id) DO NOTHING`,
+          )
+          .bind(grantId),
+      ]),
+    );
+    if (inserted?.meta.changes !== 1) return false;
+    this.#analytics.track(userId, {
+      name: "credit_action",
+      action: "granted",
+      wallet: "personal",
+      credits: creditsFromTenths(WELCOME_TENTHS),
+    });
+    return true;
+  }).bind(this);
+
   readonly expire = Effect.fn("CreditGrants.expire")(function* (this: CreditGrants): Effect.fn.Return<number, Failure> {
     const now = this.#now();
     const due = yield* billingCall(() =>
@@ -249,13 +305,14 @@ export class CreditGrants {
                           + COALESCE((
                             SELECT SUM(credits_tenths) FROM credit_holds WHERE status = 'held' AND server_id = g.server_id
                           ), 0)
-                          AS held
+                          AS held,
+                        ${welcomeTenthsSql("user_id", "g.user_id")} AS welcome
                    FROM credit_grants g
                   WHERE g.grant_id = ?1 AND g.status = 'active'
                ),
                lost AS (
                  SELECT grant_id, user_id, server_id,
-                        MIN(remaining, MAX(0, ledger - held)) AS tenths
+                        MIN(remaining, MAX(0, ledger - held - welcome)) AS tenths
                    FROM wallet
                )
                INSERT INTO credit_ledger(

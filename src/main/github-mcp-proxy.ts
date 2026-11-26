@@ -40,6 +40,16 @@ const notVisibleHint = (repository: string) =>
   'GitHub App is not installed: GitHub then answers "Not Found", and git answers "Write access to repository not ' +
   'granted". Check the owner and the name. When they are correct, tell the user to add the repository in OpenBot: ' +
   "Marketplace > Apps > GitHub > Choose repositories.";
+const SAML_ENFORCEMENT = /SAML enforcement/iu;
+const singleSignOnHint = (owner: string) =>
+  `GitHub refused this request because the organization ${owner} uses single sign-on (SAML), and the GitHub ` +
+  "sign-in of OpenBot does not have single sign-on access to it. This happens when the user signed in to GitHub " +
+  "in OpenBot while their browser had no active single sign-on session for the organization. Repository " +
+  'permissions are not the cause, and the "grant your OAuth token" step in the GitHub message does not apply to ' +
+  "OpenBot. Do not try another credential. Tell the user to: 1. Open " +
+  `https://github.com/orgs/${encodeURIComponent(owner)}/sso in their browser and complete the single sign-on. ` +
+  '2. In OpenBot, open Marketplace > Apps > GitHub and click "Disconnect". On the GitHub page that opens, revoke ' +
+  'OpenBotGit. 3. Click "Connect GitHub" and enter the code in the same browser. Then try again.';
 
 export interface GitHubMcpProxyOptions {
   upstreamUrl: string;
@@ -210,7 +220,10 @@ export class GitHubMcpProxy {
     );
     const forward = <T>(token: string, call: (client: Client) => Promise<T>) => runCauseEffect(this.#call(token, call));
     mcp.setRequestHandler(ListToolsRequestSchema, ({ params }, extra) =>
-      forward(userToken, (client) => client.listTools(params, requestOptions(extra.signal))),
+      forward(userToken, (client) => client.listTools(params, requestOptions(extra.signal))).then((result) => ({
+        ...result,
+        tools: result.tools.filter(isModelVisible),
+      })),
     );
     mcp.setRequestHandler(CallToolRequestSchema, ({ params }, extra) => {
       const args = params.arguments;
@@ -223,13 +236,16 @@ export class GitHubMcpProxy {
             client.callTool(params, undefined, requestOptions(extra.signal)),
           );
           if (params.name === "create_repository") addRepositoryCreationHint(result);
+          const singleSignOn = owner !== null && isSingleSignOnRefused(result);
+          if (singleSignOn) addHint(result, singleSignOnHint(owner));
           const unseen =
+            !singleSignOn &&
             token === userToken &&
             owner &&
             name &&
             isNotFoundOrRefused(result) &&
             (yield* this.#options.canRead(owner, name, extra.signal)) === false;
-          if (unseen) addNotVisibleHint(result, `${owner}/${name}`);
+          if (unseen) addHint(result, notVisibleHint(`${owner}/${name}`));
           boundTextContent(result);
           return result;
         }),
@@ -320,6 +336,12 @@ export class GitHubMcpProxy {
   }
 }
 
+function isModelVisible(tool: Awaited<ReturnType<Client["listTools"]>>["tools"][number]): boolean {
+  const ui = tool._meta?.ui;
+  const visibility = isDynamicRecord(ui) ? ui.visibility : undefined;
+  return !Array.isArray(visibility) || visibility.includes("model");
+}
+
 function isRefused(error: unknown): boolean {
   return error instanceof StreamableHTTPError && error.code === 401;
 }
@@ -332,14 +354,22 @@ function addRepositoryCreationHint(result: Awaited<ReturnType<Client["callTool"]
   if (refused) result.content.push({ type: "text", text: REPOSITORY_CREATION_HINT });
 }
 
+function errorTexts(result: Awaited<ReturnType<Client["callTool"]>>): string[] {
+  if (result.isError !== true || !Array.isArray(result.content)) return [];
+  return result.content.flatMap((item) => (isDynamicRecord(item) && isString(item.text) ? [item.text] : []));
+}
+
 function isNotFoundOrRefused(result: Awaited<ReturnType<Client["callTool"]>>): boolean {
-  if (result.isError !== true || !Array.isArray(result.content)) return false;
-  const texts = result.content.flatMap((item) => (isDynamicRecord(item) && isString(item.text) ? [item.text] : []));
+  const texts = errorTexts(result);
   return texts.some((text) => NOT_FOUND_OR_REFUSED.test(text)) && !texts.some((text) => RATE_LIMIT.test(text));
 }
 
-function addNotVisibleHint(result: Awaited<ReturnType<Client["callTool"]>>, repository: string): void {
-  if (Array.isArray(result.content)) result.content.push({ type: "text", text: notVisibleHint(repository) });
+function isSingleSignOnRefused(result: Awaited<ReturnType<Client["callTool"]>>): boolean {
+  return errorTexts(result).some((text) => SAML_ENFORCEMENT.test(text));
+}
+
+function addHint(result: Awaited<ReturnType<Client["callTool"]>>, hint: string): void {
+  if (Array.isArray(result.content)) result.content.push({ type: "text", text: hint });
 }
 
 function boundTextContent(result: Awaited<ReturnType<Client["callTool"]>>): void {

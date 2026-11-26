@@ -303,6 +303,10 @@ function handOff(from: HeldSubmenu, panel: HTMLElement): void {
   });
 }
 
+export function panelShownInGroup(group: Element): boolean {
+  return held?.group === group || Array.from(openInGroup.values()).includes(group);
+}
+
 export function useMenuMotion(own?: () => MotionPlace | undefined): (element: HTMLElement) => void {
   let panel: HTMLElement | undefined;
   let place: Node | null = null;

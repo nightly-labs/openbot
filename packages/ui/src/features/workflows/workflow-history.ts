@@ -204,7 +204,17 @@ export function createCanvasHistory(options: {
 
 export const newTriggerSchedule = () => ({ kind: "daily", time: "09:00" }) satisfies RoutineSchedule;
 
-const localTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+export const localTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+export function knownTimeZone(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.length === 0) return undefined;
+  try {
+    new Intl.DateTimeFormat(undefined, { timeZone: value });
+    return value;
+  } catch {
+    return undefined;
+  }
+}
 
 export function hostDefaults(
   kind: WorkflowNodeKind,

@@ -14,6 +14,42 @@ export const messages = {
   "error.connector.githubExpired": "De verbinding met GitHub is verlopen. Verbind GitHub opnieuw.",
   "error.connector.githubFileUnreadable": "Het verbindingsbestand van GitHub is onleesbaar.",
   "error.connector.githubFileTooLarge": "Het verbindingsbestand van GitHub is te groot.",
+  "error.connector.nearSignIn": "Log in bij OpenBot om de cryptowallet te gebruiken.",
+  "error.connector.nearServiceUnavailable": "De cryptowalletdienst is niet beschikbaar. Probeer het later opnieuw.",
+  "error.connector.nearWalletNotFound": "Deze wallet hoort niet bij dit OpenBot-account of deze server.",
+  "error.connector.nearWalletLimit": "Vandaag zijn er te veel nieuwe wallets gemaakt. Probeer het morgen opnieuw.",
+  "error.connector.nearProviderBusy": "NEAR Intents antwoordt nu niet. Probeer het over een paar minuten opnieuw.",
+  "error.connector.nearNoWallet":
+    "Er is geen cryptowallet ingesteld. Stel hem in via Serverinstellingen > Kluis > Crypto.",
+  "error.connector.nearWalletExists": "Er is al een cryptowallet ingesteld.",
+  "error.connector.nearFrozen":
+    "Betalingen uit de cryptowallet zijn gepauzeerd. Hervat ze in Serverinstellingen > Kluis > Crypto.",
+  "error.connector.nearAgentNotAllowed":
+    "Deze agent kan niet betalen uit de cryptowallet. Sta het toe in Serverinstellingen > Kluis > Crypto.",
+  "error.connector.nearGrantExpired":
+    "OpenBot heeft geen betaaltoestemming voor de cryptowallet. Verleng die in Serverinstellingen > Kluis > Crypto.",
+  "error.connector.nearUnknownAsset": "De cryptowallet heeft geen asset {asset}.",
+  "error.connector.nearAmountInvalid": "{amount} is geen geldig bedrag in {asset}.",
+  "error.connector.nearRecipientInvalid": "{recipient} is geen NEAR-account en geen chain:address.",
+  "error.connector.nearRefused": "De NEAR Intents Agent API heeft het verzoek geweigerd: {detail}",
+  "error.connector.nearUnexpected": "De NEAR Intents Agent API gaf een onverwacht antwoord: {detail}",
+  "error.connector.nearUnreachable": "OpenBot kan de NEAR Intents Agent API niet bereiken: {detail}",
+  "error.connector.nearFileUnreadable": "Het cryptowalletbestand is onleesbaar.",
+  "error.connector.nearFileTooLarge": "Het cryptowalletbestand is te groot.",
+  "error.connector.nearSigningCanceled": "De handtekening is geannuleerd.",
+  "error.connector.nearSigningExpired": "De handtekening kwam niet op tijd aan. Probeer het opnieuw.",
+  "error.connector.nearSigningInvalid": "De handtekening uit de browser is niet geldig.",
+  "error.connector.nearSigningBusy":
+    "Er wacht al een andere handtekening in de browser. Rond die eerst af of annuleer hem.",
+  "error.connector.nearPolicyCooldown": "Je kunt de walletregels vanaf {time} weer wijzigen.",
+  "error.connector.nearPolicyPending": "De regelwijziging is niet afgerond. Probeer het over een paar minuten opnieuw.",
+  "error.connector.nearDeclined": "De eigenaar heeft de betaling geweigerd.",
+  "error.connector.nearUncertain":
+    "OpenBot weet niet of de betaling is verzonden. Betaal niet opnieuw. De eigenaar kan de geschiedenis van de wallet controleren.",
+  "error.connector.nearPaymentFailed": "De betaling is mislukt: {detail}",
+  "error.connector.nearPaymentUnknown": "Deze betaling wacht niet meer op een antwoord.",
+  "error.connector.nearRuleFull": "Een betaalregel kan maximaal {limit} ontvangers hebben.",
+  "error.connector.nearRulesFull": "De wallet kan maximaal {limit} betaalregels hebben.",
   "error.connector.onePasswordCliMissing":
     "OpenBot kan de 1Password-CLI niet vinden. Installeer deze en zet de integratie aan in de 1Password-app, of gebruik een token van een serviceaccount.",
   "error.connector.onePasswordCliInstallFailed":

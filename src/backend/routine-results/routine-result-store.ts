@@ -9,6 +9,7 @@ import {
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { databaseRow, databaseRows } from "../database/database-rows";
 import { withTransaction } from "../database/sqlite-transaction";
+import { cachedStatement } from "../database/statement-cache";
 import type { OpenBotDatabase } from "../openbot-database";
 
 export interface RoutineResultOutgoing {
@@ -98,20 +99,22 @@ export class RoutineResultStore {
   }
 
   runsWithoutDelivery(since: string): RoutineResultPendingRun[] {
+    const connection = this.#database.connection;
+    if (!cachedStatement(connection, "SELECT 1 FROM routine_result_destinations LIMIT 1").get()) return [];
     return databaseRows(
-      this.#database.connection
-        .prepare(
-          `SELECT run.run_id, run.routine_id, run.agent_id, run.routine_name, run.delivery_id, run.updated_at AS run_updated_at, destination.*
+      cachedStatement(
+        connection,
+        `SELECT run.run_id, run.routine_id, run.agent_id, run.routine_name, run.delivery_id, run.updated_at AS run_updated_at, destination.*
            FROM projection_routine_runs AS run
-           JOIN routine_result_destinations AS destination ON destination.routine_id = run.routine_id
-           WHERE (run.status = 'succeeded'
+           CROSS JOIN routine_result_destinations AS destination ON destination.routine_id = run.routine_id
+           WHERE run.status IN ('succeeded', 'failed')
+             AND (run.status = 'succeeded'
                OR (run.status = 'failed' AND EXISTS (SELECT 1 FROM projection_deliveries AS queued
                  WHERE queued.delivery_id = run.delivery_id AND queued.status = 'completed')))
              AND run.updated_at >= ? AND run.updated_at >= destination.updated_at
              AND NOT EXISTS (SELECT 1 FROM routine_result_deliveries AS delivery WHERE delivery.run_id = run.run_id)
            ORDER BY run.updated_at, run.run_id`,
-        )
-        .all(since),
+      ).all(since),
     ).map((row) => ({
       runId: String(row.run_id),
       routineId: String(row.routine_id),
