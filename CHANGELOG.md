@@ -28,6 +28,7 @@ All notable changes to OpenBot will be documented here. The project follows
   sleeps. The watch also shows the channels that you see, and sends messages to them. Your server
   must also be on the new version; on an older server the watch uses the iPhone.
 - A watch stops when you sign out on its iPhone or revoke that iPhone in your connected devices.
+- Marketplace has a CoinMarketCap app. Agents can read crypto prices, market data, technical indicators, on-chain metrics and crypto news. Sign in to your CoinMarketCap account in the browser, or connect with an API key. The app only reads data: it cannot trade or move funds.
 
 ### Changed
 
@@ -158,6 +159,8 @@ All notable changes to OpenBot will be documented here. The project follows
 - The Usage page no longer cuts off the labels of the totals.
 - On the Usage page, a provider with no brand color gets its own chart color. Before, all these providers were grey.
 - Bitwarden on a server now connects when you paste the web vault address from the browser, for example `https://vault.example.com/#/vault`. OpenBot removes the part after `#`. Before, it showed the error for all four fields, although they were filled. The server must also be on this version.
+- When an app server does not accept your API key and sends an answer that OpenBot cannot read, the connect dialog now tells you to check the key. Before, it showed technical text.
+- A valid EU VAT ID no longer fails with "The EU VAT system cannot check the VAT ID now" when the EU VAT system is slow or busy. OpenBot now tries the check up to 3 times and waits longer for an answer.
 
 ## [0.79.0] - 2026-11-25
 
