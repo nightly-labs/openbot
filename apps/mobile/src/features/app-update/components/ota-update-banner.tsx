@@ -59,12 +59,14 @@ const UPDATE_ID_LENGTH = 8;
 const REVEAL = { duration: 420, easing: Easing.bezier(0.32, 0.72, 0, 1) };
 const GROUP_ORDER = ["notice", "security", "added", "changed", "fixed", "removed", "deprecated"];
 
+type MovingPart = "drop" | "reveal" | "notes";
+
 export interface OtaUpdateBanner {
   update: ReadyAppUpdate | null;
   shown: boolean;
   pushDown: SharedValue<number>;
   moving: boolean;
-  setMoving: (moving: boolean) => void;
+  setMoving: (part: MovingPart, moving: boolean) => void;
   clear: () => void;
 }
 
@@ -72,12 +74,18 @@ export function useOtaUpdateBanner(update: ReadyAppUpdate | null): OtaUpdateBann
   const pushDown = useSharedValue(0);
   const [latched, setLatched] = useState(update);
   if (update && update.id !== latched?.id) setLatched(update);
-  const [moving, setMoving] = useState(false);
+  const [movingParts, setMovingParts] = useState<readonly MovingPart[]>([]);
+  const setMoving = useCallback((part: MovingPart, moving: boolean) => {
+    setMovingParts((current) => {
+      if (current.includes(part) === moving) return current;
+      return moving ? [...current, part] : current.filter((entry) => entry !== part);
+    });
+  }, []);
   const clear = useCallback(() => {
-    setMoving(false);
+    setMovingParts([]);
     setLatched(null);
   }, []);
-  return { update: latched, shown: update !== null, pushDown, moving, setMoving, clear };
+  return { update: latched, shown: update !== null, pushDown, moving: movingParts.length > 0, setMoving, clear };
 }
 
 export function OtaUpdateSpacer({ banner }: { banner: OtaUpdateBanner }) {
@@ -300,11 +308,11 @@ export function OtaUpdateBlock({
       if (!shown) clear();
       return;
     }
-    setMoving(true);
+    setMoving("drop", true);
     drop.set(
       withTiming(shown ? 1 : 0, BLOUB_MOVE, (finished) => {
         if (!finished) return;
-        if (shown) scheduleOnRN(setMoving, false);
+        if (shown) scheduleOnRN(setMoving, "drop", false);
         else scheduleOnRN(clear);
       }),
     );
@@ -317,10 +325,10 @@ export function OtaUpdateBlock({
   useEffect(() => {
     if (reduced || reveal.get() === (expanded ? 1 : 0)) reveal.set(expanded ? 1 : 0);
     else {
-      setMoving(true);
+      setMoving("reveal", true);
       reveal.set(
         withTiming(expanded ? 1 : 0, REVEAL, (finished) => {
-          if (finished) scheduleOnRN(setMoving, false);
+          if (finished) scheduleOnRN(setMoving, "reveal", false);
         }),
       );
     }
@@ -358,10 +366,10 @@ export function OtaUpdateBlock({
       contentHeight.set(height);
       return;
     }
-    setMoving(true);
+    setMoving("notes", true);
     contentHeight.set(
       withTiming(height, REVEAL, (finished) => {
-        if (finished) scheduleOnRN(setMoving, false);
+        if (finished) scheduleOnRN(setMoving, "notes", false);
       }),
     );
   };
