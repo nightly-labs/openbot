@@ -539,6 +539,10 @@ export class TurnLifecycle {
     return this.#runningTurns.get(turnId)?.startedAt ?? null;
   }
 
+  turnSession(turnId: string): string | undefined {
+    return this.#runningTurns.get(turnId)?.threadId;
+  }
+
   startedTask(turnId: string): void {
     if (this.#runningTurns.has(turnId)) this.#taskStartTurns.add(turnId);
   }
