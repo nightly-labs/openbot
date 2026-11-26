@@ -577,6 +577,7 @@ const LICENSE_MINIMUM_TOAST = "hosted-license-minimum";
 export function HostedLicensePeople(props: {
   value: number;
   min: number;
+  max: number;
   used: number;
   disabled: boolean;
   onChange: (value: number) => void;
@@ -605,7 +606,7 @@ export function HostedLicensePeople(props: {
           label={t("billing.order.license.more")}
           variant="outline"
           size="icon-sm"
-          disabled={props.disabled || props.value >= LICENSE_MAX_USERS}
+          disabled={props.disabled || props.value >= props.max}
           onClick={() => props.onChange(stepLicenseUsers(props.value, 1))}
         >
           <Plus aria-hidden="true" />
