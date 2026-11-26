@@ -2851,14 +2851,14 @@ textarea {
 }
 
 @container (max-width: 300px) {
-  .agent-row-wait-chip:has(.agent-row-wait-chip-label) {
+  .agent-row-wait-chip[data-labeled] {
     width: 18px;
     height: 18px;
     justify-content: center;
     padding: 0;
   }
 
-  .agent-row-wait-chip:has(.agent-row-wait-chip-label) svg {
+  .agent-row-wait-chip[data-labeled] svg {
     width: 12px;
     height: 12px;
   }

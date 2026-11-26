@@ -177,6 +177,7 @@ export const messages = {
   "chat.marker.settingLink": "Toonde een instelling",
   "chat.settingLink.desktopOnly": "Open hem in de OpenBot-app op je computer.",
   "chat.settingLink.agentChatOnly": "Open hem in je chat met deze agent.",
+  "chat.settingLink.adminOnly": "Alleen de servereigenaar of een beheerder kan deze instelling wijzigen.",
   "chat.marker.skillSuggestion": "Stelde een vaardigheid voor",
   "chat.marker.mcpSignIn": "Vroeg je in te loggen bij een MCP-server",
   "chat.marker.serverInstall": "Heeft een opdracht gemaakt om een server te installeren",

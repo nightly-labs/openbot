@@ -375,7 +375,7 @@ export const messages = defineMessages("mobile.agent", {
     "When a usage limit stops {name} after it starts to work, {name} continues the same work on the first available model in the order. It goes back to {model} when the limit ends, or 10 minutes after a provider error.",
   "mobile.agent.busyMessage.label": "While working",
   "mobile.agent.busyMessage.footer":
-    "What a message does when you send it while the agent works. Queue keeps it until the turn ends. Steer gives it to the agent during the turn.",
+    "What a message from you or another agent does when it arrives while the agent works. Queue keeps it until the turn ends. Steer gives it to the agent during the turn.",
   "mobile.agent.busyMessage.queue": "Queue",
   "mobile.agent.busyMessage.steer": "Steer",
   "mobile.agent.busyMessage.hostDefaultQueue": "Host default (Queue)",

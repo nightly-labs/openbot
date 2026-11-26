@@ -499,13 +499,22 @@ function TasksSidePanel(props: {
   );
 }
 
+function markComposerStuck(scroll: HTMLElement): void {
+  const composer = scroll.querySelector(".tasks-page-composer");
+  const stuck =
+    composer !== null &&
+    scroll.scrollTop > 0 &&
+    Math.abs(composer.getBoundingClientRect().top - scroll.getBoundingClientRect().top) <= 1;
+  scroll.toggleAttribute("data-composer-stuck", stuck);
+}
+
 export function TasksPage(props: TasksPageProps) {
   const { t } = useText();
   const headingId = createUniqueId();
   const empty = () => props.loaded === true && props.tasks.length === 0;
   return (
     <section class="tasks-page" aria-labelledby={headingId} data-empty={empty() ? "" : undefined}>
-      <div class="tasks-page-scroll">
+      <div class="tasks-page-scroll" onScroll={(event) => markComposerStuck(event.currentTarget)}>
         <div class="tasks-page-column">
           <PageHeader
             class="tasks-page-header"

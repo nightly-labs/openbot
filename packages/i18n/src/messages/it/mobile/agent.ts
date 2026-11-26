@@ -382,7 +382,7 @@ export const messages = {
     "Se un limite di utilizzo ferma {name} dopo l'inizio del lavoro, {name} continua lo stesso lavoro con il primo modello disponibile nell'ordine. Torna a {model} quando il limite termina, o 10 minuti dopo un errore del provider.",
   "mobile.agent.busyMessage.label": "Durante il lavoro",
   "mobile.agent.busyMessage.footer":
-    "Cosa fa un messaggio inviato mentre l'agente lavora. Coda lo tiene fino alla fine del turno. Indirizza lo consegna all'agente durante il turno.",
+    "Cosa fa un messaggio tuo o di un altro agente che arriva mentre l'agente lavora. Coda lo tiene fino alla fine del turno. Indirizza lo consegna all'agente durante il turno.",
   "mobile.agent.busyMessage.queue": "Coda",
   "mobile.agent.busyMessage.steer": "Indirizza",
   "mobile.agent.busyMessage.hostDefaultQueue": "Predefinita dell'host (Coda)",

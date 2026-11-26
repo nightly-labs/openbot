@@ -359,6 +359,8 @@ export const messages = {
   "sitePage.landing.pricing.yourPlans": "Usa los planes de IA que ya pagas",
   "sitePage.landing.pricing.download": "Descargar",
   "sitePage.landing.pricing.license": "Licencia profesional",
+  "sitePage.landing.pricing.eggs.smallPrint": "sin letra pequeña. de verdad.",
+  "sitePage.landing.pricing.eggs.forever": "para siempre",
   "sitePage.landing.teams.title": "OpenBot para equipos",
   "sitePage.landing.teams.statement": "Compañeros de IA para toda tu empresa.",
   "sitePage.landing.teams.description":

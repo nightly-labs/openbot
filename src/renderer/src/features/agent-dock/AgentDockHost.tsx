@@ -42,7 +42,7 @@ import {
   type AgentDockSeat as AgentDockUiSeat,
   agentDockSeatKey,
 } from "@openbot/ui/features/agent-dock/AgentDock";
-import { isDockMessage, isDockVisualReply } from "@openbot/ui/features/agent-dock/AgentDockChat";
+import { isDockAnswer, isDockMessage, isDockVisualReply } from "@openbot/ui/features/agent-dock/AgentDockChat";
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { threadLists } from "@openbot/ui/features/conversation/threads/thread-items";
@@ -1210,7 +1210,7 @@ function withStepAnswers(
 ): AgentMessage[] {
   const answered = new Set<string>();
   for (const message of messages)
-    if (message.turnId && message.author === "agent" && isDockMessage(message)) answered.add(message.turnId);
+    if (message.turnId && message.author === "agent" && isDockAnswer(message)) answered.add(message.turnId);
   const notes: AgentMessage[][] = [];
   const rows = messages.flatMap((message) => {
     const turnId = message.turnId;
@@ -1242,7 +1242,7 @@ function unreadAnswers(messages: readonly AgentMessage[], count: number, firstUn
   const first = firstUnreadId === null ? -1 : messages.findIndex((message) => message.id === firstUnreadId);
   const unread = first >= 0 ? messages.slice(first) : messages.slice(-count);
   return unread.filter(
-    (message) => message.author === "agent" && isDockMessage(message) && message.kind !== "error" && !message.streaming,
+    (message) => message.author === "agent" && isDockAnswer(message) && message.kind !== "error" && !message.streaming,
   );
 }
 

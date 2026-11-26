@@ -36,6 +36,8 @@ const START_REASON_LIMIT = 160;
 const UNAUTHORIZED = /\bstatus 401\b|\b401 Unauthorized\b/;
 const CALL_NOT_FOUND = /\bstatus 404\b[\s\S]*\/realtime\/calls\b/;
 const FORBIDDEN = /^(?=[\s\S]*\brealtime\b)[\s\S]*(?:\bstatus 403\b|\b403 Forbidden\b)/;
+const CONNECTION_LOST =
+  /^(?![\s\S]*\bcontent_filter\b)(?:[\s\S]*\bstream disconnected before completion\b|transport_closed$)/;
 const ASK_TOOL = "ask_agent";
 const ASK_NAMESPACE = "openbot";
 const RELAY_VERBATIM_BYTES = 600;
@@ -571,8 +573,17 @@ export class LiveVoice {
     if (!message) return sourceText("error.voice.live.disconnected");
     return (
       this.#plainText(message, agentId) ??
+      this.#connectionLost(message) ??
       sourceText("error.voice.live.failed", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) })
     );
+  }
+
+  #connectionLost(message: string): string | null {
+    if (!CONNECTION_LOST.test(message)) return null;
+    logger.warn("Live voice lost its connection to OpenAI.", {
+      reason: this.#hooks.redact(message).slice(0, REASON_LIMIT),
+    });
+    return sourceText("error.voice.live.connectionLost");
   }
 
   #plainText(message: string, agentId: string): string | null {

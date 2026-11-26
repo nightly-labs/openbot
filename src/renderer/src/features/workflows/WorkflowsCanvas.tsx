@@ -1,6 +1,7 @@
 import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type ProviderAccountStatus,
+  type TeamPresenceMember,
   WORKFLOW_MEDIA_MODELS,
   type WorkflowCatalogProvider,
   type WorkflowMediaCatalogModel,
@@ -19,6 +20,7 @@ import {
   type WorkflowCatalogs,
   type WorkflowFeatures,
 } from "@openbot/ui/features/workflows/workflow-model";
+import type { WorkflowPresence } from "@openbot/ui/features/workflows/workflow-presence";
 import { currentText, useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
@@ -37,6 +39,8 @@ export function WorkflowsCanvas(props: {
   request?: WorkflowRequest | undefined;
   serverId?: string | undefined;
   agentProgress?: ((agentId: string) => WorkflowAgentProgress | undefined) | undefined;
+  members?: readonly TeamPresenceMember[] | undefined;
+  selfMemberId?: string | null | undefined;
 }) {
   const { t } = useText();
   const workflows = createWorkflowsController(
@@ -268,6 +272,22 @@ export function WorkflowsCanvas(props: {
       return props.self;
     },
   };
+  const presenceShown = () => props.host.presenceSupported();
+  const presence = createMemo((): WorkflowPresence | undefined => {
+    if (!presenceShown()) return undefined;
+    const self = props.selfMemberId ?? null;
+    const spots = workflows.spots();
+    return {
+      self,
+      members: (props.members ?? []).filter((member) => member.id === self || spots[member.id] !== undefined),
+      spots: Object.fromEntries(
+        Object.entries(spots).map(([memberId, spot]) => [
+          memberId,
+          { at: spot.at ?? undefined, selected: spot.selected ?? undefined },
+        ]),
+      ),
+    };
+  });
   const features = createMemo<WorkflowFeatures>(() => {
     const github = props.admin && props.host.githubSupported();
     const discord = props.admin && workflows.discord().length > 0;
@@ -291,6 +311,7 @@ export function WorkflowsCanvas(props: {
       triggers: [...WORKFLOW_FEATURES_V1.triggers, ...added],
       outputs: [...outputs, ...added],
       format: workflows.detail()?.hostFormat ?? WORKFLOW_FEATURES_V1.format,
+      presence: presenceShown(),
     };
   });
   return (
@@ -314,6 +335,7 @@ export function WorkflowsCanvas(props: {
           server={props.serverId}
           readOnly={workflows.readOnly()}
           agentProgress={props.agentProgress}
+          presence={presence()}
           {...workflows.props}
           onRotateWebhookSecret={props.admin ? workflows.props.onRotateWebhookSecret : undefined}
         />

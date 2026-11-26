@@ -508,6 +508,10 @@ export function creditsFromTenths(tenths: number): number {
   return tenths / CREDIT_TENTHS;
 }
 
+export function creditsMovable(credits: Pick<CreditsState, "balance" | "welcome">): number {
+  return creditsFromTenths(Math.max(0, creditTenths(credits.balance) - creditTenths(credits.welcome ?? 0)));
+}
+
 export function creditCharge(credits: number): number {
   return creditsFromTenths(Math.ceil(Math.round(credits * CREDIT_TENTHS * 100) / 100));
 }

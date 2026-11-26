@@ -356,6 +356,8 @@ export const messages = {
   "sitePage.landing.pricing.yourPlans": "契約中の AI プランをそのまま利用",
   "sitePage.landing.pricing.download": "ダウンロード",
   "sitePage.landing.pricing.license": "業務用ライセンス",
+  "sitePage.landing.pricing.eggs.smallPrint": "小さな注意書きはありません。本当に。",
+  "sitePage.landing.pricing.eggs.forever": "ずっと",
   "sitePage.landing.teams.title": "チーム向け OpenBot",
   "sitePage.landing.teams.statement": "会社全体に AI の同僚を。",
   "sitePage.landing.teams.description":

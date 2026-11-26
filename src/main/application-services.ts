@@ -3207,6 +3207,7 @@ export async function createApplicationServices({
     timezone: () => serverTimezone.effective(),
     settings: {
       mcpServers: () => service.listMcpServers(),
+      listedMcpServers: () => catalogPluginServers.filter((server) => server.transport === "http"),
       saveMcpServer: (config) => service.saveMcpServer({ config }),
       customProviders: () => customProviderChanges.list(),
       saveCustomProvider: (input) => customProviderChanges.save(input),
@@ -4052,7 +4053,7 @@ export async function createApplicationServices({
       write: (line) => process.stdout.write(line),
     });
   }
-  configureAttachmentProtocol({ mailbox, agents: service, remoteServers });
+  configureAttachmentProtocol({ mailbox, agents: service, remoteServers, attachmentPreviews });
   configureServerLogoProtocols({ teamStore, remoteServers });
   const browserView = new BrowserViewClient({
     servers: remoteServers,

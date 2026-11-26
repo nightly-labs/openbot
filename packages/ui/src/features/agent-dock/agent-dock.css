@@ -647,6 +647,7 @@
   min-width: 0;
   flex: 1;
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .agent-dock-markdown {

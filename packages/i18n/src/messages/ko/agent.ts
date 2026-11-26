@@ -60,6 +60,7 @@ export const messages = {
   "agent.dock.openInMain": "메인 창에서 열기",
   "agent.dock.openWindow": "새 창에서 열기",
   "agent.dock.openPage": "{title} 열기",
+  "agent.dock.openFile": "{name} 열기",
   "agent.dock.remove": "독에서 제거",
   "agent.dock.send": "보내기",
   "agent.dock.working": "작업 중…",

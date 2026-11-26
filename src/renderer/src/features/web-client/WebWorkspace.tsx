@@ -1378,6 +1378,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     admin: () => canAdministerServer(workspace.state.host?.role),
     hostName: () => server()?.name,
     onHostEvent: workspace.onHostEvent,
+    setSpot: (input) => workspace.runtime.setWorkflowSpot(input),
     onReconnect(listener) {
       hostOnlineListeners.add(listener);
       return () => {
@@ -3324,6 +3325,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                                     workspace.stepLines(),
                                   )
                                 }
+                                members={workspace.state.presence?.members}
+                                selfMemberId={workspace.state.memberId}
                               />
                             </Loading>
                           )}

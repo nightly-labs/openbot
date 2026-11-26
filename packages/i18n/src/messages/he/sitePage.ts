@@ -346,6 +346,8 @@ export const messages = {
   "sitePage.landing.pricing.yourPlans": "משתמש בתוכניות ה-AI שאתם כבר משלמים עליהן",
   "sitePage.landing.pricing.download": "הורדה",
   "sitePage.landing.pricing.license": "רישיון לעבודה",
+  "sitePage.landing.pricing.eggs.smallPrint": "בלי אותיות קטנות. באמת.",
+  "sitePage.landing.pricing.eggs.forever": "לתמיד",
   "sitePage.landing.teams.title": "OpenBot לצוותים",
   "sitePage.landing.teams.statement": "עמיתי AI לכל החברה שלכם.",
   "sitePage.landing.teams.description":

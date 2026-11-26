@@ -220,6 +220,8 @@ export const messages = {
   "error.backend.videoGenerationFailed": "La génération de la vidéo a échoué.",
   "error.backend.videoGenerationNoVideo": "La génération de la vidéo n’a renvoyé aucune vidéo.",
   "error.backend.videoGenerationInterrupted": "La génération de la vidéo a été interrompue.",
+  "error.backend.grokVideoNoQuota":
+    "Votre compte Grok ne peut pas créer de vidéos. Générez plutôt la vidéo avec des crédits.",
   "error.backend.attachmentNotRegularFile": "Seuls les fichiers ordinaires peuvent être joints : {name}",
   "error.backend.attachmentCopyFailed": "OpenBot n’a pas pu copier {name}.",
   "error.backend.routineNameRequired": "Un nom de routine est requis.",

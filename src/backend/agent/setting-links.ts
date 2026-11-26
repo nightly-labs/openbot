@@ -326,7 +326,8 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
   "agent.busy-message": {
     title: "While working",
     place: `${AGENT} > Advanced`,
-    about: "What happens to a message that the user sends while the agent works: queue it or steer the work.",
+    about:
+      "What happens to a message from the user or another agent that arrives while the agent works: queue it or steer the work.",
     words: "queue steer interrupt busy",
   },
   "agent.browser-profile": {
