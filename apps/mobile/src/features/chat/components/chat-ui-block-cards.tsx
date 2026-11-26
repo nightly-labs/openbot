@@ -177,14 +177,15 @@ const COPIED_FEEDBACK_MS = 1_500;
 
 function CopyPreviewButton({ markdown }: { markdown: string }) {
   const { t } = useText();
-  const [copied, setCopied] = useState(false);
+  const [copiedText, setCopiedText] = useState<string | null>(null);
+  const copied = copiedText === markdown;
   useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS);
+    if (copiedText === null) return;
+    const timer = setTimeout(() => setCopiedText(null), COPIED_FEEDBACK_MS);
     return () => clearTimeout(timer);
-  }, [copied]);
+  }, [copiedText]);
   async function copy() {
-    if (await copyToClipboard(markdown, "mobile.chat.question.copyPreviewFailed", t)) setCopied(true);
+    if (await copyToClipboard(markdown, "mobile.chat.question.copyPreviewFailed", t)) setCopiedText(markdown);
   }
   return (
     <Button variant="ghost" size="sm" className="px-0" onPress={() => void copy()}>
