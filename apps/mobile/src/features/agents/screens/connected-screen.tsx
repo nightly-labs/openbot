@@ -254,11 +254,7 @@ function SectionDropTarget({ sectionId, children }: { sectionId: string; childre
 function applyChatDrop(workspace: MobileWorkspaceActions, serverId: string, change: DropChange) {
   if (change.pins && !workspace.setChatPins(serverId, change.pins)) return;
   if (!change.move) return;
-  const saved =
-    change.move.type === "assign"
-      ? workspace.mutateSidebarLayout(serverId, change.move)
-      : workspace.moveSidebarChat(serverId, change.move);
-  saved.catch((error: unknown) => {
+  workspace.moveSidebarChat(serverId, change.move).catch((error: unknown) => {
     void haptics.notification("error");
     const text = currentText();
     showFailureAlert(

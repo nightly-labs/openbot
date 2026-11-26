@@ -1980,7 +1980,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       answerBrowserPermission: browser.answerBrowserPermission,
       answerBrowserHttpSignIn: browser.answerBrowserHttpSignIn,
       mutateSidebarLayout: async (serverId, action) => {
-        requireSidebarLayout(serverCapabilities.current, serverId);
+        requireSidebarLayout(
+          serverCapabilities.current,
+          serverId,
+          serversRef.current.find((server) => server.id === serverId),
+        );
         const layout = await request(
           "POST",
           hasCapability(serverCapabilities.current, serverId, SIDEBAR_FOLDERS_CAPABILITY)
@@ -1993,14 +1997,20 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         applySidebarLayout(serverId, layout);
       },
       moveSidebarChat: async (serverId, action) => {
-        requireSidebarLayout(serverCapabilities.current, serverId);
+        requireSidebarLayout(
+          serverCapabilities.current,
+          serverId,
+          serversRef.current.find((server) => server.id === serverId),
+        );
         const previous = sidebarByServerRef.current[serverId]?.layout;
         const moved = previous ? moveSidebarChat(previous, action) : null;
         if (moved) setSidebarByServer((current) => ({ ...current, [serverId]: { layout: moved, error: null } }));
         try {
           const layout = await request(
             "POST",
-            TEAM_API_ROUTES.sidebarLayout.actions,
+            action.type === "assign" && hasCapability(serverCapabilities.current, serverId, SIDEBAR_FOLDERS_CAPABILITY)
+              ? SIDEBAR_FOLDERS_ROUTES.actions
+              : TEAM_API_ROUTES.sidebarLayout.actions,
             decodeSidebarLayout,
             action,
             serverId,

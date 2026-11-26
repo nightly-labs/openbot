@@ -3,6 +3,8 @@ import type { TeamProtocolV1Capability } from "@openbot/contracts/team-protocol/
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { currentText } from "@/shared/lib/text";
 import { ConnectionUnavailableError } from "./connection-waits";
+import { showsOnline } from "./server-status";
+import type { MobileServer } from "./workspace-types";
 
 export type ServerCapabilities = ReadonlyMap<string, readonly string[]>;
 
@@ -26,8 +28,12 @@ export function requireCapability(
   if (!hasCapability(capabilities, serverId, capability)) throw new Error(currentText().t(unsupported));
 }
 
-export function requireSidebarLayout(capabilities: ServerCapabilities, serverId: string): void {
-  if (!capabilities.has(serverId))
+export function requireSidebarLayout(
+  capabilities: ServerCapabilities,
+  serverId: string,
+  server: Pick<MobileServer, "state" | "resuming"> | undefined,
+): void {
+  if (!showsOnline(server) && server?.state !== "error")
     throw new ConnectionUnavailableError(currentText().t("mobile.workspace.error.sidebarOffline"));
   requireCapability(capabilities, serverId, SIDEBAR_LAYOUT_CAPABILITY, "mobile.workspace.error.sectionsUnsupported");
 }
