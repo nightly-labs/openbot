@@ -31,6 +31,7 @@ const DATA_IMAGE = /^data:image\/(?:png|jpeg|gif|webp|avif|svg\+xml)[;,]/iu;
 const KEY_LIMIT = 32;
 const CONTENT_BLOCK_LIMIT = 32;
 const NOT_FILE_LINK = /^(?:[a-z][a-z\d+.-]*:|[/\\?#~]|$)|[\0\r\n]/iu;
+const LINK_SPACE = /[\t\n\r]/gu;
 
 export const CHAT_VISUAL_ITEM_TYPE_PREFIX = "visual-reply:";
 export const CHAT_VISUAL_HTML_LIMIT = 512_000;
@@ -431,7 +432,7 @@ document.addEventListener("click",(event)=>{
 if(event.button!==0||!(event.target instanceof Element))return;
 const link=event.target.closest("a[href],area[href]");
 if(!link)return;
-const href=(link.getAttribute("href")||"").trim();
+const href=(link.getAttribute("href")||"").replace(${LINK_SPACE},"").trim();
 if(href.startsWith("#")){
 event.preventDefault();
 jump(href);
@@ -445,12 +446,12 @@ event.preventDefault();
 jump(url.hash);
 return;
 }
-if(!${NOT_FILE_LINK}.test(href)){
+if(!url||(url.protocol!=="http:"&&url.protocol!=="https:")){
+if(${NOT_FILE_LINK}.test(href))return;
 event.preventDefault();
 send({id:nextId++,method:"${CHAT_VISUAL_OPEN_FILE}",params:{path:href}});
 return;
 }
-if(!url||(url.protocol!=="http:"&&url.protocol!=="https:"))return;
 event.preventDefault();
 send({id:nextId++,method:"${CHAT_VISUAL_OPEN_LINK}",params:{url:url.href}});
 },true);

@@ -1036,7 +1036,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 sourceUrl={openedAttachmentUrl(attached()?.previewUrl)}
                 pageUrl={htmlAttachmentPageUrl(attached()) ?? file().preview?.pageUrl}
                 pageHtml={props.runtime?.visualPage ? htmlFilePageHtml(attached(), file().preview) : undefined}
-                onOpenPageFile={openPreviewPageFile}
+                onOpenPageFile={attached() ? undefined : openPreviewPageFile}
                 fileKey={previewFileKey()}
                 selectionQuoteId={previewQuoteId()}
                 onPageQuote={(text) => {
