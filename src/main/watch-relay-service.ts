@@ -35,7 +35,7 @@ const LANGUAGE_LIMIT = 1_000;
 const TIMER_LIMIT_MS = 2_147_483_647;
 const REPLY_PLAINTEXT_LIMIT = Math.floor((WATCH_RELAY_REPLY_SEALED_LIMIT * 3) / 4) - 28;
 
-export interface WatchRelayIngress {
+interface WatchRelayIngress {
   acquireWatchRelay(): () => void;
   authEpoch(): number | null;
 }

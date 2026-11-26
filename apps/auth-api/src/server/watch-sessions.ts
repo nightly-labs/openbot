@@ -20,13 +20,13 @@ export class WatchSessionStoreError extends Schema.TaggedError<WatchSessionStore
   {},
 ) {}
 
-export interface CreatedWatchSession {
+interface CreatedWatchSession {
   watchSessionId: string;
   token: string;
   expiresAt: number;
 }
 
-export interface AccountWatchSession {
+interface AccountWatchSession {
   watchSessionId: string;
   authSessionId: string;
   connectedAt: number;
@@ -34,7 +34,7 @@ export interface AccountWatchSession {
   expiresAt: number;
 }
 
-export interface IssuedWatchTicket {
+interface IssuedWatchTicket {
   ticket: string;
   expiresAt: number;
   signalUrl: string;

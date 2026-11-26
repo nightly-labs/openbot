@@ -55,13 +55,6 @@ export function shareAvatarName(agent: AvatarAgent): string {
   return agentAvatarFile(agent, AVATAR_PIXELS).name;
 }
 
-export function shareAvatarFile(name: string): File | null {
-  const folder = appGroupDirectory(AVATAR_FOLDER);
-  if (!folder) return null;
-  const file = new File(folder, name);
-  return file.exists ? file : null;
-}
-
 function decodeAgent(value: unknown): ShareExtensionAgent | null {
   if (!isDynamicRecord(value) || !isString(value.serverId) || !isString(value.id) || !isString(value.name)) return null;
   const agent: ShareExtensionAgent = { serverId: value.serverId, id: value.id, name: value.name };
