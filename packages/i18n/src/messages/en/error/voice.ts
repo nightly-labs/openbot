@@ -33,6 +33,7 @@ export const messages = defineMessages("error.voice", {
   "error.voice.live.timedOut": "Codex live voice did not start in time. Try again.",
   "error.voice.live.failed": "Live voice stopped: {reason}",
   "error.voice.live.disconnected": "Live voice disconnected.",
+  "error.voice.live.connectionLost": "Live voice lost its connection. Unmute the microphone to start it again.",
   "error.voice.live.startFailed":
     "Live voice could not start. Update Codex and sign in with ChatGPT on the computer that runs the agent, then try again. Reason: {reason}",
   "error.voice.live.hostFailed":

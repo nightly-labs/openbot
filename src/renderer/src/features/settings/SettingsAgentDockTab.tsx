@@ -114,6 +114,10 @@ export function SettingsAgentDockTab(props: { model: AgentDockSettingsModel; sel
               description: "settings.agentDock.xwayland.description",
               unsupported: "settings.agentDock.xwayland.unsupported",
               restart: "settings.agentDock.xwayland.restart",
+              noCompositor: {
+                title: "settings.agentDock.noCompositor.title",
+                description: "settings.agentDock.noCompositor.description",
+              },
             }}
             onRestart={() => agentDockPort().agentDock.setXWayland({ enabled: true })}
           />

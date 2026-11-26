@@ -1,10 +1,17 @@
-import { sourceText } from "@openbot/i18n/source";
+import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
-import { classifyFailure } from "@openbot/telemetry";
+import { type CauseCode, classifyFailure } from "@openbot/telemetry";
 import type { AgentProvider } from "../agent-client";
+import { isSpentBalanceDiagnostic } from "./provider-diagnostics";
 import { providerLabel } from "./thread-items";
 
-export function workflowGenerationError(cause: unknown, provider: AgentProvider): string {
+const PROVIDER_REASON_LIMIT = 300;
+
+export function workflowGenerationError(
+  cause: unknown,
+  provider: AgentProvider,
+  redact: (text: string) => string = redactText,
+): string {
   const failure = cause instanceof Error ? cause : null;
   if (
     failure?.message === sourceText("error.workflow.modelImageUnsupported") ||
@@ -14,7 +21,10 @@ export function workflowGenerationError(cause: unknown, provider: AgentProvider)
   const providerError = workflowProviderError(failure, provider, sourceText("error.workflow.modelTimedOut"));
   if (providerError) return providerError;
   if (failure?.message === sourceText("error.agent.profileToolUse")) return sourceText("error.workflow.modelToolUse");
-  return sourceText("error.workflow.modelFailed");
+  const reason = failure?.message === sourceText("error.agent.profileFailed") ? providerReason(failure, redact) : null;
+  const refusal = providerRefusal(failure, reason);
+  if (refusal) return refusal;
+  return reason ? sourceText("error.workflow.providerRefused", { reason }) : sourceText("error.workflow.modelFailed");
 }
 
 export function workflowMediaError(cause: unknown, provider: AgentProvider): string {
@@ -51,5 +61,71 @@ function workflowProviderError(failure: Error | null, provider: AgentProvider, t
     case "timeout":
       return timedOut;
   }
+  return null;
+}
+
+function providerRefusal(failure: Error | null, reason: string | null): string | null {
+  const said = failure?.cause instanceof Error ? failure.cause : null;
+  if (!said) return null;
+  const found: CauseCode = classifyFailure(said);
+  switch (found) {
+    case "billing":
+      return sourceText("error.workflow.providerBilling");
+    case "usage_limit":
+      return isSpentBalanceDiagnostic(said.message)
+        ? sourceText("error.workflow.providerBilling")
+        : sourceText("error.provider.usageLimitReached");
+    case "permission":
+      return reason
+        ? sourceText("error.workflow.modelRefusedReason", { reason })
+        : sourceText("error.workflow.modelRefused");
+    case "content_blocked":
+      return sourceText("error.workflow.contentBlocked");
+    case "context_too_long":
+      return sourceText("error.workflow.inputTooLong");
+    case "invalid_request":
+      return reason
+        ? sourceText("error.workflow.requestRefusedReason", { reason })
+        : sourceText("error.workflow.requestRefused");
+    case "authentication":
+    case "model_not_found":
+    case "rate_limit":
+    case "provider_unavailable":
+    case "network":
+    case "timeout":
+    case "invalid_upload_request":
+    case "stalled":
+    case "storage":
+    case "not_found":
+    case "conflict":
+    case "turn_limit":
+    case "empty_answer":
+    case "provider_internal_error":
+    case "provider_exited":
+    case "attachment_type_unsupported":
+    case "attachment_too_large":
+    case "attachment_upload_failed":
+    case "cancelled":
+    case "unknown":
+      return null;
+    default:
+      return unhandledCause(found);
+  }
+}
+
+function providerReason(failure: Error, redact: (text: string) => string): string | null {
+  const said = failure.cause instanceof Error ? failure.cause.message : "";
+  const text = redact(said)
+    .replace(/\s+/gu, " ")
+    .trim()
+    .replace(/^(?:[A-Za-z]*Error:\s*)+/u, "");
+  if (!text || isFixedSourceText(text)) return null;
+  const characters = Array.from(text);
+  return characters.length > PROVIDER_REASON_LIMIT
+    ? `${characters.slice(0, PROVIDER_REASON_LIMIT - 1).join("")}…`
+    : text;
+}
+
+function unhandledCause(_cause: never): null {
   return null;
 }

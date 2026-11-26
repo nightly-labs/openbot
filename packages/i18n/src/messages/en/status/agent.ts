@@ -24,6 +24,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} has no credits left. Switched to {model}. To use it again, add credits and then select it.",
   "status.agent.modelReturnedAfterError": "Switched back to {model} after the provider error.",
+  "status.agent.modelSwitchedForRemovedModel": "{previous} is no longer available. Switched to {model}.",
   "status.agent.marketplaceSuggested": "Suggested a Marketplace app: {app}.",
   "status.agent.settingShown": "Showed a setting: {setting}.",
   "status.agent.channelMemberAdded": "{agent} added {member} to the channel. {person} asked for it.",
@@ -36,6 +37,12 @@ export const messages = defineMessages("status.agent", {
   "status.agent.screenCaptureScreen": "Capture the main screen and send the image to the agent's model.",
   "status.agent.screenCaptureChannel":
     "The image shows in the channel {channel}, and each member of this server who reads the channel can see it.",
+  "status.agent.creditImageApproval": "Generate an image with {model}. This uses {credits} credits.",
+  "status.agent.creditVideoApproval": "Generate a video with {model}. This uses {credits} credits.",
+  "status.agent.creditMediaChannel":
+    "The result shows in the channel {channel}, and each member of this server who reads the channel can see it.",
+  "status.agent.creditsHoldBalance": "This uses {credits} credits, and the balance is {balance} credits.",
+  "status.agent.creditsHoldAgentsOff": "Agents on this server cannot use credits.",
   "status.agent.screenCapturePermissionNext": "macOS can then ask you to allow Screen Recording for OpenBot.",
   "status.agent.screenCaptureDisplay": "Capture the display {name} and send the image to the agent's model.",
   "status.agent.screenCaptureWindow": "Capture the window {name} and send the image to the agent's model.",
@@ -74,6 +81,17 @@ export const messages = defineMessages("status.agent", {
   "status.agent.vaultCardFillFrames": "The card fields are in frames from {origins}.",
   "status.agent.linkCardFill":
     "Fill the one-time Link card {card} on {site}. You approved this payment in Link for {merchant}.",
+  "status.agent.nearSignatureReceived": "OpenBot received the signature. You can close this tab.",
+  "status.agent.nearSignatureUnknown": "OpenBot does not wait for this signature. Start it again in OpenBot.",
+  "status.agent.nearPayment": "Pay {amount} {symbol} to {recipient} from the crypto wallet, for {domain}: {reason}",
+  "status.agent.nearSummaryCreate": "All agents can pay up to {amount} USD a day. You can change it later in OpenBot.",
+  "status.agent.nearSummaryGrant": "Let this OpenBot app pay from the wallet for {days} days, within your rules.",
+  "status.agent.nearSummaryBudget": "Change the daily budget of the wallet to {amount} USD.",
+  "status.agent.nearSummaryAutoPay":
+    "Let OpenBot pay without your signature when a payment rule allows it. Other payments still ask you in the chat.",
+  "status.agent.nearSummaryPayment": "Approve the payment of {amount} to {recipient}.",
+  "status.agent.nearSummaryFreeze": "Agents cannot pay from this wallet until you resume payments.",
+  "status.agent.nearSummaryUnfreeze": "Agents can pay from this wallet again, within your rules.",
   "status.agent.screenCaptureProgress": "Asking to capture the screen…",
   "status.agent.screenCaptureReviewing": "Reviewing the screen capture…",
   "status.agent.browserOpening": "Opening a web page…",
@@ -81,6 +99,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.browserClicking": "Clicking on the web page…",
   "status.agent.browserTyping": "Typing on the web page…",
   "status.agent.browserActing": "Using the web page…",
+  "status.agent.browserPaying": "Sending the payment…",
   "status.agent.browserReviewing": "Reviewing the web page…",
   "status.agent.memoriesSearching": "Searching its memories…",
   "status.agent.chatsSearching": "Searching its past chats…",
@@ -165,6 +184,8 @@ export const messages = defineMessages("status.agent", {
   "status.agent.nextStepContinues": "The agent stopped before its next step. It continues ({current} of {limit}).",
   "status.agent.planContinues": "The plan has open steps. The agent continues ({current} of {limit}).",
   "status.agent.planStopped": "The agent stopped with open steps in its plan. Send a message to continue.",
+  "status.agent.continuationLimitReached":
+    "The agent stopped before the request was done. It cannot continue by itself again. Send a message to continue.",
   "status.agent.compactionContinues":
     "The connection stopped while the agent compacted its context. The agent continues.",
   "status.agent.providerExitContinues": "The agent stopped before it finished its answer. The agent continues.",

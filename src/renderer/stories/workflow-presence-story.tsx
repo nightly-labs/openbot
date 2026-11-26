@@ -111,7 +111,7 @@ export function createStoryPresence(): WorkflowPresence {
         const u = 1 - t;
         const x = u * u * walk.from.x + 2 * u * t * walk.bend.x + t * t * walk.to.x;
         const y = u * u * walk.from.y + 2 * u * t * walk.bend.y + t * t * walk.to.y;
-        if (x !== spot.at.x || y !== spot.at.y) spot.at = { x, y };
+        if (x !== spot.at?.x || y !== spot.at?.y) spot.at = { x, y };
         const chosen = t === 1 ? walk.select : spot.selected;
         const selected = chosen && ids.has(chosen) ? chosen : undefined;
         if (selected !== spot.selected) spot.selected = selected;

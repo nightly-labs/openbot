@@ -1264,6 +1264,17 @@ try {
     assert.ok(ran[0]?.text.includes("biome check a.ts b.ts"), "The check reads the tool steps.");
     assert.ok(ran[0]?.text.includes("I fixed a.ts and b.ts."), "The check reads the answer.");
     assert.ok(ran[1]?.text.includes("biome check c.ts"), "The second check reads the steps of its own turn.");
+    assert.ok(!ran[0]?.text.includes("<earlier-answers>"), "The first check has no earlier answers.");
+    assert.ok(
+      ran[1]?.text.includes("<earlier-answers>\n--- answer 1 ---\nI fixed a.ts and b.ts.\n</earlier-answers>"),
+      "The second check reads the earlier answer of the request.",
+    );
+    assert.ok(
+      ran[1]?.text.includes(
+        "<earlier-checks>\n- Fix the lint errors in c.ts, then run the lint again.\n</earlier-checks>",
+      ),
+      "The second check reads what the first check found.",
+    );
     assert.equal(continuationLines(agent.id).length, 0, "No finish check line shows.");
     const shown = chatMessages(agent.id).flatMap((message) => {
       if (message.id === id) return ["request"];
@@ -1306,8 +1317,30 @@ try {
       "Three continuation turns run.",
     );
     assert.ok(turns[3]?.text.includes("Automatic continuation 3 of 3."));
-    assert.equal(loggedChecks().length - checks, 3, "No check runs after the last continuation.");
+    assert.ok(
+      turns[3]?.text.includes("This can be the last automatic continuation"),
+      "The last note asks for a status.",
+    );
+    assert.ok(!turns[2]?.text.includes("This can be the last automatic continuation"));
+    assert.equal(loggedChecks().length - checks, 4, "One check runs after the last continuation.");
     assert.equal(continuationLines(agent.id).length, 0, "No finish check line shows.");
+    assert.deepEqual(
+      stopLines(agent.id).map((line) => line.text),
+      [
+        "The agent stopped before the request was done. It cannot continue by itself again. Send a message to continue.",
+      ],
+      "The chat says that the agent stopped at the limit.",
+    );
+
+    const finished = await createAgent("Finished");
+    const doneMark = loggedTurns().length;
+    const done = await send(
+      finished.id,
+      `Fix all files. ${verdicts(gap, gap, gap, { verdict: "done" })} ${plan(turn(1), turn(2), turn(3), turn(4))}`,
+    );
+    assert.equal(await settled(done), "completed");
+    assert.equal(turnsSince(doneMark).length, 4);
+    assert.equal(stopLines(finished.id).length, 0, "A request that the last continuation finished gets no line.");
     return { turns: turns.length };
   });
 

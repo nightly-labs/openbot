@@ -19,6 +19,8 @@ interface LogEntry {
   baseURL?: string | null;
   zenKey?: string | null;
   envKey?: string | null;
+  imageTool?: boolean | null;
+  videoTool?: boolean | null;
   sessionId?: string;
   key?: string | null;
 }
@@ -32,6 +34,16 @@ interface Report {
   authRequired?: { error: string };
   refusedV2?: { saved: string; notSaved: string; refused401: string | null; refused403: string | null };
   providerRefused?: { error: string };
+  inheritedEnvKey?: { envKey: string | null; configKey: string | null };
+  ownGoKey?: { error: string };
+  sameGoKey?: { error: string };
+  mediaTools?: {
+    goKeyOnly: (boolean | null)[];
+    otherProviderEnvKey: (boolean | null)[];
+    customProviderKey: (boolean | null)[];
+    userConfigKey: (boolean | null)[];
+    otherProviderKey: (boolean | null)[];
+  };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-expired-key-e2e-"));
@@ -44,8 +56,12 @@ process.env.FAKE_LOG = log;
 process.env.FAKE_AUTH_KEY = "expired";
 const openCodeData = join(root, "data", "opencode");
 process.env.XDG_DATA_HOME = join(root, "data");
+process.env.XDG_CONFIG_HOME = join(root, "config");
+delete process.env.OPENCODE_CONFIG;
+delete process.env.OPENCODE_CONFIG_DIR;
 delete process.env.OPENCODE_AUTH_CONTENT;
 delete process.env.OPENCODE_DB;
+for (const name of Object.keys(process.env)) if (name.endsWith("_API_KEY")) delete process.env[name];
 
 function open(cli: AgentCliInfo): AgentClient {
   const client = requireProviderDriver("opencode").createClient(cli, 10_000, {
@@ -84,6 +100,12 @@ try {
   const keySpawn = entries.filter((entry) => entry.event === "spawn").at(-1);
   assert.equal(keySpawn?.zenKey, null, "The free tier gets no stored key (#7550).");
   assert.equal(keySpawn?.envKey, null, "OPENCODE_API_KEY does not carry the stored key (#7550).");
+  const goKeyOnly = [keySpawn?.imageTool ?? null, keySpawn?.videoTool ?? null];
+  assert.deepEqual(
+    goKeyOnly,
+    [false, false],
+    "With only an OpenCode Go key, OpenCode's image and video tools are off: they would fail (#15281).",
+  );
   report.replaced = {
     thread,
     loaded,
@@ -92,6 +114,54 @@ try {
     envKey: keySpawn?.envKey ?? null,
   };
   await runCauseEffect(second.stop());
+
+  const mediaToolsOfNewProcess = async () => {
+    await rm(log, { force: true });
+    const client = open(cli);
+    await startThread(client, { cwd: workspace });
+    await runCauseEffect(client.stop());
+    const spawn = (await readJsonl<LogEntry>(log)).find((entry) => entry.event === "spawn");
+    return [spawn?.imageTool ?? null, spawn?.videoTool ?? null];
+  };
+
+  process.env.OPENAI_API_KEY = "other-provider";
+  const otherProviderEnvKey = await mediaToolsOfNewProcess().finally(() => {
+    delete process.env.OPENAI_API_KEY;
+  });
+  assert.deepEqual(
+    otherProviderEnvKey,
+    [null, null],
+    "A provider key in the environment keeps the image and video tools.",
+  );
+
+  endpoints = [
+    {
+      id: "openai",
+      name: "OpenAI",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "endpoint-key",
+      models: [{ id: "gpt", name: "GPT" }],
+      headers: [],
+    },
+  ];
+  const customProviderKey = await mediaToolsOfNewProcess().finally(() => {
+    endpoints = [];
+  });
+  assert.deepEqual(
+    customProviderKey,
+    [null, null],
+    "A custom provider with a key keeps the image and video tools: OpenCode adds its catalog image models.",
+  );
+
+  const userConfig = join(root, "config", "opencode", "opencode.json");
+  await mkdir(join(root, "config", "opencode"), { recursive: true });
+  await writeFile(userConfig, JSON.stringify({ provider: { openai: { options: { apiKey: "user-key" } } } }));
+  const userConfigKey = await mediaToolsOfNewProcess().finally(() => rm(userConfig, { force: true }));
+  assert.deepEqual(
+    userConfigKey,
+    [null, null],
+    "A provider key in the user's own OpenCode config keeps the image and video tools.",
+  );
 
   storedKey = null;
   process.env.FAKE_AUTH_KEY = "own";
@@ -193,7 +263,7 @@ try {
 
   const database = new DatabaseSync(join(openCodeData, "opencode.db"));
   database.exec(
-    "CREATE TABLE credential (id TEXT PRIMARY KEY, integration_id TEXT, label TEXT NOT NULL, value TEXT NOT NULL, active INTEGER)",
+    "CREATE TABLE credential (id TEXT PRIMARY KEY, integration_id TEXT, label TEXT NOT NULL, value TEXT NOT NULL, active INTEGER, time_created INTEGER NOT NULL DEFAULT 0)",
   );
   database
     .prepare("INSERT INTO credential (id, integration_id, label, value, active) VALUES (?, ?, ?, ?, ?)")
@@ -208,6 +278,62 @@ try {
     "A provider with a stored key reads as a refused request, not a missing sign-in.",
   );
   report.providerRefused = { error: refused };
+  const otherKeySpawn = (await readJsonl<LogEntry>(log)).filter((entry) => entry.event === "spawn").at(-1);
+  const otherProviderKey = [otherKeySpawn?.imageTool ?? null, otherKeySpawn?.videoTool ?? null];
+  assert.deepEqual(
+    otherProviderKey,
+    [null, null],
+    "A stored key for another provider keeps the image and video tools.",
+  );
+  report.mediaTools = { goKeyOnly, otherProviderEnvKey, customProviderKey, userConfigKey, otherProviderKey };
+  await runCauseEffect(eighth.stop());
+
+  delete process.env.FAKE_PROVIDER_AUTH;
+  storedKey = "fresh";
+  const inheritedKey = process.env.OPENCODE_API_KEY;
+  process.env.OPENCODE_API_KEY = "old-env";
+  await rm(log, { force: true });
+  try {
+    await startThread(open(cli), { cwd: workspace });
+  } finally {
+    if (inheritedKey === undefined) delete process.env.OPENCODE_API_KEY;
+    else process.env.OPENCODE_API_KEY = inheritedKey;
+  }
+  const inheritedSpawn = (await readJsonl<LogEntry>(log)).find((entry) => entry.event === "spawn");
+  assert.equal(inheritedSpawn?.envKey, "", "With a saved key, an inherited OPENCODE_API_KEY is cleared (#15988).");
+  assert.equal(inheritedSpawn?.configKey, "fresh", "The saved key stays the OpenCode Go config key.");
+  assert.equal(inheritedSpawn?.zenKey, null, "The free tier gets no key (#7550).");
+  report.inheritedEnvKey = { envKey: inheritedSpawn?.envKey ?? null, configKey: inheritedSpawn?.configKey ?? null };
+
+  storedKey = "expired-v2";
+  const credentials = new DatabaseSync(join(openCodeData, "opencode.db"));
+  credentials
+    .prepare("INSERT INTO credential (id, integration_id, label, value, active) VALUES (?, ?, ?, ?, ?)")
+    .run("cred_2", "opencode-go", "API key", JSON.stringify({ type: "key", key: "old" }), null);
+  credentials.close();
+  const ninth = open(cli);
+  const { error: ownGo } = await runTurn(ninth, await startThread(ninth, { cwd: workspace }));
+  assert.equal(
+    ownGo,
+    sourceText("error.provider.opencodeOwnGoKeyRefused"),
+    "A Go key in OpenCode's own store is named as the refused key, not the key saved in OpenBot (#15988).",
+  );
+  report.ownGoKey = { error: ownGo };
+  await runCauseEffect(ninth.stop());
+
+  const sameKey = new DatabaseSync(join(openCodeData, "opencode.db"));
+  sameKey
+    .prepare("UPDATE credential SET value = ? WHERE id = ?")
+    .run(JSON.stringify({ type: "key", key: "expired-v2" }), "cred_2");
+  sameKey.close();
+  const tenth = open(cli);
+  const { error: sameGo } = await runTurn(tenth, await startThread(tenth, { cwd: workspace }));
+  assert.equal(
+    sameGo,
+    sourceText("error.provider.opencodeKeyRefused"),
+    "When OpenCode's own Go key is the saved key, the saved key is named as refused.",
+  );
+  report.sameGoKey = { error: sameGo };
   report.passed = true;
 } finally {
   await stopClients(clients);

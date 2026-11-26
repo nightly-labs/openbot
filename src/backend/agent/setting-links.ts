@@ -1,3 +1,4 @@
+import { AGENT_PROVIDERS } from "@openbot/contracts/agent-providers";
 import {
   AGENT_PERMISSION_LEVELS,
   type AgentPermissionLevel,
@@ -222,6 +223,13 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
     about: "Choose which agents the dock shows.",
     words: "dock agents list",
   },
+  "computer-use.permissions": {
+    title: "System permissions",
+    place: `${APP} > Computer Use`,
+    about:
+      "Shows if Computer Use is ready on this computer, and what is missing when it is not, with a button to fix it. Show it when Computer Use is not ready.",
+    words: "computer use ready not ready permissions screen recording accessibility grant macos privacy driver",
+  },
   "updates.track": {
     title: "Update track",
     place: `${APP} > Updates`,
@@ -233,6 +241,13 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
     place: `${APP} > Updates`,
     about: "Install new OpenBot versions without a question.",
     words: "auto update upgrade",
+  },
+  "credits.explainer": {
+    title: "What are credits?",
+    place: "OpenBot > Credits (the credits button in the narrow bar on the left, or Help > What are credits?)",
+    about:
+      "A short explainer of OpenBot credits: they pay for pictures, videos and voices that agents make, chats do not use them, each media model has its own price, and packs of credits can be bought.",
+    words: "credits credit tokens token price prices cost costs pay balance buy pack packs media picture video free",
   },
   "agent.model": {
     title: "Agent model",
@@ -292,7 +307,8 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
   "agent.computer-use": {
     title: "Computer Use",
     place: `${AGENT} > Permissions`,
-    about: "Let this agent see the screen and control apps on this computer.",
+    about:
+      "Let this agent see the screen and control apps on this computer. It does not show if Computer Use is ready: computer-use.permissions does.",
     words: "control apps click screen mouse keyboard desktop automation",
   },
   "agent.local-scripts": {
@@ -310,7 +326,8 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
   "agent.busy-message": {
     title: "While working",
     place: `${AGENT} > Advanced`,
-    about: "What happens to a message that the user sends while the agent works: queue it or steer the work.",
+    about:
+      "What happens to a message from the user or another agent that arrives while the agent works: queue it or steer the work.",
     words: "queue steer interrupt busy",
   },
   "agent.browser-profile": {
@@ -429,7 +446,17 @@ export type ServerPlace = Omit<SettingLinkEntry, "words">;
 
 interface ServerPlaceEntry extends SettingLinkEntry {
   foundWithoutServerWord?: readonly string[];
+  answersProviderAccountQuestion?: true;
 }
+
+const PROVIDER_WORDS: readonly string[] = [
+  ...AGENT_PROVIDERS.filter((provider) => provider !== "acp"),
+  "anthropic",
+  "openai",
+  "chatgpt",
+  "gemini",
+];
+const ACCOUNT_WORDS = ["account", "subscription"];
 
 const SERVER_PLACES: readonly ServerPlaceEntry[] = [
   {
@@ -462,12 +489,44 @@ const SERVER_PLACES: readonly ServerPlaceEntry[] = [
     words: "move migrate migration copy new",
   },
   {
+    title: "Import",
+    place: `On a computer: ${SERVER_SETTINGS} > Import. On the phone app: the server's Server settings > Import agents.`,
+    about:
+      "Any member copies agents from another app into this server: Grok Bot (an export agent there makes a .zip file) or Hermes Agent (its folder or an exported .zip file). Owners and admins also see Another OpenBot computer, which opens Transfer. The user sees every item before anything changes.",
+    words: "importing grok hermes bot bring",
+    foundWithoutServerWord: ["import", "hermes"],
+  },
+  {
     title: "Vault",
     place: `On a computer: ${SERVER_SETTINGS} > Vault. The API keys filter shows the saved keys; the menu of a key has Copy API key and Copy variable name.`,
     about:
       "Only the owner or an admin. The saved logins, cards, contact info and API keys that agents use, also the keys that an agent saved with save_api_key. A Marketplace app does not read the Vault: to use a saved key in an app, copy it here, then open Marketplace, open the app, and paste it where the app asks for its key (Change key when the app is connected). A member asks the owner.",
     words: "vault api key keys token tokens secret secrets password passwords credential credentials",
     foundWithoutServerWord: ["vault", "api", "key", "keys", "token", "secret", "credential", "password"],
+  },
+  {
+    title: "Use my Claude Code setup",
+    place: `On a computer: ${SERVER_SETTINGS} > Providers > Claude > Use my Claude Code setup.`,
+    about:
+      "Only the owner or an admin. On: Claude agents load the CLAUDE.md, skills, agents, hooks and plugins from ~/.claude on that server. Off, the default: each turn sends a shorter prompt. Workspace files load either way. A member asks the owner.",
+    words: "claude code claude.md home user own personal setup config hooks plugins skills load",
+    foundWithoutServerWord: ["claude"],
+  },
+  {
+    title: "Provider accounts",
+    place: `On a computer: ${SERVER_SETTINGS} > Providers > the provider, such as Claude or ChatGPT > Accounts > Add account. On the phone app: Server settings > Providers > the provider > Add account; for some providers, the phone says to add the account on a computer.`,
+    about:
+      "Only the owner or an admin of the server. Signs in one more account of a provider, for example a second Claude or ChatGPT subscription, or adds an API key. Each agent uses one account: choose it in the agent's settings. Pool accounts lets the agents of a provider share its accounts.",
+    words: ["account accounts subscription pool", ...PROVIDER_WORDS].join(" "),
+    answersProviderAccountQuestion: true,
+  },
+  {
+    title: "Parallel threads",
+    place: `For one agent, on the phone app: the agent's settings > Advanced > Behavior > Parallel threads. For all agents, on a computer: ${SERVER_SETTINGS} > Agent defaults > Parallel threads per agent and Threads at the same time. On the phone app: the server's Server settings > Agents.`,
+    about:
+      "Only the owner or an admin changes these rows; a member asks the owner. How many threads of an agent run at the same time; the others wait. An agent's Parallel threads on Default uses the server's Parallel threads per agent, which is 4 until it is changed. Parallel threads per agent applies to each agent with no limit of its own, and Threads at the same time limits all agent threads of the server; more threads use more memory. A provider that runs one turn at a time runs one thread at a time.",
+    words: "parallel concurrent concurrency simultaneous simultaneously threads task tasks",
+    foundWithoutServerWord: ["parallel", "concurrent", "concurrency", "simultaneous", "simultaneously"],
   },
 ];
 
@@ -502,11 +561,14 @@ const SERVER_TERMS = ["server", "computer", "machine", "device", "laptop", "macb
 
 export function searchServerPlaces(query: string, limit = 2): ServerPlace[] {
   const queryTerms = terms(query);
+  const asksAboutProviderAccount =
+    queryTerms.some((term) => hits(term, ACCOUNT_WORDS)) && queryTerms.some((term) => PROVIDER_WORDS.includes(term));
   const places = queryTerms.some((term) => hits(term, SERVER_TERMS))
     ? SERVER_PLACES
     : SERVER_PLACES.filter(
-        ({ foundWithoutServerWord }) =>
-          foundWithoutServerWord && queryTerms.some((term) => hits(term, foundWithoutServerWord)),
+        ({ foundWithoutServerWord, answersProviderAccountQuestion }) =>
+          (foundWithoutServerWord && queryTerms.some((term) => hits(term, foundWithoutServerWord))) ||
+          (answersProviderAccountQuestion && asksAboutProviderAccount),
       );
   if (places.length === 0) return [];
   const scored = queryTerms.filter((term) => !hits(term, SERVER_TERMS));

@@ -8,6 +8,7 @@ import { createSidebarDataStore } from "./stores/data-store";
 import { createSidebarDragStateStore } from "./stores/drag-state-store";
 import { createSidebarLayoutActions } from "./stores/layout-actions";
 import { createSidebarPendingStore } from "./stores/pending-store";
+import { createSidebarTabStore } from "./stores/tab-store";
 
 export function createSidebarScope(props: SidebarProps) {
   const layoutMutable = () => props.layoutMutable !== false;
@@ -61,6 +62,13 @@ export function createSidebarScope(props: SidebarProps) {
     visibleSectionIds,
     waitingChats,
   } = createSidebarDataStore({ props, dragActive: () => dragActive(), pointerInList });
+  const sidebarTabs = createSidebarTabStore({
+    props,
+    filterFolders,
+    listFilter,
+    listFilterCount,
+    setListFilter,
+  });
   const layoutDraggable = () => layoutMutable() && !listFiltered();
   const chatsDraggable = () => layoutDraggable() && !sidebarChatOrderSortsSections(props.chatOrder);
   const {
@@ -263,6 +271,7 @@ export function createSidebarScope(props: SidebarProps) {
     setSectionNameInput,
     shownPeople,
     sidebarClickIsSuppressed,
+    sidebarTabs,
     startChatDragging,
     startCreateSection,
     startNativeItemDragging,

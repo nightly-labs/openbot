@@ -112,6 +112,12 @@ import {
   type ThreadMessageSearchRequest,
 } from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
+import {
+  WORKFLOW_PRESENCE_CAPABILITY,
+  WORKFLOW_SPOT_CONTROL,
+  type WorkflowSpotControl,
+  type WorkflowSpotInput,
+} from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { followHostKeyHandovers } from "@openbot/team-client/host-key-handover";
@@ -312,8 +318,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   #duplicateIds = retryOperationIds(randomUUID);
   readonly #hostRestartAway = new Map<string, number>();
   readonly #webrtcTransport: TeamWebRtcClientTransport | null;
+  readonly #workflowSpotSends = new Map<string, WorkflowSpotControl | null>();
   readonly #getLocalHostId: () => string | null;
-  #localMemberLimit: number | null = null;
+  #localMemberLimit: Pick<ServerSummary, "memberLimit" | "licenseRaisesMemberLimit"> = {};
   #keyChangedAt = new Map<string, number>();
   #accountHidden: ReadonlyMap<string, boolean> = new Map();
   #thisComputerServers: ReadonlySet<string> = new Set();
@@ -1909,6 +1916,40 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     });
   }).bind(this);
 
+  readonly setWorkflowSpot = Effect.fn("RemoteManager.setWorkflowSpot")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+    input: WorkflowSpotInput,
+  ) {
+    if (!this.supportsCapability(serverId, WORKFLOW_PRESENCE_CAPABILITY)) return;
+    const control: WorkflowSpotControl = { type: WORKFLOW_SPOT_CONTROL, ...input };
+    if (this.#store.find(serverId)?.transport === "webrtc-v2") {
+      const transport = this.#webrtcTransport;
+      if (!transport) return;
+      const sending = this.#workflowSpotSends.has(serverId);
+      this.#workflowSpotSends.set(serverId, control);
+      if (!sending) yield* Effect.forkIn(this.#owned(this.#sendWorkflowSpots(transport, serverId)), this.#scope);
+      return;
+    }
+    this.#events.sendWorkflowSpot(serverId, control);
+  }).bind(this);
+
+  readonly #sendWorkflowSpots = Effect.fn("RemoteManager.sendWorkflowSpots")(function* (
+    this: RemoteServerManager,
+    transport: TeamWebRtcClientTransport,
+    serverId: string,
+  ) {
+    const sends = this.#workflowSpotSends;
+    const drain = Effect.gen(function* () {
+      for (let control = sends.get(serverId); control; control = sends.get(serverId)) {
+        sends.set(serverId, null);
+        yield* transport.setWorkflowSpot(serverId, control).pipe(Effect.catch(() => Effect.void));
+      }
+      sends.delete(serverId);
+    });
+    yield* drain.pipe(Effect.onInterrupt(() => Effect.sync(() => sends.delete(serverId))));
+  }).bind(this);
+
   checkRemoteDesktopSetup(serverId: string) {
     if (!this.supportsCapability(serverId, REMOTE_DESKTOP_SETUP_CAPABILITY))
       throw new Error(sourceText("error.remote.desktopSetupHostUpdate"));
@@ -2663,7 +2704,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     const hosts = yield* transport.listHosts();
     const email = yield* remoteDecode(() => this.#centralAccount.getEmail());
     const localHostId = this.#getLocalHostId();
-    this.#localMemberLimit = hosts.find((host) => host.hostId === localHostId)?.memberLimit ?? null;
+    const localHost = hosts.find((host) => host.hostId === localHostId);
+    this.#localMemberLimit = {
+      ...(localHost?.memberLimit === undefined ? {} : { memberLimit: localHost.memberLimit }),
+      ...(localHost?.licenseRaisesMemberLimit === undefined
+        ? {}
+        : { licenseRaisesMemberLimit: localHost.licenseRaisesMemberLimit }),
+    };
     const followedHandovers = yield* followedHostKeyHandovers({
       hosts,
       servers: this.#store.servers,

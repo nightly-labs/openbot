@@ -117,7 +117,7 @@ export const messages = {
   "settings.quitGuard.never": "Jamais",
   "settings.externalLinks.title": "Ouvrir les liens externes dans",
   "settings.externalLinks.description":
-    "Les liens des discussions, des pages de connexion et de facturation s’ouvrent ici.",
+    "Les liens des discussions, des pages de connexion et de facturation s’ouvrent ici. Avec OpenBot, seuls les liens des discussions de la fenêtre principale avec des agents de cet ordinateur s’ouvrent dans OpenBot. Les autres liens s’ouvrent dans le navigateur par défaut.",
   "settings.externalLinks.defaultBrowser": "Navigateur par défaut",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Navigateur par défaut ({name})",
@@ -254,7 +254,7 @@ export const messages = {
   "settings.notch.xwayland.description":
     "Sous Wayland, OpenBot doit utiliser XWayland pour afficher l’îlot dynamique au-dessus des autres apps. D’ici là, l’îlot ne s’affiche pas.",
   "settings.notch.xwayland.unsupported":
-    "Sous Wayland sans XWayland, l’îlot dynamique ne peut pas s’afficher au-dessus des autres apps.",
+    "Sur ce bureau Wayland, l’îlot dynamique ne peut pas s’afficher au-dessus des autres apps.",
   "settings.notch.xwayland.restart": "Redémarrer",
   "settings.notch.idle.title": "Afficher l’îlot au repos",
   "settings.notch.idle.description": "Afficher le logo OpenBot et un message d’accueil lorsqu’aucun état n’est actif.",
@@ -285,8 +285,11 @@ export const messages = {
   "settings.agentDock.xwayland.description":
     "Sous Wayland, OpenBot doit utiliser XWayland pour afficher le dock au-dessus des autres apps. D’ici là, le dock s’affiche dans la fenêtre OpenBot.",
   "settings.agentDock.xwayland.unsupported":
-    "Sous Wayland sans XWayland, le dock ne peut pas s’afficher au-dessus des autres apps. Il s’affiche dans la fenêtre OpenBot.",
+    "Sur ce bureau Wayland, le dock ne peut pas s’afficher au-dessus des autres apps. Il s’affiche dans la fenêtre OpenBot.",
   "settings.agentDock.xwayland.restart": "Redémarrer",
+  "settings.agentDock.noCompositor.title": "Dans la fenêtre OpenBot",
+  "settings.agentDock.noCompositor.description":
+    "Votre bureau ne peut pas afficher de fenêtres transparentes : le dock s’affiche donc dans la fenêtre OpenBot. Pour l’afficher au-dessus des autres apps, activez les effets de bureau (un compositeur) dans les réglages du système, puis redémarrez OpenBot.",
   "settings.agentDock.display.title": "Écran",
   "settings.agentDock.display.description":
     "Si cet écran n’est pas connecté, le dock passe sur l’écran de la fenêtre OpenBot.",

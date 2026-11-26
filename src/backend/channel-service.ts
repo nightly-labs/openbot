@@ -38,8 +38,9 @@ import {
   type UpdateChannelMemoryInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
+import { isFixedSourceText, matchingSourceKeys, type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
+import type { CauseCode } from "@openbot/telemetry";
 import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import { isTextAnswer } from "./agent/routine-quiet-runs";
 import { setChannelFolderSource } from "./agent/workspace-sandbox";
@@ -86,6 +87,7 @@ export interface ChannelHooks {
   schedule(agentId: string): void;
   awaitDrain?(agentId: string): Effect.Effect<void, ChannelOperationError> | undefined;
   interrupt(agentId: string, turnId: string, threadId: string): Effect.Effect<void, ChannelOperationError>;
+  settleUnconfirmedStart?(deliveryId: string): Effect.Effect<void>;
   busy(agentId: string, channelId: string): boolean;
   channelTurnLimit?(agentId: string): number;
   usageLimited?(agentId: string): boolean;
@@ -993,7 +995,10 @@ export class ChannelService {
     if (command.type === "cancel") {
       if (selected.state !== "paused" && selected.state !== "failed")
         return yield* channelFailure(new Error(sourceText("error.backend.channelTaskNotStopped")));
-      return yield* this.#cancelTasks(channel, descendants(tasks, selected.rootTaskId), operationId);
+      const cancelled = descendants(tasks, selected.rootTaskId);
+      const result = yield* this.#cancelTasks(channel, cancelled, operationId);
+      yield* this.#settleUnconfirmedStarts(channel.id, cancelled);
+      return result;
     }
     if (command.type === "reassign") {
       if (!command.recipientAgentId)
@@ -1020,9 +1025,34 @@ export class ChannelService {
     const result = yield* channelSync(() => this.store.update(channel, { tasks: updated }, operationId));
     this.publish(channel.id);
     yield* this.interruptTasks(channel.id, affected);
+    if (command.type !== "stop") yield* this.#settleUnconfirmedStarts(channel.id, affected);
     yield* this.wake(channel.id);
     return result;
   }).bind(this);
+
+  #settleUnconfirmedStarts(
+    channelId: string,
+    tasks: readonly ChannelTask[],
+  ): Effect.Effect<void, ChannelOperationError> {
+    const settle = this.hooks.settleUnconfirmedStart;
+    if (!settle) return Effect.void;
+    return channelSync(() => this.store.assignments(channelId)).pipe(
+      Effect.flatMap((assignments) =>
+        Effect.forEach(
+          assignments.flatMap((assignment) =>
+            assignment.deliveryId &&
+            !assignment.turnId &&
+            activeAssignment(assignment) &&
+            tasks.some((task) => task.id === assignment.taskId)
+              ? [assignment.deliveryId]
+              : [],
+          ),
+          (deliveryId) => settle(deliveryId),
+          { discard: true },
+        ),
+      ),
+    );
+  }
 
   readonly #applyHandoff = Effect.fn("ChannelService.applyHandoff")(function* (
     this: ChannelService,
@@ -3504,7 +3534,17 @@ export class ChannelService {
       `${this.hooks.agents().find((item) => item.id === args.recipientAgentId)?.name ?? args.recipientAgentId}: ${args.task}`,
     );
     const [firstSourceMessageId] = sourceMessageIds;
-    if (firstSourceMessageId !== undefined) handoff.message.replyToMessageId = firstSourceMessageId;
+    const rootTaskIds = new Set(tasks.filter((item) => item.rootTaskId === root.id).map((item) => item.id));
+    const rootRepliedToSource =
+      firstSourceMessageId !== undefined &&
+      (yield* channelSync(() => this.store.messages(channelId))).some(
+        (message) =>
+          message.message.replyToMessageId === firstSourceMessageId &&
+          message.taskId !== null &&
+          rootTaskIds.has(message.taskId),
+      );
+    if (firstSourceMessageId !== undefined && !rootRepliedToSource)
+      handoff.message.replyToMessageId = firstSourceMessageId;
     yield* channelSync(() => this.store.update(channel, { tasks: changes, messages: [handoff] }, operationId));
     this.publish(channelId);
     yield* this.wake(channelId);
@@ -3908,6 +3948,23 @@ function routingRequest(text: string): string {
 
 function routingTimedOut(error: unknown): boolean {
   return error instanceof Error && error.message === sourceText("error.agent.profileTimedOut");
+}
+
+const CHANNEL_LEAD_FAILURE_KEYS = [
+  ["provider_unavailable", "error.backend.channelLeadBusy"],
+  ["rate_limit", "error.backend.channelLeadBusy"],
+  ["network", "error.backend.channelLeadOffline"],
+  ["authentication", "error.backend.channelLeadSignIn"],
+  ["model_not_found", "error.backend.channelLeadModelGone"],
+  ["invalid_request", "error.backend.channelLeadRefused"],
+] as const satisfies readonly (readonly [CauseCode, keyof SourceMessages])[];
+const CHANNEL_LEAD_FAILURES = new Map<CauseCode, (typeof CHANNEL_LEAD_FAILURE_KEYS)[number][1]>(
+  CHANNEL_LEAD_FAILURE_KEYS,
+);
+
+export function channelLeadFailureText(causeCode: CauseCode): string | null {
+  const key = CHANNEL_LEAD_FAILURES.get(causeCode);
+  return key ? sourceText(key) : null;
 }
 
 function routingFailureText(error: unknown): string | null {

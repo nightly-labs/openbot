@@ -8,7 +8,12 @@ import { Deferred, Effect, Exit, Option, Result } from "effect";
 import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
 import { ACP_SESSION_PROCESS_START_TIMEOUT_MS, type AcpHistoryPersistence, withStartModels } from "./acp-client";
 import { type AcpFlavor, customAgentFlavor } from "./acp-flavor";
-import { type AgentClient, AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
+import {
+  type AgentClient,
+  AgentProcessExitError,
+  CUSTOM_ACP_CONTEXT_COMPACTION,
+  type DiagnosticOrigin,
+} from "./agent-client";
 import { agentLaunchPath } from "./cli";
 import { causeHelpers } from "./effect-boundary";
 import { encodedModelId, providerModelValue } from "./encoded-model-id";
@@ -120,7 +125,7 @@ function requiredCwd(params: unknown): string {
 }
 
 export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements AgentClient {
-  readonly contextCompaction = "unsupported";
+  readonly contextCompaction = CUSTOM_ACP_CONTEXT_COMPACTION;
   readonly provider = "acp" as const;
   readonly turnContext = true;
   readonly #source: CustomAgentSource;

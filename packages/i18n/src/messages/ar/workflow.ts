@@ -137,6 +137,8 @@ export const messages = {
   "workflow.agent.removedLabel": "تمت إزالة الوكيل. اختر وكيلًا",
   "workflow.agent.list": "الوكلاء",
   "workflow.agent.search": "البحث في الوكلاء",
+  "workflow.agentMade.title": "سير عمل جديد من {agent}",
+  "workflow.agentMade.open": "فتح",
 
   "workflow.model.label": "النموذج: {name}",
   "workflow.model.title": "النماذج",

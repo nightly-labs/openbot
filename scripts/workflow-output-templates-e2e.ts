@@ -290,6 +290,7 @@ try {
       "agent-builder",
       `call-${crypto.randomUUID()}`,
       new Set<string>(),
+      undefined,
       () => Effect.succeed(false),
     ),
   );

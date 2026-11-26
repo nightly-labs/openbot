@@ -115,7 +115,8 @@ export const messages = {
   "settings.quitGuard.always": "Sempre",
   "settings.quitGuard.never": "Mai",
   "settings.externalLinks.title": "Apri i link esterni in",
-  "settings.externalLinks.description": "I link nelle chat, nelle pagine di accesso e di fatturazione si aprono qui.",
+  "settings.externalLinks.description":
+    "I link nelle chat, nelle pagine di accesso e di fatturazione si aprono qui. Con OpenBot, solo i link nelle chat della finestra principale con agenti su questo computer si aprono in OpenBot. Gli altri link si aprono nel browser predefinito.",
   "settings.externalLinks.defaultBrowser": "Browser predefinito",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Browser predefinito ({name})",
@@ -250,7 +251,7 @@ export const messages = {
   "settings.notch.xwayland.description":
     "Su Wayland, OpenBot deve usare XWayland per mostrare la Dynamic Island sopra le altre app. Fino ad allora, l’isola non appare.",
   "settings.notch.xwayland.unsupported":
-    "Su Wayland senza XWayland, la Dynamic Island non può apparire sopra le altre app.",
+    "Su questo desktop Wayland, la Dynamic Island non può apparire sopra le altre app.",
   "settings.notch.xwayland.restart": "Riavvia",
   "settings.notch.idle.title": "Mostra l'isola a riposo",
   "settings.notch.idle.description": "Mostra il logo di OpenBot e il saluto quando non c'è nessuno stato attivo.",
@@ -281,8 +282,11 @@ export const messages = {
   "settings.agentDock.xwayland.description":
     "Su Wayland, OpenBot deve usare XWayland per mostrare il dock sopra le altre app. Fino ad allora, il dock appare nella finestra di OpenBot.",
   "settings.agentDock.xwayland.unsupported":
-    "Su Wayland senza XWayland, il dock non può apparire sopra le altre app. Appare nella finestra di OpenBot.",
+    "Su questo desktop Wayland, il dock non può apparire sopra le altre app. Appare nella finestra di OpenBot.",
   "settings.agentDock.xwayland.restart": "Riavvia",
+  "settings.agentDock.noCompositor.title": "Nella finestra di OpenBot",
+  "settings.agentDock.noCompositor.description":
+    "Il tuo desktop non può mostrare finestre trasparenti, quindi il dock appare nella finestra di OpenBot. Per mostrarlo sopra le altre app, attiva gli effetti del desktop (un compositor) nelle impostazioni di sistema, poi riavvia OpenBot.",
   "settings.agentDock.display.title": "Schermo",
   "settings.agentDock.display.description":
     "Se quello schermo non è collegato, il dock passa allo schermo della finestra di OpenBot.",

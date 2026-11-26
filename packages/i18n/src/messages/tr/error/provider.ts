@@ -247,6 +247,8 @@ export const messages = {
     "OpenCode API anahtarınızın süresi doldu. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go kayıtlı API anahtarınızı reddetti. Anahtarın süresi dolmuş olabilir. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode, OpenBot'a kaydettiğiniz anahtarı kullanmadı. OpenCode'un kendisinin sakladığı başka bir OpenCode Go anahtarını kullandı ve OpenCode Go bu anahtarı reddetti. Bu anahtarı kaldırmak için ajanı çalıştıran bilgisayarda bir terminalde `opencode auth logout opencode-go` komutunu çalıştırın ve anahtarı seçin. Ardından yeniden deneyin.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go isteği reddetti. Yeni bir API anahtarı bunu düzeltmez. OpenCode Go planınız etkin olmayabilir veya OpenCode Go ağınızı engelliyor olabilir: bazı hizmetler VPN'leri, proxy'leri veya bazı ülkeleri engeller. Planınızın OpenCode Console'da etkin olduğundan emin olun ya da VPN'i kapatın, sonra yeniden deneyin. Başka bir model de seçebilirsiniz.",
   "error.provider.opencodeServiceFailure":
@@ -310,6 +312,8 @@ export const messages = {
     "OpenCode modeli eylemlerini metin olarak yazdı ve gerçekleştirmedi. Tekrar deneyin veya başka bir model seçin.",
   "error.provider.acpNoAnswer":
     "{provider} turu yanıt vermeden bitirdi. Mesajı yeniden gönderin veya yeni bir sohbet başlatın.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} takım arkadaşlarından sonuçları aldı, ardından turu yanıt vermeden bitirdi. Ajandan devam etmesini isteyin.",
   "error.provider.noAnswerAfterSteps":
     "{provider} bazı adımları uyguladı, sonra turu yanıt vermeden bitirdi. Aynı isteği yeniden göndermeden önce ajana ne yaptığını sorun.",
   "error.provider.acpRefusedNoReason": "{provider} yanıt vermeden durdu. Mesajı yeniden gönderin.",
@@ -354,6 +358,8 @@ export const messages = {
     "Gemini bu sohbetin kayıtlı geçmişini okuyamadı. OpenBot, sohbet geçmişiyle yeni bir Gemini oturumu başlattı. Mesajınızı yeniden gönderin.",
   "error.provider.acpTurnStuck":
     "{provider} önceki turunu bitirmediği için bu mesajı kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Mesajınızı yeniden gönderin.",
+  "error.provider.antigravityLicenseRefused":
+    "Google, hesabınızın bu modeli kullanma lisansı olmadığını bildiriyor. Başka bir model seçin, sonra mesajınızı yeniden gönderin.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google, bu ajanı çalıştıran bilgisayarın ağ konumundan Gemini'nin çalışmasına izin vermiyor. Gemini'yi başka bir bilgisayarda kullanın veya bu ajan için başka bir sağlayıcı seçin.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -375,6 +381,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Cursor'ı kullanmak için Cursor ile oturum açın veya CURSOR_API_KEY ayarlayın.",
   "error.provider.cursorSignInUnusable":
     "Cursor, oturum bilgilerinizle sunucusuna bağlanamadı. İnternet bağlantınızı kontrol edin, ardından Cursor'da yeniden oturum açın.",
+  "error.provider.cursorNoModels":
+    'Cursor model listesini göndermedi. Cursor’a yeniden giriş yapmak için "Bağlan"ı seçin. Bu mesaj kalırsa Cursor planınızın modelleri içerdiğini kontrol edin.',
   "error.provider.clineArchivePath": "Cline arşivi beklenmeyen bir yola sahip.",
   "error.provider.clinePackageMismatch": "Cline paketi çalışma zamanı kataloğuyla eşleşmiyor.",
   "error.provider.clineChecksum": "Cline çalışma zamanı sağlama toplamı (checksum) eşleşmiyor.",
@@ -420,6 +428,8 @@ export const messages = {
     "Anthropic API anahtarında API kredisi yok. Claude planı, API anahtarıyla yapılan istekleri ödemez. Anthropic Console'da kredi ekleyin ya da Ayarlar'da Claude'da oturum açıp ajanın model menüsünde Claude hesabını seçin.",
   "error.provider.claudeAccountNoCredit":
     "Claude hesabınızın kredi bakiyesi çok düşük. Hızlı mod gibi bazı istekler, Claude planınızda kullanım kalsa da kullanım kredisi harcar. Claude hesabınıza kullanım kredisi ekleyin ya da ajanın model menüsünde başka bir model seçin.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code istekleri Anthropic'e değil, {host} adresine gönderiyor: bu API adresini Claude Code ayarları veya ortam değişkenleri belirliyor. {host}, isteği Claude planınız yüzünden değil, hesap bakiyesi yüzünden reddetti. {host} hesabınıza bakiye ekleyin ya da ajanın model menüsünde başka bir model seçin.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Claude hizmeti bu isteği engelledi. Bu genellikle Claude tarafında kısa süreli bir sorundur, hesabınızla ilgili değildir. Mesajı birkaç dakika sonra yeniden gönderin.",
   "error.provider.foreignReasoning":
@@ -444,6 +454,8 @@ export const messages = {
     "Görsel çok büyük olduğu için model bu sohbetteki bir görseli kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageCountLimit":
     "Sohbette çok fazla görsel olduğu için model bu sohbeti kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
+  "error.provider.imageCountLimitRepeated":
+    "Model bu sohbeti yine kabul etmedi: sohbette çok fazla görsel var. Bir görev bu modelin kabul ettiğinden fazla görsel açıyor, bu yüzden yeni bir oturum işe yaramaz. Yeni sohbet'i seçin ve ajandan her adımda daha az görsel açmasını isteyin ya da daha fazla görsel kabul eden bir model seçin.",
   "error.provider.imageUnreadable":
     "Model bu sohbetteki bir görseli okuyamadı. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin. Bir görsel gönderdiyseniz, başka bir görsel gönderin.",
   "error.provider.requestTooLarge":
@@ -458,6 +470,8 @@ export const messages = {
     "Muse bir MCP sunucusunu başlatamadı ve bu oturumda MCP’yi engelledi. OpenBot, sohbet geçmişiyle yeni bir Muse oturumu başlattı. Tekrar deneyin. Hata devam ederse bu ajan için Bilgisayar Kullanımı’nı veya başarısız olan MCP sunucusunu kapatın.",
   "error.provider.claudeSessionMissing":
     "Claude Code bu sohbetin kayıtlı oturumunu bulamadı. OpenBot sohbet geçmişiyle yeni bir Claude Code oturumu başlattı. Tekrar deneyin.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode bu sohbetin kayıtlı oturumunu bulamadı. OpenBot sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Tekrar deneyin.",
   "error.provider.grokSignIn": "Grok'u kullanmak için `grok login` komutunu çalıştırın veya XAI_API_KEY ayarlayın.",
   "error.provider.acpSignInNoStart":
     "Sağlayıcı başlamadı, bu yüzden oturum açma başlayamadı. Yeniden deneyin veya OpenBot’u yeniden başlatın.",
@@ -567,7 +581,10 @@ export const messages = {
   "error.provider.sessionSettingsTimedOut": "Ajanın oturumu zamanında yanıt vermedi. Tekrar deneyin.",
   "error.provider.piOutdated": "Pi {version} çok eski. Yerel RPC ve MCP desteği için Pi 1.1.0 veya sonrasını yükleyin.",
   "error.provider.nativeMissing": "{provider} CLI yüklü değil. Ayarlar'dan indirin.",
-  "error.provider.nativeNotStarted": "{provider} CLI başlatılamadı.",
+  "error.provider.nativeNotStarted":
+    "OpenBot yüklediğiniz {provider} uygulamasını buldu, ancak başlamadı. {provider} uygulamasını güncelleyin veya yeniden yükleyin, sonra tekrar deneyin.",
+  "error.provider.nativeManagedNotStarted":
+    "{provider} bu sunucuyu çalıştıran bilgisayarda başlamadı. OpenBot'u o bilgisayarda yeniden başlatın. Yine başlamazsa Yardım > Sorun bildir'i seçin.",
   "error.provider.nativeVersionUnreadable": "{provider} CLI sürümü okunamadı.",
   "error.provider.piSessionBusy": "Mevcut Pi turunun bitmesini bekleyin.",
   "error.provider.acpSessionBusy": "{provider} durdurulan turu hâlâ bitiriyor. Biraz sonra yeniden deneyin.",

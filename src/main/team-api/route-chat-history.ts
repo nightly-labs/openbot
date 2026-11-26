@@ -1,4 +1,8 @@
 import { CHANNEL_CHATS_CAPABILITY, canAdministerServer } from "@openbot/contracts/ipc";
+import {
+  CHANNEL_COMPACT_AVAILABILITY_CAPABILITY,
+  CHANNEL_COMPACT_AVAILABILITY_ROUTE,
+} from "@openbot/contracts/team-protocol/channel-compact-availability-v1";
 import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
 import { ContextCompactRefusedError } from "@openbot/contracts/team-protocol/context-compact-v1";
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
@@ -74,6 +78,26 @@ export async function routeChatHistory(
     throw error;
   }
   return json(200, {});
+}
+
+export async function routeChannelCompactAvailability(
+  context: TeamApiRequestContext,
+  agents: Pick<TeamApiAgents, "channelCompactAvailable">,
+  channels: Pick<ChannelService, "store"> | undefined,
+  hiddenAgentIds: ReadonlySet<string>,
+): Promise<RouteOutcome> {
+  const { method, url, capabilities, member, request, json } = context;
+  if (method !== "POST" || url.pathname !== CHANNEL_COMPACT_AVAILABILITY_ROUTE) return "unmatched";
+  if (
+    !channels ||
+    !capabilities.has(CHANNEL_CHATS_CAPABILITY) ||
+    !capabilities.has(CHANNEL_COMPACT_AVAILABILITY_CAPABILITY)
+  )
+    throw new HttpError(400, sourceText("error.team.channelContextUnsupported"));
+  const channelId = stringField(await readJson(request), "channelId");
+  if (!channels.store.exists(channelId)) throw new HttpError(404, sourceText("error.backend.channelNotFound"));
+  requireVisibleChannel(channels, channelId, canAdministerServer(member.role) ? new Set() : hiddenAgentIds);
+  return json(200, { available: agents.channelCompactAvailable(channelId) });
 }
 
 function channelRefusals(): ReadonlySet<string> {

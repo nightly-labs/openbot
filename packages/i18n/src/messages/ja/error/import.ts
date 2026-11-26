@@ -91,6 +91,8 @@ export const messages = {
   "error.import.transferAgentEnv": "{name}: 設定で {names} の値を入力し直してください。",
   "error.import.transferMcpValues":
     "{name}: MCP サーバーはオフの状態で追加されます。コマンドを確認し、値と完全なアドレスを入力し直してから、マーケットプレイス、アプリでオンにしてください。",
+  "error.import.transferMcpSignIn":
+    "{name}: アプリはオフの状態で追加されます。もう一度接続してから、マーケットプレイス、アプリでオンにしてください。",
   "error.import.transferValuesCleared":
     "{name}: シークレットを含む可能性のある値が、引数またはアドレスから削除されました。設定で入力し直してください。",
   "error.import.transferSharedKept":

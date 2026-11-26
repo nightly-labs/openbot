@@ -1,4 +1,4 @@
-import { type CreditServerWallet, creditsFromTenths, creditTenths } from "@openbot/contracts/credits";
+import { type CreditServerWallet, creditsFromTenths, creditsMovable, creditTenths } from "@openbot/contracts/credits";
 import { router, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import ArrowUpDown from "lucide-react-native/icons/arrow-up-down";
@@ -122,10 +122,18 @@ export function MoveCreditsScreen() {
       </SettingsContent>
     );
   }
-  return <MoveCreditsForm personal={credits.data.balance} wallet={wallet} />;
+  return <MoveCreditsForm personal={credits.data.balance} movable={creditsMovable(credits.data)} wallet={wallet} />;
 }
 
-function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: CreditServerWallet }) {
+function MoveCreditsForm({
+  personal,
+  movable,
+  wallet,
+}: {
+  personal: number;
+  movable: number;
+  wallet: CreditServerWallet;
+}) {
   const { t, format, errorMessage } = useText();
   const move = useMoveCredits();
   const reducedMotion = useReducedMotion();
@@ -137,7 +145,7 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
     "--openbot-bg-grouped",
     "--openbot-credit-star-fill",
   ]);
-  const [toServer, setToServer] = useState(() => personal > 0 || wallet.balance <= 0);
+  const [toServer, setToServer] = useState(() => movable > 0 || wallet.balance <= 0);
   const [turns, setTurns] = useState(0);
   const [text, setText] = useState("");
   const [transfer, setTransfer] = useState<TransferValues | null>(null);
@@ -177,7 +185,7 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
     lineHeight: Math.round(amountFont * AMOUNT_LINE_HEIGHT),
     fontVariant: ["tabular-nums"],
   };
-  const source = toServer ? personal : wallet.balance;
+  const source = toServer ? movable : wallet.balance;
   const limit = Math.min(source, MAX_MOVE_CREDITS);
   const tooMuch = !transfer && creditTenths(amount) > creditTenths(source);
   const ready = amount > 0 && !tooMuch;
@@ -185,12 +193,16 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
   const pending = move.isPending || transfer !== null;
   const personalShown = transfer ? creditsFromTenths(toServer ? transfer.fromTenths : transfer.toTenths) : personal;
   const serverShown = transfer ? creditsFromTenths(toServer ? transfer.toTenths : transfer.fromTenths) : wallet.balance;
-  const sourceText = format.number(toServer ? personalShown : serverShown);
-  const status = tooMuch
-    ? toServer
-      ? t("mobile.settings.credits.move.youHave", { count: source, amount: sourceText })
-      : t("mobile.settings.credits.move.serverHas", { count: source, amount: sourceText, name: wallet.name })
-    : t("mobile.settings.credits.move.available", { amount: sourceText });
+  const keptTenths = creditTenths(personal) - creditTenths(movable);
+  const sourceText = format.number(
+    toServer ? creditsFromTenths(creditTenths(personalShown) - keptTenths) : serverShown,
+  );
+  const status =
+    !tooMuch || (toServer && keptTenths > 0)
+      ? t("mobile.settings.credits.move.available", { amount: sourceText })
+      : toServer
+        ? t("mobile.settings.credits.move.youHave", { count: source, amount: sourceText })
+        : t("mobile.settings.credits.move.serverHas", { count: source, amount: sourceText, name: wallet.name });
 
   const stopTween = () => {
     if (tween.current === null) return;
@@ -279,7 +291,7 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
     const amountTenths = creditTenths(amount);
     before.current = { personal, server: wallet.balance };
     setTransfer({
-      fromTenths: creditTenths(source),
+      fromTenths: creditTenths(toServer ? personal : wallet.balance),
       toTenths: creditTenths(toServer ? wallet.balance : personal),
       amountTenths,
     });

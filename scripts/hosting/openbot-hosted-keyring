@@ -1,0 +1,221 @@
+#!/bin/bash
+set -euo pipefail
+export LC_ALL=C
+umask 077
+
+INSTALL=/opt/OpenBot
+BACKUP=/srv/openbot-keyring
+KEYRING=/srv/openbot-hosted/keyrings/login.keyring
+FILE_LIMIT=16777216
+CHECK_SECONDS=20
+CHECK_USER=nobody
+START_LOCK_SECONDS=15
+TOO_LARGE=3
+SAFE_STORAGE_SCHEMA=chrome_libsecret_os_crypt_password_v2
+PASS=0
+FAILED=1
+UNKNOWN=2
+
+CHECK_SESSION='
+set -u
+call() { timeout 5 dbus-send --session --print-reply=literal --dest=org.freedesktop.secrets "$@"; }
+keyrings=$XDG_DATA_HOME/keyrings
+mkdir -p "$keyrings"
+cp "$HOME/login.keyring" "$keyrings/login.keyring"
+printf login >"$keyrings/default"
+gnome-keyring-daemon --unlock --components=secrets <"$HOME/keyring-password" >/dev/null 2>&1 || exit 10
+gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1 || exit 11
+locked=$(call /org/freedesktop/secrets/collection/login org.freedesktop.DBus.Properties.Get \
+  string:org.freedesktop.Secret.Collection string:Locked) || exit 12
+case $locked in
+  *"boolean false"*) ;;
+  *"boolean true"*) exit 1 ;;
+  *) exit 13 ;;
+esac
+[ ! -e "$keyrings/login_1.keyring" ] || exit 1
+items=$(call /org/freedesktop/secrets/collection/login org.freedesktop.Secret.Collection.SearchItems \
+  "dict:string:string:xdg:schema,$1") || exit 14
+for item in $(grep -o "/org/freedesktop/secrets/collection/login/[A-Za-z0-9_]*" <<<"$items"); do
+  properties=$(call "$item" org.freedesktop.DBus.Properties.GetAll string:org.freedesktop.Secret.Item | tr -s " \n" " ") || exit 15
+  created=$(grep -o "Created variant uint64 [0-9]*" <<<"$properties" | grep -o "[0-9]*$") || exit 16
+  modified=$(grep -o "Modified variant uint64 [0-9]*" <<<"$properties" | grep -o "[0-9]*$") || exit 17
+  echo "$item $created $modified"
+done
+exit 0
+'
+
+log() {
+  echo "$*" >&2
+}
+
+service_user() {
+  local user
+  [ -r "$INSTALL/hosted/service-user" ] || return 1
+  user=$(<"$INSTALL/hosted/service-user")
+  [[ $user =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]] && id "$user" >/dev/null 2>&1 || return 1
+  echo "$user"
+}
+
+read_as_user() {
+  local user=$1 source=$2 target=$3 size
+  runuser -u "$user" -- test -f "$source" 2>/dev/null || return 1
+  runuser -u "$user" -- head -c "$((FILE_LIMIT + 1))" -- "$source" >"$target" 2>/dev/null || return 1
+  size=$(stat -c %s "$target")
+  [ "$size" -le "$FILE_LIMIT" ] || return "$TOO_LARGE"
+  [ "$size" -gt 0 ]
+}
+
+read_current() {
+  local target=$1 status=0 password_status=0 keyring_status=0
+  mkdir -p "$target"
+  read_as_user "$USER_NAME" "$PASSWORD" "$target/keyring-password" || password_status=$?
+  read_as_user "$USER_NAME" "$KEYRING" "$target/login.keyring" || keyring_status=$?
+  for status in "$password_status" "$keyring_status"; do
+    [ "$status" -ne "$TOO_LARGE" ] || return "$TOO_LARGE"
+  done
+  [ "$password_status" -eq 0 ] && [ "$keyring_status" -eq 0 ]
+}
+
+has_backup() {
+  [ -f "$BACKUP/keyring-password" ] && [ -f "$BACKUP/login.keyring" ]
+}
+
+check_keyring() {
+  local source=$1 report=$2 home status=0
+  if ! command -v gnome-keyring-daemon >/dev/null || ! command -v dbus-run-session >/dev/null ||
+    ! command -v dbus-send >/dev/null || ! id "$CHECK_USER" >/dev/null 2>&1; then
+    CHECK_STATUS=missing
+    return "$UNKNOWN"
+  fi
+  home=$(mktemp -d "$WORK/check.XXXXXX")
+  cp "$source/keyring-password" "$source/login.keyring" "$home/"
+  mkdir -p "$home/data" "$home/run"
+  chown -R "$CHECK_USER" "$home"
+  (cd / && runuser -u "$CHECK_USER" -- env -i HOME="$home" XDG_DATA_HOME="$home/data" \
+    XDG_RUNTIME_DIR="$home/run" PATH=/usr/sbin:/usr/bin:/sbin:/bin \
+    timeout --kill-after=5 "$CHECK_SECONDS" dbus-run-session -- \
+    bash -c "$CHECK_SESSION" openbot-hosted-keyring "$SAFE_STORAGE_SCHEMA" </dev/null >"$report" 2>/dev/null) ||
+    status=$?
+  rm -rf "$home"
+  case $status in
+    0) sort -o "$report" "$report" && return "$PASS" ;;
+    1) return "$FAILED" ;;
+    *)
+      CHECK_STATUS=$status
+      return "$UNKNOWN"
+      ;;
+  esac
+}
+
+keeps_items() {
+  [ -z "$(comm -23 "$1" "$2")" ]
+}
+
+save_backup() {
+  local source=$1 file
+  install -d -o root -g root -m 0700 "$BACKUP"
+  for file in keyring-password login.keyring; do
+    cp "$source/$file" "$BACKUP/.$file.new"
+  done
+  sync -f "$BACKUP/.login.keyring.new" 2>/dev/null || true
+  mv -f "$BACKUP/.keyring-password.new" "$BACKUP/keyring-password"
+  mv -f "$BACKUP/.login.keyring.new" "$BACKUP/login.keyring"
+}
+
+write_as_user() {
+  local source=$1 target=$2 folder=${2%/*}
+  runuser -u "$USER_NAME" -- mkdir -p -m 0700 "$folder"
+  runuser -u "$USER_NAME" -- bash -c 'umask 077 && cat >"$1"' write "$folder/.openbot-keyring.new" <"$source"
+  runuser -u "$USER_NAME" -- mv -f "$folder/.openbot-keyring.new" "$target"
+}
+
+restore_backup() {
+  local current=$1 replaced file
+  replaced=$(mktemp -d "$BACKUP/.replaced.XXXXXX")
+  for file in keyring-password login.keyring; do
+    [ ! -s "$current/$file" ] || cp "$current/$file" "$replaced/"
+  done
+  rm -rf "$BACKUP/replaced"
+  mv -f "$replaced" "$BACKUP/replaced"
+  write_as_user "$BACKUP/keyring-password" "$PASSWORD"
+  write_as_user "$BACKUP/login.keyring" "$KEYRING"
+}
+
+same_files() {
+  cmp -s "$1/keyring-password" "$2/keyring-password" && cmp -s "$1/login.keyring" "$2/login.keyring"
+}
+
+guard() {
+  local mode=$1 current=$WORK/current backup_status=0 current_status=0 complete=1 read_status=0
+  read_current "$current" || read_status=$?
+  if [ "$read_status" -eq "$TOO_LARGE" ]; then
+    log "A file of the OpenBot keyring is larger than $FILE_LIMIT bytes. The OpenBot keyring and its copy stay as they are."
+    return 0
+  fi
+  [ "$read_status" -eq 0 ] || complete=0
+  if ! has_backup; then
+    [ "$complete" -eq 1 ] || return 0
+    check_keyring "$current" "$WORK/current.items" || return 0
+    save_backup "$current"
+    log "Saved a copy of the OpenBot keyring in $BACKUP."
+    return 0
+  fi
+  if [ "$complete" -eq 1 ] && same_files "$current" "$BACKUP"; then return 0; fi
+  check_keyring "$BACKUP" "$WORK/backup.items" || backup_status=$?
+  if [ "$complete" -eq 1 ]; then
+    check_keyring "$current" "$WORK/current.items" || current_status=$?
+  else
+    current_status=$FAILED
+  fi
+  if [ "$backup_status" -eq "$UNKNOWN" ] || [ "$current_status" -eq "$UNKNOWN" ]; then
+    log "The keyring check did not complete ($CHECK_STATUS). The OpenBot keyring and its copy stay as they are."
+    return 0
+  fi
+  if [ "$current_status" -eq "$PASS" ] &&
+    { [ "$backup_status" -ne "$PASS" ] || keeps_items "$WORK/backup.items" "$WORK/current.items"; }; then
+    save_backup "$current"
+    return 0
+  fi
+  if [ "$backup_status" -ne "$PASS" ]; then
+    log "The OpenBot keyring and its copy in $BACKUP do not open. Both stay as they are."
+    return 0
+  fi
+  if [ "$mode" != start ]; then
+    log "The OpenBot keyring changed outside OpenBot. Its copy is restored at the next start of OpenBot."
+    return 0
+  fi
+  restore_backup "$current"
+  log "The OpenBot keyring changed outside OpenBot, and it no longer had the key of the OpenBot data. Restored the copy from $(date -u -r "$BACKUP/login.keyring" +%FT%TZ). The replaced files are in $BACKUP/replaced."
+}
+
+main() {
+  local mode=${1:-}
+  case $mode in
+    start | backup) ;;
+    *)
+      log "usage: $0 start|backup"
+      return 2
+      ;;
+  esac
+  [ "$(id -u)" -eq 0 ] || { log "Run this as root." && return 1; }
+  USER_NAME=$(service_user) || { log "The service user is not valid." && return 1; }
+  local home
+  home=$(getent passwd "$USER_NAME" | cut -d: -f6)
+  [ -n "$home" ] || { log "The service user has no home folder." && return 1; }
+  PASSWORD=$home/.config/openbot-hosted/keyring-password
+  exec 8>/run/openbot-hosted-keyring.lock
+  if [ "$mode" = start ]; then
+    flock -w "$START_LOCK_SECONDS" 8 || {
+      log "Another keyring check did not stop in $START_LOCK_SECONDS seconds. The OpenBot keyring stays as it is."
+      return 0
+    }
+  else
+    flock 8
+  fi
+  WORK=$(mktemp -d /run/openbot-hosted-keyring.XXXXXX)
+  trap 'rm -rf "$WORK"' EXIT
+  chmod 0711 "$WORK"
+  guard "$mode"
+}
+
+main "$@"

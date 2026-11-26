@@ -64,7 +64,7 @@ export function CreditTargetSelect(props: {
   value: CreditTarget;
   onChange: (target: CreditTarget) => void;
 }): JSX.Element {
-  const { t, format } = useText();
+  const { t } = useText();
   return (
     <div class="credit-corner">
       <span class="credit-corner-for" aria-hidden="true">
@@ -83,7 +83,7 @@ export function CreditTargetSelect(props: {
         trailing={(target) => (
           <>
             <TargetRole target={target} />
-            <CreditAmount value={format.number(target.balance)} class="credit-picker-balance" />
+            <CreditAmount credits={target.balance} class="credit-picker-balance" />
           </>
         )}
         align="end"
@@ -95,7 +95,7 @@ export function CreditTargetSelect(props: {
         <span class="credit-corner-value">
           <CreditTargetLogo target={props.value} />
           <span class="credit-corner-name">{props.value.name}</span>
-          <CreditAmount value={format.number(props.value.balance)} class="credit-corner-balance" />
+          <CreditAmount credits={props.value.balance} class="credit-corner-balance" />
         </span>
         <ChevronsUpDown class="credit-corner-chevron" aria-hidden="true" />
       </SearchPicker>

@@ -67,6 +67,7 @@ import { Route as HealthLiveRouteImport } from './routes/health/live'
 import { Route as HealthReadyRouteImport } from './routes/health/ready'
 import { Route as MarketplaceIndexRouteImport } from './routes/marketplace/index'
 import { Route as MarketplaceAppsRouteImport } from './routes/marketplace/apps'
+import { Route as NearSignRouteImport } from './routes/near/sign'
 import { Route as NewsIndexRouteImport } from './routes/news/index'
 import { Route as NewsSlugRouteImport } from './routes/news/$slug'
 import { Route as NewsOpenbotVsGrokbotRouteImport } from './routes/news/openbot-vs-grokbot'
@@ -141,6 +142,8 @@ import { Route as V1BrowserExtensionXRulesRouteImport } from './routes/v1/browse
 import { Route as V1FeedbackSimilarRouteImport } from './routes/v1/feedback/similar'
 import { Route as V1FeedbackWithdrawRouteImport } from './routes/v1/feedback/withdraw'
 import { Route as V1GithubInstallationTokensRouteImport } from './routes/v1/github/installation-tokens'
+import { Route as V1GithubPublicRepositoriesRouteImport } from './routes/v1/github/public-repositories'
+import { Route as V1MeActivityRouteImport } from './routes/v1/me/activity'
 import { Route as V1MeAnalyticsRouteImport } from './routes/v1/me/analytics'
 import { Route as V1MeAvatarRouteImport } from './routes/v1/me/avatar'
 import { Route as V1MeChatColorRouteImport } from './routes/v1/me/chat-color'
@@ -155,6 +158,7 @@ import { Route as V1MobileAuthSessionRouteImport } from './routes/v1/mobile-auth
 import { Route as V1MobileAuthTicketRouteImport } from './routes/v1/mobile-auth/ticket'
 import { Route as V1MobileChangelogRouteImport } from './routes/v1/mobile/changelog'
 import { Route as V1MobileFeaturesRouteImport } from './routes/v1/mobile/features'
+import { Route as V1NearSplatRouteImport } from './routes/v1/near/$'
 import { Route as V1SitesIndexRouteImport } from './routes/v1/sites/index'
 import { Route as V1SitesSiteIdRouteImport } from './routes/v1/sites/$siteId'
 import { Route as V1SitesReportsRouteImport } from './routes/v1/sites/reports'
@@ -579,6 +583,11 @@ const MarketplaceAppsRoute = MarketplaceAppsRouteImport.update({
   path: '/marketplace/apps',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NearSignRoute = NearSignRouteImport.update({
+  id: '/near/sign',
+  path: '/near/sign',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const NewsIndexRoute = NewsIndexRouteImport.update({
   id: '/news/',
   path: '/news/',
@@ -954,6 +963,17 @@ const V1GithubInstallationTokensRoute =
     path: '/v1/github/installation-tokens',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V1GithubPublicRepositoriesRoute =
+  V1GithubPublicRepositoriesRouteImport.update({
+    id: '/v1/github/public-repositories',
+    path: '/v1/github/public-repositories',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const V1MeActivityRoute = V1MeActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => V1MeRoute,
+} as any)
 const V1MeAnalyticsRoute = V1MeAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
@@ -1022,6 +1042,11 @@ const V1MobileChangelogRoute = V1MobileChangelogRouteImport.update({
 const V1MobileFeaturesRoute = V1MobileFeaturesRouteImport.update({
   id: '/v1/mobile/features',
   path: '/v1/mobile/features',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const V1NearSplatRoute = V1NearSplatRouteImport.update({
+  id: '/v1/near/$',
+  path: '/v1/near/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const V1SitesIndexRoute = V1SitesIndexRouteImport.update({
@@ -1827,6 +1852,7 @@ export interface FileRoutesByFullPath {
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/marketplace/apps': typeof MarketplaceAppsRoute
+  '/near/sign': typeof NearSignRoute
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
@@ -1904,6 +1930,8 @@ export interface FileRoutesByFullPath {
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
   '/v1/feedback/withdraw': typeof V1FeedbackWithdrawRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
+  '/v1/github/public-repositories': typeof V1GithubPublicRepositoriesRoute
+  '/v1/me/activity': typeof V1MeActivityRoute
   '/v1/me/analytics': typeof V1MeAnalyticsRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
   '/v1/me/chat-color': typeof V1MeChatColorRoute
@@ -1918,6 +1946,7 @@ export interface FileRoutesByFullPath {
   '/v1/mobile-auth/ticket': typeof V1MobileAuthTicketRoute
   '/v1/mobile/changelog': typeof V1MobileChangelogRoute
   '/v1/mobile/features': typeof V1MobileFeaturesRoute
+  '/v1/near/$': typeof V1NearSplatRoute
   '/v1/sites/$siteId': typeof V1SitesSiteIdRoute
   '/v1/sites/reports': typeof V1SitesReportsRoute
   '/v1/skills/$skillId': typeof V1SkillsSkillIdRouteWithChildren
@@ -2107,6 +2136,7 @@ export interface FileRoutesByTo {
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/marketplace/apps': typeof MarketplaceAppsRoute
+  '/near/sign': typeof NearSignRoute
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
@@ -2184,6 +2214,8 @@ export interface FileRoutesByTo {
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
   '/v1/feedback/withdraw': typeof V1FeedbackWithdrawRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
+  '/v1/github/public-repositories': typeof V1GithubPublicRepositoriesRoute
+  '/v1/me/activity': typeof V1MeActivityRoute
   '/v1/me/analytics': typeof V1MeAnalyticsRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
   '/v1/me/chat-color': typeof V1MeChatColorRoute
@@ -2198,6 +2230,7 @@ export interface FileRoutesByTo {
   '/v1/mobile-auth/ticket': typeof V1MobileAuthTicketRoute
   '/v1/mobile/changelog': typeof V1MobileChangelogRoute
   '/v1/mobile/features': typeof V1MobileFeaturesRoute
+  '/v1/near/$': typeof V1NearSplatRoute
   '/v1/sites/$siteId': typeof V1SitesSiteIdRoute
   '/v1/sites/reports': typeof V1SitesReportsRoute
   '/v1/skills/$skillId': typeof V1SkillsSkillIdRouteWithChildren
@@ -2391,6 +2424,7 @@ export interface FileRoutesById {
   '/health/live': typeof HealthLiveRoute
   '/health/ready': typeof HealthReadyRoute
   '/marketplace/apps': typeof MarketplaceAppsRoute
+  '/near/sign': typeof NearSignRoute
   '/news/$slug': typeof NewsSlugRoute
   '/news/openbot-vs-grokbot': typeof NewsOpenbotVsGrokbotRoute
   '/news/rss.xml': typeof NewsRssDotxmlRoute
@@ -2469,6 +2503,8 @@ export interface FileRoutesById {
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
   '/v1/feedback/withdraw': typeof V1FeedbackWithdrawRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
+  '/v1/github/public-repositories': typeof V1GithubPublicRepositoriesRoute
+  '/v1/me/activity': typeof V1MeActivityRoute
   '/v1/me/analytics': typeof V1MeAnalyticsRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
   '/v1/me/chat-color': typeof V1MeChatColorRoute
@@ -2483,6 +2519,7 @@ export interface FileRoutesById {
   '/v1/mobile-auth/ticket': typeof V1MobileAuthTicketRoute
   '/v1/mobile/changelog': typeof V1MobileChangelogRoute
   '/v1/mobile/features': typeof V1MobileFeaturesRoute
+  '/v1/near/$': typeof V1NearSplatRoute
   '/v1/sites/$siteId': typeof V1SitesSiteIdRoute
   '/v1/sites/reports': typeof V1SitesReportsRoute
   '/v1/skills/$skillId': typeof V1SkillsSkillIdRouteWithChildren
@@ -2674,6 +2711,7 @@ export interface FileRouteTypes {
     | '/health/live'
     | '/health/ready'
     | '/marketplace/apps'
+    | '/near/sign'
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
@@ -2751,6 +2789,8 @@ export interface FileRouteTypes {
     | '/v1/feedback/similar'
     | '/v1/feedback/withdraw'
     | '/v1/github/installation-tokens'
+    | '/v1/github/public-repositories'
+    | '/v1/me/activity'
     | '/v1/me/analytics'
     | '/v1/me/avatar'
     | '/v1/me/chat-color'
@@ -2765,6 +2805,7 @@ export interface FileRouteTypes {
     | '/v1/mobile-auth/ticket'
     | '/v1/mobile/changelog'
     | '/v1/mobile/features'
+    | '/v1/near/$'
     | '/v1/sites/$siteId'
     | '/v1/sites/reports'
     | '/v1/skills/$skillId'
@@ -2954,6 +2995,7 @@ export interface FileRouteTypes {
     | '/health/live'
     | '/health/ready'
     | '/marketplace/apps'
+    | '/near/sign'
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
@@ -3031,6 +3073,8 @@ export interface FileRouteTypes {
     | '/v1/feedback/similar'
     | '/v1/feedback/withdraw'
     | '/v1/github/installation-tokens'
+    | '/v1/github/public-repositories'
+    | '/v1/me/activity'
     | '/v1/me/analytics'
     | '/v1/me/avatar'
     | '/v1/me/chat-color'
@@ -3045,6 +3089,7 @@ export interface FileRouteTypes {
     | '/v1/mobile-auth/ticket'
     | '/v1/mobile/changelog'
     | '/v1/mobile/features'
+    | '/v1/near/$'
     | '/v1/sites/$siteId'
     | '/v1/sites/reports'
     | '/v1/skills/$skillId'
@@ -3237,6 +3282,7 @@ export interface FileRouteTypes {
     | '/health/live'
     | '/health/ready'
     | '/marketplace/apps'
+    | '/near/sign'
     | '/news/$slug'
     | '/news/openbot-vs-grokbot'
     | '/news/rss.xml'
@@ -3315,6 +3361,8 @@ export interface FileRouteTypes {
     | '/v1/feedback/similar'
     | '/v1/feedback/withdraw'
     | '/v1/github/installation-tokens'
+    | '/v1/github/public-repositories'
+    | '/v1/me/activity'
     | '/v1/me/analytics'
     | '/v1/me/avatar'
     | '/v1/me/chat-color'
@@ -3329,6 +3377,7 @@ export interface FileRouteTypes {
     | '/v1/mobile-auth/ticket'
     | '/v1/mobile/changelog'
     | '/v1/mobile/features'
+    | '/v1/near/$'
     | '/v1/sites/$siteId'
     | '/v1/sites/reports'
     | '/v1/skills/$skillId'
@@ -3505,6 +3554,7 @@ export interface RootRouteChildren {
   HealthLiveRoute: typeof HealthLiveRoute
   HealthReadyRoute: typeof HealthReadyRoute
   MarketplaceAppsRoute: typeof MarketplaceAppsRoute
+  NearSignRoute: typeof NearSignRoute
   NewsSlugRoute: typeof NewsSlugRoute
   NewsOpenbotVsGrokbotRoute: typeof NewsOpenbotVsGrokbotRoute
   NewsRssDotxmlRoute: typeof NewsRssDotxmlRoute
@@ -3538,6 +3588,7 @@ export interface RootRouteChildren {
   V1AvatarsUserIdRoute: typeof V1AvatarsUserIdRoute
   V1BrowserExtensionXRulesRoute: typeof V1BrowserExtensionXRulesRoute
   V1GithubInstallationTokensRoute: typeof V1GithubInstallationTokensRoute
+  V1GithubPublicRepositoriesRoute: typeof V1GithubPublicRepositoriesRoute
   V1MediaBalanceRoute: typeof V1MediaBalanceRoute
   V1MediaModelsRoute: typeof V1MediaModelsRoute
   V1MobileAuthDevicesRoute: typeof V1MobileAuthDevicesRouteWithChildren
@@ -3547,6 +3598,7 @@ export interface RootRouteChildren {
   V1MobileAuthTicketRoute: typeof V1MobileAuthTicketRoute
   V1MobileChangelogRoute: typeof V1MobileChangelogRoute
   V1MobileFeaturesRoute: typeof V1MobileFeaturesRoute
+  V1NearSplatRoute: typeof V1NearSplatRoute
   V1SitesSiteIdRoute: typeof V1SitesSiteIdRoute
   V1SitesReportsRoute: typeof V1SitesReportsRoute
   V1SkillsSkillIdRoute: typeof V1SkillsSkillIdRouteWithChildren
@@ -4064,6 +4116,13 @@ declare module '@tanstack/solid-router' {
       path: '/marketplace/apps'
       fullPath: '/marketplace/apps'
       preLoaderRoute: typeof MarketplaceAppsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/near/sign': {
+      id: '/near/sign'
+      path: '/near/sign'
+      fullPath: '/near/sign'
+      preLoaderRoute: typeof NearSignRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/news/': {
@@ -4584,6 +4643,20 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V1GithubInstallationTokensRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v1/github/public-repositories': {
+      id: '/v1/github/public-repositories'
+      path: '/v1/github/public-repositories'
+      fullPath: '/v1/github/public-repositories'
+      preLoaderRoute: typeof V1GithubPublicRepositoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/me/activity': {
+      id: '/v1/me/activity'
+      path: '/activity'
+      fullPath: '/v1/me/activity'
+      preLoaderRoute: typeof V1MeActivityRouteImport
+      parentRoute: typeof V1MeRoute
+    }
     '/v1/me/analytics': {
       id: '/v1/me/analytics'
       path: '/analytics'
@@ -4680,6 +4753,13 @@ declare module '@tanstack/solid-router' {
       path: '/v1/mobile/features'
       fullPath: '/v1/mobile/features'
       preLoaderRoute: typeof V1MobileFeaturesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v1/near/$': {
+      id: '/v1/near/$'
+      path: '/v1/near/$'
+      fullPath: '/v1/near/$'
+      preLoaderRoute: typeof V1NearSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/v1/sites/': {
@@ -5806,6 +5886,7 @@ const V1FeedbackRouteWithChildren = V1FeedbackRoute._addFileChildren(
 )
 
 interface V1MeRouteChildren {
+  V1MeActivityRoute: typeof V1MeActivityRoute
   V1MeAnalyticsRoute: typeof V1MeAnalyticsRoute
   V1MeAvatarRoute: typeof V1MeAvatarRoute
   V1MeChatColorRoute: typeof V1MeChatColorRoute
@@ -5828,6 +5909,7 @@ interface V1MeRouteChildren {
 }
 
 const V1MeRouteChildren: V1MeRouteChildren = {
+  V1MeActivityRoute: V1MeActivityRoute,
   V1MeAnalyticsRoute: V1MeAnalyticsRoute,
   V1MeAvatarRoute: V1MeAvatarRoute,
   V1MeChatColorRoute: V1MeChatColorRoute,
@@ -6005,6 +6087,7 @@ const rootRouteChildren: RootRouteChildren = {
   HealthLiveRoute: HealthLiveRoute,
   HealthReadyRoute: HealthReadyRoute,
   MarketplaceAppsRoute: MarketplaceAppsRoute,
+  NearSignRoute: NearSignRoute,
   NewsSlugRoute: NewsSlugRoute,
   NewsOpenbotVsGrokbotRoute: NewsOpenbotVsGrokbotRoute,
   NewsRssDotxmlRoute: NewsRssDotxmlRoute,
@@ -6038,6 +6121,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1AvatarsUserIdRoute: V1AvatarsUserIdRoute,
   V1BrowserExtensionXRulesRoute: V1BrowserExtensionXRulesRoute,
   V1GithubInstallationTokensRoute: V1GithubInstallationTokensRoute,
+  V1GithubPublicRepositoriesRoute: V1GithubPublicRepositoriesRoute,
   V1MediaBalanceRoute: V1MediaBalanceRoute,
   V1MediaModelsRoute: V1MediaModelsRoute,
   V1MobileAuthDevicesRoute: V1MobileAuthDevicesRouteWithChildren,
@@ -6047,6 +6131,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1MobileAuthTicketRoute: V1MobileAuthTicketRoute,
   V1MobileChangelogRoute: V1MobileChangelogRoute,
   V1MobileFeaturesRoute: V1MobileFeaturesRoute,
+  V1NearSplatRoute: V1NearSplatRoute,
   V1SitesSiteIdRoute: V1SitesSiteIdRoute,
   V1SitesReportsRoute: V1SitesReportsRoute,
   V1SkillsSkillIdRoute: V1SkillsSkillIdRouteWithChildren,

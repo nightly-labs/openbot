@@ -23,6 +23,8 @@ export const messages = {
   "preview.tooLarge.title": "Plik jest za duży na podgląd",
   "preview.tooLarge.description": "Podgląd działa do 100 MB. Możesz otworzyć ten plik w domyślnej aplikacji.",
   "preview.spreadsheet.readFailed": "Nie udało się odczytać tego arkusza kalkulacyjnego.",
+  "preview.spreadsheet.tooLarge":
+    "Ten arkusz kalkulacyjny jest za duży na podgląd. Otwórz lub pobierz plik, aby zobaczyć całość.",
   "preview.spreadsheet.truncated": "Podgląd ograniczony do pierwszych wierszy ({rows}) i kolumn ({columns}).",
   "preview.document.readFailed": "Nie można odczytać tego dokumentu.",
   "preview.document.empty": "Ten dokument nie zawiera tekstu do wyświetlenia.",
