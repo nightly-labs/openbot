@@ -274,6 +274,7 @@ import { createDownloadQueue } from "@/features/workspace/model/request-lanes";
 import {
   hasCapability,
   requireCapability,
+  requireSidebarLayout,
   type ServerCapabilities,
   SIDEBAR_LAYOUT_CAPABILITY,
   supportsBrowserView,
@@ -1979,12 +1980,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       answerBrowserPermission: browser.answerBrowserPermission,
       answerBrowserHttpSignIn: browser.answerBrowserHttpSignIn,
       mutateSidebarLayout: async (serverId, action) => {
-        requireCapability(
-          serverCapabilities.current,
-          serverId,
-          SIDEBAR_LAYOUT_CAPABILITY,
-          "mobile.workspace.error.sectionsUnsupported",
-        );
+        requireSidebarLayout(serverCapabilities.current, serverId);
         const layout = await request(
           "POST",
           hasCapability(serverCapabilities.current, serverId, SIDEBAR_FOLDERS_CAPABILITY)
@@ -1997,12 +1993,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         applySidebarLayout(serverId, layout);
       },
       moveSidebarChat: async (serverId, action) => {
-        requireCapability(
-          serverCapabilities.current,
-          serverId,
-          SIDEBAR_LAYOUT_CAPABILITY,
-          "mobile.workspace.error.sectionsUnsupported",
-        );
+        requireSidebarLayout(serverCapabilities.current, serverId);
         const previous = sidebarByServerRef.current[serverId]?.layout;
         const moved = previous ? moveSidebarChat(previous, action) : null;
         if (moved) setSidebarByServer((current) => ({ ...current, [serverId]: { layout: moved, error: null } }));

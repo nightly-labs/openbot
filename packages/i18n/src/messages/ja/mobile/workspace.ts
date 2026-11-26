@@ -15,6 +15,7 @@ export const messages = {
   "mobile.workspace.error.sectionsLoadFailed": "フォルダーを読み込めませんでした。もう一度お試しください。",
   "mobile.workspace.error.transportNotReady": "モバイル接続の準備ができていません。",
   "mobile.workspace.error.sectionsUnsupported": "このホストはフォルダーの変更に対応していません。",
+  "mobile.workspace.error.sidebarOffline": "フォルダーを変更するには、このサーバーに接続してください。",
   "mobile.workspace.error.leaveOwnServer": "退出できるのは参加したリモートサーバーのみです。",
   "mobile.workspace.error.removeOwnedServerOnly": "このサーバーを削除できるのはオーナーだけです。",
   "mobile.workspace.error.agentNotOnHost": "エージェントはこのホストにありません。",

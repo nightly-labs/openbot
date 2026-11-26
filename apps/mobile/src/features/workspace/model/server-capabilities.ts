@@ -2,6 +2,7 @@ import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/b
 import type { TeamProtocolV1Capability } from "@openbot/contracts/team-protocol/v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { currentText } from "@/shared/lib/text";
+import { ConnectionUnavailableError } from "./connection-waits";
 
 export type ServerCapabilities = ReadonlyMap<string, readonly string[]>;
 
@@ -23,6 +24,12 @@ export function requireCapability(
   unsupported: MobileTextKey,
 ): void {
   if (!hasCapability(capabilities, serverId, capability)) throw new Error(currentText().t(unsupported));
+}
+
+export function requireSidebarLayout(capabilities: ServerCapabilities, serverId: string): void {
+  if (!capabilities.has(serverId))
+    throw new ConnectionUnavailableError(currentText().t("mobile.workspace.error.sidebarOffline"));
+  requireCapability(capabilities, serverId, SIDEBAR_LAYOUT_CAPABILITY, "mobile.workspace.error.sectionsUnsupported");
 }
 
 export function supportsBrowserView(capabilities: readonly string[]): boolean {
