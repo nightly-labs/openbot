@@ -443,6 +443,7 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "업로드 중",
   "mobile.chat.outbox.sendsWhenOnline": "서버가 온라인이 되면 보내요",
   "mobile.chat.outbox.waiting": "보내는 중",
+  "mobile.chat.outbox.waitingForFailed": "보내지 못한 메시지를 기다리는 중",
   "mobile.chat.outbox.failed": "보내지 못함",
   "mobile.chat.outbox.failedHold": "보내지 못했어요. 메시지를 길게 눌러 다시 시도하세요.",
   "mobile.chat.outbox.cancelSend": "보내지 않기",

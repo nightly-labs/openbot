@@ -420,6 +420,7 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "Uploaden",
   "mobile.chat.outbox.sendsWhenOnline": "Wordt verstuurd als de server online is",
   "mobile.chat.outbox.waiting": "Wacht op versturen",
+  "mobile.chat.outbox.waitingForFailed": "Wacht op het niet-verstuurde bericht",
   "mobile.chat.outbox.failed": "Niet verstuurd",
   "mobile.chat.outbox.failedHold": "Niet verstuurd. Houd het bericht ingedrukt om het opnieuw te proberen.",
   "mobile.chat.outbox.cancelSend": "Niet versturen",

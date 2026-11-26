@@ -450,6 +450,7 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "מעלה",
   "mobile.chat.outbox.sendsWhenOnline": "יישלח כשהשרת יתחבר",
   "mobile.chat.outbox.waiting": "ממתין לשליחה",
+  "mobile.chat.outbox.waitingForFailed": "ממתין להודעה שלא נשלחה",
   "mobile.chat.outbox.failed": "לא נשלח",
   "mobile.chat.outbox.failedHold": "לא נשלח. יש ללחוץ לחיצה ארוכה על ההודעה כדי לנסות שוב.",
   "mobile.chat.outbox.cancelSend": "לא לשלוח",

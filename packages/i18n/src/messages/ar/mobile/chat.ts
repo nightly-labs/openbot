@@ -556,6 +556,7 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "جارٍ الرفع",
   "mobile.chat.outbox.sendsWhenOnline": "يُرسل عند اتصال الخادم",
   "mobile.chat.outbox.waiting": "في انتظار الإرسال",
+  "mobile.chat.outbox.waitingForFailed": "في انتظار الرسالة التي لم تُرسل",
   "mobile.chat.outbox.failed": "لم يُرسل",
   "mobile.chat.outbox.failedHold": "لم يُرسل. المس الرسالة مع الاستمرار لإعادة المحاولة.",
   "mobile.chat.outbox.cancelSend": "عدم الإرسال",

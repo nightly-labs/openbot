@@ -443,6 +443,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.upload.uploadingLabel": "Uploading",
   "mobile.chat.outbox.sendsWhenOnline": "Sends when the server is online",
   "mobile.chat.outbox.waiting": "Waiting to send",
+  "mobile.chat.outbox.waitingForFailed": "Waits for the message that was not sent",
   "mobile.chat.outbox.failed": "Not sent",
   "mobile.chat.outbox.failedHold": "Not sent. Touch and hold the message to try again.",
   "mobile.chat.outbox.cancelSend": "Don't send",

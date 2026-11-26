@@ -430,6 +430,7 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "正在上传",
   "mobile.chat.outbox.sendsWhenOnline": "服务器在线时会发送",
   "mobile.chat.outbox.waiting": "等待发送",
+  "mobile.chat.outbox.waitingForFailed": "正在等待未发送的消息",
   "mobile.chat.outbox.failed": "未发送",
   "mobile.chat.outbox.failedHold": "未发送。长按该消息即可重试。",
   "mobile.chat.outbox.cancelSend": "不发送",

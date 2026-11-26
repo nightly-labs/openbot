@@ -451,6 +451,7 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "Enviando",
   "mobile.chat.outbox.sendsWhenOnline": "Será enviada quando o servidor estiver online",
   "mobile.chat.outbox.waiting": "Aguardando envio",
+  "mobile.chat.outbox.waitingForFailed": "Aguardando a mensagem não enviada",
   "mobile.chat.outbox.failed": "Não enviada",
   "mobile.chat.outbox.failedHold": "Não enviada. Toque e segure a mensagem para tentar novamente.",
   "mobile.chat.outbox.cancelSend": "Não enviar",
