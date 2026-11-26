@@ -783,6 +783,12 @@
       "detailSha256": "79bccb2e68d34a7e9b932b651c6e7b4e27e281a5ad36fd7b06e3f190083b0765"
     },
     {
+      "slug": "gsc-wizard",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "d20b52149500fa2151f535244e13d875967fc5b6cf4eec4d0831f6cae3fc9f2e"
+    },
+    {
       "slug": "guru",
       "version": "1.0.0",
       "featured": false,
