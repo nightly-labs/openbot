@@ -28,7 +28,7 @@ import {
   isBrowserViewUserAction,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { REMOTE_DESKTOP_MAX_SIGNAL_BYTES } from "@openbot/contracts/team-protocol/remote-stream-v1";
-import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
+import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Context, Deferred, Effect, Layer, Result, Semaphore } from "effect";
 import type * as Ws from "ws";
@@ -102,7 +102,7 @@ class BrowserViewPort extends Context.Service<
 
 function viewStartFailure(error: unknown): string {
   const message = redactText(String(error instanceof Error ? error.message : error));
-  return matchingSourceKeys(message).length > 0 ? message : sourceText("error.backend.browserViewFailed");
+  return isFixedSourceText(message) ? message : sourceText("error.backend.browserViewFailed");
 }
 
 type ViewInput = Parameters<BrowserHost["dispatchViewInput"]>[1];
