@@ -39,7 +39,7 @@ import {
   mcpAgentParam,
   usableMcpServers,
 } from "./mcp-provider-shapes";
-import { mcpSecretValues, redactMcpRecord, redactMcpValues } from "./mcp-redaction";
+import { mcpSecretValues, redactMcpModelText, redactMcpRecord, redactMcpValues } from "./mcp-redaction";
 import type { CustomProviderSource } from "./opencode-config";
 import { PendingServerRequests } from "./pending-server-requests";
 import { createPiCustomEndpointExtension, piCustomEndpointSecrets } from "./pi-custom-endpoints";
@@ -1030,7 +1030,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       method === "turn/started" ||
       method === "turn/completed"
         ? params
-        : withOwnIds(redactMcpRecord(params, this.#secretValues()), params);
+        : this.#safeParams(method, params);
     this.emit("notification", {
       method,
       params: {
@@ -1364,13 +1364,39 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     );
   });
 
+  #safeParams(method: string, params: DynamicRecord): LogValue {
+    const values = this.#secretValues();
+    const safe = withOwnIds(redactMcpRecord(params, values), params);
+    if (!isRecord(safe)) return safe;
+    const delta = MODEL_TEXT_DELTAS.has(method) && isString(params.delta) ? params.delta : null;
+    return {
+      ...safe,
+      ...(delta === null ? {} : { delta: redactMcpModelText(delta, values) }),
+      ...(isRecord(safe.item) ? { item: withSafeModelText(safe.item, params.item, values) } : {}),
+    };
+  }
+
   #safeItems(items: ThreadItem[]): ThreadItem[] {
     const values = this.#secretValues();
     return items.flatMap((item) => {
-      const value = withOwnIds(redactMcpRecord(item, values), item);
+      const value = withSafeModelText(withOwnIds(redactMcpRecord(item, values), item), item, values);
       return isRecord(value) && isString(value.type) ? [{ ...value, type: value.type }] : [];
     });
   }
+}
+
+const MODEL_TEXT_ITEMS = new Set(["agentMessage", "reasoning"]);
+const MODEL_TEXT_DELTAS = new Set(["item/agentMessage/delta", "item/reasoning/summaryTextDelta"]);
+
+function withSafeModelText(safe: LogValue, original: unknown, values: readonly string[]): LogValue {
+  if (!isRecord(safe) || !isRecord(original) || !isString(original.type) || !MODEL_TEXT_ITEMS.has(original.type))
+    return safe;
+  const text = isString(original.text) ? { text: redactMcpModelText(original.text, values) } : {};
+  const summary =
+    Array.isArray(original.summary) && original.summary.every(isString)
+      ? { summary: original.summary.map((part) => redactMcpModelText(part, values)) }
+      : {};
+  return { ...safe, ...text, ...summary };
 }
 
 function withOwnIds(safe: LogValue, original: DynamicRecord | ThreadItem): LogValue {
