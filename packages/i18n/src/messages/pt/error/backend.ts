@@ -66,6 +66,11 @@ export const messages = {
   "error.backend.browserSignInReadFailed": "O OpenBot não conseguiu ler o login da janela.",
   "error.backend.browserStopUnsupported":
     "Este computador anfitrião remoto não consegue parar o carregamento de uma página.",
+  "error.backend.browserLocationFailed": "Não foi possível definir a localização da página.",
+  "error.backend.browserPermissionsUnsupported": "Este host remoto não pode responder a pedidos de localização.",
+  "error.backend.browserLocationRequired": "Envie a localização do dispositivo para permitir o pedido.",
+  "error.backend.browserHttpSignInInactive": "Este site não pede mais login. Recarregue a página para tentar de novo.",
+  "error.backend.browserHttpSignInUnsupported": "Este host remoto não pode receber um login de site.",
   "error.backend.sharedDataLocalOnly":
     "Os dados compartilhados são gerenciados no computador que executa estes agentes.",
   "error.backend.browserUrlProtocol": "Somente URLs HTTP(S) são permitidas no navegador.",
@@ -210,6 +215,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "A geração do vídeo falhou.",
   "error.backend.videoGenerationNoVideo": "A geração do vídeo não retornou nenhum vídeo.",
   "error.backend.videoGenerationInterrupted": "A geração do vídeo foi interrompida.",
+  "error.backend.grokVideoNoQuota": "Sua conta do Grok não pode criar vídeos. Gere o vídeo com créditos.",
   "error.backend.attachmentNotRegularFile": "Somente arquivos comuns podem ser anexados: {name}",
   "error.backend.attachmentCopyFailed": "O OpenBot não conseguiu copiar {name}.",
   "error.backend.routineNameRequired": "É necessário informar um nome para a rotina.",
@@ -298,6 +304,8 @@ export const messages = {
     "O servidor de login ainda não aceita o OpenBot como aplicativo. Sua conta não é a causa. Use outra forma de conexão, como um servidor MCP local.",
   "error.backend.mcpRegistrationUnavailable":
     "O servidor de login não consegue registrar o OpenBot como aplicativo. Sua conta não é a causa. Para conectar, salve este servidor na Loja, Apps, e depois adicione um app de login a ele.",
+  "error.backend.mcpSignInAppNeeded":
+    "O servidor de login não consegue registrar o OpenBot como aplicativo. Sua conta não é a causa. Para conectar, abra este servidor na Loja, Apps, clique em Testar conexão e depois adicione um app de login.",
   "error.backend.mcpSignInAbandonedGeneric": "O login foi abandonado.",
   "error.backend.mcpSignInForgotten": "O login MCP foi esquecido enquanto estava em andamento.",
   "error.backend.mcpSignInAbandoned": "O login MCP foi abandonado.",
@@ -349,6 +357,8 @@ export const messages = {
     "{provider} não conseguiu obter as ferramentas do GitHub, porque o GitHub não respondeu. Abra o GitHub na Loja, Apps, e conecte-o de novo se ele pedir. Depois inicie um novo chat para tentar de novo.",
   "error.backend.mcpAppReconnect":
     "{name} no ChatGPT pede que você entre de novo. Reconecte {name} no ChatGPT e peça de novo ao agente.",
+  "error.backend.mcpAppAutoReview":
+    "Este app do ChatGPT não funciona quando o agente tem Perguntar antes ou Acesso completo. O app precisa da revisão automática de aprovações do Codex, que o OpenBot ainda não suporta. Você pode tentar Espaço de trabalho em Acesso, nas configurações do agente, e pedir de novo ao agente.",
   "error.backend.mcpServerSignInPage":
     "O servidor MCP {name} pediu que você entre em uma página da web. O OpenBot não abre essa página para um servidor, então recusou o pedido. Abra {name} na Loja, Apps, entre e peça de novo ao agente.",
   "error.backend.mcpServerRequestDeclined":
@@ -451,6 +461,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "O proxy {name} recusou o início de sessão, por isso a página não abriu.",
   "error.backend.browserSystemProxyFailed":
     "O proxy nas configurações do computador que executa o OpenBot não responde ou recusou a conexão, por isso a página não abriu. Verifique as configurações de proxy desse computador.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "O site ou o proxy nas configurações do computador que executa o OpenBot fechou a conexão sem resposta, por isso a página não abriu. Se nenhum site abrir, verifique as configurações de proxy desse computador.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "O site ou o proxy deste perfil do navegador fechou a conexão sem resposta, por isso a página não abriu. Se nenhum site abrir, verifique o proxy do perfil.",
   "error.backend.browserProxyComputerUnreachable":
     "O computador que este perfil usa não responde, por isso a página não abriu.",
   "error.backend.browserProxyComputerLocalAddress":

@@ -34,6 +34,8 @@ export const messages = {
   "error.voice.live.timedOut": "Codex live spraak is niet op tijd gestart. Probeer het opnieuw.",
   "error.voice.live.failed": "Live spraak is gestopt: {reason}",
   "error.voice.live.disconnected": "Live spraak is verbroken.",
+  "error.voice.live.connectionLost":
+    "Live spraak heeft de verbinding verloren. Zet de microfoon weer aan om opnieuw te starten.",
   "error.voice.live.startFailed":
     "Live spraak kon niet starten. Werk Codex bij en log in met ChatGPT op de computer waarop de agent draait, en probeer het dan opnieuw. Reden: {reason}",
   "error.voice.live.hostFailed":

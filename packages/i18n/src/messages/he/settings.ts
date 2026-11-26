@@ -109,7 +109,8 @@ export const messages = {
   "settings.quitGuard.always": "תמיד",
   "settings.quitGuard.never": "אף פעם",
   "settings.externalLinks.title": "פתיחת קישורים חיצוניים ב",
-  "settings.externalLinks.description": "קישורים בצ'אטים, בעמודי התחברות ובעמודי חיוב נפתחים כאן.",
+  "settings.externalLinks.description":
+    "קישורים בצ'אטים, בעמודי התחברות ובעמודי חיוב נפתחים כאן. עם OpenBot, רק קישורים בצ'אטים של החלון הראשי עם סוכנים במחשב הזה נפתחים ב-OpenBot. קישורים אחרים נפתחים בדפדפן ברירת המחדל.",
   "settings.externalLinks.defaultBrowser": "דפדפן ברירת המחדל",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "דפדפן ברירת המחדל ({name})",
@@ -238,7 +239,8 @@ export const messages = {
   "settings.notch.xwayland.title": "נדרשת הפעלה מחדש",
   "settings.notch.xwayland.description":
     "ב-Wayland, ‏OpenBot צריך להשתמש ב-XWayland כדי להציג את ה-Dynamic Island מעל אפליקציות אחרות. עד אז, האי לא מוצג.",
-  "settings.notch.xwayland.unsupported": "ב-Wayland בלי XWayland, ה-Dynamic Island לא יכול להופיע מעל אפליקציות אחרות.",
+  "settings.notch.xwayland.unsupported":
+    "בשולחן העבודה הזה של Wayland, ה-Dynamic Island לא יכול להופיע מעל אפליקציות אחרות.",
   "settings.notch.xwayland.restart": "הפעלה מחדש",
   "settings.notch.idle.title": "הצגת האי במצב סרק",
   "settings.notch.idle.description": "הצגת הלוגו של OpenBot וברכה כשאין סטטוס פעיל.",
@@ -267,7 +269,7 @@ export const messages = {
   "settings.agentDock.xwayland.description":
     "ב-Wayland, ‏OpenBot צריך להשתמש ב-XWayland כדי להציג את המעגן מעל אפליקציות אחרות. עד אז, המעגן מוצג בחלון OpenBot.",
   "settings.agentDock.xwayland.unsupported":
-    "ב-Wayland בלי XWayland, המעגן לא יכול להופיע מעל אפליקציות אחרות. הוא מוצג בחלון OpenBot.",
+    "בשולחן העבודה הזה של Wayland, המעגן לא יכול להופיע מעל אפליקציות אחרות. הוא מוצג בחלון OpenBot.",
   "settings.agentDock.xwayland.restart": "הפעלה מחדש",
   "settings.agentDock.noCompositor.title": "מוצג בחלון OpenBot",
   "settings.agentDock.noCompositor.description":

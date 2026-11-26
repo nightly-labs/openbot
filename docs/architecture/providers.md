@@ -358,6 +358,11 @@ OpenBot unloads a session that has no turn, keeps its identity, and resumes it a
   default) with no activity. That unload ends the thread's unified exec processes and its MCP servers.
   An agent delete sends `thread/archive` after the unsubscribe: Codex ends the thread before it answers,
   so Windows can remove the workspace (#6266).
+- The Codex app server keeps the tool list of each MCP server in memory for 30 minutes. With a valid
+  list, a resumed thread does not wait for its MCP servers to start; without one, the first turn waits
+  up to `mcp_optional_startup_grace_ms` (10 s) for each slow server. So `ProviderRuntime` stops an
+  idle Codex app server 30 minutes after its last use, not after the 10 minutes of the other
+  provider CLIs (#16388). A Workspace only Codex process still stops after 10 minutes.
 - When the memory of a server is critical, `MemoryHold` releases every idle session of each kind at once.
 - A routine session is ephemeral and is not released.
 - Outside Windows, the Claude, Codex and Pi CLIs start as the leaders of their own process groups
@@ -461,6 +466,20 @@ Claude sessions, sign-in and sign-out) start with the resolved `launchPath`: the
 folders, then OpenBot's own, then the CLI's folder for a system copy. An app that Finder starts can
 then run a `#!/usr/bin/env node` CLI. A CLI that exists but does not start reports whether the
 managed copy or the user's copy failed.
+
+A native system Codex with no `codex-code-mode-host` beside it, or in `codex-resources`, is
+`incomplete`: GPT-6 and other code-mode models cannot run tools with it. It runs only when no
+complete Codex starts, and Settings > Providers offers the managed copy. A desktop window waits for
+the user to click Download. A server (hosted, server mode, or a local server child) runs agents in
+the background, often for routines that nobody watches, so `createSystemCliTracker` in `src/main/system-cli-tracker.ts`
+downloads the managed copy once per process when an agent uses ChatGPT, the provider is on, the
+managed copy is not downloaded, and the user did not choose "Use installed version". It checks
+again at each provider status and each change to the agent list, so a server's first ChatGPT agent
+starts the download without a restart. An explicit
+`OPENBOT_CODEX_PATH` is never `incomplete`. The download replaces the CLI as Download in Settings
+does. `bun run test:server-incomplete-codex` (CI runs it in `test:provider-update-busy`) checks
+these decisions with the real runtime manager and resolver. It calls the tracker directly, so it
+does not cover the agent-list event or the server kinds.
 
 Installed runtimes live in one store per computer, `appData/OpenBot/provider-runtimes`, which is the
 path the packaged app always used: its `userData` is `appData/OpenBot`. Development profiles differ
@@ -671,6 +690,15 @@ and does not connect again while the settings stay the same (#10749). When the b
 its tools within that time after the session request, OpenBot gives the directory a new token and
 resumes the session once. The earlier tokens stay valid until the last session of the directory closes.
 
+On Windows, OpenCode picks PowerShell 7 first and accepts its Microsoft Store alias in `WindowsApps`.
+Its process service (`@opencode/pty` 0.6.0) starts that alias only some of the time: Windows refuses it
+with error 5 while another process of the Store package runs (anomalyco/opencode#64803). When `pwsh` on
+the `PATH` is only that alias and `SHELL` is not set, `opencode-windows-shell.ts` sets `SHELL` to
+Windows PowerShell in `System32`. A `shell` in the OpenCode config comes before `SHELL`, so the
+user's choice still wins. OpenCode has no variable of its own for the shell, so the commands and the
+stdio MCP servers of these agents also see this `SHELL`; GNU make on Windows reads it. Remove this
+when an OpenCode release ships anomalyco/opencode#64901.
+
 OpenCode adds its own system prompt, tools, skill listing and Code Mode catalog to each request of an
 agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does not use: the
 `question` tool (OpenBot has `ask_user`), the `opencode_list_mcp_resources` and
@@ -754,6 +782,25 @@ to Zen in OpenCode itself (`opencode auth login`). That sign-in buys the model, 
 each model that OpenCode lists. Checked in OpenCode 2.2.5 and 2.3.0: a key on `opencode-go` lists
 the Go models and no paid Zen model (#6185).
 
+The anonymous-key filter of OpenCode turns off only a model whose token price has an input cost
+above 0. A Zen image or video model has its price under `cost.image`, so OpenCode lists it as `input
+0`, keeps it, and offers its `generate_image` (2.2 and 2.3: `experimental_image_generate`) and
+`generate_video` tools to a free model. The OpenCode service refuses each request with "Invalid
+credential" or "Missing API key" (#15281, #6432). OpenCode Go has no image or video model, so the
+Go key does not help. When `hasOpenCodeMediaSignIn` finds no sign-in that can pay for these models,
+`openCodeAgentConfig` sends `experimental.image_generate` and `experimental.video_generate` as
+`false`, which removes both tools. OpenBot's own `generate_image` and `generate_video` (OpenBot
+credits) stay, and their guidance sends an agent to them when it has no media tool of its own. The check counts a non-empty environment variable whose name ends in
+`_API_KEY` (`OPENCODE_API_KEY` after `clearedInheritedOpenCodeKeyEnv`, or a provider key such as
+`OPENAI_API_KEY`: 291 of the 326 key variables in the OpenCode 2.4.2 catalog end so), and an
+`auth.json` entry or an active `credential` row for any provider except `opencode-go`. It also counts
+a custom endpoint with a key or headers (`hasCustomProviderCredentials`), and a user OpenCode config
+(the global config files or `OPENCODE_CONFIG`) that sets a provider `apiKey` or
+`experimental.image_generate`/`video_generate`, or that OpenBot cannot decode. A key for another
+provider keeps the tools, because that provider can have its own image models: a custom endpoint
+with the id `openai` and a key gets the OpenAI image models of the catalog in OpenCode 2.4.2. Checked with the real OpenCode 2.4.0 and 2.4.2 on a free
+model; 2.2.5 and 2.3.2 have the same switch. `test:opencode-expired-key` checks the config.
+
 OpenCode first lists the models of a cached or built-in catalog and fetches the new catalog in the
 background, about 3 s later. A first start of OpenCode 2.2.5 listed 80 of 88 models. The OpenCode
 driver thus sets `catalog.relistAfterStart`: the list is read again 5 s after each start, and agents
@@ -763,6 +810,16 @@ right after the computer wakes, also the second list lacks new models (#16212). 
 (`moveAgentsOffModelsUnlistedTwice`). The count is kept in memory, so the first start after an
 OpenBot restart never moves an agent. A model that is really gone moves at the next provider start,
 for example after the idle release.
+
+The same partial list is the session's model list right after a start. Before a turn, `applyConfig`
+fails a model that the session does not list (#11964), so a queued message failed with "does not
+offer" although OpenCode offered the model a moment later (#15963). OpenCode reloads its catalog when
+it gets a model that it does not list, and refuses a model that is still missing with -32602 and
+`data.modelId` (OpenCode 1.19 and 2). The OpenCode flavor sets `modelNotOffered` to match that
+error, so OpenBot sends the model and lets OpenCode decide. That refusal fails the turn with
+`ProviderModelNotOfferedError`, and so does a reply whose model list still does not have the model:
+OpenCode 1.15 sets any model with no check. Other ACP agents keep the check before the send, because Antigravity
+kept its own model and gave no error for a model that it did not list (#11797).
 
 The CLI reports no Go quota over ACP. `readOpenCodeGoUsage` (`src/backend/opencode-usage.ts`)
 sends `opencode.ai/zen/go/v1/usage` the key the CLI uses. A saved key is the only key: the CLI
@@ -996,7 +1053,11 @@ advertise the capability; open OpenBot in the host's desktop session to connect 
 A host on any platform also advertises the `antigravity-code-sign-in-v1` marker (Team API v10). It
 adds nothing to the wire: it tells a client that the released providers-v8 `codeLoginStart` route
 signs Gemini in with `agy acp --login` (`ANTIGRAVITY_CODE_SIGN_IN` in `provider-drivers.ts`) and
-answers with the `paste` shape. The CLI prints the Google link; the user opens it on any device and
+answers with the `paste` shape. The CLI prints the Google link and also runs `open` or `xdg-open` with
+it, so each start would open a Google tab on the host (#16705). The code sign-in, also of an added
+account, therefore gets `SSH_CONNECTION` (`ANTIGRAVITY_LINK_ONLY_ENV`): then 1.5.4 prints the link
+only. The ACP `authenticate` sign-in does not get it, because the CLI then refuses a browser sign-in.
+The user opens the link on any device and
 pastes the code, or the URL of the page they land on, with the released `codeLoginSubmit`. This
 works on a server with no desktop and on a Windows host. A host before this marker refuses Gemini on
 that route, so the desktop with a joined server, the web client and mobile offer the code sign-in

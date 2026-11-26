@@ -64,6 +64,7 @@ export const messages = {
   "provider.aria.install": "安装 {name}",
   "provider.aria.signIn": "登录 {name}",
   "provider.aria.codeFallback": "用验证码登录 {name}",
+  "provider.aria.addressFallback": "粘贴 {name} 的登录地址",
   "provider.aria.moreActions": "{name} 的更多操作",
 
   "provider.aria.use": "在 OpenBot 中使用 {name}",
@@ -91,6 +92,7 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "等待你的操作，本次登录将在 {time} 后终止。",
   "provider.codeLogin.linkTitle": "在另一台设备上登录 {name}",
   "provider.codeLogin.pageTitle": "登录 {name}",
+  "provider.codeLogin.addressDescription": "请在浏览器中完成登录。登录完成后，此窗口会自动关闭。",
   "provider.codeLogin.pageDescription": "该页面已在 {host} 的浏览器中打开，请在这里登录。",
   "provider.codeLogin.relayStarting": "正在 {host} 上启动 {name} 登录…",
   "provider.codeLogin.pageOpening": "正在 {host} 上打开 {name} 登录页面…",
@@ -224,6 +226,7 @@ export const messages = {
   "provider.account.numbered": "账号 {number}",
   "provider.account.listLabel": "{name} 的账号",
   "provider.account.usedBy": "被 {agents} 使用",
+  "provider.account.sameEmail": "与 {name} 的邮箱相同",
   "provider.account.failed": "登录失败",
   "provider.account.moreActions": "{name} 的更多操作",
   "provider.account.renameLabel": "{name} 的名称",

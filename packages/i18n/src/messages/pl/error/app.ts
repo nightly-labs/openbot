@@ -11,4 +11,6 @@ export const messages = {
   "error.app.remoteIdentityUnavailable": "Tożsamość zdalnego hosta jest niedostępna.",
   "error.app.iceServersMissing": "Remote Signal nie dostarczył jeszcze serwerów ICE.",
   "error.app.finishLocalTest": "Zakończ test lokalny przed przełączeniem ekranów.",
+  "error.app.windowBlockedBySecuritySoftware":
+    "Oprogramowanie zabezpieczające na tym komputerze prawdopodobnie zatrzymało okno OpenBot. W oprogramowaniu zabezpieczającym, na przykład Kaspersky, dodaj OpenBot.exe jako zaufaną aplikację. Następnie uruchom OpenBot ponownie.",
 } as const satisfies PartialTranslation<typeof source>;

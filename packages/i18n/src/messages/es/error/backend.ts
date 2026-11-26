@@ -64,6 +64,12 @@ export const messages = {
     "OpenBot no pudo cargar la página en la ventana de inicio de sesión. Comprueba la conexión a internet y vuelve a abrir la ventana de inicio de sesión.",
   "error.backend.browserSignInReadFailed": "OpenBot no pudo leer el inicio de sesión de la ventana.",
   "error.backend.browserStopUnsupported": "Este host remoto no puede detener la carga de una página.",
+  "error.backend.browserLocationFailed": "No se pudo establecer la ubicación de la página.",
+  "error.backend.browserPermissionsUnsupported": "Este host remoto no puede responder a solicitudes de ubicación.",
+  "error.backend.browserLocationRequired": "Envía la ubicación del dispositivo para permitir la solicitud.",
+  "error.backend.browserHttpSignInInactive":
+    "Este sitio ya no pide iniciar sesión. Vuelve a cargar la página para intentarlo de nuevo.",
+  "error.backend.browserHttpSignInUnsupported": "Este host remoto no puede recibir un inicio de sesión en un sitio.",
   "error.backend.sharedDataLocalOnly": "Los datos compartidos se gestionan en el equipo que ejecuta estos agentes.",
   "error.backend.browserUrlProtocol": "Solo se permiten URL HTTP(S) en el navegador.",
   "error.backend.sunshineNotReady": "Sunshine no llegó a estar listo.",
@@ -210,6 +216,7 @@ export const messages = {
   "error.backend.videoGenerationFailed": "La generación del video falló.",
   "error.backend.videoGenerationNoVideo": "La generación del video no devolvió ningún video.",
   "error.backend.videoGenerationInterrupted": "La generación del video se interrumpió.",
+  "error.backend.grokVideoNoQuota": "Tu cuenta de Grok no puede crear videos. Genera el video con créditos.",
   "error.backend.attachmentNotRegularFile": "Solo se pueden adjuntar archivos normales: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot no pudo copiar {name}.",
   "error.backend.routineNameRequired": "Se requiere un nombre para la rutina.",
@@ -299,6 +306,8 @@ export const messages = {
     "El servidor de inicio de sesión aún no acepta OpenBot como aplicación. Tu cuenta no es la causa. Usa otra forma de conexión, como un servidor MCP local.",
   "error.backend.mcpRegistrationUnavailable":
     "El servidor de inicio de sesión no puede registrar OpenBot como aplicación. Tu cuenta no es la causa. Para conectar, guarda este servidor en Marketplace, Apps, y después añádele una app de inicio de sesión.",
+  "error.backend.mcpSignInAppNeeded":
+    "El servidor de inicio de sesión no puede registrar OpenBot como aplicación. Tu cuenta no es la causa. Para conectar, abre este servidor en Marketplace, Apps, haz clic en Probar conexión y después añade una app de inicio de sesión.",
   "error.backend.mcpSignInAbandonedGeneric": "Se abandonó el inicio de sesión.",
   "error.backend.mcpSignInForgotten": "Se olvidó el inicio de sesión de MCP mientras estaba en curso.",
   "error.backend.mcpSignInAbandoned": "Se abandonó el inicio de sesión de MCP.",
@@ -447,6 +456,10 @@ export const messages = {
     "El proxy {name} rechazó el inicio de sesión, así que la página no se abrió.",
   "error.backend.browserSystemProxyFailed":
     "El proxy de la configuración del ordenador que ejecuta OpenBot no responde o rechazó la conexión, así que la página no se abrió. Revisa la configuración de proxy de ese ordenador.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "El sitio o el proxy de la configuración del ordenador que ejecuta OpenBot cerró la conexión sin responder, así que la página no se abrió. Si no se abre ningún sitio, revisa la configuración de proxy de ese ordenador.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "El sitio o el proxy de este perfil del navegador cerró la conexión sin responder, así que la página no se abrió. Si no se abre ningún sitio, revisa el proxy del perfil.",
   "error.backend.browserProxyComputerUnreachable":
     "El ordenador que usa este perfil no responde, así que la página no se abrió.",
   "error.backend.browserProxyComputerLocalAddress":

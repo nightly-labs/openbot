@@ -54,6 +54,7 @@ export type ProviderCodeLoginState =
       hostName: string;
       page: McpSignInRelaySource | null;
     }
+  | { phase: "address" }
   | { phase: "verifying" };
 
 export interface ProviderCodeLoginDialogProps {
@@ -76,6 +77,7 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
   const linkOnThisComputer = () => linking()?.onThisComputer === true;
   const hostPage = () => (props.state.phase === "page" ? props.state : null);
   const relay = () => (props.state.phase === "relay" ? props.state : null);
+  const addressPaste = () => props.state.phase === "address";
   const [pastedCode, setPastedCode] = createSignal("");
   createEffect(
     () => pasting()?.verificationUrl,
@@ -84,6 +86,7 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
     },
   );
   const descriptionText = () => {
+    if (addressPaste()) return t("provider.codeLogin.addressDescription");
     const host = hostPage();
     if (host) return t("provider.codeLogin.pageDescription", { host: host.hostName });
     if (linkOnThisComputer()) return t("provider.codeLogin.thisComputerDescription");
@@ -109,7 +112,7 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
               <Dialog.Title class="provider-code-login-title">
                 {linking() && !linkOnThisComputer()
                   ? t("provider.codeLogin.linkTitle", { name: props.providerName })
-                  : hostPage() || relay() || linking()
+                  : hostPage() || relay() || linking() || addressPaste()
                     ? t("provider.codeLogin.pageTitle", { name: props.providerName })
                     : t("provider.codeLogin.title", { name: props.providerName })}
               </Dialog.Title>
@@ -338,6 +341,13 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
                 )}
               </Show>
 
+              <Show when={addressPaste()}>
+                <McpSignInRelayControls
+                  page={BROWSER_ADDRESS_PAGE}
+                  onPaste={(address) => props.onPasteRelayAddress?.(address) ?? Promise.resolve()}
+                />
+              </Show>
+
               <Show when={props.state.phase === "verifying"}>
                 <div class="provider-code-login-pending" role="status">
                   <Spinner size="sm" />
@@ -363,6 +373,8 @@ export function ProviderCodeLoginDialog(props: ProviderCodeLoginDialogProps) {
     </Dialog.Root>
   );
 }
+
+const BROWSER_ADDRESS_PAGE: McpSignInRelaySource = { authorizeHost: "", url: null, listening: true, pasteable: true };
 
 function createCountdown(deadline: () => number | null) {
   const [now, setNow] = createSignal(Date.now());

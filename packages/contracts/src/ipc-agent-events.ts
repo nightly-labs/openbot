@@ -31,6 +31,7 @@ import { isSidebarLayoutSnapshot, type SidebarLayoutSnapshot } from "./ipc-sideb
 import { isSidebarPinsSnapshot, type SidebarPin } from "./ipc-sidebar-pins";
 import type { ServerNotificationLevel } from "./ipc-team-host";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
+import { isWorkflowSpotEvent, type WorkflowSpotEvent } from "./team-protocol/workflow-presence-v1";
 
 export type AgentTurnOrigin = "user" | "routine" | "agent" | "unknown";
 
@@ -75,6 +76,7 @@ export type AgentEvent =
   | { type: "skills-changed"; agentId: string }
   | { type: "routine-flows-changed"; agentId: string }
   | { type: "workflows-changed"; workflowId: string; agentId?: string }
+  | WorkflowSpotEvent
   | { type: "crm-changed" }
   | { type: "vault-changed" }
   | { type: "browser-profiles-changed" }
@@ -166,6 +168,11 @@ export type AgentEvent =
       type: "browser-page-state-changed";
       tabs: { tabId: string; canGoBack: boolean; canGoForward: boolean }[];
     }
+  | { type: "browser-http-sign-in-changed"; tabs: { tabId: string; origin: string; refused: boolean }[] }
+  | {
+      type: "browser-permissions-changed";
+      requests: { tabId: string; id: string; origin: string; permission: "geolocation" }[];
+    }
   | {
       type: "error";
       agentId?: string;
@@ -222,6 +229,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
       return isIdentifier(value.agentId);
     case "workflows-changed":
       return isIdentifier(value.workflowId) && (value.agentId === undefined || isIdentifier(value.agentId));
+    case "workflow-spot-changed":
+      return isWorkflowSpotEvent(value);
     case "crm-changed":
     case "vault-changed":
     case "browser-profiles-changed":
@@ -372,6 +381,25 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         value.tabs.every(
           (tab) =>
             isDynamicRecord(tab) && isString(tab.tabId) && isBoolean(tab.canGoBack) && isBoolean(tab.canGoForward),
+        )
+      );
+    case "browser-permissions-changed":
+      return (
+        Array.isArray(value.requests) &&
+        value.requests.every(
+          (request) =>
+            isDynamicRecord(request) &&
+            isString(request.tabId) &&
+            isString(request.id) &&
+            isString(request.origin) &&
+            request.permission === "geolocation",
+        )
+      );
+    case "browser-http-sign-in-changed":
+      return (
+        Array.isArray(value.tabs) &&
+        value.tabs.every(
+          (tab) => isDynamicRecord(tab) && isString(tab.tabId) && isString(tab.origin) && isBoolean(tab.refused),
         )
       );
     case "error":

@@ -58,6 +58,9 @@ export const messages = {
     "Un autre OpenBot est associé à ce numéro WhatsApp, vous pouvez donc recevoir deux réponses. Pour corriger cela, ouvrez Appareils connectés dans WhatsApp sur votre téléphone et déconnectez l’OpenBot que vous n’utilisez pas.",
   "status.messaging.whatsappPaused":
     "OpenBot ne répond plus ici pendant 10 minutes : trop de messages sont arrivés en peu de temps. Si un autre OpenBot est associé à ce numéro, ouvrez Appareils connectés dans WhatsApp sur votre téléphone et déconnectez l’OpenBot que vous n’utilisez pas.",
+  "status.messaging.whatsappNotDelivered": "WhatsApp n’a pas accepté cette réponse, la personne ne l’a donc pas reçue.",
+  "status.messaging.whatsappPartlyDelivered":
+    "WhatsApp n’a pas accepté toute cette réponse, la personne n’en a donc reçu qu’une partie.",
   "status.messaging.whatsappOrchestratorName": "Orchestrateur WhatsApp",
   "status.messaging.whatsappOrchestratorTitle": "Répond dans WhatsApp et consulte l’équipe",
 } as const satisfies PartialTranslation<typeof source>;

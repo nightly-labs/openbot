@@ -64,6 +64,7 @@ export const messages = {
   "provider.aria.install": "{name} sağlayıcısını yükle",
   "provider.aria.signIn": "{name} sağlayıcısında oturum aç",
   "provider.aria.codeFallback": "{name} için kodla oturum aç",
+  "provider.aria.addressFallback": "{name} için oturum açma adresini yapıştır",
   "provider.aria.moreActions": "{name} için diğer eylemler",
 
   "provider.aria.use": "OpenBot'ta {name} kullan",
@@ -92,6 +93,8 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "Sizi bekliyor. Bu oturum açma işlemi {time} içinde sona erecek.",
   "provider.codeLogin.linkTitle": "Başka bir cihazda {name} hesabında oturum açın",
   "provider.codeLogin.pageTitle": "{name} hesabında oturum açın",
+  "provider.codeLogin.addressDescription":
+    "Oturum açmayı tarayıcınızda tamamlayın. Oturum açma bitince bu pencere kapanır.",
   "provider.codeLogin.pageDescription": "Bu sayfa {host} üzerindeki tarayıcıda açık. Burada oturum açın.",
   "provider.codeLogin.relayStarting": "{name} oturum açma işlemi {host} üzerinde başlatılıyor…",
   "provider.codeLogin.pageOpening": "{name} oturum açma sayfası {host} üzerinde açılıyor…",
@@ -232,6 +235,7 @@ export const messages = {
   "provider.account.apiKey": "API anahtarı",
   "provider.account.listLabel": "{name} hesapları",
   "provider.account.usedBy": "Kullanan: {agents}",
+  "provider.account.sameEmail": "{name} ile aynı e-posta",
   "provider.account.failed": "Oturum açılamadı",
   "provider.account.moreActions": "{name} için diğer eylemler",
   "provider.account.renameLabel": "{name} adı",

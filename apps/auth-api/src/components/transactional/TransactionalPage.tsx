@@ -1,4 +1,5 @@
 import type { JSX } from "@solidjs/web";
+import { Show } from "solid-js";
 import { LandingFooter } from "../landing/LandingFooter";
 import { SiteHeader } from "../landing/SiteHeader";
 
@@ -7,13 +8,16 @@ export interface TransactionalPageProps {
   layout?: "message" | "form";
   class?: string;
   lang?: string;
+  bare?: boolean;
   children: JSX.Element;
 }
 
 export function TransactionalPage(props: TransactionalPageProps) {
   return (
     <div class="landing-page transactional-page">
-      <SiteHeader page="content" />
+      <Show when={!props.bare}>
+        <SiteHeader page="content" />
+      </Show>
       <main class="transactional-main" lang={props.lang}>
         <section
           class={props.class ? `join-card transactional-card ${props.class}` : "join-card transactional-card"}
@@ -23,7 +27,9 @@ export function TransactionalPage(props: TransactionalPageProps) {
           {props.children}
         </section>
       </main>
-      <LandingFooter />
+      <Show when={!props.bare}>
+        <LandingFooter />
+      </Show>
     </div>
   );
 }

@@ -18,6 +18,7 @@ import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from
 import { Deferred, Effect, Exit, type Layer, Result, Scope, Semaphore } from "effect";
 import { z } from "zod";
 import { writeFileAtomically } from "../backend/atomic-json-file";
+import type { AgentGitConfigForm } from "../backend/provider-drivers";
 import { GitHubBotTokens } from "./github-bot-tokens";
 import type { GitHubAppConfig } from "./github-connector-config";
 import type { GitHubConnectorRecord, GitHubConnectorStore } from "./github-connector-store";
@@ -394,20 +395,23 @@ export class GitHubConnectorService {
     };
   }
 
-  agentEnvironment(inherited: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  agentEnvironment(
+    inherited: NodeJS.ProcessEnv = process.env,
+    gitConfig: AgentGitConfigForm = "parameters",
+  ): Record<string, string> {
     if (!this.#agentConnected()) return {};
     const tokenFile = shellQuote(this.#credentialFile().replaceAll("\\", "/"));
     const repositoriesFile = shellQuote(this.#repositoriesFile().replaceAll("\\", "/"));
     const inheritedGitConfig = inherited.GIT_CONFIG_PARAMETERS;
+    const first = gitConfigCount(inherited.GIT_CONFIG_COUNT);
     const ownGhConfig =
       inherited.GH_CONFIG_DIR === undefined
         ? "unset GH_CONFIG_DIR"
         : `GH_CONFIG_DIR=${shellQuote(inherited.GH_CONFIG_DIR)}; export GH_CONFIG_DIR`;
-    const ownGitConfig = [
-      `m=$(printf '\\047%s\\047' ${GIT_USE_HTTP_PATH_KEY}=true)`,
-      `case $GIT_CONFIG_PARAMETERS in (*"$m"*) a=\${GIT_CONFIG_PARAMETERS##*"$m"};; (*) a=;; esac`,
-      `a=${shellQuote(inheritedGitConfig ?? "")}$a; GIT_CONFIG_PARAMETERS=\${a# }; export GIT_CONFIG_PARAMETERS`,
-    ].join("; ");
+    const ownGitConfig =
+      gitConfig === "count"
+        ? `GIT_CONFIG_COUNT=${first}; export GIT_CONFIG_COUNT`
+        : ownGitConfigParameters(inheritedGitConfig);
     const helper = [
       '!f() { test "$1" = get || exit 0; p=; s=; h=; u=',
       "while IFS='=' read -r k v; do case $k in (path) p=$v;; (protocol) s=$v;; (host) h=$v;; (username) u=$v;; esac; done",
@@ -418,13 +422,27 @@ export class GitHubConnectorService {
       "echo username=x-access-token; printf 'password='",
       `if test -n "$t"; then printf '%s' "$t"; else cat ${tokenFile}; fi; echo; }; f`,
     ].join("; ");
+    const settings: readonly (readonly [string, string])[] = [
+      [GIT_CREDENTIAL_KEY, ""],
+      [GIT_CREDENTIAL_KEY, helper],
+      [GIT_USE_HTTP_PATH_KEY, "true"],
+    ];
+    if (gitConfig === "count")
+      return {
+        GH_CONFIG_DIR: this.#ghConfigDirectory(),
+        GIT_CONFIG_COUNT: String(first + settings.length),
+        ...Object.fromEntries(
+          settings.flatMap(([key, value], offset) => [
+            [`GIT_CONFIG_KEY_${first + offset}`, key],
+            [`GIT_CONFIG_VALUE_${first + offset}`, value],
+          ]),
+        ),
+      };
     return {
       GH_CONFIG_DIR: this.#ghConfigDirectory(),
       GIT_CONFIG_PARAMETERS: [
         ...(inheritedGitConfig ? [inheritedGitConfig] : []),
-        gitConfigParameter(GIT_CREDENTIAL_KEY, ""),
-        gitConfigParameter(GIT_CREDENTIAL_KEY, helper),
-        gitConfigParameter(GIT_USE_HTTP_PATH_KEY, "true"),
+        ...settings.map(([key, value]) => gitConfigParameter(key, value)),
       ].join(" "),
     };
   }
@@ -985,6 +1003,18 @@ export class GitHubConnectorService {
 function registerTokenSecrets(tokens: Pick<GitHubTokenSet, "accessToken" | "refreshToken">): void {
   registerSecretValue(tokens.accessToken);
   if (tokens.refreshToken) registerSecretValue(tokens.refreshToken);
+}
+
+function ownGitConfigParameters(inherited: string | undefined): string {
+  return [
+    `m=$(printf '\\047%s\\047' ${GIT_USE_HTTP_PATH_KEY}=true)`,
+    `case $GIT_CONFIG_PARAMETERS in (*"$m"*) a=\${GIT_CONFIG_PARAMETERS##*"$m"};; (*) a=;; esac`,
+    `a=${shellQuote(inherited ?? "")}$a; GIT_CONFIG_PARAMETERS=\${a# }; export GIT_CONFIG_PARAMETERS`,
+  ].join("; ");
+}
+
+function gitConfigCount(value: string | undefined): number {
+  return value && /^\d+$/u.test(value) ? Number(value) : 0;
 }
 
 function gitConfigParameter(key: string, value: string): string {

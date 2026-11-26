@@ -54,6 +54,7 @@ import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-t
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_USAGE_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
 import { AGENT_WAITS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-waits-v1";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/browser-view-v1";
@@ -1109,6 +1110,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       workspace.state.capabilities.includes(capability) && canAdministerServer(workspace.state.host?.role),
     () => storageCalls,
     () => marketplaceCalls.skills,
+    () => (workspace.state.synced ? workspace.state.capabilities.includes(ATTACHMENT_PREVIEW_CAPABILITY) : undefined),
   );
   const [searchRoutineList, setSearchRoutineList] = createSignal<GlobalSearchRoutine[]>([]);
   const [searchRoutinesLoading, setSearchRoutinesLoading] = createSignal(false);
@@ -1376,6 +1378,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     admin: () => canAdministerServer(workspace.state.host?.role),
     hostName: () => server()?.name,
     onHostEvent: workspace.onHostEvent,
+    setSpot: (input) => workspace.runtime.setWorkflowSpot(input),
     onReconnect(listener) {
       hostOnlineListeners.add(listener);
       return () => {
@@ -2398,6 +2401,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       workspace.state.capabilities.includes("browser-control") &&
       workspace.state.capabilities.includes("browser-view"),
   );
+  const noticedBrowserTabIds = createMemo(() => {
+    const noticed = workspace.state.noticedBrowserTabIds;
+    return browserEnabled() && noticed ? new Set(noticed) : undefined;
+  });
   const clearSelectedAgentContext = createMemo(() => {
     const agent = workspace.selected();
     if (!agent || !workspace.runtime.admin || !workspace.state.capabilities.includes(CONTEXT_RESET_CAPABILITY))
@@ -3318,6 +3325,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                                     workspace.stepLines(),
                                   )
                                 }
+                                members={workspace.state.presence?.members}
+                                selfMemberId={workspace.state.memberId}
                               />
                             </Loading>
                           )}
@@ -3466,6 +3475,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       }
                       chatOrder={layout.sidebarChatOrder()}
                       onChatOrderChange={layout.setSidebarChatOrder}
+                      tabIds={workspace.preferences.sidebarTabIds()}
+                      onTabIdsChange={workspace.preferences.setSidebarTabIds}
                       collapsedSectionIds={workspace.preferences.collapsedSidebarSectionIds()}
                       onMutateLayout={workspace.mutateSidebarLayout}
                       sectionDuplicateSupported={
@@ -4168,6 +4179,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   queue={workspace.state.selectedId ? workspace.state.queues[workspace.state.selectedId] : undefined}
                   browserRuntime={workspace.runtime.browser}
                   browserTabs={workspace.state.browserTabs}
+                  noticedBrowserTabIds={noticedBrowserTabIds()}
+                  onNoticeBrowserTabs={workspace.noticeBrowserTabs}
                   activeBrowserTabId={workspace.state.activeBrowserTabId}
                   browserVisibilitySuspended={workspace.state.status !== "online" || pageCovered()}
                   workspaceCovered={pageCovered() || hostOffline()}

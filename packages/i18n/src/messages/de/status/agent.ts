@@ -71,6 +71,19 @@ export const messages = {
   "status.agent.workflowDelete":
     "Den Workflow {title} mit seinen Ausführungen und Versionen löschen. Seine offenen Schritte werden beendet.",
   "status.agent.deleteAgents": "{agents} mit ihren Chats und Dateien löschen. Das lässt sich nicht rückgängig machen.",
+  "status.agent.nearSignatureReceived": "OpenBot hat die Signatur erhalten. Du kannst diesen Tab schließen.",
+  "status.agent.nearSignatureUnknown": "OpenBot wartet nicht auf diese Signatur. Starte sie in OpenBot erneut.",
+  "status.agent.nearPayment": "{amount} {symbol} aus der Krypto-Wallet an {recipient} zahlen, für {domain}: {reason}",
+  "status.agent.nearSummaryCreate":
+    "Alle Agenten können bis zu {amount} USD pro Tag zahlen. Du kannst das später in OpenBot ändern.",
+  "status.agent.nearSummaryGrant":
+    "Diese OpenBot-App {days} Tage lang im Rahmen deiner Regeln aus der Wallet zahlen lassen.",
+  "status.agent.nearSummaryBudget": "Das Tagesbudget der Wallet auf {amount} USD ändern.",
+  "status.agent.nearSummaryAutoPay":
+    "OpenBot ohne deine Signatur zahlen lassen, wenn eine Zahlungsregel es erlaubt. Bei anderen Zahlungen wirst du weiterhin im Chat gefragt.",
+  "status.agent.nearSummaryPayment": "Die Zahlung von {amount} an {recipient} genehmigen.",
+  "status.agent.nearSummaryFreeze": "Agenten können nicht aus dieser Wallet zahlen, bis du die Zahlungen fortsetzt.",
+  "status.agent.nearSummaryUnfreeze": "Agenten können wieder im Rahmen deiner Regeln aus dieser Wallet zahlen.",
   "status.agent.screenCaptureProgress": "Bildschirmaufnahme wird angefragt…",
   "status.agent.screenCaptureReviewing": "Bildschirmaufnahme wird geprüft…",
   "status.agent.browserOpening": "Webseite wird geöffnet…",
@@ -78,6 +91,7 @@ export const messages = {
   "status.agent.browserClicking": "Klick auf der Webseite…",
   "status.agent.browserTyping": "Eingabe auf der Webseite…",
   "status.agent.browserActing": "Webseite wird bedient…",
+  "status.agent.browserPaying": "Zahlung wird gesendet…",
   "status.agent.browserReviewing": "Webseite wird geprüft…",
   "status.agent.memoriesSearching": "Erinnerungen werden durchsucht…",
   "status.agent.chatsSearching": "Frühere Chats werden durchsucht…",

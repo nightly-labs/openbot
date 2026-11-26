@@ -8,6 +8,7 @@ import { useAgents } from "../agents/agents-context";
 import { useSetup } from "../onboarding/onboarding-context";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
+import { usePresence } from "../team/team-context";
 import { useUsage } from "../usage/usage-context";
 import { WorkflowsCanvas } from "./WorkflowsCanvas";
 import { workflowAgentProgress } from "./workflow-agent-progress";
@@ -42,18 +43,32 @@ export function WorkflowsPage(props: { serverId: string }) {
           serverId={serverId}
           host={desktopWorkflowHost(serverId, server)}
           admin={serverRoleCanAdminister(server())}
+          username={server()?.username}
         />
       )}
     </Show>
   );
 }
 
-function DesktopWorkflowsCanvas(props: { serverId: string; host: WorkflowHost; admin: boolean }) {
+function DesktopWorkflowsCanvas(props: {
+  serverId: string;
+  host: WorkflowHost;
+  admin: boolean;
+  username: string | undefined;
+}) {
   const { agentList, agentStatus, modelOptions, serverSetupChoice } = useAgents();
   const { setupState } = useSetup();
   const { signedInAccount } = useAuth();
   const { turnProgress, turnStepLines } = useTurns();
   const usage = useUsage();
+  const { teamPresence, readerMemberId } = usePresence();
+  const selfMemberId = () => {
+    const reader = readerMemberId();
+    if (reader) return reader;
+    const username = props.username?.trim().toLowerCase();
+    if (!username) return null;
+    return teamPresence().members.find((member) => member.username.trim().toLowerCase() === username)?.id ?? null;
+  };
   const request = {
     workflowId: () => {
       const requested = usage.workflowRequest();
@@ -73,6 +88,8 @@ function DesktopWorkflowsCanvas(props: { serverId: string; host: WorkflowHost; a
       preference={serverSetupChoice() ?? setupState()}
       request={request}
       agentProgress={(agentId) => workflowAgentProgress(agentId, turnProgress()[agentId], turnStepLines())}
+      members={teamPresence().members}
+      selfMemberId={selfMemberId()}
     />
   );
 }

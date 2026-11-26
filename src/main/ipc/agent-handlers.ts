@@ -128,6 +128,11 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import {
+  CHANNEL_COMPACT_AVAILABILITY_CAPABILITY,
+  CHANNEL_COMPACT_AVAILABILITY_ROUTE,
+  decodeChannelCompactAvailability,
+} from "@openbot/contracts/team-protocol/channel-compact-availability-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
@@ -464,7 +469,7 @@ export function agentIpcHandlers({
         },
       }),
       getHostAnalytics: scopedHandler(parseHostAnalyticsInput, {
-        local: (input) => service.getHostAnalytics(input),
+        local: (input) => runCauseEffect(service.getHostAnalytics(input)),
         remote: (input, serverId) =>
           remoteServers.supportsCapability(serverId, "host-analytics")
             ? runCauseEffect(
@@ -748,6 +753,18 @@ export function agentIpcHandlers({
             { channelId },
             "error.team.channelContextUnsupported",
           ),
+      }),
+      channelCompactAvailability: scopedHandler(parseChannelId, {
+        local: (channelId) => ({ available: service.channelCompactAvailable(channelId) }),
+        remote: (channelId, serverId) =>
+          remoteServers.supportsCapability(serverId, CHANNEL_COMPACT_AVAILABILITY_CAPABILITY)
+            ? runCauseEffect(
+                remoteServers.request(serverId, CHANNEL_COMPACT_AVAILABILITY_ROUTE, decodeChannelCompactAvailability, {
+                  method: "POST",
+                  body: { channelId },
+                }),
+              )
+            : { available: true },
       }),
       getSidebarLayout: scopedQueryHandler({
         local: () => sidebarLayout.getSnapshot(),

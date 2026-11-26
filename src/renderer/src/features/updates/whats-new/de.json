@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.79.0",
+    "date": "2026-11-25",
+    "notices": [
+      "Aktualisiere auch jeden verbundenen Server auf diese Version. Die Bild- und Videowerkzeuge mit Credits, Standortanfragen und viele der Korrekturen unten funktionieren auf einem Server nur, wenn der Server diese Version hat."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agenten können mit OpenBot-Credits Bilder und Videos erstellen und deine Bilder bearbeiten. Die Genehmigungskarte zeigt das Modell, den Preis und die Anweisung. Du kannst ein anderes Modell wählen, bevor du zustimmst. Der Eintrag Credits in der linken Leiste zeigt dein Guthaben. Ein Inhaber oder ein Admin kann „Agenten dürfen Credits verwenden“ ein- oder ausschalten.",
+          "Agenten können Websites mit Krypto aus einer NEAR-Intents-Wallet bezahlen. Verbinde sie in Servereinstellungen › Vault › Krypto mit einem Passkey und zahle dann Guthaben ein. Jede Zahlung wartet im Chat auf deine Genehmigung, außer du wählst für diese Website „Immer erlauben“. Ein Tagesbudget begrenzt, was Agenten ausgeben können. Die Wallet gilt nur für diesen Computer, und Zahlungen verwenden echtes Geld.",
+          "Jedes Konto erhält 10 kostenlose Willkommens-Credits. Du kannst auch auf der Seite Credits einen Credit-Code mit „Redeem code“ einlösen.",
+          "Der Browser-Tab eines Agenten kann nach deinem Standort fragen. Der Chat fragt dich zuerst, und du wählst „Blockieren“, „Immer erlauben“ oder „Erlauben“. Vorher blockierte der Browser die Anfrage immer.",
+          "Die Seitenleiste hat über der Chatliste Tabs: Alle, Ungelesen und die Ordner, die du auswählst. Jeder Tab zeigt seine ungelesenen Chats."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Ein neuer Workflow-Schritt startet jetzt mit einem Modell, das laufen kann. Ein Textschritt nutzt dein bevorzugtes Modell oder das übliche Modell eines verbundenen Anbieters.",
+          "Wenn du nur kostenlose Credits hast, markiert die Modellliste einer Genehmigungskarte die Modelle, die kostenlose Credits bezahlen, mit „Gratis-Credits“.",
+          "Das Seitenpanel kann sich in bis zu drei Gruppen teilen, eine über der anderen. Ziehe die Linie zwischen zwei Gruppen, um ihre Höhen zu ändern."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Die App friert seltener ein, vor allem unter Windows. Sie behält die Ergebnisse langsamer Prüfungen kurz und erledigt die langsame Arbeit im Hintergrund.",
+          "Wenn ein Claude-Agent einen Plan im Planmodus fertig hat, zeigt der Chat jetzt den Plan mit „Genehmigen“ und „Stop planning“. Vorher erschien keine Genehmigung, und der Agent begann zu bauen.",
+          "Eine Nachricht von einem anderen Agenten oder einer Routine stoppt die Arbeit eines beschäftigten Claude-Agenten nicht mehr.",
+          "Eine Warnung einer Website im Browser-Tab eines Agenten verdeckt das OpenBot-Fenster nicht mehr, bis du auf „OK“ klickst. Die Warnung schließt sich von selbst, und der Agent erhält ihren Text.",
+          "Auf einem Linux-X11-Desktop hört das Tippen in OpenBot nicht mehr auf, nachdem ein Agent Computersteuerung in einer anderen App nutzt. Wenn das Tippen schon aufgehört hat, melde dich einmal ab und wieder an."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.78.0",
     "date": "2026-11-24",
     "notices": [

@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect, Option, Schema } from "effect";
+import { OPENCODE_GO_PROVIDER } from "./opencode-config";
 import { openCodeDataDirectory } from "./process-confinement";
 import {
   type AccountRateLimitsReadResult,
@@ -86,38 +87,53 @@ const readOwnKeys = Effect.fn("OpenCode.readOwnKeys")(function* () {
 const AuthFileEntries = Schema.Record(Schema.String, Schema.Unknown);
 const AuthFileEntry = Schema.Struct({ type: Schema.String });
 
+const readAuthFileProviders = Effect.fn("OpenCode.readAuthFileProviders")(function* (env: NodeJS.ProcessEnv) {
+  const authText =
+    env.OPENCODE_AUTH_CONTENT ||
+    (yield* Effect.try({
+      try: () => readFileSync(join(openCodeDataDirectory(env), "auth.json"), "utf8"),
+      catch: (cause) => new OpenCodeUsageFailed({ cause }),
+    }).pipe(Effect.orElseSucceed(() => "")));
+  const entries = Schema.decodeUnknownOption(Schema.fromJsonString(AuthFileEntries))(authText);
+  if (Option.isNone(entries)) return [];
+  return Object.entries(entries.value)
+    .filter(([, entry]) => Option.isSome(Schema.decodeUnknownOption(AuthFileEntry)(entry)))
+    .map(([provider]) => provider);
+});
+
+const PROVIDER_CREDENTIAL_QUERY = "SELECT 1 FROM credential WHERE integration_id = ? AND active IS NOT 0 LIMIT 1";
+const OTHER_PROVIDER_CREDENTIAL_QUERY =
+  "SELECT 1 FROM credential WHERE integration_id != ? AND active IS NOT 0 LIMIT 1";
+
+const hasStoredCredential = Effect.fn("OpenCode.hasStoredCredential")(function* (
+  env: NodeJS.ProcessEnv,
+  query: string,
+  provider: string,
+) {
+  const databasePath = openCodeDatabasePath(env);
+  if (env.OPENCODE_AUTH_CONTENT || !databasePath) return false;
+  return yield* Effect.try({
+    try: () => readOpenCodeDatabase(databasePath, (database) => database.prepare(query).get(provider) !== undefined),
+    catch: (cause) => new OpenCodeUsageFailed({ cause }),
+  }).pipe(Effect.orElseSucceed(() => false));
+});
+
 export const hasOpenCodeProviderKey = Effect.fn("OpenCode.hasProviderKey")(function* (
   provider: string,
   env: NodeJS.ProcessEnv,
 ) {
-  const dataDirectory = openCodeDataDirectory(env);
-  const inlineAuth = env.OPENCODE_AUTH_CONTENT;
-  const authText =
-    inlineAuth ||
-    (yield* Effect.try({
-      try: () => readFileSync(join(dataDirectory, "auth.json"), "utf8"),
-      catch: (cause) => new OpenCodeUsageFailed({ cause }),
-    }).pipe(Effect.orElseSucceed(() => "")));
-  const entries = Schema.decodeUnknownOption(Schema.fromJsonString(AuthFileEntries))(authText);
-  if (
-    Option.isSome(entries) &&
-    Object.hasOwn(entries.value, provider) &&
-    Option.isSome(Schema.decodeUnknownOption(AuthFileEntry)(entries.value[provider]))
-  )
-    return true;
-  const databasePath = openCodeDatabasePath(env);
-  if (inlineAuth || !databasePath) return false;
-  return yield* Effect.try({
-    try: () =>
-      readOpenCodeDatabase(
-        databasePath,
-        (database) =>
-          database
-            .prepare("SELECT 1 FROM credential WHERE integration_id = ? AND active IS NOT 0 LIMIT 1")
-            .get(provider) !== undefined,
-      ),
-    catch: (cause) => new OpenCodeUsageFailed({ cause }),
-  }).pipe(Effect.orElseSucceed(() => false));
+  if ((yield* readAuthFileProviders(env)).includes(provider)) return true;
+  return yield* hasStoredCredential(env, PROVIDER_CREDENTIAL_QUERY, provider);
+});
+
+function hasProviderKeyVariable(env: NodeJS.ProcessEnv): boolean {
+  return Object.entries(env).some(([name, value]) => name.toUpperCase().endsWith("_API_KEY") && Boolean(value?.trim()));
+}
+
+export const hasOpenCodeMediaSignIn = Effect.fn("OpenCode.hasMediaSignIn")(function* (env: NodeJS.ProcessEnv) {
+  if (hasProviderKeyVariable(env)) return true;
+  if ((yield* readAuthFileProviders(env)).some((provider) => provider !== OPENCODE_GO_PROVIDER)) return true;
+  return yield* hasStoredCredential(env, OTHER_PROVIDER_CREDENTIAL_QUERY, OPENCODE_GO_PROVIDER);
 });
 
 const RefusedTurn = Schema.Struct({

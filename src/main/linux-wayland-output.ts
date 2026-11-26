@@ -9,6 +9,7 @@ import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Option, Schema } from "effect";
 import { app } from "electron";
 import { relaunchApp } from "./linux-appimage-relaunch";
+import { onNiriDesktop } from "./linux-tiling-desktop";
 import { x11CompositorRunning } from "./linux-x11-activation";
 
 const logger = createOpenBotLogger("main");
@@ -150,15 +151,20 @@ export function usesX11Windows(): boolean {
   return process.platform === "linux" && app.commandLine.getSwitchValue("ozone-platform") !== "wayland";
 }
 
+export function x11OverlaysShow(): boolean {
+  return usesX11Windows() && !onNiriDesktop(process.env);
+}
+
 export function aboveAppsWindowKind(server: boolean): "panel" | "tool" | "x11" | null {
   if (server) return null;
   if (process.platform === "darwin") return "panel";
   if (process.platform === "win32") return "tool";
-  return usesX11Windows() ? "x11" : null;
+  return x11OverlaysShow() ? "x11" : null;
 }
 
 export function aboveAppsScreenSupport(): AboveAppsSupport | undefined {
   if (process.platform !== "linux") return undefined;
+  if (onNiriDesktop(process.env)) return "unsupported";
   if (usesX11Windows()) return onXWayland() || x11CompositorRunning() ? undefined : "no-compositor";
   return app.isPackaged && process.env.DISPLAY && chromiumChoosesWayland() ? "restart" : "unsupported";
 }
@@ -206,7 +212,8 @@ export const restartOnXWaylandForAboveApps = Effect.fn("restartOnXWaylandForAbov
   environment: NodeJS.ProcessEnv,
   userDataPath: string,
 ) {
-  if (process.platform !== "linux" || !chromiumChoosesWayland() || !environment.DISPLAY) return false;
+  if (process.platform !== "linux" || !chromiumChoosesWayland() || !environment.DISPLAY || onNiriDesktop(environment))
+    return false;
   if (!Object.values(ABOVE_APPS_XWAYLAND_FILES).some((file) => existsSync(join(userDataPath, file)))) return false;
   return yield* startOnX11(environment, "above-apps").pipe(
     Effect.as(true),

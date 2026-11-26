@@ -10,7 +10,7 @@ import type {
   VoiceLiveStart,
 } from "@openbot/contracts/ipc";
 import { speechTextFromMarkdown } from "@openbot/contracts/speech-text";
-import { isFixedSourceText, sourceText, sourceTextValues } from "@openbot/i18n/source";
+import { isFixedSourceText, matchingSourceKeys, sourceText, sourceTextValues } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Fiber, Schema, Semaphore } from "effect";
 import type { AgentClient } from "../agent-client";
@@ -36,6 +36,8 @@ const START_REASON_LIMIT = 160;
 const UNAUTHORIZED = /\bstatus 401\b|\b401 Unauthorized\b/;
 const CALL_NOT_FOUND = /\bstatus 404\b[\s\S]*\/realtime\/calls\b/;
 const FORBIDDEN = /^(?=[\s\S]*\brealtime\b)[\s\S]*(?:\bstatus 403\b|\b403 Forbidden\b)/;
+const CONNECTION_LOST =
+  /^(?![\s\S]*\bcontent_filter\b)(?:[\s\S]*\bstream disconnected before completion\b|transport_closed$)/;
 const ASK_TOOL = "ask_agent";
 const ASK_NAMESPACE = "openbot";
 const RELAY_VERBATIM_BYTES = 600;
@@ -80,15 +82,13 @@ const summaryPrompt = (answer: string) =>
   `A voice says your reply aloud. The answer below is too long for the voice: reply with ${SUMMARY_RULES}` +
   `Reply with the summary only.\n\nAnswer:\n${answer}`;
 const SAME_TURN_REPLY = "The agent answered this request together with the previous one.";
-const RELAY_DELEGATION = /^<realtime_delegation>\s*(?:<source>[^<]*<\/source>\s*)?<input>([^<]*)<\/input>/;
+const RELAY_DELEGATION = /<realtime_delegation>\s*(?:<source>[^<]*<\/source>\s*)?<input>([^<]*)<\/input>/g;
 
 function relayRequest(text: string): string {
-  const input = RELAY_DELEGATION.exec(text)?.[1]
-    ?.replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&amp;", "&")
-    .trim();
-  return input || text;
+  const inputs = [...text.matchAll(RELAY_DELEGATION)]
+    .map((match) => (match[1] ?? "").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&").trim())
+    .filter(Boolean);
+  return inputs.at(-1) || text;
 }
 
 const HEARD_LINE_LIMIT = 20;
@@ -224,7 +224,10 @@ export class LiveVoice {
       if ((session.owner?.memberId ?? null) === key) yield* this.#stopSession(session);
     const start = (this.#starts.get(key) ?? 0) + 1;
     this.#starts.set(key, start);
-    const relay = yield* this.#hooks.relay(agent).pipe(toLiveVoiceFailed);
+    const relay = yield* this.#hooks.relay(agent).pipe(
+      toLiveVoiceFailed,
+      Effect.mapError((failure) => this.#relayFailure(failure, agent.id)),
+    );
     const cwd = yield* makeToollessDirectory().pipe(toLiveVoiceFailed);
     const session: LiveSession = {
       id: randomUUID(),
@@ -550,6 +553,11 @@ export class LiveVoice {
     fiber.addObserver(() => session.speaking.delete(fiber));
   }
 
+  #relayFailure(failure: LiveVoiceFailed, agentId: string): LiveVoiceFailed {
+    const message = failure.cause instanceof Error ? failure.cause.message : "";
+    return matchingSourceKeys(message).length > 0 ? failure : this.#startFailure(failure, agentId);
+  }
+
   #startFailure(failure: LiveVoiceFailed, agentId: string): LiveVoiceFailed {
     const message = failure.cause instanceof Error ? failure.cause.message : String(failure.cause);
     const text = this.#plainText(message, agentId);
@@ -565,8 +573,17 @@ export class LiveVoice {
     if (!message) return sourceText("error.voice.live.disconnected");
     return (
       this.#plainText(message, agentId) ??
+      this.#connectionLost(message) ??
       sourceText("error.voice.live.failed", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) })
     );
+  }
+
+  #connectionLost(message: string): string | null {
+    if (!CONNECTION_LOST.test(message)) return null;
+    logger.warn("Live voice lost its connection to OpenAI.", {
+      reason: this.#hooks.redact(message).slice(0, REASON_LIMIT),
+    });
+    return sourceText("error.voice.live.connectionLost");
   }
 
   #plainText(message: string, agentId: string): string | null {

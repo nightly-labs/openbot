@@ -96,7 +96,7 @@ function CreditsCard(props: { label: string; buyLabel: string; balance: number; 
         onSelect={props.onOpen}
       >
         <span class="server-menu-credits-label">{props.label}</span>
-        <CreditAmount value={format.number(props.balance)} class="ui-menu-trailing server-menu-credit-value" />
+        <CreditAmount credits={props.balance} class="ui-menu-trailing server-menu-credit-value" />
       </DropdownMenu.Item>
       <div class="server-menu-credits-buy">
         <CreditIcon class="server-menu-credits-buy-icon" tile />

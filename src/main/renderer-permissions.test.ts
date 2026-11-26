@@ -38,6 +38,28 @@ describe("renderer permissions", () => {
     ).toBe(false);
   });
 
+  it("allows the device location only for the trusted renderer", () => {
+    expect(canCheckRendererPermission("geolocation", developmentUrl, {}, developmentUrl)).toBe(true);
+    expect(
+      canRequestRendererPermission("geolocation", { requestingUrl: developmentUrl, isMainFrame: true }, developmentUrl),
+    ).toBe(true);
+    expect(canCheckRendererPermission("geolocation", "https://example.com", {}, developmentUrl)).toBe(false);
+    expect(
+      canRequestRendererPermission(
+        "geolocation",
+        { requestingUrl: "https://example.com", isMainFrame: true },
+        developmentUrl,
+      ),
+    ).toBe(false);
+    expect(
+      canRequestRendererPermission(
+        "geolocation",
+        { requestingUrl: "openbot-visual://file/attachment-1", isMainFrame: false },
+        developmentUrl,
+      ),
+    ).toBe(false);
+  });
+
   it("refuses a frame inside the trusted window, such as a visual reply", () => {
     const visualFrame = { requestingUrl: "openbot-visual://file/attachment-1", isMainFrame: false };
     expect(canRequestRendererPermission("clipboard-sanitized-write", visualFrame, developmentUrl)).toBe(false);

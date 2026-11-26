@@ -41,7 +41,9 @@ import { AGENT_USAGE_LIMIT_CODECS } from "./agent-usage-limit-v1";
 import { AGENT_WAITS_CODECS } from "./agent-waits-v1";
 import { BACKGROUND_PROCESSES_CODECS } from "./background-processes-v1";
 import { BITWARDEN_CONNECTOR_CODECS } from "./bitwarden-connector-v1";
+import { BROWSER_HTTP_SIGN_IN_CODECS } from "./browser-http-sign-in-v1";
 import { BROWSER_PAGE_STATE_CODECS } from "./browser-page-state-v1";
+import { BROWSER_PERMISSIONS_CODECS } from "./browser-permissions-v1";
 import { BROWSER_PROFILES_CODECS } from "./browser-profiles-v1";
 import { BROWSER_PROXIES_CODECS } from "./browser-proxies-v1";
 import { BROWSER_SECRET_VAULT_CODECS } from "./browser-secret-vault-v1";
@@ -51,6 +53,7 @@ import { BROWSER_TEACH_CODECS } from "./browser-teach-v1";
 import { BROWSER_USER_CONTROL_CODECS } from "./browser-user-control-v1";
 import { BROWSING_MEMORY_CODECS } from "./browsing-memory-v1";
 import { CACHE_EXPIRY_COMPACTION_CODECS } from "./cache-expiry-compaction-v1";
+import { CHANNEL_COMPACT_AVAILABILITY_CODECS } from "./channel-compact-availability-v1";
 import { CHANNEL_FOLDERS_CODECS } from "./channel-folders-v1";
 import { CHAT_COLORS_CODECS } from "./chat-colors-v1";
 import { CHAT_HISTORY_CODECS } from "./chat-history-v1";
@@ -332,6 +335,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WHATSAPP_READ_ONLY_CODECS,
   ...MESSAGE_DELETE_CODECS,
   ...CHAT_HISTORY_CODECS,
+  ...CHANNEL_COMPACT_AVAILABILITY_CODECS,
   ...CONVERSATION_UNREAD_FROM_CODECS,
   ...PASSWORD_MANAGERS_CODECS,
   ...BROWSER_PROXIES_CODECS,
@@ -343,6 +347,8 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...BROWSER_USER_CONTROL_CODECS,
   ...BROWSER_TEACH_CODECS,
   ...BROWSER_PAGE_STATE_CODECS,
+  ...BROWSER_PERMISSIONS_CODECS,
+  ...BROWSER_HTTP_SIGN_IN_CODECS,
   ...BROWSER_SIGN_IN_CODECS,
   ...BROWSER_SIGN_IN_STORAGE_CODECS,
   ...AGENT_TASKS_CODECS,

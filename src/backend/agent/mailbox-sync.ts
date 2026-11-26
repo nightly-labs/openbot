@@ -121,13 +121,9 @@ export class MailboxSync {
       deliveries: exchange.deliveries.map((delivery) => {
         const current = this.#mailbox.getDelivery(delivery.id)?.delivery;
         if (!current) return delivery;
-        const held =
-          current.status === "completed" &&
-          exchange.expectsReply !== false &&
-          this.#mailbox.heldByTask(current.recipientAgentId, exchange.messageId);
         return {
           ...delivery,
-          status: held ? "running" : current.status,
+          status: this.#mailbox.outgoingRequestStatus(current, exchange.expectsReply !== false),
           position: current.position,
           error: current.error,
         };

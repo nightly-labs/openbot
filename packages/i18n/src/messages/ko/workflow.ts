@@ -109,6 +109,8 @@ export const messages = {
   "workflow.agent.removedLabel": "에이전트가 삭제됐어요. 에이전트 선택",
   "workflow.agent.list": "에이전트",
   "workflow.agent.search": "에이전트 검색",
+  "workflow.agentMade.title": "{agent}이(가) 워크플로를 만들었습니다",
+  "workflow.agentMade.open": "열기",
 
   "workflow.model.label": "모델: {name}",
   "workflow.model.title": "모델",

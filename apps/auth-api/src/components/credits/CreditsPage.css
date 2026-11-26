@@ -6,7 +6,7 @@
 
 .credits-toolbar {
   position: sticky;
-  top: 0;
+  top: calc(var(--site-header-offset) - var(--site-header-island-inset));
   z-index: 2;
   display: grid;
   grid-template-columns: fit-content(100%);
@@ -43,6 +43,7 @@
 
 .credits-sections {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: clamp(36px, 5vw, 56px);
   margin-top: clamp(24px, 3vw, 36px);
 }
@@ -53,7 +54,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 4px 16px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .credits-section-title {
@@ -78,29 +79,82 @@
 }
 
 .credits-section-unit {
-  margin: 0;
   color: var(--openbot-text-secondary);
-  font-size: 14px;
+  font-size: 13px;
 }
 
-.credits-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.credits-table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--openbot-bg-surface);
 }
 
-.credits-row {
+.credits-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.credits-table th,
+.credits-table td {
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.credits-table thead th {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--openbot-border);
+  color: var(--openbot-text-dim);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.credits-table tbody tr + tr > * {
+  border-top: 1px solid var(--openbot-border);
+}
+
+.credits-table-model {
+  width: 1%;
+  min-width: 250px;
+  padding-right: 24px;
+  font-weight: 400;
+}
+
+.credits-cell {
+  min-width: 88px;
+}
+
+.credits-cell-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--openbot-text-primary);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.credits-cell-silent {
+  display: block;
+  margin-top: 2px;
+  color: var(--openbot-text-dim);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.credits-cell-none {
+  color: var(--openbot-text-dim);
+}
+
+.credits-model {
   display: flex;
   align-items: center;
   gap: 14px;
   min-width: 0;
-  padding: 14px 16px;
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-lg);
-  background: var(--openbot-bg-surface);
 }
 
 .credits-logo {
@@ -120,23 +174,19 @@
   font-size: 17px;
 }
 
-.credits-row-body {
+.credits-model-body {
   display: grid;
-  flex: 1;
   gap: 2px;
   min-width: 0;
 }
 
-.credits-row-name {
-  overflow: hidden;
+.credits-model-name {
   color: var(--openbot-text-primary);
   font-size: 15px;
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.credits-row-maker {
+.credits-model-maker {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -146,7 +196,7 @@
   white-space: nowrap;
 }
 
-.credits-row-variant {
+.credits-model-variant {
   padding: 1px 7px;
   border: 1px solid var(--openbot-border-strong);
   border-radius: var(--openbot-radius-pill);
@@ -155,25 +205,55 @@
   font-weight: 500;
 }
 
-.credits-row-cost {
-  display: grid;
-  flex: none;
-  justify-items: end;
-  gap: 2px;
+.credits-soon {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
 
-.credits-row-credits {
+.credits-table-scroll + .credits-soon {
+  margin-top: 14px;
+}
+
+.credits-soon-label {
+  flex: none;
+  padding: 5px 0;
+  color: var(--openbot-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.credits-soon-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.credits-soon-model {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--openbot-text-primary);
-  font-size: 18px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  padding: 4px 10px 4px 8px;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-pill);
+  color: var(--openbot-text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
 }
 
-.credits-row-unit {
-  color: var(--openbot-text-dim);
+.credits-soon-logo {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+}
+
+.credits-soon-logo > .maker-logo {
+  width: 14px;
+  height: 14px;
   font-size: 12px;
 }
 
@@ -201,7 +281,16 @@
     flex: none;
   }
 
-  .credits-list {
-    grid-template-columns: minmax(0, 1fr);
+  .credits-table-model {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    min-width: 180px;
+    background: var(--openbot-bg-surface);
+  }
+
+  .credits-soon {
+    flex-direction: column;
+    gap: 6px;
   }
 }

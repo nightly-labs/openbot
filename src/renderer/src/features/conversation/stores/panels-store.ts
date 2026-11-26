@@ -7,16 +7,19 @@ import {
   type FilePreview,
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { matchingSourceKeys } from "@openbot/i18n";
 import type { AgentSettingLinkId, AgentSettingReveal } from "@openbot/ui/features/conversation/agent-setting-links";
+import type { ImageCopies } from "@openbot/ui/features/conversation/ImageLightbox";
 import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { isSidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import { currentText } from "@openbot/ui/text";
 import { normalizeMessage } from "@openbot/user-errors/reference";
 import { createEffect, createMemo, createSignal, onCleanup, type Store, type StoreSetter, untrack } from "solid-js";
 import { createScopeGuard } from "../../../scope-lifetime";
+import { serverSupportsCapability } from "../../servers/server-capabilities";
 import { createAttachmentDownloads } from "../attachment-downloads";
-import { attachmentFilePreview } from "../attachment-preview";
+import { attachmentFilePreview, localAttachmentCopyUrl, remoteAttachmentUrlWith } from "../attachment-preview";
 import { BROWSER_PIP_STORAGE_KEY, BROWSER_WINDOW_STORAGE_KEY, storeBounds } from "../browser-bounds-storage";
 import { releaseFilePreviewPage } from "../conversation-port";
 import { conversationRuntime } from "../conversation-runtime";
@@ -492,6 +495,21 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     onError: (error, target) => deps.setComposerError(errorMessage(error, t("attachment.error.open")), target),
   });
   const attachmentDownloads = attachmentFiles.downloads;
+  const remoteImageCopies: ImageCopies = {
+    copyUrl: (image) => {
+      const server = deps.props.server;
+      const url = image.previewUrl;
+      if (!url) return undefined;
+      const local = localAttachmentCopyUrl(url);
+      if (local) return local;
+      if (server?.kind !== "remote" || !serverSupportsCapability(server, ATTACHMENT_PREVIEW_CAPABILITY))
+        return undefined;
+      const copy = remoteAttachmentUrlWith(url, "preview");
+      return copy === url ? undefined : copy;
+    },
+    fullUrl: (image) => image.previewUrl,
+  };
+  const imageCopies = () => (deps.props.runtime ? deps.props.runtime.imageCopies : remoteImageCopies);
 
   function attachmentAction(attachment: AttachmentSummary, action: FileAction) {
     if (action === "open" && previewsInsteadOfReveal(attachment)) {
@@ -910,6 +928,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
+    imageCopies,
     openSharedFile,
     openThreadFile,
     openWorkspaceFile,

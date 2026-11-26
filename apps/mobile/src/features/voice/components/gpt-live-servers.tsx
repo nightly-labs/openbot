@@ -83,7 +83,10 @@ function LiveVoiceAccountPicker({ serverId }: { serverId: string }) {
   if (!choose || (planAccounts.length < 2 && chosen === null)) return null;
   const options = [
     { value: AUTOMATIC_ACCOUNT, label: t("mobile.settings.voice.gptLive.automatic") },
-    ...planAccounts.map((account) => ({ value: account.id, label: accountName(account, accounts.indexOf(account)) })),
+    ...planAccounts.map((account) => ({
+      value: account.id,
+      label: accountName(account, accounts.indexOf(account), accounts),
+    })),
   ];
   return (
     <SettingsPicker

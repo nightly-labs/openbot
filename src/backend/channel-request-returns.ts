@@ -109,13 +109,7 @@ export class ChannelRequestReturns {
     recent: readonly ChannelMessage[],
   ) {
     const senderAgentId = task.ownerAgentId ?? leadAgentId;
-    if (
-      !senderAgentId ||
-      senderAgentId === requesterId ||
-      !this.#hooks.agentExists(senderAgentId) ||
-      !this.#hooks.agentExists(requesterId)
-    )
-      return;
+    if (!senderAgentId || !this.#hooks.agentExists(senderAgentId) || !this.#hooks.agentExists(requesterId)) return;
     const answer = task.state === "completed" ? this.#answer(channelId, task, request, recent) : null;
     const sourcePaths = answer ? yield* this.#attachmentPaths(answer) : [];
     const requesterTaskId = channelHandoffSenderTaskId(request);

@@ -124,6 +124,7 @@ import {
   TEAM_PROTOCOL_V10,
   TEAM_PROTOCOL_V10_ABSENT_LIMIT,
 } from "@openbot/contracts/team-protocol/v10";
+import { WORKFLOW_SPOT_CONTROL } from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime } from "effect";
@@ -1019,7 +1020,11 @@ export class TeamWebRtcHostPeer {
     if (!this.#eventsSocket && this.#localSessionToken) this.#connectLocalEvents(this.#localSessionToken);
     if (frame.type === "event-control") {
       if (this.#eventsSocket?.readyState === webSockets.WebSocket.OPEN) {
-        this.#eventsSocket.send(encodeTeamProtocolV1ClientEvent(frame.control));
+        this.#eventsSocket.send(
+          frame.control.type === WORKFLOW_SPOT_CONTROL
+            ? JSON.stringify(frame.control)
+            : encodeTeamProtocolV1ClientEvent(frame.control),
+        );
       }
       return;
     }

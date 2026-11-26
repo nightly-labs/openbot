@@ -1264,6 +1264,17 @@ try {
     assert.ok(ran[0]?.text.includes("biome check a.ts b.ts"), "The check reads the tool steps.");
     assert.ok(ran[0]?.text.includes("I fixed a.ts and b.ts."), "The check reads the answer.");
     assert.ok(ran[1]?.text.includes("biome check c.ts"), "The second check reads the steps of its own turn.");
+    assert.ok(!ran[0]?.text.includes("<earlier-answers>"), "The first check has no earlier answers.");
+    assert.ok(
+      ran[1]?.text.includes("<earlier-answers>\n--- answer 1 ---\nI fixed a.ts and b.ts.\n</earlier-answers>"),
+      "The second check reads the earlier answer of the request.",
+    );
+    assert.ok(
+      ran[1]?.text.includes(
+        "<earlier-checks>\n- Fix the lint errors in c.ts, then run the lint again.\n</earlier-checks>",
+      ),
+      "The second check reads what the first check found.",
+    );
     assert.equal(continuationLines(agent.id).length, 0, "No finish check line shows.");
     const shown = chatMessages(agent.id).flatMap((message) => {
       if (message.id === id) return ["request"];

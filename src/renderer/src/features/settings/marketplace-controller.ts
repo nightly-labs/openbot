@@ -889,7 +889,7 @@ export function createMarketplaceController(
           status: status === "unavailable" ? "idle" : status,
         };
       }),
-      ...(props.xApp && X_EXTENSION_URL
+      ...(props.xApp
         ? [
             {
               kind: "x",

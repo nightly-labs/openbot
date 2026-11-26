@@ -333,6 +333,8 @@ export const messages = {
     "Gemini לא הצליח לקרוא את ההיסטוריה השמורה של הצ'אט הזה. OpenBot התחיל סשן חדש של Gemini עם היסטוריית הצ'אט. יש לשלוח את ההודעה שוב.",
   "error.provider.acpTurnStuck":
     "{provider} לא סיים את התור הקודם שלו, ולכן לא קיבל את ההודעה הזו. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. יש לשלוח את ההודעה שוב.",
+  "error.provider.antigravityLicenseRefused":
+    "Google מציינת שלחשבון שלך אין רישיון להשתמש במודל הזה. יש לבחור מודל אחר ולשלוח את ההודעה שוב.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "חברת Google לא מאפשרת ל-Gemini לפעול ממיקום הרשת של המחשב שמריץ את הסוכן הזה. יש להשתמש ב-Gemini במחשב אחר, או לבחור ספק אחר לסוכן הזה.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -422,6 +424,8 @@ export const messages = {
     "המודל לא קיבל תמונה בצ'אט הזה כי התמונה גדולה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.imageCountLimit":
     "המודל לא קיבל את הצ'אט הזה כי יש בו יותר מדי תמונות. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
+  "error.provider.imageCountLimitRepeated":
+    "המודל שוב לא קיבל את הצ'אט הזה: יש בו יותר מדי תמונות. משימה אחת פותחת יותר תמונות ממה שהמודל הזה מקבל, ולכן סשן חדש לא עוזר. בחר צ'אט חדש ובקש מהסוכן לפתוח פחות תמונות בכל שלב, או בחר מודל שמקבל יותר תמונות.",
   "error.provider.imageUnreadable":
     "המודל לא הצליח לקרוא תמונה בצ'אט הזה. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב. אם שלחת תמונה, שלח תמונה אחרת.",
   "error.provider.requestTooLarge":
@@ -436,6 +440,8 @@ export const messages = {
     "Muse לא הצליח להפעיל שרת MCP וחסם MCP בסשן הזה. OpenBot התחיל סשן חדש של Muse עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לכבות את שליטה במחשב או את שרת ה-MCP שנכשל עבור הסוכן הזה.",
   "error.provider.claudeSessionMissing":
     "Claude Code לא מצא את הסשן השמור של הצ'אט הזה. OpenBot התחיל סשן חדש של Claude Code עם היסטוריית הצ'אט. יש לנסות שוב.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode לא מצא את הסשן השמור של הצ'אט הזה. OpenBot התחיל סשן חדש של OpenCode עם היסטוריית הצ'אט. יש לנסות שוב.",
   "error.provider.grokSignIn": "יש להריץ `grok login` או להגדיר XAI_API_KEY כדי להשתמש ב-Grok.",
   "error.provider.acpSignInNoStart": "הספק לא הופעל, ולכן ההתחברות לא יכלה להתחיל. נסה שוב או הפעל מחדש את OpenBot.",
   "error.provider.acpSignInTimedOut": "זמן ההתחברות אזל.",
@@ -536,7 +542,10 @@ export const messages = {
   "error.provider.sessionSettingsTimedOut": "הסשן של הסוכן לא הגיב בזמן. יש לנסות שוב.",
   "error.provider.piOutdated": "Pi {version} ישן מדי. יש להתקין Pi 1.1.0 ומעלה לתמיכה מקורית ב-RPC וב-MCP.",
   "error.provider.nativeMissing": "ה-CLI של {provider} אינו מותקן. יש להוריד אותו בהגדרות.",
-  "error.provider.nativeNotStarted": "לא ניתן להפעיל את ה-CLI של {provider}.",
+  "error.provider.nativeNotStarted":
+    "OpenBot מצא את {provider} שהתקנת, אבל הוא לא הופעל. יש לעדכן או להתקין מחדש את {provider}, ואז לנסות שוב.",
+  "error.provider.nativeManagedNotStarted":
+    "{provider} לא הופעל במחשב שמריץ את השרת הזה. יש להפעיל מחדש את OpenBot באותו מחשב. אם הוא עדיין לא מופעל, יש לבחור עזרה > דיווח על בעיה.",
   "error.provider.nativeVersionUnreadable": "לא ניתן לקרוא את הגרסה של ה-CLI של {provider}.",
   "error.provider.piSessionBusy": "יש להמתין לסיום הפעולה הנוכחית של Pi.",
   "error.provider.acpSessionBusy": "{provider} עדיין מסיים פעולה שנעצרה. יש לנסות שוב בעוד רגע.",

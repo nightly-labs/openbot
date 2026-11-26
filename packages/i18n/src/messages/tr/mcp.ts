@@ -40,6 +40,7 @@ export const messages = {
   "mcp.status.signedIn": "Oturum açık",
   "mcp.status.signingIn": "Oturum açılıyor…",
   "mcp.status.signInNeeded": "Oturum açılmalı",
+  "mcp.status.signInAppNeeded": "Oturum açma uygulaması gerekli",
   "mcp.status.refused": "Reddedildi",
   "mcp.status.checkUrl": "URL'yi kontrol edin",
   "mcp.status.noAnswer": "Yanıt yok",

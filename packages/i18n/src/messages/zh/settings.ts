@@ -106,7 +106,8 @@ export const messages = {
   "settings.quitGuard.always": "始终",
   "settings.quitGuard.never": "从不",
   "settings.externalLinks.title": "打开外部链接的方式",
-  "settings.externalLinks.description": "聊天、登录页面和账单页面中的链接在这里打开。",
+  "settings.externalLinks.description":
+    "聊天、登录页面和账单页面中的链接在这里打开。选择 OpenBot 时，只有主窗口中与这台电脑上的助手聊天时的链接在 OpenBot 中打开。其他链接在默认浏览器中打开。",
   "settings.externalLinks.defaultBrowser": "默认浏览器",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "默认浏览器（{name}）",
@@ -232,7 +233,7 @@ export const messages = {
   "settings.notch.xwayland.title": "需要重新启动",
   "settings.notch.xwayland.description":
     "在 Wayland 上，OpenBot 必须使用 XWayland 才能在其他应用上方显示灵动岛。在此之前，灵动岛不会显示。",
-  "settings.notch.xwayland.unsupported": "在没有 XWayland 的 Wayland 上，灵动岛无法显示在其他应用上方。",
+  "settings.notch.xwayland.unsupported": "在此 Wayland 桌面上，灵动岛无法显示在其他应用上方。",
   "settings.notch.xwayland.restart": "重新启动",
   "settings.notch.idle.title": "空闲时显示灵动岛",
   "settings.notch.idle.description": "没有活跃状态时显示 OpenBot 标志和问候语。",
@@ -261,7 +262,7 @@ export const messages = {
   "settings.agentDock.xwayland.description":
     "在 Wayland 上，OpenBot 必须使用 XWayland 才能在其他应用上方显示停靠栏。在此之前，停靠栏显示在 OpenBot 窗口中。",
   "settings.agentDock.xwayland.unsupported":
-    "在没有 XWayland 的 Wayland 上，停靠栏无法显示在其他应用上方。它显示在 OpenBot 窗口中。",
+    "在此 Wayland 桌面上，停靠栏无法显示在其他应用上方。它显示在 OpenBot 窗口中。",
   "settings.agentDock.xwayland.restart": "重新启动",
   "settings.agentDock.noCompositor.title": "显示在 OpenBot 窗口中",
   "settings.agentDock.noCompositor.description":

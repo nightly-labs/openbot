@@ -85,6 +85,7 @@ export interface ServerSummary {
   logoUrl: string | null;
   appearance?: ServerAppearance | null;
   role: TeamRole | null;
+  username?: string;
   active: boolean;
   memberLimit?: number;
   licenseRaisesMemberLimit?: boolean;

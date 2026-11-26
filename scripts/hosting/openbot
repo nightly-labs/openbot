@@ -299,9 +299,9 @@ uninstall_command() {
   for entry in app hosted staged staged.ready .applying; do rm -rf "${INSTALL:?}/$entry"; done
   rmdir "$INSTALL" 2>/dev/null || true
   home=$(getent passwd "$user" | cut -d: -f6)
-  echo "Removed OpenBot. The data stays in ${home:-the home folder of $user} and /srv/openbot-hosted."
+  echo "Removed OpenBot. The data stays in ${home:-the home folder of $user}, /srv/openbot-hosted and /srv/openbot-keyring."
   echo "To install again with this data: the install command, with --user $user."
-  echo "To delete the data too: sudo userdel --remove $user && sudo rm -rf /srv/openbot-hosted"
+  echo "To delete the data too: sudo userdel --remove $user && sudo rm -rf /srv/openbot-hosted /srv/openbot-keyring"
 }
 
 command=${1:-}

@@ -35,6 +35,7 @@ export function serverSupportsCapability(
       capability === "browser-view-clipboard" ||
       capability === "browser-user-control" ||
       capability === "browser-sign-in" ||
+      capability === "browser-http-sign-in" ||
       capability === "mcp-servers-v1" ||
       capability === "mcp-sign-in-v1" ||
       capability === "mcp-sign-in-app-v1" ||
@@ -159,6 +160,7 @@ export function serverSupportsCapability(
       capability === "workflows-media-v1" ||
       capability === "workflows-agent-files-v1" ||
       capability === "workflow-folders-v1" ||
+      capability === "workflow-presence-v1" ||
       capability === "vault-import-v1" ||
       capability === "agent-waits-v1" ||
       capability === "agent-queue-task-v1" ||
