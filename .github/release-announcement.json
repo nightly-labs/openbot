@@ -1,10 +1,10 @@
 {
-  "version": "0.79.0",
+  "version": "0.80.0",
   "highlights": [
-    "Update your joined servers to this version too, so that credit image and video tools, location requests and many fixes work there.",
-    "Ask an agent for an image or a video with OpenBot credits. An approval card shows the model, the price and the prompt first. Each account gets 10 free welcome credits.",
-    "Let agents pay sites in crypto from a NEAR Intents wallet on this computer. You approve each payment in the chat, or let a site be paid without asking up to a daily limit.",
-    "Allow or block a website's location request from the chat of an agent's browser tab.",
-    "Use sidebar tabs above the chat list to see All chats, Unread chats or the folders that you choose."
+    "Update your joined servers to this version too. It makes a server with a large chat history fast again after 0.79.0, and the new features below work there only then.",
+    "Use the OpenBot Apple Watch app when OpenBot on iPhone is closed. Your server answers the watch directly, end to end encrypted.",
+    "See the pointer and the selected step of each other person who has the same workflow open.",
+    "Spread agents over all your pooled provider accounts with the new Spread choice in Settings › Providers.",
+    "Type with no lag while an agent writes its reply, and use much less memory in long chats with many images."
   ]
 }

@@ -1,5 +1,42 @@
 [
   {
+    "version": "0.80.0",
+    "date": "2026-11-26",
+    "notices": [
+      "Aggiorna anche ogni server a cui ti sei unito a questa versione. Dopo la 0.79.0, rende di nuovo veloce un server con una lunga cronologia di chat. L’app Apple Watch, i puntatori live dei flussi di lavoro, Distribuisci e molte delle correzioni qui sotto funzionano su un server solo se il server ha questa versione."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Il tuo server risponde direttamente all’app OpenBot per Apple Watch. L’orologio funziona anche quando OpenBot su iPhone è in background o chiuso. Le richieste e le risposte sono cifrate end-to-end tra l’orologio e il server.",
+          "Vedi il puntatore e il passaggio selezionato di ogni altra persona che ha aperto lo stesso flusso di lavoro.",
+          "In Impostazioni › Provider › Raggruppa account c’è una nuova scelta, Distribuisci. Distribuisce gli agenti sugli account con più utilizzo disponibile, così tutti gli account vengono usati. Riempi prima resta l’impostazione predefinita.",
+          "Ogni pagamento con il wallet NEAR mostra una scheda in chat, con il suo stato e un link alla transazione. Quando configuri il wallet o ne cambi le spese, puoi digitare il tuo limite giornaliero.",
+          "MAGI-2 crea clip video 1080p con audio con i crediti di OpenBot. Un agente che non indica un modello video ora usa questo."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "La pagina Utilizzo mostra costi e token come barre impilate, con un colore per ogni provider. Mantiene l’ultimo report sullo schermo mentre ne carica uno nuovo.",
+          "La pagina Buy credits mostra ogni pacchetto di crediti come una scheda con un colore suo, il prezzo e il prezzo di un credito.",
+          "Una licenza Team ora ha fino a 25 utenti. Prima il massimo era 10."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un server con una lunga cronologia di chat è di nuovo veloce dopo l’aggiornamento alla 0.79.0. Prima, una pulizia dei vecchi eventi delle chat fermava il server per molti secondi ogni minuto.",
+          "Scrivere nella casella del messaggio non rallenta più mentre un agente scrive la risposta.",
+          "Su Windows gli agenti con Controllo del computer vedono di nuovo il desktop. Dalla 0.77.0 ricevevano un’immagine nera.",
+          "Una chat lunga con molte immagini usa molta meno memoria.",
+          "Le routine programmate ripartono da sole dopo un breve errore del database. Prima, una lettura non riuscita fermava tutte le routine programmate."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.79.0",
     "date": "2026-11-25",
     "notices": [

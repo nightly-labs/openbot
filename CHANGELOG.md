@@ -21,7 +21,7 @@ All notable changes to OpenBot will be documented here. The project follows
 - `openbot.run/chrome-extension` opens the OpenBot extension in the Chrome Web Store. A link to it that you share shows the OpenBot title, description and "One click away." picture.
 - The download section of openbot.run has a card for the OpenBot extension for Chrome, next to the iPhone and Android apps.
 - The promo card at the bottom of the desktop sidebar can now show more than one card. Use the dots to go between the Chrome extension card and the mobile apps card. The Chrome card shows while you are signed in, and "Add to Chrome" opens the extension in the Chrome Web Store. You can close each card separately.
-- Settings > Providers > Pool accounts has a new choice, **Spread**. With Spread, OpenBot puts agents on the accounts with the most usage left, so all accounts get used. An agent changes accounts only when another account has much more room. **Fill first** stays the default. A server must be on this version for the web app and the desktop app to show the choice.
+- Settings > Providers > Pool accounts has a new choice, Spread. With Spread, OpenBot puts agents on the accounts with the most usage left, so all accounts get used. An agent changes accounts only when another account has much more room. Fill first stays the default. A server must be on this version for the web app and the desktop app to show the choice.
 - Your server answers the OpenBot Apple Watch app directly, so the watch works when OpenBot on iPhone is
   in the background or closed. The requests and answers are end to end encrypted between the watch
   and the server; Signal only passes them on. A request from the watch wakes a hosted server that
@@ -88,7 +88,7 @@ All notable changes to OpenBot will be documented here. The project follows
 - On Windows, when security software such as Kaspersky stops the OpenBot window at start, OpenBot
   now says so and tells you to add OpenBot.exe as a trusted application. Before, it showed only
   `ERR_FAILED (-2) loading 'openbot-app://app/index.html'`.
-- The agent dock chat now shows a message that has only files, such as a picture that an agent sends with no text. The row shows the file names and an **Open** button that opens the chat in the main window. Before, the dock did not show the message at all.
+- The agent dock chat now shows a message that has only files, such as a picture that an agent sends with no text. The row shows the file names and an Open button that opens the chat in the main window. Before, the dock did not show the message at all.
 - A long chat with many images uses much less memory in the desktop app. Before, each image in a chat loaded its full-size file, also in a small tile, and a chat with 30 large images used about 600 MB more memory in the window. Image tiles now show a small copy of the image. A single image keeps its full-size file when the copy would look less sharp, for example on a high-resolution screen. The image viewer, Save and Open still use the full file.
 - Scrolling a long chat with tables and code blocks does less work. Before, each table and code block that came into view measured its size at once and made the window calculate the layout again.
 - Settings > Billing: free credits stay in Your credits, and Move credits now offers only the credits
@@ -1441,7 +1441,7 @@ All notable changes to OpenBot will be documented here. The project follows
   shows only "Compacting context" with its timer. When the compaction ends, the one-minute count
   starts again.
 - An agent whose last answer was only a picture showed "No messages yet" in the sidebar. The row now shows the picture's name. A picture with a Windows file path in a chat now also shows only its file name.
-- A page that an agent shows in the chat now has its own row in the agent dock: the page title and an **Open** button that opens the chat in the main window. Before, the dock showed only the title, as if it were a normal reply.
+- A page that an agent shows in the chat now has its own row in the agent dock: the page title and an Open button that opens the chat in the main window. Before, the dock showed only the title, as if it were a normal reply.
 - Scroll long chats smoothly. Before, a chat with more than 100 messages stuttered while you
   scrolled, most with tables and code blocks, and a short chat scrolled smoothly.
 - Codex live voice now works when Codex uses an OpenAI API key and you also added a ChatGPT account. Before, Settings → Voice still showed "Connect" after you signed in with ChatGPT, and you could not turn on live voice or choose its account. When the live voice account is "Automatic", live voice now uses your ChatGPT account, not the API key.
