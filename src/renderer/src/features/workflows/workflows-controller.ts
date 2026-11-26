@@ -823,7 +823,7 @@ export function createWorkflowsController(
       await load(found.id, list);
       return;
     }
-    const created = await queued(() => host.workflows.create({ title: t("workflow.canvas.untitled") }));
+    const created = await writes.then(() => host.workflows.create({ title: t("workflow.canvas.untitled") }));
     if (ticket === opens) await load(created.summary.id);
   };
   void Promise.resolve()
@@ -841,8 +841,9 @@ export function createWorkflowsController(
       flush();
       closePreview();
       loadAfterWrites(async () => {
+        const before = opens;
         const list = await host.workflows.list();
-        if (list.some((summary) => summary.id === workflowId)) await load(workflowId, list);
+        if (opens === before && list.some((summary) => summary.id === workflowId)) await load(workflowId, list);
       });
     },
   );
