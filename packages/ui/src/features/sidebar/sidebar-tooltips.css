@@ -53,9 +53,17 @@
 .sidebar-name-tooltip-heading {
   display: flex;
   min-width: 0;
-  flex-wrap: wrap;
   align-items: center;
   gap: var(--openbot-space-2);
+}
+
+.sidebar-name-tooltip-heading:has(.agent-role-badge) {
+  --agent-role-badge-collapsed-width: calc(2ch + 9px);
+
+  display: grid;
+  grid-template-columns:
+    fit-content(calc(100% - var(--agent-role-badge-collapsed-width) - var(--openbot-space-2)))
+    minmax(var(--agent-role-badge-collapsed-width), 1fr);
 }
 
 .sidebar-name-tooltip-name {
