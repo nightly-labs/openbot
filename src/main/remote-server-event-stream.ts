@@ -19,6 +19,10 @@ import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-upd
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
+import {
+  addPromptQuestionDetails,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
+} from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { addSkillSuggestionNames, SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { TEAM_PROTOCOL_V1_WEBSOCKET } from "@openbot/contracts/team-protocol/v1";
 import {
@@ -26,6 +30,7 @@ import {
   type TeamProtocolV1CurrentClientEvent,
 } from "@openbot/contracts/team-protocol/v1-adapter";
 import { decodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
+import type { WorkflowSpotControl } from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { referenceFrom } from "@openbot/user-errors";
 import { Effect, Exit, Result, Scope } from "effect";
@@ -211,6 +216,12 @@ export class RemoteEventStream {
     const socket = this.#sockets.get(serverId);
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     socket.send(encodeTeamProtocolV1CurrentClientEvent(event));
+  }
+
+  sendWorkflowSpot(serverId: string, control: WorkflowSpotControl): void {
+    const socket = this.#sockets.get(serverId);
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify(control));
   }
 
   syncScopes(): void {
@@ -546,6 +557,7 @@ export class RemoteEventStream {
             }
             const event = decoded.event;
             if (this.#advertises(serverId, SKILL_LEARNING_CAPABILITY)) addSkillSuggestionNames(event, value);
+            if (this.#advertises(serverId, TEAM_PROMPT_DETAIL_CAPABILITY)) addPromptQuestionDetails(event, value);
             if (event.type === "team-identity") {
               this.#onServerIdentity(serverId, { serverName: event.serverName, logoVersion: event.logoVersion });
             } else if (event.type === "team-presence") {

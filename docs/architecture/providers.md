@@ -9,7 +9,11 @@ To add a provider, or to see how a provider signs in on a joined server, read
 Claude uses its native question tool instead of `ask_user`. The direct tools are `ask_user`,
 `attach_files_to_response`, `list_agents`, `send_message`, `search_memories`, `remember`,
 `forget_memory`, `react_to_user_message`, `request_api_key`, `routine_no_update`, and
-`routine_report_failure`. External plugin registration stays with each provider adapter.
+`routine_report_failure`. `generate_image` and `generate_video` are direct tools too: as a
+deferred tool behind `tool_call`, Claude did not find `generate_video` and made a video with ffmpeg.
+`list_media_models` stays behind `tool_call`. The guidance tells an agent with its own image or video tool,
+such as Codex `image_gen`, to use that tool. It uses the credits tools only when the user asks for
+OpenBot credits, or names a model that its own tool cannot make. External plugin registration stays with each provider adapter.
 
 A Claude session of a channel thread also gets `channel_result` and `channel_reply` as direct tools,
 and names them in `CLAUDE_CODE_TERMINAL_MCP_TOOLS`. Their accepted call tells the agent to end the
@@ -240,7 +244,11 @@ must fire (a correction of how the agent does a class of task, a technique that 
 worked, or a listed skill that was wrong), an update of a covering skill comes before a new skill,
 a new skill has a class-level name, and environment failures, claims that a tool does not work,
 errors that went away, tasks done once and attempts that never worked are not skills. The review
-suggests at most one skill, and only when a signal fired.
+suggests at most one skill, and only when a signal fired. Main also passes `reviewSkillsFull`: true
+when the agent's skill lock holds `INPUT_LIMITS.agentSkills` skills, so the install of a new skill
+would fail. Then the prompt forbids `create` and the review drops a `create` answer, which an idea
+from the OpenClaw skill workshop (MIT) suggested: check a limit when the review proposes, not when
+the save fails. Update suggestions stay. When the read fails, the review can still suggest `create`.
 
 Skill learning is a setting of the server that runs the agents: Server settings > Memory >
 Skill learning, with Automatic (the default), Ask first, or Off. An owner or admin of a joined server
@@ -335,6 +343,10 @@ OpenBot unloads a session that has no turn, keeps its identity, and resumes it a
   the session's process (`AcpThread.workHold`, #9551). No idle release closes it, and the provider
   process stays, until the session does not change for 30 minutes, or for 4 hours at most. When memory
   is low, `releaseQuietBackgroundThreads` closes a held session that did not change for 10 minutes.
+  When Antigravity loads a session again, it can tell the agent that a server restart stopped its
+  subagents and background tasks, also when nothing ran (#15853). So when OpenBot stops a session
+  with no turn and no held work, the next prompt to that session starts with a note
+  (`SESSION_RELOAD_NOTE`): no server restarted, and the agent's teammates and OpenBot tasks still run.
 - One Codex app server holds every thread of its account, and stops the MCP servers of a thread only
   when it unloads that thread. `CodexIdleSessions` (`src/backend/agent/codex-idle-sessions.ts`)
   releases an agent session 5 minutes after its last turn ends. When a turn ends, it releases at once
@@ -346,6 +358,11 @@ OpenBot unloads a session that has no turn, keeps its identity, and resumes it a
   default) with no activity. That unload ends the thread's unified exec processes and its MCP servers.
   An agent delete sends `thread/archive` after the unsubscribe: Codex ends the thread before it answers,
   so Windows can remove the workspace (#6266).
+- The Codex app server keeps the tool list of each MCP server in memory for 30 minutes. With a valid
+  list, a resumed thread does not wait for its MCP servers to start; without one, the first turn waits
+  up to `mcp_optional_startup_grace_ms` (10 s) for each slow server. So `ProviderRuntime` stops an
+  idle Codex app server 30 minutes after its last use, not after the 10 minutes of the other
+  provider CLIs (#16388). A Workspace only Codex process still stops after 10 minutes.
 - When the memory of a server is critical, `MemoryHold` releases every idle session of each kind at once.
 - A routine session is ephemeral and is not released.
 - Outside Windows, the Claude, Codex and Pi CLIs start as the leaders of their own process groups
@@ -449,6 +466,20 @@ Claude sessions, sign-in and sign-out) start with the resolved `launchPath`: the
 folders, then OpenBot's own, then the CLI's folder for a system copy. An app that Finder starts can
 then run a `#!/usr/bin/env node` CLI. A CLI that exists but does not start reports whether the
 managed copy or the user's copy failed.
+
+A native system Codex with no `codex-code-mode-host` beside it, or in `codex-resources`, is
+`incomplete`: GPT-6 and other code-mode models cannot run tools with it. It runs only when no
+complete Codex starts, and Settings > Providers offers the managed copy. A desktop window waits for
+the user to click Download. A server (hosted, server mode, or a local server child) runs agents in
+the background, often for routines that nobody watches, so `createSystemCliTracker` in `src/main/system-cli-tracker.ts`
+downloads the managed copy once per process when an agent uses ChatGPT, the provider is on, the
+managed copy is not downloaded, and the user did not choose "Use installed version". It checks
+again at each provider status and each change to the agent list, so a server's first ChatGPT agent
+starts the download without a restart. An explicit
+`OPENBOT_CODEX_PATH` is never `incomplete`. The download replaces the CLI as Download in Settings
+does. `bun run test:server-incomplete-codex` (CI runs it in `test:provider-update-busy`) checks
+these decisions with the real runtime manager and resolver. It calls the tracker directly, so it
+does not cover the agent-list event or the server kinds.
 
 Installed runtimes live in one store per computer, `appData/OpenBot/provider-runtimes`, which is the
 path the packaged app always used: its `userData` is `appData/OpenBot`. Development profiles differ
@@ -632,8 +663,9 @@ a delivery on its way to one, which holds no turn id yet, or a context compactio
 `turn/started` `ContextCompaction.claimTurn` takes away from the agent - therefore makes the
 update wait, as a restart the user asked for waits, before anything is downloaded. Main shows the
 wait as a `downloading` runtime with no progress and the message `status.provider.updateWaiting`;
-its Cancel aborts the wait. New turns of the provider wait for the update from the start of the
-wait, so a busy provider still gets a moment without turns. No turn may start on that provider until the new client is ready: the drain
+its Cancel aborts the wait. The wait does not hold new turns, so one long turn does not stop the
+other agents of the provider; the update runs at the first moment with no turn. The check that finds
+that moment also starts the hold, in one step. No turn may start on that provider until the new client is ready: the drain
 scheduler skips an agent whose provider reports `isReplacingCli`, before it can reschedule the
 delivery, and `onProviderResumed` schedules the held deliveries when the replacement ends, after a
 failure as well as after a success.
@@ -657,6 +689,15 @@ its token in the local MCP bridge. OpenCode gives a server 30 s to connect, then
 and does not connect again while the settings stay the same (#10749). When the bridge did not list
 its tools within that time after the session request, OpenBot gives the directory a new token and
 resumes the session once. The earlier tokens stay valid until the last session of the directory closes.
+
+On Windows, OpenCode picks PowerShell 7 first and accepts its Microsoft Store alias in `WindowsApps`.
+Its process service (`@opencode/pty` 0.6.0) starts that alias only some of the time: Windows refuses it
+with error 5 while another process of the Store package runs (anomalyco/opencode#64803). When `pwsh` on
+the `PATH` is only that alias and `SHELL` is not set, `opencode-windows-shell.ts` sets `SHELL` to
+Windows PowerShell in `System32`. A `shell` in the OpenCode config comes before `SHELL`, so the
+user's choice still wins. OpenCode has no variable of its own for the shell, so the commands and the
+stdio MCP servers of these agents also see this `SHELL`; GNU make on Windows reads it. Remove this
+when an OpenCode release ships anomalyco/opencode#64901.
 
 OpenCode adds its own system prompt, tools, skill listing and Code Mode catalog to each request of an
 agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does not use: the
@@ -718,6 +759,15 @@ only while that provider has no key, so a refused key there failed every free mo
 reach the next process with no other plumbing, and what carries `OPENCODE_DISABLE_AUTOUPDATE` to a
 managed install so the CLI cannot update past the pin. `src/main/provider-credential-store.ts` holds
 that optional key, encrypted by `safeStorage` in a `0o600` envelope under `userData`.
+
+OpenCode uses its own key before that config key: the newest active `credential` row (OpenCode 2.4
+also copies an `auth.json` key into that table once, when it makes its database), then
+`OPENCODE_API_KEY` (checked on OpenCode 2.2.5 and 2.4.1, #15988). An old `OPENCODE_API_KEY` in the
+host's environment, for example in a server's service file, thus shadowed the key saved in Settings.
+With a stored key, `clearedInheritedOpenCodeKeyEnv` sets an inherited `OPENCODE_API_KEY` to an empty
+value, which OpenCode treats as no key: the `opencode-go` provider uses the stored key, and the free
+tier keeps its anonymous key as #7550 requires. A paid Zen model that used only that variable is not
+listed while a key is stored.
 Only a status (`missing`, `saved` or `unreadable`) crosses IPC; no getter returns the key. A file the store cannot read does not stop
 startup: OpenCode runs keyless, Settings reports the key as unreadable, and the file stays until the
 user saves or removes a key. The store writes a change to disk before it changes memory, so a
@@ -732,10 +782,44 @@ to Zen in OpenCode itself (`opencode auth login`). That sign-in buys the model, 
 each model that OpenCode lists. Checked in OpenCode 2.2.5 and 2.3.0: a key on `opencode-go` lists
 the Go models and no paid Zen model (#6185).
 
+The anonymous-key filter of OpenCode turns off only a model whose token price has an input cost
+above 0. A Zen image or video model has its price under `cost.image`, so OpenCode lists it as `input
+0`, keeps it, and offers its `generate_image` (2.2 and 2.3: `experimental_image_generate`) and
+`generate_video` tools to a free model. The OpenCode service refuses each request with "Invalid
+credential" or "Missing API key" (#15281, #6432). OpenCode Go has no image or video model, so the
+Go key does not help. When `hasOpenCodeMediaSignIn` finds no sign-in that can pay for these models,
+`openCodeAgentConfig` sends `experimental.image_generate` and `experimental.video_generate` as
+`false`, which removes both tools. OpenBot's own `generate_image` and `generate_video` (OpenBot
+credits) stay, and their guidance sends an agent to them when it has no media tool of its own. The check counts a non-empty environment variable whose name ends in
+`_API_KEY` (`OPENCODE_API_KEY` after `clearedInheritedOpenCodeKeyEnv`, or a provider key such as
+`OPENAI_API_KEY`: 291 of the 326 key variables in the OpenCode 2.4.2 catalog end so), and an
+`auth.json` entry or an active `credential` row for any provider except `opencode-go`. It also counts
+a custom endpoint with a key or headers (`hasCustomProviderCredentials`), and a user OpenCode config
+(the global config files or `OPENCODE_CONFIG`) that sets a provider `apiKey` or
+`experimental.image_generate`/`video_generate`, or that OpenBot cannot decode. A key for another
+provider keeps the tools, because that provider can have its own image models: a custom endpoint
+with the id `openai` and a key gets the OpenAI image models of the catalog in OpenCode 2.4.2. Checked with the real OpenCode 2.4.0 and 2.4.2 on a free
+model; 2.2.5 and 2.3.2 have the same switch. `test:opencode-expired-key` checks the config.
+
 OpenCode first lists the models of a cached or built-in catalog and fetches the new catalog in the
 background, about 3 s later. A first start of OpenCode 2.2.5 listed 80 of 88 models. The OpenCode
 driver thus sets `catalog.relistAfterStart`: the list is read again 5 s after each start, and agents
-do not leave a model that only the first list lacks.
+do not leave a model that only the first list lacks. When the catalog fetch takes longer, for example
+right after the computer wakes, also the second list lacks new models (#16212). So for a provider with
+`catalog.partialListAtStart`, an agent leaves its model only when two starts in a row do not list it
+(`moveAgentsOffModelsUnlistedTwice`). The count is kept in memory, so the first start after an
+OpenBot restart never moves an agent. A model that is really gone moves at the next provider start,
+for example after the idle release.
+
+The same partial list is the session's model list right after a start. Before a turn, `applyConfig`
+fails a model that the session does not list (#11964), so a queued message failed with "does not
+offer" although OpenCode offered the model a moment later (#15963). OpenCode reloads its catalog when
+it gets a model that it does not list, and refuses a model that is still missing with -32602 and
+`data.modelId` (OpenCode 1.19 and 2). The OpenCode flavor sets `modelNotOffered` to match that
+error, so OpenBot sends the model and lets OpenCode decide. That refusal fails the turn with
+`ProviderModelNotOfferedError`, and so does a reply whose model list still does not have the model:
+OpenCode 1.15 sets any model with no check. Other ACP agents keep the check before the send, because Antigravity
+kept its own model and gave no error for a model that it did not list (#11797).
 
 The CLI reports no Go quota over ACP. `readOpenCodeGoUsage` (`src/backend/opencode-usage.ts`)
 sends `opencode.ai/zen/go/v1/usage` the key the CLI uses. A saved key is the only key: the CLI
@@ -743,8 +827,10 @@ applies config `options.apiKey` last. With no saved key, it reads the CLI's own 
 T3 Code uses: the active OpenCode Console row (`integration_id = 'opencode'`, `type: "key"`, no
 self-hosted `metadata.server`) in the `credential` table of `$XDG_DATA_HOME/opencode/opencode.db`
 (or `OPENCODE_DB`), then the Go key: the `opencode-go` key of `auth.json` (or `OPENCODE_AUTH_CONTENT`,
-which also skips the database), or `OPENCODE_API_KEY` when that has none (#3548). A 401 or 403 on the
-Console key tries the Go key. The
+which also skips the database), or `OPENCODE_API_KEY` when that has none (#3548), then the `opencode`
+key of `auth.json` with no self-hosted `metadata.server` (#16230). OpenCode 1 keeps the Console key only
+there; OpenCode 2 copies it into the `credential` table once. A 401 or 403 tries the next key, and Go
+answers 403 for a key with no Go subscription. The
 database is opened read-only with a 100 ms busy timeout, because Effect cannot interrupt a blocked
 SQLite call. `scripts/opencode-go-usage-e2e.ts` covers it.
 
@@ -799,6 +885,14 @@ flavor shows `error.provider.opencodeProviderRefused`: the provider refused the 
 a proxy or a blocked country can be the cause. A key in an environment variable or a config file is
 not found, so the text stays `error.provider.opencodeAuthRequired`. An `opencode-go/` model keeps
 that text too, because it names the fix in OpenBot's settings for an expired Go key.
+
+A `credential` row for `opencode-go` wins over OpenBot's saved key, and OpenBot cannot override it
+(OpenCode issue anomalyco/opencode#58394). With a saved key, the client's `savedKeyShadowed` option
+reads the newest active row read-only (`readOpenCodeStoredKey` in `opencode-usage.ts`). When that key
+differs from the saved key, a refused turn shows `error.provider.opencodeOwnGoKeyRefused`: OpenCode
+used its own other key, and `opencode auth logout opencode-go` removes it (#15988). The same key, no
+row, or an `auth.json` entry alone keeps `error.provider.opencodeKeyRefused`; OpenCode 2.2.5 uses
+the config key before an `auth.json` entry.
 
 #### Turns of a background subagent or shell command
 
@@ -959,7 +1053,11 @@ advertise the capability; open OpenBot in the host's desktop session to connect 
 A host on any platform also advertises the `antigravity-code-sign-in-v1` marker (Team API v10). It
 adds nothing to the wire: it tells a client that the released providers-v8 `codeLoginStart` route
 signs Gemini in with `agy acp --login` (`ANTIGRAVITY_CODE_SIGN_IN` in `provider-drivers.ts`) and
-answers with the `paste` shape. The CLI prints the Google link; the user opens it on any device and
+answers with the `paste` shape. The CLI prints the Google link and also runs `open` or `xdg-open` with
+it, so each start would open a Google tab on the host (#16705). The code sign-in, also of an added
+account, therefore gets `SSH_CONNECTION` (`ANTIGRAVITY_LINK_ONLY_ENV`): then 1.5.4 prints the link
+only. The ACP `authenticate` sign-in does not get it, because the CLI then refuses a browser sign-in.
+The user opens the link on any device and
 pastes the code, or the URL of the page they land on, with the released `codeLoginSubmit`. This
 works on a server with no desktop and on a Windows host. A host before this marker refuses Gemini on
 that route, so the desktop with a joined server, the web client and mobile offer the code sign-in
@@ -1124,8 +1222,13 @@ a desktop keyring keeps its sign-in in the Secret Service (service `cursor-crede
 reader runs `secret-tool search`, not `lookup`, so a locked keyring gives no reading and no unlock
 prompt at each poll. It keeps a token until the CLI rewrites `auth.json`, which the CLI does after
 each keyring write, and a read with no token (locked keyring, no session bus, no `secret-tool`) for 30
-minutes. Windows 2026.11.22 keeps its
-sign-in in `auth.dpapi`, which the reader does not read. Cursor does not document
+minutes. A Windows CLI from 2026.11.22 leaves the same marker and keeps its sign-in in `auth.dpapi`
+next to `auth.json`: `{"version":1,"dpapi":"<base64>"}`, encrypted with DPAPI for the current user.
+With that marker the reader decrypts the blob with `ProtectedData.Unprotect` in the system Windows
+PowerShell, as the CLI does, and sends the blob on standard input. It keeps the result by the
+modification time of `auth.dpapi`, with the same 30 minute reuse for a read with no token. The CLI
+uses the Windows Credential Manager only when `CURSOR_CLI_WINDOWS_CREDENTIAL_MANAGER=1`; the reader
+does not read it. Cursor does not document
 this API. `autoPercentUsed` (Cursor's own models) fills the primary window and `apiPercentUsed`
 (all other models) the secondary one, both for the billing cycle; the dock names them by slot for a
 `cursor` row, because both windows have the same length. The total of that split plan
@@ -1451,15 +1554,17 @@ Hermes 0.21.5 advertises `session/resume`, but a resume of a missing session mak
 and the reply does not carry its id: each later prompt to the saved id would end as "refusal".
 `HERMES_ACP_FLAVOR.loadInsteadOfResume` restores with `session/load`, whose reply for a missing
 session is null, which the SDK gives as `{}`; a reply with no `modes` is a missing session.
-Hermes before 0.22.1 keeps one MCP server of each name for its whole process, so in one shared
-process each session's `openbot` call went out with the bearer token of the first session. OpenBot
-then ran it as that session's agent, and a message to that agent was refused as a message to
-itself (#13120). Hermes 0.22.1 gives each session its own servers (`GatewayACPAgent`). Both Hermes
-flavors set `sessionProcessesBefore: "0.22.1"`: when `initialize` reports an older `agentInfo.version`,
+Hermes before 0.22.1, and Hermes 0.22.2, keep one MCP server of each name for the whole process,
+so in one shared process each session's `openbot` call went out with the bearer token of the first
+session. OpenBot then ran it as that session's agent, and a message to that agent was refused as a message to
+itself (#13120). Hermes 0.22.3 gives each session its own servers (`GatewayACPAgent`,
+`gateway/session_local_mcp.py`). Hermes 0.22.1 had them too, but Hermes 0.22.2 is a rebuild of the
+older line without them, and shares the servers again (#15923). Both Hermes flavors set
+`sessionProcessesBefore: "0.22.3"`: when `initialize` reports an older `agentInfo.version`,
 each session runs in a Hermes process of its own, as for Mistral. Hermes keeps its sessions in
 `state.db`, so an idle session closes with its process and loads again in a new one. A version that
 `isVersion` does not read keeps the shared process. `bun run test:hermes-session-processes` checks
-both versions with a fake `hermes` agent.
+0.21.3, 0.22.2 and 0.22.3 with a fake `hermes` agent.
 Hermes reads only one project context file: `.hermes.md` or `HERMES.md` before `AGENTS.md`. It
 reads project skills only in a git root that `skills.trusted_project_dirs` names. A turn that fails
 with an exception in Hermes ends as answer text `Error: …`, not as a failed turn. Team API
@@ -1636,6 +1741,9 @@ The settings page, the admin route `agent-backup-models-v1`, and the `update_pro
 When the list is automatic, `UsageLimitGate` and `AgentService.#usageLimitMove` move the agent to the
 first ready model in the order that no hold covers. `usageLimitReturn` keeps the model the agent
 left, and the agent goes back to it when its hold ends. A model the user picks drops the return.
+An effort that the user or an agent picks on the backup model is also the effort that the agent goes
+back with, when its own model takes that effort (#16007). Otherwise the agent goes back with the effort
+that it had before the move.
 
 Two holds move an agent:
 

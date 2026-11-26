@@ -7,16 +7,19 @@ import {
   type FilePreview,
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { matchingSourceKeys } from "@openbot/i18n";
 import type { AgentSettingLinkId, AgentSettingReveal } from "@openbot/ui/features/conversation/agent-setting-links";
+import type { ImageCopies } from "@openbot/ui/features/conversation/ImageLightbox";
 import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { isSidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import { currentText } from "@openbot/ui/text";
 import { normalizeMessage } from "@openbot/user-errors/reference";
 import { createEffect, createMemo, createSignal, onCleanup, type Store, type StoreSetter, untrack } from "solid-js";
 import { createScopeGuard } from "../../../scope-lifetime";
+import { serverSupportsCapability } from "../../servers/server-capabilities";
 import { createAttachmentDownloads } from "../attachment-downloads";
-import { attachmentFilePreview } from "../attachment-preview";
+import { attachmentFilePreview, localAttachmentCopyUrl, remoteAttachmentUrlWith } from "../attachment-preview";
 import { BROWSER_PIP_STORAGE_KEY, BROWSER_WINDOW_STORAGE_KEY, storeBounds } from "../browser-bounds-storage";
 import { releaseFilePreviewPage } from "../conversation-port";
 import { conversationRuntime } from "../conversation-runtime";
@@ -51,6 +54,7 @@ export interface SidePanelFile {
   folder: boolean;
   source: SidebarFilePreview["source"];
   unavailable: boolean;
+  threadId?: string | undefined;
 }
 
 export interface SidePanelState {
@@ -61,10 +65,20 @@ export interface SidePanelState {
   maximized: boolean;
 }
 
+export interface SideSplitState {
+  panes: readonly SidePanelPane[];
+  selected: SidePanelPane | null;
+}
+
+export type SidePanelTarget = { group: number } | { newGroupAt: number };
+
+export const MAX_SIDE_SPLITS = 2;
+
 type FileTabPlace = "tab" | "here" | "open";
 
 export interface SidePanelsState {
   side: Record<string, SidePanelState>;
+  splits: Record<string, readonly SideSplitState[]>;
   subagents: Record<string, string>;
   threads: Record<string, string>;
 }
@@ -82,6 +96,7 @@ export function isSidePanelMode(mode: RightPanelMode | undefined): boolean {
 }
 
 const SIDE_PANEL_EMPTY: SidePanelState = { panes: [], selected: null, files: [], file: null, maximized: false };
+const NO_SPLITS: readonly SideSplitState[] = [];
 
 export interface PanelsStoreDeps {
   props: ConversationProps;
@@ -202,8 +217,99 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       return { ...state, files };
     });
   }
-  const settingsOpen = () => activeRightPanel() === "settings";
-  const filesOpen = () => activeRightPanel() === "files";
+  const sideSplits = (): readonly SideSplitState[] => {
+    const agentId = conversationOwnerId(deps.props);
+    return (agentId && !channel?.readOnly() && panels.splits[agentId]) || NO_SPLITS;
+  };
+  const paneSplit = (pane: SidePanelPane) => sideSplits().some((group) => group.panes.includes(pane));
+  const paneShown = (pane: SidePanelPane) =>
+    activeRightPanel() === pane || (sidePanelOpen() && sideSplits().some((group) => group.selected === pane));
+  function splitIndex(agentId: string, pane: SidePanelPane): number {
+    return (panels.splits[agentId] ?? NO_SPLITS).findIndex((group) => group.panes.includes(pane));
+  }
+  function splitShows(agentId: string, pane: SidePanelPane): boolean {
+    return (panels.splits[agentId] ?? NO_SPLITS).some((group) => group.selected === pane);
+  }
+  function updateSplits(agentId: string, update: (groups: SideSplitState[]) => SideSplitState[]) {
+    setPanels((draft) => {
+      const groups = (draft.splits[agentId] ?? NO_SPLITS).map((group) => ({
+        panes: [...group.panes],
+        selected: group.selected,
+      }));
+      draft.splits[agentId] = update(groups).filter((group) => group.panes.length > 0);
+    });
+  }
+  function withoutPane(group: SideSplitState, pane: SidePanelPane): SideSplitState {
+    const index = group.panes.indexOf(pane);
+    if (index < 0) return group;
+    const panes = group.panes.filter((item) => item !== pane);
+    const selected = group.selected === pane ? (panes[Math.min(index, panes.length - 1)] ?? null) : group.selected;
+    return { panes, selected };
+  }
+  const splitReturn: Record<string, RightPanelMode> = {};
+  function mainGroupMode(agentId: string): RightPanelMode {
+    const state = panels.side[agentId] ?? SIDE_PANEL_EMPTY;
+    return state.selected && state.panes.includes(state.selected) ? state.selected : "side-panel";
+  }
+  function returnFromBrowserScreen(agentId: string, pane: SidePanelPane) {
+    const current = deps.rightPanels()[agentId] ?? "none";
+    if (pane !== "browser" || !isBrowserScreenMode(current)) return;
+    const back = splitReturn[agentId] ?? "none";
+    delete splitReturn[agentId];
+    showInMainGroup(isSidePanelMode(back) ? back : mainGroupMode(agentId), agentId);
+  }
+  function selectSplitPane(agentId: string, pane: SidePanelPane) {
+    const index = splitIndex(agentId, pane);
+    if (index < 0) return;
+    if (panels.splits[agentId]?.[index]?.selected === "settings" && pane !== "settings") clearSettingsRequests(agentId);
+    updateSplits(agentId, (groups) =>
+      groups.map((group, position) => (position === index ? { ...group, selected: pane } : group)),
+    );
+    const current = deps.rightPanels()[agentId] ?? "none";
+    if (pane === "browser" && isBrowserScreenMode(current)) returnFromBrowserScreen(agentId, pane);
+    else if (!isSidePanelMode(current)) showInMainGroup(mainGroupMode(agentId), agentId, pane === "settings");
+  }
+  function removeSplitPane(pane: SidePanelPane, agentId = conversationOwnerId(deps.props)): void {
+    if (!agentId) return;
+    if (pane === "settings") clearSettingsRequests(agentId);
+    updateSplits(agentId, (groups) => groups.map((group) => withoutPane(group, pane)));
+    returnFromBrowserScreen(agentId, pane);
+  }
+  function takeFromMainGroup(agentId: string, pane: SidePanelPane): () => void {
+    const shownInMain = deps.rightPanels()[agentId] === pane;
+    const next = removeSidePanelPane(pane);
+    return () => {
+      if (shownInMain) showInMainGroup(next ?? "side-panel", agentId, pane === "settings");
+    };
+  }
+  function moveSidePanelPane(pane: SidePanelPane, target: SidePanelTarget) {
+    const agentId = conversationOwnerId(deps.props);
+    if (!agentId) return;
+    const groups = panels.splits[agentId] ?? NO_SPLITS;
+    const from = splitIndex(agentId, pane);
+    if ("group" in target) {
+      if (target.group === from || target.group >= groups.length) return;
+      if (target.group < 0) {
+        removeSplitPane(pane, agentId);
+        deps.invalidateFilePreviewGeneration();
+        showInMainGroup(pane, agentId);
+        return;
+      }
+    } else if (groups.length >= MAX_SIDE_SPLITS) return;
+    const reshowMain = from < 0 ? takeFromMainGroup(agentId, pane) : undefined;
+    updateSplits(agentId, (current) => {
+      const next = current.map((group) => withoutPane(group, pane));
+      if ("newGroupAt" in target) next.splice(target.newGroupAt, 0, { panes: [pane], selected: pane });
+      else {
+        const group = next[target.group];
+        if (group) next[target.group] = { panes: [...group.panes, pane], selected: pane };
+      }
+      return next;
+    });
+    reshowMain?.();
+  }
+  const settingsOpen = () => paneShown("settings");
+  const filesOpen = () => paneShown("files");
   const panelSubagentId = (): string | null => {
     const agentId = conversationOwnerId(deps.props);
     return agentId ? (panels.subagents[agentId] ?? null) : null;
@@ -228,12 +334,20 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     if (!agentId) return;
     if (mode === "browser-pip") deps.setBrowserWindowOpen(false);
     if (mode !== "file-preview") deps.invalidateFilePreviewGeneration();
-    if (mode !== "settings") {
-      setSkillSettingsRequest(null);
-      setInstructionsSettingsRequest(null);
-      setAgentSettingRowRequest(null);
-      setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
+    if (isSidePanelPane(mode) && splitIndex(agentId, mode) >= 0) {
+      selectSplitPane(agentId, mode);
+      return;
     }
+    showInMainGroup(mode, agentId);
+  }
+
+  function showInMainGroup(mode: RightPanelMode, agentId: string, keepSettingsRequests = false) {
+    if (isBrowserScreenMode(mode) && splitIndex(agentId, "browser") >= 0) {
+      const current = deps.rightPanels()[agentId] ?? "none";
+      if (!isBrowserScreenMode(current)) splitReturn[agentId] = current;
+    }
+    if (mode !== "settings" && !keepSettingsRequests && !splitShows(agentId, "settings"))
+      clearSettingsRequests(agentId);
     deps.setRightPanels((current) => (current[agentId] === mode ? current : { ...current, [agentId]: mode }));
     if (isSidePanelPane(mode))
       updateSidePanel(agentId, (state) => ({
@@ -247,6 +361,13 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     else if (mode === "none" && panels.side[agentId]?.maximized) {
       updateSidePanel(agentId, (state) => ({ ...state, maximized: false }));
     }
+  }
+
+  function clearSettingsRequests(agentId: string) {
+    setSkillSettingsRequest(null);
+    setInstructionsSettingsRequest(null);
+    setAgentSettingRowRequest(null);
+    setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
   }
 
   function openSubagentPanel(subagentId: string): void {
@@ -326,9 +447,21 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       void conversationRuntime(deps.props).browser.setVisible({ visible: false, target: "main" });
   }
 
+  let openingThreadId: string | undefined;
+  function openFileFromThread(threadId: string | undefined, open: () => void): void {
+    const previous = openingThreadId;
+    openingThreadId = threadId;
+    try {
+      open();
+    } finally {
+      openingThreadId = previous;
+    }
+  }
+
   async function previewAttachment(attachment: AttachmentSummary, place: FileTabPlace = "tab") {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!ownerAgentId || !canPreviewAttachment(attachment)) return;
+    const threadId = openingThreadId;
     const target = { agentId: ownerAgentId, serverId: deps.props.server?.id ?? "local" };
     const generation = deps.nextFilePreviewGeneration();
     deps.setComposerError(null, target);
@@ -336,7 +469,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       const preview = await (deps.props.runtime?.previewAttachment?.(attachment) ?? attachmentFilePreview(attachment));
       if (generation !== deps.currentFilePreviewGeneration() || conversationOwnerId(deps.props) !== ownerAgentId)
         return;
-      showSidebarFile({ ownerAgentId, source: { kind: "attachment", attachment }, preview }, place);
+      showSidebarFile({ ownerAgentId, threadId, source: { kind: "attachment", attachment }, preview }, place);
     } catch (error) {
       if (generation !== deps.currentFilePreviewGeneration()) return;
       deps.setComposerError(errorMessage(error, t("attachment.error.preview", { name: attachment.name })), target);
@@ -362,6 +495,21 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     onError: (error, target) => deps.setComposerError(errorMessage(error, t("attachment.error.open")), target),
   });
   const attachmentDownloads = attachmentFiles.downloads;
+  const remoteImageCopies: ImageCopies = {
+    copyUrl: (image) => {
+      const server = deps.props.server;
+      const url = image.previewUrl;
+      if (!url) return undefined;
+      const local = localAttachmentCopyUrl(url);
+      if (local) return local;
+      if (server?.kind !== "remote" || !serverSupportsCapability(server, ATTACHMENT_PREVIEW_CAPABILITY))
+        return undefined;
+      const copy = remoteAttachmentUrlWith(url, "preview");
+      return copy === url ? undefined : copy;
+    },
+    fullUrl: (image) => image.previewUrl,
+  };
+  const imageCopies = () => (deps.props.runtime ? deps.props.runtime.imageCopies : remoteImageCopies);
 
   function attachmentAction(attachment: AttachmentSummary, action: FileAction) {
     if (action === "open" && previewsInsteadOfReveal(attachment)) {
@@ -386,6 +534,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   function openSharedFile(path: string, place: FileTabPlace = "tab", fallback?: () => void) {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!ownerAgentId) return;
+    const threadId = openingThreadId;
     const serverId = deps.props.server?.id ?? "local";
     const target = { agentId: ownerAgentId, serverId };
     const generation = deps.nextFilePreviewGeneration();
@@ -402,14 +551,14 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
             releaseFilePreviewPage(preview.pageUrl);
             return;
           }
-          showSidebarFile({ ownerAgentId, source: { kind: "shared", path }, preview }, place);
+          showSidebarFile({ ownerAgentId, threadId, source: { kind: "shared", path }, preview }, place);
         },
         (error) => {
           if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
           const showError = () => {
             if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
             if (fallback) {
-              if (conversationOwnerId(deps.props) === ownerAgentId) fallback();
+              if (conversationOwnerId(deps.props) === ownerAgentId) openFileFromThread(threadId, fallback);
             } else {
               deps.setComposerError(filePreviewError(error, path), target);
               fileTabReadFailed(place);
@@ -434,6 +583,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   ) {
     const ownerAgentId = conversationOwnerId(deps.props);
     if (!agentId || !ownerAgentId) return;
+    const threadId = openingThreadId;
     const next = SHARED_FOLDER_PATH.test(path) ? () => openSharedFile(decodedPath(path), place, fallback) : fallback;
     const serverId = deps.props.server?.id ?? "local";
     const target = { agentId: ownerAgentId, serverId };
@@ -450,26 +600,29 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           releaseFilePreviewPage(preview.pageUrl);
           return;
         }
-        showSidebarFile({ ownerAgentId, source: { kind: "workspace", agentId, path, folder }, preview }, place);
+        showSidebarFile(
+          { ownerAgentId, threadId, source: { kind: "workspace", agentId, path, folder }, preview },
+          place,
+        );
       },
       (error) =>
         agent.listWorkspaceDirectory({ agentId, path }).then(
           (directory) => {
             if (!current()) return;
-            showWorkspaceFolder(ownerAgentId, agentId, path, directory, place);
+            showWorkspaceFolder(ownerAgentId, agentId, path, directory, place, threadId);
           },
           () => {
             if (!scopeActive() || generation !== deps.currentFilePreviewGeneration()) return;
             if (!attachment || !canPreviewAttachment(attachment)) {
               if (next) {
-                if (current()) next();
+                if (current()) openFileFromThread(threadId, next);
               } else {
                 deps.setComposerError(filePreviewError(error, path), target);
                 fileTabReadFailed(place);
               }
               return;
             }
-            if (current()) void previewAttachment(attachment, place);
+            if (current()) openFileFromThread(threadId, () => void previewAttachment(attachment, place));
           },
         ),
     );
@@ -514,9 +667,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     path: string,
     directory: WorkspaceDirectory,
     place: FileTabPlace,
+    threadId?: string,
   ) {
     showSidebarFile(
-      { ownerAgentId, source: { kind: "workspace-folder", agentId, path }, preview: null, directory },
+      { ownerAgentId, threadId, source: { kind: "workspace-folder", agentId, path }, preview: null, directory },
       place,
     );
   }
@@ -524,16 +678,21 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   function showSidebarFile(file: SidebarFilePreview, place: FileTabPlace) {
     const { ownerAgentId, source } = file;
     const key = filePreviewKey(source);
-    if (place === "open" && !(panels.side[ownerAgentId] ?? SIDE_PANEL_EMPTY).files.some((item) => item.key === key)) {
+    const shown = panels.side[ownerAgentId] ?? SIDE_PANEL_EMPTY;
+    if (place === "open" && !shown.files.some((item) => item.key === key)) {
       releaseFilePreviewPage(file.preview?.pageUrl);
       return;
     }
+    const existing = shown.files.find((item) => item.key === key);
+    const replaced = place === "here" ? shown.files.find((item) => item.key === shown.file) : undefined;
+    const threadId = file.threadId ?? (place === "tab" ? undefined : (existing ?? replaced)?.threadId);
     const tab: SidePanelFile = {
       key,
       name: file.directory?.name ?? file.preview?.name ?? key,
       folder: source.kind === "workspace-folder",
       source,
       unavailable: false,
+      threadId,
     };
     updateSidePanel(ownerAgentId, (state) => {
       const files = [...state.files];
@@ -544,7 +703,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       else files.push(tab);
       return { ...state, files, file: key, selected: null };
     });
-    deps.setSidebarFilePreview(file);
+    deps.setSidebarFilePreview({ ...file, threadId });
     setActiveRightPanel("file-preview", ownerAgentId);
   }
 
@@ -623,7 +782,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
       void agent.listWorkspaceDirectory({ agentId: source.agentId, path: source.path }).then(
         (directory) => {
           if (!current() || JSON.stringify(directory) === JSON.stringify(file.directory)) return;
-          deps.setSidebarFilePreview({ ownerAgentId, source, preview: null, directory });
+          deps.setSidebarFilePreview({ ownerAgentId, threadId: file.threadId, source, preview: null, directory });
         },
         () => undefined,
       );
@@ -644,7 +803,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
           releaseFilePreviewPage(preview.pageUrl);
           return;
         }
-        deps.setSidebarFilePreview({ ownerAgentId, source, preview });
+        deps.setSidebarFilePreview({ ownerAgentId, threadId: file.threadId, source, preview });
       },
       () => undefined,
     );
@@ -737,6 +896,11 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     activeRightPanel,
     settingsOpen,
     filesOpen,
+    sideSplits,
+    paneSplit,
+    paneShown,
+    removeSplitPane,
+    moveSidePanelPane,
     panelSubagentId,
     openSubagentPanel,
     panelThreadId,
@@ -760,9 +924,11 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     openBrowserWindow,
     reattachBrowserWindow,
     hideBrowserPanel,
+    openFileFromThread,
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
+    imageCopies,
     openSharedFile,
     openThreadFile,
     openWorkspaceFile,

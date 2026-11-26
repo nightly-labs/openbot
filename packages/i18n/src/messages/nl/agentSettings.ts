@@ -50,6 +50,7 @@ export const messages = {
     other: "Je kunt maximaal {count} mappen toevoegen",
   },
   "agentSettings.folders.browse.places": "Ga naar",
+  "agentSettings.folders.browse.path": "Mappad",
   "agentSettings.folders.browse.home": "Thuismap",
   "agentSettings.folders.browse.parent": "Omhoog naar {folder}",
   "agentSettings.folders.browse.failed": "Kan deze map niet openen.",
@@ -96,6 +97,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Gebruikslimiet bereikt · overgeslagen",
   "agentSettings.backupModels.unavailable": "Nu niet beschikbaar · overgeslagen",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Als een gebruikslimiet {name} stopt nadat het werk is begonnen, gaat {name} met hetzelfde werk verder op het eerste beschikbare model in de volgorde. Het gaat terug naar {model} als de limiet afloopt, of 10 minuten na een fout van de aanbieder.",
   "agentSettings.groups.brain": "Brein",
@@ -190,6 +192,10 @@ export const messages = {
     "Alle berichten en bestanden van deze chat worden uit OpenBot gewist en de agent vergeet ze. Dit kun je niet ongedaan maken. Zijthreads, instructies, model, tools, herinneringen, werkruimte en browser veranderen niet.",
   "agentSettings.deleteHistory.confirm": "Geschiedenis wissen",
   "agentSettings.deleteHistory.failed": "Kan de geschiedenis niet wissen.",
+  "agentSettings.deleteAgent.title": "Agent verwijderen",
+  "agentSettings.deleteAgent.description":
+    "De agent, de chat, herinneringen, routines en werkruimte verdwijnen uit OpenBot.",
+  "agentSettings.deleteAgent.button": "Verwijderen",
   "agentSettings.fullAccess.title": "Deze agent volledige toegang geven?",
   "agentSettings.fullAccess.askTitle": "Deze agent buiten zijn werkruimte laten werken?",
   "agentSettings.fullAccess.description":

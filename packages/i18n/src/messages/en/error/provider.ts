@@ -237,6 +237,8 @@ export const messages = defineMessages("error.provider", {
     "Your OpenCode API key expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go refused your saved API key. The key may have expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode did not use the key that you saved in OpenBot. It used a different OpenCode Go key that OpenCode keeps itself, and OpenCode Go refused that key. To remove that key, run `opencode auth logout opencode-go` in a terminal on the computer that runs the agent, and choose the key. Then try again.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go refused the request. A new API key does not fix this. Your OpenCode Go plan may not be active, or OpenCode Go may block your network: some services block VPNs, proxies or some countries. Make sure that your plan is active in OpenCode Console, or turn off the VPN, then try again. You can also choose a different model.",
   "error.provider.opencodeServiceFailure":
@@ -295,8 +297,12 @@ export const messages = defineMessages("error.provider", {
     "The OpenCode model ended the turn with no answer. Try again, or choose another model.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "The OpenCode model ended the turn after its reasoning, with no answer. Try again, or choose another model.",
+  "error.provider.opencodeToolCallsAsText":
+    "The OpenCode model wrote its actions as text and did not do them. Try again, or choose another model.",
   "error.provider.acpNoAnswer":
     "{provider} ended the turn with no answer. Send the message again, or start a new chat.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} received the results from its teammates, then ended the turn with no answer. Ask the agent to continue.",
   "error.provider.noAnswerAfterSteps":
     "{provider} did some steps, then ended the turn with no answer. Ask the agent what it did before you send the same request again.",
   "error.provider.acpRefusedNoReason": "{provider} stopped without an answer. Send the message again.",
@@ -339,6 +345,8 @@ export const messages = defineMessages("error.provider", {
     "Gemini could not read the saved history of this chat. OpenBot started a new Gemini session with the chat history. Send your message again.",
   "error.provider.acpTurnStuck":
     "{provider} did not end its earlier turn, so it did not accept this message. OpenBot started a new {provider} session with the chat history. Send your message again.",
+  "error.provider.antigravityLicenseRefused":
+    "Google says that your account does not have a license to use this model. Choose another model, then send your message again.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google does not let Gemini work from the network location of the computer that runs this agent. Use Gemini on another computer, or choose another provider for this agent.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -360,6 +368,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.cursorSignIn": "Sign in with Cursor or set CURSOR_API_KEY to use Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor could not connect to its server with your sign-in. Check your internet connection, then sign in to Cursor again.",
+  "error.provider.cursorNoModels":
+    "Cursor did not send its list of models. Select Connect to sign in to Cursor again. If this message stays, check that your Cursor plan includes models.",
   "error.provider.clineArchivePath": "The Cline archive has an unexpected path.",
   "error.provider.clinePackageMismatch": "The Cline package does not match the runtime catalog.",
   "error.provider.clineChecksum": "Cline runtime checksum mismatch.",
@@ -401,6 +411,8 @@ export const messages = defineMessages("error.provider", {
     "The credit balance of the Anthropic API key is too low. A Claude plan does not pay for requests with an API key. Add credit in the Anthropic Console, or sign in to Claude in Settings and select the Claude account in the agent's model menu.",
   "error.provider.claudeAccountNoCredit":
     "Your Claude account's credit balance is too low. Some requests, such as fast mode, use usage credits also when your Claude plan has usage left. Add usage credits in your Claude account, or select a different model in the agent's model menu.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code sends requests to {host}, not to Anthropic: the Claude Code settings or the environment variables set this API address. {host} refused the request because of the account's balance, not because of your Claude plan. Add funds to your {host} account, or select a different model in the agent's model menu.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Claude's service blocked this request. This is usually a short problem on Claude's side, not a problem with your account. Send the message again in a few minutes.",
   "error.provider.foreignReasoning":
@@ -417,12 +429,16 @@ export const messages = defineMessages("error.provider", {
     "{provider} blocked this message because of its safety rules: {reason} If {provider} also blocks your next messages, start a new chat.",
   "error.provider.codexAudioRefused":
     "This model cannot listen to audio, so it did not accept the sound in this chat. OpenBot started a new Codex session with the chat history. To continue, send your request again and ask the agent to work without the sound. To check sound, select a model that can listen to audio in the agent's model menu.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex could not load the settings of your ChatGPT account, so the agent stopped. Try again. If it stops again, select Reconnect for ChatGPT in Server settings → Providers.",
   "error.provider.imageTooSmall":
     "The model did not accept an image in this chat because the image is too small. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageTooLarge":
     "The model did not accept an image in this chat because the image is too large. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageCountLimit":
     "The model did not accept this chat because the chat has too many images. OpenBot started a new {provider} session with the chat history. Try again.",
+  "error.provider.imageCountLimitRepeated":
+    "The model did not accept this chat again: it has too many images. One task opens more images than this model accepts, so a new session does not help. Select New chat and ask the agent to open fewer images in each step, or select a model that accepts more images.",
   "error.provider.imageUnreadable":
     "The model could not read an image in this chat. OpenBot started a new {provider} session with the chat history. Try again. If you sent an image, send a different one.",
   "error.provider.requestTooLarge":
@@ -437,6 +453,8 @@ export const messages = defineMessages("error.provider", {
     "Muse could not start an MCP server and blocked MCP in this session. OpenBot started a new Muse session with the chat history. Try again. If the error continues, turn off Computer Use or the failed MCP server for this agent.",
   "error.provider.claudeSessionMissing":
     "Claude Code could not find the saved session of this chat. OpenBot started a new Claude Code session with the chat history. Try again.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode could not find the saved session of this chat. OpenBot started a new OpenCode session with the chat history. Try again.",
   "error.provider.grokSignIn": "Run `grok login` or set XAI_API_KEY to use Grok.",
   "error.provider.acpSignInNoStart":
     "The provider did not start, so the sign-in could not begin. Try again, or restart OpenBot.",
@@ -543,7 +561,10 @@ export const messages = defineMessages("error.provider", {
   "error.provider.sessionSettingsTimedOut": "The agent's session did not answer in time. Try again.",
   "error.provider.piOutdated": "Pi {version} is too old. Install Pi 1.1.0 or later for native RPC and MCP support.",
   "error.provider.nativeMissing": "The {provider} CLI is not installed. Download it in Settings.",
-  "error.provider.nativeNotStarted": "The {provider} CLI could not start.",
+  "error.provider.nativeNotStarted":
+    "OpenBot found the {provider} that you installed, but it did not start. Update or reinstall your {provider}, then try again.",
+  "error.provider.nativeManagedNotStarted":
+    "{provider} did not start on the computer that runs this server. Restart OpenBot on that computer. If it still does not start, choose Help > Report a problem.",
   "error.provider.nativeVersionUnreadable": "The {provider} CLI version could not be read.",
   "error.provider.piSessionBusy": "Wait for the current Pi turn to finish.",
   "error.provider.acpSessionBusy": "{provider} still finishes a stopped turn. Try again in a moment.",

@@ -11,6 +11,7 @@ import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protoco
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_PROTOCOL_CAPABILITY_LIMITS } from "@openbot/contracts/team-protocol/capability-limits";
 import {
+  AGENT_ERROR_LINK_CAPABILITY,
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSER_VAULT_SKIP_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
@@ -39,6 +40,11 @@ import {
 import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/current-agent-keys";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import {
+  addPromptQuestionDetails,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
+  withPromptQuestionDetails,
+} from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { PROVIDER_MANY_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
 import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
@@ -118,9 +124,12 @@ import {
   TEAM_PROTOCOL_V10,
   TEAM_PROTOCOL_V10_ABSENT_LIMIT,
 } from "@openbot/contracts/team-protocol/v10";
+import { WORKFLOW_SPOT_CONTROL } from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime } from "effect";
+import { createOpenBotLogger } from "@openbot/logging";
+import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime } from "effect";
 import type * as Ws from "ws";
+import { reportOriginalFailure } from "../backend/effect-boundary";
 import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
 import { contentDispositionFileName } from "./content-disposition";
 import {
@@ -137,6 +146,7 @@ import { rawDataBytes, sendableCloseCode } from "./ws-raw-data";
 
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
+const logger = createOpenBotLogger("team-webrtc-host-peer");
 const MAXIMUM_BUFFERED_EVENTS = 2_000;
 const MAXIMUM_BUFFERED_EVENT_CHARACTERS = 32 * 1024 * 1024;
 const MAXIMUM_KEPT_RESPONSES = 1_000;
@@ -150,7 +160,7 @@ export interface TeamWebRtcHostPeerOptions {
   transferDirectory: string;
   closeSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
   pathChanged?: (sessionId: string, lost: boolean) => void;
-  unknownMemberConnected?: (membershipId: string) => void;
+  memberConnected?: (membershipId: string, role: IncomingConnection["role"]) => void;
   peerMemberChanged?: (peerId: string, membershipId: string | null) => void;
   verifyClientTicket?:
     | ((ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>)
@@ -186,7 +196,7 @@ export class TeamWebRtcHostPeer {
   readonly #files: TeamWebRtcFileTransfer;
   readonly #closeSession: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
   readonly #pathChanged: (sessionId: string, lost: boolean) => void;
-  readonly #unknownMemberConnected: (membershipId: string) => void;
+  readonly #memberConnected: (membershipId: string, role: IncomingConnection["role"]) => void;
   readonly #peerMemberChanged: (peerId: string, membershipId: string | null) => void;
   #sessionMembershipId: string | null = null;
   readonly #verifyClientTicket:
@@ -250,7 +260,7 @@ export class TeamWebRtcHostPeer {
     );
     this.#closeSession = options.closeSession ?? (() => Effect.void);
     this.#pathChanged = options.pathChanged ?? (() => undefined);
-    this.#unknownMemberConnected = options.unknownMemberConnected ?? (() => undefined);
+    this.#memberConnected = options.memberConnected ?? (() => undefined);
     this.#peerMemberChanged = options.peerMemberChanged ?? (() => undefined);
     this.#verifyClientTicket = options.verifyClientTicket ?? null;
     this.#bridge.on("connected", this.#onConnected);
@@ -369,7 +379,7 @@ export class TeamWebRtcHostPeer {
     this.#localSessionId = connection.sessionId;
     this.#sessionMembershipId = connection.membershipId;
     this.#scheduleSessionExpiration(expiresAt);
-    if (!this.#store.getMember(connection.membershipId)) this.#unknownMemberConnected(connection.membershipId);
+    this.#memberConnected(connection.membershipId, connection.role);
   });
 
   #scheduleSessionExpiration(expiresAt: number): void {
@@ -394,13 +404,17 @@ export class TeamWebRtcHostPeer {
     const authFrame = channel === "rpc" && isString(data) ? authenticationFrame(data) : null;
     if (authFrame?.type === "auth-init") {
       this.#dispatch(
-        this.#handleAuthentication(peerId, authFrame).pipe(Effect.catchCause(() => this.#failProtocol(peerId))),
+        this.#handleAuthentication(peerId, authFrame).pipe(
+          Effect.catchCause((cause) => this.#rejectAuthentication(peerId, authFrame.type, cause)),
+        ),
       );
       return;
     }
     if (authFrame?.type === "auth-complete") {
       this.#dispatch(
-        this.#completeAuthentication(peerId, authFrame).pipe(Effect.catchCause(() => this.#failProtocol(peerId))),
+        this.#completeAuthentication(peerId, authFrame).pipe(
+          Effect.catchCause((cause) => this.#rejectAuthentication(peerId, authFrame.type, cause)),
+        ),
       );
       return;
     }
@@ -934,6 +948,7 @@ export class TeamWebRtcHostPeer {
                 agentPendingRuntime: this.#peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
                 queueHold: this.#peerCapabilities.has(QUEUE_HOLD_CAPABILITY),
                 queueHoldSignIn: this.#peerCapabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
+                errorLink: this.#peerCapabilities.has(AGENT_ERROR_LINK_CAPABILITY),
                 uiBlocks: this.#peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
                 subagents: this.#peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
                 promptMultiSelect: this.#peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
@@ -947,6 +962,7 @@ export class TeamWebRtcHostPeer {
         if (this.#peerCapabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY))
           frame = withUiBlockLocationRequests(frame, event);
         if (this.#peerCapabilities.has(SKILL_LEARNING_CAPABILITY)) frame = withSkillSuggestionNames(frame, event);
+        if (this.#peerCapabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)) frame = withPromptQuestionDetails(frame, event);
       } catch {
         return;
       }
@@ -1004,7 +1020,11 @@ export class TeamWebRtcHostPeer {
     if (!this.#eventsSocket && this.#localSessionToken) this.#connectLocalEvents(this.#localSessionToken);
     if (frame.type === "event-control") {
       if (this.#eventsSocket?.readyState === webSockets.WebSocket.OPEN) {
-        this.#eventsSocket.send(encodeTeamProtocolV1ClientEvent(frame.control));
+        this.#eventsSocket.send(
+          frame.control.type === WORKFLOW_SPOT_CONTROL
+            ? JSON.stringify(frame.control)
+            : encodeTeamProtocolV1ClientEvent(frame.control),
+        );
       }
       return;
     }
@@ -1044,6 +1064,22 @@ export class TeamWebRtcHostPeer {
       if (!sent) this.#eventResetPending = true;
     }
     if (this.#eventSender === sessionId) this.#eventSender = null;
+  });
+
+  readonly #rejectAuthentication = Effect.fn("TeamHostPeer.rejectAuthentication")(function* (
+    this: TeamWebRtcHostPeer,
+    peerId: string,
+    step: TeamProtocolV2AuthFrame["type"],
+    cause: Cause.Cause<RemoteWorkflowError>,
+  ) {
+    if (peerId !== this.#peerId) return;
+    if (!Cause.hasInterruptsOnly(cause))
+      yield* reportOriginalFailure(cause, (failure) =>
+        logger.warn(
+          `A remote client did not pass the ${step} sign-in step (${authenticationFailureReason(failure)}). The server closed the connection.`,
+        ),
+      );
+    yield* this.#failProtocol(peerId);
   });
 
   readonly #failProtocol = Effect.fn("TeamHostPeer.failProtocol")(function* (this: TeamWebRtcHostPeer, peerId: string) {
@@ -1286,6 +1322,16 @@ function encodeRpcResponse(response: TeamProtocolV2RpcFrame): string {
   }
 }
 
+function authenticationFailureReason(failure: unknown): string {
+  let error = failure;
+  for (let depth = 0; depth < 4 && isDynamicRecord(error); depth += 1) {
+    if (isString(error.code) && /^[A-Z][A-Z0-9_]{2,}$/u.test(error.code))
+      return isString(error.claim) ? `${error.code} ${error.claim}` : error.code;
+    error = error.cause;
+  }
+  return failure instanceof Error ? failure.message : "unknown";
+}
+
 function authenticationFrame(data: string): TeamProtocolV2AuthFrame | null {
   try {
     return decodeTeamProtocolV2AuthFrame(data);
@@ -1313,5 +1359,6 @@ function withBlockExtensions(
   if (capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)) addUiBlockVaultRequests(encoded, source);
   if (capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)) addUiBlockLocationRequests(encoded, source);
   if (capabilities.has(SKILL_LEARNING_CAPABILITY)) addSkillSuggestionNames(encoded, source);
+  if (capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)) addPromptQuestionDetails(encoded, source);
   return encoded;
 }

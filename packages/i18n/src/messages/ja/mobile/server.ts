@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "{name} から退出できませんでした",
   "mobile.server.drawer.removeFailed": "{name} を削除できませんでした",
   "mobile.server.drawer.deleteFailed": "{name} を削除できませんでした",
+  "mobile.server.drawer.hide": "サーバーを非表示",
+  "mobile.server.drawer.show": "サーバーを表示",
+  "mobile.server.drawer.hiddenServers": "非表示のサーバー",
+  "mobile.server.drawer.hideFailed": "{name} を非表示にできませんでした",
+  "mobile.server.drawer.showFailed": "{name} を表示できませんでした",
   "mobile.server.drawer.actionFailed": "OpenBot はこの操作を完了できませんでした。もう一度お試しください。",
   "mobile.server.drawer.moveUp": "上へ移動",
   "mobile.server.drawer.moveDown": "下へ移動",
@@ -269,6 +274,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "すべてのメンバーについてサーバーをアカウントサービスから削除します。そのコンピューター上のファイルとチャットは残ります。再び使うには、そのコンピューターから登録してください。",
   "mobile.server.settings.remove": "サーバーを削除",
+  "mobile.server.settings.hide": "サーバーを非表示",
+  "mobile.server.settings.show": "サーバーを表示",
   "mobile.server.settings.deleteTitle": "{name} を削除しますか？",
   "mobile.server.settings.deleteBody":
     "OpenBot はそのコンピュータでサーバーを停止し、エージェント、チャット、ファイルをそのコンピュータのゴミ箱に移動します。サーバーはすべてのデバイスのサーバー一覧から消えます。",
@@ -516,12 +523,39 @@ export const messages = {
   "mobile.server.settings.keyOwnerOnly": "サーバーキーを変更できるのはオーナーだけです。",
   "mobile.server.settings.keyUnsupported":
     "ここでキーを変更するには、このサーバーの OpenBot をアップデートしてください。",
+  "mobile.server.settings.turnLimit": "同時に実行するスレッド",
+  "mobile.server.settings.turnLimitDescription":
+    "このサーバーで同時に実行できるエージェントのスレッド数です。スレッドが多いほどメモリーを多く使います。",
+  "mobile.server.settings.turnLimitAutomatic": "自動 ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "自動 (上限なし)",
+  "mobile.server.settings.turnLimitUnlimited": "上限なし",
+  "mobile.server.settings.turnLimitsLoadFailed": "このサーバーのスレッド上限を読み込めませんでした。",
+  "mobile.server.settings.turnLimitsSaveFailed": "スレッド上限を保存できませんでした。もう一度お試しください。",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "ここでスレッド上限を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.agentTaskLimit": "エージェントごとの並列スレッド",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "独自の上限がない各エージェントが同時に実行できるスレッド数です。",
+  "mobile.server.settings.agentTaskLimitDefault": "デフォルト ({count})",
   "mobile.server.settings.memoryLimit": "エージェントごとのメモリー数",
   "mobile.server.settings.memoryLimitDescription": "このサーバーの各エージェントが保持できるメモリーの数です。",
   "mobile.server.settings.memoryLimitLoadFailed": "このサーバーのメモリー上限を読み込めませんでした。",
   "mobile.server.settings.memoryLimitSaveFailed": "メモリー数の上限を保存できませんでした。もう一度お試しください。",
   "mobile.server.settings.memoryLimitUnsupported":
     "ここでメモリー数の上限を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.mediaApprovalCredits": "次の値を超えたら確認",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "クレジット",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed": "このサーバーのクレジット確認の上限を読み込めませんでした。",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed":
+    "クレジット確認の上限を保存できませんでした。もう一度お試しください。",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "ここでクレジット確認の上限を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.mediaApprovalAgents": "エージェントのクレジット使用を許可",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed":
+    "エージェントのクレジット使用を変更できませんでした。もう一度お試しください。",
+  "mobile.server.settings.mediaApprovalAsk": "クレジットが必要なときに確認する",
+  "mobile.server.settings.mediaApprovalAskSaveFailed":
+    "クレジットの確認設定を変更できませんでした。もう一度お試しください。",
   "mobile.server.settings.memoryReview": "メモリーの見直し",
   "mobile.server.settings.memoryReviewDescription":
     "このサーバーのエージェントが、チャットから長く使う事実をバックグラウンドで保存する頻度です。",

@@ -5,7 +5,14 @@ import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
 import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
 import type { BillingDetails, BillingDetailsRequest } from "./billing-details";
-import type { CreditActivity, CreditCheckoutRequest, CreditsState, CreditTransferRequest } from "./credits";
+import type {
+  CreditActivity,
+  CreditCheckoutRequest,
+  CreditRedeemRequest,
+  CreditRedeemResult,
+  CreditsState,
+  CreditTransferRequest,
+} from "./credits";
 import type { CustomServerCheckoutRequest, CustomServerCheckoutResult } from "./custom-server-plans";
 import type {
   CreateHostedServerInput,
@@ -224,6 +231,7 @@ import type {
   BrowserBounds,
   BrowserControlState,
   BrowserDisplayState,
+  BrowserHttpSignInInput,
   BrowserLiveViewEvent,
   BrowserLocalSignInEnd,
   BrowserLocalSignInFinish,
@@ -231,6 +239,7 @@ import type {
   BrowserLocalSignInResult,
   BrowserNavigateInput,
   BrowserOpenInput,
+  BrowserPermissionAnswer,
   BrowserPictureInPictureEvent,
   BrowserPreview,
   BrowserTab,
@@ -434,6 +443,14 @@ import type {
   SignOutMcpServerInput,
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
+import type {
+  CreditsHold,
+  MediaApprovalRead,
+  ReadMediaApprovalInput,
+  RespondToCreditsHoldInput,
+  RespondToMediaApprovalInput,
+} from "./ipc-media-approval";
+import type { MediaApprovalCreditsSetting, MediaApprovalCreditsUpdate } from "./ipc-media-approval-credits";
 import type { PinnedMessagesSnapshot, SetMessagePinnedInput } from "./ipc-message-pins";
 import type {
   AddMessagingOrchestratorInput,
@@ -475,6 +492,15 @@ import type {
   WhatsAppSenderInput,
 } from "./ipc-messaging";
 import type { ProviderModelVisibility, ProviderModelVisibilityChange } from "./ipc-model-visibility";
+import type {
+  NearAgentsInput,
+  NearAllowPaymentInput,
+  NearDepositAddress,
+  NearDepositInput,
+  NearRuleInput,
+  NearWalletCreateInput,
+  NearWalletStatus,
+} from "./ipc-near-wallet";
 import type {
   NotificationOpenedEvent,
   NotificationPreference,
@@ -602,6 +628,7 @@ import type {
   ScopedTeamPresenceSnapshot,
   SendDirectMessageInput,
   ServerSummary,
+  SetServerHiddenInput,
   SetServerMutedInput,
   SetServerNotificationLevelInput,
   SetTeamTypingInput,
@@ -633,6 +660,7 @@ import type {
   VoiceServerSave,
   VoiceServerSettings,
   VoiceSettings,
+  VoiceSettingsState,
   VoiceStream,
   VoiceStreamAudio,
   VoiceStreamTranscript,
@@ -688,6 +716,8 @@ import type { AccountSession, MobileConnectedDevice, MobileConnectLink, MobileCo
 import type { AcceptedOwnerTransfer, OwnerTransfer } from "./owner-transfer";
 import type { ReferralPageRequest, ReferralState } from "./referral";
 import type { AgentActiveQueues } from "./team-protocol/agent-active-queues-v1";
+import type { ChannelCompactAvailability } from "./team-protocol/channel-compact-availability-v1";
+import type { WorkflowSpotInput } from "./team-protocol/workflow-presence-v1";
 
 declare const payloadType: unique symbol;
 declare const resultType: unique symbol;
@@ -876,7 +906,7 @@ export const IPC_ENDPOINTS = {
     downloadModel: request<VoiceModelRequest, VoiceModelStatus>()("voice:download-model"),
     cancelModelDownload: request<VoiceModelRequest, VoiceModelStatus>()("voice:cancel-model-download"),
     removeModel: request<VoiceModelRequest, VoiceModelStatus>()("voice:remove-model"),
-    getSettings: request<undefined, VoiceSettings>()("voice:get-settings"),
+    getSettings: request<undefined, VoiceSettingsState>()("voice:get-settings"),
     setSettings: request<VoiceSettings, VoiceSettings>()("voice:set-settings"),
     transcribe: request<VoiceTranscriptionInput, VoiceTranscriptionResult>()("voice:transcribe"),
     setApiKey: request<VoiceApiKeyInput, VoiceModelStatus>()("voice:set-api-key"),
@@ -1263,6 +1293,12 @@ export const IPC_ENDPOINTS = {
     setCacheExpiryCompaction: scopedRequest<boolean, CacheExpiryCompactionSetting, "required">()(
       "host-admin:set-cache-expiry-compaction",
     ),
+    getMediaApprovalCredits: scopedQuery<MediaApprovalCreditsSetting, "required">()(
+      "host-admin:get-media-approval-credits",
+    ),
+    setMediaApprovalCredits: scopedRequest<MediaApprovalCreditsUpdate, MediaApprovalCreditsSetting, "required">()(
+      "host-admin:set-media-approval-credits",
+    ),
     getClaudeUserSetup: scopedQuery<ClaudeUserSetupSetting, "required">()("host-admin:get-claude-user-setup"),
     setClaudeUserSetup: scopedRequest<boolean, ClaudeUserSetupSetting, "required">()(
       "host-admin:set-claude-user-setup",
@@ -1341,6 +1377,24 @@ export const IPC_ENDPOINTS = {
     disconnect: request<undefined, LinkAccountStatus>()("link-account:disconnect"),
     changed: event<LinkAccountStatus>()("link-account:changed"),
   },
+  nearWallet: {
+    status: request<undefined, NearWalletStatus>()("near-wallet:status"),
+    create: request<NearWalletCreateInput, NearWalletStatus>()("near-wallet:create"),
+    setBudget: request<{ dailyBudgetUsd: string }, NearWalletStatus>()("near-wallet:set-budget"),
+    setAgents: request<NearAgentsInput, NearWalletStatus>()("near-wallet:set-agents"),
+    renewGrant: request<undefined, NearWalletStatus>()("near-wallet:renew-grant"),
+    freeze: request<undefined, NearWalletStatus>()("near-wallet:freeze"),
+    unfreeze: request<undefined, NearWalletStatus>()("near-wallet:unfreeze"),
+    deposit: request<NearDepositInput, NearDepositAddress>()("near-wallet:deposit"),
+    saveRule: request<NearRuleInput, NearWalletStatus>()("near-wallet:save-rule"),
+    removeRule: request<{ domain: string }, NearWalletStatus>()("near-wallet:remove-rule"),
+    allowPayment: request<NearAllowPaymentInput, NearWalletStatus>()("near-wallet:allow-payment"),
+    openSigning: request<undefined, void>()("near-wallet:open-signing"),
+    cancelSigning: request<undefined, NearWalletStatus>()("near-wallet:cancel-signing"),
+    checkBackup: request<undefined, NearWalletStatus>()("near-wallet:check-backup"),
+    disconnect: request<undefined, NearWalletStatus>()("near-wallet:disconnect"),
+    changed: event<NearWalletStatus>()("near-wallet:changed"),
+  },
   vault: {
     list: request<undefined, VaultState>()("vault:list"),
     save: request<VaultSaveInput, VaultState>()("vault:save"),
@@ -1403,6 +1457,7 @@ export const IPC_ENDPOINTS = {
     getActivity: request<undefined, CreditActivity>()("credits:get-activity"),
     openCheckout: request<CreditCheckoutRequest, void>()("credits:open-checkout"),
     transfer: request<CreditTransferRequest, CreditsState>()("credits:transfer"),
+    redeem: request<CreditRedeemRequest, CreditRedeemResult>()("credits:redeem"),
   },
   license: {
     getState: request<undefined, LicenseState>()("license:get-state"),
@@ -1529,6 +1584,9 @@ export const IPC_ENDPOINTS = {
     clearChannelContext: scopedRequest<string, void>()("agent:channels:clear-context"),
     deleteChannelHistory: scopedRequest<string, void>()("agent:channels:delete-history"),
     compactChannelContext: scopedRequest<string, void>()("agent:channels:compact-context"),
+    channelCompactAvailability: scopedRequest<string, ChannelCompactAvailability>()(
+      "agent:channels:compact-availability",
+    ),
     getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
     mutateSidebarLayout: scopedRequest<SidebarLayoutAction, SidebarLayoutSnapshot>()("agent:mutate-sidebar-layout"),
     getSidebarPins: scopedQuery<SidebarPinsSnapshot>()("agent:sidebar-pins:get"),
@@ -1612,6 +1670,13 @@ export const IPC_ENDPOINTS = {
     respondToPrompt: scopedRequest<RespondToPromptInput, void>()("agent:respond-to-prompt"),
     respondToApproval: scopedRequest<RespondToApprovalInput, void>()("agent:respond-to-approval"),
     readPendingApproval: scopedRequest<ReadPendingApprovalInput, AgentApproval | null>()("agent:read-pending-approval"),
+    readMediaApproval: scopedRequest<ReadMediaApprovalInput, MediaApprovalRead>()("agent:read-media-approval"),
+    respondToMediaApproval: scopedRequest<RespondToMediaApprovalInput, void>()("agent:respond-to-media-approval"),
+    respondToCreditsHold: scopedRequest<RespondToCreditsHoldInput, CreditsHold | null>()(
+      "agent:respond-to-credits-hold",
+    ),
+    setCreditsAskMuted: scopedRequest<{ muted: boolean }, void>()("agent:set-credits-ask-muted"),
+    readCreditsAskMuted: scopedQuery<{ muted: boolean }>()("agent:read-credits-ask-muted"),
     listPendingPrompts: scopedQuery<AgentRuntimePrompt[]>()("agent:list-pending-prompts"),
     respondToBrowserSecret: scopedRequest<LocalBrowserSecretResponse, void>()("agent:respond-to-browser-secret"),
     respondToBrowserTakeover: scopedRequest<RespondToBrowserTakeoverInput, void>()("agent:respond-to-browser-takeover"),
@@ -1705,6 +1770,7 @@ export const IPC_ENDPOINTS = {
     mediaPrice: scopedRequest<WorkflowMediaPriceRequest, WorkflowMediaPrice>()("workflows:media-price"),
     folders: scopedQuery<WorkflowFoldersSnapshot>()("workflows:folders"),
     folderAction: scopedRequest<WorkflowFolderAction, WorkflowFoldersSnapshot>()("workflows:folder-action"),
+    setSpot: scopedRequest<WorkflowSpotInput, void>()("workflows:set-spot"),
   },
   crm: {
     overview: scopedQuery<CrmOverview>()("crm:overview"),
@@ -1777,6 +1843,7 @@ export const IPC_ENDPOINTS = {
     close: request<string, void>()("browser:close"),
     takeControl: request<string, void>()("browser:take-control"),
     releaseControl: request<string, void>()("browser:release-control"),
+    answerPermission: request<BrowserPermissionAnswer, void>()("browser:answer-permission"),
     startTeach: request<string, void>()("browser:teach-start"),
     stopTeach: request<BrowserTeachStopInput, BrowserTeachStep[]>()("browser:teach-stop"),
     listTabs: request<undefined, BrowserTab[]>()("browser:list-tabs"),
@@ -1806,6 +1873,7 @@ export const IPC_ENDPOINTS = {
     finishLocalSignIn: request<BrowserLocalSignInFinish, BrowserLocalSignInResult | null>()(
       "browser:local-sign-in-finish",
     ),
+    answerHttpSignIn: request<BrowserHttpSignInInput, void>()("browser:http-sign-in-answer"),
   },
   browserInput: {
     sendLiveViewInput: untypedRequest("browser:send-live-view-input"),
@@ -1815,6 +1883,7 @@ export const IPC_ENDPOINTS = {
     select: request<string, ServerSummary[]>()("servers:select"),
     reorder: request<ReorderServersInput, ServerSummary[]>()("servers:reorder"),
     setMuted: request<SetServerMutedInput, ServerSummary[]>()("servers:set-muted"),
+    setHidden: request<SetServerHiddenInput, ServerSummary[]>()("servers:set-hidden"),
     setNotificationLevel: request<SetServerNotificationLevelInput, ServerSummary[]>()("servers:set-notification-level"),
     join: request<JoinServerInput, ServerSummary>()("servers:join"),
     previewInvite: request<JoinServerInput, InvitePreview>()("servers:preview-invite"),
@@ -2074,6 +2143,7 @@ export const IPC_GROUP_PATHS = {
   bitwardenConnector: "bitwardenConnector",
   passwordManagers: "passwordManagers",
   linkAccount: "linkAccount",
+  nearWallet: "nearWallet",
   vault: "vault",
   hostedSites: "hostedSites",
   routineFeed: "routineFeed",

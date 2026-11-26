@@ -36,6 +36,7 @@ import {
 } from "@openbot/contracts/team-protocol";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
+import { addPromptQuestionDetails } from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { addUiBlockAutoAnswers } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
@@ -46,6 +47,11 @@ import {
   toWireTeamProtocolV1ClientEvent,
 } from "@openbot/contracts/team-protocol/v1-adapter";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
+import {
+  WORKFLOW_SPOT_CONTROL,
+  type WorkflowSpotControl,
+  type WorkflowSpotInput,
+} from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { errorReference, referenceFrom } from "@openbot/user-errors/reference";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Result, Schema, Scope, Semaphore } from "effect";
@@ -280,6 +286,7 @@ export interface RemoteTeamDiagnostic {
     | "ice-state"
     | "ice-gathering"
     | "ice-candidate-error"
+    | "ice-gathering-stalled"
     | "route"
     | "ice-recovery"
     | "channels-open"
@@ -584,6 +591,11 @@ export function createRemoteTeamPeer(
           lastTyping = null;
         },
       );
+    },
+    setWorkflowSpot(input: WorkflowSpotInput) {
+      const state = peer;
+      if (!state || !isPeerOnline(state)) return;
+      void runPeerEffect(sendEventControl(state, { type: WORKFLOW_SPOT_CONTROL, ...input })).catch(() => undefined);
     },
     execute: (command: RemoteTeamCommand) => runPeerEffect(executeCommand(command, actions)),
     setWaitForHost(value: boolean) {
@@ -1549,13 +1561,25 @@ export function createRemoteTeamPeer(
       if (state.channels[kind] !== channel) return;
       failPeer(
         state,
-        referenced(sourceText("error.remote.dataChannelFailed", { kind }), referenceFrom("webrtc", "channel", kind)),
+        state.binding && !state.authenticated
+          ? referenced(sourceText("error.remote.signInConnectionClosed"), "webrtc/channel/sign_in_closed")
+          : referenced(
+              sourceText("error.remote.dataChannelFailed", { kind }),
+              referenceFrom("webrtc", "channel", kind),
+            ),
         actions,
       );
     };
     channel.onclose = () => {
-      if (state.authenticated && state.channels[kind] === channel)
+      if (state.channels[kind] !== channel) return;
+      if (state.authenticated)
         failPeer(state, referenced(sourceText("error.remote.desktopOffline"), "webrtc/channel/closed"), actions);
+      else if (state.binding)
+        failPeer(
+          state,
+          referenced(sourceText("error.remote.signInConnectionClosed"), "webrtc/channel/sign_in_closed"),
+          actions,
+        );
     };
   }
 
@@ -1717,6 +1741,7 @@ export function createRemoteTeamPeer(
           addUiBlockVaultRequests(decoded.event, frame.payload);
           addUiBlockLocationRequests(decoded.event, frame.payload);
           addSkillSuggestionNames(decoded.event, frame.payload);
+          addPromptQuestionDetails(decoded.event, frame.payload);
         }
         yield* RemotePeerIO.use((io) => io.teamEvent(state.hostId, decoded.event));
       }
@@ -2034,7 +2059,7 @@ export function createRemoteTeamPeer(
     }, 16);
   }
 
-  function sendEventControl(state: PeerState, control: TeamProtocolV1CurrentEventControl) {
+  function sendEventControl(state: PeerState, control: TeamProtocolV1CurrentEventControl | WorkflowSpotControl) {
     return Effect.fn("RemotePeer.sendEventControl")(function* () {
       yield* sendPayload(
         state,
@@ -2043,7 +2068,7 @@ export function createRemoteTeamPeer(
           encodeTeamProtocolV2Frame({
             version: 2,
             type: "event-control",
-            control: toWireTeamProtocolV1ClientEvent(control),
+            control: control.type === WORKFLOW_SPOT_CONTROL ? control : toWireTeamProtocolV1ClientEvent(control),
           }),
         ),
       );
@@ -2351,8 +2376,19 @@ export function createRemoteTeamPeer(
     if (!state.connected || state.connectedTimer !== null) return;
     state.connectedTimer = setTimeout(() => {
       diagnose(state, "stalled", `connect deadline: ${connectionSnapshot(state)}`);
+      if (gatheringFoundNothing(state)) diagnose(state, "ice-gathering-stalled");
       failPeer(state, connectTimeout(state), actions);
     }, 30_000);
+  }
+
+  function gatheringFoundNothing(state: PeerState): boolean {
+    const connection = state.connection;
+    return (
+      connection !== null &&
+      state.offerSentAt !== null &&
+      connection.iceGatheringState === "gathering" &&
+      state.localCandidates.size === 0
+    );
   }
 
   function connectionSnapshot(state: PeerState): string {
@@ -2455,6 +2491,7 @@ function withWireBlockExtensions<T>(state: PeerState, decoded: T, wire: unknown)
     addUiBlockVaultRequests(decoded, wire);
     addUiBlockLocationRequests(decoded, wire);
     addSkillSuggestionNames(decoded, wire);
+    addPromptQuestionDetails(decoded, wire);
   }
   return decoded;
 }

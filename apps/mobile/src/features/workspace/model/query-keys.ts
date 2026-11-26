@@ -72,6 +72,10 @@ export const queryKeys = {
     ...queryKeys.agentRecord(scope, serverId, agentId, "routines"),
     "events",
   ],
+  agentOnceRoutines: (scope: QueryScope, serverId: string, agentId: string) => [
+    ...queryKeys.agentRecord(scope, serverId, agentId, "routines"),
+    "once",
+  ],
   agentRoutineResultOptions: (scope: QueryScope, serverId: string, agentId: string) => [
     ...queryKeys.agentRecord(scope, serverId, agentId, "routines"),
     "result-options",
@@ -131,10 +135,12 @@ export const queryKeys = {
   serverInvites: (scope: QueryScope, serverId: string) => ["server-invites", ...scope, serverId],
   ownerTransfer: (scope: QueryScope, serverId: string) => ["owner-transfer", ...scope, serverId],
   serverTimezone: (scope: QueryScope, serverId: string) => ["server-timezone", ...scope, serverId],
+  serverTurnLimits: (scope: QueryScope, serverId: string) => ["server-turn-limits", ...scope, serverId],
   serverVoiceModel: (scope: QueryScope, serverId: string) => ["server-voice-model", ...scope, serverId],
   serverSignalHome: (scope: QueryScope, serverId: string) => ["server-signal-home", ...scope, serverId],
   localServers: (scope: QueryScope, serverId: string) => ["local-servers", ...scope, serverId],
   agentMemoryLimit: (scope: QueryScope, serverId: string) => ["agent-memory-limit", ...scope, serverId],
+  mediaApprovalCredits: (scope: QueryScope, serverId: string) => ["media-approval-credits", ...scope, serverId],
   memoryReview: (scope: QueryScope, serverId: string) => ["memory-review", ...scope, serverId],
   skillLearning: (scope: QueryScope, serverId: string) => ["skill-learning", ...scope, serverId],
   browsingMemory: (scope: QueryScope, serverId: string) => ["browsing-memory", ...scope, serverId],
@@ -209,6 +215,7 @@ export const queryKeys = {
     ...logo,
   ],
   planLimits: (scope: QueryScope, serverId: string) => ["plan-limits", ...scope, serverId],
+  agentUsageLimits: (scope: QueryScope, serverId: string) => ["agent-usage-limits", ...scope, serverId],
   machineMetrics: (scope: QueryScope, serverId: string) => ["machine-metrics", ...scope, serverId],
   serverUsage: (scope: QueryScope, serverId: string, range: unknown) => ["server-usage", ...scope, serverId, range],
   profileActivity: (scope: QueryScope, serverId: string, range: unknown) => [

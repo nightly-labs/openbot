@@ -98,6 +98,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Partie suivante",
   "mobile.chat.preview.pdfFailed": "Impossible d’afficher ce PDF.",
   "mobile.chat.preview.spreadsheetFailed": "Impossible de lire cette feuille de calcul.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Cette feuille de calcul est trop volumineuse pour l’aperçu. Partagez-la pour l’ouvrir dans une autre app.",
   "mobile.chat.preview.spreadsheetTruncated":
     "Aperçu limité aux {rows} premières lignes et aux {columns} premières colonnes.",
   "mobile.chat.copyFailedMessage": "Veuillez réessayer.",
@@ -133,6 +135,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "Maintenez le bouton enfoncé pour confirmer.",
   "mobile.chat.question.preview": "Aperçu",
   "mobile.chat.question.showAllPreview": "Tout afficher",
+  "mobile.chat.question.copyPreviewFailed": "Impossible de copier le brouillon",
   "mobile.chat.question.sendChoice": "Envoyer",
   "mobile.chat.question.selectedCount": { one: "{count} sélectionné", other: "{count} sélectionnés" },
   "mobile.chat.question.noneSelected": "Rien de sélectionné",
@@ -193,6 +196,8 @@ export const messages = {
   "mobile.chat.attachment.tooLarge": "{name} dépasse {limit}.",
   "mobile.chat.attachment.cameraPermission":
     "Autorisez l’accès à l’appareil photo dans Réglages pour prendre une photo.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "La photo ne s’est pas chargée. Ouvrez-la dans l’app Photos jusqu’à ce qu’elle s’affiche entièrement, puis réessayez.",
   "mobile.chat.composer.send": "Envoyer le message",
   "mobile.chat.composer.stop": "Arrêter {name}",
   "mobile.chat.composer.dictate": "Dicter un message",
@@ -228,7 +233,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "Le serveur n’est pas connecté. La conversation reprend quand il se reconnecte.",
   "mobile.chat.liveVoice.speakFailed": "La réponse n’a pas pu être lue à voix haute.",
   "mobile.chat.liveVoice.voiceNotReady": "Choisissez une voix dans Réglages > Voix.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 ne lit pas cette langue.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 ne lit pas cette langue. Choisissez une autre voix dans Réglages > Voix.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs n’a pas accepté la clé d’API.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "Il manque une autorisation à la clé ElevenLabs. Vérifiez-la dans Réglages > Voix.",
@@ -249,6 +255,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "Impossible de prendre la photo. Réessayez.",
   "mobile.chat.camera.startFailed": "Impossible de démarrer l’appareil photo. Fermez-le et réessayez.",
   "mobile.chat.camera.close": "Fermer l’appareil photo",
+  "mobile.chat.camera.fullScreenTipTitle": "Besoin d’une vue plus grande ?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "Utilisez l’appareil photo en plein écran, avec le zoom et tous les objectifs. Vous pouvez modifier ce choix dans Réglages > Conversations.",
+  "mobile.chat.camera.fullScreenTipUse": "Passer en plein écran",
+  "mobile.chat.camera.fullScreenTipDismiss": "Masquer le conseil",
   "mobile.chat.camera.takePhoto": "Prendre une photo",
   "mobile.chat.camera.switch": "Changer d’appareil photo",
   "mobile.chat.header.info": "Infos sur {name}",
@@ -318,6 +329,8 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "Vitesse de lecture : {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Impossible de lire le message à voix haute",
+  "mobile.chat.message.readAloudModelMissing":
+    "Pour écouter les messages, téléchargez le modèle vocal dans Réglages > Voix.",
   "mobile.chat.message.selectText": "Sélectionner le texte",
   "mobile.chat.message.copyImage": "Copier l’image",
   "mobile.chat.message.copyText": "Copier le texte",
@@ -451,6 +464,7 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "Envoi en cours",
   "mobile.chat.outbox.sendsWhenOnline": "Sera envoyé quand le serveur sera en ligne",
   "mobile.chat.outbox.waiting": "En attente d’envoi",
+  "mobile.chat.outbox.waitingForFailed": "En attente du message non envoyé",
   "mobile.chat.outbox.failed": "Non envoyé",
   "mobile.chat.outbox.failedHold": "Non envoyé. Maintenez le message appuyé pour réessayer.",
   "mobile.chat.outbox.cancelSend": "Ne pas envoyer",
@@ -520,6 +534,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Connexion au serveur",
   "mobile.chat.history.loading": "Chargement de l’historique de la discussion",
   "mobile.chat.history.waiting": "En attente de connexion",
+  "mobile.chat.history.syncing": "Recherche de nouveaux messages",
   "mobile.chat.history.loadFailed": "Impossible de charger l’historique de la discussion",
   "mobile.chat.scrollToLatest": "Aller au dernier message",
   "mobile.chat.agentUnavailable.title": "Agent non disponible",
@@ -545,6 +560,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "En attente de réponses",
   "mobile.chat.queue.providerRestart": "En attente du redémarrage de {provider}",
   "mobile.chat.queue.signIn": "En attente de connexion à {provider}",
+  "mobile.chat.queue.usageLimit": "Limite d’utilisation atteinte",
+  "mobile.chat.queue.usageLimitResets": "Limite d’utilisation atteinte · Réinitialisation le {time}",
   "mobile.chat.providerSignIn.title": "{provider} n’est pas connecté",
   "mobile.chat.providerSignIn.action": "Se connecter",
   "mobile.chat.providerSignIn.open": "{label}. Ouvrir les réglages du fournisseur",
@@ -562,6 +579,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Aucun message en file d’attente",
   "mobile.chat.queue.emptyBody": "Les nouveaux messages rejoignent la file d’attente pendant que l’agent travaille.",
   "mobile.chat.queue.noLongerQueued": "Ce message n’est plus en file d’attente.",
+  "mobile.chat.queue.routine": "Routine : {name}",
   "mobile.chat.queue.position": "Position {position} · {date}",
   "mobile.chat.queue.attachments": "Pièces jointes",
   "mobile.chat.queue.steer": "Orienter",

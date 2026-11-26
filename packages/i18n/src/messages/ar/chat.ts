@@ -273,6 +273,7 @@ export const messages = {
   "chat.marker.settingLink": "عرض إعدادًا",
   "chat.settingLink.desktopOnly": "افتحه في تطبيق OpenBot على حاسوبك.",
   "chat.settingLink.agentChatOnly": "افتحه في محادثتك مع هذا الوكيل.",
+  "chat.settingLink.adminOnly": "يمكن لمالك الخادم أو المسؤول فقط تغيير هذا الإعداد.",
   "chat.marker.skillSuggestion": "اقترح مهارة",
   "chat.marker.mcpSignIn": "طلب منك تسجيل الدخول إلى خادم MCP",
   "chat.marker.serverInstall": "أنشأ أمرًا لتثبيت خادم",

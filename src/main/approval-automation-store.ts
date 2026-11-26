@@ -117,14 +117,16 @@ export class ApprovalAutomation {
   }
 
   set(input: AgentApprovalGrant): Effect.Effect<ApprovalAutomationPreference, PreferenceFileFailure> {
-    return Effect.suspend(() => {
-      if (input.autoApprove && this.#deletingAgentIds.has(input.agentId)) {
-        return Effect.fail(
-          new PreferenceFileFailure({ cause: new Error(sourceText("error.agent.approvalWhileDeleting")) }),
-        );
-      }
-      return this.#writes.withPermit(this.#apply(input));
-    });
+    return this.#writes.withPermit(
+      Effect.suspend(() => {
+        if (input.autoApprove && this.#deletingAgentIds.has(input.agentId)) {
+          return Effect.fail(
+            new PreferenceFileFailure({ cause: new Error(sourceText("error.agent.approvalWhileDeleting")) }),
+          );
+        }
+        return this.#apply(input);
+      }),
+    );
   }
 
   deleteAgent<E>(
@@ -133,20 +135,14 @@ export class ApprovalAutomation {
   ): Effect.Effect<void, E | PreferenceFileFailure> {
     return Effect.suspend(() => {
       this.#deletingAgentIds.add(agentId);
-      return this.#writes
-        .withPermit(
-          Effect.gen({ self: this }, function* () {
-            yield* this.#apply({ agentId, autoApprove: false });
-            yield* remove();
+      return this.#writes.withPermit(this.#apply({ agentId, autoApprove: false })).pipe(
+        Effect.andThen(Effect.suspend(remove)),
+        Effect.ensuring(
+          Effect.sync(() => {
+            this.#deletingAgentIds.delete(agentId);
           }),
-        )
-        .pipe(
-          Effect.ensuring(
-            Effect.sync(() => {
-              this.#deletingAgentIds.delete(agentId);
-            }),
-          ),
-        );
+        ),
+      );
     }).pipe(Effect.uninterruptible);
   }
 

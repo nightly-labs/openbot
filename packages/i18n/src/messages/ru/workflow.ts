@@ -129,6 +129,8 @@ export const messages = {
   "workflow.agent.removedLabel": "Агент удалён. Выберите агента",
   "workflow.agent.list": "Агенты",
   "workflow.agent.search": "Искать агентов",
+  "workflow.agentMade.title": "Новый рабочий процесс от {agent}",
+  "workflow.agentMade.open": "Открыть",
 
   "workflow.model.label": "Модель: {name}",
   "workflow.model.title": "Модели",
@@ -593,8 +595,34 @@ export const messages = {
   "workflow.canvas.presence.follow": "Следить за {name}",
   "workflow.canvas.presence.you": "{name} (вы)",
   "workflow.canvas.presence.following": "Вы следите за {name}",
-  "workflow.canvas.empty.title": "Начните с триггера",
-  "workflow.canvas.empty.add": "Добавить триггер",
+  "workflow.canvas.start.title": "Начать с шаблона",
+  "workflow.canvas.start.blank": "Пустой холст",
+  "workflow.template.morningBrief.title": "Утренняя сводка",
+  "workflow.template.morningBrief.brief": "Каждое утро в 08:00 — 5 строк новостей по вашим темам.",
+  "workflow.template.morningBrief.task":
+    "Найди новости за последний день по этим темам: ИИ, стартапы. Напиши 5 самых важных, по одной строке, со ссылкой.",
+  "workflow.template.answerIssues.title": "Ответы на новые задачи",
+  "workflow.template.answerIssues.brief": "Когда кто-то открывает задачу в GitHub, ответить на неё и добавить метку.",
+  "workflow.template.answerIssues.task":
+    "Прочитай задачу. Найди вероятную причину в коде. Напиши короткий доброжелательный ответ и выбери одну метку.",
+  "workflow.template.weeklyReport.title": "Еженедельный отчёт",
+  "workflow.template.weeklyReport.brief": "Каждую пятницу в 16:00 — итоги недели. Вы одобряете отчёт перед отправкой.",
+  "workflow.template.weeklyReport.task":
+    "Подведи итоги недели команды: завершённая работа, открытые проблемы и следующие шаги. Используй короткие списки.",
+  "workflow.template.weeklyReport.question": "Отправить этот еженедельный отчёт?",
+  "workflow.template.priceWatch.title": "Слежение за ценой",
+  "workflow.template.priceWatch.brief":
+    "Каждое утро в 09:00 проверять цену товара. Уведомление, когда она ниже вашего порога.",
+  "workflow.template.priceWatch.task":
+    "Открой эту страницу товара и прочитай цену: https://example.com/product. Напиши только цену и ссылку.",
+  "workflow.template.priceWatch.rule": "Цена меньше 100.",
+  "workflow.template.priceWatch.alert": "Цена снизилась",
+  "workflow.template.socialPost.title": "Пост с картинкой",
+  "workflow.template.socialPost.brief": "Напишите одну идею. Получите короткий пост и квадратную картинку к нему.",
+  "workflow.template.socialPost.idea": "Теперь мы открыты по воскресеньям, с 10:00 до 16:00.",
+  "workflow.template.socialPost.prompt":
+    "Напиши пост для соцсетей об этой новости короче 280 символов. Сделай понятную первую строку, без хештегов.",
+  "workflow.template.socialPost.picture": "Чистая, светлая картинка для этого поста.",
   "workflow.canvas.tool.label": "Инструменты холста",
   "workflow.canvas.tool.select": "Выбор",
   "workflow.canvas.tool.pan": "Перемещение",

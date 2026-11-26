@@ -165,6 +165,9 @@ function storyWorkflowHost(workflows: readonly StoryWorkflow[]): WorkflowHost {
       folderListeners.add(changed);
       return () => folderListeners.delete(changed);
     },
+    presenceSupported: () => false,
+    setSpot: () => undefined,
+    onSpot: () => () => undefined,
     pictures: async () => [],
     uploadPicture: async (file) => keptPicture(crypto.randomUUID(), file, URL.createObjectURL(file)),
     mediaUrl: () => null,

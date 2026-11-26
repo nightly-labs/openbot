@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "Kan {name} niet verlaten",
   "mobile.server.drawer.removeFailed": "Kan {name} niet verwijderen",
   "mobile.server.drawer.deleteFailed": "Kan {name} niet verwijderen",
+  "mobile.server.drawer.hide": "Server verbergen",
+  "mobile.server.drawer.show": "Server tonen",
+  "mobile.server.drawer.hiddenServers": "Verborgen servers",
+  "mobile.server.drawer.hideFailed": "Kan {name} niet verbergen",
+  "mobile.server.drawer.showFailed": "Kan {name} niet tonen",
   "mobile.server.drawer.actionFailed": "OpenBot kan deze actie niet voltooien. Probeer het opnieuw.",
   "mobile.server.drawer.moveUp": "Omhoog",
   "mobile.server.drawer.moveDown": "Omlaag",
@@ -271,6 +276,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Hiermee verwijder je de server uit de accountdienst voor alle leden. Bestanden en chats op de computer blijven bewaard. Registreer de server vanaf die computer om hem weer te gebruiken.",
   "mobile.server.settings.remove": "Server verwijderen",
+  "mobile.server.settings.hide": "Server verbergen",
+  "mobile.server.settings.show": "Server tonen",
   "mobile.server.settings.deleteTitle": "{name} verwijderen?",
   "mobile.server.settings.deleteBody":
     "OpenBot stopt de server op zijn computer en verplaatst de agents, chats en bestanden naar de prullenbak van die computer. De server verdwijnt uit de serverlijst op al je apparaten.",
@@ -523,12 +530,38 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Kan de serversleutel niet wijzigen. Probeer het opnieuw.",
   "mobile.server.settings.keyOwnerOnly": "Alleen de eigenaar kan de serversleutel wijzigen.",
   "mobile.server.settings.keyUnsupported": "Werk OpenBot op deze server bij om de sleutel hier te wijzigen.",
+  "mobile.server.settings.turnLimit": "Threads tegelijk",
+  "mobile.server.settings.turnLimitDescription":
+    "Hoeveel agentthreads tegelijk kunnen draaien op deze server. Meer threads gebruiken meer geheugen.",
+  "mobile.server.settings.turnLimitAutomatic": "Automatisch ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Automatisch (geen limiet)",
+  "mobile.server.settings.turnLimitUnlimited": "Geen limiet",
+  "mobile.server.settings.turnLimitsLoadFailed": "Kan de threadlimieten van deze server niet laden.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Kan de threadlimiet niet opslaan. Probeer het opnieuw.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Werk OpenBot bij op deze server om de threadlimiet hier te wijzigen.",
+  "mobile.server.settings.agentTaskLimit": "Parallelle threads per agent",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Hoeveel threads elke agent zonder eigen limiet tegelijk kan draaien.",
+  "mobile.server.settings.agentTaskLimitDefault": "Standaard ({count})",
   "mobile.server.settings.memoryLimit": "Herinneringen per agent",
   "mobile.server.settings.memoryLimitDescription": "Hoeveel herinneringen elke agent op deze server kan bewaren.",
   "mobile.server.settings.memoryLimitLoadFailed": "Kan de geheugenlimiet van deze server niet laden.",
   "mobile.server.settings.memoryLimitSaveFailed": "Kan de geheugenlimiet niet opslaan. Probeer het opnieuw.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Werk OpenBot bij op deze server om de geheugenlimiet hier te wijzigen.",
+  "mobile.server.settings.mediaApprovalCredits": "Vragen bij meer dan",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "credits",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed": "Kan de creditgoedkeuringsgrens van deze server niet laden.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed":
+    "Kan de creditgoedkeuringsgrens niet opslaan. Probeer het opnieuw.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "Werk OpenBot op deze server bij om de creditgoedkeuringsgrens hier te wijzigen.",
+  "mobile.server.settings.mediaApprovalAgents": "Agents mogen credits gebruiken",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed":
+    "Kan het creditgebruik door agents niet wijzigen. Probeer het opnieuw.",
+  "mobile.server.settings.mediaApprovalAsk": "Vragen wanneer credits nodig zijn",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "Kan de creditaanvragen niet wijzigen. Probeer het opnieuw.",
   "mobile.server.settings.memoryReview": "Geheugencontrole",
   "mobile.server.settings.memoryReviewDescription":
     "Hoe vaak agents op deze server op de achtergrond blijvende feiten uit hun chats bewaren.",

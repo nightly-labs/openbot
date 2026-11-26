@@ -112,6 +112,8 @@ export const messages = {
   "workflow.agent.removedLabel": "Ajan kaldırıldı. Ajan seç",
   "workflow.agent.list": "Ajanlar",
   "workflow.agent.search": "Ajan ara",
+  "workflow.agentMade.title": "{agent} bir iş akışı oluşturdu",
+  "workflow.agentMade.open": "Aç",
 
   "workflow.model.label": "Model: {name}",
   "workflow.model.title": "Modeller",
@@ -546,8 +548,34 @@ export const messages = {
   "workflow.canvas.presence.follow": "{name} kişisini takip et",
   "workflow.canvas.presence.you": "{name} (sen)",
   "workflow.canvas.presence.following": "{name} takip ediliyor",
-  "workflow.canvas.empty.title": "Bir tetikleyiciyle başlayın",
-  "workflow.canvas.empty.add": "Tetikleyici ekle",
+  "workflow.canvas.start.title": "Bir şablonla başlayın",
+  "workflow.canvas.start.blank": "Boş tuval",
+  "workflow.template.morningBrief.title": "Sabah özeti",
+  "workflow.template.morningBrief.brief": "Her sabah 08:00'de konularınızla ilgili 5 satır haber alın.",
+  "workflow.template.morningBrief.task":
+    "Şu konularda son bir günün haberlerini bul: yapay zekâ, girişimler. En önemli 5 haberi, her biri tek satır ve bağlantılı olarak yaz.",
+  "workflow.template.answerIssues.title": "Yeni issue'lara yanıt ver",
+  "workflow.template.answerIssues.brief": "Biri GitHub'da bir issue açtığında yanıtlayın ve bir etiket ekleyin.",
+  "workflow.template.answerIssues.task":
+    "Issue'yu oku. Koddaki olası nedeni bul. Kısa ve nazik bir yanıt yaz ve bir etiket seç.",
+  "workflow.template.weeklyReport.title": "Haftalık rapor",
+  "workflow.template.weeklyReport.brief": "Her cuma 16:00'da haftayı özetleyin. Gönderilmeden önce onaylarsınız.",
+  "workflow.template.weeklyReport.task":
+    "Ekibin bu hafta yaptıklarını özetle: biten işler, açık sorunlar ve sonraki adımlar. Kısa listeler kullan.",
+  "workflow.template.weeklyReport.question": "Bu haftalık rapor gönderilsin mi?",
+  "workflow.template.priceWatch.title": "Fiyat takibi",
+  "workflow.template.priceWatch.brief":
+    "Her sabah 09:00'da bir ürünün fiyatını kontrol edin. Sınırınızın altına düşünce bildirim alın.",
+  "workflow.template.priceWatch.task":
+    "Bu ürün sayfasını aç ve fiyatı oku: https://example.com/product. Yalnızca fiyatı ve bağlantıyı yaz.",
+  "workflow.template.priceWatch.rule": "Fiyat 100'den düşük.",
+  "workflow.template.priceWatch.alert": "Fiyat düştü",
+  "workflow.template.socialPost.title": "Görselli gönderi",
+  "workflow.template.socialPost.brief": "Bir fikir yazın. Kısa bir gönderi ve onun için kare bir görsel alın.",
+  "workflow.template.socialPost.idea": "Artık pazar günleri de 10:00 ile 16:00 arasında açığız.",
+  "workflow.template.socialPost.prompt":
+    "Bu haber hakkında 280 karakterden kısa bir sosyal medya gönderisi yaz. Net bir ilk satır kullan, hashtag kullanma.",
+  "workflow.template.socialPost.picture": "Bu gönderi için sade ve aydınlık bir görsel.",
   "workflow.canvas.tool.label": "Tuval araçları",
   "workflow.canvas.tool.select": "Seç",
   "workflow.canvas.tool.pan": "Kaydır",

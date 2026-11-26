@@ -111,6 +111,8 @@ export const messages = defineMessages("workflow", {
   "workflow.agent.removedLabel": "Agent removed. Choose agent",
   "workflow.agent.list": "Agents",
   "workflow.agent.search": "Search agents",
+  "workflow.agentMade.title": "{agent} made a workflow",
+  "workflow.agentMade.open": "Open",
 
   "workflow.model.label": "Model: {name}",
   "workflow.model.title": "Models",
@@ -546,8 +548,34 @@ export const messages = defineMessages("workflow", {
   "workflow.canvas.presence.follow": "Follow {name}",
   "workflow.canvas.presence.you": "{name} (you)",
   "workflow.canvas.presence.following": "Following {name}",
-  "workflow.canvas.empty.title": "Start with a trigger",
-  "workflow.canvas.empty.add": "Add trigger",
+  "workflow.canvas.start.title": "Start from a template",
+  "workflow.canvas.start.blank": "Blank canvas",
+  "workflow.template.morningBrief.title": "Morning brief",
+  "workflow.template.morningBrief.brief": "Every morning at 08:00, get 5 lines of news on your topics.",
+  "workflow.template.morningBrief.task":
+    "Find news from the last day about these topics: AI, startups. Write the 5 most important items, one line each, with a link.",
+  "workflow.template.answerIssues.title": "Answer new issues",
+  "workflow.template.answerIssues.brief": "When someone opens a GitHub issue, reply to it and add a label.",
+  "workflow.template.answerIssues.task":
+    "Read the issue. Find the likely cause in the code. Write a short, friendly reply and choose one label.",
+  "workflow.template.weeklyReport.title": "Weekly report",
+  "workflow.template.weeklyReport.brief": "Every Friday at 16:00, sum up the week. You approve it before it is sent.",
+  "workflow.template.weeklyReport.task":
+    "Sum up what the team did this week: finished work, open problems and next steps. Use short lists.",
+  "workflow.template.weeklyReport.question": "Send this weekly report?",
+  "workflow.template.priceWatch.title": "Price watch",
+  "workflow.template.priceWatch.brief":
+    "Every morning at 09:00, check a product price. Get a notification when it is below your limit.",
+  "workflow.template.priceWatch.task":
+    "Open this product page and read the price: https://example.com/product. Write only the price and the link.",
+  "workflow.template.priceWatch.rule": "The price is less than 100.",
+  "workflow.template.priceWatch.alert": "Price drop",
+  "workflow.template.socialPost.title": "Post with a picture",
+  "workflow.template.socialPost.brief": "Write one idea. Get a short post and a square picture for it.",
+  "workflow.template.socialPost.idea": "We now open on Sundays, from 10:00 to 16:00.",
+  "workflow.template.socialPost.prompt":
+    "Write a social post about this news in less than 280 characters. Use a clear first line and no hashtags.",
+  "workflow.template.socialPost.picture": "A clean, bright picture for this post.",
   "workflow.canvas.tool.label": "Canvas tools",
   "workflow.canvas.tool.select": "Select",
   "workflow.canvas.tool.pan": "Pan",

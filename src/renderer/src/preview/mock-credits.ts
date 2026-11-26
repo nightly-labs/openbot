@@ -4,11 +4,15 @@ import {
   type CreditActivityEntry,
   type CreditsState,
   creditModelCharge,
+  creditsMovable,
+  isCreditCode,
+  normalizeCreditCode,
 } from "@openbot/contracts/credits";
 import type { CreditsDesktopApi } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 
 const MINUTE_MS = 60 * 1_000;
+const PREVIEW_CODE_CREDITS = 500;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 
@@ -85,6 +89,7 @@ export function createMockCredits(initial: Partial<CreditsState> = {}): CreditsD
   const state: CreditsState = { ...previewCreditsState(), ...initial };
   const activity = previewCreditActivity();
   const server = (serverId: string) => state.servers.find((wallet) => wallet.serverId === serverId);
+  const redeemed = new Set<string>();
   return {
     getState: async () => structuredClone(state),
     getActivity: async () => ({ entries: structuredClone(activity) }),
@@ -101,7 +106,7 @@ export function createMockCredits(initial: Partial<CreditsState> = {}): CreditsD
       const wallet = server(request.serverId);
       if (wallet?.role !== "owner") throw new Error(sourceText("error.billing.creditsServerOwner"));
       const toServer = request.direction === "to_server";
-      const available = toServer ? state.balance : wallet.balance;
+      const available = toServer ? creditsMovable(state) : wallet.balance;
       if (available < request.credits) throw new Error(sourceText("error.billing.creditsNotEnough"));
       const change = toServer ? request.credits : -request.credits;
       state.balance -= change;
@@ -113,6 +118,26 @@ export function createMockCredits(initial: Partial<CreditsState> = {}): CreditsD
         { id: `${id}:in`, kind: "move", at, credits: change, actor: "you", serverId: request.serverId },
       );
       return structuredClone(state);
+    },
+    redeem: async (request) => {
+      const code = normalizeCreditCode(request.code);
+      if (!isCreditCode(code)) throw new Error(sourceText("error.billing.creditCodeInvalid"));
+      if (redeemed.has(code)) throw new Error(sourceText("error.billing.creditCodeRedeemed"));
+      const wallet = request.serverId === undefined ? null : server(request.serverId);
+      if (wallet === undefined) throw new Error(sourceText("error.billing.creditCodeServerMember"));
+      redeemed.add(code);
+      if (wallet) wallet.balance += PREVIEW_CODE_CREDITS;
+      else state.balance += PREVIEW_CODE_CREDITS;
+      const at = Date.now();
+      activity.unshift({
+        id: `grant:code:${at}`,
+        kind: "free",
+        at,
+        credits: PREVIEW_CODE_CREDITS,
+        actor: "you",
+        ...(request.serverId === undefined ? {} : { serverId: request.serverId }),
+      });
+      return { credits: PREVIEW_CODE_CREDITS, state: structuredClone(state) };
     },
   };
 }

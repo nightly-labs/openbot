@@ -247,6 +247,8 @@ export const messages = {
     "Je OpenCode-API-sleutel is verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go heeft je opgeslagen API-sleutel geweigerd. De sleutel is misschien verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode heeft niet de sleutel gebruikt die je in OpenBot hebt opgeslagen. Het gebruikte een andere OpenCode Go-sleutel die OpenCode zelf bewaart, en OpenCode Go heeft die sleutel geweigerd. Voer `opencode auth logout opencode-go` uit in een terminal op de computer waarop de agent draait en kies de sleutel om die sleutel te verwijderen. Probeer het daarna opnieuw.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go heeft het verzoek geweigerd. Een nieuwe API-sleutel lost dit niet op. Je OpenCode Go-abonnement is misschien niet actief, of OpenCode Go blokkeert misschien je netwerk: sommige diensten blokkeren vpn's, proxy's of bepaalde landen. Controleer in OpenCode Console of je abonnement actief is, of zet de vpn uit, en probeer het opnieuw. Je kunt ook een ander model kiezen.",
   "error.provider.opencodeServiceFailure":
@@ -306,8 +308,12 @@ export const messages = {
     "Het OpenCode-model beëindigde de beurt zonder antwoord. Probeer het opnieuw, of kies een ander model.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "Het OpenCode-model beëindigde de beurt na het redeneren, zonder antwoord. Probeer het opnieuw, of kies een ander model.",
+  "error.provider.opencodeToolCallsAsText":
+    "Het OpenCode-model schreef zijn acties als tekst en voerde ze niet uit. Probeer het opnieuw, of kies een ander model.",
   "error.provider.acpNoAnswer":
     "{provider} beëindigde de beurt zonder antwoord. Stuur het bericht opnieuw, of begin een nieuwe chat.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} kreeg de resultaten van zijn teamgenoten en beëindigde daarna de beurt zonder antwoord. Vraag de agent om verder te gaan.",
   "error.provider.noAnswerAfterSteps":
     "{provider} voerde enkele stappen uit en beëindigde de beurt daarna zonder antwoord. Vraag de agent wat hij deed voordat je hetzelfde verzoek opnieuw stuurt.",
   "error.provider.acpRefusedNoReason": "{provider} stopte zonder antwoord. Stuur het bericht opnieuw.",
@@ -352,6 +358,8 @@ export const messages = {
     "Gemini kon de opgeslagen geschiedenis van deze chat niet lezen. OpenBot heeft een nieuwe Gemini-sessie met de chatgeschiedenis gestart. Stuur je bericht opnieuw.",
   "error.provider.acpTurnStuck":
     "{provider} heeft de vorige beurt niet afgerond en heeft dit bericht daarom niet aangenomen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Stuur je bericht opnieuw.",
+  "error.provider.antigravityLicenseRefused":
+    "Google meldt dat je account geen licentie heeft voor dit model. Kies een ander model en stuur je bericht opnieuw.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google staat Gemini niet toe vanaf de netwerklocatie van de computer waarop deze agent draait. Gebruik Gemini op een andere computer, of kies een andere aanbieder voor deze agent.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -373,6 +381,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Log in met Cursor of stel CURSOR_API_KEY in om Cursor te gebruiken.",
   "error.provider.cursorSignInUnusable":
     "Cursor kon met je aanmelding geen verbinding maken met zijn server. Controleer je internetverbinding en log daarna opnieuw in bij Cursor.",
+  "error.provider.cursorNoModels":
+    "Cursor heeft zijn lijst met modellen niet gestuurd. Kies 'Verbinden' om opnieuw aan te melden bij Cursor. Blijft dit bericht staan, controleer dan of je Cursor-abonnement modellen bevat.",
   "error.provider.clineArchivePath": "Het Cline-archief heeft een onverwacht pad.",
   "error.provider.clinePackageMismatch": "Het Cline-pakket komt niet overeen met de runtimecatalogus.",
   "error.provider.clineChecksum": "Checksum van de Cline-runtime komt niet overeen.",
@@ -415,6 +425,8 @@ export const messages = {
     "De Anthropic-API-sleutel heeft geen API-tegoed. Een Claude-abonnement betaalt geen verzoeken met een API-sleutel. Voeg tegoed toe in de Anthropic Console, of log bij Instellingen in bij Claude en kies het Claude-account in het modelmenu van de agent.",
   "error.provider.claudeAccountNoCredit":
     "Het tegoed van je Claude-account is te laag. Sommige verzoeken, zoals de snelle modus, gebruiken gebruikstegoed, ook als je Claude-abonnement nog gebruik over heeft. Voeg gebruikstegoed toe in je Claude-account, of kies een ander model in het modelmenu van de agent.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code stuurt verzoeken naar {host}, niet naar Anthropic: de Claude Code-instellingen of de omgevingsvariabelen geven dit API-adres op. {host} weigerde het verzoek vanwege het tegoed van het account, niet vanwege je Claude-abonnement. Voeg tegoed toe aan je {host}-account, of kies een ander model in het modelmenu van de agent.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "De Claude-dienst heeft dit verzoek geblokkeerd. Meestal is dit een kort probleem bij Claude, geen probleem met je account. Stuur het bericht over een paar minuten opnieuw.",
   "error.provider.foreignReasoning":
@@ -431,12 +443,16 @@ export const messages = {
     "{provider} heeft dit bericht geblokkeerd vanwege zijn veiligheidsregels: {reason} Als {provider} ook je volgende berichten blokkeert, start dan een nieuwe chat.",
   "error.provider.codexAudioRefused":
     "Dit model kan geen audio beluisteren, dus het accepteerde het geluid in deze chat niet. OpenBot heeft een nieuwe Codex-sessie gestart met de chatgeschiedenis. Stuur je verzoek opnieuw en vraag de agent om zonder het geluid te werken om verder te gaan. Kies in het modelmenu van de agent een model dat audio kan beluisteren om geluid te controleren.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex kon de instellingen van je ChatGPT-account niet laden, dus de agent is gestopt. Probeer het opnieuw. Als hij weer stopt, kies dan Opnieuw verbinden voor ChatGPT in Serverinstellingen → Aanbieders.",
   "error.provider.imageTooSmall":
     "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te klein is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageTooLarge":
     "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te groot is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageCountLimit":
     "Het model accepteerde deze chat niet, omdat de chat te veel afbeeldingen bevat. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.imageCountLimitRepeated":
+    "Het model accepteerde deze chat opnieuw niet: de chat bevat te veel afbeeldingen. Een taak opent meer afbeeldingen dan dit model accepteert, dus een nieuwe sessie helpt niet. Kies Nieuwe chat en vraag de agent per stap minder afbeeldingen te openen, of kies een model voor meer afbeeldingen.",
   "error.provider.imageUnreadable":
     "Het model kon een afbeelding in deze chat niet lezen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Stuurde je een afbeelding, stuur dan een andere.",
   "error.provider.requestTooLarge":
@@ -451,6 +467,8 @@ export const messages = {
     "Muse kon een MCP-server niet starten en heeft MCP in deze sessie geblokkeerd. OpenBot heeft een nieuwe Muse-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, zet dan Computerbesturing of de mislukte MCP-server uit voor deze agent.",
   "error.provider.claudeSessionMissing":
     "Claude Code heeft de opgeslagen sessie van deze chat niet gevonden. OpenBot heeft een nieuwe Claude Code-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode heeft de opgeslagen sessie van deze chat niet gevonden. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.grokSignIn": "Voer `grok login` uit of stel XAI_API_KEY in om Grok te gebruiken.",
   "error.provider.acpSignInNoStart":
     "De aanbieder is niet gestart, dus het inloggen kon niet beginnen. Probeer het opnieuw of start OpenBot opnieuw.",
@@ -564,7 +582,10 @@ export const messages = {
   "error.provider.piOutdated":
     "Pi {version} is te oud. Installeer Pi 1.1.0 of nieuwer voor native ondersteuning van RPC en MCP.",
   "error.provider.nativeMissing": "De {provider} CLI is niet geïnstalleerd. Download hem in Instellingen.",
-  "error.provider.nativeNotStarted": "De {provider} CLI kon niet starten.",
+  "error.provider.nativeNotStarted":
+    "OpenBot heeft de {provider} gevonden die je hebt geïnstalleerd, maar die is niet gestart. Werk {provider} bij of installeer hem opnieuw en probeer het dan opnieuw.",
+  "error.provider.nativeManagedNotStarted":
+    "{provider} is niet gestart op de computer waarop deze server draait. Start OpenBot opnieuw op die computer. Start hij dan nog steeds niet, kies dan Help > Meld een probleem.",
   "error.provider.nativeVersionUnreadable": "De versie van de {provider} CLI kon niet worden gelezen.",
   "error.provider.piSessionBusy": "Wacht tot de huidige Pi-beurt klaar is.",
   "error.provider.acpSessionBusy": "{provider} rondt nog een gestopte beurt af. Probeer het zo opnieuw.",

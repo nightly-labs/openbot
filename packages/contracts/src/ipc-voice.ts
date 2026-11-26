@@ -232,6 +232,10 @@ export interface VoiceSettings {
   language: VoiceLanguage;
 }
 
+export interface VoiceSettingsState extends VoiceSettings {
+  saved: boolean;
+}
+
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   modelId: DEFAULT_VOICE_MODEL_ID,
   language: AUTOMATIC_VOICE_LANGUAGE,

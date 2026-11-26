@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "{name} sunucusundan ayrılınamadı",
   "mobile.server.drawer.removeFailed": "{name} kaldırılamadı",
   "mobile.server.drawer.deleteFailed": "{name} silinemedi",
+  "mobile.server.drawer.hide": "Sunucuyu gizle",
+  "mobile.server.drawer.show": "Sunucuyu göster",
+  "mobile.server.drawer.hiddenServers": "Gizli sunucular",
+  "mobile.server.drawer.hideFailed": "{name} gizlenemedi",
+  "mobile.server.drawer.showFailed": "{name} gösterilemedi",
   "mobile.server.drawer.actionFailed": "OpenBot bu işlemi tamamlayamadı. Tekrar deneyin.",
   "mobile.server.drawer.moveUp": "Yukarı taşı",
   "mobile.server.drawer.moveDown": "Aşağı taşı",
@@ -276,6 +281,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Bu işlem sunucuyu tüm üyeler için hesap hizmetinden kaldırır. Bilgisayarındaki dosyalar ve sohbetler kalır. Yeniden kullanmak için o bilgisayardan kaydedin.",
   "mobile.server.settings.remove": "Sunucuyu kaldır",
+  "mobile.server.settings.hide": "Sunucuyu gizle",
+  "mobile.server.settings.show": "Sunucuyu göster",
   "mobile.server.settings.deleteTitle": "{name} silinsin mi?",
   "mobile.server.settings.deleteBody":
     "OpenBot sunucuyu bilgisayarında durdurur ve ajanlarını, sohbetlerini ve dosyalarını o bilgisayarın çöp kutusuna taşır. Sunucu tüm cihazlarınızdaki sunucu listesinden çıkar.",
@@ -527,12 +534,36 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Sunucu anahtarı değiştirilemedi. Tekrar deneyin.",
   "mobile.server.settings.keyOwnerOnly": "Sunucu anahtarını yalnızca sahip değiştirebilir.",
   "mobile.server.settings.keyUnsupported": "Anahtarını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.turnLimit": "Aynı anda mesaj dizileri",
+  "mobile.server.settings.turnLimitDescription":
+    "Bu sunucuda aynı anda kaç ajan mesaj dizisinin çalışabileceği. Daha fazla dizi daha fazla bellek kullanır.",
+  "mobile.server.settings.turnLimitAutomatic": "Otomatik ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Otomatik (sınırsız)",
+  "mobile.server.settings.turnLimitUnlimited": "Sınırsız",
+  "mobile.server.settings.turnLimitsLoadFailed": "Bu sunucunun mesaj dizisi sınırları yüklenemedi.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Mesaj dizisi sınırı kaydedilemedi. Tekrar deneyin.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Mesaj dizisi sınırını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.agentTaskLimit": "Ajan başına paralel mesaj dizileri",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Kendi sınırı olmayan her ajanın aynı anda kaç mesaj dizisi çalıştırabileceği.",
+  "mobile.server.settings.agentTaskLimitDefault": "Varsayılan ({count})",
   "mobile.server.settings.memoryLimit": "Ajan başına bellek",
   "mobile.server.settings.memoryLimitDescription": "Bu sunucudaki her ajanın tutabileceği bellek sayısı.",
   "mobile.server.settings.memoryLimitLoadFailed": "Bu sunucunun bellek sınırı yüklenemedi.",
   "mobile.server.settings.memoryLimitSaveFailed": "Anı sınırı kaydedilemedi. Tekrar deneyin.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Anı sınırını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.mediaApprovalCredits": "Şu miktarı aşınca sor",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "kredi",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed": "Bu sunucunun kredi onay sınırı yüklenemedi.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed": "Kredi onay sınırı kaydedilemedi. Tekrar deneyin.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "Kredi onay sınırını buradan değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.mediaApprovalAgents": "Ajanlar kredi kullanabilir",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed": "Ajanların kredi kullanımı değiştirilemedi. Tekrar deneyin.",
+  "mobile.server.settings.mediaApprovalAsk": "Kredi gerektiğinde sor",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "Kredi istekleri değiştirilemedi. Tekrar deneyin.",
   "mobile.server.settings.memoryReview": "Bellek incelemesi",
   "mobile.server.settings.memoryReviewDescription":
     "Bu sunucudaki ajanların sohbetlerindeki kalıcı bilgileri arka planda ne sıklıkla kaydettiği.",

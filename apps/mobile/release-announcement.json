@@ -1,10 +1,10 @@
 {
-  "version": "1.4.13",
+  "version": "1.4.14",
   "highlights": [
-    "Choose how agents access your location: once, always, or never.",
-    "Background refresh keeps agents and chats up to date when you open the app.",
-    "Workflows now support image, video, and asset steps, with pause and resume controls.",
-    "Transfer ownership of your server to another OpenBot account.",
-    "Introducing Neon Coast, a sunset backdrop featuring a police chase and fireworks."
+    "Hide a server from your server list. It stays hidden on all your devices.",
+    "Make a one-time routine: in \"When to run\", select \"Once\".",
+    "New option: use the full-screen camera, with zoom and all lenses.",
+    "Home has larger avatars and shorter rows, so you see more chats.",
+    "Better connection: the app connects again by itself after a network change, and sent messages no longer disappear."
   ]
 }

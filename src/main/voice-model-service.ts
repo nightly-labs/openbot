@@ -18,6 +18,7 @@ import { causeHelpers } from "../backend/effect-boundary";
 const logger = createOpenBotLogger("voice-model-service");
 
 export const VOICE_RUNTIME_ADDON = "sherpa-onnx.node";
+export const VOICE_SPEECH_DETECTOR = "silero_vad_v5.onnx";
 
 export const VOICE_SESSION_CONFIGS = {
   "no-arena.cfg": "EnableCpuMemArena=0\n",

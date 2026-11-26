@@ -2,6 +2,7 @@ import { VOICE_AUDIO_LIMITS } from "@openbot/contracts/ipc";
 import { currentText } from "@openbot/ui/text";
 import { recordingToWav, startVoiceMeter, VOICE_LEVEL_COUNT } from "@openbot/ui/voice-recording";
 import { createSignal, onCleanup } from "solid-js";
+import { track } from "./analytics";
 
 export type DictationPhase = "idle" | "starting" | "recording" | "transcribing";
 
@@ -76,12 +77,19 @@ export function createDictation(options: {
     recorder = null;
     if (current !== generation) return;
     setPhase("transcribing");
+    const audioSeconds = seconds();
     try {
       const text = (await options.transcribe(await recordingToWav(recording))).trim();
+      void track("voice_transcription", {
+        result: text ? "succeeded" : "failed",
+        audio_duration_seconds: audioSeconds,
+        ...(text ? {} : { empty: true }),
+      });
       if (current !== generation) return;
       if (text) options.onText(text);
       else setError(t("extension.chat.dictation.empty"));
     } catch (cause) {
+      void track("voice_transcription", { result: "failed", audio_duration_seconds: audioSeconds });
       if (current === generation)
         setError(cause instanceof Error && cause.message ? cause.message : t("extension.chat.dictation.failed"));
     } finally {

@@ -1,9 +1,12 @@
-import type {
-  CreditActivity,
-  CreditCheckoutRequest,
-  CreditServerWallet,
-  CreditsState,
-  CreditTransferRequest,
+import {
+  type CreditActivity,
+  type CreditCheckoutRequest,
+  type CreditRedeemRequest,
+  type CreditRedeemResult,
+  type CreditServerWallet,
+  type CreditsState,
+  type CreditTransferRequest,
+  creditsMovable,
 } from "@openbot/contracts/credits";
 import { classifyFailure } from "@openbot/telemetry";
 import { createEffect, createSignal, createStore } from "solid-js";
@@ -16,9 +19,10 @@ export interface CreditsCalls {
   getActivity: () => Promise<CreditActivity>;
   openCheckout: (request: CreditCheckoutRequest) => Promise<void>;
   transfer: (request: CreditTransferRequest) => Promise<CreditsState>;
+  redeem: (request: CreditRedeemRequest) => Promise<CreditRedeemResult>;
 }
 
-export type CreditsAction = "checkout" | "transfer";
+export type CreditsAction = "checkout" | "transfer" | "redeem";
 
 interface CreditsCheckout {
   serverId: string | null;
@@ -45,6 +49,39 @@ export function creditsBalance(credits: CreditsState | null, serverId: string | 
 export function creditsServer(credits: CreditsState | null, serverId: string | null): CreditServerWallet | null {
   if (!credits || serverId === null) return null;
   return credits.servers.find((server) => server.serverId === serverId) ?? null;
+}
+
+export function movablePersonalCredits(credits: CreditsState | null | undefined): number {
+  return credits ? creditsMovable(credits) : 0;
+}
+
+export interface CreditsRailWallet {
+  balance: number;
+  welcome: number | null;
+  serverId: string | null;
+  name: string | null;
+  movable: CreditServerWallet | null;
+}
+
+export function creditsRailWallet(
+  credits: CreditsState | null,
+  server: { kind: "local" | "remote"; id: string } | null,
+  localServerId: string | null | undefined,
+): CreditsRailWallet | null {
+  if (!credits) return null;
+  const walletId = server?.kind === "remote" ? server.id : (localServerId ?? null);
+  const wallet = creditsServer(credits, walletId);
+  const movable = wallet?.role === "owner" ? wallet : null;
+  if (!wallet)
+    return { balance: credits.balance, welcome: credits.welcome ?? null, serverId: null, name: null, movable };
+  const welcome = movable ? (credits.welcome ?? null) : null;
+  return {
+    balance: wallet.balance + (welcome ?? 0),
+    welcome,
+    serverId: wallet.serverId,
+    name: wallet.name,
+    movable,
+  };
 }
 
 export function createCreditsStore(
@@ -152,9 +189,28 @@ export function createCreditsStore(
     }
   }
 
+  async function redeem(request: CreditRedeemRequest): Promise<CreditRedeemResult | null> {
+    const api = calls();
+    if (!api || state.pending) return null;
+    setState((draft) => {
+      draft.pending = "redeem";
+    });
+    try {
+      const result = await api.redeem(request);
+      apply(result.state);
+      void loadActivity(api);
+      return result;
+    } finally {
+      setState((draft) => {
+        draft.pending = null;
+      });
+    }
+  }
+
   return {
     state,
     load,
+    redeem,
     openCheckout: (request: CreditCheckoutRequest) => {
       const serverId = request.serverId ?? null;
       setState((draft) => {

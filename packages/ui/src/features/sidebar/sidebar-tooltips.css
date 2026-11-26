@@ -57,6 +57,15 @@
   gap: var(--openbot-space-2);
 }
 
+.sidebar-name-tooltip-heading:has(.agent-role-badge) {
+  --agent-role-badge-collapsed-width: calc(2ch + 9px);
+
+  display: grid;
+  grid-template-columns:
+    fit-content(calc(100% - var(--agent-role-badge-collapsed-width) - var(--openbot-space-2)))
+    minmax(var(--agent-role-badge-collapsed-width), 1fr);
+}
+
 .sidebar-name-tooltip-name {
   font-weight: var(--openbot-weight-semibold);
 }

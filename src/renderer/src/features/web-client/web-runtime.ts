@@ -15,6 +15,8 @@ import type {
   AgentWaitsSnapshot,
   AttachmentSummary,
   AvatarImageInput,
+  BrowserHttpSignIn,
+  BrowserHttpSignInInput,
   BrowserLiveViewEvent,
   BrowserNavigateInput,
   BrowserOpenInput,
@@ -32,18 +34,23 @@ import type {
   ConversationReadState,
   ConversationSearchPage,
   CreateAgentInput,
+  CreditsHold,
   DuplicateAgentResult,
   EditQueuedMessageInput,
   HiddenAgentsSnapshot,
   InvitePreview,
   LocalBrowserSecretResponse,
+  MediaApprovalRead,
   PinnedMessagesSnapshot,
   ProviderModelSourceEntry,
   QueueSnapshot,
+  ReadMediaApprovalInput,
   ReadPendingApprovalInput,
   ReorderQueueInput,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
+  RespondToCreditsHoldInput,
+  RespondToMediaApprovalInput,
   RespondToPromptInput,
   ServerNotificationLevel,
   SetAgentHiddenInput,
@@ -69,6 +76,7 @@ import {
   decodeAgentFastModels,
   decodeAgentModelListings,
   decodeAgentSteeringModels,
+  decodeCreditsAskMuted,
   decodeProviderModelSources,
   decodeUsageCredits,
   decodeWorkspaceDirectory,
@@ -124,6 +132,11 @@ import {
   decodeAgentWaitsResponse,
 } from "@openbot/contracts/team-protocol/agent-waits-v1";
 import {
+  BROWSER_HTTP_SIGN_IN_CAPABILITY,
+  BROWSER_HTTP_SIGN_IN_ROUTES,
+  decodeBrowserHttpSignInSnapshot,
+} from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
+import {
   BROWSER_PAGE_STATE_CAPABILITY,
   BROWSER_PAGE_STATE_ROUTES,
   decodeBrowserPageStateSnapshot,
@@ -141,9 +154,17 @@ import {
 import {
   decodeBrowserViewInputValue,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
+  TEAM_BROWSER_VIEW_DIALOG_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY,
   TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
+import {
+  CHANNEL_COMPACT_AVAILABILITY_CAPABILITY,
+  CHANNEL_COMPACT_AVAILABILITY_ROUTE,
+  type ChannelCompactAvailability,
+  decodeChannelCompactAvailability,
+} from "@openbot/contracts/team-protocol/channel-compact-availability-v1";
 import {
   CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_PICTURE_ROUTES,
@@ -166,6 +187,12 @@ import {
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY, TEAM_WEB_CLIENT_PROTOCOL } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
+import {
+  decodeCreditsHoldResponse,
+  decodeMediaApprovalReadResponse,
+  MEDIA_APPROVAL_CHOICE_CAPABILITY,
+  MEDIA_APPROVAL_CHOICE_ROUTES,
+} from "@openbot/contracts/team-protocol/media-approval-choice-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
   decodeMessagePinsResponse,
@@ -216,6 +243,7 @@ import {
 import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import type { TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import type { WorkflowSpotInput } from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import {
   WORKSPACE_DIRECTORY_CAPABILITY,
   WORKSPACE_DIRECTORY_ROUTES,
@@ -234,6 +262,7 @@ import {
 } from "@openbot/team-client/remote-directory";
 import {
   createRemoteTeamPeer,
+  type RemoteDownloadWatch,
   type RemoteFileUpload,
   type RemoteLargeDownload,
   type RemoteTeamCommandResult,
@@ -343,6 +372,7 @@ export interface WebWorkspaceRuntime {
   navigateBrowserTab(input: BrowserNavigateInput): Promise<void>;
   reloadBrowserTab(tabId: string): Promise<void>;
   stopBrowserTab(tabId: string): Promise<void>;
+  answerBrowserHttpSignIn(input: BrowserHttpSignInInput): Promise<void>;
   closeBrowserTab(tabId: string): Promise<void>;
   takeBrowserControl(tabId: string): Promise<void>;
   releaseBrowserControl(tabId: string): Promise<void>;
@@ -360,6 +390,7 @@ export interface WebWorkspaceRuntime {
   listHosts(): Promise<RemoteTeamHost[]>;
   leaveHost(hostId: string, membershipId: string): Promise<void>;
   removeOwnedHost?: (hostId: string) => Promise<void>;
+  setHostHidden?: (hostId: string, hidden: boolean) => Promise<void>;
   ownerTransfers?: WebOwnerTransfers;
   previewInvite(url: string): Promise<InvitePreview>;
   acceptInvite(url: string): Promise<RemoteTeamHost>;
@@ -376,11 +407,17 @@ export interface WebWorkspaceRuntime {
   deleteHistory?: (input: WebHistoryDelete) => Promise<void>;
   clearChannelContext?: (channelId: string) => Promise<void>;
   compactChannelContext?: (channelId: string) => Promise<void>;
+  channelCompactAvailability?: (channelId: string) => Promise<ChannelCompactAvailability>;
   listWaits?: (agentId: string) => Promise<AgentWaitsSnapshot>;
   listPinnedMessages?: (agentId: string) => Promise<PinnedMessagesSnapshot>;
   setMessagePinned?: (input: SetMessagePinnedInput) => Promise<PinnedMessagesSnapshot>;
   cancelWait?: (agentId: string, waitId: string) => Promise<void>;
   readPendingApproval?: (input: ReadPendingApprovalInput) => Promise<AgentApproval | null>;
+  readMediaApproval?: (input: ReadMediaApprovalInput) => Promise<MediaApprovalRead>;
+  respondToMediaApproval?: (input: RespondToMediaApprovalInput) => Promise<void>;
+  respondToCreditsHold?: (input: RespondToCreditsHoldInput) => Promise<CreditsHold | null>;
+  setCreditsAskMuted?: (input: { muted: boolean }) => Promise<void>;
+  readCreditsAskMuted?: () => Promise<{ muted: boolean }>;
   listPendingPrompts?: () => Promise<AgentRuntimePrompt[]>;
   focusUse(): Promise<void>;
   send(
@@ -392,6 +429,7 @@ export interface WebWorkspaceRuntime {
   ): Promise<string>;
   stop(agentId: string, turnId: string): Promise<void>;
   setTyping(agentId: string | null, typing: boolean): void;
+  setWorkflowSpot(input: WorkflowSpotInput): void;
   queue(agentId: string): Promise<QueueSnapshot>;
   activeQueues(agentIds: string[]): Promise<AgentActiveQueues>;
   editQueue(input: EditQueuedMessageInput): Promise<QueueSnapshot>;
@@ -404,7 +442,7 @@ export interface WebWorkspaceRuntime {
   upload(file: File): Promise<AttachmentSummary>;
   cancelUpload(): Promise<void>;
   discard(attachmentId: string): Promise<void>;
-  download(attachmentId: string): Promise<WebFile>;
+  download(attachmentId: string, progress?: RemoteDownloadWatch): Promise<WebFile>;
   downloadPreview(attachmentId: string): Promise<WebFile>;
   sharedFile(path: string): Promise<WebFile>;
   workspaceFile(agentId: string, path: string, options?: { exactPath?: boolean }): Promise<WebFile>;
@@ -592,6 +630,7 @@ export function createWebWorkspaceRuntime(
       if (!sessionsEnded) await runTeamEffect(directory.endSession(id));
     },
   };
+  const downloadProgress = new Map<string, RemoteDownloadWatch["onProgress"]>();
   let waitingHostId: string | null = null;
   const openedActions: RemoteTeamPeerActions = {
     ...sessionActions,
@@ -611,6 +650,7 @@ export function createWebWorkspaceRuntime(
     onTeamEvent: async (id, event) => events.event(id, event),
     onAccountProfileChanged: events.accountChanged,
     onAccountServersChanged: async () => events.serversChanged?.(),
+    onDownloadProgress: async ({ commandId, received, total }) => downloadProgress.get(commandId)?.(received, total),
   };
   const hostProtocols = {
     get: (id: string) => savedHostProtocol(accountId, id),
@@ -765,22 +805,28 @@ export function createWebWorkspaceRuntime(
     body: TeamProtocolV2Json = {},
     upload?: RemoteFileUpload,
     largeDownload?: RemoteLargeDownload,
+    download?: RemoteDownloadWatch,
   ) {
     if (disposed) throw new Error(currentText().t("webClient.error.connectionClosed"));
     const current = generation;
     const requestHostId = lockedHostId;
     const timeoutMs =
       method === "GET" && path === TEAM_API_ROUTES.me ? 15_000 : remoteWorkspaceReadTimeout(method, path);
-    const result = await peer.execute({
-      id: crypto.randomUUID(),
-      type: "request",
-      method,
-      path,
-      body,
-      ...(upload === undefined ? {} : { upload }),
-      ...(timeoutMs === undefined ? {} : { timeoutMs }),
-      ...(largeDownload === undefined ? {} : { largeDownload }),
-    });
+    const id = crypto.randomUUID();
+    if (download) downloadProgress.set(id, download.onProgress);
+    const result = await peer
+      .execute({
+        id,
+        type: "request",
+        method,
+        path,
+        body,
+        ...(upload === undefined ? {} : { upload }),
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+        ...(largeDownload === undefined ? {} : { largeDownload }),
+        ...(download === undefined ? {} : { downloadSize: download.size }),
+      })
+      .finally(() => downloadProgress.delete(id));
     if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
     const membershipRead = method === "GET" && path === TEAM_API_ROUTES.me;
     if (result.status === 403 && !membershipRead) {
@@ -980,6 +1026,10 @@ export function createWebWorkspaceRuntime(
       contextMenu: false,
       viewport: null,
       pageCopy: capabilities.includes(TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY),
+      dialog: capabilities.includes(TEAM_BROWSER_VIEW_DIALOG_CAPABILITY),
+      frameSize: capabilities.includes(TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY)
+        ? { width: window.innerWidth * window.devicePixelRatio, height: window.innerHeight * window.devicePixelRatio }
+        : null,
     }),
   );
   let liveView: RemoteBrowserView | null = null;
@@ -1122,6 +1172,7 @@ export function createWebWorkspaceRuntime(
             (copied) => emitView({ ...copied, tabId }),
             (message) => {
               if (message.type === "pageCopied") writePageCopy(message.text);
+              else if (message.type === "dialog") emitView({ type: "dialog", tabId, dialog: message.dialog });
             },
           ),
         );
@@ -1157,11 +1208,22 @@ export function createWebWorkspaceRuntime(
             ),
           )
         : new Map<string, { canGoBack: boolean; canGoForward: boolean }>();
-      return value.map(decodeWebBrowserTab).map((tab) => ({
-        ...tab,
-        ...(held.has(tab.id) ? { userControl: true as const } : {}),
-        ...pageStates.get(tab.id),
-      }));
+      const httpSignIns = capabilities.includes(BROWSER_HTTP_SIGN_IN_CAPABILITY)
+        ? new Map(
+            decodeBrowserHttpSignInSnapshot(await request("POST", BROWSER_HTTP_SIGN_IN_ROUTES.state, {})).tabs.map(
+              ({ tabId, origin, refused }) => [tabId, { origin, ...(refused ? { refused: true as const } : {}) }],
+            ),
+          )
+        : new Map<string, BrowserHttpSignIn>();
+      return value.map(decodeWebBrowserTab).map((tab) => {
+        const httpSignIn = httpSignIns.get(tab.id);
+        return {
+          ...tab,
+          ...(held.has(tab.id) ? { userControl: true as const } : {}),
+          ...pageStates.get(tab.id),
+          ...(httpSignIn ? { httpSignIn } : {}),
+        };
+      });
     },
     async openBrowserTab(input) {
       return decodeWebBrowserTab(await request("POST", TEAM_API_ROUTES.browser.open, { ...input }));
@@ -1182,6 +1244,11 @@ export function createWebWorkspaceRuntime(
       if (!capabilities.includes(BROWSER_PAGE_STATE_CAPABILITY))
         throw new Error(currentText().t("error.backend.browserStopUnsupported"));
       decodeBrowserPageStateSnapshot(await request("POST", BROWSER_PAGE_STATE_ROUTES.stop, { tabId }));
+    },
+    async answerBrowserHttpSignIn(input) {
+      if (!capabilities.includes(BROWSER_HTTP_SIGN_IN_CAPABILITY))
+        throw new Error(currentText().t("error.backend.browserHttpSignInUnsupported"));
+      decodeBrowserHttpSignInSnapshot(await request("POST", BROWSER_HTTP_SIGN_IN_ROUTES.answer, { ...input }));
     },
     async closeBrowserTab(tabId) {
       await request("POST", TEAM_API_ROUTES.browser.close, { tabId });
@@ -1287,6 +1354,7 @@ export function createWebWorkspaceRuntime(
       Effect.runPromise(respondToBrowserTakeover(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     listHosts: () => runTeamEffect(directory.listHosts()),
     leaveHost: (hostId, membershipId) => runTeamEffect(directory.leaveHost(hostId, membershipId)),
+    setHostHidden: (hostId, hidden) => runTeamEffect(directory.setHostHidden(hostId, hidden)),
     ownerTransfers: {
       pending: (hostId) => runTeamEffect(directory.pendingOwnerTransfer(hostId)),
       start: (hostId, email) => runTeamEffect(directory.startOwnerTransfer(hostId, email)),
@@ -1409,6 +1477,10 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("error.team.channelContextUnsupported"));
       await request("POST", CHAT_HISTORY_ROUTES.channelCompact, { channelId });
     },
+    async channelCompactAvailability(channelId) {
+      if (!capabilities.includes(CHANNEL_COMPACT_AVAILABILITY_CAPABILITY)) return { available: true };
+      return decodeChannelCompactAvailability(await request("POST", CHANNEL_COMPACT_AVAILABILITY_ROUTE, { channelId }));
+    },
     async listWaits(agentId) {
       if (!capabilities.includes(AGENT_WAITS_CAPABILITY))
         throw new Error(currentText().t("error.team.agentWaitsUnsupported"));
@@ -1434,6 +1506,30 @@ export function createWebWorkspaceRuntime(
     async readPendingApproval(input) {
       if (!capabilities.includes(PENDING_APPROVAL_CAPABILITY)) return null;
       return decodePendingApprovalResponse(await request("POST", PENDING_APPROVAL_ROUTES.read, { ...input }));
+    },
+    async readMediaApproval(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY)) return { media: null, hold: null };
+      return decodeMediaApprovalReadResponse(await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.read, { ...input }));
+    },
+    async respondToMediaApproval(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.respond, { ...input, choice: { ...input.choice } });
+    },
+    async respondToCreditsHold(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      return decodeCreditsHoldResponse(await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.hold, { ...input }));
+    },
+    async setCreditsAskMuted(input) {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.muted, { muted: input.muted });
+    },
+    async readCreditsAskMuted() {
+      if (!capabilities.includes(MEDIA_APPROVAL_CHOICE_CAPABILITY))
+        throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      return decodeCreditsAskMuted(await request("POST", MEDIA_APPROVAL_CHOICE_ROUTES.mutedRead, {}));
     },
     async listPendingPrompts() {
       if (!capabilities.includes(PENDING_PROMPTS_CAPABILITY)) return [];
@@ -1559,6 +1655,9 @@ export function createWebWorkspaceRuntime(
     setTyping(agentId, typing) {
       peer.setTyping(agentId, typing);
     },
+    setWorkflowSpot(input) {
+      peer.setWorkflowSpot(input);
+    },
     async cancelUpload() {
       uploadGeneration += 1;
       await peer.cancelUpload();
@@ -1568,8 +1667,10 @@ export function createWebWorkspaceRuntime(
       removeCompletedDrafts([id]);
       revokeLocalDraftPreviews([id]);
     },
-    async download(id) {
-      return decodeWebFile(await request("GET", TEAM_API_ROUTES.attachment(id), {}, undefined, WEB_FILE_DOWNLOAD));
+    async download(id, progress) {
+      return decodeWebFile(
+        await request("GET", TEAM_API_ROUTES.attachment(id), {}, undefined, WEB_FILE_DOWNLOAD, progress),
+      );
     },
     async downloadPreview(id) {
       return decodeWebFile(

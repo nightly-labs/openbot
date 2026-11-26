@@ -100,6 +100,7 @@ export type CreditModelMaker =
   | "openai"
   | "pixverse"
   | "recraft"
+  | "sandai"
   | "sync"
   | "tencent"
   | "topaz"
@@ -122,6 +123,7 @@ export const CREDIT_MODEL_MAKERS: Readonly<Record<CreditModelMaker, string>> = {
   openai: "OpenAI",
   pixverse: "PixVerse",
   recraft: "Recraft",
+  sandai: "Sand AI",
   sync: "Sync Labs",
   tencent: "Tencent",
   topaz: "Topaz Labs",
@@ -197,6 +199,7 @@ export const CREDIT_MODEL_COSTS: readonly CreditModelCost[] = [
     unit: "clip",
     credits: 20.5,
   },
+  { modelId: "magi-2", name: "MAGI-2", maker: "sandai", kind: "video", unit: "clip", credits: 20 },
   { modelId: "kling-3.0-omni", name: "Kling 3.0 Omni", maker: "kling", kind: "video", unit: "clip", credits: 18 },
   { modelId: "kling-3.0-turbo", name: "Kling 3.0 Turbo", maker: "kling", kind: "video", unit: "clip", credits: 19 },
   {
@@ -316,36 +319,18 @@ export const CREDIT_MODEL_COSTS: readonly CreditModelCost[] = [
     credits: 3,
     variant: "768p",
   },
-  { modelId: "chatgpt-image-2", name: "ChatGPT Image 2", maker: "openai", kind: "image", unit: "image", credits: 7.1 },
-  { modelId: "nano-banana-pro", name: "Nano Banana Pro", maker: "google", kind: "image", unit: "image", credits: 4.5 },
-  { modelId: "ideogram-4.5", name: "Ideogram 4.5", maker: "ideogram", kind: "image", unit: "image", credits: 3.5 },
-  { modelId: "flux-kontext-max", name: "Flux Kontext Max", maker: "bfl", kind: "image", unit: "image", credits: 3 },
-  { modelId: "ideogram-v3", name: "Ideogram V3", maker: "ideogram", kind: "image", unit: "image", credits: 3 },
-  {
-    modelId: "gpt-image-2.5-flare",
-    name: "GPT Image 2.5 Flare",
-    maker: "openai",
-    kind: "image",
-    unit: "image",
-    credits: 2,
-  },
-  {
-    modelId: "gpt-image-2.5-sunburst",
-    name: "GPT Image 2.5 Sunburst",
-    maker: "openai",
-    kind: "image",
-    unit: "image",
-    credits: 2,
-  },
-  { modelId: "gpt-image-2.6", name: "GPT Image 2.6 Flare", maker: "openai", kind: "image", unit: "image", credits: 2 },
+  { modelId: "gpt-image-2.6", name: "GPT Image 2.6 Flare", maker: "openai", kind: "image", unit: "image", credits: 4 },
   {
     modelId: "gpt-image-2.6-sunburst",
     name: "GPT Image 2.6 Sunburst",
     maker: "openai",
     kind: "image",
     unit: "image",
-    credits: 2,
+    credits: 4,
   },
+  { modelId: "nano-banana-pro", name: "Nano Banana Pro", maker: "google", kind: "image", unit: "image", credits: 4.5 },
+  { modelId: "ideogram-4.5", name: "Ideogram 4.5", maker: "ideogram", kind: "image", unit: "image", credits: 3.5 },
+  { modelId: "flux-kontext-max", name: "Flux Kontext Max", maker: "bfl", kind: "image", unit: "image", credits: 3 },
   {
     modelId: "qwen-image-layered",
     name: "Qwen Image Layered",
@@ -354,11 +339,8 @@ export const CREDIT_MODEL_COSTS: readonly CreditModelCost[] = [
     unit: "image",
     credits: 2,
   },
-  { modelId: "nano-banana", name: "Nano Banana", maker: "google", kind: "image", unit: "image", credits: 1.5 },
   { modelId: "nano-banana-2.1", name: "Nano Banana 2.1", maker: "google", kind: "image", unit: "image", credits: 1.8 },
-  { modelId: "recraft-v4", name: "Recraft V4", maker: "recraft", kind: "image", unit: "image", credits: 1.5 },
   { modelId: "recraft-v4.1", name: "Recraft V4.1", maker: "recraft", kind: "image", unit: "image", credits: 1.5 },
-  { modelId: "seedream-4.5", name: "Seedream 4.5", maker: "bytedance", kind: "image", unit: "image", credits: 1.5 },
   {
     modelId: "seedream-5.0-lite",
     name: "Seedream 5.0 Lite",
@@ -386,7 +368,6 @@ export const CREDIT_MODEL_COSTS: readonly CreditModelCost[] = [
     credits: 1,
   },
   { modelId: "kling-o1-image", name: "Kling O1", maker: "kling", kind: "image", unit: "image", credits: 1 },
-  { modelId: "seedream-4.0", name: "Seedream 4.0", maker: "bytedance", kind: "image", unit: "image", credits: 1.1 },
   { modelId: "seedream-5.5", name: "Seedream 5.5", maker: "bytedance", kind: "image", unit: "image", credits: 1 },
   {
     modelId: "seedream-5.5-layers",
@@ -506,6 +487,9 @@ export const CREDIT_MODEL_COSTS: readonly CreditModelCost[] = [
 ];
 
 export const CREDIT_CLIP_SECONDS = 5;
+export const CREDIT_WELCOME = 10;
+
+export const CREDIT_PRICES_URL = "https://openbot.run/credits";
 
 export const CREDIT_MIN_RATE = 0.1;
 
@@ -527,6 +511,10 @@ export function creditsFromTenths(tenths: number): number {
   return tenths / CREDIT_TENTHS;
 }
 
+export function creditsMovable(credits: Pick<CreditsState, "balance" | "welcome">): number {
+  return creditsFromTenths(Math.max(0, creditTenths(credits.balance) - creditTenths(credits.welcome ?? 0)));
+}
+
 export function creditCharge(credits: number): number {
   return creditsFromTenths(Math.ceil(Math.round(credits * CREDIT_TENTHS * 100) / 100));
 }
@@ -542,11 +530,30 @@ export function creditModelCharge(model: CreditModelCost): number {
   return creditCharge(creditModelRate(model) * units);
 }
 
-export const CREDIT_ESTIMATE_MODEL_IDS: readonly string[] = ["nano-banana-pro", "seedance-2.5"];
-
-export function creditEstimateModels(): CreditModelCost[] {
-  return CREDIT_MODEL_COSTS.filter((model) => CREDIT_ESTIMATE_MODEL_IDS.includes(model.modelId));
+export interface CreditEstimate {
+  model: CreditModelCost;
+  resolution: string;
+  charge: number;
 }
+
+interface CreditEstimateSpec {
+  resolution: string;
+  credits: number;
+}
+
+const CREDIT_ESTIMATE_SPECS: Readonly<Record<string, CreditEstimateSpec>> = {
+  "nano-banana-pro": { resolution: "1K", credits: 4.5 },
+  "seedance-2.5": { resolution: "480p", credits: 17.5 },
+};
+
+export function creditEstimates(): CreditEstimate[] {
+  return CREDIT_MODEL_COSTS.flatMap((model) => {
+    const spec = CREDIT_ESTIMATE_SPECS[model.modelId];
+    if (spec === undefined) return [];
+    return [{ model, resolution: spec.resolution, charge: creditModelCharge({ ...model, credits: spec.credits }) }];
+  });
+}
+
 export const CREDIT_PRODUCT_ID = "openbot_credits";
 export const CREDIT_METADATA_KIND = "credits";
 export const CREDIT_METADATA = {
@@ -601,6 +608,7 @@ export interface CreditsState {
   balance: number;
   servers: CreditServerWallet[];
   expiring?: CreditExpiring;
+  welcome?: number;
 }
 
 export const CREDITS_UNAVAILABLE_STATE: CreditsState = {
@@ -623,6 +631,41 @@ export interface CreditTransferRequest {
   direction: CreditTransferDirection;
   credits: number;
 }
+
+export interface CreditRedeemRequest {
+  code: string;
+  serverId?: string;
+}
+
+export interface CreditRedeemResult {
+  credits: number;
+  state: CreditsState;
+}
+
+export const CREDIT_CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+export const CREDIT_CODE_LENGTH = 16;
+const CREDIT_CODE_GROUP = 4;
+const MAX_CREDIT_CODE_INPUT = 64;
+
+export function normalizeCreditCode(value: string): string {
+  return value.toUpperCase().replace(/[^0-9A-Z]/gu, "");
+}
+
+export function isCreditCode(value: string): boolean {
+  return (
+    value.length === CREDIT_CODE_LENGTH && [...value].every((character) => CREDIT_CODE_ALPHABET.includes(character))
+  );
+}
+
+export function formatCreditCode(value: string): string {
+  const code = normalizeCreditCode(value).slice(0, CREDIT_CODE_LENGTH);
+  const groups: string[] = [];
+  for (let start = 0; start < code.length; start += CREDIT_CODE_GROUP)
+    groups.push(code.slice(start, start + CREDIT_CODE_GROUP));
+  return groups.join("-");
+}
+
+export const CREDIT_CODE_INPUT_LENGTH = CREDIT_CODE_LENGTH + CREDIT_CODE_LENGTH / CREDIT_CODE_GROUP - 1;
 
 const CREDIT_SERVER_ROLES: readonly CreditServerRole[] = ["owner", "admin", "member"];
 const CREDIT_TRANSFER_DIRECTIONS: readonly CreditTransferDirection[] = ["to_server", "to_personal"];
@@ -691,6 +734,7 @@ export function parseCreditsState(value: unknown): CreditsState | null {
   };
   const expiring = parseExpiring(value.expiring);
   if (expiring) state.expiring = expiring;
+  if (isCreditAmount(value.welcome) && value.welcome > 0) state.welcome = Math.min(value.welcome, value.balance);
   return state;
 }
 
@@ -717,6 +761,22 @@ export function parseCreditTransferRequest(value: unknown): CreditTransferReques
   )
     return null;
   return { serverId: value.serverId, direction: value.direction, credits: value.credits };
+}
+
+export function parseCreditRedeemRequest(value: unknown): CreditRedeemRequest | null {
+  if (!isDynamicRecord(value) || !isString(value.code) || value.code.length > MAX_CREDIT_CODE_INPUT) return null;
+  const request: CreditRedeemRequest = { code: value.code };
+  if (value.serverId !== undefined) {
+    if (!isServerId(value.serverId)) return null;
+    request.serverId = value.serverId;
+  }
+  return request;
+}
+
+export function parseCreditRedeemResult(value: unknown): CreditRedeemResult | null {
+  if (!isDynamicRecord(value) || !isCreditAmount(value.credits) || value.credits <= 0) return null;
+  const state = parseCreditsState(value.state);
+  return state ? { credits: value.credits, state } : null;
 }
 
 export function parseCreditCheckoutUrl(value: unknown): string | null {

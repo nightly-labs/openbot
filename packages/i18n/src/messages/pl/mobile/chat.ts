@@ -152,6 +152,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Następna część",
   "mobile.chat.preview.pdfFailed": "Nie udało się wyświetlić tego pliku PDF.",
   "mobile.chat.preview.spreadsheetFailed": "Nie udało się odczytać tego arkusza kalkulacyjnego.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Ten arkusz kalkulacyjny jest za duży na podgląd. Udostępnij go, aby otworzyć go w innej aplikacji.",
   "mobile.chat.preview.spreadsheetTruncated":
     "Podgląd ograniczony do pierwszych wierszy ({rows}) i kolumn ({columns}).",
   "mobile.chat.copyFailedMessage": "Spróbuj ponownie.",
@@ -187,6 +189,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "Przytrzymaj przycisk, aby potwierdzić.",
   "mobile.chat.question.preview": "Podgląd",
   "mobile.chat.question.showAllPreview": "Pokaż całość",
+  "mobile.chat.question.copyPreviewFailed": "Nie można skopiować wersji roboczej",
   "mobile.chat.question.sendChoice": "Wyślij",
   "mobile.chat.question.selectedCount": {
     one: "Wybrano: {count}",
@@ -249,6 +252,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "Załącznik jest uszkodzony. Wybierz go ponownie.",
   "mobile.chat.attachment.tooLarge": "{name} ma ponad {limit}.",
   "mobile.chat.attachment.cameraPermission": "Zezwól na dostęp do aparatu w Ustawieniach, aby zrobić zdjęcie.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "Zdjęcie się nie wczytało. Otwórz je w aplikacji Zdjęcia, aż wyświetli się w całości, i spróbuj ponownie.",
   "mobile.chat.composer.send": "Wyślij wiadomość",
   "mobile.chat.composer.stop": "Zatrzymaj: {name}",
   "mobile.chat.composer.dictate": "Dyktuj wiadomość",
@@ -284,7 +289,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "Serwer nie jest połączony. Rozmowa będzie kontynuowana po ponownym połączeniu.",
   "mobile.chat.liveVoice.speakFailed": "Nie udało się odczytać odpowiedzi na głos.",
   "mobile.chat.liveVoice.voiceNotReady": "Wybierz głos odpowiedzi w Ustawienia > Głos.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 nie czyta tego języka.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 nie czyta tego języka. Wybierz inny głos odpowiedzi w Ustawienia > Głos.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs nie przyjął klucza API.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "Kluczowi ElevenLabs brakuje uprawnienia. Sprawdź je w Ustawienia > Głos.",
@@ -306,6 +312,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "Nie udało się zrobić zdjęcia. Spróbuj ponownie.",
   "mobile.chat.camera.startFailed": "Nie udało się uruchomić aparatu. Zamknij go i spróbuj ponownie.",
   "mobile.chat.camera.close": "Zamknij aparat",
+  "mobile.chat.camera.fullScreenTipTitle": "Potrzebujesz większego podglądu?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "Użyj aparatu na pełnym ekranie, z zoomem i wszystkimi obiektywami. Możesz to zmienić w Ustawienia > Rozmowy.",
+  "mobile.chat.camera.fullScreenTipUse": "Użyj pełnego ekranu",
+  "mobile.chat.camera.fullScreenTipDismiss": "Ukryj wskazówkę",
   "mobile.chat.camera.takePhoto": "Zrób zdjęcie",
   "mobile.chat.camera.switch": "Przełącz aparat",
   "mobile.chat.header.info": "Informacje: {name}",
@@ -375,6 +386,7 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "Szybkość odtwarzania: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Nie można odczytać wiadomości na głos",
+  "mobile.chat.message.readAloudModelMissing": "Aby słuchać wiadomości, pobierz model głosu w Ustawienia > Głos.",
   "mobile.chat.message.selectText": "Zaznacz tekst",
   "mobile.chat.message.copyImage": "Kopiuj obraz",
   "mobile.chat.message.copyText": "Kopiuj tekst",
@@ -523,6 +535,7 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "Przesyłanie",
   "mobile.chat.outbox.sendsWhenOnline": "Zostanie wysłana, gdy serwer będzie online",
   "mobile.chat.outbox.waiting": "Oczekuje na wysłanie",
+  "mobile.chat.outbox.waitingForFailed": "Czeka na niewysłaną wiadomość",
   "mobile.chat.outbox.failed": "Nie wysłano",
   "mobile.chat.outbox.failedHold": "Nie wysłano. Przytrzymaj wiadomość, aby spróbować ponownie.",
   "mobile.chat.outbox.cancelSend": "Nie wysyłaj",
@@ -597,6 +610,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Łączenie z serwerem",
   "mobile.chat.history.loading": "Wczytywanie historii czatu",
   "mobile.chat.history.waiting": "Oczekiwanie na połączenie",
+  "mobile.chat.history.syncing": "Sprawdzanie nowych wiadomości",
   "mobile.chat.history.loadFailed": "Nie udało się wczytać historii czatu",
   "mobile.chat.scrollToLatest": "Przewiń do najnowszej wiadomości",
   "mobile.chat.agentUnavailable.title": "Agent niedostępny",
@@ -624,6 +638,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "Oczekiwanie na odpowiedzi",
   "mobile.chat.queue.providerRestart": "Oczekiwanie na ponowne uruchomienie {provider}",
   "mobile.chat.queue.signIn": "Oczekiwanie na zalogowanie do {provider}",
+  "mobile.chat.queue.usageLimit": "Osiągnięto limit użycia",
+  "mobile.chat.queue.usageLimitResets": "Osiągnięto limit użycia · Reset {time}",
   "mobile.chat.providerSignIn.title": "{provider} nie jest zalogowany",
   "mobile.chat.providerSignIn.action": "Zaloguj się",
   "mobile.chat.providerSignIn.open": "{label}. Otwórz ustawienia dostawcy",
@@ -641,6 +657,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Brak wiadomości w kolejce",
   "mobile.chat.queue.emptyBody": "Nowe wiadomości trafiają do kolejki, gdy agent pracuje.",
   "mobile.chat.queue.noLongerQueued": "Ta wiadomość nie jest już w kolejce.",
+  "mobile.chat.queue.routine": "Rutyna: {name}",
   "mobile.chat.queue.position": "Pozycja {position} · {date}",
   "mobile.chat.queue.attachments": "Załączniki",
   "mobile.chat.queue.steer": "Pokieruj",

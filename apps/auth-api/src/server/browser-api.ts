@@ -6,6 +6,7 @@ import {
   CREDITS_UNAVAILABLE_STATE,
   EMPTY_CREDIT_ACTIVITY,
   parseCreditCheckoutRequest,
+  parseCreditRedeemRequest,
   parseCreditTransferRequest,
 } from "@openbot/contracts/credits";
 import { parseHostedServerLifecycleInput } from "@openbot/contracts/hosted-servers";
@@ -67,6 +68,7 @@ export interface BrowserApiServices {
     RemoteControlPlane,
     | "listHosts"
     | "removeOwnedHost"
+    | "setHostHidden"
     | "startSession"
     | "issueSessionTicket"
     | "endSession"
@@ -334,6 +336,13 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
     yield* services.remote.removeOwnedHost(user.id, decodeURIComponent(removedHostId));
     return new Response(null, { status: 204 });
   }
+  const [, hiddenHostId] = /^v2\/remote\/hosts\/([^/]+)\/hidden$/u.exec(path) ?? [];
+  if (hiddenHostId !== undefined && request.method === "PUT") {
+    const body = yield* readJsonObject(request);
+    if (!isBoolean(body.hidden)) return yield* invalidRemoteRequest("The request is invalid.");
+    yield* services.remote.setHostHidden(user.id, decodeURIComponent(hiddenHostId), body.hidden);
+    return new Response(null, { status: 204 });
+  }
   const [, checkoutHostId] = /^v2\/remote\/hosts\/([^/]+)\/checkout$/u.exec(path) ?? [];
   if (checkoutHostId !== undefined && request.method === "POST") {
     const body = yield* readJsonObject(request);
@@ -553,6 +562,11 @@ const handleCredits = Effect.fn("BrowserApi.handleCredits")(function* (
     const input = parseCreditTransferRequest(body);
     if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
     return json(yield* billing.credits.transfer(user.id, input));
+  }
+  if (path === "v1/me/credits/redeem") {
+    const input = parseCreditRedeemRequest(body);
+    if (!input) return failure(400, "invalid_billing_request", "The billing request is invalid.");
+    return json(yield* billing.credits.redeem(user.id, input, services.sourceIp(request)));
   }
   return null;
 }, refuseWith(BillingError));

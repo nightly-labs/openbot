@@ -293,6 +293,12 @@
     opacity var(--openbot-duration-island-content-exit) var(--dynamic-island-shared-ease);
 }
 
+.dynamic-island[data-shared-leading="true"][data-layout-state="expanded"]
+  .dynamic-island-ear-leading
+  .dynamic-island-ear-content {
+  pointer-events: none;
+}
+
 .dynamic-island:not([data-shared-leading="true"])[data-layout-state="expanded"]
   .dynamic-island-ear-leading
   .dynamic-island-ear-content {

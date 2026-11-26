@@ -307,9 +307,14 @@ task sends nothing. When a person continues the task, its request message change
 finds the request in the newest `agent:<agentId>` message of the task sources and replies to it. The idempotency key holds the task id, revision and state, so a task that is resumed and
 finishes again sends a new result. At start, the tasks that are already finished are marked as
 handled, so an upgrade or a restart sends no old results. A send that fails is reported
-(`channel_request_return_failed`) and is not tried again. The reply goes to the main chat of the
-agent, also when it sent the request from a side task. No result is sent when the owner is the
-sender, or when one of the two agents was deleted. When the lead moves a request into an open
+(`channel_request_return_failed`) and is not tried again. A request sent from a side thread keeps that
+thread's id (`senderTaskId` on the request message), and the reply goes to that side thread while it
+is open. The reply goes to the main chat of the agent when the request came from the main chat, when
+the side thread is archived or deleted, and for a request sent before this id was kept (#15476). When
+the owner (or the lead) is the sending agent, the result is a message from that agent to itself. Its
+prompt calls it the result of the agent's own channel request, the chat shows it once as the incoming
+card, and a restart during its turn queues it again one time, as for a teammate result. No result is
+sent when one of the two agents was deleted. When the lead moves a request into an open
 task, the request message gets the `taskId` of that task, and the cancelled routing task (it has
 no owner) sends nothing; the open task sends the result. Each member task of a request with more
 than one recipient has an owner, so each one sends its own result. The agent asks the members with `send_message`, whose answers come back. On desktop, a person can do the same by hand: "Send to channel" on a message of

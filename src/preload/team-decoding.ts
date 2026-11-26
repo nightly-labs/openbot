@@ -281,6 +281,7 @@ function server(summary: DynamicRecord): ServerSummary {
     hostedIssue,
     hostedStart,
     memberLimit,
+    licenseRaisesMemberLimit,
     hosted,
     restartAvailable,
     storageGb,
@@ -288,7 +289,9 @@ function server(summary: DynamicRecord): ServerSummary {
     customPlan,
     keyChangedAt,
     thisComputer,
+    hidden,
     appearance,
+    username,
   } = summary;
   if (!isOneOf(SERVER_NOTIFICATION_LEVELS, notificationLevel)) throw new Error("Invalid notificationLevel.");
   if (!isOneOf(SERVER_KINDS, kind)) throw new Error("Invalid kind.");
@@ -296,6 +299,9 @@ function server(summary: DynamicRecord): ServerSummary {
   if (connectionSequence !== undefined && !isNumber(connectionSequence)) throw new Error("Invalid connectionSequence.");
   if (memberLimit !== undefined && !(isNumber(memberLimit) && Number.isSafeInteger(memberLimit) && memberLimit >= 1)) {
     throw new Error("Invalid memberLimit.");
+  }
+  if (licenseRaisesMemberLimit !== undefined && !isBoolean(licenseRaisesMemberLimit)) {
+    throw new Error("Invalid licenseRaisesMemberLimit.");
   }
   if (hosted !== undefined && !isBoolean(hosted)) throw new Error("Invalid hosted.");
   if (restartAvailable !== undefined && !isBoolean(restartAvailable)) throw new Error("Invalid restartAvailable.");
@@ -309,6 +315,8 @@ function server(summary: DynamicRecord): ServerSummary {
     throw new Error("Invalid keyChangedAt.");
   }
   if (thisComputer !== undefined && thisComputer !== true) throw new Error("Invalid thisComputer.");
+  if (hidden !== undefined && !isBoolean(hidden)) throw new Error("Invalid hidden.");
+  if (username !== undefined && !isString(username)) throw new Error("Invalid username.");
   if (paymentRequired !== undefined && paymentRequired !== true) throw new Error("Invalid paymentRequired.");
   const plan = customPlan === undefined ? undefined : parseCustomServerPlan(customPlan);
   if (plan === null) throw new Error("Invalid customPlan.");
@@ -328,6 +336,7 @@ function server(summary: DynamicRecord): ServerSummary {
     logoUrl: nullableString(summary, "logoUrl"),
     ...(appearance === undefined ? {} : { appearance: serverAppearance(appearance) }),
     role: role === null ? null : teamRole(role),
+    ...(username === undefined ? {} : { username }),
     active: requiredBoolean(summary, "active"),
     ...(compatibility === undefined
       ? {}
@@ -342,6 +351,7 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(hostedIssue === undefined ? {} : { hostedIssue: decodeHostedIssue(hostedIssue) }),
     ...(hostedStart === undefined ? {} : { hostedStart: decodeHostedStart(hostedStart) }),
     ...(memberLimit === undefined ? {} : { memberLimit }),
+    ...(licenseRaisesMemberLimit === undefined ? {} : { licenseRaisesMemberLimit }),
     ...(hosted === undefined ? {} : { hosted }),
     ...(restartAvailable === undefined ? {} : { restartAvailable }),
     ...(storageGb === undefined ? {} : { storageGb }),
@@ -349,6 +359,7 @@ function server(summary: DynamicRecord): ServerSummary {
     ...(plan === undefined ? {} : { customPlan: plan }),
     ...(keyChangedAt === undefined ? {} : { keyChangedAt }),
     ...(thisComputer === undefined ? {} : { thisComputer }),
+    ...(hidden === undefined ? {} : { hidden }),
   };
 }
 

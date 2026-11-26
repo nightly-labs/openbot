@@ -1,5 +1,75 @@
 [
   {
+    "version": "0.79.0",
+    "date": "2026-11-25",
+    "notices": [
+      "Update each joined server to this version too. Credit image and video tools, location requests and many fixes below work on a server only when the server has this version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agents can make images and videos with OpenBot credits, and edit your pictures. The approval card shows the model, the price and the prompt. You can choose another model before you allow it. The Credits item in the left rail shows your balance. An owner or an admin can turn \"Agents can use credits\" on or off.",
+          "Agents can pay sites in crypto from a NEAR Intents wallet. Connect it in Server settings › Vault › Crypto with a passkey, then add funds. A payment waits for your approval in the chat, unless you select \"Always allow\" for that site. A daily budget limits what agents can spend. The wallet is only for this computer, and payments use real funds.",
+          "Each account gets 10 free welcome credits. You can also redeem a credit code on the Credits page with Redeem code.",
+          "An agent's browser tab can ask for your location. The chat asks you first, and you choose Block, Allow always or Allow. Before, the browser always blocked the request.",
+          "The sidebar has tabs above the chat list: All, Unread and the folders that you choose. Each tab shows its unread chats."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "A new workflow step now starts with a model that can run. A text step uses your preferred model, or the usual model of a connected provider.",
+          "When you have only free credits, the model list on an approval card marks the models that free credits pay for with \"Free credits\".",
+          "The side panel can split into up to three groups, one above the other. Drag the line between two groups to change their heights."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "The app freezes less, mostly on Windows. It keeps the results of slow checks for a short time and does the slow work in the background.",
+          "When a Claude agent finishes a plan in plan mode, the chat now shows the plan with Approve and Stop planning. Before, no approval showed and the agent started to build.",
+          "A message from another agent or a routine no longer stops the work of a busy Claude agent.",
+          "An alert from a website in an agent's browser tab no longer covers the OpenBot window until you click OK. The alert closes by itself and the agent gets its text.",
+          "On a Linux X11 desktop, typing in OpenBot no longer stops after an agent uses Computer Use in another app. If typing already stopped, log out and log in again once."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Update each joined server to this version too. Many of the fixes below work on a server only when the server has this version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Use voice in channels. When you dictate a message to a channel, the app reads the answer of an agent aloud. You can also start a voice conversation from the channel's message box.",
+          "Hide a server from the server rail. The server is also hidden on your other computers. Select it in the \"Hidden servers\" folder to show it again."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "The Tasks page is now called Threads, as in the phone app and in the chat side panel.",
+          "Streamed replies and workflows that run at the same time use less CPU, and the web client opens a server faster."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "On a Mac, Connect and Add account for Claude now open the Claude sign-in page from OpenBot.",
+          "When the connection to a joined server stops sending data, the app now connects again by itself.",
+          "Long channels on a joined server open and update faster.",
+          "A workflow \"Notification\" output or a step that waits for approval now sends a phone notification.",
+          "A Gemini chat continues after Google refuses a tool result. Before, each later message failed."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.77.0",
     "date": "2026-11-23",
     "notices": [

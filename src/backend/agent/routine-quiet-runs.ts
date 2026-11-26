@@ -34,20 +34,19 @@ export function quietRoutineRun(run: Pick<RoutineRun, "kind" | "source">): boole
   return run.kind === "scheduled" || run.source === "script" || run.source === "webhook";
 }
 
-export function quietTeammateDelivery(delivery: QueueDelivery): boolean {
+export type FollowsUpOwnAnswer = (delivery: QueueDelivery) => boolean;
+
+export function quietTeammateDelivery(delivery: QueueDelivery, followsUpOwnAnswer: FollowsUpOwnAnswer): boolean {
   return (
     delivery.sender.kind === "agent" &&
     delivery.sender.agentId !== delivery.recipientAgentId &&
     delivery.expectsReply === false &&
-    !delivery.replyToMessageId
+    (!delivery.replyToMessageId || followsUpOwnAnswer(delivery))
   );
 }
 
 export function answeredRequestId(delivery: QueueDelivery): string | null {
-  return delivery.sender.kind === "agent" &&
-    delivery.sender.agentId !== delivery.recipientAgentId &&
-    delivery.expectsReply === false &&
-    delivery.replyToMessageId
+  return delivery.sender.kind === "agent" && delivery.expectsReply === false && delivery.replyToMessageId
     ? delivery.replyToMessageId
     : null;
 }
@@ -64,8 +63,9 @@ export function teammateRequest(delivery: QueueDelivery): boolean {
 export function quietTeammateTurnDelivery(
   delivery: QueueDelivery,
   answered: (delivery: QueueDelivery) => boolean,
+  followsUpOwnAnswer: FollowsUpOwnAnswer,
 ): boolean {
-  return quietTeammateDelivery(delivery) || (teammateRequest(delivery) && answered(delivery));
+  return quietTeammateDelivery(delivery, followsUpOwnAnswer) || (teammateRequest(delivery) && answered(delivery));
 }
 
 export function isNoUpdateAnswer(text: string): boolean {

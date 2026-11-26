@@ -1,4 +1,5 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
+import { ATTACHMENT_PREVIEW_EDGE } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { Button, ChevronLeft, ChevronRight, Dialog, Spinner, toast, X } from "@openbot/ui";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 import {
@@ -13,6 +14,7 @@ import {
   untrack,
 } from "solid-js";
 import { useText } from "../../text";
+import type { AttachmentMediaSource } from "./AttachmentCards";
 import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon } from "./ConversationIcons";
 import { justifiedGalleryLayout } from "./image-gallery-layout";
 import {
@@ -31,6 +33,13 @@ import {
 import { rememberedMediaSize, rememberMediaSize } from "./media-size-memory";
 import { createSteadyImageUrl } from "./steady-image-url";
 import { type Camera, DOUBLE_CLICK_ZOOM, MAX_SCALE, WHEEL_ZOOM_RATE, ZOOM_STEP, ZoomControls } from "./ZoomControls";
+
+export interface ImageCopies {
+  mediaSource?: AttachmentMediaSource | undefined;
+  copyUrl(image: AttachmentSummary): string | undefined;
+  fullUrl(image: AttachmentSummary): string | null | undefined;
+  loadFull?(image: AttachmentSummary): Promise<boolean>;
+}
 
 export interface ImageLightboxOpening {
   images: AttachmentSummary[];
@@ -62,17 +71,30 @@ function galleryRatio(width: number, height: number): number {
   return Math.min(GALLERY_MAX_RATIO, Math.max(GALLERY_MIN_RATIO, width / height));
 }
 
+const copyRatios = new Map<string, number>();
+const COPY_RATIOS_LIMIT = 500;
+
+function rememberCopyRatio(attachmentId: string, ratio: number): void {
+  copyRatios.delete(attachmentId);
+  copyRatios.set(attachmentId, ratio);
+  if (copyRatios.size <= COPY_RATIOS_LIMIT) return;
+  const oldest = copyRatios.keys().next();
+  if (!oldest.done) copyRatios.delete(oldest.value);
+}
+
 function rememberedGalleryRatio(attachmentId: string): number {
   const size = rememberedMediaSize(attachmentId);
-  return size ? galleryRatio(size.width, size.height) : 1;
+  return size ? galleryRatio(size.width, size.height) : (copyRatios.get(attachmentId) ?? 1);
 }
 
 export function ImageGallery(props: {
   images: AttachmentSummary[];
   onOpen: (attachment: AttachmentSummary, origin: HTMLElement) => void;
   onDownload?: ((attachment: AttachmentSummary) => void) | undefined;
+  copies?: ImageCopies | undefined;
 }) {
   const { t } = useText();
+  const copies = createMemo(() => props.copies);
   const [ratios, setRatios] = createStore<Record<number, number>>({});
   const [missing, setMissing] = createStore<Record<string, boolean>>({});
   const [width, setWidth] = createSignal(0);
@@ -111,15 +133,17 @@ export function ImageGallery(props: {
         {(image, index) => {
           const box = () => layout().boxes[index];
           const [loaded, setLoaded] = createSignal(false);
-          const url = createSteadyImageUrl(() => image().previewUrl);
+          const copy = () => copies()?.copyUrl(image());
+          const url = createSteadyImageUrl(() => copy() ?? image().previewUrl);
           const key = () => url() ?? image().id;
           const isMissing = () => missing[key()] === true;
           let element: HTMLImageElement | undefined;
           const measure = ({ naturalHeight, naturalWidth }: HTMLImageElement) => {
             setLoaded(true);
             if (naturalWidth <= 0 || naturalHeight <= 0) return;
-            rememberMediaSize(image().id, { width: naturalWidth, height: naturalHeight });
             const ratio = galleryRatio(naturalWidth, naturalHeight);
+            if (untrack(copy)) rememberCopyRatio(image().id, ratio);
+            else rememberMediaSize(image().id, { width: naturalWidth, height: naturalHeight });
             setRatios((state) => {
               state[index] = ratio;
             });
@@ -223,11 +247,16 @@ function zoomKeyframes(from: DOMRect, to: DOMRect, fromRadius: number, toRadius:
 
 const screenPixelRatio = () => window.devicePixelRatio || 1;
 
-function fitScreenPixels(image: HTMLImageElement, mimeType: string): void {
+function fitScreenPixels(
+  image: HTMLImageElement,
+  mimeType: string,
+  width = image.naturalWidth,
+  height = image.naturalHeight,
+): void {
   if (mimeType === "image/svg+xml") return;
   const ratio = screenPixelRatio();
-  image.style.setProperty("--image-lightbox-screen-width", `${image.naturalWidth / ratio}px`);
-  image.style.setProperty("--image-lightbox-screen-height", `${image.naturalHeight / ratio}px`);
+  image.style.setProperty("--image-lightbox-screen-width", `${width / ratio}px`);
+  image.style.setProperty("--image-lightbox-screen-height", `${height / ratio}px`);
 }
 
 const canCopyImages = () => typeof ClipboardItem !== "undefined" && typeof navigator.clipboard?.write === "function";
@@ -280,6 +309,7 @@ export function ImageLightbox(props: {
   canDownload?: ((attachment: AttachmentSummary) => boolean) | undefined;
   macWindowControls?: boolean | undefined;
   stripLabel?: string | undefined;
+  copies?: ImageCopies | undefined;
   stripUrl?: ((attachment: AttachmentSummary) => string | null) | undefined;
   onClose: () => void;
 }) {
@@ -297,6 +327,25 @@ export function ImageLightbox(props: {
   const [closing, setClosing] = createSignal(false);
   const [loaded, setLoaded] = createStore<Record<string, boolean>>({});
   const [failed, setFailed] = createStore<Record<string, boolean>>({});
+  const [fullReady, setFullReady] = createStore<Record<string, boolean>>({});
+  const [fullFailed, setFullFailed] = createStore<Record<string, boolean>>({});
+  const copies = createMemo(() => props.copies);
+  const copyOf = (entry: AttachmentSummary) => {
+    const copy = copies()?.copyUrl(entry);
+    return copy && copy !== copies()?.fullUrl(entry) ? copy : undefined;
+  };
+  const showsCopy = (entry: AttachmentSummary) =>
+    copyOf(entry) !== undefined && !(fullReady[entry.id] === true && copies()?.fullUrl(entry));
+  const [copyFailed, setCopyFailed] = createStore<Record<string, boolean>>({});
+  const [copyScaled, setCopyScaled] = createStore<Record<string, boolean>>({});
+  const failImage = (entry: AttachmentSummary) => {
+    if (entry.id === current()?.id) opened = true;
+    setFailed((state) => {
+      state[entry.id] = true;
+    });
+  };
+  const sourceOf = (entry: AttachmentSummary) =>
+    (showsCopy(entry) ? copyOf(entry) : copies()?.fullUrl(entry)) ?? entry.previewUrl;
   const images = () => props.opening.images;
   const current = createMemo(() => images()[Math.min(index(), images().length - 1)]);
   const downloadable = () => {
@@ -305,7 +354,7 @@ export function ImageLightbox(props: {
   };
   const shownImageLoaded = () => {
     const image = current();
-    return image !== undefined && loaded[image.id] === true && failed[image.id] !== true;
+    return image !== undefined && loaded[image.id] === true && failed[image.id] !== true && !showsCopy(image);
   };
   const imageElements = new Map<string, HTMLImageElement>();
   const copyable = canCopyImages();
@@ -328,7 +377,7 @@ export function ImageLightbox(props: {
   let gesture: { camera: Camera; point: Point; distance: number } | undefined;
 
   const zoomImage = (entry = current()) => {
-    const image = entry ? imageElements.get(entry.id) : undefined;
+    const image = entry && !showsCopy(entry) ? imageElements.get(entry.id) : undefined;
     return image?.isConnected && image.complete && image.naturalWidth ? image : undefined;
   };
   const limited = (scale: number, image: HTMLImageElement) =>
@@ -384,7 +433,7 @@ export function ImageLightbox(props: {
   const copy = () => {
     const entry = current();
     const image = entry ? imageElements.get(entry.id) : undefined;
-    if (!entry || !image?.isConnected || !copyable) return;
+    if (!entry || showsCopy(entry) || !image?.isConnected || !copyable) return;
     navigator.clipboard.write([new ClipboardItem({ "image/png": pngImage(image) })]).then(
       () => {
         setCopied(entry.id);
@@ -515,6 +564,52 @@ export function ImageLightbox(props: {
     }
   });
   onCleanup(() => tiles.cancel());
+
+  createEffect(
+    () => {
+      const entry = current();
+      return entry && showsCopy(entry) && fullFailed[entry.id] !== true ? entry : undefined;
+    },
+    (entry) => {
+      if (!entry) return;
+      const source = untrack(copies);
+      let done = false;
+      let decoded = false;
+      const full = new Image();
+      const fail = () => {
+        if (done) return;
+        setFullFailed((state) => {
+          state[entry.id] = true;
+        });
+        if (untrack(() => copyFailed[entry.id])) failImage(entry);
+      };
+      const show = (url: string) => {
+        full.src = url;
+        void full.decode().then(() => {
+          if (done) return;
+          decoded = true;
+          const element = imageElements.get(entry.id);
+          if (element) fitScreenPixels(element, entry.mimeType, full.naturalWidth, full.naturalHeight);
+          setFullReady((state) => {
+            state[entry.id] = true;
+          });
+        }, fail);
+      };
+      const url = untrack(() => source?.fullUrl(entry));
+      if (url) show(url);
+      else if (!source?.loadFull) fail();
+      else
+        void source.loadFull(entry).then((ready) => {
+          const next = ready ? source.fullUrl(entry) : undefined;
+          if (next) show(next);
+          else fail();
+        }, fail);
+      return () => {
+        done = true;
+        if (!decoded) full.src = "";
+      };
+    },
+  );
 
   const slideOffset = (position: number): -1 | 0 | 1 | undefined => {
     const count = images().length;
@@ -759,20 +854,43 @@ export function ImageLightbox(props: {
                         >
                           <img
                             ref={(element) => imageElements.set(entry.id, element)}
-                            class={["image-lightbox-image", { "image-lightbox-image-pending": !loaded[entry.id] }]}
-                            src={entry.previewUrl ?? ""}
+                            class={[
+                              "image-lightbox-image",
+                              {
+                                "image-lightbox-image-pending": !loaded[entry.id],
+                                "image-lightbox-image-copy": showsCopy(entry) && copyScaled[entry.id] === true,
+                              },
+                            ]}
+                            src={sourceOf(entry) ?? ""}
                             alt={entry.name}
                             referrerpolicy="no-referrer"
                             draggable={false}
                             onLoad={(event) => {
-                              fitScreenPixels(event.currentTarget, entry.mimeType);
-                              reveal(entry, event.currentTarget);
+                              const element = event.currentTarget;
+                              const { naturalHeight, naturalWidth } = element;
+                              if (
+                                showsCopy(entry) &&
+                                Math.max(naturalWidth, naturalHeight) >= ATTACHMENT_PREVIEW_EDGE
+                              ) {
+                                element.style.setProperty(
+                                  "--image-lightbox-ratio",
+                                  `${naturalWidth} / ${naturalHeight}`,
+                                );
+                                setCopyScaled((state) => {
+                                  state[entry.id] = true;
+                                });
+                              } else {
+                                fitScreenPixels(element, entry.mimeType);
+                              }
+                              if (!loaded[entry.id] || !copyOf(entry)) reveal(entry, element);
+                              else if (entry.id === current()?.id) move(camera);
                             }}
                             onError={() => {
-                              if (entry.id === current()?.id) opened = true;
-                              setFailed((state) => {
-                                state[entry.id] = true;
-                              });
+                              if (showsCopy(entry) && fullFailed[entry.id] !== true)
+                                setCopyFailed((state) => {
+                                  state[entry.id] = true;
+                                });
+                              else failImage(entry);
                             }}
                           />
                         </Show>
@@ -824,7 +942,9 @@ export function ImageLightbox(props: {
                     onClick={() => go(position(), Math.sign(position() - index()))}
                   >
                     <img
-                      src={(props.stripUrl ? props.stripUrl(entry) : entry.previewUrl) ?? ""}
+                      src={
+                        (props.stripUrl ? props.stripUrl(entry) : (copies()?.copyUrl(entry) ?? entry.previewUrl)) ?? ""
+                      }
                       alt=""
                       loading="lazy"
                       decoding="async"

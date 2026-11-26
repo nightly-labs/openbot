@@ -1,0 +1,53 @@
+name: Windows process launcher E2E
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - src/backend/process-launch.ts
+      - src/main/process-launcher.ts
+      - src/main/process-launcher-host.ts
+      - src/main/process-launcher-protocol.ts
+      - scripts/process-launcher-e2e.ts
+      - scripts/process-launcher-e2e-main.ts
+      - .github/workflows/windows-process-launcher-e2e.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-process-launcher-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  process-launcher:
+    name: Windows process launcher
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Download Electron
+        shell: bash
+        run: node node_modules/electron/install.js
+
+      - name: Run the process launcher E2E
+        shell: bash
+        run: bun scripts/process-launcher-e2e.ts
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: windows-process-launcher-e2e
+          path: .openbot-build/process-launcher-e2e/report.json
+          if-no-files-found: warn

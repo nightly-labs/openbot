@@ -487,6 +487,7 @@ export function mockWorkflows(
   const currentFolders = () => prunedWorkflowFolders(folders, new Set(records.keys()));
   return {
     folders: async () => structuredClone(currentFolders()),
+    setSpot: async () => undefined,
     folderAction: async (action) => {
       const current = currentFolders();
       const next = applyWorkflowFolderAction(current, action, { workflowIds: new Set(records.keys()) });

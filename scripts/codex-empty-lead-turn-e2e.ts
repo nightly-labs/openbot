@@ -23,6 +23,7 @@ const home = join(root, "home");
 const fakeCodex = join(root, "codex");
 const fakeLog = join(root, "codex.jsonl");
 const countsFile = join(root, "empty-counts.json");
+const releaseFile = join(root, "release-held-teammate");
 const PRIMARY = defaultProviderModel("codex");
 const BACKUP = `${PRIMARY}-backup`;
 const NO_ANSWER = sourceText("error.provider.acpNoAnswer", { provider: agentProviderDescriptor("codex").displayName });
@@ -30,6 +31,9 @@ const CHANNEL_NO_ANSWER = sourceText("error.provider.channelNoAnswer", {
   provider: agentProviderDescriptor("codex").displayName,
 });
 const NO_ANSWER_AFTER_STEPS = sourceText("error.provider.noAnswerAfterSteps", {
+  provider: agentProviderDescriptor("codex").displayName,
+});
+const TEAMMATE_NO_ANSWER = sourceText("error.provider.teammateResultsNoAnswer", {
   provider: agentProviderDescriptor("codex").displayName,
 });
 
@@ -59,6 +63,7 @@ if (process.argv.includes("--version")) {
 }
 const LOG = ${JSON.stringify(fakeLog)};
 const COUNTS = ${JSON.stringify(countsFile)};
+const RELEASE = ${JSON.stringify(releaseFile)};
 const PRIMARY = ${JSON.stringify(PRIMARY)};
 const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
 let buffer = "";
@@ -85,6 +90,7 @@ const narrate = (threadId, turnId, id, text) => {
 };
 const finish = (turn) => {
   const { threadId, turnId } = turn;
+  if (turn.hold && !existsSync(RELEASE)) return setTimeout(() => finish(turn), 25);
   if (turn.kind === "narration") {
     const hex = Buffer.from(turnId).toString("hex");
     if (!turn.after) narrate(threadId, turnId, "msg_" + hex + "01", "Let me check the folder.");
@@ -127,13 +133,13 @@ const decide = (text, model) => {
   if (result) {
     const mode = result[1];
     const run = nextRun(mode);
-    const empty = mode === "empty-always" || mode === "repeat-new" || (mode === "repeat" && run > 1) || mode === "thread-empty-always" || mode === "chat-empty-always" || mode === "channel-empty-always" || ((mode === "empty-once" || mode === "thread-empty-once" || mode === "chat-empty-once" || mode === "channel-empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY) || (mode === "restart-replay" && run > 1);
+    const empty = mode === "empty-always" || mode === "pending-empty" || mode === "repeat-new" || (mode === "repeat" && run > 1) || mode === "thread-empty-always" || mode === "chat-empty-always" || mode === "channel-empty-always" || ((mode === "empty-once" || mode === "thread-empty-once" || mode === "chat-empty-once" || mode === "channel-empty-once") && run === 1) || (mode === "empty-on-primary" && model === PRIMARY) || (mode === "restart-replay" && run > 1);
     return { kind: "result", mode, calls: [], empty, crash: mode === "restart-replay" && run === 1, reply: "Team done." };
   }
   const named = /<<CALLS([\\s\\S]*?)CALLS>>/.exec(text);
   if (named) return { kind: "calls", calls: JSON.parse(named[1]), empty: false, reply: "Asked." };
   const question = /TEAM-QUESTION mode:([a-z-]+)/.exec(text);
-  if (question) return { kind: "question", mode: question[1], calls: [], empty: false, reply: "TEAM-RESULT mode:" + question[1] };
+  if (question) return { kind: "question", mode: question[1], calls: [], empty: false, hold: question[1] === "pending-hold", reply: "TEAM-RESULT mode:" + question[1] };
   const narration = /NARRATION-(AFTER|BEFORE)-STEP/.exec(text);
   if (narration) return { kind: "narration", after: narration[1] === "AFTER", calls: [], empty: false, reply: "" };
   if (text.includes("STEP-THEN-EMPTY")) return { kind: "step-empty", calls: [], empty: true, step: true, reply: "" };
@@ -502,8 +508,50 @@ try {
       outcome.results.map((result) => result.status),
       ["failed", "failed"],
     );
-    assert.deepEqual(outcome.errors, [NO_ANSWER]);
+    assert.deepEqual(outcome.errors, [TEAMMATE_NO_ANSWER]);
     return outcome;
+  });
+
+  await check("an empty lead turn for a teammate result ends quietly while another teammate still works", async () => {
+    const before = new Set(agents.listQueue(lead.id).deliveries.map((delivery) => delivery.id));
+    const since = events.length;
+    await runCauseEffect(
+      agents.sendMessage({
+        agentId: lead.id,
+        text: `Ask the team. ${calls(
+          {
+            tool: "send_message",
+            arguments: { recipientAgentIds: [alpha.id], text: "TEAM-QUESTION mode:pending-empty", expectsReply: true },
+          },
+          {
+            tool: "send_message",
+            arguments: { recipientAgentIds: [beta.id], text: "TEAM-QUESTION mode:pending-hold", expectsReply: true },
+          },
+        )}`,
+      }),
+    );
+    const [early] = await waitFor("the first result to end", () => {
+      const found = newResults(lead.id, before);
+      return found.length === 1 && found.every((delivery) => ended(delivery.status)) ? found : null;
+    });
+    await waitFor("the lead to be idle", () => agents.listQueue(lead.id).deliveries.every((d) => ended(d.status)));
+    const emptyTurns = fakeTurns().filter((turn) => turn.kind === "result" && turn.mode === "pending-empty");
+    assert.deepEqual(
+      emptyTurns.map((turn) => turn.empty),
+      [true],
+      `The result does not run again: ${JSON.stringify(emptyTurns)}`,
+    );
+    assert.equal(early?.status, "completed");
+    assert.deepEqual(errorsFor(lead.id, since), [], "No error shows while a teammate still works.");
+    writeFileSync(releaseFile, "");
+    const results = await waitFor("the held teammate's result to end", () => {
+      const found = newResults(lead.id, before);
+      return found.length === 2 && found.every((delivery) => ended(delivery.status)) ? found : null;
+    });
+    await waitFor("the lead to be idle", () => agents.listQueue(lead.id).deliveries.every((d) => ended(d.status)));
+    assert.equal(await lastAnswer(lead.id), "Team done.", "The held teammate's result wakes the lead.");
+    assert.deepEqual(errorsFor(lead.id, since), []);
+    return { results: results.map((delivery) => delivery.status), emptyTurns };
   });
 
   async function resendResult(text: string) {
@@ -669,7 +717,7 @@ try {
     const outcome = await askTeammateInThread(lead.id, alpha.id, "thread-empty-always");
     assert.equal(outcome.turns.length, 2, `The result runs again only once: ${JSON.stringify(outcome)}`);
     assert.equal(outcome.outcome, "failed");
-    assert.equal(outcome.error, NO_ANSWER);
+    assert.equal(outcome.error, TEAMMATE_NO_ANSWER);
     return outcome;
   });
 
@@ -699,7 +747,7 @@ try {
       outcome.ends.filter((end) => end.followUp),
       [{ status: "failed", followUp: true, answer: null }],
     );
-    assert.deepEqual(outcome.errors, [NO_ANSWER]);
+    assert.deepEqual(outcome.errors, [TEAMMATE_NO_ANSWER]);
     return outcome;
   });
 
@@ -842,7 +890,7 @@ try {
         ["completed"],
       );
       assert.ok(
-        !outcome.errors.includes(NO_ANSWER),
+        !outcome.errors.includes(TEAMMATE_NO_ANSWER),
         `No error shows for the replayed result: ${JSON.stringify(outcome)}`,
       );
       return outcome;

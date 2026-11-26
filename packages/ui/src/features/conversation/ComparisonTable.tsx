@@ -5,7 +5,11 @@ import { firstTextDirection } from "../../content-direction";
 import { useText } from "../../text";
 import type { ComparisonTableBlock } from "./DataTable";
 
-export function ComparisonTable(props: { table: ComparisonTableBlock; renderCell?: (text: string) => JSX.Element }) {
+export function ComparisonTable(props: {
+  table: ComparisonTableBlock;
+  renderCell?: (text: string) => JSX.Element;
+  selectionMessageId?: string | undefined;
+}) {
   const { t } = useText();
   return (
     <ScrollEdges
@@ -17,6 +21,7 @@ export function ComparisonTable(props: { table: ComparisonTableBlock; renderCell
       <table
         class="message-data-table message-comparison-table"
         style={`--message-data-table-columns: ${props.table.headers.length}`}
+        data-selection-message-id={props.selectionMessageId}
         dir={firstTextDirection([...props.table.headers, ...props.table.rows.flat()])}
       >
         <thead>

@@ -110,6 +110,11 @@ import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-update-v1";
 import {
+  AGENT_USAGE_LIMIT_CAPABILITY,
+  AGENT_USAGE_LIMIT_ROUTES,
+  isAgentUsageLimits,
+} from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import {
   BACKGROUND_PROCESSES_CAPABILITY,
   BACKGROUND_PROCESSES_ROUTES,
   decodeBackgroundProcessesResponse,
@@ -152,6 +157,7 @@ import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-r
 import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_SIGNAL_HOME_CAPABILITY } from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
+import { HOST_TURN_LIMITS_CAPABILITY } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOST_VOICE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
@@ -167,6 +173,7 @@ import {
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
+import { MEDIA_APPROVAL_CREDITS_CAPABILITY } from "@openbot/contracts/team-protocol/media-approval-credits-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
@@ -228,9 +235,13 @@ import { readPlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteDownloadWatch, RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import {
+  createOnceAgentRoutine,
+  isOnceSchedule,
   listOnceAgentRoutines,
   listOnceChannelRoutines,
   type RoutinesOncePost,
+  requireReleasedScheduleOn,
+  updateAgentRoutineOnce,
 } from "@openbot/team-client/routines-once";
 import {
   addAgentFolder,
@@ -260,12 +271,14 @@ import {
   getHostAuditLog,
   getHostBrowsingMemory,
   getHostMcpAccess,
+  getHostMediaApprovalCredits,
   getHostMemoryReview,
   getHostPersonality,
   getHostReleaseStatus,
   getHostSignalHome,
   getHostSkillLearning,
   getHostTimezone,
+  getHostTurnLimits,
   getHostUpdateStatus,
   getHostVoiceModel,
   getRoutineResultDestination,
@@ -327,11 +340,13 @@ import {
   setHostBrowserProfileProxy,
   setHostBrowsingMemory,
   setHostMcpAccess,
+  setHostMediaApprovalCredits,
   setHostMemoryReview,
   setHostPersonality,
   setHostSignalHome,
   setHostSkillLearning,
   setHostTimezone,
+  setHostTurnLimits,
   setHostUpdateSettings,
   setMcpServerEnabled,
   setOwnServerNotificationLevel,
@@ -455,6 +470,7 @@ type HostRequestActions = Pick<
   | "loadAgentMemorySelection"
   | "setAgentMemoryInclusion"
   | "loadAgentRoutines"
+  | "loadOnceAgentRoutines"
   | "loadRoutineCalendar"
   | "listEventRoutines"
   | "saveEventRoutine"
@@ -540,12 +556,16 @@ type HostRequestActions = Pick<
   | "restartServerItself"
   | "loadServerTimezone"
   | "setServerTimezone"
+  | "loadServerTurnLimits"
+  | "setServerTurnLimits"
   | "loadServerVoiceModel"
   | "changeServerVoiceModel"
   | "loadServerSignalHome"
   | "setServerSignalHome"
   | "loadAgentMemoryLimit"
   | "setAgentMemoryLimit"
+  | "loadMediaApprovalCredits"
+  | "setMediaApprovalCredits"
   | "loadMemoryReview"
   | "setMemoryReview"
   | "loadSkillLearning"
@@ -653,6 +673,7 @@ type HostRequestActions = Pick<
   | "loadAgentAvatar"
   | "duplicateAgent"
   | "loadQueue"
+  | "loadAgentUsageLimits"
   | "editQueue"
   | "changeQueue"
   | "setMessageReaction"
@@ -756,6 +777,7 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
     canChooseNewAgentModel: (serverId) => has(serverId, TEAM_AGENT_CREATE_MODEL_CAPABILITY),
     canInstallAgentTemplate: (serverId) => has(serverId, AGENT_INSTALL_CAPABILITY),
     canEditQueue: (serverId) => has(serverId, TEAM_QUEUE_EDIT_CAPABILITY),
+    canReadAgentUsageLimits: (serverId) => has(serverId, AGENT_USAGE_LIMIT_CAPABILITY),
     canReadModelSteering: (serverId) => has(serverId, MODEL_STEERING_CAPABILITY),
     canRetryMessage: (serverId) => has(serverId, TEAM_MESSAGE_CLIENT_ID_CAPABILITY),
     canDeleteMessages: (serverId) => has(serverId, MESSAGE_DELETE_CAPABILITY),
@@ -811,6 +833,11 @@ export function createHostRequestActions({
   const eventsAdmin = (serverId: string) =>
     capabilityApi(serverId, EVENTS_CAPABILITY, "mobile.agent.record.eventsUnsupported");
   const recovery = (serverId: string) => has(serverId, ROUTINE_RECOVERY_CAPABILITY);
+  const onceRoutines = (serverId: string) => has(serverId, ROUTINES_ONCE_CAPABILITY);
+  const oncePost =
+    (serverId: string): RoutinesOncePost =>
+    (path, decode, body) =>
+      teamApi(serverId)("POST", path, decode, body);
   const routineResultsAdmin = (serverId: string) =>
     capabilityApi(serverId, ROUTINE_RESULTS_CAPABILITY, "mobile.agent.record.resultDestinationUnsupported");
   const sessionSettingsAdmin = (serverId: string) =>
@@ -839,12 +866,20 @@ export function createHostRequestActions({
     capabilityApi(serverId, HOST_RESTART_CAPABILITY, "mobile.server.settings.restartUnsupported");
   const timezoneAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_TIMEZONE_CAPABILITY, "mobile.server.settings.timezoneUnsupported");
+  const turnLimitsAdmin = (serverId: string) =>
+    capabilityApi(serverId, HOST_TURN_LIMITS_CAPABILITY, "mobile.server.settings.turnLimitsUnsupported");
   const signalHomeAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_SIGNAL_HOME_CAPABILITY, "mobile.server.settings.signalHomeUnsupported");
   const voiceModelAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_VOICE_MODEL_CAPABILITY, "mobile.server.settings.voiceModelUnsupported");
   const memoryLimitAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_MEMORY_LIMIT_CAPABILITY, "mobile.server.settings.memoryLimitUnsupported");
+  const mediaApprovalCreditsAdmin = (serverId: string) =>
+    capabilityApi(
+      serverId,
+      MEDIA_APPROVAL_CREDITS_CAPABILITY,
+      "mobile.server.settings.mediaApprovalCreditsUnsupported",
+    );
   const memoryReviewAdmin = (serverId: string) =>
     capabilityApi(serverId, MEMORY_REVIEW_CAPABILITY, "mobile.server.settings.learningUnsupported");
   const skillLearningAdmin = (serverId: string) =>
@@ -916,6 +951,8 @@ export function createHostRequestActions({
     restartServerItself: async (serverId) => runTeamRequest(requestHostRestart(restartAdmin(serverId))),
     loadServerTimezone: async (serverId) => runTeamRequest(getHostTimezone(timezoneAdmin(serverId))),
     setServerTimezone: async (timezone, serverId) => runTeamRequest(setHostTimezone(timezoneAdmin(serverId), timezone)),
+    loadServerTurnLimits: async (serverId) => runTeamRequest(getHostTurnLimits(turnLimitsAdmin(serverId))),
+    setServerTurnLimits: async (input, serverId) => runTeamRequest(setHostTurnLimits(turnLimitsAdmin(serverId), input)),
     loadServerVoiceModel: async (serverId) => runTeamRequest(getHostVoiceModel(voiceModelAdmin(serverId))),
     loadServerSignalHome: async (serverId) => runTeamRequest(getHostSignalHome(signalHomeAdmin(serverId))),
     setServerSignalHome: async (home, serverId) => runTeamRequest(setHostSignalHome(signalHomeAdmin(serverId), home)),
@@ -924,6 +961,10 @@ export function createHostRequestActions({
     loadAgentMemoryLimit: async (serverId) => runTeamRequest(getHostAgentMemoryLimit(memoryLimitAdmin(serverId))),
     setAgentMemoryLimit: async (limit, serverId) =>
       runTeamRequest(setHostAgentMemoryLimit(memoryLimitAdmin(serverId), limit)),
+    loadMediaApprovalCredits: async (serverId) =>
+      runTeamRequest(getHostMediaApprovalCredits(mediaApprovalCreditsAdmin(serverId))),
+    setMediaApprovalCredits: async (update, serverId) =>
+      runTeamRequest(setHostMediaApprovalCredits(mediaApprovalCreditsAdmin(serverId), update)),
     loadMemoryReview: async (serverId) => runTeamRequest(getHostMemoryReview(memoryReviewAdmin(serverId))),
     setMemoryReview: async (interval, serverId) =>
       runTeamRequest(setHostMemoryReview(memoryReviewAdmin(serverId), interval)),
@@ -1172,7 +1213,7 @@ export function createHostRequestActions({
     listEventRoutines: (owner, serverId) =>
       runTeamRequest(listEventRoutines(eventsAdmin(serverId), { owner }, recovery(serverId))),
     saveEventRoutine: (input, serverId) =>
-      runTeamRequest(saveEventRoutine(eventsAdmin(serverId), input, recovery(serverId))),
+      runTeamRequest(saveEventRoutine(eventsAdmin(serverId), input, recovery(serverId), false, onceRoutines(serverId))),
     loadRoutineResultOptions: (serverId) => runTeamRequest(listRoutineResultOptions(routineResultsAdmin(serverId))),
     loadRoutineResultDestination: (input, serverId) =>
       runTeamRequest(getRoutineResultDestination(routineResultsAdmin(serverId), input)),
@@ -1204,6 +1245,20 @@ export function createHostRequestActions({
       await request("DELETE", TEAM_API_ROUTES.agent.memory(agentId, memoryId), ignoreResponse, undefined, serverId);
     },
     createAgentRoutine: async (input, serverId) => {
+      const fields = {
+        name: input.name,
+        instruction: input.instruction,
+        active: input.active,
+        timezone: input.timezone,
+        schedule: input.schedule,
+      };
+      if (isOnceSchedule(input.schedule)) {
+        requireReleasedScheduleOn(input.schedule, onceRoutines(serverId));
+        await saveAgentRecord(queryClient, queryKeys.agentOnceRoutines(queryScope, serverId, input.agentId), () =>
+          createOnceAgentRoutine(oncePost(serverId), { agentId: input.agentId, ...fields }),
+        );
+        return;
+      }
       await saveAgentRecord(queryClient, queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines"), () =>
         request(
           "POST",
@@ -1213,37 +1268,53 @@ export function createHostRequestActions({
               throw new Error("The host returned an invalid saved record.");
             return value;
           },
-          {
-            name: input.name,
-            instruction: input.instruction,
-            active: input.active,
-            timezone: input.timezone,
-            schedule: input.schedule,
-          },
+          fields,
           serverId,
         ),
       );
     },
     updateAgentRoutine: async (input, serverId) => {
-      await saveAgentRecord(queryClient, queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines"), () =>
-        request(
-          "PATCH",
-          TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
-          (value) => {
-            if (!isRoutine(value) || value.agentId !== input.agentId || value.id !== input.routineId)
-              throw new Error("The host returned an invalid saved record.");
-            return value;
-          },
-          {
-            ...(input.name === undefined ? {} : { name: input.name }),
-            ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
-            ...(input.active === undefined ? {} : { active: input.active }),
-            ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
-          },
-          serverId,
-        ),
+      const changes = {
+        ...(input.name === undefined ? {} : { name: input.name }),
+        ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
+        ...(input.active === undefined ? {} : { active: input.active }),
+        ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+      };
+      const savedRoutine = (value: unknown) => {
+        if (!isRoutine(value) || value.agentId !== input.agentId || value.id !== input.routineId)
+          throw new Error("The host returned an invalid saved record.");
+        return value;
+      };
+      const releasedKey = queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines");
+      if (!onceRoutines(serverId)) {
+        await saveAgentRecord(queryClient, releasedKey, () =>
+          request(
+            "PATCH",
+            TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
+            savedRoutine,
+            changes,
+            serverId,
+          ),
+        );
+        return;
+      }
+      const saved = savedRoutine(
+        await updateAgentRoutineOnce(oncePost(serverId), {
+          agentId: input.agentId,
+          routineId: input.routineId,
+          ...changes,
+        }),
+      );
+      await saveAgentRecord(
+        queryClient,
+        isOnceSchedule(saved.trigger.schedule)
+          ? queryKeys.agentOnceRoutines(queryScope, serverId, input.agentId)
+          : releasedKey,
+        async () => saved,
       );
     },
+    loadOnceAgentRoutines: async (agentId, serverId) =>
+      onceRoutines(serverId) ? listOnceAgentRoutines(oncePost(serverId), agentId) : [],
     deleteAgentRoutine: async (agentId, routineId, serverId) => {
       await request("DELETE", TEAM_API_ROUTES.agent.routine(agentId, routineId), ignoreResponse, undefined, serverId);
     },
@@ -1719,6 +1790,17 @@ export function createHostRequestActions({
           return value;
         },
         undefined,
+        serverId,
+      ),
+    loadAgentUsageLimits: (serverId) =>
+      request(
+        "POST",
+        AGENT_USAGE_LIMIT_ROUTES.list,
+        (value) => {
+          if (!isAgentUsageLimits(value)) throw new Error("The host returned invalid usage limits.");
+          return value;
+        },
+        {},
         serverId,
       ),
     editQueue: async (agentId, serverId, input) => {

@@ -214,6 +214,7 @@ async function boot<T>(use: (threads: MessagingThreads, mailbox: MailboxStore) =
     interrupt: unused,
     forgetThread: () => Effect.void,
     ownChat: () => false,
+    appendSystemMessage: () => {},
     contextSession: () => null,
     progressUpdates: () => null,
   });

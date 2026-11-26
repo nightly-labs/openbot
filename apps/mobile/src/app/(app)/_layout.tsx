@@ -6,7 +6,6 @@ import { useThemeColor } from "heroui-native/hooks";
 import { type PropsWithChildren, useCallback, useEffect, useMemo, useRef } from "react";
 import { TextInput } from "react-native";
 import { useCSSVariable } from "uniwind";
-import { AgentPinTransitionProvider } from "@/features/agents/components/agent-pin-transition";
 import { ChatListPaneProvider } from "@/features/agents/components/chat-list-pane-context";
 import { ConnectedScreen } from "@/features/agents/screens/connected-screen";
 import { whenUnlocked } from "@/features/app-lock/model/app-lock";
@@ -471,17 +470,15 @@ export default function AuthenticatedLayout() {
     <MobileWorkspaceProvider key={workspaceKey}>
       <HomeOnboardingProvider>
         <OutboxProvider>
-          <AgentPinTransitionProvider>
-            <AppDrawerShell>
-              <QueuedMessagesProvider>
-                <AuthenticatedSplit>
-                  <AuthenticatedStack />
-                </AuthenticatedSplit>
-                <MermaidRendererHost />
-                <AudioWaveformHost />
-              </QueuedMessagesProvider>
-            </AppDrawerShell>
-          </AgentPinTransitionProvider>
+          <AppDrawerShell>
+            <QueuedMessagesProvider>
+              <AuthenticatedSplit>
+                <AuthenticatedStack />
+              </AuthenticatedSplit>
+              <MermaidRendererHost />
+              <AudioWaveformHost />
+            </QueuedMessagesProvider>
+          </AppDrawerShell>
         </OutboxProvider>
       </HomeOnboardingProvider>
     </MobileWorkspaceProvider>

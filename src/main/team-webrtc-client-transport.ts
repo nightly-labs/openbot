@@ -8,6 +8,7 @@ import {
   teamCapabilityLists,
 } from "@openbot/contracts/team-protocol/current";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
+import { addPromptQuestionDetails } from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import {
@@ -29,6 +30,7 @@ import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { encodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { decodeTeamProtocolV10WebRtcHttpResponse } from "@openbot/contracts/team-protocol/v10-webrtc-adapter";
+import { WORKFLOW_SPOT_CONTROL, type WorkflowSpotControl } from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { remoteWorkspaceReadTimeout, startRemoteRequestDeadline } from "@openbot/team-client/remote-recovery";
 import { type RemoteRequestProfile, startRemoteRequest } from "@openbot/team-client/sync-profile";
@@ -108,6 +110,7 @@ interface TeamWebRtcClientTransportOptions {
   ) => Effect.Effect<void, CentralAuthOperationError>;
   removeMember: (hostId: string, membershipId: string) => Effect.Effect<void, CentralAuthOperationError>;
   removeOwnedHost: (hostId: string) => Effect.Effect<void, CentralAuthOperationError>;
+  setHostHidden: (hostId: string, hidden: boolean) => Effect.Effect<void, CentralAuthOperationError>;
   getPrincipalId: () => string;
   controlPlaneUrl: string;
   downloadHostLogo: (
@@ -350,6 +353,14 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     );
   }).bind(this);
 
+  readonly setHostHidden = Effect.fn("TeamWebRtcClient.setHostHidden")(function* (
+    this: TeamWebRtcClientTransport,
+    hostId: string,
+    hidden: boolean,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
+    return yield* this.#owned(this.#options.setHostHidden(hostId, hidden).pipe(toRemoteWorkflowError));
+  }).bind(this);
+
   readonly sendDesktop = Effect.fn("TeamWebRtcClient.sendDesktop")(function* (
     this: TeamWebRtcClientTransport,
     hostId: string,
@@ -407,6 +418,14 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     return yield* this.#owned(
       this.#sendEventControlEffect(hostId, { type: "team-direct-typing", recipientMemberId, typing }),
     );
+  }).bind(this);
+
+  readonly setWorkflowSpot = Effect.fn("TeamWebRtcClient.setWorkflowSpot")(function* (
+    this: TeamWebRtcClientTransport,
+    hostId: string,
+    control: WorkflowSpotControl,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
+    return yield* this.#owned(this.#sendEventControlEffect(hostId, control));
   }).bind(this);
 
   connect(hostId: string): Effect.Effect<void, RemoteWorkflowError> {
@@ -599,7 +618,10 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                   }),
               ),
             );
-        if (this.#sendsSkillSuggestionNames(hostId)) addSkillSuggestionNames(body, envelope.body);
+        if (this.#sendsWireExtensions(hostId)) {
+          addSkillSuggestionNames(body, envelope.body);
+          addPromptQuestionDetails(body, envelope.body);
+        }
         if (method === "GET" && path === "/v1/compatibility" && status === 200) {
           const support = yield* remoteDecode(() => decodeTeamProtocolSupportExpanded(body));
           this.#hostProtocols.set(hostId, Math.min(support.protocol.maximum, LOCAL_TEAM_PROTOCOL.maximum));
@@ -1159,7 +1181,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   readonly #sendEventControlEffect = Effect.fn("TeamWebRtcClient.sendEventControl")(function* (
     this: TeamWebRtcClientTransport,
     hostId: string,
-    control: TeamProtocolV1CurrentEventControl,
+    control: TeamProtocolV1CurrentEventControl | WorkflowSpotControl,
   ): Effect.fn.Return<void, RemoteWorkflowError, TeamClientBridge> {
     yield* this.#ensureConnected(hostId);
     yield* TeamClientBridge.use((bridge) =>
@@ -1169,7 +1191,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         encodeTeamProtocolV2Frame({
           version: 2,
           type: "event-control",
-          control: toWireTeamProtocolV1ClientEvent(control),
+          control: control.type === WORKFLOW_SPOT_CONTROL ? control : toWireTeamProtocolV1ClientEvent(control),
         }),
       ),
     );
@@ -1461,7 +1483,10 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         return;
       }
       if (decoded.status === "known") {
-        if (this.#sendsSkillSuggestionNames(hostId)) addSkillSuggestionNames(decoded.event, frame.payload);
+        if (this.#sendsWireExtensions(hostId)) {
+          addSkillSuggestionNames(decoded.event, frame.payload);
+          addPromptQuestionDetails(decoded.event, frame.payload);
+        }
         this.emit("event", hostId, decoded.event);
       }
       this.#lastEventSequence.set(hostId, frame.sequence);
@@ -1489,7 +1514,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.#eventAckTimers.set(hostId, timer);
   }
 
-  #sendsSkillSuggestionNames(hostId: string): boolean {
+  #sendsWireExtensions(hostId: string): boolean {
     return (this.#hostProtocols.get(hostId) ?? 0) >= TEAM_PROTOCOL_V9;
   }
 
@@ -1511,8 +1536,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.emit("path", hostId, path);
   };
   readonly #onError = (hostId: string, code: string, message: string): void => {
-    if (!this.#active.has(hostId)) return;
-    this.emit("error", hostId, code, message);
+    const active = this.#active.get(hostId);
+    if (!active) return;
+    if (code === "data_channel_error" && !active.connected && active.authentication?.started)
+      this.emit("error", hostId, "sign_in_closed", sourceText("error.remote.signInConnectionClosed"));
+    else this.emit("error", hostId, code, message);
   };
 
   #sendRecoverable(hostId: string, channel: "events", data: string): void {

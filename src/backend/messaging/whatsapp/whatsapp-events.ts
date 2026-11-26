@@ -95,17 +95,20 @@ export async function whatsAppInbound(
     ? context.me.number
     : await numberOf([key.participantAlt, key.remoteJidAlt, authorJid], context);
   const isSelfChat = !isGroup && (await isOwnChat(rawChatJid, key.remoteJidAlt, context));
+  const contactNumber =
+    isGroup || isSelfChat ? null : key.fromMe ? await numberOf([key.remoteJidAlt, rawChatJid], context) : authorNumber;
   const chatJid = isGroup
     ? rawChatJid
     : isSelfChat
       ? userJid(context.me.number)
-      : authorNumber && !key.fromMe
-        ? userJid(authorNumber)
+      : contactNumber
+        ? userJid(contactNumber)
         : rawChatJid;
   const decision: SenderDecision = senderDecision(context.rules, {
     isGroup,
     chatJid,
     authorNumber,
+    contactNumber,
     isSelfChat,
     fromMe: Boolean(key.fromMe),
   });

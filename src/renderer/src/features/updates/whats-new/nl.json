@@ -1,5 +1,75 @@
 [
   {
+    "version": "0.79.0",
+    "date": "2026-11-25",
+    "notices": [
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Afbeeldings- en videotools met credits, locatieverzoeken en veel van de onderstaande oplossingen werken op een server alleen als de server deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Agents kunnen met OpenBot-credits afbeeldingen en video’s maken en je foto’s bewerken. De goedkeuringskaart toont het model, de prijs en de prompt. Je kunt een ander model kiezen voordat je toestaat. Het item Credits in de linkerbalk toont je saldo. Een eigenaar of beheerder kan “Agents mogen credits gebruiken” aan- of uitzetten.",
+          "Agents kunnen sites in crypto betalen vanuit een NEAR Intents-wallet. Koppel de wallet in Serverinstellingen › Kluis › Crypto met een toegangssleutel en stort daarna geld. Elke betaling wacht in de chat op je goedkeuring, tenzij je “Altijd toestaan” kiest voor die site. Een dagbudget beperkt wat agents kunnen uitgeven. De wallet is alleen voor deze computer, en betalingen gebruiken echt geld.",
+          "Elk account krijgt 10 gratis welkomstcredits. Je kunt ook op de pagina Credits een creditcode inwisselen met Redeem code.",
+          "Een browsertab van een agent kan om je locatie vragen. De chat vraagt je eerst, en je kiest Blokkeren, Altijd toestaan of Toestaan. Vroeger blokkeerde de browser het verzoek altijd.",
+          "De zijbalk heeft tabbladen boven de chatlijst: Alle, Ongelezen en de mappen die je kiest. Elk tabblad toont zijn ongelezen chats."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Een nieuwe workflowstap start nu met een model dat kan draaien. Een tekststap gebruikt je voorkeursmodel of het gebruikelijke model van een verbonden aanbieder.",
+          "Als je alleen gratis credits hebt, markeert de modellijst op een goedkeuringskaart de modellen die gratis credits betalen met “Gratis credits”.",
+          "Het zijpaneel kan splitsen in maximaal drie groepen, de ene boven de andere. Sleep de lijn tussen twee groepen om hun hoogte te wijzigen."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "De app hangt minder vaak, vooral op Windows. Hij bewaart de resultaten van trage controles kort en doet het trage werk op de achtergrond.",
+          "Wanneer een Claude-agent een plan in de plan-modus afrondt, toont de chat nu het plan met Goedkeuren en Stop planning. Vroeger verscheen geen goedkeuring en begon de agent met bouwen.",
+          "Een bericht van een andere agent of een routine stopt het werk van een drukke Claude-agent niet meer.",
+          "Een melding van een website in het browsertabblad van een agent bedekt het OpenBot-venster niet meer totdat je op OK klikt. De melding sluit zichzelf en de agent krijgt de tekst.",
+          "Op een Linux X11-bureaublad stopt typen in OpenBot niet meer nadat een agent Computerbesturing in een andere app gebruikt. Als typen al gestopt is, log dan één keer uit en weer in."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Veel van de onderstaande oplossingen werken op een server alleen als de server deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Gebruik spraak in kanalen. Wanneer je een bericht voor een kanaal dicteert, leest de app het antwoord van een agent hardop voor. Je kunt ook een spraakgesprek starten vanuit het berichtvak van het kanaal.",
+          "Verberg een server op de serverbalk. De server is ook verborgen op je andere computers. Selecteer hem in de map “Verborgen servers” om hem weer te tonen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "De pagina Taken heet nu Threads, zoals in de telefoon-app en in het zijpaneel van de chat.",
+          "Gestreamde antwoorden en workflows die tegelijk lopen, gebruiken minder CPU, en de webclient opent een server sneller."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Op een Mac openen Koppelen en Account toevoegen voor Claude nu de aanmeldpagina van Claude vanuit OpenBot.",
+          "Wanneer de verbinding met een server waarbij je bent aangesloten stopt met het verzenden van gegevens, maakt de app zelf weer verbinding.",
+          "Lange kanalen op een server waarbij je bent aangesloten, openen en updaten sneller.",
+          "Een workflowuitvoer “Melding” of een stap die op goedkeuring wacht, stuurt nu een melding naar je telefoon.",
+          "Een Gemini-chat gaat door nadat Google een toolresultaat weigert. Eerder mislukte elk volgend bericht."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.77.0",
     "date": "2026-11-23",
     "notices": [

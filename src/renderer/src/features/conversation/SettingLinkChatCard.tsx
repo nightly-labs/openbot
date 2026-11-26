@@ -1,4 +1,5 @@
 import type { SettingLinkId } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
 import {
   AGENT_SETTING_LINK_ROWS,
@@ -7,12 +8,31 @@ import {
   isAgentSettingLinkId,
 } from "@openbot/ui/features/conversation/agent-setting-links";
 import { SettingLinkCard } from "@openbot/ui/features/conversation/SettingLinkCard";
+import { CreditIcon } from "@openbot/ui/features/credits/CreditIcon";
+import { CreditsExplainerDialog } from "@openbot/ui/features/credits/CreditsExplainerDialog";
 import { useText } from "@openbot/ui/text";
+import { createSignal, Show } from "solid-js";
 import { usePlatform } from "../../platform";
+import { openCreditPrices } from "../servers/credit-prices";
+import { serverRoleCanAdminister } from "../servers/server-capabilities";
 import { appSettingLinkTarget } from "../settings/setting-link-targets";
 import { navItem } from "../settings/settings-tabs";
+import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationProps } from "./conversation-types";
+
+const ADMIN_ONLY_REMOTE_AGENT_SETTINGS: ReadonlySet<AgentSettingLinkId> = new Set([
+  "agent.access",
+  "agent.computer-use",
+  "agent.local-scripts",
+  "agent.folders",
+  "agent.busy-message",
+  "agent.browser-profile",
+  "agent.starts-new-chats",
+  "agent.plan-card",
+  "agent.builtin-memory",
+  "agent.backup-models",
+]);
 
 export interface SettingLinkChatCardProps {
   settingId: SettingLinkId;
@@ -21,9 +41,39 @@ export interface SettingLinkChatCardProps {
   appSettingOpener?: ConversationProps["appSettingOpener"];
 }
 
+function CreditsExplainerChatCard() {
+  const { t } = useText();
+  const { props } = useConversationViewScope();
+  const [open, setOpen] = createSignal(false);
+  return (
+    <>
+      <SettingLinkCard
+        title={t("billing.credits.explainer.title")}
+        path={[t("billing.credits.explainer.place"), t("app.rail.credits")]}
+        icon={<CreditIcon />}
+        onOpen={() => setOpen(true)}
+      />
+      <CreditsExplainerDialog
+        open={open()}
+        onOpenChange={setOpen}
+        onOpenPrices={() => openCreditPrices(conversationRuntime(props).openUrl)}
+      />
+    </>
+  );
+}
+
 export function SettingLinkChatCard(props: SettingLinkChatCardProps) {
+  return (
+    <Show when={props.settingId !== "credits.explainer"} fallback={<CreditsExplainerChatCard />}>
+      <SettingRowChatCard {...props} />
+    </Show>
+  );
+}
+
+function SettingRowChatCard(props: SettingLinkChatCardProps) {
   const { t } = useText();
   const platform = usePlatform();
+  const view = useConversationViewScope();
   const card = () => {
     const settingId = props.settingId;
     if (isAgentSettingLinkId(settingId)) {
@@ -31,13 +81,23 @@ export function SettingLinkChatCard(props: SettingLinkChatCardProps) {
       const agent = props.agent;
       const path = [agent?.name ?? "", t("agentSettings.title")].filter(Boolean);
       if (row.page) path.push(t(AGENT_SETTINGS_PAGE_TITLE[row.page]));
+      const server = view.props.server;
+      const adminOnly =
+        server?.kind === "remote" &&
+        !serverRoleCanAdminister(server) &&
+        ADMIN_ONLY_REMOTE_AGENT_SETTINGS.has(settingId);
       return {
         title: t(row.title),
         path,
-        open: agent ? () => props.onOpenAgentSetting(agent.id, settingId) : undefined,
+        open: !agent
+          ? undefined
+          : adminOnly
+            ? () => toast.info(t("chat.settingLink.adminOnly"))
+            : () => props.onOpenAgentSetting(agent.id, settingId),
         note: agent ? undefined : t("chat.settingLink.agentChatOnly"),
       };
     }
+    if (settingId === "credits.explainer") return { title: "", path: [], open: undefined, note: undefined };
     const target = appSettingLinkTarget(settingId, platform.appInfo()?.platform);
     const open = props.appSettingOpener?.(settingId);
     return {
