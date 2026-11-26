@@ -688,6 +688,24 @@ async function main(): Promise<void> {
     recordCases("crashed-tool-call-stops");
     await close(crashing.tab.id);
 
+    phase("busy-page-after-navigation");
+    const busy = await open("/form");
+    const busyStarted = Date.now();
+    const busyNavigate = await call("navigate", {
+      tabId: busy.tab.id,
+      url: `${origin}/busy-on-load`,
+      timeoutMs: 3_000,
+    });
+    measurements.busyNavigateMs = Date.now() - busyStarted;
+    assert.equal(busyNavigate.success, false, "A navigation to a page that never answers did not fail.");
+    assert(text(busyNavigate).includes("OpenBot stopped the page"), text(busyNavigate));
+    assert(busy.contents.isCrashed(), "The page that never answers kept its renderer.");
+    assert(measurements.busyNavigateMs < 15_000, "Stopping the page that never answers took too long.");
+    const afterBusy = await readPage("navigate", { tabId: busy.tab.id, url: `${origin}/form` });
+    assert(names(afterBusy.page).includes("Search"), "The tab did not load a page after the stopped page.");
+    recordCases("navigation-timeout-stops-busy-page", "tab-loads-after-busy-page-stops");
+    await close(busy.tab.id);
+
     phase("tab-sleep");
     await runCauseEffect(host.destroy());
     const sleepy = new BrowserHost(window, join(fixtureRoot, "downloads"), join(fixtureRoot, "sleep-tabs.json"), {
@@ -783,6 +801,7 @@ function recordCases(...names: string[]): void {
 }
 
 const PAGES: Record<string, string> = {
+  "/busy-on-load": `<!doctype html><meta charset="utf-8"><title>Busy</title><script>for (;;) {}</script>`,
   "/skeleton": `<!doctype html><meta charset="utf-8"><title>Skeleton</title>
     <main><div class="skeleton" aria-busy="true" style="width:240px;height:40px;background:#ddd"></div></main>
     <script>
