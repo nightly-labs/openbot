@@ -1081,9 +1081,7 @@ app data folder. Its own log there (`log/`) contains the Google account email (`
 OpenBot does not read that folder into its log or a diagnostics export. In the 1.5.4 tests the CLI wrote
 nothing to stderr. So Gemini can hold more than one account: each account after the first gets
 `GEMINI_HOME` set to its own folder, which `antigravityArgv` passes as `--gemini-dir`, and
-`antigravityStatePaths` confines its process to that folder. A usage read needs an access token that
-has not expired, and only a running CLI refreshes it, so a usage read of an account with no agent
-process starts no process: the account shows its reading from the sign-in check. The sandbox cannot
+`antigravityStatePaths` confines its process to that folder. The sandbox cannot
 create folders in a new account's home, so OpenBot makes them.
 A plan can serve models that the first account's does not, so the account check also reads the account's own
 `model/list` (`ModelCatalog.read`) after it marks the account connected (#5217). The account row carries as

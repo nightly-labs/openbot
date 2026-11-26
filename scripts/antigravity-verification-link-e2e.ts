@@ -77,8 +77,6 @@ function handle(message) {
       update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: NL + "\\u26A0 Agent execution terminated due to error." } });
       return write({ id: message.id, result: { stopReason: "end_turn" } });
     }
-    if (text.includes("RPC-DENIED"))
-      return write({ id: message.id, error: { code: -32603, message: "Internal error: Error 403, Message: The caller does not have permission, Status: PERMISSION_DENIED" } });
     if (text.includes("RPC-VERIFY"))
       return write({ id: message.id, error: { code: -32603, message: "Internal error: Verification required. Please complete verification in your browser to continue." } });
     update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Done." } });
