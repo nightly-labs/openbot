@@ -19,6 +19,8 @@ interface LogEntry {
   baseURL?: string | null;
   zenKey?: string | null;
   envKey?: string | null;
+  imageTool?: boolean | null;
+  videoTool?: boolean | null;
   sessionId?: string;
   key?: string | null;
 }
@@ -35,6 +37,11 @@ interface Report {
   inheritedEnvKey?: { envKey: string | null; configKey: string | null };
   ownGoKey?: { error: string };
   sameGoKey?: { error: string };
+  mediaTools?: {
+    goKeyOnly: (boolean | null)[];
+    otherProviderEnvKey: (boolean | null)[];
+    otherProviderKey: (boolean | null)[];
+  };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-expired-key-e2e-"));
@@ -49,6 +56,7 @@ const openCodeData = join(root, "data", "opencode");
 process.env.XDG_DATA_HOME = join(root, "data");
 delete process.env.OPENCODE_AUTH_CONTENT;
 delete process.env.OPENCODE_DB;
+for (const name of Object.keys(process.env)) if (name.endsWith("_API_KEY")) delete process.env[name];
 
 function open(cli: AgentCliInfo): AgentClient {
   const client = requireProviderDriver("opencode").createClient(cli, 10_000, {
@@ -87,6 +95,12 @@ try {
   const keySpawn = entries.filter((entry) => entry.event === "spawn").at(-1);
   assert.equal(keySpawn?.zenKey, null, "The free tier gets no stored key (#7550).");
   assert.equal(keySpawn?.envKey, null, "OPENCODE_API_KEY does not carry the stored key (#7550).");
+  const goKeyOnly = [keySpawn?.imageTool ?? null, keySpawn?.videoTool ?? null];
+  assert.deepEqual(
+    goKeyOnly,
+    [false, false],
+    "With only an OpenCode Go key, OpenCode's image and video tools are off: they would fail (#15281).",
+  );
   report.replaced = {
     thread,
     loaded,
@@ -95,6 +109,21 @@ try {
     envKey: keySpawn?.envKey ?? null,
   };
   await runCauseEffect(second.stop());
+
+  process.env.OPENAI_API_KEY = "other-provider";
+  await rm(log, { force: true });
+  try {
+    await startThread(open(cli), { cwd: workspace });
+  } finally {
+    delete process.env.OPENAI_API_KEY;
+  }
+  const envKeySpawn = (await readJsonl<LogEntry>(log)).find((entry) => entry.event === "spawn");
+  const otherProviderEnvKey = [envKeySpawn?.imageTool ?? null, envKeySpawn?.videoTool ?? null];
+  assert.deepEqual(
+    otherProviderEnvKey,
+    [null, null],
+    "A provider key in the environment keeps the image and video tools.",
+  );
 
   storedKey = null;
   process.env.FAKE_AUTH_KEY = "own";
@@ -211,6 +240,14 @@ try {
     "A provider with a stored key reads as a refused request, not a missing sign-in.",
   );
   report.providerRefused = { error: refused };
+  const otherKeySpawn = (await readJsonl<LogEntry>(log)).filter((entry) => entry.event === "spawn").at(-1);
+  const otherProviderKey = [otherKeySpawn?.imageTool ?? null, otherKeySpawn?.videoTool ?? null];
+  assert.deepEqual(
+    otherProviderKey,
+    [null, null],
+    "A stored key for another provider keeps the image and video tools.",
+  );
+  report.mediaTools = { goKeyOnly, otherProviderEnvKey, otherProviderKey };
   await runCauseEffect(eighth.stop());
 
   delete process.env.FAKE_PROVIDER_AUTH;

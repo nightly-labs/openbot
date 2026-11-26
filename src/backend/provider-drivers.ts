@@ -92,14 +92,15 @@ import {
   type CustomProviderSource,
   clearedInheritedOpenCodeKeyEnv,
   customProvidersOn,
-  OPENCODE_AGENT_CONFIG,
   OPENCODE_GO_PROVIDER,
   OPENCODE_PROFILE_CONFIG,
+  openCodeAgentConfig,
   openCodeConfigEnv,
   openCodeModelName,
   openCodeSignInMessage,
 } from "./opencode-config";
 import {
+  hasOpenCodeMediaSignIn,
   hasOpenCodeProviderKey,
   readOpenCodeGoUsage,
   readOpenCodeRefusalStatus,
@@ -881,6 +882,10 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, openCodeStatePaths()) } : {}),
         extraEnv: () => {
           const agentEnvironment = context.agentEnvironment?.();
+          const keyEnv = clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode"));
+          const mediaSignIn = Effect.runSync(
+            hasOpenCodeMediaSignIn({ ...process.env, ...agentEnvironment, ...keyEnv }),
+          );
           return {
             ...agentEnvironment,
             ...opencodeEnv(cli),
@@ -891,8 +896,12 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
               cli.version,
               confinement ? "confined" : "provider-asks",
             ),
-            ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
-            ...clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode")),
+            ...openCodeConfigEnv(
+              openCodeAgentConfig(mediaSignIn),
+              openCodeEndpoints(context),
+              context.apiKey("opencode"),
+            ),
+            ...keyEnv,
             ...(confinement ? OPENCODE_CONFINED_ENV : {}),
           };
         },
