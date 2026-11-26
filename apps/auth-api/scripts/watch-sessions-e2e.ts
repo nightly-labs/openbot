@@ -150,7 +150,7 @@ async function setup(parentLifetimeMs = PARENT_LIFETIME_MS) {
 }
 
 async function aPairedWatchGetsATicket() {
-  const { database, clock, plane, sessions, pair, ticket, row, phoneToken } = await setup();
+  const { database, clock, plane, pair, ticket, row } = await setup();
   const key = await watchKey();
   const created = await pair(key);
   const session = created.value;
@@ -219,16 +219,6 @@ async function aPairedWatchGetsATicket() {
   );
   check("a remote ticket check refuses the watch ticket", !asRemote);
   check("a ticket updates the last use of the watch session", row(session.watchSessionId)?.last_used_at === clock.now);
-
-  const listed = await result(sessions.listForAccount(phoneToken));
-  check(
-    "the connected devices list the watch under its phone",
-    listed.value?.length === 1 &&
-      listed.value[0]?.watchSessionId === session.watchSessionId &&
-      listed.value[0]?.authSessionId === "phone" &&
-      listed.value[0]?.lastActiveAt === clock.now,
-    listed.value,
-  );
 }
 
 async function refusedTicketsGiveNoTicket() {

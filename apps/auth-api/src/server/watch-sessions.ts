@@ -26,14 +26,6 @@ interface CreatedWatchSession {
   expiresAt: number;
 }
 
-interface AccountWatchSession {
-  watchSessionId: string;
-  authSessionId: string;
-  connectedAt: number;
-  lastActiveAt: number;
-  expiresAt: number;
-}
-
 interface IssuedWatchTicket {
   ticket: string;
   expiresAt: number;
@@ -181,45 +173,6 @@ export class WatchSessions {
         )
         .bind(now(), watchSessionId, userId)
         .run(),
-    );
-  }).bind(this);
-
-  readonly listForAccount = Effect.fn("WatchSessions.listForAccount")(function* (
-    this: WatchSessions,
-    accountSessionToken: string,
-  ) {
-    const { database, now: clock } = this.#dependencies;
-    const currentHash = yield* sha256(accountSessionToken);
-    const now = clock();
-    const rows = yield* storeCall(() =>
-      database
-        .prepare(
-          `SELECT w.watch_session_id, parent.id AS auth_session_id, w.created_at, w.last_used_at, w.expires_at
-         FROM auth_sessions account
-         JOIN watch_sessions w ON w.user_id = account.user_id
-         JOIN auth_sessions parent ON parent.token_hash = w.auth_session_hash AND parent.user_id = w.user_id
-         WHERE account.token_hash = ? AND account.revoked_at IS NULL AND account.expires_at > ?
-           AND w.revoked_at IS NULL AND w.expires_at > ?
-           AND parent.revoked_at IS NULL AND parent.expires_at > ?
-         ORDER BY w.last_used_at DESC, w.created_at DESC`,
-        )
-        .bind(currentHash, now, now, now)
-        .all<{
-          watch_session_id: string;
-          auth_session_id: string;
-          created_at: number;
-          last_used_at: number;
-          expires_at: number;
-        }>(),
-    );
-    return rows.results.map(
-      (row): AccountWatchSession => ({
-        watchSessionId: row.watch_session_id,
-        authSessionId: row.auth_session_id,
-        connectedAt: row.created_at,
-        lastActiveAt: row.last_used_at,
-        expiresAt: row.expires_at,
-      }),
     );
   }).bind(this);
 

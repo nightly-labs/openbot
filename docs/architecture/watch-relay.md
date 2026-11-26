@@ -44,7 +44,8 @@ Decided by the developer on 2026-11-25:
   `ts` must be within `WATCH_RELAY_CLOCK_SKEW_MS`. The user must have an active membership on the
   host. Reply `{ ticket, expiresAt, signalUrl }`. The ticket is an ES256 JWT with
   `aud: "openbot-watch"` and the claims of `WatchTicketClaims`, TTL `WATCH_TICKET_TTL_SECONDS`.
-- The watch session is listed with the user's connected devices and can be revoked there.
+- The watch session ends with its phone session: a sign-out on the phone, or a revoke of the phone in
+  the connected devices, revokes it too.
 
 ## Relay request (Signal)
 

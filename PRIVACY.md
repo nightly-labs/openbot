@@ -2395,8 +2395,8 @@ of the phone is on. A sign-out on the phone tells the watch to delete its copy, 
 keys.
 
 For the direct link, the iPhone app gives the watch its own watch session from the OpenBot account
-service. It is linked to the phone's session: a sign-out on the phone ends it, and you can see and
-revoke it in your connected devices. The watch makes its own signing key, which does not leave the
+service. It is linked to the phone's session: a sign-out on the phone, or a revoke of the phone in
+your connected devices, ends it. The watch makes its own signing key, which does not leave the
 watch, and keeps the session token and the public watch keys of your servers in its Keychain.
 
 To reach a server, the watch asks the account service for a ticket for that server, then sends the

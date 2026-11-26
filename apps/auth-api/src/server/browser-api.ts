@@ -42,7 +42,6 @@ import { type Referrals, referralPageQuery, referralState } from "./referrals";
 import { type RemoteControlPlane, RemoteControlPlaneError } from "./remote-control-plane";
 import { sendTeamInviteEmail } from "./team-invite-email";
 import type { AuthUser, OwnerTransferEmailDelivery, TeamInviteEmailDelivery } from "./types";
-import type { WatchSessions } from "./watch-sessions";
 
 const COOKIE = "__Host-openbot-web";
 const PREFIX = "/api/browser/";
@@ -97,7 +96,6 @@ export interface BrowserApiServices {
     "list" | "plans" | "create" | "checkout" | "delete" | "wake" | "restart" | "status" | "lifecycle"
   >;
   customServerOffers: () => CustomServerOffers;
-  watchSessions: () => Pick<WatchSessions, "listForAccount" | "revoke">;
   inviteEmailDelivery: () => TeamInviteEmailDelivery | null;
   ownerTransferEmailDelivery: () => OwnerTransferEmailDelivery | null;
   schedule: (work: Effect.Effect<void>) => void;
@@ -453,10 +451,8 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
   }
   if (path === AVATAR_PATH && request.method === "DELETE")
     return json(yield* removeAccountAvatar(services.auth, services.avatarBucket(), token, user));
-  if (path === "v1/me/sessions" && request.method === "GET") {
-    const sessions = yield* services.auth.listAccountSessions(token);
-    return json({ sessions, watches: yield* services.watchSessions().listForAccount(token) });
-  }
+  if (path === "v1/me/sessions" && request.method === "GET")
+    return json({ sessions: yield* services.auth.listAccountSessions(token) });
   if (path === "v2/server-claims" && request.method === "POST")
     return json(yield* services.auth.createServerClaimForUser(user.id));
   if (path.startsWith("v1/me/billing") || path.startsWith("v1/me/license"))
@@ -475,11 +471,6 @@ const handleAccount = Effect.fn("BrowserApi.handleAccount")(function* (
         inviteLinkOrigin(url),
       ).pipe(refuseWith(BillingError)),
     );
-  }
-  const [, watchSessionId] = /^v1\/me\/watch-sessions\/([^/]+)$/u.exec(path) ?? [];
-  if (watchSessionId !== undefined && request.method === "DELETE") {
-    yield* services.watchSessions().revoke(user.id, watchSessionId);
-    return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   }
   const [, sessionId] = /^v1\/me\/sessions\/([^/]+)$/u.exec(path) ?? [];
   if (sessionId !== undefined && request.method === "DELETE") {
