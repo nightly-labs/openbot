@@ -9,6 +9,7 @@ import type {
   VoiceServerProbe,
   VoiceServerSettings,
   VoiceSettings,
+  VoiceSettingsState,
   VoiceStream,
   VoiceTranscriptionResult,
 } from "@openbot/contracts/ipc";
@@ -134,7 +135,7 @@ export function voiceIpcHandlers({
         parseVoiceModelRequest,
         ({ modelId }): Promise<VoiceModelStatus> => runCauseEffect(voice.removeModel(modelId)),
       ),
-      getSettings: handler((): VoiceSettings => voice.getSettings()),
+      getSettings: handler((): VoiceSettingsState => voice.getSettings()),
       setSettings: payloadHandler(
         parseVoiceSettings,
         (settings): Promise<VoiceSettings> => runCauseEffect(voice.setSettings(settings)),

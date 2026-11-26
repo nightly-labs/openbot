@@ -42,6 +42,7 @@ export const messages = {
   "update.idleRestart.description": "Novas execuções de rotina aguardam até a reinicialização.",
   "update.idleRestart.waitingFor": "Aguardando {reasons}.",
   "update.idleRestart.cancel": "Não reiniciar",
+  "update.idleRestart.openSettings": "Configurações de atualização",
   "update.idleRestart.restartNow": "Reiniciar agora",
   "update.idleRestart.restartNowTitle": "Reiniciar o OpenBot agora?",
   "update.idleRestart.restartNowDescription": "Turnos de agente e execuções de rotina não concluídos param agora.",

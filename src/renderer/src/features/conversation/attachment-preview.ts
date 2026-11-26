@@ -22,6 +22,17 @@ export function remoteAttachmentUrlWith(url: string, flag: "preview" | "open"): 
   }
 }
 
+export function localAttachmentCopyUrl(url: string): string | undefined {
+  if (!LOCAL_ATTACHMENT_URL.test(url)) return undefined;
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set("preview", "1");
+    return parsed.toString();
+  } catch {
+    return undefined;
+  }
+}
+
 export function openedAttachmentUrl(url: string | null | undefined): string | null {
   return url ? remoteAttachmentUrlWith(url, "open") : null;
 }

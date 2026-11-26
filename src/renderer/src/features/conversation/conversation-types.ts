@@ -41,6 +41,7 @@ import type { AwaitingReplyItem } from "@openbot/ui/features/conversation/Awaiti
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import type { ChatMessageAuthor } from "@openbot/ui/features/conversation/ChatMessageRow";
 import type { UnloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
+import type { MediaApprovalControls } from "@openbot/ui/features/conversation/MediaApprovalCard";
 import type { SidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import type { AgentThreadOlderMessages } from "@openbot/ui/features/conversation/threads/AgentThreadView";
 import type { ThreadHeaderProps, ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
@@ -168,6 +169,8 @@ export interface ConversationProps {
   waits?: readonly AgentWait[] | undefined;
   threads?: ConversationThreads | undefined;
   browserTabs: BrowserTab[];
+  noticedBrowserTabIds?: ReadonlySet<string> | undefined;
+  onNoticeBrowserTabs?: ((tabIds: readonly string[]) => void) | undefined;
   activeBrowserTabId: string | null;
   browserVisibilitySuspended: boolean;
   workspaceCovered?: boolean | undefined;
@@ -222,6 +225,7 @@ export interface ConversationProps {
   onPromptResolutionPresented?: ((agentId: string, turnId: string, requestId: string | number) => void) | undefined;
   onRespondToApproval: (decision: "accept" | "decline") => Promise<boolean>;
   onAlwaysAllowApproval?: (() => Promise<boolean>) | undefined;
+  mediaApproval?: MediaApprovalControls | undefined;
   agentAutoApproves?: boolean | undefined;
   remoteBackupModelsLoaded?: boolean | undefined;
   remotePlanCardLoaded?: boolean | undefined;
@@ -235,6 +239,7 @@ export interface ConversationProps {
   onUpdateAgentPermissions?: ((input: UpdateAgentAdminSettingsInput) => Promise<void>) | undefined;
   onClearAgentContext?: (() => Promise<void>) | undefined;
   onDeleteAgentHistory?: (() => Promise<void>) | undefined;
+  onDeleteAgent?: ((agentId: string) => Promise<void>) | undefined;
   onCompactAgentContext?: (() => Promise<void>) | undefined;
   onRespondToBrowserTakeover: (decision: "complete" | "cancel", options?: PromptAnswerOptions) => Promise<boolean>;
   onCancelQueuedMessage: (deliveryId: string, recipientAgentId?: string) => void;
@@ -269,9 +274,16 @@ type SidebarFilePreviewSource =
   | { kind: "attachment"; attachment: AttachmentSummary };
 
 export type SidebarFilePreview =
-  | { ownerAgentId: string; source: SidebarFilePreviewSource; preview: FilePreview; directory?: undefined }
   | {
       ownerAgentId: string;
+      threadId?: string | undefined;
+      source: SidebarFilePreviewSource;
+      preview: FilePreview;
+      directory?: undefined;
+    }
+  | {
+      ownerAgentId: string;
+      threadId?: string | undefined;
       source: { kind: "workspace-folder"; agentId: string; path: string };
       preview: null;
       directory: WorkspaceDirectory;

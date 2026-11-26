@@ -187,6 +187,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "Slack, Discord, Telegram 대화에서는 다른 사람도 파일을 받으므로 화면 캡처를 사용할 수 없어요.",
   "error.agent.screenCaptureDeclined": "사용자가 이 화면 캡처를 허용하지 않았어요. 캡처된 내용은 없어요.",
+  "error.agent.creditMediaDeclined": "사용자가 이 생성을 허용하지 않았습니다. 크레딧은 사용되지 않았습니다.",
+  "error.agent.creditMediaNotSaved": "파일은 만들어졌지만 OpenBot이 채팅에 저장하지 못했습니다.",
   "error.agent.mcpServerDeclined": "사용자가 이 MCP 서버 변경을 허용하지 않았어요. 변경된 내용은 없어요.",
   "error.agent.mcpToolDeclined": "사용자가 이 MCP 도구 호출을 허용하지 않았어요. 도구는 실행되지 않았어요.",
   "error.agent.mcpServerNotSaved": "MCP 서버가 응답하지 않아 저장하지 않았어요. {error}",

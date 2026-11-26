@@ -28,6 +28,7 @@ import {
 import { OpenPanelBase, type OpenPanelOptions } from "@openpanel/web";
 import { Effect, Exit, Scope } from "effect";
 import { parse as parseDomain } from "tldts";
+import type { CreditMediaReport } from "../backend/agent/credit-media-tools";
 import type { FailureSignal } from "../backend/agent/failure-signal";
 import type { ToolUsageSignal } from "../backend/agent/thread-items";
 import type { TurnTiming } from "../backend/agent/turn-lifecycle";
@@ -177,6 +178,33 @@ const MAX_WEBHOOK_BODY_BYTES = 2 * 1024 * 1024;
 const MAX_WEBHOOK_HANDLE_MS = 10 * 60 * 1_000;
 const MAX_WEBHOOK_AGE_MS = 10 * 60 * 1_000;
 const MAX_WEBHOOK_DELIVERY_EVENTS_PER_MINUTE = 60;
+const CREDIT_MEDIA_ENUMS = {
+  media_kind: ["image", "video"],
+  outcome: [
+    "generated",
+    "failed",
+    "not_saved",
+    "declined",
+    "skipped",
+    "muted",
+    "not_asked",
+    "short",
+    "invalid",
+    "input_failed",
+    "stopped",
+    "unavailable",
+  ],
+  model_source: ["agent", "default"],
+  hold_reason: ["balance", "agents_off"],
+  hold_answer: ["continued", "enabled", "skipped", "muted", "not_asked", "stopped"],
+  hold_via: ["local", "remote", "automatic"],
+  approval: ["accepted", "declined"],
+  approval_via: ["local", "remote", "automatic"],
+} as const;
+const CREDIT_MEDIA_MODEL_PATTERN = /^[a-z0-9][a-z0-9._:/-]{0,79}$/iu;
+const CREDIT_MEDIA_SPEC_PATTERN = /^[a-z0-9][a-z0-9:.x_-]{0,15}$/iu;
+const MAX_CREDIT_MEDIA_CREDITS = 1_000_000;
+const MAX_CREDIT_MEDIA_MS = 24 * 60 * 60 * 1_000;
 const WEBHOOK_DELIVERY_WINDOW_MS = 60 * 1_000;
 
 type AnalyticsIdentity = Pick<CentralAuthUser, "id" | "email">;
@@ -194,6 +222,7 @@ type HostEventName =
   | "system_site_visited"
   | "system_routine_run"
   | "system_workflow_run"
+  | "system_credit_media"
   | "system_webhook_delivery"
   | "system_inventory"
   | "system_resources"
@@ -341,6 +370,28 @@ const HOST_ALLOWLIST = {
   ],
   system_site_visited: [...AGENT_PROPERTY_NAMES, "domain", "actor"],
   system_routine_run: [...AGENT_PROPERTY_NAMES, "status", "run_kind", "run_source", "trigger_type"],
+  system_credit_media: [
+    ...AGENT_PROPERTY_NAMES,
+    "origin",
+    "media_kind",
+    "outcome",
+    "media_model",
+    "agent_media_model",
+    "model_source",
+    "model_changed",
+    "credits_cost",
+    "credits_charged",
+    "resolution",
+    "duration_seconds",
+    "audio",
+    "reference_count",
+    "hold_reason",
+    "hold_answer",
+    "hold_via",
+    "approval",
+    "approval_via",
+    "duration_ms",
+  ],
   system_webhook_delivery: [
     "owner_kind",
     "format",
@@ -762,6 +813,45 @@ export class HostAnalytics {
         ]),
       ),
     });
+  }
+
+  handleCreditMedia(report: CreditMediaReport): void {
+    if (!this.#client) return;
+    const turn = this.#activeTurns.get(report.turnId);
+    this.#track(
+      "system_credit_media",
+      {
+        ...(turn?.properties ?? this.#agentProperties(report.agentId)),
+        origin: turn?.origin ?? "unknown",
+        media_kind: report.kind,
+        outcome: report.outcome,
+        ...optionalProperty("media_model", report.model),
+        ...optionalProperty("agent_media_model", report.agentModel),
+        ...optionalProperty("model_source", report.modelSource),
+        ...optionalProperty("credits_cost", report.cost),
+        ...optionalProperty("credits_charged", report.charged),
+        ...optionalProperty("resolution", report.resolution),
+        ...optionalProperty("duration_seconds", report.durationSeconds),
+        ...optionalProperty("audio", report.audio),
+        reference_count: report.references,
+        ...(report.hold
+          ? {
+              hold_reason: report.hold.reason,
+              ...optionalProperty("hold_answer", report.hold.answer),
+              ...optionalProperty("hold_via", report.hold.via),
+            }
+          : {}),
+        ...(report.approval
+          ? {
+              approval: report.approval.accepted ? "accepted" : "declined",
+              ...optionalProperty("approval_via", report.approval.via),
+              model_changed: report.approval.modelChanged,
+            }
+          : {}),
+        duration_ms: Math.max(0, Math.round(report.durationMs)),
+      },
+      turn?.owner,
+    );
   }
 
   handleWebhookDelivery(report: WebhookDeliveryReport): void {
@@ -1344,6 +1434,30 @@ function sanitizeHostProperty(name: HostEventName, key: string, value: unknown):
         : systemFailureCode(value)
       : "unknown";
   }
+  if (name === "system_credit_media") {
+    if (
+      key === "media_kind" ||
+      key === "outcome" ||
+      key === "model_source" ||
+      key === "hold_reason" ||
+      key === "hold_answer" ||
+      key === "hold_via" ||
+      key === "approval" ||
+      key === "approval_via"
+    )
+      return isOneOf(CREDIT_MEDIA_ENUMS[key], value) ? value : undefined;
+    if (key === "media_model" || key === "agent_media_model")
+      return isString(value) && CREDIT_MEDIA_MODEL_PATTERN.test(value) ? value : undefined;
+    if (key === "resolution") return isString(value) && CREDIT_MEDIA_SPEC_PATTERN.test(value) ? value : undefined;
+    if (key === "model_changed" || key === "audio") return isBoolean(value) ? value : undefined;
+    if (key === "credits_cost" || key === "credits_charged")
+      return isNumber(value) && Number.isFinite(value) && value >= 0 && value <= MAX_CREDIT_MEDIA_CREDITS
+        ? value
+        : undefined;
+    if (key === "duration_seconds") return boundedCount(value, 3_600);
+    if (key === "reference_count") return boundedCount(value, 100);
+    if (key === "duration_ms") return boundedCount(value, MAX_CREDIT_MEDIA_MS);
+  }
   if (name === "hosted_site_action") {
     if (key === "action") return isOneOf(["publish", "replace", "delete"] as const, value) ? value : undefined;
     if (key === "entry_point") return value === "agent" ? value : undefined;
@@ -1448,6 +1562,10 @@ function analyticsDomain(hostname: string): string | undefined {
 
 function isHomeNetwork(domain: string): boolean {
   return domain === "home.arpa" || domain.endsWith(".home.arpa");
+}
+
+function optionalProperty(property: HostPropertyName, value: HostPropertyValue | null): HostProperties {
+  return value === null ? {} : { [property]: value };
 }
 
 function boundedCount(value: unknown, max: number): number | undefined {

@@ -50,6 +50,8 @@ export default defineConfig({
           "agent-database-host": resolve("src/backend/agent-data/agent-database-host.ts"),
           "voice-transcription-host": resolve("src/main/voice-transcription-host.ts"),
           "voice-speech-host": resolve("src/main/voice-speech-host.ts"),
+          "process-launcher-host": resolve("src/main/process-launcher-host.ts"),
+          "usage-report-worker": resolve("src/backend/database/usage-report-worker.ts"),
         },
       },
     },

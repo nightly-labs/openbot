@@ -98,6 +98,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Partie suivante",
   "mobile.chat.preview.pdfFailed": "Impossible d’afficher ce PDF.",
   "mobile.chat.preview.spreadsheetFailed": "Impossible de lire cette feuille de calcul.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Cette feuille de calcul est trop volumineuse pour l’aperçu. Partagez-la pour l’ouvrir dans une autre app.",
   "mobile.chat.preview.spreadsheetTruncated":
     "Aperçu limité aux {rows} premières lignes et aux {columns} premières colonnes.",
   "mobile.chat.copyFailedMessage": "Veuillez réessayer.",
@@ -133,6 +135,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "Maintenez le bouton enfoncé pour confirmer.",
   "mobile.chat.question.preview": "Aperçu",
   "mobile.chat.question.showAllPreview": "Tout afficher",
+  "mobile.chat.question.copyPreviewFailed": "Impossible de copier le brouillon",
   "mobile.chat.question.sendChoice": "Envoyer",
   "mobile.chat.question.selectedCount": { one: "{count} sélectionné", other: "{count} sélectionnés" },
   "mobile.chat.question.noneSelected": "Rien de sélectionné",
@@ -461,6 +464,7 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "Envoi en cours",
   "mobile.chat.outbox.sendsWhenOnline": "Sera envoyé quand le serveur sera en ligne",
   "mobile.chat.outbox.waiting": "En attente d’envoi",
+  "mobile.chat.outbox.waitingForFailed": "En attente du message non envoyé",
   "mobile.chat.outbox.failed": "Non envoyé",
   "mobile.chat.outbox.failedHold": "Non envoyé. Maintenez le message appuyé pour réessayer.",
   "mobile.chat.outbox.cancelSend": "Ne pas envoyer",
@@ -556,6 +560,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "En attente de réponses",
   "mobile.chat.queue.providerRestart": "En attente du redémarrage de {provider}",
   "mobile.chat.queue.signIn": "En attente de connexion à {provider}",
+  "mobile.chat.queue.usageLimit": "Limite d’utilisation atteinte",
+  "mobile.chat.queue.usageLimitResets": "Limite d’utilisation atteinte · Réinitialisation le {time}",
   "mobile.chat.providerSignIn.title": "{provider} n’est pas connecté",
   "mobile.chat.providerSignIn.action": "Se connecter",
   "mobile.chat.providerSignIn.open": "{label}. Ouvrir les réglages du fournisseur",

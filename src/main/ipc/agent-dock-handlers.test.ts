@@ -291,13 +291,30 @@ describe("agent dock handlers", () => {
     expect(() => call("getPresentation", MAIN_ID)).toThrow("outside the agent dock window");
     expect(call("getPresentation", DOCK_ID)).toEqual(PRESENTATION);
     const channelSend: AgentDockAction = { ...SEND, seat: { kind: "channel", id: "channel-1" } };
+    const threadSend: AgentDockAction = { ...SEND, taskId: "task-1" };
+    const threadActions: AgentDockAction[] = [
+      { type: "open-thread", serverId: "local", agentId: "agent-1", threadId: "main" },
+      { type: "open-thread", serverId: "local", agentId: "agent-1", threadId: "task-2", started: true },
+      { type: "new-thread", serverId: "local", agentId: "agent-1" },
+      {
+        type: "start-thread",
+        serverId: "local",
+        agentId: "agent-1",
+        text: "Plan the offsite",
+        clientMessageId: "draft-2",
+      },
+    ];
     await call("performAction", DOCK_ID, SEND);
     await call("performAction", DOCK_ID, channelSend);
+    await call("performAction", DOCK_ID, threadSend);
+    for (const action of threadActions) await call("performAction", DOCK_ID, action);
     await call("performAction", DOCK_ID, { type: "open-settings" });
     call("setInteractive", DOCK_ID, { interactive: true, keyboard: true });
     expect(actions).toEqual([
       [DOCK_ID, SEND],
       [DOCK_ID, channelSend],
+      [DOCK_ID, threadSend],
+      ...threadActions.map((action) => [DOCK_ID, action]),
       [DOCK_ID, { type: "open-settings" }],
     ]);
     expect(interactive).toEqual([[DOCK_ID, { interactive: true, keyboard: true }]]);
@@ -309,6 +326,31 @@ describe("agent dock handlers", () => {
     expect(() => call("performAction", DOCK_ID, { ...SEND, seat: { kind: "group", id: "agent-1" } })).toThrow(
       "action is invalid",
     );
+    expect(() => call("performAction", DOCK_ID, { ...SEND, taskId: "" })).toThrow("action is invalid");
+    expect(() =>
+      call("performAction", DOCK_ID, { type: "open-thread", serverId: "local", agentId: "agent-1", threadId: "" }),
+    ).toThrow("action is invalid");
+    expect(() =>
+      call("performAction", DOCK_ID, {
+        type: "open-thread",
+        serverId: "local",
+        agentId: "agent-1",
+        threadId: "task-2",
+        started: "yes",
+      }),
+    ).toThrow("action is invalid");
+    expect(() =>
+      call("performAction", DOCK_ID, {
+        type: "start-thread",
+        serverId: "local",
+        agentId: "agent-1",
+        text: "   ",
+        clientMessageId: "draft-3",
+      }),
+    ).toThrow("action is invalid");
+    expect(() =>
+      call("performAction", DOCK_ID, { ...SEND, seat: { kind: "channel", id: "channel-1" }, taskId: "task-1" }),
+    ).toThrow("action is invalid");
     expect(() => call("performAction", DOCK_ID, { type: "open-link", url: "x".repeat(8193) })).toThrow(
       "action is invalid",
     );

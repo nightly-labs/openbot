@@ -101,6 +101,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "החלק הבא",
   "mobile.chat.preview.pdfFailed": "לא ניתן להציג את ה-PDF הזה.",
   "mobile.chat.preview.spreadsheetFailed": "לא ניתן לקרוא את הגיליון הזה.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "הגיליון גדול מדי לתצוגה מקדימה. אפשר לשתף אותו כדי לפתוח אותו באפליקציה אחרת.",
   "mobile.chat.preview.spreadsheetTruncated":
     "התצוגה המקדימה מוגבלת ל-{rows} השורות הראשונות ול-{columns} העמודות הראשונות.",
   "mobile.chat.copyFailedMessage": "יש לנסות שוב.",
@@ -136,6 +138,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "יש ללחוץ לחיצה ארוכה על הלחצן כדי לאשר.",
   "mobile.chat.question.preview": "תצוגה מקדימה",
   "mobile.chat.question.showAllPreview": "הצגת הכול",
+  "mobile.chat.question.copyPreviewFailed": "לא ניתן להעתיק את הטיוטה",
   "mobile.chat.question.sendChoice": "שליחה",
   "mobile.chat.question.selectedCount": { one: "נבחר אחד", two: "נבחרו שניים", other: "נבחרו {count}" },
   "mobile.chat.question.noneSelected": "לא נבחר דבר",
@@ -448,6 +451,7 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "מעלה",
   "mobile.chat.outbox.sendsWhenOnline": "יישלח כשהשרת יתחבר",
   "mobile.chat.outbox.waiting": "ממתין לשליחה",
+  "mobile.chat.outbox.waitingForFailed": "ממתין להודעה שלא נשלחה",
   "mobile.chat.outbox.failed": "לא נשלח",
   "mobile.chat.outbox.failedHold": "לא נשלח. יש ללחוץ לחיצה ארוכה על ההודעה כדי לנסות שוב.",
   "mobile.chat.outbox.cancelSend": "לא לשלוח",
@@ -542,6 +546,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "ממתין לתשובות",
   "mobile.chat.queue.providerRestart": "ממתין להפעלה מחדש של {provider}",
   "mobile.chat.queue.signIn": "ממתין להתחברות ל-{provider}",
+  "mobile.chat.queue.usageLimit": "הגעת למגבלת השימוש",
+  "mobile.chat.queue.usageLimitResets": "הגעת למגבלת השימוש · מתאפס {time}",
   "mobile.chat.providerSignIn.title": "אין התחברות ל-{provider}",
   "mobile.chat.providerSignIn.action": "התחברות",
   "mobile.chat.providerSignIn.open": "{label}. פתיחת הגדרות הספק",

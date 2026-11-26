@@ -250,7 +250,7 @@ export class SkillMarketplaceService {
 
   #availableVersion(skillId: string): Effect.Effect<number, SkillMarketplaceFailure> {
     return skillId.startsWith("local-skill-")
-      ? this.get(skillId).pipe(Effect.map((detail) => detail.version))
+      ? Effect.suspend(() => this.requireLocalLibrary().revision(skillId)).pipe(toSkillMarketplaceFailure)
       : Cache.get(this.#catalogVersions, skillId);
   }
 
@@ -518,20 +518,19 @@ export class SkillMarketplaceService {
           return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.replaceModified")) });
       }
       const owned = new Set(Object.values(lock.skills).flatMap(entryFolders));
-      for (const folder of folders.keys()) {
+      for (const [folder, folderFiles] of folders) {
         if (owned.has(folder)) continue;
         if (MANAGED_SKILL_SLUGS.has(folder))
           return yield* new SkillMarketplaceFailure({
             cause: new Error(sourceText("error.skill.managedSlug", { slug: folder })),
           });
-        for (const target of [
-          ...targetDirectories(agent.workspacePath, folder),
-          disabledDirectory(agent.workspacePath, folder),
-        ]) {
-          if (yield* pathExists(target))
-            return yield* new SkillMarketplaceFailure({
-              cause: new Error(sourceText("error.skill.unmanagedExists", { path: target })),
-            });
+        const ownSkillExists = new SkillMarketplaceFailure({
+          cause: new Error(sourceText("error.skill.ownSkillExists", { slug: folder })),
+        });
+        if (yield* pathExists(disabledDirectory(agent.workspacePath, folder))) return yield* ownSkillExists;
+        for (const target of targetDirectories(agent.workspacePath, folder)) {
+          if ((yield* pathExists(target)) && !(yield* copyHas(target, fileHashes(folderFiles))))
+            return yield* ownSkillExists;
         }
       }
       const receiptId = existing?.receiptId ?? randomUUID();
@@ -1038,9 +1037,7 @@ const onlyNewFiles = Effect.fn("SkillMarketplace.onlyNewFiles")(function* (
   for (const [folder, files] of skillFolders(entry.slug, entry.files, entry.folders ?? [])) {
     const acceptedHashes = accepted.flatMap((folders) => {
       const acceptedFiles = folders.get(folder);
-      return acceptedFiles
-        ? [Object.fromEntries(Object.entries(acceptedFiles).map(([name, bytes]) => [name, sha256(bytes)]))]
-        : [];
+      return acceptedFiles ? [fileHashes(acceptedFiles)] : [];
     });
     target: for (const target of enabled
       ? targetDirectories(workspace, folder)
@@ -1052,6 +1049,10 @@ const onlyNewFiles = Effect.fn("SkillMarketplace.onlyNewFiles")(function* (
   }
   return true;
 });
+
+function fileHashes(files: Record<string, Uint8Array>): Record<string, string> {
+  return Object.fromEntries(Object.entries(files).map(([name, bytes]) => [name, sha256(bytes)]));
+}
 
 const copyHas = Effect.fn("SkillMarketplace.copyHas")(function* (
   target: string,

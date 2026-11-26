@@ -14,6 +14,44 @@ export const messages = {
   "error.connector.githubExpired": "La connexion GitHub a expiré. Connectez GitHub à nouveau.",
   "error.connector.githubFileUnreadable": "Le fichier de connexion GitHub est illisible.",
   "error.connector.githubFileTooLarge": "Le fichier de connexion GitHub est trop volumineux.",
+  "error.connector.nearSignIn": "Connectez-vous à OpenBot pour utiliser le portefeuille crypto.",
+  "error.connector.nearServiceUnavailable":
+    "Le service du portefeuille crypto n’est pas disponible. Réessayez plus tard.",
+  "error.connector.nearWalletNotFound": "Ce portefeuille n’appartient pas à ce compte ou à ce serveur OpenBot.",
+  "error.connector.nearWalletLimit": "Trop de nouveaux portefeuilles aujourd’hui. Réessayez demain.",
+  "error.connector.nearProviderBusy": "NEAR Intents ne répond pas pour le moment. Réessayez dans quelques minutes.",
+  "error.connector.nearNoWallet":
+    "Aucun portefeuille crypto n’est configuré. Configurez-le dans Réglages du serveur > Vault > Crypto.",
+  "error.connector.nearWalletExists": "Un portefeuille crypto est déjà configuré.",
+  "error.connector.nearFrozen":
+    "Les paiements depuis le portefeuille crypto sont en pause. Reprenez-les dans Réglages du serveur > Vault > Crypto.",
+  "error.connector.nearAgentNotAllowed":
+    "Cet agent ne peut pas payer depuis le portefeuille crypto. Activez-le dans Réglages du serveur > Vault > Crypto.",
+  "error.connector.nearGrantExpired":
+    "OpenBot n’a pas d’autorisation de paiement pour le portefeuille crypto. Renouvelez-la dans Réglages du serveur > Vault > Crypto.",
+  "error.connector.nearUnknownAsset": "Le portefeuille crypto n’a pas d’actif {asset}.",
+  "error.connector.nearAmountInvalid": "{amount} n’est pas un montant valide de {asset}.",
+  "error.connector.nearRecipientInvalid": "{recipient} n’est ni un compte NEAR ni une adresse chain:address.",
+  "error.connector.nearRefused": "La NEAR Intents Agent API a refusé la requête : {detail}",
+  "error.connector.nearUnexpected": "La NEAR Intents Agent API a envoyé une réponse inattendue : {detail}",
+  "error.connector.nearUnreachable": "OpenBot ne peut pas joindre la NEAR Intents Agent API : {detail}",
+  "error.connector.nearFileUnreadable": "Le fichier du portefeuille crypto est illisible.",
+  "error.connector.nearFileTooLarge": "Le fichier du portefeuille crypto est trop volumineux.",
+  "error.connector.nearSigningCanceled": "La signature a été annulée.",
+  "error.connector.nearSigningExpired": "La signature n’est pas arrivée à temps. Réessayez.",
+  "error.connector.nearSigningInvalid": "La signature du navigateur n’est pas valide.",
+  "error.connector.nearSigningBusy":
+    "Une autre signature est en attente dans le navigateur. Terminez-la ou annulez-la d’abord.",
+  "error.connector.nearPolicyCooldown":
+    "Vous pourrez de nouveau modifier les règles du portefeuille à partir de {time}.",
+  "error.connector.nearPolicyPending": "La modification des règles n’a pas abouti. Réessayez dans quelques minutes.",
+  "error.connector.nearDeclined": "Le propriétaire a refusé le paiement.",
+  "error.connector.nearUncertain":
+    "OpenBot ne sait pas si le paiement a été envoyé. Ne payez pas une deuxième fois. Le propriétaire peut consulter l’historique du portefeuille.",
+  "error.connector.nearPaymentFailed": "Le paiement a échoué : {detail}",
+  "error.connector.nearPaymentUnknown": "Ce paiement n’attend plus de réponse.",
+  "error.connector.nearRuleFull": "Une règle de paiement peut avoir au plus {limit} destinataires.",
+  "error.connector.nearRulesFull": "Le portefeuille peut avoir au plus {limit} règles de paiement.",
   "error.connector.onePasswordCliMissing":
     "OpenBot ne trouve pas la CLI 1Password. Installez-la et activez son intégration dans l’application 1Password, ou utilisez un jeton de compte de service.",
   "error.connector.onePasswordCliInstallFailed":

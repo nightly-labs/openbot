@@ -309,6 +309,8 @@ export const messages = {
     "OpenCode 모델이 작업을 텍스트로만 쓰고 실행하지 않았어요. 다시 시도하거나 다른 모델을 선택하세요.",
   "error.provider.acpNoAnswer":
     "{provider}이(가) 답변 없이 턴을 끝냈어요. 메시지를 다시 보내거나 새 채팅을 시작해 주세요.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider}이(가) 팀원의 결과를 받은 뒤 답변 없이 턴을 끝냈어요. 에이전트에게 계속하라고 요청해 주세요.",
   "error.provider.noAnswerAfterSteps":
     "{provider}이(가) 몇 가지 단계를 실행한 뒤 답변 없이 턴을 끝냈어요. 같은 요청을 다시 보내기 전에 에이전트에게 무엇을 했는지 물어보세요.",
   "error.provider.acpRefusedNoReason": "{provider}이(가) 답변 없이 멈췄어요. 메시지를 다시 보내 주세요.",
@@ -351,6 +353,8 @@ export const messages = {
     "Gemini가 이 채팅의 저장된 기록을 읽지 못했습니다. OpenBot이 채팅 기록으로 새 Gemini 세션을 시작했습니다. 메시지를 다시 보내세요.",
   "error.provider.acpTurnStuck":
     "{provider}이(가) 이전 턴을 끝내지 않아 이 메시지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 메시지를 다시 보내세요.",
+  "error.provider.antigravityLicenseRefused":
+    "Google에 따르면 이 계정에는 이 모델을 사용할 라이선스가 없어요. 다른 모델을 선택한 후 메시지를 다시 보내 주세요.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google이 이 에이전트를 실행하는 컴퓨터의 네트워크 위치에서는 Gemini 사용을 허용하지 않아요. 다른 컴퓨터에서 Gemini를 사용하거나 이 에이전트에 다른 제공자를 선택하세요.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -372,6 +376,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Cursor를 사용하려면 Cursor로 로그인하거나 CURSOR_API_KEY를 설정하세요.",
   "error.provider.cursorSignInUnusable":
     "Cursor가 로그인 정보로 서버에 연결하지 못했어요. 인터넷 연결을 확인한 다음 Cursor에 다시 로그인하세요.",
+  "error.provider.cursorNoModels":
+    "Cursor가 모델 목록을 보내지 않았습니다. '연결'을 선택해 Cursor에 다시 로그인하세요. 이 메시지가 계속 표시되면 Cursor 요금제에 모델이 포함되어 있는지 확인하세요.",
   "error.provider.clineArchivePath": "Cline 아카이브에 예상하지 못한 경로가 있어요.",
   "error.provider.clinePackageMismatch": "Cline 패키지가 런타임 카탈로그와 일치하지 않아요.",
   "error.provider.clineChecksum": "Cline 런타임 체크섬이 일치하지 않아요.",
@@ -441,6 +447,8 @@ export const messages = {
     "이미지가 너무 커서 모델이 이 채팅의 이미지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
   "error.provider.imageCountLimit":
     "이미지가 너무 많아서 모델이 이 채팅을 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
+  "error.provider.imageCountLimitRepeated":
+    "이미지가 너무 많아서 모델이 이 채팅을 다시 받지 않았습니다. 한 작업이 이 모델이 받는 것보다 많은 이미지를 열기 때문에 새 세션으로는 해결되지 않습니다. 새 채팅을 선택하고 에이전트에게 각 단계에서 이미지를 더 적게 열라고 요청하거나, 이미지를 더 많이 받는 모델을 선택하세요.",
   "error.provider.imageUnreadable":
     "모델이 이 채팅의 이미지를 읽지 못했습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요. 이미지를 보냈다면 다른 이미지를 보내세요.",
   "error.provider.requestTooLarge":
@@ -455,6 +463,8 @@ export const messages = {
     "Muse가 MCP 서버를 시작하지 못해서 이 세션에서 MCP를 차단했어요. OpenBot이 채팅 기록으로 새 Muse 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 이 에이전트의 컴퓨터 제어 또는 실패한 MCP 서버를 끄세요.",
   "error.provider.claudeSessionMissing":
     "Claude Code가 이 채팅의 저장된 세션을 찾지 못했어요. OpenBot이 채팅 기록으로 새 Claude Code 세션을 시작했어요. 다시 시도해 주세요.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode가 이 채팅의 저장된 세션을 찾지 못했어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 다시 시도해 주세요.",
   "error.provider.grokSignIn": "Grok을 사용하려면 `grok login`을 실행하거나 XAI_API_KEY를 설정하세요.",
   "error.provider.acpSignInNoStart":
     "제공자가 시작되지 않아 로그인을 시작할 수 없었어요. 다시 시도하거나 OpenBot을 다시 시작해 주세요.",
@@ -563,7 +573,10 @@ export const messages = {
   "error.provider.piOutdated":
     "Pi {version}이(가) 너무 오래되었어요. 네이티브 RPC 및 MCP 지원을 위해 Pi 1.1.0 이상을 설치하세요.",
   "error.provider.nativeMissing": "{provider} CLI가 설치되어 있지 않아요. 설정에서 다운로드하세요.",
-  "error.provider.nativeNotStarted": "{provider} CLI를 시작할 수 없었어요.",
+  "error.provider.nativeNotStarted":
+    "OpenBot이 설치된 {provider}를 찾았지만 시작되지 않았어요. {provider}를 업데이트하거나 다시 설치한 다음 다시 시도하세요.",
+  "error.provider.nativeManagedNotStarted":
+    "이 서버를 실행하는 컴퓨터에서 {provider}가 시작되지 않았어요. 그 컴퓨터에서 OpenBot을 다시 시작하세요. 그래도 시작되지 않으면 도움말 > 문제 신고를 선택하세요.",
   "error.provider.nativeVersionUnreadable": "{provider} CLI 버전을 읽을 수 없었어요.",
   "error.provider.piSessionBusy": "현재 Pi 턴이 끝날 때까지 기다려 주세요.",
   "error.provider.acpSessionBusy": "{provider}이(가) 중지된 턴을 아직 마무리하고 있습니다. 잠시 후 다시 시도해 주세요.",

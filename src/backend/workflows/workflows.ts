@@ -589,6 +589,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             const answer = delivery.turnId ? dependencies.turnAnswer(step.agentId, delivery.turnId) : null;
             const output = answer === null || isNoUpdateAnswer(answer) ? "" : answer;
             if (fields.length === 0) return settle(step, { status: "done", output });
+            const quietAnswer = output === "" ? readGivenAnswer(fields, {}) : null;
+            if (quietAnswer && "output" in quietAnswer)
+              return settle(step, { status: "done", output: quietAnswer.output });
             const read = readAnswer(fields, output);
             if ("output" in read) return settle(step, { status: "done", output: read.output });
             const fix = yield* askAnswerFix(step, step.agentId, step.deliveryId, answerFixAsk(fields, read.problems));

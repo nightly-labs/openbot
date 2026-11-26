@@ -58,6 +58,10 @@ export interface ServerActionCallbacks {
   onRenewPlan?: ((serverId: string) => Promise<void>) | undefined;
 }
 
+export function accountRestartsServer(server: Pick<ServerSummary, "hosted" | "restartAvailable">): boolean {
+  return server.hosted === true && server.restartAvailable !== false;
+}
+
 export function ServerActionItems(
   props: ServerActionCallbacks & {
     menu: ServerActionMenu;
@@ -79,9 +83,8 @@ export function ServerActionItems(
     Boolean(props.onRestart) &&
     props.server.kind === "remote" &&
     canAdministerServer(props.server.role) &&
-    props.server.restartAvailable !== false &&
     !(props.server.hostedSleep === "waking" && props.server.hostedStart?.step !== "openbot") &&
-    (props.server.hosted === true || Boolean(props.canRestart?.(props.server.id)));
+    (accountRestartsServer(props.server) || Boolean(props.canRestart?.(props.server.id)));
   const canHide = () => Boolean(props.onHide) && Boolean(props.canHide?.(props.server.id));
   const Menu = props.menu;
   return (

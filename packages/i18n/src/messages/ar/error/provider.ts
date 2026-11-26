@@ -287,6 +287,8 @@ export const messages = {
   "error.provider.opencodeToolCallsAsText":
     "كتب نموذج OpenCode إجراءاته كنص ولم ينفّذها. أعد المحاولة، أو اختر نموذجًا آخر.",
   "error.provider.acpNoAnswer": "أنهى {provider} الدور بدون إجابة. أرسل الرسالة مرة أخرى، أو ابدأ دردشة جديدة.",
+  "error.provider.teammateResultsNoAnswer":
+    "تلقى {provider} النتائج من زملائه، ثم أنهى الدور بدون إجابة. اطلب من الوكيل أن يتابع.",
   "error.provider.noAnswerAfterSteps":
     "نفّذ {provider} بعض الخطوات، ثم أنهى الدور بدون إجابة. اسأل الوكيل عمّا فعله قبل أن ترسل الطلب نفسه مرة أخرى.",
   "error.provider.acpRefusedNoReason": "توقف {provider} بدون إجابة. أرسل الرسالة مرة أخرى.",
@@ -329,6 +331,8 @@ export const messages = {
     "تعذّر على Gemini قراءة السجل المحفوظ لهذه الدردشة. بدأ OpenBot جلسة Gemini جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
   "error.provider.acpTurnStuck":
     "لم يُنهِ {provider} دوره السابق، لذلك لم يقبل هذه الرسالة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
+  "error.provider.antigravityLicenseRefused":
+    "تقول Google إن حسابك لا يملك ترخيصًا لاستخدام هذا النموذج. اختر نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "لا تسمح Google بتشغيل Gemini من الموقع الشبكي للكمبيوتر الذي يشغّل هذا الوكيل. استخدم Gemini على كمبيوتر آخر، أو اختر مزوّدًا آخر لهذا الوكيل.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -348,6 +352,8 @@ export const messages = {
   "error.provider.cursorSignIn": "سجّل الدخول باستخدام Cursor أو عيّن CURSOR_API_KEY لاستخدام Cursor.",
   "error.provider.cursorSignInUnusable":
     "تعذّر على Cursor الاتصال بخادمه باستخدام تسجيل دخولك. تحقّق من اتصالك بالإنترنت، ثم سجّل الدخول إلى Cursor مرة أخرى.",
+  "error.provider.cursorNoModels":
+    "لم يرسل Cursor قائمة النماذج. اختر «اتصال» لتسجيل الدخول إلى Cursor مرة أخرى. إذا بقيت هذه الرسالة، فتحقق من أن خطة Cursor تتضمن نماذج.",
   "error.provider.clineArchivePath": "يحتوي أرشيف Cline على مسار غير متوقع.",
   "error.provider.clinePackageMismatch": "لا تطابق حزمة Cline كتالوج بيئات التشغيل.",
   "error.provider.clineChecksum": "عدم تطابق المجموع الاختباري لبيئة تشغيل Cline.",
@@ -416,6 +422,8 @@ export const messages = {
     "لم يقبل النموذج صورة في هذه الدردشة لأن الصورة كبيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.imageCountLimit":
     "لم يقبل النموذج هذه الدردشة لأن فيها صورًا كثيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
+  "error.provider.imageCountLimitRepeated":
+    "لم يقبل النموذج هذه الدردشة مرة أخرى: فيها صور كثيرة جدًا. تفتح مهمة واحدة صورًا أكثر مما يقبله هذا النموذج، لذلك لا تساعد جلسة جديدة. اختر دردشة جديدة واطلب من الوكيل أن يفتح صورًا أقل في كل خطوة، أو اختر نموذجًا يقبل صورًا أكثر.",
   "error.provider.imageUnreadable":
     "لم يتمكن النموذج من قراءة صورة في هذه الدردشة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى. إذا أرسلت صورة، فأرسل صورة أخرى.",
   "error.provider.requestTooLarge":
@@ -430,6 +438,8 @@ export const messages = {
     "تعذّر على Muse تشغيل خادم MCP فحظر MCP في هذه الجلسة. بدأ OpenBot جلسة Muse جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، أوقف التحكم في الحاسوب أو خادم MCP الفاشل لهذا الوكيل.",
   "error.provider.claudeSessionMissing":
     "لم يعثر Claude Code على الجلسة المحفوظة لهذه الدردشة. بدأ OpenBot جلسة Claude Code جديدة بسجل الدردشة. أعد المحاولة.",
+  "error.provider.opencodeSessionMissing":
+    "لم يعثر OpenCode على الجلسة المحفوظة لهذه الدردشة. بدأ OpenBot جلسة OpenCode جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.grokSignIn": "شغّل `grok login` أو عيّن XAI_API_KEY لاستخدام Grok.",
   "error.provider.acpSignInNoStart": "لم يبدأ المزوّد، لذلك لم يبدأ تسجيل الدخول. حاول مرة أخرى، أو أعد تشغيل OpenBot.",
   "error.provider.acpSignInTimedOut": "انتهت مهلة تسجيل الدخول.",
@@ -531,7 +541,10 @@ export const messages = {
   "error.provider.sessionSettingsTimedOut": "لم تستجب جلسة الوكيل في الوقت المحدد. حاول مرة أخرى.",
   "error.provider.piOutdated": "إصدار Pi {version} قديم جدًا. ثبّت Pi 1.1.0 أو أحدث لدعم RPC وMCP الأصلي.",
   "error.provider.nativeMissing": "واجهة {provider} CLI غير مثبتة. نزّلها في الإعدادات.",
-  "error.provider.nativeNotStarted": "تعذّر تشغيل واجهة {provider} CLI.",
+  "error.provider.nativeNotStarted":
+    "وجد OpenBot ‏{provider} الذي ثبّتّه، لكنه لم يبدأ. حدّث {provider} أو أعد تثبيته، ثم حاول مرة أخرى.",
+  "error.provider.nativeManagedNotStarted":
+    "لم يبدأ {provider} على الحاسوب الذي يشغّل هذا الخادم. أعد تشغيل OpenBot على ذلك الحاسوب. إذا لم يبدأ بعد ذلك، فاختر المساعدة > الإبلاغ عن مشكلة.",
   "error.provider.nativeVersionUnreadable": "تعذّرت قراءة إصدار واجهة {provider} CLI.",
   "error.provider.piSessionBusy": "انتظر حتى ينتهي دور Pi الحالي.",
   "error.provider.acpSessionBusy": "لا يزال {provider} ينهي دورًا تم إيقافه. حاول مرة أخرى بعد قليل.",

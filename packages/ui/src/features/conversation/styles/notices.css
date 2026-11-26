@@ -25,6 +25,11 @@
   --notice-surface: var(--openbot-danger-soft);
 }
 
+.composer-notice[data-tone="info"] {
+  --notice-accent: var(--openbot-accent-text);
+  --notice-surface: var(--openbot-accent-soft);
+}
+
 .composer-notice:not(:has(.ui-button)) {
   --notice-inset: 8px;
 

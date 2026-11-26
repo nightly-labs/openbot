@@ -33,6 +33,13 @@
   flex-wrap: wrap;
 }
 
+.ui-item-description.server-mcp-row-text {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+}
+
 .server-mcp-controls[data-disabled] .server-mcp-row-title,
 .server-mcp-controls[data-disabled] .server-mcp-row-text {
   opacity: 0.55;
@@ -43,6 +50,17 @@
   align-items: center;
   gap: var(--openbot-space-2);
   margin-top: var(--openbot-space-1);
+}
+
+.server-mcp-sign-in-link {
+  display: grid;
+  justify-items: start;
+  gap: var(--openbot-space-2);
+}
+
+.server-mcp-sign-in-link > .mcp-sign-in-relay-form {
+  justify-self: stretch;
+  margin-top: var(--openbot-space-2);
 }
 
 .server-mcp-form {

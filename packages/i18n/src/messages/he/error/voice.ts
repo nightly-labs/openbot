@@ -31,6 +31,7 @@ export const messages = {
   "error.voice.live.timedOut": "הקול החי של Codex לא התחיל בזמן. יש לנסות שוב.",
   "error.voice.live.failed": "הקול החי נעצר: {reason}",
   "error.voice.live.disconnected": "הקול החי התנתק.",
+  "error.voice.live.connectionLost": "הקול החי איבד את החיבור. בטלו את השתקת המיקרופון כדי להפעיל אותו שוב.",
   "error.voice.live.startFailed":
     "לא ניתן היה להפעיל את הקול החי. עדכנו את Codex והיכנסו עם ChatGPT במחשב שמריץ את הסוכן, ואז נסו שוב. סיבה: {reason}",
   "error.voice.live.hostFailed":

@@ -163,6 +163,8 @@ export const messages = {
   "error.agent.screenCaptureUnavailable": "这台电脑不支持截屏。",
   "error.agent.screenCaptureShared": "在 Slack、Discord、Telegram 对话中无法使用截屏，因为其他人也会收到这些文件。",
   "error.agent.screenCaptureDeclined": "用户未允许本次截屏，没有截取任何内容。",
+  "error.agent.creditMediaDeclined": "用户未允许此次生成。未花费任何积分。",
+  "error.agent.creditMediaNotSaved": "文件已生成，但 OpenBot 无法将其保存到聊天中。",
   "error.agent.mcpServerDeclined": "用户未允许这次 MCP 服务器更改，未做任何更改。",
   "error.agent.mcpToolDeclined": "用户未允许这次 MCP 工具调用，工具没有运行。",
   "error.agent.mcpServerNotSaved": "该 MCP 服务器没有响应，因此未保存。{error}",
