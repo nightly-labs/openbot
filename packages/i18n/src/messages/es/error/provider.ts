@@ -364,6 +364,8 @@ export const messages = {
     "Gemini no pudo leer el historial guardado de este chat. OpenBot inició una nueva sesión de Gemini con el historial del chat. Vuelve a enviar tu mensaje.",
   "error.provider.acpTurnStuck":
     "{provider} no terminó su turno anterior, por lo que no aceptó este mensaje. OpenBot inició una nueva sesión de {provider} con el historial del chat. Vuelve a enviar tu mensaje.",
+  "error.provider.antigravityLicenseRefused":
+    "Google indica que tu cuenta no tiene licencia para usar este modelo. Elige otro modelo y vuelve a enviar tu mensaje.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google no permite que Gemini funcione desde la ubicación de red del equipo que ejecuta este agente. Usa Gemini en otro equipo o elige otro proveedor para este agente.\n{detail}",
   "error.provider.antigravityTurnStopped":

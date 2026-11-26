@@ -331,6 +331,8 @@ export const messages = {
     "تعذّر على Gemini قراءة السجل المحفوظ لهذه الدردشة. بدأ OpenBot جلسة Gemini جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
   "error.provider.acpTurnStuck":
     "لم يُنهِ {provider} دوره السابق، لذلك لم يقبل هذه الرسالة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
+  "error.provider.antigravityLicenseRefused":
+    "تقول Google إن حسابك لا يملك ترخيصًا لاستخدام هذا النموذج. اختر نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "لا تسمح Google بتشغيل Gemini من الموقع الشبكي للكمبيوتر الذي يشغّل هذا الوكيل. استخدم Gemini على كمبيوتر آخر، أو اختر مزوّدًا آخر لهذا الوكيل.\n{detail}",
   "error.provider.antigravityTurnStopped":

@@ -75,6 +75,7 @@ const GEMINI_NETWORK_FAILURE =
 
 const GEMINI_REQUEST_FAILURES = [
   ["error.provider.antigravityLocationUnsupported", /\bUser location is not supported\b/iu],
+  ["error.provider.antigravityLicenseRefused", /\b(?:do(?:es)? not|don't) have a valid license\b/iu],
   [
     "error.provider.antigravityModelAtCapacity",
     /\bMODEL_CAPACITY_EX(?:HAUSTED|CEEDED)\b|\b[Nn]o capacity available for model\b/u,
@@ -103,6 +104,7 @@ type GeminiRequestFailureKey = (typeof GEMINI_REQUEST_FAILURES)[number][0];
 
 const GEMINI_FAILURE_CAUSES: Partial<Record<GeminiRequestFailureKey, CauseCode>> = {
   "error.provider.antigravityQuotaReached": "usage_limit",
+  "error.provider.antigravityLicenseRefused": "billing",
   "error.provider.antigravityRateLimited": "rate_limit",
   "error.provider.antigravityModelUnavailable": "model_not_found",
   "error.provider.antigravityNetwork": "network",

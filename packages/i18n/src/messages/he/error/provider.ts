@@ -333,6 +333,8 @@ export const messages = {
     "Gemini לא הצליח לקרוא את ההיסטוריה השמורה של הצ'אט הזה. OpenBot התחיל סשן חדש של Gemini עם היסטוריית הצ'אט. יש לשלוח את ההודעה שוב.",
   "error.provider.acpTurnStuck":
     "{provider} לא סיים את התור הקודם שלו, ולכן לא קיבל את ההודעה הזו. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. יש לשלוח את ההודעה שוב.",
+  "error.provider.antigravityLicenseRefused":
+    "Google מציינת שלחשבון שלך אין רישיון להשתמש במודל הזה. יש לבחור מודל אחר ולשלוח את ההודעה שוב.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "חברת Google לא מאפשרת ל-Gemini לפעול ממיקום הרשת של המחשב שמריץ את הסוכן הזה. יש להשתמש ב-Gemini במחשב אחר, או לבחור ספק אחר לסוכן הזה.\n{detail}",
   "error.provider.antigravityTurnStopped":
