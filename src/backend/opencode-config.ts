@@ -177,6 +177,12 @@ function modelEntry(model: CustomProviderModel, withoutReasoning: boolean): Open
   };
 }
 
+export function hasCustomProviderCredentials(providers: readonly CustomProviderConfig[]): boolean {
+  return providers.some(
+    (provider) => provider.models.length > 0 && (Boolean(provider.apiKey) || provider.headers.length > 0),
+  );
+}
+
 function customProviderEntries(
   providers: readonly CustomProviderConfig[],
 ): Readonly<Record<string, OpenCodeProviderEntry>> | null {

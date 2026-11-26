@@ -40,6 +40,8 @@ interface Report {
   mediaTools?: {
     goKeyOnly: (boolean | null)[];
     otherProviderEnvKey: (boolean | null)[];
+    customProviderKey: (boolean | null)[];
+    userConfigKey: (boolean | null)[];
     otherProviderKey: (boolean | null)[];
   };
 }
@@ -54,6 +56,9 @@ process.env.FAKE_LOG = log;
 process.env.FAKE_AUTH_KEY = "expired";
 const openCodeData = join(root, "data", "opencode");
 process.env.XDG_DATA_HOME = join(root, "data");
+process.env.XDG_CONFIG_HOME = join(root, "config");
+delete process.env.OPENCODE_CONFIG;
+delete process.env.OPENCODE_CONFIG_DIR;
 delete process.env.OPENCODE_AUTH_CONTENT;
 delete process.env.OPENCODE_DB;
 for (const name of Object.keys(process.env)) if (name.endsWith("_API_KEY")) delete process.env[name];
@@ -110,19 +115,52 @@ try {
   };
   await runCauseEffect(second.stop());
 
+  const mediaToolsOfNewProcess = async () => {
+    await rm(log, { force: true });
+    const client = open(cli);
+    await startThread(client, { cwd: workspace });
+    await runCauseEffect(client.stop());
+    const spawn = (await readJsonl<LogEntry>(log)).find((entry) => entry.event === "spawn");
+    return [spawn?.imageTool ?? null, spawn?.videoTool ?? null];
+  };
+
   process.env.OPENAI_API_KEY = "other-provider";
-  await rm(log, { force: true });
-  try {
-    await startThread(open(cli), { cwd: workspace });
-  } finally {
+  const otherProviderEnvKey = await mediaToolsOfNewProcess().finally(() => {
     delete process.env.OPENAI_API_KEY;
-  }
-  const envKeySpawn = (await readJsonl<LogEntry>(log)).find((entry) => entry.event === "spawn");
-  const otherProviderEnvKey = [envKeySpawn?.imageTool ?? null, envKeySpawn?.videoTool ?? null];
+  });
   assert.deepEqual(
     otherProviderEnvKey,
     [null, null],
     "A provider key in the environment keeps the image and video tools.",
+  );
+
+  endpoints = [
+    {
+      id: "openai",
+      name: "OpenAI",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "endpoint-key",
+      models: [{ id: "gpt", name: "GPT" }],
+      headers: [],
+    },
+  ];
+  const customProviderKey = await mediaToolsOfNewProcess().finally(() => {
+    endpoints = [];
+  });
+  assert.deepEqual(
+    customProviderKey,
+    [null, null],
+    "A custom provider with a key keeps the image and video tools: OpenCode adds its catalog image models.",
+  );
+
+  const userConfig = join(root, "config", "opencode", "opencode.json");
+  await mkdir(join(root, "config", "opencode"), { recursive: true });
+  await writeFile(userConfig, JSON.stringify({ provider: { openai: { options: { apiKey: "user-key" } } } }));
+  const userConfigKey = await mediaToolsOfNewProcess().finally(() => rm(userConfig, { force: true }));
+  assert.deepEqual(
+    userConfigKey,
+    [null, null],
+    "A provider key in the user's own OpenCode config keeps the image and video tools.",
   );
 
   storedKey = null;
@@ -247,7 +285,7 @@ try {
     [null, null],
     "A stored key for another provider keeps the image and video tools.",
   );
-  report.mediaTools = { goKeyOnly, otherProviderEnvKey, otherProviderKey };
+  report.mediaTools = { goKeyOnly, otherProviderEnvKey, customProviderKey, userConfigKey, otherProviderKey };
   await runCauseEffect(eighth.stop());
 
   delete process.env.FAKE_PROVIDER_AUTH;

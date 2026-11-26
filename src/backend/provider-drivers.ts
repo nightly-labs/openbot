@@ -86,12 +86,13 @@ import type { McpOAuthAuthority } from "./mcp-oauth-provider";
 import type { McpOAuthProxySettingsStore } from "./mcp-oauth-proxy";
 import type { McpDropReporter, McpEndpointSource, McpServerSource, McpToolRuntimeSource } from "./mcp-provider-shapes";
 import { MuseAgentClient } from "./muse-client";
-import { openCodeAgentDefaultsEnv } from "./opencode-agent-defaults";
+import { openCodeAgentDefaultsEnv, openCodeUserConfigHasMediaSetup } from "./opencode-agent-defaults";
 import {
   CUSTOM_ENDPOINT_SILENCE_MS,
   type CustomProviderSource,
   clearedInheritedOpenCodeKeyEnv,
   customProvidersOn,
+  hasCustomProviderCredentials,
   OPENCODE_GO_PROVIDER,
   OPENCODE_PROFILE_CONFIG,
   openCodeAgentConfig,
@@ -883,9 +884,11 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         extraEnv: () => {
           const agentEnvironment = context.agentEnvironment?.();
           const keyEnv = clearedInheritedOpenCodeKeyEnv(context.apiKey("opencode"));
-          const mediaSignIn = Effect.runSync(
-            hasOpenCodeMediaSignIn({ ...process.env, ...agentEnvironment, ...keyEnv }),
-          );
+          const processEnv = { ...process.env, ...agentEnvironment, ...keyEnv };
+          const mediaSignIn =
+            hasCustomProviderCredentials(openCodeEndpoints(context)()) ||
+            openCodeUserConfigHasMediaSetup(processEnv) ||
+            Effect.runSync(hasOpenCodeMediaSignIn(processEnv));
           return {
             ...agentEnvironment,
             ...opencodeEnv(cli),
