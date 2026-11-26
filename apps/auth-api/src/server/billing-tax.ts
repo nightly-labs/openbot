@@ -105,7 +105,7 @@ export const setCustomerBillingDetails = Effect.fn("BillingTax.setCustomerBillin
     return yield* new BillingError(400, "vat_id_invalid", sourceText("error.billing.vatIdInvalid"));
   const tax = yield* stripeCall(() => stripe.getCustomerTax(customerId));
   const unansweredVatId = needsCheck && Option.isNone(answer) ? vatId : null;
-  const keptCheck = unansweredVatId !== null && tax.metadata[CUSTOMER_METADATA.vatId] === unansweredVatId;
+  const keptCheck = unansweredVatId !== null && confirmedVatId(tax) === unansweredVatId;
   for (const id of tax.taxIds) {
     if (id.type === "eu_vat" && id.value !== vatId)
       yield* stripeCall(() => stripe.deleteCustomerTaxId(customerId, id.id));
@@ -139,7 +139,7 @@ export const setCustomerBillingDetails = Effect.fn("BillingTax.setCustomerBillin
 
 function viesUnansweredText(customerId: string, vatId: string, keptCheck: boolean): string {
   return keptCheck
-    ? `VAT check: VIES did not answer for VAT ID ${vatId} of customer ${customerId}. VIES confirmed this ID before, so the customer keeps reverse charge.`
+    ? `VAT check: VIES did not answer for VAT ID ${vatId} of customer ${customerId}. This ID was confirmed before, so the customer keeps reverse charge.`
     : `VAT check: VIES did not answer for VAT ID ${vatId} of customer ${customerId}, so the customer pays Polish VAT. Check the ID in VIES. If it is valid, set reverse charge on the customer and its open subscriptions, or ask the customer to save the VAT ID again.`;
 }
 

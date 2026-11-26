@@ -1886,8 +1886,9 @@ creates them and the Customer Portal settings.
     buyer pays Polish VAT, the reply and the next `GET` have no VAT ID, and the operator alert
     (`HOSTED_POOL_ALERT_WEBHOOK_URL`) gets a "VAT check" line with the customer and the VAT ID. The
     operator checks the ID and can set reverse charge, or the buyer saves the ID again. When Stripe's
-    own check later marks the saved `eu_vat` ID `verified`, the next Checkout also gets reverse charge. An ID that VIES
-    confirmed before for this customer keeps reverse charge, also with an alert. The Worker tries VIES up to 3 times in
+    own check later marks the saved `eu_vat` ID `verified`, the next Checkout also gets reverse charge. An ID that was
+    confirmed before for this customer (by VIES, or `verified` by Stripe) keeps reverse charge, also with
+    an alert. The Worker tries VIES up to 3 times in
     20 seconds (9 seconds for each try), and checks again without `VIES_REQUESTER_VAT_ID` when VIES
     refuses it. It stops at once when VIES blocks the VAT ID or the caller (`VAT_BLOCKED`,
     `IP_BLOCKED`). Desktop and the web client wait 30 seconds for this `PUT`. The optional setting

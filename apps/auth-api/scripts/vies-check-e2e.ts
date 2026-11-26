@@ -112,7 +112,7 @@ interface FakeCustomer {
   country: string | null;
   taxExempt: string;
   metadata: Record<string, string>;
-  taxIds: { id: string; type: string; value: string }[];
+  taxIds: { id: string; type: string; value: string; verification?: { status: string } }[];
 }
 
 function stripeReply(body: unknown) {
@@ -296,6 +296,22 @@ try {
   assert.equal(kept.alerts.length, 1);
   assert.match(kept.alerts[0] ?? "", /^VAT check: VIES did not answer .*keeps reverse charge/);
   detailsCases.push(kept);
+
+  const stripeVerified = await runDetailsCase(
+    "VIES does not answer for an ID that Stripe verified: reverse charge stays",
+    ["serverError"],
+    {
+      country: "DE",
+      taxExempt: "reverse",
+      metadata: {},
+      taxIds: [{ id: "txi_migrated", type: "eu_vat", value: VAT_ID, verification: { status: "verified" } }],
+    },
+  );
+  assert.equal(stripeVerified.status, "saved");
+  assert.equal(stripeVerified.savedVatId, VAT_ID);
+  assert.equal(stripeVerified.customer.taxExempt, "reverse");
+  assert.match(stripeVerified.alerts[0] ?? "", /keeps reverse charge/);
+  detailsCases.push(stripeVerified);
 
   const unknown = await runDetailsCase("VIES does not know the VAT ID: refused", ["invalidInput"], newCustomer());
   assert.equal(unknown.status, "BillingError");
