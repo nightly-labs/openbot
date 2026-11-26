@@ -483,6 +483,15 @@ export const messages = {
   "marketplace.plugin.trypost.prompt.draft":
     "Yeni sürümümüz hakkında bir LinkedIn gönderisi taslağı hazırla, ama planlama.",
   "marketplace.plugin.trypost.prompt.analytics": "Geçen ayki gönderilerimden hangileri en çok etkileşim aldı?",
+  "marketplace.plugin.postsyncer.tagline": "Sosyal medya planlama",
+  "marketplace.plugin.postsyncer.description":
+    "PostSyncer, ajanların çalışma alanlarınızı ve bağlı hesaplarınızı listelemesini ve Instagram, TikTok, Facebook, X, LinkedIn, YouTube, Threads, Pinterest, Bluesky, Google Business Profile, Mastodon ve Telegram'da gönderi taslağı hazırlamasını, planlamasını ve yayınlamasını sağlar. Ajanlar ayrıca medya yükleyebilir, yorumlara ve Google değerlendirmelerine yanıt verebilir ve analizleri okuyabilir. PostSyncer hesabınıza tarayıcıdan giriş yapın veya PostSyncer'daki Settings › API bölümünden bir API anahtarı yapıştırın. Ajanlar bir gönderiyi hemen yayınlayabilir, bu yüzden onaylamadan önce her gönderiyi gözden geçirin.",
+  "marketplace.plugin.postsyncer.app":
+    "Çalışma alanları, hesaplar, gönderiler, medya, yorumlar, değerlendirmeler ve analizler; tarayıcıdan giriş veya API anahtarıyla PostSyncer'ın MCP sunucusu üzerinden.",
+  "marketplace.plugin.postsyncer.prompt.accounts": "PostSyncer'a hangi sosyal medya hesapları bağlı?",
+  "marketplace.plugin.postsyncer.prompt.draft":
+    "Yeni sürümümüz hakkında bir Instagram gönderisi ve bir LinkedIn gönderisi yaz, ikisini de taslak olarak kaydet.",
+  "marketplace.plugin.postsyncer.prompt.week": "PostSyncer'da gelecek hafta için planlanan gönderileri gün gün listele.",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub ve 1.000'den fazla uygulama",
   "marketplace.plugin.composio.description":
     "Composio, ajanlarınızı tek bir MCP sunucusu üzerinden Gmail, Slack, GitHub ve 1.000'den fazla başka uygulamaya bağlar. Composio hesabınızla oturum açın. Bir ajanın bir uygulamaya ihtiyacı olduğunda, o uygulamayı bağlamanızı ister.",

@@ -255,6 +255,32 @@ Troubleshooting:
 - A self-hosted TryPost: add an MCP server with the address of the instance followed by
   `/mcp/trypost`, in the MCP servers settings, and select Sign in.
 
+## PostSyncer
+
+The listing connects to PostSyncer's own MCP server at `https://postsyncer.com/mcp`
+(<https://docs.postsyncer.com/mcp/overview>). It answers 401 with a `Bearer` challenge. The
+protected-resource metadata names `https://postsyncer.com/mcp`, whose authorization server metadata
+has dynamic client registration with S256 and the `refresh_token` grant, so the user signs in
+through the browser and types no key. One connection works on every workspace of the account; the
+agent gets the workspace IDs from `list-workspaces` (checked 2026-11-27).
+
+The key flow is for a computer where no one can sign in. The key comes from Settings > API in
+PostSyncer and goes in `Authorization: Bearer <key>`. A key can do only what its permissions allow.
+
+MCP is on every PostSyncer plan, the free plan included. Campaigns and labels need a paid plan, and
+on the free plan analytics shows the last 7 days.
+
+Troubleshooting:
+
+- The agent finds no accounts: no social media account is connected in that workspace. Ask the agent
+  for a connect link (`create-account-connect-link`) and open it, or connect the account in
+  PostSyncer.
+- The tools stop with a sign-in error after the server was not used for about a month: the refresh
+  token expired after 30 days. In the MCP servers settings, select Sign out on the PostSyncer
+  server, then Sign in.
+- With an API key, a tool answers that the key lacks a permission: edit the key in Settings > API in
+  PostSyncer, or sign in through the browser instead.
+
 ## Adobe Analytics
 
 The listing connects to Adobe's own MCP server at `https://aa-mcp.adobe.io/mcp`

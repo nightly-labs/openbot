@@ -416,6 +416,15 @@ export const messages = {
   "marketplace.plugin.trypost.prompt.week": "本周排程了哪些帖子？",
   "marketplace.plugin.trypost.prompt.draft": "起草一篇关于我们新版本的 LinkedIn 帖子，但不要排程。",
   "marketplace.plugin.trypost.prompt.analytics": "上个月我的哪些帖子互动最多？",
+  "marketplace.plugin.postsyncer.tagline": "社交媒体排程",
+  "marketplace.plugin.postsyncer.description":
+    "PostSyncer 让智能体列出你的工作区和已连接的账户，并在 Instagram、TikTok、Facebook、X、LinkedIn、YouTube、Threads、Pinterest、Bluesky、Google Business Profile、Mastodon 和 Telegram 上起草、排程和发布帖子。智能体还可以上传媒体、回复评论和 Google 评价，并查看分析数据。在浏览器中登录你的 PostSyncer 账户，或粘贴 PostSyncer 中 Settings › API 里的 API 密钥。智能体可以立即发布帖子，因此请在批准前检查每篇帖子。",
+  "marketplace.plugin.postsyncer.app":
+    "通过 PostSyncer 的 MCP 服务器，用浏览器登录或 API 密钥处理工作区、账户、帖子、媒体、评论、评价和分析。",
+  "marketplace.plugin.postsyncer.prompt.accounts": "哪些社交媒体账户已连接到 PostSyncer？",
+  "marketplace.plugin.postsyncer.prompt.draft":
+    "写一篇关于我们新版本的 Instagram 帖子和一篇 LinkedIn 帖子，并把两篇都保存为草稿。",
+  "marketplace.plugin.postsyncer.prompt.week": "按天列出 PostSyncer 中下周排程的帖子。",
   "marketplace.plugin.composio.tagline": "Gmail、Slack、GitHub 等 1000 多款应用",
   "marketplace.plugin.composio.description":
     "Composio 通过一个 MCP 服务器把你的助手连接到 Gmail、Slack、GitHub 等 1000 多款应用。使用 Composio 账号登录。助手需要某个应用时，会请你连接该应用。",

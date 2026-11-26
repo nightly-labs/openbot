@@ -472,6 +472,15 @@ export const messages = {
   "marketplace.plugin.trypost.prompt.week": "ما المنشورات المجدولة لهذا الأسبوع؟",
   "marketplace.plugin.trypost.prompt.draft": "اكتب مسودة منشور على LinkedIn عن إصدارنا الجديد، لكن لا تجدوله.",
   "marketplace.plugin.trypost.prompt.analytics": "أي من منشوراتي في الشهر الماضي حصل على أكبر تفاعل؟",
+  "marketplace.plugin.postsyncer.tagline": "جدولة وسائل التواصل الاجتماعي",
+  "marketplace.plugin.postsyncer.description":
+    "يتيح PostSyncer للوكلاء عرض مساحات العمل والحسابات المتصلة لديك، وكتابة المسودات وجدولة المنشورات ونشرها على Instagram وTikTok وFacebook وX وLinkedIn وYouTube وThreads وPinterest وBluesky وGoogle Business Profile وMastodon وTelegram. ويمكن للوكلاء أيضًا رفع الوسائط والرد على التعليقات ومراجعات Google وقراءة التحليلات. سجّل الدخول إلى حسابك في PostSyncer عبر المتصفح، أو الصق مفتاح API من Settings › API في PostSyncer. يمكن للوكلاء نشر منشور فورًا، لذا راجع كل منشور قبل الموافقة عليه.",
+  "marketplace.plugin.postsyncer.app":
+    "مساحات العمل والحسابات والمنشورات والوسائط والتعليقات والمراجعات والتحليلات، عبر خادم MCP من PostSyncer بتسجيل الدخول في المتصفح أو بمفتاح API.",
+  "marketplace.plugin.postsyncer.prompt.accounts": "ما حسابات التواصل الاجتماعي المتصلة بـ PostSyncer؟",
+  "marketplace.plugin.postsyncer.prompt.draft":
+    "اكتب منشورًا على Instagram ومنشورًا على LinkedIn عن إصدارنا الجديد، واحفظ الاثنين كمسودات.",
+  "marketplace.plugin.postsyncer.prompt.week": "اعرض المنشورات المجدولة في PostSyncer للأسبوع القادم، مرتبة حسب اليوم.",
   "marketplace.plugin.composio.tagline": "Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر",
   "marketplace.plugin.composio.description":
     "يربط Composio وكلاءك بـ Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر عبر خادم MCP واحد. سجّل الدخول بحساب Composio. عندما يحتاج وكيل إلى تطبيق، يطلب منك ربط ذلك التطبيق.",
