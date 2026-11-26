@@ -77,7 +77,7 @@ import { writeClipboardText } from "../../clipboard";
 import type { AgentSkillCalls } from "../../skills-port";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
 import type { McpServerSignIn, McpServerTools } from "../servers/mcp-server-tools";
-import { mcpSignInRecord } from "../servers/mcp-servers";
+import { mcpOwnSignIn, mcpSignInRecord, sameSignInAddress } from "../servers/mcp-servers";
 import { desktopMarketplaceCalls, type MarketplaceCalls, type MarketplaceSignInRelay } from "./marketplace-calls";
 import { createPluginAppConfig } from "./marketplace-plugin-catalog";
 import { localizedPlugin } from "./marketplace-plugin-text";
@@ -147,15 +147,6 @@ export interface PendingSkillConfirm {
   kind: "replace" | "remove";
   agents: string;
   settle: (confirmed: boolean) => void;
-}
-
-function sameSignInAddress(a: string, b: string): boolean {
-  if (!URL.canParse(a.trim()) || !URL.canParse(b.trim())) return false;
-  if (mcpAccountFragment(a) !== mcpAccountFragment(b)) return false;
-  const [first, second] = [new URL(a.trim()), new URL(b.trim())];
-  first.hash = "";
-  second.hash = "";
-  return first.href === second.href;
 }
 
 export interface PendingServerReplace {
@@ -1425,7 +1416,9 @@ export function createMarketplaceController(
           if (!held) addedSkills.push(skill.id);
         }
         for (const app of plugin.apps) {
-          const config = pluginAppConfig(app);
+          const replaced = replacing.get(app.id);
+          const others = servers().filter((row) => row.id !== replaced?.id);
+          const config = mcpOwnSignIn(pluginAppConfig(app), others, crypto.randomUUID());
           const invalid = Object.values(mcpConfigErrors(config))[0];
           if (invalid) throw new Error(t("marketplace.error.appInvalid", { name: app.name, reason: invalid }));
           const connected = await connectStep(app, config);
@@ -1433,7 +1426,6 @@ export function createMarketplaceController(
             await undoSkills(agentId, addedSkills);
             return false;
           }
-          const replaced = replacing.get(app.id);
           const sharesSignIn = replaced !== undefined && sameSignInAddress(replaced.url, connected.url);
           if (replaced && !sharesSignIn)
             setServers(await calls().mcp.removeMcpServer({ mcpServerId: replaced.id }, serverId));

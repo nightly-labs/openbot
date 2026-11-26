@@ -54,7 +54,6 @@ import type { RuntimeRefreshTiming } from "./thread-lifecycle";
 
 const SIGN_IN_FAILURE_CHECK_MS = 5_000;
 
-/** The address of a row without any fragment. The fragment names an account, not a place. */
 function mcpAccountAddress(url: string): string {
   const index = url.indexOf("#");
   return index < 0 ? url : url.slice(0, index);
@@ -246,12 +245,6 @@ export class McpGateway {
     return yield* this.changed(previous ? "now" : "after-background-work", [input.config.name, previous?.name]);
   }, Effect.uninterruptible);
 
-  /**
-   * A row is an account of its server. One address keeps one sign-in, so a row that would take
-   * the account of another row gets an account fragment of its own. An edit keeps the account of
-   * the row, unless the row moves to an address another row already uses. The fragment names no
-   * person and never leaves the computer: the gateway drops it before the request goes out.
-   */
   #accountConfig(config: McpServerConfig): McpServerConfig {
     if (config.transport !== "http" || !config.url) return config;
     const key = mcpOAuthAccountKey(config.url);

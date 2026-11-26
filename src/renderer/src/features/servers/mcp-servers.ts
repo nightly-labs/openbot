@@ -5,6 +5,7 @@ import {
   normalizeMcpConfig,
   type ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
+import { mcpAccountFragment, mcpAccountUrl } from "@openbot/contracts/mcp-accounts";
 import { type AppTextKey, type AppTranslate, matchingSourceKeys, sourceTextValues } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
 
@@ -139,6 +140,26 @@ export function mcpSaveConnects(draft: McpServerConfig, baseline: McpServerConfi
   const next = normalizeMcpConfig(draft);
   const stored = normalizeMcpConfig(baseline);
   return next.url !== stored.url || JSON.stringify(next.headers) !== JSON.stringify(stored.headers);
+}
+
+export function sameSignInAddress(a: string, b: string): boolean {
+  if (!URL.canParse(a.trim()) || !URL.canParse(b.trim())) return false;
+  if (mcpAccountFragment(a) !== mcpAccountFragment(b)) return false;
+  const [first, second] = [new URL(a.trim()), new URL(b.trim())];
+  first.hash = "";
+  second.hash = "";
+  return first.href === second.href;
+}
+
+export function mcpOwnSignIn(
+  config: McpServerConfig,
+  others: readonly McpServerConfig[],
+  accountId: string,
+): McpServerConfig {
+  if (config.transport !== "http") return config;
+  if (!others.some((row) => row.transport === "http" && sameSignInAddress(row.url, config.url))) return config;
+  const address = config.url.split("#", 1)[0] ?? config.url;
+  return { ...config, url: mcpAccountUrl(address, accountId) };
 }
 
 export function isMcpHttpAddress(value: string): boolean {

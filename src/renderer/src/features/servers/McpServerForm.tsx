@@ -28,9 +28,11 @@ import {
   mcpConfigDraft,
   mcpConfigErrors,
   mcpConfigIsValid,
+  mcpOwnSignIn,
   mcpSaveConnects,
   mcpUrlAtAddress,
   normalizeMcpConfig,
+  sameSignInAddress,
 } from "./mcp-servers";
 
 export interface McpServerFormProps {
@@ -72,12 +74,20 @@ export function McpServerForm(props: McpServerFormProps) {
     testConfig: null,
   });
   let testRun = 0;
+  const accountId = crypto.randomUUID();
+
+  const prepared = (): McpServerConfig => {
+    const config = normalizeMcpConfig(state.draft);
+    if (props.id !== null && sameSignInAddress(state.baseline.url, config.url)) return config;
+    const others = props.tools.servers().filter((row) => row.id !== props.id);
+    return mcpOwnSignIn(config, others, accountId);
+  };
 
   const errors = createMemo(() => mcpConfigErrors(state.draft));
   const visible = (key: "name" | "command" | "url" | "headers") => (state.touched ? errors()[key] : undefined);
   const changed = () => mcpConfigChanged(state.draft, state.baseline);
   const test = createMemo(() =>
-    state.testConfig && !mcpConfigChanged(state.draft, state.testConfig) ? state.test : null,
+    state.testConfig && !mcpConfigChanged(prepared(), state.testConfig) ? state.test : null,
   );
   const signingIn = () => (state.test?.status === "signing-in" ? state.testConfig : null);
   const waiting = () => signingIn() !== null || test()?.status === "testing";
@@ -97,7 +107,7 @@ export function McpServerForm(props: McpServerFormProps) {
     });
     if (!mcpConfigIsValid(state.draft)) return null;
     const run = ++testRun;
-    const tested = normalizeMcpConfig(state.draft);
+    const tested = prepared();
     setState((current) => {
       current.test = { status: pending };
       current.testConfig = tested;
@@ -169,7 +179,7 @@ export function McpServerForm(props: McpServerFormProps) {
     let saved: McpServerConfig | null = null;
     try {
       if (!connects || (await connectBeforeSave(tested))) {
-        saved = await props.tools.save(normalizeMcpConfig(state.draft));
+        saved = await props.tools.save(prepared());
       }
     } catch (error) {
       setState((current) => {

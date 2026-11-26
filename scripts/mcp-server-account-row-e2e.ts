@@ -97,6 +97,11 @@ try {
   );
   steps.push({ step: "a copied account row gets its own account", detail: copy.url });
 
+  const tested = `${ADDRESS}#account-tested-before-save`;
+  await save(draft("tested", { url: tested }));
+  assert.equal(row("tested").url, tested, "a row keeps the free account that its client tested and signed in");
+  steps.push({ step: "a row keeps the account that its client signed in before the save", detail: row("tested").url });
+
   const other = row("other");
   await save({ ...other, url: ADDRESS });
   const moved = row("other");
