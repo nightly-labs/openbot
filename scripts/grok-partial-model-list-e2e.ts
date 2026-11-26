@@ -24,6 +24,7 @@ mkdirSync(home, { recursive: true });
 
 const { AgentService } = await import("../src/backend/agent-service");
 const { AgentStore } = await import("../src/backend/agent-store");
+const { CustomEndpoints } = await import("../src/backend/agent/custom-endpoints");
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
@@ -114,7 +115,21 @@ async function listsAfter(label: string, before: Set<number>, done: (lines: Setu
 }
 
 const hasModel = (lines: SetupLine[]) => lines.some((line) => line.models.includes(MODEL));
-const listMark = () => agents.listModels().find((model) => model.id.startsWith("grok-list-"))?.id;
+const moveAgentsOffModelsUnlistedTwice = CustomEndpoints.prototype.moveAgentsOffModelsUnlistedTwice;
+let markedStartReconciled = false;
+CustomEndpoints.prototype.moveAgentsOffModelsUnlistedTwice = function (
+  this: InstanceType<typeof CustomEndpoints>,
+  provider,
+) {
+  const fromMarkedStart = provider === "grok" && this.available().some((model) => model.id.startsWith("grok-list-"));
+  return moveAgentsOffModelsUnlistedTwice.call(this, provider).pipe(
+    Effect.andThen(
+      Effect.sync(() => {
+        markedStartReconciled ||= fromMarkedStart;
+      }),
+    ),
+  );
+};
 
 try {
   await runCauseEffect(agents.initialize());
@@ -152,16 +167,21 @@ try {
   report.restartDuringWait = { setups: secondLists, model: modelOf(agent.id) };
   assert.equal(report.restartDuringWait.model, MODEL, "A replaced process's activation does not move the agent.");
 
-  const once = await restartGrok(Number.MAX_SAFE_INTEGER, true);
-  const startMark = await waitFor("the first list of the start", async () => listMark());
-  await waitFor("OpenBot to read the list again", async () => {
-    const mark = listMark();
-    return mark !== undefined && mark !== startMark;
+  const publishedMarkers = new Set<string>();
+  agents.on("event", (event) => {
+    if (event.type !== "status") return;
+    for (const model of agents.listModels()) {
+      if (model.id.startsWith("grok-list-")) publishedMarkers.add(model.id);
+    }
   });
+  const once = await restartGrok(Number.MAX_SAFE_INTEGER, true);
+  await waitFor("the marked start to reconcile its own list", async () => markedStartReconciled);
+  assert.ok(publishedMarkers.size >= 2, "OpenBot publishes a new list before it reconciles the marked start.");
   const onceLists = (await setups()).filter((line) => !once.has(line.pid)).map((line) => line.models);
-  const gone = await restartGrok(Number.MAX_SAFE_INTEGER);
   report.oneStartWithoutModel = { setups: onceLists, model: modelOf(agent.id) };
   assert.equal(report.oneStartWithoutModel.model, MODEL, "One start whose lists all lack the model keeps it.");
+
+  const gone = await restartGrok(Number.MAX_SAFE_INTEGER);
   const goneLists = await listsAfter("the agent to move", gone, () => modelOf(agent.id) !== MODEL);
   report.restartWithoutModel = { setups: goneLists, model: modelOf(agent.id) };
   assert.equal(report.restartWithoutModel.model, FALLBACK, "A model that two starts lack still moves.");
@@ -171,6 +191,7 @@ try {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
 } finally {
   await runCauseEffect(agents.stop()).catch(() => {});
+  CustomEndpoints.prototype.moveAgentsOffModelsUnlistedTwice = moveAgentsOffModelsUnlistedTwice;
   database.close();
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
