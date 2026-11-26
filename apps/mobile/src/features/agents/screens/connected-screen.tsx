@@ -963,7 +963,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                     </AgentListRowReveal>
                     <PinnedAgentsGrid
                       agents={pinnedAgents}
-                      animateLayout={!updateHeader.moving}
+                      animateLayout={!updateHeader.moving && !otaBanner.moving}
                       dropZone={dragging && !hasPins}
                       reveal={listReveal}
                       revealOffset={1}

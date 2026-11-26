@@ -44,7 +44,6 @@ export const messages = {
   "mobile.app.quickAction.support": "待って、削除しないで！",
   "mobile.app.quickAction.supportSubtitle": "改善点を教えてください",
   "mobile.app.update.title": "OpenBot {version} が登場",
-  "mobile.app.update.readyTitle": "新しい OpenBot の準備ができました",
   "mobile.app.update.storeBody": "最新の機能と修正を入手しましょう。",
   "mobile.app.update.readyBody": "インストールのため OpenBot が再起動します。",
   "mobile.app.update.install": "更新",

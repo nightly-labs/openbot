@@ -44,7 +44,6 @@ export const messages = {
   "mobile.app.quickAction.support": "Warte, lösch mich nicht!",
   "mobile.app.quickAction.supportSubtitle": "Sag uns, was wir verbessern können",
   "mobile.app.update.title": "OpenBot {version} ist da",
-  "mobile.app.update.readyTitle": "Ein neues OpenBot ist bereit",
   "mobile.app.update.storeBody": "Hol dir die neuesten Funktionen und Fehlerbehebungen.",
   "mobile.app.update.readyBody": "OpenBot startet neu, um es zu installieren.",
   "mobile.app.update.install": "Updaten",

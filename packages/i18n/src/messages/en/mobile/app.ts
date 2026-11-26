@@ -44,7 +44,6 @@ export const messages = defineMessages("mobile.app", {
   "mobile.app.quickAction.support": "Wait, don't delete me!",
   "mobile.app.quickAction.supportSubtitle": "Tell us what to make better",
   "mobile.app.update.title": "OpenBot {version} is here",
-  "mobile.app.update.readyTitle": "A new OpenBot is ready",
   "mobile.app.update.storeBody": "Get the newest features and fixes.",
   "mobile.app.update.readyBody": "OpenBot restarts to install it.",
   "mobile.app.update.install": "Update",

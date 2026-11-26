@@ -18,6 +18,7 @@ import Animated, {
 import { scheduleOnRN } from "react-native-worklets";
 
 import { showFailureAlert } from "@/features/analytics/failure-reports";
+import { groupTitle, NoteItem } from "@/features/app-update/components/app-update-notes";
 import {
   type AppUpdate,
   dismissAppUpdate,
@@ -33,7 +34,7 @@ import type { LargeTitleScroll } from "@/shared/components/large-title";
 import { haptics } from "@/shared/lib/haptics";
 import { currentAppVersion } from "@/shared/lib/mobile-features";
 import { useReducedMotion } from "@/shared/lib/motion";
-import { currentText, type MobileText, useText } from "@/shared/lib/text";
+import { currentText, useText } from "@/shared/lib/text";
 
 export type ReadyAppUpdate = Extract<AppUpdate, { kind: "ready" }>;
 
@@ -53,7 +54,6 @@ const EDGE_INSET = 4;
 const ROW_LIFT = 4;
 const ROW_RISE = 6;
 const ROW_SCALE = 0.985;
-const ITEM_TEXT_INSET = 16;
 const EYES_SCALE = 0.3;
 const UPDATE_ID_LENGTH = 8;
 const REVEAL = { duration: 420, easing: Easing.bezier(0.32, 0.72, 0, 1) };
@@ -63,6 +63,8 @@ export interface OtaUpdateBanner {
   update: ReadyAppUpdate | null;
   shown: boolean;
   pushDown: SharedValue<number>;
+  moving: boolean;
+  setMoving: (moving: boolean) => void;
   clear: () => void;
 }
 
@@ -70,8 +72,12 @@ export function useOtaUpdateBanner(update: ReadyAppUpdate | null): OtaUpdateBann
   const pushDown = useSharedValue(0);
   const [latched, setLatched] = useState(update);
   if (update && update.id !== latched?.id) setLatched(update);
-  const clear = useCallback(() => setLatched(null), []);
-  return { update: latched, shown: update !== null, pushDown, clear };
+  const [moving, setMoving] = useState(false);
+  const clear = useCallback(() => {
+    setMoving(false);
+    setLatched(null);
+  }, []);
+  return { update: latched, shown: update !== null, pushDown, moving, setMoving, clear };
 }
 
 export function OtaUpdateSpacer({ banner }: { banner: OtaUpdateBanner }) {
@@ -79,27 +85,6 @@ export function OtaUpdateSpacer({ banner }: { banner: OtaUpdateBanner }) {
   const style = useAnimatedStyle(() => ({ height: pushDown.get() }));
   if (!banner.update) return null;
   return <Animated.View style={style} />;
-}
-
-function groupTitle(t: MobileText["t"], type: string, heading: string): string {
-  switch (type) {
-    case "notice":
-      return t("mobile.app.update.group.notice");
-    case "added":
-      return t("mobile.app.update.group.added");
-    case "changed":
-      return t("mobile.app.update.group.changed");
-    case "fixed":
-      return t("mobile.app.update.group.fixed");
-    case "removed":
-      return t("mobile.app.update.group.removed");
-    case "deprecated":
-      return t("mobile.app.update.group.deprecated");
-    case "security":
-      return t("mobile.app.update.group.security");
-    default:
-      return heading;
-  }
 }
 
 function mergedGroups(releases: readonly MobileReleaseNotes[] | undefined) {
@@ -181,65 +166,6 @@ function ScrollRow({
   );
 }
 
-function NoteItem({ item, scroll, color }: { item: string; scroll: RowScroll; color: string }) {
-  const itemY = useSharedValue(0);
-  const [lines, setLines] = useState<{ start: number; text: string }[] | null>(null);
-  const dot = <View className="mt-[8px] size-1.5 rounded-full" style={{ backgroundColor: color }} />;
-  return (
-    <View
-      accessible
-      accessibilityLabel={item}
-      className="mb-1.5"
-      onLayout={(event) => itemY.set(event.nativeEvent.layout.y)}
-    >
-      <View pointerEvents="none" style={{ position: "absolute", left: ITEM_TEXT_INSET, right: 0, opacity: 0 }}>
-        <Typography.Paragraph
-          type="body-sm"
-          onTextLayout={(event) => {
-            let start = 0;
-            const next = event.nativeEvent.lines.map((line) => {
-              const entry = { start, text: line.text.trimEnd() };
-              start += line.text.length;
-              return entry;
-            });
-            setLines((current) =>
-              current?.length === next.length &&
-              current.every((line, index) => line.start === next[index]?.start && line.text === next[index]?.text)
-                ? current
-                : next,
-            );
-          }}
-        >
-          {item}
-        </Typography.Paragraph>
-      </View>
-      {lines ? (
-        lines.map((line) => (
-          <ScrollRow key={line.start} scroll={scroll} baseY={itemY} className="flex-row gap-2.5">
-            {line.start === 0 ? dot : <View className="size-1.5" />}
-            <Typography.Paragraph
-              type="body-sm"
-              numberOfLines={1}
-              ellipsizeMode="clip"
-              className="flex-1"
-              style={{ color }}
-            >
-              {line.text}
-            </Typography.Paragraph>
-          </ScrollRow>
-        ))
-      ) : (
-        <ScrollRow scroll={scroll} baseY={itemY} className="flex-row gap-2.5">
-          {dot}
-          <Typography.Paragraph type="body-sm" className="flex-1" style={{ color }}>
-            {item}
-          </Typography.Paragraph>
-        </ScrollRow>
-      )}
-    </View>
-  );
-}
-
 function NotesStatus({
   loading,
   failed,
@@ -312,7 +238,7 @@ export function OtaUpdateBlock({
   const colors = useBloubColors();
   const reduced = useReducedMotion();
   const window = useWindowDimensions();
-  const { update, shown, pushDown, clear } = banner;
+  const { update, shown, pushDown, clear, setMoving } = banner;
   const notes = useOtaUpdateNotes(update !== null && update.updateId !== null);
   const [installing, setInstalling] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -374,21 +300,32 @@ export function OtaUpdateBlock({
       if (!shown) clear();
       return;
     }
+    setMoving(true);
     drop.set(
       withTiming(shown ? 1 : 0, BLOUB_MOVE, (finished) => {
-        if (finished && !shown) scheduleOnRN(clear);
+        if (!finished) return;
+        if (shown) scheduleOnRN(setMoving, false);
+        else scheduleOnRN(clear);
       }),
     );
-  }, [clear, drop, measured, reduced, shown, update]);
+  }, [clear, drop, measured, reduced, setMoving, shown, update]);
 
   useEffect(() => {
     const updateId = update?.updateId;
     if (shown && updateId && newestNotes) void rememberShownOtaNotes(updateId, newestNotes).catch(() => undefined);
   }, [newestNotes, shown, update?.updateId]);
   useEffect(() => {
-    reveal.set(reduced ? (expanded ? 1 : 0) : withTiming(expanded ? 1 : 0, REVEAL));
+    if (reduced || reveal.get() === (expanded ? 1 : 0)) reveal.set(expanded ? 1 : 0);
+    else {
+      setMoving(true);
+      reveal.set(
+        withTiming(expanded ? 1 : 0, REVEAL, (finished) => {
+          if (finished) scheduleOnRN(setMoving, false);
+        }),
+      );
+    }
     if (!expanded) scrollRef.current?.scrollTo({ y: 0, animated: !reduced });
-  }, [expanded, reduced, reveal, scrollRef]);
+  }, [expanded, reduced, reveal, scrollRef, setMoving]);
   useEffect(() => {
     if ((!canExpand || !shown) && expanded) setExpanded(false);
   }, [canExpand, expanded, shown]);
@@ -417,7 +354,16 @@ export function OtaUpdateBlock({
 
   const measureNotes = (height: number) => {
     setNatural(height);
-    contentHeight.set(contentHeight.get() === 0 || reduced ? height : withTiming(height, REVEAL));
+    if (contentHeight.get() === 0 || reduced) {
+      contentHeight.set(height);
+      return;
+    }
+    setMoving(true);
+    contentHeight.set(
+      withTiming(height, REVEAL, (finished) => {
+        if (finished) scheduleOnRN(setMoving, false);
+      }),
+    );
   };
   const toggle = () => {
     void haptics.impact("soft");
@@ -500,11 +446,22 @@ export function OtaUpdateBlock({
                 className="font-semibold uppercase tracking-openbot-wide"
                 style={{ color: colors.eye, opacity: 0.55 }}
               >
-                {groupTitle(t, group.type, group.heading)}
+                {groupTitle(t, group)}
               </Typography.Paragraph>
             </ScrollRow>,
             ...group.items.map((item) => (
-              <NoteItem key={`${group.type}-${item}`} item={item} scroll={rows} color={colors.eye} />
+              <NoteItem
+                key={`${group.type}-${item}`}
+                item={item}
+                dot={colors.eye}
+                textColor={colors.eye}
+                compact
+                renderRow={(row) => (
+                  <ScrollRow key={row.key} scroll={rows} baseY={row.baseY} className={row.className}>
+                    {row.children}
+                  </ScrollRow>
+                )}
+              />
             )),
           ])}
           {count > 0 && canExpand ? (
