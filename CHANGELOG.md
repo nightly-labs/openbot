@@ -1442,7 +1442,7 @@ All notable changes to OpenBot will be documented here. The project follows
   shows only "Compacting context" with its timer. When the compaction ends, the one-minute count
   starts again.
 - An agent whose last answer was only a picture showed "No messages yet" in the sidebar. The row now shows the picture's name. A picture with a Windows file path in a chat now also shows only its file name.
-- A page that an agent shows in the chat now has its own row in the agent dock: the page title and an Open button that opens the chat in the main window. Before, the dock showed only the title, as if it were a normal reply.
+- A page that an agent shows in the chat now has its own row in the agent dock: the page title and an **Open** button that opens the chat in the main window. Before, the dock showed only the title, as if it were a normal reply.
 - Scroll long chats smoothly. Before, a chat with more than 100 messages stuttered while you
   scrolled, most with tables and code blocks, and a short chat scrolled smoothly.
 - Codex live voice now works when Codex uses an OpenAI API key and you also added a ChatGPT account. Before, Settings → Voice still showed "Connect" after you signed in with ChatGPT, and you could not turn on live voice or choose its account. When the live voice account is "Automatic", live voice now uses your ChatGPT account, not the API key.
