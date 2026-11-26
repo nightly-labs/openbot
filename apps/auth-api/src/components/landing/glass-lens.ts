@@ -95,15 +95,9 @@ const INTERACTIVE = "a, button, input, select, textarea, [role='button']";
 const EXTENT: Record<GlassShape, number> = { lens: 1.03, blob: 1.08, pill: 1.02, torus: 1, prism: 1.18, diamond: 1.05 };
 const FLOOR = 0.75;
 const FOCAL = 1.6;
-const SHADE_SIZE = 256;
-const SUN_LENGTH = Math.hypot(-0.42, 0.55, 1);
-const SUN = [-0.42 / SUN_LENGTH, 0.55 / SUN_LENGTH, 1 / SUN_LENGTH] as const;
 const UNIFORMS = [
   "uScene",
-  "uShade",
   "uSceneOn",
-  "uPass",
-  "uShadeBox",
   "uView",
   "uRatio",
   "uCamera",
@@ -133,10 +127,7 @@ void main() {
 const FRAGMENT_SOURCE = `#version 300 es
 precision highp float;
 uniform sampler2D uScene;
-uniform sampler2D uShade;
 uniform float uSceneOn;
-uniform float uPass;
-uniform vec4 uShadeBox;
 uniform vec2 uView;
 uniform float uRatio;
 uniform vec3 uCamera;
@@ -156,9 +147,7 @@ uniform float uTint;
 out vec4 outColor;
 
 const float FLOOR = ${FLOOR.toFixed(2)};
-const float SHADE = ${SHADE_SIZE.toFixed(1)};
 const float MAX_FOOTPRINT = 4.0;
-const vec3 SUN = vec3(${SUN.map((value) => value.toFixed(4)).join(", ")});
 const vec2 GLINT = vec2(-0.6, 0.8);
 const vec2 JITTER[3] = vec2[3](vec2(0.3, 0.2), vec2(-0.2, 0.3), vec2(0.1, -0.35));
 
@@ -177,17 +166,6 @@ vec4 sceneGrad(vec2 point, vec2 gx, vec2 gy) {
   vec2 uv = point / uView;
   if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return vec4(0.0);
   return textureGrad(uScene, uv, gx / uView, gy / uView) * uSceneOn;
-}
-
-vec2 lightAt(vec2 point) {
-  vec2 uv = (point - uShadeBox.xy) / uShadeBox.zw;
-  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return vec2(0.0);
-  return textureLod(uShade, uv, 0.0).rg;
-}
-
-vec4 lit(vec4 color, vec2 light) {
-  vec4 shaded = vec4(color.rgb * (1.0 - light.x), color.a + light.x * (1.0 - color.a));
-  return vec4(vec3(light.y) + shaded.rgb * (1.0 - light.y), light.y + shaded.a * (1.0 - light.y));
 }
 
 vec3 toLocal(vec3 world) {
@@ -282,23 +260,6 @@ vec4 studio(vec3 d, float gain) {
   float level = (key * 7.0 + strip * 3.5 + smoothstep(0.0, 1.0, d.z) * 0.04) * gain;
   float cover = clamp(level, 0.0, 1.0);
   return vec4(vec3(cover), cover);
-}
-
-vec2 shadowAt(vec2 point) {
-  vec3 p = toLocal(vec3(point, 0.0));
-  float t = 0.05;
-  float soft = 1.0;
-  float deep = 1e3;
-  for (int i = 0; i < 32; i++) {
-    float d = map(p + SUN * t);
-    deep = min(deep, d);
-    if (d > 0.0) soft = min(soft, 6.0 * d / t);
-    t += clamp(abs(d) * 0.8, 0.02, 0.27);
-    if (t > FLOOR * 2.6 + uReach * 2.0) break;
-  }
-  if (deep > 0.0) return vec2((1.0 - clamp(soft, 0.0, 1.0)) * 0.18, 0.0);
-  float depth = -deep;
-  return vec2(exp(-depth * 14.0) * 0.21, clamp(smoothstep(0.12, 0.5, depth) * (uIor - 1.0), 0.0, 1.0));
 }
 
 Hit trace(vec3 ro, vec3 rd, float eps) {
@@ -403,7 +364,7 @@ vec4 shade(Hit hit, vec3 rd, vec4 back, vec4 tone, vec2 point, vec2 tx, vec2 ty,
   if (band < 1.0) {
     mirror = mirrorOf(hit.p, mirrorDir, point, rx, ry, 1.0);
     vec2 land = landing(hit.q, hit.dir, point);
-    vec4 seen = lit(sceneGrad(land, tx, ty), lightAt(land) * vec2(0.45, 0.12));
+    vec4 seen = sceneGrad(land, tx, ty);
     through = mix(seen, tone, band);
     mirror = mix(mirror, tone, band);
   }
@@ -425,14 +386,9 @@ vec2 footprint(vec2 delta) {
 }
 
 void main() {
-  if (uPass > 0.5) {
-    vec2 light = uUnit < 0.5 ? vec2(0.0) : shadowAt(uShadeBox.xy + gl_FragCoord.xy / SHADE * uShadeBox.zw);
-    outColor = vec4(light, 0.0, 1.0);
-    return;
-  }
   vec2 frag = gl_FragCoord.xy / uRatio;
   vec2 point = vec2(frag.x, uView.y - frag.y);
-  vec4 back = lit(sceneGrad(point, vec2(0.0), vec2(0.0)), lightAt(point) * vec2(1.0, 0.3));
+  vec4 back = sceneGrad(point, vec2(0.0), vec2(0.0));
   if (uUnit < 0.5) {
     outColor = back;
     return;
@@ -597,12 +553,6 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     const most: number = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
     gl.texParameterf(gl.TEXTURE_2D, anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(MAX_ANISOTROPY, most));
   }
-  const shadeTexture = makeTexture(gl, gl.LINEAR);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, SHADE_SIZE, SHADE_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  const shadeTarget = gl.createFramebuffer();
-  gl.bindFramebuffer(gl.FRAMEBUFFER, shadeTarget);
-  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, shadeTexture, 0);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const sceneCanvas = document.createElement("canvas");
@@ -835,17 +785,12 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     const depth = (focal - height) / focal;
     const centerX = view.width / 2 + (lens.x - view.width / 2) * depth;
     const centerY = view.height / 2 + (lens.y - view.height / 2) * depth;
-    const shadeHalf = unit * reach * 1.7;
-    const shadeX = centerX - (SUN[0] / SUN[2]) * height;
-    const shadeY = centerY + (SUN[1] / SUN[2]) * height;
     gl.useProgram(program);
     gl.bindVertexArray(vao);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform1i(at("uScene"), 0);
-    gl.uniform1i(at("uShade"), 1);
     gl.uniform1f(at("uSceneOn"), sceneReady ? 1 : 0);
-    gl.uniform4f(at("uShadeBox"), shadeX - shadeHalf, shadeY - shadeHalf, shadeHalf * 2, shadeHalf * 2);
     gl.uniform2f(at("uView"), view.width, view.height);
     gl.uniform1f(at("uRatio"), view.ratio);
     gl.uniform3f(at("uCamera"), view.width / 2, view.height / 2, focal);
@@ -862,18 +807,9 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     gl.uniform1f(at("uIor"), 1 + 0.5 * clamp(s.refraction, 0, 2));
     gl.uniform3f(at("uColor"), red, green, blue);
     gl.uniform1f(at("uTint"), clamp(s.tint, 0, 1));
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, shadeTarget);
-    gl.viewport(0, 0, SHADE_SIZE, SHADE_SIZE);
-    gl.uniform1f(at("uPass"), 1);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.bindTexture(gl.TEXTURE_2D, shadeTexture);
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.uniform1f(at("uPass"), 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
 
@@ -1061,8 +997,6 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
       if (gl.isContextLost()) return;
       gl.deleteProgram(program);
       gl.deleteTexture(texture);
-      gl.deleteTexture(shadeTexture);
-      gl.deleteFramebuffer(shadeTarget);
       gl.deleteVertexArray(vao);
     },
   } satisfies GlassLens;
