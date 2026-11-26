@@ -549,6 +549,12 @@
       "detailSha256": "8e560e0e2fb19409ff956ac7978867530dcf75a97629956d2e090f77aa2c27a9"
     },
     {
+      "slug": "coinmarketcap",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "ada077098e78b447a73bd7c8433f25b83e55762dbdebc9417df06206cd55a382"
+    },
+    {
       "slug": "convex",
       "version": "1.0.0",
       "featured": false,

@@ -332,6 +332,7 @@ export const messages = {
     "המחשב הזה חסם את החיבור אל השרת. יש לבדוק את חומת האש או את תוכנת האבטחה ולנסות שוב.",
   "error.backend.mcpServerIncompatible":
     "משהו ענה בכתובת הזו, אבל לא כשרת MCP דרך Streamable HTTP. יש לבדוק את ה-URL ולעדכן את האפליקציה שמריצה את השרת.",
+  "error.backend.mcpServerKeyNotAccepted": "השרת לא קיבל את מפתח ה-API. יש לבדוק את המפתח ולנסות שוב.",
   "error.backend.mcpRemoteBridge":
     "{reason} הפקודה הזו מריצה את הגשר mcp-remote. במקום זאת יש לבחור Streamable HTTP עם ה-URL {url}, ו-OpenBot יתחבר בשבילך.",
   "error.backend.oauthNotHttps": "נקודת הקצה של OAuth {origin} אינה https, ולכן פרטי הגישה לא נשלחו.",
