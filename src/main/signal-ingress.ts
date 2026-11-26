@@ -49,15 +49,20 @@ import { downloadTelegramFile, signalHttpOrigin, uploadTelegramFile } from "./te
 const logger = createOpenBotLogger("signal-ingress");
 
 const CERTIFICATE_ERROR_CODES: ReadonlySet<string> = new Set([
+  "CERT_CHAIN_TOO_LONG",
   "CERT_HAS_EXPIRED",
   "CERT_NOT_YET_VALID",
+  "CERT_REJECTED",
+  "CERT_REVOKED",
   "CERT_SIGNATURE_FAILURE",
   "CERT_UNTRUSTED",
   "DEPTH_ZERO_SELF_SIGNED_CERT",
   "ERR_TLS_CERT_ALTNAME_INVALID",
+  "INVALID_CA",
   "SELF_SIGNED_CERT_IN_CHAIN",
   "UNABLE_TO_GET_ISSUER_CERT",
   "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+  "UNABLE_TO_DECRYPT_CERT_SIGNATURE",
   "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
 ]);
 
@@ -555,6 +560,7 @@ export class SignalIngress implements MessagingIngress {
     let opened = false;
     socket.on("open", () => {
       opened = true;
+      if (socket === this.#socket) this.#failure = null;
       const hello: SignalClientMessage = {
         type: "hello",
         version: SIGNAL_PROTOCOL_VERSION,

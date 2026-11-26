@@ -2474,10 +2474,10 @@ const TELEGRAM_RELAY_REFUSALS = new Map([
 
 function telegramNotReady(state: IngressState, failure: IngressFailure | null): MessagingOperationFailed {
   const text =
-    state === "online" || failure === "refused"
-      ? sourceText("error.messaging.telegramServiceUnavailable")
-      : state === "signed_out" || state === "no_host"
-        ? sourceText("error.messaging.telegramRelayUnavailable")
+    state === "signed_out" || state === "no_host"
+      ? sourceText("error.messaging.telegramRelayUnavailable")
+      : state === "online" || failure === "refused"
+        ? sourceText("error.messaging.telegramServiceUnavailable")
         : failure === "certificate"
           ? sourceText("error.messaging.telegramRelayCertificate")
           : sourceText("error.messaging.telegramRelayUnreachable");
