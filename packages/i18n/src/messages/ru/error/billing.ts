@@ -27,8 +27,6 @@ export const messages = {
   "error.billing.detailsInvalid": "Проверьте страну и номер НДС. Номер НДС должен относиться к выбранной стране.",
   "error.billing.vatIdInvalid":
     "Система НДС ЕС не знает этот номер НДС. Проверьте номер или продолжите без номера НДС.",
-  "error.billing.vatIdUnverified":
-    "Система НДС ЕС сейчас не может проверить номер НДС. Повторите попытку позже или продолжите без номера НДС.",
   "error.billing.vatUnavailable": "Оплата сейчас недоступна. Повторите попытку позже.",
   "error.billing.invalidRequest": "Некорректный запрос оплаты.",
   "error.billing.invalidResponse": "Некорректный ответ оплаты.",

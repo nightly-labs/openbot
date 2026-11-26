@@ -22,7 +22,6 @@ export const messages = {
   "error.billing.countryRequired": "付款前请填写账单国家/地区。请先更新 OpenBot，然后重试。",
   "error.billing.detailsInvalid": "请检查国家/地区和增值税号。增值税号必须属于所选国家/地区。",
   "error.billing.vatIdInvalid": "欧盟增值税系统中没有此增值税号。请检查号码，或不填增值税号继续。",
-  "error.billing.vatIdUnverified": "欧盟增值税系统现在无法核验增值税号。请稍后重试，或不填增值税号继续。",
   "error.billing.vatUnavailable": "现在无法付款，请稍后重试。",
   "error.billing.invalidRequest": "账单请求无效。",
   "error.billing.invalidResponse": "账单响应无效。",

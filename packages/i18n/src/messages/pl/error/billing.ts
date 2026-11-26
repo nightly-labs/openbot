@@ -27,8 +27,6 @@ export const messages = {
     "Podaj kraj rozliczenia przed płatnością. Zaktualizuj OpenBot, aby to zrobić, i spróbuj ponownie.",
   "error.billing.detailsInvalid": "Sprawdź kraj i numer VAT. Numer VAT musi należeć do wybranego kraju.",
   "error.billing.vatIdInvalid": "System VAT UE nie zna tego numeru VAT. Sprawdź numer lub kontynuuj bez numeru VAT.",
-  "error.billing.vatIdUnverified":
-    "System VAT UE nie może teraz sprawdzić numeru VAT. Spróbuj później lub kontynuuj bez numeru VAT.",
   "error.billing.vatUnavailable": "Płatność jest teraz niedostępna. Spróbuj później.",
   "error.billing.invalidRequest": "Żądanie rozliczeniowe jest nieprawidłowe.",
   "error.billing.invalidResponse": "Odpowiedź rozliczeniowa jest nieprawidłowa.",

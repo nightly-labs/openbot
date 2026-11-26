@@ -27,8 +27,6 @@ export const messages = {
   "error.billing.detailsInvalid": "Revisa el país y el NIF-IVA. El NIF-IVA debe ser del país elegido.",
   "error.billing.vatIdInvalid":
     "El sistema de IVA de la UE no reconoce este NIF-IVA. Revisa el número o continúa sin NIF-IVA.",
-  "error.billing.vatIdUnverified":
-    "El sistema de IVA de la UE no puede comprobar el NIF-IVA ahora. Inténtalo más tarde o continúa sin NIF-IVA.",
   "error.billing.vatUnavailable": "El pago no está disponible ahora. Inténtalo más tarde.",
   "error.billing.invalidRequest": "La solicitud de facturación no es válida.",
   "error.billing.invalidResponse": "La respuesta de facturación no es válida.",

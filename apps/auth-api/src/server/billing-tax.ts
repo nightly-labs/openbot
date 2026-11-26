@@ -98,44 +98,50 @@ export const setCustomerBillingDetails = Effect.fn("BillingTax.setCustomerBillin
   now: number,
 ): Effect.fn.Return<{ details: BillingDetails; vatChanges: readonly string[] }, BillingError | BillingOperationError> {
   const vatId = request.vatId ?? null;
-  const check =
-    vatId && vatTreatment(request.country, true) === "reverse"
-      ? yield* vies
-          .check(vatId)
-          .pipe(
-            Effect.mapError(
-              () => new BillingError(503, "vat_id_unverified", sourceText("error.billing.vatIdUnverified")),
-            ),
-          )
-      : null;
+  const needsCheck = vatId !== null && vatTreatment(request.country, true) === "reverse";
+  const answer = needsCheck ? yield* Effect.option(vies.check(vatId)) : Option.none();
+  const check = Option.getOrNull(answer);
   if (check && !check.valid)
     return yield* new BillingError(400, "vat_id_invalid", sourceText("error.billing.vatIdInvalid"));
   const tax = yield* stripeCall(() => stripe.getCustomerTax(customerId));
+  const unansweredVatId = needsCheck && Option.isNone(answer) ? vatId : null;
+  const keptCheck = unansweredVatId !== null && confirmedVatId(tax) === unansweredVatId;
   for (const id of tax.taxIds) {
     if (id.type === "eu_vat" && id.value !== vatId)
       yield* stripeCall(() => stripe.deleteCustomerTaxId(customerId, id.id));
   }
   if (vatId && !tax.taxIds.some((id) => id.type === "eu_vat" && id.value === vatId))
     yield* stripeCall(() => stripe.addCustomerVatId(customerId, vatId));
-  const treatment = vatTreatment(request.country, check?.valid === true);
+  const treatment = vatTreatment(request.country, check?.valid === true || keptCheck);
   yield* stripeCall(() =>
     stripe.setCustomerTax(customerId, {
       ...(tax.country === request.country ? {} : { country: request.country }),
       taxExempt: treatment === "reverse" ? "reverse" : "none",
-      metadata: {
-        [CUSTOMER_METADATA.vatId]: check ? (vatId ?? "") : "",
-        [CUSTOMER_METADATA.viesRequest]: check?.requestIdentifier ?? "",
-        [CUSTOMER_METADATA.checkedAt]: check ? new Date(now).toISOString() : "",
-      },
+      metadata: keptCheck
+        ? {}
+        : {
+            [CUSTOMER_METADATA.vatId]: check ? (vatId ?? "") : "",
+            [CUSTOMER_METADATA.viesRequest]: check?.requestIdentifier ?? "",
+            [CUSTOMER_METADATA.checkedAt]: check ? new Date(now).toISOString() : "",
+          },
     }),
   );
   const changed = yield* syncSubscriptionTax(stripe, customerId, treatment);
-  const vatChanges = changed.map(
-    (subscription) =>
-      `VAT check: customer ${customerId} changed its billing details from ${tax.country ?? "no country"} to ${request.country}, so subscription ${subscription.id} changed from ${subscription.from} to ${treatment} VAT from its next invoice. Check the country.`,
-  );
-  return { details: { country: request.country, vatId }, vatChanges };
+  const vatChanges = [
+    ...(unansweredVatId ? [viesUnansweredText(customerId, unansweredVatId, keptCheck)] : []),
+    ...changed.map(
+      (subscription) =>
+        `VAT check: customer ${customerId} changed its billing details from ${tax.country ?? "no country"} to ${request.country}, so subscription ${subscription.id} changed from ${subscription.from} to ${treatment} VAT from its next invoice. Check the country.`,
+    ),
+  ];
+  return { details: { country: request.country, vatId: unansweredVatId && !keptCheck ? null : vatId }, vatChanges };
 });
+
+function viesUnansweredText(customerId: string, vatId: string, keptCheck: boolean): string {
+  return keptCheck
+    ? `VAT check: VIES did not answer for VAT ID ${vatId} of customer ${customerId}. This ID was confirmed before, so the customer keeps reverse charge.`
+    : `VAT check: VIES did not answer for VAT ID ${vatId} of customer ${customerId}, so the customer pays Polish VAT. Check the ID in VIES. If it is valid, set reverse charge on the customer and its open subscriptions, or ask the customer to save the VAT ID again.`;
+}
 
 const OPEN_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due", "unpaid", "incomplete", "paused"]);
 

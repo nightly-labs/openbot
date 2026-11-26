@@ -25,8 +25,6 @@ export const messages = {
   "error.billing.detailsInvalid": "국가와 VAT ID를 확인해 주세요. VAT ID는 선택한 국가의 것이어야 해요.",
   "error.billing.vatIdInvalid":
     "EU VAT 시스템에서 이 VAT ID를 찾을 수 없어요. 번호를 확인하거나 VAT ID 없이 계속해 주세요.",
-  "error.billing.vatIdUnverified":
-    "지금은 EU VAT 시스템에서 VAT ID를 확인할 수 없어요. 나중에 다시 시도하거나 VAT ID 없이 계속해 주세요.",
   "error.billing.vatUnavailable": "지금은 결제할 수 없어요. 나중에 다시 시도해 주세요.",
   "error.billing.invalidRequest": "결제 요청이 올바르지 않아요.",
   "error.billing.invalidResponse": "결제 응답이 올바르지 않아요.",
