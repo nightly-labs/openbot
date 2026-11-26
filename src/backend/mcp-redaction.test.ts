@@ -161,6 +161,7 @@ describe("mcpSecretValues", () => {
         reached: () => false,
         dropped: () => false,
         listedWithin: () => false,
+        calledSince: () => false,
         renew: () => [],
         close: () => {},
       };

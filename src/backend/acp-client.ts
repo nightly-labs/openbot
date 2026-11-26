@@ -2915,7 +2915,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           }
         }
       }
-      if (!thread.mcpListed) thread.mcpListed = this.#listedInTime(thread.mcp, sentAt);
+      if (!thread.mcpListed)
+        thread.mcpListed = this.#listedInTime(thread.mcp, sentAt) || thread.mcp.calledSince(sentAt);
       if (
         !promptedAgain &&
         !turn.wake &&
