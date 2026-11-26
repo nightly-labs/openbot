@@ -173,6 +173,7 @@ export const messages = {
   "chat.marker.settingLink": "显示了一个设置",
   "chat.settingLink.desktopOnly": "请在你电脑上的 OpenBot 应用中打开。",
   "chat.settingLink.agentChatOnly": "请在你与这个 agent 的聊天中打开。",
+  "chat.settingLink.adminOnly": "只有服务器所有者或管理员可以更改此设置。",
   "chat.marker.skillSuggestion": "推荐了一个技能",
   "chat.marker.mcpSignIn": "请你登录 MCP 服务器",
   "chat.marker.serverInstall": "创建了安装服务器的命令",

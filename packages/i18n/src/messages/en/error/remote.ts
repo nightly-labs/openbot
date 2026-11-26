@@ -95,6 +95,8 @@ export const messages = defineMessages("error.remote", {
   "error.remote.connectionServiceUnreachable":
     "This computer cannot reach the OpenBot connection service. Check its internet connection. OpenBot connects again automatically.",
   "error.remote.serverAnswerTimeout": "The server did not answer in time. OpenBot connects again automatically.",
+  "error.remote.signInConnectionClosed":
+    "The connection to the server closed during sign-in. If this continues, make sure that the date and time are correct on the server and on this device.",
   "error.remote.connectionCancelled": "The remote connection was cancelled.",
   "error.remote.hostDisconnected":
     "The connection to the server was lost. Check whether the action finished, then try again.",

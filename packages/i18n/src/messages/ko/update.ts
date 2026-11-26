@@ -42,6 +42,7 @@ export const messages = {
   "update.idleRestart.description": "새 루틴 실행은 다시 시작될 때까지 대기해요.",
   "update.idleRestart.waitingFor": "{reasons}을(를) 기다리는 중이에요.",
   "update.idleRestart.cancel": "다시 시작 취소",
+  "update.idleRestart.openSettings": "업데이트 설정 열기",
   "update.idleRestart.restartNow": "지금 다시 시작",
   "update.idleRestart.restartNowTitle": "지금 OpenBot을 다시 시작할까요?",
   "update.idleRestart.restartNowDescription": "끝나지 않은 에이전트 턴과 루틴 실행이 지금 중지돼요.",

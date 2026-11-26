@@ -35,6 +35,7 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createStore, onSettled, Show } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createPageHeaderFrame } from "../window/page-header-frame";
+import { createBackgroundRefresh } from "./background-refresh";
 import { type UsagePort, usagePort } from "./usage-port";
 
 interface AgentUsagePanelProps {
@@ -134,13 +135,14 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     },
   );
   onSettled(() => {
+    const refresh = createBackgroundRefresh(() => load(state.range, true));
     const unsubscribe = port().agent.onScopedEvent(({ serverId, event }) => {
       if (
         serverId === props.serverId &&
         event.type === "turn-completed" &&
         (!state.range.agentId || event.agentId === state.range.agentId)
       )
-        void load(state.range, true);
+        refresh.request();
     });
     const reconnect = port().servers.onEvent((servers) => {
       if (servers.some((server) => server.id === props.serverId && server.state === "online"))
@@ -148,6 +150,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
     });
     return () => {
       generation++;
+      refresh.dispose();
       unsubscribe();
       reconnect();
     };

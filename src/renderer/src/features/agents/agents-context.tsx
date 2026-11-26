@@ -58,6 +58,7 @@ const Agents = createSimpleContext({
     const [agentChatOpenRevision, setAgentChatOpenRevision] = createSignal(0);
     const [agentSetupOpen, setAgentSetupOpen] = createSignal(false);
     const [agentSetupDraft, setAgentSetupDraft] = createSignal<FirstAgentDraft>(createFirstAgentDraft());
+    const [agentSetupModelTouched, setAgentSetupModelTouched] = createSignal(false);
     const [agentSetupError, setAgentSetupError] = createSignal<string | null>(null);
     const [creatingAgent, setCreatingAgent] = createSignal(false);
     const [serverSetupChoice, setServerSetupChoice] = createSignal<CreationPreference | null>(null);
@@ -188,7 +189,7 @@ const Agents = createSimpleContext({
         return (profiles.find((agent) => !hidden.has(agent.id)) ?? profiles[0])?.id ?? "";
       });
       if (profiles.length === 0 && !agentSetupOpen()) {
-        setAgentSetupDraft(createFirstAgentDraft());
+        resetAgentSetupDraft();
         setAgentSetupError(null);
         setAgentSetupOpen(true);
       }
@@ -225,11 +226,16 @@ const Agents = createSimpleContext({
       hiddenAgentIds.delete(agentId);
     }
 
+    function resetAgentSetupDraft(): void {
+      setAgentSetupDraft(createFirstAgentDraft());
+      setAgentSetupModelTouched(false);
+    }
+
     function openAgentSetup(): void {
       windowPage.showAgents();
       if (agentSetupOpen()) return;
       setDirectTyping(false);
-      setAgentSetupDraft(createFirstAgentDraft());
+      resetAgentSetupDraft();
       setAgentSetupError(null);
       openedAgentChatId = null;
       setAgentSetupOpen(true);
@@ -239,7 +245,7 @@ const Agents = createSimpleContext({
       if (creatingAgent() || agentList().length === 0) return;
       setAgentSetupOpen(false);
       setAgentSetupError(null);
-      setAgentSetupDraft(createFirstAgentDraft());
+      resetAgentSetupDraft();
     }
 
     async function updateAgent(agentId: string, updates: Omit<UpdateAgentInput, "agentId">): Promise<void> {
@@ -333,6 +339,8 @@ const Agents = createSimpleContext({
       setAgentSetupOpen,
       agentSetupDraft,
       setAgentSetupDraft,
+      agentSetupModelTouched,
+      setAgentSetupModelTouched,
       agentSetupError,
       setAgentSetupError,
       creatingAgent,

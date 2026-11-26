@@ -37,6 +37,7 @@ function endsQuietResume(status: RemoteRecoveryStatus): boolean {
 export interface ServerConnectionHandle {
   client: RemoteTeamTransportRef;
   refresh(): void;
+  reconnect(): void;
   quietStart(): void;
 }
 
@@ -226,7 +227,15 @@ export const ServerConnection = memo(function ServerConnection({
       },
     );
     controller.current = recovery;
-    register(hostId, { client, refresh: () => recovery.refresh(), quietStart });
+    register(hostId, {
+      client,
+      refresh: () => recovery.refresh(),
+      reconnect: () => {
+        if (activeRef.current && lastStatus.current && lastStatus.current.status.phase !== "online") client.newPage();
+        recovery.refresh();
+      },
+      quietStart,
+    });
     recovery.setActive(activeRef.current);
     return () => {
       disposed = true;
@@ -270,6 +279,13 @@ export const ServerConnection = memo(function ServerConnection({
       void onMembershipChanged?.().catch(() => undefined);
     }
   }, [active, hostId, onMembershipChanged, analytics, endResume]);
+
+  const wasBackground = useRef(background);
+  useEffect(() => {
+    const opened = wasBackground.current && !background;
+    wasBackground.current = background;
+    if (opened) controller.current?.resetBackoff();
+  }, [background]);
 
   return (
     <RemoteTeamTransport

@@ -267,6 +267,10 @@ export function landingPageText(t: AppTranslate) {
       ],
       download: t("sitePage.landing.pricing.download"),
       license: t("sitePage.landing.pricing.license"),
+      eggs: {
+        smallPrint: t("sitePage.landing.pricing.eggs.smallPrint"),
+        forever: t("sitePage.landing.pricing.eggs.forever"),
+      },
     },
     teams: {
       title: t("sitePage.landing.teams.title"),

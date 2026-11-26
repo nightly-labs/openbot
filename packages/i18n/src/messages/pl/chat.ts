@@ -242,6 +242,7 @@ export const messages = {
   "chat.marker.settingLink": "Pokazano ustawienie",
   "chat.settingLink.desktopOnly": "Otwórz je w aplikacji OpenBot na swoim komputerze.",
   "chat.settingLink.agentChatOnly": "Otwórz je w czacie z tym agentem.",
+  "chat.settingLink.adminOnly": "Tylko właściciel serwera lub administrator może zmienić to ustawienie.",
   "chat.marker.skillSuggestion": "Zaproponowano umiejętność",
   "chat.marker.serverInstall": "Utworzył polecenie instalacji serwera",
   "chat.marker.skill.created": "Utworzono umiejętność",

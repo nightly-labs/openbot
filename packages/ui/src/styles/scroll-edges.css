@@ -55,16 +55,16 @@
   overflow-y: auto;
 }
 
-.scroll-edges[data-axis="x"]:dir(rtl) > .scroll-edges-view {
-  --scroll-edges-fade-side: to left;
-}
-
-.scroll-edges:has(> .scroll-edges-edge[data-edge="start"][data-visible]) > .scroll-edges-view {
+.scroll-edges[data-start-visible] > .scroll-edges-view {
   --scroll-edges-fade-start: var(--scroll-edges-fade-size);
 }
 
-.scroll-edges:has(> .scroll-edges-edge[data-edge="end"][data-visible]) > .scroll-edges-view {
+.scroll-edges[data-end-visible] > .scroll-edges-view {
   --scroll-edges-fade-end: var(--scroll-edges-fade-size);
+}
+
+.scroll-edges[data-axis="x"]:dir(rtl) > .scroll-edges-view {
+  --scroll-edges-fade-side: to left;
 }
 
 @supports (animation-timeline: scroll()) {
@@ -162,9 +162,8 @@
   background: color-mix(in srgb, var(--openbot-text-primary) 8%, var(--openbot-bg-surface-raised));
 }
 
-.scroll-edges:is(:hover, :has(> .scroll-edges-view:focus-visible))
-  > .scroll-edges-edge[data-visible]
-  .scroll-edges-arrow {
+.scroll-edges:hover > .scroll-edges-edge[data-visible] .scroll-edges-arrow,
+.scroll-edges > .scroll-edges-view:focus-visible ~ .scroll-edges-edge[data-visible] .scroll-edges-arrow {
   opacity: 1;
   visibility: visible;
   transition-delay: 0s;

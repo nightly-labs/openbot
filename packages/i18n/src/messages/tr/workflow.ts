@@ -112,6 +112,8 @@ export const messages = {
   "workflow.agent.removedLabel": "Ajan kaldırıldı. Ajan seç",
   "workflow.agent.list": "Ajanlar",
   "workflow.agent.search": "Ajan ara",
+  "workflow.agentMade.title": "{agent} bir iş akışı oluşturdu",
+  "workflow.agentMade.open": "Aç",
 
   "workflow.model.label": "Model: {name}",
   "workflow.model.title": "Modeller",

@@ -175,6 +175,7 @@ export const messages = {
   "chat.marker.settingLink": "Mostrou uma configuração",
   "chat.settingLink.desktopOnly": "Abra no app OpenBot do seu computador.",
   "chat.settingLink.agentChatOnly": "Abra na sua conversa com este agente.",
+  "chat.settingLink.adminOnly": "Só o proprietário do servidor ou um administrador pode alterar esta configuração.",
   "chat.marker.skillSuggestion": "Sugeriu uma habilidade",
   "chat.marker.serverInstall": "Criou um comando para instalar um servidor",
   "chat.marker.skill.created": "Habilidade criada",

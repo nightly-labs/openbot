@@ -7,6 +7,13 @@ export const messages = {
   "composer.feedbackFix.body":
     "Corrigiendo el informe #{number}. Envía la solicitud o cancela para dejar el informe como está.",
   "composer.feedbackFix.cancel": "Cancelar",
+  "composer.browserTab.opened": "{name} abrió {title} en el navegador.",
+  "composer.browserTab.openedMany": {
+    one: "{name} abrió {count} página en el navegador.",
+    other: "{name} abrió {count} páginas en el navegador.",
+  },
+  "composer.browserTab.open": "Abrir página",
+  "composer.browserTab.hide": "Ocultar",
   "composer.providerWait.offlineTitle": "Sin conexión a internet",
   "composer.providerWait.offline": "{provider} no puede responder hasta que este equipo vuelva a estar en línea.",
   "composer.providerWait.silent": "{provider} no ha enviado nada en {duration}.",
@@ -104,6 +111,9 @@ export const messages = {
   "composer.voice.limitSoon": "La grabación se detiene en {seconds} segundos.",
   "composer.voice.limitReached":
     "La grabación se detuvo al llegar al límite de 10 minutos. Lo que dijiste está en el mensaje.",
+  "composer.voice.languageNotice":
+    "El dictado conoce 25 idiomas europeos, como el inglés. Otros idiomas necesitan un modelo más grande ({size}), y el texto aparece cuando te detienes.",
+  "composer.voice.languageNotice.action": "Hablo otro idioma",
   "composer.send.saveQueued": "Guardar mensaje en cola",
   "composer.send.voice": "Enviar mensaje de voz",
   "composer.send.message": "Enviar mensaje",

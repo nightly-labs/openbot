@@ -3,7 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { isDeepStrictEqual } from "node:util";
 import type { ConversationMessage, ConversationSnapshot, ImageGenerationInfo } from "@openbot/contracts/ipc";
 import { mergeImageGenerationInfo } from "@openbot/contracts/ipc";
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { perfTimed } from "../perf-probe-hooks";
 import type { AgentRoster } from "./agent-roster";
 import { recordUsageMessage } from "./agent-usage";
@@ -231,9 +231,18 @@ export class ConversationWriter {
         );
         this.#streamedEvents.set(streamedEvent, sequence);
         const orderBefore = readOrderInputs(db, threadId, [message.id]);
-        const ordinal = storedOrNextOrdinal(db, threadId, message.id);
-        this.#core
-          .statement(`
+        const stored = storedMessageKey(this.#core, threadId, message.id);
+        if (stored && hasStoredKey(stored, message)) {
+          this.#core
+            .statement(
+              `UPDATE projection_thread_messages SET status = ?, message_json = ?, last_event_sequence = ?
+               WHERE thread_id = ? AND message_id = ?`,
+            )
+            .run(message.status, JSON.stringify(message), sequence, threadId, message.id);
+        } else {
+          const ordinal = stored ? requiredNumberColumn(stored, "ordinal") : nextOrdinal(this.#core, threadId);
+          this.#core
+            .statement(`
           INSERT INTO projection_thread_messages (
             thread_id, message_id, turn_id, author, status, item_type, created_at,
             ordinal, message_json, last_event_sequence
@@ -248,18 +257,19 @@ export class ConversationWriter {
             message_json = excluded.message_json,
             last_event_sequence = excluded.last_event_sequence
         `)
-          .run(
-            threadId,
-            message.id,
-            message.turnId ?? null,
-            message.author,
-            message.status,
-            message.itemType ?? null,
-            message.createdAt,
-            ordinal,
-            JSON.stringify(message),
-            sequence,
-          );
+            .run(
+              threadId,
+              message.id,
+              message.turnId ?? null,
+              message.author,
+              message.status,
+              message.itemType ?? null,
+              message.createdAt,
+              ordinal,
+              JSON.stringify(message),
+              sequence,
+            );
+        }
         refreshChangedOrder(db, threadId, orderBefore, [message.id]);
         recordUsageMessage(db, agent.id, message, agent.provider, agent.model);
         this.#core
@@ -433,7 +443,7 @@ export class ConversationWriter {
         const sequence = sequences[0] ?? 0;
         const agent = this.#roster.getAgent(input.agentId);
         const threadOwner = databaseRow(
-          db.prepare("SELECT agent_id FROM projection_threads WHERE thread_id = ?").get(input.threadId),
+          this.#core.statement("SELECT agent_id FROM projection_threads WHERE thread_id = ?").get(input.threadId),
         );
         if (
           !agent ||
@@ -444,13 +454,13 @@ export class ConversationWriter {
         if (!threadOwner) this.#roster.ensureThreadProjection(db, agent, sequence);
         const writtenMessageIds = [...changedMessages.map((message) => message.id), ...removedMessageIds];
         const orderBefore = readOrderInputs(db, input.threadId, writtenMessageIds);
-        const findOrdinal = db.prepare(
+        const findOrdinal = this.#core.statement(
           "SELECT ordinal, message_json FROM projection_thread_messages WHERE thread_id = ? AND message_id = ?",
         );
-        const nextOrdinal = db.prepare(
+        const nextOrdinal = this.#core.statement(
           "SELECT COALESCE(MAX(ordinal), -1) + 1 AS ordinal FROM projection_thread_messages WHERE thread_id = ?",
         );
-        const upsert = db.prepare(`
+        const upsert = this.#core.statement(`
           INSERT INTO projection_thread_messages (
             thread_id, message_id, turn_id, author, status, item_type, created_at,
             ordinal, message_json, last_event_sequence
@@ -465,10 +475,10 @@ export class ConversationWriter {
             message_json = excluded.message_json,
             last_event_sequence = excluded.last_event_sequence
         `);
-        const deleteAttachments = db.prepare(
+        const deleteAttachments = this.#core.statement(
           "DELETE FROM projection_attachments WHERE owner_kind = 'thread-message' AND owner_id = ?",
         );
-        const insertAttachment = db.prepare(`
+        const insertAttachment = this.#core.statement(`
           INSERT OR REPLACE INTO projection_attachments
             (attachment_id, owner_kind, owner_id, name, path, metadata_json, created_at, last_event_sequence)
           VALUES (?, 'thread-message', ?, ?, '', ?, ?, ?)
@@ -516,7 +526,7 @@ export class ConversationWriter {
             );
           }
         }
-        const deleteMessage = db.prepare(
+        const deleteMessage = this.#core.statement(
           "DELETE FROM projection_thread_messages WHERE thread_id = ? AND message_id = ?",
         );
         const deletedAt = new Date().toISOString();
@@ -526,12 +536,15 @@ export class ConversationWriter {
           deleteMessage.run(input.threadId, messageId);
         }
         refreshChangedOrder(db, input.threadId, orderBefore, writtenMessageIds);
-        db.prepare(
-          `UPDATE projection_threads
+        this.#core
+          .statement(
+            `UPDATE projection_threads
            SET active_turn_id = ?, updated_at = ?, last_event_sequence = ? WHERE thread_id = ?`,
-        ).run(input.activeTurnId, new Date().toISOString(), sequence, input.threadId);
+          )
+          .run(input.activeTurnId, new Date().toISOString(), sequence, input.threadId);
         if (input.activeTurnId) {
-          db.prepare(`
+          this.#core
+            .statement(`
             INSERT INTO projection_turns
               (turn_id, thread_id, provider_session_id, status, started_at, completed_at, last_event_sequence)
             VALUES (?, ?, (
@@ -540,7 +553,8 @@ export class ConversationWriter {
             ), 'running', ?, NULL, ?)
             ON CONFLICT(turn_id) DO UPDATE SET status = 'running', last_event_sequence = excluded.last_event_sequence
             WHERE projection_turns.completed_at IS NULL
-          `).run(input.activeTurnId, input.threadId, input.threadId, new Date().toISOString(), sequence);
+          `)
+            .run(input.activeTurnId, input.threadId, input.threadId, new Date().toISOString(), sequence);
         }
         if (
           isTurnEndEvent(input.eventType) &&
@@ -554,32 +568,38 @@ export class ConversationWriter {
               : input.eventType === "turn.interrupted-by-restart"
                 ? "interrupted"
                 : "completed";
-          db.prepare(
-            `UPDATE projection_turns
+          this.#core
+            .statement(
+              `UPDATE projection_turns
              SET status = ?, completed_at = ?, last_event_sequence = ?
              WHERE thread_id = ? AND turn_id = ?`,
-          ).run(status, new Date().toISOString(), sequence, input.threadId, input.detail.turnId);
+            )
+            .run(status, new Date().toISOString(), sequence, input.threadId, input.detail.turnId);
         }
         if (input.eventType === "turn.interrupted-by-restart") {
-          db.prepare(
-            `UPDATE projection_turns
+          this.#core
+            .statement(
+              `UPDATE projection_turns
              SET status = 'interrupted', completed_at = COALESCE(completed_at, ?), last_event_sequence = ?
              WHERE thread_id = ? AND status = 'running'`,
-          ).run(new Date().toISOString(), sequence, input.threadId);
+            )
+            .run(new Date().toISOString(), sequence, input.threadId);
         }
-        db.prepare(`
+        this.#core
+          .statement(`
           INSERT INTO projection_thread_activities
             (activity_id, thread_id, turn_id, activity_type, payload_json, created_at, last_event_sequence)
           VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          input.eventType === CONVERSATION_UPDATED ? updateActivityId(sequence) : randomUUID(),
-          input.threadId,
-          activityTurnId(input.eventType, input.detail, input.activeTurnId),
-          input.eventType,
-          JSON.stringify(input.detail ?? {}),
-          new Date().toISOString(),
-          sequence,
-        );
+        `)
+          .run(
+            input.eventType === CONVERSATION_UPDATED ? updateActivityId(sequence) : randomUUID(),
+            input.threadId,
+            activityTurnId(input.eventType, input.detail, input.activeTurnId),
+            input.eventType,
+            JSON.stringify(input.detail ?? {}),
+            new Date().toISOString(),
+            sequence,
+          );
         if (input.eventType === CONVERSATION_UPDATED && input.commandId === undefined)
           supersedePreviousConversationUpdate(db, input.threadId, sequence, changedMessages, input.activeTurnId);
         return { revision: sequence };
@@ -834,16 +854,30 @@ export function keptUnsavedImage(
   };
 }
 
-function storedOrNextOrdinal(db: DatabaseSync, threadId: string, messageId: string): number {
-  const stored = databaseRow(
-    db
-      .prepare("SELECT ordinal FROM projection_thread_messages WHERE thread_id = ? AND message_id = ?")
+function storedMessageKey(core: DatabaseCore, threadId: string, messageId: string): DynamicRecord | null {
+  return databaseRow(
+    core
+      .statement(
+        `SELECT ordinal, turn_id, author, item_type, created_at FROM projection_thread_messages
+         WHERE thread_id = ? AND message_id = ?`,
+      )
       .get(threadId, messageId),
   );
-  if (stored) return requiredNumberColumn(stored, "ordinal");
+}
+
+function hasStoredKey(stored: DynamicRecord, message: ConversationMessage): boolean {
+  return (
+    stored.turn_id === (message.turnId ?? null) &&
+    stored.author === message.author &&
+    stored.item_type === (message.itemType ?? null) &&
+    stored.created_at === message.createdAt
+  );
+}
+
+function nextOrdinal(core: DatabaseCore, threadId: string): number {
   const next = databaseRow(
-    db
-      .prepare("SELECT COALESCE(MAX(ordinal), -1) + 1 AS ordinal FROM projection_thread_messages WHERE thread_id = ?")
+    core
+      .statement("SELECT COALESCE(MAX(ordinal), -1) + 1 AS ordinal FROM projection_thread_messages WHERE thread_id = ?")
       .get(threadId),
   );
   return next ? requiredNumberColumn(next, "ordinal") : 0;
@@ -984,8 +1018,8 @@ function supersedeStreamedMessageEvents(
   deleteReceiptsOf(core.connection, [requiredStringColumn(previous, "command_id")]);
 }
 
-const CONVERSATION_UPDATED = "conversation.snapshot-updated";
-const GENERATED_UPDATE_COMMAND =
+export const CONVERSATION_UPDATED = "conversation.snapshot-updated";
+export const GENERATED_UPDATE_COMMAND =
   /^conversation:conversation\.snapshot-updated:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 function updateActivityId(sequence: number): string {

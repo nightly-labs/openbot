@@ -109,6 +109,8 @@ export const messages = {
   "workflow.agent.removedLabel": "エージェントは削除済みです。エージェントを選択",
   "workflow.agent.list": "エージェント",
   "workflow.agent.search": "エージェントを検索",
+  "workflow.agentMade.title": "{agent} がワークフローを作成しました",
+  "workflow.agentMade.open": "開く",
 
   "workflow.model.label": "モデル: {name}",
   "workflow.model.title": "モデル",

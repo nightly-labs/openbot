@@ -306,6 +306,8 @@ export const messages = {
     "Model OpenCode zapisał swoje działania jako tekst i ich nie wykonał. Spróbuj ponownie albo wybierz inny model.",
   "error.provider.acpNoAnswer":
     "{provider} zakończył turę bez odpowiedzi. Wyślij wiadomość ponownie albo rozpocznij nowy czat.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} otrzymał wyniki od członków zespołu, a potem zakończył turę bez odpowiedzi. Poproś agenta, aby kontynuował.",
   "error.provider.noAnswerAfterSteps":
     "{provider} wykonał kilka kroków, a potem zakończył turę bez odpowiedzi. Zanim wyślesz tę samą prośbę ponownie, zapytaj agenta, co zrobił.",
   "error.provider.acpRefusedNoReason": "{provider} zatrzymał się bez odpowiedzi. Wyślij wiadomość ponownie.",
@@ -349,6 +351,8 @@ export const messages = {
     "Gemini nie mógł odczytać zapisanej historii tego czatu. OpenBot uruchomił nową sesję Gemini z historią czatu. Wyślij wiadomość ponownie.",
   "error.provider.acpTurnStuck":
     "{provider} nie zakończył poprzedniej tury, więc nie przyjął tej wiadomości. OpenBot rozpoczął nową sesję {provider} z historią czatu. Wyślij wiadomość ponownie.",
+  "error.provider.antigravityLicenseRefused":
+    "Google informuje, że Twoje konto nie ma licencji na ten model. Wybierz inny model i wyślij wiadomość ponownie.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google nie pozwala Gemini działać z lokalizacji sieciowej komputera, na którym działa ten agent. Użyj Gemini na innym komputerze albo wybierz innego dostawcę dla tego agenta.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -370,6 +374,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Zaloguj się przez Cursor lub ustaw CURSOR_API_KEY, aby używać Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor nie mógł połączyć się ze swoim serwerem przy użyciu Twojego logowania. Sprawdź połączenie z internetem, a potem zaloguj się ponownie do Cursor.",
+  "error.provider.cursorNoModels":
+    "Cursor nie wysłał listy modeli. Wybierz „Połącz”, aby ponownie zalogować się do Cursor. Jeśli ten komunikat nie znika, sprawdź, czy Twój plan Cursor obejmuje modele.",
   "error.provider.clineArchivePath": "Archiwum Cline ma nieoczekiwaną ścieżkę.",
   "error.provider.clinePackageMismatch": "Pakiet Cline nie pasuje do katalogu środowisk uruchomieniowych.",
   "error.provider.clineChecksum": "Niezgodna suma kontrolna środowiska uruchomieniowego Cline.",
@@ -438,6 +444,8 @@ export const messages = {
     "Model nie przyjął obrazu z tego czatu, ponieważ obraz jest za duży. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.imageCountLimit":
     "Model nie przyjął tego czatu, ponieważ czat zawiera za dużo obrazów. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
+  "error.provider.imageCountLimitRepeated":
+    "Model znowu nie przyjął tego czatu: czat zawiera za dużo obrazów. Zadanie otwiera więcej obrazów, niż ten model przyjmuje, więc nowa sesja nie pomoże. Wybierz Nowy czat i poproś agenta, aby w każdym kroku otwierał mniej obrazów, albo wybierz model, który przyjmuje więcej obrazów.",
   "error.provider.imageUnreadable":
     "Model nie mógł odczytać obrazu w tym czacie. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie. Jeśli wysłano obraz, wyślij inny.",
   "error.provider.requestTooLarge":
@@ -452,6 +460,8 @@ export const messages = {
     "Muse nie mógł uruchomić serwera MCP i zablokował MCP w tej sesji. OpenBot rozpoczął nową sesję Muse z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wyłącz Sterowanie komputerem lub serwer MCP, który zawiódł, dla tego agenta.",
   "error.provider.claudeSessionMissing":
     "Claude Code nie znalazł zapisanej sesji tego czatu. OpenBot rozpoczął nową sesję Claude Code z historią czatu. Spróbuj ponownie.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode nie znalazł zapisanej sesji tego czatu. OpenBot rozpoczął nową sesję OpenCode z historią czatu. Spróbuj ponownie.",
   "error.provider.grokSignIn": "Uruchom `grok login` lub ustaw XAI_API_KEY, aby używać Grok.",
   "error.provider.acpSignInNoStart":
     "Dostawca się nie uruchomił, więc logowanie nie mogło się zacząć. Spróbuj ponownie lub uruchom ponownie OpenBot.",
@@ -563,7 +573,10 @@ export const messages = {
   "error.provider.piOutdated":
     "Pi {version} jest za stary. Zainstaluj Pi 1.1.0 lub nowszy, aby mieć natywną obsługę RPC i MCP.",
   "error.provider.nativeMissing": "{provider} CLI nie jest zainstalowany. Pobierz go w Ustawieniach.",
-  "error.provider.nativeNotStarted": "Nie udało się uruchomić {provider} CLI.",
+  "error.provider.nativeNotStarted":
+    "OpenBot znalazł zainstalowany przez Ciebie {provider}, ale nie uruchomił się. Zaktualizuj lub zainstaluj ponownie {provider}, a potem spróbuj jeszcze raz.",
+  "error.provider.nativeManagedNotStarted":
+    "{provider} nie uruchomił się na komputerze, na którym działa ten serwer. Uruchom ponownie OpenBot na tym komputerze. Jeśli nadal się nie uruchamia, wybierz Pomoc > Zgłoś problem.",
   "error.provider.nativeVersionUnreadable": "Nie udało się odczytać wersji {provider} CLI.",
   "error.provider.piSessionBusy": "Zaczekaj na zakończenie bieżącej tury Pi.",
   "error.provider.acpSessionBusy": "{provider} wciąż kończy zatrzymaną turę. Spróbuj ponownie za chwilę.",

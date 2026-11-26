@@ -176,6 +176,7 @@ export const messages = {
   "chat.marker.settingLink": "설정을 표시함",
   "chat.settingLink.desktopOnly": "내 컴퓨터의 OpenBot 앱에서 열어 주세요.",
   "chat.settingLink.agentChatOnly": "이 에이전트와의 채팅에서 열어 주세요.",
+  "chat.settingLink.adminOnly": "서버 소유자나 관리자만 이 설정을 변경할 수 있습니다.",
   "chat.marker.skillSuggestion": "스킬을 추천함",
   "chat.marker.mcpSignIn": "MCP 서버에 로그인하도록 요청함",
   "chat.marker.serverInstall": "서버를 설치하는 명령을 만들었습니다",

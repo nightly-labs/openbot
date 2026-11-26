@@ -13,6 +13,14 @@ export interface MobileBrowserTabs {
   activeTabId: string | null;
 }
 
+export type MobileHttpSignIns = Record<string, { origin: string; refused: boolean }>;
+
+export function mobileHttpSignIns(
+  prompts: readonly { tabId: string; origin: string; refused: boolean }[],
+): MobileHttpSignIns {
+  return Object.fromEntries(prompts.map(({ tabId, origin, refused }) => [tabId, { origin, refused }]));
+}
+
 function mobileBrowserTab(value: unknown): MobileBrowserTab | null {
   if (!isDynamicRecord(value) || !isString(value.id) || !isString(value.title) || !isString(value.url)) return null;
   return {
@@ -84,8 +92,12 @@ export function browserTabTitle(tab: MobileBrowserTab, untitled: string): string
 }
 
 export function browserTabHost(tab: MobileBrowserTab): string {
+  return urlHost(tab.url);
+}
+
+export function urlHost(url: string): string {
   try {
-    return new URL(tab.url).host;
+    return new URL(url).host;
   } catch {
     return "";
   }

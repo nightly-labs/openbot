@@ -1,9 +1,13 @@
 import type { BrowserLiveViewEvent } from "@openbot/contracts/ipc";
 import {
+  BROWSER_VIEW_DIALOG_QUERY,
   BROWSER_VIEW_FRAME_ACK_QUERY,
+  BROWSER_VIEW_FRAME_SIZE_QUERY,
   BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS,
   BROWSER_VIEW_PAGE_COPY_QUERY,
   type BrowserViewInput,
+  type BrowserViewViewport,
+  browserViewFrameSizeQuery,
   browserViewInputForHost,
   decodeBrowserViewFrame,
   decodeBrowserViewHostMessage,
@@ -11,7 +15,9 @@ import {
   isBrowserViewUserAction,
   TEAM_BROWSER_VIEW_CAPABILITY,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
+  TEAM_BROWSER_VIEW_DIALOG_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY,
   TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -26,6 +32,7 @@ export interface BrowserViewClientOptions {
   >;
   onEvent: (event: BrowserLiveViewEvent, owner: number) => void;
   writeClipboard: (text: string) => void;
+  frameSize?: (owner: number) => BrowserViewViewport | null;
 }
 
 interface ActiveView {
@@ -64,6 +71,13 @@ export class BrowserViewClient {
       if (this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY)) {
         url.searchParams.set(BROWSER_VIEW_PAGE_COPY_QUERY, "1");
       }
+      if (this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_DIALOG_CAPABILITY)) {
+        url.searchParams.set(BROWSER_VIEW_DIALOG_QUERY, "1");
+      }
+      const frameSize = this.#options.frameSize?.(owner);
+      if (frameSize && this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY)) {
+        url.searchParams.set(BROWSER_VIEW_FRAME_SIZE_QUERY, browserViewFrameSizeQuery(frameSize));
+      }
       const socket = yield* remoteDecode(() => new WebSocket(url, stream.protocols));
       socket.binaryType = "arraybuffer";
       const view: ActiveView = { serverId, sessionId: stream.sessionId, tabId, owner, socket, lastActionAt: 0 };
@@ -73,7 +87,11 @@ export class BrowserViewClient {
         if (typeof message.data === "string") {
           try {
             const hostMessage = decodeBrowserViewHostMessage(message.data);
-            if (hostMessage?.type === "copied" || hostMessage?.type === "copyTooLarge")
+            if (
+              hostMessage?.type === "copied" ||
+              hostMessage?.type === "copyTooLarge" ||
+              hostMessage?.type === "dialog"
+            )
               this.#options.onEvent({ ...hostMessage, tabId }, owner);
             else if (hostMessage?.type === "pageCopied") {
               if (Date.now() - view.lastActionAt <= BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS)

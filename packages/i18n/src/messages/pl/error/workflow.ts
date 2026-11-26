@@ -45,6 +45,17 @@ export const messages = {
   "error.workflow.providerBusy": "Dostawca jest zajęty. Poczekaj kilka minut, a potem uruchom krok ponownie.",
   "error.workflow.providerOffline":
     "OpenBot nie mógł połączyć się z dostawcą. Sprawdź połączenie z internetem, a potem uruchom krok ponownie.",
+  "error.workflow.providerBilling":
+    "Konto nie ma środków albo jego plan nie obejmuje tego modelu. Sprawdź plan albo wybierz inny model.",
+  "error.workflow.modelRefused": "Dostawca nie pozwala na ten model dla tego konta. Wybierz inny model.",
+  "error.workflow.modelRefusedReason":
+    'Wybierz inny model. Dostawca nie pozwala na ten model dla tego konta: "{reason}"',
+  "error.workflow.contentBlocked":
+    "Dostawca zablokował dane wejściowe. Zmień je lub prompt, a potem uruchom krok ponownie.",
+  "error.workflow.inputTooLong": "Dane wejściowe są za długie dla tego modelu. Skróć je albo wybierz inny model.",
+  "error.workflow.requestRefused": "Dostawca nie przyjął tego kroku. Wybierz inny model.",
+  "error.workflow.requestRefusedReason": 'Wybierz inny model. Dostawca nie przyjął tego kroku: "{reason}"',
+  "error.workflow.providerRefused": 'Wybierz inny model albo uruchom krok ponownie. Dostawca odpowiedział: "{reason}"',
   "error.workflow.modelBusy": "Trwa inne zapytanie do modelu. Uruchom krok ponownie za chwilę.",
   "error.workflow.mediaFailed": "Model nie mógł utworzyć obrazu ani wideo. Uruchom krok ponownie.",
   "error.workflow.mediaNotMade": "Model nie utworzył obrazu ani wideo. Odpowiedź modelu: {answer}",

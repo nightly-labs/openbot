@@ -27,7 +27,7 @@ import type { JSX } from "@solidjs/web";
 import { createSignal, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { CreditIcon } from "./CreditIcon";
-import type { CreditsStore } from "./credits-store";
+import { type CreditsStore, movablePersonalCredits } from "./credits-store";
 import { MoveCreditsDialog } from "./MoveCreditsDialog";
 
 const ROLE_LABEL = {
@@ -132,7 +132,7 @@ function ServerCreditsRow(props: {
         <Show when={props.server.role === "owner"}>
           <ServerCreditsMenu
             server={props.server}
-            personal={props.store.state.credits?.balance ?? 0}
+            personal={movablePersonalCredits(props.store.state.credits)}
             disabled={props.store.state.pending !== null}
             onMove={(direction) => props.onMove({ server: props.server, direction })}
           />
@@ -174,6 +174,13 @@ export function CreditsSection(props: CreditsSectionProps): JSX.Element {
                   })}
                 </ItemTitle>
                 <ItemDescription>{t("billing.credits.yours")}</ItemDescription>
+                <Show when={state().welcome}>
+                  {(welcome) => (
+                    <ItemDescription>
+                      {t("billing.credits.welcomeIncluded", { amount: format.number(welcome()) })}
+                    </ItemDescription>
+                  )}
+                </Show>
                 <ExpiringCredits expiring={state().expiring} />
               </ItemContent>
               <ItemActions>

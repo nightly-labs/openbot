@@ -23,6 +23,8 @@ export const messages = {
   "preview.tooLarge.title": "Файл слишком большой для просмотра",
   "preview.tooLarge.description": "Просмотр работает до 100 МБ. Этот файл можно открыть в программе по умолчанию.",
   "preview.spreadsheet.readFailed": "Не удалось прочитать эту таблицу.",
+  "preview.spreadsheet.tooLarge":
+    "Эта таблица слишком большая для просмотра. Откройте или скачайте файл, чтобы увидеть её целиком.",
   "preview.spreadsheet.truncated": "Просмотр ограничен первыми {rows} строками и {columns} столбцами.",
   "preview.document.readFailed": "Не удалось прочитать этот документ.",
   "preview.document.empty": "В этом документе нет текста для показа.",

@@ -136,6 +136,8 @@ export const messages = {
   "error.team.claudeUserSetupUnsupported": "当前连接不支持 Claude Code 配置开关。",
   "error.team.claudeCompactWindowUnsupported": "此连接不支持 Claude 压缩大小。",
   "error.team.cacheExpiryCompactionUnsupported": "此连接不支持在缓存过期前压缩。",
+  "error.team.mediaApprovalCreditsUnsupported": "此连接不支持积分审批额度。",
+  "error.team.mediaApprovalCreditsInvalid": "请输入 0 到 100,000 之间的整数积分。",
   "error.team.providerEnvironmentUnsupported": "此连接不支持提供方变量。",
   "error.team.modelVisibilityUnsupported": "当前连接不支持模型列表。",
   "error.team.providerDefaultUnsupported": "当前连接不支持默认服务商。",
@@ -201,4 +203,6 @@ export const messages = {
   "error.team.backgroundProcessesUnsupported": "此连接不支持后台进程。",
   "error.team.providerUseUnsupported": "当前连接不支持开启和关闭服务商。",
   "error.team.providerUseInvalid": "该服务商没有开关。",
+  "error.team.mediaApprovalChoiceUnsupported": "此服务器不支持在媒体审批中选择模型。请更新服务器上的 OpenBot。",
+  "error.team.mediaApprovalChoiceInvalid": "媒体审批的选择无效。",
 } as const satisfies PartialTranslation<typeof source>;

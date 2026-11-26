@@ -1,6 +1,6 @@
 ---
 name: release-extension-safely
-description: Audit a pending OpenBot Chrome extension release for hazards before the zip goes to the Chrome Web Store, then build the zip with the Release browser extension workflow. Use when asked to release, publish, upload or submit the browser extension, to make the Chrome Web Store zip, or to check whether an extension change is safe to ship.
+description: Audit a pending OpenBot Chrome extension release for hazards before a release tag sends it to the Chrome Web Store, and run the Release browser extension workflow by hand when the automatic run stopped. Use when asked to release, publish, upload or submit the browser extension, to make the Chrome Web Store zip, or to check whether an extension change is safe to ship.
 ---
 
 # Release the extension safely
@@ -16,14 +16,18 @@ a version. Users do not choose the time and cannot go back. A hazard that ships 
   account service, which may not have the new route yet.
 - The store accepts each `version` only once, and only if it is higher than the last one.
 
-Audit the diff since the last published version against the gates below, report a verdict, then
-build the zip. This skill does not upload the zip and does not publish. The developer uploads it in
-the Chrome Web Store Developer Dashboard.
+Each release tag publishes the extension automatically: `.github/workflows/release-extension.yml`
+builds the zip from the tag and submits it to the store with automatic publish
+([Browser extension](../../../docs/RELEASING.md#browser-extension)). Its script stops on a dev build,
+a source map, a wrong version and new permissions or match patterns (gate B). It cannot see gates
+C, D and E. Run this audit before the release tag that carries an extension change, so that a
+hazard stops the tag and not the users.
 
 ## What this skill does and does not do
 
-- It audits, then starts `.github/workflows/release-extension.yml` and checks its zip.
-- It does not bump the version, push a tag, deploy the account service or upload to the store.
+- It audits. When the automatic run stopped, it starts the workflow by hand on the tag (Step 3).
+- It does not bump the version, push a tag or deploy the account service. It sets
+  `allow_new_permissions` or `replace_pending` only when the developer says so.
 - It does not run `bun run check`, `bun run test`, `bun run lint` or `bun run typecheck`. Run only
   `bun run typecheck:extension`, the extension build, and the checks that a gate names.
 - It does not run `bun run dev:seed`, `dev:reset` or `pkill -f`.
@@ -54,9 +58,17 @@ git tag --list 'v*' --sort=-v:refname | head -1
 
 **Stop if the tree is not clean.**
 
-Ask the developer for the last version that the store published (Developer Dashboard › Package).
-Do not guess it: no tag records it. The range is `v<last published>..v<new version>`. The new version
-must be a released tag that contains `apps/browser-extension`; build from the tag only.
+Read the last version that the store published from the public package. Do not guess it: no tag
+records it.
+
+```bash
+curl -sSL -o /tmp/openbot-public.crx \
+  'https://clients2.google.com/service/update2/crx?response=redirect&prodversion=142.0&acceptformat=crx3&x=id%3Deggdpikcggoicfcfdpdihfkinajchpfj%26uc'
+unzip -p /tmp/openbot-public.crx manifest.json | jq -r .version
+```
+
+The range is `v<last published>..v<new version>`. The new version must be a released tag that
+contains `apps/browser-extension`; build from the tag only.
 
 **First store release.** When the store has no published version, there is no installed user and
 no range. Gate C is not triggered. Gates B, D and E check the full manifest and code of `v<new>`
@@ -194,21 +206,30 @@ worktree's `bun run dev` stack (the `smoke` skill starts it). It writes its repo
 sign-in screen. A failure that the range causes is a **stop**. A dev stack that does not start is
 **needs a human**.
 
-## Step 3 — build the zip
+## Step 3 — the store run
 
-When no gate is a stop, build the zip from the tag:
+The tag push starts the workflow. Find its run and read the job summary:
 
 ```bash
-gh workflow run release-extension.yml --ref v<new>
-gh run list --workflow release-extension.yml --event workflow_dispatch --limit 1 \
+gh run list --workflow release-extension.yml --event push --limit 5 \
   --json databaseId,headSha,headBranch,status,conclusion,url
-gh run watch <databaseId> --exit-status
-gh run download <databaseId> --dir .openbot-build/release-extension-v<new>
 ```
 
 - `headSha` must be the commit of `v<new>` (`git rev-list -n1 v<new>`).
-- Unzip the file into a new empty directory, and check that `manifest.json` is at the top level and
-  has `"version": "<new>"`.
+- The run summary says that the version was submitted, or why it was not. The `package` job
+  writes the permission stop; when it stops, the `publish` job is skipped. The `publish` job writes
+  the store result and a warning when it skipped the upload.
+
+When it stopped on new permissions that the developer confirmed, or the developer wants to replace a
+version in review, run it by hand on the tag:
+
+```bash
+gh workflow run release-extension.yml --ref v<new> -f publish=true \
+  -f allow_new_permissions=<true|false> -f replace_pending=<true|false>
+```
+
+To check a zip without the store, run the workflow on a branch with no inputs, or run
+`bun scripts/chrome-web-store-release.ts check <zip>` locally.
 
 ## Step 4 — report and hand off
 
@@ -216,10 +237,11 @@ gh run download <databaseId> --dir .openbot-build/release-extension-v<new>
 | --- | --- | --- |
 | A. Version and build | always | pass / stop / needs a human |
 
-Add the range, the count of files that you could not account for, the workflow run URL, and the zip
-path.
+Add the range, the count of files that you could not account for, the workflow run URL, and the
+store state.
 
-Any of these means **do not upload**:
+Any of these means **do not release the tag**, or, after the tag, cancel the review in the
+Developer Dashboard:
 
 - `v<new>` is not higher than the last published version;
 - a dev build, a `localhost` host or a source map in the zip;
@@ -230,6 +252,5 @@ Any of these means **do not upload**:
 - remote code;
 - a live check failure that the range causes.
 
-If all gates pass, hand off to the developer: upload the zip in the Developer Dashboard, fill in a
-justification for each new permission, update the Privacy tab if gate E says so, and submit for
-review. The store reviews each version before Chrome updates users.
+If all gates pass, hand off to the developer: fill in a justification for each new permission and
+update the Privacy tab if gate E says so. The store reviews each version before Chrome updates users.

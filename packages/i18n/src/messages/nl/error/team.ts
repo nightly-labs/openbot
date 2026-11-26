@@ -148,6 +148,8 @@ export const messages = {
   "error.team.claudeCompactWindowUnsupported": "Deze verbinding ondersteunt de compressiegrootte van Claude niet.",
   "error.team.cacheExpiryCompactionUnsupported":
     "Deze verbinding ondersteunt comprimeren voordat de cache verloopt niet.",
+  "error.team.mediaApprovalCreditsUnsupported": "Deze verbinding ondersteunt de creditgoedkeuringsgrens niet.",
+  "error.team.mediaApprovalCreditsInvalid": "Voer een geheel aantal credits in van 0 tot 100.000.",
   "error.team.providerEnvironmentUnsupported": "Deze verbinding ondersteunt geen providervariabelen.",
   "error.team.modelVisibilityUnsupported": "Deze verbinding ondersteunt de modellijst niet.",
   "error.team.providerDefaultUnsupported": "Deze verbinding ondersteunt de standaardaanbieder niet.",
@@ -219,4 +221,7 @@ export const messages = {
   "error.team.backgroundProcessesUnsupported": "Deze verbinding ondersteunt geen achtergrondprocessen.",
   "error.team.providerUseUnsupported": "Deze verbinding ondersteunt het aan- en uitzetten van aanbieders niet.",
   "error.team.providerUseInvalid": "Deze aanbieder heeft geen aan/uit-schakelaar.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "Deze server ondersteunt geen modelkeuze bij mediagoedkeuringen. Werk OpenBot op de server bij.",
+  "error.team.mediaApprovalChoiceInvalid": "De keuze voor de mediagoedkeuring is ongeldig.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -13,10 +13,46 @@ export interface BrowserTab {
   diagnosticErrorCount?: number;
   openerTabId?: string;
   popupFailure?: { id: string; message: string };
+  permissionRequest?: BrowserPermissionRequest;
   userControl?: true;
   canGoBack?: boolean;
   canGoForward?: boolean;
+  httpSignIn?: BrowserHttpSignIn;
 }
+
+export interface BrowserPermissionRequest {
+  id: string;
+  origin: string;
+  permission: "geolocation";
+}
+
+export interface BrowserLocation {
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number | null;
+}
+
+export interface BrowserPermissionAnswer {
+  tabId: string;
+  requestId: string;
+  allow: boolean;
+  always?: boolean | undefined;
+  location?: BrowserLocation | undefined;
+}
+export interface BrowserHttpSignIn {
+  origin: string;
+  refused?: true;
+}
+
+export function browserHttpSignInPrompts(
+  tabs: readonly BrowserTab[],
+): { tabId: string; origin: string; refused: boolean }[] {
+  return tabs.flatMap((tab) =>
+    tab.httpSignIn ? [{ tabId: tab.id, origin: tab.httpSignIn.origin, refused: tab.httpSignIn.refused === true }] : [],
+  );
+}
+
+export type BrowserHttpSignInInput = { tabId: string } & ({ username: string; password: string } | { cancel: true });
 
 export interface BrowserTeachStep {
   kind: "page" | "click";
@@ -328,7 +364,8 @@ export type BrowserLiveViewInput =
   | { type: "ack"; sequence: number }
   | { type: "paste"; text: string }
   | { type: "copy" }
-  | { type: "cut"; text: string };
+  | { type: "cut"; text: string }
+  | { type: "dialog"; id: string; accept: boolean };
 
 export const BROWSER_LIVE_VIEW_MAX_PASTE_TEXT = 100_000;
 
@@ -336,4 +373,11 @@ export type BrowserLiveViewEvent =
   | { type: "frame"; tabId: string; sequence: number; width: number; height: number; image: Uint8Array }
   | { type: "stopped"; tabId: string; reason: string }
   | { type: "copied"; tabId: string; text: string }
-  | { type: "copyTooLarge"; tabId: string };
+  | { type: "copyTooLarge"; tabId: string }
+  | { type: "dialog"; tabId: string; dialog: BrowserLiveViewDialog | null };
+
+export interface BrowserLiveViewDialog {
+  id: string;
+  type: "alert" | "confirm";
+  message: string;
+}

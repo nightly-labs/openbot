@@ -74,6 +74,7 @@ import {
   isEventRoutineTriggerInput,
   type SaveEventRoutineInput,
 } from "@openbot/contracts/ipc-events";
+import { withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { isDynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -221,8 +222,14 @@ interface InstanceTransferAgents extends TransferPreferenceAgents, TransferHisto
   deleteChannel(channelId: string): Effect.Effect<void, unknown>;
 }
 
+interface ListedMcpServer {
+  name: string;
+  url: string;
+}
+
 interface InstanceTransferSettings {
   mcpServers(): McpServerConfig[];
+  listedMcpServers?(): readonly ListedMcpServer[];
   saveMcpServer(config: McpServerConfig): Effect.Effect<unknown, unknown>;
   customProviders(): CustomProviderSummary[];
   saveCustomProvider(input: SaveCustomProviderInput): Effect.Effect<unknown, unknown>;
@@ -657,6 +664,7 @@ export class InstanceTransferService {
       for (const link of yield* settings.routineFlowLinks(agentId).pipe(Effect.mapError(failure)))
         links.set(link.id, link);
     const redact = createRedaction();
+    const listed = settings.listedMcpServers?.() ?? [];
     const positions: NonNullable<TransferSettings["routineFlowPositions"]>[number][] = [];
     if (settings.routineFlowPositions)
       for (const [agentId, agentKey] of keys)
@@ -683,7 +691,7 @@ export class InstanceTransferService {
         ...server,
         id: "",
         args: redact.args(server.name, server.args),
-        url: redact.origin(server.name, server.url),
+        url: isListedMcpUrl(server.url, listed) ? server.url : redact.origin(server.name, server.url),
         env: server.env.map(({ key }) => ({ key, value: "" })),
         headers: server.headers.map(({ key }) => ({ key, value: "" })),
       })),
@@ -1338,10 +1346,16 @@ export class InstanceTransferService {
     }
 
     const servers = new Set(port.mcpServers().map((server) => server.name.toLowerCase()));
+    const listed = port.listedMcpServers?.() ?? [];
     for (const server of settings.mcpServers) {
       if (servers.has(server.name.toLowerCase())) continue;
-      const saved = yield* attempt(named(server.name), port.saveMcpServer({ ...server, id: "", enabled: false }));
-      if (saved) warnings.push(sourceText("error.import.transferMcpValues", { name: server.name }));
+      const url = cleared.has(server.name) ? (listedUrlOfOrigin(server, listed) ?? server.url) : server.url;
+      const saved = yield* attempt(named(server.name), port.saveMcpServer({ ...server, url, id: "", enabled: false }));
+      if (!saved) continue;
+      const app = server.transport === "http" && isListedMcpUrl(url, listed);
+      warnings.push(
+        sourceText(app ? "error.import.transferMcpSignIn" : "error.import.transferMcpValues", { name: server.name }),
+      );
     }
   });
 
@@ -1951,6 +1965,25 @@ export function createRedaction() {
     },
     cleared: () => [...names],
   };
+}
+
+function isListedMcpUrl(url: string, listed: readonly ListedMcpServer[]): boolean {
+  const address = withoutMcpAccountFragment(url);
+  return address !== "" && listed.some((server) => server.url === address);
+}
+
+function listedUrlOfOrigin(server: McpServerConfig, listed: readonly ListedMcpServer[]): string | null {
+  if (server.transport !== "http") return null;
+  return (
+    listed.find((entry) => {
+      if (entry.name !== server.name) return false;
+      try {
+        return new URL(entry.url).origin === server.url;
+      } catch {
+        return false;
+      }
+    })?.url ?? null
+  );
 }
 
 function named(name: string): (reason: string) => string {
