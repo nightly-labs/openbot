@@ -378,7 +378,7 @@ export const messages = {
     "כשמגבלת שימוש עוצרת את {name} אחרי שהתחיל לעבוד, {name} ממשיך את אותה עבודה במודל הזמין הראשון לפי הסדר. הוא חוזר ל-{model} כשהמגבלה מסתיימת, או 10 דקות אחרי שגיאת ספק.",
   "mobile.agent.busyMessage.label": "בזמן עבודה",
   "mobile.agent.busyMessage.footer":
-    "מה קורה להודעה שנשלחת כשהסוכן עובד. תור שומר אותה עד סוף התור. הכוונה מוסרת אותה לסוכן במהלך התור.",
+    "מה קורה להודעה ממך או מסוכן אחר שמגיעה כשהסוכן עובד. תור שומר אותה עד סוף התור. הכוונה מוסרת אותה לסוכן במהלך התור.",
   "mobile.agent.busyMessage.queue": "תור",
   "mobile.agent.busyMessage.steer": "הכוונה",
   "mobile.agent.busyMessage.hostDefaultQueue": "ברירת מחדל של המארח (תור)",

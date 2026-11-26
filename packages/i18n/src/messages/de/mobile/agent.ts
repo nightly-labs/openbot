@@ -392,7 +392,7 @@ export const messages = {
     "Stoppt ein Nutzungslimit {name} nach Beginn der Arbeit, setzt {name} dieselbe Arbeit mit dem ersten verfügbaren Modell der Reihenfolge fort. Wenn das Limit endet oder 10 Minuten nach einem Anbieterfehler, kehrt {name} zu {model} zurück.",
   "mobile.agent.busyMessage.label": "Während der Arbeit",
   "mobile.agent.busyMessage.footer":
-    "Was mit einer Nachricht passiert, die du sendest, während der Agent arbeitet. Warteschlange behält sie, bis der Durchlauf endet. Steuern gibt sie dem Agenten während des Durchlaufs.",
+    "Was mit einer Nachricht von dir oder einem anderen Agenten passiert, die ankommt, während der Agent arbeitet. Warteschlange behält sie, bis der Durchlauf endet. Steuern gibt sie dem Agenten während des Durchlaufs.",
   "mobile.agent.busyMessage.queue": "Warteschlange",
   "mobile.agent.busyMessage.steer": "Steuern",
   "mobile.agent.busyMessage.hostDefaultQueue": "Host-Standard (Warteschlange)",

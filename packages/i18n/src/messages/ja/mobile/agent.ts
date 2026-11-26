@@ -385,7 +385,7 @@ export const messages = {
     "作業の開始後に利用上限で {name} が止まると、{name} は順序の中で最初に使えるモデルで同じ作業を続けます。上限が解除されると、またはプロバイダーのエラーから 10 分後に {model} に戻ります。",
   "mobile.agent.busyMessage.label": "作業中",
   "mobile.agent.busyMessage.footer":
-    "エージェントの作業中に送信したメッセージの扱いです。「キュー」ではターンが終わるまで保持します。「方向を修正」ではターン中にエージェントに渡します。",
+    "エージェントの作業中に届いた、あなたや他のエージェントからのメッセージの扱いです。「キュー」ではターンが終わるまで保持します。「方向を修正」ではターン中にエージェントに渡します。",
   "mobile.agent.busyMessage.queue": "キュー",
   "mobile.agent.busyMessage.steer": "方向を修正",
   "mobile.agent.busyMessage.hostDefaultQueue": "ホストの既定 (キュー)",
