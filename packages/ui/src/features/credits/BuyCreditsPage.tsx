@@ -289,6 +289,8 @@ function PopularBadge(props: { index: number }) {
   );
 }
 
+const STICKER_LAYERS = ["credit-pack-sticker-outline", "credit-pack-sticker-fill", "credit-pack-sticker-ink"];
+
 function StickerLayer(props: { class: string; count: string; unit: string }) {
   return (
     <g class={props.class} transform="skewX(-9)">
@@ -322,21 +324,11 @@ function PackCard(props: { purchase: Purchase; index: number; order: number }) {
       <div class="credit-pack-card">
         <RateChip stop={stop()} currency={currency()} />
         <svg class="credit-pack-sticker" width="1" height="1" aria-hidden="true">
-          <StickerLayer
-            class="credit-pack-sticker-outline"
-            count={credit.count(stop().credits)}
-            unit={t("billing.credits.unit")}
-          />
-          <StickerLayer
-            class="credit-pack-sticker-fill"
-            count={credit.count(stop().credits)}
-            unit={t("billing.credits.unit")}
-          />
-          <StickerLayer
-            class="credit-pack-sticker-ink"
-            count={credit.count(stop().credits)}
-            unit={t("billing.credits.unit")}
-          />
+          <For each={STICKER_LAYERS}>
+            {(layer) => (
+              <StickerLayer class={layer} count={credit.count(stop().credits)} unit={t("billing.credits.unit")} />
+            )}
+          </For>
         </svg>
         <CreditEmblem class="credit-pack-emblem" />
         <div class="credit-pack-panel">

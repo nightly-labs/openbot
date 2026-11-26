@@ -556,7 +556,6 @@ svg.credit-target-logo {
 .credit-pack {
   --credit-light: var(--openbot-credit-card-light);
   --credit-ink: var(--openbot-credit-card-ink);
-  --credit-glow: 0.55;
   position: relative;
   display: grid;
   align-content: start;
@@ -649,7 +648,7 @@ svg.credit-target-logo {
   top: var(--openbot-space-4);
   left: var(--openbot-space-4);
   border-color: color-mix(in srgb, var(--credit-light) 45%, var(--openbot-transparent));
-  background: color-mix(in srgb, var(--credit-ink) 16%, var(--openbot-transparent));
+  background: oklch(from var(--credit-tier) calc(l - 0.34) calc(c * 0.8) h / 0.6);
   color: var(--credit-light);
   font-weight: var(--openbot-weight-semibold);
 }
@@ -907,6 +906,12 @@ svg.credit-target-logo {
 .credit-corner-select:focus-visible {
   background: var(--openbot-bg-control-hover);
   color: var(--openbot-text-primary);
+}
+
+.credit-header-actions .ui-button:focus-visible,
+.credit-header-actions .hosted-currency .ui-select-trigger:focus-visible,
+.credit-corner-select:focus-visible {
+  box-shadow: var(--openbot-focus-ring);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1194,7 +1199,8 @@ svg.credit-target-logo {
   align-items: center;
   justify-content: space-between;
   gap: var(--openbot-space-3);
-  height: 48px;
+  min-height: 48px;
+  padding-block: var(--openbot-space-2);
   padding-inline: var(--openbot-space-4);
   font-variant-numeric: tabular-nums;
   animation: credit-rise var(--openbot-duration-overlay) var(--openbot-ease-out) backwards;
