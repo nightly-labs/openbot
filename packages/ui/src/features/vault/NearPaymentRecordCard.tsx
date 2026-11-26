@@ -66,9 +66,7 @@ export function NearPaymentRecordCard(props: NearPaymentRecordCardProps) {
   };
   const note = () => {
     const detail = props.payment.detail;
-    return props.payment.state === "failed" || props.payment.state === "uncertain"
-      ? detail && sourceText(detail)
-      : null;
+    return props.payment.state === "paid" ? null : detail && sourceText(detail);
   };
   return (
     <UiBlockCard

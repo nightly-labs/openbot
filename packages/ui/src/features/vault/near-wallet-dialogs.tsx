@@ -203,11 +203,11 @@ export function NearSetupDialog(props: NearDialogProps) {
   };
 
   async function create(passkey?: NearPasskeyChoice) {
+    const dailyBudgetUsd = budget();
+    if (dailyBudgetUsd === null) return;
     setStopped(false);
     setSigned(-1);
     setStarted(true);
-    const dailyBudgetUsd = budget();
-    if (dailyBudgetUsd === null) return;
     const input = { dailyBudgetUsd };
     const sent = await action.run(() => props.actions.create(passkey ? { ...input, passkey } : input));
     if (!sent) setStopped(true);
@@ -302,11 +302,11 @@ export function NearSetupDialog(props: NearDialogProps) {
       <SetupSteps labels={stepLabels()} current={index()} />
       <Switch>
         <Match when={step() === "sign"}>
-          <Show when={!started()}>
+          <Show when={!started() || stopped()}>
             <Text as="p" variant="label">
               {t("vault.near.budgetLabel")}
             </Text>
-            <BudgetChoice initial={SETUP_DAILY_BUDGET} onChange={chooseBudget} />
+            <BudgetChoice initial={shownBudget()} onChange={chooseBudget} />
           </Show>
           <SetupSignatures active={activeSignature()} failed={started() && stopped()} dailyBudgetUsd={shownBudget()} />
           <Show when={!started()}>
@@ -436,11 +436,15 @@ export function NearBudgetDialog(props: NearDialogProps) {
   const { t } = useText();
   const current = untrack(() => props.status.account?.dailyBudgetUsd ?? SETUP_DAILY_BUDGET);
   const [budget, setBudget] = createSignal<string | null>(current);
-  const changed = () => budget() !== null && budget() !== current;
+  const sameAsCurrent = (value: string) => Number(value) === Number(current);
+  const changed = () => {
+    const next = budget();
+    return next !== null && !sameAsCurrent(next);
+  };
   const run = createNearRun();
   async function save() {
     const next = budget();
-    if (next === null || next === current) return;
+    if (next === null || sameAsCurrent(next)) return;
     if (await run.run(() => props.actions.setBudget(next))) props.onClose();
   }
   return (

@@ -111,7 +111,7 @@ export function isNearTransactionHash(value: unknown): value is string {
 export function isConversationNearPayment(value: unknown): value is ConversationNearPayment {
   return (
     isDynamicRecord(value) &&
-    isBoundedString(value.domain, INPUT_LIMITS.hostname) &&
+    isNearRuleDomain(value.domain) &&
     isBoundedString(value.amount, NEAR_WALLET_LIMITS.amount) &&
     isBoundedString(value.symbol, NEAR_WALLET_LIMITS.asset) &&
     isBoundedString(value.reason, NEAR_WALLET_LIMITS.reason) &&
