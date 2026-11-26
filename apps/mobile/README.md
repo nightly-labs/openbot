@@ -801,7 +801,7 @@ Run them from the repository root. The publish, rollout and rollback commands st
 | `bun run mobile:ota:publish -- --platform all --message "Fix the chat scroll"` | Publishes the current branch to all phones of the store builds that can get it. `--platform ios` or `android` selects one platform. `--rollout 10` gives it to 10% of the phones. `--dry-run` runs the checks and the guard, and publishes nothing. |
 | `bun run mobile:ota:rollout -- --platform all --rollout 50` | Changes the percentage of phones that get the current update. |
 | `bun run mobile:ota:rollback -- --platform all` | Takes the current update back. Phones get the earlier update again, or with `--to-embedded` the bundle in their binary. |
-| `bun run mobile:ota:status` | Shows what the update server gives the phones of each store build. It changes nothing. |
+| `bun run mobile:ota:status` | Shows what the update server gives the phones of each store build. It changes nothing. It asks with no install ID, so during a rollout under 100% it shows the earlier update or "no update". |
 | `bun run mobile:release:ota -- --base <store build tag> --platform all` | Writes the release notes of an update. See [the notes of an update](#release-notes-of-an-update). |
 
 Add `--channel preview` to send an update to internal builds of the `preview` profile only. Such a
@@ -813,10 +813,17 @@ commit, or from a commit with the same runtime version (`mobile:ota:check` print
 1. Merge the fix to `main` with its note file in `changelog.d`.
 2. Run `bun run mobile:ota:check`. When it names the store builds, `main` has no native change since
    those builds, and all of `main` can go out.
-3. Run `bun run mobile:ota:publish -- --platform all --message "<what the update does>"`.
-4. Follow the workflow in GitHub Actions. It runs the mobile lint, typecheck and tests, the guard,
+3. Write the notes with `bun run mobile:release:ota`, and merge that change before the publish. The
+   update banner reads the notes from the account service when the update is ready on the phone; a
+   phone that gets the update before the notes deploy never shows them. Wait for the
+   `Deploy Cloudflare production` job of the merge, and confirm that
+   `https://openbot.run/v1/mobile/changelog?platform=ios&after=<store version>` has the new section.
+4. Run `bun run mobile:ota:publish -- --platform all --message "<what the update does>"`.
+5. Follow the workflow in GitHub Actions. It runs the mobile lint, typecheck and tests, the guard,
    `expo export`, and the upload. Its summary names each update ID and the store builds that get it.
-5. Write the notes with `bun run mobile:release:ota`, and merge that change.
+
+The `release-mobile-ota` agent skill (`.agents/skills/release-mobile-ota`) does these steps with the
+checks before and after the publish.
 
 When step 2 says that the checkout needs a store build, `main` has a native change. Then:
 
