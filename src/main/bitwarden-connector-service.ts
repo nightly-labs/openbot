@@ -192,7 +192,7 @@ const findCli: BitwardenCliFinder = Effect.fn("BitwardenConnector.findCli")(func
 function serverAddress(value: string): string | null {
   try {
     const url = new URL(value.trim());
-    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) return null;
+    if (url.protocol !== "https:" || url.username || url.password || url.search) return null;
     return `${url.origin}${url.pathname.replace(/\/+$/u, "")}`;
   } catch {
     return null;
