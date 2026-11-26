@@ -49,6 +49,13 @@ export function applyBrowserEvent(liveState: LiveWorkspaceStore, serverId: strin
   }
 }
 
+async function refreshAgentUsageLimits(queryClient: QueryClient, scope: QueryScope, serverId: string): Promise<void> {
+  const filters = { queryKey: queryKeys.agentUsageLimits(scope, serverId), exact: true };
+  const readInProgress = queryClient.isFetching(filters) > 0;
+  await queryClient.invalidateQueries(filters, { cancelRefetch: false });
+  if (readInProgress) await queryClient.invalidateQueries(filters, { cancelRefetch: false });
+}
+
 export function syncEventQueries(
   queryClient: QueryClient,
   scope: QueryScope,
@@ -59,6 +66,7 @@ export function syncEventQueries(
     void applyMobileQueueEvent(queryClient, serverId, event);
   }
   applyTaskEvent(queryClient, scope, serverId, event);
+  if (event.type === "runtime-snapshot") void refreshAgentUsageLimits(queryClient, scope, serverId);
   if (event.type === "usage-changed") {
     queryClient.setQueryData<PlanLimits>(queryKeys.planLimits(scope, serverId), (current) =>
       current ? { ...current, usage: withUsageEvent(current.usage, event.usage) } : current,

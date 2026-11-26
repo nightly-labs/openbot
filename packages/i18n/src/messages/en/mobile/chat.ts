@@ -537,6 +537,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.queue.repliesTitle": "Waiting for replies",
   "mobile.chat.queue.providerRestart": "Waiting for {provider} to restart",
   "mobile.chat.queue.signIn": "Waiting for {provider} sign-in",
+  "mobile.chat.queue.usageLimit": "Usage limit reached",
+  "mobile.chat.queue.usageLimitResets": "Usage limit reached · Resets {time}",
   "mobile.chat.providerSignIn.title": "{provider} is not signed in",
   "mobile.chat.providerSignIn.action": "Sign in",
   "mobile.chat.providerSignIn.open": "{label}. Open provider settings",

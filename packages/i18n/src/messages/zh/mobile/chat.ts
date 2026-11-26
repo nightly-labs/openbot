@@ -521,6 +521,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "等待回复",
   "mobile.chat.queue.providerRestart": "等待 {provider} 重启",
   "mobile.chat.queue.signIn": "正在等待登录 {provider}",
+  "mobile.chat.queue.usageLimit": "已达用量上限",
+  "mobile.chat.queue.usageLimitResets": "已达用量上限 · {time} 重置",
   "mobile.chat.providerSignIn.title": "{provider} 未登录",
   "mobile.chat.providerSignIn.action": "登录",
   "mobile.chat.providerSignIn.open": "{label}。打开提供方设置",

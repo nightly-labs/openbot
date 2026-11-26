@@ -660,6 +660,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "في انتظار الردود",
   "mobile.chat.queue.providerRestart": "في انتظار إعادة تشغيل {provider}",
   "mobile.chat.queue.signIn": "في انتظار تسجيل الدخول إلى {provider}",
+  "mobile.chat.queue.usageLimit": "تم بلوغ حد الاستخدام",
+  "mobile.chat.queue.usageLimitResets": "تم بلوغ حد الاستخدام · يُعاد التعيين {time}",
   "mobile.chat.providerSignIn.title": "لم يتم تسجيل الدخول إلى {provider}",
   "mobile.chat.providerSignIn.action": "تسجيل الدخول",
   "mobile.chat.providerSignIn.open": "{label}. فتح إعدادات المزوّد",

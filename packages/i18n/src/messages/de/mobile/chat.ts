@@ -562,6 +562,8 @@ export const messages = {
   "mobile.chat.queue.repliesTitle": "Warten auf Antworten",
   "mobile.chat.queue.providerRestart": "Wartet auf den Neustart von {provider}",
   "mobile.chat.queue.signIn": "Wartet auf die Anmeldung bei {provider}",
+  "mobile.chat.queue.usageLimit": "Nutzungslimit erreicht",
+  "mobile.chat.queue.usageLimitResets": "Nutzungslimit erreicht · Wird am {time} zurückgesetzt",
   "mobile.chat.providerSignIn.title": "{provider} ist nicht angemeldet",
   "mobile.chat.providerSignIn.action": "Anmelden",
   "mobile.chat.providerSignIn.open": "{label}. Anbietereinstellungen öffnen",
