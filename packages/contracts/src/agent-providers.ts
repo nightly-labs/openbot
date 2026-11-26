@@ -204,7 +204,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     workspaceEnforcement: "confined-process",
     steer: "native",
     concurrentTurns: true,
-    reportsUsage: true,
+    reportsUsage: false,
     approvalsInFullAccess: true,
     foldersInFullAccess: true,
   },

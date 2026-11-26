@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { ProviderAccountStatus } from "@openbot/contracts/ipc";
@@ -19,7 +18,6 @@ const SAVED_KEY = "fake-gemini-key-for-the-first-account";
 const GOOGLE_PAGE = "https://accounts.google.com/o/oauth2/auth?client_id=fake&state=fake&prompt=consent";
 const GOOGLE_PAGE_WITH_CHOOSER =
   "https://accounts.google.com/o/oauth2/auth?client_id=fake&state=fake&prompt=consent+select_account";
-const PROJECT = "fake-account-project";
 const TOKEN_FILE = "antigravity-oauth-token";
 const LEGACY_TOKEN_FILE = "acp_token.json";
 const MARKER = "openbot-token-imported";
@@ -142,11 +140,6 @@ interface LogEntry {
   tokenAtStart?: boolean;
 }
 
-interface QuotaCall {
-  path: string | undefined;
-  authorization: string | undefined;
-}
-
 interface Report {
   passed: boolean;
   oldRuntime?: { accounts: boolean; connectError: string };
@@ -168,12 +161,12 @@ interface Report {
     argv: string[][];
     wsl: (string | null | undefined)[];
   };
-  accountUsage?: { quotaCalls: QuotaCall[]; usedPercent: number | undefined };
+  accountUsage?: { googleRequests: string[]; reading: boolean };
   idleUsage?: { processesStarted: number };
   busyReconnect?: { error: string; loggedOut: boolean; agentProcessKept: boolean };
   reconnect?: { logoutFirst: boolean; agentProcessStopped: boolean; accountState: string | undefined };
   remove?: { folderLeft: boolean; rows: number };
-  failedUsage?: { quotaCalls: number; stored: number; accountState: string | undefined };
+  signInAgain?: { googleRequests: string[]; stored: number; accountState: string | undefined };
   firstAccountTokens?: { legacyUnchanged: boolean; importedUnchanged: boolean };
   noSecondImport?: { tokenAtStart: boolean | undefined; tokenFile: boolean; legacyUnchanged: boolean };
   otherSignIn?: { tokenFile: boolean; marker: boolean; legacyUnchanged: boolean; started: boolean };
@@ -186,53 +179,24 @@ const approve = join(root, "approve");
 const defaultHome = join(root, "default-gemini");
 const defaultData = join(defaultHome, "antigravity-acp");
 const report: Report = { passed: false };
-const savedEnvironment = {
-  GEMINI_HOME: process.env.GEMINI_HOME,
-  OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL: process.env.OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL,
-};
+const savedEnvironment = { GEMINI_HOME: process.env.GEMINI_HOME };
 process.env.FAKE_AGY_LOG = log;
 process.env.FAKE_AGY_APPROVE = approve;
 process.env.FAKE_AGY_FREE_HOME = defaultHome;
 process.env.GEMINI_HOME = defaultHome;
 delete process.env.OPENBOT_ANTIGRAVITY_PATH;
 
-const quotaCalls: QuotaCall[] = [];
-let usageFails = false;
-const quotaServer = createServer((request, response) => {
-  request.resume();
-  request.on("end", () => {
-    quotaCalls.push({ path: request.url, authorization: request.headers.authorization });
-    response.setHeader("Content-Type", "application/json");
-    if (usageFails) {
-      response.statusCode = 500;
-      return response.end(JSON.stringify({ error: { code: 500, message: "Quota service unavailable" } }));
-    }
-    if (request.url === "/v1internal:loadCodeAssist")
-      return response.end(JSON.stringify({ cloudaicompanionProject: PROJECT }));
-    response.end(
-      JSON.stringify({
-        groups: [
-          {
-            displayName: "Gemini Models",
-            description: "Models within this group: Gemini Flash, Gemini Pro",
-            buckets: [
-              {
-                displayName: "Weekly Limit Remaining",
-                window: "weekly",
-                resetTime: "2026-11-17T11:59:31Z",
-                remainingFraction: 0.5,
-              },
-            ],
-          },
-        ],
-      }),
-    );
-  });
-});
-await new Promise<void>((done) => quotaServer.listen(0, "127.0.0.1", done));
-const quotaAddress = quotaServer.address();
-assert.ok(quotaAddress !== null && typeof quotaAddress === "object");
-process.env.OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL = `http://127.0.0.1:${quotaAddress.port}/v1internal`;
+const googleRequests: string[] = [];
+const sendRequest = globalThis.fetch;
+globalThis.fetch = Object.assign(
+  (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    if (!url.hostname.endsWith("googleapis.com")) return sendRequest(input, init);
+    googleRequests.push(url.origin + url.pathname);
+    return Promise.reject(new Error("This check sends nothing to Google."));
+  },
+  { preconnect: sendRequest.preconnect },
+);
 
 async function entries(): Promise<LogEntry[]> {
   const text = await readFile(log, "utf8").catch(() => "");
@@ -443,18 +407,11 @@ try {
 
   const usage = await runCauseEffect(runtime.accountUsage());
   report.accountUsage = {
-    quotaCalls: [...quotaCalls],
-    usedPercent: usage.limits.find((limit) => limit.accountId === account.id)?.secondary?.usedPercent,
+    googleRequests: [...googleRequests],
+    reading: usage.limits.some((limit) => limit.accountId === account.id && (limit.primary || limit.secondary)),
   };
-  assert.ok(
-    quotaCalls.some((call) => call.path === "/v1internal:retrieveUserQuotaSummary"),
-    "the check read the account's quota",
-  );
-  assert.ok(
-    quotaCalls.every((call) => call.authorization === `Bearer access:${accountHome}`),
-    "only the account's own token is sent",
-  );
-  assert.equal(report.accountUsage.usedPercent, 50, "the account's reading is its own quota");
+  assert.deepEqual(report.accountUsage.googleRequests, [], "the usage read sends nothing to Google");
+  assert.equal(report.accountUsage.reading, false, "Gemini shows no plan usage");
 
   await runCauseEffect(agents.initialize());
   const created = await runCauseEffect(
@@ -506,23 +463,15 @@ try {
   assert.equal(report.remove.rows, 1);
 
   await rm(log, { force: true });
-  quotaCalls.length = 0;
-  usageFails = true;
   await runCauseEffect(runtime.signInProviderAccountOnHost("antigravity", null, openPage));
-  const [failed] = store.list("antigravity");
-  report.failedUsage = {
-    quotaCalls: quotaCalls.length,
+  report.signInAgain = {
+    googleRequests: [...googleRequests],
     stored: store.list("antigravity").length,
     accountState: accountRows(runtime)?.[1]?.state,
   };
-  assert.ok(failed);
-  assert.ok(
-    quotaCalls.some((call) => call.authorization === `Bearer access:${store.home(failed)}`),
-    "the check asked for the usage",
-  );
-  assert.equal(report.failedUsage.stored, 1);
-  assert.equal(report.failedUsage.accountState, "connected");
-  usageFails = false;
+  assert.deepEqual(report.signInAgain.googleRequests, [], "the sign-in check sends nothing to Google");
+  assert.equal(report.signInAgain.stored, 1);
+  assert.equal(report.signInAgain.accountState, "connected");
 
   report.firstAccountTokens = {
     legacyUnchanged: (await readFile(join(defaultData, LEGACY_TOKEN_FILE), "utf8")) === defaultLegacy,
@@ -609,7 +558,6 @@ try {
     if (value === undefined) delete process.env[name];
     else process.env[name] = value;
   }
-  await new Promise<void>((done) => quotaServer.close(() => done()));
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   await rm(root, { recursive: true, force: true });
