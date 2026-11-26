@@ -336,6 +336,10 @@ function folderNames(folder: string): string[] {
   }
 }
 
+function hasNoItemType(items: unknown): boolean {
+  return items === undefined || items === true || (isRecord(items) && !Object.hasOwn(items, "type"));
+}
+
 function hasRefusedField(parameters: unknown, path: string, reason: string): boolean {
   const steps = Array.from(path.matchAll(GOOGLE_FIELD_STEP), ([, key = "", index]) => ({
     key: key.replace(/_([a-z])/gu, (_, letter: string) => letter.toUpperCase()),
@@ -354,8 +358,11 @@ function hasRefusedField(parameters: unknown, path: string, reason: string): boo
     else node = isRecord(value) && Object.hasOwn(value, index) ? value[index] : undefined;
   }
   if (missing) {
-    if (last.index !== undefined || !isRecord(node) || Object.hasOwn(node, last.key)) return false;
-    return last.key !== "items" || node.type === "array" || (Array.isArray(node.type) && node.type.includes("array"));
+    if (last.index !== undefined || !isRecord(node)) return false;
+    const value = Object.hasOwn(node, last.key) ? node[last.key] : undefined;
+    if (last.key !== "items") return value === undefined;
+    if (!hasNoItemType(value)) return false;
+    return node.type === "array" || (Array.isArray(node.type) && node.type.includes("array"));
   }
   if (type) {
     if (last.index !== undefined || !isRecord(node) || !Object.hasOwn(node, last.key)) return false;
