@@ -99,7 +99,7 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
           draft.phase = result ? "ready" : "unsupported";
         });
     } catch (error) {
-      if (background && state.result) return;
+      if (background && state.result && state.phase !== "loading") return;
       if (request === generation && props.serverId === serverId && state.range.agentId === agentId)
         setState((draft) => {
           draft.result = null;
