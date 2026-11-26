@@ -449,6 +449,7 @@ export interface ProviderClientContext {
   readonly codexTurnContext?: TurnContext;
   readonly providerEnvironment?: (provider: ProviderEnvironmentProvider) => Readonly<Record<string, string>>;
   readonly systemProxyFetch?: (url: string, init: RequestInit) => Promise<Response>;
+  readonly codexProxyEnvironment?: () => Readonly<Record<string, string>>;
   readonly grokProxyEnvironment?: () => Readonly<Record<string, string>>;
   readonly fitImage?: ImageFitter | null;
 }
@@ -730,12 +731,13 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       return new CodexAppServerClient(
         cli.executable,
         requestTimeoutMs,
-        {
+        () => ({
           ...cliPathEnvironment(cli),
+          ...context.codexProxyEnvironment?.(),
           ...serverEnvironment,
           ...context.accountEnvironment,
           ...variables,
-        },
+        }),
         context.codexTurnContext,
         overrides,
         overrides.length > 0 ? CODEX_ADDRESS_VARIABLE : undefined,

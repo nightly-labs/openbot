@@ -1,7 +1,8 @@
 import { Effect } from "effect";
 import { proxyUrlFromRules } from "./signal-ingress";
 
-const GROK_API_URL = "https://cli-chat-proxy.grok.com/";
+export const CODEX_API_URL = "https://chatgpt.com/";
+export const GROK_API_URL = "https://cli-chat-proxy.grok.com/";
 const PROXY_READ_TIMEOUT_MS = 2_000;
 const USER_PROXY_NAMES = new Set(["https_proxy", "http_proxy", "all_proxy"]);
 const DIRECT_ADDRESSES = [
@@ -22,7 +23,7 @@ function valuesNamed(environment: NodeJS.ProcessEnv, names: ReadonlySet<string>)
   );
 }
 
-function grokProxyEnvironment(rules: string, environment: NodeJS.ProcessEnv): Record<string, string> {
+function providerProxyEnvironment(rules: string, environment: NodeJS.ProcessEnv): Record<string, string> {
   if (valuesNamed(environment, USER_PROXY_NAMES).length > 0) return {};
   const userBypass = valuesNamed(environment, new Set(["no_proxy"])).flatMap((value) => value.split(/[\s,]+/u));
   if (userBypass.includes("*")) return {};
@@ -31,17 +32,18 @@ function grokProxyEnvironment(rules: string, environment: NodeJS.ProcessEnv): Re
   return { HTTPS_PROXY: proxy, NO_PROXY: [...new Set([...userBypass.filter(Boolean), ...DIRECT_ADDRESSES])].join(",") };
 }
 
-export function createGrokSystemProxy(
+export function createProviderSystemProxy(
+  apiUrl: string,
   resolveProxy: (url: string) => Promise<string>,
   environment: NodeJS.ProcessEnv = process.env,
 ) {
   let current: Readonly<Record<string, string>> = {};
   let reading = false;
-  const refresh = Effect.tryPromise(() => resolveProxy(GROK_API_URL)).pipe(
+  const refresh = Effect.tryPromise(() => resolveProxy(apiUrl)).pipe(
     Effect.timeout(PROXY_READ_TIMEOUT_MS),
     Effect.flatMap((rules) =>
       Effect.sync(() => {
-        current = grokProxyEnvironment(rules, environment);
+        current = providerProxyEnvironment(rules, environment);
       }),
     ),
     Effect.ignore,
