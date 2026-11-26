@@ -25,7 +25,7 @@
 /** @type {import('@expo/fingerprint').Config} */
 module.exports = {
   preset: "strict",
-  ignorePaths: ["modules/speech/ios/vendor/**/*"],
+  ignorePaths: ["modules/speech/ios/vendor/**/*", "targets/*/Assets.xcassets/**/*"],
   extraSources: [
     { type: "dir", filePath: "plugins/share-extension", reasons: ["shareExtension"] },
     { type: "dir", filePath: "plugins/notification-service", reasons: ["notificationService"] },
