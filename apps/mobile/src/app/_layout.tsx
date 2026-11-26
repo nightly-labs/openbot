@@ -56,6 +56,7 @@ import { checkRecognitionModels } from "@/features/voice/model/recognition-model
 import { supertonicModel } from "@/features/voice/model/supertonic-model";
 import { loadVoiceServer } from "@/features/voice/model/voice-server";
 import { loadVoiceSettings } from "@/features/voice/model/voice-settings";
+import { installWatch, resetWatch } from "@/features/watch/watch-native";
 import { AppLoadingOverlayProvider, useAppLoadingOverlay } from "@/shared/components/app-loading-overlay";
 import { useBloubColors } from "@/shared/components/bloub-stage/bloub-look";
 import { BloubStage } from "@/shared/components/bloub-stage/bloub-stage";
@@ -77,6 +78,7 @@ export const unstable_settings = {
 installSupportLog();
 installQuickActions();
 installShortcuts();
+installWatch();
 installAppLock();
 installNotificationHandler();
 backgroundRefreshNative?.install();
@@ -137,6 +139,7 @@ function RootNavigator() {
     resetShortcutDirectory();
     resetShortcuts();
     resetNotificationAvatars();
+    resetWatch();
   }, [loading, session]);
 
   useLayoutEffect(() => {

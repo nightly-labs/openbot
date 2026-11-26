@@ -148,6 +148,11 @@
       "name": "FEEDBACK_RATE_LIMITER",
       "namespace_id": "2026110801",
       "simple": { "limit": 3, "period": 60 }
+    },
+    {
+      "name": "WATCH_TICKET_RATE_LIMITER",
+      "namespace_id": "2026112501",
+      "simple": { "limit": 30, "period": 60 }
     }
   ],
   "env": {
@@ -237,6 +242,11 @@
           "name": "FEEDBACK_RATE_LIMITER",
           "namespace_id": "2026110802",
           "simple": { "limit": 3, "period": 60 }
+        },
+        {
+          "name": "WATCH_TICKET_RATE_LIMITER",
+          "namespace_id": "2026112502",
+          "simple": { "limit": 30, "period": 60 }
         }
       ]
     },
@@ -337,6 +347,11 @@
           "name": "FEEDBACK_RATE_LIMITER",
           "namespace_id": "2026110803",
           "simple": { "limit": 3, "period": 60 }
+        },
+        {
+          "name": "WATCH_TICKET_RATE_LIMITER",
+          "namespace_id": "2026112503",
+          "simple": { "limit": 30, "period": 60 }
         }
       ]
     }

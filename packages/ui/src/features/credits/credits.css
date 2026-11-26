@@ -4,6 +4,12 @@
   initial-value: transparent;
 }
 
+@property --credit-glow {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.55;
+}
+
 @keyframes credit-rise {
   from {
     opacity: 0;
@@ -176,19 +182,6 @@ svg.credit-target-logo {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--openbot-space-3);
-}
-
-.credit-tier-tag {
-  padding: 2px var(--openbot-space-3);
-  border: 1px solid color-mix(in srgb, var(--credit-tier) 50%, var(--openbot-transparent));
-  border-radius: var(--openbot-radius-pill);
-  background: color-mix(in srgb, var(--credit-tier) 14%, var(--openbot-transparent));
-  color: var(--credit-tier);
-  font-size: var(--openbot-text-sm);
-  font-weight: var(--openbot-weight-semibold);
-  letter-spacing: 0.08em;
-  line-height: var(--openbot-leading-md);
-  text-transform: uppercase;
 }
 
 .credit-chip {
@@ -472,6 +465,9 @@ svg.credit-target-logo {
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--credit-tier) 30%, var(--openbot-transparent));
   border-radius: var(--openbot-radius-card);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--openbot-credit-card-light) 10%, var(--openbot-transparent)),
+    0 0 48px -8px color-mix(in oklab, var(--credit-tier) 28%, var(--openbot-transparent));
   background:
     radial-gradient(
       70% 90% at 0% 0%,
@@ -502,9 +498,7 @@ svg.credit-target-logo {
 }
 
 .credit-split-number {
-  background: linear-gradient(180deg, var(--openbot-text-primary) 35%, var(--credit-tier));
-  background-clip: text;
-  color: var(--openbot-transparent);
+  color: var(--openbot-text-primary);
   font-size: var(--credit-big);
   font-weight: var(--openbot-weight-semibold);
   font-variant-numeric: tabular-nums;
@@ -512,8 +506,10 @@ svg.credit-target-logo {
   line-height: 1;
 }
 
-.credit-split-number * {
-  color: inherit;
+.credit-split-number :is(.t-digit-run > span, .t-digit-word) {
+  background: linear-gradient(180deg, var(--openbot-text-primary) 35%, var(--credit-tier));
+  background-clip: text;
+  color: var(--openbot-transparent);
 }
 
 .credit-split-unit {
@@ -550,116 +546,341 @@ svg.credit-target-logo {
   width: 100%;
 }
 
-.credit-pack {
-  position: relative;
+.credit-pack-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--openbot-space-6);
-  padding: var(--openbot-space-6) var(--openbot-space-8);
-  border: 1px solid var(--openbot-border-strong);
-  border-radius: var(--openbot-radius-card);
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--credit-tier) 7%, var(--openbot-transparent)),
-    var(--openbot-transparent) 50%
-  );
-  animation: credit-rise var(--openbot-duration-toast-enter) var(--openbot-ease-out) backwards;
-  animation-delay: calc(var(--credit-order) * var(--credit-stagger));
-  transition: border-color var(--openbot-duration-normal) var(--openbot-ease-out);
+  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+  gap: var(--openbot-space-8) var(--openbot-space-6);
+  padding-block-start: var(--openbot-space-3);
 }
 
-.credit-pack:hover {
-  border-color: color-mix(in srgb, var(--credit-tier) 45%, var(--openbot-transparent));
+.credit-pack {
+  --credit-light: var(--openbot-credit-card-light);
+  --credit-ink: var(--openbot-credit-card-ink);
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: var(--openbot-space-4);
+  min-width: 0;
+  animation: credit-rise var(--openbot-duration-toast-enter) var(--openbot-ease-out) backwards;
+  animation-delay: calc(var(--credit-order) * var(--credit-stagger));
+}
+
+.credit-page[data-tier],
+.credit-split[data-tier],
+.credit-pack[data-tier],
+.credit-confirm-modal[data-tier] {
+  --credit-tier: color-mix(
+    in oklch,
+    color-mix(
+      in oklch,
+      var(--openbot-credit-basic),
+      var(--openbot-credit-plus) clamp(0%, var(--credit-step) * 200%, 100%)
+    ),
+    var(--openbot-credit-max) clamp(0%, (var(--credit-step) - 0.5) * 200%, 100%)
+  );
 }
 
 .credit-pack[data-popular] {
-  border-color: var(--credit-tier);
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--credit-tier) 16%, var(--openbot-transparent)),
-    color-mix(in srgb, var(--credit-tier) 4%, var(--openbot-transparent))
-  );
+  --credit-glow: 0.85;
+}
+
+.credit-pack-card {
+  position: relative;
+  isolation: isolate;
+  aspect-ratio: 1.6;
+  border-radius: var(--openbot-radius-xl);
+  color: var(--credit-light);
+  transition:
+    translate var(--openbot-duration-normal) var(--openbot-ease-out),
+    --credit-glow var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.credit-pack-card::before,
+.credit-pack-card::after {
+  position: absolute;
+  border-radius: inherit;
+  content: "";
+  pointer-events: none;
+}
+
+.credit-pack-card::after {
+  z-index: -2;
+  inset: 0;
+  opacity: var(--credit-glow);
+  box-shadow:
+    0 0 6px 1px oklch(from var(--credit-tier) calc(l + 0.1) calc(c * 1.2) h),
+    0 0 22px 4px color-mix(in oklab, var(--credit-tier) 70%, var(--openbot-transparent)),
+    0 8px 64px 12px color-mix(in oklab, var(--credit-tier) 32%, var(--openbot-transparent));
+}
+
+.credit-pack-card::before {
+  z-index: -1;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      -55deg,
+      color-mix(in srgb, var(--credit-light) 6%, var(--openbot-transparent)) 0 14px,
+      var(--openbot-transparent) 14px 28px
+    ),
+    linear-gradient(
+      180deg,
+      oklch(from var(--credit-tier) calc(l + 0.12) calc(c * 1.1) calc(h + 14)),
+      var(--credit-tier) 42%,
+      oklch(from var(--credit-tier) calc(l - 0.1) c calc(h - 6)) 74%,
+      oklch(from var(--credit-tier) calc(l - 0.2) calc(c * 0.9) calc(h - 10))
+    );
+  box-shadow:
+    inset 0 2px 2px color-mix(in srgb, var(--credit-light) 85%, var(--openbot-transparent)),
+    inset 0 6px 10px -2px color-mix(in srgb, var(--credit-light) 40%, var(--openbot-transparent)),
+    inset 2px 0 4px -1px color-mix(in srgb, var(--credit-light) 35%, var(--openbot-transparent)),
+    inset -2px 0 4px -1px color-mix(in srgb, var(--credit-light) 35%, var(--openbot-transparent)),
+    inset 0 -3px 6px color-mix(in srgb, var(--credit-ink) 22%, var(--openbot-transparent));
+  filter: blur(1.4px);
+}
+
+.credit-pack:hover .credit-pack-card {
+  --credit-glow: 1;
+  translate: 0 calc(var(--openbot-space-1) * -1);
+}
+
+.credit-pack-card > .credit-chip {
+  position: absolute;
+  top: var(--openbot-space-4);
+  left: var(--openbot-space-4);
+  border-color: color-mix(in srgb, var(--credit-light) 45%, var(--openbot-transparent));
+  background: oklch(from var(--credit-tier) calc(l - 0.34) calc(c * 0.8) h / 0.6);
+  color: var(--credit-light);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.credit-pack-card > .credit-chip .credit-star {
+  fill: var(--credit-light);
+}
+
+.credit-pack-sticker {
+  position: absolute;
+  top: var(--openbot-space-3);
+  right: calc(var(--openbot-space-4) + 2px);
+  overflow: visible;
+}
+
+.credit-pack-sticker text {
+  font-weight: var(--openbot-weight-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.045em;
+  text-anchor: end;
+  text-rendering: geometricPrecision;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  paint-order: stroke;
+}
+
+.credit-pack-sticker-number {
+  font-size: var(--openbot-text-3xl);
+}
+
+.credit-pack-sticker-unit {
+  font-size: var(--openbot-text-md);
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+}
+
+.credit-pack-sticker-outline text {
+  fill: var(--credit-ink);
+  stroke: var(--credit-ink);
+  stroke-width: 10px;
+}
+
+.credit-pack-sticker-fill text {
+  fill: var(--credit-light);
+  stroke: var(--credit-light);
+  stroke-width: 7px;
+}
+
+.credit-pack-sticker-ink text {
+  fill: var(--credit-ink);
+}
+
+.credit-pack-emblem {
+  position: absolute;
+  top: 35%;
+  left: 50%;
+  width: 28%;
+  height: auto;
+  aspect-ratio: 1;
+  overflow: visible;
+  translate: -50% -50%;
+}
+
+.credit-emblem-stop-top {
+  stop-color: var(--credit-light);
+}
+
+.credit-emblem-stop-middle {
+  stop-color: oklch(from var(--credit-tier) calc(l + 0.24) calc(c * 0.5) calc(h + 10));
+}
+
+.credit-emblem-stop-bottom {
+  stop-color: oklch(from var(--credit-tier) calc(l + 0.1) calc(c * 0.9) h);
+}
+
+.credit-emblem-stop-gloss {
+  stop-color: var(--credit-light);
+  stop-opacity: 0.9;
+}
+
+.credit-emblem-stop-clear {
+  stop-color: var(--credit-light);
+  stop-opacity: 0;
+}
+
+.credit-emblem-halo {
+  fill: oklch(from var(--credit-tier) calc(l + 0.2) calc(c * 0.8) h / 0.7);
+  filter: blur(10px);
+}
+
+.credit-emblem-rim {
+  fill: none;
+  stroke: color-mix(in srgb, var(--credit-light) 75%, var(--openbot-transparent));
+  stroke-width: 0.5;
+}
+
+.credit-emblem-spark {
+  fill: var(--credit-light);
+  opacity: 0.95;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    scale var(--openbot-duration-normal) var(--openbot-ease-out),
+    rotate var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.credit-emblem-spark[data-small] {
+  opacity: 0.7;
+}
+
+.credit-pack:hover .credit-emblem-spark {
+  scale: 1.25;
+  rotate: 45deg;
+}
+
+.credit-pack-panel {
+  position: absolute;
+  right: var(--openbot-space-3);
+  bottom: var(--openbot-space-3);
+  left: var(--openbot-space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-2);
+  min-height: 52px;
+  padding-inline: var(--openbot-space-4) var(--openbot-space-3);
+  border-radius: var(--openbot-radius-lg);
+  background: oklch(from var(--credit-tier) calc(l - 0.34) calc(c * 0.8) h / 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.credit-pack-panel .credit-price-now {
+  color: var(--credit-light);
+}
+
+.credit-pack-panel .credit-price-was {
+  color: color-mix(in srgb, var(--credit-light) 68%, var(--openbot-transparent));
+  font-size: var(--openbot-text-lg);
+  line-height: var(--openbot-leading-lg);
+}
+
+.credit-pack-panel .credit-chip-save {
+  border-color: var(--credit-light);
+  background: var(--credit-light);
+  color: var(--credit-ink);
 }
 
 .credit-popular {
   position: absolute;
   top: 0;
-  left: var(--openbot-space-8);
+  left: 50%;
   padding: 2px var(--openbot-space-3);
   border-radius: var(--openbot-radius-pill);
-  background: var(--credit-tier);
-  color: var(--openbot-text-on-light);
+  background: var(--credit-light);
+  color: var(--credit-ink);
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-bold);
   letter-spacing: 0.08em;
   line-height: var(--openbot-leading-sm);
   text-transform: uppercase;
-  transform: translateY(-50%);
+  white-space: nowrap;
+  translate: -50% -50%;
   animation: credit-pop var(--openbot-duration-overlay) var(--openbot-ease-out) backwards;
   animation-delay: calc(var(--credit-order) * var(--credit-stagger) + var(--openbot-duration-overlay));
 }
 
-.credit-pack-main {
+.credit-pack-body {
   display: grid;
-  gap: var(--openbot-space-4);
+  justify-items: start;
+  gap: var(--openbot-space-3);
+  padding-inline: var(--openbot-space-1);
 }
 
-.credit-pack-amount {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--openbot-space-2);
-  margin: 0;
-  color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-xl);
-  font-weight: var(--openbot-weight-semibold);
-  font-variant-numeric: tabular-nums;
+.credit-pack-body .credit-facts {
+  gap: var(--openbot-space-1-5);
+  font-size: var(--openbot-text-sm);
 }
 
-.credit-pack .credit-head {
-  flex-wrap: nowrap;
+.credit-page .credit-pack-pay {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  margin-block-start: var(--openbot-space-1);
 }
 
-.credit-pack .credit-facts {
-  display: flex;
-  gap: var(--openbot-space-6);
+.credit-page .credit-pack-pay::after {
+  position: absolute;
+  inset: 0;
+  content: "";
 }
 
-.credit-pack .credit-facts li {
-  white-space: nowrap;
-}
-
-.credit-pack-side {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-6);
-}
-
-.credit-pack-price {
-  align-items: end;
-}
-
-@container credit-packs (width < 960px) {
-  .credit-pack-side {
-    flex-direction: column;
-    align-items: end;
-    gap: var(--openbot-space-2);
-  }
+.credit-pack:hover .hosted-pricing-pill-secondary:not(:disabled) {
+  border-color: color-mix(in srgb, var(--credit-tier) 55%, var(--openbot-transparent));
+  background: color-mix(in srgb, var(--credit-tier) 14%, var(--openbot-transparent));
 }
 
 .credit-header-actions {
   display: flex;
   align-items: center;
-  gap: var(--openbot-space-3);
+  gap: var(--openbot-space-1);
 }
 
-.credit-header-actions .credit-redeem-trigger {
-  height: 30px;
-  border-color: var(--openbot-border);
-  border-radius: var(--openbot-radius-pill);
-  padding-inline: var(--openbot-space-2) var(--openbot-space-3);
-  color: var(--openbot-text-primary);
+.credit-header-actions .ui-button,
+.credit-header-actions .hosted-currency .ui-select-trigger,
+.credit-corner-select {
+  display: inline-flex;
+  height: var(--openbot-control-sm);
+  flex: none;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+  border: 0;
+  border-radius: var(--openbot-radius-md);
+  outline: 0;
+  background: var(--openbot-transparent);
+  box-shadow: none;
+  padding-inline: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-family: var(--openbot-font-sans);
   font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.credit-header-icon {
+  color: var(--openbot-text-muted);
+}
+
+.credit-header-actions .hosted-currency .ui-select-trigger-icon,
+.credit-corner-chevron {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  flex: none;
+  color: var(--openbot-text-muted);
 }
 
 .credit-header-actions .hosted-currency {
@@ -667,10 +888,46 @@ svg.credit-target-logo {
   width: auto;
 }
 
+.credit-header-actions .hosted-currency .ui-select-trigger {
+  width: auto;
+  padding-inline-end: var(--openbot-space-1-5);
+}
+
+.credit-header-actions .hosted-currency-locked {
+  height: var(--openbot-control-sm);
+  padding-inline: var(--openbot-space-2);
+}
+
+.credit-header-actions .ui-button[aria-expanded="true"],
+.credit-header-actions .hosted-currency .ui-select-trigger[data-expanded],
+.credit-corner-select[data-expanded],
+.credit-header-actions .ui-button:focus-visible,
+.credit-header-actions .hosted-currency .ui-select-trigger:focus-visible,
+.credit-corner-select:focus-visible {
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-primary);
+}
+
+.credit-header-actions .ui-button:focus-visible,
+.credit-header-actions .hosted-currency .ui-select-trigger:focus-visible,
+.credit-corner-select:focus-visible {
+  box-shadow: var(--openbot-focus-ring);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .credit-header-actions .ui-button:hover:not(:disabled),
+  .credit-header-actions .hosted-currency .ui-select-trigger:hover:not([data-disabled]),
+  .credit-corner-select:hover {
+    background: var(--openbot-bg-control-hover);
+    color: var(--openbot-text-primary);
+  }
+}
+
 .credit-corner {
   display: flex;
   align-items: center;
-  gap: var(--openbot-space-2);
+  gap: var(--openbot-space-1);
+  padding-inline-start: var(--openbot-space-2);
 }
 
 .credit-corner-for {
@@ -679,39 +936,17 @@ svg.credit-target-logo {
 }
 
 .credit-corner-select {
-  display: inline-flex;
   min-width: 0;
   max-width: 320px;
-  height: 30px;
-  flex: none;
-  align-items: center;
-  gap: var(--openbot-space-2);
-  border: 0;
-  border-radius: var(--openbot-radius-pill);
-  outline: 0;
-  background: var(--openbot-bg-control);
-  box-shadow: inset 0 0 0 1px var(--openbot-border);
-  padding-inline: 3px var(--openbot-space-2);
+  padding-inline: var(--openbot-space-1) var(--openbot-space-1-5);
   color: var(--openbot-text-primary);
-  font-family: var(--openbot-font-sans);
   cursor: pointer;
 }
 
-.credit-corner-select:hover,
-.credit-corner-select[data-expanded] {
-  background: var(--openbot-bg-control-hover);
-  box-shadow: inset 0 0 0 1px var(--openbot-border-strong);
-}
-
-.credit-corner-select:focus-visible {
-  box-shadow: inset 0 0 0 1px var(--openbot-border-focus);
-}
-
-.credit-corner-chevron {
-  width: var(--openbot-icon-sm);
-  height: var(--openbot-icon-sm);
-  flex: none;
-  color: var(--openbot-text-muted);
+.credit-corner-select .credit-target-logo {
+  width: 20px;
+  height: 20px;
+  padding: 2px;
 }
 
 .credit-corner-value {
@@ -925,19 +1160,30 @@ svg.credit-target-logo {
 }
 
 .credit-confirm-badge {
+  --credit-light: var(--openbot-credit-card-light);
+  --credit-ink: var(--openbot-credit-card-ink);
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 56px;
-  border: 1px solid var(--credit-tier);
-  border-radius: var(--openbot-radius-pill);
-  background: color-mix(in srgb, var(--credit-tier) 14%, transparent);
+  width: 72px;
+  height: 72px;
+  border-radius: var(--openbot-radius-xl);
+  background: linear-gradient(
+    180deg,
+    oklch(from var(--credit-tier) calc(l + 0.12) calc(c * 1.1) calc(h + 14)),
+    var(--credit-tier) 50%,
+    oklch(from var(--credit-tier) calc(l - 0.14) c calc(h - 8))
+  );
+  box-shadow:
+    inset 0 2px 2px color-mix(in srgb, var(--credit-light) 70%, var(--openbot-transparent)),
+    inset 0 -3px 6px color-mix(in srgb, var(--credit-ink) 22%, var(--openbot-transparent)),
+    0 0 28px 2px color-mix(in oklab, var(--credit-tier) 40%, var(--openbot-transparent));
   animation: credit-pop var(--openbot-duration-overlay) var(--openbot-ease-out) var(--openbot-duration-fast) backwards;
 }
 
 .credit-confirm-icon {
-  width: 28px;
-  height: 28px;
+  width: 40px;
+  height: 40px;
+  overflow: visible;
 }
 
 .credit-confirm-summary {
@@ -954,7 +1200,8 @@ svg.credit-target-logo {
   justify-content: space-between;
   gap: var(--openbot-space-3);
   min-height: 48px;
-  padding: var(--openbot-space-2) var(--openbot-space-4);
+  padding-block: var(--openbot-space-2);
+  padding-inline: var(--openbot-space-4);
   font-variant-numeric: tabular-nums;
   animation: credit-rise var(--openbot-duration-overlay) var(--openbot-ease-out) backwards;
 }
@@ -997,6 +1244,17 @@ svg.credit-target-logo {
   display: inline-flex;
   align-items: center;
   gap: var(--openbot-space-2);
+}
+
+.credit-confirm-target .credit-target-logo {
+  --server-plush-logo-size: 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+}
+
+.credit-confirm-discount .credit-chip {
+  padding-block: 0;
 }
 
 .credit-confirm-target-name {
@@ -1213,6 +1471,8 @@ svg.credit-target-logo {
 @media (prefers-reduced-motion: reduce) {
   .credit-page,
   .credit-split,
+  .credit-pack-card,
+  .credit-emblem-spark,
   .credit-move-swap svg,
   .credit-page .credit-stop,
   .credit-page .credit-stop::after,

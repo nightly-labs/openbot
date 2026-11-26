@@ -93,6 +93,8 @@ export const messages = defineMessages("status.agent", {
   "status.agent.nearSummaryBudget": "Change the daily budget of the wallet to {amount} USD.",
   "status.agent.nearSummaryAutoPay":
     "Let OpenBot pay without your signature when a payment rule allows it. Other payments still ask you in the chat.",
+  "status.agent.nearSummaryManualPay":
+    "No payment rule is left. OpenBot asks for your signature for each payment again.",
   "status.agent.nearSummaryPayment": "Approve the payment of {amount} to {recipient}.",
   "status.agent.nearSummaryFreeze": "Agents cannot pay from this wallet until you resume payments.",
   "status.agent.nearSummaryUnfreeze": "Agents can pay from this wallet again, within your rules.",

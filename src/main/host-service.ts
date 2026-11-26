@@ -112,6 +112,7 @@ import { TeamApiServer } from "./team-api-server";
 import type { RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcHostGateway } from "./team-webrtc-host-gateway";
+import type { WatchRelayTeamApi } from "./watch-relay-commands";
 import { windowsSessionDisconnected } from "./windows-session-state";
 
 export const DEVELOPMENT_REMOTE_CLIENT_USERNAME = "openbot-dev-client";
@@ -180,6 +181,7 @@ interface HostServiceOptions {
   browserProfiles?: ForwardedApiOptions["browserProfiles"];
   admin?: ForwardedApiOptions["admin"];
   focusUse?: ForwardedApiOptions["focusUse"];
+  watchRelay?: ForwardedApiOptions["watchRelay"];
   appVersion: string;
   store: TeamStore;
   agents: ForwardedApiOptions["agents"] &
@@ -556,6 +558,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(this.#liveActivityPush === undefined ? {} : { liveActivityPush: this.#liveActivityPush }),
       ...(this.#pushNotifications === undefined ? {} : { pushNotifications: this.#pushNotifications }),
       ...(options.focusUse === undefined ? {} : { focusUse: options.focusUse }),
+      ...(options.watchRelay === undefined ? {} : { watchRelay: options.watchRelay }),
     });
     this.#runtime = ManagedRuntime.make(
       Layer.succeed(
@@ -635,6 +638,10 @@ export class HostService extends EventEmitter<HostEvents> {
     return Effect.sync(() => {
       if (this.#webRtcOnline) this.#webrtcGateway?.scheduleSignalHomeFollow();
     });
+  }
+
+  watchTeamApi(): WatchRelayTeamApi {
+    return this.#api.watchTeamApi();
   }
 
   getStatus(): HostStatus {

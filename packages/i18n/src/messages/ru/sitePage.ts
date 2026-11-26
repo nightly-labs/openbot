@@ -67,6 +67,7 @@ export const messages = {
   "sitePage.nearSign.action.freeze": "Приостановить платежи",
   "sitePage.nearSign.action.unfreeze": "Возобновить платежи",
   "sitePage.nearSign.action.autoPay": "Включить автоматические платежи",
+  "sitePage.nearSign.action.manualPay": "Отключить автоматические платежи",
   "sitePage.nearSign.action.approvePayment": "Одобрить платёж",
   "sitePage.nearSign.action.checkBackup": "Проверить резервную копию ключа доступа",
   "sitePage.nearSign.createPasskey": "Создать ключ доступа",

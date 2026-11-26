@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release mobile OTA"
+  short_description: "Deliver a mobile OTA update with its notes and checks"
+  default_prompt: "Use $release-mobile-ota to audit main since the store builds, merge the release notes, and publish the mobile OTA update."

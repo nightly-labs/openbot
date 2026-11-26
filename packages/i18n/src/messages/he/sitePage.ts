@@ -63,6 +63,7 @@ export const messages = {
   "sitePage.nearSign.action.freeze": "השהיית התשלומים",
   "sitePage.nearSign.action.unfreeze": "חידוש התשלומים",
   "sitePage.nearSign.action.autoPay": "הפעלת תשלומים אוטומטיים",
+  "sitePage.nearSign.action.manualPay": "כיבוי תשלומים אוטומטיים",
   "sitePage.nearSign.action.approvePayment": "אישור תשלום",
   "sitePage.nearSign.action.checkBackup": "בדיקת הגיבוי של מפתח הגישה",
   "sitePage.nearSign.createPasskey": "יצירת מפתח גישה",

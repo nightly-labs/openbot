@@ -61,6 +61,7 @@ export const messages = {
   "sitePage.nearSign.action.freeze": "暂停付款",
   "sitePage.nearSign.action.unfreeze": "恢复付款",
   "sitePage.nearSign.action.autoPay": "开启自动付款",
+  "sitePage.nearSign.action.manualPay": "关闭自动付款",
   "sitePage.nearSign.action.approvePayment": "批准一笔付款",
   "sitePage.nearSign.action.checkBackup": "检查通行密钥备份",
   "sitePage.nearSign.createPasskey": "创建通行密钥",

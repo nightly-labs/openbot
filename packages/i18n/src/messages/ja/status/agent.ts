@@ -85,6 +85,8 @@ export const messages = {
   "status.agent.nearSummaryBudget": "ウォレットの 1 日の予算を {amount} USD に変更します。",
   "status.agent.nearSummaryAutoPay":
     "支払いルールで許可されている場合は、OpenBot があなたの署名なしで支払えるようにします。その他の支払いは引き続きチャットで確認します。",
+  "status.agent.nearSummaryManualPay":
+    "支払いルールがなくなりました。OpenBot は支払いごとに再びあなたの署名を求めます。",
   "status.agent.nearSummaryPayment": "{recipient} への {amount} の支払いを承認します。",
   "status.agent.nearSummaryFreeze": "支払いを再開するまで、エージェントはこのウォレットから支払えません。",
   "status.agent.nearSummaryUnfreeze":

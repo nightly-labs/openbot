@@ -83,6 +83,8 @@ export const messages = {
   "status.agent.nearSummaryBudget": "Изменить дневной бюджет кошелька на {amount} USD.",
   "status.agent.nearSummaryAutoPay":
     "Разрешить OpenBot платить без вашей подписи, когда это позволяет правило платежей. О других платежах вас по-прежнему спросят в чате.",
+  "status.agent.nearSummaryManualPay":
+    "Правил платежей больше нет. OpenBot снова будет запрашивать вашу подпись для каждого платежа.",
   "status.agent.nearSummaryPayment": "Одобрить платёж {amount} получателю {recipient}.",
   "status.agent.nearSummaryFreeze": "Агенты не смогут платить из этого кошелька, пока вы не возобновите платежи.",
   "status.agent.nearSummaryUnfreeze": "Агенты снова смогут платить из этого кошелька в рамках ваших правил.",

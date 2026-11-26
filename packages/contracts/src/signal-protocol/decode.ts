@@ -18,6 +18,7 @@ import {
   TELEGRAM_UPDATE_BYTES_LIMIT,
   type TelegramCallResult,
 } from "./telegram-route";
+import { decodeWatchRelayHttpRequest } from "./watch-relay";
 import {
   STANDARD_WEBHOOK_SIGNATURE_PATTERN,
   STANDARD_WEBHOOKS_FORMAT,
@@ -148,6 +149,20 @@ export function decodeSignalServerMessage(value: unknown): SignalServerMessage |
       if (sealed.length === 0 || sealed.length > QUEUED_DELIVERY_SEALED_LIMIT || !/^[A-Za-z0-9_-]+$/u.test(sealed))
         invalid();
       return { type: kind, version, id: identifier(value.id), sealed };
+    }
+    case "watch-delivery": {
+      const request = decodeWatchRelayHttpRequest({ v: 1, ts: value.ts, sealed: value.sealed, proof: value.proof });
+      const ticket = text(value.ticket);
+      if (!request || ticket.length === 0 || ticket.length > 8_192) invalid();
+      return {
+        type: kind,
+        version,
+        requestId: identifier(value.requestId),
+        ticket,
+        ts: request.ts,
+        proof: request.proof,
+        sealed: request.sealed,
+      };
     }
     case "telegram-delivery":
       if (value.linked !== undefined && value.linked !== true) invalid();
