@@ -609,6 +609,25 @@ try {
     stepOf(detail, "agent"),
   );
 
+  const blankItems = await startRun(workflows, "Blank list items", findingsGraph());
+  await runUntil(workflows, blankItems, (run) => stepOf(run, "agent")?.status === "running");
+  const blankItemsId = report.handoffs.at(-1)?.deliveryId ?? "";
+  complete(blankItemsId, '{"summary":"The build broke","issues":[""," "]}');
+  await runUntil(workflows, blankItems, () => report.handoffs.at(-1)?.deliveryId !== blankItemsId);
+  check(
+    "a required list with only blank items still gets the fix message",
+    report.handoffs.at(-1)?.text.includes("issues is empty") === true,
+    report.handoffs.at(-1)?.text,
+  );
+  complete(report.handoffs.at(-1)?.deliveryId ?? "", '{"summary":"The build broke","issues":["test"]}');
+  detail = await runUntil(workflows, blankItems, ended);
+  check(
+    "the fixed answer with list items ends the step",
+    stepOf(detail, "agent")?.status === "done" &&
+      stepOf(detail, "agent")?.output === '{"summary":"The build broke","issues":["test"]}',
+    stepOf(detail, "agent"),
+  );
+
   const emptyTool = await startRun(workflows, "Empty list with the tool", findingsGraph());
   await runUntil(workflows, emptyTool, (run) => stepOf(run, "agent")?.status === "running");
   const emptyToolDelivery = report.handoffs.at(-1)?.deliveryId ?? "";

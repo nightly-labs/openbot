@@ -167,7 +167,8 @@ export function checkWorkflowAnswer(
       problems.push({ name: field.name, problem: checked.problem });
     else if (checked !== undefined && !isBlank(checked)) entries.push([field.name, checked]);
     else if (field.optional) continue;
-    else if (emptyList === "given" && typeof checked === "object") entries.push([field.name, checked]);
+    else if (emptyList === "given" && isEmptyList(raw) && typeof checked === "object")
+      entries.push([field.name, checked]);
     else problems.push({ name: field.name, problem: absent ? "missing" : "empty" });
   }
   return { answer: Object.fromEntries(entries), problems };
@@ -187,6 +188,8 @@ function extraKeyProblems(
 }
 
 const DECIMAL = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/u;
+
+const isEmptyList = (raw: unknown) => Array.isArray(raw) && raw.length === 0;
 
 const isBlank = (value: WorkflowAnswerValue) => value === "" || (typeof value === "object" && value.length === 0);
 
