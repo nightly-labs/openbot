@@ -14,6 +14,7 @@ const TEMPLATE_FILES = [
   "openbot-hosted-server",
   "openbot-hosted-env",
   "openbot-hosted-update",
+  "openbot-hosted-keyring",
   "openbot",
   "openbot-boat-pre-stop",
   "openbot-hosted.apparmor",
