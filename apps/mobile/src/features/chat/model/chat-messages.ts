@@ -50,7 +50,7 @@ export type RoutineMarkerEvent = RoutineConversationEventAction | RoutineRunStat
 
 export type ChatPlanStepState = "pending" | "active" | "done";
 
-export interface RoutineQuietAnswer {
+interface RoutineQuietAnswer {
   id: string;
   body: string;
 }
