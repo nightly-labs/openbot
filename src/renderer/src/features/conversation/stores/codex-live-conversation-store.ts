@@ -1,4 +1,5 @@
 import type { OpenBotDesktopApi, VoiceLiveEvent } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import type { VoicePhase, VoiceTalkMode } from "@openbot/ui/features/conversation/VoicePill";
 import { currentText } from "@openbot/ui/text";
 import { createStore, onCleanup } from "solid-js";
@@ -78,7 +79,9 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     });
   }
 
-  function fail(message: string): void {
+  const endedToastId = `codex-live-ended-${deps.serverId}-${deps.agentId}`;
+
+  function fail(message: string | null): void {
     failed = true;
     release();
     setStep("listening");
@@ -92,8 +95,10 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
 
   function failEnded(error: string | null): void {
     const { t, errorMessage } = currentText();
-    fail(
+    fail(null);
+    toast.error(
       error ? errorMessage(new Error(error), t("error.voice.live.disconnected")) : t("error.voice.live.disconnected"),
+      { id: endedToastId },
     );
   }
 
@@ -307,6 +312,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     });
     if (!muted && failed && !disposed) {
       failed = false;
+      toast.dismiss(endedToastId);
       setState((draft) => {
         draft.error = null;
       });
