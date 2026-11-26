@@ -9,6 +9,8 @@ export const messages = {
   "error.update.downloadStalled": "Le téléchargement de la mise à jour ne répond plus. Réessayez.",
   "error.update.installFailed": "Impossible d’installer la mise à jour. Quittez puis rouvrez OpenBot, et réessayez.",
   "error.update.notInstalled": "Le dernier redémarrage n’a pas installé la mise à jour. Redémarrez pour réessayer.",
+  "error.update.needsAdministrator":
+    "OpenBot n’a pas pu installer la mise à jour tout seul, car macOS demande un mot de passe administrateur pour remplacer OpenBot. Cliquez sur Redémarrer sur cet ordinateur, puis saisissez le mot de passe.",
   "error.update.downloadFailed": "Impossible de télécharger la mise à jour. Réessayez.",
   "error.update.signatureNotConfirmed":
     "OpenBot n'a pas pu vérifier la mise à jour. Réessayez. Si l'erreur persiste, téléchargez OpenBot sur openbot.run/download.",

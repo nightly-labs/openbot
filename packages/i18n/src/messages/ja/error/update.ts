@@ -10,6 +10,8 @@ export const messages = {
     "アップデートをインストールできませんでした。OpenBot を終了してから開き直し、もう一度お試しください。",
   "error.update.notInstalled":
     "前回の再起動ではアップデートがインストールされませんでした。もう一度再起動してお試しください。",
+  "error.update.needsAdministrator":
+    "macOS が OpenBot の置き換えに管理者パスワードを求めるため、OpenBot はアップデートを自動でインストールできませんでした。このコンピュータで「再起動」をクリックし、パスワードを入力してください。",
   "error.update.downloadFailed": "アップデートをダウンロードできませんでした。もう一度お試しください。",
   "error.update.signatureNotConfirmed":
     "OpenBot はアップデートを検証できませんでした。もう一度お試しください。エラーが続く場合は、openbot.run/download から OpenBot をダウンロードしてください。",

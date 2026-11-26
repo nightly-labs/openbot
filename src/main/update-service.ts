@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { constants } from "node:fs";
-import { access, appendFile, mkdir, readdir, readFile, rename, rm, stat } from "node:fs/promises";
+import { access, appendFile, mkdir, readdir, readFile, realpath, rename, rm, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import type {
@@ -541,6 +541,17 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     });
   }
 
+  assertUnattendedInstall(): Effect.Effect<void, UpdateOperationFailure> {
+    return Effect.gen({ self: this }, function* () {
+      const bundle = this.#options.platform === "darwin" ? this.#options.appBundlePath : undefined;
+      if (!bundle || this.#managedByHost || (yield* isOnReadOnlyVolume(bundle))) return;
+      if (!(yield* needsAdministratorToReplace(bundle))) return;
+      logger.warn("OpenBot update install refused: replacing the application needs an administrator password.");
+      if (this.#status.phase === "ready") this.#setStatus({ message: NEEDS_ADMINISTRATOR_MESSAGE });
+      return yield* new UpdateOperationFailure({ cause: new Error(NEEDS_ADMINISTRATOR_MESSAGE) });
+    });
+  }
+
   #restartFromInstalledCopy(bundle: string): Effect.Effect<boolean> {
     return Effect.gen({ self: this }, function* () {
       const { restartFromInstalledCopy } = this.#options;
@@ -839,6 +850,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
 const INSTALL_FAILED_MESSAGE = sourceText("error.update.installFailed");
 const MANAGED_HOST_MESSAGE = sourceText("error.update.managedByHost");
 const NOT_INSTALLED_MESSAGE = sourceText("error.update.notInstalled");
+const NEEDS_ADMINISTRATOR_MESSAGE = sourceText("error.update.needsAdministrator");
 const SIBLING_SESSION_MESSAGE = sourceText("error.update.siblingSession");
 const CHECK_STALLED_MESSAGE = sourceText("error.update.checkStalled");
 const CHECK_OFFLINE_MESSAGE = sourceText("error.update.checkOffline");
@@ -897,6 +909,23 @@ function isOnReadOnlyVolume(bundlePath: string): Effect.Effect<boolean> {
     Effect.catch(({ cause }) =>
       Effect.succeed(typeof cause === "object" && cause !== null && "code" in cause && cause.code === "EROFS"),
     ),
+  );
+}
+
+function needsAdministratorToReplace(bundlePath: string): Effect.Effect<boolean> {
+  return Effect.gen(function* () {
+    const bundle = yield* updateIO(() => realpath(bundlePath)).pipe(Effect.catch(() => Effect.succeed(bundlePath)));
+    return (yield* isWriteDenied(bundle)) || (yield* isWriteDenied(dirname(bundle)));
+  });
+}
+
+function isWriteDenied(path: string): Effect.Effect<boolean> {
+  return updateIO(() => access(path, constants.W_OK)).pipe(
+    Effect.as(false),
+    Effect.catch(({ cause }) => {
+      const code = typeof cause === "object" && cause !== null && "code" in cause ? cause.code : undefined;
+      return Effect.succeed(code === "EACCES" || code === "EPERM");
+    }),
   );
 }
 

@@ -7,6 +7,8 @@ export const messages = defineMessages("error.update", {
   "error.update.downloadStalled": "The update download stopped responding. Try again.",
   "error.update.installFailed": "Could not install the update. Quit and reopen OpenBot, then try again.",
   "error.update.notInstalled": "The last restart did not install the update. Restart to try again.",
+  "error.update.needsAdministrator":
+    "OpenBot could not install the update by itself, because macOS asks for an administrator password to replace OpenBot. Click Restart on this computer, then enter the password.",
   "error.update.downloadFailed": "Could not download the update. Try again.",
   "error.update.signatureNotConfirmed":
     "OpenBot could not verify the update. Try again. If this error continues, download OpenBot from openbot.run/download.",

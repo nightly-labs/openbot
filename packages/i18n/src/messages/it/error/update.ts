@@ -8,6 +8,8 @@ export const messages = {
   "error.update.downloadStalled": "Il download dell'aggiornamento ha smesso di rispondere. Riprova.",
   "error.update.installFailed": "Impossibile installare l'aggiornamento. Chiudi e riapri OpenBot, poi riprova.",
   "error.update.notInstalled": "L'ultimo riavvio non ha installato l'aggiornamento. Riavvia per riprovare.",
+  "error.update.needsAdministrator":
+    "OpenBot non è riuscito a installare l'aggiornamento da solo, perché macOS chiede una password di amministratore per sostituire OpenBot. Fai clic su Riavvia su questo computer, poi inserisci la password.",
   "error.update.downloadFailed": "Impossibile scaricare l'aggiornamento. Riprova.",
   "error.update.signatureNotConfirmed":
     "OpenBot non è riuscito a verificare l'aggiornamento. Riprova. Se l'errore continua, scarica OpenBot da openbot.run/download.",

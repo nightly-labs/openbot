@@ -39,6 +39,7 @@ interface RequestedUpdateUpdater {
   checkForUpdates(): Effect.Effect<UpdateStatus, UpdateOperationFailure>;
   downloadUpdate(): Effect.Effect<UpdateStatus, UpdateOperationFailure>;
   installUpdate(): Effect.Effect<void, UpdateOperationFailure>;
+  assertUnattendedInstall(): Effect.Effect<void, UpdateOperationFailure>;
   setScheduledRestart(restart: ScheduledUpdateRestart | null): void;
   getAutoDownload(): boolean;
   setAutoDownload(enabled: boolean): Effect.Effect<void>;
@@ -333,11 +334,18 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
       schedule.waitingFor = [];
       this.#publish();
     }
-    this.#log(`Restarting to install the update that ${describe(schedule)} asked for.`);
-    this.#announceState("restarting");
-    this.#installing = true;
     yield* this.#updater
-      .installUpdate()
+      .assertUnattendedInstall()
+      .pipe(
+        Effect.andThen(
+          Effect.suspend(() => {
+            this.#log(`Restarting to install the update that ${describe(schedule)} asked for.`);
+            this.#announceState("restarting");
+            this.#installing = true;
+            return this.#updater.installUpdate();
+          }),
+        ),
+      )
       .pipe(Effect.mapError(({ cause }) => new RemoteWorkflowError({ cause })))
       .pipe(
         Effect.catch((failure) =>

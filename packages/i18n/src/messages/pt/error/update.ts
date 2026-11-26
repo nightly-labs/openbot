@@ -9,6 +9,8 @@ export const messages = {
   "error.update.installFailed":
     "Não foi possível instalar a atualização. Encerre e abra o OpenBot novamente, depois tente outra vez.",
   "error.update.notInstalled": "A última reinicialização não instalou a atualização. Reinicie para tentar outra vez.",
+  "error.update.needsAdministrator":
+    "O OpenBot não conseguiu instalar a atualização sozinho, porque o macOS pede uma senha de administrador para substituir o OpenBot. Clique em Reiniciar neste computador e depois digite a senha.",
   "error.update.downloadFailed": "Não foi possível baixar a atualização. Tente novamente.",
   "error.update.signatureNotConfirmed":
     "O OpenBot não conseguiu verificar a atualização. Tente novamente. Se o erro continuar, baixe o OpenBot em openbot.run/download.",

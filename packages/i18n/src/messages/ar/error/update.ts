@@ -8,6 +8,8 @@ export const messages = {
   "error.update.downloadStalled": "توقف تنزيل التحديث عن الاستجابة. حاول مرة أخرى.",
   "error.update.installFailed": "تعذّر تثبيت التحديث. أغلق OpenBot وأعد فتحه، ثم حاول مرة أخرى.",
   "error.update.notInstalled": "لم تُثبِّت إعادة التشغيل الأخيرة التحديث. أعد التشغيل للمحاولة مرة أخرى.",
+  "error.update.needsAdministrator":
+    "لم يتمكن OpenBot من تثبيت التحديث بنفسه، لأن macOS يطلب كلمة مرور المسؤول لاستبدال OpenBot. انقر على «إعادة التشغيل» على هذا الكمبيوتر، ثم أدخل كلمة المرور.",
   "error.update.downloadFailed": "تعذّر تنزيل التحديث. حاول مرة أخرى.",
   "error.update.signatureNotConfirmed":
     "تعذّر على OpenBot التحقق من التحديث. حاول مرة أخرى. إذا استمر هذا الخطأ، نزّل OpenBot من openbot.run/download.",
