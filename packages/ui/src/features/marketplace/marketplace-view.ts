@@ -18,7 +18,7 @@ export type MarketplaceView =
   | { kind: "agent"; listing: MarketplaceAgentSummary; detail?: MarketplaceAgentDetail | undefined }
   | { kind: "agentGroup"; category: SkillCategory }
   | { kind: "skill"; listing: MarketplaceSkillSummary }
-  | { kind: "app"; id: string }
+  | { kind: "app"; id: string; setup?: boolean }
   | { kind: "appGroup"; category: SkillCategory }
   | { kind: "skillGroup"; group: SkillGroup }
   | { kind: "localSkill"; skillId: string }

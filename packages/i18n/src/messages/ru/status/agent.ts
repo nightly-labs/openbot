@@ -14,6 +14,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "У {previous} закончились кредиты. Выполнено переключение на {model}. Чтобы снова использовать эту модель, пополните кредиты и выберите её.",
   "status.agent.modelReturnedAfterError": "После ошибки провайдера снова используется {model}.",
+  "status.agent.modelSwitchedForRemovedModel": "Модель {previous} больше недоступна. Переключено на {model}.",
   "status.agent.marketplaceSuggested": "Предложено приложение из каталога: {app}.",
   "status.agent.settingShown": "Показан параметр: {setting}.",
   "status.agent.channelMemberAdded": "Агент {agent} добавил {member} в канал. Запрос: {person}.",
@@ -26,6 +27,12 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Сделать снимок главного экрана и отправить изображение модели агента.",
   "status.agent.screenCaptureChannel":
     "Изображение появится в канале {channel}, и его увидит каждый участник этого сервера, который читает канал.",
+  "status.agent.creditImageApproval": "Создать изображение с помощью {model}. Стоимость в кредитах: {credits}.",
+  "status.agent.creditVideoApproval": "Создать видео с помощью {model}. Стоимость в кредитах: {credits}.",
+  "status.agent.creditMediaChannel":
+    "Результат появится в канале {channel}, и его увидит каждый участник этого сервера, который читает канал.",
+  "status.agent.creditsHoldBalance": "Будет потрачено кредитов: {credits}. Баланс: {balance}.",
+  "status.agent.creditsHoldAgentsOff": "Агенты на этом сервере не могут использовать кредиты.",
   "status.agent.screenCapturePermissionNext": "Затем macOS может попросить вас разрешить OpenBot запись экрана.",
   "status.agent.screenCaptureDisplay": "Сделать снимок дисплея {name} и отправить изображение модели агента.",
   "status.agent.screenCaptureWindow": "Сделать снимок окна {name} и отправить изображение модели агента.",
@@ -61,6 +68,20 @@ export const messages = {
   "status.agent.workflowDelete":
     "Удалить рабочий процесс {title} вместе с его запусками и версиями. Его открытые шаги остановятся.",
   "status.agent.deleteAgents": "Удалить {agents} вместе с их чатами и файлами. Это нельзя отменить.",
+  "status.agent.nearSignatureReceived": "OpenBot получил подпись. Эту вкладку можно закрыть.",
+  "status.agent.nearSignatureUnknown": "OpenBot не ждёт эту подпись. Начните её заново в OpenBot.",
+  "status.agent.nearPayment":
+    "Заплатить {amount} {symbol} получателю {recipient} из криптокошелька, для {domain}: {reason}",
+  "status.agent.nearSummaryCreate":
+    "Все агенты могут платить до {amount} USD в день. Это можно изменить позже в OpenBot.",
+  "status.agent.nearSummaryGrant":
+    "Разрешить этому приложению OpenBot платить из кошелька {days} дней в рамках ваших правил.",
+  "status.agent.nearSummaryBudget": "Изменить дневной бюджет кошелька на {amount} USD.",
+  "status.agent.nearSummaryAutoPay":
+    "Разрешить OpenBot платить без вашей подписи, когда это позволяет правило платежей. О других платежах вас по-прежнему спросят в чате.",
+  "status.agent.nearSummaryPayment": "Одобрить платёж {amount} получателю {recipient}.",
+  "status.agent.nearSummaryFreeze": "Агенты не смогут платить из этого кошелька, пока вы не возобновите платежи.",
+  "status.agent.nearSummaryUnfreeze": "Агенты снова смогут платить из этого кошелька в рамках ваших правил.",
   "status.agent.screenCaptureProgress": "Запрос снимка экрана…",
   "status.agent.screenCaptureReviewing": "Просмотр снимка экрана…",
   "status.agent.browserOpening": "Открытие веб-страницы…",
@@ -68,6 +89,7 @@ export const messages = {
   "status.agent.browserClicking": "Нажатие на веб-странице…",
   "status.agent.browserTyping": "Ввод на веб-странице…",
   "status.agent.browserActing": "Работа с веб-страницей…",
+  "status.agent.browserPaying": "Отправка платежа…",
   "status.agent.browserReviewing": "Просмотр веб-страницы…",
   "status.agent.memoriesSearching": "Поиск в памяти…",
   "status.agent.chatsSearching": "Поиск в прошлых чатах…",
@@ -113,11 +135,16 @@ export const messages = {
     "Память: сохранено {saved}, обновлено {updated}, забыто {forgotten}, не изменено {notChanged}, потому что другая ветка изменила их раньше.",
   "status.agent.mcpToolCall": "Запустить инструмент {tool} MCP-сервера {name}.",
   "status.agent.uiBlockClosedByMessage": "Закрыто новым сообщением",
-  "status.agent.finishCheckContinues": "Запрос ещё не выполнен. Агент продолжает ({current} из {limit}).",
+  "status.agent.location.field": "Ваше местоположение",
+  "status.agent.location.placeholder": "Город, адрес или место",
+  "status.agent.location.submit": "Поделиться",
+  "status.agent.location.shared": "Местоположение отправлено",
   "status.agent.nextStepContinues": "Агент остановился перед следующим шагом. Он продолжает ({current} из {limit}).",
   "status.agent.planContinues": "В плане есть незавершённые шаги. Агент продолжает ({current} из {limit}).",
   "status.agent.planStopped":
     "Агент остановился, в плане остались незавершённые шаги. Отправьте сообщение, чтобы продолжить.",
+  "status.agent.continuationLimitReached":
+    "Агент остановился, не завершив запрос. Он больше не может продолжить сам. Отправьте сообщение, чтобы продолжить.",
   "status.agent.compactionContinues": "Соединение прервалось, пока агент сжимал контекст. Агент продолжает.",
   "status.agent.providerExitContinues": "Агент остановился, не закончив ответ. Агент продолжает.",
   "status.agent.branchTitle": "Ответвлённый чат",

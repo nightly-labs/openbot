@@ -3,7 +3,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, agentProviderDescriptor, defaultProviderModel } from "@openbot/contracts/ipc";
+import {
+  AGENT_PROVIDERS,
+  agentProviderDescriptor,
+  defaultProviderModel,
+  isNoAnswerNotice,
+} from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
@@ -107,6 +112,16 @@ const turn = (message) => {
     toolStep(message, "toolu_bash_" + backgroundTasks.length, "Bash", { command: "sleep 600", run_in_background: true });
     write(frame({ type: "system", subtype: "background_tasks_changed", uuid: randomUUID(), tasks: backgroundTasks }));
     result(message, "");
+    return;
+  }
+  if (text.includes("NEXT-STEP")) {
+    if (text.includes("BACKGROUND")) {
+      backgroundTasks.push({ id: "task_" + (backgroundTasks.length + 1), type: "local_bash", status: "running" });
+      toolStep(message, "toolu_bash_" + backgroundTasks.length, "Bash", { command: "sleep 600", run_in_background: true });
+      write(frame({ type: "system", subtype: "background_tasks_changed", uuid: randomUUID(), tasks: backgroundTasks }));
+    }
+    assistant(message, [{ type: "text", text: "Next, I'll run the tests." }]);
+    result(message, "Next, I'll run the tests.");
     return;
   }
   assistant(message, [{ type: "text", text: "Done." }]);
@@ -214,7 +229,9 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
 interface CaseResult {
   status: string | null;
   runs: number;
+  turns: number;
   errors: string[];
+  notices: string[];
   lastAnswer: string | null;
 }
 
@@ -228,6 +245,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -305,6 +323,7 @@ try {
 
   const runCase = async (text: string): Promise<CaseResult> => {
     const errorsBefore = errors.length;
+    const promptsBefore = prompts().length;
     await runCauseEffect(agents.sendMessage({ agentId: agent.id, text }));
     const delivery = await waitFor(`the message "${text}" to settle`, () => {
       const found = agents.listQueue(agent.id).deliveries.find((item) => item.text === text);
@@ -320,10 +339,15 @@ try {
     const result: CaseResult = {
       status: delivery.status,
       runs: prompts().filter((prompt) => prompt.includes(text)).length,
+      turns: prompts().length - promptsBefore,
       errors: errors
         .slice(errorsBefore)
         .filter((error) => error.agentId === agent.id)
         .map((error) => error.message),
+      notices: shown
+        .slice(turnStart + 1)
+        .filter(isNoAnswerNotice)
+        .map((message) => message.text),
       lastAnswer: answer?.text ?? null,
     };
     report.cases[text] = result;
@@ -341,6 +365,11 @@ try {
     if (result.runs !== 1) report.failures.push(`${label}: the message ran ${result.runs} times, not once.`);
     if (JSON.stringify(result.errors) !== JSON.stringify(expectedErrors))
       report.failures.push(`${label}: errors ${JSON.stringify(result.errors)}, not ${JSON.stringify(expectedErrors)}.`);
+    const expectedNotices = expectedErrors.filter((error) => error === NO_ANSWER_AFTER_STEPS);
+    if (JSON.stringify(result.notices) !== JSON.stringify(expectedNotices))
+      report.failures.push(
+        `${label}: the chat keeps the notes ${JSON.stringify(result.notices)}, not ${JSON.stringify(expectedNotices)}.`,
+      );
     if (result.lastAnswer !== lastAnswer)
       report.failures.push(`${label}: the last answer is ${JSON.stringify(result.lastAnswer)}.`);
   };
@@ -361,6 +390,14 @@ try {
     "completed",
     [],
   );
+  const startedWork = await runCase("BACKGROUND-NEXT-STEP");
+  if (startedWork.turns !== 1)
+    report.failures.push(`a next step after the turn starts background work: ${startedWork.turns} turns ran, not 1.`);
+  const laterTurn = await runCase("LATER-NEXT-STEP");
+  if (laterTurn.status !== "completed" || laterTurn.turns < 2)
+    report.failures.push(
+      `a next step while earlier background work runs: ${laterTurn.turns} turns ran and the message ended as ${laterTurn.status}; the agent must continue.`,
+    );
   report.passed = report.failures.length === 0;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

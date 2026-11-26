@@ -20,13 +20,14 @@ export function applyAppFonts(preference: Pick<AppAppearancePreference, "interfa
   }
 }
 
+const [installedFonts, setInstalledFonts] = createSignal<readonly AppFontFamily[]>([]);
+
 export function useInstalledFonts(): Accessor<readonly AppFontFamily[]> {
-  const [fonts, setFonts] = createSignal<readonly AppFontFamily[]>([]);
   onSettled(() => {
     void appPort()
       .listInstalledFonts()
-      .then((next) => setFonts(() => next))
+      .then((next) => setInstalledFonts(() => next))
       .catch(() => undefined);
   });
-  return fonts;
+  return installedFonts;
 }

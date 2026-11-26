@@ -1,6 +1,7 @@
 import {
   WORKFLOW_DISCORD_EMOJI,
   WORKFLOW_DISCORD_TRIGGER_SERVER,
+  WORKFLOW_UNLINKED_CONNECTION,
   type WorkflowNode,
   workflowListField,
 } from "@openbot/contracts/ipc";
@@ -47,7 +48,9 @@ export function DiscordOutputFields({ node }: { node: WorkflowNode }) {
         value={
           connectionId === WORKFLOW_DISCORD_TRIGGER_SERVER
             ? t("mobile.workflow.discord.sameServer")
-            : t("mobile.workflow.discord.oneServer")
+            : connectionId === WORKFLOW_UNLINKED_CONNECTION
+              ? t("mobile.workflow.discord.chooseServer")
+              : t("mobile.workflow.discord.oneServer")
         }
       />
       <ValueRow label={t("mobile.workflow.discord.action")} value={t(DISCORD_ACTION_LABEL[action])} />

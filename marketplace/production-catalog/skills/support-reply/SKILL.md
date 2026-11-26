@@ -14,7 +14,7 @@ description: "Draft a customer reply that states what is known and the next step
 ## Inputs
 
 1. **The ticket.** Tool path: the helpdesk or shared inbox in a signed-in tab (`openbot_browser.list_tabs` first),
-   or an installed plugin found with `tool_search`. Paste path: the message text the user gives.
+   or the tools of an installed plugin; `openbot.tool_search` does not list them. Paste path: the message text the user gives.
 2. **Product facts.** The help center, documentation, release notes or status page, read in the browser, or text
    the user gives.
 3. **Policy.** The written refund, credit, SLA or exception policy. Without one, you can promise nothing about

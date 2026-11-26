@@ -1,10 +1,10 @@
 {
-  "version": "1.4.11",
+  "version": "1.4.14",
   "highlights": [
-    "Added new integrations and expanded app connectivity.",
-    "Improved chat with context tracking, subagent progress, and memory updates.",
-    "Redesigned workflow editor with interactive Flow view.",
-    "Added more customization options for chat appearance and behavior.",
-    "Improved file handling, connection reliability, and overall app stability."
+    "Hide a server from your server list. It stays hidden on all your devices.",
+    "Make a one-time routine: in \"When to run\", select \"Once\".",
+    "New option: use the full-screen camera, with zoom and all lenses.",
+    "Home has larger avatars and shorter rows, so you see more chats.",
+    "Better connection: the app connects again by itself after a network change, and sent messages no longer disappear."
   ]
 }

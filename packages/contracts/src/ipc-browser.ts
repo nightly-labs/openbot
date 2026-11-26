@@ -1,3 +1,6 @@
+import type { AvatarColor, AvatarHue } from "./ipc-agent-identity";
+import type { BrowserTabProfile } from "./ipc-browser-profiles";
+
 export interface BrowserTab {
   id: string;
   title: string;
@@ -10,10 +13,46 @@ export interface BrowserTab {
   diagnosticErrorCount?: number;
   openerTabId?: string;
   popupFailure?: { id: string; message: string };
+  permissionRequest?: BrowserPermissionRequest;
   userControl?: true;
   canGoBack?: boolean;
   canGoForward?: boolean;
+  httpSignIn?: BrowserHttpSignIn;
 }
+
+export interface BrowserPermissionRequest {
+  id: string;
+  origin: string;
+  permission: "geolocation";
+}
+
+export interface BrowserLocation {
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number | null;
+}
+
+export interface BrowserPermissionAnswer {
+  tabId: string;
+  requestId: string;
+  allow: boolean;
+  always?: boolean | undefined;
+  location?: BrowserLocation | undefined;
+}
+export interface BrowserHttpSignIn {
+  origin: string;
+  refused?: true;
+}
+
+export function browserHttpSignInPrompts(
+  tabs: readonly BrowserTab[],
+): { tabId: string; origin: string; refused: boolean }[] {
+  return tabs.flatMap((tab) =>
+    tab.httpSignIn ? [{ tabId: tab.id, origin: tab.httpSignIn.origin, refused: tab.httpSignIn.refused === true }] : [],
+  );
+}
+
+export type BrowserHttpSignInInput = { tabId: string } & ({ username: string; password: string } | { cancel: true });
 
 export interface BrowserTeachStep {
   kind: "page" | "click";
@@ -145,34 +184,40 @@ export interface BrowserPreview {
 
 export type BrowserControlPhase = "acting" | "waiting";
 
-export type BrowserControlAction =
-  | "open"
-  | "list-tabs"
-  | "snapshot"
-  | "click"
-  | "type"
-  | "key"
-  | "scroll"
-  | "back"
-  | "forward"
-  | "reload"
-  | "screenshot"
-  | "close-tab";
+export const BROWSER_CONTROL_ACTIONS = [
+  "open",
+  "list-tabs",
+  "snapshot",
+  "click",
+  "type",
+  "key",
+  "scroll",
+  "back",
+  "forward",
+  "reload",
+  "screenshot",
+  "close-tab",
+] as const;
 
-export type BrowserControlDetailAction =
-  | "status"
-  | "navigate"
-  | "press"
-  | "hover"
-  | "select-option"
-  | "set-checked"
-  | "drag"
-  | "upload-files"
-  | "wait-for"
-  | "evaluate"
-  | "set-environment"
-  | "recording-start"
-  | "recording-stop";
+export type BrowserControlAction = (typeof BROWSER_CONTROL_ACTIONS)[number];
+
+export const BROWSER_CONTROL_DETAIL_ACTIONS = [
+  "status",
+  "navigate",
+  "press",
+  "hover",
+  "select-option",
+  "set-checked",
+  "drag",
+  "upload-files",
+  "wait-for",
+  "evaluate",
+  "set-environment",
+  "recording-start",
+  "recording-stop",
+] as const;
+
+export type BrowserControlDetailAction = (typeof BROWSER_CONTROL_DETAIL_ACTIONS)[number];
 
 export interface BrowserControlSession {
   id: string;
@@ -208,6 +253,61 @@ export type BrowserPictureInPictureEvent =
   | { type: "bounds-changed"; bounds: BrowserBounds }
   | { type: "dock" }
   | { type: "hide" };
+
+export interface BrowserTabAgent {
+  id: string;
+  name: string;
+  avatarSeed: string;
+  avatarHue: AvatarHue | null;
+  avatarColor?: AvatarColor | null;
+  avatarUrl: string | null;
+}
+
+export type BrowserTabLabel = BrowserTabProfile & { proxy?: string | undefined };
+
+export interface BrowserWindowTabDetails {
+  tabId: string;
+  control?: BrowserControlSession | undefined;
+  controller?: BrowserTabAgent | undefined;
+  owner?: BrowserTabAgent | undefined;
+  profile?: BrowserTabLabel | undefined;
+}
+
+export interface BrowserWindowHistoryEntry {
+  url: string;
+  title: string;
+  visits: number;
+}
+
+export interface BrowserWindowModel {
+  tabs: BrowserTab[];
+  activeTabId: string | null;
+  details: BrowserWindowTabDetails[];
+  history: BrowserWindowHistoryEntry[];
+  canReopen: boolean;
+  canCloseTabs: boolean;
+  liveViewTabId: string | null;
+  liveViewClipboard: boolean;
+  shortcuts: "mac" | "pc" | null;
+}
+
+export type BrowserWindowAction =
+  | { type: "activate"; tabId: string }
+  | { type: "close"; tabIds: string[] }
+  | { type: "new-tab"; afterId?: string | undefined }
+  | { type: "duplicate"; tabId: string }
+  | { type: "move"; tabId: string; index: number }
+  | { type: "reopen" }
+  | { type: "reload"; tabId: string }
+  | { type: "stop"; tabId: string }
+  | { type: "navigate"; tabId: string; direction: BrowserNavigationDirection }
+  | { type: "open-address"; url: string; tabId?: string | undefined };
+
+export type BrowserWindowEvent =
+  | { type: "bounds-changed"; bounds: BrowserBounds }
+  | { type: "dock" }
+  | { type: "hide" }
+  | { type: "action"; action: BrowserWindowAction };
 
 export interface BrowserOpenInput {
   url: string;
@@ -264,7 +364,8 @@ export type BrowserLiveViewInput =
   | { type: "ack"; sequence: number }
   | { type: "paste"; text: string }
   | { type: "copy" }
-  | { type: "cut"; text: string };
+  | { type: "cut"; text: string }
+  | { type: "dialog"; id: string; accept: boolean };
 
 export const BROWSER_LIVE_VIEW_MAX_PASTE_TEXT = 100_000;
 
@@ -272,4 +373,11 @@ export type BrowserLiveViewEvent =
   | { type: "frame"; tabId: string; sequence: number; width: number; height: number; image: Uint8Array }
   | { type: "stopped"; tabId: string; reason: string }
   | { type: "copied"; tabId: string; text: string }
-  | { type: "copyTooLarge"; tabId: string };
+  | { type: "copyTooLarge"; tabId: string }
+  | { type: "dialog"; tabId: string; dialog: BrowserLiveViewDialog | null };
+
+export interface BrowserLiveViewDialog {
+  id: string;
+  type: "alert" | "confirm";
+  message: string;
+}

@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect, Option, Schema } from "effect";
+import { OPENCODE_GO_PROVIDER } from "./opencode-config";
 import { openCodeDataDirectory } from "./process-confinement";
 import {
   type AccountRateLimitsReadResult,
@@ -45,7 +46,10 @@ export function readOpenCodeDatabase<A>(databasePath: string, read: (database: D
 }
 
 const AuthFileKey = Schema.Struct({ type: Schema.Literal("api"), key: Schema.String });
-const AuthFile = Schema.Struct({ "opencode-go": Schema.optionalKey(Schema.Unknown) });
+const AuthFile = Schema.Struct({
+  "opencode-go": Schema.optionalKey(Schema.Unknown),
+  opencode: Schema.optionalKey(Schema.Unknown),
+});
 const StoredKey = Schema.Struct({
   type: Schema.Literal("key"),
   key: Schema.String,
@@ -71,47 +75,65 @@ const readOwnKeys = Effect.fn("OpenCode.readOwnKeys")(function* () {
       try: () => readFile(join(dataDirectory, "auth.json"), "utf8"),
       catch: (cause) => new OpenCodeUsageFailed({ cause }),
     }).pipe(Effect.orElseSucceed(() => "")));
-  const goKey = (authFileGoKey(authText) ?? env.OPENCODE_API_KEY)?.trim();
+  const authFile = Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(AuthFile))(authText));
+  const goKey = (authFileApiKey(authFile, "opencode-go")?.key ?? env.OPENCODE_API_KEY)?.trim();
+  const consoleFile = authFileApiKey(authFile, "opencode");
+  const consoleFileKey = consoleFile?.servedByConsole ? consoleFile.key.trim() : undefined;
   const databasePath = openCodeDatabasePath(env);
   const consoleKey = inlineAuth || !databasePath ? undefined : yield* readConsoleKey(databasePath);
-  return [...new Set([consoleKey, goKey].filter((key): key is string => Boolean(key)))];
+  return [...new Set([consoleKey, goKey, consoleFileKey].filter((key): key is string => Boolean(key)))];
 });
 
 const AuthFileEntries = Schema.Record(Schema.String, Schema.Unknown);
 const AuthFileEntry = Schema.Struct({ type: Schema.String });
 
+const readAuthFileProviders = Effect.fn("OpenCode.readAuthFileProviders")(function* (env: NodeJS.ProcessEnv) {
+  const authText =
+    env.OPENCODE_AUTH_CONTENT ||
+    (yield* Effect.try({
+      try: () => readFileSync(join(openCodeDataDirectory(env), "auth.json"), "utf8"),
+      catch: (cause) => new OpenCodeUsageFailed({ cause }),
+    }).pipe(Effect.orElseSucceed(() => "")));
+  const entries = Schema.decodeUnknownOption(Schema.fromJsonString(AuthFileEntries))(authText);
+  if (Option.isNone(entries)) return [];
+  return Object.entries(entries.value)
+    .filter(([, entry]) => Option.isSome(Schema.decodeUnknownOption(AuthFileEntry)(entry)))
+    .map(([provider]) => provider);
+});
+
+const PROVIDER_CREDENTIAL_QUERY = "SELECT 1 FROM credential WHERE integration_id = ? AND active IS NOT 0 LIMIT 1";
+const OTHER_PROVIDER_CREDENTIAL_QUERY =
+  "SELECT 1 FROM credential WHERE integration_id != ? AND active IS NOT 0 LIMIT 1";
+
+const hasStoredCredential = Effect.fn("OpenCode.hasStoredCredential")(function* (
+  env: NodeJS.ProcessEnv,
+  query: string,
+  provider: string,
+) {
+  const databasePath = openCodeDatabasePath(env);
+  if (env.OPENCODE_AUTH_CONTENT || !databasePath) return false;
+  return yield* Effect.try({
+    try: () => readOpenCodeDatabase(databasePath, (database) => database.prepare(query).get(provider) !== undefined),
+    catch: (cause) => new OpenCodeUsageFailed({ cause }),
+  }).pipe(Effect.orElseSucceed(() => false));
+});
+
 export const hasOpenCodeProviderKey = Effect.fn("OpenCode.hasProviderKey")(function* (
   provider: string,
   env: NodeJS.ProcessEnv,
 ) {
-  const dataDirectory = openCodeDataDirectory(env);
-  const inlineAuth = env.OPENCODE_AUTH_CONTENT;
-  const authText =
-    inlineAuth ||
-    (yield* Effect.try({
-      try: () => readFileSync(join(dataDirectory, "auth.json"), "utf8"),
-      catch: (cause) => new OpenCodeUsageFailed({ cause }),
-    }).pipe(Effect.orElseSucceed(() => "")));
-  const entries = Schema.decodeUnknownOption(Schema.fromJsonString(AuthFileEntries))(authText);
-  if (
-    Option.isSome(entries) &&
-    Object.hasOwn(entries.value, provider) &&
-    Option.isSome(Schema.decodeUnknownOption(AuthFileEntry)(entries.value[provider]))
-  )
-    return true;
-  const databasePath = openCodeDatabasePath(env);
-  if (inlineAuth || !databasePath) return false;
-  return yield* Effect.try({
-    try: () =>
-      readOpenCodeDatabase(
-        databasePath,
-        (database) =>
-          database
-            .prepare("SELECT 1 FROM credential WHERE integration_id = ? AND active IS NOT 0 LIMIT 1")
-            .get(provider) !== undefined,
-      ),
-    catch: (cause) => new OpenCodeUsageFailed({ cause }),
-  }).pipe(Effect.orElseSucceed(() => false));
+  if ((yield* readAuthFileProviders(env)).includes(provider)) return true;
+  return yield* hasStoredCredential(env, PROVIDER_CREDENTIAL_QUERY, provider);
+});
+
+function hasProviderKeyVariable(env: NodeJS.ProcessEnv): boolean {
+  return Object.entries(env).some(([name, value]) => name.toUpperCase().endsWith("_API_KEY") && Boolean(value?.trim()));
+}
+
+export const hasOpenCodeMediaSignIn = Effect.fn("OpenCode.hasMediaSignIn")(function* (env: NodeJS.ProcessEnv) {
+  if (hasProviderKeyVariable(env)) return true;
+  if ((yield* readAuthFileProviders(env)).some((provider) => provider !== OPENCODE_GO_PROVIDER)) return true;
+  return yield* hasStoredCredential(env, OTHER_PROVIDER_CREDENTIAL_QUERY, OPENCODE_GO_PROVIDER);
 });
 
 const RefusedTurn = Schema.Struct({
@@ -137,32 +159,63 @@ export const readOpenCodeRefusalStatus = Effect.fn("OpenCode.readRefusalStatus")
   return Option.isSome(refused) ? refused.value.error.status : null;
 });
 
-function authFileGoKey(text: string): string | undefined {
-  const file = Schema.decodeUnknownOption(Schema.fromJsonString(AuthFile))(text);
-  if (Option.isNone(file)) return undefined;
-  const entry = Schema.decodeUnknownOption(AuthFileKey)(file.value["opencode-go"]);
-  return Option.isSome(entry) ? entry.value.key : undefined;
+interface AuthFileApiKey {
+  readonly key: string;
+  readonly servedByConsole: boolean;
 }
+
+function authFileApiKey(
+  file: typeof AuthFile.Type | undefined,
+  integration: "opencode" | "opencode-go",
+): AuthFileApiKey | undefined {
+  const entry = file?.[integration];
+  const decoded = Schema.decodeUnknownOption(AuthFileKey)(entry);
+  if (Option.isNone(decoded)) return undefined;
+  return {
+    key: decoded.value.key,
+    servedByConsole: servedByOpenCodeConsole(getRecord(entry, "metadata")?.server),
+  };
+}
+
+function servedByOpenCodeConsole(server: unknown): boolean {
+  if (typeof server !== "string") return true;
+  const url = URL.parse(server);
+  return url !== null && `${url.origin}${url.pathname.replace(/\/+$/u, "")}` === OPENCODE_CONSOLE_URL;
+}
+
+function newestStoredKey(databasePath: string, integration: string) {
+  const row = readOpenCodeDatabase(databasePath, (database) =>
+    database
+      .prepare(
+        `SELECT value FROM credential
+         WHERE integration_id = ? AND active IS NOT 0
+         ORDER BY active DESC, time_created DESC, id DESC LIMIT 1`,
+      )
+      .get(integration),
+  );
+  return Schema.decodeUnknownOption(Schema.fromJsonString(StoredKey))(row?.value);
+}
+
+export const readOpenCodeStoredKey = Effect.fn("OpenCode.readStoredKey")(function* (
+  integration: string,
+  env: NodeJS.ProcessEnv,
+) {
+  const databasePath = openCodeDatabasePath(env);
+  if (!databasePath) return null;
+  return yield* Effect.try({
+    try: () => {
+      const stored = newestStoredKey(databasePath, integration);
+      return Option.isSome(stored) ? stored.value.key.trim() || null : null;
+    },
+    catch: (cause) => new OpenCodeUsageFailed({ cause }),
+  }).pipe(Effect.orElseSucceed(() => null));
+});
 
 const readConsoleKey = Effect.fn("OpenCode.readConsoleKey")(function* (databasePath: string) {
   return yield* Effect.try({
     try: () => {
-      const row = readOpenCodeDatabase(databasePath, (database) =>
-        database
-          .prepare(
-            `SELECT value FROM credential
-             WHERE integration_id = 'opencode' AND active IS NOT 0
-             ORDER BY active DESC, time_created DESC, id DESC LIMIT 1`,
-          )
-          .get(),
-      );
-      const stored = Schema.decodeUnknownOption(Schema.fromJsonString(StoredKey))(row?.value);
-      if (Option.isNone(stored)) return undefined;
-      const server = stored.value.metadata?.server;
-      if (typeof server === "string") {
-        const url = new URL(server);
-        if (`${url.origin}${url.pathname.replace(/\/+$/u, "")}` !== OPENCODE_CONSOLE_URL) return undefined;
-      }
+      const stored = newestStoredKey(databasePath, "opencode");
+      if (Option.isNone(stored) || !servedByOpenCodeConsole(stored.value.metadata?.server)) return undefined;
       return stored.value.key.trim() || undefined;
     },
     catch: (cause) => new OpenCodeUsageFailed({ cause }),

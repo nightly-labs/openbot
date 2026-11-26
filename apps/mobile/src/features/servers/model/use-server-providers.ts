@@ -25,6 +25,22 @@ export function useProviderAdmin(serverId: string) {
   return { available, admin };
 }
 
+function useProviderStatusQuery(serverId: string, admin: ProviderAdmin | null, watchStatus: boolean) {
+  const queryScope = useQueryScope();
+  return useQuery({
+    queryKey: queryKeys.providerStatus(queryScope, serverId),
+    retry: false,
+    staleTime: 0,
+    refetchInterval: watchStatus ? STATUS_POLL_MS : false,
+    queryFn: admin ? () => admin.readStatus() : skipToken,
+  });
+}
+
+export function useServerProviderStatus(serverId: string) {
+  const { admin } = useProviderAdmin(serverId);
+  return useProviderStatusQuery(serverId, admin, false);
+}
+
 export function useServerProviders(serverId: string, options: { watchStatus?: boolean } = {}) {
   const { available, admin } = useProviderAdmin(serverId);
   const queryScope = useQueryScope();
@@ -53,13 +69,7 @@ export function useServerProviders(serverId: string, options: { watchStatus?: bo
     () => queryClient.invalidateQueries({ queryKey: keys.current.statusKey, exact: true }),
     [queryClient],
   );
-  const status = useQuery({
-    queryKey: statusKey,
-    retry: false,
-    staleTime: 0,
-    refetchInterval: options.watchStatus ? STATUS_POLL_MS : false,
-    queryFn: admin ? () => admin.readStatus() : skipToken,
-  });
+  const status = useProviderStatusQuery(serverId, admin, options.watchStatus === true);
   const runtimes = useQuery({
     queryKey: runtimesKey,
     retry: false,

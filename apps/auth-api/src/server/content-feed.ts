@@ -15,6 +15,7 @@ import {
   collectionFeedUrl,
   collectionIndexUrl,
 } from "../lib/content-collection";
+import { CREDITS_PAGE_UPDATED_AT, CREDITS_ROUTE } from "../lib/credits-page";
 import { DOWNLOAD_PAGE_ORDER, DOWNLOAD_PAGES_UPDATED_AT, downloadPageUrl } from "../lib/download-pages";
 import { MARKETPLACE_APPS_ROUTE, MARKETPLACE_ROUTE, MARKETPLACE_SKILLS_ROUTE } from "../lib/marketplace-routes";
 import { PLUGINS_UPDATED_AT, pluginUrl, SITE_PLUGINS } from "../lib/plugins";
@@ -122,6 +123,7 @@ function contentSitemapXml(listings: MarketplaceSitemapListings | null): string 
     ...localizedSitemapEntries(TEAMS_ROUTE, TEAMS_PAGE_UPDATED_AT),
     { loc: new URL(PRICING_ROUTE, OPENBOT_SITE_URL).toString(), lastmod: PRICING_PAGE_UPDATED_AT },
     ...localizedSitemapEntries(PRICING_ROUTE, PRICING_PAGE_UPDATED_AT),
+    { loc: new URL(CREDITS_ROUTE, OPENBOT_SITE_URL).toString(), lastmod: CREDITS_PAGE_UPDATED_AT },
     { loc: new URL(BRAND_ROUTE, OPENBOT_SITE_URL).toString(), lastmod: BRAND_PAGE_UPDATED_AT },
     { loc: new URL(PRIVACY_POLICY_ROUTE, OPENBOT_SITE_URL).toString(), lastmod: PRIVACY_POLICY_UPDATED_AT },
   ];

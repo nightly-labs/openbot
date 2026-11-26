@@ -278,7 +278,7 @@ export function createMockMessaging(orchestrator: () => string): MessagingDeskto
         throw new Error(sourceText("error.messaging.whatsappTooManySenders"));
       accounts.set(workspaceId, {
         ...current,
-        allowedSenders: [...others, { id, kind: sender.kind, name: sender.name.trim() || id }],
+        allowedSenders: [...others, { id, kind: sender.kind, name: sender.name.trim() || id, readOnly: false }],
       });
     },
     removeWhatsAppSender: async ({ workspaceId, senderId }) => {
@@ -298,7 +298,7 @@ export function createMockMessaging(orchestrator: () => string): MessagingDeskto
         allowedSenders: approve
           ? [
               ...current.allowedSenders.filter((sender) => sender.id !== request.senderId),
-              { id: request.senderId, kind: "contact", name: request.name || request.senderId },
+              { id: request.senderId, kind: "contact", name: request.name || request.senderId, readOnly: false },
             ]
           : current.allowedSenders,
       });
@@ -311,6 +311,17 @@ export function createMockMessaging(orchestrator: () => string): MessagingDeskto
     },
     setWhatsAppStatusReactions: async ({ workspaceId, statusReactions }) => {
       accounts.set(workspaceId, { ...account(workspaceId), statusReactions });
+    },
+    setWhatsAppSenderReadOnly: async ({ workspaceId, senderId, readOnly }) => {
+      const current = account(workspaceId);
+      if (!current.allowedSenders.some((sender) => sender.id === senderId))
+        throw new Error(sourceText("error.messaging.whatsappSenderNotFound"));
+      accounts.set(workspaceId, {
+        ...current,
+        allowedSenders: current.allowedSenders.map((sender) =>
+          sender.id === senderId ? { ...sender, readOnly } : sender,
+        ),
+      });
     },
   };
   const overview = { slack: api.getSlackOverview, discord: api.getDiscordOverview, telegram: api.getTelegramOverview };
@@ -365,5 +376,6 @@ export function createMockMessaging(orchestrator: () => string): MessagingDeskto
     hostSetWhatsAppOwnNumber: (input) => api.setWhatsAppOwnNumber(input),
     hostSetWhatsAppWorkingMessage: (input) => api.setWhatsAppWorkingMessage(input),
     hostSetWhatsAppStatusReactions: (input) => api.setWhatsAppStatusReactions(input),
+    hostSetWhatsAppSenderReadOnly: (input) => api.setWhatsAppSenderReadOnly(input),
   };
 }

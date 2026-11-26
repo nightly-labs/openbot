@@ -12,7 +12,7 @@ export function ConversationQuestionPrompt(props: {
   onAnswer?: (answers: Record<string, string[]>, options?: PromptAnswerOptions) => Promise<boolean>;
   registerComposerAnswer?: ((answer: QuestionPromptComposerAnswer) => () => void) | undefined;
 }) {
-  const { props: view, openExternalMessageUrl } = useConversationViewScope();
+  const { props: view, openExternalMessageUrl, keepUnsentPromptAnswer } = useConversationViewScope();
   let cachedPrompt: { key: string; prompt: NonNullable<ConversationProps["prompt"]> } | null = null;
   const keyedPrompt = createMemo(() => {
     const prompt = view.prompt;
@@ -59,6 +59,7 @@ export function ConversationQuestionPrompt(props: {
                   elementRef={(element) => props.elementRef?.(element)}
                   onAnswer={answer}
                   canEditPreview={serverSupportsCapability(view.server, UI_BLOCK_PREVIEW_EDIT_CAPABILITY)}
+                  onUnsentPreviewChange={keepUnsentPromptAnswer}
                   onAnswered={presentResolution}
                 />
               )}

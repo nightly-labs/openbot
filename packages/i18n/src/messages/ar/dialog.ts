@@ -4,6 +4,7 @@ import type { messages as source } from "../en/dialog";
 export const messages = {
   "dialog.chooseSiteDirectory": "اختر مجلد موقع ثابت",
   "dialog.chooseAgentFolder": "اختر مجلدًا لـ {agent}",
+  "dialog.chooseChannelFolder": "اختر مجلدًا لـ {channel}",
   "dialog.chooseAgentExclusion": "اختر مجلدًا يجب ألا يغيّره {agent}",
   "dialog.chooseSkill": "اختر مجلد مهارة أو ملف ZIP",
   "dialog.filter.skillPackages": "حزم المهارات",
@@ -21,6 +22,8 @@ export const messages = {
   "dialog.saveTransfer": "حفظ ملف النقل",
   "dialog.chooseTransfer": "اختر ملف نقل",
   "dialog.filter.transfer": "ملفات نقل OpenBot",
+  "dialog.saveWorkflow": "حفظ ملف سير العمل",
+  "dialog.filter.workflow": "ملفات سير عمل OpenBot",
   "dialog.chooseExternalLinkApp": "اختر متصفحًا",
   "dialog.filter.applications": "التطبيقات",
 } as const satisfies PartialTranslation<typeof source>;

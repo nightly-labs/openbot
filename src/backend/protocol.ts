@@ -71,6 +71,8 @@ export interface AppServerRequest {
   answerBeforeMs?: number;
 }
 
+export const PROVIDER_STOPPED_WAITING = "provider-stopped-waiting";
+
 export const CLAUDE_API_KEY_ACCOUNT_TYPE = "claude-api-key";
 
 export const CLAUDE_CLI_API_KEY_ACCOUNT_TYPE = "claude-cli-api-key";
@@ -198,6 +200,7 @@ export interface ModelListResponse {
     supportedReasoningEfforts?: Array<{ reasoningEffort?: string }>;
     reasoningEffortConfigurable?: boolean;
     hidden?: boolean;
+    upgrade?: string;
     serviceTiers?: Array<{ id: string; name?: string }>;
     additionalSpeedTiers?: string[];
     steersTurns?: boolean;
@@ -216,6 +219,7 @@ export function decodeModelListResponse(value: unknown): ModelListResponse {
       ...(isString(item.displayName) ? { displayName: item.displayName } : {}),
       ...(isString(item.defaultReasoningEffort) ? { defaultReasoningEffort: item.defaultReasoningEffort } : {}),
       ...(isBoolean(item.hidden) ? { hidden: item.hidden } : {}),
+      ...(isString(item.upgrade) ? { upgrade: item.upgrade } : {}),
       ...(item.steersTurns === true ? { steersTurns: true } : {}),
       ...(isBoolean(item.reasoningEffortConfigurable)
         ? { reasoningEffortConfigurable: item.reasoningEffortConfigurable }

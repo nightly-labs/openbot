@@ -6,11 +6,14 @@ export const messages = {
   "error.workflow.versionMissing": "Ta wersja przepływu pracy już nie istnieje.",
   "error.workflow.annotation": "Teksty, notatki i kształty nie mogą mieć połączeń.",
   "error.workflow.port": "Krok nie może przyjąć tego typu danych.",
+  "error.workflow.unknownValue":
+    "Ten OpenBot nie zna ustawienia jednego z kroków. Zaktualizuj OpenBot i spróbuj ponownie.",
   "error.workflow.branch": "Tylko warunek może mieć połączenia tak i nie.",
   "error.workflow.conditionBranch": "Każde połączenie z warunku musi być tak albo nie.",
   "error.workflow.duplicateEdge": "Te dwa kroki mają już to połączenie.",
   "error.workflow.serverTooOld":
     "Ten serwer nie obsługuje przepływów pracy. Zaktualizuj OpenBot na komputerze, na którym działa.",
+  "error.workflow.newerSteps": "Ten przepływ ma kroki z nowszej wersji OpenBot. Zaktualizuj OpenBot, aby go zmienić.",
   "error.workflow.nodeUnsupported": "Ta wersja OpenBot nie może jeszcze uruchamiać kroków obrazu, pliku i wiadomości.",
   "error.workflow.interrupted": "OpenBot zatrzymał się podczas tego kroku. Uruchom go ponownie.",
   "error.workflow.agentMissing": "Wybierz agenta dla tego kroku.",
@@ -18,6 +21,17 @@ export const messages = {
   "error.workflow.agentStepEnded": "Wiadomość do agenta została usunięta, zanim odpowiedział.",
   "error.workflow.agentStepStopped": "Agent zatrzymał się, zanim odpowiedział na ten krok. Uruchom krok ponownie.",
   "error.workflow.conditionUnclear": "Model nie odpowiedział tak ani nie.",
+  "error.workflow.answerInvalid": "Odpowiedź nie miała pól, których wymaga ten krok: {fields}. Uruchom krok ponownie.",
+  "error.workflow.answerSetup":
+    "Pola odpowiedzi tego przepływu mają tu problem: {fields}. Popraw przepływ, a potem uruchom krok ponownie.",
+  "error.workflow.answerSourceEnded":
+    "Te pola nie mają wartości, bo krok, który je podaje, się nie zakończył: {fields}. Najpierw uruchom ponownie tamten krok.",
+  "error.workflow.runInputInvalid":
+    "Dane wejściowe uruchomienia nie pasują do pól odpowiedzi wyzwalacza: {fields}. Wyślij jeden obiekt JSON z tymi polami.",
+  "error.workflow.sourceNotDone":
+    "Krok przed tym kończył się błędem lub został zatrzymany przy ostatnim uruchomieniu. Najpierw uruchom ponownie tamten krok.",
+  "error.workflow.checkInvalid":
+    "Warunek sprawdzenia w tym kroku jest nieprawidłowy. Popraw go i uruchom krok ponownie.",
   "error.workflow.modelFailed": "Model nie mógł odpowiedzieć. Uruchom krok ponownie.",
   "error.workflow.modelTimedOut":
     "Model nie odpowiedział na czas. Wybierz mniejszy wysiłek lub szybszy model dla tego kroku, a potem uruchom go ponownie.",
@@ -31,8 +45,20 @@ export const messages = {
   "error.workflow.providerBusy": "Dostawca jest zajęty. Poczekaj kilka minut, a potem uruchom krok ponownie.",
   "error.workflow.providerOffline":
     "OpenBot nie mógł połączyć się z dostawcą. Sprawdź połączenie z internetem, a potem uruchom krok ponownie.",
+  "error.workflow.providerBilling":
+    "Konto nie ma środków albo jego plan nie obejmuje tego modelu. Sprawdź plan albo wybierz inny model.",
+  "error.workflow.modelRefused": "Dostawca nie pozwala na ten model dla tego konta. Wybierz inny model.",
+  "error.workflow.modelRefusedReason":
+    'Wybierz inny model. Dostawca nie pozwala na ten model dla tego konta: "{reason}"',
+  "error.workflow.contentBlocked":
+    "Dostawca zablokował dane wejściowe. Zmień je lub prompt, a potem uruchom krok ponownie.",
+  "error.workflow.inputTooLong": "Dane wejściowe są za długie dla tego modelu. Skróć je albo wybierz inny model.",
+  "error.workflow.requestRefused": "Dostawca nie przyjął tego kroku. Wybierz inny model.",
+  "error.workflow.requestRefusedReason": 'Wybierz inny model. Dostawca nie przyjął tego kroku: "{reason}"',
+  "error.workflow.providerRefused": 'Wybierz inny model albo uruchom krok ponownie. Dostawca odpowiedział: "{reason}"',
   "error.workflow.modelBusy": "Trwa inne zapytanie do modelu. Uruchom krok ponownie za chwilę.",
   "error.workflow.mediaFailed": "Model nie mógł utworzyć obrazu ani wideo. Uruchom krok ponownie.",
+  "error.workflow.mediaNotMade": "Model nie utworzył obrazu ani wideo. Odpowiedź modelu: {answer}",
   "error.workflow.pictureMissing": "Obrazu nie ma już na serwerze. Wyślij go ponownie.",
   "error.workflow.pictureType": "Użyj obrazu PNG, JPEG lub WebP.",
   "error.workflow.mediaInputMissing": "Obraz z wcześniejszego kroku jest niedostępny. Uruchom ten krok ponownie.",

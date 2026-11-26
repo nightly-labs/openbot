@@ -1,4 +1,4 @@
-import type { BrowserEnvironment, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
+import type { BrowserEnvironment, BrowserPermissionRequest, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import type { BrowserViewContextMenu } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type { Deferred, Effect, Scope } from "effect";
 import { BrowserWindow, type Session, type WebContents, type WebContentsView, webContents } from "electron";
@@ -29,6 +29,7 @@ export interface BrowserHostTab {
   tabSession?: BrowserTabSession;
   popup: boolean;
   popupFailure?: BrowserTab["popupFailure"];
+  permissionRequest?: BrowserPermissionRequest | undefined;
   closing?: boolean;
   ownerThreadId: string | null;
   ownerAgentId: string | null;
@@ -41,6 +42,7 @@ export interface BrowserHostTab {
   pendingOperations: number;
   opening?: boolean;
   crashes?: number;
+  endingSilentPage?: boolean;
   documents: number;
   challengeWait?: { document: number; waitedMs: number };
   challengeClick?: { document: number; waited: boolean };
@@ -55,6 +57,7 @@ export interface BrowserHostTab {
   sleeping?: { title: string; preview: BrowserPreview | null } | undefined;
   idleUnloadNoted?: Set<string>;
   lastUsedAt: number;
+  lastToolChat?: { threadId: string; at: number } | undefined;
   focusOnVisible: boolean;
   focusOnCommit?: boolean | undefined;
   focusedAtPageClose?: boolean | undefined;
@@ -68,6 +71,18 @@ export interface BrowserHostTab {
   viewContextMenu: { deliver: (menu: BrowserViewContextMenu) => void; until: number } | null;
   visitedHost?: string | undefined;
   secret?: { origin: string; submitted: boolean; replaced: boolean; running: boolean } | undefined;
+  httpSignIn?: BrowserHttpSignInPrompt | undefined;
+  mainFrameRequestUrl?: string | undefined;
+  httpSignInAnswer?: (BrowserHttpSignInRealm & { username: string; password: string }) | undefined;
+}
+
+interface BrowserHttpSignInRealm {
+  origin: string;
+  realm: string;
+}
+
+interface BrowserHttpSignInPrompt extends BrowserHttpSignInRealm {
+  refused: boolean;
 }
 
 export type KeepQueueBlocked = (work: Effect.Effect<unknown, BrowserOperationError>) => void;
@@ -115,6 +130,10 @@ export function toPublicTab(tab: BrowserHostTab): BrowserTab {
     canGoForward: hasHistoryEntry(tab.contents, 1),
     ...(tab.openerTabId ? { openerTabId: tab.openerTabId } : {}),
     ...(tab.popupFailure ? { popupFailure: tab.popupFailure } : {}),
+    ...(tab.permissionRequest ? { permissionRequest: tab.permissionRequest } : {}),
+    ...(tab.httpSignIn && !tab.secret
+      ? { httpSignIn: { origin: tab.httpSignIn.origin, ...(tab.httpSignIn.refused ? { refused: true as const } : {}) } }
+      : {}),
   };
 }
 

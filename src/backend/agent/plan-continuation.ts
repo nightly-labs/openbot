@@ -18,9 +18,12 @@ export type FinishCheckMode = "no" | "allowed" | "only";
 export interface FinishCheckPending {
   kind: "check";
   continuations: number;
+  earlierGaps: readonly string[];
 }
 
 const STOPPED = { kind: "stopped" } as const;
+
+const LIMIT_REACHED = { kind: "limitReached" } as const;
 
 const FINISH_CHECK_LIMIT = 3;
 
@@ -147,6 +150,20 @@ function stoppedBeforeNextStep(answer: string | undefined): boolean {
   return ANNOUNCES_WORK.test(plain) || STATES_WORK.test(plain) || PT_ANNOUNCES_WORK.test(plain);
 }
 
+const PROMISES_WORK =
+  /(?:^|[^\p{L}'’])(?<!(?:^|[^\p{L}])(?:não|nao|nunca)\s+)(?:i['’]ll|i\s+will|let\s+me|i['’]m\s+going\s+to|i\s+am\s+going\s+to|(?:eu\s+)?vou|(?:eu\s+)?irei|deix[ae](?:-me|\s+eu))\s+(?!(?:not|never|know|wait|hold|pause|stop|be\s+here|aguardar|esperar|ficar\s+(?:aguardando|esperando|no\s+aguardo))(?!\p{L}))\p{L}/iu;
+
+export function promisesWork(answer: string | undefined): boolean {
+  const text = answer?.trim() ?? "";
+  if (text.length === 0 || text.length > NEXT_STEP_ANSWER_MAX || waitsForUser(answer)) return false;
+  const plain = text
+    .replace(/[*_`>#]/g, "")
+    .trimEnd()
+    .replace(NOTHING_FROM_USER, "");
+  const lastSentence = plain.split(/(?<=[.!…])\s+|\n+/u).at(-1) ?? "";
+  return PROMISES_WORK.test(lastSentence);
+}
+
 interface ContinuationCount {
   current: number;
   limit: number;
@@ -160,6 +177,8 @@ interface Chain {
   nextSteps: number;
   checks: number;
   gap: string | null;
+  earlierGaps: readonly string[];
+  final?: true;
   failureContinued: boolean;
   plan: ConversationPlan | null;
   openSteps: string;
@@ -196,6 +215,7 @@ export class PlanContinuation {
     earlierPlan: ConversationPlan | null;
     answer: string | undefined;
     finishCheck?: FinishCheckMode;
+    nextStep?: boolean;
   }): ({ kind: ContinuationKind } & ContinuationCount) | typeof STOPPED | FinishCheckPending | null {
     const key = laneKey(input.agentId, input.taskId);
     const previous = this.#chains.get(key);
@@ -212,10 +232,30 @@ export class PlanContinuation {
         );
     const count = chained ? previous.count : 0;
     const open = plan ? openSteps(plan, earlierSteps) : [];
-    if (count >= this.#limit) return chained && open.length > 0 ? STOPPED : null;
     const nextSteps = chained ? previous.nextSteps : 0;
     const checks = chained ? previous.checks : 0;
+    const earlierGaps = chained ? previous.earlierGaps : [];
     const mode = input.finishCheck ?? "no";
+    const checkAtLimit = (): FinishCheckPending | null => {
+      if (!chained || mode === "no") return null;
+      this.#chains.set(key, {
+        deliveryIds: new Set(input.deliveryIds),
+        count,
+        kind: "finishCheck",
+        shown: previous.shown,
+        nextSteps,
+        checks,
+        gap: null,
+        earlierGaps,
+        final: true,
+        failureContinued: previous.failureContinued,
+        plan,
+        openSteps: JSON.stringify(open.map(stepKey)),
+        earlierSteps,
+      });
+      return { kind: "check", continuations: count, earlierGaps };
+    };
+    if (count >= this.#limit) return chained && open.length > 0 ? STOPPED : checkAtLimit();
     let kind: ContinuationKind;
     if (open.length > 0 && mode !== "only") {
       const signature = JSON.stringify(open.map(stepKey));
@@ -227,7 +267,13 @@ export class PlanContinuation {
       )
         return STOPPED;
       kind = "plan";
-    } else if (mode !== "only" && nextSteps < NEXT_STEP_LIMIT && stoppedBeforeNextStep(input.answer)) kind = "nextStep";
+    } else if (
+      mode !== "only" &&
+      input.nextStep !== false &&
+      nextSteps < NEXT_STEP_LIMIT &&
+      stoppedBeforeNextStep(input.answer)
+    )
+      kind = "nextStep";
     else if (mode !== "no" && checks < FINISH_CHECK_LIMIT) {
       this.#chains.set(key, {
         deliveryIds: new Set(input.deliveryIds),
@@ -237,13 +283,14 @@ export class PlanContinuation {
         nextSteps,
         checks,
         gap: null,
+        earlierGaps,
         failureContinued: chained ? previous.failureContinued : false,
         plan,
         openSteps: JSON.stringify(open.map(stepKey)),
         earlierSteps,
       });
-      return { kind: "check", continuations: count };
-    } else return null;
+      return { kind: "check", continuations: count, earlierGaps };
+    } else return checkAtLimit();
     const shown =
       kind === "plan"
         ? { current: count + 1, limit: this.#limit }
@@ -256,6 +303,7 @@ export class PlanContinuation {
       nextSteps: kind === "nextStep" ? nextSteps + 1 : nextSteps,
       checks,
       gap: null,
+      earlierGaps,
       failureContinued: chained ? previous.failureContinued : false,
       plan,
       openSteps: JSON.stringify(open.map(stepKey)),
@@ -268,18 +316,25 @@ export class PlanContinuation {
     agentId: string,
     taskId: string | null,
     gap: string,
-  ): ({ kind: ContinuationKind } & ContinuationCount) | null {
+  ): ({ kind: ContinuationKind } & ContinuationCount) | typeof LIMIT_REACHED | null {
     const key = laneKey(agentId, taskId);
     const chain = this.#chains.get(key);
-    if (chain?.kind !== "finishCheck" || chain.gap !== null) {
+    if (chain?.kind !== "finishCheck" || chain.gap !== null || chain.final) {
       this.#chains.delete(key);
-      return null;
+      return chain?.final ? LIMIT_REACHED : null;
     }
     const shown = {
       current: chain.checks + 1,
       limit: chain.checks + Math.min(FINISH_CHECK_LIMIT - chain.checks, this.#limit - chain.count),
     };
-    this.#chains.set(key, { ...chain, count: chain.count + 1, checks: chain.checks + 1, gap, shown });
+    this.#chains.set(key, {
+      ...chain,
+      count: chain.count + 1,
+      checks: chain.checks + 1,
+      gap,
+      earlierGaps: [...chain.earlierGaps, gap],
+      shown,
+    });
     return { kind: "finishCheck", ...shown };
   }
 
@@ -340,6 +395,7 @@ export class PlanContinuation {
       nextSteps: chained ? previous.nextSteps : 0,
       checks: chained ? previous.checks : 0,
       gap: null,
+      earlierGaps: chained ? previous.earlierGaps : [],
       failureContinued: true,
       plan,
       openSteps: JSON.stringify((plan ? openSteps(plan, earlierSteps) : []).map(stepKey)),

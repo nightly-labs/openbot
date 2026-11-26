@@ -347,6 +347,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Для этого провайдера нет доступных моделей.",
   "mobile.agent.runtime.searchModels": "Поиск моделей",
   "mobile.agent.runtime.noMatches": "Моделей по вашему запросу не найдено.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Моделей по вашему запросу не найдено. Настройки конфиденциальности, провайдеров и ограничений (guardrails) на openrouter.ai могут скрывать модели из этого списка.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Этот провайдер не работает с режимом «Только рабочее пространство» в Windows и Linux. Чтобы использовать его, сначала измените «Разрешения».",
   "mobile.agent.runtime.usageLimit": "Лимит использования исчерпан",
@@ -405,11 +407,12 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Убрать {model}",
   "mobile.agent.backupModels.unavailable": "Сейчас недоступна · пропущена",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Если лимит использования остановит {name} после начала работы, {name} продолжит ту же работу на первой доступной модели из списка. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
   "mobile.agent.busyMessage.label": "Во время работы",
   "mobile.agent.busyMessage.footer":
-    "Что происходит с сообщением, которое вы отправляете во время работы агента. «Очередь» хранит его до конца хода. «Направлять» передаёт его агенту во время хода.",
+    "Что происходит с сообщением от вас или другого агента, которое приходит во время работы агента. «Очередь» хранит его до конца хода. «Направлять» передаёт его агенту во время хода.",
   "mobile.agent.busyMessage.queue": "Очередь",
   "mobile.agent.busyMessage.steer": "Направлять",
   "mobile.agent.busyMessage.hostDefaultQueue": "Очередь (по умолчанию на хосте)",
@@ -428,10 +431,15 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Управлять профилями",
   "mobile.agent.browserProfile.footer":
     "Каждый профиль хранит свои входы и файлы cookie. Изменение закрывает открытые вкладки агента.",
+  "mobile.agent.browserProfile.movedNote":
+    "Входы на сайты остаются в старом профиле. Агенту нужно снова войти на эти сайты.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot не удалось изменить профиль браузера агента.",
   "mobile.agent.planCard.label": "Показывать план перед долгими задачами",
   "mobile.agent.planCard.footer":
     "Перед долгой задачей агент показывает свой план. Он начинает через 10 с или когда вы нажимаете «Начать».",
+  "mobile.agent.builtinMemory.label": "Память OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "Агент сохраняет и читает свою память. Выключите, чтобы использовать только приложение памяти, например Mem0. Сохранённая память остаётся.",
   "mobile.agent.workspace.title": "Папка рабочего пространства",
   "mobile.agent.workspace.footer": "Папка этого агента на компьютере-хосте.",
   "mobile.agent.advanced.behavior": "Поведение",
@@ -524,6 +532,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Этот хост не позволяет публиковать агентов с удалённого устройства.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Токены без чтения из кэша",
   "mobile.agent.usage.estimatedCost": "Оценка стоимости",
+  "mobile.agent.usage.noCostEstimate": "Нет оценки стоимости",
   "mobile.agent.usage.daily": "Использование по дням",
   "mobile.agent.usage.tokens": "Токены",
   "mobile.agent.usage.cost": "Стоимость",
@@ -558,6 +567,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Сбор данных начат: {started}. Обновлено: {updated}.",
   "mobile.agent.usage.never": "никогда",
   "mobile.agent.record.time": "Время",
+  "mobile.agent.record.date": "Дата",
   "mobile.agent.section.changeFailed": "Не удалось изменить папку",
   "mobile.agent.section.tryAgain": "Повторите попытку.",
   "mobile.agent.section.moveUp": "Выше",
@@ -659,13 +669,13 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Не удалось загрузить серверы",
   "mobile.agent.home.serversFailedBody": "Убедитесь, что настольное приложение запущено, и повторите попытку.",
   "mobile.agent.home.noServers": "Нет доступных серверов",
-  "mobile.agent.home.noServersBody": "Подключите настольное приложение снова или присоединитесь к удалённому серверу.",
+  "mobile.agent.home.noServersBody":
+    "Откройте OpenBot на компьютере с этим аккаунтом и включите «Опубликовать этот сервер» в «Настройки сервера» → «Участники». Или присоединитесь к удалённому серверу.",
   "mobile.agent.home.chooseServer": "Выберите сервер",
   "mobile.agent.home.openServers": "Открыть серверы",
   "mobile.agent.home.noChatOpen": "Чат не открыт",
   "mobile.agent.home.noChatOpenBody": "Выберите чат в списке.",
   "mobile.agent.home.chatListWidth": "Ширина списка чатов",
-  "mobile.agent.home.serverTitle": "{name}, открыть серверы",
   "mobile.agent.home.waiting": "Ожидание подключения",
   "mobile.agent.home.waitingBody": "Список агентов загрузится, когда сервер подключится.",
   "mobile.agent.home.noAgents": "На этом сервере нет агентов",
@@ -752,6 +762,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Не исключать",
   "mobile.agent.folders.browseTitle": "Выбор папки",
   "mobile.agent.folders.places": "Перейти",
+  "mobile.agent.folders.path": "Путь к папке",
   "mobile.agent.folders.home": "Домашняя папка",
   "mobile.agent.folders.parent": "Вверх: {folder}",
   "mobile.agent.folders.browseFailed": "Не удалось открыть эту папку.",

@@ -12,7 +12,9 @@ const QUICK_EXIT_S = 0.6;
 const EXIT_LIMIT_MS = 3000;
 const EXIT_FADE_DELAY_MS = 300;
 const MIN_RAIN_S = 2;
+const MIN_SHOWN_S = 1.5;
 const EXIT_ANIMATION = "app-loading-exit";
+const ENTER_ANIMATION = "app-loading-enter";
 const THINKING_SIZE = 132;
 const ENTER_DELAY_S = 0.25;
 
@@ -43,6 +45,7 @@ interface PileSeat {
   alone: () => boolean;
   handOver: () => void;
   playThrough: () => boolean;
+  playToEnd: () => void;
   hopOut: () => void;
   leave: () => void;
 }
@@ -64,7 +67,7 @@ function newRun(seed: number, reduced: boolean, now: number): PileRun {
   };
 }
 
-function takeSeat(seed: number | undefined, reduced: boolean, playThrough: boolean): PileSeat {
+function takeSeat(seed: number | undefined, reduced: boolean): PileSeat {
   const now = performance.now();
   let run: PileRun;
   if (seed !== undefined) {
@@ -78,7 +81,6 @@ function takeSeat(seed: number | undefined, reduced: boolean, playThrough: boole
   }
   const token = {};
   run.screens.push(token);
-  if (playThrough) run.playThrough = true;
   const waiting = () => run.screens.filter((screen) => !run.handedOver.has(screen));
   return {
     pile: run.pile,
@@ -89,6 +91,9 @@ function takeSeat(seed: number | undefined, reduced: boolean, playThrough: boole
       run.handedOver.add(token);
     },
     playThrough: () => run.playThrough,
+    playToEnd: () => {
+      run.playThrough = true;
+    },
     hopOut: () => {
       run.leaving = true;
     },
@@ -106,23 +111,23 @@ export interface AppLoadingScreenProps {
   ready?: boolean | undefined;
   onExited?: (() => void) | undefined;
   onMountViews?: (() => void) | undefined;
-  scene?: "pile" | "thinking";
+  scene?: "pile" | "thinking" | "quiet";
   seed?: number;
   label?: string;
   title?: string;
-  quickExit?: boolean;
+  exit?: "playToEnd" | "fade" | undefined;
   immediate?: boolean;
 }
 
 export function AppLoadingScreen(props: AppLoadingScreenProps) {
   const { t } = useText();
   const reducedMotion = prefersReducedMotion() || documentStillFaces();
-  const pileScene = untrack(() => props.scene !== "thinking");
+  const scene = untrack(() => props.scene ?? "pile");
+  const pileScene = scene === "pile";
   const seat = pileScene
     ? takeSeat(
         untrack(() => props.seed),
         reducedMotion,
-        untrack(() => props.quickExit === false),
       )
     : undefined;
   onCleanup(() => seat?.leave());
@@ -135,11 +140,13 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
   const status = () => STATUS_LINES[Math.floor(clock() / STATUS_EVERY_S) % STATUS_LINES.length] ?? STATUS_LINES[0];
   let statusTimer: ReturnType<typeof setTimeout> | undefined;
   let exitTimer: ReturnType<typeof setTimeout> | undefined;
-  let rainTimer: ReturnType<typeof setTimeout> | undefined;
+  let holdTimer: ReturnType<typeof setTimeout> | undefined;
   let hopFrame = 0;
   let exited = false;
   let viewsMounted = false;
-  let hopWanted = false;
+  let exitWanted = false;
+  let shownAt: number | undefined;
+  const shownFor = () => (shownAt === undefined ? 0 : (performance.now() - shownAt) / 1000);
   const [hop, setHop] = createSignal(false);
   const [fadeDelay, setFadeDelay] = createSignal(EXIT_FADE_DELAY_MS);
   let root: HTMLElement | undefined;
@@ -164,25 +171,32 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
   });
 
   createEffect(
-    () => props.ready,
-    (ready) => {
-      if (!ready || untrack(phase) !== "loading" || hopWanted) return;
+    () => [props.ready, untrack(() => props.exit)] as const,
+    ([ready, exit]) => {
+      if (!ready || untrack(phase) !== "loading" || exitWanted) return;
       clearTimeout(statusTimer);
-      const quick = !seat?.playThrough() && age() < QUICK_EXIT_S;
+      if (exit === "playToEnd") seat?.playToEnd();
+      const quick = exit === "fade" || (!seat?.playThrough() && age() < QUICK_EXIT_S);
       const hopOut = seat && !reducedMotion && seat.owns() && seat.alone() && !quick;
-      const rainLeft = hopOut ? Math.max(0, MIN_RAIN_S - age()) * 1000 : 0;
-      exitTimer ??= setTimeout(finishExit, rainLeft + EXIT_LIMIT_MS);
+      const holdS = hopOut ? MIN_RAIN_S - age() : exit === "fade" ? MIN_SHOWN_S - shownFor() : 0;
+      const holdLeft = Math.max(0, holdS) * 1000;
+      exitTimer ??= setTimeout(finishExit, holdLeft + EXIT_LIMIT_MS);
       if (seat && !hopOut && !seat.alone()) seat.handOver();
-      if (!hopOut) {
+      if (!hopOut && holdLeft === 0) {
         setPhase("fade");
         return;
       }
+      exitWanted = true;
+      if (!hopOut) {
+        mountViews();
+        holdTimer = setTimeout(() => setPhase("fade"), holdLeft);
+        return;
+      }
       seat.hopOut();
-      hopWanted = true;
-      rainTimer = setTimeout(() => {
+      holdTimer = setTimeout(() => {
         mountViews();
         hopFrame = requestAnimationFrame(() => setHop(true));
-      }, rainLeft);
+      }, holdLeft);
     },
   );
 
@@ -195,6 +209,7 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
   }
 
   onSettled(() => {
+    shownAt = performance.now();
     const next = () => {
       const now = age();
       setClock(now);
@@ -204,12 +219,13 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
     return () => {
       clearTimeout(statusTimer);
       clearTimeout(exitTimer);
-      clearTimeout(rainTimer);
+      clearTimeout(holdTimer);
       cancelAnimationFrame(hopFrame);
     };
   });
 
   function handleAnimationStart(event: AnimationEvent): void {
+    if (event.animationName === ENTER_ANIMATION) shownAt = performance.now();
     if (event.animationName === EXIT_ANIMATION && event.target === event.currentTarget) mountViews();
   }
 
@@ -224,7 +240,7 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
       }}
       class="app-loading"
       style={{ "--app-loading-at": `${enterAt}s`, "--app-loading-exit-delay": `${fadeDelay()}ms` }}
-      data-scene={pileScene ? "pile" : "thinking"}
+      data-scene={scene}
       data-phase={phase()}
       role="status"
       aria-live="polite"

@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { Linking, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { RELAY_PASTE_PLACEHOLDER } from "@/features/servers/model/use-mcp-sign-in-relay";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
@@ -20,8 +21,6 @@ import { ListingIcon } from "../components/marketplace-parts";
 import { appListings } from "../model/marketplace-listings";
 import { pluginConnectMethod } from "../model/plugin-connect";
 import { usePluginConnect } from "../model/use-plugin-connect";
-
-const PASTE_PLACEHOLDER = "http://localhost/callback?code=…";
 
 export function MarketplaceAppConnectScreen() {
   const { t } = useText();
@@ -129,33 +128,36 @@ export function MarketplaceAppConnectScreen() {
               label={t("mobile.marketplace.app.stepOpen", { name: listing.name })}
             />
             <ConnectStep index={1} current={step} label={t("mobile.marketplace.app.stepAllow")} />
-            <ConnectStep
-              index={2}
-              current={step}
-              label={t("mobile.marketplace.app.stepReturn", { name: listing.name })}
-            />
+            {signingIn?.paste ? (
+              <>
+                <ConnectStep index={2} current={step} label={t("mobile.marketplace.app.stepBlank")} />
+                <ConnectStep index={3} current={step} label={t("mobile.marketplace.app.stepCopy")} />
+                <ConnectStep index={4} current={step} label={t("mobile.marketplace.app.stepPaste")} />
+              </>
+            ) : (
+              <ConnectStep
+                index={2}
+                current={step}
+                label={t("mobile.marketplace.app.stepReturn", { name: listing.name })}
+              />
+            )}
           </SettingsSection>
           {signingIn?.paste ? (
-            <View className="gap-3">
-              <Typography.Paragraph type="body-sm" className="px-1 text-grouped-secondary">
-                {t("mobile.marketplace.app.pasteHint")}
-              </Typography.Paragraph>
-              <SheetFormField
-                label={t("mobile.marketplace.app.pasteLabel")}
-                placeholder={PASTE_PLACEHOLDER}
-                value={address}
-                autoCapitalize="none"
-                autoCorrect={false}
-                inputMode="url"
-                onChangeText={setAddress}
-              />
-            </View>
+            <SheetFormField
+              label={t("mobile.marketplace.app.pasteLabel")}
+              placeholder={RELAY_PASTE_PLACEHOLDER}
+              value={address}
+              autoCapitalize="none"
+              autoCorrect={false}
+              inputMode="url"
+              onChangeText={setAddress}
+            />
           ) : null}
           {signingIn?.paste ? (
             <Button
               className="bg-action"
               feedbackVariant="scale"
-              isDisabled={!address.trim()}
+              isDisabled={!address.trim() || connect.pasting}
               onPress={() => void connect.paste(address)}
             >
               <Button.Label className="text-action-foreground">{t("mobile.marketplace.app.finishSignIn")}</Button.Label>

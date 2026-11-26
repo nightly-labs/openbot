@@ -3,11 +3,12 @@ import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 import { BROWSER_DYNAMIC_TOOLS, BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
+import { CHANNEL_TOOL_DEFINITIONS } from "../channel-tools";
 import type { DynamicToolNamespace } from "../local-mcp-bridge";
 import { OPENBOT_DYNAMIC_TOOLS, OPENBOT_TOOL_DEFINITIONS } from "../openbot-tools";
 import { type DynamicToolCallParams, isRecord, qualifiedToolName } from "../protocol";
 import { advertisedJsonSchema } from "./advertised-json-schema";
-import { withSchemaTypes } from "./schema-typed-arguments";
+import { nullStructuredItemPaths, withSchemaTypes } from "./schema-typed-arguments";
 import { toolGuidance } from "./tool-guidance";
 
 export const BUILTIN_TOOL_CATALOG = [OPENBOT_DYNAMIC_TOOLS, ...BROWSER_DYNAMIC_TOOLS].flatMap((namespace) =>
@@ -26,6 +27,9 @@ const DIRECT_NAMES = new Set([
   "attach_files_to_response",
   "list_agents",
   "send_message",
+  "start_task",
+  "message_task",
+  "close_task",
   "search_memories",
   "routine_no_update",
   "routine_report_failure",
@@ -34,6 +38,8 @@ const DIRECT_NAMES = new Set([
   "react_to_user_message",
   "request_api_key",
   "suggest_marketplace_app",
+  "generate_image",
+  "generate_video",
 ]);
 
 const BROWSER_SCRIPT_TOOL = requireTool(`${OPENBOT_BROWSER_NAMESPACE}.run_script`);
@@ -106,13 +112,15 @@ const kimiCallShape = {
   arguments: callShape.arguments.meta({ additionalProperties: KIMI_ARGUMENT_VALUE }),
 };
 
+const TOOL_SEARCH_DESCRIPTION =
+  "Find built-in tools by keywords or qualified name: queries (array) or query. Returns short descriptions, default 5, max 10; the best matches also give inputSchema and guidance. Run found tools with tool_call, not directly. Describe others before use.";
+
 function toolDefinitions(catalog: typeof BUILTIN_TOOL_CATALOG) {
-  const names = catalogNames(catalog);
   return [
     ...OPENBOT_TOOL_DEFINITIONS.filter((tool) => DIRECT_NAMES.has(tool.name)),
     {
       name: "tool_search",
-      description: `Find built-in tools by keywords or qualified name: queries (array) or query. Returns short descriptions, default 5, max 10; the best matches also give inputSchema and guidance. Run found tools with tool_call, not directly. Describe others before use. Catalog: ${names}`,
+      description: `${TOOL_SEARCH_DESCRIPTION} Catalog: ${catalogNames(catalog)}`,
       shape: searchShape,
     },
     {
@@ -155,6 +163,49 @@ const KIMI_DYNAMIC_TOOLS = dynamicTools(
     definition.name === "tool_call" ? { ...definition, shape: kimiCallShape } : definition,
   ),
 );
+const ANTIGRAVITY_DISCOVERY_TOOLS: DynamicToolNamespace["tools"] = [
+  {
+    type: "function",
+    name: "tool_search",
+    description: "Find catalog tools by keywords.",
+    inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+  },
+  {
+    type: "function",
+    name: "tool_describe",
+    description: "Get catalog tool schemas.",
+    inputSchema: {
+      type: "object",
+      properties: { names: { type: "array", items: { type: "string" } } },
+      required: ["names"],
+    },
+  },
+  {
+    type: "function",
+    name: "tool_call",
+    description: "Run a catalog tool.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, arguments: { type: "object", properties: {}, additionalProperties: {} } },
+      required: ["name"],
+    },
+  },
+];
+
+const ANTIGRAVITY_DYNAMIC_TOOLS = dynamicTools(toolDefinitions(catalogFor("antigravity"))).map((namespace) =>
+  namespace.name === OPENBOT_DYNAMIC_TOOLS.name
+    ? {
+        ...namespace,
+        tools: namespace.tools.map(
+          (tool) => ANTIGRAVITY_DISCOVERY_TOOLS.find((compact) => compact.name === tool.name) ?? tool,
+        ),
+      }
+    : namespace,
+);
+
+export function toolCatalogNames(provider: AgentProviderId): string {
+  return catalogNames(catalogFor(provider));
+}
 
 export function visibleToolDefinitions(provider: AgentProviderId) {
   return OWN_WEB_SEARCH_PROVIDERS.has(provider) ? OWN_WEB_SEARCH_TOOL_DEFINITIONS : ALL_TOOL_DEFINITIONS;
@@ -162,6 +213,7 @@ export function visibleToolDefinitions(provider: AgentProviderId) {
 
 export function visibleDynamicTools(provider: AgentProviderId) {
   if (provider === "kimi") return KIMI_DYNAMIC_TOOLS;
+  if (provider === "antigravity") return ANTIGRAVITY_DYNAMIC_TOOLS;
   return OWN_WEB_SEARCH_PROVIDERS.has(provider) ? OWN_WEB_SEARCH_DYNAMIC_TOOLS : ALL_DYNAMIC_TOOLS;
 }
 
@@ -202,6 +254,21 @@ export function withCatalogTools(
       .filter((entry) => entry.namespace === namespace.name && !names.has(entry.tool))
       .flatMap((entry) => tools.get(entry.name) ?? []);
     return { ...namespace, tools: [...listed, ...added] };
+  });
+}
+
+const CHANNEL_TOOL_NAMES: ReadonlySet<string> = new Set(
+  CHANNEL_TOOL_DEFINITIONS.map((definition) => `${OPENBOT_DYNAMIC_TOOLS.name}.${definition.name}`),
+);
+
+export function withChannelTools(namespaces: readonly DynamicToolNamespace[]): DynamicToolNamespace[] {
+  const tools = mcpCatalogs.get(BUILTIN_TOOL_CATALOG) ?? mcpCatalogTools(BUILTIN_TOOL_CATALOG);
+  mcpCatalogs.set(BUILTIN_TOOL_CATALOG, tools);
+  const channelTools = [...tools].flatMap(([name, tool]) => (CHANNEL_TOOL_NAMES.has(name) ? [tool] : []));
+  return namespaces.map((namespace) => {
+    if (namespace.name !== OPENBOT_DYNAMIC_TOOLS.name) return namespace;
+    const names = new Set(namespace.tools.map((tool) => tool.name));
+    return { ...namespace, tools: [...namespace.tools, ...channelTools.filter((tool) => !names.has(tool.name))] };
   });
 }
 
@@ -410,6 +477,14 @@ export function resolveDeferredTool(
   if (!entry) return null;
   const args = withSchemaTypes(parsed.data.arguments, entry.inputSchema);
   return { ...params, namespace: entry.namespace, tool: entry.tool, arguments: args };
+}
+
+export function deferredNullValueError(resolved: DynamicToolCallParams, provider: AgentProviderId): string | null {
+  const name = `${resolved.namespace}.${resolved.tool}`;
+  const entry = catalogEntry(catalogFor(provider), name);
+  if (!entry || !isRecord(resolved.arguments)) return null;
+  const paths = nullStructuredItemPaths(resolved.arguments, entry.inputSchema);
+  return paths.length === 0 ? null : sourceText("error.agent.toolCallNullValue", { name, paths: paths.join(", ") });
 }
 
 export function deferredCall(

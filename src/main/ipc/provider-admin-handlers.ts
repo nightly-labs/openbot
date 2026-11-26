@@ -39,6 +39,11 @@ import {
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import {
+  decodeLiveVoiceAccount,
+  LIVE_VOICE_ACCOUNT_CAPABILITY,
+  LIVE_VOICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/live-voice-account-v1";
+import {
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-code-v1";
@@ -68,6 +73,7 @@ import {
   PROVIDER_HOST_SIGN_IN_ERROR_LIMIT,
   PROVIDER_HOST_SIGN_IN_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
+import { providerSignInRelay } from "@openbot/contracts/team-protocol/provider-sign-in-relays";
 import {
   PROVIDER_SIGN_OUT_CAPABILITY,
   PROVIDER_SIGN_OUT_ROUTES,
@@ -89,17 +95,13 @@ import {
 import { PROVIDERS_V4_CAPABILITY, PROVIDERS_V4_ROUTES } from "@openbot/contracts/team-protocol/providers-v4";
 import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
-import {
-  SIGN_IN_RELAY_CAPABILITY,
-  SIGN_IN_RELAY_PROVIDERS,
-  SIGN_IN_RELAY_ROUTES,
-} from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Cause, Effect, Exit, Fiber } from "effect";
 import { normalizePastedCode } from "../../backend/agent/cli-code-login";
 import { AgentLifecycleFailed, type AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { CustomProviderChanges, PeerCustomProviderChanges } from "../custom-provider-changes";
+import type { LocalSignInPages } from "../local-sign-in-pages";
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import {
@@ -129,6 +131,7 @@ import {
   parseRemoveProviderAccountInput,
   parseRenameProviderAccountInput,
   parseResetProviderUsageInput,
+  parseSetLiveVoiceAccountInput,
   parseSetProviderAccountPoolInput,
   signInCodexWithApiKey,
 } from "./provider-handlers";
@@ -168,6 +171,7 @@ interface ProviderAdminIpcDependencies {
   customProviders: PeerCustomProviderChanges & Pick<CustomProviderChanges, "update">;
   remoteServers: ProviderAdminRemoteServers;
   relay: Pick<SignInRelayClient, "run" | "page" | "open" | "paste">;
+  signInPages: Pick<LocalSignInPages, "paste">;
 }
 
 interface RelayedSignIn {
@@ -184,6 +188,7 @@ export function providerAdminIpcHandlers({
   customProviders,
   remoteServers,
   relay,
+  signInPages,
 }: ProviderAdminIpcDependencies): Pick<IpcGroupHandlers, "providerAdmin"> {
   function remote<T>(serverId: string, path: string, body: unknown, decoder: ResponseDecoder<T>): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, PROVIDERS_ADMIN_CAPABILITY))
@@ -297,12 +302,10 @@ export function providerAdminIpcHandlers({
       local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
       remote: run,
     });
-  function requireRelay(serverId: string, provider: AgentProviderId): void {
-    if (
-      !remoteServers.supportsCapability(serverId, SIGN_IN_RELAY_CAPABILITY) ||
-      !SIGN_IN_RELAY_PROVIDERS.some((candidate) => candidate === provider)
-    )
-      throw new Error(sourceText("error.team.providersUnsupported"));
+  function requireRelay(serverId: string, provider: AgentProviderId): string {
+    const match = providerSignInRelay(provider, (capability) => remoteServers.supportsCapability(serverId, capability));
+    if (!match) throw new Error(sourceText("error.team.providersUnsupported"));
+    return match.relay.start;
   }
   async function startRelay(serverId: string, provider: AgentProviderId, path: string, body: unknown): Promise<void> {
     const key = relayKey(serverId, provider);
@@ -347,7 +350,7 @@ export function providerAdminIpcHandlers({
   return {
     providerAdmin: {
       startCodeLogin: scopedHandler(parseProviderId, {
-        local: (provider) => runCauseEffect(service.startProviderCodeLogin(provider)),
+        local: (provider) => runCauseEffect(service.startProviderCodeLogin(provider, true)),
         remote: (provider, serverId) =>
           remote(serverId, signInRoutes(serverId, provider).codeLoginStart, { provider }, decodeProviderCodeLoginStart),
       }),
@@ -406,11 +409,23 @@ export function providerAdminIpcHandlers({
                 })
                 .pipe(Effect.orElseSucceed(() => null))
             : Effect.succeed(null);
+          const liveVoice = remoteServers.supportsCapability(serverId, LIVE_VOICE_ACCOUNT_CAPABILITY)
+            ? remoteServers
+                .request(serverId, LIVE_VOICE_ACCOUNT_ROUTES.settings, decodeLiveVoiceAccount, {
+                  method: "POST",
+                  body: {},
+                })
+                .pipe(
+                  Effect.map((accountId) => ({ accountId })),
+                  Effect.orElseSucceed(() => null),
+                )
+            : Effect.succeed(null);
           return runCauseEffect(
-            Effect.all([list, models, pools], { concurrency: "unbounded" }).pipe(
-              Effect.map(([accounts, extra, pooled]) => {
+            Effect.all([list, models, pools, liveVoice], { concurrency: "unbounded" }).pipe(
+              Effect.map(([accounts, extra, pooled, voice]) => {
                 const withModels = extra ? withHostProviderAccountModels(accounts, extra) : accounts;
-                return pooled ? { ...withModels, pools: pooled } : withModels;
+                const withPools = pooled ? { ...withModels, pools: pooled } : withModels;
+                return voice ? { ...withPools, liveVoiceAccount: voice.accountId } : withPools;
               }),
             ),
           );
@@ -485,6 +500,19 @@ export function providerAdminIpcHandlers({
           );
         },
       }),
+      setLiveVoiceAccount: scopedHandler(parseSetLiveVoiceAccountInput, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, LIVE_VOICE_ACCOUNT_CAPABILITY))
+            throw new Error(sourceText("error.team.providersUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, LIVE_VOICE_ACCOUNT_ROUTES.update, acceptEmpty, {
+              method: "POST",
+              body: input,
+            }),
+          );
+        },
+      }),
       hostDefaultProvider: scopedQueryHandler({
         local: () => Promise.reject(new Error(sourceText("error.team.providerDefaultUnsupported"))),
         remote: (serverId) => hostDefaultProvider(serverId, PROVIDER_DEFAULT_ROUTES.settings, {}),
@@ -530,8 +558,7 @@ export function providerAdminIpcHandlers({
         },
       }),
       startRelaySignIn: relaySignIn(parseProviderId, (provider, serverId) => {
-        requireRelay(serverId, provider);
-        return startRelay(serverId, provider, SIGN_IN_RELAY_ROUTES.providerStart, { provider });
+        return startRelay(serverId, provider, requireRelay(serverId, provider), { provider });
       }),
       startAccountRelaySignIn: relaySignIn(parseConnectProviderAccountInput, ({ provider, accountId }, serverId) => {
         const accountRelay = providerAccountRelay((capability) =>
@@ -548,9 +575,10 @@ export function providerAdminIpcHandlers({
         return { page: running.result ? null : relay.page(key), result: running.result };
       }),
       openRelaySignIn: relaySignIn(parseProviderId, (provider, serverId) => relay.open(relayKey(serverId, provider))),
-      pasteRelaySignIn: relaySignIn(parsePasteRelaySignInInput, ({ provider, address }, serverId) =>
-        relay.paste(relayKey(serverId, provider), address),
-      ),
+      pasteRelaySignIn: scopedHandler(parsePasteRelaySignInInput, {
+        local: ({ provider, address }) => runCauseEffect(signInPages.paste(provider, address)),
+        remote: ({ provider, address }, serverId) => relay.paste(relayKey(serverId, provider), address),
+      }),
       cancelRelaySignIn: relaySignIn(parseProviderId, async (provider, serverId) => {
         await stopRelay(relayKey(serverId, provider));
         return runCauseEffect(readRemoteAgentStatus(remoteServers, serverId));

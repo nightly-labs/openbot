@@ -133,6 +133,7 @@ export const SUPPORTED_ATTACHMENT_DESCRIPTION =
   "images, MP3 audio, MOV or MP4 video, ZIP archives, PDF, Office documents, EML, text, Markdown, data, or source files";
 
 export const XLSX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+export const DOCX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 const SUPPORTED_EXTENSIONS = new Set<string>(ATTACHMENT_FILE_EXTENSIONS);
 const EXTENSIONLESS_TEXT_FILES = new Set(["dockerfile", "makefile", "procfile"]);
@@ -221,7 +222,7 @@ export function attachmentMimeTypeForName(name: string) {
     case "doc":
       return "application/msword";
     case "docx":
-      return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      return DOCX_MIME_TYPE;
     case "odt":
       return "application/vnd.oasis.opendocument.text";
     case "rtf":
@@ -261,4 +262,8 @@ export function playableMediaKind(mimeType: string): "audio" | "video" | null {
 
 export function isXlsxMimeType(mimeType: string): boolean {
   return mimeType === XLSX_MIME_TYPE;
+}
+
+export function isDocxMimeType(mimeType: string): boolean {
+  return mimeType === DOCX_MIME_TYPE;
 }

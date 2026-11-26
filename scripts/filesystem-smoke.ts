@@ -214,7 +214,12 @@ async function runFilesystemSmoke(provider: AgentProvider, completedProviders: A
 async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
   const workspaceRoot = join(temporaryRoot, `workspace-${provider}`);
   const outsideRoot = await mkdtemp(join(reportRoot, `outside-${provider}-`));
-  const agent = { access: "workspace", provider, workspacePath: workspaceRoot } as const;
+  const agent = {
+    id: `filesystem-smoke-${provider}`,
+    access: "workspace",
+    provider,
+    workspacePath: workspaceRoot,
+  } as const;
   const token = provider.toUpperCase();
   const paths = {
     workspace: join(workspaceRoot, "inside.txt"),

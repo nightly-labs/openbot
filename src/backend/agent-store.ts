@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { createReadStream } from "node:fs";
+import { type CopyOptions, createReadStream, promises as nodeFsPromises } from "node:fs";
 import {
   copyFile,
   cp,
@@ -10,11 +10,12 @@ import {
   readlink,
   realpath,
   rename,
-  rm,
   rmdir,
+  stat,
   symlink,
   writeFile,
 } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { avatarFileExtension, isAvatarMimeType, isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -74,7 +75,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Result, Semaphore, Stream } from "effect";
 import { ProfileCreationRecovery } from "./agent/profile-creation-recovery";
-import { isEmptyStoredFile, parseStoredJson, writeFileAtomically } from "./atomic-json-file";
+import { isEmptyStoredFile, isHeldTargetError, parseStoredJson, writeFileAtomically } from "./atomic-json-file";
 import { automationRoot } from "./automation-command";
 import type { AgentModelChange } from "./database/agent-roster";
 import { type OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
@@ -152,7 +153,45 @@ const CLAUDE_FAST_MODE_RESET_COMMAND_ID = "agent-fast-mode:claude-reset:v1";
 
 const logger = createOpenBotLogger("agent-store");
 
+const fsPromisesWithoutAsarArchives: typeof nodeFsPromises = process.versions.electron
+  ? createRequire(import.meta.url)("original-fs").promises
+  : nodeFsPromises;
+
+const { rm } = fsPromisesWithoutAsarArchives;
+
 const AGENT_FILES_REMOVAL = { recursive: true, force: true, maxRetries: 10, retryDelay: 150 } as const;
+
+const OWNER_FULL_ACCESS = 0o700;
+
+async function removeAgentFiles(path: string): Promise<void> {
+  try {
+    await rm(path, AGENT_FILES_REMOVAL);
+  } catch (error) {
+    if (process.platform === "win32" || !isPermissionRefusal(error)) throw error;
+    await grantOwnerFolderAccess(path).catch(() => {
+      throw error;
+    });
+    await rm(path, AGENT_FILES_REMOVAL);
+  }
+}
+
+function isPermissionRefusal(error: unknown): boolean {
+  return error instanceof Error && "code" in error && (error.code === "EACCES" || error.code === "EPERM");
+}
+
+async function grantOwnerFolderAccess(path: string): Promise<void> {
+  const entry = await fsPromisesWithoutAsarArchives.lstat(path).catch((error: unknown) => {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return null;
+    throw error;
+  });
+  if (!entry?.isDirectory()) return;
+  if ((entry.mode & OWNER_FULL_ACCESS) !== OWNER_FULL_ACCESS)
+    await fsPromisesWithoutAsarArchives.chmod(path, entry.mode | OWNER_FULL_ACCESS);
+  for (const child of await fsPromisesWithoutAsarArchives.readdir(path, { withFileTypes: true }))
+    if (child.isDirectory()) await grantOwnerFolderAccess(join(path, child.name));
+}
+
+const HELD_COPIED_FOLDER_WAITS_MS: readonly number[] = [10, 50, 100, 250, 500, 1000, 1000, 2000, 2000, 3000];
 
 export class AgentStore {
   readonly #statePath: string;
@@ -380,6 +419,7 @@ export class AgentStore {
             : folder,
         );
       record.computerUse = source.computerUse;
+      if (source.memory === false) record.memory = false;
       if (source.busyMessageMode) record.busyMessageMode = source.busyMessageMode;
       if (source.taskLimit !== undefined) record.taskLimit = source.taskLimit;
       if (source.backupModels) record.backupModels = structuredClone(source.backupModels);
@@ -397,6 +437,7 @@ export class AgentStore {
       const stagedAvatarDirectory = `${avatarDirectory}.openbot-stage`;
       const duplicationMarker = this.#duplicationMarkerPath(record.id);
       let stagedAvatarPath: string | null = null;
+      const windowsFolderLinks: string[] = [];
       {
         const attempt1 = yield* Effect.result(
           Effect.gen({ self: this }, function* () {
@@ -415,6 +456,7 @@ export class AgentStore {
                   errorOnExist: true,
                   force: false,
                   verbatimSymlinks: true,
+                  filter: skipFolderLinksOnWindows(source.workspacePath, windowsFolderLinks),
                 }),
               );
               if (sourceAvatar) {
@@ -438,12 +480,18 @@ export class AgentStore {
                 stagedWorkspace,
                 record.workspacePath,
               );
+              yield* copyFolderLinksEffect(
+                windowsFolderLinks,
+                source.workspacePath,
+                stagedWorkspace,
+                record.workspacePath,
+              );
               if (this.#state.agents.length >= INPUT_LIMITS.agents) {
                 throw new Error(sourceText("error.agent.hostLimit", { limit: INPUT_LIMITS.agents }));
               }
               record.name = duplicateAgentName(source.name, this.#state.agents);
-              yield* storedIO(() => rename(stagedWorkspace, record.workspacePath));
-              if (sourceAvatar) yield* storedIO(() => rename(stagedAvatarDirectory, avatarDirectory));
+              yield* renameCopiedFolderEffect(stagedWorkspace, record.workspacePath);
+              if (sourceAvatar) yield* renameCopiedFolderEffect(stagedAvatarDirectory, avatarDirectory);
               this.#state.agents.unshift(record);
               try {
                 this.#persist("agent.duplicated");
@@ -703,6 +751,11 @@ export class AgentStore {
         if (!isBoolean(input.allowNewChat)) throw new Error("Invalid new chat value.");
         next.allowNewChat = input.allowNewChat;
       }
+      if (input.memory !== undefined) {
+        if (!isBoolean(input.memory)) throw new Error("Invalid memory value.");
+        if (input.memory) delete next.memory;
+        else next.memory = false;
+      }
       if (input.quickAcknowledgement === null) delete next.quickAcknowledgement;
       else if (input.quickAcknowledgement !== undefined) {
         if (!isBoolean(input.quickAcknowledgement)) throw new Error("Invalid quick acknowledgement value.");
@@ -832,6 +885,7 @@ export class AgentStore {
       if (next.allowAutomation === undefined) delete agent.allowAutomation;
       if (next.allowNewChat === undefined) delete agent.allowNewChat;
       if (next.quickAcknowledgement === undefined) delete agent.quickAcknowledgement;
+      if (next.memory === undefined) delete agent.memory;
       if (next.ultrafast === undefined) delete agent.ultrafast;
       if (next.avatarColor === undefined) delete agent.avatarColor;
       if (next.chatColor === undefined) delete agent.chatColor;
@@ -852,6 +906,7 @@ export class AgentStore {
         if (previous.allowAutomation === undefined) delete agent.allowAutomation;
         if (previous.allowNewChat === undefined) delete agent.allowNewChat;
         if (previous.quickAcknowledgement === undefined) delete agent.quickAcknowledgement;
+        if (previous.memory === undefined) delete agent.memory;
         if (previous.ultrafast === undefined) delete agent.ultrafast;
         if (previous.avatarColor === undefined) delete agent.avatarColor;
         if (previous.chatColor === undefined) delete agent.chatColor;
@@ -974,7 +1029,7 @@ export class AgentStore {
         join(this.#agentsRoot, id),
         `${join(this.#agentsRoot, id)}.openbot-stage`,
       ]) {
-        yield* storedIO(() => rm(path, AGENT_FILES_REMOVAL));
+        yield* storedIO(() => removeAgentFiles(path));
       }
       yield* storedIO(() => rm(this.#duplicationMarkerPath(id), { force: true }));
       const legacyPaths = [join(this.#legacyAgentsRoot, id)];
@@ -982,7 +1037,7 @@ export class AgentStore {
       if (legacyId !== null) {
         legacyPaths.push(join(this.#avatarsRoot, legacyId), join(this.#legacyAgentsRoot, legacyId));
       }
-      for (const path of legacyPaths) yield* storedIO(() => rm(path, AGENT_FILES_REMOVAL));
+      for (const path of legacyPaths) yield* storedIO(() => removeAgentFiles(path));
       const remaining = this.#state.agents.filter((candidate) => candidate.id !== id);
       this.#database.hardDeleteAgent(`agents:hard-delete:${randomUUID()}`, id, agent?.threadId ?? null, remaining);
       this.#state.agents = remaining;
@@ -1383,6 +1438,10 @@ export class AgentStore {
     return this.#state.agents.some((agent) => agent.threadId === threadId);
   }
 
+  mainThreadAgentId(threadId: string): string | null {
+    return this.#state.agents.find((agent) => agent.threadId === threadId)?.id ?? null;
+  }
+
   activeProviderSession(id: string): ProviderSession | null {
     const agent = this.#requireAgent(id);
     if (!agent.threadId) return null;
@@ -1621,17 +1680,14 @@ const rewriteInternalWorkspaceSymlinksEffect = Effect.fn("AgentStore.rewriteWork
       const finalPath = join(finalDirectory, entry.name);
       if (entry.isSymbolicLink()) {
         const target = yield* storedIO(() => readlink(stagedPath));
-        const resolvedSourceTarget = resolve(dirname(sourcePath), target);
-        const resolved = yield* Effect.result(storedIO(() => realpath(resolvedSourceTarget)));
-        let sourceRelativePath: string;
-        if (Result.isSuccess(resolved)) {
-          if (!isPathInside(canonicalSourceRoot, resolved.success)) continue;
-          sourceRelativePath = relative(canonicalSourceRoot, resolved.success);
-        } else {
-          if (!isPathInside(sourceRoot, resolvedSourceTarget)) continue;
-          sourceRelativePath = relative(sourceRoot, resolvedSourceTarget);
-        }
-        const finalTarget = join(finalRoot, sourceRelativePath);
+        const finalTarget = yield* copiedInternalLinkTargetEffect(
+          canonicalSourceRoot,
+          sourceRoot,
+          finalRoot,
+          sourcePath,
+          target,
+        );
+        if (finalTarget === null) continue;
         const rewrittenTarget = isAbsolute(target) ? finalTarget : relative(dirname(finalPath), finalTarget) || ".";
         yield* storedIO(() => rm(stagedPath));
         yield* storedIO(() => symlink(rewrittenTarget, stagedPath));
@@ -1639,6 +1695,79 @@ const rewriteInternalWorkspaceSymlinksEffect = Effect.fn("AgentStore.rewriteWork
     }
   });
   yield* visit(stagedRoot, sourceRoot, finalRoot);
+});
+
+const copiedInternalLinkTargetEffect = Effect.fn("AgentStore.copiedInternalLinkTarget")(function* (
+  canonicalSourceRoot: string,
+  sourceRoot: string,
+  finalRoot: string,
+  sourcePath: string,
+  target: string,
+): Effect.fn.Return<string | null, StoredStateFailure> {
+  const resolvedSourceTarget = resolve(dirname(sourcePath), target);
+  const resolved = yield* Effect.result(storedIO(() => realpath(resolvedSourceTarget)));
+  if (Result.isSuccess(resolved)) {
+    if (!isPathInside(canonicalSourceRoot, resolved.success)) return null;
+    return join(finalRoot, relative(canonicalSourceRoot, resolved.success));
+  }
+  if (!isPathInside(sourceRoot, resolvedSourceTarget)) return null;
+  return join(finalRoot, relative(sourceRoot, resolvedSourceTarget));
+});
+
+function skipFolderLinksOnWindows(sourceRoot: string, skipped: string[]): CopyOptions["filter"] {
+  if (process.platform !== "win32") return undefined;
+  return async (path) => {
+    if (path === sourceRoot || !(await lstat(path)).isSymbolicLink()) return true;
+    const isFolder = await stat(path).then(
+      (stats) => stats.isDirectory(),
+      () => false,
+    );
+    if (isFolder) skipped.push(path);
+    return !isFolder;
+  };
+}
+
+const copyFolderLinksEffect = Effect.fn("AgentStore.copyFolderLinks")(function* (
+  sourceLinks: readonly string[],
+  sourceRoot: string,
+  stagedRoot: string,
+  finalRoot: string,
+) {
+  if (sourceLinks.length === 0) return;
+  const canonicalSourceRoot = yield* storedIO(() => realpath(sourceRoot));
+  for (const sourcePath of sourceLinks) {
+    const linkPath = relative(sourceRoot, sourcePath);
+    const stagedPath = join(stagedRoot, linkPath);
+    const target = yield* storedIO(() => readlink(sourcePath));
+    const internalTarget = yield* copiedInternalLinkTargetEffect(
+      canonicalSourceRoot,
+      sourceRoot,
+      finalRoot,
+      sourcePath,
+      target,
+    );
+    const symlinkTarget =
+      internalTarget === null
+        ? target
+        : isAbsolute(target)
+          ? internalTarget
+          : relative(dirname(join(finalRoot, linkPath)), internalTarget) || ".";
+    const linked = yield* Effect.result(storedIO(() => symlink(symlinkTarget, stagedPath, "dir")));
+    if (Result.isSuccess(linked)) continue;
+    if (!isRecord(linked.failure.cause) || linked.failure.cause.code !== "EPERM") return yield* linked.failure;
+    const junctionTarget = internalTarget ?? resolve(dirname(sourcePath), target);
+    yield* storedIO(() => symlink(junctionTarget, stagedPath, "junction"));
+  }
+});
+
+const renameCopiedFolderEffect = Effect.fn("AgentStore.renameCopiedFolder")(function* (from: string, to: string) {
+  for (let attempt = 0; ; attempt += 1) {
+    const renamed = yield* Effect.result(storedIO(() => rename(from, to)));
+    if (Result.isSuccess(renamed)) return;
+    const wait = HELD_COPIED_FOLDER_WAITS_MS[attempt];
+    if (wait === undefined || !isHeldTargetError(renamed.failure.cause)) return yield* renamed.failure;
+    yield* Effect.sleep(wait);
+  }
 });
 
 const workspaceMetadataFingerprintEffect = Effect.fn("AgentStore.workspaceFingerprint")(function* (root: string) {
@@ -1780,6 +1909,7 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
     (record.allowAutomation === undefined || isBoolean(record.allowAutomation)) &&
     (record.allowNewChat === undefined || isBoolean(record.allowNewChat)) &&
     (record.quickAcknowledgement === undefined || isBoolean(record.quickAcknowledgement)) &&
+    (record.memory === undefined || record.memory === false) &&
     (record.ownBrowserSession === undefined || isBoolean(record.ownBrowserSession)) &&
     (record.browserProfileId === undefined || isBrowserProfileId(record.browserProfileId)) &&
     (record.fastMode === undefined || isBoolean(record.fastMode)) &&
@@ -1853,6 +1983,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     value.quickAcknowledgement === undefined || isBoolean(value.quickAcknowledgement)
       ? value.quickAcknowledgement
       : reset("quickAcknowledgement", undefined);
+  const memory = value.memory === undefined || value.memory === false ? value.memory : reset("memory", undefined);
   const ownBrowserSession =
     value.ownBrowserSession === undefined || isBoolean(value.ownBrowserSession)
       ? value.ownBrowserSession
@@ -1948,6 +2079,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     ...(allowAutomation === undefined ? {} : { allowAutomation }),
     ...(allowNewChat === undefined ? {} : { allowNewChat }),
     ...(quickAcknowledgement === undefined ? {} : { quickAcknowledgement }),
+    ...(memory === undefined ? {} : { memory }),
     ...(ownBrowserSession === undefined ? {} : { ownBrowserSession }),
     ...(browserProfileId === undefined ? {} : { browserProfileId }),
     ...(fastMode === undefined ? {} : { fastMode }),

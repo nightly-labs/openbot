@@ -37,9 +37,11 @@ export const messages = {
   "status.messaging.signInUnknown":
     "この Slack のインストールは OpenBot が開始したものではありません。OpenBot でもう一度開始してください。",
   "status.messaging.telegramNoAgent":
-    "ここで回答できるエージェントはまだいません。OpenBot で Telegram Orchestrator を追加してください。",
+    "ここで回答できるエージェントはまだいません。OpenBot で マーケットプレイス > アプリ > Telegram を開き、エージェントを追加 をクリックしてください。",
   "status.messaging.telegramLinked":
     "OpenBot はこのチャットに接続されています。エージェントに依頼するには、{bot} をメンションするか、OpenBot のメッセージに返信してください。",
+  "status.messaging.telegramNotLinked":
+    "OpenBot はこのチャットに接続されていません。接続するには、OpenBot アプリを開き、マーケットプレイス → アプリ → Telegram で「グループに追加」または「ダイレクトチャットを開く」を選択してください。",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Telegram で回答し、チームに依頼します",
   "status.messaging.whatsappNoAgent":
@@ -58,6 +60,9 @@ export const messages = {
     "この WhatsApp 番号には別の OpenBot もリンクされているため、回答が 2 件届くことがあります。直すには、スマートフォンの WhatsApp で「リンク済みデバイス」を開き、使っていない OpenBot をログアウトしてください。",
   "status.messaging.whatsappPaused":
     "短時間にメッセージが多すぎたため、OpenBot はここで 10 分間応答を止めています。この番号に別の OpenBot もリンクされている場合は、スマートフォンの WhatsApp で「リンク済みデバイス」を開き、使っていない OpenBot をログアウトしてください。",
+  "status.messaging.whatsappNotDelivered": "WhatsApp がこの回答を受け付けなかったため、相手には届いていません。",
+  "status.messaging.whatsappPartlyDelivered":
+    "WhatsApp がこの回答の一部を受け付けなかったため、相手には一部しか届いていません。",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "WhatsApp で回答し、チームに依頼します",
 } as const satisfies PartialTranslation<typeof source>;

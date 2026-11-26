@@ -66,6 +66,8 @@ export const messages = {
   "files.library.agents": "에이전트",
   "files.library.allAgents": { other: "에이전트 {count}개 모두" },
   "files.library.folders": "폴더",
+  "files.library.workflows": "워크플로",
+  "files.library.workflowsOf": "{name}의 워크플로",
   "files.library.favorite": "{name} 즐겨찾기",
   "files.folder.new": "새 폴더",
   "files.folder.name": "폴더 이름",
@@ -191,6 +193,8 @@ export const messages = {
   "files.conversation.title": "파일",
   "files.conversation.summary": "{files} · 채팅 {size}",
   "files.conversation.close": "파일 닫기",
+  "files.conversation.workspace": "워크스페이스 폴더",
+  "files.conversation.workspaces": "워크스페이스 폴더",
   "files.conversation.emptyTitle": "이 채팅에 파일이 없어요",
   "files.conversation.emptyDescription": "첨부한 파일과 에이전트가 만든 파일이 여기에 표시돼요.",
 } as const satisfies PartialTranslation<typeof source>;

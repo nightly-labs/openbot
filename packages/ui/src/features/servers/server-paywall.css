@@ -1,0 +1,265 @@
+.server-paywall {
+  --server-paywall-glow: var(--openbot-price-accent);
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  place-items: center;
+  overflow-y: auto;
+  background: var(--openbot-bg-canvas);
+  color: var(--openbot-text-primary);
+}
+
+.server-paywall-success {
+  --server-paywall-glow: var(--openbot-success-text);
+}
+
+.server-paywall::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: radial-gradient(
+    40% 32% at 50% 38%,
+    color-mix(in srgb, var(--server-paywall-glow) 12%, var(--openbot-transparent)),
+    var(--openbot-transparent) 70%
+  );
+  content: "";
+  pointer-events: none;
+  transition: background var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.server-paywall-shell {
+  display: flex;
+  width: min(100%, 760px);
+  flex-direction: column;
+  align-items: center;
+  padding: 52px 24px;
+}
+
+.server-paywall-panel {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.server-paywall-panel h1 {
+  max-width: 620px;
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-display);
+  font-weight: var(--openbot-weight-medium);
+  letter-spacing: -0.045em;
+  line-height: 1.12;
+}
+
+.server-paywall-description {
+  max-width: 560px;
+  margin: 10px 0 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-lg);
+  line-height: 1.45;
+}
+
+.server-paywall-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--openbot-space-2);
+  margin-top: var(--openbot-space-8);
+}
+
+.server-paywall-alert {
+  width: min(100%, 680px);
+  margin-top: var(--openbot-space-4);
+  text-align: start;
+}
+
+.server-paywall-crew {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--openbot-space-3);
+  margin-bottom: var(--openbot-space-8);
+}
+
+.server-paywall-avatar {
+  width: 52px;
+  height: 52px;
+  flex: none;
+  animation: server-paywall-rise var(--openbot-duration-overlay) var(--openbot-ease-out) both;
+}
+
+.server-paywall-avatar:nth-child(1),
+.server-paywall-avatar:nth-child(7) {
+  width: 40px;
+  height: 40px;
+  transform: translateY(24px);
+}
+
+.server-paywall-avatar:nth-child(2),
+.server-paywall-avatar:nth-child(6) {
+  transform: translateY(8px);
+}
+
+.server-paywall-avatar:nth-child(3),
+.server-paywall-avatar:nth-child(5) {
+  width: 68px;
+  height: 68px;
+}
+
+.server-paywall-crew-cheer .server-paywall-avatar {
+  animation:
+    server-paywall-rise var(--openbot-duration-overlay) var(--openbot-ease-out) both,
+    server-paywall-hop 560ms var(--openbot-ease-out) calc(var(--server-paywall-hop-step, 0) * 70ms) 2;
+}
+
+.server-paywall-crew-cheer .server-paywall-avatar:nth-child(3),
+.server-paywall-crew-cheer .server-paywall-avatar:nth-child(5) {
+  --server-paywall-hop-step: 1;
+}
+
+.server-paywall-crew-cheer .server-paywall-avatar:nth-child(2),
+.server-paywall-crew-cheer .server-paywall-avatar:nth-child(6) {
+  --server-paywall-hop-step: 2;
+}
+
+.server-paywall-crew-cheer .server-paywall-avatar:nth-child(1),
+.server-paywall-crew-cheer .server-paywall-avatar:nth-child(7) {
+  --server-paywall-hop-step: 3;
+}
+
+.server-paywall-subscribe {
+  min-width: 220px;
+}
+
+.server-paywall-strip {
+  width: min(100%, 680px);
+  margin-top: var(--openbot-space-8);
+  padding: var(--openbot-space-6);
+  text-align: start;
+}
+
+.server-paywall-plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+}
+
+.server-paywall-plan-name {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-0-5);
+}
+
+.server-paywall-plan-name span {
+  color: var(--openbot-price-accent);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.server-paywall-strip .server-paywall-plan-name h2 {
+  margin: 0;
+  font-size: var(--openbot-text-2xl);
+}
+
+.server-paywall-plan ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+}
+
+.server-paywall-plan li {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.server-paywall-plan li > svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--openbot-price-accent);
+}
+
+.server-paywall-details {
+  flex-basis: 100%;
+}
+
+.server-paywall-consent {
+  width: min(100%, 680px);
+  margin-top: var(--openbot-space-4);
+  padding-inline: var(--openbot-space-6);
+  font-size: var(--openbot-text-sm);
+  text-align: start;
+}
+
+.server-paywall-buy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--openbot-space-3);
+  margin-inline-start: auto;
+}
+
+.server-paywall-strip .server-paywall-price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--openbot-space-1-5);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.server-paywall-price strong {
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-3xl);
+  font-weight: var(--openbot-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.server-paywall-price span {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+}
+
+.server-paywall .ui-button > svg {
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes server-paywall-rise {
+  from {
+    opacity: 0;
+    translate: 0 16px;
+  }
+}
+
+@keyframes server-paywall-hop {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+
+  40% {
+    translate: 0 -16px;
+  }
+
+  70% {
+    translate: 0 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .server-paywall-avatar,
+  .server-paywall-crew-cheer .server-paywall-avatar {
+    animation: none;
+  }
+}

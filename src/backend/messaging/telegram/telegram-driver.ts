@@ -115,6 +115,14 @@ class TelegramAdapter implements MessagingAdapter {
       message_id: Number(messageId),
       ...this.#content(body),
     }).pipe(Effect.catch((failure) => (notModified(failure) ? Effect.void : Effect.fail(failure))));
+    return messageId;
+  });
+
+  readonly remove = Effect.fnUntraced(function* (this: TelegramAdapter, target: MessageTarget, messageId: string) {
+    yield* this.#call("deleteMessage", {
+      chat_id: this.#chatNumber(target),
+      message_id: Number(messageId),
+    });
   });
 
   postPrivate(target: MessageTarget, _userId: string, text: string): Effect.Effect<void, MessagingAdapterError> {
@@ -164,11 +172,7 @@ class TelegramAdapter implements MessagingAdapter {
     }
     if (firstId === null) {
       firstId = yield* this.#answerPart(first, (text) => this.#postText(target, text));
-      if (replaceMessageId)
-        yield* this.#call("deleteMessage", {
-          chat_id: this.#chatNumber(target),
-          message_id: Number(replaceMessageId),
-        }).pipe(Effect.catch(() => Effect.void));
+      if (replaceMessageId) yield* this.remove(target, replaceMessageId).pipe(Effect.catch(() => Effect.void));
     }
     for (const chunk of rest) yield* this.#answerPart(chunk, (text) => this.#postText(target, text));
     return firstId;

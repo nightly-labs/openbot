@@ -669,6 +669,23 @@ async function main(): Promise<void> {
     measurements.crashedScriptMs = Date.now() - crashStarted;
     assert(measurements.crashedScriptMs < 15_000, "A crashed script waited for its deadline.");
     recordCases("crashed-script-stops");
+
+    const toolCrashStarted = Date.now();
+    const pendingEvaluate = call("evaluate", {
+      tabId: crashing.tab.id,
+      expression: "new Promise((resolve) => { window.fixtureEvaluate = resolve; })",
+      awaitPromise: true,
+    });
+    await crashing.contents.executeJavaScript(
+      "new Promise((resolve) => { const ready = () => (window.fixtureEvaluate ? resolve() : requestAnimationFrame(ready)); ready(); })",
+    );
+    crashing.contents.forcefullyCrashRenderer();
+    const crashedEvaluate = await pendingEvaluate;
+    measurements.crashedToolMs = Date.now() - toolCrashStarted;
+    assert.equal(crashedEvaluate.success, false, "A tool call on a crashed page did not fail.");
+    assert(text(crashedEvaluate).includes("The page crashed"), text(crashedEvaluate));
+    assert(measurements.crashedToolMs < 15_000, "A tool call on a crashed page waited for its deadline.");
+    recordCases("crashed-tool-call-stops");
     await close(crashing.tab.id);
 
     phase("tab-sleep");
@@ -691,6 +708,7 @@ async function main(): Promise<void> {
       assert(contents, `Missing contents of sleep tab ${index}.`);
       loaded.push(contents);
     }
+    await runCauseEffect(sleepy.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
     const [first, second, ...newest] = loaded;
     assert(first && second, "Missing sleep tabs.");
     await unloaded(first);

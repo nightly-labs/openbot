@@ -2,14 +2,15 @@ import { Alert, AlertContent, AlertDescription, AlertTitle, ArrowLeft, Button, T
 import { CloseIcon, PlusIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { useText } from "@openbot/ui/text";
 import { clamp, holdFlag } from "@openbot/ui/utils";
-import { createEffect, createSignal, flush, onCleanup, onSettled, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, flush, onCleanup, onSettled, Show } from "solid-js";
 import { BrowserAddressRow } from "./BrowserAddressRow";
-import BrowserLiveView from "./BrowserLiveView";
+import { BrowserHttpSignInPopover } from "./BrowserHttpSignInPopover";
+import BrowserLiveView, { browserPageSite } from "./BrowserLiveView";
 import { BrowserTabStrip } from "./BrowserTabStrip";
 import { BrowserTabSwitcher } from "./BrowserTabSwitcher";
 import { BrowserTeachBar } from "./BrowserTeachBar";
 import type { BrowserFullViewProps } from "./browser-full-view-types";
-import { BrowserPageCover } from "./browser-page-cover";
+import { BrowserPageCover, menuCoversPage } from "./browser-page-cover";
 import { type BrowserViewCommand, browserAriaShortcut, browserViewCommand } from "./browser-view-shortcuts";
 
 export type { BrowserFullViewProps } from "./browser-full-view-types";
@@ -29,10 +30,20 @@ function createNarrow() {
 
 export default function BrowserFullView(props: BrowserFullViewProps) {
   const { t, sourceText } = useText();
-  onCleanup(holdFlag(document.body, "browser-full-view"));
+  if (!props.pane) onCleanup(holdFlag(document.body, "browser-full-view"));
   const narrow = createNarrow();
   const [dismissedPopupFailures, setDismissedPopupFailures] = createSignal<ReadonlySet<string>>(new Set());
   const popupFailure = () => props.activeTab?.popupFailure;
+  const [httpSignInAnswering, setHttpSignInAnswering] = createSignal<string | undefined>(undefined);
+  const [httpSignInUsername, setHttpSignInUsername] = createSignal({ key: "", value: "" });
+  const httpSignInKey = () => {
+    const tab = props.activeTab;
+    if (!props.onHttpSignIn || !tab) return undefined;
+    if (tab.httpSignIn) return `${tab.id}\n${tab.httpSignIn.origin}`;
+    const answering = httpSignInAnswering();
+    return answering?.startsWith(`${tab.id}\n`) ? answering : undefined;
+  };
+  const httpSignInSite = (origin: string) => (URL.canParse(origin) ? new URL(origin).host : origin);
   const [frameSize, setFrameSize] = createSignal<{ width: number; height: number } | undefined>(undefined, {
     equals: (previous, next) => previous?.width === next?.width && previous?.height === next?.height,
   });
@@ -57,29 +68,46 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
       });
   };
 
-  createEffect(
-    () => props.open,
-    (open) => {
-      setSettled(false);
-      if (!open) return;
-      let disposed = false;
-      onSettled(() => {
-        hideButton?.focus();
-        const animations = view?.getAnimations() ?? [];
-        const settle = () => {
-          if (!disposed) setSettled(true);
-        };
-        if (animations.length === 0) settle();
-        else void Promise.all(animations.map((animation) => animation.finished)).then(settle, () => undefined);
-      });
-      return () => {
-        disposed = true;
+  const viewOpen = createMemo(() => props.open);
+  createEffect(viewOpen, (open) => {
+    setSettled(false);
+    if (!open) return;
+    let disposed = false;
+    onSettled(() => {
+      hideButton?.focus();
+      const animations = view?.getAnimations() ?? [];
+      const settle = () => {
+        if (!disposed) setSettled(true);
       };
+      if (animations.length === 0) settle();
+      else void Promise.all(animations.map((animation) => animation.finished)).then(settle, () => undefined);
+    });
+    return () => {
+      disposed = true;
+    };
+  });
+
+  const [overlapped, setOverlapped] = createSignal(false);
+  createEffect(
+    () => props.coveringMenus ?? [],
+    (menus) => {
+      if (menus.length === 0) {
+        setOverlapped(false);
+        return;
+      }
+      let frame = 0;
+      const measure = () => {
+        const surface = surfaceElement;
+        setOverlapped(surface !== undefined && menus.some((menu) => menuCoversPage(surface, menu)));
+        frame = requestAnimationFrame(measure);
+      };
+      measure();
+      return () => cancelAnimationFrame(frame);
     },
   );
 
   createEffect(
-    () => props.open && settled() && covers().size === 0,
+    () => viewOpen() && settled() && covers().size === 0 && !overlapped(),
     (shown) => props.onSurface(shown ? surfaceElement : undefined),
   );
 
@@ -167,9 +195,11 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
       onClick={props.onBack}
     >
       <ArrowLeft aria-hidden="true" />
-      {t("browser.backToChat")}
+      {props.detached ? t("browser.pip.reattachTitle") : t("browser.backToChat")}
     </Button>
   );
+
+  const fullViewIdentity = () => (props.pane ? {} : { id: "browser-expanded-panel" });
 
   return (
     <Tabs.Root
@@ -178,11 +208,12 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
       hidden={!props.open}
       aria-hidden={props.open ? undefined : "true"}
       inert={!props.open}
-      id="browser-expanded-panel"
+      {...fullViewIdentity()}
       class={[
         "browser-full-view",
         {
           "browser-full-view-mac-controls": props.macWindowControls === true,
+          "browser-pane-view": props.pane === true,
         },
       ]}
       style={
@@ -194,33 +225,35 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
       value={props.activeTab?.id ?? "__empty"}
       activationMode="automatic"
     >
-      <div class="browser-full-top window-drag">
-        <BrowserPageCover value={cover}>
-          <Show
-            when={narrow()}
-            fallback={
-              <>
-                <BrowserTabStrip view={props} onNewTab={newTab} onClose={closeTabs} />
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  class="no-drag"
-                  aria-label={t("browser.newTab")}
-                  aria-keyshortcuts={browserAriaShortcut("newTab", props.shortcuts)}
-                  title={t("browser.newTab")}
-                  onClick={() => newTab()}
-                >
-                  <PlusIcon />
-                </Button>
-              </>
-            }
-          >
-            <BrowserTabSwitcher view={props} onNewTab={() => newTab()} onClose={closeTabs} />
-          </Show>
-        </BrowserPageCover>
-        <div class="browser-full-top-spacer" />
-        {hideBrowserButton()}
-      </div>
+      <Show when={!props.pane}>
+        <div class="browser-full-top window-drag">
+          <BrowserPageCover value={cover}>
+            <Show
+              when={narrow()}
+              fallback={
+                <>
+                  <BrowserTabStrip view={props} onNewTab={newTab} onClose={closeTabs} />
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    class="no-drag"
+                    aria-label={t("browser.newTab")}
+                    aria-keyshortcuts={browserAriaShortcut("newTab", props.shortcuts)}
+                    title={t("browser.newTab")}
+                    onClick={() => newTab()}
+                  >
+                    <PlusIcon />
+                  </Button>
+                </>
+              }
+            >
+              <BrowserTabSwitcher view={props} onNewTab={() => newTab()} onClose={closeTabs} />
+            </Show>
+          </BrowserPageCover>
+          <div class="browser-full-top-spacer" />
+          {hideBrowserButton()}
+        </div>
+      </Show>
       <div class="browser-full-card">
         <Tabs.Content
           forceMount
@@ -236,6 +269,31 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
               ref={(element) => {
                 address = element;
               }}
+              popover={
+                <Show when={httpSignInKey()} keyed>
+                  {(key) => {
+                    const [tabId = "", origin = ""] = key.split("\n");
+                    const answer = async (value: { username: string; password: string } | null) => {
+                      if (value) setHttpSignInAnswering(key);
+                      try {
+                        await props.onHttpSignIn?.(tabId, value);
+                      } finally {
+                        if (value) setHttpSignInAnswering((current) => (current === key ? undefined : current));
+                      }
+                    };
+                    return (
+                      <BrowserHttpSignInPopover
+                        site={httpSignInSite(origin)}
+                        refused={props.activeTab?.httpSignIn?.refused === true}
+                        username={httpSignInUsername().key === key ? httpSignInUsername().value : ""}
+                        onUsernameChange={(value) => setHttpSignInUsername({ key, value })}
+                        onSubmit={(username, password) => answer({ username, password })}
+                        onCancel={() => answer(null)}
+                      />
+                    );
+                  }}
+                </Show>
+              }
             />
           </BrowserPageCover>
           <Show when={popupFailure() && !dismissedPopupFailures().has(popupFailure()?.id ?? "")}>
@@ -283,6 +341,7 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
                   tabId={tabId()}
                   active={props.open}
                   clipboard={props.liveViewClipboard}
+                  site={browserPageSite(props.tabs.find((entry) => entry.id === tabId())?.url)}
                   onFrameSize={setFrameSize}
                 />
               )}

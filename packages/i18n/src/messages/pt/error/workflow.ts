@@ -6,11 +6,15 @@ export const messages = {
   "error.workflow.versionMissing": "Esta versão do fluxo de trabalho não existe mais.",
   "error.workflow.annotation": "Textos, notas e formas não podem ter conexões.",
   "error.workflow.port": "Uma etapa não pode receber este tipo de entrada.",
+  "error.workflow.unknownValue":
+    "Este OpenBot não conhece uma configuração de uma etapa. Atualize o OpenBot e tente novamente.",
   "error.workflow.branch": "Somente uma condição pode ter conexões de sim e não.",
   "error.workflow.conditionBranch": "Cada conexão de uma condição deve ser sim ou não.",
   "error.workflow.duplicateEdge": "Estas duas etapas já têm esta conexão.",
   "error.workflow.serverTooOld":
     "Este servidor não oferece suporte a fluxos de trabalho. Atualize o OpenBot no computador que o executa.",
+  "error.workflow.newerSteps":
+    "Este fluxo de trabalho tem etapas de uma versão mais recente do OpenBot. Atualize o OpenBot para alterá-lo.",
   "error.workflow.nodeUnsupported":
     "Esta versão do OpenBot ainda não pode executar etapas de imagem, arquivo e mensagem.",
   "error.workflow.interrupted": "O OpenBot parou enquanto esta etapa era executada. Execute-a novamente.",
@@ -19,6 +23,17 @@ export const messages = {
   "error.workflow.agentStepEnded": "A mensagem ao agente foi removida antes da resposta.",
   "error.workflow.agentStepStopped": "O agente parou antes de responder a esta etapa. Execute a etapa novamente.",
   "error.workflow.conditionUnclear": "O modelo não respondeu sim ou não.",
+  "error.workflow.answerInvalid":
+    "A resposta não tinha os campos que esta etapa pede: {fields}. Execute a etapa novamente.",
+  "error.workflow.answerSetup":
+    "Os campos de resposta deste fluxo de trabalho têm um problema aqui: {fields}. Corrija o fluxo de trabalho e execute a etapa novamente.",
+  "error.workflow.answerSourceEnded":
+    "Estes campos não têm valor, porque a etapa que os fornece não terminou: {fields}. Execute essa etapa novamente primeiro.",
+  "error.workflow.runInputInvalid":
+    "A entrada da execução não corresponde aos campos de resposta do gatilho: {fields}. Envie um objeto JSON com estes campos.",
+  "error.workflow.sourceNotDone":
+    "Uma etapa anterior falhou ou foi parada na última vez que foi executada. Execute essa etapa novamente primeiro.",
+  "error.workflow.checkInvalid": "A verificação desta etapa não é válida. Corrija-a e execute a etapa novamente.",
   "error.workflow.modelFailed": "O modelo não conseguiu responder. Execute a etapa novamente.",
   "error.workflow.modelTimedOut":
     "O modelo não respondeu a tempo. Escolha um esforço menor ou um modelo mais rápido para esta etapa e execute-a novamente.",
@@ -32,8 +47,20 @@ export const messages = {
   "error.workflow.providerBusy": "O provedor está ocupado. Aguarde alguns minutos e execute a etapa novamente.",
   "error.workflow.providerOffline":
     "O OpenBot não conseguiu acessar o provedor. Verifique a conexão com a internet e execute a etapa novamente.",
+  "error.workflow.providerBilling":
+    "A conta não tem crédito, ou o plano dela não inclui este modelo. Verifique o plano ou escolha outro modelo.",
+  "error.workflow.modelRefused": "O provedor não permite este modelo para esta conta. Escolha outro modelo.",
+  "error.workflow.modelRefusedReason":
+    'Escolha outro modelo. O provedor não permite este modelo para esta conta: "{reason}"',
+  "error.workflow.contentBlocked":
+    "O provedor bloqueou a entrada. Altere a entrada ou o prompt e execute a etapa novamente.",
+  "error.workflow.inputTooLong": "A entrada é longa demais para este modelo. Encurte-a ou escolha outro modelo.",
+  "error.workflow.requestRefused": "O provedor não aceitou esta etapa. Escolha outro modelo.",
+  "error.workflow.requestRefusedReason": 'Escolha outro modelo. O provedor não aceitou esta etapa: "{reason}"',
+  "error.workflow.providerRefused": 'Escolha outro modelo ou execute a etapa novamente. O provedor disse: "{reason}"',
   "error.workflow.modelBusy": "Outra solicitação ao modelo está em andamento. Execute a etapa novamente em breve.",
   "error.workflow.mediaFailed": "O modelo não conseguiu criar a imagem ou o vídeo. Execute a etapa novamente.",
+  "error.workflow.mediaNotMade": "O modelo não criou a imagem ou o vídeo. Ele respondeu: {answer}",
   "error.workflow.pictureMissing": "A imagem não está mais no servidor. Envie-a novamente.",
   "error.workflow.pictureType": "Use uma imagem PNG, JPEG ou WebP.",
   "error.workflow.mediaInputMissing":

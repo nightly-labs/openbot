@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { lstat, mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import type { AgentProviderId } from "@openbot/contracts/agent-providers";
+import { type AgentProviderId, MANAGED_SKILL_FOLDERS } from "@openbot/contracts/agent-providers";
 import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_IMPORT_LIMITS,
@@ -74,6 +74,7 @@ import {
   isEventRoutineTriggerInput,
   type SaveEventRoutineInput,
 } from "@openbot/contracts/ipc-events";
+import { withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
 import { isDynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { INSTANCE_TRANSFER_REMOTE_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { sourceText } from "@openbot/i18n/source";
@@ -147,7 +148,7 @@ import {
 import { exportWorkflows, importWorkflows, type TransferWorkflowPort } from "./instance-transfer-workflows";
 import { parseAvatarImage } from "./ipc/avatar-inputs";
 import { parseHostIdentity } from "./ipc/server-inputs";
-import { MANAGED_SKILL_FOLDERS, OWNERSHIP_MARKER } from "./managed-skill-service";
+import { OWNERSHIP_MARKER } from "./managed-skill-service";
 import { readPackFolders } from "./skill-marketplace-service";
 import { isUnsafeArchivePath, normalizedFiles } from "./skill-package";
 
@@ -221,8 +222,14 @@ interface InstanceTransferAgents extends TransferPreferenceAgents, TransferHisto
   deleteChannel(channelId: string): Effect.Effect<void, unknown>;
 }
 
+interface ListedMcpServer {
+  name: string;
+  url: string;
+}
+
 interface InstanceTransferSettings {
   mcpServers(): McpServerConfig[];
+  listedMcpServers?(): readonly ListedMcpServer[];
   saveMcpServer(config: McpServerConfig): Effect.Effect<unknown, unknown>;
   customProviders(): CustomProviderSummary[];
   saveCustomProvider(input: SaveCustomProviderInput): Effect.Effect<unknown, unknown>;
@@ -594,7 +601,7 @@ export class InstanceTransferService {
       version: INSTANCE_TRANSFER_VERSION,
       source: { appVersion: this.options.appVersion, exportedAt: this.#now().toISOString() },
       agents: manifestAgents,
-      settings: input.includeSettings ? yield* this.#readSettings(keys, channelKeys, manifestAgents) : null,
+      settings: input.includeSettings ? yield* this.#readSettings(keys, channelKeys, manifestAgents, warnings) : null,
       ...(sharedSkills.skills.length > 0 ? { sharedSkills: sharedSkills.skills } : {}),
       shared,
       signedIn: this.options.settings.signedInProviders(),
@@ -640,6 +647,7 @@ export class InstanceTransferService {
     keys: ReadonlyMap<string, string>,
     channelKeys: ReadonlyMap<string, string>,
     agents: readonly TransferAgent[],
+    warnings: string[],
   ): Effect.fn.Return<TransferSettings, ArchiveOperationError> {
     const settings = this.options.settings;
     const layout = settings.sidebar();
@@ -656,6 +664,7 @@ export class InstanceTransferService {
       for (const link of yield* settings.routineFlowLinks(agentId).pipe(Effect.mapError(failure)))
         links.set(link.id, link);
     const redact = createRedaction();
+    const listed = settings.listedMcpServers?.() ?? [];
     const positions: NonNullable<TransferSettings["routineFlowPositions"]>[number][] = [];
     if (settings.routineFlowPositions)
       for (const [agentId, agentKey] of keys)
@@ -666,7 +675,12 @@ export class InstanceTransferService {
           if (nodeKey) positions.push({ agentKey, nodeKey, x: position.x, y: position.y });
         }
     const workflows = settings.workflows
-      ? exportWorkflows(yield* settings.workflows.workflows().pipe(Effect.mapError(failure)), keys, channelKeys)
+      ? exportWorkflows(
+          yield* settings.workflows.workflows().pipe(Effect.mapError(failure)),
+          keys,
+          channelKeys,
+          warnings,
+        )
       : [];
     const order = [
       ...layout.agentOrder,
@@ -677,7 +691,7 @@ export class InstanceTransferService {
         ...server,
         id: "",
         args: redact.args(server.name, server.args),
-        url: redact.origin(server.name, server.url),
+        url: isListedMcpUrl(server.url, listed) ? server.url : redact.origin(server.name, server.url),
         env: server.env.map(({ key }) => ({ key, value: "" })),
         headers: server.headers.map(({ key }) => ({ key, value: "" })),
       })),
@@ -1332,10 +1346,16 @@ export class InstanceTransferService {
     }
 
     const servers = new Set(port.mcpServers().map((server) => server.name.toLowerCase()));
+    const listed = port.listedMcpServers?.() ?? [];
     for (const server of settings.mcpServers) {
       if (servers.has(server.name.toLowerCase())) continue;
-      const saved = yield* attempt(named(server.name), port.saveMcpServer({ ...server, id: "", enabled: false }));
-      if (saved) warnings.push(sourceText("error.import.transferMcpValues", { name: server.name }));
+      const url = cleared.has(server.name) ? (listedUrlOfOrigin(server, listed) ?? server.url) : server.url;
+      const saved = yield* attempt(named(server.name), port.saveMcpServer({ ...server, url, id: "", enabled: false }));
+      if (!saved) continue;
+      const app = server.transport === "http" && isListedMcpUrl(url, listed);
+      warnings.push(
+        sourceText(app ? "error.import.transferMcpSignIn" : "error.import.transferMcpValues", { name: server.name }),
+      );
     }
   });
 
@@ -1945,6 +1965,25 @@ export function createRedaction() {
     },
     cleared: () => [...names],
   };
+}
+
+function isListedMcpUrl(url: string, listed: readonly ListedMcpServer[]): boolean {
+  const address = withoutMcpAccountFragment(url);
+  return address !== "" && listed.some((server) => server.url === address);
+}
+
+function listedUrlOfOrigin(server: McpServerConfig, listed: readonly ListedMcpServer[]): string | null {
+  if (server.transport !== "http") return null;
+  return (
+    listed.find((entry) => {
+      if (entry.name !== server.name) return false;
+      try {
+        return new URL(entry.url).origin === server.url;
+      } catch {
+        return false;
+      }
+    })?.url ?? null
+  );
 }
 
 function named(name: string): (reason: string) => string {

@@ -5,7 +5,8 @@ import { defaultProviderModel, PICKER_PROVIDERS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentProvider } from "../agent-client";
 import { DEFAULT_AGENT_PROVIDER } from "../agent-store";
-import { providerCanRun } from "./model-tools";
+import { AgentSettingsRefused } from "./agent-settings-refused";
+import { providerCanRun, providerNotReadyText } from "./model-tools";
 import { providerLabel } from "./thread-items";
 
 export interface ProviderPreference {
@@ -35,21 +36,22 @@ export function modelUnavailableError(
   provider: AgentProvider | undefined,
   models: readonly AgentModelOption[],
   providers: readonly AgentProviderStatus[],
-): Error {
-  if (provider === undefined) return new Error(sourceText("error.agent.modelUnavailable"));
+): AgentSettingsRefused {
+  if (provider === undefined) return new AgentSettingsRefused(sourceText("error.agent.modelUnavailable"));
   const customAgentId = provider === "acp" ? customAgentIdOfModel(model) : null;
   const name = customAgentId ?? providerLabel(provider);
   const row = providers.find((candidate) => candidate.id === provider);
   if (row?.state !== "available") {
-    return new Error(sourceText("error.agent.modelProviderNotConnected", { model, provider: name }));
+    return new AgentSettingsRefused(providerNotReadyText(model, name, row));
   }
   const listed = models.some(
     (candidate) =>
       candidate.provider === provider &&
       (customAgentId === null || customAgentIdOfModel(candidate.id) === customAgentId),
   );
-  if (listed) return new Error(sourceText("error.agent.modelNotInProviderList", { model, provider: name }));
-  return new Error(
+  if (listed)
+    return new AgentSettingsRefused(sourceText("error.agent.modelNotInProviderList", { model, provider: name }));
+  return new AgentSettingsRefused(
     row.lastError
       ? sourceText("error.agent.modelListEmpty", { model, provider: name, detail: row.lastError })
       : sourceText("error.agent.modelListEmptyNoError", { model, provider: name }),
@@ -110,6 +112,22 @@ export function startingChoice(
     if (model) return { provider, model };
   }
   return null;
+}
+
+export function runnableStartingChoice(
+  models: AgentModelOption[],
+  preference: ProviderPreference,
+  providers: readonly AgentProviderStatus[],
+  context: { developmentDefaults: boolean; providerAvailable: (provider: AgentProvider) => boolean },
+): ModelChoice | null {
+  const starting = startingChoice(models, preference, context);
+  if (!starting || providerCanRun(starting.provider, providers)) return starting;
+  for (const provider of PICKER_PROVIDERS) {
+    if (provider === starting.provider || !context.providerAvailable(provider)) continue;
+    const model = startingModel(provider, models, preference);
+    if (model) return { provider, model };
+  }
+  return starting;
 }
 
 export function workflowProvider(

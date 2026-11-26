@@ -1,12 +1,15 @@
+import { chatVisualItemType } from "@openbot/contracts/chat-visual";
 import type {
   AgentApproval,
   AgentDockAction,
   AgentDockApproval,
   AgentDockChannel,
+  AgentDockExtent,
   AgentDockPresentation,
   AgentDockSeatRef as AgentDockSeatContract,
   AgentRuntimeApproval,
 } from "@openbot/contracts/ipc";
+import { AGENT_DOCK_LIMITS, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import {
   AgentDock,
@@ -19,10 +22,11 @@ import {
   agentDockBody,
   agentDockSeatKey,
 } from "@openbot/ui/features/agent-dock/AgentDock";
+import { DRAFT_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
-import { windowShape } from "../../window-shape";
+import { windowExtent, windowShape } from "../../window-shape";
 import {
   AGENT_DOCK_STRIP_FEEL,
   AGENT_DOCK_STRIP_REST,
@@ -34,8 +38,52 @@ import { createAgentDockVoice } from "./agent-dock-voice";
 
 const TUCK_DELAY_MS = 900;
 const EDGE_STRIP = 4;
-const SHAPED_WINDOW = currentDevicePlatform() === "linux";
-const POINTER_ZONE_WINDOW = currentDevicePlatform() === "win32";
+const SHAPED_WINDOW = currentDevicePlatform() === "linux" || currentDevicePlatform() === "win32";
+const FITTED_WINDOW = currentDevicePlatform() === "darwin";
+const POINTER_ZONE_WHILE_MOVING = currentDevicePlatform() === "win32";
+const WIDEN_WAIT_MS = 250;
+const EXTENT_SETTLE_MS = 700;
+const EXTENT_SLACK = 4;
+const EXTENT_SIDES = ["inward", "above", "below"] as const;
+
+function extentChange(
+  current: AgentDockExtent | null | undefined,
+  next: AgentDockExtent | null,
+): "keep" | "grow" | "shrink" {
+  if (current === undefined) return "grow";
+  if (current === null) return next === null ? "keep" : "shrink";
+  if (next === null || EXTENT_SIDES.some((side) => next[side] > current[side])) return "grow";
+  return EXTENT_SIDES.every((side) => current[side] - next[side] <= EXTENT_SLACK) ? "keep" : "shrink";
+}
+
+function grownExtent(current: AgentDockExtent | null | undefined, next: AgentDockExtent | null) {
+  if (!current || !next) return next;
+  return {
+    inward: Math.max(current.inward, next.inward),
+    above: Math.max(current.above, next.above),
+    below: Math.max(current.below, next.below),
+  };
+}
+
+function nextGrowth(): Promise<void> {
+  return new Promise((resolve) => {
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    const done = () => {
+      window.removeEventListener("resize", resized);
+      clearTimeout(timer);
+      resolve();
+    };
+    const resized = () => {
+      const grew = window.innerWidth > width || window.innerHeight > height;
+      width = window.innerWidth;
+      height = window.innerHeight;
+      if (grew) done();
+    };
+    const timer = setTimeout(done, WIDEN_WAIT_MS);
+    window.addEventListener("resize", resized);
+  });
+}
 
 export function AgentDockSurface() {
   const { t, errorMessage } = useText();
@@ -53,6 +101,8 @@ export function AgentDockSurface() {
   let received = false;
   let chatOpen = false;
   let pointerIn = false;
+  let menuWanted = false;
+  let widening: Promise<void> | null = null;
   let dragging = false;
   let shelfShown = false;
   let autoHide = false;
@@ -62,7 +112,9 @@ export function AgentDockSurface() {
   let sent: { interactive: boolean; keyboard: boolean } | null = null;
   let dockShape: readonly AgentDockShapeRect[] | null = null;
   let sentShape = "";
-  let failed: { seatKey: string; text: string; clientMessageId: string } | null = null;
+  let sentExtent: AgentDockExtent | null | undefined;
+  let shrinkTimer: ReturnType<typeof setTimeout> | undefined;
+  let failed: { seatKey: string; taskId: string | undefined; text: string; clientMessageId: string } | null = null;
 
   const apply = (next: AgentDockPresentation | null) => {
     received = true;
@@ -107,37 +159,75 @@ export function AgentDockSurface() {
   const stripOn = () => (presentation()?.autoHide ?? false) && (presentation()?.edgeStrip ?? false);
   const asks = createMemo(() => (presentation()?.seats ?? []).some((seat) => seat.state?.kind === "waiting"));
 
+  function tuckedStrip(body: DOMRect | undefined, reach: number): AgentDockShapeRect {
+    const width = body ? AGENT_DOCK_STRIP_WIDTH + reach : EDGE_STRIP;
+    const x = presentation()?.edge === "left" ? 0 : window.innerWidth - width;
+    if (!body) {
+      return {
+        x,
+        y: window.innerHeight / 2 - AGENT_DOCK_LIMITS.inputExtent,
+        width,
+        height: AGENT_DOCK_LIMITS.inputExtent * 2,
+      };
+    }
+    return {
+      x,
+      y: Math.round(body.top + (body.height * (1 - AGENT_DOCK_STRIP_REST)) / 2) - reach,
+      width,
+      height: Math.round(body.height * AGENT_DOCK_STRIP_REST) + reach * 2,
+    };
+  }
+
+  const fitted = () => sentExtent !== undefined && sentExtent !== null;
+  const stopShrink = () => {
+    clearTimeout(shrinkTimer);
+    shrinkTimer = undefined;
+  };
+
+  function syncExtent(settled = false) {
+    const body = isTucked && edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
+    if (menuOpen()) menuWanted = false;
+    const extent =
+      dockShape === null || chatOpen || menuWanted || menuOpen() || (pointerIn && !fitted())
+        ? null
+        : windowExtent(
+            isTucked ? [...dockShape, tuckedStrip(body, AGENT_DOCK_STRIP_FEEL)] : dockShape,
+            presentation()?.edge ?? "right",
+          );
+    const change = extentChange(sentExtent, extent);
+    if (change === "keep") return stopShrink();
+    if (change === "shrink" && !settled) {
+      shrinkTimer ??= setTimeout(() => {
+        shrinkTimer = undefined;
+        syncExtent(true);
+      }, EXTENT_SETTLE_MS);
+      return;
+    }
+    stopShrink();
+    const next = change === "grow" ? grownExtent(sentExtent, extent) : extent;
+    if (next === null && fitted()) {
+      const resized = nextGrowth();
+      widening = resized;
+      void resized.then(() => {
+        if (widening === resized) widening = null;
+      });
+    }
+    sentExtent = next;
+    void agentDockPort()
+      .agentDock.setExtent(next)
+      .catch(() => undefined);
+  }
+
   function syncShape() {
-    if (!SHAPED_WINDOW && !POINTER_ZONE_WINDOW) return;
+    if (FITTED_WINDOW) syncExtent();
+    if (!SHAPED_WINDOW) return;
     const whole = { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
     const parts = dockShape === null || menuOpen() ? [whole] : [...dockShape];
     if (isTucked) {
       const body = edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
-      const width = body ? AGENT_DOCK_STRIP_WIDTH : EDGE_STRIP;
-      const x = presentation()?.edge === "left" ? 0 : window.innerWidth - width;
-      const rest = POINTER_ZONE_WINDOW ? 1 : AGENT_DOCK_STRIP_REST;
-      parts.push(
-        body
-          ? {
-              x,
-              y: Math.round(body.top + (body.height * (1 - rest)) / 2),
-              width,
-              height: Math.round(body.height * rest),
-            }
-          : { x, y: 0, width, height: window.innerHeight },
-      );
+      parts.push(tuckedStrip(body, 0));
     }
-    const feel = AGENT_DOCK_STRIP_FEEL;
-    const shape = windowShape(
-      POINTER_ZONE_WINDOW
-        ? parts.map((part) => ({
-            x: part.x - feel,
-            y: part.y - feel,
-            width: part.width + feel * 2,
-            height: part.height + feel * 2,
-          }))
-        : parts,
-    );
+    const shape = POINTER_ZONE_WHILE_MOVING && dockShape === null && !menuOpen() ? [] : windowShape(parts);
     const key = JSON.stringify(shape);
     if (key === sentShape) return;
     sentShape = key;
@@ -148,6 +238,7 @@ export function AgentDockSurface() {
 
   const sync = () => {
     updateTuck();
+    if (FITTED_WINDOW) syncExtent();
     const next = { interactive: pointerIn, keyboard: chatOpen || menuOpen() };
     if (next.interactive === sent?.interactive && next.keyboard === sent.keyboard) return;
     sent = next;
@@ -177,11 +268,48 @@ export function AgentDockSurface() {
         target !== document.documentElement &&
         target !== document.body &&
         target.id !== "root";
+      if (event.type === "mousemove" && !pointerIn) menuWanted = false;
       sync();
     };
     const onLeave = () => {
       pointerIn = false;
+      menuWanted = false;
       sync();
+    };
+    const onContextMenu = (event: MouseEvent) => {
+      const target = event.target;
+      if (!FITTED_WINDOW || !event.isTrusted || !(target instanceof Element)) return;
+      if (fitted()) {
+        menuWanted = true;
+        syncExtent();
+      }
+      const resized = widening;
+      if (!resized) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const before = agentDockBody()?.getBoundingClientRect();
+      void resized.then(() => {
+        if (!target.isConnected) return;
+        const after = agentDockBody()?.getBoundingClientRect();
+        target.dispatchEvent(
+          new MouseEvent("contextmenu", {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            view: window,
+            button: event.button,
+            buttons: event.buttons,
+            screenX: event.screenX,
+            screenY: event.screenY,
+            clientX: event.clientX + (before && after ? after.left - before.left : 0),
+            clientY: event.clientY + (before && after ? after.top - before.top : 0),
+            ctrlKey: event.ctrlKey,
+            shiftKey: event.shiftKey,
+            altKey: event.altKey,
+            metaKey: event.metaKey,
+          }),
+        );
+      });
     };
     const onBlur = () => setBlurRequest((value) => value + 1);
     const menus = new MutationObserver(() => {
@@ -192,6 +320,7 @@ export function AgentDockSurface() {
     document.addEventListener("mouseover", onPointer);
     document.addEventListener("mousemove", onPointer);
     document.documentElement.addEventListener("mouseleave", onLeave);
+    window.addEventListener("contextmenu", onContextMenu, true);
     window.addEventListener("blur", onBlur);
     return () => {
       unsubscribe();
@@ -200,8 +329,10 @@ export function AgentDockSurface() {
       document.removeEventListener("mouseover", onPointer);
       document.removeEventListener("mousemove", onPointer);
       document.documentElement.removeEventListener("mouseleave", onLeave);
+      window.removeEventListener("contextmenu", onContextMenu, true);
       window.removeEventListener("blur", onBlur);
       stopTuckTimer();
+      stopShrink();
     };
   });
 
@@ -241,9 +372,17 @@ export function AgentDockSurface() {
           body: message.body,
           time: "",
           attachments: message.attachments,
+          ...(message.visual ? { itemType: chatVisualItemType() } : {}),
         }),
       );
       bySeat.set(agentDockSeatKey(chat.seat), {
+        thread: chat.thread ?? null,
+        threads: chat.threads
+          ? {
+              activeId: chat.threads.activeId,
+              threads: chat.threads.threads.map((thread) => ({ ...thread, kind: "side" as const })),
+            }
+          : null,
         messages,
         working: chat.working,
         wait: chat.wait,
@@ -300,6 +439,14 @@ export function AgentDockSurface() {
       });
       return true;
     },
+    takeoverDone: ({ request }) => server === LOCAL_SERVER_ID || request.reason !== "sign-in-blocked",
+    openTakeover: ({ request }) =>
+      void perform({
+        type: "open-browser-takeover",
+        serverId: server,
+        agentId: request.agentId,
+        tabId: request.tabId,
+      }).catch(() => undefined),
     secret: (_takeover, input) => agentDockPort().agent.respondToBrowserSecret(input, server),
     usageLimitSend: async (limit, option, remember) => {
       await perform({
@@ -339,7 +486,7 @@ export function AgentDockSurface() {
             side={presentation()?.edge ?? "right"}
             tucked={tucked()}
             onShapeChange={
-              SHAPED_WINDOW || POINTER_ZONE_WINDOW
+              SHAPED_WINDOW || FITTED_WINDOW
                 ? (parts) => {
                     dockShape = parts;
                     syncShape();
@@ -376,17 +523,33 @@ export function AgentDockSurface() {
             }}
             onSend={async (seat, text) => {
               const seatKey = agentDockSeatKey(seat);
+              const shown = presentation()?.chats.find((chat) => agentDockSeatKey(chat.seat) === seatKey);
+              const draft = seat.kind === "agent" && shown?.threads?.activeId === DRAFT_THREAD_ID;
+              const taskId = draft ? DRAFT_THREAD_ID : shown?.thread?.taskId;
               const clientMessageId =
-                failed && failed.seatKey === seatKey && failed.text === text
+                failed && failed.seatKey === seatKey && failed.taskId === taskId && failed.text === text
                   ? failed.clientMessageId
                   : crypto.randomUUID();
               try {
-                await perform({ type: "send", serverId: server, seat: contractSeat(seat), text, clientMessageId });
+                await perform(
+                  draft
+                    ? { type: "start-thread", serverId: server, agentId: seat.id, text, clientMessageId }
+                    : {
+                        type: "send",
+                        serverId: server,
+                        seat: contractSeat(seat),
+                        ...(taskId ? { taskId } : {}),
+                        text,
+                        clientMessageId,
+                      },
+                );
                 failed = null;
                 return { messageId: clientMessageId };
               } catch (error) {
-                failed = { seatKey, text, clientMessageId };
-                return { error: errorMessage(error, t("chat.errorStatus.send")) };
+                failed = { seatKey, taskId, text, clientMessageId };
+                return {
+                  error: errorMessage(error, t(draft ? "conversation.threads.error.start" : "chat.errorStatus.send")),
+                };
               }
             }}
             onOpenInMain={(seat) =>
@@ -398,6 +561,12 @@ export function AgentDockSurface() {
             }
             onOpenWindow={(agentId) =>
               void perform({ type: "open-window", serverId: server, agentId }).catch(() => undefined)
+            }
+            onOpenThread={(seat, threadId) =>
+              void perform({ type: "open-thread", serverId: server, agentId: seat.id, threadId }).catch(() => undefined)
+            }
+            onNewThread={(seat) =>
+              void perform({ type: "new-thread", serverId: server, agentId: seat.id }).catch(() => undefined)
             }
             answers={answersFor(server)}
             agents={agents()}

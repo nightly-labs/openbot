@@ -1,5 +1,5 @@
 import type { AnalyticsModel } from "@openbot/contracts/ipc";
-import { agentProviderCliName, analyticsTokens, isAgentProvider } from "@openbot/contracts/ipc";
+import { agentProviderName, analyticsTokens, isAgentProvider } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { currentText, type TextValue } from "../../text";
 
@@ -41,7 +41,7 @@ export function usageCost(value: number | null, text: UsageText = currentText())
   if (value !== null && value > 0 && value < 1e-12)
     return `<${text.format.currencyUsd(1e-12, { minimumFractionDigits: 2, maximumFractionDigits: 12 })}`;
   return value === null
-    ? text.t("usage.unavailable")
+    ? text.t("usage.noCostEstimate")
     : text.format.currencyUsd(value, {
         minimumFractionDigits: 2,
         maximumFractionDigits: value > 0 && value < 0.01 ? Math.min(12, -Math.floor(Math.log10(value)) + 1) : 2,
@@ -49,11 +49,11 @@ export function usageCost(value: number | null, text: UsageText = currentText())
 }
 export function usageExactCost(value: number | null, text: UsageText = currentText()): string {
   return value === null
-    ? text.t("usage.unavailable")
+    ? text.t("usage.noCostEstimate")
     : text.t("usage.exactCost", { amount: text.format.number(value, { maximumFractionDigits: 12 }) });
 }
 export function usageProviderName(provider: string): string {
-  return isAgentProvider(provider) ? agentProviderCliName(provider) : provider;
+  return isAgentProvider(provider) ? agentProviderName(provider) : provider;
 }
 export function usageProviders(models: AnalyticsModel[]) {
   const providers = new Map<string, { provider: string; tokens: number; cost: number | null }>();

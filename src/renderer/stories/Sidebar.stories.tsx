@@ -165,6 +165,7 @@ const args: Parameters<typeof Sidebar>[0] = {
   onOpenSearch: fn(),
   onOpenMarketplace: fn(),
   onChatOrderChange: fn(),
+  onTabIdsChange: fn(),
 };
 
 function InteractiveSidebar(props: Parameters<typeof Sidebar>[0]) {
@@ -174,6 +175,7 @@ function InteractiveSidebar(props: Parameters<typeof Sidebar>[0]) {
   const [collapsedSectionIds, setCollapsedSectionIds] = createSignal(untrack(() => props.collapsedSectionIds));
   const [hiddenAgents, setHiddenAgents] = createSignal(untrack(() => props.userHiddenAgents ?? []));
   const [chatOrder, setChatOrder] = createSignal(untrack(() => props.chatOrder));
+  const [tabIds, setTabIds] = createSignal(untrack(() => props.tabIds));
   const [activeAgentId, setActiveAgentId] = createSignal(untrack(() => props.activeAgentId));
   const [readAgentIds, setReadAgentIds] = createSignal<ReadonlySet<string>>(new Set());
   const [mutedAgentIds, setMutedAgentIds] = createSignal<ReadonlySet<string>>(new Set());
@@ -222,6 +224,11 @@ function InteractiveSidebar(props: Parameters<typeof Sidebar>[0]) {
       onChatOrderChange={(order) => {
         setChatOrder(order);
         props.onChatOrderChange?.(order);
+      }}
+      tabIds={tabIds()}
+      onTabIdsChange={(next) => {
+        setTabIds(next);
+        props.onTabIdsChange?.(next);
       }}
       collapsedSectionIds={collapsedSectionIds()}
       pinnedItems={pinnedItems()}
@@ -313,7 +320,7 @@ export const ChatHistory: Story = {
 };
 
 export const MobileAppCard: Story = {
-  args: { footer: <SidebarMobileAppCard onOpenInstall={fn()} onDismiss={fn()} /> },
+  args: { footer: <SidebarMobileAppCard agents={STORY_AGENTS} onInstall={fn()} onDismiss={fn()} /> },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };
 
@@ -332,6 +339,7 @@ export const StorageLow: Story = {
         serverName="Acme HQ"
         freeBytes={1.1 * GB}
         totalBytes={12 * GB}
+        hostedPlan
         onFreeUpSpace={fn()}
         onDismiss={fn()}
       />
@@ -348,6 +356,24 @@ export const StorageFull: Story = {
         serverName="Acme HQ"
         freeBytes={0.14 * GB}
         totalBytes={12 * GB}
+        hostedPlan
+        onFreeUpSpace={fn()}
+        onDismiss={fn()}
+      />
+    ),
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+export const StorageThisComputer: Story = {
+  args: {
+    footer: (
+      <SidebarStorageCard
+        level="low"
+        serverName="OpenBot"
+        freeBytes={5_100_000_000}
+        totalBytes={245_000_000_000}
+        thisComputer
         onFreeUpSpace={fn()}
         onDismiss={fn()}
       />
@@ -626,6 +652,17 @@ export const FoldersClosed: Story = {
     pinnedItems: [],
     foldersSupported: true,
     collapsedSectionIds: [folderIds.acme, folderIds.internal],
+  },
+  decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
+};
+
+export const FolderTabs: Story = {
+  args: {
+    agents: folderAgents,
+    layout: folderLayout,
+    pinnedItems: [],
+    foldersSupported: true,
+    tabIds: ["unread", `folder:${folderIds.clients}`, `folder:${folderIds.internal}`, `folder:${folderIds.archive}`],
   },
   decorators: [(Story) => <div style={{ width: "280px", height: "100vh" }}>{Story()}</div>],
 };

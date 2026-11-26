@@ -93,6 +93,7 @@ async function step(name: string, run: () => Promise<unknown>): Promise<void> {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -286,6 +287,7 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
     interrupt: unused,
     forgetThread: () => Effect.void,
     ownChat: () => false,
+    appendSystemMessage: () => {},
     contextSession: () => null,
     progressUpdates: () => null,
   });
@@ -294,6 +296,7 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
     agents: {
       listAgents: () => agents.listAgents(),
       respondToApproval: (input) => agents.respondToApproval(input),
+      approvalExecutionThreadId: (requestId) => agents.approvalExecutionThreadId(requestId),
       onEvent: () => () => {},
       createAgentProfile: (input) => agents.createAgentProfile(input),
       createMemory: (input) => agents.createMemory(input),

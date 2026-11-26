@@ -334,6 +334,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Bu sağlayıcı için kullanılabilir model yok.",
   "mobile.agent.runtime.searchModels": "Modellerde ara",
   "mobile.agent.runtime.noMatches": "Aramanızla eşleşen model yok.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Aramanızla eşleşen model yok. openrouter.ai üzerindeki gizlilik, sağlayıcı ve koruma (guardrail) ayarlarınız bu listedeki bazı modelleri gizleyebilir.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     'Bu sağlayıcı Windows ve Linux\'ta "Yalnızca çalışma alanı" ile çalışmaz. Kullanmak için önce "İzinler"i değiştirin.',
   "mobile.agent.runtime.usageLimit": "Kullanım sınırına ulaşıldı",
@@ -387,11 +389,12 @@ export const messages = {
   "mobile.agent.backupModels.remove": "{model} modelini kaldır",
   "mobile.agent.backupModels.unavailable": "Şu an uygun değil · atlandı",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Bir kullanım sınırı {name} işe başladıktan sonra onu durdurursa, {name} aynı işe sıradaki ilk kullanılabilir modelle devam eder. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
   "mobile.agent.busyMessage.label": "Çalışırken",
   "mobile.agent.busyMessage.footer":
-    "Ajan çalışırken gönderdiğiniz bir mesajın ne olacağı. Kuyruk, mesajı tur bitene kadar tutar. Yönlendir, mesajı tur sırasında ajana verir.",
+    "Ajan çalışırken sizden veya başka bir ajandan gelen bir mesajın ne olacağı. Kuyruk, mesajı tur bitene kadar tutar. Yönlendir, mesajı tur sırasında ajana verir.",
   "mobile.agent.busyMessage.queue": "Kuyruk",
   "mobile.agent.busyMessage.steer": "Yönlendir",
   "mobile.agent.busyMessage.hostDefaultQueue": "Ana makine varsayılanı (Kuyruk)",
@@ -411,10 +414,15 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Profilleri yönet",
   "mobile.agent.browserProfile.footer":
     "Her profil kendi oturumlarını ve çerezlerini tutar. Bir değişiklik ajanın açık sekmelerini kapatır.",
+  "mobile.agent.browserProfile.movedNote":
+    "Sitelerdeki oturumlar eski profilde kalır. Ajanın bu sitelerde yeniden oturum açması gerekir.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot ajanın tarayıcı profilini değiştiremedi.",
   "mobile.agent.planCard.label": "Uzun görevlerden önce planı göster",
   "mobile.agent.planCard.footer":
     "Uzun bir görevden önce ajan planını gösterir. 10 sn sonra veya Başlat'a bastığınızda başlar.",
+  "mobile.agent.builtinMemory.label": "OpenBot belleği",
+  "mobile.agent.builtinMemory.footer":
+    "Ajan kendi belleklerini kaydeder ve okur. Yalnızca Mem0 gibi bir bellek uygulaması kullanmak için kapatın. Kayıtlı bellekler kalır.",
   "mobile.agent.workspace.title": "Çalışma alanı klasörü",
   "mobile.agent.workspace.footer": "Bu ajanın ana makinedeki klasörü.",
   "mobile.agent.advanced.behavior": "Davranış",
@@ -498,6 +506,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Bu ana makine uzak bir cihazdan ajan yayımlayamaz.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Önbellek okumaları hariç token'lar",
   "mobile.agent.usage.estimatedCost": "Tahmini maliyet",
+  "mobile.agent.usage.noCostEstimate": "Maliyet tahmini yok",
   "mobile.agent.usage.daily": "Günlük kullanım",
   "mobile.agent.usage.tokens": "Token'lar",
   "mobile.agent.usage.cost": "Maliyet",
@@ -532,6 +541,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Toplama başlangıcı: {started}. Güncellendi: {updated}.",
   "mobile.agent.usage.never": "hiçbir zaman",
   "mobile.agent.record.time": "Zaman",
+  "mobile.agent.record.date": "Tarih",
   "mobile.agent.section.changeFailed": "Klasör değiştirilemedi",
   "mobile.agent.section.tryAgain": "Lütfen tekrar deneyin.",
   "mobile.agent.section.moveUp": "Yukarı taşı",
@@ -617,13 +627,13 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Sunucularınız yüklenemedi",
   "mobile.agent.home.serversFailedBody": "Masaüstü uygulamasının çalıştığını kontrol edip tekrar deneyin.",
   "mobile.agent.home.noServers": "Kullanılabilir sunucu yok",
-  "mobile.agent.home.noServersBody": "Masaüstü uygulamasını tekrar bağlayın veya uzak bir sunucuya katılın.",
+  "mobile.agent.home.noServersBody":
+    "Bilgisayarınızda OpenBot'u bu hesapla açın ve Sunucu ayarları → Üyeler bölümünde “Bu sunucuyu yayımla” seçeneğini açın. Ya da uzak bir sunucuya katılın.",
   "mobile.agent.home.chooseServer": "Bir sunucu seçin",
   "mobile.agent.home.openServers": "Sunucuları aç",
   "mobile.agent.home.noChatOpen": "Açık sohbet yok",
   "mobile.agent.home.noChatOpenBody": "Listeden bir sohbet seçin.",
   "mobile.agent.home.chatListWidth": "Sohbet listesi genişliği",
-  "mobile.agent.home.serverTitle": "{name}, sunucuları aç",
   "mobile.agent.home.waiting": "Bağlantı bekleniyor",
   "mobile.agent.home.waitingBody": "Ajan listesi bu sunucu bağlandığında yüklenecektir.",
   "mobile.agent.home.noAgents": "Bu sunucuda ajan yok",
@@ -696,6 +706,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Hariç tutma",
   "mobile.agent.folders.browseTitle": "Klasör seç",
   "mobile.agent.folders.places": "Git",
+  "mobile.agent.folders.path": "Klasör yolu",
   "mobile.agent.folders.home": "Ana klasör",
   "mobile.agent.folders.parent": "Yukarı: {folder}",
   "mobile.agent.folders.browseFailed": "Bu klasör açılamadı.",

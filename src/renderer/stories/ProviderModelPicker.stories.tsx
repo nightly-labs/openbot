@@ -39,6 +39,18 @@ export const AllEffortLevels: Story = {
   },
 };
 
+export const LimitedEffort: Story = {
+  args: {
+    provider: "claude",
+    value: "claude-opus-5-5",
+    modelOptions: STORY_MODELS.map((model) =>
+      model.id === "claude-opus-5-5" ? { ...model, supportedReasoningEfforts: ["low", "medium"] } : model,
+    ),
+    reasoningEffort: "medium",
+    onReasoningEffortChange: fn(),
+  },
+};
+
 export const Ultrafast: Story = {
   args: {
     value: "gpt-5.6-sol",

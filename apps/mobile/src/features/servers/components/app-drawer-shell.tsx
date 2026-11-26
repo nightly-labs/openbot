@@ -78,7 +78,8 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
   const activeServerId = useMobileWorkspaceSelector((current) => current.activeServer.id);
   const servers = useMobileWorkspaceSelector((current) => current.servers);
   const localServerKind = useMobileWorkspaceSelector((current) => current.localServerKind);
-  const { leaveServer, removeServer, deleteLocalServer, reorderServers, selectServer } = useMobileWorkspaceActions();
+  const { leaveServer, removeServer, deleteLocalServer, setServerHidden, reorderServers, selectServer } =
+    useMobileWorkspaceActions();
   const [muted] = useThemeColor(["muted"]);
   const reducedMotion = useReducedMotion();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -357,6 +358,7 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
                 onLeave={leaveServer}
                 onRemove={removeServer}
                 onDelete={deleteLocalServer}
+                onSetHidden={setServerHidden}
                 localServerKind={localServerKind}
                 onReorder={reorderServers}
                 onSelectServer={selectServerAndClose}
@@ -381,7 +383,12 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
                 <Animated.View collapsable={false} className="flex-1" style={contentTouchStyle}>
                   {children}
                 </Animated.View>
-                <Animated.View className="absolute inset-0" style={scrimTouchStyle}>
+                <Animated.View
+                  className="absolute inset-0"
+                  style={scrimTouchStyle}
+                  accessibilityElementsHidden={!drawerOpen}
+                  importantForAccessibility={drawerOpen ? "auto" : "no-hide-descendants"}
+                >
                   {isAndroid ? null : (
                     <Animated.View className="absolute inset-0" pointerEvents="none" style={blurStyle}>
                       <BlurView intensity={5} style={{ flex: 1 }} tint="systemThickMaterial" />

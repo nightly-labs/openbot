@@ -5,6 +5,7 @@ export const messages = {
   "notification.needsInput": "Girdinize ihtiyaç duyuyor.",
   "notification.needsApproval": "Onayınıza ihtiyaç duyuyor.",
   "notification.needsBrowserStep": "Tarayıcıda bir adımı tamamlamanız gerekiyor.",
+  "notification.waitsForSignIn": "{provider} oturumunun açılmasını bekliyor.",
   "notification.needsApprovalFor": "Onayınıza ihtiyaç duyuyor: {action}",
   "notification.finished": "Çalışmayı tamamladı.",
   "notification.workflowApproval": "Bir adım onayınızı bekliyor.",

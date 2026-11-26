@@ -23,13 +23,15 @@ import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
 import X from "lucide-react-native/icons/x";
 import { type ReactNode, useEffect, useState } from "react";
-import { AccessibilityInfo, View } from "react-native";
-import { useCSSVariable } from "uniwind";
+import { AccessibilityInfo, StyleSheet, View } from "react-native";
+import { useCSSVariable, useUniwind } from "uniwind";
 import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
+import { copyToClipboard } from "@/features/chat/components/use-copy-message";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { storeCodePreview } from "@/features/chat/model/code-preview-store";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
+import { SettingsPicker } from "@/features/settings/components/settings-controls";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { useSecondsUntil } from "@/shared/lib/countdown";
 import { haptics } from "@/shared/lib/haptics";
@@ -61,6 +63,13 @@ export function confirmBlockOf(prompt: ConversationQuestionPrompt, uiBlock: Conv
   return spec?.type === "confirm" && prompt.questions[0]?.id === UI_CONFIRM_ACTION_QUESTION_ID ? spec : null;
 }
 
+export function formTitleOf(uiBlock: ConversationUiBlock | undefined, question: string | undefined): string | null {
+  const spec = uiBlock?.spec;
+  if (spec?.type !== "form") return null;
+  const title = spec.title.trim();
+  return title && title !== question?.trim() ? title : null;
+}
+
 export function choiceBlockOf(prompt: ConversationQuestionPrompt, uiBlock: ConversationUiBlock | undefined) {
   const spec = uiBlock?.spec;
   const question = prompt.questions[0];
@@ -81,6 +90,11 @@ export function QuestionText({ question, variant }: { question: string; variant:
       selectable={false}
     />
   );
+}
+
+export function QuestionDetail({ detail }: { detail: string }) {
+  const secondaryColor = useCSSVariable("--openbot-text-secondary");
+  return <ChatMarkdown body={detail} color={String(secondaryColor)} compact finished />;
 }
 
 export function PromptStatus({ controller, canSend }: { controller: QuestionPromptController; canSend: boolean }) {
@@ -140,41 +154,80 @@ function ConfirmPreview({ markdown, title }: { markdown: string; title: string }
           />
         </View>
       </View>
-      {cutOff ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="self-start px-0"
-          onPress={() => {
-            const previewId = storeCodePreview({ kind: "markdown", source: markdown, title });
-            router.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
-          }}
-        >
-          <Button.Label>{t("mobile.chat.question.showAllPreview")}</Button.Label>
-        </Button>
-      ) : null}
+      <View className="flex-row flex-wrap items-center gap-x-4">
+        {cutOff ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-0"
+            onPress={() => {
+              const previewId = storeCodePreview({ kind: "markdown", source: markdown, title });
+              router.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
+            }}
+          >
+            <Button.Label>{t("mobile.chat.question.showAllPreview")}</Button.Label>
+          </Button>
+        ) : null}
+        <CopyPreviewButton markdown={markdown} />
+      </View>
     </View>
   );
 }
 
-function FieldRow({ index, label, children }: { index: number; label: string; children: ReactNode }) {
+const COPIED_FEEDBACK_MS = 1_500;
+
+function CopyPreviewButton({ markdown }: { markdown: string }) {
+  const { t } = useText();
+  const [copiedText, setCopiedText] = useState<string | null>(null);
+  const copied = copiedText === markdown;
+  useEffect(() => {
+    if (copiedText === null) return;
+    const timer = setTimeout(() => setCopiedText(null), COPIED_FEEDBACK_MS);
+    return () => clearTimeout(timer);
+  }, [copiedText]);
+  async function copy() {
+    if (await copyToClipboard(markdown, "mobile.chat.question.copyPreviewFailed", t)) setCopiedText(markdown);
+  }
   return (
-    <View className="flex-row gap-3">
-      <View
-        className="h-6 w-6 items-center justify-center rounded-full bg-control"
-        style={{ borderCurve: "continuous" }}
-      >
-        <Typography type="body-xs" weight="medium" className="text-text-secondary">
-          {String(index + 1)}
-        </Typography>
-      </View>
-      <View className="min-w-0 flex-1 gap-0.5">
-        <Typography type="body-xs" weight="medium" className="text-text-secondary">
-          {label}
-        </Typography>
-        {children}
-      </View>
+    <Button variant="ghost" size="sm" className="px-0" onPress={() => void copy()}>
+      <Button.Label>{t(copied ? "common.copied" : "common.copy")}</Button.Label>
+    </Button>
+  );
+}
+
+function FieldRow({
+  label,
+  last,
+  compact,
+  children,
+}: {
+  label: string;
+  last: boolean;
+  compact: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <View
+      className={`min-h-11 flex-row items-center gap-3 py-1.5 ${last ? "" : "border-separator"}`}
+      style={last ? undefined : { borderBottomWidth: StyleSheet.hairlineWidth }}
+    >
+      <Typography type={compact ? "body-sm" : undefined} className="max-w-[50%] shrink">
+        {label}
+      </Typography>
+      <View className="min-w-0 flex-1 flex-row justify-end">{children}</View>
     </View>
+  );
+}
+
+function FieldValue({ value, compact }: { value: string; compact: boolean }) {
+  return (
+    <Typography
+      type={compact ? "body-sm" : undefined}
+      className="min-w-0 shrink text-right text-grouped-secondary"
+      numberOfLines={compact ? 2 : undefined}
+    >
+      {value}
+    </Typography>
   );
 }
 
@@ -186,6 +239,7 @@ export function ConfirmBody({
   disabled = false,
   closed = false,
   previewEditor,
+  titleAccessory,
 }: {
   spec: UiConfirmBlock;
   compact?: boolean;
@@ -194,50 +248,48 @@ export function ConfirmBody({
   selectValue: (field: Extract<UiConfirmField, { select: string }>) => string;
   onSelect?: (select: string, option: string) => void;
   disabled?: boolean;
+  titleAccessory?: ReactNode;
 }) {
+  const { theme } = useUniwind();
+  const fields = spec.fields ?? [];
   return (
-    <View className="gap-3">
-      <Typography weight="medium" className={spec.danger && !closed ? "text-danger-text" : undefined}>
-        {spec.title}
-      </Typography>
-      {(spec.fields?.length ?? 0) > 0 ? (
-        <View className="gap-2.5">
-          {spec.fields?.map((field, index) =>
-            "select" in field ? (
-              <FieldRow key={`select\n${field.select}`} index={index} label={field.label}>
+    <View className="gap-2">
+      <View className="flex-row items-start gap-2">
+        <Typography weight="medium" className={`min-w-0 flex-1 ${spec.danger && !closed ? "text-danger-text" : ""}`}>
+          {spec.title}
+        </Typography>
+        {titleAccessory}
+      </View>
+      {fields.length > 0 ? (
+        <View>
+          {fields.map((field, index) => {
+            const last = index === fields.length - 1;
+            if (!("select" in field))
+              return (
+                <FieldRow key={`${field.label}\n${field.value}`} label={field.label} last={last} compact={compact}>
+                  <FieldValue value={field.value} compact={compact} />
+                </FieldRow>
+              );
+            return (
+              <FieldRow key={`select\n${field.select}`} label={field.label} last={last} compact={compact}>
                 {onSelect && !compact ? (
-                  <View className="flex-row flex-wrap gap-1.5 pt-0.5">
-                    {field.options.map((option) => (
-                      <Button
-                        key={option}
-                        size="sm"
-                        variant={selectValue(field) === option ? "primary" : "tertiary"}
-                        className="rounded-full"
-                        isDisabled={disabled}
-                        accessibilityState={{ selected: selectValue(field) === option }}
-                        onPress={() => {
-                          void haptics.selection();
-                          onSelect(field.select, option);
-                        }}
-                      >
-                        <Button.Label>{option}</Button.Label>
-                      </Button>
-                    ))}
-                  </View>
+                  <SettingsPicker<string>
+                    value={selectValue(field)}
+                    options={field.options.map((option) => ({ value: option, label: option }))}
+                    enabled={!disabled}
+                    dark={theme === "dark"}
+                    label={field.label}
+                    onChange={(option) => {
+                      void haptics.selection();
+                      onSelect(field.select, option);
+                    }}
+                  />
                 ) : (
-                  <Typography type="body-sm" numberOfLines={compact ? 2 : undefined}>
-                    {selectValue(field)}
-                  </Typography>
+                  <FieldValue value={selectValue(field)} compact={compact} />
                 )}
               </FieldRow>
-            ) : (
-              <FieldRow key={`${field.label}\n${field.value}`} index={index} label={field.label}>
-                <Typography type="body-sm" numberOfLines={compact ? 2 : undefined}>
-                  {field.value}
-                </Typography>
-              </FieldRow>
-            ),
-          )}
+            );
+          })}
         </View>
       ) : null}
       {previewEditor ??
@@ -295,7 +347,11 @@ export function ChatConfirmPrompt({
   const secondsLeft = useSecondsUntil(autoAnswer?.at ? Date.parse(autoAnswer.at) : 0);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [confirming, setConfirming] = useState<UiAction>();
-  const [draft, setDraft] = useState<string>();
+  const [draft, setPreviewDraft] = useState<string>();
+  const setDraft = (text: string) => {
+    setPreviewDraft(text);
+    controller.setUnsentPreview(text.trim() && text !== spec.preview ? text : undefined);
+  };
   const blankDraft = draft !== undefined && !draft.trim();
   const opensEditor = (action: UiAction) =>
     canEditPreview && uiConfirmPreviewEditable(spec) && action.id === UI_CONFIRM_EDIT_ACTION_ID;
@@ -311,7 +367,7 @@ export function ChatConfirmPrompt({
     if (disabled || blankDraft) return;
     setConfirming(undefined);
     if (opensEditor(action)) {
-      setDraft(spec.preview);
+      setPreviewDraft(spec.preview);
       return;
     }
     const values: Record<string, string> = {};
@@ -322,122 +378,125 @@ export function ChatConfirmPrompt({
     void submit(uiConfirmAnswersWithPreview(spec, response, draft));
   }
 
+  const closeButton = autoAnswer ? null : (
+    <Button
+      variant="ghost"
+      size="sm"
+      isIconOnly
+      className="-my-1.5 -mr-2"
+      accessibilityLabel={t("mobile.chat.question.cancelForm")}
+      isDisabled={disabled}
+      onPress={() => void submit({})}
+    >
+      <X color={String(muted)} size={18} />
+    </Button>
+  );
+
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
       <View
-        className={`max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] ${card.fillClass} px-4 py-3`}
+        className={`w-full max-w-[92%] gap-3 self-start rounded-[20px] ${card.fillClass} px-4 py-3`}
         style={card.style}
       >
-        <View className="min-w-0 flex-1 pt-1">
-          <ConfirmBody
-            spec={spec}
-            selectValue={selectValue}
-            disabled={disabled}
-            onSelect={(select, option) => setSelected((current) => ({ ...current, [select]: option }))}
-            previewEditor={
-              draft === undefined ? undefined : (
-                <SheetFormField
-                  label={t("mobile.chat.question.preview")}
-                  hideLabel
-                  multiline
-                  tall
-                  autoFocus
-                  editable={!disabled}
-                  maxLength={UI_BLOCK_LIMITS.preview}
-                  value={draft}
-                  onChangeText={setDraft}
-                />
-              )
-            }
-          />
-        </View>
-        {autoAnswer ? null : (
-          <Button
-            variant="ghost"
-            size="sm"
-            isIconOnly
-            accessibilityLabel={t("mobile.chat.question.cancelForm")}
-            isDisabled={disabled}
-            onPress={() => void submit({})}
-          >
-            <X color={String(muted)} size={18} />
-          </Button>
+        <ConfirmBody
+          spec={spec}
+          selectValue={selectValue}
+          disabled={disabled}
+          titleAccessory={closeButton}
+          onSelect={(select, option) => setSelected((current) => ({ ...current, [select]: option }))}
+          previewEditor={
+            draft === undefined ? undefined : (
+              <SheetFormField
+                label={t("mobile.chat.question.preview")}
+                hideLabel
+                multiline
+                tall
+                autoFocus
+                editable={!disabled}
+                maxLength={UI_BLOCK_LIMITS.preview}
+                value={draft}
+                onChangeText={setDraft}
+              />
+            )
+          }
+        />
+        {confirming ? (
+          <View className="gap-2">
+            <Typography type="body-sm" weight="medium">
+              {t("mobile.chat.question.confirmAction", { action: confirming.label })}
+            </Typography>
+            <View className="flex-row flex-wrap justify-end gap-2">
+              <Button size="sm" variant="ghost" className="rounded-full" onPress={() => setConfirming(undefined)}>
+                <Button.Label>{t("common.cancel")}</Button.Label>
+              </Button>
+              <Button
+                size="sm"
+                variant={BUTTON_VARIANT[actionStyle(confirming)]}
+                className="rounded-full"
+                isDisabled={disabled || blankDraft}
+                onPress={() => {
+                  void haptics.selection();
+                  respond(confirming);
+                }}
+              >
+                <Button.Label className="font-sans font-semibold">
+                  {t("mobile.chat.question.confirmAccept")}
+                </Button.Label>
+              </Button>
+            </View>
+          </View>
+        ) : (
+          <>
+            <View className="flex-row flex-wrap justify-end gap-2">
+              {[...spec.actions].reverse().map((action) => {
+                if (draft !== undefined && opensEditor(action)) return null;
+                const held = isHeld(action);
+                return (
+                  <Button
+                    key={action.id}
+                    size="sm"
+                    variant={BUTTON_VARIANT[actionStyle(action)]}
+                    className="rounded-full"
+                    isDisabled={disabled || blankDraft}
+                    accessibilityHint={held && !screenReader ? t("mobile.chat.question.holdHint") : undefined}
+                    delayLongPress={held ? holdMs : undefined}
+                    onLongPress={
+                      held
+                        ? () => {
+                            void haptics.notification("success");
+                            respond(action);
+                          }
+                        : undefined
+                    }
+                    onPress={() => {
+                      if (held && !screenReader) return void haptics.notification("warning");
+                      void haptics.selection();
+                      if (held || action.confirm === true) setConfirming(action);
+                      else respond(action);
+                    }}
+                  >
+                    <Button.Label className="font-sans font-semibold">
+                      {autoAnswer?.actionId !== action.id || secondsLeft <= 0
+                        ? action.label
+                        : secondsLeft < 60
+                          ? t("mobile.chat.question.autoAction", { action: action.label, seconds: secondsLeft })
+                          : t("mobile.chat.question.autoActionClock", {
+                              action: action.label,
+                              time: countdownClock(secondsLeft),
+                            })}
+                    </Button.Label>
+                  </Button>
+                );
+              })}
+            </View>
+            {spec.actions.some(isHeld) && !screenReader ? (
+              <Typography type="body-xs" className="text-right text-text-secondary">
+                {t("mobile.chat.question.holdHint")}
+              </Typography>
+            ) : null}
+          </>
         )}
       </View>
-      {confirming ? (
-        <View className="gap-2">
-          <Typography type="body-sm" weight="medium">
-            {t("mobile.chat.question.confirmAction", { action: confirming.label })}
-          </Typography>
-          <View className="flex-row flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant={BUTTON_VARIANT[actionStyle(confirming)]}
-              className="rounded-full"
-              isDisabled={disabled || blankDraft}
-              onPress={() => {
-                void haptics.selection();
-                respond(confirming);
-              }}
-            >
-              <Button.Label className="font-sans font-semibold">{t("mobile.chat.question.confirmAccept")}</Button.Label>
-            </Button>
-            <Button size="sm" variant="ghost" className="rounded-full" onPress={() => setConfirming(undefined)}>
-              <Button.Label>{t("common.cancel")}</Button.Label>
-            </Button>
-          </View>
-        </View>
-      ) : (
-        <>
-          <View className="flex-row flex-wrap gap-2">
-            {spec.actions.map((action) => {
-              if (draft !== undefined && opensEditor(action)) return null;
-              const held = isHeld(action);
-              return (
-                <Button
-                  key={action.id}
-                  size="sm"
-                  variant={BUTTON_VARIANT[actionStyle(action)]}
-                  className="rounded-full"
-                  isDisabled={disabled || blankDraft}
-                  accessibilityHint={held && !screenReader ? t("mobile.chat.question.holdHint") : undefined}
-                  delayLongPress={held ? holdMs : undefined}
-                  onLongPress={
-                    held
-                      ? () => {
-                          void haptics.notification("success");
-                          respond(action);
-                        }
-                      : undefined
-                  }
-                  onPress={() => {
-                    if (held && !screenReader) return void haptics.notification("warning");
-                    void haptics.selection();
-                    if (held || action.confirm === true) setConfirming(action);
-                    else respond(action);
-                  }}
-                >
-                  <Button.Label className="font-sans font-semibold">
-                    {autoAnswer?.actionId !== action.id || secondsLeft <= 0
-                      ? action.label
-                      : secondsLeft < 60
-                        ? t("mobile.chat.question.autoAction", { action: action.label, seconds: secondsLeft })
-                        : t("mobile.chat.question.autoActionClock", {
-                            action: action.label,
-                            time: countdownClock(secondsLeft),
-                          })}
-                  </Button.Label>
-                </Button>
-              );
-            })}
-          </View>
-          {spec.actions.some(isHeld) && !screenReader ? (
-            <Typography type="body-xs" className="text-text-secondary">
-              {t("mobile.chat.question.holdHint")}
-            </Typography>
-          ) : null}
-        </>
-      )}
       <PromptStatus controller={controller} canSend={canSend} />
     </View>
   );

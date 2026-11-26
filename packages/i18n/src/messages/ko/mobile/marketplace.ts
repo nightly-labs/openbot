@@ -104,6 +104,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "{name} 로그인 페이지를 여세요.",
   "mobile.marketplace.app.stepAllow": "로그인한 다음 접근을 허용하세요.",
   "mobile.marketplace.app.stepReturn": "여기로 돌아오세요. {name}이(가) 서버에서 연결돼요.",
+  "mobile.marketplace.app.stepBlank": "마지막 페이지는 로드되지 않습니다. 정상입니다.",
+  "mobile.marketplace.app.stepCopy": "주소 표시줄을 탭하고 전체 주소를 복사합니다.",
+  "mobile.marketplace.app.stepPaste": "OpenBot으로 돌아와 아래에 주소를 붙여 넣습니다.",
   "mobile.marketplace.app.openSignIn": "로그인 페이지 열기",
   "mobile.marketplace.app.keySecure": "키는 암호화된 연결을 통해 내 서버로만 전송돼요.",
   "mobile.marketplace.app.connecting": "연결 중",
@@ -118,8 +121,6 @@ export const messages = {
     "이 앱은 브라우저 로그인이 필요해요. 서버의 OpenBot을 업데이트하거나 컴퓨터에서 앱을 연결하세요.",
   "mobile.marketplace.app.waiting": "로그인 페이지를 기다리는 중…",
   "mobile.marketplace.app.openAgain": "로그인 페이지 다시 열기",
-  "mobile.marketplace.app.pasteHint":
-    "마지막에 페이지가 로드되지 않는 주소를 열어요. 그 주소를 복사해 아래에 붙여넣으세요.",
   "mobile.marketplace.app.pasteLabel": "로그인 후 주소",
   "mobile.marketplace.app.pasteInvalid": "이 주소는 이번 로그인의 마지막 단계 주소가 아니에요.",
   "mobile.marketplace.app.finishSignIn": "로그인 완료",

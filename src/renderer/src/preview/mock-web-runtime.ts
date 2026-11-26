@@ -1,7 +1,6 @@
 import { CHANNEL_CHATS_CAPABILITY } from "@openbot/contracts/ipc";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
-import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import type { WebRuntimeFactory } from "../features/web-client/web-client-context";
 import type { WebRuntimeEvents, WebWorkspaceRuntime } from "../features/web-client/web-runtime";
 import { createMockOpenBot, type MockOpenBotControls } from "./mock-openbot";
@@ -28,6 +27,7 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
     navigateBrowserTab: (input) => mock.api.browser.navigate(input),
     reloadBrowserTab: (tabId) => mock.api.browser.reload(tabId),
     stopBrowserTab: (tabId) => mock.api.browser.stop(tabId),
+    answerBrowserHttpSignIn: (input) => mock.api.browser.answerHttpSignIn(input),
     closeBrowserTab: (tabId) => mock.api.browser.close(tabId),
     takeBrowserControl: (tabId) => mock.api.browser.takeControl(tabId),
     releaseBrowserControl: (tabId) => mock.api.browser.releaseControl(tabId),
@@ -59,7 +59,6 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
         "agent-duplication",
         "sidebar-layout",
         CHANNEL_CHATS_CAPABILITY,
-        ROUTINE_FLOWS_CAPABILITY,
         MESSAGE_DELETE_CAPABILITY,
         MESSAGE_PINS_CAPABILITY,
       ];
@@ -98,6 +97,7 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
     },
     stop: (agentId, turnId) => agent.interrupt({ agentId, turnId }),
     setTyping: () => {},
+    setWorkflowSpot: () => {},
     queue: (agentId) => agent.listQueue(agentId),
     activeQueues: async (agentIds) => (await agent.listActiveQueues(agentIds)) ?? { queues: [], omitted: agentIds },
     editQueue: (input) => agent.editQueuedMessage(input),
@@ -121,9 +121,6 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
     sharedFile: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
     workspaceFile: async () => ({ name: "preview.txt", mimeType: "text/plain", base64: btoa("OpenBot file preview") }),
     workspaceDirectory: (agentId, path) => agent.listWorkspaceDirectory({ agentId, path }),
-    routineFlows: mock.api.routineFlows,
-    updateRoutine: (input) => agent.updateRoutine(input),
-    testRoutine: (input) => agent.testRoutine(input),
     react: (input) => agent.setMessageReaction(input),
     setAvatar: async (agentId, image) => {
       await agent.setAvatar({ agentId, image });

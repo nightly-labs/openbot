@@ -10,13 +10,13 @@ import {
 import type { AppTranslate } from "@openbot/i18n";
 import { Button, CopyButton, Popover, Skeleton, SlidersHorizontal } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, createStore, For, Match, onSettled, Show, Switch } from "solid-js";
+import { createStore, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { PORT_NAME, useBoard, type WfnBoard, type WfnFields, type WfnResult } from "./workflow-board";
 import { optionNameKey, optionValueKey, readableName } from "./workflow-media-step";
 import type { WorkflowCatalogs } from "./workflow-model";
 import { EFFORT_LABEL, modelOption } from "./workflow-model-pills";
-import { PortIcon, resultName, resultTime, ToolAction } from "./workflow-node-parts";
+import { ClampedText, PortIcon, resultName, resultTime, ToolAction } from "./workflow-node-parts";
 
 interface SettingLine {
   key: string;
@@ -85,6 +85,10 @@ function settingLines(
         return line(key, t("workflow.llm.system"), value, true);
       case "rule":
         return line(key, t("workflow.condition.rule"), value, true);
+      case "answer":
+        return line(key, t("workflow.answer.title"), value, true);
+      case "check":
+        return line(key, t("workflow.check.title"), value, true);
       case "aspect":
         return line(key, t("workflow.image.aspect"), value === "custom" ? undefined : value);
       case "width": {
@@ -162,36 +166,6 @@ function sourceName(t: AppTranslate, settings: WorkflowFields, source: WorkflowS
   if (first) return t("workflow.video.role.first");
   if (last) return t("workflow.video.role.last");
   return t(PORT_NAME.image);
-}
-
-function ClampedText(props: { value: string }) {
-  const { t } = useText();
-  const [open, setOpen] = createSignal(false);
-  const [overflows, setOverflows] = createSignal(false);
-  let body: HTMLDivElement | undefined;
-  onSettled(() => {
-    if (body) setOverflows(body.scrollHeight > body.clientHeight + 1);
-  });
-  return (
-    <div class="wfn-step-text" data-clamped={overflows() && !open() ? "" : undefined}>
-      <div ref={body} class="wfn-step-text-body" data-open={open() ? "" : undefined}>
-        {props.value}
-      </div>
-      <Show when={overflows()}>
-        <Button
-          variant="link"
-          size="xs"
-          class="wfn-step-text-toggle"
-          aria-expanded={open() ? "true" : "false"}
-          onClick={() => {
-            setOpen((value) => !value);
-          }}
-        >
-          {open() ? t("workflow.node.settings.showLess") : t("workflow.node.settings.showMore")}
-        </Button>
-      </Show>
-    </div>
-  );
 }
 
 function TextBlock(props: { title: JSX.Element; value: string }) {

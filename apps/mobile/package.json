@@ -1,7 +1,7 @@
 {
   "name": "@openbot/mobile",
   "main": "expo-router/entry",
-  "version": "1.4.12",
+  "version": "1.4.14",
   "expo": {
     "install": {
       "exclude": [
@@ -9,6 +9,13 @@
       ]
     },
     "autolinking": {
+      "ios": {
+        "exclude": [
+          "expo-background-task",
+          "expo-task-manager",
+          "unimodules-app-loader"
+        ]
+      },
       "android": {
         "buildFromSource": [
           "expo-splash-screen",
@@ -48,6 +55,7 @@
     "effect": "catalog:",
     "expo": "~58.0.25",
     "expo-application": "~58.1.2",
+    "expo-background-task": "~58.0.13",
     "expo-blur": "~58.0.6",
     "expo-build-properties": "~58.0.12",
     "expo-camera": "~58.0.14",
@@ -68,6 +76,7 @@
     "expo-linking": "~58.0.17",
     "expo-local-authentication": "~58.0.3",
     "expo-localization": "~58.0.5",
+    "expo-location": "~58.0.22",
     "expo-media-library": "~58.0.14",
     "expo-network": "~58.0.5",
     "expo-notifications": "~58.1.9",
@@ -79,6 +88,7 @@
     "expo-status-bar": "~58.0.5",
     "expo-symbols": "~58.0.5",
     "expo-system-ui": "~58.0.7",
+    "expo-task-manager": "~58.0.14",
     "expo-updates": "~58.0.22",
     "expo-video": "~58.0.14",
     "expo-web-browser": "~58.0.8",
@@ -87,6 +97,7 @@
     "katex": "catalog:",
     "lucide-react-native": "^1.73.0",
     "marked": "catalog:",
+    "marked-cjk-friendly": "catalog:",
     "mermaid": "catalog:",
     "pdfjs-dist": "catalog:",
     "react": "19.3.0",

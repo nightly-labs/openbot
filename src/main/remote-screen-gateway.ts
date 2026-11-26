@@ -23,6 +23,7 @@ import { recordRestartActivity } from "../backend/restart-activity";
 import { readBodyWithin } from "./http-body";
 import { listenLoopback } from "./listen-loopback";
 import { RemoteDesktopOperationError } from "./remote-desktop-effects";
+import { remoteDesktopKeyboardScript } from "./remote-desktop-keyboard";
 import { remoteDesktopPasteScript } from "./remote-desktop-paste";
 import type { RemoteDesktopRuntimePaths } from "./remote-desktop-runtime-artifact";
 import { remoteDesktopStreamWatchScript } from "./remote-desktop-stream-watch";
@@ -39,6 +40,8 @@ import { rawDataSize, rawDataText } from "./ws-raw-data";
 
 const GRANT_TTL_MS = 60_000;
 const REMOTE_DESKTOP_MAX_SESSIONS = 4;
+const MAC_SCREEN_WAKE_TIMEOUT_MS = 2_000;
+const MAC_SCREEN_WAKE_POLL_MS = 100;
 const VIEWER_COOKIE = "openbotRemoteViewer";
 const MAX_PENDING_STREAM_FRAMES = 32;
 const MAX_PENDING_STREAM_BYTES = 1_048_576;
@@ -60,6 +63,7 @@ const viewerStateSchema = z.object({
   state: z.enum(["connecting", "connected", "error"]),
   transport: z.enum(["p2p", "relay"]).optional(),
   message: z.string().max(1_000).optional(),
+  noPicture: z.boolean().optional(),
 });
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
@@ -79,6 +83,7 @@ interface RemoteScreenGatewayOptions {
   getDisplayScreenOrigin?: ((displayId: string) => { x: number; y: number } | undefined) | undefined;
   sessionDisconnected?: (() => boolean) | undefined;
   screenLocked?: (() => boolean) | undefined;
+  wakeScreen?: (() => void) | undefined;
   getIceServers: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   createRuntime?: RemoteScreenGatewayCreateRuntime;
   audit?: (event: RemoteScreenAuditEvent) => void;
@@ -94,6 +99,9 @@ export interface RemoteScreenRuntime {
   selectDisplay: SunshineMoonlightRuntime["selectDisplay"];
   stop: SunshineMoonlightRuntime["stop"];
   screenCaptureDenied?(): boolean;
+  windowsCaptureDenied?(): boolean;
+  canSwitchToSoftwareEncoder?(): boolean;
+  noPictureReceived?: SunshineMoonlightRuntime["noPictureReceived"];
   checkSetup?: SunshineMoonlightRuntime["checkSetup"];
   test?: SunshineMoonlightRuntime["test"];
 }
@@ -186,6 +194,10 @@ export class RemoteScreenGateway {
 
   screenRecordingDenied(): boolean {
     return this.#screenRecordingDenied;
+  }
+
+  needsX11Session(): boolean {
+    return this.#linuxWithoutX11;
   }
 
   readonly recheckScreenRecording = Effect.fn("RemoteScreenGateway.recheckScreenRecording")(
@@ -500,6 +512,20 @@ export class RemoteScreenGateway {
     (operation) => this.#provide(operation),
   ).bind(this);
 
+  readonly #macScreenStaysLocked = Effect.fn("RemoteScreenGateway.macScreenStaysLocked")(function* (
+    this: RemoteScreenGateway,
+  ) {
+    const { screenLocked, wakeScreen } = this.#options;
+    if (!screenLocked?.()) return false;
+    if (!wakeScreen) return true;
+    wakeScreen();
+    for (let waitedMs = 0; waitedMs < MAC_SCREEN_WAKE_TIMEOUT_MS; waitedMs += MAC_SCREEN_WAKE_POLL_MS) {
+      yield* Effect.sleep(MAC_SCREEN_WAKE_POLL_MS);
+      if (!screenLocked()) return false;
+    }
+    return true;
+  }).bind(this);
+
   readonly #createSession = Effect.fn("RemoteScreenGateway.createSession")(function* (
     this: RemoteScreenGateway,
     input: RemoteScreenSessionRequest,
@@ -525,7 +551,7 @@ export class RemoteScreenGateway {
         cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.windowsSessionDisconnected")),
       });
     }
-    if (this.#options.platform === "darwin" && this.#options.screenLocked?.()) {
+    if (this.#options.platform === "darwin" && (yield* this.#macScreenStaysLocked())) {
       return yield* new RemoteWorkflowError({
         cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.macScreenLocked")),
       });
@@ -739,6 +765,18 @@ export class RemoteScreenGateway {
           this.#audit(session, "transport");
         }
         if (update.state === "connected" || update.state === "error") this.#finishStreamStart(session.snapshot.id);
+        if (update.state === "error" && update.noPicture && this.#sessions.size === 1) {
+          yield* (this.#runtime?.noPictureReceived?.() ?? Effect.void).pipe(
+            Effect.catch(({ cause }: RemoteDesktopOperationError) =>
+              Effect.sync(() =>
+                this.#options.onDiagnostic?.(
+                  "sunshine",
+                  `OpenBot: the encoder choice was not saved: ${describeCause(cause)}\n`,
+                ),
+              ),
+            ),
+          );
+        }
         response.writeHead(204, { "Cache-Control": "no-store" });
         response.end();
         return;
@@ -1102,6 +1140,8 @@ export class RemoteScreenGateway {
       stage === "sunshine" ? "sunshine" : "moonlight",
       `OpenBot: the remote desktop runtime did not start (${stage ?? "runtime"}): ${describeCause(cause)}\n`,
     );
+    if (stage === "sunshine" && this.#runtime?.windowsCaptureDenied?.())
+      return new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.windowsCaptureDenied"));
     return new RemoteScreenError(
       503,
       "host_unavailable",
@@ -1157,8 +1197,12 @@ export class RemoteScreenGateway {
     if (upstreamPath === PASTE_SCRIPT_PATH) {
       response.writeHead(200, { "Content-Type": "text/javascript", "Cache-Control": "no-store" });
       response.end(
-        remoteDesktopStreamWatchScript(session.snapshot.serverId) +
-          (writeClipboard ? remoteDesktopPasteScript(this.#options.platform) : ""),
+        remoteDesktopStreamWatchScript(
+          session.snapshot.serverId,
+          this.#sessions.size === 1 && this.#runtime?.canSwitchToSoftwareEncoder?.() === true,
+        ) +
+          (writeClipboard ? remoteDesktopPasteScript(this.#options.platform) : "") +
+          remoteDesktopKeyboardScript(),
       );
       return;
     }

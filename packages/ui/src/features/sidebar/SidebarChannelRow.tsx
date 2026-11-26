@@ -1,3 +1,4 @@
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { Badge, buttonVariants, ContextMenu } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -21,7 +22,7 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
     sidebarClickIsSuppressed,
     startChatDragging,
   } = useSidebarScope();
-  const { t, format } = useText();
+  const { t, format, sourceText } = useText();
   const active = () => props.activeChannelId === rowProps.channel.id;
   const channelWait = () => props.channelWaits?.[rowProps.channel.id];
   const badgeState = createMemo(() => sidebarUnreadBadge(rowProps.channel.unreadCount, channelWait()));
@@ -37,10 +38,13 @@ export function SidebarChannelRow(rowProps: { channel: ChannelSummary; waiting?:
   const previewPending = () => props.channelPreviewsPending === true && !rowProps.channel.lastMessage;
   const time = () =>
     previewPending() ? "" : sidebarMessageTime(rowProps.channel.lastMessage?.at ?? rowProps.channel.createdAt, format);
+  const lastMessageText = () => {
+    const message = rowProps.channel.lastMessage;
+    if (!message) return undefined;
+    return coordinatorText(message.author, message.text, sourceText);
+  };
   const preview = () => {
-    const text =
-      wait()?.detail ||
-      (rowProps.channel.lastMessage?.text ?? (previewPending() ? "" : t("sidebar.channel.noMessages")));
+    const text = wait()?.detail || (lastMessageText() ?? (previewPending() ? "" : t("sidebar.channel.noMessages")));
     return rowProps.channel.activeTasks > 0 ? t("sidebar.channel.workingPreview", { preview: text }) : text;
   };
   const labelPreview = () => (wait()?.detail && rowProps.channel.activeTasks === 0 ? "" : `. ${preview()}`);

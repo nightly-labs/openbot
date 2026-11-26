@@ -6,6 +6,7 @@ import type {
   BrowserEnvironment,
   BrowserFocus,
   BrowserJsonValue,
+  BrowserLocation,
   BrowserSnapshot,
   BrowserTarget,
 } from "@openbot/contracts/ipc";
@@ -108,6 +109,9 @@ export const SNAPSHOT_NAVIGATED_MESSAGE = "Page navigated during the browser sna
 
 const ACTION_TIMEOUT_MS = 10_000;
 const WAIT_TIMEOUT_MS = 30_000;
+const BROWSER_LOCATION_DEFAULT_ACCURACY = 50;
+const PAGE_ANSWER_WAIT_MS = 2_000;
+const PAGE_ANSWER_RETRY_MS = 100;
 const MAX_RESULT_BYTES = 64 * 1024;
 const DOCUMENT_ID_PROPERTY = "__openbot_browser_document_id__";
 const MAX_SNAPSHOT_FRAMES = 12;
@@ -171,6 +175,7 @@ export interface BrowserScreencastOptions {
   maxHeight: number;
   viewport?: { width: number; height: number };
   onPageCopy?: (text: string) => void;
+  watchDialogs?: boolean;
 }
 
 export interface BrowserScreencastFrame {
@@ -399,6 +404,7 @@ interface DialogWatch {
 }
 
 const DIALOG_MESSAGE_LIMIT = 2_000;
+const PERSON_ACTIVATION_MS = 5_000;
 const CANCEL_DIALOGS_EVENT = "-cancel-dialogs";
 const RUN_DIALOG_EVENT = "-run-dialog";
 const DIALOG_CLOSED_ERROR = "This dialog is closed. A person answered it, or the page closed it. Read the tab again.";
@@ -412,6 +418,8 @@ export class BrowserCdpEngine {
   #targets = new Map<string, TargetRecord>();
   #lastSnapshot: BrowserSnapshot | null = null;
   #environment: BrowserEnvironment | null = null;
+  #location: BrowserLocation | null = null;
+  #locationApplied = false;
   readonly #viewViewports: Array<{ width: number; height: number }> = [];
   #navigationGeneration = 0;
   #documentGeneration = 0;
@@ -427,7 +435,11 @@ export class BrowserCdpEngine {
     singlePassword: boolean,
   ): Effect.fn.Return<
     {
-      enter: (values: readonly string[], vault: boolean) => Effect.Effect<void, BrowserOperationError>;
+      enter: (
+        values: readonly string[],
+        vault: boolean,
+        onSubmitSent: () => void,
+      ) => Effect.Effect<void, BrowserOperationError>;
       clear: (secrets: readonly string[]) => Effect.Effect<boolean, BrowserOperationError>;
       hide: (secret: string, shown: boolean) => void;
       kinds: Array<{ password: boolean; oneTimeCode: boolean }>;
@@ -591,13 +603,13 @@ export class BrowserCdpEngine {
                 if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || this.disabled || this.readOnly || this.type !== 'password') throw new Error('Authentication target changed.');
                 Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(this, text);
                 this.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText' }));
-                this.dispatchEvent(new Event('change', { bubbles: true }));
+                if (this.value !== text) throw new Error('Authentication field did not keep the value.');
               }`,
         [nodes.origin, text],
         node.sessionId,
         node.contextId,
       );
-    const enter = (values: readonly string[], vault: boolean) =>
+    const enter = (values: readonly string[], vault: boolean, onSubmitSent: () => void) =>
       Effect.gen({ self: this }, function* () {
         yield* Effect.gen({ self: this }, function* () {
           yield* this.#leaseEffect((send) =>
@@ -704,6 +716,7 @@ export class BrowserCdpEngine {
                 );
                 if (generation !== this.#documentGeneration)
                   return yield* browserFailure(new Error("Authentication page changed."));
+                onSubmitSent();
                 yield* dispatchMouseClick(send, point, "left", 1, 0, sessionId);
               } else if (submission === "enter") {
                 const last = nodes.inputs.at(-1);
@@ -720,6 +733,7 @@ export class BrowserCdpEngine {
                 )
                   return yield* browserFailure(new Error("Authentication target changed."));
                 yield* send("DOM.focus", { backendNodeId: last.backendNodeId }, last.sessionId);
+                onSubmitSent();
                 yield* dispatchShortcut(send, "Enter", last.sessionId);
               }
             }),
@@ -922,6 +936,7 @@ export class BrowserCdpEngine {
   #ownsDebugger = false;
   #idleDetach: NodeJS.Immediate | undefined;
   #idleFocusOff = false;
+  #frozen = false;
   #closing = false;
   #disposed = false;
   readonly #scope = Scope.makeUnsafe();
@@ -929,10 +944,14 @@ export class BrowserCdpEngine {
   readonly #dialogWatches = new Set<DialogWatch>();
   #dialog: (BrowserDialog & { owner: BrowserDialogOwner | undefined }) | undefined;
   #dialogChanged = Deferred.makeUnsafe<void>();
+  readonly #dialogListeners = new Set<() => void>();
+  #viewDialogWatches = 0;
   #pageEnabled = false;
   #dialogBoxPending = false;
   #cancelDialogBox = false;
   #dialogsReleased = false;
+  #acceptsPageAlert: ((message: string) => boolean) | undefined;
+  #personInputAt = Number.NEGATIVE_INFINITY;
   #highlightSessionId: string | undefined;
   readonly #uploadDocumentIds = new Set<string>();
   readonly #targetSessions = new Map<string, { sessionId: string; url: string }>();
@@ -944,11 +963,20 @@ export class BrowserCdpEngine {
       this.#closing = true;
     });
     const internalEvents: NodeJS.EventEmitter = contents;
-    internalEvents.on(RUN_DIALOG_EVENT, () => {
+    internalEvents.on(RUN_DIALOG_EVENT, (info: unknown, reply: unknown) => {
       this.#dialogBoxPending = false;
-      if (!this.#cancelDialogBox) return;
-      this.#cancelDialogBox = false;
-      contents.emit(CANCEL_DIALOGS_EVENT);
+      if (this.#cancelDialogBox) {
+        this.#cancelDialogBox = false;
+        contents.emit(CANCEL_DIALOGS_EVENT);
+        return;
+      }
+      if (this.#acceptedPageAlert(info, reply)) contents.emit(CANCEL_DIALOGS_EVENT);
+    });
+    contents.on("before-mouse-event", (_event, input) => {
+      if (input.type === "mouseDown") this.#notePersonInput();
+    });
+    contents.on("before-input-event", (_event, input) => {
+      if (input.type === "keyDown") this.#notePersonInput();
     });
     contents.on("did-start-navigation", (details) => {
       if (details.isMainFrame) this.#navigationGeneration += 1;
@@ -979,7 +1007,15 @@ export class BrowserCdpEngine {
         this.#forgetTargetSession(stringValue(params.sessionId));
       }
     });
-    contents.debugger.on("detach", () => this.#clearDebuggerSessions());
+    contents.debugger.on("detach", () => {
+      this.#clearDebuggerSessions();
+      this.#restoreLocation();
+    });
+  }
+
+  #restoreLocation(): void {
+    if (!this.#location || this.#disposed || this.#closing || this.#contents.isDestroyed()) return;
+    Effect.runFork(this.#leaseEffect(() => Effect.void, false).pipe(Effect.ignore));
   }
 
   #forgetTargetSession(sessionId: string): void {
@@ -2187,6 +2223,28 @@ export class BrowserCdpEngine {
   ): Effect.fn.Return<void, BrowserOperationError> {
     if (this.#dialog?.id !== id) return yield* browserFailure(new Error(DIALOG_CLOSED_ERROR));
     if (!this.dialogOwnedBy(owner)) return yield* browserFailure(new Error(DIALOG_FOR_PERSON_ERROR));
+    yield* this.#sendDialogAnswer(id, accept);
+  });
+
+  readonly answerPersonDialog = Effect.fn("BrowserCdp.answerPersonDialog")(function* (
+    this: BrowserCdpEngine,
+    id: string,
+    accept: boolean,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    if (this.#dialog?.id !== id) return yield* browserFailure(new Error(DIALOG_CLOSED_ERROR));
+    yield* this.#sendDialogAnswer(id, accept);
+  });
+
+  onDialogChange(listener: () => void): () => void {
+    this.#dialogListeners.add(listener);
+    return () => this.#dialogListeners.delete(listener);
+  }
+
+  readonly #sendDialogAnswer = Effect.fn("BrowserCdp.sendDialogAnswer")(function* (
+    this: BrowserCdpEngine,
+    id: string,
+    accept: boolean,
+  ): Effect.fn.Return<void, BrowserOperationError> {
     const answered = yield* browserCall(() =>
       this.#contents.debugger.sendCommand("Page.handleJavaScriptDialog", { accept }).then(() => {
         this.#contents.emit(CANCEL_DIALOGS_EVENT);
@@ -2215,6 +2273,29 @@ export class BrowserCdpEngine {
     if (!changed) return;
     this.#signalDialogChange();
     this.#releaseIdleDebugger();
+  }
+
+  acceptPageAlerts(accepts: (message: string) => boolean): void {
+    this.#acceptsPageAlert = accepts;
+  }
+
+  #notePersonInput(): void {
+    if (this.#activeLeases === 0) this.#personInputAt = Date.now();
+  }
+
+  notePersonViewInput(): void {
+    this.#personInputAt = Date.now();
+  }
+
+  #acceptedPageAlert(info: unknown, reply: unknown): boolean {
+    if (!this.#acceptsPageAlert || this.#dialogsReleased || this.#dialogWatches.size > 0 || this.#dialog?.agent)
+      return false;
+    if (Date.now() - this.#personInputAt < PERSON_ACTIVATION_MS) return false;
+    if (!isRecord(info) || info.dialogType !== "alert" || typeof reply !== "function") return false;
+    const message = redactText(this.#cardScrub.text(stringValue(info.messageText))).slice(0, DIALOG_MESSAGE_LIMIT);
+    if (!this.#acceptsPageAlert(message)) return false;
+    reply(true, "");
+    return true;
   }
 
   releaseDialogs(): void {
@@ -2262,13 +2343,20 @@ export class BrowserCdpEngine {
   }
 
   #debuggerIdle(): boolean {
-    return this.#activeLeases === 0 && !this.#retainDebugger && !this.#dialog && this.#dialogWatches.size === 0;
+    return (
+      this.#activeLeases === 0 &&
+      !this.#retainDebugger &&
+      !this.#location &&
+      !this.#dialog &&
+      this.#dialogWatches.size === 0
+    );
   }
 
   #signalDialogChange(): void {
     const changed = this.#dialogChanged;
     this.#dialogChanged = Deferred.makeUnsafe<void>();
     Deferred.doneUnsafe(changed, Effect.void);
+    for (const listener of [...this.#dialogListeners]) listener();
   }
 
   cancelPendingCommands(): boolean {
@@ -2277,6 +2365,37 @@ export class BrowserCdpEngine {
     return true;
   }
 
+  readonly pageAnswers = Effect.fn("BrowserCdp.pageAnswers")(function* (
+    this: BrowserCdpEngine,
+  ): Effect.fn.Return<boolean, BrowserOperationError> {
+    if (this.#disposed || this.#closing || this.#frozen || this.#dialog) return true;
+    if (this.#contents.isDestroyed() || this.#contents.isCrashed()) return true;
+    const pageDebugger = this.#contents.debugger;
+    this.#activeLeases += 1;
+    return yield* Effect.gen({ self: this }, function* () {
+      while (!this.#contents.isDestroyed()) {
+        if (!pageDebugger.isAttached()) {
+          yield* browserSync(() => pageDebugger.attach("1.3"));
+          this.#ownsDebugger = true;
+        }
+        const reply = yield* Effect.exit(
+          browserCall(() => pageDebugger.sendCommand("Runtime.evaluate", { expression: "0" })),
+        );
+        if (Exit.isSuccess(reply)) return;
+        yield* Effect.sleep(PAGE_ANSWER_RETRY_MS);
+      }
+    }).pipe(
+      Effect.timeoutOption(PAGE_ANSWER_WAIT_MS),
+      Effect.map(Option.isSome),
+      Effect.ensuring(
+        Effect.sync(() => {
+          this.#activeLeases -= 1;
+          this.#releaseIdleDebugger();
+        }),
+      ),
+    );
+  });
+
   readonly setIdleFocus = Effect.fn("BrowserCdp.setIdleFocus")(function* (
     this: BrowserCdpEngine,
     enabled: boolean,
@@ -2284,6 +2403,53 @@ export class BrowserCdpEngine {
     this.#idleFocusOff = !enabled;
     if (!this.#mayEmulateIdleFocus()) return;
     yield* browserCall(() => this.#contents.debugger.sendCommand("Emulation.setFocusEmulationEnabled", { enabled }));
+  });
+
+  get frozen(): boolean {
+    return this.#frozen;
+  }
+
+  readonly setFrozen = Effect.fn("BrowserCdp.setFrozen")(function* (
+    this: BrowserCdpEngine,
+    frozen: boolean,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    if ((!frozen && !this.#frozen) || this.#disposed || this.#closing || this.#contents.isDestroyed()) return;
+    this.#frozen = frozen;
+    if (!this.#contents.debugger.isAttached()) {
+      yield* browserSync(() => this.#contents.debugger.attach("1.3"));
+      this.#ownsDebugger = true;
+    }
+    yield* browserCall(() =>
+      this.#contents.debugger.sendCommand("Page.setWebLifecycleState", { state: frozen ? "frozen" : "active" }),
+    ).pipe(Effect.ensuring(Effect.sync(() => this.#releaseIdleDebugger())));
+  });
+
+  readonly setLocation = Effect.fn("BrowserCdp.setLocation")(function* (
+    this: BrowserCdpEngine,
+    location: BrowserLocation | null,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    if (location) {
+      const previous = this.#location;
+      this.#location = location;
+      this.#locationApplied = false;
+      yield* this.#leaseEffect(() => Effect.void, false).pipe(
+        Effect.tapError(() =>
+          Effect.sync(() => {
+            this.#location = previous;
+            this.#locationApplied = false;
+          }),
+        ),
+      );
+      return;
+    }
+    if (!this.#location) return;
+    this.#location = null;
+    this.#locationApplied = false;
+    if (!this.#disposed && !this.#closing && !this.#contents.isDestroyed() && this.#contents.debugger.isAttached())
+      yield* browserCall(() => this.#contents.debugger.sendCommand("Emulation.clearGeolocationOverride")).pipe(
+        Effect.ignore,
+      );
+    this.#releaseIdleDebugger();
   });
 
   readonly setEnvironment = Effect.fn("BrowserCdp.setEnvironment")(function* (
@@ -2400,6 +2566,13 @@ export class BrowserCdpEngine {
       this.#viewViewports.splice(this.#viewViewports.indexOf(viewport), 1);
       return true;
     };
+    let watchesDialogs = options.watchDialogs === true;
+    if (watchesDialogs) this.#viewDialogWatches += 1;
+    const releaseDialogWatch = () => {
+      if (!watchesDialogs) return;
+      watchesDialogs = false;
+      this.#viewDialogWatches -= 1;
+    };
     let sequence = 0;
     const pacer = createFramePacer<Omit<BrowserScreencastFrame, "sequence">>((frame) => {
       sequence += 1;
@@ -2472,6 +2645,7 @@ export class BrowserCdpEngine {
             Effect.sync(() => {
               pacer.stop();
               releaseViewport();
+              releaseDialogWatch();
             }),
           ),
         );
@@ -2830,6 +3004,8 @@ export class BrowserCdpEngine {
     this.#disposed = true;
     yield* Scope.close(this.#scope, Exit.void);
     this.#retainDebugger = false;
+    this.#location = null;
+    this.#locationApplied = false;
     clearImmediate(this.#idleDetach);
     this.#idleDetach = undefined;
     this.#detachOwnedDebugger();
@@ -3670,6 +3846,8 @@ export class BrowserCdpEngine {
   ): Effect.fn.Return<T, BrowserOperationError> {
     if (this.#disposed || this.#closing || this.#contents.isDestroyed())
       return yield* browserFailure(new Error("Browser tab was closed."));
+    if (this.#contents.isCrashed())
+      return yield* browserFailure(new Error("The page of this browser tab stopped. Load it again with navigate."));
     if (!this.#contents.debugger.isAttached()) {
       yield* browserSync(() => this.#contents.debugger.attach("1.3"));
       this.#ownsDebugger = true;
@@ -3689,7 +3867,7 @@ export class BrowserCdpEngine {
         return result;
       });
     return yield* Effect.gen({ self: this }, function* () {
-      if (this.#dialogWatches.size > 0 && this.#ownsDebugger && !this.#pageEnabled) {
+      if ((this.#dialogWatches.size > 0 || this.#viewDialogWatches > 0) && this.#ownsDebugger && !this.#pageEnabled) {
         yield* send("Page.enable");
         this.#pageEnabled = true;
       }
@@ -3704,6 +3882,14 @@ export class BrowserCdpEngine {
       }
       const environment = this.#appliedEnvironment(this.#environment);
       if (environment) yield* this.#applyEnvironmentEffect(send, environment);
+      if (this.#location && !this.#locationApplied) {
+        yield* send("Emulation.setGeolocationOverride", {
+          latitude: this.#location.latitude,
+          longitude: this.#location.longitude,
+          accuracy: this.#location.accuracyMeters ?? BROWSER_LOCATION_DEFAULT_ACCURACY,
+        });
+        this.#locationApplied = true;
+      }
       return yield* operation(send);
     }).pipe(
       Effect.ensuring(
@@ -3740,6 +3926,7 @@ export class BrowserCdpEngine {
   }
 
   #clearDebuggerSessions(): void {
+    this.#locationApplied = false;
     this.#targetSessions.clear();
     this.#highlightSessionId = undefined;
     this.#pageEnabled = false;

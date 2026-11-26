@@ -13,6 +13,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "{previous}의 크레딧이 모두 소진되었습니다. {model}(으)로 전환했습니다. 다시 사용하려면 크레딧을 추가한 후 선택하세요.",
   "status.agent.modelReturnedAfterError": "제공자 오류 후 {model}(으)로 다시 전환했어요.",
+  "status.agent.modelSwitchedForRemovedModel": "{previous}을(를) 더 이상 사용할 수 없어요. {model}(으)로 전환했어요.",
   "status.agent.marketplaceSuggested": "마켓플레이스 앱을 추천했어요: {app}.",
   "status.agent.settingShown": "설정을 표시했어요: {setting}.",
   "status.agent.channelMemberAdded": "{agent} 에이전트가 {member} 멤버를 채널에 추가했어요. {person} 님이 요청했어요.",
@@ -27,6 +28,12 @@ export const messages = {
   "status.agent.screenCaptureScreen": "메인 화면을 캡처해서 이미지를 에이전트의 모델에 보내요.",
   "status.agent.screenCaptureChannel":
     "이미지가 {channel} 채널에 표시되고, 이 채널을 읽는 서버의 모든 멤버가 볼 수 있어요.",
+  "status.agent.creditImageApproval": "{model}(으)로 이미지를 생성합니다. 크레딧 {credits}을(를) 사용합니다.",
+  "status.agent.creditVideoApproval": "{model}(으)로 동영상을 생성합니다. 크레딧 {credits}을(를) 사용합니다.",
+  "status.agent.creditMediaChannel":
+    "결과는 {channel} 채널에 표시되며, 이 서버에서 채널을 읽는 모든 멤버가 볼 수 있습니다.",
+  "status.agent.creditsHoldBalance": "크레딧 {credits}을(를) 사용하며, 잔액은 크레딧 {balance}입니다.",
+  "status.agent.creditsHoldAgentsOff": "이 서버의 에이전트는 크레딧을 사용할 수 없습니다.",
   "status.agent.screenCapturePermissionNext": "그다음 macOS가 OpenBot의 화면 녹화를 허용할지 물어볼 수 있어요.",
   "status.agent.screenCaptureDisplay": "디스플레이 {name}을(를) 캡처해서 이미지를 에이전트의 모델에 보내요.",
   "status.agent.screenCaptureWindow": "창 {name}을(를) 캡처해서 이미지를 에이전트의 모델에 보내요.",
@@ -60,6 +67,19 @@ export const messages = {
   "status.agent.workflowDelete":
     "워크플로 {title}을(를) 실행 기록 및 버전과 함께 삭제합니다. 진행 중인 단계는 중지됩니다.",
   "status.agent.deleteAgents": "{agents}을(를) 채팅 및 파일과 함께 삭제합니다. 되돌릴 수 없습니다.",
+  "status.agent.nearSignatureReceived": "OpenBot이 서명을 받았습니다. 이 탭은 닫아도 됩니다.",
+  "status.agent.nearSignatureUnknown": "OpenBot이 이 서명을 기다리고 있지 않습니다. OpenBot에서 다시 시작하세요.",
+  "status.agent.nearPayment":
+    "{domain} 결제로 암호화폐 지갑에서 {recipient}에게 {amount} {symbol}을(를) 보냅니다: {reason}",
+  "status.agent.nearSummaryCreate":
+    "모든 에이전트가 하루 최대 {amount} USD까지 결제할 수 있습니다. 나중에 OpenBot에서 변경할 수 있습니다.",
+  "status.agent.nearSummaryGrant": "이 OpenBot 앱이 {days}일 동안 내 규칙 범위 안에서 지갑으로 결제하도록 허용합니다.",
+  "status.agent.nearSummaryBudget": "지갑의 일일 예산을 {amount} USD로 변경합니다.",
+  "status.agent.nearSummaryAutoPay":
+    "결제 규칙이 허용하면 OpenBot이 내 서명 없이 결제하도록 허용합니다. 다른 결제는 계속 채팅에서 확인을 요청합니다.",
+  "status.agent.nearSummaryPayment": "{recipient}에게 보내는 {amount} 결제를 승인합니다.",
+  "status.agent.nearSummaryFreeze": "결제를 재개할 때까지 에이전트가 이 지갑으로 결제할 수 없습니다.",
+  "status.agent.nearSummaryUnfreeze": "에이전트가 내 규칙 범위 안에서 다시 이 지갑으로 결제할 수 있습니다.",
   "status.agent.screenCaptureProgress": "화면 캡처를 요청하는 중…",
   "status.agent.screenCaptureReviewing": "화면 캡처를 확인하는 중…",
   "status.agent.browserOpening": "웹 페이지를 여는 중…",
@@ -67,6 +87,7 @@ export const messages = {
   "status.agent.browserClicking": "웹 페이지를 클릭하는 중…",
   "status.agent.browserTyping": "웹 페이지에 입력하는 중…",
   "status.agent.browserActing": "웹 페이지를 사용하는 중…",
+  "status.agent.browserPaying": "결제를 보내는 중…",
   "status.agent.browserReviewing": "웹 페이지를 확인하는 중…",
   "status.agent.memoriesSearching": "메모리를 검색하는 중…",
   "status.agent.chatsSearching": "이전 채팅을 검색하는 중…",
@@ -119,10 +140,15 @@ export const messages = {
   "status.agent.mcpSignInRequested":
     "MCP 서버 {name}에 로그인이 필요해요. 마켓플레이스, 앱, {name}에서 로그인해 주세요.",
   "status.agent.uiBlockClosedByMessage": "새 메시지로 종료되었어요",
-  "status.agent.finishCheckContinues": "요청이 아직 끝나지 않았어요. 에이전트가 계속해요 ({current}/{limit}).",
+  "status.agent.location.field": "내 위치",
+  "status.agent.location.placeholder": "도시, 주소 또는 장소",
+  "status.agent.location.submit": "공유",
+  "status.agent.location.shared": "위치를 공유했어요",
   "status.agent.nextStepContinues": "에이전트가 다음 단계 전에 멈췄어요. 계속해요 ({current}/{limit}).",
   "status.agent.planContinues": "계획에 남은 단계가 있어요. 에이전트가 계속해요 ({current}/{limit}).",
   "status.agent.planStopped": "계획에 남은 단계가 있는데 에이전트가 멈췄어요. 계속하려면 메시지를 보내세요.",
+  "status.agent.continuationLimitReached":
+    "요청이 끝나기 전에 에이전트가 멈췄어요. 에이전트가 더 이상 스스로 계속할 수 없어요. 계속하려면 메시지를 보내세요.",
   "status.agent.compactionContinues": "에이전트가 컨텍스트를 압축하는 동안 연결이 끊겼어요. 에이전트가 계속해요.",
   "status.agent.providerExitContinues": "에이전트가 답변을 끝내기 전에 멈췄어요. 에이전트가 계속해요.",
   "status.agent.branchTitle": "분기된 채팅",

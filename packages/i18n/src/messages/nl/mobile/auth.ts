@@ -32,7 +32,7 @@ export const messages = {
   "mobile.auth.signIn.helpTitle": "Waar is de QR-code?",
   "mobile.auth.signIn.helpStep1": "1. Open OpenBot op je computer.",
   "mobile.auth.signIn.helpStep2": "2. Ga naar Instellingen → Mobile Connect.",
-  "mobile.auth.signIn.helpStep3": "3. Kies Genereer QR-code en scan die hier.",
+  "mobile.auth.signIn.helpStep3": "3. Kies Voeg telefoon toe → Ja, log in en scan de code hier.",
   "mobile.auth.signIn.emailButton": "Ga door met e-mail",
   "mobile.auth.done.title": "Verbonden",
   "mobile.auth.done.body": "Je bent ingelogd.",

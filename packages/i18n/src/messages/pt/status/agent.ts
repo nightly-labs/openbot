@@ -14,6 +14,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} ficou sem créditos. Trocado para {model}. Para usá-lo de novo, adicione créditos e depois selecione-o.",
   "status.agent.modelReturnedAfterError": "Após o erro do provedor, o modelo voltou para {model}.",
+  "status.agent.modelSwitchedForRemovedModel": "{previous} não está mais disponível. O modelo mudou para {model}.",
   "status.agent.marketplaceSuggested": "App da loja sugerido: {app}.",
   "status.agent.settingShown": "Configuração mostrada: {setting}.",
   "status.agent.channelMemberAdded": "{agent} adicionou {member} ao canal. {person} pediu.",
@@ -26,6 +27,12 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Capturar a tela principal e enviar a imagem ao modelo do agente.",
   "status.agent.screenCaptureChannel":
     "A imagem aparece no canal {channel}, e cada membro deste servidor que lê o canal pode vê-la.",
+  "status.agent.creditImageApproval": "Gerar uma imagem com {model}. Custa {credits} créditos.",
+  "status.agent.creditVideoApproval": "Gerar um vídeo com {model}. Custa {credits} créditos.",
+  "status.agent.creditMediaChannel":
+    "O resultado aparece no canal {channel}, e cada membro deste servidor que lê o canal pode vê-lo.",
+  "status.agent.creditsHoldBalance": "Isso usa {credits} créditos, e o saldo é de {balance} créditos.",
+  "status.agent.creditsHoldAgentsOff": "Os agentes deste servidor não podem usar créditos.",
   "status.agent.screenCapturePermissionNext":
     "Depois, o macOS pode pedir que você permita a Gravação de Tela para o OpenBot.",
   "status.agent.screenCaptureDisplay": "Capturar o monitor {name} e enviar a imagem ao modelo do agente.",
@@ -62,6 +69,19 @@ export const messages = {
   "status.agent.workflowDelete":
     "Excluir o fluxo de trabalho {title} com suas execuções e versões. Suas etapas abertas param.",
   "status.agent.deleteAgents": "Excluir {agents} com seus chats e arquivos. Não é possível desfazer.",
+  "status.agent.nearSignatureReceived": "O OpenBot recebeu a assinatura. Você pode fechar esta aba.",
+  "status.agent.nearSignatureUnknown": "O OpenBot não está aguardando esta assinatura. Comece de novo no OpenBot.",
+  "status.agent.nearPayment": "Pagar {amount} {symbol} para {recipient} pela carteira cripto, para {domain}: {reason}",
+  "status.agent.nearSummaryCreate":
+    "Todos os agentes podem pagar até {amount} USD por dia. Você pode alterar isso depois no OpenBot.",
+  "status.agent.nearSummaryGrant":
+    "Permitir que este app do OpenBot pague pela carteira por {days} dias, dentro das suas regras.",
+  "status.agent.nearSummaryBudget": "Alterar o orçamento diário da carteira para {amount} USD.",
+  "status.agent.nearSummaryAutoPay":
+    "Permitir que o OpenBot pague sem sua assinatura quando uma regra de pagamento permitir. Outros pagamentos continuam pedindo sua aprovação no chat.",
+  "status.agent.nearSummaryPayment": "Aprovar o pagamento de {amount} para {recipient}.",
+  "status.agent.nearSummaryFreeze": "Os agentes não podem pagar por esta carteira até você retomar os pagamentos.",
+  "status.agent.nearSummaryUnfreeze": "Os agentes podem pagar por esta carteira de novo, dentro das suas regras.",
   "status.agent.screenCaptureProgress": "Pedindo para capturar a tela…",
   "status.agent.screenCaptureReviewing": "Analisando a captura de tela…",
   "status.agent.browserOpening": "Abrindo uma página da web…",
@@ -69,6 +89,7 @@ export const messages = {
   "status.agent.browserClicking": "Clicando na página da web…",
   "status.agent.browserTyping": "Digitando na página da web…",
   "status.agent.browserActing": "Usando a página da web…",
+  "status.agent.browserPaying": "Enviando o pagamento…",
   "status.agent.browserReviewing": "Analisando a página da web…",
   "status.agent.memoriesSearching": "Pesquisando suas memórias…",
   "status.agent.chatsSearching": "Pesquisando seus chats anteriores…",
@@ -113,10 +134,15 @@ export const messages = {
     "Memórias: {saved} salvas, {updated} atualizadas, {forgotten} esquecidas, {notChanged} não alteradas porque outro tópico as alterou antes.",
   "status.agent.mcpToolCall": "Executar a ferramenta {tool} do servidor MCP {name}.",
   "status.agent.uiBlockClosedByMessage": "Fechado por uma nova mensagem",
-  "status.agent.finishCheckContinues": "O pedido ainda não está concluído. O agente continua ({current} de {limit}).",
+  "status.agent.location.field": "A sua localização",
+  "status.agent.location.placeholder": "Cidade, morada ou local",
+  "status.agent.location.submit": "Partilhar",
+  "status.agent.location.shared": "Localização partilhada",
   "status.agent.nextStepContinues": "O agente parou antes da próxima etapa. Ele continua ({current} de {limit}).",
   "status.agent.planContinues": "O plano tem etapas abertas. O agente continua ({current} de {limit}).",
   "status.agent.planStopped": "O agente parou com etapas abertas no plano. Envie uma mensagem para continuar.",
+  "status.agent.continuationLimitReached":
+    "O agente parou antes de terminar o pedido. Ele não pode continuar sozinho outra vez. Envie uma mensagem para continuar.",
   "status.agent.compactionContinues": "A conexão parou enquanto o agente compactava o contexto. O agente continua.",
   "status.agent.providerExitContinues": "O agente parou antes de terminar a resposta. O agente continua.",
   "status.agent.branchTitle": "Chat ramificado",

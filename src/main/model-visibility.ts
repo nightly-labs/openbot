@@ -16,10 +16,10 @@ import {
   isCustomProviderContextWindow,
   isCustomProviderMaxOutput,
   OPENCODE_RECOMMENDED_FREE_MODELS,
+  savedCustomModelId,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Clock, Effect, Result, Semaphore } from "effect";
-import { encodedModelId } from "../backend/encoded-model-id";
 import { isMissingFileError } from "../backend/file-errors";
 import { OPENCODE_CONFINED_ENV } from "../backend/process-confinement";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
@@ -322,7 +322,10 @@ function savedEndpointModels(endpoints: readonly CustomProviderSummary[]): Set<M
   return new Set(
     endpoints.flatMap((endpoint) =>
       endpoint.models.map((model) =>
-        modelKey(endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS, encodedModelId(`${endpoint.id}/`, model.id)),
+        modelKey(
+          endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
+          savedCustomModelId(endpoint.id, endpoint.harness, model.id),
+        ),
       ),
     ),
   );
@@ -380,6 +383,10 @@ export class ModelVisibility {
     return this.#set(change);
   }
 
+  hiddenIn(provider: string): ReadonlySet<string> | undefined {
+    return this.#hidden.get(provider);
+  }
+
   hiddenModels(): { provider: string; hidden: string[] }[] {
     return [...this.#hidden].map(([provider, ids]) => ({ provider, hidden: [...ids] }));
   }
@@ -420,8 +427,18 @@ export class ModelVisibility {
     return this.#picker(this.#options.listModels()).pipe(
       Effect.map((models) =>
         models.flatMap((model) =>
-          model.listing ? [{ provider: model.provider, id: model.id, listing: model.listing }] : [],
+          model.listing && model.listing !== "kept"
+            ? [{ provider: model.provider, id: model.id, listing: model.listing }]
+            : [],
         ),
+      ),
+    );
+  }
+
+  kept(): Effect.Effect<{ provider: string; id: string }[]> {
+    return this.#picker(this.#options.listModels()).pipe(
+      Effect.map((models) =>
+        models.flatMap((model) => (model.listing === "kept" ? [{ provider: model.provider, id: model.id }] : [])),
       ),
     );
   }
@@ -493,12 +510,11 @@ export class ModelVisibility {
       const picker = pickers.get(model.provider);
       if (!picker) return [model];
       const used = inUse.has(modelKey(model.provider, model.id));
-      if (picker.hidden.has(model.id) && !used) return [];
-      if (picker.byDefault.has(model.id)) {
-        const released = Date.parse(picker.released.get(model.id) ?? "");
-        return now - released < NEW_MODEL_MS ? [{ ...model, listing: "new" }] : [model];
-      }
-      return used ? [model] : [{ ...model, listing: "older" }];
+      if (picker.hidden.has(model.id)) return used ? [{ ...model, listing: "kept" }] : [];
+      if (model.listing === "older" || !picker.byDefault.has(model.id))
+        return used ? [{ ...model, listing: undefined }] : [{ ...model, listing: "older" }];
+      const released = Date.parse(picker.released.get(model.id) ?? "");
+      return now - released < NEW_MODEL_MS ? [{ ...model, listing: "new" }] : [model];
     });
   });
 

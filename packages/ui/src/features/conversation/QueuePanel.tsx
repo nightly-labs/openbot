@@ -373,6 +373,7 @@ export function QueuePanel(props: QueuePanelProps) {
   function holdText(hold: QueueHold): string {
     if (hold.reason === "provider-restart")
       return t("queue.hold.providerRestart", { provider: providerDisplayName(hold.provider) });
+    if (hold.reason === "sign-in") return t("queue.hold.signIn", { provider: providerDisplayName(hold.provider) });
     const name = (props.agents ?? []).find((agent) => agent.id === hold.agentId)?.name;
     return name
       ? t("queue.hold.named", { name, channel: hold.channelName })

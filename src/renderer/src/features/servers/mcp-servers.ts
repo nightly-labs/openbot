@@ -5,7 +5,7 @@ import {
   normalizeMcpConfig,
   type ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
-import { type AppTextKey, type AppTranslate, matchingSourceKeys } from "@openbot/i18n";
+import { type AppTextKey, type AppTranslate, matchingSourceKeys, sourceTextValues } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
 
 export type {
@@ -13,11 +13,19 @@ export type {
   McpSignInState,
   McpTestResult,
 } from "@openbot/contracts/ipc";
-export { mcpConfigErrors, mcpConfigIsValid, normalizeMcpConfig } from "@openbot/contracts/ipc";
+export { isMcpHeaderName, mcpConfigErrors, mcpConfigIsValid, normalizeMcpConfig } from "@openbot/contracts/ipc";
 
 export type McpStatusVariant = "success-light" | "destructive-light" | "warning-light" | "secondary";
 
-export type McpFailureKind = "sign-in" | "refused" | "url" | "timeout" | "startup" | "unreachable" | "other";
+export type McpFailureKind =
+  | "sign-in"
+  | "sign-in-app"
+  | "refused"
+  | "url"
+  | "timeout"
+  | "startup"
+  | "unreachable"
+  | "other";
 
 const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
   "error.backend.mcpSignInRequired": "sign-in",
@@ -25,6 +33,8 @@ const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
   "error.backend.mcpSignInTimedOut": "sign-in",
   "error.backend.mcpSignInRefused": "sign-in",
   "error.mcp.signInOnHost": "sign-in",
+  "error.backend.mcpSignInAppNeeded": "sign-in-app",
+  "error.backend.mcpRegistrationUnavailable": "sign-in-app",
   "error.backend.mcpSignInNotAccepted": "refused",
   "error.backend.mcpSignInAccountRefused": "refused",
   "error.backend.mcpServerHttpCredentials": "refused",
@@ -32,11 +42,13 @@ const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
   "error.backend.mcpRegistrationRefused": "refused",
   "error.backend.mcpSignInAppRefused": "refused",
   "error.backend.mcpSignInNeedsHttps": "url",
+  "error.backend.mcpSignInOtherAddress": "url",
   "error.backend.mcpServerHttpUrl": "url",
   "error.backend.mcpServerNoAnswer": "timeout",
   "error.backend.mcpSignInResponseTimedOut": "timeout",
   "error.backend.mcpServerExited": "startup",
   "error.backend.mcpServerExitedWithOutput": "startup",
+  "error.backend.mcpServerDownloadFailed": "startup",
   "error.backend.mcpCommandNotFound": "startup",
   "error.backend.mcpRemoteBridge": "startup",
   "error.backend.mcpServerUnreachable": "unreachable",
@@ -44,6 +56,7 @@ const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
 
 const FAILURE_LABELS = {
   "sign-in": "mcp.status.signInNeeded",
+  "sign-in-app": "mcp.status.signInAppNeeded",
   refused: "mcp.status.refused",
   url: "mcp.status.checkUrl",
   timeout: "mcp.status.noAnswer",
@@ -61,6 +74,20 @@ export function isMcpSignInOnHost(sourceText: string): boolean {
   return matchingSourceKeys(sourceText)[0] === "error.backend.mcpSignInOnHost";
 }
 
+export function mcpSignInAddress(sourceText: string): string | undefined {
+  return sourceTextValues(sourceText, "error.backend.mcpSignInOtherAddress")?.url;
+}
+
+export function mcpUrlAtAddress(url: string, address: string | undefined): string | undefined {
+  if (!address || !URL.canParse(url.trim()) || !URL.canParse(address)) return undefined;
+  const next = new URL(url.trim());
+  const target = new URL(address);
+  if (target.protocol !== "https:" || target.pathname !== next.pathname) return undefined;
+  next.protocol = target.protocol;
+  next.host = target.host;
+  return next.href;
+}
+
 export function isMcpSignInCancelled(sourceText: string): boolean {
   return matchingSourceKeys(sourceText)[0] === "error.backend.mcpSignInCancelled";
 }
@@ -69,7 +96,7 @@ export type McpTestState =
   | { status: "testing" }
   | { status: "signing-in" }
   | { status: "passed"; toolCount: number }
-  | { status: "failed"; error: string; kind: McpFailureKind };
+  | { status: "failed"; error: string; kind: McpFailureKind; address?: string };
 
 export function mcpSignInRecord(states: readonly McpSignInState[]): Record<string, McpSignInState> {
   return Object.fromEntries(states.map((state) => [state.mcpServerId, state]));
@@ -138,7 +165,8 @@ export function mcpStatusLabel(config: McpServerConfig, t: AppTranslate, test?: 
 }
 
 export function mcpStatusVariant(test?: McpTestState): McpStatusVariant {
-  if (test?.status === "failed") return test.kind === "sign-in" ? "warning-light" : "destructive-light";
+  if (test?.status === "failed")
+    return test.kind === "sign-in" || test.kind === "sign-in-app" ? "warning-light" : "destructive-light";
   if (test?.status === "passed") return "success-light";
   return "secondary";
 }

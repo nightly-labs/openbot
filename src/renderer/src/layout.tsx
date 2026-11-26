@@ -1,11 +1,12 @@
 import type { AppInfo } from "@openbot/contracts/ipc";
 import type { ServerView } from "@openbot/ui/features/servers/ServerMenu";
+import { SIDEBAR_CHAT_ORDERS, type SidebarChatOrder } from "@openbot/ui/features/sidebar/sidebar-types";
 import {
-  SIDEBAR_CHAT_ORDERS,
-  type SidebarChatOrder,
-  type SidebarView,
-} from "@openbot/ui/features/sidebar/sidebar-types";
-import { PAGE_RAIL_PINNABLE_PAGES, type PageRailPinnablePage } from "@openbot/ui/features/window/PageRail";
+  PAGE_RAIL_HIDEABLE_ITEMS,
+  PAGE_RAIL_PINNABLE_PAGES,
+  type PageRailHideableItem,
+  type PageRailPinnablePage,
+} from "@openbot/ui/features/window/PageRail";
 import { createEffect, createMemo, createSignal, onSettled } from "solid-js";
 import { z } from "zod";
 import { readPanelWidth } from "./components/panel-width-storage";
@@ -19,11 +20,11 @@ import {
   LEFT_PANEL_STORAGE_KEY,
   MAC_SERVER_RAIL_WIDTH,
   NARROW_SERVER_RAIL_WIDTH,
+  RAIL_HIDDEN_STORAGE_KEY,
   RAIL_PINS_STORAGE_KEY,
   SERVER_RAIL_WIDTH,
   SERVER_VIEW_STORAGE_KEY,
   SIDEBAR_CHAT_ORDER_STORAGE_KEY,
-  SIDEBAR_VIEW_STORAGE_KEY,
 } from "./layout-constants";
 import { usePlatform } from "./platform";
 import { createSimpleContext } from "./simple-context";
@@ -56,15 +57,21 @@ const railPinChoicesSchema = z.record(z.string(), z.boolean().optional().catch(u
 
 type RailPinChoices = z.infer<typeof railPinChoicesSchema>;
 
-function readRailPinChoices(): RailPinChoices {
+function readRailChoices(key: string): RailPinChoices {
   try {
-    const parsed = railPinChoicesSchema.safeParse(
-      JSON.parse(window.localStorage.getItem(RAIL_PINS_STORAGE_KEY) ?? "{}"),
-    );
+    const parsed = railPinChoicesSchema.safeParse(JSON.parse(window.localStorage.getItem(key) ?? "{}"));
     return parsed.success ? parsed.data : {};
   } catch {
     return {};
   }
+}
+
+function readRailPinChoices(): RailPinChoices {
+  return readRailChoices(RAIL_PINS_STORAGE_KEY);
+}
+
+function readRailHiddenChoices(): RailPinChoices {
+  return readRailChoices(RAIL_HIDDEN_STORAGE_KEY);
 }
 
 function readSidebarChatOrder(): SidebarChatOrder {
@@ -89,14 +96,16 @@ const Layout = createSimpleContext({
     const [serverView, setServerViewSignal] = createSignal<ServerView>(
       window.localStorage.getItem(SERVER_VIEW_STORAGE_KEY) === "rail" ? "rail" : "menu",
     );
-    const [sidebarView, setSidebarViewSignal] = createSignal<SidebarView>(
-      window.localStorage.getItem(SIDEBAR_VIEW_STORAGE_KEY) === "routines" ? "routines" : "agents",
-    );
     const [sidebarChatOrder, setSidebarChatOrderSignal] = createSignal<SidebarChatOrder>(readSidebarChatOrder());
     const [railPinChoices, setRailPinChoices] = createSignal<RailPinChoices>(readRailPinChoices());
     const railPinned = createMemo(() => {
       const choices = railPinChoices();
       return PAGE_RAIL_PINNABLE_PAGES.filter((page) => choices[page] ?? RAIL_PINNED_BY_DEFAULT.has(page));
+    });
+    const [railHiddenChoices, setRailHiddenChoices] = createSignal<RailPinChoices>(readRailHiddenChoices());
+    const railHidden = createMemo(() => {
+      const choices = railHiddenChoices();
+      return PAGE_RAIL_HIDEABLE_ITEMS.filter((item) => choices[item] === true);
     });
     const [leftPanelAutoCompact, setLeftPanelAutoCompact] = createSignal(false);
     const [sidebarClosed, setSidebarClosedSignal] = createSignal(
@@ -126,6 +135,7 @@ const Layout = createSimpleContext({
 
     function readRailPinsFromStorage(event: StorageEvent): void {
       if (event.key === null || event.key === RAIL_PINS_STORAGE_KEY) setRailPinChoices(readRailPinChoices());
+      if (event.key === null || event.key === RAIL_HIDDEN_STORAGE_KEY) setRailHiddenChoices(readRailHiddenChoices());
       if (event.key === null || event.key === SIDEBAR_CHAT_ORDER_STORAGE_KEY)
         setSidebarChatOrderSignal(readSidebarChatOrder());
     }
@@ -150,11 +160,6 @@ const Layout = createSimpleContext({
       window.localStorage.setItem(SERVER_VIEW_STORAGE_KEY, view);
     }
 
-    function setSidebarView(view: SidebarView): void {
-      setSidebarViewSignal(view);
-      window.localStorage.setItem(SIDEBAR_VIEW_STORAGE_KEY, view);
-    }
-
     function setSidebarChatOrder(order: SidebarChatOrder): void {
       setSidebarChatOrderSignal(order);
       try {
@@ -167,6 +172,14 @@ const Layout = createSimpleContext({
       setRailPinChoices(choices);
       try {
         window.localStorage.setItem(RAIL_PINS_STORAGE_KEY, JSON.stringify(choices));
+      } catch {}
+    }
+
+    function setRailHidden(item: PageRailHideableItem, hidden: boolean): void {
+      const choices = { ...railHiddenChoices(), ...readRailHiddenChoices(), [item]: hidden };
+      setRailHiddenChoices(choices);
+      try {
+        window.localStorage.setItem(RAIL_HIDDEN_STORAGE_KEY, JSON.stringify(choices));
       } catch {}
     }
 
@@ -188,12 +201,12 @@ const Layout = createSimpleContext({
       serverView,
       setServerView,
       serverRailVisible,
-      sidebarView,
-      setSidebarView,
       sidebarChatOrder,
       setSidebarChatOrder,
       railPinned,
       setRailPinned,
+      railHidden,
+      setRailHidden,
     };
   },
 });

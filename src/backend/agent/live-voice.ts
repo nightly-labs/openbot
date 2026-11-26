@@ -10,7 +10,7 @@ import type {
   VoiceLiveStart,
 } from "@openbot/contracts/ipc";
 import { speechTextFromMarkdown } from "@openbot/contracts/speech-text";
-import { sourceText } from "@openbot/i18n/source";
+import { isFixedSourceText, matchingSourceKeys, sourceText, sourceTextValues } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Fiber, Schema, Semaphore } from "effect";
 import type { AgentClient } from "../agent-client";
@@ -32,9 +32,12 @@ import {
 
 const ANSWER_TIMEOUT_MS = 20_000;
 const REASON_LIMIT = 1_000;
+const START_REASON_LIMIT = 160;
 const UNAUTHORIZED = /\bstatus 401\b|\b401 Unauthorized\b/;
 const CALL_NOT_FOUND = /\bstatus 404\b[\s\S]*\/realtime\/calls\b/;
 const FORBIDDEN = /^(?=[\s\S]*\brealtime\b)[\s\S]*(?:\bstatus 403\b|\b403 Forbidden\b)/;
+const CONNECTION_LOST =
+  /^(?![\s\S]*\bcontent_filter\b)(?:[\s\S]*\bstream disconnected before completion\b|transport_closed$)/;
 const ASK_TOOL = "ask_agent";
 const ASK_NAMESPACE = "openbot";
 const RELAY_VERBATIM_BYTES = 600;
@@ -68,7 +71,8 @@ const relayVoiceRule = (name: string) =>
   "Say only what the result says, and add no facts of your own. " +
   "Always speak the language that I speak, also for your own short words such as greetings. " +
   "Keep that language when a short or unclear phrase sounds like a different one. " +
-  "If I ask you to speak a different language, use it. " +
+  "Also use the same regional variety of the language as I do, for example European or Brazilian Portuguese. " +
+  "If I ask you to speak a different language or variety, use it. " +
   "Do not reply to this message.";
 const QUEUED_NOTICE =
   "Your request is in the queue. The agent is still working on an earlier request. " +
@@ -78,19 +82,23 @@ const summaryPrompt = (answer: string) =>
   `A voice says your reply aloud. The answer below is too long for the voice: reply with ${SUMMARY_RULES}` +
   `Reply with the summary only.\n\nAnswer:\n${answer}`;
 const SAME_TURN_REPLY = "The agent answered this request together with the previous one.";
-const RELAY_DELEGATION = /^<realtime_delegation>\s*(?:<source>[^<]*<\/source>\s*)?<input>([^<]*)<\/input>/;
+const RELAY_DELEGATION = /<realtime_delegation>\s*(?:<source>[^<]*<\/source>\s*)?<input>([^<]*)<\/input>/g;
 
 function relayRequest(text: string): string {
-  const input = RELAY_DELEGATION.exec(text)?.[1]
-    ?.replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&amp;", "&")
-    .trim();
-  return input || text;
+  const inputs = [...text.matchAll(RELAY_DELEGATION)]
+    .map((match) => (match[1] ?? "").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&").trim())
+    .filter(Boolean);
+  return inputs.at(-1) || text;
 }
 
 const HEARD_LINE_LIMIT = 20;
+const USER_LINE_WAIT_MS = 2_000;
 const oneLine = (text: string) => text.replace(/\s+/gu, " ").trim();
+const requestWords = (text: string) =>
+  text
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
 
 const logger = createOpenBotLogger("live-voice");
 
@@ -146,6 +154,12 @@ export interface LiveVoiceHooks {
   summarize(agentId: string, prompt: string): Effect.Effect<string, { readonly cause: unknown }>;
   emit(event: VoiceLiveEvent, memberId: string | null): void;
   redact(text: string): string;
+  otherAccounts(agentId: string): boolean;
+}
+
+interface OpenUserLine {
+  text: string;
+  readonly done: Deferred.Deferred<void>;
 }
 
 interface LiveSession {
@@ -157,6 +171,11 @@ interface LiveSession {
   threadId: string | null;
   readonly rule: string;
   readonly heard: LiveVoiceLine[];
+  userLine: OpenUserLine | null;
+  userLineGiven: boolean;
+  userLines: number;
+  lastAsk: SentAsk | null;
+  readonly asking: Semaphore.Semaphore;
   readonly answer: Deferred.Deferred<string, LiveVoiceFailed>;
   readonly onNotification: (notification: AppServerNotification) => void;
   readonly onRequest: (request: AppServerRequest) => void;
@@ -164,6 +183,12 @@ interface LiveSession {
   readonly speech: Semaphore.Semaphore;
   readonly answeredTurns: Set<string>;
   readonly speaking: Set<Fiber.Fiber<void>>;
+}
+
+interface SentAsk {
+  readonly words: string;
+  readonly userLines: number;
+  readonly deliveryId: string;
 }
 
 interface PendingAsk {
@@ -199,7 +224,10 @@ export class LiveVoice {
       if ((session.owner?.memberId ?? null) === key) yield* this.#stopSession(session);
     const start = (this.#starts.get(key) ?? 0) + 1;
     this.#starts.set(key, start);
-    const relay = yield* this.#hooks.relay(agent).pipe(toLiveVoiceFailed);
+    const relay = yield* this.#hooks.relay(agent).pipe(
+      toLiveVoiceFailed,
+      Effect.mapError((failure) => this.#relayFailure(failure, agent.id)),
+    );
     const cwd = yield* makeToollessDirectory().pipe(toLiveVoiceFailed);
     const session: LiveSession = {
       id: randomUUID(),
@@ -210,6 +238,11 @@ export class LiveVoice {
       threadId: null,
       rule: oneLine(relayVoiceRule(name)),
       heard: [],
+      userLine: null,
+      userLineGiven: false,
+      userLines: 0,
+      lastAsk: null,
+      asking: Semaphore.makeUnsafe(1),
       answer: Deferred.makeUnsafe<string, LiveVoiceFailed>(),
       onNotification: (notification) => this.#notification(session, notification),
       onRequest: (request) => this.#request(session, request),
@@ -299,7 +332,7 @@ export class LiveVoice {
         .pipe(toLiveVoiceFailed);
       return answer;
     }).pipe(
-      Effect.mapError((failure) => this.#startFailure(failure)),
+      Effect.mapError((failure) => this.#startFailure(failure, session.agentId)),
       Effect.onError(() => Effect.sync(() => this.#end(session, null, false))),
     );
     return { sessionId: session.id, sdp } satisfies VoiceLiveSession;
@@ -342,12 +375,12 @@ export class LiveVoice {
         return;
       }
       case "thread/realtime/error": {
-        this.#end(session, this.#reason(getString(params, "message")));
+        this.#end(session, this.#reason(getString(params, "message"), session.agentId));
         return;
       }
       case "thread/realtime/closed": {
         const reason = getString(params, "reason");
-        this.#end(session, reason ? this.#reason(reason) : null);
+        this.#end(session, reason ? this.#reason(reason, session.agentId) : null);
         return;
       }
       case "thread/realtime/transcript/delta":
@@ -362,10 +395,12 @@ export class LiveVoice {
             session.owner?.memberId ?? null,
           );
         const line = final ? text?.trim() : undefined;
-        if (line && !(role === "user" && oneLine(line) === session.rule)) {
+        const given = role === "user" && final && session.userLineGiven;
+        if (line && !given && !(role === "user" && oneLine(line) === session.rule)) {
           session.heard.push({ role, text: line });
           if (session.heard.length > HEARD_LINE_LIMIT) session.heard.shift();
         }
+        if (role === "user" && (final || text)) trackUserLine(session, final, text ?? "");
         return;
       }
     }
@@ -388,38 +423,83 @@ export class LiveVoice {
       session.client.respond(request.id, toolResult({ success: false, text: "The request is empty." }));
       return;
     }
+    const ask = Effect.suspend(() => {
+      const pending = session.userLine;
+      const settled = pending
+        ? Deferred.await(pending.done).pipe(Effect.timeoutOption(USER_LINE_WAIT_MS), Effect.asVoid)
+        : Effect.void;
+      return settled.pipe(
+        Effect.andThen(
+          Effect.suspend(() => {
+            const repeated = this.#repeatedAsk(session, text);
+            if (!repeated) return this.#send(session, request, text, pending);
+            return Effect.sync(() => {
+              if (!repeated.reply) this.#wait(session, request, repeated.deliveryId);
+              else if (!request.signal?.aborted) this.#respond(session, request.id, repeated.reply);
+            });
+          }),
+        ),
+      );
+    });
+    Effect.runFork(session.asking.withPermit(ask));
+  }
+
+  #send(
+    session: LiveSession,
+    request: AppServerRequest,
+    text: string,
+    pending: OpenUserLine | null,
+  ): Effect.Effect<void> {
     const waits = this.#hooks.busy(session.agentId);
     const heard = session.heard.splice(0);
+    const partial = takePartial(session, pending);
+    if (partial) heard.push(partial);
     const said = heard.flatMap((line) => (line.role === "user" ? [line.text] : [])).join("\n");
-    Effect.runFork(
-      this.#hooks.send(session.agentId, { shown: said || text, request: text, heard }, session.owner?.sender).pipe(
-        Effect.match({
-          onFailure: (failure) => {
-            session.heard.unshift(...heard);
-            session.heard.splice(0, session.heard.length - HEARD_LINE_LIMIT);
-            this.#respond(session, request.id, {
-              success: false,
-              text: failure.cause instanceof Error ? failure.cause.message : String(failure.cause),
-            });
-          },
-          onSuccess: (deliveryId) => {
-            if (!this.#sessions.has(session.id)) return;
-            const ask: PendingAsk = { session, requestId: request.signal?.aborted ? null : request.id, deliveryId };
-            this.#asks.add(ask);
-            request.signal?.addEventListener(
-              "abort",
-              () => {
-                if (!this.#asks.delete(ask)) return;
-                this.#asks.add({ session, requestId: null, deliveryId });
-              },
-              { once: true },
-            );
-            this.#answerSettled();
-            if (waits && this.#asks.has(ask)) this.#say(session, Effect.succeed(QUEUED_NOTICE), false);
-          },
-        }),
-      ),
+    return this.#hooks.send(session.agentId, { shown: said || text, request: text, heard }, session.owner?.sender).pipe(
+      Effect.match({
+        onFailure: (failure) => {
+          const replaced = partial !== null && session.userLineGiven;
+          if (replaced) session.userLineGiven = false;
+          session.heard.unshift(...(replaced ? heard.filter((line) => line !== partial) : heard));
+          session.heard.splice(0, session.heard.length - HEARD_LINE_LIMIT);
+          this.#respond(session, request.id, {
+            success: false,
+            text: failure.cause instanceof Error ? failure.cause.message : String(failure.cause),
+          });
+        },
+        onSuccess: (deliveryId) => {
+          if (!this.#sessions.has(session.id)) return;
+          session.lastAsk = { words: requestWords(text), userLines: session.userLines, deliveryId };
+          const ask = this.#wait(session, request, deliveryId);
+          if (waits && ask && this.#asks.has(ask)) this.#say(session, Effect.succeed(QUEUED_NOTICE), false);
+        },
+      }),
     );
+  }
+
+  #repeatedAsk(session: LiveSession, text: string): { deliveryId: string; reply: LiveVoiceReply | null } | null {
+    const last = session.lastAsk;
+    if (!last || last.userLines !== session.userLines || last.words !== requestWords(text)) return null;
+    const reply = this.#hooks.reply(session.agentId, last.deliveryId);
+    if (reply && !reply.success) return null;
+    logger.info("Live voice gave the same request again without new speech. It is not sent again.");
+    return { deliveryId: last.deliveryId, reply };
+  }
+
+  #wait(session: LiveSession, request: AppServerRequest, deliveryId: string): PendingAsk | null {
+    if (!this.#sessions.has(session.id)) return null;
+    const ask: PendingAsk = { session, requestId: request.signal?.aborted ? null : request.id, deliveryId };
+    this.#asks.add(ask);
+    request.signal?.addEventListener(
+      "abort",
+      () => {
+        if (!this.#asks.delete(ask)) return;
+        this.#asks.add({ session, requestId: null, deliveryId });
+      },
+      { once: true },
+    );
+    this.#answerSettled();
+    return ask;
   }
 
   #answerSettled(): void {
@@ -473,22 +553,44 @@ export class LiveVoice {
     fiber.addObserver(() => session.speaking.delete(fiber));
   }
 
-  #startFailure(failure: LiveVoiceFailed): LiveVoiceFailed {
-    const message = failure.cause instanceof Error ? failure.cause.message : String(failure.cause);
-    const text = this.#plainText(message);
-    return text ? liveFailure(text) : failure;
+  #relayFailure(failure: LiveVoiceFailed, agentId: string): LiveVoiceFailed {
+    const message = failure.cause instanceof Error ? failure.cause.message : "";
+    return matchingSourceKeys(message).length > 0 ? failure : this.#startFailure(failure, agentId);
   }
 
-  #reason(message: string | null): string {
+  #startFailure(failure: LiveVoiceFailed, agentId: string): LiveVoiceFailed {
+    const message = failure.cause instanceof Error ? failure.cause.message : String(failure.cause);
+    const text = this.#plainText(message, agentId);
+    if (text) return liveFailure(text);
+    if (isFixedSourceText(message)) return failure;
+    const fullReason = sourceTextValues(message, "error.voice.live.failed")?.reason ?? this.#hooks.redact(message);
+    logger.warn("Codex could not start live voice.", { reason: fullReason.slice(0, REASON_LIMIT) });
+    const reason = Array.from(fullReason).slice(0, START_REASON_LIMIT).join("");
+    return liveFailure(sourceText("error.voice.live.startFailed", { reason }));
+  }
+
+  #reason(message: string | null, agentId: string): string {
     if (!message) return sourceText("error.voice.live.disconnected");
     return (
-      this.#plainText(message) ??
+      this.#plainText(message, agentId) ??
+      this.#connectionLost(message) ??
       sourceText("error.voice.live.failed", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) })
     );
   }
 
-  #plainText(message: string): string | null {
-    if (UNAUTHORIZED.test(message)) return sourceText("error.voice.live.signIn");
+  #connectionLost(message: string): string | null {
+    if (!CONNECTION_LOST.test(message)) return null;
+    logger.warn("Live voice lost its connection to OpenAI.", {
+      reason: this.#hooks.redact(message).slice(0, REASON_LIMIT),
+    });
+    return sourceText("error.voice.live.connectionLost");
+  }
+
+  #plainText(message: string, agentId: string): string | null {
+    if (UNAUTHORIZED.test(message))
+      return sourceText(
+        this.#hooks.otherAccounts(agentId) ? "error.voice.live.chooseAccount" : "error.voice.live.signIn",
+      );
     const key = CALL_NOT_FOUND.test(message)
       ? "error.voice.live.unavailable"
       : FORBIDDEN.test(message)
@@ -530,6 +632,27 @@ export class LiveVoice {
     closing.addObserver(() => this.#closing.delete(closing));
     if (announce) this.#hooks.emit({ type: "ended", sessionId: session.id, error }, session.owner?.memberId ?? null);
   }
+}
+
+function trackUserLine(session: LiveSession, final: boolean, text: string): void {
+  if (!final) {
+    if (!session.userLine) session.userLines += 1;
+    session.userLine ??= { text: "", done: Deferred.makeUnsafe<void>() };
+    session.userLine.text += text;
+    return;
+  }
+  if (session.userLine) Deferred.doneUnsafe(session.userLine.done, Effect.void);
+  else if (!session.userLineGiven) session.userLines += 1;
+  session.userLine = null;
+  session.userLineGiven = false;
+}
+
+function takePartial(session: LiveSession, pending: OpenUserLine | null): LiveVoiceLine | null {
+  if (!pending || session.userLine !== pending || Deferred.isDoneUnsafe(pending.done)) return null;
+  session.userLine = null;
+  session.userLineGiven = true;
+  const text = pending.text.trim();
+  return text && oneLine(text) !== session.rule ? { role: "user", text } : null;
 }
 
 function toolResult(reply: LiveVoiceReply): DynamicToolResult {

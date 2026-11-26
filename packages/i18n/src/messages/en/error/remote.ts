@@ -22,12 +22,16 @@ export const messages = defineMessages("error.remote", {
     "The host has not allowed OpenBot to record its screen. Grant screen recording on the host, then try again.",
   "error.remote.windowsSessionDisconnected":
     "The Windows session on the host is disconnected, so it has no screen to share. Sign in to Windows at the screen of the host, then try again.",
+  "error.remote.windowsCaptureDenied":
+    "Windows on the host does not let OpenBot record its screen. Unlock Windows at the screen of the host and close any administrator prompt, then try again. If this continues, restart the host.",
   "error.remote.macScreenLocked":
     "The Mac is locked, so it cannot share its screen. Unlock the Mac at its screen, then try again.",
   "error.remote.streamTooSlowLowerQuality":
     "The connection to the host is too slow for the picture. Try again: the next connection uses a lower quality.",
   "error.remote.streamTooSlow":
     "The connection to the host is too slow for the picture. Use a faster network, then try again.",
+  "error.remote.noPictureSwitchEncoder":
+    "The host did not send a picture. Try again: the next connection uses a video setting that works on more computers.",
   "error.remote.teamSessionExpired": "The team session has expired.",
   "error.remote.finishTestBeforeSwitch": "Finish the remote desktop test before switching displays.",
   "error.remote.displayNotFound": "Remote display not found.",
@@ -88,7 +92,11 @@ export const messages = defineMessages("error.remote", {
     "OpenBot cannot verify this server because its security key is missing or changed. Ask the server owner to check the server.",
   "error.remote.connectionNotStarted":
     "OpenBot could not start the connection to this server. If this continues, quit OpenBot and open it again.",
-  "error.remote.hostDidNotConnect": "The WebRTC host did not connect.",
+  "error.remote.connectionServiceUnreachable":
+    "This computer cannot reach the OpenBot connection service. Check its internet connection. OpenBot connects again automatically.",
+  "error.remote.serverAnswerTimeout": "The server did not answer in time. OpenBot connects again automatically.",
+  "error.remote.signInConnectionClosed":
+    "The connection to the server closed during sign-in. If this continues, make sure that the date and time are correct on the server and on this device.",
   "error.remote.connectionCancelled": "The remote connection was cancelled.",
   "error.remote.hostDisconnected":
     "The connection to the server was lost. Check whether the action finished, then try again.",
@@ -206,6 +214,10 @@ export const messages = defineMessages("error.remote", {
   "error.remote.formUnavailable": "This form is no longer available.",
   "error.remote.hostedServerRemoval": "Use Billing to delete a hosted server.",
   "error.remote.hostRemoved": "The owner removed this server from the account.",
+  "error.remote.ownerTransferSelf": "You already own this server. Enter the email of the new owner.",
+  "error.remote.ownerTransferHosted": "A server that OpenBot hosts cannot change its owner.",
+  "error.remote.ownerTransferInvalid":
+    "This ownership transfer is no longer available. Ask the owner to send it again.",
   "error.remote.channelsUnsupported": "Update this desktop server to use channels.",
   "error.remote.channelDeleteUnsupported": "Update this desktop server to delete channels.",
   "error.remote.historyRefreshFailed": "The message was sent, but chat history could not refresh.",

@@ -10,9 +10,11 @@ const BOAT_API_URL = "https://boat.dev/api/v1";
 const TEMPLATE_FILES = [
   "provision.sh",
   "packages.txt",
+  "optional-packages.txt",
   "openbot-hosted-server",
   "openbot-hosted-env",
   "openbot-hosted-update",
+  "openbot-hosted-keyring",
   "openbot",
   "openbot-boat-pre-stop",
   "openbot-hosted.apparmor",

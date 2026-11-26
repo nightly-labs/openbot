@@ -56,6 +56,7 @@ import {
   untrack,
 } from "solid-js";
 import { AmbientMotion, useAmbientMotion } from "../../ambient-motion";
+import { ScrollEdges } from "../../components/ScrollEdges";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { StopIcon } from "../conversation/ConversationIcons";
 import { playIdleGreetingMotion } from "./idle-greeting-motion";
@@ -413,7 +414,8 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
   const [outgoingPresentation, setOutgoingPresentation] = createSignal<DynamicIslandPresentation>();
   const [modeTransitioning, setModeTransitioning] = createSignal(false);
   const [hovered, setHovered] = createSignal(false);
-  const ambientMotion = hovered;
+  const windowMotion = useAmbientMotion();
+  const ambientMotion = () => windowMotion() && hovered();
   let transitionRoot: HTMLDivElement | undefined;
   let modeAnimations: Animation[] = [];
   let modeTransitionVersion = 0;
@@ -1438,6 +1440,13 @@ function QuestionContent(props: {
       />
       <div data-island-motion-content>
         <div ref={questionStep} class="dynamic-island-surface-question-step">
+          <Show when={currentQuestion()?.detail}>
+            {(detail) => (
+              <ScrollEdges axis="y" class="dynamic-island-surface-question-detail">
+                <p>{detail()}</p>
+              </ScrollEdges>
+            )}
+          </Show>
           <Show when={directAnswerAvailable()}>
             <ul class="dynamic-island-surface-question-options" aria-label={t("island.question.suggestedAnswers")}>
               <For each={currentQuestion()?.options ?? []}>

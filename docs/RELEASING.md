@@ -26,7 +26,8 @@ Installed apps do not wait for a release to get a new provider CLI: they offer t
 release (see [Provider CLI updates](architecture/providers.md#provider-cli-updates)). The pinned version is the
 first-install fallback. To stop a broken upstream release, add its version to the provider's list in
 `provider-runtime-blocklist.json` and merge it to `main`. Apps read the list at their next check. A
-blocked version is no longer offered, but it stays on the computers that already installed it.
+blocked version is no longer offered. An OpenBot copy that already runs a blocked version moves to the
+newest version that is not blocked, also when that version is older. A CLI that the user installed stays.
 
 ## One-time GitHub setup
 
@@ -609,11 +610,13 @@ The workflow:
 
 1. verifies the tag matches `package.json`;
 2. installs and verifies the pinned remote desktop runtime without CMake or Cargo;
-3. runs the complete offline repository check;
+3. runs the complete offline repository check on its own macOS runner, in parallel with the builds;
 4. builds signed and notarized ARM64 DMG and ZIP artifacts plus a separately signed/notarized Host PKG on a GitHub Apple silicon runner,
    and signed and notarized x64 DMG and ZIP artifacts on a GitHub Intel runner (`macos-15-intel`). Each
    architecture builds on its own runner, because the voice runtime and the remote desktop runtime
-   are prepared for the architecture of the build machine. The Host PKG is ARM64 only.
+   are prepared for the architecture of the build machine. The Host PKG is ARM64 only. The x64 job
+   does not run on an Apple silicon runner under Rosetta: there, the packaged app checks take about
+   ten times longer, and the upgrade check does not finish.
    When `hdiutil create` fails with "Device not configured" or "Resource busy", or a network
    connection drops, the app build of each architecture starts again, up to 3 attempts, because
    these runner errors are not caused by the app;
@@ -681,7 +684,12 @@ stage the user waits on is bounded by a timeout and recorded in `logs/update/upd
 check, download, or restart reports an actionable error and can be retried in place.
 
 The voice runtime (the sherpa-onnx N-API addon and ONNX Runtime, from the pinned `sherpa-onnx-*`
-npm packages) is part of the macOS, Windows and Linux applications, in `voice/runtime`. Each Linux
+npm packages) is part of the macOS, Windows and Linux applications, in `voice/runtime`. The runtime
+also holds the pinned Silero VAD v5 speech detector (`silero_vad_v5.onnx`, 2.3 MB, MIT, notice in
+`NOTICE`), which `scripts/prepare-voice.ts` downloads and checks. Before a Whisper model (local or
+Groq) transcribes a recording, the transcription host runs the detector, and a recording with no
+speech gives an empty text and is not uploaded. When the file is missing, transcription works as
+before. Each Linux
 AppImage carries the runtime of its architecture. The Linux arm64 AppImage ships no remote desktop
 runtime. The NVIDIA Parakeet TDT 0.6B v3 int8 model is not part of an application or update
 artifact. OpenBot downloads its four pinned files on first voice use, checks the size and SHA-256 of
@@ -861,6 +869,42 @@ How the apps use it:
   confirmed state. An answer with no readable minimum removes the block.
 - An install that cannot update itself (a Linux package, Nix) shows only the download page.
 
+## Browser extension
+
+Each release tag also releases the Chrome extension. `.github/workflows/release-extension.yml` runs
+on the tag push, builds the zip from the tag, and `scripts/chrome-web-store-release.ts` uploads it to
+the Chrome Web Store and submits it with automatic publish. The store reviews the version, then
+publishes it to all users. Chrome updates each install within a few hours. The extension version is
+the release version.
+
+The workflow does not upload, and the job summary says why, when:
+
+- the package asks for a permission, a host or a match pattern that the public version does not
+  have. Chrome can disable the extension for each user until the user accepts the new warning.
+  Confirm the change, then run the workflow by hand on the tag with `publish` and
+  `allow_new_permissions`;
+- an earlier version is still in review. The next release uploads after the review. To replace the
+  version in review, run the workflow by hand on the tag with `publish` and `replace_pending`;
+- the store already has this version or a newer one, for example after a patch of an older release.
+
+It also stops on a development build, a source map, or a manifest version that is not the tag. A run
+by hand on a branch only builds and checks the zip. The `release-extension-safely` skill audits a
+range for the hazards that the script cannot see: stored state, host capability gates and account
+service routes. Use it on a pull request that changes the extension.
+
+### One-time Chrome Web Store setup
+
+1. In Google Cloud, enable the **Chrome Web Store API** in a project, create a service account with
+   no roles, and create a JSON key for it.
+2. In the Chrome Web Store Developer Dashboard of the "Nightly" publisher, add the service account
+   email in **Account**. A publisher has one service account. Copy the publisher ID from
+   **Publisher > Settings**.
+3. In `nightly-labs/openbot`, create the `chrome-web-store` environment. Limit its deployments to
+   `v*.*.*` tags. Add the secret `CHROME_WEB_STORE_SERVICE_ACCOUNT_KEY` (the JSON key) and the
+   variable `CHROME_WEB_STORE_PUBLISHER_ID`.
+4. In the dashboard, set the distribution and the rollout percentage. The API publishes with the
+   saved settings. After a change of visibility in the dashboard, publish once by hand.
+
 ## Release health after publishing
 
 Before a staged rollout goes to 100%, run the release health check. It compares how the new release
@@ -876,8 +920,9 @@ MAIN="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 
 It prints a table per platform and for servers, and writes `.openbot-build/release-health/report.json`.
 The metrics are finished starts, crashes, startup crashes, quit hangs, and update arrivals: the share
-of the computers that started an update install and then started the new release. The thresholds are
-in the script header.
+of the computers that started an update install and then started a version other than the one that
+installed it, before the end of the window. An install of an older release that a computer downloaded
+earlier counts for the window in which it started. The thresholds are in the script header.
 
 - Exit code 0: no metric is clearly worse. Raise the rollout.
 - Exit code 1: a metric is clearly worse. Keep the rollout where it is, find the cause, and publish a
@@ -900,7 +945,9 @@ Before creating the first tag or any later release:
 
 0. run the Team API compatibility matrix for every protocol that remains in the adapter registry. The matrix must cover an older client with the new host, the new client with an older host, matching versions, no shared protocol, capability omission, unknown optional events, and malformed known events. Do not reduce this matrix because a protocol is old or because many application versions separate the peers. Confirm that each supported protocol still has unchanged client and host fixtures;
 
-1. run `bun run release:preflight` and resolve every reported release-secret or repository gate;
+1. run `bun run release:preflight` and resolve every reported release-secret or repository gate.
+   It also stops when the live Marketplace does not have the catalog of `main`: publish it as
+   [the catalog README](../marketplace/production-catalog/README.md#prepare-and-publish) says;
 2. confirm the `release` environment contains all eight macOS secrets above; Windows signs through
    the Azure federated credential and needs no secret; Linux remains unsigned;
 3. confirm the production `/join` page and Apple association file pass the deployment checks in CI;

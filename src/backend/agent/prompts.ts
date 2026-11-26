@@ -13,16 +13,20 @@ import {
   vaultExpiryText,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { decodeSharedLocationAnswer } from "@openbot/contracts/team-protocol/ui-block-location-v1";
 import {
   normalizeUiBlockSpec,
   UI_API_KEY_SCOPE_FIELD_ID,
+  UI_CONFIRM_ACTION_QUESTION_ID,
   UI_CONFIRM_EDIT_ACTION_ID,
+  UI_LOCATION_FIELD_ID,
   UI_VAULT_REQUEST_FIELDS,
   UI_VAULT_SECRET_FIELDS,
   type UiBlockResponse,
   type UiBlockSpec,
   type UiFormField,
   type UiVaultRequestField,
+  uiBlockFallbackQuestions,
 } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
 import type { SavedApiKey } from "../agent-api-keys";
@@ -251,6 +255,20 @@ export function declinedMcpElicitationText(params: unknown): string {
   });
 }
 
+export function codexAppNeedsAutoReview(item: unknown): boolean {
+  if (getString(item, "type") !== "mcpToolCall" || getString(item, "server") !== CODEX_APPS_MCP_SERVER_NAME)
+    return false;
+  if (getString(item, "status") !== "failed") return false;
+  const texts = [
+    getString(getRecord(item, "error"), "message"),
+    ...getArray(getRecord(item, "result"), "content").map((part) => getString(part, "text")),
+  ];
+  return texts.some((text) => {
+    const lower = text?.toLowerCase() ?? "";
+    return lower.includes("automatic approval review") && lower.includes("full access");
+  });
+}
+
 const CODEX_MCP_TOOL_CALL_APPROVAL_KIND = "mcp_tool_call";
 
 export const MCP_TOOL_CONSENT_ALLOW_ONCE: Record<string, string[]> = {
@@ -378,18 +396,29 @@ export function promptResolution(
   };
 }
 
-export function dynamicPromptResult(answers: Record<string, string[]>): DynamicToolResult {
+export function dynamicPromptResult(
+  questions: AgentPromptQuestion[],
+  answers: Record<string, string[]>,
+): DynamicToolResult {
+  const responses = questions.map((question) => {
+    const values = answers[question.id] ?? [];
+    const asked = { id: question.id, question: question.question };
+    return values.length > 0 ? { ...asked, status: "answered", answer: values } : { ...asked, status: "skipped" };
+  });
   return {
     success: true,
-    contentItems: [{ type: "inputText", text: JSON.stringify(answers) }],
+    contentItems: [{ type: "inputText", text: JSON.stringify({ responses }) }],
   };
 }
 
-export function detachedPromptResult(): DynamicToolResult {
-  const value = {
-    status: "waiting",
-    next: "The user has not answered yet. The question stays open in the chat, and the answer arrives as the user's next message, which quotes the question. Do not ask it again. End your turn unless other work does not need the answer.",
-  };
+const DETACHED_PROMPT_NOTE =
+  "The user has not answered yet. The question stays open in the chat, and the answer arrives as the user's next message, which quotes the question. Do not ask it again. End your turn unless other work does not need the answer.";
+
+export function detachedPromptResult(
+  responseKind: "dynamic-tool" | "mcp-elicitation" | "user-input" | "ui-block",
+): DynamicToolResult | { answers: Record<string, never>; note: string } {
+  if (responseKind === "user-input") return { answers: {}, note: DETACHED_PROMPT_NOTE };
+  const value = { status: "waiting", next: DETACHED_PROMPT_NOTE };
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
@@ -401,6 +430,19 @@ export function lateAnswerText(questions: AgentPromptQuestion[], answers: Record
       return [`${quoted(question.question)}\n\n${values.join(", ")}`];
     })
     .join("\n\n");
+}
+
+export function editedPreviewQuestions(
+  questions: AgentPromptQuestion[],
+  spec: UiBlockSpec | undefined,
+  preview: string | undefined,
+): AgentPromptQuestion[] {
+  if (preview === undefined || spec?.type !== "confirm") return questions;
+  return uiBlockFallbackQuestions({ ...spec, preview: "" }).map((question) =>
+    question.id === UI_CONFIRM_ACTION_QUESTION_ID
+      ? { ...question, question: `${question.question}\n\n${preview}` }
+      : question,
+  );
 }
 
 export function vaultLateAnswerText(title: string, savedName: string | null): string {
@@ -529,6 +571,42 @@ export function apiKeyPromptResult(blockId: string, saved: SavedApiKey | null): 
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
+export function locationFormSpec(reason: string): UiBlockSpec | null {
+  return normalizeUiBlockSpec({
+    type: "form",
+    title: reason,
+    fields: [
+      {
+        id: UI_LOCATION_FIELD_ID,
+        kind: "text",
+        label: sourceText("status.agent.location.field"),
+        placeholder: sourceText("status.agent.location.placeholder"),
+        secret: true,
+      },
+    ],
+    submit: sourceText("status.agent.location.submit"),
+  });
+}
+
+const LOCATION_USE =
+  "Use it only for this request. Do not repeat the coordinates unless the user asks, and do not save them to memory, files, or messages.";
+
+export function locationPromptResult(blockId: string, response: UiBlockResponse | null): DynamicToolResult {
+  const answer = response?.values?.[UI_LOCATION_FIELD_ID];
+  const text = typeof answer === "string" ? answer.trim() : "";
+  const location = text ? decodeSharedLocationAnswer(text) : null;
+  const value = location
+    ? { status: "shared", blockId, ...location, next: LOCATION_USE }
+    : text
+      ? { status: "shared", blockId, place: text, next: LOCATION_USE }
+      : {
+          status: "declined",
+          blockId,
+          next: "Do not ask again in this turn. Ask the user for a place if you still need one.",
+        };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
 type VaultRequestArguments = BrowserToolArguments<"request_vault_item">;
 
 const VAULT_REQUEST_PREFILL: Record<VaultRequestArguments["kind"], readonly string[]> = {
@@ -610,6 +688,35 @@ const TAKEOVER_SIGN_IN_MISSING_NEXT =
 const TAKEOVER_USER_CANCELLED_NEXT =
   "The user selected Cancel. Do not call submit_secret or request_takeover again for this step, and do not try to get the same result another way. Say in your reply that the user cancelled it, and wait for the user before you try again.";
 
+function browserTakeoverNotes(
+  vault: string | undefined,
+  vaultSkipped: string | undefined,
+  signInMissing: boolean,
+  secureInputFailed: string | undefined,
+) {
+  return {
+    ...(vault ? { vault } : {}),
+    ...(vaultSkipped ? { vaultSkipped } : {}),
+    ...(signInMissing ? { signIn: "not-received" } : {}),
+    ...(secureInputFailed === undefined
+      ? {}
+      : {
+          secureInput: `OpenBot could not finish entering the value.${secureInputFailed ? ` ${secureInputFailed}` : ""} The page went to the user.`,
+        }),
+  };
+}
+
+export function browserTakeoverLateNotes(
+  vault: string | undefined,
+  vaultSkipped: string | undefined,
+  signInMissing: boolean,
+  secureInputFailed: string | undefined,
+): string {
+  const notes = browserTakeoverNotes(vault, vaultSkipped, signInMissing, secureInputFailed);
+  if (Object.keys(notes).length === 0) return "";
+  return JSON.stringify(signInMissing ? { ...notes, next: TAKEOVER_SIGN_IN_MISSING_NEXT } : notes);
+}
+
 export function browserTakeoverResult(
   decision: RespondToBrowserTakeoverInput["decision"],
   vault?: string,
@@ -625,14 +732,7 @@ export function browserTakeoverResult(
         type: "inputText",
         text: JSON.stringify({
           status: decision === "complete" ? "completed" : "cancelled",
-          ...(vault ? { vault } : {}),
-          ...(vaultSkipped ? { vaultSkipped } : {}),
-          ...(signInMissing ? { signIn: "not-received" } : {}),
-          ...(secureInputFailed === undefined
-            ? {}
-            : {
-                secureInput: `OpenBot could not finish entering the value.${secureInputFailed ? ` ${secureInputFailed}` : ""} The page went to the user.`,
-              }),
+          ...browserTakeoverNotes(vault, vaultSkipped, signInMissing, secureInputFailed),
           ...(decision === "complete"
             ? { next: signInMissing ? TAKEOVER_SIGN_IN_MISSING_NEXT : "Take a fresh snapshot and continue the task." }
             : userCancelled
@@ -648,6 +748,22 @@ export function browserTakeoverWaitingResult(tool: string, tabId: string): Dynam
   const value = {
     status: "waiting",
     next: `The user has not finished yet. The card stays open. Call ${tool} again now with tabId "${tabId}" to keep waiting for it; that call does not show a new card. Do not end your turn: the card closes when the turn ends.`,
+  };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
+export function browserTakeoverReleasedResult(tool: string, tabId: string): DynamicToolResult {
+  const value = {
+    status: "waiting",
+    next: `The user has not finished yet. The card stays open for the user, and the browser tools of this chat stay unavailable until the user finishes. When the user finishes or cancels, the result arrives as the user's next message. Do not call ${tool} again for tab "${tabId}" in this turn. Tell the user in one short sentence that the browser waits for them, and end your turn unless other work does not need the browser.`,
+  };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
+export function browserTakeoverExpiredResult(): DynamicToolResult {
+  const value = {
+    status: "expired",
+    next: "The user did not answer in time, and the card closed. Tell the user in one short sentence what they must do in the browser, and end your turn.",
   };
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }

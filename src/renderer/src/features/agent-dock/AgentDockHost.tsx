@@ -18,12 +18,18 @@ import {
   type AgentDockSeatState,
   type AgentDockTakeover,
   type AgentDockTakeoverPage,
+  type AgentDockThreadChoice,
   type AgentDockUsageLimit,
+  type AgentTask,
   type ChannelPage,
   type ChannelSummary,
   isAttachmentSummary,
+  LOCAL_SERVER_ID,
   sameAgentModelChoice,
+  withOpenBotSource,
 } from "@openbot/contracts/ipc";
+import { isAgentTaskActive } from "@openbot/team-client/agent-tasks";
+import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { approvalIsCut } from "@openbot/team-client/runtime-attention";
 import type { AgentMessage, ComposerAgent } from "@openbot/ui/data";
 import {
@@ -31,24 +37,31 @@ import {
   type AgentDockChatAnswers,
   type AgentDockChatModel,
   type AgentDockSendResult,
+  type AgentDockThreadChoices,
   type AgentDockChannel as AgentDockUiChannel,
   type AgentDockSeat as AgentDockUiSeat,
   agentDockSeatKey,
 } from "@openbot/ui/features/agent-dock/AgentDock";
-import { isDockMessage } from "@openbot/ui/features/agent-dock/AgentDockChat";
+import { isDockAnswer, isDockMessage, isDockVisualReply } from "@openbot/ui/features/agent-dock/AgentDockChat";
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
+import { threadLists } from "@openbot/ui/features/conversation/threads/thread-items";
+import { DRAFT_THREAD_ID, type ThreadItem } from "@openbot/ui/features/conversation/threads/thread-types";
 import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
 import { sidebarChannelWaits, sidebarUnreadBadge } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import type { SidebarAgentState } from "@openbot/ui/features/sidebar/sidebar-types";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, Match, onCleanup, onSettled, Show, Switch, untrack } from "solid-js";
+import { toAgentMessages } from "../../app-message-projection";
 import { appPort } from "../../app-port";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
+import { agentTasksPort } from "../agent-tasks/agent-tasks-port";
+import { useAgentThreads } from "../agent-threads/agent-threads-context";
+import { taskWaitsFor } from "../agent-threads/conversation-threads";
 import { createAgentActivity } from "../agents/agent-activity";
 import { attentionKey } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";
@@ -62,7 +75,9 @@ import {
 import { useChannels } from "../channels/channels-context";
 import { browserSecretVault } from "../conversation/browser-secret-vault";
 import { useConversation } from "../conversation/conversation-context";
+import { useConversationController } from "../conversation/conversation-controller-context";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
+import { useDesktopMediaApproval } from "../conversation/desktop-media-approval";
 import { createAgentMessageDeleteAccess, desktopAgentMessageDeleteAccess } from "../conversation/message-delete-access";
 import { narrationRows, placeTurnRowsByTime } from "../conversation/narration-rows";
 import { usageLimitAskFrom } from "../conversation/usage-limit-ask";
@@ -95,6 +110,14 @@ export function useAgentDockPlacement(): () => AgentDockPlacement | null {
   };
 }
 
+function useTakeoverPageOpener(mainTabOf: (agentId: string) => string | undefined) {
+  const { selectAgent } = useNavigation();
+  const { setBrowserTakeoverPageRequest } = useConversationController();
+  return (agentId: string, tabId: string) => {
+    if (selectAgent(agentId, mainTabOf(agentId))) setBrowserTakeoverPageRequest({ agentId, tabId });
+  };
+}
+
 export function AgentDockHost() {
   const { activeServerId } = useServers();
   const placement = useAgentDockPlacement();
@@ -108,7 +131,7 @@ export function AgentDockHost() {
       if (info?.platform !== "linux") return undefined;
       return {
         on: preference().shown && preference().placement === "screen",
-        onWayland: info.aboveAppsSupport !== undefined,
+        onWayland: info.aboveAppsSupport !== undefined && info.aboveAppsSupport !== "no-compositor",
       };
     },
     (state) => {
@@ -155,10 +178,32 @@ export function AgentDockHost() {
 function createServerDock(serverId: string, options: { readWhenHidden: boolean }) {
   const { activeAgentId, agentList, userHiddenAgentIds, agentStatus, modelOptions, updateAgent, appendUiError } =
     useAgents();
-  const { conversations, markAgentMessagesRead, loadLatestAgentMessages, clearRecentReply, presentPromptResolution } =
-    useConversation();
+  const {
+    conversations,
+    markAgentMessagesRead,
+    loadLatestAgentMessages,
+    clearRecentReply,
+    presentPromptResolution,
+    sendMessage,
+  } = useConversation();
   const { workingTurns, agentStates, agentMoods } = createAgentActivity();
   const agentTasks = useAgentTasks();
+  const agentThreads = useAgentThreads();
+  const openThread = (agentId: string): AgentTask | undefined => {
+    const shown = agentThreads.activeId(agentId);
+    return agentTasks.snapshot(agentId)?.tasks.find((task) => task.id === shown);
+  };
+  const draftShown = (agentId: string) => agentThreads.activeId(agentId) === DRAFT_THREAD_ID;
+  const threadSendIds = retryOperationIds(() => crypto.randomUUID());
+  const threadMessages = (agentId: string, thread: AgentTask): AgentMessage[] => {
+    const messages = agentTasks.conversation(thread.id)?.messages;
+    return messages
+      ? toAgentMessages(
+          messages.filter((message) => message.questionPrompt?.resolution !== null),
+          agentId,
+        )
+      : [];
+  };
   const { sidebarLayout, pinnedSidebarItems } = useSidebar();
   const channels = useChannels();
   const {
@@ -177,7 +222,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   const auth = useAuth();
   const { activeServer } = useServers();
   const { browserTabs } = useBrowserTabs();
-  const { t, errorMessage } = useText();
+  const { t, errorMessage, sourceText } = useText();
   const preference = useAgentDockPreference();
   const seatRefs = createMemo(
     () =>
@@ -352,16 +397,18 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     const page = channelId ? channelPage(channelId) : null;
     if (!page) return [];
     return withStepAnswers(
-      channelConversationRows(page.messages.filter(channelMessageHasContent), page.tasks).map(asOwn),
+      channelConversationRows(page.messages.filter(channelMessageHasContent), page.tasks, sourceText).map(asOwn),
       new Set(channelWorkingTurns(page, new Set())),
       (row) => agentList().find((agent) => agent.id === row.senderAgentId)?.provider,
     );
   });
   const agentMessages = (agentId: string): AgentMessage[] => {
-    const running = workingTurns()[agentId];
+    if (draftShown(agentId)) return [];
+    const thread = openThread(agentId);
+    const running = thread ? thread.activeTurnId : workingTurns()[agentId];
     const asking = promptOf({ kind: "agent", id: agentId })?.turnId;
     return withStepAnswers(
-      (conversations[agentId]?.messages ?? []).map(asOwn),
+      (thread ? threadMessages(agentId, thread) : (conversations[agentId]?.messages ?? [])).map(asOwn),
       new Set(running && running !== asking ? [running] : []),
       () => agentList().find((agent) => agent.id === agentId)?.provider,
     );
@@ -372,12 +419,14 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   const failed = (key: string) => {
     if (!disposed) setFailedAnswers((current) => ({ ...current, [key]: (current[key] ?? 0) + 1 }));
   };
-  const threadsOf = (seat: AgentDockSeatRef): readonly { agentId: string; threadId: string }[] =>
-    seat.kind === "agent"
-      ? shownAgents().flatMap((agent) =>
-          agent.id === seat.id && agent.threadId ? [{ agentId: agent.id, threadId: agent.threadId }] : [],
-        )
-      : (shownChannels().find((channel) => channel.id === seat.id)?.threads ?? []);
+  const threadsOf = (seat: AgentDockSeatRef): readonly { agentId: string; threadId: string }[] => {
+    if (seat.kind === "channel") return shownChannels().find((channel) => channel.id === seat.id)?.threads ?? [];
+    const own = shownAgents().flatMap((agent) =>
+      agent.id === seat.id && agent.threadId ? [{ agentId: agent.id, threadId: agent.threadId }] : [],
+    );
+    const thread = openThread(seat.id);
+    return thread ? [{ agentId: seat.id, threadId: thread.threadId }, ...own] : own;
+  };
   const approvalOf = (seat: AgentDockSeatRef): AgentDockApproval | null => {
     const threads = threadsOf(seat);
     const approval = approvals().find((item) =>
@@ -498,9 +547,18 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       };
     }
     const state = agentStates()[seat.id];
+    const thread = openThread(seat.id);
+    const draft = draftShown(seat.id);
     return {
+      threads: threadChoices(seat.id),
+      thread: thread
+        ? {
+            taskId: thread.id,
+            title: thread.title.slice(0, INPUT_LIMITS.agentTaskTitle) || t("conversation.threads.new"),
+          }
+        : null,
       messages: agentMessages(seat.id),
-      working: Boolean(workingTurns()[seat.id]),
+      working: draft ? false : thread ? isAgentTaskActive(thread) : Boolean(workingTurns()[seat.id]),
       wait: state?.kind === "waiting" ? state.reason : null,
       approval: approvalOf(seat),
       prompt: promptOf(seat),
@@ -509,20 +567,65 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     };
   };
 
+  const threadChoices = (agentId: string): AgentDockThreadChoices | null => {
+    const snapshot = agentTasks.snapshot(agentId);
+    if (!agentTasks.available() || !snapshot) return null;
+    const waiting = Object.values(pendingPrompts());
+    const waits = {
+      approvals: approvals(),
+      prompts: waiting.flatMap((event) => (event?.type === "prompt" ? [event] : [])),
+      takeovers: waiting.flatMap((event) => (event?.type === "browser-takeover-requested" ? [event.request] : [])),
+    };
+    const lists = threadLists({
+      mainUpdatedAt: "",
+      tasks: snapshot.tasks,
+      open: agentThreads.openIds(agentId),
+      draft: agentThreads.hasDraft(agentId),
+      draftTitle: t("conversation.threads.new"),
+      hidden: agentThreads.hidden(),
+      waitsFor: (task) => taskWaitsFor(task, waits),
+      unread: (task) => agentTasks.unreadCount(task),
+    });
+    return { activeId: agentThreads.activeId(agentId), threads: lists.threads.slice(0, AGENT_DOCK_LIMITS.threads) };
+  };
+
   const readable = () => options.readWhenHidden || document.visibilityState === "visible";
   createEffect(
     () => {
       const seat = openSeat();
-      return seat?.kind === "agent"
-        ? { agentId: seat.id, latest: latestVisibleAgentMessageId(conversations[seat.id]?.messages) }
-        : null;
+      if (seat?.kind !== "agent" || draftShown(seat.id)) return null;
+      const thread = openThread(seat.id);
+      if (thread)
+        return agentTasks.unreadCount(thread) > 0
+          ? {
+              agentId: seat.id,
+              taskId: thread.id,
+              latest: latestVisibleAgentMessageId(threadMessages(seat.id, thread)),
+            }
+          : null;
+      return { agentId: seat.id, latest: latestVisibleAgentMessageId(conversations[seat.id]?.messages) };
     },
     (open) => {
       if (!open?.latest || !readable()) return;
+      if (open.taskId !== undefined) {
+        agentTasks.markTaskRead(open.agentId, open.taskId, open.latest);
+        return;
+      }
       clearRecentReply(open.agentId);
       void markAgentMessagesRead(open.agentId, open.latest, serverId).catch(() => undefined);
     },
   );
+  const unloadedThread = createMemo(
+    (): { agentId: string; taskId: string } | null => {
+      const seat = openSeat();
+      const thread = seat?.kind === "agent" ? openThread(seat.id) : undefined;
+      return seat && thread && !agentTasks.conversation(thread.id) ? { agentId: seat.id, taskId: thread.id } : null;
+    },
+    { equals: (left, right) => left?.agentId === right?.agentId && left?.taskId === right?.taskId },
+  );
+  createEffect(unloadedThread, (unloaded) => {
+    if (unloaded) agentTasks.openTask(unloaded.agentId, unloaded.taskId);
+  });
   let connectedSequence: number | undefined;
   createEffect(
     () => {
@@ -605,7 +708,40 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     openSeat,
     openChat(seat: AgentDockSeatRef | null) {
       setOpenSeat(seat ? { kind: seat.kind, id: seat.id } : null);
-      if (seat?.kind === "agent" && !conversations[seat.id]?.messages?.length) void loadLatestAgentMessages(seat.id);
+      if (seat?.kind !== "agent") return;
+      if (agentTasks.available() && !agentTasks.snapshot(seat.id)) void agentTasks.loadTasks(seat.id);
+      if (!openThread(seat.id) && !conversations[seat.id]?.messages?.length) void loadLatestAgentMessages(seat.id);
+    },
+    showThread(agentId: string, id: string, started = false) {
+      if (!started) {
+        agentThreads.open(agentId, id);
+        return;
+      }
+      void agentTasks.loadTasks(agentId).finally(() => {
+        const draftOpen = draftShown(agentId);
+        if (agentThreads.hasDraft(agentId)) agentThreads.close(agentId, DRAFT_THREAD_ID);
+        if (draftOpen) agentThreads.open(agentId, id);
+      });
+    },
+    newThread(agentId: string) {
+      agentThreads.startNew(agentId);
+    },
+    async sendToAgent(agentId: string, text: string): Promise<AgentDockSendResult> {
+      if (draftShown(agentId)) {
+        const started = await agentThreads.sendDraft(agentId, text, []);
+        return started ? { messageId: crypto.randomUUID() } : { error: t("conversation.threads.error.start") };
+      }
+      const thread = openThread(agentId);
+      if (!thread) return sendMessage(text, [], null, { agentId, serverId });
+      const message = threadSendIds([agentId, thread.id, text]);
+      void agentTasks.loadLatest(agentId, thread.id);
+      try {
+        await agentTasksPort(serverId).sendToTask({ agentId, taskId: thread.id, text, clientMessageId: message.id });
+        return { messageId: message.id };
+      } catch (error) {
+        message.failed();
+        return { error: errorMessage(error, t("conversation.threads.error.send")) };
+      }
     },
     mainTabOf(agentId: string): string | undefined {
       const state = agentStates()[agentId];
@@ -705,20 +841,24 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
 }
 
 function WindowAgentDock(props: { serverId: string }) {
-  const { sendMessage } = useConversation();
   const { selectAgent } = useNavigation();
   const channels = useChannels();
   const { openAppSettings } = useSettings();
   const dock = createServerDock(props.serverId, { readWhenHidden: false });
+  const media = useDesktopMediaApproval();
   const voice = createAgentDockVoice(() => props.serverId);
+  const openTakeoverPage = useTakeoverPageOpener((agentId) => dock.mainTabOf(agentId));
   const answers: AgentDockChatAnswers = {
     approval: (approval, decision) => dock.respondToApproval(approval.agentId, approval.requestId, decision),
     prompt: (prompt, values) => dock.answerPrompt(prompt.agentId, prompt.threadId, prompt.requestId, values),
     takeover: ({ request }, decision) =>
       dock.respondToTakeover(request.agentId, request.threadId, request.requestId, decision),
+    takeoverDone: ({ request }) => props.serverId === LOCAL_SERVER_ID || request.reason !== "sign-in-blocked",
+    openTakeover: ({ request }) => openTakeoverPage(request.agentId, request.tabId),
     secret: (_takeover, input) => agentDockPort().agent.respondToBrowserSecret(input, props.serverId),
     usageLimitSend: (limit, option, remember) => dock.sendOnBackup(limit.agentId, option.key, remember),
     usageLimitWait: (limit) => dock.waitForReset(limit.agentId),
+    media,
   };
 
   return (
@@ -732,19 +872,23 @@ function WindowAgentDock(props: { serverId: string }) {
       onRemove={dock.remove}
       onMove={dock.move}
       onSend={(seat, text) =>
-        seat.kind === "channel"
-          ? dock.sendToChannel(seat.id, text)
-          : sendMessage(text, [], null, { agentId: seat.id, serverId: props.serverId })
+        seat.kind === "channel" ? dock.sendToChannel(seat.id, text) : dock.sendToAgent(seat.id, text)
       }
       onOpenInMain={(seat) =>
         seat.kind === "channel" ? void channels.open(seat.id) : selectAgent(seat.id, dock.mainTabOf(seat.id))
       }
       onOpenWindow={(agentId) => void appPort().openChatWindow({ serverId: props.serverId, agentId })}
+      onOpenThread={(seat, id) => {
+        if (seat.kind === "agent") dock.showThread(seat.id, id);
+      }}
+      onNewThread={(seat) => {
+        if (seat.kind === "agent") dock.newThread(seat.id);
+      }}
       answers={answers}
       voice={voice}
       agents={dock.agents()}
       onSelectAgent={(agentId) => selectAgent(agentId)}
-      onOpenLink={(url) => void appPort().openUrl(url)}
+      onOpenLink={(url) => void appPort().openUrl(withOpenBotSource(url))}
       onOpenSettings={() => openAppSettings(null, "agent-dock")}
       onHide={() => setAgentDockPreference({ shown: false })}
       results={dock.results()}
@@ -758,6 +902,7 @@ function ScreenAgentDock(props: { serverId: string }) {
   const { openAppSettings } = useSettings();
   const preference = useAgentDockPreference();
   const dock = createServerDock(props.serverId, { readWhenHidden: true });
+  const openTakeoverPage = useTakeoverPageOpener((agentId) => dock.mainTabOf(agentId));
 
   const presentation = createMemo(
     (): AgentDockPresentation => ({
@@ -824,7 +969,7 @@ function ScreenAgentDock(props: { serverId: string }) {
   onSettled(() => {
     const unsubscribe = agentDockPort().agentDock.onAction((action) => {
       if (action.type === "open-link") {
-        void appPort().openUrl(action.url);
+        void appPort().openUrl(withOpenBotSource(action.url));
         return;
       }
       if (action.type === "open-settings") {
@@ -852,6 +997,9 @@ function ScreenAgentDock(props: { serverId: string }) {
         case "open-agent":
           selectAgent(action.agentId, dock.mainTabOf(action.agentId));
           return;
+        case "open-browser-takeover":
+          openTakeoverPage(action.agentId, action.tabId);
+          return;
         case "open-channel":
           void channels.open(action.channelId);
           return;
@@ -875,6 +1023,13 @@ function ScreenAgentDock(props: { serverId: string }) {
         case "usage-limit-wait":
           dock.waitForReset(action.agentId);
           return;
+        case "open-thread":
+          dock.showThread(action.agentId, action.threadId, action.started === true);
+          return;
+        case "new-thread":
+          dock.newThread(action.agentId);
+          return;
+        case "start-thread":
         case "send":
           return;
       }
@@ -963,6 +1118,10 @@ function openChats(
   return [
     {
       seat: { kind: seat.kind, id: seat.id },
+      thread: model.thread ? { taskId: model.thread.taskId, title: model.thread.title } : null,
+      threads: model.threads
+        ? { activeId: model.threads.activeId, threads: model.threads.threads.map(dockThreadChoice) }
+        : null,
       messages: messages(seat).filter(isDockMessage).slice(-AGENT_DOCK_LIMITS.messages).map(dockMessage),
       working: model.working,
       wait: model.wait,
@@ -1006,7 +1165,32 @@ function dockApproval(current: { approval: AgentApproval; attempt: number }): Ag
   };
 }
 
+function dockThreadChoice(thread: ThreadItem): AgentDockThreadChoice {
+  return {
+    id: thread.id,
+    title: thread.title.slice(0, INPUT_LIMITS.agentTaskTitle),
+    updatedAt: thread.updatedAt.slice(0, AGENT_DOCK_LIMITS.threadTime),
+    status:
+      thread.status.kind === "waiting"
+        ? { kind: "waiting", reason: thread.status.reason }
+        : { kind: thread.status.kind },
+    unread: Math.min(thread.unread ?? 0, AGENT_DOCK_LIMITS.count),
+  };
+}
+
 function dockMessage(message: AgentMessage): AgentDockMessage {
+  const attachments = (message.attachments ?? [])
+    .filter(isAttachmentSummary)
+    .slice(0, INPUT_LIMITS.attachments)
+    .map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      size: attachment.size,
+      kind: attachment.kind,
+      mimeType: attachment.mimeType,
+      previewKind: attachment.previewKind,
+      previewUrl: attachment.previewUrl,
+    }));
   return {
     id: message.id.slice(0, INPUT_LIMITS.identifier),
     author: message.author,
@@ -1014,18 +1198,8 @@ function dockMessage(message: AgentMessage): AgentDockMessage {
     senderMember: message.senderMember ? { id: message.senderMember.id, name: message.senderMember.name } : null,
     kind: message.kind === "error" ? "error" : "text",
     body: message.body.slice(0, INPUT_LIMITS.messageText),
-    attachments: (message.attachments ?? [])
-      .filter(isAttachmentSummary)
-      .slice(0, INPUT_LIMITS.attachments)
-      .map((attachment) => ({
-        id: attachment.id,
-        name: attachment.name,
-        size: attachment.size,
-        kind: attachment.kind,
-        mimeType: attachment.mimeType,
-        previewKind: attachment.previewKind,
-        previewUrl: attachment.previewUrl,
-      })),
+    attachments,
+    ...(isDockVisualReply({ ...message, attachments }) ? { visual: true } : {}),
   };
 }
 
@@ -1036,7 +1210,7 @@ function withStepAnswers(
 ): AgentMessage[] {
   const answered = new Set<string>();
   for (const message of messages)
-    if (message.turnId && message.author === "agent" && isDockMessage(message)) answered.add(message.turnId);
+    if (message.turnId && message.author === "agent" && isDockAnswer(message)) answered.add(message.turnId);
   const notes: AgentMessage[][] = [];
   const rows = messages.flatMap((message) => {
     const turnId = message.turnId;
@@ -1068,7 +1242,7 @@ function unreadAnswers(messages: readonly AgentMessage[], count: number, firstUn
   const first = firstUnreadId === null ? -1 : messages.findIndex((message) => message.id === firstUnreadId);
   const unread = first >= 0 ? messages.slice(first) : messages.slice(-count);
   return unread.filter(
-    (message) => message.author === "agent" && isDockMessage(message) && message.kind !== "error" && !message.streaming,
+    (message) => message.author === "agent" && isDockAnswer(message) && message.kind !== "error" && !message.streaming,
   );
 }
 

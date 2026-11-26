@@ -10,6 +10,8 @@ export function useMessageArrivals(agentId: string, messages: ChatMessage[], ena
     if (enabled && snapshot.enabled && snapshot.agentId === agentId) {
       const previous = snapshot.messages;
       let byId: Map<string, ChatMessage> | undefined;
+      const previousThinking = previous.findLast((item) => item.kind === "thinking");
+      const newestStep = previousThinking?.kind === "thinking" ? previousThinking.steps.at(-1)?.id : undefined;
       const previousTail = previous.at(-1)?.id;
       const tailIndex = !previousTail
         ? -1
@@ -25,7 +27,8 @@ export function useMessageArrivals(agentId: string, messages: ChatMessage[], ena
         if (
           snapshot.arriving.has(message.id) ||
           (old?.kind === "message" && old.streaming && message.kind === "message" && message.status === "completed") ||
-          ((previous.length === 0 || (tailIndex >= 0 && index > tailIndex)) && !old)
+          ((previous.length === 0 || (tailIndex >= 0 && index > tailIndex)) && !old) ||
+          (!old && message.kind === "message" && message.progress && message.id === newestStep)
         )
           arriving.add(message.id);
       }

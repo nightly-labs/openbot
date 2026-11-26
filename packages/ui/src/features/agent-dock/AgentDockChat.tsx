@@ -1,3 +1,4 @@
+import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type {
   AgentApproval,
   AgentDockBackupModel,
@@ -37,11 +38,14 @@ import { ComposerEditor } from "../conversation/ComposerEditor";
 import { ApprovalCard, BrowserTakeoverCard } from "../conversation/ConversationPrompts";
 import { createComposerRowsResize } from "../conversation/createComposerRowsResize";
 import { MarkdownMessageText } from "../conversation/MarkdownMessageText";
+import type { MediaApprovalControls } from "../conversation/MediaApprovalCard";
+import { DRAFT_THREAD_ID } from "../conversation/threads/thread-types";
 import { ComposerVoiceControls, type VoicePhase } from "../conversation/VoiceRecordingMorph";
 import { SidebarWaitIcon } from "../sidebar/SidebarAgentIndicator";
 import { SIDEBAR_WAIT_ACTION, SIDEBAR_WAIT_TITLE } from "../sidebar/sidebar-filtering";
 import type { SidebarWaitReason } from "../sidebar/sidebar-types";
 import type { AgentDockSeat } from "./AgentDock";
+import { type AgentDockThreadChoices, AgentDockThreadMenu } from "./AgentDockThreadMenu";
 
 const VISIBLE_MESSAGES = 60;
 const STICK_TO_END_PX = 80;
@@ -51,6 +55,8 @@ const THUMB_HIDE_MS = 900;
 const SCROLL_INPUT_MS = 1000;
 
 export interface AgentDockChatModel {
+  thread?: { taskId: string; title: string } | null | undefined;
+  threads?: AgentDockThreadChoices | null | undefined;
   messages: readonly AgentMessage[];
   working: boolean;
   wait: SidebarWaitReason | null;
@@ -64,9 +70,12 @@ export interface AgentDockChatAnswers {
   approval: (approval: AgentApproval, decision: "accept" | "decline") => Promise<boolean>;
   prompt: (prompt: AgentDockPrompt, answers: Record<string, string[]>) => Promise<boolean>;
   takeover: (takeover: AgentDockTakeover, decision: "complete" | "cancel") => Promise<boolean>;
+  takeoverDone?: ((takeover: AgentDockTakeover) => boolean) | undefined;
+  openTakeover?: ((takeover: AgentDockTakeover) => void) | undefined;
   secret: (takeover: AgentDockTakeover, input: LocalBrowserSecretResponse) => Promise<void>;
   usageLimitSend: (limit: AgentDockUsageLimit, option: AgentDockBackupModel, remember: boolean) => Promise<void>;
   usageLimitWait: (limit: AgentDockUsageLimit) => void;
+  media?: MediaApprovalControls | undefined;
 }
 
 export interface AgentDockPendingMessage {
@@ -89,14 +98,51 @@ export interface AgentDockChatVoice {
   onSend: () => void;
 }
 
-export function isDockMessage(message: AgentMessage): boolean {
+function isDockRow(message: AgentMessage): boolean {
   if (message.author !== "you" && message.author !== "agent") return false;
-  if (message.kind !== undefined && message.kind !== "text" && message.kind !== "error") return false;
+  return message.kind === undefined || message.kind === "text" || message.kind === "error";
+}
+
+function hasDockText(message: AgentMessage): boolean {
   return message.body.trim().length > 0;
+}
+
+function hasDockAttachments(message: AgentMessage): boolean {
+  return (message.attachments?.length ?? 0) > 0;
+}
+
+export function isDockAnswer(message: AgentMessage): boolean {
+  return isDockRow(message) && hasDockText(message);
+}
+
+export function isDockMessage(message: AgentMessage): boolean {
+  return isDockRow(message) && (hasDockText(message) || hasDockAttachments(message));
+}
+
+export function isDockVisualReply(message: AgentMessage): boolean {
+  return chatVisualReply(message) !== null;
 }
 
 function isOwn(message: AgentMessage): boolean {
   return message.author === "you" && !message.senderMember;
+}
+
+function AgentDockFileRow(props: { names: readonly string[]; onOpen: () => void }) {
+  const { t, format } = useText();
+  const label = () => format.list(props.names);
+  return (
+    <div class="agent-dock-visual">
+      <p class="agent-dock-text">{label()}</p>
+      <Button
+        variant="secondary"
+        size="sm"
+        aria-label={t("agent.dock.openFile", { name: label() })}
+        onClick={() => props.onOpen()}
+      >
+        {t("common.open")}
+      </Button>
+    </div>
+  );
 }
 
 export function pendingMessageDelivered(pending: AgentDockPendingMessage, messages: readonly AgentMessage[]): boolean {
@@ -121,7 +167,10 @@ export function AgentDockChat(props: {
   onRemove: () => void;
   onAdd: () => void;
   onOpenInMain: () => void;
+  onOpenTakeover: (takeover: AgentDockTakeover) => void;
   onOpenWindow?: (() => void) | undefined;
+  onOpenThread?: ((id: string) => void) | undefined;
+  onNewThread?: (() => void) | undefined;
   voice?: AgentDockChatVoice | undefined;
   agents: ComposerAgent[];
   onSelectAgent?: ((agentId: string) => void) | undefined;
@@ -142,7 +191,20 @@ export function AgentDockChat(props: {
   const subtitle = () => {
     if (props.chat.wait) return t(SIDEBAR_WAIT_TITLE[props.chat.wait]);
     if (props.chat.working) return t("agent.dock.working");
+    if (props.chat.thread) return t("conversation.threads.current", { title: props.chat.thread.title });
     return props.seat.kind === "agent" ? props.seat.agent.title : props.seat.channel.title;
+  };
+  const threadSwitcher = () => {
+    const choices = props.chat.threads;
+    const onOpen = props.onOpenThread;
+    const onNew = props.onNewThread;
+    return choices && onOpen && onNew ? { choices, onOpen, onNew } : undefined;
+  };
+  const composerPlaceholder = () => {
+    if (props.chat.threads?.activeId === DRAFT_THREAD_ID)
+      return t("conversation.threads.view.newPlaceholder", { name: name() });
+    if (props.chat.thread) return t("conversation.threads.view.placeholder", { name: name() });
+    return t("composer.placeholder.message", { name: name() });
   };
   const author = (message: AgentMessage): string | undefined => {
     if (!channel() || isOwn(message)) return undefined;
@@ -324,7 +386,11 @@ export function AgentDockChat(props: {
         </Show>
         <div class="agent-dock-chat-title">
           <strong>{name()}</strong>
-          <span>{subtitle()}</span>
+          <Show when={threadSwitcher()} fallback={<span>{subtitle()}</span>}>
+            {(switcher) => (
+              <AgentDockThreadMenu choices={switcher().choices} onOpen={switcher().onOpen} onNew={switcher().onNew} />
+            )}
+          </Show>
         </div>
         <Show when={props.onPinChange}>
           {(change) => (
@@ -426,16 +492,43 @@ export function AgentDockChat(props: {
                         <Show when={author(message)}>
                           {(shown) => <span class="agent-dock-author">{shown()}</span>}
                         </Show>
-                        <div class="agent-dock-markdown message-markdown">
-                          <MarkdownMessageText
-                            body={message.body}
-                            agents={props.agents}
-                            attachments={message.attachments}
-                            onSelectAgent={(agentId) => props.onSelectAgent?.(agentId)}
-                            onOpenAttachment={() => props.onOpenInMain()}
-                            onOpenLink={(url) => props.onOpenLink?.(url)}
-                          />
-                        </div>
+                        <Show
+                          when={isDockVisualReply(message)}
+                          fallback={
+                            <Show
+                              when={hasDockText(message)}
+                              fallback={
+                                <AgentDockFileRow
+                                  names={(message.attachments ?? []).map((attachment) => attachment.name)}
+                                  onOpen={() => props.onOpenInMain()}
+                                />
+                              }
+                            >
+                              <div class="agent-dock-markdown message-markdown">
+                                <MarkdownMessageText
+                                  body={message.body}
+                                  agents={props.agents}
+                                  attachments={message.attachments}
+                                  onSelectAgent={(agentId) => props.onSelectAgent?.(agentId)}
+                                  onOpenAttachment={() => props.onOpenInMain()}
+                                  onOpenLink={(url) => props.onOpenLink?.(url)}
+                                />
+                              </div>
+                            </Show>
+                          }
+                        >
+                          <div class="agent-dock-visual">
+                            <p class="agent-dock-text">{message.body}</p>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              aria-label={t("agent.dock.openPage", { title: message.body })}
+                              onClick={() => props.onOpenInMain()}
+                            >
+                              {t("common.open")}
+                            </Button>
+                          </div>
+                        </Show>
                       </BubbleContent>
                     </Bubble>
                   );
@@ -482,8 +575,12 @@ export function AgentDockChat(props: {
                         tab={takeoverTab(current())}
                         preview={null}
                         previewStatus="idle"
-                        onOpen={() => props.onOpenInMain()}
-                        onComplete={() => respondTakeover(current(), "complete")}
+                        onOpen={() => props.onOpenTakeover(current())}
+                        onComplete={
+                          props.answers?.takeoverDone?.(current()) === false
+                            ? undefined
+                            : () => respondTakeover(current(), "complete")
+                        }
                         onCancel={() => respondTakeover(current(), "cancel")}
                         browserSecret={takeoverSecret(current())}
                       />
@@ -516,6 +613,7 @@ export function AgentDockChat(props: {
                         approval={current().approval}
                         onApprove={() => respond(current().approval, "accept")}
                         onReject={() => respond(current().approval, "decline")}
+                        media={props.answers?.media}
                       />
                     </div>
                   )}
@@ -571,8 +669,8 @@ export function AgentDockChat(props: {
               agentId={undefined}
               agents={props.agents}
               value={props.draft}
-              placeholder={t("composer.placeholder.message", { name: name() })}
-              ariaLabel={t("composer.placeholder.message", { name: name() })}
+              placeholder={composerPlaceholder()}
+              ariaLabel={composerPlaceholder()}
               disabled={transcribing()}
               focusRequest={props.focusRequest}
               dictation={{ text: props.voice?.liveText ?? "", final: transcribing() }}

@@ -48,6 +48,7 @@ import type { LicenseCalls } from "@openbot/ui/features/billing/license-store";
 import type { ProviderSettingsDetail } from "@openbot/ui/features/settings/ProviderSettingsPage";
 import {
   SaveBarDock,
+  type SettingsCrumb,
   SettingsDialogShell,
   SettingsNavGroupLabel,
   type SettingsPagePlacement,
@@ -88,19 +89,23 @@ import {
   type ServerImportOptions,
   ServerImportPanel,
 } from "./ServerImportPanel";
+import type { ServerMediaApprovalOptions } from "./ServerMediaApprovalSetting";
 import { createServerMembersSection } from "./ServerMembersSection";
 import type { ServerMemoryLimitOptions } from "./ServerMemoryLimitSetting";
 import type { ServerMemoryReviewOptions } from "./ServerMemoryReviewSetting";
 import { createServerMemorySection } from "./ServerMemorySection";
+import { createServerOwnerTransferSection, type OwnerTransferCalls } from "./ServerOwnerTransferSection";
 import { type ServerPersonalityOptions, ServerPersonalitySetting } from "./ServerPersonalitySetting";
 import { createServerRolesSection, type ServerAgentAccessOptions } from "./ServerRolesSection";
 import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
+import type { ServerSignalHomeOptions } from "./ServerSignalHomeSetting";
 import type { ServerSkillLearningOptions } from "./ServerSkillLearningSetting";
 import type { ServerTimezoneOptions } from "./ServerTimezoneSetting";
 import { type ServerTransferOptions, ServerTransferPanel } from "./ServerTransferPanel";
 import type { ServerTurnLimitsOptions } from "./ServerTurnLimitsSetting";
 import { type ServerUpdateOptions, ServerUpdatePanel } from "./ServerUpdatePanel";
-import { serverCanAdminister, serverRoleCanAdminister } from "./server-capabilities";
+import type { ServerVoiceModelOptions } from "./ServerVoiceModelSetting";
+import { PROVIDER_SEARCH_NAMES, serverCanAdminister, serverRoleCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
 export interface ServerSettingsModalProps {
@@ -122,6 +127,7 @@ export interface ServerSettingsModalProps {
   onCreateInvite: (input: { role: "admin" | "member"; email?: string; permanent?: boolean }) => Promise<InviteSummary>;
   license?: Pick<LicenseCalls, "getState" | "setUsers" | "changePlan"> | undefined;
   companySignIn?: CompanySignInCalls | undefined;
+  ownerTransfer?: OwnerTransferCalls | undefined;
   onDownloadDesktopApp?: (() => void) | undefined;
   onContactUs?: () => void;
   onUpdateMember: (input: UpdateTeamMemberInput) => Promise<void>;
@@ -139,7 +145,10 @@ export interface ServerSettingsModalProps {
   instanceTransfer?: ServerTransferOptions | undefined;
   hostUpdate?: ServerUpdateOptions | undefined;
   hostTimezone?: ServerTimezoneOptions | undefined;
+  hostVoiceModel?: ServerVoiceModelOptions | undefined;
+  hostSignalHome?: ServerSignalHomeOptions | undefined;
   hostTurnLimits?: ServerTurnLimitsOptions | undefined;
+  mediaApprovalCredits?: ServerMediaApprovalOptions | undefined;
   hostPersonality?: ServerPersonalityOptions | undefined;
   hostMemoryLimit?: ServerMemoryLimitOptions | undefined;
   memoryReview?: ServerMemoryReviewOptions | undefined;
@@ -231,7 +240,10 @@ const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
   agents: [
     "server.settings.timezone",
     "server.settings.turnLimit",
+    "server.settings.voiceModel.section",
     "server.settings.agentTaskLimit",
+    "server.settings.mediaApprovalAgents",
+    "server.settings.mediaApprovalCredits",
     "agentSettings.automation.title",
     "agentSettings.agentNewChat.title",
     "agentSettings.quickAcknowledgement.title",
@@ -249,7 +261,9 @@ const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
     "server.companySignIn.title",
     "server.companySignIn.sso",
     "server.companySignIn.scim",
+    "server.ownerTransfer.title",
   ],
+  providers: ["provider.settings.accounts", "provider.account.add"],
   storage: ["settings.backgroundProcesses.title"],
   experimental: ["server.settings.experimentalCrm"],
 };
@@ -286,7 +300,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   );
   const [providerDetail, setProviderDetail] = createSignal<ProviderSettingsDetail | null>(null);
   const [importDetail, setImportDetail] = createSignal<ServerImportDetail | null>(null);
+  const [vaultDetail, setVaultDetail] = createSignal<SettingsCrumb | null>(null);
   const crumbDetail = () => {
+    if (section() === "vault") return vaultDetail();
     if (section() === "import") return importDetail();
     if (section() === "roles") return roles.crumb();
     if (section() === "agents") return agents.crumb();
@@ -309,7 +325,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   function promptCacheSource(): ProviderPromptCacheSource | undefined {
     const options = props.hostPromptCacheTtl;
     if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "prompt-cache-ttl-v1")) return undefined;
-    return { ...options, serverId: props.server.id };
+    return {
+      ...options,
+      serverId: props.server.id,
+      appliesToPi: local() || serverCanAdminister(props.server, "prompt-cache-ttl-pi-v1"),
+      compaction: local() || serverCanAdminister(props.server, "cache-expiry-compaction-v1"),
+    };
   }
   function claudeUserSetupSource(): ProviderClaudeUserSetupSource | undefined {
     const options = props.claudeUserSetup;
@@ -436,8 +457,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     const needle = props.sectionQuery?.trim().toLocaleLowerCase();
     if (!needle) return true;
     const { title, description } = sections[value];
-    return [title, description, ...(SECTION_ROWS[value] ?? [])].some((key) =>
-      t(key).toLocaleLowerCase().includes(needle),
+    const names = value === "providers" ? PROVIDER_SEARCH_NAMES : [];
+    return [...[title, description, ...(SECTION_ROWS[value] ?? [])].map((key) => t(key)), ...names].some((words) =>
+      words.toLocaleLowerCase().includes(needle),
     );
   };
   const matchingSections = createMemo(() =>
@@ -483,6 +505,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     host,
     () => props.companySignIn,
     () => props.onDownloadDesktopApp,
+    () => props.open && section() === "members",
+  );
+  const ownerTransfer = createServerOwnerTransferSection(
+    host,
+    () => props.ownerTransfer,
     () => props.open && section() === "members",
   );
   const hostedSites = createSettingsHostedSitesStore(
@@ -536,6 +563,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         general.resetForServer();
         members.resetForServer();
         companySignIn.resetForServer();
+        ownerTransfer.resetForServer();
         roles.resetForServer();
         audit.resetForServer();
         agents.resetForServer();
@@ -785,13 +813,14 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Show when={props.vault}>
           {(vault) => (
             <Tabs.Content value="vault" class="settings-modal-tab-panel server-settings-panel" data-tab="vault">
-              <ServerVaultPanel {...vault()} menuMount={modalElement()} />
+              <ServerVaultPanel {...vault()} menuMount={modalElement()} onDetailChange={setVaultDetail} />
             </Tabs.Content>
           )}
         </Show>
         <Tabs.Content value="members" class="settings-modal-tab-panel server-settings-panel" data-tab="members">
           <members.Panel />
           <companySignIn.Panel />
+          <ownerTransfer.Panel />
         </Tabs.Content>
         <Show when={roles.available()}>
           <Tabs.Content value="roles" class="settings-modal-tab-panel server-settings-panel" data-tab="roles">
@@ -958,6 +987,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       </SettingsDialogShell>
 
       <members.ConfirmDialogs />
+      <ownerTransfer.Dialogs />
       <general.LeaveDialog />
       <general.RotateKeyDialog />
     </Tabs.Root>

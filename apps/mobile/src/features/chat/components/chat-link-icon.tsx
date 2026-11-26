@@ -1,5 +1,6 @@
 import { Image } from "expo-image";
 import LinkIcon from "lucide-react-native/icons/link";
+import PhoneIcon from "lucide-react-native/icons/phone";
 import { memo, useState } from "react";
 import { type ColorValue, View } from "react-native";
 
@@ -35,7 +36,11 @@ export const ChatLinkIcon = memo(function ChatLinkIcon({
       pointerEvents="none"
       style={{ width: size, height: size }}
     >
-      {shown && loaded === favicon ? null : <LinkIcon color={String(color)} size={size} strokeWidth={1.8} />}
+      {shown && loaded === favicon ? null : url.startsWith("tel:") ? (
+        <PhoneIcon color={String(color)} size={size} strokeWidth={1.8} />
+      ) : (
+        <LinkIcon color={String(color)} size={size} strokeWidth={1.8} />
+      )}
       {shown ? (
         <Image
           source={{ uri: favicon }}

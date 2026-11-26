@@ -9,9 +9,48 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub kennt die Client ID dieser GitHub App nicht.",
   "error.connector.githubUnexpected": "GitHub hat eine unerwartete Antwort gesendet: {detail}",
   "error.connector.githubUnreachable": "OpenBot kann GitHub nicht erreichen: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot kann GitHub nicht erreichen. Prüfe die Internetverbindung und die DNS-Einstellungen des Computers oder Servers, auf dem OpenBot läuft, und versuche es dann erneut.",
   "error.connector.githubExpired": "Die GitHub-Verbindung ist abgelaufen. Verbinde GitHub erneut.",
   "error.connector.githubFileUnreadable": "Die GitHub-Verbindungsdatei ist nicht lesbar.",
   "error.connector.githubFileTooLarge": "Die GitHub-Verbindungsdatei ist zu groß.",
+  "error.connector.nearSignIn": "Melde dich bei OpenBot an, um die Krypto-Wallet zu verwenden.",
+  "error.connector.nearServiceUnavailable": "Der Krypto-Wallet-Dienst ist nicht verfügbar. Versuche es später erneut.",
+  "error.connector.nearWalletNotFound": "Diese Wallet gehört nicht zu diesem OpenBot-Konto oder Server.",
+  "error.connector.nearWalletLimit": "Heute wurden zu viele neue Wallets erstellt. Versuche es morgen erneut.",
+  "error.connector.nearProviderBusy": "NEAR Intents antwortet gerade nicht. Versuche es in ein paar Minuten erneut.",
+  "error.connector.nearNoWallet":
+    "Es ist keine Krypto-Wallet eingerichtet. Richte sie unter Servereinstellungen > Vault > Krypto ein.",
+  "error.connector.nearWalletExists": "Eine Krypto-Wallet ist bereits eingerichtet.",
+  "error.connector.nearFrozen":
+    "Zahlungen aus der Krypto-Wallet sind pausiert. Setze sie unter Servereinstellungen > Vault > Krypto fort.",
+  "error.connector.nearAgentNotAllowed":
+    "Dieser Agent kann nicht aus der Krypto-Wallet zahlen. Erlaube es unter Servereinstellungen > Vault > Krypto.",
+  "error.connector.nearGrantExpired":
+    "OpenBot hat keine Zahlungsfreigabe für die Krypto-Wallet. Erneuere sie unter Servereinstellungen > Vault > Krypto.",
+  "error.connector.nearUnknownAsset": "Die Krypto-Wallet hat kein Asset {asset}.",
+  "error.connector.nearAmountInvalid": "{amount} ist kein gültiger Betrag in {asset}.",
+  "error.connector.nearRecipientInvalid": "{recipient} ist kein NEAR-Konto und keine chain:address.",
+  "error.connector.nearRefused": "Die NEAR Intents Agent API hat die Anfrage abgelehnt: {detail}",
+  "error.connector.nearUnexpected": "Die NEAR Intents Agent API hat eine unerwartete Antwort gesendet: {detail}",
+  "error.connector.nearUnreachable": "OpenBot kann die NEAR Intents Agent API nicht erreichen: {detail}",
+  "error.connector.nearFileUnreadable": "Die Krypto-Wallet-Datei ist nicht lesbar.",
+  "error.connector.nearFileTooLarge": "Die Krypto-Wallet-Datei ist zu groß.",
+  "error.connector.nearSigningCanceled": "Die Signatur wurde abgebrochen.",
+  "error.connector.nearSigningExpired": "Die Signatur kam nicht rechtzeitig an. Versuche es erneut.",
+  "error.connector.nearSigningInvalid": "Die Signatur aus dem Browser ist nicht gültig.",
+  "error.connector.nearSigningBusy":
+    "Im Browser wartet bereits eine andere Signatur. Schließe sie zuerst ab oder brich sie ab.",
+  "error.connector.nearPolicyCooldown": "Du kannst die Wallet-Regeln ab {time} wieder ändern.",
+  "error.connector.nearPolicyPending":
+    "Die Regeländerung wurde nicht abgeschlossen. Versuche es in ein paar Minuten erneut.",
+  "error.connector.nearDeclined": "Der Eigentümer hat die Zahlung abgelehnt.",
+  "error.connector.nearUncertain":
+    "OpenBot weiß nicht, ob die Zahlung gesendet wurde. Zahle nicht noch einmal. Der Eigentümer kann den Verlauf der Wallet prüfen.",
+  "error.connector.nearPaymentFailed": "Die Zahlung ist fehlgeschlagen: {detail}",
+  "error.connector.nearPaymentUnknown": "Diese Zahlung wartet nicht mehr auf eine Antwort.",
+  "error.connector.nearRuleFull": "Eine Zahlungsregel kann höchstens {limit} Empfänger haben.",
+  "error.connector.nearRulesFull": "Die Wallet kann höchstens {limit} Zahlungsregeln haben.",
   "error.connector.onePasswordCliMissing":
     "OpenBot kann die 1Password CLI nicht finden. Installiere sie und aktiviere ihre Integration in der 1Password-App oder verwende ein Dienstkonto-Token.",
   "error.connector.onePasswordCliInstallFailed":
@@ -31,6 +70,8 @@ export const messages = {
     "1Password hat zu viele Anfragen erhalten. Warte ein paar Minuten und versuche es erneut.",
   "error.connector.onePasswordNoVault":
     "Das Dienstkonto kann keinen Tresor lesen. Gib ihm Zugriff auf einen Tresor und versuche es erneut.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot kann deine Logins in 1Password nicht lesen. Trenne 1Password und verbinde es dann erneut.",
   "error.connector.onePasswordFileUnreadable": "Die 1Password-Verbindungsdatei ist nicht lesbar.",
   "error.connector.onePasswordFileTooLarge": "Die 1Password-Verbindungsdatei ist zu groß.",
   "error.connector.bitwardenFailed":
@@ -43,6 +84,10 @@ export const messages = {
     "Gib eine HTTPS-Serveradresse, client_id und client_secret des API-Schlüssels und das Master-Passwort ein.",
   "error.connector.bitwardenHostFailed":
     "Bitwarden konnte auf diesem Server nicht geöffnet werden. Prüfe die Serveradresse, den API-Schlüssel und das Master-Passwort und stelle sicher, dass ein Ordner Shared with OpenBot heißt. Verbinde dann erneut.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Die Anmeldung bei Bitwarden auf diesem Server ist fehlgeschlagen. Prüfe die Serveradresse und den API-Schlüssel und verbinde dann erneut.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Bitwarden konnte auf diesem Server nicht entsperrt werden. Prüfe das Master-Passwort und verbinde dann erneut.",
   "error.connector.bitwardenCliInstallFailed":
     "Die Bitwarden CLI konnte auf diesem Server nicht installiert werden. Prüfe seine Netzwerkverbindung und verbinde dann erneut.",
   "error.connector.bitwardenFileUnreadable": "Die Bitwarden-Verbindungsdatei ist nicht lesbar.",

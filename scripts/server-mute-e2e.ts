@@ -145,6 +145,7 @@ const serversPath = join(userData, "remote-servers.json");
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -170,6 +171,7 @@ const teamBrowser: TeamApiBrowser = {
   navigate: unused,
   reload: unused,
   stop: unused,
+  answerPermission: unused,
   takeUserControl: unused,
   startTeach: unused,
   stopTeach: () => [],
@@ -185,7 +187,9 @@ const teamBrowser: TeamApiBrowser = {
   startView: unused,
   dispatchViewInput: unused,
   copyViewSelection: unused,
+  answerViewDialog: unused,
   importSignIn: unused,
+  answerHttpSignIn: unused,
 };
 const cipher = {
   encrypt: (value: string) => Buffer.from(value, "utf8"),
@@ -274,6 +278,7 @@ try {
     teamIpcHandlers({
       host,
       localServers: null,
+      ownerTransfers: { pendingOwnerTransfer: unused, startOwnerTransfer: unused, cancelOwnerTransfer: unused },
       remoteDesktop: new RemoteDesktopManager(manager),
       remoteServers: manager,
       takePendingInvite: () => null,
@@ -295,6 +300,7 @@ try {
     createRendererForwarders({
       getMainWindow: () => mainWindow,
       getChatWindows: () => [],
+      chatWindowTarget: () => null,
       getAgentService: () => agents ?? null,
       getHostService: () => null,
       getHostAnalytics: () => null,

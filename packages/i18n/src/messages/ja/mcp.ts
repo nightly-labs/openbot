@@ -30,6 +30,8 @@ export const messages = {
   "mcp.signIn.pageDescription": "このページは {host} のブラウザーで開いています。ここでサインインしてください。",
   "mcp.signIn.copyHint": "ページが読み込まれない場合は、リンクをコピーして別のブラウザーで開いてください。",
   "mcp.signIn.copyLink": "リンクをコピー",
+  "mcp.signIn.pasteHint":
+    "別のデバイスでサインインした場合は、最後にそのブラウザーに表示されたアドレスをコピーしてここに貼り付けてください。",
   "mcp.test.connected": { other: "接続済み · ツール {count} 個" },
   "mcp.status.testing": "テスト中…",
   "mcp.status.failed": "失敗",
@@ -38,6 +40,7 @@ export const messages = {
   "mcp.status.signedIn": "サインイン済み",
   "mcp.status.signingIn": "サインイン中…",
   "mcp.status.signInNeeded": "サインインが必要",
+  "mcp.status.signInAppNeeded": "サインインアプリが必要",
   "mcp.status.refused": "拒否されました",
   "mcp.status.checkUrl": "URL を確認",
   "mcp.status.noAnswer": "応答なし",
@@ -98,6 +101,7 @@ export const messages = {
   "mcp.panel.signIn": "サインイン",
   "mcp.panel.signOut": "サインアウト",
   "mcp.panel.cancelSignIn": "サインインをキャンセル",
+  "mcp.panel.useAddress": "このアドレスを使う",
   "mcp.panel.signInTo": "{name} にサインイン",
   "mcp.panel.signInWaiting": {
     other: "ブラウザーでサインインを完了してください。OpenBot は {count} 分後に待機をやめます。",

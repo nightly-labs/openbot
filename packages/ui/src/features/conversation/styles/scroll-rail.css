@@ -94,17 +94,13 @@
 }
 
 .chat-scroll-rail-nav:is(:hover, :has(:focus-visible))
-  :is(.chat-scroll-rail-item[data-open] + * + *, .chat-scroll-rail-item:has(+ * + [data-open]))
+  .chat-scroll-rail-item[data-open-distance="2"]
   .chat-scroll-rail-tick {
   width: 10px;
 }
 
 .chat-scroll-rail-nav:is(:hover, :has(:focus-visible))
-  :is(
-    .chat-scroll-rail-item[data-state="active"],
-    .chat-scroll-rail-item[data-open] + *,
-    .chat-scroll-rail-item:has(+ [data-open])
-  )
+  :is(.chat-scroll-rail-item[data-state="active"], .chat-scroll-rail-item[data-open-distance="1"])
   .chat-scroll-rail-tick {
   width: var(--openbot-space-3);
 }

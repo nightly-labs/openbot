@@ -15,6 +15,8 @@ const OUT = join(ROOT, ".openbot-build", "mobile-connected-devices-e2e");
 const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
 const SERVER = join(ROOT, "apps", "auth-api", "scripts", "mobile-connected-devices-server.ts");
 const START_LIMIT_MS = 20_000;
+const COMPUTER_CLOCK_AHEAD_MS = 10 * 60_000;
+const MOBILE_TICKET_LIFETIME_LIMIT_MS = 2 * 60_000 + 2_000;
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
 function check(name: string, passed: boolean, detail?: unknown) {
@@ -192,6 +194,32 @@ try {
     );
     const phoneMe = await fetch(`${apiUrl}/v1/me`, { headers: { Authorization: `Bearer ${phoneToken}` } });
     check("the revoked phone cannot use its session", phoneMe.status === 401, phoneMe.status);
+
+    const realNow = Date.now;
+    const computerNow = () => realNow() + COMPUTER_CLOCK_AHEAD_MS;
+    Date.now = computerNow;
+    const aheadCode = await runCauseEffect(desktop.createMobileConnect(joined)).then(
+      (value) => value,
+      (cause: unknown) => (cause instanceof Error ? cause.message : String(cause)),
+    );
+    Date.now = realNow;
+    const aheadRemainingMs = typeof aheadCode === "string" ? null : aheadCode.expiresAt - computerNow();
+    check(
+      "a computer clock 10 minutes ahead gets a code that stays valid for its full time on that clock",
+      aheadRemainingMs !== null && aheadRemainingMs > 60_000 && aheadRemainingMs <= MOBILE_TICKET_LIFETIME_LIMIT_MS,
+      typeof aheadCode === "string" ? { error: aheadCode } : { remainingMs: aheadRemainingMs },
+    );
+    const aheadTicket = typeof aheadCode === "string" ? null : parseMobileConnectUrl(aheadCode.qrData)?.ticket;
+    const aheadRedeem = aheadTicket
+      ? await fetch(`${apiUrl}/v1/mobile-auth/redeem`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ticket: aheadTicket, deviceId: randomUUID(), deviceName: "iPhone", platform: "ios" }),
+        })
+      : null;
+    check("the phone can use the code from the computer with the clock ahead", aheadRedeem?.status === 200, {
+      status: aheadRedeem?.status ?? null,
+    });
   } finally {
     await runCauseEffect(desktop.dispose());
   }

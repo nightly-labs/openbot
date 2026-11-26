@@ -1,3 +1,4 @@
+import { providerCliSource } from "@openbot/contracts/cli-version";
 import {
   AGENT_PROVIDERS,
   type AgentProviderId,
@@ -38,11 +39,12 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
     ).map((provider) => {
       const agent = props.agentStatus?.providers?.find((candidate) => candidate.id === provider);
       const runtime = props.providerRuntimeStatuses?.[provider];
+      const cliSource = agent ? providerCliSource(agent, runtime) : undefined;
       const agentVersionShown = Boolean(
         runtime &&
           agent &&
           (runtime.phase === "ready" || runtime.phase === "not-downloaded") &&
-          (agent.cliSource === "system" && !(agent.cliIncomplete && runtime.phase === "not-downloaded")
+          (cliSource === "system" && !(agent.cliIncomplete && runtime.phase === "not-downloaded")
             ? agent.state === "available" ||
               agent.state === "sign-in-required" ||
               (agent.state === "error" && runtime.phase === "ready")
@@ -90,10 +92,10 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
         accountPool: agent?.accountPool,
         runtimeStatus:
           runtime && agentVersionShown ? { ...runtime, phase: "ready", version: agent?.version ?? null } : runtime,
-        cliSource: agentVersionShown || agent?.cliSource === "managed" ? agent?.cliSource : undefined,
-        otherCliVersion: agentVersionShown || agent?.cliSource === "managed" ? agent?.otherCliVersion : undefined,
+        cliSource: agentVersionShown || cliSource === "managed" ? cliSource : undefined,
+        otherCliVersion: agentVersionShown || cliSource === "managed" ? agent?.otherCliVersion : undefined,
         incompleteCliVersion:
-          agent?.cliSource === "system" && agent.cliIncomplete && runtime?.phase === "not-downloaded"
+          cliSource === "system" && agent?.cliIncomplete && runtime?.phase === "not-downloaded"
             ? (agent.version ?? undefined)
             : undefined,
       };

@@ -6,12 +6,15 @@ export interface RoutineDueSource {
 }
 
 const MAX_DELAY = 60_000;
+const MIN_REFIRE_GAP = 2_000;
 
 export class RoutineTimer {
   #timer: NodeJS.Timeout | null = null;
   #firing = false;
   #suspended = false;
   #held = false;
+  #lastFiredAt = Number.NEGATIVE_INFINITY;
+  #readFailing = false;
 
   constructor(
     private readonly sources: () => Iterable<RoutineDueSource>,
@@ -24,10 +27,18 @@ export class RoutineTimer {
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
     if (this.#paused() || !this.isRunning()) return;
-    const earliest = this.nextDueAt();
+    let earliest: string | null;
+    try {
+      earliest = this.nextDueAt();
+    } catch (error) {
+      this.#retryArmAfterReadFailure(error);
+      return;
+    }
+    this.#readFailing = false;
     if (!earliest) return;
     const dueAt = new Date(earliest).getTime();
-    const delay = Math.max(0, Math.min(dueAt - Date.now(), MAX_DELAY));
+    const refireGap = this.#lastFiredAt + MIN_REFIRE_GAP - performance.now();
+    const delay = Math.max(0, Math.min(dueAt - Date.now(), MAX_DELAY), refireGap);
     this.#timer = setTimeout(() => {
       this.#timer = null;
       if (Date.now() < dueAt) {
@@ -37,6 +48,17 @@ export class RoutineTimer {
       Effect.runFork(this.#fire());
     }, delay);
     this.#timer.unref?.();
+  }
+
+  #retryArmAfterReadFailure(error: unknown): void {
+    this.#timer = setTimeout(() => {
+      this.#timer = null;
+      this.arm();
+    }, MAX_DELAY);
+    this.#timer.unref?.();
+    if (this.#readFailing) return;
+    this.#readFailing = true;
+    this.onError("routine_scheduler_failed", error);
   }
 
   nextDueAt(): string | null {
@@ -97,6 +119,7 @@ export class RoutineTimer {
       Effect.ensuring(
         Effect.sync(() => {
           this.#firing = false;
+          this.#lastFiredAt = performance.now();
           this.arm();
         }),
       ),

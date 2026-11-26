@@ -14,6 +14,7 @@ import {
   type ShortcutDirectoryAgent,
   writeShortcutDirectory,
 } from "./model/shortcut-directory";
+import { ShortcutSendHandler } from "./shortcut-send";
 import { shortcutsSupported } from "./shortcuts-native";
 
 interface ShortcutsSyncProps {
@@ -26,7 +27,12 @@ interface ShortcutsSyncProps {
 }
 
 export function ShortcutsSync(props: ShortcutsSyncProps): ReactNode {
-  return shortcutsSupported ? <ShortcutsDirectorySync {...props} /> : null;
+  return shortcutsSupported ? (
+    <>
+      <ShortcutsDirectorySync {...props} />
+      <ShortcutSendHandler />
+    </>
+  ) : null;
 }
 
 function ShortcutsDirectorySync({
@@ -59,6 +65,10 @@ function ShortcutsDirectorySync({
       "mobile.settings.shortcuts.card.noAgent.action": t("mobile.settings.shortcuts.card.noAgent.action"),
       "mobile.settings.shortcuts.card.locked.title": t("mobile.settings.shortcuts.card.locked.title"),
       "mobile.settings.shortcuts.card.locked.action": t("mobile.settings.shortcuts.card.locked.action"),
+      "mobile.settings.shortcuts.card.message": t("mobile.settings.shortcuts.card.message", { name: "{name}" }),
+      "mobile.settings.shortcuts.card.messagePrompt": t("mobile.settings.shortcuts.card.messagePrompt", {
+        name: "{name}",
+      }),
       "mobile.settings.shortcuts.send.sent": t("mobile.settings.shortcuts.send.sent"),
       "mobile.settings.shortcuts.send.failed": t("mobile.settings.shortcuts.send.failed"),
       "mobile.settings.shortcuts.send.unconfirmed": t("mobile.settings.shortcuts.send.unconfirmed"),

@@ -3,6 +3,7 @@ import type { ProfileActivityPhase } from "@openbot/ui/features/settings/Profile
 import type { ProfileActivityState } from "@openbot/ui/features/settings/SettingsProfileTab";
 import { errorReference } from "@openbot/user-errors";
 import { createEffect, createStore, untrack } from "solid-js";
+import { createBackgroundRefresh } from "../usage/background-refresh";
 import { usagePort } from "../usage/usage-port";
 
 const PROFILE_DAYS = 365;
@@ -54,10 +55,12 @@ export function createProfileActivityStore(
       return;
     }
     void load();
+    const refresh = createBackgroundRefresh(load);
     const unsubscribe = usagePort().agent.onScopedEvent(({ serverId, event }) => {
-      if (serverId === LOCAL_SERVER_ID && event.type === "turn-completed") void load();
+      if (serverId === LOCAL_SERVER_ID && event.type === "turn-completed") refresh.request();
     });
     return () => {
+      refresh.dispose();
       unsubscribe();
     };
   });

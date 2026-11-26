@@ -42,14 +42,23 @@ import {
 import { downloadWhatsAppMedia } from "./whatsapp-media";
 import { whatsAppChunks, whatsAppText } from "./whatsapp-render";
 import type { WhatsAppConnectionHandle, WhatsAppRuntime } from "./whatsapp-runtime";
-import { allowsContact, whatsAppNumberForms } from "./whatsapp-senders";
+import { allowsContact, isReadOnlyChat, whatsAppNumberForms } from "./whatsapp-senders";
+import type { WhatsAppSocket } from "./whatsapp-session";
 import { WhatsAppTransport } from "./whatsapp-transport";
 
 const WHATSAPP_FILE_BYTES_LIMIT = 64 * 1024 * 1024;
 const WHATSAPP_CAPTION_LIMIT = 1_024;
-const WHATSAPP_POST_STOPS = new Set(["place_not_allowed", "not_linked", "not_connected", "not_confirmed"]);
+const WHATSAPP_POST_STOPS = new Set([
+  "place_not_allowed",
+  "place_read_only",
+  "no_account",
+  "not_linked",
+  "not_connected",
+  "not_confirmed",
+]);
 const EDIT_WINDOW_MS = 14 * 60_000;
 const PLACE_NAME_TIMEOUT_MS = 5_000;
+const ACCOUNT_CHECK_TIMEOUT_MS = 5_000;
 const SAVED_HISTORY_NOTE =
   "WhatsApp sends no older messages to OpenBot. OpenBot has only the messages that it received after the number was linked and the chat was allowed, up to 1 day old on arrival, for 90 days. In a chat with a contact, the messages that the user sent from their phone are not saved. Fewer messages here does not mean that the connection has a problem: tell the user what OpenBot can read.";
 
@@ -108,6 +117,7 @@ class WhatsAppAdapter implements MessagingAdapter {
   readonly #credentials: WhatsAppCredentials;
   #opened: WhatsAppConnectionHandle | null = null;
   readonly #sentAt = new Map<string, number>();
+  #accounts: { socket: WhatsAppSocket; numbers: Set<string> } | null = null;
 
   constructor(runtime: WhatsAppRuntime, credentials: WhatsAppCredentials) {
     this.#runtime = runtime;
@@ -149,6 +159,7 @@ class WhatsAppAdapter implements MessagingAdapter {
   }
 
   readonly post = Effect.fnUntraced(function* (this: WhatsAppAdapter, target: MessageTarget, body: MessageBody) {
+    yield* this.#checkPlace(target.platformChannelId);
     const sent = yield* this.#send(target, {
       text: this.#statusText(body),
       ...this.#mentions(body.text),
@@ -170,14 +181,12 @@ class WhatsAppAdapter implements MessagingAdapter {
   ) {
     if (!body.buttons?.length) this.#handle.chats.forgetMenu(messageId);
     const sentAt = this.#sentAt.get(messageId);
-    if (sentAt === undefined || Date.now() - sentAt > EDIT_WINDOW_MS) {
-      yield* this.post(target, body);
-      return;
-    }
+    if (sentAt === undefined || Date.now() - sentAt > EDIT_WINDOW_MS) return yield* this.post(target, body);
     yield* this.#session().send(target.platformChannelId, {
       text: this.#statusText(body),
       edit: this.#ownKey(target, messageId),
     });
+    return messageId;
   });
 
   readonly remove = Effect.fnUntraced(function* (this: WhatsAppAdapter, target: MessageTarget, messageId: string) {
@@ -273,6 +282,7 @@ class WhatsAppAdapter implements MessagingAdapter {
     if (!caption || caption.length > WHATSAPP_CAPTION_LIMIT) return null;
     const content = yield* this.#fileContent(file).pipe(Effect.catch(() => Effect.succeed(null)));
     if (!content) return null;
+    yield* this.#checkPlace(target.platformChannelId);
     return yield* this.#send(target, { ...content, caption, ...this.#mentions(caption) }).pipe(
       Effect.catch((failure) => {
         const cause = failure.cause;
@@ -378,20 +388,23 @@ class WhatsAppAdapter implements MessagingAdapter {
       const identity = whatsAppIdentity(this.#handle);
       if (!identity) return { places: [] };
       const rules = this.#runtime.policy.rules(identity.number);
-      const places: MessagingPlace[] = [];
-      if (rules.ownNumber)
-        places.push({
-          id: userJid(identity.number),
-          name: sourceText("status.messaging.whatsappOwnChat"),
-          kind: "chat",
-        });
+      const places: MessagingPlace[] = [
+        { id: userJid(identity.number), name: sourceText("status.messaging.whatsappOwnChat"), kind: "chat" },
+      ];
       for (const [contact, savedName] of rules.contacts)
         places.push({
           id: userJid(contact),
           name: savedName || (this.#handle.chats.name(contact) ?? maskedNumber(contact)),
           kind: "chat",
+          ...(rules.readOnly.has(contact) ? { readOnly: true as const } : {}),
         });
-      for (const group of rules.groups) places.push({ id: group, name: yield* this.placeName(group), kind: "channel" });
+      for (const group of rules.groups)
+        places.push({
+          id: group,
+          name: yield* this.placeName(group),
+          kind: "channel",
+          ...(rules.readOnly.has(group) ? { readOnly: true as const } : {}),
+        });
       return { places };
     });
   }
@@ -423,7 +436,7 @@ class WhatsAppAdapter implements MessagingAdapter {
 
   #send(target: MessageTarget, content: AnyMessageContent): Effect.Effect<string, MessagingAdapterError> {
     return Effect.gen({ self: this }, function* () {
-      yield* this.#checkPlace(target.platformChannelId);
+      yield* this.#allowPlace(target.platformChannelId);
       const quoteId = whatsAppQuoteId(target);
       const options: MiscMessageGenerationOptions | undefined = quoteId
         ? { quoted: this.#quoted(target, quoteId) }
@@ -459,6 +472,17 @@ class WhatsAppAdapter implements MessagingAdapter {
   }
 
   #checkPlace(chatJid: string): Effect.Effect<void, MessagingAdapterError> {
+    return this.#allowPlace(chatJid).pipe(
+      Effect.flatMap(() => {
+        const identity = whatsAppIdentity(this.#handle);
+        const user = isJidGroup(chatJid) ? null : userPart(chatJid);
+        const contact = user !== null && user !== identity?.number && chatJid.endsWith("@s.whatsapp.net");
+        return contact ? this.#checkAccount(user) : Effect.void;
+      }),
+    );
+  }
+
+  #allowPlace(chatJid: string): Effect.Effect<void, MessagingAdapterError> {
     return Effect.suspend(() => {
       const identity = whatsAppIdentity(this.#handle);
       if (!identity) return Effect.fail(new MessagingAdapterError({ cause: new Error("not_linked") }));
@@ -467,8 +491,31 @@ class WhatsAppAdapter implements MessagingAdapter {
       const allowed = isJidGroup(chatJid)
         ? rules.groups.has(chatJid)
         : user === identity.number || (user !== null && allowsContact(rules, user));
-      return allowed ? Effect.void : Effect.fail(new MessagingAdapterError({ cause: new Error("place_not_allowed") }));
+      if (!allowed) return Effect.fail(new MessagingAdapterError({ cause: new Error("place_not_allowed") }));
+      return isReadOnlyChat(rules, chatJid)
+        ? Effect.fail(new MessagingAdapterError({ cause: new Error("place_read_only") }))
+        : Effect.void;
     });
+  }
+
+  #checkAccount(number: string): Effect.Effect<void, MessagingAdapterError> {
+    const socket = this.#session().socket();
+    if (!socket) return Effect.void;
+    if (this.#accounts?.socket !== socket) this.#accounts = { socket, numbers: new Set() };
+    const known = this.#accounts.numbers;
+    if (known.has(number)) return Effect.void;
+    return this.#session()
+      .registered(whatsAppNumberForms(number))
+      .pipe(
+        Effect.timeoutOrElse({ duration: ACCOUNT_CHECK_TIMEOUT_MS, orElse: () => Effect.succeed(null) }),
+        Effect.orElseSucceed(() => null),
+        Effect.flatMap((jids) => {
+          if (jids === null) return Effect.void;
+          if (jids.length === 0) return Effect.fail(new MessagingAdapterError({ cause: new Error("no_account") }));
+          known.add(number);
+          return Effect.void;
+        }),
+      );
   }
 
   #quoted(target: MessageTarget, messageId: string): WAMessage {

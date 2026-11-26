@@ -6,6 +6,15 @@ import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./a
 import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
 import type { BillingDetails, BillingDetailsRequest } from "./billing-details";
 import type {
+  CreditActivity,
+  CreditCheckoutRequest,
+  CreditRedeemRequest,
+  CreditRedeemResult,
+  CreditsState,
+  CreditTransferRequest,
+} from "./credits";
+import type { CustomServerCheckoutRequest, CustomServerCheckoutResult } from "./custom-server-plans";
+import type {
   CreateHostedServerInput,
   DeleteHostedServerInput,
   HostedServerCatalog,
@@ -25,6 +34,7 @@ import type {
   AddedAgent,
   AgentAdminSettings,
   AgentBackupModelSettings,
+  AgentBuiltinMemorySettings,
   AgentDefaultsOverview,
   AgentFastModeSettings,
   AgentHostSettings,
@@ -33,6 +43,7 @@ import type {
   SetAgentDefaultChoiceInput,
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
+  UpdateAgentBuiltinMemoryInput,
   UpdateAgentDefaultsInput,
   UpdateAgentFastModeInput,
   UpdateAgentHostSettingsInput,
@@ -44,6 +55,7 @@ import type {
   AgentDockAction,
   AgentDockDisplayInfo,
   AgentDockDragPhase,
+  AgentDockExtent,
   AgentDockInputRect,
   AgentDockOffset,
   AgentDockPresentation,
@@ -88,7 +100,7 @@ import type {
   SaveAgentProfileInput,
   SaveAgentProfileResult,
 } from "./ipc-agent-profile";
-import type { AgentRuntimeSnapshot } from "./ipc-agent-runtime";
+import type { AgentRuntimePrompt, AgentRuntimeSnapshot } from "./ipc-agent-runtime";
 import type {
   AgentSessionSettings,
   ResetAgentSessionSettingInput,
@@ -114,6 +126,7 @@ import type {
   RemoveProviderAccountInput,
   RenameProviderAccountInput,
   ResetProviderUsageInput,
+  SetLiveVoiceAccountInput,
   SetProviderAccountPoolInput,
   SetProviderApiKeyInput,
   SubmitProviderAccountCodeLoginInput,
@@ -126,7 +139,9 @@ import type {
   AgentTaskReadState,
   AgentTasksSnapshot,
   AgentTaskWindow,
+  ArchivedAgentTasksPage,
   BranchAgentTaskInput,
+  ListArchivedAgentTasksInput,
   MarkAgentTaskReadInput,
   ReadAgentTaskAroundInput,
   ReadAgentTaskPageInput,
@@ -216,6 +231,7 @@ import type {
   BrowserBounds,
   BrowserControlState,
   BrowserDisplayState,
+  BrowserHttpSignInInput,
   BrowserLiveViewEvent,
   BrowserLocalSignInEnd,
   BrowserLocalSignInFinish,
@@ -223,12 +239,16 @@ import type {
   BrowserLocalSignInResult,
   BrowserNavigateInput,
   BrowserOpenInput,
+  BrowserPermissionAnswer,
   BrowserPictureInPictureEvent,
   BrowserPreview,
   BrowserTab,
   BrowserTeachStep,
   BrowserTeachStopInput,
   BrowserVisibilityInput,
+  BrowserWindowAction,
+  BrowserWindowEvent,
+  BrowserWindowModel,
 } from "./ipc-browser";
 import type { BrowserDockAction, BrowserDockFrame, BrowserDockPresentation } from "./ipc-browser-dock";
 import type {
@@ -249,6 +269,13 @@ import type {
   SetBrowserProfileProxyInput,
 } from "./ipc-browser-proxies";
 import type { LocalBrowserSecretResponse } from "./ipc-browser-secret";
+import type { CacheExpiryCompactionSetting } from "./ipc-cache-expiry-compaction";
+import type {
+  BrowseChannelFoldersInput,
+  ChannelFolderChange,
+  ChannelFolderInput,
+  ChannelFolderList,
+} from "./ipc-channel-folders";
 import type {
   ChannelMemory,
   CreateChannelMemoryInput,
@@ -366,6 +393,7 @@ import type { HiddenAgentsSnapshot, SetAgentHiddenInput } from "./ipc-hidden-age
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
 import type { HostPersonality } from "./ipc-host-personality";
 import type { HostReleaseStatus } from "./ipc-host-release";
+import type { HostSignalHomeSettings } from "./ipc-host-signal-home";
 import type { HostTimezoneSettings } from "./ipc-host-timezone";
 import type { HostTurnLimits, HostTurnLimitsInput } from "./ipc-host-turn-limits";
 import type {
@@ -415,6 +443,14 @@ import type {
   SignOutMcpServerInput,
   TestMcpServerInput,
 } from "./ipc-mcp-servers";
+import type {
+  CreditsHold,
+  MediaApprovalRead,
+  ReadMediaApprovalInput,
+  RespondToCreditsHoldInput,
+  RespondToMediaApprovalInput,
+} from "./ipc-media-approval";
+import type { MediaApprovalCreditsSetting, MediaApprovalCreditsUpdate } from "./ipc-media-approval-credits";
 import type { PinnedMessagesSnapshot, SetMessagePinnedInput } from "./ipc-message-pins";
 import type {
   AddMessagingOrchestratorInput,
@@ -442,6 +478,7 @@ import type {
   SetSlackEnabledInput,
   SetTelegramEnabledInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppSenderReadOnlyInput,
   SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
   SlackOverview,
@@ -455,6 +492,15 @@ import type {
   WhatsAppSenderInput,
 } from "./ipc-messaging";
 import type { ProviderModelVisibility, ProviderModelVisibilityChange } from "./ipc-model-visibility";
+import type {
+  NearAgentsInput,
+  NearAllowPaymentInput,
+  NearDepositAddress,
+  NearDepositInput,
+  NearRuleInput,
+  NearWalletCreateInput,
+  NearWalletStatus,
+} from "./ipc-near-wallet";
 import type {
   NotificationOpenedEvent,
   NotificationPreference,
@@ -501,16 +547,6 @@ import type {
   RemoteNetworkRouteState,
   RemoteSessionReusePreference,
 } from "./ipc-remote-sessions";
-import type {
-  ConnectRoutineFlowInput,
-  DisconnectRoutineFlowInput,
-  RemoveRoutineFlowPositionInput,
-  RoutineFlowCanvas,
-  RoutineFlowLink,
-  SaveRoutineFlowPositionInput,
-  StopRoutineFlowRunInput,
-  UpdateRoutineFlowLinkInput,
-} from "./ipc-routine-flows";
 import type {
   ResendRoutineResultInput,
   RoutineResultConnectionOption,
@@ -592,6 +628,7 @@ import type {
   ScopedTeamPresenceSnapshot,
   SendDirectMessageInput,
   ServerSummary,
+  SetServerHiddenInput,
   SetServerMutedInput,
   SetServerNotificationLevelInput,
   SetTeamTypingInput,
@@ -604,6 +641,8 @@ import type {
 } from "./ipc-team-host";
 import type { VaultImportResult, VaultSaveInput, VaultSecretRequest, VaultState, VaultTwoStepCodes } from "./ipc-vault";
 import type {
+  HostVoiceModel,
+  HostVoiceModelChange,
   SpeechApiKeyInput,
   SpeechAudio,
   SpeechInput,
@@ -621,12 +660,15 @@ import type {
   VoiceServerSave,
   VoiceServerSettings,
   VoiceSettings,
+  VoiceSettingsState,
   VoiceStream,
   VoiceStreamAudio,
   VoiceStreamTranscript,
   VoiceTranscriptionInput,
   VoiceTranscriptionResult,
 } from "./ipc-voice";
+import type { WorkflowFileSaveResult } from "./ipc-workflow-file";
+import type { WorkflowFolderAction, WorkflowFoldersSnapshot } from "./ipc-workflow-folders";
 import type {
   WorkflowGitHubCatalog,
   WorkflowGitHubHistory,
@@ -641,6 +683,7 @@ import type {
   RetryWorkflowStepInput,
   RunWorkflowStepInput,
   SaveWorkflowGraphInput,
+  SetWorkflowPausedInput,
   StartWorkflowRunInput,
   WorkflowDetail,
   WorkflowGraph,
@@ -670,8 +713,11 @@ import type {
 } from "./license";
 import type { MarketplaceListingLink } from "./marketplace-links";
 import type { AccountSession, MobileConnectedDevice, MobileConnectLink, MobileConnectTicket } from "./mobile-connect";
+import type { AcceptedOwnerTransfer, OwnerTransfer } from "./owner-transfer";
 import type { ReferralPageRequest, ReferralState } from "./referral";
 import type { AgentActiveQueues } from "./team-protocol/agent-active-queues-v1";
+import type { ChannelCompactAvailability } from "./team-protocol/channel-compact-availability-v1";
+import type { WorkflowSpotInput } from "./team-protocol/workflow-presence-v1";
 
 declare const payloadType: unique symbol;
 declare const resultType: unique symbol;
@@ -839,6 +885,7 @@ export const IPC_ENDPOINTS = {
     renameProviderAccount: request<RenameProviderAccountInput, AgentStatus>()("app:rename-provider-account"),
     removeProviderAccount: request<RemoveProviderAccountInput, AgentStatus>()("app:remove-provider-account"),
     setProviderAccountPool: request<SetProviderAccountPoolInput, AgentStatus>()("app:set-provider-account-pool"),
+    setLiveVoiceAccount: request<SetLiveVoiceAccountInput, AgentStatus>()("app:set-live-voice-account"),
     signOutProvider: request<AgentProviderId, AgentStatus>()("app:sign-out-provider"),
     providerUsageResets: request<AgentProviderId, ProviderUsageResets[]>()("app:provider-usage-resets"),
     resetProviderUsage: request<ResetProviderUsageInput, ProviderUsageResetOutcome>()("app:reset-provider-usage"),
@@ -859,7 +906,7 @@ export const IPC_ENDPOINTS = {
     downloadModel: request<VoiceModelRequest, VoiceModelStatus>()("voice:download-model"),
     cancelModelDownload: request<VoiceModelRequest, VoiceModelStatus>()("voice:cancel-model-download"),
     removeModel: request<VoiceModelRequest, VoiceModelStatus>()("voice:remove-model"),
-    getSettings: request<undefined, VoiceSettings>()("voice:get-settings"),
+    getSettings: request<undefined, VoiceSettingsState>()("voice:get-settings"),
     setSettings: request<VoiceSettings, VoiceSettings>()("voice:set-settings"),
     transcribe: request<VoiceTranscriptionInput, VoiceTranscriptionResult>()("voice:transcribe"),
     setApiKey: request<VoiceApiKeyInput, VoiceModelStatus>()("voice:set-api-key"),
@@ -924,6 +971,7 @@ export const IPC_ENDPOINTS = {
     action: event<AgentDockAction>()("agent-dock:action"),
     setInteractive: request<SetAgentDockInteractiveInput, void>()("agent-dock:set-interactive"),
     setInputRegion: request<AgentDockInputRect[], void>()("agent-dock:set-input-region"),
+    setExtent: request<AgentDockExtent | null, void>()("agent-dock:set-extent"),
     setXWayland: request<SetAgentDockXWaylandInput, void>()("agent-dock:set-xwayland"),
     closeChat: event<undefined>()("agent-dock:close-chat"),
     listDisplays: request<undefined, AgentDockDisplayInfo[]>()("agent-dock:list-displays"),
@@ -1040,6 +1088,9 @@ export const IPC_ENDPOINTS = {
     renameAccount: scopedRequest<RenameProviderAccountInput, void, "required">()("provider-admin:rename-account"),
     removeAccount: scopedRequest<RemoveProviderAccountInput, void, "required">()("provider-admin:remove-account"),
     setAccountPool: scopedRequest<SetProviderAccountPoolInput, void, "required">()("provider-admin:set-account-pool"),
+    setLiveVoiceAccount: scopedRequest<SetLiveVoiceAccountInput, void, "required">()(
+      "provider-admin:set-live-voice-account",
+    ),
     usageResets: scopedRequest<AgentProviderId, ProviderUsageResets[], "required">()("provider-admin:usage-resets"),
     resetUsage: scopedRequest<ResetProviderUsageInput, ProviderUsageResetOutcome, "required">()(
       "provider-admin:reset-usage",
@@ -1134,6 +1185,9 @@ export const IPC_ENDPOINTS = {
     setWhatsAppStatusReactions: request<SetWhatsAppStatusReactionsInput, void>()(
       "messaging:set-whatsapp-status-reactions",
     ),
+    setWhatsAppSenderReadOnly: request<SetWhatsAppSenderReadOnlyInput, void>()(
+      "messaging:set-whatsapp-sender-read-only",
+    ),
     hostOverview: scopedRequest<HostMessagingPlatformInput, MessagingOverview, "required">()("messaging:host-overview"),
     hostConnect: scopedRequest<HostMessagingConnectInput, void, "required">()("messaging:host-connect"),
     hostDisconnect: scopedRequest<HostMessagingWorkspaceInput, void, "required">()("messaging:host-disconnect"),
@@ -1188,6 +1242,9 @@ export const IPC_ENDPOINTS = {
     hostSetWhatsAppStatusReactions: scopedRequest<SetWhatsAppStatusReactionsInput, void, "required">()(
       "messaging:host-set-whatsapp-status-reactions",
     ),
+    hostSetWhatsAppSenderReadOnly: scopedRequest<SetWhatsAppSenderReadOnlyInput, void, "required">()(
+      "messaging:host-set-whatsapp-sender-read-only",
+    ),
   },
   hostAdmin: {
     updateIdentity: scopedRequest<UpdateHostIdentityInput, ServerSummary, "required">()("host-admin:update-identity"),
@@ -1204,6 +1261,12 @@ export const IPC_ENDPOINTS = {
     ),
     getTimezone: scopedQuery<HostTimezoneSettings, "required">()("host-admin:get-timezone"),
     setTimezone: scopedRequest<string | null, HostTimezoneSettings, "required">()("host-admin:set-timezone"),
+    getSignalHome: scopedQuery<HostSignalHomeSettings, "required">()("host-admin:get-signal-home"),
+    setSignalHome: scopedRequest<string | null, HostSignalHomeSettings, "required">()("host-admin:set-signal-home"),
+    getVoiceModel: scopedQuery<HostVoiceModel, "required">()("host-admin:get-voice-model"),
+    changeVoiceModel: scopedRequest<HostVoiceModelChange, HostVoiceModel, "required">()(
+      "host-admin:change-voice-model",
+    ),
     getTurnLimits: scopedQuery<HostTurnLimits, "required">()("host-admin:get-turn-limits"),
     setTurnLimits: scopedRequest<HostTurnLimitsInput, HostTurnLimits, "required">()("host-admin:set-turn-limits"),
     getPersonality: scopedQuery<HostPersonality, "required">()("host-admin:get-personality"),
@@ -1223,6 +1286,18 @@ export const IPC_ENDPOINTS = {
     getPromptCacheTtl: scopedQuery<PromptCacheTtlSetting, "required">()("host-admin:get-prompt-cache-ttl"),
     setPromptCacheTtl: scopedRequest<PromptCacheTtl, PromptCacheTtlSetting, "required">()(
       "host-admin:set-prompt-cache-ttl",
+    ),
+    getCacheExpiryCompaction: scopedQuery<CacheExpiryCompactionSetting, "required">()(
+      "host-admin:get-cache-expiry-compaction",
+    ),
+    setCacheExpiryCompaction: scopedRequest<boolean, CacheExpiryCompactionSetting, "required">()(
+      "host-admin:set-cache-expiry-compaction",
+    ),
+    getMediaApprovalCredits: scopedQuery<MediaApprovalCreditsSetting, "required">()(
+      "host-admin:get-media-approval-credits",
+    ),
+    setMediaApprovalCredits: scopedRequest<MediaApprovalCreditsUpdate, MediaApprovalCreditsSetting, "required">()(
+      "host-admin:set-media-approval-credits",
     ),
     getClaudeUserSetup: scopedQuery<ClaudeUserSetupSetting, "required">()("host-admin:get-claude-user-setup"),
     setClaudeUserSetup: scopedRequest<boolean, ClaudeUserSetupSetting, "required">()(
@@ -1302,6 +1377,24 @@ export const IPC_ENDPOINTS = {
     disconnect: request<undefined, LinkAccountStatus>()("link-account:disconnect"),
     changed: event<LinkAccountStatus>()("link-account:changed"),
   },
+  nearWallet: {
+    status: request<undefined, NearWalletStatus>()("near-wallet:status"),
+    create: request<NearWalletCreateInput, NearWalletStatus>()("near-wallet:create"),
+    setBudget: request<{ dailyBudgetUsd: string }, NearWalletStatus>()("near-wallet:set-budget"),
+    setAgents: request<NearAgentsInput, NearWalletStatus>()("near-wallet:set-agents"),
+    renewGrant: request<undefined, NearWalletStatus>()("near-wallet:renew-grant"),
+    freeze: request<undefined, NearWalletStatus>()("near-wallet:freeze"),
+    unfreeze: request<undefined, NearWalletStatus>()("near-wallet:unfreeze"),
+    deposit: request<NearDepositInput, NearDepositAddress>()("near-wallet:deposit"),
+    saveRule: request<NearRuleInput, NearWalletStatus>()("near-wallet:save-rule"),
+    removeRule: request<{ domain: string }, NearWalletStatus>()("near-wallet:remove-rule"),
+    allowPayment: request<NearAllowPaymentInput, NearWalletStatus>()("near-wallet:allow-payment"),
+    openSigning: request<undefined, void>()("near-wallet:open-signing"),
+    cancelSigning: request<undefined, NearWalletStatus>()("near-wallet:cancel-signing"),
+    checkBackup: request<undefined, NearWalletStatus>()("near-wallet:check-backup"),
+    disconnect: request<undefined, NearWalletStatus>()("near-wallet:disconnect"),
+    changed: event<NearWalletStatus>()("near-wallet:changed"),
+  },
   vault: {
     list: request<undefined, VaultState>()("vault:list"),
     save: request<VaultSaveInput, VaultState>()("vault:save"),
@@ -1359,6 +1452,13 @@ export const IPC_ENDPOINTS = {
   referral: {
     getState: request<ReferralPageRequest, ReferralState>()("referral:get-state"),
   },
+  credits: {
+    getState: request<undefined, CreditsState>()("credits:get-state"),
+    getActivity: request<undefined, CreditActivity>()("credits:get-activity"),
+    openCheckout: request<CreditCheckoutRequest, void>()("credits:open-checkout"),
+    transfer: request<CreditTransferRequest, CreditsState>()("credits:transfer"),
+    redeem: request<CreditRedeemRequest, CreditRedeemResult>()("credits:redeem"),
+  },
   license: {
     getState: request<undefined, LicenseState>()("license:get-state"),
     openCheckout: request<LicenseCheckoutRequest, void>()("license:open-checkout"),
@@ -1371,6 +1471,9 @@ export const IPC_ENDPOINTS = {
     plans: request<undefined, HostedServerCatalog>()("hosted-servers:plans"),
     create: request<CreateHostedServerInput, HostedServerSummary>()("hosted-servers:create"),
     openCheckout: request<string, HostedServerSummary>()("hosted-servers:open-checkout"),
+    openCustomCheckout: request<CustomServerCheckoutRequest, CustomServerCheckoutResult>()(
+      "hosted-servers:open-custom-checkout",
+    ),
     delete: request<DeleteHostedServerInput, void>()("hosted-servers:delete"),
     lifecycle: request<HostedServerLifecycleInput, void>()("hosted-servers:lifecycle"),
     wake: request<string, HostedServerSummary>()("hosted-servers:wake"),
@@ -1428,7 +1531,11 @@ export const IPC_ENDPOINTS = {
     removeCompanySignIn: request<string, CompanySignInSettings>()("auth:company-sign-in:remove"),
     createCompanySignInScimToken: request<string, CompanySignInScimToken>()("auth:company-sign-in:create-scim-token"),
     revokeCompanySignInScimToken: request<string, CompanySignInSettings>()("auth:company-sign-in:revoke-scim-token"),
+    listOwnerTransfers: request<undefined, OwnerTransfer[]>()("auth:list-owner-transfers"),
+    acceptOwnerTransfer: request<string, AcceptedOwnerTransfer>()("auth:accept-owner-transfer"),
+    declineOwnerTransfer: request<string, void>()("auth:decline-owner-transfer"),
     event: event<CentralAuthState>()("auth:event"),
+    ownerTransfersChanged: event<undefined>()("auth:owner-transfers-changed"),
   },
   update: {
     getStatus: request<undefined, UpdateStatus>()("update:get-status"),
@@ -1440,6 +1547,7 @@ export const IPC_ENDPOINTS = {
     cancelScheduledRestart: request<undefined, UpdateStatus>()("update:cancel-scheduled-restart"),
     restartWhenIdle: request<IdleRestartTarget, UpdateStatus>()("update:restart-when-idle"),
     cancelIdleRestart: request<undefined, UpdateStatus>()("update:cancel-idle-restart"),
+    restartNow: request<undefined, UpdateStatus>()("update:restart-now"),
     event: event<UpdateStatus>()("update:event"),
     preference: event<UpdatePreference>()("update:preference-event"),
   },
@@ -1476,6 +1584,9 @@ export const IPC_ENDPOINTS = {
     clearChannelContext: scopedRequest<string, void>()("agent:channels:clear-context"),
     deleteChannelHistory: scopedRequest<string, void>()("agent:channels:delete-history"),
     compactChannelContext: scopedRequest<string, void>()("agent:channels:compact-context"),
+    channelCompactAvailability: scopedRequest<string, ChannelCompactAvailability>()(
+      "agent:channels:compact-availability",
+    ),
     getSidebarLayout: scopedQuery<SidebarLayoutSnapshot>()("agent:get-sidebar-layout"),
     mutateSidebarLayout: scopedRequest<SidebarLayoutAction, SidebarLayoutSnapshot>()("agent:mutate-sidebar-layout"),
     getSidebarPins: scopedQuery<SidebarPinsSnapshot>()("agent:sidebar-pins:get"),
@@ -1529,6 +1640,9 @@ export const IPC_ENDPOINTS = {
     listPinnedMessages: scopedRequest<string, PinnedMessagesSnapshot>()("agent:list-pinned-messages"),
     setMessagePinned: scopedRequest<SetMessagePinnedInput, PinnedMessagesSnapshot>()("agent:set-message-pinned"),
     listTasks: scopedRequest<string, AgentTasksSnapshot>()("agent:tasks:list"),
+    listArchivedTasks: scopedRequest<ListArchivedAgentTasksInput, ArchivedAgentTasksPage>()(
+      "agent:tasks:list-archived",
+    ),
     readTask: scopedRequest<AgentTaskInput, ConversationSnapshot>()("agent:tasks:read"),
     readTaskPage: scopedRequest<ReadAgentTaskPageInput, AgentTaskPage>()("agent:tasks:read-page"),
     readTaskAround: scopedRequest<ReadAgentTaskAroundInput, AgentTaskWindow>()("agent:tasks:read-around"),
@@ -1556,6 +1670,14 @@ export const IPC_ENDPOINTS = {
     respondToPrompt: scopedRequest<RespondToPromptInput, void>()("agent:respond-to-prompt"),
     respondToApproval: scopedRequest<RespondToApprovalInput, void>()("agent:respond-to-approval"),
     readPendingApproval: scopedRequest<ReadPendingApprovalInput, AgentApproval | null>()("agent:read-pending-approval"),
+    readMediaApproval: scopedRequest<ReadMediaApprovalInput, MediaApprovalRead>()("agent:read-media-approval"),
+    respondToMediaApproval: scopedRequest<RespondToMediaApprovalInput, void>()("agent:respond-to-media-approval"),
+    respondToCreditsHold: scopedRequest<RespondToCreditsHoldInput, CreditsHold | null>()(
+      "agent:respond-to-credits-hold",
+    ),
+    setCreditsAskMuted: scopedRequest<{ muted: boolean }, void>()("agent:set-credits-ask-muted"),
+    readCreditsAskMuted: scopedQuery<{ muted: boolean }>()("agent:read-credits-ask-muted"),
+    listPendingPrompts: scopedQuery<AgentRuntimePrompt[]>()("agent:list-pending-prompts"),
     respondToBrowserSecret: scopedRequest<LocalBrowserSecretResponse, void>()("agent:respond-to-browser-secret"),
     respondToBrowserTakeover: scopedRequest<RespondToBrowserTakeoverInput, void>()("agent:respond-to-browser-takeover"),
     scopedEvent: event<ScopedAgentEvent>()("agent:event"),
@@ -1592,6 +1714,13 @@ export const IPC_ENDPOINTS = {
     deleteChannelMemory: scopedRequest<DeleteChannelMemoryInput, void>()("agent:channel-memories:delete"),
     clearChannelMemories: scopedRequest<string, void>()("agent:channel-memories:clear"),
   },
+  channelFolders: {
+    listChannelFolders: scopedRequest<string, ChannelFolderList>()("agent:channel-folders:list"),
+    chooseChannelFolder: request<string, ChannelFolderChange>()("agent:channel-folders:choose"),
+    addChannelFolder: scopedRequest<ChannelFolderInput, ChannelFolderChange>()("agent:channel-folders:add"),
+    removeChannelFolder: scopedRequest<ChannelFolderInput, ChannelFolderChange>()("agent:channel-folders:remove"),
+    browseChannelFolders: scopedRequest<BrowseChannelFoldersInput, AgentFolderBrowse>()("agent:channel-folders:browse"),
+  },
   channelRoutines: {
     listChannelRoutines: scopedRequest<string, ChannelRoutine[]>()("agent:channel-routines:list"),
     createChannelRoutine: scopedRequest<CreateChannelRoutineInput, ChannelRoutine>()("agent:channel-routines:create"),
@@ -1602,20 +1731,13 @@ export const IPC_ENDPOINTS = {
       "agent:channel-routines:runs",
     ),
   },
-  routineFlows: {
-    canvas: scopedRequest<string, RoutineFlowCanvas>()("routine-flows:canvas"),
-    savePosition: scopedRequest<SaveRoutineFlowPositionInput, void>()("routine-flows:save-position"),
-    removePosition: scopedRequest<RemoveRoutineFlowPositionInput, void>()("routine-flows:remove-position"),
-    connect: scopedRequest<ConnectRoutineFlowInput, RoutineFlowLink>()("routine-flows:connect"),
-    disconnect: scopedRequest<DisconnectRoutineFlowInput, void>()("routine-flows:disconnect"),
-    updateLink: scopedRequest<UpdateRoutineFlowLinkInput, RoutineFlowLink>()("routine-flows:update-link"),
-    stopRun: scopedRequest<StopRoutineFlowRunInput, void>()("routine-flows:stop-run"),
-  },
   workflows: {
     list: scopedQuery<WorkflowSummary[]>()("workflows:list"),
     get: scopedRequest<string, WorkflowDetail>()("workflows:get"),
     create: scopedRequest<CreateWorkflowInput, WorkflowDetail>()("workflows:create"),
     rename: scopedRequest<RenameWorkflowInput, WorkflowSummary>()("workflows:rename"),
+    setPaused: scopedRequest<SetWorkflowPausedInput, WorkflowSummary>()("workflows:setPaused"),
+    exportFile: scopedRequest<string, WorkflowFileSaveResult>()("workflows:export-file"),
     delete: scopedRequest<string, void>()("workflows:delete"),
     saveGraph: scopedRequest<SaveWorkflowGraphInput, WorkflowSaveResult>()("workflows:save-graph"),
     versions: scopedRequest<string, WorkflowVersion[]>()("workflows:versions"),
@@ -1646,6 +1768,9 @@ export const IPC_ENDPOINTS = {
     mediaCredits: scopedQuery<WorkflowMediaCredits>()("workflows:media-credits"),
     mediaCatalog: scopedQuery<WorkflowMediaCatalog>()("workflows:media-catalog"),
     mediaPrice: scopedRequest<WorkflowMediaPriceRequest, WorkflowMediaPrice>()("workflows:media-price"),
+    folders: scopedQuery<WorkflowFoldersSnapshot>()("workflows:folders"),
+    folderAction: scopedRequest<WorkflowFolderAction, WorkflowFoldersSnapshot>()("workflows:folder-action"),
+    setSpot: scopedRequest<WorkflowSpotInput, void>()("workflows:set-spot"),
   },
   crm: {
     overview: scopedQuery<CrmOverview>()("crm:overview"),
@@ -1718,6 +1843,7 @@ export const IPC_ENDPOINTS = {
     close: request<string, void>()("browser:close"),
     takeControl: request<string, void>()("browser:take-control"),
     releaseControl: request<string, void>()("browser:release-control"),
+    answerPermission: request<BrowserPermissionAnswer, void>()("browser:answer-permission"),
     startTeach: request<string, void>()("browser:teach-start"),
     stopTeach: request<BrowserTeachStopInput, BrowserTeachStep[]>()("browser:teach-stop"),
     listTabs: request<undefined, BrowserTab[]>()("browser:list-tabs"),
@@ -1734,10 +1860,20 @@ export const IPC_ENDPOINTS = {
     dockPictureInPicture: request<undefined, void>()("browser:picture-in-picture-dock"),
     hidePictureInPicture: request<undefined, void>()("browser:picture-in-picture-hide"),
     pictureInPictureEvent: event<BrowserPictureInPictureEvent>()("browser:picture-in-picture-event"),
+    openWindow: request<BrowserBounds | undefined, BrowserBounds>()("browser:window-open"),
+    closeWindow: request<undefined, void>()("browser:window-close"),
+    focusWindow: request<undefined, void>()("browser:window-focus"),
+    dockWindow: request<undefined, void>()("browser:window-dock"),
+    publishWindowModel: request<BrowserWindowModel, void>()("browser:window-model-publish"),
+    getWindowModel: request<undefined, BrowserWindowModel | null>()("browser:window-model-get"),
+    sendWindowAction: request<BrowserWindowAction, void>()("browser:window-action"),
+    windowModel: event<BrowserWindowModel>()("browser:window-model-event"),
+    windowEvent: event<BrowserWindowEvent>()("browser:window-event"),
     openLocalSignIn: request<BrowserLocalSignInInput, BrowserLocalSignInEnd>()("browser:local-sign-in-open"),
     finishLocalSignIn: request<BrowserLocalSignInFinish, BrowserLocalSignInResult | null>()(
       "browser:local-sign-in-finish",
     ),
+    answerHttpSignIn: request<BrowserHttpSignInInput, void>()("browser:http-sign-in-answer"),
   },
   browserInput: {
     sendLiveViewInput: untypedRequest("browser:send-live-view-input"),
@@ -1747,6 +1883,7 @@ export const IPC_ENDPOINTS = {
     select: request<string, ServerSummary[]>()("servers:select"),
     reorder: request<ReorderServersInput, ServerSummary[]>()("servers:reorder"),
     setMuted: request<SetServerMutedInput, ServerSummary[]>()("servers:set-muted"),
+    setHidden: request<SetServerHiddenInput, ServerSummary[]>()("servers:set-hidden"),
     setNotificationLevel: request<SetServerNotificationLevelInput, ServerSummary[]>()("servers:set-notification-level"),
     join: request<JoinServerInput, ServerSummary>()("servers:join"),
     previewInvite: request<JoinServerInput, InvitePreview>()("servers:preview-invite"),
@@ -1763,6 +1900,9 @@ export const IPC_ENDPOINTS = {
     listInvites: request<string, TeamInviteSummary[]>()("servers:list-invites"),
     revokeInvite: scopedRequest<string, void, "required">()("servers:revoke-invite"),
     createInvite: scopedRequest<CreateTeamInviteInput, InviteSummary, "required">()("servers:create-invite"),
+    getOwnerTransfer: scopedQuery<OwnerTransfer | null, "required">()("servers:get-owner-transfer"),
+    startOwnerTransfer: scopedRequest<string, OwnerTransfer, "required">()("servers:start-owner-transfer"),
+    cancelOwnerTransfer: scopedQuery<void, "required">()("servers:cancel-owner-transfer"),
     setTyping: request<SetTeamTypingInput, void>()("servers:set-typing"),
     scopedPresence: event<ScopedTeamPresenceSnapshot>()("servers:presence"),
     listDirectThreads: request<undefined, DirectThreadSummary[]>()("servers:list-direct-threads"),
@@ -1797,6 +1937,10 @@ export const IPC_ENDPOINTS = {
     getAgentPlanCard: scopedRequest<string, AgentPlanCardSettings>()("agent:admin:get-plan-card"),
     updateAgentPlanCard: scopedRequest<UpdateAgentPlanCardInput, AgentPlanCardSettings>()(
       "agent:admin:update-plan-card",
+    ),
+    getAgentBuiltinMemory: scopedRequest<string, AgentBuiltinMemorySettings>()("agent:admin:get-builtin-memory"),
+    updateAgentBuiltinMemory: scopedRequest<UpdateAgentBuiltinMemoryInput, AgentBuiltinMemorySettings>()(
+      "agent:admin:update-builtin-memory",
     ),
     getAgentFastMode: scopedRequest<string, AgentFastModeSettings>()("agent:admin:get-fast-mode"),
     updateAgentFastMode: scopedRequest<UpdateAgentFastModeInput, AgentFastModeSettings>()(
@@ -1999,15 +2143,16 @@ export const IPC_GROUP_PATHS = {
   bitwardenConnector: "bitwardenConnector",
   passwordManagers: "passwordManagers",
   linkAccount: "linkAccount",
+  nearWallet: "nearWallet",
   vault: "vault",
   hostedSites: "hostedSites",
   routineFeed: "routineFeed",
-  routineFlows: "routineFlows",
   workflows: "workflows",
   crm: "crm",
   routineResults: "routineResults",
   billing: "billing",
   referral: "referral",
+  credits: "credits",
   license: "license",
   hostedServers: "hostedServers",
   localServers: "localServers",
@@ -2022,6 +2167,7 @@ export const IPC_GROUP_PATHS = {
   agentRoutines: "agent",
   channelMemories: "agent",
   channelRoutines: "agent",
+  channelFolders: "agent",
   agentAttachments: "agent",
   agentFolders: "agent",
   agentInstructions: "agent",

@@ -15,7 +15,6 @@ import { type FlatList, Pressable, StyleSheet, View, type ViewInstance, type Vie
 import Animated, {
   cancelAnimation,
   Easing,
-  FadeIn,
   FadeOut,
   LinearTransition,
   ReduceMotion,
@@ -32,7 +31,7 @@ import {
   useAgentListReveal,
 } from "@/features/agents/components/agent-list-reveal";
 import { AgentListRow } from "@/features/agents/components/agent-list-row";
-import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
+import { chatRowSlideIn, chatRowSlideOut, usePinMotion } from "@/features/agents/components/agent-pin-motion";
 import { AgentUnreadGroupHeader, AgentWaitingGroupHeader } from "@/features/agents/components/agent-wait-badge";
 import {
   ChatDragProvider,
@@ -100,7 +99,7 @@ import {
 import { SplitPaneLayers, useSplitLayout } from "@/shared/components/adaptive-split";
 import { AndroidBlurTarget } from "@/shared/components/android-header-blur";
 import { useAppLoadingOverlay, useScreenLoadingLabel } from "@/shared/components/app-loading-overlay";
-import { LargeTitle, LargeTitleBar, useLargeTitleScroll } from "@/shared/components/large-title";
+import { LargeTitleBar, useLargeTitleScroll } from "@/shared/components/large-title";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { useChromeGlass } from "@/shared/lib/chrome-glass";
 import { haptics } from "@/shared/lib/haptics";
@@ -112,10 +111,10 @@ import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const ONBOARDING_EXIT = FadeOut.duration(220).easing(EASE_OUT);
-const ROW_ENTER = FadeIn.duration(180).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const LIST_REFLOW = LinearTransition.duration(240).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const CARD_MOVE = { duration: 240, easing: EASE_OUT, reduceMotion: ReduceMotion.Never };
-const LIST_WINDOW_SIZE = 7;
+const LIST_WINDOW_SIZE = 3;
+const LIST_DRAG_WINDOW_SIZE = 21;
 const LIST_BATCH = 10;
 
 interface ChatRowTarget {
@@ -212,13 +211,15 @@ const TransitioningChatRow = memo(function TransitioningChatRow({
   reveal: AgentListRevealState;
   collapsed: boolean;
 }) {
-  const { transition } = useAgentPinTransition();
-  const chatId = agent?.id ?? channel?.id;
-  const isTarget = transition !== null && transition.chatId === chatId && transition.target === "row";
+  const motion = usePinMotion(agent?.id ?? channel?.id ?? "");
   return (
     <CollapsingRow collapsed={collapsed}>
-      <Animated.View collapsable={false} entering={isTarget ? ROW_ENTER : undefined}>
-        <AgentListRowReveal index={index} reveal={reveal} skip={isTarget}>
+      <Animated.View
+        collapsable={false}
+        entering={motion === "unpin" ? chatRowSlideIn : undefined}
+        exiting={motion === "pin" ? chatRowSlideOut : undefined}
+      >
+        <AgentListRowReveal index={index} reveal={reveal} skip={motion === "unpin"}>
           {agent ? (
             <AgentListRow agent={agent} leftInset={15} rightInset={24} />
           ) : channel && serverId && channelAgents ? (
@@ -531,7 +532,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     router.push("/add-agent");
   };
   const sceneShows = listReady && showAgentsScene;
-  const statusShows = hasSelectedServer && !activeServer.initialConnectionPending && !activeServerOnline;
   const searchShows = listReady && hasSelectedServer && !onboarding.active && !sceneShows;
   const appUpdate = useAppUpdate();
   const updateHeader = useAppUpdateHeader(searchShows ? appUpdate : null);
@@ -651,6 +651,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                 unread={folderUnread.get(item.id) ?? 0}
                 visibleSectionIds={visibleSectionIds}
                 collapsed={collapsedSectionIds.has(item.id)}
+                first={index === 0}
                 onToggle={toggleSection}
               />
             </SectionDropTarget>
@@ -930,19 +931,11 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                 renderItem={renderItem}
                 initialNumToRender={LIST_BATCH}
                 maxToRenderPerBatch={LIST_BATCH}
-                windowSize={dragging ? LIST_WINDOW_SIZE * 3 : LIST_WINDOW_SIZE}
+                windowSize={dragging ? LIST_DRAG_WINDOW_SIZE : LIST_WINDOW_SIZE}
                 ListHeaderComponent={
                   <View onLayout={(event) => layoutStage(event.nativeEvent.layout.height)}>
                     <AgentListRowReveal index={0} reveal={listReveal}>
-                      {hasSelectedServer ? (
-                        <LargeTitle
-                          scroll={scroll}
-                          title={activeServer.name}
-                          above={<AppUpdateSpacer header={updateHeader} headerHeight={headerHeight} />}
-                          accessibilityLabel={t("mobile.agent.home.serverTitle", { name: activeServer.name })}
-                          onPress={openDrawer}
-                        />
-                      ) : null}
+                      {hasSelectedServer ? <AppUpdateSpacer header={updateHeader} headerHeight={headerHeight} /> : null}
                       {sidebar?.error ? (
                         <View className="gap-2 px-4">
                           <Typography.Paragraph className="text-danger-text">
@@ -1058,13 +1051,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       </AndroidBlurTarget>
 
       {onboarding.active ? null : (
-        <LargeTitleBar
-          scroll={scroll}
-          title={activeServer.name}
-          blurTarget={barBlurTarget}
-          androidSurfaceWithTitle={homeCard}
-          hidden={!searchShows || statusShows || search.open}
-        >
+        <LargeTitleBar scroll={scroll} blurTarget={barBlurTarget} androidSurfaceOnScroll={homeCard}>
           <AppUpdateBlock header={updateHeader} scroll={scroll} hidden={search.open} />
         </LargeTitleBar>
       )}

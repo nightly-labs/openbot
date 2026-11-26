@@ -1,9 +1,10 @@
 import {
   BROWSER_LIVE_VIEW_MAX_PASTE_TEXT,
   type BrowserDesktopApi,
+  type BrowserLiveViewDialog,
   type BrowserLiveViewInput,
 } from "@openbot/contracts/ipc";
-import { ErrorReference, toast } from "@openbot/ui";
+import { AlertDialog, Button, ErrorReference, Globe2, toast } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { errorReference } from "@openbot/user-errors";
 import { createEffect, createSignal, createStore, onCleanup, Show } from "solid-js";
@@ -30,7 +31,17 @@ interface BrowserLiveViewProps {
   tabId: string;
   active: boolean;
   clipboard: boolean;
+  site?: string | undefined;
   onFrameSize?: (size: { width: number; height: number }) => void;
+}
+
+export function browserPageSite(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    return new URL(url).hostname || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export default function BrowserLiveView(props: BrowserLiveViewProps) {
@@ -43,6 +54,7 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
   });
   const [canvas, setCanvas] = createSignal<HTMLCanvasElement>();
   const [frame, setFrame] = createSignal<{ sequence: number; width: number; height: number }>();
+  const [dialog, setDialog] = createSignal<BrowserLiveViewDialog | null>(null);
   let pendingFrame: Promise<void> | undefined;
   let queuedFrame: LiveViewFrame | undefined;
   let stream = 0;
@@ -52,6 +64,7 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     pendingFrame = undefined;
     queuedFrame = undefined;
     setFrame(undefined);
+    setDialog(null);
   };
 
   const draw = async (next: LiveViewFrame) => {
@@ -64,11 +77,11 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
       bitmap.close();
       return;
     }
-    if (element.width !== next.width || element.height !== next.height) {
-      element.width = next.width;
-      element.height = next.height;
+    if (element.width !== bitmap.width || element.height !== bitmap.height) {
+      element.width = bitmap.width;
+      element.height = bitmap.height;
     }
-    context.drawImage(bitmap, 0, 0, next.width, next.height);
+    context.drawImage(bitmap, 0, 0);
     bitmap.close();
     setFrame({ sequence: next.sequence, width: next.width, height: next.height });
   };
@@ -102,6 +115,10 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
     }
     if (event.type === "copyTooLarge") {
       settleCopy("tooLarge");
+      return;
+    }
+    if (event.type === "dialog") {
+      setDialog(event.dialog);
       return;
     }
     if (event.type === "stopped") {
@@ -156,6 +173,13 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
 
   const send = (input: BrowserLiveViewInput) => {
     void runtime.sendLiveViewInput(input).catch(() => undefined);
+  };
+
+  const answerDialog = (accept: boolean) => {
+    const open = dialog();
+    if (!open) return;
+    setDialog(null);
+    send({ type: "dialog", id: open.id, accept });
   };
 
   createEffect(
@@ -306,10 +330,67 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
       />
       <Show when={!state.live}>
         <div class="browser-empty-state">
-          <span>{state.message ?? t("browser.liveView.connecting")}</span>
+          <span>
+            {state.message ?? (dialog() ? t("browser.liveView.dialog.waiting") : t("browser.liveView.connecting"))}
+          </span>
           <ErrorReference reference={state.reference} />
         </div>
       </Show>
+      <AlertDialog.Root
+        open={dialog() !== null}
+        modal={false}
+        onOpenChange={(open) => {
+          if (!open) answerDialog(false);
+        }}
+      >
+        <Show when={dialog()}>
+          {(open) => (
+            <div class="browser-live-view-dialog-scrim">
+              <AlertDialog.Content
+                class="browser-live-view-dialog"
+                onOpenAutoFocus={(event) => event.preventDefault()}
+                onCloseAutoFocus={(event) => {
+                  event.preventDefault();
+                  canvas()?.focus({ preventScroll: true });
+                }}
+                onInteractOutside={(event) => event.preventDefault()}
+                onEscapeKeyDown={(event) => {
+                  const view = canvas()?.parentElement;
+                  if (!(event.target instanceof Node && view?.contains(event.target))) event.preventDefault();
+                }}
+              >
+                <AlertDialog.Title class="browser-live-view-dialog-site">
+                  <Globe2 aria-hidden="true" />
+                  {props.site
+                    ? t("browser.liveView.dialog.site", { site: props.site })
+                    : t("browser.liveView.dialog.page")}
+                </AlertDialog.Title>
+                <AlertDialog.Description class="browser-live-view-dialog-message">
+                  {open().message}
+                </AlertDialog.Description>
+                <div class="browser-live-view-dialog-actions">
+                  <Show when={open().type === "confirm"}>
+                    <Button variant="ghost" size="sm" onClick={() => answerDialog(false)}>
+                      {t("common.cancel")}
+                    </Button>
+                  </Show>
+                  <Button
+                    size="sm"
+                    ref={(element: HTMLButtonElement) => {
+                      requestAnimationFrame(() => {
+                        if (element.isConnected) element.focus({ preventScroll: true });
+                      });
+                    }}
+                    onClick={() => answerDialog(true)}
+                  >
+                    {t("browser.liveView.dialog.ok")}
+                  </Button>
+                </div>
+              </AlertDialog.Content>
+            </div>
+          )}
+        </Show>
+      </AlertDialog.Root>
     </div>
   );
 }

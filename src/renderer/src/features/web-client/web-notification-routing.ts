@@ -133,6 +133,7 @@ export function createWebNotificationRouting(options: {
       agents: untrack(() => workspace.state.agents),
       translate: options.t,
       level,
+      agentLevels: untrack(agentLevels)[hostId] ?? null,
       redact: null,
     });
     showWebChannelNotifications({ hostId, replies, onOpen: (channelId) => options.onOpenChannel(hostId, channelId) });

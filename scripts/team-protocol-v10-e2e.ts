@@ -157,6 +157,7 @@ function sorted(values: Iterable<string>): string[] {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -336,6 +337,7 @@ try {
       navigate: unused,
       reload: unused,
       stop: unused,
+      answerPermission: unused,
       takeUserControl: unused,
       startTeach: unused,
       stopTeach: () => [],
@@ -351,7 +353,9 @@ try {
       startView: unused,
       dispatchViewInput: unused,
       copyViewSelection: unused,
+      answerViewDialog: unused,
       importSignIn: unused,
+      answerHttpSignIn: unused,
     },
     sidebarLayout: sidebar,
     agentAccess: access,

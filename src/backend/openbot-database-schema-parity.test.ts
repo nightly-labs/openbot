@@ -62,6 +62,7 @@ const LARGE_TABLES = ["orchestration_events", "provider_history_staging", "proje
 const MEASURED_LARGE_TABLE_CHANGES: Record<string, readonly string[]> = {
   "40": ["index thread_messages_shown_order", "index thread_messages_turn", "table projection_thread_messages"],
   "43": ["index orchestration_events_thread_type"],
+  "67": ["index thread_messages_ordinal"],
 };
 
 describe("OpenBot database migrations of large tables", () => {

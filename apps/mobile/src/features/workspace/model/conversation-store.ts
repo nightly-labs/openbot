@@ -23,9 +23,12 @@ export class MobileConversationStore {
   #deltas = new Map<string, Delta[]>();
   #cancelFrame: (() => void) | null = null;
   #olderLoads = new Map<string, symbol>();
-  #loads = new Map<string, { promise: Promise<ConversationPage>; dirty: boolean; attach: boolean }>();
+  #loads = new Map<string, { promise: Promise<ConversationPage>; dirty: boolean; stale: boolean; attach: boolean }>();
   #latestPages = new Map<string, { firstId: string; pageInfo: ConversationPage["pageInfo"] }>();
   #upToDate = new Set<string>();
+  #missedLatest = new Set<string>();
+  #latestReads = new Map<string, number>();
+  #latestLoads = 0;
   #cached = new Set<string>();
 
   constructor(private schedule: (flush: () => void) => () => void) {}
@@ -47,6 +50,16 @@ export class MobileConversationStore {
     return Boolean(entry && entry.revision >= revision && (threadId === undefined || entry.threadId === threadId));
   }
 
+  missedLatest(agentId: string) {
+    return this.#missedLatest.has(agentId);
+  }
+
+  #markMissedLatest(agentId: string, load: number) {
+    if ((this.#latestReads.get(agentId) ?? 0) > load) return;
+    this.#upToDate.delete(agentId);
+    this.#missedLatest.add(agentId);
+  }
+
   markStale() {
     this.#upToDate.clear();
   }
@@ -54,6 +67,8 @@ export class MobileConversationStore {
   invalidate(agentId: string) {
     if (this.isObserved(agentId)) return true;
     this.#upToDate.delete(agentId);
+    const pending = this.#loads.get(agentId);
+    if (pending) pending.stale = true;
     return false;
   }
 
@@ -79,6 +94,8 @@ export class MobileConversationStore {
     this.#entries.delete(agentId);
     this.#latestPages.delete(agentId);
     this.#upToDate.delete(agentId);
+    this.#missedLatest.delete(agentId);
+    this.#latestReads.delete(agentId);
     this.#cached.delete(agentId);
     this.#indices.delete(agentId);
     this.#deltas.delete(agentId);
@@ -99,6 +116,7 @@ export class MobileConversationStore {
 
   cancelRequests() {
     this.markStale();
+    for (const agentId of this.#loads.keys()) this.#missedLatest.add(agentId);
     this.#loads.clear();
     this.#olderLoads.clear();
     for (const [id, entry] of this.#entries) {
@@ -259,21 +277,34 @@ export class MobileConversationStore {
       if (attach) pending.attach = true;
       return pending.promise;
     }
-    const load: { promise: Promise<ConversationPage>; dirty: boolean; attach: boolean } = {
+    const serial = ++this.#latestLoads;
+    const load: { promise: Promise<ConversationPage>; dirty: boolean; stale: boolean; attach: boolean } = {
       dirty: false,
+      stale: false,
       attach,
       promise: Promise.resolve()
         .then(async () => {
           let page: ConversationPage;
           do {
             load.dirty = false;
+            load.stale = false;
             page = await read();
             if (page.agentId !== agentId) throw new Error("The server returned a page for another conversation.");
-            if (!isCurrent() || this.#loads.get(agentId) !== load) return page;
+            if (!isCurrent() || this.#loads.get(agentId) !== load) {
+              this.#markMissedLatest(agentId, serial);
+              return page;
+            }
             this.applyPage(page, undefined, load.attach);
-          } while (load.dirty);
+          } while (load.dirty || (load.stale && this.isObserved(agentId)));
+          if (load.stale) return page;
           this.#upToDate.add(agentId);
+          this.#missedLatest.delete(agentId);
+          this.#latestReads.set(agentId, serial);
           return page;
+        })
+        .catch((error: unknown) => {
+          this.#markMissedLatest(agentId, serial);
+          throw error;
         })
         .finally(() => {
           if (this.#loads.get(agentId) === load) {

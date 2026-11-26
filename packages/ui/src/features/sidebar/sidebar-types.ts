@@ -16,8 +16,6 @@ import type { ThreadItem } from "../conversation/threads/thread-types";
 import type { ServerMenuProps } from "../servers/ServerMenu";
 import type { SidebarPinnedItem } from "./sidebar-pins";
 
-export type SidebarView = "agents" | "routines";
-
 export const SIDEBAR_HIDDEN_GROUP_OPEN_ID = "hidden-agents:open";
 
 export type SidebarChatOrder = "manual" | "recent" | "unread-group" | "unread-first";
@@ -41,8 +39,6 @@ export function sidebarChatOrderSortsSections(order: SidebarChatOrder | undefine
 }
 
 export interface SidebarProps {
-  view?: SidebarView | undefined;
-  onViewChange?: ((view: SidebarView) => void) | undefined;
   deleteSupported?: boolean | undefined;
   marketplaceSupported?: boolean | undefined;
   channels?: ChannelSummary[] | undefined;
@@ -77,6 +73,8 @@ export interface SidebarProps {
   layoutMutable?: boolean | undefined;
   chatOrder?: SidebarChatOrder | undefined;
   onChatOrderChange?: ((order: SidebarChatOrder) => void) | undefined;
+  tabIds?: readonly string[] | undefined;
+  onTabIdsChange?: ((tabIds: string[]) => void) | undefined;
   collapsedSectionIds: string[];
   onMutateLayout: (action: SidebarLayoutAction) => Promise<void>;
   foldersSupported?: boolean | undefined;
@@ -137,6 +135,8 @@ export interface SidebarAgentThreads {
   load: (agentId: string) => void;
   onOpen: (agentId: string, threadId: string) => void;
   onNew?: ((agentId: string) => void) | undefined;
+  onArchive?: ((agentId: string, threadId: string) => void) | undefined;
+  onDelete?: ((agentId: string, threadId: string) => void) | undefined;
 }
 
 export interface SidebarChatHistory {

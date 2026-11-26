@@ -141,6 +141,7 @@ function list(value: unknown, label: string): unknown[] {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -166,6 +167,7 @@ const teamBrowser: TeamApiBrowser = {
   navigate: unused,
   reload: unused,
   stop: unused,
+  answerPermission: unused,
   takeUserControl: unused,
   startTeach: unused,
   stopTeach: () => [],
@@ -181,7 +183,9 @@ const teamBrowser: TeamApiBrowser = {
   startView: unused,
   dispatchViewInput: unused,
   copyViewSelection: unused,
+  answerViewDialog: unused,
   importSignIn: unused,
+  answerHttpSignIn: unused,
 };
 
 const root = await mkdtemp(join(tmpdir(), "openbot-crm-team-api-"));

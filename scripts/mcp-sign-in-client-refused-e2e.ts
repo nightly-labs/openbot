@@ -79,10 +79,11 @@ const REGISTRATION_FORBIDDEN = {
   error_description:
     "Dynamic client registration is not supported. Only pre-registered MCP trusted partners are allowed.",
 };
-type RegistrationForbidden = "dropbox" | "forbidden";
+type RegistrationForbidden = "dropbox" | "forbidden" | "namecheap";
 type AccountRefusal = "forbidden" | "insufficientScope";
 
 const DROPBOX_REDIRECTS = ["http://localhost/callback", "http://127.0.0.1/callback", "http://127.0.0.1"];
+const NAMECHEAP_REDIRECTS = ["https://claude.ai/api/mcp/auth_callback", "https://vscode.dev/redirect"];
 
 interface ScopeMetadata {
   resource?: string[] | null;
@@ -139,6 +140,12 @@ async function fakeServer(
         state.redirects.push(`register ${asked.redirect_uris.join(" ")}`);
         if (registrationForbidden) {
           const path = URL.parse(asked.redirect_uris[0] ?? "")?.pathname;
+          if (registrationForbidden === "namecheap")
+            return json(response, 201, {
+              client_id: id,
+              token_endpoint_auth_method: "none",
+              redirect_uris: path === "/callback" ? asked.redirect_uris : NAMECHEAP_REDIRECTS,
+            });
           if (registrationForbidden === "forbidden" || path !== "/callback")
             return json(response, 403, REGISTRATION_FORBIDDEN);
           return json(response, 201, {
@@ -625,6 +632,36 @@ async function main(): Promise<void> {
     );
     check(lostElsewhere, lostElsewhere.signedIn, "no token is stored after the sign-in");
     report.cases.push(lostElsewhere);
+
+    const namecheap = await runCase("registration-replaces-address-except-callback", ["none"], 1, {
+      registrationForbidden: "namecheap",
+    });
+    check(namecheap, namecheap.attempts[0]?.error === null, `the sign-in failed: ${namecheap.attempts[0]?.error}`);
+    check(
+      namecheap,
+      namecheap.redirects.join() === [`register ${callback}`, `page ${callback}`, `token ${callback}`].join(),
+      `the addresses were ${namecheap.redirects.join()}`,
+    );
+    check(namecheap, namecheap.signedIn, "no token is stored after the sign-in");
+    report.cases.push(namecheap);
+
+    const namecheapElsewhere = await runCase("opened-elsewhere-registration-replaces-address", ["none"], 1, {
+      registrationForbidden: "namecheap",
+      relayDeepLink: null,
+    });
+    check(
+      namecheapElsewhere,
+      namecheapElsewhere.attempts[0]?.error === null,
+      `the sign-in failed: ${namecheapElsewhere.attempts[0]?.error}`,
+    );
+    check(
+      namecheapElsewhere,
+      namecheapElsewhere.redirects.join() ===
+        [`register ${ownListener}`, `register ${callback}`, `page ${callback}`, `token ${callback}`].join(),
+      `the addresses were ${namecheapElsewhere.redirects.join()}`,
+    );
+    check(namecheapElsewhere, namecheapElsewhere.signedIn, "no token is stored after the sign-in");
+    report.cases.push(namecheapElsewhere);
 
     const forbidden = await runCase("registration-forbidden", ["none"], 1, { registrationForbidden: "forbidden" });
     check(

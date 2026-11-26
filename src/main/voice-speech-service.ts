@@ -7,6 +7,7 @@ import {
   SPEECH_VOICES,
   type SpeechAudio,
   type SpeechInput,
+  type SpeechLanguage,
   type SpeechModelStatus,
   type SpeechSettings,
   VOICE_KEY_PROVIDER_NAMES,
@@ -49,6 +50,10 @@ class HostFailure extends Error {
   constructor(readonly category: VoiceSpeechFailure | "host-exited") {
     super(category);
   }
+}
+
+interface LocalSpeechInput extends SpeechInput {
+  language: SpeechLanguage;
 }
 
 interface PendingRequest {
@@ -167,6 +172,9 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
         ),
       );
     }
+    const { language } = input;
+    if (language === null)
+      return yield* new VoiceOperationError({ cause: new Error(sourceText("error.voice.speech.failed")) });
     const speakerId = SPEECH_VOICES.indexOf(settings.voice);
     const startedAt = Date.now();
     const speech = Effect.gen({ self: this }, function* () {
@@ -175,7 +183,7 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
         return yield* new VoiceOperationError({
           cause: new Error(status.message ?? sourceText("error.voice.speech.modelRequired")),
         });
-      return yield* this.#request(input, speakerId).pipe(
+      return yield* this.#request({ text: input.text, language }, speakerId).pipe(
         Effect.mapError((error) => {
           logger.error(
             `Speech of ${input.text.length} characters failed after ${Date.now() - startedAt}ms.`,
@@ -249,7 +257,11 @@ export class VoiceSpeechService extends EventEmitter<VoiceSpeechEvents> {
     return status;
   }
 
-  #request(input: SpeechInput, speakerId: number, loadOnly = false): Effect.Effect<SpeechAudio, VoiceOperationError> {
+  #request(
+    input: LocalSpeechInput,
+    speakerId: number,
+    loadOnly = false,
+  ): Effect.Effect<SpeechAudio, VoiceOperationError> {
     return Effect.callback<SpeechAudio, VoiceOperationError>((resume) => {
       this.#cancelIdleStop();
       const host = this.#ensureHost();

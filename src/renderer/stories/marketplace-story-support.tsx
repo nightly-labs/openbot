@@ -1,26 +1,32 @@
+import { X_AGENT_LISTING_ID, X_EXTENSION_URL } from "@openbot/contracts/browser-extension-x";
 import {
   AVATAR_HUES,
   type ClientAgentSummary,
   DEFAULT_MCP_SERVER_ACCESS,
   type InstalledSkill,
+  type MarketplaceAgentDetail,
   type MarketplaceAgentSummary,
   type MarketplaceSkillQuery,
   type MarketplaceSkillSummary,
   type McpServerAccess,
   type McpServerConfig,
+  type McpSignInApp,
   type McpSignInState,
   type SkillCategory,
 } from "@openbot/contracts/ipc";
 import type { McpConnectFlow } from "@openbot/contracts/mcp-connect-flows";
+import { sourceText } from "@openbot/i18n";
 import { CONNECTOR_LISTINGS } from "@openbot/ui/features/connectors/connector-catalog";
 import { Marketplace } from "@openbot/ui/features/marketplace/Marketplace";
 import { AgentsDialog } from "@openbot/ui/features/marketplace/MarketplaceAgentsDialog";
-import type {
-  MarketplaceApp,
-  MarketplaceAppAccount,
-  MarketplaceAppConnection,
-  MarketplaceAppsBlock,
-  MarketplaceModel,
+import {
+  type MarketplaceAgent,
+  type MarketplaceApp,
+  type MarketplaceAppAccount,
+  type MarketplaceAppConnection,
+  type MarketplaceAppsBlock,
+  type MarketplaceModel,
+  X_APP_ID,
 } from "@openbot/ui/features/marketplace/marketplace-model";
 import {
   createMarketplaceNavigation,
@@ -35,6 +41,7 @@ import { createSignal, createStore, onSettled, Show, untrack } from "solid-js";
 import { fn } from "storybook/test";
 import { McpServerControls } from "../src/features/servers/McpServerControls";
 import { McpServerForm } from "../src/features/servers/McpServerForm";
+import type { McpPanelSignInApp } from "../src/features/servers/McpSignInAppSection";
 import type { McpServerTools } from "../src/features/servers/mcp-server-tools";
 import { MARKETPLACE_PLUGINS } from "../src/features/settings/marketplace-plugin-catalog";
 import {
@@ -242,6 +249,8 @@ function startSkills(agents: readonly ClientAgentSummary[]): Record<string, Inst
 
 type HeldState = "connected" | "signInNeeded";
 
+const STORY_SIGN_IN_CALLBACK = "http://127.0.0.1:47823/mcp/callback";
+
 export interface StoryProps {
   member?: boolean;
   blocked?: MarketplaceAppsBlock;
@@ -255,9 +264,57 @@ export interface StoryProps {
   catalog?: readonly string[];
   manyAgents?: boolean;
   noSkills?: boolean;
+  signInAppNeeded?: boolean;
   dialogSkill?: string;
   agentStates?: Readonly<Record<string, "added" | "update">>;
+  xAgent?: boolean;
   children?: (context: { model: MarketplaceModel; nav: MarketplaceNavigation }) => JSX.Element;
+}
+
+const X_LISTING: MarketplaceAgentDetail = {
+  id: X_AGENT_LISTING_ID,
+  category: "research",
+  name: "X",
+  title: "Does what you ask in an X reply that mentions @openbot_",
+  description: "Does what you ask in an X reply that mentions @openbot_.",
+  creatorName: "OpenBot",
+  version: 1,
+  installs: 412,
+  featured: false,
+  verified: true,
+  avatarSeed: "x-desk",
+  avatarHue: 280,
+  avatarUrl: null,
+  skillCount: 1,
+  routineCount: 0,
+  activeRoutineCount: 0,
+  updatedAt: "2026-11-20T09:00:00.000Z",
+  versionId: "x-desk-v1",
+  skills: [],
+  routines: [],
+};
+
+const X_AGENT: MarketplaceAgent = {
+  id: "agent-x",
+  name: X_LISTING.name,
+  title: X_LISTING.title,
+  avatarSeed: X_LISTING.avatarSeed,
+  avatarHue: X_LISTING.avatarHue,
+  avatarUrl: null,
+};
+
+function storyXApp(agent: MarketplaceAgent | null): MarketplaceApp {
+  const { t } = currentText();
+  return {
+    kind: "x",
+    id: X_APP_ID,
+    name: t("marketplace.xApp.title"),
+    tagline: t("marketplace.xApp.tagline"),
+    category: "productivity",
+    status: agent ? "connected" : "idle",
+    agent,
+    extensionUrl: X_EXTENSION_URL,
+  };
 }
 
 const APPLE_APPS = MARKETPLACE_PLUGINS.filter((plugin) => plugin.slug === "apple-apps");
@@ -303,8 +360,10 @@ export function MarketplaceStory(props: StoryProps) {
     catalog = [],
     manyAgents,
     noSkills,
+    signInAppNeeded,
     dialogSkill,
     agentStates,
+    xAgent,
     children,
   } = untrack(() => ({ ...props }));
   const details = connected ? CONNECTED_CONNECTOR_DETAILS : STORY_CONNECTOR_DETAILS;
@@ -337,6 +396,7 @@ export function MarketplaceStory(props: StoryProps) {
     installed: noSkills ? {} : startSkills(userAgents),
     apps: [
       ...connectorApps,
+      storyXApp(xAgent ? X_AGENT : null),
       ...[
         ...STORY_MARKETPLACE_PLUGINS,
         ...(macOS ? APPLE_APPS : []),
@@ -357,12 +417,12 @@ export function MarketplaceStory(props: StoryProps) {
           ),
         };
       }),
-      ...STORY_MCP_SERVERS.slice(0, 1).map(
+      ...STORY_MCP_SERVERS.slice(signInAppNeeded ? 1 : 0, signInAppNeeded ? 2 : 1).map(
         (server): MarketplaceApp => ({
           kind: "custom",
           id: `custom:${server.id}`,
           name: server.name,
-          tagline: server.command,
+          tagline: server.transport === "stdio" ? server.command : server.url,
           status: "connected",
           server,
         }),
@@ -478,6 +538,26 @@ export function MarketplaceStory(props: StoryProps) {
   const [dialogOpen, setDialogOpen] = createSignal(true);
 
   const [signIns, setSignIns] = createSignal<Record<string, McpSignInState>>({});
+  const [savedSignInApp, setSavedSignInApp] = createSignal<McpSignInApp | null>(null);
+  const storySignInAppState = () => ({ redirectUrl: STORY_SIGN_IN_CALLBACK, app: savedSignInApp() });
+  const storySignInApp: McpPanelSignInApp | undefined = signInAppNeeded
+    ? {
+        load: async () => storySignInAppState(),
+        save: async (input) => {
+          setSavedSignInApp({
+            clientId: input.clientId,
+            secretSaved:
+              input.clientSecret === null ? (savedSignInApp()?.secretSaved ?? false) : input.clientSecret !== "",
+            scope: input.scope,
+          });
+          return storySignInAppState();
+        },
+        remove: async () => {
+          setSavedSignInApp(null);
+          return storySignInAppState();
+        },
+      }
+    : undefined;
   const customServers = () => state.apps.flatMap((app) => (app.kind === "custom" ? [app.server] : []));
   const putServer = (server: McpServerConfig) =>
     setState((draft) => {
@@ -501,7 +581,10 @@ export function MarketplaceStory(props: StoryProps) {
       putServer(saved);
       return saved;
     },
-    test: async () => ({ toolCount: 3, error: null }),
+    test: async () => ({
+      toolCount: 3,
+      error: signInAppNeeded ? sourceText("error.backend.mcpSignInAppNeeded") : null,
+    }),
     setEnabled: async (id, enabled) => {
       const server = customServers().find((candidate) => candidate.id === id);
       if (server) putServer({ ...server, enabled });
@@ -516,17 +599,20 @@ export function MarketplaceStory(props: StoryProps) {
       signOut: async (id) => {
         setSignIns((held) => ({ ...held, [id]: { mcpServerId: id, signedIn: false } }));
       },
+      app: storySignInApp,
     }),
     signInRequest: () => null,
     endSignInRequest: () => {},
   };
   const model: MarketplaceModel = {
     listAgents: async (query) => page<MarketplaceAgentSummary>(agents, query),
-    loadAgent: async (id) => STORY_MARKETPLACE_AGENT_DETAILS[id],
+    loadAgent: async (id) => (id === X_AGENT_LISTING_ID ? X_LISTING : STORY_MARKETPLACE_AGENT_DETAILS[id]),
     agentState: (listing) => (member ? null : (state.added[listing.id] ?? "add")),
     agentBusy: (id) => Boolean(state.busy[id]),
     addAgent: async (listing) => {
       setState((draft) => {
+        if (listing.id === X_AGENT_LISTING_ID)
+          draft.apps = draft.apps.map((app) => (app.kind === "x" ? storyXApp(X_AGENT) : app));
         draft.added[listing.id] = "added";
         draft.notice = `${listing.name} added.`;
       });

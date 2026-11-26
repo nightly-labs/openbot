@@ -63,6 +63,7 @@ export const messages = defineMessages("provider", {
   "provider.aria.install": "Install {name}",
   "provider.aria.signIn": "Sign in to {name}",
   "provider.aria.codeFallback": "Log in to {name} with a code",
+  "provider.aria.addressFallback": "Paste the sign-in address for {name}",
   "provider.aria.moreActions": "More actions for {name}",
 
   "provider.aria.use": "Use {name} in OpenBot",
@@ -91,10 +92,14 @@ export const messages = defineMessages("provider", {
   "provider.codeLogin.pasteExpiresIn": "Waiting for you. This login stops in {time}.",
   "provider.codeLogin.linkTitle": "Log in to {name} on another device",
   "provider.codeLogin.pageTitle": "Sign in to {name}",
+  "provider.codeLogin.addressDescription":
+    "Finish the sign-in in your browser. This window closes when the sign-in is complete.",
   "provider.codeLogin.pageDescription": "This page is open in the browser on {host}. Sign in here.",
   "provider.codeLogin.relayStarting": "Starting the {name} sign-in on {host}…",
   "provider.codeLogin.pageOpening": "Opening the {name} sign-in page on {host}…",
   "provider.codeLogin.linkStep": "Log in to {name}. OpenBot continues by itself.",
+  "provider.codeLogin.thisComputerDescription": "Open this link in a browser on this computer. OpenBot waits here.",
+  "provider.codeLogin.copyLink": "Copy link",
   "provider.codeLogin.chatgptDeviceSetting":
     "In ChatGPT on a computer, open the security settings and turn on device code sign-in for Codex. For a work account, your workspace admin turns it on.",
 
@@ -117,11 +122,14 @@ export const messages = defineMessages("provider", {
   "provider.picker.download": "{name} download",
   "provider.picker.search": "Search models",
   "provider.picker.noMatches": "No models match your search.",
+  "provider.picker.openrouterNoMatches":
+    "No models match your search. Your privacy, provider and guardrail settings on openrouter.ai can hide models from this list.",
   "provider.picker.workspaceOnlyUnavailable":
     "These models do not work with Workspace only on Windows and Linux. To use them, change Permissions in the agent settings.",
   "provider.picker.olderModels": "Older models",
   "provider.picker.olderModelsList": "Older {name} models",
-  "provider.picker.noModels": "No models are available from {name}.",
+  "provider.picker.noModels":
+    "No {name} models show here. If they are turned off, an admin can turn them on in Server settings > Providers > {name} > Models.",
   "provider.picker.endpointModelsInCustom": "{name} runs your custom endpoints. Their models are on the Custom tab.",
   "provider.picker.showCustomModels": "Show models",
   "provider.picker.museNoModels":
@@ -141,6 +149,7 @@ export const messages = defineMessages("provider", {
   "provider.picker.effort": "Effort",
   "provider.picker.effortLabel": "Agent reasoning effort",
   "provider.picker.effortFixed": "{effort}, set by {provider}",
+  "provider.picker.effortLimited": "Your Claude settings or organization limit the effort to {effort}.",
   "provider.picker.fast": "Fast",
   "provider.picker.fastText": "Faster responses, increased usage",
   "provider.picker.speed": "Speed",
@@ -230,6 +239,7 @@ export const messages = defineMessages("provider", {
   "provider.account.apiKey": "API key",
   "provider.account.listLabel": "{name} accounts",
   "provider.account.usedBy": "Used by {agents}",
+  "provider.account.sameEmail": "Same email as {name}",
   "provider.account.failed": "Sign-in failed",
   "provider.account.moreActions": "More actions for {name}",
   "provider.account.renameLabel": "Name of {name}",
@@ -311,6 +321,7 @@ export const messages = defineMessages("provider", {
   "provider.settings.codexKeyInUse":
     "ChatGPT uses this key, not your ChatGPT plan. OpenAI bills each request to the key. The plan's usage is not shown.",
   "provider.settings.codexKeyAlternative": "Or log in with an OpenAI API key. OpenAI bills each request to the key.",
+  "provider.settings.museKeyInUse": "Muse uses this key, not your sign-in. To use your sign-in, remove the key.",
   "provider.settings.addKey": "Add key",
   "provider.settings.changeKey": "Change key",
   "provider.settings.runtime": "Runtime",
@@ -330,10 +341,14 @@ export const messages = defineMessages("provider", {
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Prompt cache",
   "provider.settings.promptCacheDescription":
-    "How long Claude keeps the context of an agent in the cache between turns.",
+    "How long Claude and Pi keep the context of an agent in the cache between turns.",
   "provider.settings.promptCacheHour": "1 hour",
-  "provider.settings.promptCacheDefault": "Claude Code default",
+  "provider.settings.promptCacheDefault": "Provider default",
   "provider.settings.promptCacheLoadFailed": "Could not load the prompt cache time of this server.",
+  "provider.settings.cacheExpiryCompaction": "Compact before the cache expires",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "When a chat with 200K or more tokens of context is idle with a 1 hour cache, the agent compacts the context before the cache expires. Then the next message does not read the full context again with no cache.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "Could not load the compaction setting of this server.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Use my Claude Code setup",
   "provider.settings.claudeUserSetupDescription":
@@ -401,4 +416,5 @@ export const messages = defineMessages("provider", {
   "provider.settings.endpointModels": { one: "{url} · 1 model", other: "{url} · {count} models" },
   "provider.settings.disconnectLocalOnly":
     "OpenBot signs {provider} out on this computer. The {provider} CLI in your terminal keeps its own sign-in.",
+  "provider.settings.updateAll": "Update all",
 });

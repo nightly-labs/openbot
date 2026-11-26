@@ -3,10 +3,15 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
+import { isCauseCode } from "@openbot/telemetry";
+import { visibleDynamicTools } from "../src/backend/agent/tool-catalog";
+import { FAILOVER_CAUSES } from "../src/backend/agent/turn-lifecycle";
 import type { AgentClient } from "../src/backend/agent-client";
 import type { AgentCliInfo } from "../src/backend/cli";
+import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { McpServerDrop } from "../src/backend/mcp-provider-shapes";
-import { getString } from "../src/backend/protocol";
+import { getRecord, getString } from "../src/backend/protocol";
 import { requireProviderDriver } from "../src/backend/provider-drivers";
 import { installFakeAgent, readJsonl, runTurn, startThread, stopClients, type TurnResult } from "./provider-fakes/host";
 
@@ -39,6 +44,7 @@ interface Report {
   googleDrops?: McpServerDrop[];
   blingDrops?: McpServerDrop[];
   aaveDrops?: McpServerDrop[];
+  openmotionDrops?: McpServerDrop[];
   error?: string;
 }
 
@@ -270,6 +276,20 @@ try {
   report.turns.ownRefusedTool = ownRefused;
   assert.equal(ownRefused.status, "failed", "The turn fails.");
   assert.equal(refusedDrops.length, 1, "No server of OpenBot is left out.");
+  const stopped = sourceText("error.provider.antigravityTurnStopped");
+  assert.equal(ownRefused.error, stopped, "The turn shows the plain message, not the CLI's text.");
+
+  const failures: Record<string, TurnResult> = {};
+  for (const word of ["FAIL_KEY", "FAIL_OTHER", "FAIL_QUIET"]) {
+    const turn = await runTurn(refusedClient, refusedThread, { text: word, timeoutMs: 30_000 });
+    failures[word] = turn;
+    report.turns[word] = turn;
+    assert.equal(turn.status, "failed", `The ${word} turn fails.`);
+  }
+  assert.equal(failures.FAIL_KEY?.error, sourceText("error.provider.geminiKeyRefused"), "A refused key is named.");
+  assert.equal(failures.FAIL_OTHER?.error, stopped, "An unknown cause gives the plain message.");
+  assert.equal(failures.FAIL_QUIET?.error, stopped, "A log with no cause gives the plain message.");
+  assert.equal(refusedDrops.length, 1, "No server is left out for these failures.");
 
   const dropsBefore = refusedDrops.length;
   const answerThread = await startThread(refusedClient, { cwd: refusedWorkspace });
@@ -434,6 +454,122 @@ try {
     "Only the server whose enum holds numbers is left out.",
   );
   assert.match(aaveDrops[0]?.detail ?? "", /get_reserve_holders/u, "The report names the tool.");
+
+  const openmotionDrops: McpServerDrop[] = [];
+  const openmotionClient = requireProviderDriver("antigravity").createClient(
+    { executable: googleExecutable, version: "1.5.6", source: "managed" },
+    20_000,
+    {
+      apiKey: () => null,
+      customProviders: () => [],
+      mcpServers: () => [
+        httpServer("atlas", "atlas", "https://atlas.example/mcp"),
+        httpServer("openmotion", "openmotion", "https://openmotion.example/mcp"),
+      ],
+      reportMcpDrops: (_provider, dropped) => openmotionDrops.push(...dropped),
+    },
+  );
+  clients.push(openmotionClient);
+  openmotionClient.start();
+  const openmotionWorkspace = join(root, "openmotion-workspace");
+  await mkdir(openmotionWorkspace, { recursive: true });
+  report.openmotionDrops = openmotionDrops;
+  for (const [name, text] of [
+    ["googleRefusedTypelessEnum", "Reply with OK only."],
+    ["googleRefusedTypelessEnumAnswer", "CLI_1_5_9 Reply with OK only."],
+  ] as const) {
+    const dropsBefore = openmotionDrops.length;
+    const openmotionThread = await startThread(openmotionClient, { cwd: openmotionWorkspace });
+    const openmotionTurn = await runTurn(openmotionClient, openmotionThread, { text, timeoutMs: 30_000 });
+    report.turns[name] = openmotionTurn;
+    assert.equal(openmotionTurn.error, null, "The turn that Google refused for an enum with no type has no error.");
+    assert.equal(openmotionTurn.reply, "OK", "The turn answers without the server.");
+    assert.deepEqual(
+      openmotionDrops.slice(dropsBefore).map((drop) => drop.name),
+      ["openmotion"],
+      "Only the server of the tool that Google names is left out.",
+    );
+    assert.match(openmotionDrops.at(-1)?.detail ?? "", /openmotion_restore_version/u, "The report names the tool.");
+    const openmotionPrompts = (await readJsonl<RefusedEntry>(googleLog)).filter(
+      (entry) => entry.method === "session/prompt" && entry.sessionId === openmotionThread,
+    );
+    assert.deepEqual(
+      openmotionPrompts.map((entry) => entry.refused),
+      ["openmotion", null],
+      "The prompt runs once more, and then without the refused server.",
+    );
+  }
+
+  const listCauses = new Map<string, string | null>();
+  const listAgent = async (name: string, env: Record<string, string>) => {
+    const executable = join(root, `agy-list-${name}`, "bin", "antigravity");
+    const workspace = join(root, `list-${name}`);
+    await mkdir(workspace, { recursive: true });
+    await installFakeAgent(executable, "antigravity-mcp-list", { FAKE_LOG: join(root, `list-${name}.jsonl`), ...env });
+    const listClient = requireProviderDriver("antigravity").createClient(
+      { executable, version: env.FAKE_VERSION ?? "1.5.12", source: "managed" },
+      20_000,
+      { apiKey: () => null, customProviders: () => [], mcpServers: () => [] },
+    );
+    clients.push(listClient);
+    listClient.on("notification", (notification: { method: string; params?: unknown }) => {
+      if (notification.method !== "error") return;
+      const threadId = getString(notification.params, "threadId");
+      if (threadId) listCauses.set(threadId, getString(notification.params, "causeCode") ?? null);
+    });
+    listClient.start();
+    const response = await runCauseEffect(
+      listClient.request(
+        "thread/start",
+        { cwd: workspace, dynamicTools: visibleDynamicTools("antigravity") },
+        (value) => value,
+      ),
+    );
+    const threadId = getString(getRecord(response, "thread"), "id");
+    assert.ok(threadId, "The thread opens.");
+    return { listClient, threadId, log: join(root, `list-${name}.jsonl`) };
+  };
+  const plain = { text: "Reply with OK only.", timeoutMs: 30_000 };
+
+  const onTime = await listAgent("now", { FAKE_OPEN_LIST: "now" });
+  const onTimeTurn = await runTurn(onTime.listClient, onTime.threadId, plain);
+  report.turns.toolsListedOnTime = onTimeTurn;
+  assert.equal(onTimeTurn.status, "completed", "A turn with OpenBot's tools completes.");
+  assert.equal(onTimeTurn.error, null, "A turn with OpenBot's tools has no error.");
+  const onTimeLog = await readJsonl<{ method: string; listed: number | null }>(onTime.log);
+  assert.ok(
+    onTimeLog.some((entry) => entry.method === "session/new" && (entry.listed ?? 0) > 0),
+    "The fake listed OpenBot's tools over the bridge.",
+  );
+
+  const never = await listAgent("never", { FAKE_OPEN_LIST: "never" });
+  const missed = await runTurn(never.listClient, never.threadId, plain);
+  report.turns.toolsNotListed = missed;
+  assert.equal(missed.status, "failed", "A turn without OpenBot's tools fails.");
+  assert.match(missed.error ?? "", /without OpenBot's tools/u, "The error says that the tools were missing.");
+  assert.doesNotMatch(missed.error ?? "", /MCP|policy|admin/u, "The error has no protocol words.");
+  assert.equal(missed.reply, "OK", "The answer of the turn stays.");
+  const missedCause = listCauses.get(never.threadId) ?? null;
+  assert.equal(missedCause, "unknown", "The cause is one that does not start a backup model.");
+  assert.ok(
+    missedCause !== null && isCauseCode(missedCause) && !FAILOVER_CAUSES.has(missedCause),
+    "No backup model runs the prompt again.",
+  );
+  const resumes = async () =>
+    (await readJsonl<{ method: string }>(never.log)).filter((entry) => entry.method === "session/resume").length;
+  const resumesBefore = await resumes();
+  const listedTurn = await runTurn(never.listClient, never.threadId, { ...plain, text: "list the tools" });
+  report.turns.toolsListedAtPrompt = listedTurn;
+  assert.equal(listedTurn.status, "completed", "A prompt that lists the tools in time completes.");
+  assert.equal(await resumes(), resumesBefore + 1, "The turn after the failure opens the session again.");
+  const keptTurn = await runTurn(never.listClient, never.threadId, plain);
+  report.turns.toolsKept = keptTurn;
+  assert.equal(keptTurn.status, "completed", "The session keeps the tools for the next prompt.");
+
+  const older = await listAgent("older", { FAKE_OPEN_LIST: "never", FAKE_VERSION: "1.5.10" });
+  const olderTurn = await runTurn(older.listClient, older.threadId, plain);
+  report.turns.toolsOlderCli = olderTurn;
+  assert.equal(olderTurn.status, "completed", "An older CLI's turn completes as before.");
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

@@ -33,8 +33,11 @@ export const messages = {
   "status.messaging.integrationsSection": "集成",
   "status.messaging.signInReceived": "OpenBot 已收到 Slack 安装请求，你可以关闭该标签页。",
   "status.messaging.signInUnknown": "该 Slack 安装不是由 OpenBot 发起的，请在 OpenBot 中重新开始。",
-  "status.messaging.telegramNoAgent": "这里还没有助手能回答。请在 OpenBot 中添加 Telegram 调度助手。",
+  "status.messaging.telegramNoAgent":
+    "这里还没有助手能回答。请在 OpenBot 中打开 市场 > 应用 > Telegram，然后点击 添加助手。",
   "status.messaging.telegramLinked": "OpenBot 已连接到该聊天。提及 {bot} 或回复 OpenBot 的消息即可向助手提问。",
+  "status.messaging.telegramNotLinked":
+    "OpenBot 未连接到该聊天。要连接，请打开 OpenBot 应用，前往 市场 → 应用 → Telegram，然后选择“加入群组”或“开启私聊”。",
   "status.messaging.telegramOrchestratorName": "Telegram 调度助手",
   "status.messaging.telegramOrchestratorTitle": "在 Telegram 中回答并调度团队",
   "status.messaging.whatsappNoAgent": "这里还没有助手能回答。请在 OpenBot 中添加 WhatsApp 调度助手。",
@@ -51,6 +54,8 @@ export const messages = {
     "此 WhatsApp 号码还关联了另一个 OpenBot，所以你可能会收到两条回复。要解决此问题，请在手机上的 WhatsApp 中打开“已关联设备”，然后退出你不用的 OpenBot。",
   "status.messaging.whatsappPaused":
     "短时间内收到的消息太多，OpenBot 已在此暂停回复 10 分钟。如果此号码还关联了另一个 OpenBot，请在手机上的 WhatsApp 中打开“已关联设备”，然后退出你不用的 OpenBot。",
+  "status.messaging.whatsappNotDelivered": "WhatsApp 没有接受这条回答，所以对方没有收到。",
+  "status.messaging.whatsappPartlyDelivered": "WhatsApp 没有接受这条回答的全部内容，所以对方只收到了一部分。",
   "status.messaging.whatsappOrchestratorName": "WhatsApp 调度助手",
   "status.messaging.whatsappOrchestratorTitle": "在 WhatsApp 中回答并调度团队",
 } as const satisfies PartialTranslation<typeof source>;

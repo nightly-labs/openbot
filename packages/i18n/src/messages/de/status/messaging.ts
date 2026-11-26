@@ -36,9 +36,11 @@ export const messages = {
   "status.messaging.signInUnknown":
     "OpenBot hat diese Slack-Installation nicht gestartet. Starte sie erneut in OpenBot.",
   "status.messaging.telegramNoAgent":
-    "Hier kann noch kein Agent antworten. Füge den Telegram-Orchestrator in OpenBot hinzu.",
+    "Hier kann noch kein Agent antworten. Öffne in OpenBot Marktplatz > Apps > Telegram und klicke auf Agenten hinzufügen.",
   "status.messaging.telegramLinked":
     "OpenBot ist mit diesem Chat verbunden. Erwähne {bot} oder antworte auf eine Nachricht von OpenBot, um die Agenten zu fragen.",
+  "status.messaging.telegramNotLinked":
+    "OpenBot ist nicht mit diesem Chat verbunden. Öffne zum Verbinden die OpenBot-App, gehe zu Marketplace → Apps → Telegram und wähle „Zu Gruppe hinzufügen“ oder „Direkten Chat öffnen“.",
   "status.messaging.telegramOrchestratorName": "Telegram-Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Antwortet in Telegram und fragt das Team",
   "status.messaging.whatsappNoAgent":
@@ -57,6 +59,10 @@ export const messages = {
     "Ein anderer OpenBot ist mit dieser WhatsApp-Nummer verknüpft, darum bekommst du vielleicht zwei Antworten. Öffne dazu in WhatsApp auf deinem Handy „Verknüpfte Geräte“ und melde den OpenBot ab, den du nicht nutzt.",
   "status.messaging.whatsappPaused":
     "OpenBot antwortet hier 10 Minuten lang nicht: In kurzer Zeit kamen zu viele Nachrichten. Wenn ein anderer OpenBot mit dieser Nummer verknüpft ist, öffne in WhatsApp auf deinem Handy „Verknüpfte Geräte“ und melde den OpenBot ab, den du nicht nutzt.",
+  "status.messaging.whatsappNotDelivered":
+    "WhatsApp hat diese Antwort nicht angenommen, daher hat die Person sie nicht erhalten.",
+  "status.messaging.whatsappPartlyDelivered":
+    "WhatsApp hat diese Antwort nicht vollständig angenommen, daher hat die Person nur einen Teil erhalten.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp-Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Antwortet in WhatsApp und fragt das Team",
 } as const satisfies PartialTranslation<typeof source>;

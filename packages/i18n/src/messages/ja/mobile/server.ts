@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "{name} から退出できませんでした",
   "mobile.server.drawer.removeFailed": "{name} を削除できませんでした",
   "mobile.server.drawer.deleteFailed": "{name} を削除できませんでした",
+  "mobile.server.drawer.hide": "サーバーを非表示",
+  "mobile.server.drawer.show": "サーバーを表示",
+  "mobile.server.drawer.hiddenServers": "非表示のサーバー",
+  "mobile.server.drawer.hideFailed": "{name} を非表示にできませんでした",
+  "mobile.server.drawer.showFailed": "{name} を表示できませんでした",
   "mobile.server.drawer.actionFailed": "OpenBot はこの操作を完了できませんでした。もう一度お試しください。",
   "mobile.server.drawer.moveUp": "上へ移動",
   "mobile.server.drawer.moveDown": "下へ移動",
@@ -100,14 +105,17 @@ export const messages = {
   "mobile.server.hosted.intro.description":
     "クラウドサーバーは、コンピューターの電源が切れていてもエージェントとルーティンを実行します。セットアップと運用は OpenBot が行います。",
   "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
-  "mobile.server.hosted.computer.title": "コンピューターで",
+  "mobile.server.hosted.steps.title": "コンピューターで追加",
+  "mobile.server.hosted.steps.open": "コンピューターで OpenBot を開きます。",
+  "mobile.server.hosted.steps.settings": "「設定」→「ホスト型サーバー」に移動します。",
+  "mobile.server.hosted.steps.add": "「サーバーを追加」を選択し、プランを選びます。",
+  "mobile.server.hosted.plansToggle": "各プランの内容",
   "mobile.server.hosted.computer.add": "クラウドサーバーを追加",
   "mobile.server.hosted.computer.addHint":
     "OpenBot で「設定」→「ホスト型サーバー」を開き、「サーバーを追加」を選択します。",
   "mobile.server.hosted.computer.change": "プランを変更",
   "mobile.server.hosted.computer.changeHint": "OpenBot で「設定」→「お支払い」を開きます。",
   "mobile.server.hosted.yourServers": "あなたのサーバー",
-  "mobile.server.hosted.plans": "プラン",
   "mobile.server.hosted.currentPlan": "ご利用中のプラン",
   "mobile.server.hosted.soldOut": "売り切れ",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
@@ -226,6 +234,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "待機中です。ホストはメモリが許す数のターンを実行します。",
   "mobile.server.threads.hold.agentBusy": "このエージェントの他の作業が終わるのを待っています。",
   "mobile.server.threads.hold.oneTurn": "待機中です。このエージェントのプロバイダーは一度に1ターンずつ実行します。",
+  "mobile.server.threads.hold.signIn": "待機中です。このエージェントのプロバイダーへのサインインが必要です。",
   "mobile.server.threads.offline": "このサーバーに接続するとスレッドが表示されます。",
   "mobile.server.threads.loading": "スレッドを読み込み中…",
   "mobile.server.threads.loadFailed": "一部のエージェントのスレッドを読み込めませんでした。",
@@ -265,6 +274,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "すべてのメンバーについてサーバーをアカウントサービスから削除します。そのコンピューター上のファイルとチャットは残ります。再び使うには、そのコンピューターから登録してください。",
   "mobile.server.settings.remove": "サーバーを削除",
+  "mobile.server.settings.hide": "サーバーを非表示",
+  "mobile.server.settings.show": "サーバーを表示",
   "mobile.server.settings.deleteTitle": "{name} を削除しますか？",
   "mobile.server.settings.deleteBody":
     "OpenBot はそのコンピュータでサーバーを停止し、エージェント、チャット、ファイルをそのコンピュータのゴミ箱に移動します。サーバーはすべてのデバイスのサーバー一覧から消えます。",
@@ -329,8 +340,10 @@ export const messages = {
   "mobile.server.route.invite": "ユーザーを招待",
   "mobile.server.route.member": "メンバー",
   "mobile.server.route.timezone": "タイムゾーン",
+  "mobile.server.route.signalHome": "Signal サーバー",
   "mobile.server.route.personality": "エージェントの性格",
   "mobile.server.route.agents": "エージェント",
+  "mobile.server.route.voiceModel": "音声認識",
   "mobile.server.settings.storage": "ストレージ",
   "mobile.server.route.storage": "ストレージ",
   "mobile.server.route.storageFiles": "すべてのファイル",
@@ -456,6 +469,41 @@ export const messages = {
     "タイムゾーンを変更するには、オーナーまたは管理者としてこのサーバーに接続してください。",
   "mobile.server.settings.timezoneUnsupported":
     "ここでタイムゾーンを変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.signalHomeAutomatic": "自動",
+  "mobile.server.settings.signalHomeNearest": "最寄りの Signal サーバー",
+  "mobile.server.settings.signalHomeInUse": "使用中: {name}",
+  "mobile.server.settings.signalHomeLoading": "Signal サーバーを測定しています…",
+  "mobile.server.settings.signalHomeSaveFailed": "Signal サーバーを変更できませんでした。もう一度お試しください。",
+  "mobile.server.settings.signalHomeUnavailable":
+    "Signal サーバーを変更するには、オーナーまたは管理者としてこのサーバーに接続してください。",
+  "mobile.server.settings.signalHomeUnsupported":
+    "ここで Signal サーバーを変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.signalHomeDescription":
+    "メンバーはこの Signal サーバーを通じてこのサーバーに接続します。レイテンシの低い Signal サーバーほど接続が速くなります。",
+  "mobile.server.settings.signalHomeFallback":
+    "{chosen} が応答しません。{chosen} が再び応答するまで、サーバーは {name} を使います。",
+  "mobile.server.settings.signalHomeMoving": "サーバーは {name} に移動します。メンバーは数秒後に再接続します。",
+  "mobile.server.settings.signalHomeLoadFailed": "Signal サーバーを読み込めませんでした。",
+  "mobile.server.settings.signalHomeLatency": "{latency} ms",
+  "mobile.server.settings.signalHomeNoAnswer": "応答なし",
+  "mobile.server.settings.signalHomePlaceHelsinki1": "ヘルシンキ 1",
+  "mobile.server.settings.signalHomePlaceHelsinki2": "ヘルシンキ 2",
+  "mobile.server.settings.signalHomePlaceSanJose": "サンノゼ",
+  "mobile.server.settings.signalHomePlaceSydney": "シドニー",
+  "mobile.server.settings.signalHomePlaceSingapore": "シンガポール",
+  "mobile.server.settings.voiceModelDescription":
+    "このサーバーのエージェントは、字幕のない動画の音声をこのモデルで文字起こしします。",
+  "mobile.server.settings.voiceModelLoading": "音声認識を読み込み中…",
+  "mobile.server.settings.voiceModelLoadFailed": "サーバーの音声認識モデルを読み込めませんでした。",
+  "mobile.server.settings.voiceModelSaveFailed": "音声認識モデルを変更できませんでした。もう一度お試しください。",
+  "mobile.server.settings.voiceModelUnsupported":
+    "ここで音声認識を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.voiceModelReady": "準備完了",
+  "mobile.server.settings.voiceModelDownloading": "ダウンロード中: {percent}",
+  "mobile.server.settings.voiceModelSize": "{size} のダウンロード",
+  "mobile.server.settings.voiceModelDownload": "ダウンロード",
+  "mobile.server.settings.voiceModelCancel": "ダウンロードを停止",
+  "mobile.server.settings.voiceModelRemove": "削除",
   "mobile.server.settings.keySection": "サーバーキー",
   "mobile.server.settings.keyChanged": "最終変更",
   "mobile.server.settings.keyChange": "キーを変更",
@@ -475,12 +523,39 @@ export const messages = {
   "mobile.server.settings.keyOwnerOnly": "サーバーキーを変更できるのはオーナーだけです。",
   "mobile.server.settings.keyUnsupported":
     "ここでキーを変更するには、このサーバーの OpenBot をアップデートしてください。",
+  "mobile.server.settings.turnLimit": "同時に実行するスレッド",
+  "mobile.server.settings.turnLimitDescription":
+    "このサーバーで同時に実行できるエージェントのスレッド数です。スレッドが多いほどメモリーを多く使います。",
+  "mobile.server.settings.turnLimitAutomatic": "自動 ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "自動 (上限なし)",
+  "mobile.server.settings.turnLimitUnlimited": "上限なし",
+  "mobile.server.settings.turnLimitsLoadFailed": "このサーバーのスレッド上限を読み込めませんでした。",
+  "mobile.server.settings.turnLimitsSaveFailed": "スレッド上限を保存できませんでした。もう一度お試しください。",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "ここでスレッド上限を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.agentTaskLimit": "エージェントごとの並列スレッド",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "独自の上限がない各エージェントが同時に実行できるスレッド数です。",
+  "mobile.server.settings.agentTaskLimitDefault": "デフォルト ({count})",
   "mobile.server.settings.memoryLimit": "エージェントごとのメモリー数",
   "mobile.server.settings.memoryLimitDescription": "このサーバーの各エージェントが保持できるメモリーの数です。",
   "mobile.server.settings.memoryLimitLoadFailed": "このサーバーのメモリー上限を読み込めませんでした。",
   "mobile.server.settings.memoryLimitSaveFailed": "メモリー数の上限を保存できませんでした。もう一度お試しください。",
   "mobile.server.settings.memoryLimitUnsupported":
     "ここでメモリー数の上限を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.mediaApprovalCredits": "次の値を超えたら確認",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "クレジット",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed": "このサーバーのクレジット確認の上限を読み込めませんでした。",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed":
+    "クレジット確認の上限を保存できませんでした。もう一度お試しください。",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "ここでクレジット確認の上限を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.mediaApprovalAgents": "エージェントのクレジット使用を許可",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed":
+    "エージェントのクレジット使用を変更できませんでした。もう一度お試しください。",
+  "mobile.server.settings.mediaApprovalAsk": "クレジットが必要なときに確認する",
+  "mobile.server.settings.mediaApprovalAskSaveFailed":
+    "クレジットの確認設定を変更できませんでした。もう一度お試しください。",
   "mobile.server.settings.memoryReview": "メモリーの見直し",
   "mobile.server.settings.memoryReviewDescription":
     "このサーバーのエージェントが、チャットから長く使う事実をバックグラウンドで保存する頻度です。",
@@ -540,6 +615,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "エージェントを追加",
   "mobile.server.browserProfiles.agentsHint":
     "タップすると、エージェントにこのプロファイルを割り当てるか、共有プロファイルに戻します。変更するとエージェントの開いているタブは閉じます。",
+  "mobile.server.browserProfiles.movedNote":
+    "サイトへのサインインは古いプロファイルに残ります。移動したエージェントはこれらのサイトに再度サインインする必要があります。",
   "mobile.server.browserProfiles.clear": "データを消去",
   "mobile.server.browserProfiles.clearTitle": "{name} のデータを消去しますか?",
   "mobile.server.browserProfiles.clearBody":
@@ -872,7 +949,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
+    "あなたの「自分にメッセージ」チャットと、許可した人が OpenBot に連絡できます。ほかの人には、あなたに伝えるためのコードが届きます。",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp がこのサーバーをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
   "mobile.server.connectors.whatsapp.helpError":
@@ -886,7 +963,7 @@ export const messages = {
     "あなたの「自分にメッセージ」チャットと、許可した人だけが書き込めます。それ以外の人には返信しません。オフにすると、OpenBot は知らない人にコードを返信します。",
   "mobile.server.connectors.whatsapp.workingMessage": "「対応しています…」メッセージ",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。前のリクエストを待っているリクエストには、待機中のメッセージも送信します。回答だけを送信するにはオフにしてください。",
+    "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。前のリクエストを待っているリクエストには、待機中のメッセージも送信します。個人の番号では、あなたの「自分にメッセージ」チャットだけがこれらのメッセージを受け取ります。回答だけを送信するにはオフにしてください。",
   "mobile.server.connectors.whatsapp.statusReactions": "ステータスのリアクション",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "メッセージが届くと OpenBot が 👀 で、回答の準備ができると ✅ でリアクションします。リアクションを送信しないにはオフにしてください。",
@@ -951,6 +1028,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "1 つの番号で許可できる連絡先とグループは最大 {count} 件です。",
   "mobile.server.connectors.whatsapp.senderGroup": "グループ",
   "mobile.server.connectors.whatsapp.removeSender": "削除",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · 読み取り専用",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "読み取り専用にする",
+  "mobile.server.connectors.whatsapp.allowWork": "仕事を頼めるようにする",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "読み取り専用: エージェントはこのチャットを読めますが、OpenBot がここに書き込むことはありません。",
   "mobile.server.connectors.whatsapp.addContact": "連絡先を追加",
   "mobile.server.connectors.whatsapp.addGroup": "グループを追加",
   "mobile.server.connectors.whatsapp.contactTitle": "連絡先を追加",
@@ -1113,10 +1195,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "モデルを変更できませんでした。もう一度お試しください。",
   "mobile.server.providers.promptCache": "プロンプトキャッシュ",
   "mobile.server.providers.promptCacheHint":
-    "ターンの間に Claude がエージェントのコンテキストをキャッシュに保持する時間です。変更は Claude の次回起動時に適用されます。",
-  "mobile.server.providers.promptCacheDefault": "Claude Code のデフォルト",
+    "ターンの間に Claude と Pi がエージェントのコンテキストをキャッシュに保持する時間です。変更はプロバイダーの次回起動時に適用されます。",
+  "mobile.server.providers.promptCacheDefault": "プロバイダーの既定",
   "mobile.server.providers.promptCacheHour": "1 時間",
   "mobile.server.providers.promptCacheLoadFailed": "このサーバーのプロンプトキャッシュ時間を読み込めませんでした。",
+  "mobile.server.providers.cacheExpiryCompaction": "キャッシュの期限切れ前に圧縮",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "20 万トークン以上のコンテキストを持つチャットが 1 時間のキャッシュでアイドル状態のとき、エージェントはキャッシュの期限切れ前にコンテキストを圧縮します。これにより、次のメッセージはキャッシュなしでコンテキスト全体を読み直しません。",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "このサーバーの圧縮設定を読み込めませんでした。",
   "mobile.server.providers.compactWindow": "チャットを圧縮するサイズ",
   "mobile.server.providers.compactWindowHint":
     "チャットがこのサイズに達すると、Claude Code は古いターンを要約します。小さくするとターンが速く安くなります。大きくすると詳細が多く残ります。ウィンドウが小さいモデルは、その上限で圧縮します。",
@@ -1171,6 +1257,8 @@ export const messages = {
     "ChatGPT は ChatGPT のプランではなく、このキーを使います。OpenAI は各リクエストをキーに課金します。プランの使用量は表示されません。",
   "mobile.server.providers.codexKeyAlternative":
     "または OpenAI の API キーでログインします。OpenAI は各リクエストをキーに課金します。",
+  "mobile.server.providers.museKeyInUse":
+    "Muse はサインインではなく、このキーを使います。サインインを使うには、キーを削除してください。",
   "mobile.server.providers.sectionUse": "使用",
   "mobile.server.providers.unused": "使用しているエージェントはありません",
   "mobile.server.providers.usedByCount": { other: "{count} 個のエージェントが使用中" },
@@ -1236,6 +1324,9 @@ export const messages = {
   "mobile.server.mcp.connected": { other: "接続済み · ツール {count} 個" },
   "mobile.server.mcp.signInOnComputer":
     "この MCP サーバーはサインインを求めています。コンピューターの OpenBot からサインインして、もう一度テストしてください。",
+  "mobile.server.mcp.signIn": "サインイン",
+  "mobile.server.mcp.signInHere":
+    "この MCP サーバーはサインインを求めています。サインインをタップしてから、もう一度テストしてください。",
   "mobile.server.mcp.signedInDescription": "{server} はこの MCP サーバーにサインインしています。",
   "mobile.server.mcp.signOut": "サインアウト",
   "mobile.server.mcp.saveFailed": "変更を保存できませんでした。もう一度お試しください。",
@@ -1286,6 +1377,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 時間",
   "mobile.server.planLimits.window.hours": { other: "{count} 時間" },
   "mobile.server.planLimits.window.minutes": "{minutes} 分",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "アップデート",
   "mobile.server.settings.updateAvailable": "アップデートあり",
   "mobile.server.route.updates": "アップデート",
@@ -1338,7 +1430,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "{reasons} を待っています。",
   "mobile.server.update.disabledTitle": "リモートアップデートはオフです",
   "mobile.server.update.disabledDescription":
-    "{name} のユーザーが、サーバーメンバーからのアップデートをオフにしました。OpenBot をアップデートするか、設定をオンにするよう依頼してください。",
+    "{name} のユーザーが、サーバーメンバーからのアップデートをオフにしました。OpenBot をアップデートするか、そのコンピューターで「設定」>「アップデート」を開いて「サーバーのメンバーからのアップデートを許可する」をオンにするよう依頼してください。",
   "mobile.server.update.managedTitle": "アップデートは Host Manager が管理しています",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager が {name} をアップデートします。ホストの管理者に連絡してください。",
@@ -1624,4 +1716,41 @@ export const messages = {
   "mobile.server.transfer.copyNext": "コピーしたエージェントには、{server} の承認ルールが適用されます。",
   "mobile.server.transfer.copyNoServer":
     "エージェントをコピーするには、オーナーまたは管理者として別のサーバーに接続してください。",
+  "mobile.server.route.ownerTransfer": "所有権を移す",
+  "mobile.server.ownerTransfer.unavailable": "所有権を移すには、所有者としてこのサーバーに接続してください。",
+  "mobile.server.ownerTransfer.hosted": "このサーバーは OpenBot がホストしているため、所有者を変更できません。",
+  "mobile.server.ownerTransfer.lede":
+    "新しい所有者にメールが届きます。そのメールアドレスでサインインした状態で承認する必要があります。その後、あなたはこのサーバーから削除されます。",
+  "mobile.server.ownerTransfer.email": "新しい所有者のメールアドレス",
+  "mobile.server.ownerTransfer.send": "送信",
+  "mobile.server.ownerTransfer.sending": "送信中…",
+  "mobile.server.ownerTransfer.stays":
+    "エージェント、チャット、ルーティン、プロバイダーのサインイン、保存したキー、Vault のログイン、ブラウザのサインイン、接続済みアプリはサーバーに残ります。新しい所有者はそれらを使えます。",
+  "mobile.server.ownerTransfer.expiry": "リクエストは 7 日後に期限切れになります。",
+  "mobile.server.ownerTransfer.confirmTitle": "{email} を所有者にしますか？",
+  "mobile.server.ownerTransfer.confirmBody":
+    "{email} が承認すると、{server} の所有者になり、あなたはアクセスできなくなります。データはサーバーに残ります。リクエストは 7 日後に期限切れになります。",
+  "mobile.server.ownerTransfer.confirm": "移す",
+  "mobile.server.ownerTransfer.sendFailed": "リクエストを送信できませんでした。",
+  "mobile.server.ownerTransfer.loadFailed": "保留中の移行を読み込めませんでした。",
+  "mobile.server.ownerTransfer.pending": "新しい所有者の承認待ち",
+  "mobile.server.ownerTransfer.expires": "期限: {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} はこのメールアドレスでサインインした状態で承認する必要があります。それまではあなたが所有者です。",
+  "mobile.server.ownerTransfer.cancel": "取り消す",
+  "mobile.server.ownerTransfer.cancelTitle": "移行を取り消しますか？",
+  "mobile.server.ownerTransfer.cancelBody": "{email} は承認できなくなります。",
+  "mobile.server.ownerTransfer.keep": "残す",
+  "mobile.server.ownerTransfer.cancelFailed": "移行を取り消せませんでした。",
+  "mobile.server.ownerTransfer.incomingTitle": "{server} の所有者になりますか？",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} があなたを {server} の所有者にしようとしています。サーバーを完全に管理でき、エージェント、チャット、ルーティン、保存したサインインはそのまま残ります。{name} はアクセスできなくなります。 サーバーを動かしているコンピューターにまだサインインできる人は、あなたの OpenBot アカウントを使えます。そのコンピューターのパスワードと SSH キーを変更してください。",
+  "mobile.server.ownerTransfer.accept": "承認",
+  "mobile.server.ownerTransfer.decline": "拒否",
+  "mobile.server.ownerTransfer.accepted": "あなたは {server} の所有者になりました。",
+  "mobile.server.ownerTransfer.acceptFailed": "移行を承認できませんでした",
+  "mobile.server.ownerTransfer.declineFailed": "移行を拒否できませんでした",
+  "mobile.server.ownerTransfer.tryAgain": "後でもう一度お試しください。",
+  "mobile.server.providers.updateAll": "すべて更新",
+  "mobile.server.providers.updateAllFailed": "一部の更新を開始できませんでした。もう一度お試しください。",
 } as const satisfies PartialTranslation<typeof source>;

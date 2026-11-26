@@ -1,11 +1,13 @@
 import { AGENT_MEMORY_CONTEXT_BUDGET_BYTES, essentialMemoryBytes } from "@openbot/contracts/agent-memory-context";
 import { feedbackSentIssue, feedbackWithdrawnItemType } from "@openbot/contracts/feedback";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AcpRegistryEntry,
   AgentProviderRef,
   AgentSessionSettings,
   CreateAgentInput,
   HiddenAgentsSnapshot,
+  ListArchivedAgentTasksInput,
   McpSignInApp,
   McpSignInAppState,
   ServerNotificationLevel,
@@ -44,6 +46,7 @@ import {
   type AppLogoColorPreference,
   type ApprovalAutomationPreference,
   type AppSetupState,
+  type ArchivedAgentTasksPage,
   type AttachmentImportEvent,
   type AvatarHue,
   agentAccessAuditChanges,
@@ -54,6 +57,7 @@ import {
   agentDefaultChoiceValues,
   agentExclusionCoverage,
   agentFolderCoverage,
+  agentMemoryEnabled,
   agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
   agentTaskLimit,
@@ -63,7 +67,11 @@ import {
   type BrowsingMemoryPreference,
   type BusyMessageModePreference,
   browserProxyAddressText,
+  type CacheExpiryCompactionSetting,
   type CentralAuthState,
+  CHANNEL_FOLDER_LIMIT,
+  type ChannelFolderChange,
+  type ChannelFolderList,
   type ClaudeCompactWindowSetting,
   type ClaudeUserSetupSetting,
   type ClientAgentModelOption,
@@ -77,7 +85,7 @@ import {
   type ConversationTurnTrace,
   type CustomAgentSummary,
   type CustomProviderSummary,
-  composedCustomModelId,
+  channelFolderCoverage,
   createMcpServerId,
   DEFAULT_AGENT_ACCESS,
   DEFAULT_AGENT_DEFAULTS,
@@ -88,12 +96,14 @@ import {
   DEFAULT_APPROVAL_AUTOMATION_PREFERENCE,
   DEFAULT_BROWSING_MEMORY_PREFERENCE,
   DEFAULT_BUSY_MESSAGE_MODE,
+  DEFAULT_CACHE_EXPIRY_COMPACTION,
   DEFAULT_CLAUDE_COMPACT_WINDOW,
   DEFAULT_CLAUDE_USER_SETUP,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
   DEFAULT_EXTERNAL_LINK_PREFERENCE,
   DEFAULT_MACHINE_ALERT_SETTINGS,
+  DEFAULT_MEDIA_APPROVAL_CREDITS_SETTING,
   DEFAULT_MEMORY_REVIEW_INTERVAL,
   DEFAULT_PROMPT_CACHE_TTL,
   DEFAULT_PROVIDER_ACCOUNT_ID,
@@ -135,6 +145,7 @@ import {
   MESSAGE_PIN_THREAD_TITLE_LIMIT,
   MESSAGE_PINS_LIMIT,
   MESSAGE_PINS_LIST_LIMIT,
+  type MediaApprovalCreditsSetting,
   type MemoryReviewPreference,
   type MessagePinner,
   nextBrowserProfileHue,
@@ -154,11 +165,13 @@ import {
   type ProviderModelVisibility,
   parseAgentAccessChange,
   parseBrowserProxyAddress,
+  parseMediaApprovalCreditsUpdate,
   parseProviderModelVisibilityChange,
   parseSetMcpAccessInput,
   providerEnvironmentProblem,
   type QueueDelivery,
   type QueuedMessageReceipt,
+  type QueueHold,
   type QueueSnapshot,
   type RemoteDesktopSession,
   type RemoteNetworkRouteState,
@@ -166,8 +179,6 @@ import {
   type ReorderQueueInput,
   type RespondToPromptInput,
   type Routine,
-  type RoutineFlowLink,
-  type RoutineFlowStep,
   type RoutineRun,
   type RoutineSchedule,
   type SendMessageInput,
@@ -182,6 +193,7 @@ import {
   type SkillLearningPreference,
   type SteerQueuedMessageInput,
   sameCustomProviderOrigin,
+  savedCustomModelId,
   type TeamPresenceSnapshot,
   type UpdateAgentInput,
   type UpdatePreference,
@@ -234,24 +246,27 @@ import { createMockBilling, previewBillingServers } from "./mock-billing";
 import { createMockBitwardenConnector } from "./mock-bitwarden-connector";
 import { createMockBrowser, type MockBrowserOptions } from "./mock-browser";
 import { createMockChannels, type MockChannelSeed } from "./mock-channels";
+import { createMockCredits } from "./mock-credits";
 import { type MockCrmSeed, mockCrm } from "./mock-crm";
 import { createMockEvents } from "./mock-events";
 import { createMockGitHubConnector } from "./mock-github-connector";
 import { createMockHostPersonality } from "./mock-host-personality";
+import { createMockHostSignalHome } from "./mock-host-signal-home";
 import { createMockHostTimezone } from "./mock-host-timezone";
 import { createMockHostTurnLimits } from "./mock-host-turn-limits";
 import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
+import { createMockHostVoiceModel } from "./mock-host-voice-model";
 import { createMockHostedServers } from "./mock-hosted-servers";
 import { createMockLicense } from "./mock-license";
 import { createMockLinkAccount } from "./mock-link-account";
 import { createMockMessaging } from "./mock-messaging";
+import { createMockNearWallet } from "./mock-near-wallet";
 import { createMockOnePasswordConnector } from "./mock-onepassword-connector";
 import { createMockPasswordManagers } from "./mock-password-managers";
 import { createMockProviderRuntimes, type MockProviderRuntimeOptions } from "./mock-provider-runtimes";
 import { createMockReferral } from "./mock-referral";
 import { mockRoutineCalendar } from "./mock-routine-calendar";
 import { createMockRoutineFeed } from "./mock-routine-feed";
-import { mockRoutineFlows } from "./mock-routine-flows";
 import { type MockRoutineResultsOptions, mockRoutineResults } from "./mock-routine-results";
 import { applySidebarLayoutAction } from "./mock-sidebar-layout";
 import { createMockSkills, type MockSkillsOptions } from "./mock-skills";
@@ -291,8 +306,6 @@ export interface MockOpenBotOptions
   tables?: SharedTable[];
   routines?: Record<string, Routine[]>;
   routineRuns?: Record<string, RoutineRun[]>;
-  routineFlowLinks?: RoutineFlowLink[];
-  routineFlowSteps?: RoutineFlowStep[];
   workflows?: MockWorkflowSeed[];
   crm?: MockCrmSeed;
   customProviders?: CustomProviderSummary[];
@@ -344,6 +357,7 @@ function mockTurnTrace(turnId: string, endedAt: Date): ConversationTurnTrace {
       { id: `${turnId}:answer`, kind: "message", startedAt: at(5_560), endedAt: at(6_400) },
     ],
     tokens: 18_342,
+    cachedInput: 14_120,
     costUsd: 0.0427,
   };
 }
@@ -354,7 +368,7 @@ function mockCustomProviderModels(provider: CustomProviderSummary): ClientAgentM
     const efforts = model.reasoningEfforts ?? (harness === "pi" ? [] : (["low", "medium", "high"] as const));
     return {
       provider: harness,
-      id: composedCustomModelId(provider.id, model.id),
+      id: savedCustomModelId(provider.id, harness, model.id),
       name: `${provider.name}/${model.name}`,
       description: `Served by ${provider.baseUrl}.`,
       defaultReasoningEffort: efforts.includes("medium") ? "medium" : (efforts[0] ?? "medium"),
@@ -381,7 +395,7 @@ export interface MockOpenBotControls {
   emitConversationDelta: (
     event: Omit<Extract<AgentEvent, { type: "conversation-delta" }>, "type" | "revision">,
   ) => void;
-  setQueueSnapshot: (agentId: string, deliveries: QueueDelivery[]) => QueueSnapshot;
+  setQueueSnapshot: (agentId: string, deliveries: QueueDelivery[], hold?: QueueHold | null) => QueueSnapshot;
   setRuntimeSnapshot: (snapshot: AgentRuntimeSnapshot) => void;
   onMessageSent: (listener: (message: MockSentMessage) => boolean) => () => void;
   onPromptResponse: (listener: (input: RespondToPromptInput) => void) => () => void;
@@ -495,7 +509,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let approvalAutomation = clone<ApprovalAutomationPreference>(DEFAULT_APPROVAL_AUTOMATION_PREFERENCE);
   let busyMessageMode: BusyMessageModePreference = { mode: DEFAULT_BUSY_MESSAGE_MODE };
   let agentDefaults: AgentDefaults = { ...DEFAULT_AGENT_DEFAULTS };
-  const hostTurnLimits = createMockHostTurnLimits();
+  const hostTurnLimits = createMockHostTurnLimits(() => emitAgentEvent({ type: "host-turn-limits-changed" }));
   let agentMemoryLimit: AgentMemoryLimitPreference = { limit: DEFAULT_AGENT_MEMORY_LIMIT };
   let memoryReview: MemoryReviewPreference = { interval: DEFAULT_MEMORY_REVIEW_INTERVAL };
   let skillLearning: SkillLearningPreference = { mode: DEFAULT_SKILL_LEARNING_MODE };
@@ -503,6 +517,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let machineAlerts: MachineAlertSettings = { ...DEFAULT_MACHINE_ALERT_SETTINGS, diskPercent: 80 };
   let promptCacheTtl: PromptCacheTtlSetting = { ...DEFAULT_PROMPT_CACHE_TTL };
   let claudeUserSetup: ClaudeUserSetupSetting = { ...DEFAULT_CLAUDE_USER_SETUP };
+  let cacheExpiryCompaction: CacheExpiryCompactionSetting = { ...DEFAULT_CACHE_EXPIRY_COMPACTION };
+  let mediaApprovalCredits: MediaApprovalCreditsSetting = { ...DEFAULT_MEDIA_APPROVAL_CREDITS_SETTING };
   let claudeCompactWindow: ClaudeCompactWindowSetting = { ...DEFAULT_CLAUDE_COMPACT_WINDOW };
   const providerVariables = new Map<
     ProviderEnvironmentProvider,
@@ -882,6 +898,24 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return { outcome: "added", path, replaced, list: mockAgentFolders(agentId) };
   }
 
+  const mockChannelFolderPaths = new Map<string, string[]>();
+
+  function mockChannelFolders(channelId: string): ChannelFolderList {
+    return { folders: (mockChannelFolderPaths.get(channelId) ?? []).map((path) => ({ path, found: true })) };
+  }
+
+  function addMockChannelFolder(channelId: string, path: string): ChannelFolderChange {
+    const current = mockChannelFolderPaths.get(channelId) ?? [];
+    const list = mockChannelFolders(channelId);
+    const folder = channelFolderCoverage(path, current);
+    if (folder) return { outcome: "covered", path, folder, list };
+    const kept = current.filter((existing) => !folderInside(path, existing));
+    if (kept.length >= CHANNEL_FOLDER_LIMIT) return { outcome: "refused", path, refusal: "limit", list };
+    mockChannelFolderPaths.set(channelId, [...kept, path]);
+    const replaced = current.filter((existing) => !kept.includes(existing));
+    return { outcome: "added", path, replaced, list: mockChannelFolders(channelId) };
+  }
+
   function allModels() {
     return [...models, ...customProviders.flatMap(mockCustomProviderModels)].filter(
       (model) => !agentStatus.providers?.some((row) => row.id === model.provider && row.off),
@@ -910,12 +944,33 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   const taskUnread = new Map<string, number>(Object.entries(options.taskUnread ?? {}));
   const branches = new Map<string, AgentTask>();
 
+  const newestTaskFirst = (left: AgentTask, right: AgentTask) =>
+    right.updatedAt.localeCompare(left.updatedAt) || left.threadId.localeCompare(right.threadId);
+
   function taskList(agentId: string): AgentTasksSnapshot {
     const list = tasks.get(agentId) ?? [];
+    const archived = list.filter((task) => task.closedAt).sort(newestTaskFirst);
     return {
       agentId,
-      tasks: clone([...list.filter((task) => !task.closedAt), ...list.filter((task) => task.closedAt)]),
+      tasks: clone([...list.filter((task) => !task.closedAt), ...archived].slice(0, INPUT_LIMITS.agentTasks)),
       limit: agentTaskLimitOf(agentId),
+    };
+  }
+
+  function archivedTaskPage(input: ListArchivedAgentTasksInput): ArchivedAgentTasksPage {
+    const { before } = input;
+    const archived = (tasks.get(input.agentId) ?? [])
+      .filter((task) => task.closedAt)
+      .sort(newestTaskFirst)
+      .filter(
+        (task) =>
+          !before ||
+          task.updatedAt < before.updatedAt ||
+          (task.updatedAt === before.updatedAt && task.threadId > before.threadId),
+      );
+    return {
+      tasks: clone(archived.slice(0, INPUT_LIMITS.agentTasks)),
+      hasMore: archived.length > INPUT_LIMITS.agentTasks,
     };
   }
 
@@ -1154,8 +1209,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     return readStateForMessages(state, getSnapshot(agentId).messages);
   }
 
-  function setQueueSnapshot(agentId: string, deliveries: QueueDelivery[]): QueueSnapshot {
-    const snapshot = { agentId, deliveries: clone(deliveries) };
+  function setQueueSnapshot(agentId: string, deliveries: QueueDelivery[], hold?: QueueHold | null): QueueSnapshot {
+    const snapshot: QueueSnapshot = { agentId, deliveries: clone(deliveries), ...(hold ? { hold: clone(hold) } : {}) };
     queues.set(agentId, snapshot);
     emitAgentEvent({ type: "queue-changed", snapshot });
     return clone(snapshot);
@@ -1394,6 +1449,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       onAction: () => () => undefined,
       setInteractive: async () => undefined,
       setInputRegion: async () => undefined,
+      setExtent: async () => undefined,
       setXWayland: async () => undefined,
       onCloseChat: () => () => undefined,
       listDisplays: async () => [{ id: 1, label: "Built-in Retina Display", primary: true, internal: true }],
@@ -1596,6 +1652,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       };
       return clone(agentStatus);
     },
+    setLiveVoiceAccount: async ({ accountId }) => {
+      agentStatus = {
+        ...agentStatus,
+        providers: agentStatus.providers?.map((row) => {
+          if (row.id !== "codex") return row;
+          const { liveVoiceAccount: _old, ...rest } = row;
+          return accountId ? { ...rest, liveVoiceAccount: accountId } : rest;
+        }),
+      };
+      return clone(agentStatus);
+    },
     signOutProvider: async (provider) => {
       agentStatus = {
         ...agentStatus,
@@ -1635,12 +1702,10 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     providerRuntimes: mockProviderRuntimes.providerRuntimes,
     openUrl: async () => undefined,
     voice: mockVoice.voice,
-    routineFlows: mockRoutineFlows(
-      { routines, routineRuns, links: options.routineFlowLinks, steps: options.routineFlowSteps },
-      (agentId) => emitAgentEvent({ type: "routine-flows-changed", agentId }),
-    ),
-    workflows: mockWorkflows(options.workflows ?? [], (workflowId) =>
-      emitAgentEvent({ type: "workflows-changed", workflowId }),
+    workflows: mockWorkflows(
+      options.workflows ?? [],
+      (workflowId) => emitAgentEvent({ type: "workflows-changed", workflowId }),
+      () => emitAgentEvent({ type: "workflow-folders-changed" }),
     ),
     crm: mockCrm(options.crm ?? {}, () => emitAgentEvent({ type: "crm-changed" })),
     routineResults: mockRoutineResults(routines, options, (agentId) =>
@@ -1692,6 +1757,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     },
     githubConnector: createMockGitHubConnector(),
     linkAccount: createMockLinkAccount(),
+    nearWallet: createMockNearWallet(),
     onePasswordConnector: createMockOnePasswordConnector(),
     bitwardenConnector: createMockBitwardenConnector(),
     passwordManagers: createMockPasswordManagers(),
@@ -1699,6 +1765,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     billing: createMockBilling(billingPlans),
     referral: createMockReferral(),
     license: createMockLicense(),
+    credits: createMockCredits(),
     routineFeed: createMockRoutineFeed(),
     hostedServers: createMockHostedServers(billingPlans),
     customProviders: {
@@ -1853,6 +1920,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         pools: (agentStatus.providers ?? []).flatMap((row) =>
           row.accounts && row.accountPool ? [{ provider: row.id, pool: clone(row.accountPool) }] : [],
         ),
+        liveVoiceAccount: agentStatus.providers?.find((row) => row.id === "codex")?.liveVoiceAccount ?? null,
         agents: [],
       }),
       accountUsage: async () => ({ limits: [] }),
@@ -1886,6 +1954,9 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       setAccountPool: async (input) => {
         await api.setProviderAccountPool(input);
+      },
+      setLiveVoiceAccount: async (input) => {
+        await api.setLiveVoiceAccount(input);
       },
       hostDefaultProvider: async () => ({
         preferredProvider: setupState.preferredProvider,
@@ -2260,6 +2331,17 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
           volumes: [],
         };
       },
+      listChannelFolders: async (channelId) => mockChannelFolders(channelId),
+      chooseChannelFolder: async (channelId) => addMockChannelFolder(channelId, "/mock/Projects/Shared work"),
+      addChannelFolder: async ({ channelId, path }) => addMockChannelFolder(channelId, path),
+      removeChannelFolder: async ({ channelId, path }) => {
+        mockChannelFolderPaths.set(
+          channelId,
+          (mockChannelFolderPaths.get(channelId) ?? []).filter((folder) => folder !== path),
+        );
+        return { outcome: "removed", path, list: mockChannelFolders(channelId) };
+      },
+      browseChannelFolders: async ({ path }) => api.agent.browseAgentFolders({ agentId: "", path }),
       readAgentInstructions: async (agentId) => mockAgentInstructions(agentId),
       saveAgentInstructions: async ({ agentId, text, expected }) => {
         const current = mockAgentInstructions(agentId);
@@ -2291,6 +2373,15 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       updateAgentPlanCard: async (input) => {
         await api.agent.updateAgent(input);
         return api.agent.getAgentPlanCard(input.agentId);
+      },
+      getAgentBuiltinMemory: async (agentId) => {
+        const agent = agents.find((candidate) => candidate.id === agentId);
+        if (!agent) throw new Error("Agent not found");
+        return { memory: agentMemoryEnabled(agent) };
+      },
+      updateAgentBuiltinMemory: async (input) => {
+        await api.agent.updateAgent(input);
+        return api.agent.getAgentBuiltinMemory(input.agentId);
       },
       getAgentFastMode: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
@@ -3222,6 +3313,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       listWaits: async (agentId) => ({ agentId, waits: [] }),
       cancelWait: async () => undefined,
       listTasks: async (agentId) => taskList(agentId),
+      listArchivedTasks: async (input) => archivedTaskPage(input),
       readTask: async (input) => {
         const conversation = taskConversation(findTask(input.agentId, input.taskId));
         return clone({ ...conversation, messages: conversation.messages.slice(-100) });
@@ -3480,6 +3572,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       respondToApproval: async () => undefined,
       readPendingApproval: async () => null,
+      readMediaApproval: async () => ({ media: null, hold: null }),
+      respondToMediaApproval: async () => undefined,
+      respondToCreditsHold: async () => null,
+      setCreditsAskMuted: async () => undefined,
+      readCreditsAskMuted: async () => ({ muted: false }),
+      listPendingPrompts: async () => (runtimeSnapshot ? clone(runtimeSnapshot.pendingPrompts) : []),
       respondToBrowserSecret: async (input) => {
         for (const listener of agentListeners)
           listener({ type: "browser-takeover-resolved", requestId: input.requestId, agentId: input.agentId });
@@ -3547,6 +3645,12 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emit(updateListeners, updateStatus);
         return clone(updateStatus);
       },
+      restartNow: async () => {
+        const { idleRestart: _restarted, ...rest } = updateStatus;
+        updateStatus = rest;
+        emit(updateListeners, updateStatus);
+        return clone(updateStatus);
+      },
       onEvent: (listener) => {
         updateListeners.add(listener);
         return () => updateListeners.delete(listener);
@@ -3599,6 +3703,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       restartHost: async () => {},
       ...createMockHostUpdate(options),
       ...createMockHostTimezone(),
+      ...createMockHostSignalHome(),
+      ...createMockHostVoiceModel(),
       ...hostTurnLimits,
       ...createMockHostPersonality(),
       getAgentMemoryLimit: async () => hostAgentMemoryLimit(agentMemoryLimit),
@@ -3635,6 +3741,19 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (!isPromptCacheTtl(ttl)) throw new Error("Prompt cache time is required.");
         promptCacheTtl = { ttl };
         return clone(promptCacheTtl);
+      },
+      getCacheExpiryCompaction: async () => clone(cacheExpiryCompaction),
+      setCacheExpiryCompaction: async (enabled) => {
+        if (typeof enabled !== "boolean") throw new Error("Invalid cache expiry compaction setting.");
+        cacheExpiryCompaction = { enabled };
+        return clone(cacheExpiryCompaction);
+      },
+      getMediaApprovalCredits: async () => clone(mediaApprovalCredits),
+      setMediaApprovalCredits: async (update) => {
+        const parsed = parseMediaApprovalCreditsUpdate(update);
+        if (!parsed) throw new Error("Invalid media approval credits.");
+        mediaApprovalCredits = { ...mediaApprovalCredits, ...parsed };
+        return clone(mediaApprovalCredits);
       },
       getClaudeUserSetup: async () => clone(claudeUserSetup),
       setClaudeUserSetup: async (enabled) => {

@@ -102,6 +102,50 @@ export const messages = {
   "marketplace.app.whatsappTagline": "Votre propre discussion et les personnes que vous autorisez dans WhatsApp",
   "marketplace.app.bitwardenTagline": "Connectez-vous aux sites avec les identifiants d’un dossier partagé",
   "marketplace.app.protonPassTagline": "Connectez-vous aux sites avec les identifiants d’un coffre partagé",
+  "marketplace.xApp.title": "X",
+  "marketplace.xApp.tagline": "Répondez à un post sur X avec @openbot_, et un agent fait le travail",
+  "marketplace.xApp.description":
+    "X ajoute à ce serveur un agent, lui aussi appelé X. Sur X, répondez à n’importe quel post et mentionnez @openbot_ avec ce que vous voulez : le résumer, le traduire, rédiger une réponse, enregistrer une note ou créer un rappel. L’extension OpenBot pour Chrome lit le post et l’envoie à l’agent X, et X publie votre réponse comme d’habitude. La réponse vous attend dans la discussion X dans OpenBot. L’agent X ne publie jamais, n’aime aucun post, ne suit personne et n’envoie aucun message sur X.",
+  "marketplace.xApp.developer": "OpenBot",
+  "marketplace.xApp.notSetUp": "Non configuré",
+  "marketplace.xApp.setUp": "Configurer",
+  "marketplace.xApp.howTitle": "Fonctionnement",
+  "marketplace.xApp.howReplyTitle": "Répondez sur X.",
+  "marketplace.xApp.howReply":
+    "Répondez à n’importe quel post et mentionnez @openbot_ avec ce que vous voulez, par exemple « @openbot_ résume ceci ».",
+  "marketplace.xApp.howSendTitle": "L’extension l’envoie.",
+  "marketplace.xApp.howSend":
+    "OpenBot pour Chrome lit le post et les posts au-dessus, puis les envoie à l’agent X. X publie votre réponse comme d’habitude.",
+  "marketplace.xApp.howWorkTitle": "X fait le travail.",
+  "marketplace.xApp.howWork":
+    "La réponse vous attend dans la discussion X dans OpenBot. Rien d’OpenBot n’apparaît sur X.",
+  "marketplace.xApp.agentTitle": "Agent",
+  "marketplace.xApp.agentDescription": "X répond dans sa propre discussion à chaque post que vous envoyez depuis X.",
+  "marketplace.xApp.extensionTitle": "Dans Chrome",
+  "marketplace.xApp.extensionDescription": "X fonctionne uniquement avec l’extension OpenBot pour Chrome.",
+  "marketplace.xApp.extensionName": "OpenBot pour Chrome",
+  "marketplace.xApp.extensionNote":
+    "Ouvrez son panneau latéral et connectez-vous à ce serveur. Elle ne lit un post que lorsque vous répondez avec @openbot_.",
+  "marketplace.xApp.getExtension": "Obtenir l’extension",
+  "marketplace.xApp.stepExtension": "Extension",
+  "marketplace.xApp.stepAgent": "Agent",
+  "marketplace.xApp.next": "Suivant",
+  "marketplace.xApp.extensionStepTitle": "Ajouter OpenBot à Chrome",
+  "marketplace.xApp.extensionStepDescription":
+    "L’extension lit un post sur X lorsque vous répondez avec @openbot_ et l’envoie à ce serveur.",
+  "marketplace.xApp.extensionStepStore": "Ouvrez la page OpenBot dans le Chrome Web Store",
+  "marketplace.xApp.extensionStepAdd": "Cliquez sur « Ajouter à Chrome »",
+  "marketplace.xApp.extensionStepSignIn": "Ouvrez le panneau latéral OpenBot et connectez-vous à ce serveur",
+  "marketplace.xApp.agentStepTitle": "Ajouter l’agent X",
+  "marketplace.xApp.agentStepDescription":
+    "X reçoit les posts que vous envoyez depuis X. OpenBot l’ajoute à ce serveur.",
+  "marketplace.xApp.agentDoesReceive": "Reçoit chaque post auquel vous répondez sur X avec @openbot_",
+  "marketplace.xApp.agentDoesWork": "Résume, traduit, rédige des réponses, enregistre des notes et crée des rappels",
+  "marketplace.xApp.agentDoesNoPost": "Ne publie jamais sur X : la réponse attend dans sa discussion",
+  "marketplace.xApp.addAgent": "Ajouter un agent",
+  "marketplace.xApp.doneTitle": "X est prêt",
+  "marketplace.xApp.doneDescription":
+    "Répondez à un post sur X et mentionnez @openbot_. La réponse vous attend dans la discussion X.",
   "marketplace.app.onePasswordCategory": "Gestion des identifiants et des connexions",
   "marketplace.app.yourApps": "Vos apps",
   "marketplace.app.addCustom": "Ajout personnalisé",
@@ -688,6 +732,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "Installez {name} sur l’ordinateur qui exécute ces agents : son app demande une connexion dans le navigateur.",
   "marketplace.error.appInvalid": "Impossible d’ajouter {name} : {reason}",
+  "marketplace.error.appNotConnected": "Impossible de connecter {name} : {reason}",
   "marketplace.error.uninstallNoServer": "Sélectionnez un serveur local pour désinstaller un plugin.",
   "marketplace.error.uninstallPartial": "Une partie de {name} n’a pas pu être supprimée. {failures}",
   "marketplace.error.actionFailed": "Impossible de terminer l’action dans la Marketplace. Réessayez.",

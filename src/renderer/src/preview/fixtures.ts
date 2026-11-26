@@ -719,6 +719,7 @@ export const STORY_HOST_STATUS: HostStatus = {
   apiOnline: true,
   remoteDesktopReady: true,
   remoteDesktopScreenRecordingDenied: false,
+  remoteDesktopNeedsX11Session: false,
   remoteDesktopUnattended: true,
   remoteDesktopActiveSessions: 1,
   remoteDesktopMaxSessions: 4,

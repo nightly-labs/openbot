@@ -2,6 +2,18 @@ import { isAgentTemplateId } from "@openbot/contracts/agent-template-links";
 import { type BillingState, parseBillingState } from "@openbot/contracts/billing";
 import { type BillingDetails, parseBillingDetails } from "@openbot/contracts/billing-details";
 import {
+  type CreditActivity,
+  type CreditRedeemResult,
+  type CreditsState,
+  parseCreditActivity,
+  parseCreditRedeemResult,
+  parseCreditsState,
+} from "@openbot/contracts/credits";
+import {
+  type CustomServerCheckoutResult,
+  parseCustomServerCheckoutResult,
+} from "@openbot/contracts/custom-server-plans";
+import {
   type HostedServerCatalog,
   type HostedServerList,
   type HostedServerSummary,
@@ -103,6 +115,8 @@ import {
   type MobileConnectedDevice,
   type MobileConnectLink,
   type MobileConnectTicket,
+  type NearDepositAddress,
+  type NearWalletStatus,
   type NotificationOpenedEvent,
   type NotificationPreference,
   type OnePasswordConnectorStatus,
@@ -110,6 +124,8 @@ import {
   parseGitHubConnectorRepositories,
   parseGitHubConnectorStatus,
   parseLinkAccountStatus,
+  parseNearDepositAddress,
+  parseNearWalletStatus,
   parseOnePasswordConnectorStatus,
   QUIT_GUARDS,
   type RemoteDesktopSetupStatus,
@@ -129,6 +145,7 @@ import {
   type VoiceServerProbe,
   type VoiceServerSettings,
   type VoiceSettings,
+  type VoiceSettingsState,
   type VoiceStream,
   type VoiceStreamTranscript,
   type VoiceTranscriptionResult,
@@ -152,6 +169,7 @@ import {
   isMarketplaceSkillSlug,
   type MarketplaceListingLink,
 } from "@openbot/contracts/marketplace-links";
+import { decodeOwnerTransfer, type OwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { isPluginSlug } from "@openbot/contracts/plugin-links";
 import { parseReferralState, type ReferralState } from "@openbot/contracts/referral";
 import {
@@ -165,8 +183,16 @@ import {
 
 export function decodeAppInfo(value: unknown): AppInfo {
   const info = decodeRecord(value, "app info");
-  const { platform, variant, analyticsCaptureUrl, analyticsInstallId, softwareRendering, hourCycle, aboveAppsSupport } =
-    info;
+  const {
+    platform,
+    variant,
+    analyticsCaptureUrl,
+    analyticsInstallId,
+    softwareRendering,
+    hourCycle,
+    aboveAppsSupport,
+    dynamicIslandUnavailable,
+  } = info;
   if (!isOneOf(["darwin", "win32", "linux"] as const, platform)) throw new Error("Invalid platform.");
   if (!isOneOf(["production", "dev", "preview"] as const, variant)) throw new Error("Invalid variant.");
   if (analyticsCaptureUrl !== undefined && !isString(analyticsCaptureUrl))
@@ -176,8 +202,13 @@ export function decodeAppInfo(value: unknown): AppInfo {
   if (softwareRendering !== undefined && !isBoolean(softwareRendering))
     throw new Error("Invalid software rendering flag.");
   if (hourCycle !== undefined && !isOneOf(["h12", "h23"] as const, hourCycle)) throw new Error("Invalid hour cycle.");
-  if (aboveAppsSupport !== undefined && !isOneOf(["restart", "unsupported"] as const, aboveAppsSupport))
+  if (
+    aboveAppsSupport !== undefined &&
+    !isOneOf(["restart", "unsupported", "no-compositor"] as const, aboveAppsSupport)
+  )
     throw new Error("Invalid agent dock screen support.");
+  if (dynamicIslandUnavailable !== undefined && !isBoolean(dynamicIslandUnavailable))
+    throw new Error("Invalid Dynamic Island availability.");
   return {
     name: requiredString(info, "name"),
     version: requiredString(info, "version"),
@@ -188,6 +219,7 @@ export function decodeAppInfo(value: unknown): AppInfo {
     ...(softwareRendering === undefined ? {} : { softwareRendering }),
     ...(hourCycle === undefined ? {} : { hourCycle }),
     ...(aboveAppsSupport === undefined ? {} : { aboveAppsSupport }),
+    ...(dynamicIslandUnavailable === undefined ? {} : { dynamicIslandUnavailable }),
   };
 }
 
@@ -394,6 +426,15 @@ export function decodeMobileConnectLink(value: unknown): MobileConnectLink {
   return { url: requiredString(link, "url"), createdAt: requiredNumber(link, "createdAt") };
 }
 
+export function decodeOwnerTransferOrNull(value: unknown): OwnerTransfer | null {
+  return value === null ? null : decodeOwnerTransfer(value);
+}
+
+export function decodeOwnerTransferList(value: unknown): OwnerTransfer[] {
+  if (!Array.isArray(value)) throw new Error("Invalid ownership transfers.");
+  return value.map(decodeOwnerTransfer);
+}
+
 export function decodeMobileConnectedDevices(value: unknown): MobileConnectedDevice[] {
   return decodeList(value, "connected device list", (device) => {
     const { platform } = device;
@@ -571,6 +612,10 @@ export function decodeVoiceSettings(value: unknown): VoiceSettings {
   return { modelId, language };
 }
 
+export function decodeVoiceSettingsState(value: unknown): VoiceSettingsState {
+  return { ...decodeVoiceSettings(value), saved: requiredBoolean(decodeRecord(value, "voice settings"), "saved") };
+}
+
 export function decodeVoiceTranscriptionResult(value: unknown): VoiceTranscriptionResult {
   return { text: requiredString(decodeRecord(value, "voice transcription"), "text") };
 }
@@ -720,6 +765,18 @@ export function decodeLinkAccountStatus(value: unknown): LinkAccountStatus {
   return status;
 }
 
+export function decodeNearWalletStatus(value: unknown): NearWalletStatus {
+  const status = parseNearWalletStatus(value);
+  if (!status) throw new Error("Invalid NEAR wallet response.");
+  return status;
+}
+
+export function decodeNearDepositAddress(value: unknown): NearDepositAddress {
+  const address = parseNearDepositAddress(value);
+  if (!address) throw new Error("Invalid NEAR deposit address response.");
+  return address;
+}
+
 export function decodeOnePasswordConnectorStatus(value: unknown): OnePasswordConnectorStatus {
   const status = parseOnePasswordConnectorStatus(value);
   if (!status) throw new Error("Invalid 1Password connector response.");
@@ -744,6 +801,24 @@ export function decodeReferralState(value: unknown): ReferralState {
   return state;
 }
 
+export function decodeCreditsState(value: unknown): CreditsState {
+  const state = parseCreditsState(value);
+  if (!state) throw new Error("Invalid credits state response.");
+  return state;
+}
+
+export function decodeCreditRedeemResult(value: unknown): CreditRedeemResult {
+  const result = parseCreditRedeemResult(value);
+  if (!result) throw new Error("Invalid credit redeem response.");
+  return result;
+}
+
+export function decodeCreditActivity(value: unknown): CreditActivity {
+  const activity = parseCreditActivity(value);
+  if (!activity) throw new Error("Invalid credit activity response.");
+  return activity;
+}
+
 export function decodeLicenseState(value: unknown): LicenseState {
   const state = parseLicenseState(value);
   if (!state) throw new Error("Invalid license state response.");
@@ -754,6 +829,12 @@ export function decodeHostedServer(value: unknown): HostedServerSummary {
   const server = parseHostedServerSummary(value);
   if (!server) throw new Error("Invalid hosted server response.");
   return server;
+}
+
+export function decodeCustomServerCheckoutResult(value: unknown): CustomServerCheckoutResult {
+  const result = parseCustomServerCheckoutResult(value);
+  if (!result) throw new Error("Invalid custom server checkout response.");
+  return result;
 }
 
 export function decodeServerClaim(value: unknown): ServerClaim {

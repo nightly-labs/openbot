@@ -5,7 +5,12 @@ import { RequestError } from "@agentclientprotocol/sdk";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
 import { type AcpFlavor, shownFailureDetail } from "./acp-flavor";
-import { GEMINI_INVALID_ARGUMENT, GEMINI_INVALID_CREDENTIALS } from "./agent/provider-diagnostics";
+import {
+  GEMINI_INVALID_ARGUMENT,
+  GEMINI_INVALID_CREDENTIALS,
+  GEMINI_UNREADABLE_HISTORY,
+  GOOGLE_RESET_FIELDS,
+} from "./agent/provider-diagnostics";
 import { getRecord, getString, isRecord } from "./protocol";
 
 const GEMINI_QUOTA_CHUNK = /^\s*(?:\u26A0 )?Usage Limit Reached\n\n([\s\S]*)$/u;
@@ -13,15 +18,27 @@ const GEMINI_SDK_FAILURE = /\bAntigravity SDK error processing prompt for sessio
 const GEMINI_EXECUTION_ERROR_ANSWER = /^\s*Agent execution error: /u;
 const GEMINI_CONNECTION_LOST_ANSWER = /^\s*Agent connection was lost and could not be re-established: /u;
 const GEMINI_VERIFICATION_ANSWER =
-  /(?:^|\n)[^\n]*:\s+(https:\/\/accounts\.google\.com\/signin\/[^\s]*auth_success_gemini[^\s]*)\s*$/u;
-const GEMINI_ACCOUNT_LINK = /https:\/\/accounts\.google\.com\/signin\/[^\s<>"'`)\]]*auth_success_gemini[^\s<>"'`)\]]*/u;
+  /(?:^|\n)[^\n]*:\s+(https:\/\/accounts\.google\.com\/(?:v\d+\/)?signin\/[^\s]*auth_success_gemini[^\s]*)\s*$/u;
+const GEMINI_ACCOUNT_LINK =
+  /https:\/\/accounts\.google\.com\/(?:v\d+\/)?signin\/[^\s<>"'`)\]]*auth_success_gemini[^\s<>"'`)\]]*/u;
+const GEMINI_VERIFICATION_LINK = /https:\/\/accounts\.google\.com\/(?:v\d+\/)?signin\/continue\?[^\s<>"'`)\]}\\]*/u;
 const GEMINI_LOG_ACCOUNT_LINK =
-  /https:\/\/accounts\.google\.com\/signin\/(?:continue\?|[^\s<>"'`)\]}\\]*auth_success_gemini)[^\s<>"'`)\]}\\]*/gu;
+  /https:\/\/accounts\.google\.com\/(?:v\d+\/)?signin\/(?:continue\?|[^\s<>"'`)\]}\\]*auth_success_gemini)[^\s<>"'`)\]}\\]*/gu;
+const GEMINI_VERIFICATION_PROMPT =
+  /Verification required\. Please complete verification in your browser\b|Please verify your account in your browser to continue\b|Verify your account to continue\./u;
 const GEMINI_VERIFICATION_REQUIRED_ANSWER = /^\s*(?:\u26A0\uFE0F?\s*)?Verification Required\b/u;
+const GEMINI_VERIFICATION_PROMPT_ANSWER = new RegExp(
+  `^\\s*(?:\\u26A0\\uFE0F?\\s*)?(?:${GEMINI_VERIFICATION_PROMPT.source})`,
+  "u",
+);
+const GEMINI_VERIFICATION_REQUIRED = new RegExp(
+  `${GEMINI_VERIFICATION_REQUIRED_ANSWER.source}|${GEMINI_VERIFICATION_PROMPT.source}|\\bVALIDATION_REQUIRED\\b`,
+  "u",
+);
 const GEMINI_WARNING_ANSWER = /^\n\u26A0 /u;
 const GEMINI_RETRY_NOTICE = /^\n?⚠ API error \(attempt (\d+)\): /u;
 const GEMINI_FAILURE_ANSWER = new RegExp(
-  `${GEMINI_EXECUTION_ERROR_ANSWER.source}|${GEMINI_CONNECTION_LOST_ANSWER.source}|${GEMINI_VERIFICATION_ANSWER.source}|${GEMINI_WARNING_ANSWER.source}`,
+  `${GEMINI_EXECUTION_ERROR_ANSWER.source}|${GEMINI_CONNECTION_LOST_ANSWER.source}|${GEMINI_VERIFICATION_ANSWER.source}|${GEMINI_WARNING_ANSWER.source}|${GEMINI_VERIFICATION_PROMPT_ANSWER.source}`,
   "u",
 );
 
@@ -58,6 +75,7 @@ const GEMINI_NETWORK_FAILURE =
 
 const GEMINI_REQUEST_FAILURES = [
   ["error.provider.antigravityLocationUnsupported", /\bUser location is not supported\b/iu],
+  ["error.provider.antigravityLicenseRefused", /\b(?:do(?:es)? not|don't) have a valid license\b/iu],
   [
     "error.provider.antigravityModelAtCapacity",
     /\bMODEL_CAPACITY_EX(?:HAUSTED|CEEDED)\b|\b[Nn]o capacity available for model\b/u,
@@ -86,33 +104,51 @@ type GeminiRequestFailureKey = (typeof GEMINI_REQUEST_FAILURES)[number][0];
 
 const GEMINI_FAILURE_CAUSES: Partial<Record<GeminiRequestFailureKey, CauseCode>> = {
   "error.provider.antigravityQuotaReached": "usage_limit",
+  "error.provider.antigravityLicenseRefused": "billing",
   "error.provider.antigravityRateLimited": "rate_limit",
   "error.provider.antigravityModelUnavailable": "model_not_found",
   "error.provider.antigravityNetwork": "network",
 };
 
-function geminiRequestFailureText(key: GeminiRequestFailureKey, text: string): string {
+function geminiRequestFailureText(key: GeminiRequestFailureKey, text: string, fullText = text): string {
   if (key === "error.provider.antigravityNetwork")
     return sourceText(key, { cause: GEMINI_NETWORK_FAILURE.exec(text)?.[0] ?? "" });
-  return sourceText(key, { detail: shownFailureDetail(text) });
+  const detail = shownFailureDetail(text);
+  const resets = Array.from(fullText.matchAll(GOOGLE_RESET_FIELDS), ([field]) => field).filter(
+    (field) => !detail.includes(field),
+  );
+  return sourceText(key, { detail: resets.length > 0 ? `${detail}\n${resets.join(" ")}` : detail });
 }
 
 function geminiAnswerFailure(answer: string): { message: string; key: GeminiRequestFailureKey | null } {
   const text = answer.replace(GEMINI_WARNING_ANSWER, "");
-  if (geminiAccountLink(text) !== null || GEMINI_VERIFICATION_REQUIRED_ANSWER.test(text))
+  if (geminiAccountLink(text) !== null || GEMINI_VERIFICATION_REQUIRED.test(text))
     return { message: sourceText("error.provider.geminiVerificationRequired"), key: null };
   if (/\bAPI key not valid\b|\bAPI_KEY_INVALID\b/u.test(text))
     return { message: sourceText("error.provider.geminiKeyRefused"), key: null };
   if (GEMINI_CONNECTION_LOST_ANSWER.test(text))
     return { message: sourceText("error.provider.antigravityConnectionLost"), key: null };
+  if (GEMINI_UNREADABLE_HISTORY.test(text))
+    return { message: GEMINI_API_ERROR_MESSAGE.exec(text)?.[1] ?? text, key: null };
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(text))?.[0] ?? null;
-  return { message: key ? geminiRequestFailureText(key, text) : shownFailureDetail(text), key };
+  const logged = GEMINI_EXECUTOR_ERROR.test(text);
+  if (key) {
+    const shown =
+      logged && key !== "error.provider.antigravityNetwork" ? (GEMINI_API_ERROR_MESSAGE.exec(text)?.[1] ?? text) : text;
+    return { message: geminiRequestFailureText(key, shown, text), key };
+  }
+  if (logged || GEMINI_TERMINATED_ANSWER.test(text))
+    return { message: sourceText("error.provider.antigravityTurnStopped"), key: null };
+  return { message: shownFailureDetail(text), key };
 }
 
-function geminiTurnFailureCause(answer: string): CauseCode | null {
+const GEMINI_NOT_FOUND = /\bError 404, Message: .+?, Status: (?:NOT_FOUND|404\b)|\bNOT_FOUND \(code 404\)/u;
+
+function geminiTurnFailureCause(answer: string, reachedModel: boolean): CauseCode | null {
   if (geminiMcpLoadFailure(answer.replace(GEMINI_WARNING_ANSWER, "")) !== null) return null;
   const { key } = geminiAnswerFailure(answer);
-  return key ? (GEMINI_FAILURE_CAUSES[key] ?? null) : null;
+  if (key) return GEMINI_FAILURE_CAUSES[key] ?? null;
+  return reachedModel && GEMINI_NOT_FOUND.test(answer) ? "provider_unavailable" : null;
 }
 
 const GEMINI_INTERNAL_ERROR_PREFIX = /^(?:RequestError:\s*)?Internal error:\s*/u;
@@ -121,7 +157,12 @@ const GEMINI_ZERO_LIMIT = /\blimit:\s*0(?!\d|\.\d)/u;
 export function geminiSavedKeyLimitFailure(text: string, error?: unknown): string | null {
   if (error !== undefined && !(error instanceof RequestError)) return null;
   const reason = text.replace(GEMINI_WARNING_ANSWER, "").replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
-  if (geminiAccountLink(reason) !== null || GEMINI_CONNECTION_LOST_ANSWER.test(reason)) return null;
+  if (
+    geminiAccountLink(reason) !== null ||
+    GEMINI_CONNECTION_LOST_ANSWER.test(reason) ||
+    GEMINI_UNREADABLE_HISTORY.test(reason)
+  )
+    return null;
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   if (key !== "error.provider.antigravityRateLimited") return null;
   return sourceText(
@@ -133,8 +174,18 @@ export function geminiSavedKeyLimitFailure(text: string, error?: unknown): strin
 function geminiRequestFailure(error: unknown, detail: string): string {
   if (!(error instanceof RequestError)) return detail;
   const reason = detail.replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
+  if (GEMINI_VERIFICATION_REQUIRED.test(reason)) return sourceText("error.provider.geminiVerificationRequired");
+  if (GEMINI_UNREADABLE_HISTORY.test(reason)) return detail;
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   return key ? geminiRequestFailureText(key, reason) : detail;
+}
+
+function geminiUnexplainedFailureVerification(error: unknown, detail: string, message: string): string | null {
+  const unexplained =
+    error instanceof RequestError
+      ? message === detail
+      : message === sourceText("error.provider.antigravityTurnStopped");
+  return unexplained ? sourceText("error.provider.geminiVerificationRequired") : null;
 }
 
 export function antigravityGeminiHome(env: Readonly<Record<string, string | undefined>>): string {
@@ -162,8 +213,11 @@ function antigravityOwnMcpServerNames(cwd: string, argv: readonly string[]): str
 }
 
 const GEMINI_TERMINATED_ANSWER = /^\s*(?:\u26A0 )?Agent execution terminated due to error\.?\s*$/u;
+const GEMINI_EXECUTOR_ERROR = /\bagent executor error: [^\n]+/u;
+const GEMINI_API_ERROR_MESSAGE = /\bError \d{3}, Message: (.+?), Status: /u;
 const GEMINI_PROMPT_LOG = "Sending user message to conversation ";
-const GEMINI_REFUSED_TOOL = /\bbuilding toolbox: tool "(mcp_[^"]+)" advertises an invalid parameter schema\b/gu;
+const GEMINI_REFUSED_TOOL =
+  /\bbuilding toolbox: tool "(mcp_[^"]+)" advertises an invalid parameter schema\b|\bUnable to submit request because `(mcp_[^`]+)` functionDeclaration\b/gu;
 const GOOGLE_REFUSED_FIELD =
   /\bGenerateContentRequest\.tools\[(\d+\]\.function_declarations\[\d+)\]\.parameters((?:\.\w+(?:\[[^\]]*\])?)*): (missing field|cannot be empty|field predicate failed: \$type == Type\.\w+)/gu;
 const GOOGLE_FIELD_TYPE = /^field predicate failed: \$type == Type\.(\w+)$/u;
@@ -182,12 +236,11 @@ function logTail(file: string, size: number): string {
   }
 }
 
-function* antigravityRecentLogs(argv: readonly string[]): Generator<string> {
+function* antigravityRecentLogs(argv: readonly string[], since: number): Generator<string> {
   const home = flagValue(argv, GEMINI_DIR_FLAG);
   const appData = flagValue(argv, APP_DATA_DIR_FLAG);
   if (!home || !appData) return;
   const folder = join(home, appData, "log");
-  const since = Date.now() - GEMINI_LOG_RECENT_MS;
   let logs: { file: string; size: number; mtimeMs: number }[];
   try {
     logs = readdirSync(folder)
@@ -212,17 +265,27 @@ function* antigravityRecentLogs(argv: readonly string[]): Generator<string> {
   }
 }
 
-function antigravityLastPromptLog(argv: readonly string[], sessionId: string): string | null {
+function antigravityLastPromptLog(
+  argv: readonly string[],
+  sessionId: string,
+  since = Date.now() - GEMINI_LOG_RECENT_MS,
+): string | null {
   const prompt = `${GEMINI_PROMPT_LOG}${sessionId}`;
-  for (const log of antigravityRecentLogs(argv)) {
+  for (const log of antigravityRecentLogs(argv, since)) {
     const at = log.lastIndexOf(prompt);
-    if (at >= 0) return log.slice(at);
+    if (at < 0) continue;
+    const otherPrompt = log.indexOf(GEMINI_PROMPT_LOG, at + prompt.length);
+    return log.slice(at, otherPrompt < 0 ? undefined : otherPrompt);
   }
   return null;
 }
 
+function namedRefusedMcpTools(text: string): string[] {
+  return Array.from(text.matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? match[2] ?? "");
+}
+
 function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessionId: string): string[] {
-  const answered = Array.from(text.matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
+  const answered = namedRefusedMcpTools(text);
   if (answered.length > 0) return answered;
   const home = flagValue(argv, GEMINI_DIR_FLAG);
   const appData = flagValue(argv, APP_DATA_DIR_FLAG);
@@ -232,14 +295,28 @@ function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessi
   if (google.length > 0 || !GEMINI_TERMINATED_ANSWER.test(text)) return google;
   const log = antigravityLastPromptLog(argv, sessionId);
   if (log === null) return [];
-  const named = Array.from(log.matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
+  const named = namedRefusedMcpTools(log);
   return named.length > 0 ? named : googleRefusedMcpTools(log, schemas);
+}
+
+function antigravityLoggedFailure(text: string, argv: readonly string[], sessionId: string): string | null {
+  if (!GEMINI_TERMINATED_ANSWER.test(text)) return null;
+  const causes = antigravityLastPromptLog(argv, sessionId)?.match(new RegExp(GEMINI_EXECUTOR_ERROR.source, "gu"));
+  return causes?.at(-1)?.trim() ?? null;
+}
+
+const GEMINI_SILENT_FAILURE = /\bagent executor error: [^\n]+|\bError \d{3}, Message: [^\n]+/gu;
+
+function antigravitySilentFailure(argv: readonly string[], sessionId: string, since: number): string | null {
+  return antigravityLastPromptLog(argv, sessionId, since)?.match(GEMINI_SILENT_FAILURE)?.at(-1)?.trim() ?? null;
 }
 
 function antigravityAccountLink(text: string, argv: readonly string[]): string | null {
   const link = geminiAccountLink(text);
-  if (link !== null || !GEMINI_VERIFICATION_REQUIRED_ANSWER.test(text)) return link;
-  for (const log of antigravityRecentLogs(argv)) {
+  if (link !== null || !GEMINI_VERIFICATION_REQUIRED.test(text)) return link;
+  const answered = GEMINI_VERIFICATION_LINK.exec(text)?.[0].replace(/[.,;:]+$/u, "");
+  if (answered) return answered;
+  for (const log of antigravityRecentLogs(argv, Date.now() - GEMINI_LOG_RECENT_MS)) {
     if (!log.includes("VALIDATION_REQUIRED")) continue;
     const links = log
       .replace(/\\+u0026/gu, "&")
@@ -261,6 +338,10 @@ function folderNames(folder: string): string[] {
   }
 }
 
+function hasNoItemType(items: unknown): boolean {
+  return items === undefined || items === true || (isRecord(items) && !Object.hasOwn(items, "type"));
+}
+
 function hasRefusedField(parameters: unknown, path: string, reason: string): boolean {
   const steps = Array.from(path.matchAll(GOOGLE_FIELD_STEP), ([, key = "", index]) => ({
     key: key.replace(/_([a-z])/gu, (_, letter: string) => letter.toUpperCase()),
@@ -279,8 +360,11 @@ function hasRefusedField(parameters: unknown, path: string, reason: string): boo
     else node = isRecord(value) && Object.hasOwn(value, index) ? value[index] : undefined;
   }
   if (missing) {
-    if (last.index !== undefined || !isRecord(node) || Object.hasOwn(node, last.key)) return false;
-    return last.key !== "items" || node.type === "array" || (Array.isArray(node.type) && node.type.includes("array"));
+    if (last.index !== undefined || !isRecord(node)) return false;
+    const value = Object.hasOwn(node, last.key) ? node[last.key] : undefined;
+    if (last.key !== "items") return value === undefined;
+    if (!hasNoItemType(value)) return false;
+    return node.type === "array" || (Array.isArray(node.type) && node.type.includes("array"));
   }
   if (type) {
     if (last.index !== undefined || !isRecord(node) || !Object.hasOwn(node, last.key)) return false;
@@ -315,11 +399,30 @@ function googleRefusedMcpTools(log: string, folder: string): string[] {
   return tools;
 }
 
+const ANTIGRAVITY_SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
+function antigravitySessionFiles(argv: readonly string[], sessionId: string): string[] {
+  const home = flagValue(argv, GEMINI_DIR_FLAG);
+  const appData = flagValue(argv, APP_DATA_DIR_FLAG);
+  if (!home || !appData || !ANTIGRAVITY_SESSION_ID.test(sessionId)) return [];
+  const root = join(home, appData);
+  return [
+    ...[".db", ".db-shm", ".db-wal", ".meta"].map((suffix) => join(root, "conversations", `${sessionId}${suffix}`)),
+    join(root, "brain", sessionId),
+    join(root, "annotations", `${sessionId}.pbtxt`),
+  ];
+}
+
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   ownMcpServerNames: antigravityOwnMcpServerNames,
+  sessionFiles: antigravitySessionFiles,
+  relayStdioMcpServers: "unconfined",
   mcpToolCallLimitMs: 180_000,
+  mcpListLimit: { ms: 5_000, since: "1.5.11" },
   sessionMeta: { antigravity: { disabledTools: ["schedule", "run_workflow"] } },
   approvedEditSweep: /^\s*Tool call was approved but never executed\.?\s*$/u,
+  mcpCallInputNamesServer: true,
+  bridgeToolsWithoutCard: true,
   sessionNotFound: (error, sessionId) => {
     if (error.code === -32603 && error.message.startsWith(`Failed to read session ${sessionId};`)) return true;
     if (error.code === -32602 && error.message === `Session not found: ${sessionId}`) return true;
@@ -330,6 +433,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   turnFailure: (error, detail) => geminiRequestFailure(error, detail),
   authRequiredSignsOut: true,
   failureCause: (error) => (error === "refusal" ? "usage_limit" : null),
+  unexplainedFailureVerification: geminiUnexplainedFailureVerification,
   sdkHarness: {
     failedSession: (stderrLine) => GEMINI_SDK_FAILURE.exec(stderrLine)?.[1],
     answerIsFailure: GEMINI_FAILURE_ANSWER,
@@ -342,7 +446,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
     turnFailure: (answer) => geminiAnswerFailure(answer).message,
     fallbackCause: geminiTurnFailureCause,
     accountLink: antigravityAccountLink,
-    accountVerification: GEMINI_VERIFICATION_REQUIRED_ANSWER,
+    accountVerification: GEMINI_VERIFICATION_REQUIRED,
     quota: (text) => {
       const quota = GEMINI_QUOTA_CHUNK.exec(text);
       return quota
@@ -351,6 +455,8 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
     },
     mcpLoadFailure: geminiMcpLoadFailure,
     refusedMcpTools: antigravityRefusedMcpTools,
+    loggedFailure: antigravityLoggedFailure,
+    silentFailure: antigravitySilentFailure,
     sessionLost: GEMINI_CONNECTION_LOST_ANSWER,
   },
   cancelLocallyThenResume: true,
@@ -362,10 +468,14 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
       /^\s*(?:⚠️?\s*)?(?:Error: )?The stream was interrupted\. Please continue the task you were working on\.\s*$/u,
   },
   promptOpenForBackgroundTasks: true,
+  silentTurnLimitMs: 15 * 60_000,
+  openToolStallMs: 30 * 60_000,
   wakesAfterPromptEnds: true,
+  restartNoticeOnReload: true,
   selfWakeTools: /\b(?:start|invoke)_subagent\b|^(?:Run(?:ning)? )?schedule\??$/u,
   contextCompaction: "handoff",
   closeKeepsSession: true,
   sessionProcesses: true,
+  modelsLoadWithSession: true,
   keepModelsOnRefreshFailure: true,
 };

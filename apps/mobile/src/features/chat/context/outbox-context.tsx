@@ -13,6 +13,7 @@ import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { ChannelHistoryRefreshError } from "@/features/channels/model/channel-store";
 import { donateShareTarget } from "@/features/share/model/share-extension";
+import { supportLog } from "@/features/support/model/support-log";
 import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
@@ -20,6 +21,7 @@ import {
 import { withUploadCancel } from "@/features/workspace/model/upload-cancels";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
 import { currentText } from "@/shared/lib/text";
+import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import type { OutboxMessage } from "../model/outbox";
 import { createOutboxFiles } from "../model/outbox-files";
 import {
@@ -52,7 +54,17 @@ function createAccountOutbox(scope: string | null): AccountOutbox {
       const { t, errorMessage } = currentText();
       return errorMessage(error, t("mobile.chat.outbox.failed"));
     },
-    reportFailure: (error) => reportMobileNotification({ code: classifyFailure(error) }, "turn", "banner"),
+    reportFailure: (error, message) => {
+      const code = classifyFailure(error);
+      const errorName = error instanceof Error ? error.name : typeof error;
+      const bytes = message.files.reduce((total, file) => total + file.size, 0);
+      supportLog.add(
+        "warn",
+        "app",
+        `Chat message not sent: ${code}, ${errorName}, ${message.files.length} files, ${bytes} bytes`,
+      );
+      reportMobileNotification({ code }, "turn", "banner");
+    },
     randomId: Crypto.randomUUID,
   });
   return { store, workspace };
@@ -82,7 +94,11 @@ export function OutboxProvider({ children }: PropsWithChildren) {
       .sort()
       .join("\n"),
   );
-  const online = useMemo(() => new Set(onlineKey ? onlineKey.split("\n") : []), [onlineKey]);
+  const foreground = useAppForeground();
+  const online = useMemo(
+    () => (foreground && onlineKey ? new Set(onlineKey.split("\n")) : NO_SERVERS),
+    [foreground, onlineKey],
+  );
   useEffect(() => {
     void store.load();
   }, [store]);

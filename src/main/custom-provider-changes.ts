@@ -55,7 +55,7 @@ export function createCustomProviderChanges({
     const outcome: CustomProviderRestart = yield* service.reloadCustomProviderConfig(now);
     if (previous === undefined || previous === now) return outcome;
     const before = yield* service.reloadCustomProviderConfig(previous);
-    if (outcome === "not-running") yield* service.startHarnessForMovedAgents(now);
+    if (outcome !== "skipped-busy") yield* service.startHarnessForMovedAgents(now);
     return before === "skipped-busy" ? before : outcome;
   });
   const serve = Effect.fn("CustomProviderChanges.serve")(function* (

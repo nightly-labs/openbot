@@ -280,7 +280,7 @@ function parseApp(slug: string, value: unknown): PluginApp {
   const server = parseServer(slug, value.server);
   const base = baseServerConfig(server);
   const errors = mcpConfigErrors(normalizeMcpConfig(base));
-  const firstError = errors.name ?? errors.command ?? errors.url;
+  const firstError = errors.name ?? errors.command ?? errors.url ?? errors.headers;
   if (firstError) throw new Error(`Plugin ${slug} server is invalid: ${firstError}`);
   checkCredentialFlows(slug, server, base);
   const app: PluginApp = { id: text("id"), name: text("name"), description: text("description"), iconUrl, server };
@@ -518,7 +518,7 @@ function checkCredentialFlows(slug: string, server: PluginServer, base: McpServe
               .map((field) => ({ key: field.header ?? "", value: `sample${field.prefix ?? ""}` })),
           };
     const errors = mcpConfigErrors(normalizeMcpConfig(applied));
-    const firstError = errors.name ?? errors.command ?? errors.url;
+    const firstError = errors.name ?? errors.command ?? errors.url ?? errors.headers;
     if (firstError) throw new Error(`Plugin ${slug} credential is invalid: ${firstError}`);
   }
 }
@@ -639,18 +639,6 @@ function renderRendererModule(plugins: PluginDetail[]): string {
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 
-/**
- * The configuration an app installs as. The catalog states the name and how the server is reached -
- * an address, or a command, its words and its fixed settings; the rest of the record and \`enabled\`
- * are made here rather than stored as catalog data that could disagree with \`normalizeMcpConfig\`.
- *
- * A credential is never among them. What a server asks for is declared in \`server.auth\`, and the
- * value is typed by the user in the connect dialog, which hands back the configuration that
- * connected.
- *
- * The id is empty, which is what the store reads as "new". An id it does not hold is an edit of a
- * row that is gone, and the save is refused.
- */
 export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfig {
   return {
     id: "",

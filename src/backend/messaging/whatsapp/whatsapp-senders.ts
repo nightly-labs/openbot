@@ -8,6 +8,7 @@ export interface WhatsAppSenderRules {
   ownNumber: boolean;
   contacts: ReadonlyMap<string, string>;
   groups: ReadonlySet<string>;
+  readOnly: ReadonlySet<string>;
 }
 
 export type SenderDecision = { type: "allow" } | { type: "pair" } | { type: "save" } | { type: "ignore" };
@@ -16,6 +17,7 @@ export interface SenderFacts {
   isGroup: boolean;
   chatJid: string;
   authorNumber: string | null;
+  contactNumber: string | null;
   isSelfChat: boolean;
   fromMe: boolean;
 }
@@ -23,11 +25,26 @@ export interface SenderFacts {
 export function senderDecision(rules: WhatsAppSenderRules, facts: SenderFacts): SenderDecision {
   if (facts.isSelfChat) return { type: "allow" };
   const allowedGroup = facts.isGroup && rules.groups.has(facts.chatJid);
-  if (facts.fromMe) return allowedGroup ? { type: "save" } : { type: "ignore" };
-  if (facts.isGroup) return allowedGroup ? { type: "allow" } : { type: "ignore" };
-  if (facts.authorNumber && allowsContact(rules, facts.authorNumber)) return { type: "allow" };
+  const allowedContact = !facts.isGroup && facts.contactNumber !== null && allowsContact(rules, facts.contactNumber);
+  if (facts.fromMe) return allowedGroup || allowedContact ? { type: "save" } : { type: "ignore" };
+  if (facts.isGroup) {
+    if (!allowedGroup) return { type: "ignore" };
+    return rules.readOnly.has(facts.chatJid) ? { type: "save" } : { type: "allow" };
+  }
+  if (facts.authorNumber && allowsContact(rules, facts.authorNumber))
+    return readOnlyContact(rules, facts.authorNumber) ? { type: "save" } : { type: "allow" };
   if (rules.ownNumber || !facts.authorNumber) return { type: "ignore" };
   return { type: "pair" };
+}
+
+export function isReadOnlyChat(rules: WhatsAppSenderRules, chatJid: string): boolean {
+  const [user = "", domain] = chatJid.split("@");
+  if (domain === "g.us") return rules.readOnly.has(chatJid);
+  return readOnlyContact(rules, user.split(":")[0] ?? "");
+}
+
+function readOnlyContact(rules: WhatsAppSenderRules, number: string): boolean {
+  return whatsAppNumberForms(number).some((form) => rules.readOnly.has(form));
 }
 
 export function whatsAppNumberForms(number: string): string[] {

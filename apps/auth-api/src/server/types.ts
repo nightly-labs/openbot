@@ -20,6 +20,7 @@ export interface WorkerBindings {
   LIVE_ACTIVITY_RATE_LIMITER?: RateLimit;
   FEEDBACK_RATE_LIMITER?: RateLimit;
   AUTH_EXPOSE_DEVELOPMENT_CODE?: string;
+  BROWSER_EXTENSION_IDS?: string;
   EMAIL_SMTP_HOST?: string;
   EMAIL_SMTP_PORT?: string;
   EMAIL_SMTP_USERNAME?: string;
@@ -33,8 +34,13 @@ export interface WorkerBindings {
   EMAIL_DELIVERY_WEBHOOK_URL?: string;
   EMAIL_DELIVERY_WEBHOOK_SECRET?: string;
   SKILLS_ADMIN_TOKEN?: string;
+  MEDIA_GATEWAY?: Fetcher;
+  NEAR_INTENTS_PARTNER_KEY?: string;
+  NEAR_INTENTS_AGENT_API_URL?: string;
   SITE_OPERATIONS_ADMIN_TOKEN?: string;
   SERVER_CLAIMS_ADMIN_TOKEN?: string;
+  STORE_REVIEW_EMAIL?: string;
+  STORE_REVIEW_CODE?: string;
   SITE_REPORT_HASH_SECRET?: string;
   COMPANY_SIGN_IN_SECRET?: string;
   HOSTED_ARCHIVE_KEY_SECRET?: string;
@@ -184,6 +190,15 @@ export interface EmailCodeDelivery {
     email: string;
     code: string;
     expiresAt: number;
+  }): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
+}
+
+export interface OwnerTransferEmailDelivery {
+  send(message: {
+    email: string;
+    fromEmail: string;
+    serverName: string;
+    appUrl: string;
   }): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 
