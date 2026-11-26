@@ -100,6 +100,7 @@ export type CreditModelMaker =
   | "openai"
   | "pixverse"
   | "recraft"
+  | "sandai"
   | "sync"
   | "tencent"
   | "topaz"
@@ -122,6 +123,7 @@ export const CREDIT_MODEL_MAKERS: Readonly<Record<CreditModelMaker, string>> = {
   openai: "OpenAI",
   pixverse: "PixVerse",
   recraft: "Recraft",
+  sandai: "Sand AI",
   sync: "Sync Labs",
   tencent: "Tencent",
   topaz: "Topaz Labs",
@@ -197,6 +199,7 @@ export const CREDIT_MODEL_COSTS: readonly CreditModelCost[] = [
     unit: "clip",
     credits: 20.5,
   },
+  { modelId: "magi-2", name: "MAGI-2", maker: "sandai", kind: "video", unit: "clip", credits: 20 },
   { modelId: "kling-3.0-omni", name: "Kling 3.0 Omni", maker: "kling", kind: "video", unit: "clip", credits: 18 },
   { modelId: "kling-3.0-turbo", name: "Kling 3.0 Turbo", maker: "kling", kind: "video", unit: "clip", credits: 19 },
   {

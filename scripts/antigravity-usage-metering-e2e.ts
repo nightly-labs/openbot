@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -18,7 +17,6 @@ const fakeAgy = join(install, "bin", "antigravity");
 const logPath = join(root, "agy.jsonl");
 const geminiHome = join(home, ".gemini");
 const ACCESS_TOKEN = "fake-metering-access-token";
-const PROJECT = "fake-metering-project";
 
 process.env.HOME = home;
 process.env.GEMINI_HOME = geminiHome;
@@ -26,38 +24,17 @@ process.env.OPENBOT_ANTIGRAVITY_PATH = fakeAgy;
 process.env.FAKE_AGY_LOG = logPath;
 mkdirSync(home, { recursive: true });
 
-const quotaCalls: { path: string | undefined; authorization: string | undefined }[] = [];
-const quotaServer = createServer((request, response) => {
-  request.resume();
-  request.on("end", () => {
-    quotaCalls.push({ path: request.url, authorization: request.headers.authorization });
-    response.setHeader("Content-Type", "application/json");
-    if (request.url === "/v1internal:loadCodeAssist")
-      return response.end(JSON.stringify({ cloudaicompanionProject: PROJECT }));
-    response.end(
-      JSON.stringify({
-        groups: [
-          {
-            displayName: "Gemini Models",
-            description: "Models within this group: Gemini Flash, Gemini Pro",
-            buckets: [
-              {
-                displayName: "Weekly Limit Remaining",
-                window: "weekly",
-                resetTime: "2026-11-17T11:59:31Z",
-                remainingFraction: 0.75,
-              },
-            ],
-          },
-        ],
-      }),
-    );
-  });
-});
-await new Promise<void>((done) => quotaServer.listen(0, "127.0.0.1", done));
-const quotaAddress = quotaServer.address();
-assert.ok(quotaAddress !== null && typeof quotaAddress === "object");
-process.env.OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL = `http://127.0.0.1:${quotaAddress.port}/v1internal`;
+const googleRequests: string[] = [];
+const sendRequest = globalThis.fetch;
+globalThis.fetch = Object.assign(
+  (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    if (!url.hostname.endsWith("googleapis.com")) return sendRequest(input, init);
+    googleRequests.push(url.origin + url.pathname);
+    return Promise.reject(new Error("This check sends nothing to Google."));
+  },
+  { preconnect: sendRequest.preconnect },
+);
 
 const { AgentService } = await import("../src/backend/agent-service");
 const { AgentStore } = await import("../src/backend/agent-store");
@@ -133,7 +110,7 @@ const report: {
   model?: string;
   cases: CaseReport[];
   analytics?: { processedTokens: number; turns: number; missingUsageTurns: number };
-  planUsage?: { usedPercent: number | undefined; quotaCalls: number; prompts: number };
+  planUsage?: { windows: number; googleRequests: string[]; prompts: number };
   passed: boolean;
   error?: string;
 } = { cases: [], passed: false };
@@ -329,19 +306,12 @@ try {
   const plan = await runCauseEffect(agents.getUsage(agent.id));
   const prompts = protocol().flatMap((entry) => (entry.prompt === undefined ? [] : [entry.prompt]));
   report.planUsage = {
-    usedPercent: plan.limits[0]?.secondary?.usedPercent,
-    quotaCalls: quotaCalls.length,
+    windows: plan.limits.filter((limit) => limit.primary || limit.secondary).length,
+    googleRequests: [...googleRequests],
     prompts: prompts.length,
   };
-  assert.equal(report.planUsage.usedPercent, 25, "the plan usage is the fake's Gemini window");
-  assert.ok(
-    quotaCalls.some((call) => call.path === "/v1internal:retrieveUserQuotaSummary"),
-    "the usage read asked Code Assist",
-  );
-  assert.ok(
-    quotaCalls.every((call) => call.authorization === `Bearer ${ACCESS_TOKEN}`),
-    "every call carries the token",
-  );
+  assert.equal(report.planUsage.windows, 0, "Gemini shows no plan usage");
+  assert.deepEqual(report.planUsage.googleRequests, [], "the usage read sends nothing to Google");
   assert.equal(prompts.length, promptsBefore, "the usage read sends no prompt");
   assert.ok(
     prompts.every((prompt) => !prompt.startsWith("/usage")),
@@ -370,7 +340,6 @@ try {
   await runCauseEffect(agents.stop()).catch(() => {});
   closeReader();
   database.close();
-  await new Promise<void>((done) => quotaServer.close(() => done()));
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   await rm(root, { recursive: true, force: true });

@@ -191,7 +191,7 @@ export interface CreditMediaToolsOptions {
   askWhenBlocked: () => boolean;
   asksMuted: (personIds: readonly string[]) => boolean;
   muteAsks: (person: CreditAsksPerson | null) => Effect.Effect<void, unknown>;
-  defaultModel: (kind: CreditMediaGenerationKind) => string | null;
+  defaultModels: (kind: CreditMediaGenerationKind) => readonly string[];
   fitImage: ImageFitter | null;
   scope: () => Scope.Scope;
   report?: (report: CreditMediaReport) => void;
@@ -328,12 +328,14 @@ function extensionOf(mimeType: string): string {
 function chosenModel(
   ofKind: readonly CreditMediaModel[],
   requested: string | undefined,
-  defaultModel: string | null,
+  defaultModels: readonly string[],
   inputs: Inputs,
 ): CreditMediaModel | undefined {
   if (requested !== undefined) return ofKind.find((candidate) => candidate.id === requested);
-  const preferred = ofKind.find((candidate) => candidate.id === defaultModel);
-  if (preferred && takesInputs(preferred, inputs)) return preferred;
+  for (const id of defaultModels) {
+    const preferred = ofKind.find((candidate) => candidate.id === id);
+    if (preferred && takesInputs(preferred, inputs)) return preferred;
+  }
   return ofKind.find((candidate) => takesInputs(candidate, inputs));
 }
 
@@ -342,11 +344,11 @@ function plannedJob(
   kind: CreditMediaGenerationKind,
   args: JobArguments,
   inputs: Inputs,
-  defaultModel: string | null,
+  defaultModels: readonly string[],
 ): PlannedJob | string {
   const ofKind = models.filter((model) => model.kind === kind);
   if (ofKind.length === 0) return `No ${kind} model is available now. Try again later.`;
-  const model = chosenModel(ofKind, args.model, defaultModel, inputs);
+  const model = chosenModel(ofKind, args.model, defaultModels, inputs);
   if (!model)
     return args.model === undefined
       ? `No ${kind} model takes these pictures. Call ${LIST_MEDIA_MODELS_TOOL}.`
@@ -392,12 +394,12 @@ function freeFit(
   const fits = (planned: PlannedJob | string): planned is PlannedJob =>
     typeof planned !== "string" && planned.cost <= credits;
   const asked = free
-    .map((model) => plannedJob(models, kind, { ...args, model: model.id }, inputs, null))
+    .map((model) => plannedJob(models, kind, { ...args, model: model.id }, inputs, []))
     .filter(fits)
     .sort((a, b) => a.cost - b.cost);
   if (asked[0]) return asked[0];
   const reduced = free
-    .flatMap((model) => settingChoices(model, args).map((choice) => plannedJob(models, kind, choice, inputs, null)))
+    .flatMap((model) => settingChoices(model, args).map((choice) => plannedJob(models, kind, choice, inputs, [])))
     .filter(fits)
     .sort((a, b) => (b.job.duration ?? 0) - (a.job.duration ?? 0) || b.cost - a.cost);
   return reduced[0] ?? null;
@@ -457,7 +459,7 @@ function approvalOffer(
   models: readonly CreditMediaModel[],
   kind: CreditMediaGenerationKind,
   planned: PlannedJob,
-  defaultModel: string | null,
+  defaultModels: readonly string[],
   balance: CreditMediaBalance | null,
 ): MediaApprovalOffer {
   const others = models.filter(
@@ -469,7 +471,7 @@ function approvalOffer(
     prompt: planned.job.prompt,
     agentModel: planned.model.id,
     choice: choiceOf(planned),
-    defaultModel: offered.some((model) => model.id === defaultModel) ? defaultModel : null,
+    defaultModel: defaultModels.find((id) => offered.some((model) => model.id === id)) ?? null,
     canSetDefault: true,
     models: offered,
     ...(balance ? { balance: { available: balance.available, welcome: balance.welcome ?? 0 } } : {}),
@@ -603,6 +605,12 @@ export class CreditMediaTools {
     );
   }
 
+  #defaultModelIn(models: readonly CreditMediaModel[], kind: CreditMediaGenerationKind): string | null {
+    const preferred = this.#options.defaultModels(kind);
+    const offered = preferred.find((id) => models.some((model) => model.kind === kind && model.id === id));
+    return offered ?? preferred[0] ?? null;
+  }
+
   #list = Effect.fn("CreditMediaTools.list")(function* (
     this: CreditMediaTools,
     media: CreditMediaWorkflows,
@@ -617,7 +625,7 @@ export class CreditMediaTools {
       ...(balance?.welcome ? { freeCredits: balance.welcome } : {}),
       agentsCanUseCredits: this.#options.agentsAllowed(),
       askAboveCredits: this.#options.approvalCredits(),
-      defaultModels: { image: this.#options.defaultModel("image"), video: this.#options.defaultModel("video") },
+      defaultModels: { image: this.#defaultModelIn(models, "image"), video: this.#defaultModelIn(models, "video") },
       models: models.filter((model) => kind === undefined || model.kind === kind).map(listedModel),
     });
   });
@@ -635,8 +643,8 @@ export class CreditMediaTools {
     run.facts.references = roles.length;
     run.facts.modelSource = args.model === undefined ? "default" : "agent";
     const models = yield* media.models();
-    const defaultModel = this.#options.defaultModel(kind);
-    const asked = plannedJob(models, kind, args, inputs, defaultModel);
+    const defaultModels = this.#options.defaultModels(kind);
+    const asked = plannedJob(models, kind, args, inputs, defaultModels);
     if (typeof asked === "string") {
       run.facts.outcome = "invalid";
       run.facts.agentModel = args.model ?? null;
@@ -667,7 +675,7 @@ export class CreditMediaTools {
           ? sourceText("status.agent.creditImageApproval", { model: name, credits: first.cost })
           : sourceText("status.agent.creditVideoApproval", { model: name, credits: first.cost });
       const balance = yield* media.balance();
-      const approval = yield* call.approve(reason, approvalOffer(models, kind, first, defaultModel, balance));
+      const approval = yield* call.approve(reason, approvalOffer(models, kind, first, defaultModels, balance));
       run.facts.approval = {
         accepted: approval.accepted,
         via: approval.via,
@@ -678,7 +686,7 @@ export class CreditMediaTools {
         return failure(sourceText("error.agent.creditMediaDeclined"));
       }
       if (approval.choice) {
-        const chosen = plannedJob(models, kind, argumentsOf(args.prompt, approval.choice), inputs, defaultModel);
+        const chosen = plannedJob(models, kind, argumentsOf(args.prompt, approval.choice), inputs, defaultModels);
         if (typeof chosen === "string") {
           run.facts.outcome = "invalid";
           return failure(chosen);

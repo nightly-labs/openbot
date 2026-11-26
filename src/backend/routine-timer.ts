@@ -14,6 +14,7 @@ export class RoutineTimer {
   #suspended = false;
   #held = false;
   #lastFiredAt = Number.NEGATIVE_INFINITY;
+  #readFailing = false;
 
   constructor(
     private readonly sources: () => Iterable<RoutineDueSource>,
@@ -26,7 +27,14 @@ export class RoutineTimer {
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
     if (this.#paused() || !this.isRunning()) return;
-    const earliest = this.nextDueAt();
+    let earliest: string | null;
+    try {
+      earliest = this.nextDueAt();
+    } catch (error) {
+      this.#retryArmAfterReadFailure(error);
+      return;
+    }
+    this.#readFailing = false;
     if (!earliest) return;
     const dueAt = new Date(earliest).getTime();
     const refireGap = this.#lastFiredAt + MIN_REFIRE_GAP - performance.now();
@@ -40,6 +48,17 @@ export class RoutineTimer {
       Effect.runFork(this.#fire());
     }, delay);
     this.#timer.unref?.();
+  }
+
+  #retryArmAfterReadFailure(error: unknown): void {
+    this.#timer = setTimeout(() => {
+      this.#timer = null;
+      this.arm();
+    }, MAX_DELAY);
+    this.#timer.unref?.();
+    if (this.#readFailing) return;
+    this.#readFailing = true;
+    this.onError("routine_scheduler_failed", error);
   }
 
   nextDueAt(): string | null {

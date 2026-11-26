@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import {
   type AgentEvent,
   type ConversationMessage,
+  type ConversationNearPayment,
   type ConversationPage,
   type ConversationSnapshot,
   isConversationMessage,
@@ -14,6 +15,11 @@ import {
   TEAM_UI_BLOCKS_CAPABILITY,
   teamCapabilitiesForProtocol,
 } from "@openbot/contracts/team-protocol/current";
+import {
+  addNearPayments,
+  TEAM_NEAR_PAYMENT_CAPABILITY,
+  withNearPayments,
+} from "@openbot/contracts/team-protocol/near-payment-v1";
 import {
   addUiBlockAutoAnswers,
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
@@ -807,6 +813,78 @@ try {
   await step("ui-block-vault-v1: a body without a Vault request keeps its bytes", () => {
     const encoded = encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, current, { uiBlocks: true });
     assert.equal(withUiBlockVaultRequests(encoded, current), encoded);
+  });
+
+  const payment = {
+    domain: "firecrawl.dev",
+    amount: "12.00",
+    symbol: "USDC",
+    reason: "Crawl credits",
+    state: "paid",
+    automatic: true,
+    transactionHash: "4kMbQ2rYyG7vTn8pXcLwZ3dHfJs9aEuB6qRtV1oNmKiP",
+    detail: null,
+  } satisfies ConversationNearPayment;
+  const paymentPage = page([
+    {
+      id: "near-payment:turn-1:request-1",
+      turnId: "turn-1",
+      author: "system",
+      source: "system",
+      status: "completed",
+      createdAt: "2026-11-26T10:00:00.000Z",
+      itemType: "near_payment",
+      text: "Paid 12.00 USDC to firecrawl.dev",
+      nearPayment: payment,
+    },
+  ]);
+
+  await step("near-payment-v1: a protocol 10 capability only", () => {
+    assert.ok(TEAM_CURRENT_CAPABILITIES.includes(TEAM_NEAR_PAYMENT_CAPABILITY));
+    assert.ok(!teamCapabilitiesForProtocol(9).includes(TEAM_NEAR_PAYMENT_CAPABILITY));
+    assert.ok(teamCapabilitiesForProtocol(10).includes(TEAM_NEAR_PAYMENT_CAPABILITY));
+  });
+
+  await step("without near-payment-v1: the payment record is text only", () => {
+    const encoded = encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, paymentPage, { uiBlocks: true });
+    assert.ok(!encoded.includes('"nearPayment"'));
+    assert.ok(encoded.includes("Paid 12.00 USDC to firecrawl.dev"));
+    const event = encodeTeamProtocolV7BaseCurrentEvent(
+      { type: "conversation-page", page: paymentPage },
+      { uiBlocks: true },
+    );
+    assert.ok(event && !event.includes('"nearPayment"'));
+  });
+
+  await step("near-payment-v1: page and event carry the payment record", () => {
+    const encoded = withNearPayments(
+      encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, paymentPage, { uiBlocks: true }),
+      paymentPage,
+    );
+    const wire = JSON.parse(encoded);
+    const decoded = decodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, wire);
+    assert(decoded && typeof decoded === "object" && !Array.isArray(decoded));
+    addNearPayments(decoded, wire);
+    const [message] = Array.isArray(decoded.messages) ? decoded.messages : [];
+    assert.ok(isConversationMessage(message));
+    assert.deepEqual(message.nearPayment, payment);
+
+    const plain = encodeTeamProtocolV7BaseCurrentEvent(
+      { type: "conversation-page", page: paymentPage },
+      { uiBlocks: true },
+    );
+    assert.ok(plain);
+    const event = JSON.parse(withNearPayments(plain, { type: "conversation-page", page: paymentPage }));
+    const read = decodeTeamProtocolV7BaseCurrentEvent(event);
+    assert(read.kind === "known" && read.event.type === "conversation-page");
+    addNearPayments(read.event, event);
+    assert.deepEqual(read.event.page.messages[0]?.nearPayment, payment);
+    return { bytes: encoded.length };
+  });
+
+  await step("near-payment-v1: a body without a payment record keeps its bytes", () => {
+    const encoded = encodeTeamProtocolV7CurrentHttpResponse("GET", PAGE_PATH, 200, current, { uiBlocks: true });
+    assert.equal(withNearPayments(encoded, current), encoded);
   });
 
   await writeFile(resolve(OUT, "report.json"), `${JSON.stringify({ ok: true, steps }, null, 2)}\n`);

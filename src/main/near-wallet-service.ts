@@ -17,6 +17,7 @@ import {
   type TokenView,
 } from "@near-intents-agent-api/sdk";
 import {
+  isNearTransactionHash,
   NEAR_WALLET_LIMITS,
   type NearAgentsInput,
   type NearAllowPaymentInput,
@@ -36,6 +37,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Duration, Effect, Exit, Fiber, Result, Scope, Semaphore } from "effect";
 import {
+  type NearPaymentPlan,
   type NearPaymentRequest,
   type NearPaymentResult,
   type NearWallet,
@@ -475,7 +477,8 @@ export class NearWalletService implements NearWallet {
         pending,
       });
       if (pending) this.#emitStatus();
-      return auto ? ({ kind: "auto" } as const) : ({ kind: "ask", amount: request.amount, symbol } as const);
+      const plan: NearPaymentPlan = { kind: auto ? "auto" : "ask", amount: request.amount, symbol };
+      return plan;
     },
     (operation) => operation.pipe(Effect.mapError(walletError)),
   ).bind(this);
@@ -888,6 +891,7 @@ export class NearWalletService implements NearWallet {
         result: {
           status: "declined",
           correlationId: null,
+          transactionHash: null,
           detail: saved.wallet?.frozen
             ? sourceText("error.connector.nearFrozen")
             : sourceText("error.connector.nearDeclined"),
@@ -910,6 +914,7 @@ export class NearWalletService implements NearWallet {
           result: {
             status: "failed",
             correlationId: null,
+            transactionHash: null,
             detail: sourceText("error.connector.nearPaymentFailed", { detail: apiDetail(cause) }),
           } satisfies NearPaymentResult,
         };
@@ -925,6 +930,7 @@ export class NearWalletService implements NearWallet {
         result: {
           status: "uncertain",
           correlationId: null,
+          transactionHash: null,
           detail: sourceText("error.connector.nearUncertain"),
         } satisfies NearPaymentResult,
       };
@@ -985,13 +991,14 @@ export class NearWalletService implements NearWallet {
       const status = read.success;
       if (status.status === "SUCCESS") {
         yield* this.#removePayment(payment, false);
-        return { status: "paid", correlationId, detail: null };
+        return { status: "paid", correlationId, transactionHash: transactionHashOf(status), detail: null };
       }
       if (TERMINAL_FAILURES.has(status.status)) {
         yield* this.#removePayment(payment, false);
         return {
           status: "failed",
           correlationId,
+          transactionHash: null,
           detail: sourceText("error.connector.nearPaymentFailed", { detail: status.failure_code ?? status.status }),
         };
       }
@@ -1020,11 +1027,17 @@ export class NearWalletService implements NearWallet {
           return {
             status: "declined",
             correlationId,
+            transactionHash: null,
             detail: redactText(nearMessage(vote.failure)),
           };
       }
     }
-    return { status: "uncertain", correlationId, detail: sourceText("error.connector.nearUncertain") };
+    return {
+      status: "uncertain",
+      correlationId,
+      transactionHash: null,
+      detail: sourceText("error.connector.nearUncertain"),
+    };
   });
 
   readonly #resume = Effect.fn("NearWallet.resume")(function* (this: NearWalletService) {
@@ -1241,6 +1254,12 @@ function createPolicy(dailyUsd: string): Policy {
 function intentToSign(intent: GenerateIntentResponse): NearIntentToSign | null {
   const value = intent.intent;
   return value.standard === "webauthn" ? value : null;
+}
+
+function transactionHashOf(status: StatusResponse): string | null {
+  if (status.type !== "transfer" && status.type !== "withdraw") return null;
+  const hash = status.details.tx_hash ?? null;
+  return isNearTransactionHash(hash) ? hash : null;
 }
 
 function approvalIdOf(status: StatusResponse): string | null {

@@ -65,4 +65,7 @@ shm=$(df --output=size -k /dev/shm 2>/dev/null | tail -n 1 | tr -d ' ') || shm=0
 [ "${shm:-0}" -ge 1048576 ] 2>/dev/null || chromium+=(--disable-dev-shm-usage)
 
 export OPENBOT_SERVER=1
+(bash /opt/OpenBot/app/resources/hosting/openbot-hosted-server --watchdog "$XDG_RUNTIME_DIR/openbot.pid" \
+  "${XDG_CONFIG_HOME:-$HOME/.config}/OpenBot" 30 20 </dev/null &)
+echo "$$" >"$XDG_RUNTIME_DIR/openbot.pid"
 exec /opt/OpenBot/app/openbot --password-store=gnome-libsecret "${chromium[@]}"

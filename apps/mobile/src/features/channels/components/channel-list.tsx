@@ -8,7 +8,8 @@ import { memo, type ReactNode, useMemo, useRef, useState } from "react";
 import { Alert, View } from "react-native";
 import { AndroidRowMenu, OpenRowMenu } from "@/features/agents/components/agent-context-menu";
 import { AgentPinSwipeRow } from "@/features/agents/components/agent-pin-swipe-row";
-import { AvatarCutout, useAvatarHole } from "@/features/agents/components/avatar-cutout";
+import { AgentUnreadBadge } from "@/features/agents/components/agent-unread-badge";
+import { AvatarCutout } from "@/features/agents/components/avatar-cutout";
 import { ChatDragArea, DRAG_AVATAR_SIZE, useChatDrag, useHoldMenu } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
@@ -250,15 +251,6 @@ function OpenChannelMenu({
   );
 }
 
-function PinnedUnreadDot() {
-  const reportHole = useAvatarHole();
-  return (
-    <View pointerEvents="none" className="absolute right-0 top-0 rounded-full p-0.5" onLayout={reportHole}>
-      <View className="size-2.5 rounded-full bg-accent" />
-    </View>
-  );
-}
-
 export const ChannelListRow = memo(function ChannelListRow({
   channel,
   serverId,
@@ -320,11 +312,17 @@ export const ChannelListRow = memo(function ChannelListRow({
   const avatar = (
     <View style={{ width: size, height: size }}>
       {pinned ? (
-        <AvatarCutout size={size} badge={unread ? <PinnedUnreadDot /> : null}>
+        <AvatarCutout
+          size={size}
+          badge={unread ? <AgentUnreadBadge count={channel.unreadCount} avatarSize={size} /> : null}
+        >
           {channelAvatar}
         </AvatarCutout>
       ) : (
-        channelAvatar
+        <>
+          {channelAvatar}
+          {unread ? <AgentUnreadBadge count={channel.unreadCount} avatarSize={size} ringColor={rowBackground} /> : null}
+        </>
       )}
     </View>
   );
@@ -379,7 +377,6 @@ export const ChannelListRow = memo(function ChannelListRow({
               <ChatRowHeading
                 name={channel.name}
                 title={title}
-                leading={unread ? <View className="size-2.5 rounded-full bg-accent" /> : null}
                 trailing={<ChatRowTime label={formatUpdatedAt(channel.lastMessage?.at ?? channel.createdAt, format)} />}
               />
               <Typography.Paragraph className="text-text-secondary" numberOfLines={1} style={typeScale.chatDetail}>

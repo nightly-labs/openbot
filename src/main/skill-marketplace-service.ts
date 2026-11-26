@@ -250,7 +250,7 @@ export class SkillMarketplaceService {
 
   #availableVersion(skillId: string): Effect.Effect<number, SkillMarketplaceFailure> {
     return skillId.startsWith("local-skill-")
-      ? this.get(skillId).pipe(Effect.map((detail) => detail.version))
+      ? Effect.suspend(() => this.requireLocalLibrary().revision(skillId)).pipe(toSkillMarketplaceFailure)
       : Cache.get(this.#catalogVersions, skillId);
   }
 

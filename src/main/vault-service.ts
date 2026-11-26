@@ -27,7 +27,7 @@ import {
   twoStepRemainingMs,
 } from "@openbot/contracts/two-step-code";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, registerSecretValues } from "@openbot/logging";
+import { createOpenBotLogger, replaceSecretValueGroup } from "@openbot/logging";
 import { Effect, Semaphore } from "effect";
 import { type PasswordVault, PasswordVaultError, websiteMatchesOrigin, websiteUrl } from "../backend/password-vault";
 import type {
@@ -55,29 +55,25 @@ function refuse(key: VaultErrorKey): never {
 }
 
 function registerSecrets(record: VaultRecord): void {
-  registerSecretValues(
-    record.logins.map((login) => login.password),
-    { allowShort: true },
-  );
-  registerSecretValues(
-    record.logins.flatMap(({ twoStepKey }) => {
-      const secret = twoStepKey ? twoStepKeySecret(twoStepKey) : null;
-      if (!twoStepKey || !secret) return [];
-      const grouped = secret.replace(/(.{4})(?=.)/gu, "$1 ");
-      return [twoStepKey, secret, secret.toLowerCase(), grouped, grouped.toLowerCase()];
-    }),
-  );
-  registerSecretValues(
-    record.cards.flatMap(({ number }) => [
-      number,
-      number.replace(/(\d{4})(?=\d)/gu, "$1 "),
-      number.replace(/(\d{4})(?=\d)/gu, "$1-"),
-    ]),
-  );
-  registerSecretValues(
-    record.apiKeys.map(({ key }) => key),
-    { allowShort: true },
-  );
+  replaceSecretValueGroup("vault", [
+    { values: record.logins.map((login) => login.password), allowShort: true },
+    {
+      values: record.logins.flatMap(({ twoStepKey }) => {
+        const secret = twoStepKey ? twoStepKeySecret(twoStepKey) : null;
+        if (!twoStepKey || !secret) return [];
+        const grouped = secret.replace(/(.{4})(?=.)/gu, "$1 ");
+        return [twoStepKey, secret, secret.toLowerCase(), grouped, grouped.toLowerCase()];
+      }),
+    },
+    {
+      values: record.cards.flatMap(({ number }) => [
+        number,
+        number.replace(/(\d{4})(?=\d)/gu, "$1 "),
+        number.replace(/(\d{4})(?=\d)/gu, "$1-"),
+      ]),
+    },
+    { values: record.apiKeys.map(({ key }) => key), allowShort: true },
+  ]);
 }
 
 function makeCode(key: TwoStepKey, at: number): Effect.Effect<string, PasswordVaultError> {
@@ -326,7 +322,7 @@ export class VaultService {
     }
     const readable = yield* this.#store.load();
     this.#status = readable ? "ready" : "unreadable";
-    registerSecrets(this.#store.read());
+    if (readable) registerSecrets(this.#store.read());
     return this.#status;
   });
 
@@ -455,6 +451,7 @@ export class VaultService {
           return this.state();
         }
         yield* this.#store.clear();
+        registerSecrets(this.#store.read());
         this.#status = "ready";
         this.#emit();
         return this.state();

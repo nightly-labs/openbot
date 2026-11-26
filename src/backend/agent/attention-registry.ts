@@ -12,6 +12,7 @@ import type {
   BrowserTakeoverRequest,
   BrowserVaultSkipReason,
   ConversationMessageSender,
+  ConversationNearPayment,
   CreditsHold,
   LocalBrowserSecretResponse,
   MediaApprovalChoice,
@@ -27,6 +28,8 @@ import {
   AGENT_WELCOME_ITEM_TYPE,
   BROWSER_TAKEOVER_REASONS,
   cardBrand,
+  NEAR_PAYMENT_ITEM_TYPE,
+  NEAR_WALLET_LIMITS,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { normalizeTwoStepKey, twoStepKeySecret } from "@openbot/contracts/two-step-code";
@@ -65,7 +68,7 @@ import { repairBrowserToolInput } from "../browser-tool-input";
 import { type BrowserToolArguments, parseBrowserToolCall } from "../browser-tools";
 import { causeHelpers } from "../effect-boundary";
 import { LINK_CARD_ID_PREFIX, type LinkWallet } from "../link-wallet";
-import type { NearWallet } from "../near-wallet";
+import type { NearPaymentResult, NearWallet } from "../near-wallet";
 import {
   isWebProtocol,
   type PasswordVault,
@@ -102,6 +105,7 @@ import {
 } from "./hosted-site-coordinator";
 import type { HostedSiteMutationTool } from "./hosted-site-events";
 import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "./inactive-attention-request";
+import { nearPaymentText } from "./near-payment-message";
 import {
   API_KEY_FIELD_ID,
   API_KEY_SCOPE_AGENT,
@@ -1838,6 +1842,17 @@ export class AttentionRegistry {
     const plan = yield* Effect.result(wallet.prepare({ agentId, threadId: params.threadId, requestId, ...call.args }));
     if (Result.isFailure(plan))
       return browserTakeoverError(`NEAR payment refused: ${plan.failure.message} Do not try again; tell the user.`);
+    const record = (state: ConversationNearPayment["state"], transactionHash: string | null, detail: string | null) =>
+      this.#recordNearPayment(agentId, params.threadId, params.turnId, requestId, {
+        domain: call.args.domain,
+        amount: plan.success.amount.slice(0, NEAR_WALLET_LIMITS.amount),
+        symbol: plan.success.symbol.slice(0, NEAR_WALLET_LIMITS.asset),
+        reason: call.args.reason.slice(0, NEAR_WALLET_LIMITS.reason),
+        state,
+        automatic: plan.success.kind === "auto",
+        transactionHash,
+        detail: detail === null ? null : detail.slice(0, NEAR_WALLET_LIMITS.paymentDetail),
+      });
     if (plan.success.kind === "ask") {
       const decision = yield* this.awaitToolApproval(
         client,
@@ -1864,12 +1879,22 @@ export class AttentionRegistry {
       ).pipe(Effect.onInterrupt(() => Effect.sync(() => wallet.drop(requestId))));
       if (decision !== "accept") {
         wallet.drop(requestId);
+        record("rejected", null, null);
         return browserTakeoverError("The owner declined this NEAR payment. Do not ask again; tell the user.");
       }
     }
-    const paid = yield* Effect.result(wallet.pay(requestId));
-    if (Result.isFailure(paid)) return browserTakeoverError(`NEAR payment failed: ${paid.failure.message}`);
+    record("sending", null, null);
+    const paid = yield* Effect.result(wallet.pay(requestId)).pipe(
+      Effect.onInterrupt(() =>
+        Effect.sync(() => record("uncertain", null, sourceText("error.connector.nearUncertain"))),
+      ),
+    );
+    if (Result.isFailure(paid)) {
+      record("failed", null, paid.failure.message);
+      return browserTakeoverError(`NEAR payment failed: ${paid.failure.message}`);
+    }
     const result = paid.success;
+    record(NEAR_PAYMENT_RESULT_STATE[result.status], result.transactionHash, result.detail);
     const next =
       result.status === "paid"
         ? "Go back to the site and continue."
@@ -2878,6 +2903,36 @@ export class AttentionRegistry {
     );
   }
 
+  #recordNearPayment(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    requestId: string,
+    payment: ConversationNearPayment,
+  ): void {
+    const snapshot = this.#conversation.ensureSnapshot(agentId, this.#conversation.publicThreadId(agentId, threadId));
+    const id = `near-payment:${turnId}:${requestId}`;
+    const text = nearPaymentText(payment);
+    const existing = snapshot.messages.find((message) => message.id === id);
+    if (existing) {
+      existing.nearPayment = payment;
+      existing.text = text;
+    } else {
+      snapshot.messages.push({
+        id,
+        turnId,
+        author: "system",
+        source: "system",
+        status: "completed",
+        createdAt: new Date().toISOString(),
+        itemType: NEAR_PAYMENT_ITEM_TYPE,
+        text,
+        nearPayment: payment,
+      });
+    }
+    this.#conversation.emitConversation(snapshot);
+  }
+
   #persistQuestionPrompt(
     agentId: string,
     publicThreadId: string,
@@ -2979,6 +3034,13 @@ export class AttentionRegistry {
     this.#conversation.emitConversation(snapshot);
   }
 }
+
+const NEAR_PAYMENT_RESULT_STATE = {
+  paid: "paid",
+  declined: "rejected",
+  failed: "failed",
+  uncertain: "uncertain",
+} as const satisfies Record<NearPaymentResult["status"], ConversationNearPayment["state"]>;
 
 function welcomeAnswerText(questions: AgentPromptQuestion[], resolution: AgentPromptResolution): string {
   const [question] = questions;

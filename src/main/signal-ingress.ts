@@ -27,7 +27,7 @@ import {
   STANDARD_WEBHOOKS_FORMAT,
   type WebhookSignatureFormat,
 } from "@openbot/contracts/signal-protocol/webhook-route";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Option, Result, Scope, Semaphore } from "effect";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { decodeJwt } from "jose";
@@ -125,10 +125,11 @@ class SignalIngressAccount extends Context.Service<
         telegramRoute: (hostId) =>
           options.issueTelegramRoute
             ? options.issueTelegramRoute(hostId).pipe(
-                Effect.catch(() =>
+                Effect.catch((failure) =>
                   Effect.sync(() => {
                     logger.warn(
                       "The Telegram route ticket is not available. The socket opens again later for Telegram.",
+                      toLogValue(failure.cause),
                     );
                     return null;
                   }),
@@ -517,9 +518,12 @@ export class SignalIngress implements MessagingIngress {
       : Effect.succeed(null);
     if (webhooks && (slack || discord || telegram || github || watchRelay))
       webhookTicket = webhookTicket.pipe(
-        Effect.catch(() =>
+        Effect.catch((failure) =>
           Effect.sync(() => {
-            logger.warn("The webhook route ticket is not available. The socket opens again later for webhooks.");
+            logger.warn(
+              "The webhook route ticket is not available. The socket opens again later for webhooks.",
+              toLogValue(failure.cause),
+            );
             return null;
           }),
         ),
@@ -529,9 +533,12 @@ export class SignalIngress implements MessagingIngress {
       : Effect.succeed(null);
     if (github && (slack || discord || telegram || webhooks || watchRelay))
       githubTicket = githubTicket.pipe(
-        Effect.catch(() =>
+        Effect.catch((failure) =>
           Effect.sync(() => {
-            logger.warn("The GitHub route ticket is not available. The socket opens again later for GitHub.");
+            logger.warn(
+              "The GitHub route ticket is not available. The socket opens again later for GitHub.",
+              toLogValue(failure.cause),
+            );
             return null;
           }),
         ),

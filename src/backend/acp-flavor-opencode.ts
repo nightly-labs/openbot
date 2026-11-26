@@ -130,7 +130,7 @@ function isReasoningEffortRefusal(error: unknown): boolean {
   if (!(error instanceof RequestError) || error.code !== -32603) return false;
   return (
     /\breasoning[_ .]?effort\b/iu.test(error.message) &&
-    /\b(?:does not support|doesn't support|not supported|unsupported|unrecognized|unknown|unexpected|invalid|not allowed|not permitted)\b/iu.test(
+    /\b(?:does not support|doesn't support|not supported|unsupported|unrecognized|unknown|unexpected|invalid|not allowed|not permitted|must be|should be|expected)\b/iu.test(
       error.message,
     )
   );
