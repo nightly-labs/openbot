@@ -1,4 +1,10 @@
-import { DEFAULT_VOICE_SETTINGS, isVoiceLanguage, isVoiceModelId, type VoiceSettings } from "@openbot/contracts/ipc";
+import {
+  DEFAULT_VOICE_SETTINGS,
+  isVoiceLanguage,
+  isVoiceModelId,
+  type VoiceSettings,
+  type VoiceSettingsState,
+} from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
@@ -34,8 +40,8 @@ export class VoicePreferenceStore {
     });
   }
 
-  get(): VoiceSettings {
-    return { ...(this.#settings ?? this.#defaults()) };
+  get(): VoiceSettingsState {
+    return { ...(this.#settings ?? this.#defaults()), saved: this.#settings !== null };
   }
 
   readonly set = Effect.fn("VoicePreference.set")(function* (

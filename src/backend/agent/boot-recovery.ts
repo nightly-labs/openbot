@@ -1,11 +1,13 @@
 import {
+  agentProviderDescriptor,
   CONVERSATION_PLAN_ITEM_TYPE,
   type ConversationMessage,
+  isAgentAnswer,
   PLAN_CONTINUATION_ITEM_TYPE,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { Cause, Effect, Schema } from "effect";
+import { Cause, Duration, Effect, Schema } from "effect";
 import { type AgentProvider, MissingPiSessionError, RequestTimeoutError } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
@@ -34,6 +36,7 @@ type UnresolvedDelivery = DeliveryContext["delivery"];
 
 const logger = createOpenBotLogger("provider-history");
 const eventLogger = createOpenBotLogger("thread-event-compaction");
+const THREAD_EVENT_COMPACTION_INTERVAL = Duration.hours(6);
 
 export interface BootRecoveryHooks {
   executionThreads?(): Array<{ id: string; threadId: string; channelId?: string }>;
@@ -71,6 +74,7 @@ export class BootRecovery {
   readonly #planContinuation: PlanContinuation;
   readonly #hooks: BootRecoveryHooks;
   readonly #orphanedDeliveryIds = new Set<string>();
+  readonly #lostToProviderExit = new Set<string>();
   readonly #unreadableHistory = new Set<string>();
   #historyCompacted = false;
   #threadEventsCompacted = false;
@@ -111,15 +115,44 @@ export class BootRecovery {
     for (const { delivery } of this.#mailbox.unresolvedDeliveries()) {
       const agent = agents.find((candidate) => candidate.id === delivery.recipientAgentId);
       if (agent && providerForAgent(agent) === provider && !runsOnOwnProcess(agent.id)) {
-        this.#orphanedDeliveryIds.add(delivery.id);
+        this.#orphanForProviderExit(delivery.id);
       }
     }
   }
 
   orphanDeliveriesOfAgent(agentId: string): void {
     for (const { delivery } of this.#mailbox.unresolvedDeliveries()) {
-      if (delivery.recipientAgentId === agentId) this.#orphanedDeliveryIds.add(delivery.id);
+      if (delivery.recipientAgentId === agentId) this.#orphanForProviderExit(delivery.id);
     }
+  }
+
+  #orphanForProviderExit(deliveryId: string): void {
+    if (this.#orphanedDeliveryIds.has(deliveryId)) return;
+    this.#orphanedDeliveryIds.add(deliveryId);
+    this.#lostToProviderExit.add(deliveryId);
+  }
+
+  #personTurnWithoutAnswer(
+    delivery: UnresolvedDelivery,
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    batchIds: ReadonlySet<string> | null,
+  ): boolean {
+    const fromPerson = (context: DeliveryContext | null | undefined) =>
+      context?.delivery.sender.kind === "user" && context.channelId === undefined;
+    const batch = [...(batchIds ?? [])].map((id) => this.#mailbox.getDelivery(id));
+    return (
+      fromPerson(this.#mailbox.getDelivery(delivery.id)) &&
+      this.#mailbox.findDeliveriesByTurn(agentId, turnId).every(fromPerson) &&
+      batch.every(
+        (context) =>
+          (context?.delivery.status !== "starting" && context?.delivery.status !== "running") || fromPerson(context),
+      ) &&
+      !this.#conversation
+        .ensureSnapshot(agentId, threadId)
+        .messages.some((message) => message.turnId === turnId && isAgentAnswer(message))
+    );
   }
 
   hasOrphanedOwnChatDelivery(agentId: string): boolean {
@@ -147,6 +180,9 @@ export class BootRecovery {
     const unresolvedIds = new Set(unresolved.map(({ delivery }) => delivery.id));
     for (const id of this.#orphanedDeliveryIds) {
       if (!unresolvedIds.has(id)) this.#orphanedDeliveryIds.delete(id);
+    }
+    for (const id of this.#lostToProviderExit) {
+      if (!unresolvedIds.has(id)) this.#lostToProviderExit.delete(id);
     }
     const laneOf = (delivery: { id: string; recipientAgentId: string }) =>
       `${delivery.recipientAgentId}\u0000${this.#mailbox.laneIdForDelivery(delivery.id) ?? ""}`;
@@ -255,10 +291,23 @@ export class BootRecovery {
     const cut =
       recovered.terminal === "interrupted" &&
       target?.streaming.some((message) => message.author === "assistant" && message.text.trim() !== "") === true;
-    const ownChat = cut && target !== null && target.threadId === target.agent.threadId ? target : null;
+    const stoppedBeforeAnswer = yield* recoveryStep(() =>
+      !cut &&
+      recovered.terminal === "interrupted" &&
+      this.#lostToProviderExit.has(delivery.id) &&
+      target?.turnId &&
+      target.threadId === target.agent.threadId &&
+      this.#personTurnWithoutAnswer(delivery, target.agent.id, target.threadId, target.turnId, batchIds)
+        ? sourceText("error.provider.acpProcessStopped", {
+            provider: agentProviderDescriptor(providerForAgent(target.agent)).displayName,
+          })
+        : null,
+    );
+    const ended = cut || stoppedBeforeAnswer !== null;
+    const ownChat = ended && target !== null && target.threadId === target.agent.threadId ? target : null;
     const deliveryIds = yield* recoveryStep(() => {
       const ids = new Set([delivery.id]);
-      if (!cut || !target?.turnId) return [...ids];
+      if (!ended || !target?.turnId) return [...ids];
       for (const context of this.#mailbox.findDeliveriesByTurn(target.agent.id, target.turnId))
         ids.add(context.delivery.id);
       for (const id of batchIds ?? []) {
@@ -268,7 +317,11 @@ export class BootRecovery {
       return [...ids];
     });
     const continuation = yield* recoveryStep(() => {
-      if (!ownChat?.turnId || !this.#hooks.continuesAfterProviderExit?.(ownChat.agent.id, ownChat.turnId, deliveryIds))
+      if (
+        !cut ||
+        !ownChat?.turnId ||
+        !this.#hooks.continuesAfterProviderExit?.(ownChat.agent.id, ownChat.turnId, deliveryIds)
+      )
         return null;
       const { messages } = this.#conversation.ensureSnapshot(ownChat.agent.id, ownChat.threadId);
       return this.#planContinuation.afterProviderExit({
@@ -285,7 +338,9 @@ export class BootRecovery {
     const { terminal, reason } =
       cut && !continuation
         ? { terminal: "failed" as const, reason: sourceText("error.agent.answerCutOff") }
-        : recovered;
+        : stoppedBeforeAnswer !== null
+          ? { terminal: "failed" as const, reason: stoppedBeforeAnswer }
+          : recovered;
     const routineRetries = yield* recoveryStep(
       () => new Set(deliveryIds.filter((id) => this.#hooks.retriesAfterRestart?.(id) === true)),
     );
@@ -301,6 +356,7 @@ export class BootRecovery {
         requeued.add(id);
       else yield* this.#mailbox.markTerminal(id, terminal, reason).pipe(toBootRecoveryFailed);
       if (id !== delivery.id) this.#orphanedDeliveryIds.delete(id);
+      this.#lostToProviderExit.delete(id);
     }
     if (!continuation) {
       for (const id of deliveryIds) {
@@ -460,6 +516,7 @@ export class BootRecovery {
             },
             requestAnswered: (deliveryId) =>
               this.#mailbox.hasOwnReplyFrom(deliveryId) || this.#mailbox.hasSentResultFor(deliveryId),
+            followsUpOwnAnswer: (delivery) => this.#mailbox.followsUpOwnAnswer(delivery),
           }).pipe(toBootRecoveryFailed);
           yield* recoveryStep(() => this.#refreshBackfilledConversation(agent.id, publicThreadId));
         }).pipe(
@@ -499,19 +556,32 @@ export class BootRecovery {
     );
   });
 
-  readonly compactThreadEvents = Effect.fn("BootRecovery.compactThreadEvents")(function* (this: BootRecovery) {
-    if (this.#threadEventsCompacted) return;
-    this.#threadEventsCompacted = true;
+  compactThreadEvents(): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      if (this.#threadEventsCompacted) return Effect.void;
+      this.#threadEventsCompacted = true;
+      return this.#compactThreadEventsOnce().pipe(
+        Effect.andThen(Effect.sleep(THREAD_EVENT_COMPACTION_INTERVAL)),
+        Effect.forever,
+        Effect.ensuring(
+          Effect.sync(() => {
+            this.#threadEventsCompacted = false;
+          }),
+        ),
+      );
+    });
+  }
+
+  readonly #compactThreadEventsOnce = Effect.fn("BootRecovery.compactThreadEvents")(function* (this: BootRecovery) {
     yield* compactThreadEvents(this.#store.database).pipe(
       Effect.tap((result) =>
         Effect.sync(() => {
-          if (result.rewritten > 0 || Object.keys(result.failedThreads).length > 0)
+          if (result.rewritten > 0 || result.deleted > 0 || Object.keys(result.failedThreads).length > 0)
             eventLogger.info("Compacted old thread events.", toLogValue(result));
         }),
       ),
       Effect.catch((failure) =>
         Effect.sync(() => {
-          this.#threadEventsCompacted = false;
           const cause = failure.cause;
           eventLogger.warn("Could not compact old thread events.", {
             name: cause instanceof Error ? cause.name : typeof cause,

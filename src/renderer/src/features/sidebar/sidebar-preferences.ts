@@ -14,6 +14,7 @@ import {
   writeSidebarPins,
 } from "./sidebar-pins-storage";
 import { readSidebarCollapsed, type SidebarCollapsedByServer, writeSidebarCollapsed } from "./sidebar-sections-storage";
+import { readSidebarTabs, type SidebarTabsByServer, writeSidebarTabs } from "./sidebar-tabs-storage";
 
 export function createSidebarPreferences(options: { scope: () => string; sync?: SidebarPinSync }) {
   let pinsByServer = readSidebarPins();
@@ -21,11 +22,22 @@ export function createSidebarPreferences(options: { scope: () => string; sync?: 
   const [sidebarCollapsedByServer, setSidebarCollapsedByServer] = createSignal<SidebarCollapsedByServer>(
     readSidebarCollapsed(),
   );
+  const [sidebarTabsByServer, setSidebarTabsByServer] = createSignal<SidebarTabsByServer>(readSidebarTabs());
   const pendingScopes = readPendingSidebarPinScopes();
   const localChanges = new Map<string, number>();
 
   const pinnedSidebarItems = createMemo(() => sidebarPinsByServer()[options.scope()] ?? []);
   const collapsedSidebarSectionIds = createMemo(() => sidebarCollapsedByServer()[options.scope()] ?? []);
+  const sidebarTabIds = createMemo((): readonly string[] | undefined => sidebarTabsByServer()[options.scope()]);
+
+  function setSidebarTabIds(tabIds: string[]): void {
+    const serverId = options.scope();
+    setSidebarTabsByServer((current) => {
+      const next = { ...current, [serverId]: [...new Set(tabIds)] };
+      writeSidebarTabs(next);
+      return next;
+    });
+  }
 
   function toggleSidebarSection(sectionId: string): void {
     const serverId = options.scope();
@@ -156,6 +168,8 @@ export function createSidebarPreferences(options: { scope: () => string; sync?: 
     collapsedSidebarSectionIds,
     toggleSidebarSection,
     collapseSidebarSection,
+    sidebarTabIds,
+    setSidebarTabIds,
     pinnedSidebarItems,
     reconcileActiveServerPins,
     pinSidebarItem,

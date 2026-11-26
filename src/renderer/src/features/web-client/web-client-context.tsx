@@ -24,7 +24,10 @@ import type {
   MemberChatColorEntry,
   ProviderModelSourceEntry,
   QueueSnapshot,
+  ReadMediaApprovalInput,
   RespondToApprovalInput,
+  RespondToCreditsHoldInput,
+  RespondToMediaApprovalInput,
   RespondToPromptInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
@@ -166,6 +169,7 @@ interface WebWorkspaceState {
   threadContextStates: Record<string, AgentContextState>;
   backgroundWork: Record<string, number>;
   browserTabs: BrowserTab[];
+  noticedBrowserTabIds: string[] | null;
   activeBrowserTabId: string | null;
   browserControlState: BrowserControlState;
   presence: TeamPresenceSnapshot | null;
@@ -250,6 +254,7 @@ export function createWebWorkspace(
     threadContextStates: {},
     backgroundWork: {},
     browserTabs: [],
+    noticedBrowserTabIds: null,
     activeBrowserTabId: null,
     browserControlState: { sessions: [] },
     presence: null,
@@ -694,6 +699,7 @@ export function createWebWorkspace(
                 ...(kept?.userControl ? { userControl: true as const } : {}),
                 ...(kept?.canGoBack === undefined ? {} : { canGoBack: kept.canGoBack }),
                 ...(kept?.canGoForward === undefined ? {} : { canGoForward: kept.canGoForward }),
+                ...(kept?.httpSignIn === undefined ? {} : { httpSignIn: kept.httpSignIn }),
               };
             });
             draft.activeBrowserTabId = event.activeTabId;
@@ -705,6 +711,19 @@ export function createWebWorkspace(
               ...tab,
               ...states.get(tab.id),
             }));
+          });
+        if (event.type === "browser-http-sign-in-changed")
+          setState((draft) => {
+            const prompts = new Map(event.tabs.map((prompt) => [prompt.tabId, prompt]));
+            draft.browserTabs = draft.browserTabs.map(({ httpSignIn: _signIn, ...tab }) => {
+              const prompt = prompts.get(tab.id);
+              return prompt
+                ? {
+                    ...tab,
+                    httpSignIn: { origin: prompt.origin, ...(prompt.refused ? { refused: true as const } : {}) },
+                  }
+                : tab;
+            });
           });
         if (event.type === "browser-user-control-changed")
           setState((draft) => {
@@ -1088,6 +1107,7 @@ export function createWebWorkspace(
             setStepLines({});
             draft.takeovers = [];
             draft.browserTabs = [];
+            draft.noticedBrowserTabIds = null;
             draft.activeBrowserTabId = null;
             draft.browserControlState = { sessions: [] };
             draft.sidebarLayout = defaultSidebarLayout();
@@ -1233,6 +1253,7 @@ export function createWebWorkspace(
       setStepLines({});
       draft.takeovers = [];
       draft.browserTabs = [];
+      draft.noticedBrowserTabIds = null;
       draft.activeBrowserTabId = null;
       draft.browserControlState = { sessions: [] };
       draft.sidebarLayout = defaultSidebarLayout();
@@ -1364,6 +1385,7 @@ export function createWebWorkspace(
       if (!keepWorkspace) {
         draft.progress = {};
         draft.browserTabs = [];
+        draft.noticedBrowserTabIds = null;
         draft.activeBrowserTabId = null;
         draft.sidebarLayout = defaultSidebarLayout();
         draft.userHiddenAgents = [];
@@ -1570,6 +1592,7 @@ export function createWebWorkspace(
           if (!isCurrent()) return;
           setState((draft) => {
             draft.browserTabs = browserTabs;
+            draft.noticedBrowserTabIds ??= browserTabs.map((tab) => tab.id);
             draft.activeBrowserTabId = browserTabs.some((tab) => tab.id === draft.activeBrowserTabId)
               ? draft.activeBrowserTabId
               : (browserTabs[0]?.id ?? null);
@@ -2106,7 +2129,7 @@ export function createWebWorkspace(
       runtime.hosts?.refresh();
       void props
         .onSessionCheck()
-        .then(() => refreshHosts())
+        .then(retryHosts)
         .then(() => {
           if (state.status === "online") return Date.now() - syncedAt < FOCUS_RESYNC_MS ? undefined : resync();
           if (state.recovery?.phase !== "suspended") recoverNow();
@@ -2444,6 +2467,14 @@ export function createWebWorkspace(
           draft.activeBrowserTabId = tabId;
         });
     },
+    noticeBrowserTabs(tabIds: readonly string[]) {
+      const noticed = state.noticedBrowserTabIds;
+      const added = noticed ? tabIds.filter((tabId) => !noticed.includes(tabId)) : [];
+      if (added.length > 0)
+        setState((draft) => {
+          draft.noticedBrowserTabIds?.push(...added);
+        });
+    },
     async openSearchMessage(messageId: string): Promise<boolean> {
       const id = selectedId;
       const current = generation;
@@ -2501,6 +2532,42 @@ export function createWebWorkspace(
     async approve(input: RespondToApprovalInput) {
       const current = generation;
       await runtime.approve(input);
+      if (disposed || current !== generation) return;
+      setState((draft) => {
+        draft.approvals = draft.approvals.filter((item) => item.requestId !== input.requestId);
+      });
+      await refresh();
+    },
+    readMediaApproval(input: ReadMediaApprovalInput) {
+      return runtime.readMediaApproval?.(input) ?? Promise.resolve({ media: null, hold: null });
+    },
+    async respondToCreditsHold(input: RespondToCreditsHoldInput) {
+      const respond = runtime.respondToCreditsHold;
+      if (!respond) throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      const current = generation;
+      const hold = await respond(input);
+      if (hold || disposed || current !== generation) return hold;
+      setState((draft) => {
+        draft.approvals = draft.approvals.filter((item) => item.requestId !== input.requestId);
+      });
+      await refresh();
+      return hold;
+    },
+    async setCreditsAskMuted(muted: boolean) {
+      const setMuted = runtime.setCreditsAskMuted;
+      if (!setMuted) throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      await setMuted({ muted });
+    },
+    async readCreditsAskMuted() {
+      const read = runtime.readCreditsAskMuted;
+      if (!read) throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      return read();
+    },
+    async respondToMediaApproval(input: RespondToMediaApprovalInput) {
+      const respond = runtime.respondToMediaApproval;
+      if (!respond) throw new Error(currentText().t("error.team.mediaApprovalChoiceUnsupported"));
+      const current = generation;
+      await respond(input);
       if (disposed || current !== generation) return;
       setState((draft) => {
         draft.approvals = draft.approvals.filter((item) => item.requestId !== input.requestId);

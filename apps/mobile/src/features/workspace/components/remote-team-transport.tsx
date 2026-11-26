@@ -63,6 +63,7 @@ export interface RemoteTeamTransportRef {
   connect(hostId: string, hostPublicKey: string): Promise<{ kept: boolean }>;
   disconnect(): Promise<void>;
   networkChanged(): void;
+  newPage(): void;
   request<T>(
     method: string,
     path: string,
@@ -216,6 +217,14 @@ export const RemoteTeamTransport = memo(
       return true;
     }, []);
 
+    const [bridgeKey, setBridgeKey] = useState(0);
+    const gatheringStalls = useRef(0);
+    const newPage = useCallback((reason: string) => {
+      gatheringStalls.current = 0;
+      supportLog.add("warn", "connection", `${latest.current.props.hostId} new page ${reason}`);
+      setBridgeKey((key) => key + 1);
+    }, []);
+
     const uploadListeners = useRef(new Map<string, (fraction: number) => void>());
     const downloadListeners = useRef(new Map<string, (received: number, total: number) => void>());
     const uploadFiles = useRef(new Map<string, number>());
@@ -301,6 +310,7 @@ export const RemoteTeamTransport = memo(
           const networkChanged = bridge.current?.networkChanged;
           if (typeof networkChanged === "function") networkChanged(null);
         },
+        newPage: () => newPage("on refresh"),
         disconnect: async () => {
           const result = await enqueue({ type: "disconnect" });
           if (!result.ok)
@@ -418,12 +428,10 @@ export const RemoteTeamTransport = memo(
           };
         },
       }),
-      [enqueue, sendViewCommand, sendDesktopCommand, backgroundLane],
+      [enqueue, sendViewCommand, sendDesktopCommand, backgroundLane, newPage],
     );
 
     const pageLoads = useRef(0);
-    const [bridgeKey, setBridgeKey] = useState(0);
-    const gatheringStalls = useRef(0);
     const handleReady = useCallback(async () => {
       pageLoads.current += 1;
       const outstanding = mailbox.outstanding();
@@ -530,11 +538,7 @@ export const RemoteTeamTransport = memo(
         if (step === "authenticated") gatheringStalls.current = 0;
         if (step === "ice-gathering-stalled") {
           gatheringStalls.current += 1;
-          if (gatheringStalls.current >= GATHERING_STALLS_BEFORE_NEW_BRIDGE) {
-            gatheringStalls.current = 0;
-            supportLog.add("warn", "connection", `${hostId} new page after ICE gathering stalls`);
-            setBridgeKey((key) => key + 1);
-          }
+          if (gatheringStalls.current >= GATHERING_STALLS_BEFORE_NEW_BRIDGE) newPage("after ICE gathering stalls");
         }
         latest.current.props.onDiagnostic?.(step, detail);
       },

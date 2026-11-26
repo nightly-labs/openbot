@@ -41,7 +41,7 @@ if (process.argv[2] === "--version") {
 }
 const log = (entry) => fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify(entry) + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
-const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-quota-e", "gemini-spent", "gemini-rate", "gemini-rate-b", "gemini-net", "gemini-gone", "gemini-gone-b", "gemini-gone-c", "gemini-gone-d", "gemini-credits-a", "gemini-credits-b", "gemini-lost", "gemini-reset", "gemini-flash"];
+const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-quota-e", "gemini-spent", "gemini-rate", "gemini-rate-b", "gemini-net", "gemini-gone", "gemini-gone-b", "gemini-gone-c", "gemini-gone-d", "gemini-license", "gemini-credits-a", "gemini-credits-b", "gemini-lost", "gemini-reset", "gemini-flash"];
 const models = { availableModels: MODELS.map((modelId) => ({ modelId, name: modelId })) };
 const current = new Map();
 const setup = (sessionId) => ({ sessionId, models: { ...models, currentModelId: current.get(sessionId) ?? MODELS[0] } });
@@ -65,10 +65,11 @@ function handle(message) {
     const rate = model.startsWith("gemini-rate") && text.includes("RATE-NOW");
     const net = model === "gemini-net" && text.includes("NET-NOW");
     const gone = model.startsWith("gemini-gone") && text.includes("GONE-NOW");
+    const license = model === "gemini-license" && text.includes("LICENSE-NOW");
     const credits = model.startsWith("gemini-credits-") && text.includes("CREDITS-NOW");
     const lost = model === "gemini-lost" && text.includes("LOST-NOW");
     const reset = model === "gemini-reset" && text.includes("RESET-NOW");
-    log({ model, quota: quota || credits || reset, rate: rate || net || gone || lost, text });
+    log({ model, quota: quota || credits || reset, rate: rate || net || gone || license || lost, text });
     if (lost || reset) {
       if (text.includes("ACT-FIRST"))
         update(params.sessionId, { sessionUpdate: "tool_call", toolCallId: "read-" + Date.now(), title: "Read notes.txt", kind: "read", status: "completed", rawInput: { path: "notes.txt" } });
@@ -84,8 +85,10 @@ function handle(message) {
       update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: NL + "\u26A0 Your AI credits balance is too low to continue." } });
       return write({ id: message.id, result: { stopReason: "end_turn" } });
     }
-    if (net || gone) {
-      const failure = net
+    if (net || gone || license) {
+      const failure = license
+        ? "\u26A0 Agent execution error: agent executor error: Error 403, Message: You do not have a valid license of this product., Status: PERMISSION_DENIED, Details: []"
+        : net
         ? "\u26A0 Agent execution terminated due to error: Post https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent: read tcp 192.0.2.5:5555->198.51.100.1:443: read: connection reset by peer"
         : model === "gemini-gone"
           ? "\u26A0 Unknown model ID: " + model
@@ -391,6 +394,7 @@ try {
     ["unavailable model before work", "gemini-gone-b", "GONE-NOW"],
     ["410 Gone model before work", "gemini-gone-c", "GONE-NOW"],
     ["retired model before work", "gemini-gone-d", "GONE-NOW"],
+    ["license refusal before work", "gemini-license", "LICENSE-NOW"],
   ] as const) {
     const moved = await runCase(name, model, true, text);
     assert.deepEqual(

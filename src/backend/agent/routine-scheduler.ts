@@ -179,7 +179,7 @@ export class RoutineScheduler implements RoutineDueSource {
     if (oldest !== undefined) this.#deliveryTimezones.delete(oldest);
   }
 
-  #turnSenderTimezone(agentId: string, turnId: string): string | undefined {
+  turnSenderTimezone(agentId: string, turnId: string): string | undefined {
     for (const { delivery } of this.#mailbox.findDeliveriesByTurn(agentId, turnId)) {
       const timezone = delivery.sender.kind === "user" ? this.#deliveryTimezones.get(delivery.id) : undefined;
       if (timezone !== undefined) return timezone;
@@ -699,7 +699,7 @@ export class RoutineScheduler implements RoutineDueSource {
       if (!isBoolean(active)) throw new RoutineInputError("active must be a boolean.");
       const timezone =
         args.timezone === undefined
-          ? (this.#turnSenderTimezone(senderAgentId, params.turnId) ?? this.#timezone())
+          ? (this.turnSenderTimezone(senderAgentId, params.turnId) ?? this.#timezone())
           : routineToolString(args.timezone, "timezone", 128, "A routine timezone is required.");
       const name = routineToolString(args.name, "name", INPUT_LIMITS.routineName, "A routine name is required.");
       const key = name.trim().toLowerCase();
@@ -736,7 +736,7 @@ export class RoutineScheduler implements RoutineDueSource {
       const webhooks = this.#webhookTool(requestedByPerson);
       const active = args.active === undefined ? true : args.active;
       if (!isBoolean(active)) throw new RoutineInputError("active must be a boolean.");
-      const timezone = this.#turnSenderTimezone(senderAgentId, params.turnId) ?? this.#timezone();
+      const timezone = this.turnSenderTimezone(senderAgentId, params.turnId) ?? this.#timezone();
       const name = routineToolString(args.name, "name", INPUT_LIMITS.routineName, "A routine name is required.");
       this.#requireFreeRoutineName(agentId, name);
       const { limitPolicy } = routineToolPolicies(args);

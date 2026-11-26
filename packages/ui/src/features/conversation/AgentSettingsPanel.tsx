@@ -121,6 +121,7 @@ import { useText } from "../../text";
 import { avatarColorChoiceLabel } from "../agents/avatar-hue-label";
 import { SERVER_NOTIFICATION_LEVEL_LABELS } from "../servers/ServerActionItems";
 import { AgentChatColorRow } from "../settings/ChatColorSetting";
+import { AgentDeleteDialog } from "./AgentDeleteDialog";
 import { AgentDeleteHistoryDialog } from "./AgentDeleteHistoryDialog";
 import { type AgentFolderCalls, AgentFoldersPage, AgentFoldersRow, createAgentFolders } from "./AgentFolders";
 import { AgentNewChatDialog } from "./AgentNewChatDialog";
@@ -199,6 +200,7 @@ export interface AgentSettingsPanelProps {
   onUnshownSaveError?: ((message: string) => void) | undefined;
   onStartNewChat?: (() => Promise<void>) | undefined;
   onDeleteHistory?: (() => Promise<void>) | undefined;
+  onDeleteAgent?: ((agentId: string) => Promise<void>) | undefined;
 }
 
 export interface AgentBrowserProfileOptions {
@@ -271,6 +273,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   const agentDefaults = () => props.agentDefaults ?? DEFAULT_AGENT_DEFAULTS;
   const [newChatOpen, setNewChatOpen] = createSignal(false);
   const [deleteHistoryOpen, setDeleteHistoryOpen] = createSignal(false);
+  const [agentToDelete, setAgentToDelete] = createSignal<AgentProfile | null>(null);
   const [draft, setDraft] = createStore<AgentSettingsDraft>({
     avatar: {
       hue: null,
@@ -1664,6 +1667,23 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   </div>
                 )}
               </Show>
+              <Show when={props.onDeleteAgent}>
+                <div class="agent-settings-notifications">
+                  <div>
+                    <strong>{t("agentSettings.deleteAgent.title")}</strong>
+                    <span>{t("agentSettings.deleteAgent.description")}</span>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    type="button"
+                    aria-label={t("agentSettings.deleteAgent.title")}
+                    aria-haspopup="dialog"
+                    onClick={() => setAgentToDelete({ ...props.agent })}
+                  >
+                    {t("agentSettings.deleteAgent.button")}
+                  </Button>
+                </div>
+              </Show>
             </Show>
             <Show when={draft.saveError}>
               {(message) => (
@@ -1692,6 +1712,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               open={deleteHistoryOpen()}
               onClose={() => setDeleteHistoryOpen(false)}
               remove={() => remove()()}
+            />
+          )}
+        </Show>
+        <Show when={props.onDeleteAgent && agentToDelete()}>
+          {(agent) => (
+            <AgentDeleteDialog
+              agent={agent()}
+              onClose={() => setAgentToDelete(null)}
+              remove={() => props.onDeleteAgent?.(agent().id) ?? Promise.resolve()}
             />
           )}
         </Show>

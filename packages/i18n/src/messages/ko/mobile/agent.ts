@@ -373,11 +373,12 @@ export const messages = {
   "mobile.agent.backupModels.remove": "{model} 삭제",
   "mobile.agent.backupModels.unavailable": "지금 사용할 수 없음 · 건너뜀",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "작업을 시작한 뒤 사용 한도로 {name}이(가) 멈추면, 순서에서 처음으로 사용 가능한 모델로 같은 작업을 이어가요. 한도가 끝나거나 제공자 오류 후 10분이 지나면 {model}(으)로 돌아가요.",
   "mobile.agent.busyMessage.label": "작업 중일 때",
   "mobile.agent.busyMessage.footer":
-    "에이전트가 작업하는 중에 메시지를 보낼 때의 동작이에요. 대기열은 턴이 끝날 때까지 메시지를 보관해요. 방향 지시는 턴이 진행되는 동안 에이전트에게 메시지를 전달해요.",
+    "에이전트가 작업하는 중에 내가 보내거나 다른 에이전트가 보낸 메시지가 도착할 때의 동작이에요. 대기열은 턴이 끝날 때까지 메시지를 보관해요. 방향 지시는 턴이 진행되는 동안 에이전트에게 메시지를 전달해요.",
   "mobile.agent.busyMessage.queue": "대기열",
   "mobile.agent.busyMessage.steer": "방향 지시",
   "mobile.agent.busyMessage.hostDefaultQueue": "호스트 기본값 (대기열)",
@@ -676,6 +677,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "제외 해제",
   "mobile.agent.folders.browseTitle": "폴더 선택",
   "mobile.agent.folders.places": "이동",
+  "mobile.agent.folders.path": "폴더 경로",
   "mobile.agent.folders.home": "홈 폴더",
   "mobile.agent.folders.parent": "상위 폴더: {folder}",
   "mobile.agent.folders.browseFailed": "이 폴더를 열 수 없어요.",

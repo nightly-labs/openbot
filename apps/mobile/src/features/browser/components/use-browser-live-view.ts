@@ -1,8 +1,14 @@
-import type { BrowserViewContextMenu, BrowserViewCursor } from "@openbot/contracts/team-protocol/browser-view-v1";
+import type {
+  BrowserViewContextMenu,
+  BrowserViewCursor,
+  BrowserViewDialog,
+} from "@openbot/contracts/team-protocol/browser-view-v1";
 import { type SkImage, Skia } from "@shopify/react-native-skia";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert } from "react-native";
 import { useSharedValue } from "react-native-reanimated";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import { currentText } from "@/shared/lib/text";
 import type { RemoteBrowserViewSession } from "../model/browser-view-bridge";
 import type { Size } from "../model/live-view-geometry";
 import { createLiveViewInputQueue } from "../model/live-view-input-queue";
@@ -36,6 +42,7 @@ export function useBrowserLiveView(
   const drawn = useRef<number | null>(null);
   const selections = useRef<((text: string | null) => void)[]>([]);
   const shownTab = useRef(tabId);
+  const shownDialog = useRef<string | null>(null);
   const queue = useMemo(
     () =>
       createLiveViewInputQueue(
@@ -93,7 +100,16 @@ export function useBrowserLiveView(
         else if (message.type === "copied") selections.current.shift()?.(message.text);
         else if (message.type === "copyTooLarge") selections.current.shift()?.(null);
         else if (message.type === "pageCopied") pageCopy.current(message.text);
-        else contextMenu.current(message);
+        else if (message.type === "dialog") {
+          const dialog = message.dialog;
+          if (dialog && dialog.id !== shownDialog.current) {
+            shownDialog.current = dialog.id;
+            showPageDialog(dialog, (input) => {
+              if (shownDialog.current === input.id) shownDialog.current = null;
+              queue.push(input);
+            });
+          }
+        } else contextMenu.current(message);
       } else {
         session.current = null;
         setStatus({ kind: "ended", reason: event.reason });
@@ -141,4 +157,23 @@ export function useBrowserLiveView(
     send: queue.push,
     requestSelection,
   };
+}
+
+function showPageDialog(
+  dialog: BrowserViewDialog,
+  send: (input: { type: "dialog"; id: string; accept: boolean }) => void,
+) {
+  const { t } = currentText();
+  const answer = (accept: boolean) => send({ type: "dialog", id: dialog.id, accept });
+  Alert.alert(
+    t("mobile.browser.dialog.title"),
+    dialog.message,
+    [
+      ...(dialog.type === "confirm"
+        ? [{ text: t("common.cancel"), style: "cancel" as const, onPress: () => answer(false) }]
+        : []),
+      { text: t("mobile.browser.dialog.ok"), onPress: () => answer(true) },
+    ],
+    { cancelable: true, onDismiss: () => answer(false) },
+  );
 }

@@ -383,11 +383,12 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Remover {model}",
   "mobile.agent.backupModels.unavailable": "Indisponível agora · ignorado",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Quando um limite de uso para {name} depois de começar a trabalhar, {name} continua o mesmo trabalho no primeiro modelo disponível da ordem. Volta para {model} quando o limite termina, ou 10 minutos após um erro do provedor.",
   "mobile.agent.busyMessage.label": "Durante o trabalho",
   "mobile.agent.busyMessage.footer":
-    "O que acontece com uma mensagem enviada enquanto o agente trabalha. Fila a guarda até o fim do turno. Orientar a entrega ao agente durante o turno.",
+    "O que acontece com uma mensagem sua ou de outro agente que chega enquanto o agente trabalha. Fila a guarda até o fim do turno. Orientar a entrega ao agente durante o turno.",
   "mobile.agent.busyMessage.queue": "Fila",
   "mobile.agent.busyMessage.steer": "Orientar",
   "mobile.agent.busyMessage.hostDefaultQueue": "Padrão do anfitrião (Fila)",
@@ -702,6 +703,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Parar de excluir",
   "mobile.agent.folders.browseTitle": "Escolher pasta",
   "mobile.agent.folders.places": "Ir para",
+  "mobile.agent.folders.path": "Caminho da pasta",
   "mobile.agent.folders.home": "Pasta pessoal",
   "mobile.agent.folders.parent": "Subir para {folder}",
   "mobile.agent.folders.browseFailed": "Não foi possível abrir esta pasta.",

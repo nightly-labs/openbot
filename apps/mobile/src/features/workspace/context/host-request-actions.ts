@@ -110,6 +110,11 @@ import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-update-v1";
 import {
+  AGENT_USAGE_LIMIT_CAPABILITY,
+  AGENT_USAGE_LIMIT_ROUTES,
+  isAgentUsageLimits,
+} from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import {
   BACKGROUND_PROCESSES_CAPABILITY,
   BACKGROUND_PROCESSES_ROUTES,
   decodeBackgroundProcessesResponse,
@@ -168,6 +173,7 @@ import {
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
+import { MEDIA_APPROVAL_CREDITS_CAPABILITY } from "@openbot/contracts/team-protocol/media-approval-credits-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
@@ -265,6 +271,7 @@ import {
   getHostAuditLog,
   getHostBrowsingMemory,
   getHostMcpAccess,
+  getHostMediaApprovalCredits,
   getHostMemoryReview,
   getHostPersonality,
   getHostReleaseStatus,
@@ -333,6 +340,7 @@ import {
   setHostBrowserProfileProxy,
   setHostBrowsingMemory,
   setHostMcpAccess,
+  setHostMediaApprovalCredits,
   setHostMemoryReview,
   setHostPersonality,
   setHostSignalHome,
@@ -556,6 +564,8 @@ type HostRequestActions = Pick<
   | "setServerSignalHome"
   | "loadAgentMemoryLimit"
   | "setAgentMemoryLimit"
+  | "loadMediaApprovalCredits"
+  | "setMediaApprovalCredits"
   | "loadMemoryReview"
   | "setMemoryReview"
   | "loadSkillLearning"
@@ -663,6 +673,7 @@ type HostRequestActions = Pick<
   | "loadAgentAvatar"
   | "duplicateAgent"
   | "loadQueue"
+  | "loadAgentUsageLimits"
   | "editQueue"
   | "changeQueue"
   | "setMessageReaction"
@@ -766,6 +777,7 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
     canChooseNewAgentModel: (serverId) => has(serverId, TEAM_AGENT_CREATE_MODEL_CAPABILITY),
     canInstallAgentTemplate: (serverId) => has(serverId, AGENT_INSTALL_CAPABILITY),
     canEditQueue: (serverId) => has(serverId, TEAM_QUEUE_EDIT_CAPABILITY),
+    canReadAgentUsageLimits: (serverId) => has(serverId, AGENT_USAGE_LIMIT_CAPABILITY),
     canReadModelSteering: (serverId) => has(serverId, MODEL_STEERING_CAPABILITY),
     canRetryMessage: (serverId) => has(serverId, TEAM_MESSAGE_CLIENT_ID_CAPABILITY),
     canDeleteMessages: (serverId) => has(serverId, MESSAGE_DELETE_CAPABILITY),
@@ -862,6 +874,12 @@ export function createHostRequestActions({
     capabilityApi(serverId, HOST_VOICE_MODEL_CAPABILITY, "mobile.server.settings.voiceModelUnsupported");
   const memoryLimitAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_MEMORY_LIMIT_CAPABILITY, "mobile.server.settings.memoryLimitUnsupported");
+  const mediaApprovalCreditsAdmin = (serverId: string) =>
+    capabilityApi(
+      serverId,
+      MEDIA_APPROVAL_CREDITS_CAPABILITY,
+      "mobile.server.settings.mediaApprovalCreditsUnsupported",
+    );
   const memoryReviewAdmin = (serverId: string) =>
     capabilityApi(serverId, MEMORY_REVIEW_CAPABILITY, "mobile.server.settings.learningUnsupported");
   const skillLearningAdmin = (serverId: string) =>
@@ -943,6 +961,10 @@ export function createHostRequestActions({
     loadAgentMemoryLimit: async (serverId) => runTeamRequest(getHostAgentMemoryLimit(memoryLimitAdmin(serverId))),
     setAgentMemoryLimit: async (limit, serverId) =>
       runTeamRequest(setHostAgentMemoryLimit(memoryLimitAdmin(serverId), limit)),
+    loadMediaApprovalCredits: async (serverId) =>
+      runTeamRequest(getHostMediaApprovalCredits(mediaApprovalCreditsAdmin(serverId))),
+    setMediaApprovalCredits: async (update, serverId) =>
+      runTeamRequest(setHostMediaApprovalCredits(mediaApprovalCreditsAdmin(serverId), update)),
     loadMemoryReview: async (serverId) => runTeamRequest(getHostMemoryReview(memoryReviewAdmin(serverId))),
     setMemoryReview: async (interval, serverId) =>
       runTeamRequest(setHostMemoryReview(memoryReviewAdmin(serverId), interval)),
@@ -1768,6 +1790,17 @@ export function createHostRequestActions({
           return value;
         },
         undefined,
+        serverId,
+      ),
+    loadAgentUsageLimits: (serverId) =>
+      request(
+        "POST",
+        AGENT_USAGE_LIMIT_ROUTES.list,
+        (value) => {
+          if (!isAgentUsageLimits(value)) throw new Error("The host returned invalid usage limits.");
+          return value;
+        },
+        {},
         serverId,
       ),
     editQueue: async (agentId, serverId, input) => {

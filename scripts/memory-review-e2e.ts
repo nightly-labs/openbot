@@ -288,6 +288,7 @@ control({ operations: [] });
 writer("Not JSON.");
 let reviewInterval = 20;
 let skillLearningMode: SkillLearningMode = "ask";
+let skillsFull = false;
 const events: AgentEvent[] = [];
 const browsingFile = join(userData, "openbot-browsing-steps-v1.json");
 let browsingNow = Date.now();
@@ -305,6 +306,7 @@ function open() {
     memoryReviewIdleMs: IDLE_MS,
     memoryReviewInterval: () => reviewInterval,
     reviewSkills: () => Effect.succeed(REVIEW_SKILLS),
+    reviewSkillsFull: () => Effect.succeed(skillsFull),
     localSkillTools: () => LOCAL_SKILL_TOOLS,
     skillLearning: () => skillLearningMode,
     skillLearner: () => SKILL_LEARNER,
@@ -861,6 +863,27 @@ try {
     await settle();
     assert.equal(suggestionLines(learner.id).length, 1, "No other question shows.");
     return { dropped: answers.length };
+  });
+
+  await check("an agent with the most skills gets no question to save a new skill", async () => {
+    const before = suggestionLines(learner.id).length;
+    const count = reviews().length;
+    skillsFull = true;
+    const text = "The user ships on Mondays.";
+    control({
+      operations: [{ type: "add", text, inclusion: "searchable" }],
+      skill: { action: "create", signal: "technique", name: "Monday shipping", message: "Save it as a skill?" },
+    });
+    await chat(learner.id, 3, "Learner full");
+    await reviewed(count + 1);
+    await waitFor("the memory of the full agent", () =>
+      service.listMemories(learner.id).find((memory) => memory.text === text),
+    );
+    skillsFull = false;
+    await settle();
+    assert.equal(suggestionLines(learner.id).length, before, "No question to save a new skill shows.");
+    assert.ok((reviews().at(-1) ?? "").includes('Never use "create"'), "The review prompt says no new skill fits.");
+    return { suggestions: before };
   });
 
   await check("after a clear, the answer to a skill question brings the cleared chat", async () => {

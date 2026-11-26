@@ -48,7 +48,8 @@ export const messages = {
   "error.skill.publishUntracked":
     "{name} a été installée avant le suivi exact des versions. Mettez-la à jour ou réparez-la avant la publication.",
   "error.skill.tooManySkills": "Un agent peut avoir jusqu’à {limit} compétences.",
-  "error.skill.unmanagedExists": "Une compétence non gérée existe déjà à l’emplacement {path}.",
+  "error.skill.ownSkillExists":
+    "Cet agent a déjà sa propre compétence nommée {slug}. Demandez à l’agent de renommer ou de supprimer cette compétence, puis ajoutez de nouveau cette compétence.",
   "error.skill.managedSlug":
     "OpenBot donne à chaque agent sa propre compétence {slug}. Donnez un autre nom à cette compétence.",
   "error.skill.templateMarkdownTooLarge": "{name} : SKILL.md dépasse 64 Ko. Raccourcissez-le avant la publication.",

@@ -50,7 +50,11 @@ export function FontSelect(props: FontSelectProps): JSX.Element {
       onChange={(option) => props.onChange(option.font)}
       label={label}
       optionValue={(option) => (option.font === null ? "default" : `font:${option.font}`)}
-      itemContent={(option) => <span style={{ "font-family": fontFamily(option) }}>{label(option)}</span>}
+      itemContent={(option) => (
+        <span class="settings-font-option" style={{ "font-family": fontFamily(option) }}>
+          {label(option)}
+        </span>
+      )}
       aria-labelledby={props["aria-labelledby"]}
       mount={props.mount}
     />

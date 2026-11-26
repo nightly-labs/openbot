@@ -44,6 +44,7 @@ interface Report {
   googleDrops?: McpServerDrop[];
   blingDrops?: McpServerDrop[];
   aaveDrops?: McpServerDrop[];
+  openmotionDrops?: McpServerDrop[];
   error?: string;
 }
 
@@ -453,6 +454,51 @@ try {
     "Only the server whose enum holds numbers is left out.",
   );
   assert.match(aaveDrops[0]?.detail ?? "", /get_reserve_holders/u, "The report names the tool.");
+
+  const openmotionDrops: McpServerDrop[] = [];
+  const openmotionClient = requireProviderDriver("antigravity").createClient(
+    { executable: googleExecutable, version: "1.5.6", source: "managed" },
+    20_000,
+    {
+      apiKey: () => null,
+      customProviders: () => [],
+      mcpServers: () => [
+        httpServer("atlas", "atlas", "https://atlas.example/mcp"),
+        httpServer("openmotion", "openmotion", "https://openmotion.example/mcp"),
+      ],
+      reportMcpDrops: (_provider, dropped) => openmotionDrops.push(...dropped),
+    },
+  );
+  clients.push(openmotionClient);
+  openmotionClient.start();
+  const openmotionWorkspace = join(root, "openmotion-workspace");
+  await mkdir(openmotionWorkspace, { recursive: true });
+  report.openmotionDrops = openmotionDrops;
+  for (const [name, text] of [
+    ["googleRefusedTypelessEnum", "Reply with OK only."],
+    ["googleRefusedTypelessEnumAnswer", "CLI_1_5_9 Reply with OK only."],
+  ] as const) {
+    const dropsBefore = openmotionDrops.length;
+    const openmotionThread = await startThread(openmotionClient, { cwd: openmotionWorkspace });
+    const openmotionTurn = await runTurn(openmotionClient, openmotionThread, { text, timeoutMs: 30_000 });
+    report.turns[name] = openmotionTurn;
+    assert.equal(openmotionTurn.error, null, "The turn that Google refused for an enum with no type has no error.");
+    assert.equal(openmotionTurn.reply, "OK", "The turn answers without the server.");
+    assert.deepEqual(
+      openmotionDrops.slice(dropsBefore).map((drop) => drop.name),
+      ["openmotion"],
+      "Only the server of the tool that Google names is left out.",
+    );
+    assert.match(openmotionDrops.at(-1)?.detail ?? "", /openmotion_restore_version/u, "The report names the tool.");
+    const openmotionPrompts = (await readJsonl<RefusedEntry>(googleLog)).filter(
+      (entry) => entry.method === "session/prompt" && entry.sessionId === openmotionThread,
+    );
+    assert.deepEqual(
+      openmotionPrompts.map((entry) => entry.refused),
+      ["openmotion", null],
+      "The prompt runs once more, and then without the refused server.",
+    );
+  }
 
   const listCauses = new Map<string, string | null>();
   const listAgent = async (name: string, env: Record<string, string>) => {

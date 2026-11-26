@@ -75,6 +75,7 @@ interface OpenCodeConfig {
   readonly permission?: OpenCodePermissionLayer;
   readonly provider?: Readonly<Record<string, OpenCodeProviderEntry | OpenCodeKeyEntry>>;
   readonly providers?: Readonly<Record<string, OpenCodeNativeProviderEntry>>;
+  readonly experimental?: { readonly image_generate: false; readonly video_generate: false };
 }
 
 export type OpenCodeConfigBase = Omit<OpenCodeConfig, "agent" | "provider" | "providers">;
@@ -83,7 +84,7 @@ const OPENCODE_TITLE_OFF = { title: { disable: true } } as const;
 
 export const OPENCODE_PROFILE_CONFIG: OpenCodeConfigBase = { permission: { "*": "deny", bash: "ask", read: "ask" } };
 
-export const OPENCODE_AGENT_CONFIG: OpenCodeConfigBase = {
+const OPENCODE_AGENT_CONFIG: OpenCodeConfigBase = {
   permission: {
     "opencode_session_*": "deny",
     "opencode_worktree_*": "deny",
@@ -92,9 +93,15 @@ export const OPENCODE_AGENT_CONFIG: OpenCodeConfigBase = {
   },
 };
 
+const OPENCODE_MEDIA_TOOLS_OFF = { image_generate: false, video_generate: false } as const;
+
+export function openCodeAgentConfig(mediaSignIn: boolean): OpenCodeConfigBase {
+  return mediaSignIn ? OPENCODE_AGENT_CONFIG : { ...OPENCODE_AGENT_CONFIG, experimental: OPENCODE_MEDIA_TOOLS_OFF };
+}
+
 const OPENCODE_CONFIG_ENV = "OPENCODE_CONFIG_CONTENT";
 
-const OPENCODE_GO_PROVIDER = "opencode-go";
+export const OPENCODE_GO_PROVIDER = "opencode-go";
 
 const OPENCODE_GO_ADVICE = "OpenCode listed no model. Add an OpenCode Go key to continue.";
 
@@ -170,6 +177,12 @@ function modelEntry(model: CustomProviderModel, withoutReasoning: boolean): Open
   };
 }
 
+export function hasCustomProviderCredentials(providers: readonly CustomProviderConfig[]): boolean {
+  return providers.some(
+    (provider) => provider.models.length > 0 && (Boolean(provider.apiKey) || provider.headers.length > 0),
+  );
+}
+
 function customProviderEntries(
   providers: readonly CustomProviderConfig[],
 ): Readonly<Record<string, OpenCodeProviderEntry>> | null {
@@ -243,6 +256,10 @@ function mergeOpenCodeConfig(
     ...(Object.keys(entries).length > 0 ? { provider: entries } : {}),
     ...(native ? { providers: native } : {}),
   };
+}
+
+export function clearedInheritedOpenCodeKeyEnv(apiKey: string | null): Record<string, string> {
+  return apiKey && process.env.OPENCODE_API_KEY?.trim() ? { OPENCODE_API_KEY: "" } : {};
 }
 
 export function openCodeConfigEnv(

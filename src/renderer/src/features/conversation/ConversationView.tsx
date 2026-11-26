@@ -35,7 +35,7 @@ export function ConversationView(props: ConversationProps) {
     sidePanelOpen,
     sideSplits,
     handleChatSearchShortcut,
-    sendSelectionInstruction,
+    sendMessageSelection,
     quoteSelection,
     setConversationPanelElement,
     setDropActive,
@@ -88,7 +88,7 @@ export function ConversationView(props: ConversationProps) {
       <main
         ref={(element) => {
           setConversationPanelElement(element);
-          element.addEventListener("drop", () => setDropActive(false), { capture: true });
+          element.addEventListener("drop", () => setTimeout(() => setDropActive(false)), { capture: true });
         }}
         aria-label={t("conversation.view.label")}
         onKeyDown={handleChatSearchShortcut}
@@ -120,7 +120,7 @@ export function ConversationView(props: ConversationProps) {
         <MessageSelectionActions
           contextKey={conversationOwnerId(props)}
           disabled={!conversationOwnerId(props) || props.channel?.readOnly() === true || !agentReady() || submitting()}
-          onSend={sendSelectionInstruction}
+          onSend={sendMessageSelection}
           onQuote={quoteSelection}
           quoteShortcut={deviceQuoteShortcut(props.platform)}
         />

@@ -122,7 +122,7 @@ export async function routeVault(
       case VAULT_V4_ROUTES.codes:
         return json(200, await runCauseEffect(vault.codes()));
       default:
-        return answer(vault.state());
+        return answer(await runCauseEffect(vault.reload()));
     }
   } catch (error) {
     if (error instanceof Error && !(error instanceof HttpError) && isFixedSourceText(error.message))

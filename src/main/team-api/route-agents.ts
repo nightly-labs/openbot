@@ -119,7 +119,7 @@ export async function routeAgents(
       !agents.listAgents().some((agent) => agent.id === input.agentId)
     )
       throw new HttpError(404, sourceText("error.team.agentNotFound"));
-    const { skills: _localOnly, ...report } = agents.getHostAnalytics(input);
+    const { skills: _localOnly, ...report } = await runCauseEffect(agents.getHostAnalytics(input));
     return json(
       200,
       workflows ? report : { ...report, agents: report.agents.filter((row) => row.agentId !== WORKFLOWS_USAGE_ID) },
@@ -197,7 +197,11 @@ export async function routeAgents(
     const models = (await agents.listModels())
       .filter((model) => modelId.test(model.id))
       .map(({ steersTurns: _steersTurns, ...model }) => model);
-    if (!visibleModels) return json(200, models);
+    if (!visibleModels)
+      return json(
+        200,
+        models.map(({ listing: _listing, ...model }) => model),
+      );
     const listed = await runCauseEffect(visibleModels.picker(models));
     return json(
       200,

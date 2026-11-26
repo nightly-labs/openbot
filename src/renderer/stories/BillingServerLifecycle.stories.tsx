@@ -25,7 +25,6 @@ interface PreviewServer {
   running: boolean;
   cancelAtPeriodEnd: boolean;
   scheduled: boolean;
-  deleted: boolean;
 }
 
 interface LifecycleStoryProps {
@@ -33,7 +32,6 @@ interface LifecycleStoryProps {
   scheduled?: boolean;
   cancelled?: boolean;
   action?: BillingServerLifecycleAction;
-  timing?: "period-end" | "now";
   pending?: boolean;
   error?: boolean;
   failNext?: boolean;
@@ -58,7 +56,6 @@ function previewServers(): PreviewServer[] {
       running: true,
       cancelAtPeriodEnd: false,
       scheduled: false,
-      deleted: false,
     },
     {
       id: "team",
@@ -70,7 +67,6 @@ function previewServers(): PreviewServer[] {
       running: true,
       cancelAtPeriodEnd: true,
       scheduled: true,
-      deleted: false,
     },
     {
       id: "archive",
@@ -82,7 +78,6 @@ function previewServers(): PreviewServer[] {
       running: false,
       cancelAtPeriodEnd: true,
       scheduled: false,
-      deleted: false,
     },
   ];
 }
@@ -100,7 +95,6 @@ function LifecycleStory(props: LifecycleStoryProps) {
       servers: props.single ? servers.slice(0, 1) : servers,
       activeServerId: "research",
       action: props.action ?? null,
-      timing: props.timing ?? "period-end",
       confirmName: props.pending || props.error ? "Research" : "",
       error: props.error ? t("billing.lifecycle.failed") : null,
       failNext: props.failNext ?? false,
@@ -130,8 +124,7 @@ function LifecycleStory(props: LifecycleStoryProps) {
       if (!target) return;
       if (draft.action === "delete") {
         target.cancelAtPeriodEnd = true;
-        if (draft.timing === "now") target.deleted = true;
-        else target.scheduled = true;
+        target.scheduled = true;
       } else if (draft.action === "cancel") {
         target.cancelAtPeriodEnd = true;
       } else if (draft.action === "keep") {
@@ -168,9 +161,7 @@ function LifecycleStory(props: LifecycleStoryProps) {
                   running={server.running}
                   scheduled={server.scheduled}
                   cancelAtPeriodEnd={server.cancelAtPeriodEnd}
-                  deleted={server.deleted}
                   action={state.activeServerId === server.id ? state.action : null}
-                  deletionTiming={state.timing}
                   confirmName={state.confirmName}
                   pending={props.pending ?? false}
                   error={state.activeServerId === server.id ? state.error : null}
@@ -178,14 +169,7 @@ function LifecycleStory(props: LifecycleStoryProps) {
                     setState((draft) => {
                       draft.activeServerId = server.id;
                       draft.action = action;
-                      draft.timing = "period-end";
                       draft.confirmName = "";
-                      draft.error = null;
-                    })
-                  }
-                  onTimingChange={(timing) =>
-                    setState((draft) => {
-                      draft.timing = timing;
                       draft.error = null;
                     })
                   }
@@ -235,7 +219,6 @@ export const RenewalCancelled: Story = { args: { single: true, cancelled: true }
 export const ScheduledDeletion: Story = { args: { single: true, scheduled: true } };
 export const KeepServer: Story = { args: { scheduled: true, action: "keep" } };
 export const DeleteServer: Story = { args: { action: "delete" } };
-export const DeleteNow: Story = { args: { action: "delete", timing: "now" } };
 export const Pending: Story = { args: { action: "cancel", pending: true } };
 export const RequestError: Story = { args: { action: "cancel", error: true } };
 export const FailedAction: Story = { args: { failNext: true } };

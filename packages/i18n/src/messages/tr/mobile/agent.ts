@@ -389,11 +389,12 @@ export const messages = {
   "mobile.agent.backupModels.remove": "{model} modelini kaldır",
   "mobile.agent.backupModels.unavailable": "Şu an uygun değil · atlandı",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Bir kullanım sınırı {name} işe başladıktan sonra onu durdurursa, {name} aynı işe sıradaki ilk kullanılabilir modelle devam eder. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
   "mobile.agent.busyMessage.label": "Çalışırken",
   "mobile.agent.busyMessage.footer":
-    "Ajan çalışırken gönderdiğiniz bir mesajın ne olacağı. Kuyruk, mesajı tur bitene kadar tutar. Yönlendir, mesajı tur sırasında ajana verir.",
+    "Ajan çalışırken sizden veya başka bir ajandan gelen bir mesajın ne olacağı. Kuyruk, mesajı tur bitene kadar tutar. Yönlendir, mesajı tur sırasında ajana verir.",
   "mobile.agent.busyMessage.queue": "Kuyruk",
   "mobile.agent.busyMessage.steer": "Yönlendir",
   "mobile.agent.busyMessage.hostDefaultQueue": "Ana makine varsayılanı (Kuyruk)",
@@ -705,6 +706,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Hariç tutma",
   "mobile.agent.folders.browseTitle": "Klasör seç",
   "mobile.agent.folders.places": "Git",
+  "mobile.agent.folders.path": "Klasör yolu",
   "mobile.agent.folders.home": "Ana klasör",
   "mobile.agent.folders.parent": "Yukarı: {folder}",
   "mobile.agent.folders.browseFailed": "Bu klasör açılamadı.",

@@ -410,11 +410,12 @@ export const messages = {
   "mobile.agent.backupModels.remove": "إزالة {model}",
   "mobile.agent.backupModels.unavailable": "غير متاح الآن · مُتخطى",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "عندما يوقف حدّ الاستخدام {name} بعد أن يبدأ العمل، يتابع {name} العمل نفسه على أول نموذج متاح في الترتيب. يعود إلى {model} عند انتهاء الحد، أو بعد 10 دقائق من خطأ المزوّد.",
   "mobile.agent.busyMessage.label": "أثناء العمل",
   "mobile.agent.busyMessage.footer":
-    "ما تفعله الرسالة عندما ترسلها أثناء عمل الوكيل. «قائمة الانتظار» تحتفظ بها حتى ينتهي الدور. «توجيه» تعطيها للوكيل أثناء الدور.",
+    "ما تفعله رسالة منك أو من وكيل آخر تصل أثناء عمل الوكيل. «قائمة الانتظار» تحتفظ بها حتى ينتهي الدور. «توجيه» تعطيها للوكيل أثناء الدور.",
   "mobile.agent.busyMessage.queue": "قائمة الانتظار",
   "mobile.agent.busyMessage.steer": "توجيه",
   "mobile.agent.busyMessage.hostDefaultQueue": "الإعداد الافتراضي للمضيف (قائمة الانتظار)",
@@ -775,6 +776,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "إيقاف الاستبعاد",
   "mobile.agent.folders.browseTitle": "اختر مجلدًا",
   "mobile.agent.folders.places": "انتقال إلى",
+  "mobile.agent.folders.path": "مسار المجلد",
   "mobile.agent.folders.home": "المجلد الرئيسي",
   "mobile.agent.folders.parent": "صعودًا إلى {folder}",
   "mobile.agent.folders.browseFailed": "تعذّر فتح هذا المجلد.",

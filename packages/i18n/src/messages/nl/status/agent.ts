@@ -14,6 +14,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} heeft geen tegoed meer. Overgeschakeld naar {model}. Voeg tegoed toe en selecteer het daarna om het weer te gebruiken.",
   "status.agent.modelReturnedAfterError": "Teruggeschakeld naar {model} na de fout bij de aanbieder.",
+  "status.agent.modelSwitchedForRemovedModel": "{previous} is niet meer beschikbaar. Overgeschakeld naar {model}.",
   "status.agent.marketplaceSuggested": "Een app uit de marktplaats voorgesteld: {app}.",
   "status.agent.settingShown": "Een instelling getoond: {setting}.",
   "status.agent.channelMemberAdded": "{agent} heeft {member} aan het kanaal toegevoegd. {person} vroeg erom.",
@@ -27,6 +28,12 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Het hoofdscherm vastleggen en de afbeelding naar het model van de agent sturen.",
   "status.agent.screenCaptureChannel":
     "De afbeelding verschijnt in het kanaal {channel}, en elk lid van deze server dat het kanaal leest, kan haar zien.",
+  "status.agent.creditImageApproval": "Een afbeelding maken met {model}. Dit kost {credits} credits.",
+  "status.agent.creditVideoApproval": "Een video maken met {model}. Dit kost {credits} credits.",
+  "status.agent.creditMediaChannel":
+    "Het resultaat verschijnt in het kanaal {channel}, en elk lid van deze server dat het kanaal leest, kan het zien.",
+  "status.agent.creditsHoldBalance": "Dit gebruikt {credits} credits en het saldo is {balance} credits.",
+  "status.agent.creditsHoldAgentsOff": "Agents op deze server kunnen geen credits gebruiken.",
   "status.agent.screenCapturePermissionNext": "macOS kan je daarna vragen om schermopname toe te staan voor OpenBot.",
   "status.agent.screenCaptureDisplay":
     "Het beeldscherm {name} vastleggen en de afbeelding naar het model van de agent sturen.",
@@ -65,6 +72,18 @@ export const messages = {
   "status.agent.workflowDelete": "Verwijder de workflow {title} met zijn runs en versies. Zijn open stappen stoppen.",
   "status.agent.deleteAgents": "Verwijder {agents} met hun chats en bestanden. Je kunt dit niet ongedaan maken.",
   "status.agent.vaultCardFillFrames": "De kaartvelden staan in frames van {origins}.",
+  "status.agent.nearSignatureReceived": "OpenBot heeft de handtekening ontvangen. Je kunt dit tabblad sluiten.",
+  "status.agent.nearSignatureUnknown": "OpenBot wacht niet op deze handtekening. Start het opnieuw in OpenBot.",
+  "status.agent.nearPayment": "Betaal {amount} {symbol} aan {recipient} uit de cryptowallet, voor {domain}: {reason}",
+  "status.agent.nearSummaryCreate":
+    "Alle agents kunnen tot {amount} USD per dag betalen. Je kunt dit later wijzigen in OpenBot.",
+  "status.agent.nearSummaryGrant": "Laat deze OpenBot-app {days} dagen uit de wallet betalen, binnen je regels.",
+  "status.agent.nearSummaryBudget": "Wijzig het dagbudget van de wallet naar {amount} USD.",
+  "status.agent.nearSummaryAutoPay":
+    "Laat OpenBot zonder je handtekening betalen als een betaalregel dat toestaat. Voor andere betalingen krijg je nog steeds een vraag in de chat.",
+  "status.agent.nearSummaryPayment": "Keur de betaling van {amount} aan {recipient} goed.",
+  "status.agent.nearSummaryFreeze": "Agents kunnen niet uit deze wallet betalen tot je de betalingen hervat.",
+  "status.agent.nearSummaryUnfreeze": "Agents kunnen weer uit deze wallet betalen, binnen je regels.",
   "status.agent.screenCaptureProgress": "Vraagt om het scherm vast te leggen…",
   "status.agent.screenCaptureReviewing": "Bekijkt de schermopname…",
   "status.agent.browserOpening": "Opent een webpagina…",
@@ -72,6 +91,7 @@ export const messages = {
   "status.agent.browserClicking": "Klikt op de webpagina…",
   "status.agent.browserTyping": "Typt op de webpagina…",
   "status.agent.browserActing": "Gebruikt de webpagina…",
+  "status.agent.browserPaying": "Betaling wordt verzonden…",
   "status.agent.browserReviewing": "Bekijkt de webpagina…",
   "status.agent.memoriesSearching": "Doorzoekt de herinneringen…",
   "status.agent.chatsSearching": "Doorzoekt eerdere chats…",
@@ -133,6 +153,10 @@ export const messages = {
   "status.agent.apiKeyScope.label": "Opslaan voor",
   "status.agent.apiKeyScope.vault": "Alle agents (Kluis)",
   "status.agent.apiKeyScope.agent": "Alleen deze agent",
+  "status.agent.location.field": "Je locatie",
+  "status.agent.location.placeholder": "Stad, adres of plaats",
+  "status.agent.location.submit": "Delen",
+  "status.agent.location.shared": "Locatie gedeeld",
   "status.agent.vaultExpiryHint": "MM/JJ",
   "status.agent.vaultField.website": "Website",
   "status.agent.vaultField.username": "Gebruikersnaam of e-mail",
@@ -154,12 +178,10 @@ export const messages = {
   "status.agent.nextStepContinues": "De agent stopte vóór de volgende stap en gaat verder ({current} van {limit}).",
   "status.agent.planContinues": "Het plan heeft open stappen. De agent gaat verder ({current} van {limit}).",
   "status.agent.planStopped": "De agent is gestopt met open stappen in het plan. Stuur een bericht om verder te gaan.",
+  "status.agent.continuationLimitReached":
+    "De agent is gestopt voordat de aanvraag klaar was. Hij kan niet nog een keer zelf verdergaan. Stuur een bericht om verder te gaan.",
   "status.agent.compactionContinues":
     "De verbinding viel weg terwijl de agent zijn context comprimeerde. De agent gaat verder.",
   "status.agent.providerExitContinues": "De agent stopte voordat zijn antwoord klaar was. De agent gaat verder.",
   "status.agent.branchTitle": "Afgetakte chat",
-  "status.agent.location.field": "Je locatie",
-  "status.agent.location.placeholder": "Stad, adres of plaats",
-  "status.agent.location.submit": "Delen",
-  "status.agent.location.shared": "Locatie gedeeld",
 } as const satisfies PartialTranslation<typeof source>;

@@ -40,6 +40,7 @@ export const messages = {
   "mcp.status.signedIn": "サインイン済み",
   "mcp.status.signingIn": "サインイン中…",
   "mcp.status.signInNeeded": "サインインが必要",
+  "mcp.status.signInAppNeeded": "サインインアプリが必要",
   "mcp.status.refused": "拒否されました",
   "mcp.status.checkUrl": "URL を確認",
   "mcp.status.noAnswer": "応答なし",

@@ -73,6 +73,7 @@ export interface ProviderHistoryImportInput {
   quietTeammateThread?: boolean;
   continuesQuietRun?(delivery: DeliveryContext["delivery"]): boolean;
   requestAnswered?(deliveryId: string): boolean;
+  followsUpOwnAnswer?(delivery: DeliveryContext["delivery"]): boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -242,7 +243,12 @@ function importCompletedTurn(
         ? yield* routineTurnAnswers(input, fragment.turnId)
         : "none";
     const keep = routine === "none" ? null : keptRoutineMessage(routine, input.provider);
-    const liveTurnId = fragment.liveTurnId ?? fragment.turnId;
+    const liveTurnId =
+      fragment.liveTurnId ??
+      (input.provider === "claude"
+        ? storedPromptTurnId(input.database, input.publicThreadId, fragment.turnId)
+        : null) ??
+      fragment.turnId;
     const toLiveTurn = (message: ConversationMessage): ConversationMessage =>
       liveTurnId !== fragment.turnId && message.turnId === fragment.turnId
         ? { ...message, turnId: liveTurnId }
@@ -334,6 +340,7 @@ function routineTurnAnswers(
   input: ProviderHistoryImportInput,
   turnId: string,
 ): Effect.Effect<RoutineTurnAnswers, ProviderClientOperationError> {
+  const followsUpOwnAnswer = (delivery: DeliveryContext["delivery"]) => input.followsUpOwnAnswer?.(delivery) === true;
   return Effect.gen(function* () {
     let routine: boolean | undefined;
     let requestsOnly = true;
@@ -359,7 +366,11 @@ function routineTurnAnswers(
           routine =
             delivery !== undefined &&
             ((input.quietTeammateThread === true &&
-              quietTeammateTurnDelivery(delivery, (request) => input.requestAnswered?.(request.id) === true)) ||
+              quietTeammateTurnDelivery(
+                delivery,
+                (request) => input.requestAnswered?.(request.id) === true,
+                followsUpOwnAnswer,
+              )) ||
               (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)) ||
               continuesQuietRun);
           requestsOnly &&= delivery !== undefined && teammateRequest(delivery);
@@ -409,6 +420,23 @@ function keptRoutineMessage(routine: Exclude<RoutineTurnAnswers, "none">, provid
     if (routine === "image") return isTextAnswer(message) ? [] : [message];
     return message.itemType === "commentary" || !isNoUpdateAnswer(message.text) ? [message] : [];
   };
+}
+
+function storedPromptTurnId(
+  database: ProviderHistoryImportDatabase,
+  threadId: string,
+  messageId: string,
+): string | null {
+  const row = databaseRow(
+    database.connection
+      .prepare(
+        `SELECT turn_id FROM projection_thread_messages
+         WHERE thread_id = ? AND message_id = ? AND author <> 'assistant' AND turn_id IS NOT NULL
+         LIMIT 1`,
+      )
+      .get(threadId, messageId),
+  );
+  return row ? requiredStringColumn(row, "turn_id") : null;
 }
 
 function readStoredTurnMessages(

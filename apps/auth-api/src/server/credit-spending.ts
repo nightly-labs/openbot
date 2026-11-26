@@ -5,10 +5,9 @@ import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit } from "effect";
 import { type AccountAnalytics, type CreditActionEvent, NO_ACCOUNT_ANALYTICS } from "./account-analytics";
 import { BillingError, type BillingOperationError, billingCall } from "./billing-errors";
-import { consumeGrantsSql } from "./credit-grants";
+import { consumeGrantsSql, type WalletColumn, welcomeTenthsSql } from "./credit-grants";
 
 type Failure = BillingError | BillingOperationError;
-type WalletColumn = "user_id" | "server_id";
 
 export const CREDIT_HOLD_START_GRACE_MS = 10 * 60 * 1_000;
 export const CREDIT_HOLD_FIRST_CHECK_MS = 15 * 60 * 1_000;
@@ -19,6 +18,7 @@ const SWEEP_BATCH = 50;
 
 export type CreditWallet = { userId: string } | { serverId: string };
 type CreditHoldStatus = "held" | "charged" | "released";
+type CreditHoldFunding = "paid" | "welcome";
 export type CreditHoldOutcome = "completed" | "failed" | "canceled" | "refused" | "abandoned" | "expired";
 export type CreditJobResult =
   | { outcome: "completed"; charged?: number }
@@ -39,6 +39,8 @@ export interface CreditHoldInput {
   actorUserId: string | null;
   modelId: string;
   credits: number;
+  welcome?: boolean;
+  viaServerId?: string;
 }
 
 export interface CreditHold {
@@ -53,6 +55,8 @@ export interface CreditHold {
   charged: number | null;
   providerJobId: string | null;
   upstream: string | null;
+  funding: CreditHoldFunding;
+  viaServerId: string | null;
 }
 
 export interface CreditSubmitTarget {
@@ -111,6 +115,8 @@ interface HoldRow {
   charged_tenths: number | null;
   provider_job_id: string | null;
   upstream: string | null;
+  funding: string;
+  via_server_id: string | null;
 }
 
 interface DueRow {
@@ -121,6 +127,7 @@ interface DueRow {
   expires_at: number;
 }
 
+const HOLD_FUNDINGS: readonly CreditHoldFunding[] = ["paid", "welcome"];
 const HOLD_STATUSES: readonly CreditHoldStatus[] = ["held", "charged", "released"];
 const HOLD_OUTCOMES: readonly CreditHoldOutcome[] = [
   "completed",
@@ -136,6 +143,10 @@ export function availableTenthsSql(column: WalletColumn, idParam: string): strin
     - (SELECT COALESCE(SUM(credits_tenths), 0) FROM credit_holds WHERE ${column} = ${idParam} AND status = 'held'))`;
 }
 
+export function paidTenthsSql(column: WalletColumn, idParam: string): string {
+  return `(${availableTenthsSql(column, idParam)} - ${welcomeTenthsSql(column, idParam)})`;
+}
+
 export function overdueGrantTenthsSql(column: WalletColumn, idParam: string, nowParam: string): string {
   return `(SELECT COALESCE(SUM(remaining_tenths), 0) FROM credit_grants
     WHERE ${column} = ${idParam} AND status = 'active' AND expires_at <= ${nowParam})`;
@@ -145,10 +156,26 @@ function walletIds(wallet: CreditWallet): { userId: string | null; serverId: str
   return "userId" in wallet ? { userId: wallet.userId, serverId: null } : { userId: null, serverId: wallet.serverId };
 }
 
-function spenderSql(wallet: CreditWallet): string {
-  if ("userId" in wallet) return "?4 IS NOT NULL AND ?4 = ?2 AND EXISTS (SELECT 1 FROM users WHERE id = ?2)";
-  return `EXISTS (SELECT 1 FROM remote_hosts WHERE host_id = ?3) AND (?4 IS NULL OR EXISTS (
-    SELECT 1 FROM remote_memberships m WHERE m.host_id = ?3 AND m.user_id = ?4 AND m.status = 'active'
+interface SpenderParams {
+  user: string;
+  server: string;
+  actor: string;
+  via: string;
+}
+
+const HOLD_SPENDER: SpenderParams = { user: "?2", server: "?3", actor: "?4", via: "?12" };
+const CHECK_SPENDER: SpenderParams = { user: "?1", server: "?2", actor: "?3", via: "?4" };
+
+function spenderSql(wallet: CreditWallet, { user, server, actor, via }: SpenderParams): string {
+  if ("userId" in wallet)
+    return `EXISTS (SELECT 1 FROM users WHERE id = ${user}) AND CASE
+      WHEN ${via} IS NULL THEN ${actor} IS NOT NULL AND ${actor} = ${user}
+      ELSE EXISTS (SELECT 1 FROM remote_hosts WHERE host_id = ${via} AND owner_user_id = ${user}) AND (${actor} IS NULL OR ${actor} = ${user} OR EXISTS (
+        SELECT 1 FROM remote_memberships m WHERE m.host_id = ${via} AND m.user_id = ${actor} AND m.status = 'active'
+      ))
+    END`;
+  return `${via} IS NULL AND EXISTS (SELECT 1 FROM remote_hosts WHERE host_id = ${server}) AND (${actor} IS NULL OR EXISTS (
+    SELECT 1 FROM remote_memberships m WHERE m.host_id = ${server} AND m.user_id = ${actor} AND m.status = 'active'
   ))`;
 }
 
@@ -165,6 +192,8 @@ function toHold(row: HoldRow): CreditHold {
     charged: row.charged_tenths === null ? null : creditsFromTenths(row.charged_tenths),
     providerJobId: row.provider_job_id,
     upstream: row.upstream,
+    funding: isOneOf(HOLD_FUNDINGS, row.funding) ? row.funding : "paid",
+    viaServerId: row.via_server_id,
   };
 }
 
@@ -174,6 +203,7 @@ function sameRequest(hold: CreditHold, input: CreditHoldInput): boolean {
     hold.userId === ids.userId &&
     hold.serverId === ids.serverId &&
     hold.actorUserId === input.actorUserId &&
+    hold.viaServerId === (input.viaServerId ?? null) &&
     hold.modelId === input.modelId &&
     creditTenths(hold.credits) === creditTenths(input.credits)
   );
@@ -233,15 +263,19 @@ export class CreditSpending {
     const ids = walletIds(input.wallet);
     const column: WalletColumn = ids.userId === null ? "server_id" : "user_id";
     const now = this.#now();
+    const welcome = `(?11 = 1 AND ${welcomeTenthsSql(column, "?10")} >= ?6)`;
+    const viaServerId = "userId" in input.wallet ? (input.viaServerId ?? null) : null;
     yield* billingCall(() =>
       this.#database
         .prepare(
           `INSERT INTO credit_holds(
-             job_id, user_id, server_id, actor_user_id, model_id, credits_tenths, created_at, check_at, expires_at
+             job_id, user_id, server_id, actor_user_id, model_id, credits_tenths, created_at, check_at, expires_at,
+             funding, via_server_id
            )
-           SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
-            WHERE ${spenderSql(input.wallet)}
-              AND ${availableTenthsSql(column, "?10")} - ${overdueGrantTenthsSql(column, "?10", "?7")} >= ?6
+           SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, CASE WHEN ${welcome} THEN 'welcome' ELSE 'paid' END, ?12
+            WHERE ${spenderSql(input.wallet, HOLD_SPENDER)}
+              AND (${welcome} OR (?12 IS NULL
+                AND ${paidTenthsSql(column, "?10")} - ${overdueGrantTenthsSql(column, "?10", "?7")} >= ?6))
            ON CONFLICT(job_id) DO NOTHING`,
         )
         .bind(
@@ -255,6 +289,8 @@ export class CreditSpending {
           now + CREDIT_HOLD_FIRST_CHECK_MS,
           now + CREDIT_HOLD_LIMIT_MS,
           ids.userId ?? ids.serverId,
+          input.welcome === true ? 1 : 0,
+          viaServerId,
         )
         .run(),
     );
@@ -265,8 +301,8 @@ export class CreditSpending {
     }
     const allowed = yield* billingCall(() =>
       this.#database
-        .prepare(`SELECT 1 AS allowed WHERE ${spenderSql(input.wallet)}`)
-        .bind(null, ids.userId, ids.serverId, input.actorUserId)
+        .prepare(`SELECT 1 AS allowed WHERE ${spenderSql(input.wallet, CHECK_SPENDER)}`)
+        .bind(ids.userId, ids.serverId, input.actorUserId, viaServerId)
         .first<{ allowed: number }>(),
     );
     if (!allowed)
@@ -374,7 +410,7 @@ export class CreditSpending {
         this.#database
           .prepare(
             consumeGrantsSql(
-              `SELECT user_id, server_id, charged_tenths AS tenths, created_at FROM credit_holds
+              `SELECT user_id, server_id, funding, charged_tenths AS tenths, created_at FROM credit_holds
                 WHERE job_id = ?1 AND status = 'charged'
                   AND NOT EXISTS (SELECT 1 FROM credit_ledger WHERE entry_id = 'spend:' || ?1)`,
             ),
@@ -405,7 +441,7 @@ export class CreditSpending {
       this.#database
         .prepare(
           `SELECT job_id, user_id, server_id, actor_user_id, model_id, credits_tenths, status, outcome, charged_tenths,
-                  provider_job_id, upstream
+                  provider_job_id, upstream, funding, via_server_id
              FROM credit_holds WHERE job_id = ?`,
         )
         .bind(jobId)

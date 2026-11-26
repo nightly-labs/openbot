@@ -35,6 +35,7 @@ export interface QueueControlsHooks {
   tagReferences(agentId: string, threadId: string | null): TagReferenceSource;
   liveVoiceRelayed(deliveryId: string): LiveVoiceRelayed | null;
   fromChrome(deliveryId: string): boolean;
+  turnSession(turnId: string): string | undefined;
 }
 
 export interface QueueControlsOptions {
@@ -248,18 +249,22 @@ export class QueueControls {
     busyModeSteer = false,
   ) {
     const agent = yield* this.#store.existing(input.agentId).pipe(toQueueOperationFailed);
-    const { client, session, snapshot, context, turnId, routineSession, publicThreadId, turnModel } = yield* queueStep(
+    const { client, session, snapshot, context, turnId, routineTurn, publicThreadId, turnModel } = yield* queueStep(
       () => {
         const client = this.#providers.requireReadyClientForAgent(agent);
         const taskThreadId = this.#hooks.taskThreadId(input.deliveryId);
         const publicThreadId = taskThreadId ?? agent.threadId;
         const routineSession = publicThreadId ? this.#conversation.routineSession(agent.id, publicThreadId) : undefined;
-        const session =
-          routineSession ??
-          (taskThreadId
-            ? this.#store.database.activeProviderSession(taskThreadId, agent.provider)?.externalSessionId
-            : this.#store.activeProviderSession(agent.id)?.externalSessionId);
         const snapshot = this.#conversation.ensureSnapshot(agent.id, taskThreadId ?? agent.threadId);
+        const activeTurnSession = snapshot.activeTurnId ? this.#hooks.turnSession(snapshot.activeTurnId) : undefined;
+        const routineTurn =
+          routineSession !== undefined &&
+          (activeTurnSession === undefined || this.#conversation.isRoutineSession(activeTurnSession));
+        const session = routineTurn
+          ? routineSession
+          : taskThreadId
+            ? this.#store.database.activeProviderSession(taskThreadId, agent.provider)?.externalSessionId
+            : this.#store.activeProviderSession(agent.id)?.externalSessionId;
         if (!session || !snapshot.activeTurnId || snapshot.activeTurnId !== input.expectedTurnId)
           throw new Error(sourceText("error.backend.steerTurnChanged"));
         if (this.#hooks.channelAssignment(input.deliveryId))
@@ -271,10 +276,10 @@ export class QueueControls {
         const turnModel = this.#drain.modelForTurn(agent.id, turnId) ?? agent.model;
         if (!this.#endpoints.servesClient(turnModel, client.provider, this.#providers.configRevision(client)))
           throw new Error(REMOVED_ENDPOINT_MESSAGE);
-        return { client, session, snapshot, context, turnId, routineSession, publicThreadId, turnModel };
+        return { client, session, snapshot, context, turnId, routineTurn, publicThreadId, turnModel };
       },
     );
-    if (routineSession) {
+    if (routineTurn) {
       yield* this.#mailbox.markSteerFallback(input.deliveryId, "steer-failed").pipe(toQueueOperationFailed);
       this.#mailboxSync.emitQueue(agent.id);
       return yield* new QueueOperationFailed({
@@ -298,7 +303,11 @@ export class QueueControls {
     const steersQuietTurn =
       turnDeliveries.length > 0 &&
       turnDeliveries.every(({ delivery }) =>
-        quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id)),
+        quietTeammateTurnDelivery(
+          delivery,
+          (request) => this.#mailbox.hasOwnReplyFrom(request.id),
+          (follow) => this.#mailbox.followsUpOwnAnswer(follow),
+        ),
       );
     yield* client
       .request(
@@ -327,6 +336,7 @@ export class QueueControls {
                   ? this.#routines.timezoneForDelivery(input.deliveryId)
                   : undefined,
               answeredRoutine: this.#drain.answeredRoutine(context.delivery),
+              followsUpOwnAnswer: this.#mailbox.followsUpOwnAnswer(context.delivery),
               taskReport: this.#drain.taskReport(context),
               taskReportWaiting: this.#drain.taskReportWaiting(context),
               tags: this.#hooks.tagReferences(agent.id, publicThreadId),
