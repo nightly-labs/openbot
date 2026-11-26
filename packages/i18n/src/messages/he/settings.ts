@@ -239,7 +239,8 @@ export const messages = {
   "settings.notch.xwayland.title": "נדרשת הפעלה מחדש",
   "settings.notch.xwayland.description":
     "ב-Wayland, ‏OpenBot צריך להשתמש ב-XWayland כדי להציג את ה-Dynamic Island מעל אפליקציות אחרות. עד אז, האי לא מוצג.",
-  "settings.notch.xwayland.unsupported": "ב-Wayland בלי XWayland, ה-Dynamic Island לא יכול להופיע מעל אפליקציות אחרות.",
+  "settings.notch.xwayland.unsupported":
+    "בשולחן העבודה הזה של Wayland, ה-Dynamic Island לא יכול להופיע מעל אפליקציות אחרות.",
   "settings.notch.xwayland.restart": "הפעלה מחדש",
   "settings.notch.idle.title": "הצגת האי במצב סרק",
   "settings.notch.idle.description": "הצגת הלוגו של OpenBot וברכה כשאין סטטוס פעיל.",
@@ -268,7 +269,7 @@ export const messages = {
   "settings.agentDock.xwayland.description":
     "ב-Wayland, ‏OpenBot צריך להשתמש ב-XWayland כדי להציג את המעגן מעל אפליקציות אחרות. עד אז, המעגן מוצג בחלון OpenBot.",
   "settings.agentDock.xwayland.unsupported":
-    "ב-Wayland בלי XWayland, המעגן לא יכול להופיע מעל אפליקציות אחרות. הוא מוצג בחלון OpenBot.",
+    "בשולחן העבודה הזה של Wayland, המעגן לא יכול להופיע מעל אפליקציות אחרות. הוא מוצג בחלון OpenBot.",
   "settings.agentDock.xwayland.restart": "הפעלה מחדש",
   "settings.agentDock.noCompositor.title": "מוצג בחלון OpenBot",
   "settings.agentDock.noCompositor.description":

@@ -248,7 +248,7 @@ export const messages = {
   "settings.notch.xwayland.description":
     "على Wayland، يجب أن يستخدم OpenBot ‏XWayland ليعرض Dynamic Island فوق التطبيقات الأخرى. حتى ذلك الحين، لا تظهر الجزيرة.",
   "settings.notch.xwayland.unsupported":
-    "على Wayland بدون XWayland، لا يمكن أن تظهر Dynamic Island فوق التطبيقات الأخرى.",
+    "على سطح مكتب Wayland هذا، لا يمكن أن تظهر Dynamic Island فوق التطبيقات الأخرى.",
   "settings.notch.xwayland.restart": "إعادة التشغيل",
   "settings.notch.idle.title": "عرض الجزيرة في وضع الخمول",
   "settings.notch.idle.description": "عرض شعار OpenBot والتحية عند عدم وجود حالة نشطة.",
@@ -278,7 +278,7 @@ export const messages = {
   "settings.agentDock.xwayland.description":
     "على Wayland، يجب أن يستخدم OpenBot ‏XWayland ليعرض الشريط فوق التطبيقات الأخرى. حتى ذلك الحين، يظهر الشريط في نافذة OpenBot.",
   "settings.agentDock.xwayland.unsupported":
-    "على Wayland بدون XWayland، لا يمكن أن يظهر الشريط فوق التطبيقات الأخرى. يظهر في نافذة OpenBot.",
+    "على سطح مكتب Wayland هذا، لا يمكن أن يظهر الشريط فوق التطبيقات الأخرى. يظهر في نافذة OpenBot.",
   "settings.agentDock.xwayland.restart": "إعادة التشغيل",
   "settings.agentDock.noCompositor.title": "معروض في نافذة OpenBot",
   "settings.agentDock.noCompositor.description":
