@@ -26,7 +26,6 @@ export interface GlassLensSettings {
   readonly cycle: readonly GlassShape[];
   readonly size: number;
   readonly refraction: number;
-  readonly dispersion: number;
   readonly color: string;
   readonly tint: number;
   readonly wobble: number;
@@ -119,7 +118,6 @@ const UNIFORMS = [
   "uTurn",
   "uTime",
   "uIor",
-  "uDispersion",
   "uColor",
   "uTint",
 ] as const;
@@ -153,7 +151,6 @@ uniform float uStretch;
 uniform mat3 uTurn;
 uniform float uTime;
 uniform float uIor;
-uniform float uDispersion;
 uniform vec3 uColor;
 uniform float uTint;
 out vec4 outColor;
@@ -171,10 +168,7 @@ struct Hit {
   vec3 p;
   vec3 n;
   vec3 q;
-  vec3 inner;
-  vec3 exitNormal;
   vec3 dir;
-  float escaped;
   float travel;
   float clarity;
 };
@@ -308,7 +302,7 @@ vec2 shadowAt(vec2 point) {
 }
 
 Hit trace(vec3 ro, vec3 rd, float eps) {
-  Hit hit = Hit(0.0, 0.0, vec3(0.0), vec3(0.0, 0.0, 1.0), vec3(0.0), rd, vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0), 0.0, 0.0, 1.0);
+  Hit hit = Hit(0.0, 0.0, vec3(0.0), vec3(0.0, 0.0, 1.0), vec3(0.0), vec3(0.0, 0.0, -1.0), 0.0, 1.0);
   float b = dot(ro, rd);
   float c = dot(ro, ro) - uReach * uReach;
   float disc = b * b - c;
@@ -366,7 +360,6 @@ void crossGlass(inout Hit hit, vec3 rd, float eps) {
       hit.travel += stride;
     }
     vec3 n = normalAt(q);
-    hit.exitNormal = n;
     vec3 outward = refract(dir, -n, uIor);
     if (dot(outward, outward) > 0.0) {
       hit.clarity = dot(outward, n);
@@ -380,9 +373,7 @@ void crossGlass(inout Hit hit, vec3 rd, float eps) {
   if (!escaped) leaving = dir;
   if (leaving.z > -0.2) leaving = normalize(vec3(leaving.xy, -0.2 - abs(leaving.z)));
   hit.q = q;
-  hit.inner = dir;
   hit.dir = leaving;
-  hit.escaped = escaped ? 1.0 : 0.0;
 }
 
 float entryBand(float cosi) {
@@ -412,21 +403,8 @@ vec4 shade(Hit hit, vec3 rd, vec4 back, vec4 tone, vec2 point, vec2 tx, vec2 ty,
   if (band < 1.0) {
     mirror = mirrorOf(hit.p, mirrorDir, point, rx, ry, 1.0);
     vec2 land = landing(hit.q, hit.dir, point);
-    vec4 green = sceneGrad(land, tx, ty);
-    vec4 red = green;
-    vec4 blue = green;
-    if (hit.escaped > 0.5 && uDispersion > 0.0) {
-      float spread = uDispersion * 0.06;
-      vec3 redDir = refract(hit.inner, -hit.exitNormal, uIor - spread);
-      vec3 blueDir = refract(hit.inner, -hit.exitNormal, uIor + spread);
-      if (dot(redDir, redDir) > 0.0 && redDir.z < -0.2) red = sceneGrad(landing(hit.q, redDir, land), tx, ty);
-      if (dot(blueDir, blueDir) > 0.0 && blueDir.z < -0.2) blue = sceneGrad(landing(hit.q, blueDir, land), tx, ty);
-    }
-    vec2 light = lightAt(land) * vec2(0.45, 0.12);
-    red = lit(red, light);
-    green = lit(green, light);
-    blue = lit(blue, light);
-    through = mix(vec4(red.r, green.g, blue.b, green.a), tone, band);
+    vec4 seen = lit(sceneGrad(land, tx, ty), lightAt(land) * vec2(0.45, 0.12));
+    through = mix(seen, tone, band);
     mirror = mix(mirror, tone, band);
   }
   vec3 absorb = pow(max(uColor, vec3(0.001)), vec3(uTint * 1.6 * hit.travel));
@@ -882,7 +860,6 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     gl.uniformMatrix3fv(at("uTurn"), false, turn());
     gl.uniform1f(at("uTime"), clock);
     gl.uniform1f(at("uIor"), 1 + 0.5 * clamp(s.refraction, 0, 2));
-    gl.uniform1f(at("uDispersion"), clamp(s.dispersion, 0, 1));
     gl.uniform3f(at("uColor"), red, green, blue);
     gl.uniform1f(at("uTint"), clamp(s.tint, 0, 1));
     gl.activeTexture(gl.TEXTURE1);

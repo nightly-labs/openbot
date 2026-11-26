@@ -151,7 +151,6 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
       cycle: CYCLE,
       size: amountSize * (state.forever ? FOREVER_SCALE : 1),
       refraction: state.forever ? 2 : 1.2,
-      dispersion: state.party || state.forever ? 1 : 0.6,
       color: state.party ? (palette[state.hue % Math.max(1, palette.length)] ?? WHITE) : WHITE,
       tint: state.party ? 0.7 : 0,
       wobble: state.party ? 1 : 0.6,
