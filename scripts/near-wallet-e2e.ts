@@ -694,8 +694,22 @@ async function main(): Promise<void> {
       );
       assert.equal(policyOf(fakeAgent).owner_approval, false);
 
+      page.mode = { kind: "other-key" };
+      try {
+        const failed = await attempt(wallet.service.removeRule(DOMAIN));
+        const status = wallet.status();
+        details.set("failedOwnerStep", { refused: failed.error, error: status.error, rules: status.rules });
+        assert.ok(failed.error ?? status.error, "a refused signature shows a sentence");
+        assert.deepEqual(status.rules, [], "the rule is removed although the signature failed");
+        assert.equal(policyOf(fakeAgent).owner_approval, false);
+        assert.equal(wallet.store.read().wallet?.ownerApproval, false);
+      } finally {
+        page.mode = { kind: "honest" };
+      }
+
+      const retryVisits = page.visits.length;
       const removed = await Effect.runPromise(wallet.service.removeRule(DOMAIN));
-      const actions = page.visits.slice(visits).map((visit) => visit.fragment.action);
+      const actions = page.visits.slice(retryVisits).map((visit) => visit.fragment.action);
       details.set("removed", {
         error: removed.error,
         rules: removed.rules,

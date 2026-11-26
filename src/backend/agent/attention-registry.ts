@@ -1899,7 +1899,7 @@ export class AttentionRegistry {
       result.status === "paid"
         ? result.transactionHash
           ? "Go back to the site and continue."
-          : "The payment is settled. A private payment has no public transaction hash; this is normal. Do not tell the user that the payment is not confirmed. Go back to the site and continue."
+          : "The payment is settled. Some payments have no public NEAR transaction hash; this is normal. Do not tell the user that the payment is not confirmed. Go back to the site and continue."
         : result.status === "uncertain"
           ? "Do not pay again. OpenBot finishes this payment; tell the user to check the wallet in Server settings > Vault > Crypto."
           : "Do not try again; tell the user.";
