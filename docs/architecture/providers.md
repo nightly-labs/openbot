@@ -789,7 +789,8 @@ above 0. A Zen image or video model has its price under `cost.image`, so OpenCod
 credential" or "Missing API key" (#15281, #6432). OpenCode Go has no image or video model, so the
 Go key does not help. When `hasOpenCodeMediaSignIn` finds no sign-in that can pay for these models,
 `openCodeAgentConfig` sends `experimental.image_generate` and `experimental.video_generate` as
-`false`, which removes both tools. The check counts a non-empty environment variable whose name ends in
+`false`, which removes both tools. OpenBot's own `generate_image` and `generate_video` (OpenBot
+credits) stay, and their guidance sends an agent to them when it has no media tool of its own. The check counts a non-empty environment variable whose name ends in
 `_API_KEY` (`OPENCODE_API_KEY` after `clearedInheritedOpenCodeKeyEnv`, or a provider key such as
 `OPENAI_API_KEY`: 291 of the 326 key variables in the OpenCode 2.4.2 catalog end so), and an
 `auth.json` entry or an active `credential` row for any provider except `opencode-go`. A key for
