@@ -3215,16 +3215,14 @@ export class BrowserHost {
     tabId: string,
     failure: BrowserOperationError,
   ) {
-    const cause = failure.cause;
     if (
-      !(cause instanceof Error) ||
-      !isTimeoutError(cause) ||
+      !isTimeoutError(failure.cause) ||
       this.#takeoverTabIds.has(tabId) ||
       this.#userControlTabIds.has(tabId) ||
       !(yield* this.#leaveSilentPage(tabId))
     )
       return yield* failure;
-    return yield* browserFailure(new Error(`${cause.message} ${STOPPED_PAGE_ADVICE}`));
+    return yield* browserFailure(new Error(STOPPED_PAGE_ERROR));
   });
 
   readonly #waitFor = Effect.fn("BrowserHost.waitFor")(function* <A>(
@@ -5027,8 +5025,8 @@ const CRASH_RELOAD_TIMEOUT_MS = 30_000;
 
 const SILENT_PAGE_EXIT_WAIT_MS = 5_000;
 
-const STOPPED_PAGE_ADVICE =
-  "The page does not answer because a script on it keeps running, so OpenBot stopped the page. Open a different page in this tab, or close the tab.";
+const STOPPED_PAGE_ERROR =
+  "Browser navigate timed out. The page does not answer because a script on it keeps running, so OpenBot stopped the page. Open a different page in this tab, or close the tab.";
 
 const VIEW_START_CHECK_MS = 3_000;
 
