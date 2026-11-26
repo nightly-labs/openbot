@@ -136,6 +136,7 @@ prepare_release() {
 copy_release() {
   rm -rf "$2"
   cp -a --no-preserve=ownership "$1" "$2"
+  sync -f "$2"
 }
 
 repair_release_modes() {
@@ -146,12 +147,15 @@ repair_release_modes() {
 
 swap_in() {
   : >"$INSTALL/.applying"
+  sync -f "$INSTALL"
   copy_release "$INSTALL/staged" "$INSTALL/app"
 }
 
 finish_swap() {
-  rm -f "$INSTALL/.applying"
-  rm -rf "$INSTALL/staged" "$INSTALL/staged.ready"
+  sync -f "$INSTALL" /etc
+  rm -f "$INSTALL/.applying" "$INSTALL/staged.ready"
+  sync -f "$INSTALL"
+  rm -rf "$INSTALL/staged"
 }
 
 stage_release() {
