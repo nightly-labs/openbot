@@ -1937,6 +1937,10 @@ export class ProviderRuntime implements ProviderPort {
     this.#setStatus({});
   }
 
+  accountRemoving(provider: AgentProvider, accountId: string): boolean {
+    return this.#providerAccounts?.removing(provider, accountId) ?? false;
+  }
+
   setAccountRemoving(provider: AgentProvider, accountId: string, removing: boolean): void {
     this.#providerAccounts?.setRemoving(provider, accountId, removing);
   }

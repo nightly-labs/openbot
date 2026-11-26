@@ -655,7 +655,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   #signInProviders: ReadonlySet<AgentProvider> = new Set();
   readonly #planContinuation = new PlanContinuation({ limit: 8 });
   readonly #poolReads = new Map<AgentProvider, number>();
-  readonly #accountRemovals = new Set<string>();
   readonly #poolReading = new Set<AgentProvider>();
   #initialized = false;
   #stopping = false;
@@ -5865,9 +5864,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     provider: AgentProvider,
     accountId: string,
   ) {
-    const key = `${provider}\n${accountId}`;
-    if (this.#accountRemovals.has(key)) return;
-    this.#accountRemovals.add(key);
+    if (this.#providers.accountRemoving(provider, accountId)) return;
     this.#providers.setAccountRemoving(provider, accountId, true);
     for (const agent of this.#agentsOnProviderAccount(provider, accountId))
       yield* this.#applyAgentUpdate(
@@ -5913,7 +5910,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ),
       Effect.ensuring(
         Effect.sync(() => {
-          this.#accountRemovals.delete(key);
           this.#providers.setAccountRemoving(provider, accountId, false);
           this.#refreshPoolInUse(provider);
         }),
