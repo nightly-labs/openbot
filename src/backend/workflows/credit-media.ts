@@ -30,7 +30,7 @@ import {
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Duration, Effect, Schema, Semaphore } from "effect";
-import { type McpMediaDependencies, mediaFail, mediaFailed } from "./mcp-media";
+import { type McpMediaDependencies, type McpMediaFailed, mediaFail, mediaFailed } from "./mcp-media";
 import type { MediaPictureRole } from "./workflow-walk";
 
 const CATALOG_TTL_MS = 10 * 60_000;
@@ -79,6 +79,27 @@ export interface CreditMediaWorkflowsOptions {
   gateway: CreditMediaGateway;
   warn: (message: string, details: { error: string }) => void;
   now?: () => number;
+  creditsChanged?: () => void;
+}
+
+interface CreditMediaInput {
+  mimeType: string;
+  bytes: Effect.Effect<Uint8Array, McpMediaFailed>;
+}
+
+export type CreditMediaInputRead = (attachmentId: string) => Effect.Effect<CreditMediaInput | null, McpMediaFailed>;
+
+interface CreditMediaMade {
+  bytes: Uint8Array;
+  mimeType: string;
+  credits: number;
+}
+
+export interface CreditMediaAgentRequest {
+  jobId: string;
+  model: CreditMediaModel;
+  job: Omit<CreditMediaJobRequest, "jobId">;
+  images: readonly { role: CreditMediaInputRole; attachmentId: string }[];
 }
 
 interface Listed {
@@ -170,7 +191,10 @@ interface UploadPick {
   role: CreditMediaInputRole;
 }
 
-function creditUploadPicks(model: CreditMediaModel, images: CreditMediaRequest["images"]): UploadPick[] {
+function creditUploadPicks(
+  model: CreditMediaModel,
+  images: readonly { role: MediaPictureRole; attachmentId: string }[],
+): UploadPick[] {
   const ofRole = (role: MediaPictureRole) =>
     images.filter((image) => image.role === role).map((image) => image.attachmentId);
   const frames = model.kind === "video" ? model.frames : 0;
@@ -187,6 +211,24 @@ function creditUploadPicks(model: CreditMediaModel, images: CreditMediaRequest["
 }
 
 const failedOf = (failure: CreditMediaGatewayFailed) => mediaFail(failure.message);
+
+function workflowAttachmentRead(resolveAttachment: McpMediaDependencies["resolveAttachment"]): CreditMediaInputRead {
+  return (attachmentId) =>
+    resolveAttachment(attachmentId).pipe(
+      Effect.mapError(() => mediaFail(sourceText("error.workflow.mediaInputMissing"))),
+      Effect.map((file) =>
+        file
+          ? {
+              mimeType: file.mimeType,
+              bytes: Effect.tryPromise({
+                try: async () => new Uint8Array(await readFile(file.path)),
+                catch: () => mediaFail(sourceText("error.workflow.mediaInputMissing")),
+              }),
+            }
+          : null,
+      ),
+    );
+}
 
 export class CreditMediaWorkflows {
   readonly #options: CreditMediaWorkflowsOptions;
@@ -295,8 +337,16 @@ export class CreditMediaWorkflows {
   }).bind(this);
 
   readonly credits = Effect.fn("CreditMediaWorkflows.credits")(function* (this: CreditMediaWorkflows) {
+    const balance = yield* this.balance();
+    if (!balance) return null;
+    return { available: Math.max(0, balance.available), quota: null } satisfies WorkflowMediaCreditBalance;
+  }).bind(this);
+
+  readonly balance = Effect.fn("CreditMediaWorkflows.balance")(function* (
+    this: CreditMediaWorkflows,
+  ): Effect.fn.Return<CreditMediaBalance | null> {
     if (!this.available()) return null;
-    const balance = yield* this.#options.gateway.balance().pipe(
+    return yield* this.#options.gateway.balance().pipe(
       Effect.catch((failure) =>
         Effect.sync(() => {
           this.#options.warn("Could not read the media credits.", { error: failure.message });
@@ -304,15 +354,13 @@ export class CreditMediaWorkflows {
         }),
       ),
     );
-    if (!balance) return null;
-    return { available: Math.max(0, balance.available), quota: null } satisfies WorkflowMediaCreditBalance;
   }).bind(this);
 
   #uploads = Effect.fn("CreditMediaWorkflows.uploads")(function* (
     this: CreditMediaWorkflows,
-    dependencies: Pick<McpMediaDependencies, "resolveAttachment">,
+    read: CreditMediaInputRead,
     model: CreditMediaModel,
-    images: CreditMediaRequest["images"],
+    images: readonly { role: MediaPictureRole; attachmentId: string }[],
   ) {
     const picks = creditUploadPicks(model, images);
     const required = creditMediaRequiredInput(model);
@@ -321,22 +369,17 @@ export class CreditMediaWorkflows {
     const uploads: CreditMediaUpload[] = [];
     let total = 0;
     for (const { attachmentId, role } of picks) {
-      const file = yield* dependencies
-        .resolveAttachment(attachmentId)
-        .pipe(Effect.mapError(() => mediaFail(sourceText("error.workflow.mediaInputMissing"))));
+      const file = yield* read(attachmentId);
       if (!file) return yield* mediaFail(sourceText("error.workflow.mediaInputMissing"));
       const mimeType = file.mimeType.split(";")[0]?.trim().toLowerCase() ?? "";
       if (!mimeType.startsWith("image/")) return yield* mediaFail(sourceText("error.workflow.mediaInputNotImage"));
       if (!isOneOf(CREDIT_MEDIA_INPUT_TYPES, mimeType))
         return yield* mediaFail(sourceText("error.workflow.mediaInputType"));
-      const bytes = yield* Effect.tryPromise({
-        try: () => readFile(file.path),
-        catch: () => mediaFail(sourceText("error.workflow.mediaInputMissing")),
-      });
+      const bytes = yield* file.bytes;
       total += bytes.byteLength;
       if (bytes.byteLength > CREDIT_MEDIA_INPUT_LIMIT_BYTES || total > CREDIT_MEDIA_INPUTS_LIMIT_BYTES)
         return yield* mediaFail(sourceText("error.workflow.mediaInputTooLarge"));
-      uploads.push({ role, bytes: new Uint8Array(bytes), mimeType });
+      uploads.push({ role, bytes, mimeType });
     }
     return uploads;
   });
@@ -369,25 +412,35 @@ export class CreditMediaWorkflows {
     return null;
   });
 
+  #submitJob = Effect.fn("CreditMediaWorkflows.submitJob")(function* (
+    this: CreditMediaWorkflows,
+    read: CreditMediaInputRead,
+    model: CreditMediaModel,
+    job: CreditMediaJobRequest,
+    images: readonly { role: MediaPictureRole; attachmentId: string }[],
+  ) {
+    if (model.promptRequired && job.prompt.trim() === "")
+      return yield* mediaFail(sourceText("error.workflow.creditMediaPromptRequired"));
+    const uploads = yield* this.#uploads(read, model, images);
+    const gateway = this.#options.gateway;
+    return yield* gateway.submit(job, uploads).pipe(
+      Effect.catchIf(
+        (failure) => failure.code === CREDIT_JOB_CONFLICT,
+        () => gateway.job(job.jobId),
+      ),
+      Effect.mapError(failedOf),
+    );
+  });
+
   #submit = Effect.fn("CreditMediaWorkflows.submit")(function* (
     this: CreditMediaWorkflows,
-    dependencies: Pick<McpMediaDependencies, "resolveAttachment">,
+    read: CreditMediaInputRead,
     request: CreditMediaRequest,
   ) {
     const model = yield* this.#model(request.model);
     if (!model || model.kind !== request.kind)
       return yield* mediaFail(sourceText("error.billing.mediaModelUnavailable"));
-    if (model.promptRequired && request.prompt.trim() === "")
-      return yield* mediaFail(sourceText("error.workflow.creditMediaPromptRequired"));
-    const uploads = yield* this.#uploads(dependencies, model, request.images);
-    const gateway = this.#options.gateway;
-    return yield* gateway.submit(creditJobRequest(model, request, request.jobId), uploads).pipe(
-      Effect.catchIf(
-        (failure) => failure.code === CREDIT_JOB_CONFLICT,
-        () => gateway.job(request.jobId),
-      ),
-      Effect.mapError(failedOf),
-    );
+    return yield* this.#submitJob(read, model, creditJobRequest(model, request, request.jobId), request.images);
   });
 
   #wait = Effect.fn("CreditMediaWorkflows.wait")(function* (this: CreditMediaWorkflows, started: CreditMediaJob) {
@@ -401,33 +454,68 @@ export class CreditMediaWorkflows {
     return job;
   });
 
-  readonly generate = Effect.fn("CreditMediaWorkflows.generate")(function* (
+  #produce = Effect.fn("CreditMediaWorkflows.produce")(function* (
     this: CreditMediaWorkflows,
-    dependencies: Pick<McpMediaDependencies, "resolveAttachment" | "store">,
-    request: CreditMediaRequest,
+    start: (jobId: string) => Effect.Effect<CreditMediaJob, McpMediaFailed>,
+    jobId: string,
+    earlierJobIds: readonly string[],
   ) {
     if (!(yield* this.#signedIn())) return yield* mediaFail(sourceText("error.billing.mediaSignInRequired"));
-    const existing = (yield* this.#existing(request.jobId)) ?? (yield* this.#earlier(request.earlierJobIds));
+    const existing = (yield* this.#existing(jobId)) ?? (yield* this.#earlier(earlierJobIds));
     const started =
-      existing === null
-        ? yield* this.#submit(dependencies, request)
-        : existing.status === "queued"
-          ? yield* this.#submit(dependencies, { ...request, jobId: existing.jobId })
-          : existing;
+      existing === null ? yield* start(jobId) : existing.status === "queued" ? yield* start(existing.jobId) : existing;
     const done = yield* this.#wait(started);
+    if (existing === null || existing.status === "queued" || existing.status === "processing")
+      this.#options.creditsChanged?.();
     if (done.status === "failed" && done.failure === "refused")
       return yield* mediaFail(sourceText("error.billing.mediaRequestRefused"));
     if (done.status !== "completed") return yield* mediaFailed();
     const output = done.outputs[0];
     if (!output) return yield* mediaFailed();
     const bytes = yield* this.#options.gateway.output(done.jobId, output.index).pipe(Effect.mapError(failedOf));
+    return { bytes, mimeType: output.mimeType, credits: done.credits } satisfies CreditMediaMade;
+  });
+
+  readonly models = Effect.fn("CreditMediaWorkflows.models")(function* (this: CreditMediaWorkflows) {
+    const models = yield* this.#models();
+    return models ? [...models.values()] : [];
+  }).bind(this);
+
+  readonly make = Effect.fn("CreditMediaWorkflows.make")(function* (
+    this: CreditMediaWorkflows,
+    read: CreditMediaInputRead,
+    request: CreditMediaAgentRequest,
+  ) {
+    return yield* this.#produce(
+      (jobId) => this.#submitJob(read, request.model, { ...request.job, jobId }, request.images),
+      request.jobId,
+      [],
+    );
+  }).bind(this);
+
+  readonly generate = Effect.fn("CreditMediaWorkflows.generate")(function* (
+    this: CreditMediaWorkflows,
+    dependencies: Pick<McpMediaDependencies, "resolveAttachment" | "store">,
+    request: CreditMediaRequest,
+  ) {
+    const read = workflowAttachmentRead(dependencies.resolveAttachment);
+    const made = yield* this.#produce(
+      (jobId) => this.#submit(read, { ...request, jobId }),
+      request.jobId,
+      request.earlierJobIds,
+    );
     const extension =
-      output.mimeType
+      made.mimeType
         .split("/")[1]
         ?.replace(/[^a-z0-9]/giu, "")
         .slice(0, 8) || "bin";
     const stored = yield* dependencies
-      .store({ bytes, kind: request.kind, name: `openbot-${request.kind}.${extension}`, mimeType: output.mimeType })
+      .store({
+        bytes: made.bytes,
+        kind: request.kind,
+        name: `openbot-${request.kind}.${extension}`,
+        mimeType: made.mimeType,
+      })
       .pipe(Effect.mapError(() => mediaFailed()));
     return stored.id;
   }).bind(this);

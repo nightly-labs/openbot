@@ -18,6 +18,7 @@ import {
   transcriptionHostThreads,
   VOICE_RUNTIME_ADDON,
   VOICE_SESSION_CONFIGS,
+  VOICE_SPEECH_DETECTOR,
   type VoiceSessionConfig,
   WHISPER_TURBO_MODEL_DIRECTORY,
 } from "../src/main/voice-model-service";
@@ -190,6 +191,7 @@ async function benchTranscription(
       leadingSilenceSamples: 0,
       numThreads,
       sessionConfig,
+      speechDetector: join(RUNTIME, VOICE_SPEECH_DETECTOR),
       pcm,
     };
     return host.request({ ...request, pcm: Array.from(pcm) });

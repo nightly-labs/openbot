@@ -30,6 +30,7 @@ export default function BrowserFullViewAdapter(adapter: { pane?: BrowserPaneMode
     openBrowserWindow,
     reloadBrowserTab,
     stopBrowserTab,
+    answerBrowserHttpSignIn,
     setActiveRightPanel,
     setBrowserSurfaceElement,
     setBrowserPaneSurfaceElement,
@@ -117,6 +118,11 @@ export default function BrowserFullViewAdapter(adapter: { pane?: BrowserPaneMode
       onEnterPip={props.runtime ? () => undefined : showBrowserPip}
       onOpenWindow={windowOpener()}
       onSignInLocally={full() && localSignIn.canStart(activeBrowserTab()) ? localSignIn.start : undefined}
+      onHttpSignIn={
+        props.server?.kind !== "remote" || serverSupportsCapability(props.server, "browser-http-sign-in")
+          ? answerBrowserHttpSignIn
+          : undefined
+      }
       teach={full() ? teach() : undefined}
       dock={
         <Show when={full()}>

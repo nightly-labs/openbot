@@ -1,6 +1,9 @@
 import { Effect, Result } from "effect";
 import { routeRequest as routeHostedSiteRequest } from "../../../site-router/src/index";
-import { createAccountAnalytics } from "./account-analytics";
+import { passkeyWalletHostResponse } from "../lib/near-sign-csp";
+import { OPENBOT_SITE_URL } from "../lib/site-metadata";
+import { sendAccountActivitySnapshots } from "./account-activity";
+import { createAccountAnalytics, createAccountEventDelivery } from "./account-analytics";
 import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
 import { BillingSales } from "./billing-sales";
 import { BillingService } from "./billing-service";
@@ -16,7 +19,7 @@ import { readHostedPool } from "./hosted-pool-snapshot";
 import type { HostedServerBindings } from "./hosted-server-service";
 import { HostedSiteService } from "./hosted-site-service";
 import { enforceMarketplaceIngress, MarketplaceRateLimitError } from "./marketplace-request-policy";
-import { type MediaUpstreamBindings, mediaUpstreamsFromBindings } from "./media-upstream-bindings";
+import { mediaGatewayFromBinding } from "./media-gateway";
 import { observedD1 } from "./observed-d1";
 import { pageMarkdownResponse } from "./page-markdown";
 import {
@@ -51,7 +54,7 @@ export function createWorkerHandler(
       context?: WorkerExecutionContext,
     ) {
       const bindings = workerBindings.DB ? { ...workerBindings, DB: observedD1(workerBindings.DB) } : workerBindings;
-      const hostRedirect = canonicalHostRedirect(request);
+      const hostRedirect = canonicalHostRedirect(request) ?? passkeyWalletHostResponse(request, OPENBOT_SITE_URL);
       if (hostRedirect) return hostRedirect;
       if (request.method === "GET" && new URL(request.url).pathname === "/billing/checkout-return") {
         return runApiEffect(checkoutReturnResponse(request, bindings));
@@ -129,11 +132,22 @@ export function createWorkerHandler(
             Effect.exit(tickReferralCredit(bindings)),
             Effect.exit(tickCreditHolds(bindings, now)),
             Effect.exit(tickCreditGrants(bindings, now)),
+            Effect.exit(tickAccountActivity(bindings, now)),
           ],
           { concurrency: "unbounded" },
         ).pipe(
           Effect.flatMap(
-            ([retentionExit, deliveryExit, sitesExit, salesExit, poolExit, referralExit, holdsExit, grantsExit]) =>
+            ([
+              retentionExit,
+              deliveryExit,
+              sitesExit,
+              salesExit,
+              poolExit,
+              referralExit,
+              holdsExit,
+              grantsExit,
+              activityExit,
+            ]) =>
               Effect.all([
                 retentionExit,
                 deliveryExit,
@@ -143,6 +157,7 @@ export function createWorkerHandler(
                 referralExit,
                 holdsExit,
                 grantsExit,
+                activityExit,
               ]),
           ),
         ),
@@ -218,13 +233,13 @@ function tickAnalytics(bindings: AnalyticsBindings) {
 }
 
 const tickCreditHolds = Effect.fn("CreditHolds.tick")(function* (
-  bindings: AnalyticsBindings & MediaUpstreamBindings,
+  bindings: AnalyticsBindings & { MEDIA_GATEWAY?: Fetcher | undefined },
   now: number,
 ) {
   const { analytics, flush } = tickAnalytics(bindings);
   const result = yield* new CreditMediaService({
     database: bindings.DB,
-    upstreams: mediaUpstreamsFromBindings(bindings),
+    gateway: mediaGatewayFromBinding(bindings.MEDIA_GATEWAY),
     now: () => now,
     analytics,
   })
@@ -241,6 +256,15 @@ const tickCreditGrants = Effect.fn("CreditGrants.tick")(function* (bindings: Ana
     .sweep()
     .pipe(Effect.ensuring(flush));
   if (Object.values(result).some(Boolean)) console.info("Credit grant sweep completed.", result);
+});
+
+const tickAccountActivity = Effect.fn("AccountActivity.tick")(function* (bindings: AnalyticsBindings, now: number) {
+  const deliver = createAccountEventDelivery({
+    clientId: bindings.OPENPANEL_CLIENT_ID,
+    clientSecret: bindings.OPENPANEL_CLIENT_SECRET,
+    fetch: (input, init) => fetch(input, init),
+  });
+  yield* sendAccountActivitySnapshots(bindings.DB, deliver, now);
 });
 
 const tickHostedPool = Effect.fn("HostedPool.tick")(function* (bindings: SalesBindings, now: number) {

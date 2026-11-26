@@ -1,4 +1,5 @@
 import { Button, ChevronRight, Settings } from "@openbot/ui";
+import type { JSX } from "@solidjs/web";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";
 import { UiBlockCard } from "./ui-blocks/UiBlockCard";
@@ -8,6 +9,7 @@ export interface SettingLinkCardProps {
   path: readonly string[];
   onOpen?: (() => void) | undefined;
   note?: string | undefined;
+  icon?: JSX.Element | undefined;
 }
 
 export function SettingLinkCard(props: SettingLinkCardProps) {
@@ -17,11 +19,7 @@ export function SettingLinkCard(props: SettingLinkCardProps) {
       class="marketplace-suggestion setting-link-card"
       status="pending"
       inlineActions
-      icon={
-        <span class="ui-block-icon setting-link-icon">
-          <Settings aria-hidden="true" />
-        </span>
-      }
+      icon={<span class="ui-block-icon setting-link-icon">{props.icon ?? <Settings aria-hidden="true" />}</span>}
       title={props.title}
       subtitle={
         <span class="setting-link-path">

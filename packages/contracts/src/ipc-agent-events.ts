@@ -82,6 +82,7 @@ export type AgentEvent =
   | { type: "library-folders-changed" }
   | { type: "workflow-folders-changed" }
   | { type: "usage-credits-changed" }
+  | { type: "openbot-credits-changed" }
   | { type: "agent-session-settings-changed"; agentId: string }
   | { type: "message-pins-changed"; agentId: string }
   | { type: "channel-memories-changed"; channelId: string }
@@ -165,6 +166,11 @@ export type AgentEvent =
       type: "browser-page-state-changed";
       tabs: { tabId: string; canGoBack: boolean; canGoForward: boolean }[];
     }
+  | { type: "browser-http-sign-in-changed"; tabs: { tabId: string; origin: string; refused: boolean }[] }
+  | {
+      type: "browser-permissions-changed";
+      requests: { tabId: string; id: string; origin: string; permission: "geolocation" }[];
+    }
   | {
       type: "error";
       agentId?: string;
@@ -228,6 +234,7 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
     case "library-folders-changed":
     case "workflow-folders-changed":
     case "usage-credits-changed":
+    case "openbot-credits-changed":
       return true;
     case "channel-memories-changed":
     case "channel-routines-changed":
@@ -370,6 +377,25 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         value.tabs.every(
           (tab) =>
             isDynamicRecord(tab) && isString(tab.tabId) && isBoolean(tab.canGoBack) && isBoolean(tab.canGoForward),
+        )
+      );
+    case "browser-permissions-changed":
+      return (
+        Array.isArray(value.requests) &&
+        value.requests.every(
+          (request) =>
+            isDynamicRecord(request) &&
+            isString(request.tabId) &&
+            isString(request.id) &&
+            isString(request.origin) &&
+            request.permission === "geolocation",
+        )
+      );
+    case "browser-http-sign-in-changed":
+      return (
+        Array.isArray(value.tabs) &&
+        value.tabs.every(
+          (tab) => isDynamicRecord(tab) && isString(tab.tabId) && isString(tab.origin) && isBoolean(tab.refused),
         )
       );
     case "error":

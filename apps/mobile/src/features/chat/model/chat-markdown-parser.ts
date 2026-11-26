@@ -8,6 +8,7 @@ import {
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import { replaceEqualDeep } from "@tanstack/react-query";
 import { Marked, type Token, type TokensList } from "marked";
+import markedCjkFriendly from "marked-cjk-friendly";
 import { nextPhoneNumberIndex, phoneNumberAtStart } from "./chat-phone-number";
 
 const markdown = new Marked({
@@ -100,6 +101,7 @@ const markdown = new Marked({
     },
   ],
 });
+markdown.use(markedCjkFriendly());
 
 function parseChatMarkdown(body: string): TokensList {
   return markdown.lexer(body);

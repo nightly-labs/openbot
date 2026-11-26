@@ -18,12 +18,18 @@ const TILING_DESKTOPS: ReadonlySet<string> = new Set([
   "spectrwm",
 ]);
 
+function currentDesktopNames(environment: NodeJS.ProcessEnv): string[] {
+  return (environment.XDG_CURRENT_DESKTOP ?? "").split(":").map((desktop) => desktop.trim().toLowerCase());
+}
+
 function isTilingLinuxDesktop(platform: NodeJS.Platform, environment: NodeJS.ProcessEnv): boolean {
   if (platform !== "linux") return false;
   if (TILING_DESKTOP_SOCKETS.some((name) => Boolean(environment[name]?.trim()))) return true;
-  return (environment.XDG_CURRENT_DESKTOP ?? "")
-    .split(":")
-    .some((desktop) => TILING_DESKTOPS.has(desktop.trim().toLowerCase()));
+  return currentDesktopNames(environment).some((desktop) => TILING_DESKTOPS.has(desktop));
+}
+
+export function onNiriDesktop(environment: NodeJS.ProcessEnv): boolean {
+  return Boolean(environment.NIRI_SOCKET?.trim()) || currentDesktopNames(environment).includes("niri");
 }
 
 export const onTilingLinuxDesktop = isTilingLinuxDesktop(process.platform, process.env);

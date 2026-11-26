@@ -8,7 +8,7 @@ RELEASES=https://github.com/nightly-labs/openbot/releases
 LOCK=/run/openbot-update.lock
 SCRATCH=/var/tmp
 RESTORE=/var/lib/ascii-lazy
-HOSTED_FILES=(openbot-hosted-server openbot-hosted-env openbot-hosted-update openbot)
+HOSTED_FILES=(openbot-hosted-server openbot-hosted-env openbot-hosted-update openbot-hosted-keyring openbot)
 REQUESTS=/run/openbot
 STATE=/run/openbot-update.state
 UNIT_DIRECTORY=/etc/systemd/system
@@ -180,6 +180,9 @@ stage_due() {
 
 check() {
   local staged=0 stopped=0 safe_mode=0
+  if [ -x "$INSTALL/hosted/openbot-hosted-keyring" ]; then
+    "$INSTALL/hosted/openbot-hosted-keyring" backup || echo "The copy of the keyring is not refreshed." >&2
+  fi
   if start_loop_stopped || safe_mode_running; then stopped=1; fi
   if [ "$stopped" -eq 1 ] || stage_due; then
     set +e
@@ -247,13 +250,18 @@ apparmor_predates_abi_4() {
     ! apparmor_parser --skip-kernel-load --skip-cache "$1" >/dev/null 2>&1
 }
 
+install_hosted_file() {
+  local source=$1 file=$2
+  install -m 0755 "$source/$file" "$INSTALL/hosted/.$file.new"
+  mv -f "$INSTALL/hosted/.$file.new" "$INSTALL/hosted/$file"
+}
+
 install_hosting() {
   local source=$1 user file unit changed=0
   user=$(<"$INSTALL/hosted/service-user")
   [[ $user =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]] || fail "The service user is not valid."
   for file in "${HOSTED_FILES[@]}"; do
-    install -m 0755 "$source/$file" "$INSTALL/hosted/.$file.new"
-    mv -f "$INSTALL/hosted/.$file.new" "$INSTALL/hosted/$file"
+    install_hosted_file "$source" "$file"
   done
   if apparmor_predates_abi_4 "$source/openbot-hosted.apparmor"; then
     rm -f /etc/apparmor.d/openbot-hosted
@@ -410,9 +418,19 @@ boot() {
   apply
 }
 
+install_missing_hosted_files() {
+  local source=$1 file
+  for file in "${HOSTED_FILES[@]}"; do
+    if [ ! -e "$INSTALL/hosted/$file" ] && [ -f "$source/$file" ]; then
+      install_hosted_file "$source" "$file"
+    fi
+  done
+}
+
 trigger() {
   local source=$INSTALL/app/resources/hosting unit changed=0
   repair_release_modes || echo "The modes of the release are not repaired." >&2
+  install_missing_hosted_files "$source" || echo "The server files of the release are not installed." >&2
   for unit in "${REQUEST_UNITS[@]}"; do
     if [ ! -e "$UNIT_DIRECTORY/$unit" ] && [ -f "$source/$unit" ]; then
       install -m 0644 "$source/$unit" "$UNIT_DIRECTORY/$unit"

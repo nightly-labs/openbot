@@ -45,7 +45,10 @@ export function readOpenCodeDatabase<A>(databasePath: string, read: (database: D
 }
 
 const AuthFileKey = Schema.Struct({ type: Schema.Literal("api"), key: Schema.String });
-const AuthFile = Schema.Struct({ "opencode-go": Schema.optionalKey(Schema.Unknown) });
+const AuthFile = Schema.Struct({
+  "opencode-go": Schema.optionalKey(Schema.Unknown),
+  opencode: Schema.optionalKey(Schema.Unknown),
+});
 const StoredKey = Schema.Struct({
   type: Schema.Literal("key"),
   key: Schema.String,
@@ -71,10 +74,13 @@ const readOwnKeys = Effect.fn("OpenCode.readOwnKeys")(function* () {
       try: () => readFile(join(dataDirectory, "auth.json"), "utf8"),
       catch: (cause) => new OpenCodeUsageFailed({ cause }),
     }).pipe(Effect.orElseSucceed(() => "")));
-  const goKey = (authFileGoKey(authText) ?? env.OPENCODE_API_KEY)?.trim();
+  const authFile = Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(AuthFile))(authText));
+  const goKey = (authFileApiKey(authFile, "opencode-go")?.key ?? env.OPENCODE_API_KEY)?.trim();
+  const consoleFile = authFileApiKey(authFile, "opencode");
+  const consoleFileKey = consoleFile?.servedByConsole ? consoleFile.key.trim() : undefined;
   const databasePath = openCodeDatabasePath(env);
   const consoleKey = inlineAuth || !databasePath ? undefined : yield* readConsoleKey(databasePath);
-  return [...new Set([consoleKey, goKey].filter((key): key is string => Boolean(key)))];
+  return [...new Set([consoleKey, goKey, consoleFileKey].filter((key): key is string => Boolean(key)))];
 });
 
 const AuthFileEntries = Schema.Record(Schema.String, Schema.Unknown);
@@ -137,11 +143,28 @@ export const readOpenCodeRefusalStatus = Effect.fn("OpenCode.readRefusalStatus")
   return Option.isSome(refused) ? refused.value.error.status : null;
 });
 
-function authFileGoKey(text: string): string | undefined {
-  const file = Schema.decodeUnknownOption(Schema.fromJsonString(AuthFile))(text);
-  if (Option.isNone(file)) return undefined;
-  const entry = Schema.decodeUnknownOption(AuthFileKey)(file.value["opencode-go"]);
-  return Option.isSome(entry) ? entry.value.key : undefined;
+interface AuthFileApiKey {
+  readonly key: string;
+  readonly servedByConsole: boolean;
+}
+
+function authFileApiKey(
+  file: typeof AuthFile.Type | undefined,
+  integration: "opencode" | "opencode-go",
+): AuthFileApiKey | undefined {
+  const entry = file?.[integration];
+  const decoded = Schema.decodeUnknownOption(AuthFileKey)(entry);
+  if (Option.isNone(decoded)) return undefined;
+  return {
+    key: decoded.value.key,
+    servedByConsole: servedByOpenCodeConsole(getRecord(entry, "metadata")?.server),
+  };
+}
+
+function servedByOpenCodeConsole(server: unknown): boolean {
+  if (typeof server !== "string") return true;
+  const url = URL.parse(server);
+  return url !== null && `${url.origin}${url.pathname.replace(/\/+$/u, "")}` === OPENCODE_CONSOLE_URL;
 }
 
 function newestStoredKey(databasePath: string, integration: string) {
@@ -176,12 +199,7 @@ const readConsoleKey = Effect.fn("OpenCode.readConsoleKey")(function* (databaseP
   return yield* Effect.try({
     try: () => {
       const stored = newestStoredKey(databasePath, "opencode");
-      if (Option.isNone(stored)) return undefined;
-      const server = stored.value.metadata?.server;
-      if (typeof server === "string") {
-        const url = new URL(server);
-        if (`${url.origin}${url.pathname.replace(/\/+$/u, "")}` !== OPENCODE_CONSOLE_URL) return undefined;
-      }
+      if (Option.isNone(stored) || !servedByOpenCodeConsole(stored.value.metadata?.server)) return undefined;
       return stored.value.key.trim() || undefined;
     },
     catch: (cause) => new OpenCodeUsageFailed({ cause }),

@@ -1,6 +1,7 @@
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import type { AppAppearance } from "@openbot/contracts/app-appearance";
 import type { AppLanguage } from "@openbot/contracts/app-language";
+import type { CreditMediaGenerationKind } from "@openbot/contracts/credit-media";
 import { HOSTED_SERVER_CONTACT_URL } from "@openbot/contracts/hosted-servers";
 import {
   type AddedAgent,
@@ -29,6 +30,7 @@ import {
   decodeHostVoiceModel,
   LEGACY_RESPONSE_STYLE,
   type McpSignInState,
+  mediaApprovalDefaultModelUpdate,
   type RoutineFields,
   type ServerConnectionState,
   type ServerSummary,
@@ -52,6 +54,7 @@ import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-t
 import { AGENT_THREAD_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-files-v1";
 import { AGENT_USAGE_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
 import { AGENT_WAITS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-waits-v1";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/browser-view-v1";
@@ -121,6 +124,7 @@ import {
   getHostBrowsingMemory,
   getHostCacheExpiryCompaction,
   getHostClaudeCompactWindow,
+  getHostMediaApprovalCredits,
   getHostMemoryReview,
   getHostModelVisibility,
   getHostPersonality,
@@ -139,6 +143,7 @@ import {
   setHostBrowsingMemory,
   setHostCacheExpiryCompaction,
   setHostClaudeCompactWindow,
+  setHostMediaApprovalCredits,
   setHostMemoryReview,
   setHostModelVisibility,
   setHostPersonality,
@@ -164,11 +169,18 @@ import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
 import { LicenseSection } from "@openbot/ui/features/billing/LicenseSection";
 import { createLicenseStore } from "@openbot/ui/features/billing/license-store";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
+import type { MediaApprovalControls } from "@openbot/ui/features/conversation/MediaApprovalCard";
 import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { BuyCreditsPage } from "@openbot/ui/features/credits/BuyCreditsPage";
 import { CreditActivitySection } from "@openbot/ui/features/credits/CreditActivitySection";
 import { CreditsSection } from "@openbot/ui/features/credits/CreditsSection";
-import { type CreditsMenu, createCreditsStore, createCreditsSummary } from "@openbot/ui/features/credits/credits-store";
+import {
+  type CreditsMenu,
+  createCreditsStore,
+  createCreditsSummary,
+  creditsRailWallet,
+} from "@openbot/ui/features/credits/credits-store";
+import { RailMoveCreditsDialog } from "@openbot/ui/features/credits/MoveCreditsDialog";
 import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
 import { RestartServerDialog } from "@openbot/ui/features/servers/RestartServerDialog";
 import type { ServerActionCallbacks } from "@openbot/ui/features/servers/ServerActionItems";
@@ -249,6 +261,7 @@ import {
   agentErrorDetails,
   claimErrorToast,
   createTurnErrorBanners,
+  isRetryNotice,
   readableAgentError,
   remoteAgentError,
 } from "../agents/agent-error-text";
@@ -275,6 +288,8 @@ import type {
   ConversationThreads,
   PromptAnswerOptions,
 } from "../conversation/conversation-types";
+import { trackedMediaApproval } from "../conversation/credits-card-analytics";
+import { creditsHoldControls } from "../conversation/credits-hold-controls";
 import {
   type AgentLevelsSource,
   createAgentMessageDeleteAccess,
@@ -289,8 +304,11 @@ import { createRoutineTimezonePrompt } from "../schedule/routine-timezone-prompt
 import type { ScheduleRoutine } from "../schedule/SchedulePanel";
 import { scheduleRoutinePorts } from "../schedule/schedule-routine-create";
 import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOverlay";
+import { createCreditAgentsRail } from "../servers/credit-agents-rail";
+import { openCreditPrices } from "../servers/credit-prices";
 import { createHostedUpsellOffline, HostedServerUpsell } from "../servers/hosted-server-upsell-controller";
 import { mcpSignInRecord } from "../servers/mcp-servers";
+import { type HostMediaApprovalCreditsCalls, saveMediaApprovalCredits } from "../servers/media-approval-credits-store";
 import { OwnerTransferPrompt } from "../servers/OwnerTransferPrompt";
 import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
 import type { HostAgentDefaultsCalls } from "../servers/ServerAgentsSection";
@@ -646,6 +664,9 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         hidden: host.hidden === true,
         ...(appearance === undefined ? {} : { appearance }),
         ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
+        ...(host.licenseRaisesMemberLimit === undefined
+          ? {}
+          : { licenseRaisesMemberLimit: host.licenseRaisesMemberLimit }),
         ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
         ...(host.restartAvailable === undefined ? {} : { restartAvailable: host.restartAvailable }),
         ...(host.storageGb === undefined ? {} : { storageGb: host.storageGb }),
@@ -1089,6 +1110,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       workspace.state.capabilities.includes(capability) && canAdministerServer(workspace.state.host?.role),
     () => storageCalls,
     () => marketplaceCalls.skills,
+    () => (workspace.state.synced ? workspace.state.capabilities.includes(ATTACHMENT_PREVIEW_CAPABILITY) : undefined),
   );
   const [searchRoutineList, setSearchRoutineList] = createSignal<GlobalSearchRoutine[]>([]);
   const [searchRoutinesLoading, setSearchRoutinesLoading] = createSignal(false);
@@ -1501,8 +1523,18 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     () => creditsCalls,
     () => props.accountId,
   );
+  onCleanup(
+    workspace.onHostEvent((event) => {
+      if (event.type === "openbot-credits-changed") creditsSummary.refresh();
+    }),
+  );
+  const creditWallet = () => creditsRailWallet(creditsSummary.state(), server() ?? null, null);
+  const [movingCredits, setMovingCredits] = createSignal(false);
   function creditsRailAction(): (() => void) | undefined {
-    return creditsSummary.available() ? () => openCredits(null) : undefined;
+    return creditsSummary.available() ? () => openCredits(creditWallet()?.serverId ?? null) : undefined;
+  }
+  function creditMoveAction(): (() => void) | undefined {
+    return creditWallet()?.movable ? () => setMovingCredits(true) : undefined;
   }
   function creditsMenu(): CreditsMenu {
     return { state: creditsSummary.state(), onOpen: openCredits, onRefresh: creditsSummary.refresh };
@@ -1561,9 +1593,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (gone) setRestartRequest(null);
     },
   );
+  function accountRestarts(serverId: string): boolean {
+    const item = servers().find((candidate) => candidate.id === serverId);
+    if (item?.restartAvailable === false) return false;
+    return item?.hosted === true || hostedServers.isHosted(serverId);
+  }
   function restartsItself(serverId: string): boolean {
     return (
-      !hostedServers.isHosted(serverId) &&
+      !accountRestarts(serverId) &&
       server()?.id === serverId &&
       workspace.state.restartReady &&
       workspace.runtime.admin !== undefined
@@ -1572,7 +1609,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   async function restartHost(): Promise<void> {
     const hostId = restartRequest()?.hostId;
     if (!hostId) return;
-    if (hostedServers.isHosted(hostId)) await hostedServers.calls.restart(hostId);
+    if (accountRestarts(hostId)) await hostedServers.calls.restart(hostId);
     else {
       await runTeamEffect(requestHostRestart(hostRequest(hostId)).pipe(Effect.mapError((error) => error.cause)));
       workspace.restartRequested();
@@ -1780,6 +1817,23 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         setHostAgentMemoryLimit(hostRequest(serverId), limit).pipe(Effect.mapError((error) => error.cause)),
       ),
   };
+  const hostMediaApprovalCreditsCalls: HostMediaApprovalCreditsCalls = {
+    getMediaApprovalCredits: async (serverId) =>
+      runTeamEffect(getHostMediaApprovalCredits(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setMediaApprovalCredits: async (update, serverId) =>
+      runTeamEffect(
+        setHostMediaApprovalCredits(hostRequest(serverId), update).pipe(Effect.mapError((error) => error.cause)),
+      ),
+  };
+  const creditAgents = createCreditAgentsRail({
+    server,
+    shown: () => creditsRailAction() !== undefined,
+    calls: hostMediaApprovalCreditsCalls,
+    asks: {
+      readMuted: () => workspace.readCreditsAskMuted(),
+      setMuted: (muted) => workspace.setCreditsAskMuted(muted),
+    },
+  });
   const hostMemoryReviewCalls: HostMemoryReviewCalls = {
     getMemoryReview: async (serverId) =>
       runTeamEffect(getHostMemoryReview(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
@@ -1958,7 +2012,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     onDelete: deleteHostedServer,
     canDelete: hostedServers.isHosted,
     onRestart: (hostId, trigger) => setRestartRequest({ hostId, trigger }),
-    canRestart: (serverId) => hostedServers.isHosted(serverId) || restartsItself(serverId),
+    canRestart: (serverId) => accountRestarts(serverId) || restartsItself(serverId),
     planDeletesAt: hostedServers.planDeletesAt,
     onRenewPlan: hostedServers.renewPlan,
     onHide: (serverId) => void hideServer(serverId),
@@ -2101,6 +2155,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           errorBanners.noteTurnStarted(composerDraftKey({ agentId: event.agentId, serverId }));
         return;
       }
+      if (event.type === "conversation-delta") {
+        if (serverId && isMainThread(event.agentId, event.threadId))
+          errorBanners.clearAfterOutput(
+            composerDraftKey({ agentId: event.agentId, serverId }),
+            controller.setConversationErrors,
+            controller.setConversationErrorRuns,
+          );
+        return;
+      }
       if (event.type === "turn-completed") {
         if (!serverId) return;
         const key = composerDraftKey({ agentId: event.agentId, serverId });
@@ -2119,8 +2182,20 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         errorBanners.noteError(key, event.message, message);
         controller.setConversationErrors((current) => ({ ...current, [key]: message }));
         const details = agentErrorDetails(event.message, message);
+        const link = event.link;
+        const notice = isRetryNotice(event.message);
         controller.setConversationErrorRuns((current) => {
-          if (details) return { ...current, [key]: { message, run: null, details } };
+          if (link || details || notice)
+            return {
+              ...current,
+              [key]: {
+                message,
+                run: null,
+                ...(link ? { link } : {}),
+                ...(details ? { details } : {}),
+                ...(notice ? { notice } : {}),
+              },
+            };
           if (!(key in current)) return current;
           const { [key]: _replaced, ...next } = current;
           return next;
@@ -2325,6 +2400,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       workspace.state.capabilities.includes("browser-control") &&
       workspace.state.capabilities.includes("browser-view"),
   );
+  const noticedBrowserTabIds = createMemo(() => {
+    const noticed = workspace.state.noticedBrowserTabIds;
+    return browserEnabled() && noticed ? new Set(noticed) : undefined;
+  });
   const clearSelectedAgentContext = createMemo(() => {
     const agent = workspace.selected();
     if (!agent || !workspace.runtime.admin || !workspace.state.capabilities.includes(CONTEXT_RESET_CAPABILITY))
@@ -2396,6 +2475,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       return undefined;
     return (taskId: string) => compactContext(agent.id, taskId);
   });
+  const agentDeleteAllowed = () =>
+    workspace.state.status === "online" && canAdministerServer(workspace.state.host?.role);
   const deleteSelectedAgentHistory = createMemo(() => {
     const agent = workspace.selected();
     const deleteHistory = workspace.runtime.deleteHistory;
@@ -2646,6 +2727,35 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const threadId = open === undefined ? agent.threadId : open?.threadId;
     return workspace.state.takeovers.find((request) => request.agentId === agent.id && request.threadId === threadId);
   });
+  const setMediaApprovalDefault = async (kind: CreditMediaGenerationKind, model: string | null) => {
+    const serverId = server()?.id;
+    if (!serverId) throw new Error(t("webClient.error.connectServerFirst"));
+    await saveMediaApprovalCredits(
+      serverId,
+      mediaApprovalDefaultModelUpdate(kind, model),
+      hostMediaApprovalCreditsCalls,
+    );
+  };
+  const mediaApproval: MediaApprovalControls = trackedMediaApproval(
+    {
+      read: (approval) => workspace.readMediaApproval({ agentId: approval.agentId, requestId: approval.requestId }),
+      allow: async (approval, choice) => {
+        await workspace.respondToMediaApproval({ agentId: approval.agentId, requestId: approval.requestId, choice });
+        return true;
+      },
+      setDefault: setMediaApprovalDefault,
+      hold: creditsHoldControls({
+        agents: workspace.profiles,
+        credits: creditsMenu,
+        walletId: () => server()?.id ?? null,
+        serverId: () => server()?.id,
+        respond: (approval, action) =>
+          workspace.respondToCreditsHold({ agentId: approval.agentId, requestId: approval.requestId, action }),
+        setMuted: (muted) => workspace.setCreditsAskMuted(muted),
+      }),
+    },
+    () => "remote",
+  );
   const view = createWebConversationView({
     workspace,
     remoteAgentAdmin,
@@ -2967,29 +3077,52 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 openMarketplace();
               }}
               onCredits={creditsRailAction()}
-              creditBalance={creditsMenu().state?.balance}
+              creditBalance={creditWallet()?.balance}
+              creditWelcome={creditWallet()?.welcome}
+              creditWalletName={creditWallet()?.name}
+              onCreditMove={creditMoveAction()}
+              onCreditPrices={() => openCreditPrices(openWebLink)}
+              creditAgents={creditAgents.agents()}
+              onCreditAgentsChange={creditAgents.change()}
+              creditAsk={creditAgents.ask()}
+              onCreditAskChange={creditAgents.changeAsk()}
+              hiddenItems={layout.railHidden()}
+              onHiddenChange={layout.setRailHidden}
               onMarketplace={workspace.state.status === "online" ? openMarketplace : undefined}
               onSettings={openAccountSettings}
               server={
-                <ServerMenu
-                  rail
-                  serverName={workspace.state.host?.name ?? "OpenBot"}
-                  servers={shownServers()}
-                  hiddenServers={hiddenServers()}
-                  view={layout.serverView()}
-                  onViewChange={layout.setServerView}
-                  onSelect={selectServer}
-                  onAdd={() => hostedServers.openAddServer("server_rail")}
-                  addCreatesServer={hostedServers.available()}
-                  credits={creditsMenu()}
-                  {...serverActionCallbacks}
-                />
+                <>
+                  <ServerMenu
+                    rail
+                    serverName={workspace.state.host?.name ?? "OpenBot"}
+                    servers={shownServers()}
+                    hiddenServers={hiddenServers()}
+                    view={layout.serverView()}
+                    onViewChange={layout.setServerView}
+                    onSelect={selectServer}
+                    onAdd={() => hostedServers.openAddServer("server_rail")}
+                    addCreatesServer={hostedServers.available()}
+                    credits={creditsMenu()}
+                    {...serverActionCallbacks}
+                  />
+                  <Show when={movingCredits() ? creditWallet()?.movable : null}>
+                    {(wallet) => (
+                      <RailMoveCreditsDialog
+                        calls={() => creditsCalls}
+                        server={wallet()}
+                        onChange={(state) => creditsSummary.adopt(state)}
+                        onClose={() => setMovingCredits(false)}
+                      />
+                    )}
+                  </Show>
+                </>
               }
               help={
                 <RailHelpMenu
                   version={null}
                   onOpenWhatsNew={() => void openWebDestination("changelog")}
                   onOpenLink={(destination) => void openWebDestination(destination)}
+                  onOpenUrl={openWebLink}
                 />
               }
             />
@@ -3339,6 +3472,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       }
                       chatOrder={layout.sidebarChatOrder()}
                       onChatOrderChange={layout.setSidebarChatOrder}
+                      tabIds={workspace.preferences.sidebarTabIds()}
+                      onTabIdsChange={workspace.preferences.setSidebarTabIds}
                       collapsedSectionIds={workspace.preferences.collapsedSidebarSectionIds()}
                       onMutateLayout={workspace.mutateSidebarLayout}
                       sectionDuplicateSupported={
@@ -3375,9 +3510,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       }
                       duplicatingAgentIds={new Set(workspace.state.duplicatingAgentIds)}
                       onDuplicateAgent={workspace.duplicateAgent}
-                      deleteSupported={
-                        workspace.state.status === "online" && canAdministerServer(workspace.state.host?.role)
-                      }
+                      deleteSupported={agentDeleteAllowed()}
                       marketplaceSupported={workspace.state.status === "online"}
                       onDeleteAgent={workspace.deleteAgent}
                       userHiddenAgents={workspace.state.userHiddenAgents}
@@ -3603,6 +3736,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                                 listener(workspace.state.host?.hostId ?? "");
                             }),
                         }}
+                        mediaApprovalCredits={{ calls: hostMediaApprovalCreditsCalls }}
                         hostPersonality={{ calls: hostPersonalityCalls }}
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}
                         memoryReview={{ calls: hostMemoryReviewCalls }}
@@ -3736,6 +3870,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         discard: (id, serverId) => runtime.agent.discardDraftAttachment(id, serverId),
                       }}
                       agents={workspace.profiles()}
+                      mediaApproval={mediaApproval}
                       onOpenLink={(url) => void openWebLink(url)}
                       onAttachmentAction={(attachment) =>
                         void runtime.agent
@@ -3916,6 +4051,20 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onTypingChange={() => {}}
                         onAnswerPrompt={channelView.onAnswerPrompt}
                         onRespondToApproval={channelView.onRespondToApproval}
+                        mediaApproval={trackedMediaApproval(
+                          {
+                            ...channelView.mediaApproval,
+                            setDefault: setMediaApprovalDefault,
+                            hold: creditsHoldControls({
+                              agents: workspace.profiles,
+                              credits: creditsMenu,
+                              walletId: () => server()?.id ?? null,
+                              serverId: () => server()?.id,
+                              ...channelView.creditsHold,
+                            }),
+                          },
+                          () => "remote",
+                        )}
                         onRespondToBrowserTakeover={channelView.onRespondToBrowserTakeover}
                         onCancelQueuedMessage={() => {}}
                         onSteerQueuedMessage={() => {}}
@@ -4027,6 +4176,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   queue={workspace.state.selectedId ? workspace.state.queues[workspace.state.selectedId] : undefined}
                   browserRuntime={workspace.runtime.browser}
                   browserTabs={workspace.state.browserTabs}
+                  noticedBrowserTabIds={noticedBrowserTabIds()}
+                  onNoticeBrowserTabs={workspace.noticeBrowserTabs}
                   activeBrowserTabId={workspace.state.activeBrowserTabId}
                   browserVisibilitySuspended={workspace.state.status !== "online" || pageCovered()}
                   workspaceCovered={pageCovered() || hostOffline()}
@@ -4092,6 +4243,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   }
                   onRespondToApproval={view.respondToApproval}
                   onAlwaysAllowApproval={view.alwaysAllowApproval()}
+                  mediaApproval={mediaApproval}
                   agentAutoApproves={remoteAgentAdmin.autoApproves()}
                   remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
                   remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
@@ -4103,6 +4255,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onUpdateAgentPermissions={remoteAgentAdmin.settings() ? remoteAgentAdmin.update : undefined}
                   onClearAgentContext={clearSelectedAgentContext()}
                   onDeleteAgentHistory={deleteSelectedAgentHistory()}
+                  onDeleteAgent={agentDeleteAllowed() ? workspace.deleteAgent : undefined}
                   onCompactAgentContext={compactSelectedAgentContext()}
                   contextState={
                     workspace.state.selectedId ? workspace.state.contextStates[workspace.state.selectedId] : undefined

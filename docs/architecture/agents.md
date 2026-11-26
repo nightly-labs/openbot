@@ -922,8 +922,10 @@ workspace, and OpenBot does not lock files; the `start_task` guidance warns the 
 
 A provider, account or custom-agent change that a user or an agent asks for while a turn, a task or
 a queued message waits is stored on the agent as `pendingRuntime`. The running work keeps its
-sessions. When the drain is about to start the next message and no work has started,
-`AgentService` applies the queued runtime first (the `next-turn` move), then retires the provider
+sessions. While the change waits and a turn of the agent still runs, no chat, task or channel lane
+starts a new turn (the `pending-runtime` drain hold, shown on a queued task as "Waiting for other work
+of this agent to finish."), so a queued message cannot keep the old runtime busy. When the drain is
+about to start the next message and no work has started, `AgentService` applies the queued runtime first (the `next-turn` move), then retires the provider
 sessions of the chat and of each task thread, so each one gets a handoff on the new provider. A
 queued change that fails on an idle agent, such as for a provider that is now off, is removed. A
 joined server's client queues the same change on `agent-pending-runtime-v1` (see
@@ -995,8 +997,9 @@ header with a secret name before it parses the call, so logs mask it, and a fail
 value. A key value needs the same source as `save_api_key`: never an external chat, in a channel only a
 key that the local user wrote in the request of the task, and elsewhere only a person's message. The
 approval names the headers that change. The tools never take an environment value and
-never return a header or environment value, and show an address without its query. The user can also
-enter a key with Edit on the server's page in Marketplace, Apps. An edit keeps the row's other headers
+never return a header or environment value, and show an address without its query. An agent saves an
+address as the user gave it, query included, because some servers take the key only there (#16362).
+The user can also enter a key with Edit on the server's page in Marketplace, Apps. An edit keeps the row's other headers
 and environment, and an edit that would send them to another transport, origin, command, arguments or
 folder is refused; headers that the same edit replaces do not count. The approval masks known secrets in the command line and names
 the folder a stdio server starts in. A sign-in shows an `mcp-sign-in:<id>` card in
@@ -1201,7 +1204,13 @@ message into that turn (`AgentService.#steerAgentMessage`). A request that joins
 its result separate from the answer to the person: the request text tells the recipient to send the
 result with `send_message`. The turn's answer is for the person or another request, so the turn end
 never relays it for a steered request, and sends no "no reply" note: Claude can still answer a late
-steer in a turn of its own (`moveSteerToTurn`). When the turn ends as interrupted before a reply (a
+steer in a turn of its own (`moveSteerToTurn`). Until a result or a `command_lifecycle` start lists a steer's uuid, `ClaudeAgentClient` keeps it in
+`unreadSteers`. A turn that ends with one waits for Claude's own turn (`awaitOwnTurn`), so the idle
+limit does not close the thread before Claude answers it (#16361). A result that lists no uuids, or a
+stop, clears the list. When the thread closes with a steer that is still unread, `restoreUnsteered` puts
+the message back in the queue: through `unreadSteers` of `turn/completed` when the closing turn holds the
+steer, so the failed turn does not mark it failed, otherwise through `openbot/unread-steers`.
+`scripts/claude-steer-idle-release-e2e.ts` checks both paths. When the turn ends as interrupted before a reply (a
 stop, or an exit of the provider process), the sender gets an OpenBot note (`MailboxStore.answerFailedRequest`), and does not wait for a result that
 never comes. Routine runs, channel work and messages from Slack, Telegram or
 WhatsApp do not steer automatically: each starts a turn of its own. A question back (a reply that

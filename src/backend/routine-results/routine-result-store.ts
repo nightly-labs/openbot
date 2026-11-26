@@ -103,8 +103,9 @@ export class RoutineResultStore {
         .prepare(
           `SELECT run.run_id, run.routine_id, run.agent_id, run.routine_name, run.delivery_id, run.updated_at AS run_updated_at, destination.*
            FROM projection_routine_runs AS run
-           JOIN routine_result_destinations AS destination ON destination.routine_id = run.routine_id
-           WHERE (run.status = 'succeeded'
+           CROSS JOIN routine_result_destinations AS destination ON destination.routine_id = run.routine_id
+           WHERE run.status IN ('succeeded', 'failed')
+             AND (run.status = 'succeeded'
                OR (run.status = 'failed' AND EXISTS (SELECT 1 FROM projection_deliveries AS queued
                  WHERE queued.delivery_id = run.delivery_id AND queued.status = 'completed')))
              AND run.updated_at >= ? AND run.updated_at >= destination.updated_at

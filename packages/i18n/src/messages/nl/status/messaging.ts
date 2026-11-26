@@ -58,6 +58,10 @@ export const messages = {
     "Er is nog een OpenBot aan dit WhatsApp-nummer gekoppeld, dus je kunt twee antwoorden krijgen. Open om dit op te lossen Gekoppelde apparaten in WhatsApp op je telefoon en log uit bij de OpenBot die je niet gebruikt.",
   "status.messaging.whatsappPaused":
     "OpenBot antwoordt hier 10 minuten niet: er kwamen te veel berichten in korte tijd. Als er nog een OpenBot aan dit nummer is gekoppeld, open dan Gekoppelde apparaten in WhatsApp op je telefoon en log uit bij de OpenBot die je niet gebruikt.",
+  "status.messaging.whatsappNotDelivered":
+    "WhatsApp heeft dit antwoord niet geaccepteerd, dus de persoon heeft het niet ontvangen.",
+  "status.messaging.whatsappPartlyDelivered":
+    "WhatsApp heeft dit antwoord niet volledig geaccepteerd, dus de persoon heeft maar een deel ontvangen.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp-orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Antwoordt in WhatsApp en vraagt het team",
 } as const satisfies PartialTranslation<typeof source>;

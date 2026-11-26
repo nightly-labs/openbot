@@ -5,7 +5,9 @@ import { type AgentNotificationLevelsEvent, agentNotificationLevelsEvent } from 
 import { type AgentSessionSettingsEvent, agentSessionSettingsEvent } from "./agent-session-settings-v1";
 import { withAgentTaskEventUiBlocks } from "./agent-task-ui-blocks-v1";
 import { type AgentTasksEvent, agentTasksEvent } from "./agent-tasks-v1";
+import { type BrowserHttpSignInEvent, browserHttpSignInEvent } from "./browser-http-sign-in-v1";
 import { type BrowserPageStateEvent, browserPageStateEvent } from "./browser-page-state-v1";
+import { type BrowserPermissionsEvent, browserPermissionsEvent } from "./browser-permissions-v1";
 import { type BrowserProfilesEvent, browserProfilesEvent } from "./browser-profiles-events-v1";
 import { type BrowserUserControlEvent, browserUserControlEvent } from "./browser-user-control-v1";
 import { type ChannelEvent, channelEvent } from "./channels-v1";
@@ -19,6 +21,7 @@ import { type LibraryFoldersEvent, libraryFoldersEvent } from "./library-folders
 import { type LiveVoiceEvent, liveVoiceEvent } from "./live-voice-v1";
 import { type MachineAlertEvent, machineAlertEvent } from "./machine-resources-v1";
 import { type MessagePinsEvent, messagePinsEvent } from "./message-pins-v1";
+import { type OpenBotCreditsEvent, openBotCreditsEvent } from "./openbot-credits-events-v1";
 import { type QuietTurnCompletedEvent, quietTurnEvent } from "./quiet-turn-v1";
 import { type RoutineFlowsEvent, routineFlowsEvent } from "./routine-flows-v1";
 import { type SidebarFoldersEvent, sidebarFoldersEvent } from "./sidebar-folders-v1";
@@ -37,7 +40,9 @@ export type OptionalTeamEvent =
   | AgentSessionSettingsEvent
   | ChatColorsEvent
   | ClientBrowserCommandEvent
+  | BrowserHttpSignInEvent
   | BrowserPageStateEvent
+  | BrowserPermissionsEvent
   | BrowserProfilesEvent
   | BrowserUserControlEvent
   | AgentTasksEvent
@@ -49,6 +54,7 @@ export type OptionalTeamEvent =
   | LiveVoiceEvent
   | MachineAlertEvent
   | MessagePinsEvent
+  | OpenBotCreditsEvent
   | SidebarPinsEvent
   | SidebarFoldersEvent
   | SkillsEvent
@@ -73,7 +79,9 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     agentSessionSettingsEvent(value) ??
     chatColorsEvent(value) ??
     clientBrowserCommandEvent(value) ??
+    browserHttpSignInEvent(value) ??
     browserPageStateEvent(value) ??
+    browserPermissionsEvent(value) ??
     browserProfilesEvent(value) ??
     browserUserControlEvent(value) ??
     agentTasksEvent(value) ??
@@ -85,6 +93,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     liveVoiceEvent(value) ??
     machineAlertEvent(value) ??
     messagePinsEvent(value) ??
+    openBotCreditsEvent(value) ??
     sidebarPinsEvent(value) ??
     sidebarFoldersEvent(value) ??
     skillsEvent(value) ??

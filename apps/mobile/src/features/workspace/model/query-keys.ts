@@ -140,6 +140,7 @@ export const queryKeys = {
   serverSignalHome: (scope: QueryScope, serverId: string) => ["server-signal-home", ...scope, serverId],
   localServers: (scope: QueryScope, serverId: string) => ["local-servers", ...scope, serverId],
   agentMemoryLimit: (scope: QueryScope, serverId: string) => ["agent-memory-limit", ...scope, serverId],
+  mediaApprovalCredits: (scope: QueryScope, serverId: string) => ["media-approval-credits", ...scope, serverId],
   memoryReview: (scope: QueryScope, serverId: string) => ["memory-review", ...scope, serverId],
   skillLearning: (scope: QueryScope, serverId: string) => ["skill-learning", ...scope, serverId],
   browsingMemory: (scope: QueryScope, serverId: string) => ["browsing-memory", ...scope, serverId],
@@ -214,6 +215,7 @@ export const queryKeys = {
     ...logo,
   ],
   planLimits: (scope: QueryScope, serverId: string) => ["plan-limits", ...scope, serverId],
+  agentUsageLimits: (scope: QueryScope, serverId: string) => ["agent-usage-limits", ...scope, serverId],
   machineMetrics: (scope: QueryScope, serverId: string) => ["machine-metrics", ...scope, serverId],
   serverUsage: (scope: QueryScope, serverId: string, range: unknown) => ["server-usage", ...scope, serverId, range],
   profileActivity: (scope: QueryScope, serverId: string, range: unknown) => [

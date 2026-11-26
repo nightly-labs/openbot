@@ -34,7 +34,10 @@ const RETRY_MAX_MS = 5 * 60 * 1000;
 const ACTIVITY_LIFETIME_MS = 8 * 60 * 60 * 1000;
 const REGISTRATION_LIFETIME_MS = ACTIVITY_LIFETIME_MS + 4 * 60 * 60 * 1000;
 
-type LiveActivityPushAgents = Pick<TeamApiAgents, "on" | "off" | "getRuntimeSnapshot" | "listConversationReads">;
+type LiveActivityPushAgents = Pick<
+  TeamApiAgents,
+  "on" | "off" | "getRuntimeSnapshot" | "listConversationReads" | "listAgents"
+>;
 
 export interface LiveActivityPushOptions {
   agents: LiveActivityPushAgents;
@@ -301,9 +304,10 @@ export class LiveActivityPushService {
       const count = counts.get(agent.id);
       return count && agent.notifications ? [{ ...agent, serverId: value.serverId, count }] : [];
     });
+    const colors = new Map(this.#options.agents.listAgents().map((agent) => [agent.id, agent.avatarColor ?? null]));
     const props = liveActivityView(presentation, {
       t: phoneText(value.locale),
-      agentColor: avatarHeadColor,
+      agentColor: (agent) => avatarHeadColor(agent.avatarSeed, agent.avatarHue, colors.get(agent.id) ?? null),
       avatar: (_serverId, agent, mood) =>
         registration.photos.get(agent.id) ?? liveActivityBloubFile(agent.avatarSeed, agent.avatarHue, mood),
       unreadAgents,
