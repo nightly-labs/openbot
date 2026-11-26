@@ -45,11 +45,12 @@ const REFUSED_MODEL_SWITCH =
   "API error: 429 This request would exceed your account's rate limit. Please try again later \u00b7 model not changed";
 const REFUSED_REQUEST =
   'API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"This model requires Responses for tool calls; this account only supports Chat Completions"}}';
+const defaultClaudeConfig = join(home, ".claude");
 const MODEL_NOT_OFFERED = `There's an issue with the selected model (${PRIMARY}). It may not exist or you may not have access to it.`;
 
 process.env.HOME = home;
 process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
-process.env.CLAUDE_CONFIG_DIR = join(home, ".claude");
+process.env.CLAUDE_CONFIG_DIR = defaultClaudeConfig;
 process.env.OPENBOT_CODEX_PATH = codexExecutable;
 process.env.CODEX_HOME = join(home, ".codex");
 mkdirSync(home, { recursive: true });
@@ -61,6 +62,7 @@ const { CodexAppServerClient } = await import("../src/backend/app-server-client"
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
+const { ProviderAccountStore } = await import("../src/backend/agent/provider-account-store");
 const { importProviderHistory } = await import("../src/backend/provider-history-import");
 
 const STAND_IN_CLAUDE = `#!/usr/bin/env node
@@ -110,7 +112,34 @@ const turn = (message) => {
   const input = JSON.stringify(message);
   const drops = input.includes("drop-then-fail");
   const acts = drops || input.includes("act-then-fail");
-  fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: fails, input, pid: process.pid }) + "\\n");
+  fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: fails, input, pid: process.pid, config: process.env.CLAUDE_CONFIG_DIR }) + "\\n");
+  if (input.includes("usage-command") && model === ${JSON.stringify(PRIMARY)} && process.env.CLAUDE_CONFIG_DIR === ${JSON.stringify(defaultClaudeConfig)}) {
+    const callId = "toolu_" + randomUUID().replaceAll("-", "");
+    const taskId = "bash-" + callId;
+    const task = { task_id: taskId, task_type: "local_bash", description: "npm run build" };
+    write({ type: "assistant", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+      content: [{ type: "tool_use", id: callId, name: "Bash", input: { command: "npm run build", run_in_background: true } }],
+      stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } }, parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
+    write({ type: "system", subtype: "task_started", tool_use_id: callId, ...task, session_id: sessionId, uuid: randomUUID() });
+    write({ type: "system", subtype: "background_tasks_changed", tasks: [task], session_id: sessionId, uuid: randomUUID() });
+    write({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: callId, content: "Command running in background with ID: " + taskId }] },
+      parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
+    assistant("The build runs in the background.");
+    result({ is_error: false, result: "The build runs in the background." });
+    setTimeout(() => {
+      write({ type: "system", subtype: "background_tasks_changed", tasks: [], session_id: sessionId, uuid: randomUUID() });
+      write({ type: "system", subtype: "task_notification", task_id: taskId, tool_use_id: callId, status: "completed",
+        summary: 'Background command "npm run build" completed (exit code 0)', output_file: "/tmp/build-output.txt", session_id: sessionId, uuid: randomUUID() });
+      fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: true, input: "command result", pid: process.pid, config: process.env.CLAUDE_CONFIG_DIR }) + "\\n");
+      assistant("The build passed. Now I deploy the result.");
+      const limit = "You've hit your limit. Try again later.";
+      write({ type: "assistant", error: "rate_limit", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+        content: [{ type: "text", text: limit }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
+        parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
+      result({ is_error: true, result: limit });
+    }, 200);
+    return;
+  }
   if (input.includes("usage-relay") && model === ${JSON.stringify(PRIMARY)}) {
     const startHelper = (description) => {
       const callId = "toolu_" + randomUUID().replaceAll("-", "");
@@ -385,9 +414,22 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly toolAnswers = new Map<RequestId, unknown>();
   readonly #started = new Set<string>();
 
-  constructor(cli: ClaudeCliInfo) {
+  constructor(cli: ClaudeCliInfo, accountEnvironment?: Readonly<Record<string, string>>) {
     super();
-    this.#real = new ClaudeAgentClient(cli);
+    this.#real = accountEnvironment
+      ? new ClaudeAgentClient(
+          cli,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          () => accountEnvironment,
+        )
+      : new ClaudeAgentClient(cli);
     this.readHistory = this.#real.readHistory;
     this.#real.on("notification", (notification) => {
       if (notification.method === "turn/started" && isDynamicRecord(notification.params)) {
@@ -411,6 +453,18 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
 
   stop() {
     return this.#real.stop();
+  }
+
+  holdsBackgroundWork(threadId: string) {
+    return this.#real.holdsBackgroundWork(threadId);
+  }
+
+  wakesAfterBackgroundWork(threadId: string) {
+    return this.#real.wakesAfterBackgroundWork(threadId);
+  }
+
+  wakeAfterLostWork(threadId: string) {
+    return this.#real.wakeAfterLostWork(threadId);
   }
 
   canReleaseProcess = () => this.#real.canReleaseProcess();
@@ -520,7 +574,7 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
   }
 }
 
-function turns(): { model: string; failed: boolean; input: string; pid: number }[] {
+function turns(): { model: string; failed: boolean; input: string; pid: number; config: string }[] {
   try {
     return readFileSync(turnLog, "utf8")
       .split("\n")
@@ -562,18 +616,19 @@ const database = new OpenBotDatabase(userData);
 const clients: ClaudeStandIn[] = [];
 const events: AgentEvent[] = [];
 
-function startService() {
+function startService(providerAccounts?: InstanceType<typeof ProviderAccountStore>) {
   const store = new AgentStore(userData, home, database);
   const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
   const service = new AgentService({
     store,
     mailbox,
     browser,
+    ...(providerAccounts ? { providerAccounts } : {}),
     preferredProvider: "claude",
     offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "claude" && provider !== "codex"),
-    clientFactory: (provider, cli) => {
+    clientFactory: (provider, cli, _confinement, accountEnvironment) => {
       if (provider === "codex") return new CodexAppServerClient(cli.executable, 30000);
-      const client = new ClaudeStandIn(cli);
+      const client = new ClaudeStandIn(cli, accountEnvironment);
       clients.push(client);
       return client;
     },
@@ -641,9 +696,9 @@ async function check(name: string, run: () => Promise<unknown>) {
   report.checks.push({ name, passed: true, detail });
 }
 
-async function restart() {
+async function restart(providerAccounts?: InstanceType<typeof ProviderAccountStore>) {
   await runCauseEffect(service.stop());
-  ({ store, mailbox, service } = startService());
+  ({ store, mailbox, service } = startService(providerAccounts));
   await runCauseEffect(service.initialize());
 }
 
@@ -1796,6 +1851,84 @@ try {
     assert.equal(agent.usageLimitReturn, undefined, "Nothing is left to go back to.");
     return { failedModels, workedModels };
   });
+
+  for (const account of ["model", "account"] as const) {
+    await check(
+      `a usage limit on Claude's own turn after a background command continues on the backup ${account}`,
+      async () => {
+        const accounts =
+          account === "account"
+            ? new ProviderAccountStore(
+                join(userData, "openbot-provider-accounts-v1.json"),
+                join(root, "provider-accounts"),
+              )
+            : undefined;
+        if (accounts) await runCauseEffect(accounts.load());
+        const second = accounts ? await runCauseEffect(accounts.create("claude")) : undefined;
+        if (accounts) assert.ok(second, "The second Claude account exists.");
+        await restart(accounts);
+        if (second)
+          await waitFor("the second Claude account to connect", () =>
+            service
+              .getStatus()
+              .providers?.find((row) => row.id === "claude")
+              ?.accounts?.some((candidate) => candidate.id === second.id && candidate.state === "connected"),
+          );
+        const agent = await create(`Builder${account}`);
+        await waitFor("the first turn to end", () =>
+          service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+        );
+        const backup = second
+          ? { provider: "claude" as const, model: PRIMARY, providerAccountId: second.id }
+          : { provider: "claude" as const, model: BACKUP };
+        await runCauseEffect(
+          service.updateAgent({
+            agentId: agent.id,
+            backupModels: { automatic: true, order: [{ provider: "claude", model: PRIMARY }, backup] },
+          }),
+        );
+        const since = events.length;
+        const before = turns().length;
+        const outcome = await send(agent.id, "usage-command: build in the background, then deploy.");
+        assert.equal(outcome.status, "completed", "The request that starts the command completes.");
+        const continued = await waitFor("the request to continue on the backup", () =>
+          turns()
+            .slice(before)
+            .find((turn) => turn.input.includes("Continue the unfinished task")),
+        );
+        assert.ok(
+          continued.input.includes(
+            'Background task completed: Background command \\"npm run build\\" completed (exit code 0)',
+          ),
+          "The backup gets the command result.",
+        );
+        assert.ok(continued.input.includes("/tmp/build-output.txt"), "The backup gets the output file.");
+        assert.ok(continued.input.includes("usage-command"), "The backup gets the original request.");
+        await waitFor(
+          "the continuation to end",
+          () => mailbox.getDelivery(outcome.deliveryId)?.delivery.status === "completed",
+        );
+        const ran = turns().slice(before);
+        assert.deepEqual(
+          ran.map((turn) => [turn.model, turn.config === defaultClaudeConfig]),
+          [
+            [PRIMARY, true],
+            [PRIMARY, true],
+            [second ? PRIMARY : BACKUP, !second],
+          ],
+          "The request ran, Claude's own turn was refused, and the backup continued.",
+        );
+        const moved = agentOf(agent.id);
+        assert.equal(moved.model, second ? PRIMARY : BACKUP, "The agent is on its backup model.");
+        assert.equal(moved.providerAccountId, second?.id, "The agent is on its backup account.");
+        const notes = await markers(agent.id, MODEL_SWITCH_ITEM_TYPES["usage-limit"]);
+        assert.equal(notes.length, 1, "The chat says that the agent switched.");
+        assert.deepEqual(errorsFor(agent.id, since), [], "No error shows.");
+        if (accounts) await restart();
+        return { models: ran.map((turn) => turn.model), notes };
+      },
+    );
+  }
 
   await check("a refused sign-in moves to the backup and tells the user", async () => {
     await restart();
