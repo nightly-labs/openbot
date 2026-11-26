@@ -18,12 +18,14 @@ const BASE = Date.parse("2026-10-01T00:00:00.000Z");
 const ROUNDS = 20;
 const MIN_SPEEDUP_AFTER_APPEND = 3;
 
+type SeedDelivery = MailboxProjectionState["deliveries"][number] & { queueOrder: number };
+
 const agentId = (index: number) => `agent-${String(index).padStart(3, "0")}`;
 const time = (offset: number) => new Date(BASE + offset * 1_000).toISOString();
 
 function seedState(): MailboxProjectionState {
   const messages: MailboxProjectionState["messages"] = [];
-  const deliveries: MailboxProjectionState["deliveries"] = [];
+  const deliveries: SeedDelivery[] = [];
   const idempotency: Record<string, string> = {};
   let order = 0;
   for (let index = 0; index < MESSAGES; index++) {
@@ -60,7 +62,7 @@ function seedState(): MailboxProjectionState {
         turnId: `turn-${index}`,
         error: null,
         createdAt: time(index),
-        ...{ queueOrder: order++ },
+        queueOrder: order++,
       });
     if (sender.kind === "agent") idempotency[`reply:${sender.agentId}:turn-${index}:0`] = id;
   }
@@ -83,7 +85,7 @@ function seedState(): MailboxProjectionState {
         turnId: null,
         error: null,
         createdAt: time(MESSAGES + agent * 10 + index),
-        ...{ queueOrder: order++ },
+        queueOrder: order++,
       });
     }
   return { messages, deliveries, drafts: [], generatedAttachments: [], pausedAgentIds: [], idempotency, reactions: [] };
@@ -113,9 +115,11 @@ function measure(work: () => void): number {
   return performance.now() - started;
 }
 
+type ConversationView = ReturnType<MailboxStore["conversationMessages"]>;
+
 interface AgentViews {
-  conversation: ReturnType<MailboxStore["conversationMessages"]>;
-  recent: ReturnType<MailboxStore["conversationMessages"]>;
+  conversation: ConversationView;
+  recent: ConversationView;
   queue: ReturnType<MailboxStore["listQueue"]>;
   routines: ReturnType<MailboxStore["taskRoutineDeliveries"]>;
   senders: string[];
@@ -132,12 +136,29 @@ interface Report {
   error?: string;
 }
 
+function inRecipientOrder(messages: ConversationView): ConversationView {
+  return messages.map((message) =>
+    message.exchange
+      ? {
+          ...message,
+          exchange: {
+            ...message.exchange,
+            recipientAgentIds: message.exchange.recipientAgentIds.toSorted(),
+            deliveries: message.exchange.deliveries.toSorted((left, right) =>
+              left.recipientAgentId.localeCompare(right.recipientAgentId),
+            ),
+          },
+        }
+      : message,
+  );
+}
+
 function views(mailbox: MailboxStore): AgentViews[] {
   return Array.from({ length: AGENTS }, (_, index) => {
     const agent = agentId(index);
     return {
-      conversation: mailbox.conversationMessages(agent),
-      recent: mailbox.conversationMessages(agent, { fromCreatedAt: time(MESSAGES - 2_000) }),
+      conversation: inRecipientOrder(mailbox.conversationMessages(agent)),
+      recent: inRecipientOrder(mailbox.conversationMessages(agent, { fromCreatedAt: time(MESSAGES - 2_000) })),
       queue: mailbox.listQueue(agent),
       routines: mailbox.taskRoutineDeliveries(agent),
       senders: mailbox.senderAgentIdsForRecipient(agent),
@@ -178,6 +199,7 @@ try {
   const afterStatusEmit: number[] = [];
   const afterEnqueue: number[] = [];
   const afterEnqueueEmit: number[] = [];
+  const afterAgentReply: number[] = [];
   const inTransaction: number[] = [];
   const writeInTransaction: number[] = [];
   const write: number[] = [];
@@ -205,6 +227,16 @@ try {
       mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: [agent], text: `Live b ${round}` }),
     );
     afterEnqueueEmit.push(measure(() => emitQueueReads(mailbox, agent)));
+    const replier = agentId((round + 1) % AGENTS);
+    await runCauseEffect(
+      mailbox.enqueue({
+        sender: { kind: "agent", agentId: replier },
+        recipientAgentIds: [agent, agentId((round + 2) % AGENTS)],
+        text: `Live reply ${round}`,
+        idempotencyKey: `reply:${replier}:live-reply-turn-${round}:0`,
+      }),
+    );
+    afterAgentReply.push(measure(() => mailbox.conversationMessages(agent)));
     inTransaction.push(
       measure(() =>
         withDatabaseTransaction(database, () => {
@@ -230,6 +262,7 @@ try {
   report.timings.emitQueueAfterStatus = timing(afterStatusEmit);
   report.timings.conversationMessagesAfterEnqueue = timing(afterEnqueue);
   report.timings.emitQueueAfterEnqueue = timing(afterEnqueueEmit);
+  report.timings.conversationMessagesAfterAgentReply = timing(afterAgentReply);
   report.timings.fiveReadsInTransaction = timing(inTransaction);
   report.timings.writeAndFiveEmitsInTransaction = timing(writeInTransaction);
   const live = views(mailbox);
@@ -237,7 +270,8 @@ try {
   await runCauseEffect(fresh.initialize());
   const rebuilt = views(fresh);
   const sameAsFullRebuild = isDeepStrictEqual(live, rebuilt);
-  const appendKeepsIndex = timing(afterEnqueue).p50 * MIN_SPEEDUP_AFTER_APPEND < timing(cold).p50;
+  const slowestAppend = Math.max(timing(afterEnqueue).p50, timing(afterAgentReply).p50);
+  const appendKeepsIndex = slowestAppend * MIN_SPEEDUP_AFTER_APPEND < timing(cold).p50;
   report.checks = { sameAsFullRebuild, appendKeepsIndex };
   database.close();
   report.passed = sameAsFullRebuild && appendKeepsIndex;

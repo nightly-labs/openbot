@@ -315,7 +315,7 @@ export class MailboxStore {
   #keptDeliveriesByRecipient: KeptIndex<StoredDelivery, Map<string, StoredDelivery[]>> | undefined;
   #idempotencyRevision = 0;
   #savedIdempotency: IdempotencyMark | undefined;
-  #keptTurnIds: { mark: IdempotencyMark; turnIds: ReadonlyMap<string, string | undefined> } | undefined;
+  #keptTurnIds: { mark: IdempotencyMark; turnIds: Map<string, string | undefined> } | undefined;
   #initialized = false;
   readonly #changes = {
     messageIds: new Set<string>(),
@@ -2000,9 +2000,7 @@ export class MailboxStore {
     if (this.#keptTurnIds && sameIdempotencyMark(this.#keptTurnIds.mark, mark)) return this.#keptTurnIds.turnIds;
     const turnIds = new Map<string, string | undefined>();
     for (const [key, messageId] of Object.entries(this.#state.idempotency)) {
-      if (turnIds.has(messageId)) continue;
-      const parts = key.split(":");
-      turnIds.set(messageId, parts.length >= 3 ? parts.at(-2) : undefined);
+      if (!turnIds.has(messageId)) turnIds.set(messageId, sourceTurnIdOfKey(key));
     }
     this.#keptTurnIds = { mark, turnIds };
     return turnIds;
@@ -2018,8 +2016,16 @@ export class MailboxStore {
   }
 
   #rememberIdempotencyKey(key: string, messageId: string): void {
+    const kept = this.#keptTurnIds;
+    const extendsKeptTurnIds =
+      kept !== undefined &&
+      sameIdempotencyMark(kept.mark, this.#idempotencyMark()) &&
+      !Object.hasOwn(this.#state.idempotency, key);
     this.#state.idempotency[key] = messageId;
     this.#idempotencyChanged();
+    if (!extendsKeptTurnIds) return;
+    if (!kept.turnIds.has(messageId)) kept.turnIds.set(messageId, sourceTurnIdOfKey(key));
+    this.#keptTurnIds = { mark: this.#idempotencyMark(), turnIds: kept.turnIds };
   }
 
   #forgetIdempotencyKeysOf(messageIds: ReadonlySet<string>): void {
@@ -4070,7 +4076,8 @@ function extendKeptIndex<Item, Index>(
   create: () => Index,
   add: (index: Index, item: Item) => void,
 ): KeptIndex<Item, Index> {
-  const reusable = kept?.source === source && kept.length <= source.length ? kept : undefined;
+  if (kept?.source === source && kept.length === source.length) return kept;
+  const reusable = kept?.source === source && kept.length < source.length ? kept : undefined;
   const index = reusable ? reusable.index : create();
   for (const item of reusable ? source.slice(reusable.length) : source) add(index, item);
   return { source, length: source.length, index };
@@ -4354,6 +4361,11 @@ function conversationTimeOf(entry: ConversationIndexEntry): string {
 
 function sameIdempotencyMark(left: IdempotencyMark, right: IdempotencyMark): boolean {
   return left.source === right.source && left.revision === right.revision;
+}
+
+function sourceTurnIdOfKey(key: string): string | undefined {
+  const parts = key.split(":");
+  return parts.length >= 3 ? parts.at(-2) : undefined;
 }
 
 function heldTaskId(message: StoredMessage): string | undefined {
