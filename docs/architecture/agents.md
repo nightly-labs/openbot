@@ -206,7 +206,7 @@ in `src/main/team-api/route-routine-pause-reasons.ts`), which the remote adapter
 as they merge the run places. A client of an older host shows only "Paused".
 
 A person can let the runs of one agent routine change routines: the `runsChangeRoutines` switch
-("Runs can change routines", migration 70 adds `projection_agent_routines.runs_change_routines`, off for
+("Runs can change routines", migration 71 adds `projection_agent_routines.runs_change_routines`, off for
 every routine). `RoutineScheduler.handleTool` gets the routine ids of the turn's routine deliveries from
 the tool router (`#turnRoutineIds`). In such a turn, `create_routine`, `delete_routine` and `test_routine`
 fail. `update_routine` with only `active: false` on the run's own routine works as before (the pause

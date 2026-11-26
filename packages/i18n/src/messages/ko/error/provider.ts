@@ -353,6 +353,8 @@ export const messages = {
     "Gemini가 이 채팅의 저장된 기록을 읽지 못했습니다. OpenBot이 채팅 기록으로 새 Gemini 세션을 시작했습니다. 메시지를 다시 보내세요.",
   "error.provider.acpTurnStuck":
     "{provider}이(가) 이전 턴을 끝내지 않아 이 메시지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 메시지를 다시 보내세요.",
+  "error.provider.antigravityLicenseRefused":
+    "Google에 따르면 이 계정에는 이 모델을 사용할 라이선스가 없어요. 다른 모델을 선택한 후 메시지를 다시 보내 주세요.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google이 이 에이전트를 실행하는 컴퓨터의 네트워크 위치에서는 Gemini 사용을 허용하지 않아요. 다른 컴퓨터에서 Gemini를 사용하거나 이 에이전트에 다른 제공자를 선택하세요.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -459,6 +461,8 @@ export const messages = {
     "Muse가 MCP 서버를 시작하지 못해서 이 세션에서 MCP를 차단했어요. OpenBot이 채팅 기록으로 새 Muse 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 이 에이전트의 컴퓨터 제어 또는 실패한 MCP 서버를 끄세요.",
   "error.provider.claudeSessionMissing":
     "Claude Code가 이 채팅의 저장된 세션을 찾지 못했어요. OpenBot이 채팅 기록으로 새 Claude Code 세션을 시작했어요. 다시 시도해 주세요.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode가 이 채팅의 저장된 세션을 찾지 못했어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 다시 시도해 주세요.",
   "error.provider.grokSignIn": "Grok을 사용하려면 `grok login`을 실행하거나 XAI_API_KEY를 설정하세요.",
   "error.provider.acpSignInNoStart":
     "제공자가 시작되지 않아 로그인을 시작할 수 없었어요. 다시 시도하거나 OpenBot을 다시 시작해 주세요.",
@@ -567,7 +571,10 @@ export const messages = {
   "error.provider.piOutdated":
     "Pi {version}이(가) 너무 오래되었어요. 네이티브 RPC 및 MCP 지원을 위해 Pi 1.1.0 이상을 설치하세요.",
   "error.provider.nativeMissing": "{provider} CLI가 설치되어 있지 않아요. 설정에서 다운로드하세요.",
-  "error.provider.nativeNotStarted": "{provider} CLI를 시작할 수 없었어요.",
+  "error.provider.nativeNotStarted":
+    "OpenBot이 설치된 {provider}를 찾았지만 시작되지 않았어요. {provider}를 업데이트하거나 다시 설치한 다음 다시 시도하세요.",
+  "error.provider.nativeManagedNotStarted":
+    "이 서버를 실행하는 컴퓨터에서 {provider}가 시작되지 않았어요. 그 컴퓨터에서 OpenBot을 다시 시작하세요. 그래도 시작되지 않으면 도움말 > 문제 신고를 선택하세요.",
   "error.provider.nativeVersionUnreadable": "{provider} CLI 버전을 읽을 수 없었어요.",
   "error.provider.piSessionBusy": "현재 Pi 턴이 끝날 때까지 기다려 주세요.",
   "error.provider.acpSessionBusy": "{provider}이(가) 중지된 턴을 아직 마무리하고 있습니다. 잠시 후 다시 시도해 주세요.",

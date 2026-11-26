@@ -2,16 +2,25 @@ import {
   type CreditMediaGenerationKind,
   type CreditMediaModel,
   creditMediaCost,
+  creditMediaSpendable,
 } from "@openbot/contracts/credit-media";
-import type { AgentApproval, MediaApprovalChoice, MediaApprovalOffer, MediaApprovalRead } from "@openbot/contracts/ipc";
+import type {
+  AgentApproval,
+  MediaApprovalBalance,
+  MediaApprovalChoice,
+  MediaApprovalOffer,
+  MediaApprovalRead,
+} from "@openbot/contracts/ipc";
 import { classifyFailure } from "@openbot/telemetry";
 import {
   Button,
   Check,
   ChevronDown,
   ChevronsUpDown,
+  Gift,
   Input,
   Listbox,
+  Lock,
   Monitor,
   Popover,
   Scan,
@@ -97,6 +106,20 @@ function AgentPickNote(props: { agentName: string | undefined }) {
   return <span class="media-approval-agent-pick">{text()}</span>;
 }
 
+function onFreeCredits(balance: MediaApprovalBalance | undefined): balance is MediaApprovalBalance {
+  return balance !== undefined && balance.welcome > 0;
+}
+
+function FreeCreditsChip() {
+  const { t } = useText();
+  return (
+    <span class="wfn-picker-chip media-approval-free-chip">
+      <Gift aria-hidden="true" />
+      {t("prompt.mediaApproval.freeCredits")}
+    </span>
+  );
+}
+
 function ModelPicker(props: {
   models: readonly CreditMediaModel[];
   value: string;
@@ -105,6 +128,7 @@ function ModelPicker(props: {
   defaultModel: string | null;
   label: string;
   settings: MediaSettings;
+  balance: MediaApprovalBalance | undefined;
   disabled: boolean;
   onChange: (id: string) => void;
 }) {
@@ -119,7 +143,7 @@ function ModelPicker(props: {
     const settings = settingsFor(model, props.settings);
     const credits = costFor(model, settings);
     return {
-      credits: credits === null ? "" : format.number(credits),
+      credits,
       unit:
         settings.duration === null
           ? t("prompt.mediaApproval.perImage")
@@ -133,8 +157,16 @@ function ModelPicker(props: {
       [model.name, model.variant ?? "", model.maker].some((part) => part.toLowerCase().includes(text)),
     );
   });
-  const choose = (id: string) => {
-    if (id !== props.value) props.onChange(id);
+  const freeShown = () => onFreeCredits(props.balance);
+  const paidOnly = (model: CreditMediaModel) => {
+    const balance = props.balance;
+    if (!onFreeCredits(balance) || model.welcome === true) return false;
+    const credits = priceOf(model).credits;
+    return credits === null || credits > creditMediaSpendable(balance, false);
+  };
+  const choose = (model: CreditMediaModel) => {
+    if (paidOnly(model)) return;
+    if (model.id !== props.value) props.onChange(model.id);
     setOpen(false);
   };
   const agentPickMark = (id: string) => (props.agentModel === id ? "" : undefined);
@@ -202,8 +234,8 @@ function ModelPicker(props: {
                 if (event.key !== "ArrowDown" && event.key !== "Enter") return;
                 event.preventDefault();
                 if (event.key === "Enter") {
-                  const [first] = shown();
-                  if (first) choose(first.id);
+                  const first = shown().find((model) => !paidOnly(model));
+                  if (first) choose(first);
                   return;
                 }
                 panel?.querySelector<HTMLElement>("[role=option]")?.focus();
@@ -219,6 +251,7 @@ function ModelPicker(props: {
               options={shown()}
               optionValue={(option) => option.id}
               optionTextValue={(option) => option.name}
+              optionDisabled={paidOnly}
               value={[props.value]}
               selectionMode="single"
               shouldFocusWrap
@@ -227,9 +260,9 @@ function ModelPicker(props: {
                   item={item}
                   class="wfn-picker-row media-approval-row"
                   data-agent-pick={agentPickMark(item.rawValue.id)}
-                  onClick={() => choose(item.rawValue.id)}
+                  onClick={() => choose(item.rawValue)}
                   onKeyDown={(event: KeyboardEvent) => {
-                    if (event.key === "Enter" || event.key === " ") choose(item.rawValue.id);
+                    if (event.key === "Enter" || event.key === " ") choose(item.rawValue);
                   }}
                 >
                   <span class="wfn-picker-tile">
@@ -253,12 +286,31 @@ function ModelPicker(props: {
                           {t("prompt.mediaApproval.default")}
                         </span>
                       </Show>
+                      <Show when={freeShown() && item.rawValue.welcome === true}>
+                        <FreeCreditsChip />
+                      </Show>
                     </span>
                   </span>
-                  <span class="media-approval-row-price">
-                    <CreditAmount value={priceOf(item.rawValue).credits} />
-                    <span class="media-approval-row-unit">{priceOf(item.rawValue).unit}</span>
-                  </span>
+                  <Show
+                    when={paidOnly(item.rawValue)}
+                    fallback={
+                      <span class="media-approval-row-price">
+                        <CreditAmount credits={priceOf(item.rawValue).credits} />
+                        <span class="media-approval-row-unit">{priceOf(item.rawValue).unit}</span>
+                      </span>
+                    }
+                  >
+                    <span class="media-approval-row-price media-approval-row-locked">
+                      <span class="media-approval-paid-only">
+                        <Lock aria-hidden="true" />
+                        {t("prompt.mediaApproval.paidOnly")}
+                      </span>
+                      <span class="media-approval-row-unit">
+                        <CreditAmount credits={priceOf(item.rawValue).credits} />
+                        {priceOf(item.rawValue).unit}
+                      </span>
+                    </span>
+                  </Show>
                 </Listbox.Item>
               )}
             />
@@ -444,7 +496,7 @@ export function MediaApprovalCard(props: {
   onAllow: (choice: MediaApprovalChoice) => void;
   onSetDefault?: ((model: string | null) => Promise<void>) | undefined;
 }) {
-  const { t, format } = useText();
+  const { t } = useText();
   const initial = untrack(
     (): CardState => ({
       model: props.offer.choice.model,
@@ -463,10 +515,6 @@ export function MediaApprovalCard(props: {
   const cost = () => {
     const model = picked();
     return model ? costFor(model, state.settings) : null;
-  };
-  const credits = () => {
-    const value = cost();
-    return value === null ? "" : format.number(value);
   };
   const isDefault = () => state.defaultModel === state.model;
   const title = () =>
@@ -539,7 +587,7 @@ export function MediaApprovalCard(props: {
           </Show>
           <Button size="sm" type="button" class="media-approval-allow" disabled={allowDisabled()} onClick={allow}>
             {t("prompt.approval.allow")}
-            <CreditAmount value={credits()} class="media-approval-price" />
+            <CreditAmount credits={cost()} class="media-approval-price" />
           </Button>
         </>
       }
@@ -554,6 +602,7 @@ export function MediaApprovalCard(props: {
             defaultModel={state.defaultModel}
             label={modelLabel()}
             settings={state.settings}
+            balance={props.offer.balance}
             disabled={props.submitting}
             onChange={chooseModel}
           />

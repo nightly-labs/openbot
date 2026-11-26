@@ -351,6 +351,8 @@ export const messages = {
     "Gemini nie mógł odczytać zapisanej historii tego czatu. OpenBot uruchomił nową sesję Gemini z historią czatu. Wyślij wiadomość ponownie.",
   "error.provider.acpTurnStuck":
     "{provider} nie zakończył poprzedniej tury, więc nie przyjął tej wiadomości. OpenBot rozpoczął nową sesję {provider} z historią czatu. Wyślij wiadomość ponownie.",
+  "error.provider.antigravityLicenseRefused":
+    "Google informuje, że Twoje konto nie ma licencji na ten model. Wybierz inny model i wyślij wiadomość ponownie.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google nie pozwala Gemini działać z lokalizacji sieciowej komputera, na którym działa ten agent. Użyj Gemini na innym komputerze albo wybierz innego dostawcę dla tego agenta.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -456,6 +458,8 @@ export const messages = {
     "Muse nie mógł uruchomić serwera MCP i zablokował MCP w tej sesji. OpenBot rozpoczął nową sesję Muse z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wyłącz Sterowanie komputerem lub serwer MCP, który zawiódł, dla tego agenta.",
   "error.provider.claudeSessionMissing":
     "Claude Code nie znalazł zapisanej sesji tego czatu. OpenBot rozpoczął nową sesję Claude Code z historią czatu. Spróbuj ponownie.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode nie znalazł zapisanej sesji tego czatu. OpenBot rozpoczął nową sesję OpenCode z historią czatu. Spróbuj ponownie.",
   "error.provider.grokSignIn": "Uruchom `grok login` lub ustaw XAI_API_KEY, aby używać Grok.",
   "error.provider.acpSignInNoStart":
     "Dostawca się nie uruchomił, więc logowanie nie mogło się zacząć. Spróbuj ponownie lub uruchom ponownie OpenBot.",
@@ -567,7 +571,10 @@ export const messages = {
   "error.provider.piOutdated":
     "Pi {version} jest za stary. Zainstaluj Pi 1.1.0 lub nowszy, aby mieć natywną obsługę RPC i MCP.",
   "error.provider.nativeMissing": "{provider} CLI nie jest zainstalowany. Pobierz go w Ustawieniach.",
-  "error.provider.nativeNotStarted": "Nie udało się uruchomić {provider} CLI.",
+  "error.provider.nativeNotStarted":
+    "OpenBot znalazł zainstalowany przez Ciebie {provider}, ale nie uruchomił się. Zaktualizuj lub zainstaluj ponownie {provider}, a potem spróbuj jeszcze raz.",
+  "error.provider.nativeManagedNotStarted":
+    "{provider} nie uruchomił się na komputerze, na którym działa ten serwer. Uruchom ponownie OpenBot na tym komputerze. Jeśli nadal się nie uruchamia, wybierz Pomoc > Zgłoś problem.",
   "error.provider.nativeVersionUnreadable": "Nie udało się odczytać wersji {provider} CLI.",
   "error.provider.piSessionBusy": "Zaczekaj na zakończenie bieżącej tury Pi.",
   "error.provider.acpSessionBusy": "{provider} wciąż kończy zatrzymaną turę. Spróbuj ponownie za chwilę.",

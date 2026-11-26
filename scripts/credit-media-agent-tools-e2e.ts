@@ -94,6 +94,32 @@ const MODELS: CreditMediaModel[] = [
   model({ id: "video-refs", kind: "video", durations: [5], defaultDuration: 5, references: 3 }),
 ];
 
+const FREE_MODELS: CreditMediaModel[] = [
+  model({
+    id: "image-free",
+    kind: "image",
+    welcome: true,
+    prices: [{ resolution: null, unit: "item", credits: 2, silentCredits: null }],
+  }),
+  model({
+    id: "video-free",
+    kind: "video",
+    welcome: true,
+    aspects: ["16:9"],
+    defaultAspect: "16:9",
+    resolutions: ["360p", "720p"],
+    defaultResolution: "720p",
+    durations: [4, 8],
+    defaultDuration: 8,
+    prices: [
+      { resolution: "360p", unit: "second", credits: 1.2, silentCredits: null },
+      { resolution: "720p", unit: "second", credits: 2.4, silentCredits: null },
+    ],
+  }),
+];
+
+let catalogModels = MODELS;
+let walletWelcome: number | undefined;
 const submits: { request: CreditMediaJobRequest; inputs: readonly CreditMediaUpload[] }[] = [];
 const runningJobs = new Map<string, boolean>();
 let heldJob: Deferred.Deferred<string> | null = null;
@@ -101,12 +127,17 @@ let signedIn = true;
 let walletBalance = 100;
 const gateway: CreditMediaGateway = {
   available: () => signedIn,
-  catalog: () => Effect.succeed({ models: MODELS, unavailable: [] }),
-  balance: () => Effect.sync(() => ({ wallet: "personal" as const, available: walletBalance })),
+  catalog: () => Effect.sync(() => ({ models: catalogModels, unavailable: [] })),
+  balance: () =>
+    Effect.sync(() => ({
+      wallet: "personal" as const,
+      available: walletBalance,
+      ...(walletWelcome === undefined ? {} : { welcome: walletWelcome }),
+    })),
   submit: (request, inputs) =>
     Effect.sync(() => {
       submits.push({ request, inputs });
-      const video = MODELS.find((entry) => entry.id === request.model)?.kind === "video";
+      const video = catalogModels.find((entry) => entry.id === request.model)?.kind === "video";
       const held = heldJob;
       heldJob = null;
       if (held) {
@@ -142,7 +173,7 @@ const gateway: CreditMediaGateway = {
   output: (jobId) =>
     Effect.sync(() => {
       const request = submits.find((entry) => entry.request.jobId === jobId)?.request;
-      return MODELS.find((entry) => entry.id === request?.model)?.kind === "video" ? MP4 : PNG;
+      return catalogModels.find((entry) => entry.id === request?.model)?.kind === "video" ? MP4 : PNG;
     }),
 };
 
@@ -156,7 +187,7 @@ const toolScope = Scope.makeUnsafe();
 const reports: CreditMediaReport[] = [];
 let nextReport: Deferred.Deferred<CreditMediaReport> | null = null;
 const tools = new CreditMediaTools({
-  media: () => workflows,
+  media: () => activeWorkflows,
   scope: () => toolScope,
   agentsAllowed: () => agentsAllowed,
   enableAgents: () =>
@@ -193,11 +224,13 @@ const workflows = new CreditMediaWorkflows({
     creditsChanges += 1;
   },
 });
+let activeWorkflows = workflows;
 
 const ToolData = z.looseObject({
   status: z.string().optional(),
   error: z.string().optional(),
   file: z.string().optional(),
+  note: z.string().optional(),
   balance: z.number().nullable().optional(),
   askAboveCredits: z.number().optional(),
   defaultModels: z.object({ image: z.string().nullable(), video: z.string().nullable() }).optional(),
@@ -775,10 +808,120 @@ async function stoppedCall() {
   );
 }
 
+async function freeFlow() {
+  catalogModels = [...MODELS, ...FREE_MODELS];
+  activeWorkflows = new CreditMediaWorkflows({ gateway, warn: () => undefined, creditsChanged: () => undefined });
+  defaultModels = { image: null, video: null };
+  approvalCredits = DEFAULT_MEDIA_APPROVAL_CREDITS;
+  agentsAllowed = true;
+  askWhenBlocked = true;
+  walletBalance = 10;
+  walletWelcome = 10;
+
+  const image = await call("generate_image", { prompt: "A green kite" });
+  check(
+    "with no model and too few paid credits, an image uses a model that takes free credits and says so",
+    image.result.success &&
+      image.holds.length === 0 &&
+      image.approvals.length === 0 &&
+      image.submitted?.request.model === "image-free" &&
+      image.data?.note?.includes("image-text") === true &&
+      image.reports[0]?.outcome === "generated" &&
+      image.reports[0]?.model === "image-free" &&
+      image.reports[0]?.agentModel === "image-text",
+    { data: image.data, request: image.submitted?.request, reports: image.reports },
+  );
+
+  approvalCredits = 0;
+  const asked = await call("generate_image", { prompt: "A green kite" });
+  approvalCredits = DEFAULT_MEDIA_APPROVAL_CREDITS;
+  const freeOffer = asked.offers[0];
+  check(
+    "the approval of a free-credit job sends the payer's paid and free credits and marks the free models, so the picker can lock the paid-only ones",
+    asked.result.success &&
+      freeOffer?.agentModel === "image-free" &&
+      JSON.stringify(freeOffer.balance) === JSON.stringify({ available: 10, welcome: 10 }) &&
+      freeOffer.models.find((entry) => entry.id === "image-free")?.welcome === true &&
+      freeOffer.models.some((entry) => entry.id === "image-text" && entry.welcome !== true),
+    freeOffer,
+  );
+
+  const video = await call("generate_video", { prompt: "A slow river" });
+  check(
+    "with no model, a video takes the longest free setting that fits the free credits",
+    video.result.success &&
+      video.holds.length === 0 &&
+      video.submitted?.request.model === "video-free" &&
+      video.submitted.request.resolution === "360p" &&
+      video.submitted.request.duration === 8 &&
+      video.reports[0]?.cost === 9.6,
+    { data: video.data, request: video.submitted?.request, reports: video.reports },
+  );
+
+  defaultModels = { image: null, video: "video-free" };
+  const lowered = await call("generate_video", { prompt: "A slow river" });
+  defaultModels = { image: null, video: null };
+  check(
+    "a default free model above the free credits keeps the model at lower settings and the note names the settings, not the paid balance",
+    lowered.result.success &&
+      lowered.submitted?.request.model === "video-free" &&
+      lowered.submitted.request.resolution === "360p" &&
+      lowered.data?.note?.includes("360p, 8 s") === true &&
+      lowered.data.note.includes("paid balance") === false,
+    { data: lowered.data, request: lowered.submitted?.request },
+  );
+
+  const named = await call("generate_image", { prompt: "A green kite", model: "image-text" });
+  check(
+    "a named paid model above the paid balance names the free model and its settings, asks nothing and spends nothing",
+    !named.result.success &&
+      named.holds.length === 0 &&
+      named.submitted === undefined &&
+      named.error?.includes('model "image-free"') === true &&
+      named.error.includes("Nothing was spent.") &&
+      named.reports[0]?.outcome === "short" &&
+      named.reports[0]?.hold === null,
+    { text: named.text, reports: named.reports },
+  );
+
+  const namedFree = await call("generate_video", { prompt: "A slow river", model: "video-free" });
+  check(
+    "a named free model above the free credits offers lower settings and does not call the free credits a paid balance",
+    !namedFree.result.success &&
+      namedFree.submitted === undefined &&
+      namedFree.error?.includes('model "video-free"') === true &&
+      namedFree.error.includes("free credits are") &&
+      namedFree.error.includes("paid balance") === false,
+    { text: namedFree.text },
+  );
+
+  walletBalance = 100;
+  const paid = await call("generate_image", { prompt: "A green kite" });
+  check(
+    "with enough paid credits, the default paid model stays and the result has no note",
+    paid.result.success && paid.submitted?.request.model === "image-text" && paid.data?.note === undefined,
+    { data: paid.data, request: paid.submitted?.request },
+  );
+
+  walletBalance = 2;
+  walletWelcome = undefined;
+  const noFree = await call("generate_image", { prompt: "A green kite" });
+  check(
+    "with no free credits, a short balance holds the call as before",
+    !noFree.result.success && noFree.holds.length === 1 && noFree.submitted === undefined,
+    { text: noFree.text, holds: noFree.holds },
+  );
+
+  catalogModels = MODELS;
+  activeWorkflows = workflows;
+  walletBalance = 100;
+}
+
 let passed = false;
 try {
   await flow();
   await stoppedCall();
+  await freeFlow();
   passed = checks.every((item) => item.passed);
 } finally {
   await Effect.runPromise(Scope.close(toolScope, Exit.void));

@@ -85,6 +85,7 @@ import type { MailboxSync } from "./mailbox-sync";
 import { memoryChangesMessage } from "./memory-changes-message";
 import { type FinishCheckMode, type PlanContinuation, promisesWork, waitsForUser } from "./plan-continuation";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
+import { codexAppNeedsAutoReview } from "./prompts";
 import {
   GEMINI_INVALID_CREDENTIALS,
   isBalanceDiagnostic,
@@ -135,6 +136,7 @@ import {
 import { type ToolOutcome, TurnTraces, traceMessage } from "./turn-traces";
 import { collectProviderUsage } from "./usage-collection";
 import { USAGE_LIMIT_METHOD, type UsageLimitGate } from "./usage-limit-gate";
+import { codexSandboxMode } from "./workspace-sandbox";
 
 const logger = createOpenBotLogger("turn-lifecycle");
 const RETRY_NOTICE_ATTEMPTS = 3;
@@ -795,6 +797,7 @@ export class TurnLifecycle {
     plan: ConversationPlan | null,
     answer: string,
     continuations: number,
+    earlierGaps: readonly string[],
     awaitsTeammate: boolean,
   ): Effect.Effect<string | null> {
     const check = this.#hooks.checkFinish;
@@ -814,6 +817,16 @@ export class TurnLifecycle {
       )
       .slice(-FINISH_CHECK_CONTEXT_MESSAGES)
       .map((message) => ({ author: message.author, text: redact(message.text) }));
+    const earlierTurnIds = new Set(
+      deliveries.flatMap(({ planContinuation }) => planContinuation?.turnIds ?? []).filter((id) => id !== turnId),
+    );
+    const earlierAnswers = [...earlierTurnIds]
+      .flatMap((id) => {
+        const message = latestTurnAnswer(snapshot.messages, id);
+        return message && message.text.trim().length > 0 ? [message] : [];
+      })
+      .sort((first, second) => snapshot.messages.indexOf(first) - snapshot.messages.indexOf(second))
+      .map((message) => redact(message.text));
     const input: FinishCheckInput = {
       request,
       context,
@@ -830,6 +843,8 @@ export class TurnLifecycle {
       }),
       plan: plan && { ...plan, steps: plan.steps.map((step) => ({ ...step, text: redact(step.text) })) },
       answer: redact(answer),
+      ...(earlierAnswers.length > 0 ? { earlierAnswers } : {}),
+      ...(earlierGaps.length > 0 ? { earlierGaps } : {}),
       continuations,
       ...(awaitsTeammate ? { awaitsTeammate } : {}),
     };
@@ -1420,6 +1435,11 @@ export class TurnLifecycle {
           [...getArray(params, "filePaths"), ...shellReadPaths(item)],
           [...getArray(params, "folderPaths"), ...shellWorkFolders(item)],
         );
+        if (notification.method === "item/completed" && source.provider === "codex" && codexAppNeedsAutoReview(item)) {
+          const agent = this.#store.get(agentId);
+          if (agent && codexSandboxMode(agent) === "danger-full-access")
+            this.#hooks.emitError("mcp_app_auto_review", sourceText("error.backend.mcpAppAutoReview"), agentId);
+        }
         const itemId = getString(item, "id");
         if (itemId) this.#itemTurns.set(itemId, turnId);
         if (itemId && item.failureReport === true) this.#runningTurns.get(turnId)?.failureReports.add(itemId);
@@ -2627,6 +2647,7 @@ export class TurnLifecycle {
               turnPlan,
               latestAssistant.text,
               proposed.continuations,
+              proposed.earlierGaps,
               awaitsEarlierRequest,
             )
           : null;

@@ -358,6 +358,8 @@ export const messages = {
     "Gemini kon de opgeslagen geschiedenis van deze chat niet lezen. OpenBot heeft een nieuwe Gemini-sessie met de chatgeschiedenis gestart. Stuur je bericht opnieuw.",
   "error.provider.acpTurnStuck":
     "{provider} heeft de vorige beurt niet afgerond en heeft dit bericht daarom niet aangenomen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Stuur je bericht opnieuw.",
+  "error.provider.antigravityLicenseRefused":
+    "Google meldt dat je account geen licentie heeft voor dit model. Kies een ander model en stuur je bericht opnieuw.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google staat Gemini niet toe vanaf de netwerklocatie van de computer waarop deze agent draait. Gebruik Gemini op een andere computer, of kies een andere aanbieder voor deze agent.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -463,6 +465,8 @@ export const messages = {
     "Muse kon een MCP-server niet starten en heeft MCP in deze sessie geblokkeerd. OpenBot heeft een nieuwe Muse-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, zet dan Computerbesturing of de mislukte MCP-server uit voor deze agent.",
   "error.provider.claudeSessionMissing":
     "Claude Code heeft de opgeslagen sessie van deze chat niet gevonden. OpenBot heeft een nieuwe Claude Code-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode heeft de opgeslagen sessie van deze chat niet gevonden. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.grokSignIn": "Voer `grok login` uit of stel XAI_API_KEY in om Grok te gebruiken.",
   "error.provider.acpSignInNoStart":
     "De aanbieder is niet gestart, dus het inloggen kon niet beginnen. Probeer het opnieuw of start OpenBot opnieuw.",
@@ -576,7 +580,10 @@ export const messages = {
   "error.provider.piOutdated":
     "Pi {version} is te oud. Installeer Pi 1.1.0 of nieuwer voor native ondersteuning van RPC en MCP.",
   "error.provider.nativeMissing": "De {provider} CLI is niet geïnstalleerd. Download hem in Instellingen.",
-  "error.provider.nativeNotStarted": "De {provider} CLI kon niet starten.",
+  "error.provider.nativeNotStarted":
+    "OpenBot heeft de {provider} gevonden die je hebt geïnstalleerd, maar die is niet gestart. Werk {provider} bij of installeer hem opnieuw en probeer het dan opnieuw.",
+  "error.provider.nativeManagedNotStarted":
+    "{provider} is niet gestart op de computer waarop deze server draait. Start OpenBot opnieuw op die computer. Start hij dan nog steeds niet, kies dan Help > Meld een probleem.",
   "error.provider.nativeVersionUnreadable": "De versie van de {provider} CLI kon niet worden gelezen.",
   "error.provider.piSessionBusy": "Wacht tot de huidige Pi-beurt klaar is.",
   "error.provider.acpSessionBusy": "{provider} rondt nog een gestopte beurt af. Probeer het zo opnieuw.",

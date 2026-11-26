@@ -82,6 +82,8 @@ export const messages = {
   "prompt.mediaApproval.setDefault": "Varsayılan yap",
   "prompt.mediaApproval.perImage": "görsel başına",
   "prompt.mediaApproval.forSeconds": "{count} sn için",
+  "prompt.mediaApproval.freeCredits": "Ücretsiz kredi",
+  "prompt.mediaApproval.paidOnly": "Yalnızca ücretli kredi",
   "prompt.mediaApproval.defaultFailed": "Varsayılan model kaydedilemedi. Yeniden deneyin.",
   "prompt.creditsHold.needMore": "Daha fazla krediye ihtiyacım var",
   "prompt.creditsHold.cannotUse": "Kredi kullanamıyorum",

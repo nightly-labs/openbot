@@ -362,6 +362,8 @@ export const messages = {
     "Gemini non è riuscito a leggere la cronologia salvata di questa chat. OpenBot ha avviato una nuova sessione Gemini con la cronologia della chat. Invia di nuovo il messaggio.",
   "error.provider.acpTurnStuck":
     "{provider} non ha terminato il turno precedente, quindi non ha accettato questo messaggio. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Invia di nuovo il messaggio.",
+  "error.provider.antigravityLicenseRefused":
+    "Google indica che il tuo account non ha una licenza per usare questo modello. Scegli un altro modello, poi invia di nuovo il messaggio.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google non consente a Gemini di funzionare dalla posizione di rete del computer che esegue questo agente. Usa Gemini su un altro computer oppure scegli un altro provider per questo agente.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -468,6 +470,8 @@ export const messages = {
     "Muse non è riuscito ad avviare un server MCP e ha bloccato MCP in questa sessione. OpenBot ha avviato una nuova sessione Muse con la cronologia della chat. Riprova. Se l’errore continua, disattiva Controllo del computer o il server MCP non riuscito per questo agente.",
   "error.provider.claudeSessionMissing":
     "Claude Code non ha trovato la sessione salvata di questa chat. OpenBot ha avviato una nuova sessione di Claude Code con la cronologia della chat. Riprova.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode non ha trovato la sessione salvata di questa chat. OpenBot ha avviato una nuova sessione di OpenCode con la cronologia della chat. Riprova.",
   "error.provider.grokSignIn": "Esegui `grok login` o imposta XAI_API_KEY per usare Grok.",
   "error.provider.acpSignInNoStart":
     "Il provider non si è avviato, quindi l’accesso non è potuto iniziare. Riprova o riavvia OpenBot.",
@@ -579,7 +583,10 @@ export const messages = {
   "error.provider.piOutdated":
     "Pi {version} è troppo vecchio. Installa Pi 1.1.0 o successivo per il supporto nativo a RPC e MCP.",
   "error.provider.nativeMissing": "La CLI di {provider} non è installata. Scaricala in Impostazioni.",
-  "error.provider.nativeNotStarted": "Impossibile avviare la CLI di {provider}.",
+  "error.provider.nativeNotStarted":
+    "OpenBot ha trovato il {provider} che hai installato, ma non si è avviato. Aggiorna o reinstalla {provider}, poi riprova.",
+  "error.provider.nativeManagedNotStarted":
+    "{provider} non si è avviato sul computer che esegue questo server. Riavvia OpenBot su quel computer. Se ancora non si avvia, scegli Aiuto > Segnala un problema.",
   "error.provider.nativeVersionUnreadable": "Impossibile leggere la versione della CLI di {provider}.",
   "error.provider.piSessionBusy": "Attendi che il turno attuale di Pi finisca.",
   "error.provider.acpSessionBusy": "{provider} sta ancora finendo un turno interrotto. Riprova tra un attimo.",

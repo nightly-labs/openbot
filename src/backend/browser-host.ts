@@ -1225,6 +1225,10 @@ export class BrowserHost {
     tabId: string,
   ): Effect.fn.Return<void, BrowserOperationError> {
     yield* this.#leaveSilentPage(tabId);
+    yield* this.#reloadPage(tabId);
+  }).bind(this);
+
+  readonly #reloadPage = Effect.fn("BrowserHost.reloadPage")(function* (this: BrowserHost, tabId: string) {
     yield* this.#enqueue(
       tabId,
       (tab) =>
@@ -1239,7 +1243,7 @@ export class BrowserHost {
         }),
       true,
     );
-  }).bind(this);
+  });
 
   readonly importSignIn = Effect.fn("BrowserHost.importSignIn")(function* (
     this: BrowserHost,
@@ -2508,7 +2512,7 @@ export class BrowserHost {
     if (onCursor) tab.contents.on("cursor-changed", cursorChanged);
     reportDialog();
     return yield* Effect.gen({ self: this }, function* () {
-      stopStream = yield* openStream(generation);
+      stopStream = yield* this.#startViewStream(tab, () => openStream(generation));
       const stopOnce = () =>
         Effect.gen({ self: this }, function* () {
           tab.viewInvalidations.delete(invalidate);
@@ -2905,6 +2909,7 @@ export class BrowserHost {
     request_vault_item: rejectTakeoverTool,
     delete_vault_item: rejectTakeoverTool,
     request_link_payment: rejectTakeoverTool,
+    request_near_payment: rejectTakeoverTool,
   };
 
   #siteRecall(params: DynamicToolCallParams) {
@@ -4728,16 +4733,43 @@ export class BrowserHost {
     return { title: tab.engine.scrubText(title), url: tab.engine.scrubText(url) };
   }
 
+  readonly #startViewStream = Effect.fn("BrowserHost.startViewStream")(function* (
+    this: BrowserHost,
+    tab: BrowserHostTab,
+    open: () => Effect.Effect<() => Effect.Effect<void>, BrowserOperationError>,
+  ) {
+    const start = yield* Effect.forkChild(open(), { startImmediately: true });
+    for (;;) {
+      const done = yield* Fiber.await(start).pipe(Effect.timeoutOption(VIEW_START_CHECK_MS));
+      if (Option.isSome(done) && Exit.isSuccess(done.value)) return done.value.value;
+      const agentOperationRuns = tab.pendingOperations > (tab.previewCapture ? 1 : 0);
+      if (agentOperationRuns && Option.isNone(done)) continue;
+      if (agentOperationRuns || !(yield* this.#pageStopped(tab))) return yield* Fiber.join(start);
+      break;
+    }
+    yield* Fiber.interrupt(start);
+    const late = yield* Fiber.await(start);
+    if (Exit.isSuccess(late)) yield* late.value();
+    yield* this.#reloadPage(tab.id).pipe(Effect.timeoutOption(CRASH_RELOAD_TIMEOUT_MS), Effect.ignore);
+    return yield* open();
+  });
+
+  readonly #pageStopped = Effect.fn("BrowserHost.pageStopped")(function* (this: BrowserHost, tab: BrowserHostTab) {
+    if (tab.secret) return false;
+    if (tab.endingSilentPage || (!tab.contents.isDestroyed() && tab.contents.isCrashed())) return true;
+    return yield* this.#leaveSilentPage(tab.id);
+  });
+
   readonly #leaveSilentPage = Effect.fn("BrowserHost.leaveSilentPage")(function* (
     this: BrowserHost,
     tabId: string,
     direction?: BrowserNavigationDirection | "reload",
   ) {
     const tab = this.#tabs.get(tabId);
-    if (!tab || tab.closing || tab.secret || tab.pendingRestore || tab.contents.isDestroyed()) return;
-    if (direction === "back" && !hasHistoryEntry(tab.contents, -1)) return;
-    if (direction === "forward" && !hasHistoryEntry(tab.contents, 1)) return;
-    if (yield* tab.engine.pageAnswers().pipe(Effect.orElseSucceed(() => true))) return;
+    if (!tab || tab.closing || tab.secret || tab.pendingRestore || tab.contents.isDestroyed()) return false;
+    if (direction === "back" && !hasHistoryEntry(tab.contents, -1)) return false;
+    if (direction === "forward" && !hasHistoryEntry(tab.contents, 1)) return false;
+    if (yield* tab.engine.pageAnswers().pipe(Effect.orElseSucceed(() => true))) return false;
     logger.warn("Ending the renderer of a browser tab whose page does not answer before it navigates");
     const contents = tab.contents;
     yield* Effect.callback<void>((resume) => {
@@ -4756,6 +4788,7 @@ export class BrowserHost {
         }),
       ),
     );
+    return true;
   });
 
   readonly #enqueue = Effect.fn("BrowserHost.enqueue")(function* <T>(
@@ -4976,6 +5009,8 @@ function showsCurrentPage(tab: BrowserHostTab, page: BrowserPreviewPage): boolea
 const CRASH_RELOAD_TIMEOUT_MS = 30_000;
 
 const SILENT_PAGE_EXIT_WAIT_MS = 5_000;
+
+const VIEW_START_CHECK_MS = 3_000;
 
 const reloadCrashedPage = Effect.fn("BrowserHost.reloadCrashedPage")(function* (tab: BrowserHostTab) {
   const url = currentTabUrl(tab);

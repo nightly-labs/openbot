@@ -111,7 +111,12 @@ export interface DrainHooks {
   pendingRuntimeWaits(agentId: string): boolean;
   settleStaleTaskTurns(agentId: string): void;
   turnEnded(turnId: string): boolean;
-  staleTurnSettlement(agentId: string, threadId: string, turnId: string): Effect.Effect<void> | null;
+  staleTurnSettlement(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    channelLaneId: string | undefined,
+  ): Effect.Effect<void> | null;
   orphanedDeliveryRecovery(agentId: string): Effect.Effect<void> | null;
   turnRestarting(turnId: string): void;
   deliveriesStarting(deliveryIds: readonly string[], start: DeliveryStart): void;
@@ -296,13 +301,8 @@ export class DrainScheduler {
   }
 
   #laneTurnActive(lane: Lane): boolean {
-    if (lane.taskId === null || lane.taskId === MESSAGING_LANE)
-      return this.#ownThreadTurnActive(lane.agentId, lane.taskId === MESSAGING_LANE);
-    const channelId = laneChannelId(lane.taskId);
-    if (channelId !== null)
-      return this.#conversation
-        .workingChannelSnapshots(lane.agentId)
-        .some((snapshot) => this.#conversation.channelForThread(snapshot.threadId) === channelId);
+    if (lane.taskId === null || lane.taskId === MESSAGING_LANE || laneChannelId(lane.taskId) !== null)
+      return this.#heldTurnSnapshot(lane) !== undefined;
     const threadId = this.#tasks.threadId(lane.taskId);
     return this.#conversation
       .workingTaskSnapshots(lane.agentId)
@@ -326,12 +326,22 @@ export class DrainScheduler {
     )?.[1];
   }
 
-  #settleStaleOwnTurn(lane: Lane): void {
-    if (lane.taskId !== null && lane.taskId !== MESSAGING_LANE) return;
-    const snapshot = this.#ownThreadTurn(lane.agentId, lane.taskId === MESSAGING_LANE);
+  #heldTurnSnapshot(lane: Lane) {
+    if (lane.taskId === null || lane.taskId === MESSAGING_LANE)
+      return this.#ownThreadTurn(lane.agentId, lane.taskId === MESSAGING_LANE);
+    const channelId = laneChannelId(lane.taskId);
+    if (channelId === null) return undefined;
+    return this.#conversation
+      .workingChannelSnapshots(lane.agentId)
+      .find((snapshot) => this.#conversation.channelForThread(snapshot.threadId) === channelId);
+  }
+
+  #settleStaleTurn(lane: Lane): void {
+    const snapshot = this.#heldTurnSnapshot(lane);
     const turnId = snapshot?.activeTurnId;
     if (!snapshot?.threadId || !turnId || this.#settlingTurns.has(turnId)) return;
-    const settlement = this.#hooks.staleTurnSettlement(lane.agentId, snapshot.threadId, turnId);
+    const channelLaneId = lane.taskId !== null && laneChannelId(lane.taskId) !== null ? lane.taskId : undefined;
+    const settlement = this.#hooks.staleTurnSettlement(lane.agentId, snapshot.threadId, turnId, channelLaneId);
     if (!settlement) return;
     this.#settlingTurns.add(turnId);
     Effect.runFork(settlement.pipe(Effect.ensuring(Effect.sync(() => this.#settlingTurns.delete(turnId)))));
@@ -459,6 +469,7 @@ export class DrainScheduler {
 
   channelTurnFull(agentId: string, channelId: string): boolean {
     const channelLanes = this.#lanesOf(agentId).filter((lane) => laneChannelId(lane.taskId) !== null);
+    for (const lane of channelLanes) if (!this.#mailbox.laneActive(agentId, lane.taskId)) this.#settleStaleTurn(lane);
     return (
       channelLanes.some((lane) => laneChannelId(lane.taskId) === channelId) ||
       channelLanes.length >= this.channelTurnLimit(agentId)
@@ -579,7 +590,7 @@ export class DrainScheduler {
       this.#heldBy(lane) ||
       (this.#heldByMachine(lane) && "machine");
     if (hold) this.#reportHold(lane, hold);
-    if (hold === "active-turn") this.#settleStaleOwnTurn(lane);
+    if (hold === "active-turn") this.#settleStaleTurn(lane);
     if (hold === "pending-runtime") this.#hooks.settleStaleTaskTurns(lane.agentId);
     if (hold === "machine") this.#recoverIdleLane(lane);
     if (followUsageLimit && hold === "sign-in" && this.#hooks.followPendingRuntime(lane.agentId)) return true;
@@ -692,7 +703,7 @@ export class DrainScheduler {
       (this.#heldByMachine(lane) && "machine");
     if (hold) {
       this.#reportHold(lane, hold);
-      if (hold === "active-turn") this.#settleStaleOwnTurn(lane);
+      if (hold === "active-turn") this.#settleStaleTurn(lane);
       if (hold === "pending-runtime") this.#hooks.settleStaleTaskTurns(agentId);
       if (hold === "machine") this.#recoverIdleLane(lane);
       return;

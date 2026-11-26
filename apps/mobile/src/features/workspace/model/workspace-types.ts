@@ -216,6 +216,7 @@ import type {
   SaveEventRoutineResult,
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
+import type { AgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
 import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -354,6 +355,8 @@ export interface MobileWorkspaceContextValue {
   moveSidebarChat: (serverId: string, action: Extract<SidebarLayoutAction, { type: "move-agent" }>) => Promise<void>;
   loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
   canEditQueue: (serverId: string) => boolean;
+  loadAgentUsageLimits: (serverId: string) => Promise<AgentUsageLimits>;
+  canReadAgentUsageLimits: (serverId: string) => boolean;
   canReadModelSteering: (serverId: string) => boolean;
   canRetryMessage: (serverId: string) => boolean;
   canDeleteMessages: (serverId: string) => boolean;
@@ -860,6 +863,7 @@ interface McpSignInRelay {
 export type MobileWorkspaceCapabilityCheck =
   | "browserViewSupport"
   | "canEditQueue"
+  | "canReadAgentUsageLimits"
   | "canReadModelSteering"
   | "canRetryMessage"
   | "canDeleteMessages"

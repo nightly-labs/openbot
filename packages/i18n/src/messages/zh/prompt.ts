@@ -80,6 +80,8 @@ export const messages = {
   "prompt.mediaApproval.setDefault": "设为默认",
   "prompt.mediaApproval.perImage": "每张图片",
   "prompt.mediaApproval.forSeconds": "{count} 秒",
+  "prompt.mediaApproval.freeCredits": "免费积分",
+  "prompt.mediaApproval.paidOnly": "仅限付费积分",
   "prompt.mediaApproval.defaultFailed": "无法保存默认模型。请重试。",
   "prompt.creditsHold.needMore": "我需要更多积分",
   "prompt.creditsHold.cannotUse": "我无法使用积分",

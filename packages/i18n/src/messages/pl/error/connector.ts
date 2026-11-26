@@ -14,6 +14,41 @@ export const messages = {
   "error.connector.githubExpired": "Połączenie z GitHub wygasło. Połącz GitHub ponownie.",
   "error.connector.githubFileUnreadable": "Nie można odczytać pliku połączenia z GitHub.",
   "error.connector.githubFileTooLarge": "Plik połączenia z GitHub jest za duży.",
+  "error.connector.nearSignIn": "Zaloguj się do OpenBot, aby korzystać z portfela kryptowalut.",
+  "error.connector.nearServiceUnavailable": "Usługa portfela kryptowalut jest niedostępna. Spróbuj ponownie później.",
+  "error.connector.nearWalletNotFound": "Ten portfel nie należy do tego konta OpenBot ani do tego serwera.",
+  "error.connector.nearWalletLimit": "Dziś utworzono zbyt wiele nowych portfeli. Spróbuj ponownie jutro.",
+  "error.connector.nearProviderBusy": "NEAR Intents w tej chwili nie odpowiada. Spróbuj ponownie za kilka minut.",
+  "error.connector.nearNoWallet":
+    "Portfel kryptowalut nie jest skonfigurowany. Skonfiguruj go w sekcji Ustawienia serwera > Sejf > Krypto.",
+  "error.connector.nearWalletExists": "Portfel kryptowalut jest już skonfigurowany.",
+  "error.connector.nearFrozen":
+    "Płatności z portfela kryptowalut są wstrzymane. Wznów je w sekcji Ustawienia serwera > Sejf > Krypto.",
+  "error.connector.nearAgentNotAllowed":
+    "Ten agent nie może płacić z portfela kryptowalut. Zezwól na to w sekcji Ustawienia serwera > Sejf > Krypto.",
+  "error.connector.nearGrantExpired":
+    "OpenBot nie ma zgody na płatności z portfela kryptowalut. Odnów ją w sekcji Ustawienia serwera > Sejf > Krypto.",
+  "error.connector.nearUnknownAsset": "Portfel kryptowalut nie ma aktywa {asset}.",
+  "error.connector.nearAmountInvalid": "{amount} nie jest prawidłową kwotą {asset}.",
+  "error.connector.nearRecipientInvalid": "{recipient} nie jest kontem NEAR ani adresem w formacie chain:address.",
+  "error.connector.nearRefused": "NEAR Intents Agent API odrzuciło żądanie: {detail}",
+  "error.connector.nearUnexpected": "NEAR Intents Agent API wysłało nieoczekiwaną odpowiedź: {detail}",
+  "error.connector.nearUnreachable": "OpenBot nie może połączyć się z NEAR Intents Agent API: {detail}",
+  "error.connector.nearFileUnreadable": "Nie można odczytać pliku portfela kryptowalut.",
+  "error.connector.nearFileTooLarge": "Plik portfela kryptowalut jest za duży.",
+  "error.connector.nearSigningCanceled": "Podpis został anulowany.",
+  "error.connector.nearSigningExpired": "Podpis nie dotarł na czas. Spróbuj ponownie.",
+  "error.connector.nearSigningInvalid": "Podpis z przeglądarki jest nieprawidłowy.",
+  "error.connector.nearSigningBusy": "W przeglądarce czeka już inny podpis. Najpierw go dokończ lub anuluj.",
+  "error.connector.nearPolicyCooldown": "Reguły portfela możesz znowu zmienić od {time}.",
+  "error.connector.nearPolicyPending": "Zmiana reguł się nie zakończyła. Spróbuj ponownie za kilka minut.",
+  "error.connector.nearDeclined": "Właściciel odrzucił płatność.",
+  "error.connector.nearUncertain":
+    "OpenBot nie wie, czy płatność została wysłana. Nie płać ponownie. Właściciel może sprawdzić historię portfela.",
+  "error.connector.nearPaymentFailed": "Płatność nie powiodła się: {detail}",
+  "error.connector.nearPaymentUnknown": "Ta płatność nie czeka już na odpowiedź.",
+  "error.connector.nearRuleFull": "Reguła płatności może mieć najwyżej {limit} odbiorców.",
+  "error.connector.nearRulesFull": "Portfel może mieć najwyżej {limit} reguł płatności.",
   "error.connector.onePasswordCliMissing":
     "OpenBot nie może znaleźć 1Password CLI. Zainstaluj je i włącz jego integrację w aplikacji 1Password albo użyj tokenu konta usługi.",
   "error.connector.onePasswordCliInstallFailed":

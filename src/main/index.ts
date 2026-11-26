@@ -110,6 +110,7 @@ import { marketplaceLinkIpcHandlers } from "./ipc/marketplace-link-handlers";
 import { mcpServerIpcHandlers } from "./ipc/mcp-server-handlers";
 import { memoryIpcHandlers } from "./ipc/memory-handlers";
 import { messagingIpcHandlers } from "./ipc/messaging-handlers";
+import { nearWalletIpcHandlers } from "./ipc/near-wallet-handlers";
 import { notificationIpcHandlers } from "./ipc/notification-handlers";
 import { onePasswordConnectorIpcHandlers } from "./ipc/onepassword-connector-handlers";
 import { passwordManagersIpcHandlers } from "./ipc/password-managers-handlers";
@@ -490,7 +491,10 @@ let systemSessionEnding = false;
 let systemSessionEndFlushStarted = false;
 let relaunchRequested = false;
 let quitStarted = false;
-type RendererDeepLink = Exclude<DeepLink, { kind: "mcp-auth" | "slack-workspace" | "discord-guild" }>;
+type RendererDeepLink = Exclude<
+  DeepLink,
+  { kind: "mcp-auth" | "slack-workspace" | "discord-guild" | "near-signature" }
+>;
 
 let pendingDeepLink: RendererDeepLink | null = takeRendererDeepLink(findDeepLink(process.argv, inviteLinkOptions));
 let deepLinkReceiverReady = false;
@@ -537,6 +541,7 @@ const {
   forwardProviderRuntimeStatus,
   forwardGitHubConnectorStatus,
   forwardLinkAccountStatus,
+  forwardNearWalletStatus,
   forwardOnePasswordConnectorStatus,
   forwardBitwardenConnectorStatus,
   forwardPasswordManagerStatus,
@@ -785,6 +790,7 @@ function registerIpcHandlers({
   hostedSites,
   githubConnector,
   linkAccount,
+  nearWallet,
   onePasswordConnector,
   bitwardenConnector,
   passwordManagers,
@@ -931,6 +937,7 @@ function registerIpcHandlers({
     }),
     ...githubConnectorIpcHandlers({ githubConnector, remoteServers, openExternal: openLink }),
     ...linkAccountIpcHandlers({ linkAccount }),
+    ...nearWalletIpcHandlers({ nearWallet }),
     ...onePasswordConnectorIpcHandlers({ onePasswordConnector, remoteServers }),
     ...bitwardenConnectorIpcHandlers({ bitwardenConnector, remoteServers }),
     ...passwordManagersIpcHandlers({ passwordManagers, remoteServers, openExternal: openLink }),
@@ -1331,6 +1338,10 @@ function acceptDeepLink(link: DeepLink): void {
     receiveMessagingInstall(link);
     return;
   }
+  if (link.kind === "near-signature") {
+    receiveNearSignature(link);
+    return;
+  }
   pendingDeepLink = link;
   const window = windowHolder.current;
   if (!window || window.isDestroyed() || !deepLinkReceiverReady) return;
@@ -1369,9 +1380,24 @@ function isDeepLinkKind<Kind extends RendererDeepLink["kind"]>(
 }
 
 function takeRendererDeepLink(link: DeepLink | null): RendererDeepLink | null {
-  return link && link.kind !== "mcp-auth" && link.kind !== "slack-workspace" && link.kind !== "discord-guild"
+  return link &&
+    link.kind !== "mcp-auth" &&
+    link.kind !== "slack-workspace" &&
+    link.kind !== "discord-guild" &&
+    link.kind !== "near-signature"
     ? link
     : null;
+}
+
+function receiveNearSignature(link: Extract<DeepLink, { kind: "near-signature" }>): void {
+  const current = services;
+  if (!current) return;
+  if (!current.nearWallet.receiveSignature(link.nonce, link.data)) {
+    logger.warn("A NEAR signature link was not accepted: no signature of this run waits for it.");
+    return;
+  }
+  const window = windowHolder.current;
+  if (window && !window.isDestroyed()) showMainWindow(window);
 }
 
 function receiveMessagingInstall(link: Extract<DeepLink, { kind: "slack-workspace" | "discord-guild" }>): void {
@@ -1652,6 +1678,7 @@ if (!hasSingleInstanceLock) {
       remoteDesktop.on("changed", forwardRemoteDesktopSessions);
       built.githubConnector.onChanged(forwardGitHubConnectorStatus);
       built.linkAccount.onChanged(forwardLinkAccountStatus);
+      built.nearWallet.onChanged(forwardNearWalletStatus);
       built.onePasswordConnector.onChanged(forwardOnePasswordConnectorStatus);
       built.bitwardenConnector.onChanged(forwardBitwardenConnectorStatus);
       built.passwordManagers.onChanged(forwardPasswordManagerStatus);

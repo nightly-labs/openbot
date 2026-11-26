@@ -10,7 +10,7 @@ import type {
   VoiceLiveStart,
 } from "@openbot/contracts/ipc";
 import { speechTextFromMarkdown } from "@openbot/contracts/speech-text";
-import { isFixedSourceText, sourceText, sourceTextValues } from "@openbot/i18n/source";
+import { isFixedSourceText, matchingSourceKeys, sourceText, sourceTextValues } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Fiber, Schema, Semaphore } from "effect";
 import type { AgentClient } from "../agent-client";
@@ -80,15 +80,13 @@ const summaryPrompt = (answer: string) =>
   `A voice says your reply aloud. The answer below is too long for the voice: reply with ${SUMMARY_RULES}` +
   `Reply with the summary only.\n\nAnswer:\n${answer}`;
 const SAME_TURN_REPLY = "The agent answered this request together with the previous one.";
-const RELAY_DELEGATION = /^<realtime_delegation>\s*(?:<source>[^<]*<\/source>\s*)?<input>([^<]*)<\/input>/;
+const RELAY_DELEGATION = /<realtime_delegation>\s*(?:<source>[^<]*<\/source>\s*)?<input>([^<]*)<\/input>/g;
 
 function relayRequest(text: string): string {
-  const input = RELAY_DELEGATION.exec(text)?.[1]
-    ?.replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&amp;", "&")
-    .trim();
-  return input || text;
+  const inputs = [...text.matchAll(RELAY_DELEGATION)]
+    .map((match) => (match[1] ?? "").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&").trim())
+    .filter(Boolean);
+  return inputs.at(-1) || text;
 }
 
 const HEARD_LINE_LIMIT = 20;
@@ -224,7 +222,10 @@ export class LiveVoice {
       if ((session.owner?.memberId ?? null) === key) yield* this.#stopSession(session);
     const start = (this.#starts.get(key) ?? 0) + 1;
     this.#starts.set(key, start);
-    const relay = yield* this.#hooks.relay(agent).pipe(toLiveVoiceFailed);
+    const relay = yield* this.#hooks.relay(agent).pipe(
+      toLiveVoiceFailed,
+      Effect.mapError((failure) => this.#relayFailure(failure, agent.id)),
+    );
     const cwd = yield* makeToollessDirectory().pipe(toLiveVoiceFailed);
     const session: LiveSession = {
       id: randomUUID(),
@@ -548,6 +549,11 @@ export class LiveVoice {
     const fiber = Effect.runFork(ordered ? session.speech.withPermit(say) : say);
     session.speaking.add(fiber);
     fiber.addObserver(() => session.speaking.delete(fiber));
+  }
+
+  #relayFailure(failure: LiveVoiceFailed, agentId: string): LiveVoiceFailed {
+    const message = failure.cause instanceof Error ? failure.cause.message : "";
+    return matchingSourceKeys(message).length > 0 ? failure : this.#startFailure(failure, agentId);
   }
 
   #startFailure(failure: LiveVoiceFailed, agentId: string): LiveVoiceFailed {

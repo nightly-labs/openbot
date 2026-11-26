@@ -603,7 +603,7 @@ export class BrowserCdpEngine {
                 if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || this.disabled || this.readOnly || this.type !== 'password') throw new Error('Authentication target changed.');
                 Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(this, text);
                 this.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText' }));
-                this.dispatchEvent(new Event('change', { bubbles: true }));
+                if (this.value !== text) throw new Error('Authentication field did not keep the value.');
               }`,
         [nodes.origin, text],
         node.sessionId,

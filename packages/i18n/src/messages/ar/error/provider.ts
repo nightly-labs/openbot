@@ -331,6 +331,8 @@ export const messages = {
     "تعذّر على Gemini قراءة السجل المحفوظ لهذه الدردشة. بدأ OpenBot جلسة Gemini جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
   "error.provider.acpTurnStuck":
     "لم يُنهِ {provider} دوره السابق، لذلك لم يقبل هذه الرسالة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
+  "error.provider.antigravityLicenseRefused":
+    "تقول Google إن حسابك لا يملك ترخيصًا لاستخدام هذا النموذج. اختر نموذجًا آخر، ثم أرسل رسالتك مرة أخرى.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "لا تسمح Google بتشغيل Gemini من الموقع الشبكي للكمبيوتر الذي يشغّل هذا الوكيل. استخدم Gemini على كمبيوتر آخر، أو اختر مزوّدًا آخر لهذا الوكيل.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -434,6 +436,8 @@ export const messages = {
     "تعذّر على Muse تشغيل خادم MCP فحظر MCP في هذه الجلسة. بدأ OpenBot جلسة Muse جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، أوقف التحكم في الحاسوب أو خادم MCP الفاشل لهذا الوكيل.",
   "error.provider.claudeSessionMissing":
     "لم يعثر Claude Code على الجلسة المحفوظة لهذه الدردشة. بدأ OpenBot جلسة Claude Code جديدة بسجل الدردشة. أعد المحاولة.",
+  "error.provider.opencodeSessionMissing":
+    "لم يعثر OpenCode على الجلسة المحفوظة لهذه الدردشة. بدأ OpenBot جلسة OpenCode جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.grokSignIn": "شغّل `grok login` أو عيّن XAI_API_KEY لاستخدام Grok.",
   "error.provider.acpSignInNoStart": "لم يبدأ المزوّد، لذلك لم يبدأ تسجيل الدخول. حاول مرة أخرى، أو أعد تشغيل OpenBot.",
   "error.provider.acpSignInTimedOut": "انتهت مهلة تسجيل الدخول.",
@@ -535,7 +539,10 @@ export const messages = {
   "error.provider.sessionSettingsTimedOut": "لم تستجب جلسة الوكيل في الوقت المحدد. حاول مرة أخرى.",
   "error.provider.piOutdated": "إصدار Pi {version} قديم جدًا. ثبّت Pi 1.1.0 أو أحدث لدعم RPC وMCP الأصلي.",
   "error.provider.nativeMissing": "واجهة {provider} CLI غير مثبتة. نزّلها في الإعدادات.",
-  "error.provider.nativeNotStarted": "تعذّر تشغيل واجهة {provider} CLI.",
+  "error.provider.nativeNotStarted":
+    "وجد OpenBot ‏{provider} الذي ثبّتّه، لكنه لم يبدأ. حدّث {provider} أو أعد تثبيته، ثم حاول مرة أخرى.",
+  "error.provider.nativeManagedNotStarted":
+    "لم يبدأ {provider} على الحاسوب الذي يشغّل هذا الخادم. أعد تشغيل OpenBot على ذلك الحاسوب. إذا لم يبدأ بعد ذلك، فاختر المساعدة > الإبلاغ عن مشكلة.",
   "error.provider.nativeVersionUnreadable": "تعذّرت قراءة إصدار واجهة {provider} CLI.",
   "error.provider.piSessionBusy": "انتظر حتى ينتهي دور Pi الحالي.",
   "error.provider.acpSessionBusy": "لا يزال {provider} ينهي دورًا تم إيقافه. حاول مرة أخرى بعد قليل.",

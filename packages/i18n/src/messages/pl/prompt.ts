@@ -82,6 +82,8 @@ export const messages = {
   "prompt.mediaApproval.setDefault": "Ustaw jako domyślny",
   "prompt.mediaApproval.perImage": "za obraz",
   "prompt.mediaApproval.forSeconds": "za {count} s",
+  "prompt.mediaApproval.freeCredits": "Darmowe kredyty",
+  "prompt.mediaApproval.paidOnly": "Tylko płatne kredyty",
   "prompt.mediaApproval.defaultFailed": "Nie udało się zapisać domyślnego modelu. Spróbuj ponownie.",
   "prompt.creditsHold.needMore": "Potrzebuję więcej kredytów",
   "prompt.creditsHold.cannotUse": "Nie mogę używać kredytów",

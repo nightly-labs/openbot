@@ -82,6 +82,8 @@ export const messages = {
   "prompt.mediaApproval.setDefault": "Als standaard instellen",
   "prompt.mediaApproval.perImage": "per afbeelding",
   "prompt.mediaApproval.forSeconds": "voor {count} s",
+  "prompt.mediaApproval.freeCredits": "Gratis credits",
+  "prompt.mediaApproval.paidOnly": "Alleen betaalde credits",
   "prompt.mediaApproval.defaultFailed": "Kan het standaardmodel niet opslaan. Probeer het opnieuw.",
   "prompt.creditsHold.needMore": "Ik heb meer credits nodig",
   "prompt.creditsHold.cannotUse": "Ik kan geen credits gebruiken",

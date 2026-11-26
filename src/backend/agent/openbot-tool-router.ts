@@ -932,6 +932,15 @@ export class OpenBotToolRouter {
               if (result && client.running) client.respond(toolRequest.id, result);
               return;
             }
+            if (toolRequest.params.tool === "request_near_payment") {
+              const result = yield* this.#attention.requestNearPayment(client, toolRequest, {
+                ...toolRequest.params,
+                threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
+                ownerAgentId: agentId,
+              });
+              if (client.running && !toolRequest.signal?.aborted) client.respond(toolRequest.id, result);
+              return;
+            }
             const params = {
               ...toolRequest.params,
               threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),

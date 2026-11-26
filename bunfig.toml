@@ -3,6 +3,7 @@ exact = true
 linker = "hoisted"
 minimumReleaseAge = 259200
 minimumReleaseAgeExcludes = [
+  "@near-intents-agent-api/sdk",
   "@norbert_bodziony/bloub",
   "effect",
 ]

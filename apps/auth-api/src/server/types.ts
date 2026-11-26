@@ -35,6 +35,8 @@ export interface WorkerBindings {
   EMAIL_DELIVERY_WEBHOOK_SECRET?: string;
   SKILLS_ADMIN_TOKEN?: string;
   MEDIA_GATEWAY?: Fetcher;
+  NEAR_INTENTS_PARTNER_KEY?: string;
+  NEAR_INTENTS_AGENT_API_URL?: string;
   SITE_OPERATIONS_ADMIN_TOKEN?: string;
   SERVER_CLAIMS_ADMIN_TOKEN?: string;
   STORE_REVIEW_EMAIL?: string;
