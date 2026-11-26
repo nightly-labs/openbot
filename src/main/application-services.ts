@@ -269,7 +269,6 @@ import { GitHubConnectorStore } from "./github-connector-store";
 import { GitHubRelay, receiveGitHubDelivery } from "./github-relay";
 import { createGitHubRest, type WorkflowGitHubDirectory, workflowGitHubDirectory } from "./github-rest";
 import { githubSkillSource } from "./github-skill-source";
-import { createGrokSystemProxy } from "./grok-system-proxy";
 import { hermesRoot } from "./hermes-import-reader";
 import { HermesImportService } from "./hermes-import-service";
 import { HermesInstaller } from "./hermes-installer";
@@ -402,6 +401,7 @@ import { ProviderHostSignIns } from "./provider-host-sign-ins";
 import { startAccountLog, startAgentLog, startProviderLog } from "./provider-log";
 import { toProviderRuntimeFailure } from "./provider-runtime-effects";
 import { ProviderRuntimeManager, providerRuntimeRoot, runtimeTarget } from "./provider-runtime-manager";
+import { CODEX_API_URL, createProviderSystemProxy, GROK_API_URL } from "./provider-system-proxy";
 import { ProviderUseSettingsStore } from "./provider-use-settings-store";
 import { PushNotificationStore } from "./push-notification-store";
 import { DESKTOP_USE_MS } from "./push-notifications";
@@ -1519,7 +1519,10 @@ export async function createApplicationServices({
   const providerEnvironment = createProviderEnvironmentPreferenceStore(
     join(app.getPath("userData"), PROVIDER_ENVIRONMENT_PREFERENCE_FILE),
   );
-  const grokSystemProxy = createGrokSystemProxy((url) => session.defaultSession.resolveProxy(url));
+  const resolveProxy = (url: string) => session.defaultSession.resolveProxy(url);
+  const codexSystemProxy = createProviderSystemProxy(CODEX_API_URL, resolveProxy);
+  const grokSystemProxy = createProviderSystemProxy(GROK_API_URL, resolveProxy);
+  Effect.runFork(codexSystemProxy.refresh);
   Effect.runFork(grokSystemProxy.refresh);
   const remoteSessionReuse = createRemoteSessionReusePreferenceStore(
     join(app.getPath("userData"), REMOTE_SESSION_REUSE_PREFERENCE_FILE),
@@ -2210,6 +2213,7 @@ export async function createApplicationServices({
       mcpOAuth,
       mcpOAuthProxySettings,
       systemProxyFetch: (url, init) => net.fetch(url, { ...init, credentials: "omit", cache: "no-store" }),
+      codexProxyEnvironment: codexSystemProxy.environment,
       grokProxyEnvironment: grokSystemProxy.environment,
       appVersion: app.getVersion(),
       providerStateDirectory: join(app.getPath("userData"), "provider-state"),

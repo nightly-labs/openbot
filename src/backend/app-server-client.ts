@@ -137,13 +137,13 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   #stopping = false;
   #probing = false;
 
-  readonly #extraEnv: Readonly<Record<string, string>> | undefined;
+  readonly #extraEnv: () => Readonly<Record<string, string>> | undefined;
   readonly #configOverrides: readonly string[];
 
   constructor(
     executable: string,
     requestTimeoutMs = 30_000,
-    extraEnv?: Readonly<Record<string, string>>,
+    extraEnv?: Readonly<Record<string, string>> | (() => Readonly<Record<string, string>>),
     turnContext = new TurnContext(),
     configOverrides: readonly string[] = [],
     modelAddressVariable?: string,
@@ -152,7 +152,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     this.#turnContext = turnContext;
     this.#executable = executable;
     this.#requestTimeoutMs = requestTimeoutMs;
-    this.#extraEnv = extraEnv;
+    this.#extraEnv = typeof extraEnv === "function" ? extraEnv : () => extraEnv;
     this.#configOverrides = configOverrides;
     if (modelAddressVariable) this.modelAddressVariable = modelAddressVariable;
   }
@@ -176,7 +176,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     ]);
     const child = spawn(target.command, target.args, {
       stdio: ["pipe", "pipe", "pipe"],
-      env: codexEnvironment(this.#extraEnv),
+      env: codexEnvironment(this.#extraEnv()),
       windowsVerbatimArguments: target.windowsVerbatimArguments,
       windowsHide: true,
       detached: PROVIDER_PROCESS_GROUP,
@@ -555,7 +555,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     const child = this.#process;
     const turnKey = JSON.stringify([threadId, turnId]);
     this.#linuxSandboxFailure ??= Effect.runFork(
-      linuxSandboxFailure(this.#executable, codexEnvironment(this.#extraEnv), cwd),
+      linuxSandboxFailure(this.#executable, codexEnvironment(this.#extraEnv()), cwd),
     );
     const probe = this.#linuxSandboxFailure;
     Effect.runFork(
