@@ -213,6 +213,16 @@ const CODEX_SERVICE_UNREACHABLE = new Set([
 function isCodexServiceUnreachable(error: unknown): boolean {
   return error instanceof AppServerError && CODEX_SERVICE_UNREACHABLE.has(error.message);
 }
+const CODEX_WORKSPACE_MISSING = "selected workspace missing from routing discovery";
+
+function signInForMissingCodexWorkspace(failure: ProviderOperationFailed): ProviderOperationFailed {
+  if (!(failure.cause instanceof AppServerError && failure.cause.message === CODEX_WORKSPACE_MISSING)) return failure;
+  return new ProviderOperationFailed({
+    cause: new ProviderSignInError({
+      message: sourceText("error.provider.codexWorkspaceMissing", { provider: providerLabel("codex") }),
+    }),
+  });
+}
 const PROVIDER_RESTART_POLL_MS = 1_000;
 const PROVIDER_BACKGROUND_WORK_WAIT_MS = 4 * 60 * 60_000;
 const FAILED_MODEL_LIST_RETRY_DELAYS_MS = [2_000, 15_000];
@@ -3251,7 +3261,7 @@ export class ProviderRuntime implements ProviderPort {
             logger.info("A provider answered initialize.", { provider, durationMs: durationMs() });
             const response = yield* client
               .request("account/read", { refreshToken: false }, accountReadDecoder(provider))
-              .pipe(toProviderOperationFailed);
+              .pipe(toProviderOperationFailed, Effect.mapError(signInForMissingCodexWorkspace));
             const account = response.account;
             if (!account)
               return yield* new ProviderOperationFailed({
@@ -3728,7 +3738,7 @@ export class ProviderRuntime implements ProviderPort {
                 provider === "codex" ? CODEX_START_ACCOUNT_READ_TIMEOUT_MS : START_ACCOUNT_READ_TIMEOUT_MS,
               ),
             )
-            .pipe(toProviderOperationFailed);
+            .pipe(toProviderOperationFailed, Effect.mapError(signInForMissingCodexWorkspace));
           if (!account.account) {
             const message = this.#signInRequiredMessage(provider);
             this.#startFailures.delete(provider);

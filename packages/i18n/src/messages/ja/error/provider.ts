@@ -297,6 +297,8 @@ export const messages = {
     "OpenCode がモデルプロバイダーに接続できませんでした。OpenBot を実行しているコンピューターのネットワーク接続を確認してから、もう一度お試しください。\n{detail}",
   "error.provider.codexStateBusy":
     "ChatGPT は前回の起動後、まだローカル履歴を準備しています。数分待ってから、もう一度お試しください。",
+  "error.provider.codexWorkspaceMissing":
+    "{provider} は選択したワークスペースを受け付けませんでした。もう一度サインインして、個人アカウントか別のワークスペースを選んでください。",
   "error.provider.codexThreadInUse":
     "別の Codex アプリ (Codex デスクトップアプリ、Codex CLI、IDE 拡張機能など) がこのチャットを開いています。Codex のチャットに書き込めるアプリは一度に 1 つだけです。そのアプリでチャットを閉じてから、メッセージをもう一度送信してください。",
   "error.provider.realtimeLimitZero":

@@ -292,6 +292,8 @@ export const messages = {
     "OpenCode non è riuscito a connettersi al provider del modello. Controlla la connessione di rete del computer che esegue OpenBot, poi riprova.\n{detail}",
   "error.provider.codexStateBusy":
     "ChatGPT sta ancora preparando la cronologia locale dopo un avvio precedente. Attendi qualche minuto, poi riprova.",
+  "error.provider.codexWorkspaceMissing":
+    "{provider} non ha accettato lo spazio di lavoro selezionato. Accedi di nuovo e scegli il tuo account personale o un altro spazio di lavoro.",
   "error.provider.codexThreadInUse":
     "Un'altra app Codex ha aperto questa chat, ad esempio l'app desktop di Codex, Codex CLI o un'estensione IDE. Solo un'app alla volta può scrivere in una chat di Codex. Chiudi la chat in quell'app, poi invia di nuovo il messaggio.",
   "error.provider.realtimeLimitZero":
