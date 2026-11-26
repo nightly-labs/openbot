@@ -167,6 +167,11 @@ interface ChannelHandoffCommand {
 
 type ChannelServiceCommand = ChannelCommand | ChannelHandoffCommand;
 
+interface OwnerWait {
+  channelId: string;
+  since: number;
+}
+
 const CHANNEL_HANDOFF_AUTHOR_PREFIX = "agent:";
 
 function withoutFolders({ folders: _folders, ...channel }: Channel): Channel {
@@ -206,6 +211,8 @@ export class ChannelService {
   #nextQueuePlace = 0;
   readonly #heldBehind = new Map<string, Set<string>>();
   readonly #waitingForAgents = new Set<string>();
+  readonly #ownerWaits = new Map<string, Map<string, OwnerWait>>();
+  readonly #mainChatHeld = new Set<string>();
   readonly #providerTurns = new Set<string>();
   readonly #lateTurns = new Map<string, string>();
   readonly #deletedChannels = new Set<string>();
@@ -1186,16 +1193,90 @@ export class ChannelService {
     tasks: ReadonlyMap<string, ChannelTask>,
     assignments: readonly ChannelAssignment[],
   ): boolean {
+    return (
+      this.#readyBesideOwner(waiter, tasks, assignments) &&
+      waiter.ownerAgentId !== null &&
+      !this.hooks.busy(waiter.ownerAgentId, waiter.channelId)
+    );
+  }
+
+  #readyBesideOwner(
+    waiter: ChannelTask,
+    tasks: ReadonlyMap<string, ChannelTask>,
+    assignments: readonly ChannelAssignment[],
+  ): boolean {
     const ownerAgentId = waiter.ownerAgentId;
     if (waiter.state !== "queued" || !ownerAgentId || this.#deletedChannels.has(waiter.channelId)) return false;
-    if (this.#waitsForWork(waiter, tasks, assignments)) return false;
-    if (this.hooks.busy(ownerAgentId, waiter.channelId) || this.hooks.usageLimited?.(ownerAgentId)) return false;
+    if (this.#waitsForWork(waiter, tasks, assignments) || this.hooks.usageLimited?.(ownerAgentId)) return false;
     const channel = this.store.get(waiter.channelId);
     return (
       !channel.archived &&
       channel.members.some((member) => member.agentId === ownerAgentId) &&
       this.hooks.agents().some((agent) => agent.id === ownerAgentId)
     );
+  }
+
+  #waitForOwner(task: ChannelTask): void {
+    const agentId = task.ownerAgentId;
+    if (!agentId) return;
+    const waits = this.#ownerWaits.get(agentId) ?? new Map<string, OwnerWait>();
+    if (!waits.has(task.id)) {
+      const requested = Date.parse(this.store.message(task.channelId, task.requestMessageId)?.message.createdAt ?? "");
+      waits.set(task.id, { channelId: task.channelId, since: Number.isFinite(requested) ? requested : Date.now() });
+    }
+    this.#ownerWaits.set(agentId, waits);
+  }
+
+  #forgetOwnerWait(agentId: string, taskId: string): void {
+    const waits = this.#ownerWaits.get(agentId);
+    waits?.delete(taskId);
+    if (waits?.size === 0) this.#ownerWaits.delete(agentId);
+  }
+
+  #waitsBeforeMainChat(agentId: string): OwnerWait[] {
+    const waits = this.#ownerWaits.get(agentId);
+    if (!waits?.size) return [];
+    const head = this.mailbox.nextQueued(agentId)?.delivery;
+    const queuedAt = head ? Date.parse(head.createdAt) : Number.NaN;
+    if (!Number.isFinite(queuedAt)) return [];
+    const earlier = [...waits].filter(([, wait]) => wait.since < queuedAt);
+    if (!earlier.length || this.store.hasAgentAssignmentInState(agentId, ACTIVE_ASSIGNMENT_STATES)) return [];
+    return earlier.flatMap(([taskId, wait]) => (this.#startsWhenOwnerFree(agentId, taskId, wait) ? [wait] : []));
+  }
+
+  #startsWhenOwnerFree(agentId: string, taskId: string, wait: OwnerWait): boolean {
+    const task =
+      this.#deletedChannels.has(wait.channelId) || !this.store.exists(wait.channelId)
+        ? null
+        : this.store.task(wait.channelId, taskId);
+    if (task?.state !== "queued" || task.ownerAgentId !== agentId) {
+      this.#forgetOwnerWait(agentId, taskId);
+      return false;
+    }
+    const tasks = new Map<string, ChannelTask>([[task.id, task]]);
+    for (const id of [task.rootTaskId, ...task.dependencies]) {
+      const related = tasks.has(id) ? null : this.store.task(wait.channelId, id);
+      if (related) tasks.set(id, related);
+    }
+    const assignments = task.resources.length
+      ? this.#scheduling().assignments
+      : this.store.assignments(wait.channelId).filter(activeAssignment);
+    return (
+      this.#readyBesideOwner(task, tasks, assignments) &&
+      !assignments.some((assignment) => resourcesConflict(task.resources, assignment.resources))
+    );
+  }
+
+  goesBeforeMainChat(agentId: string, channelId: string): boolean {
+    return this.#waitsBeforeMainChat(agentId).some((wait) => wait.channelId === channelId);
+  }
+
+  #releaseMainChats(): void {
+    for (const agentId of [...this.#mainChatHeld]) {
+      if (!this.mayDrain(agentId)) continue;
+      this.#mainChatHeld.delete(agentId);
+      this.hooks.schedule(agentId);
+    }
   }
 
   #olderWaiter(
@@ -1255,6 +1336,9 @@ export class ChannelService {
               Effect.gen({ self: this }, function* () {
                 this.#pumps.delete(id);
                 yield* this.#wakeHeldBehind().pipe(
+                  Effect.catch((failure) => Effect.sync(() => this.hooks.error(failure.cause))),
+                );
+                yield* channelSync(() => this.#releaseMainChats()).pipe(
                   Effect.catch((failure) => Effect.sync(() => this.hooks.error(failure.cause))),
                 );
                 if (this.#wakeAgain.delete(id))
@@ -1740,6 +1824,7 @@ export class ChannelService {
       if (!task.ownerAgentId) continue;
       if (this.hooks.busy(task.ownerAgentId, channelId)) {
         this.#waitingForAgents.add(channelId);
+        yield* channelSync(() => this.#waitForOwner(task));
         continue;
       }
       if (
@@ -1768,6 +1853,7 @@ export class ChannelService {
         continue;
       }
       this.#queuePlaces.delete(task.id);
+      this.#forgetOwnerWait(task.ownerAgentId, task.id);
       const assignment: ChannelAssignment = {
         id: randomUUID(),
         channelId,
@@ -1962,7 +2048,10 @@ export class ChannelService {
   });
 
   mayDrain(agentId: string): boolean {
-    return !this.store.hasAgentAssignmentInState(agentId, ACTIVE_ASSIGNMENT_STATES);
+    if (this.store.hasAgentAssignmentInState(agentId, ACTIVE_ASSIGNMENT_STATES)) return false;
+    if (!this.#waitsBeforeMainChat(agentId).some((wait) => !this.hooks.busy(agentId, wait.channelId))) return true;
+    this.#mainChatHeld.add(agentId);
+    return false;
   }
 
   hasActiveWork(): boolean {

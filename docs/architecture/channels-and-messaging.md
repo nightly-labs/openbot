@@ -429,7 +429,14 @@ go over it. The work of other agents does not hold it. A task end wakes `Channel
 the first against the same limit. So one channel turn can always
 run beside full tasks, as before, and the agent runs at most the limit plus one side turn. When the provider of the
 agent runs one turn at a time (`concurrentTurns: false`), nothing runs in parallel: its chat and task
-turns count as busy, and `ChannelService.mayDrain` holds its main lane during an active assignment. Only declared `browser` and `workspace:<path>` resources are
+turns count as busy, and `ChannelService.mayDrain` holds its main lane during an active assignment.
+It also holds the main lane for a queued channel task that waited only because the agent was busy,
+when the request of the task is older than the next delivery of the own chat. The channel `busy`
+hook then does not count that queued delivery (`goesBeforeMainChat`). So the channel task starts
+after the current turn and before the own-chat messages that came after it; older messages still go
+first. A task that waits for a different reason (a full channel, a dependency, a resource, a paused
+root, a usage limit) does not hold the main lane. When a pump ends, an agent that this hold no longer
+applies to gets a new drain. Only declared `browser` and `workspace:<path>` resources are
 serialized: the same browser, or two workspaces where one path contains the other. An empty list,
 `none`, and `host` (from an earlier version) reserve nothing. An assignment keeps the resources it
 started with until it ends, and a task with an active assignment starts no second owner. An update
