@@ -13,9 +13,9 @@ export const messages = {
   "usage.exactCost": "{amount} USD",
   "usage.tokensAmount": "{tokens} トークン",
   "usage.chart.costDescription":
-    "プロバイダー別の 1 日あたりの推定コスト (USD) です。正確な値は「日別データを表示」で確認できます。",
+    "プロバイダー別の推定コスト (USD) です。正確な値は「日別データを表示」で確認できます。",
   "usage.chart.tokensDescription":
-    "プロバイダー別の 1 日あたりのトークン (キャッシュ読み取りを除く) です。正確な値は「日別データを表示」で確認できます。",
+    "プロバイダー別のトークン (キャッシュ読み取りを除く) です。正確な値は「日別データを表示」で確認できます。",
   "usage.chart.weekOf": "{date} の週",
   "usage.column.cost": "コスト",
   "usage.column.share": "割合",
@@ -31,7 +31,6 @@ export const messages = {
   "usage.knownTokens": "既知のトークン (キャッシュ読み取りを除く)",
   "usage.provider.shareOfCost": "既知のコストの {share}",
   "usage.provider.shareOfTokens": "既知のトークンの {share}",
-  "usage.dailyTrend": "日別の推移",
   "usage.dailyCost": "日別のコスト",
   "usage.dailyTokens": "日別のトークン",
   "usage.weeklyCost": "週別のコスト",

@@ -12,10 +12,9 @@ export const messages = {
   "usage.noCostEstimate": "비용 추정치 없음",
   "usage.exactCost": "{amount} USD",
   "usage.tokensAmount": "토큰 {tokens}개",
-  "usage.chart.costDescription":
-    "제공자별 일일 예상 비용(USD)이에요. 정확한 값은 일별 데이터 보기에서 확인할 수 있어요.",
+  "usage.chart.costDescription": "제공자별 예상 비용(USD)이에요. 정확한 값은 일별 데이터 보기에서 확인할 수 있어요.",
   "usage.chart.tokensDescription":
-    "제공자별 일일 토큰 수(캐시 읽기 제외)예요. 정확한 값은 일별 데이터 보기에서 확인할 수 있어요.",
+    "제공자별 토큰 수(캐시 읽기 제외)예요. 정확한 값은 일별 데이터 보기에서 확인할 수 있어요.",
   "usage.chart.weekOf": "{date} 주",
   "usage.column.cost": "비용",
   "usage.column.share": "비율",
@@ -31,7 +30,6 @@ export const messages = {
   "usage.knownTokens": "확인된 토큰(캐시 읽기 제외)",
   "usage.provider.shareOfCost": "확인된 비용의 {share}",
   "usage.provider.shareOfTokens": "확인된 토큰의 {share}",
-  "usage.dailyTrend": "일별 추이",
   "usage.dailyCost": "일별 비용",
   "usage.dailyTokens": "일별 토큰",
   "usage.weeklyCost": "주별 비용",

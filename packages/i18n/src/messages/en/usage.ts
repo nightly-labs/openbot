@@ -11,10 +11,9 @@ export const messages = defineMessages("usage", {
   "usage.noCostEstimate": "No cost estimate",
   "usage.exactCost": "{amount} USD",
   "usage.tokensAmount": "{tokens} tokens",
-  "usage.chart.costDescription":
-    "Daily estimated cost in USD by provider. Exact values are available with View daily data.",
+  "usage.chart.costDescription": "Estimated cost in USD by provider. Exact values are available with View daily data.",
   "usage.chart.tokensDescription":
-    "Daily tokens without cache reads by provider. Exact values are available with View daily data.",
+    "Tokens without cache reads by provider. Exact values are available with View daily data.",
   "usage.chart.weekOf": "Week of {date}",
   "usage.column.cost": "Cost",
   "usage.column.share": "Share",
@@ -30,7 +29,6 @@ export const messages = defineMessages("usage", {
   "usage.knownTokens": "Known tokens without cache reads",
   "usage.provider.shareOfCost": "{share} of known cost",
   "usage.provider.shareOfTokens": "{share} of known tokens",
-  "usage.dailyTrend": "Daily trend",
   "usage.dailyCost": "Daily cost",
   "usage.dailyTokens": "Daily tokens",
   "usage.weeklyCost": "Weekly cost",

@@ -13,9 +13,9 @@ export const messages = {
   "usage.exactCost": "{amount} USD",
   "usage.tokensAmount": "Токенов: {tokens}",
   "usage.chart.costDescription":
-    "Ежедневная примерная стоимость в USD по провайдерам. Точные значения доступны по ссылке «Данные по дням».",
+    "Примерная стоимость в USD по провайдерам. Точные значения доступны по ссылке «Данные по дням».",
   "usage.chart.tokensDescription":
-    "Ежедневные токены без чтения из кэша по провайдерам. Точные значения доступны по ссылке «Данные по дням».",
+    "Токены без чтения из кэша по провайдерам. Точные значения доступны по ссылке «Данные по дням».",
   "usage.chart.weekOf": "Неделя с {date}",
   "usage.column.cost": "Стоимость",
   "usage.column.share": "Доля",
@@ -36,7 +36,6 @@ export const messages = {
   "usage.knownTokens": "Известные токены без чтения из кэша",
   "usage.provider.shareOfCost": "{share} известной стоимости",
   "usage.provider.shareOfTokens": "{share} известных токенов",
-  "usage.dailyTrend": "Динамика по дням",
   "usage.dailyCost": "Стоимость по дням",
   "usage.dailyTokens": "Токены по дням",
   "usage.weeklyCost": "Стоимость по неделям",

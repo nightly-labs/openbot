@@ -13,9 +13,9 @@ export const messages = {
   "usage.exactCost": "{amount} USD",
   "usage.tokensAmount": "{tokens} tokens",
   "usage.chart.costDescription":
-    "Custo diário estimado em USD por provedor. Os valores exatos estão disponíveis em Ver dados diários.",
+    "Custo estimado em USD por provedor. Os valores exatos estão disponíveis em Ver dados diários.",
   "usage.chart.tokensDescription":
-    "Tokens sem leituras de cache por dia e por provedor. Os valores exatos estão disponíveis em Ver dados diários.",
+    "Tokens sem leituras de cache por provedor. Os valores exatos estão disponíveis em Ver dados diários.",
   "usage.chart.weekOf": "Semana de {date}",
   "usage.column.cost": "Custo",
   "usage.column.share": "Participação",
@@ -31,7 +31,6 @@ export const messages = {
   "usage.knownTokens": "Tokens conhecidos sem leituras de cache",
   "usage.provider.shareOfCost": "{share} do custo conhecido",
   "usage.provider.shareOfTokens": "{share} dos tokens conhecidos",
-  "usage.dailyTrend": "Tendência diária",
   "usage.dailyCost": "Custo diário",
   "usage.dailyTokens": "Tokens diários",
   "usage.weeklyCost": "Custo semanal",

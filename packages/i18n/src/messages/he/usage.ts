@@ -12,10 +12,9 @@ export const messages = {
   "usage.noCostEstimate": "אין הערכת עלות",
   "usage.exactCost": "{amount} USD",
   "usage.tokensAmount": "{tokens} אסימונים",
-  "usage.chart.costDescription":
-    "העלות היומית המשוערת ב-USD לפי ספק. הערכים המדויקים זמינים באפשרות הצגת נתונים יומיים.",
+  "usage.chart.costDescription": "העלות המשוערת ב-USD לפי ספק. הערכים המדויקים זמינים באפשרות הצגת נתונים יומיים.",
   "usage.chart.tokensDescription":
-    "אסימונים יומיים ללא קריאות מטמון לפי ספק. הערכים המדויקים זמינים באפשרות הצגת נתונים יומיים.",
+    "אסימונים ללא קריאות מטמון לפי ספק. הערכים המדויקים זמינים באפשרות הצגת נתונים יומיים.",
   "usage.chart.weekOf": "שבוע של {date}",
   "usage.column.cost": "עלות",
   "usage.column.share": "חלק",
@@ -31,7 +30,6 @@ export const messages = {
   "usage.knownTokens": "אסימונים ידועים ללא קריאות מטמון",
   "usage.provider.shareOfCost": "{share} מהעלות הידועה",
   "usage.provider.shareOfTokens": "{share} מהאסימונים הידועים",
-  "usage.dailyTrend": "מגמה יומית",
   "usage.dailyCost": "עלות יומית",
   "usage.dailyTokens": "אסימונים יומיים",
   "usage.weeklyCost": "עלות שבועית",

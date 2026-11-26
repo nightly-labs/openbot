@@ -60,7 +60,6 @@
 }
 .agent-usage-report[data-stale] {
   opacity: 0.5;
-  pointer-events: none;
 }
 .agent-usage h3 {
   font-size: var(--openbot-text-xl);

@@ -13,9 +13,9 @@ export const messages = {
   "usage.exactCost": "{amount} USD",
   "usage.tokensAmount": "{tokens} token",
   "usage.chart.costDescription":
-    "Sağlayıcıya göre günlük tahmini maliyet (USD). Kesin değerleri görmek için “Günlük verileri gör” seçeneğini kullanın.",
+    "Sağlayıcıya göre tahmini maliyet (USD). Kesin değerleri görmek için “Günlük verileri gör” seçeneğini kullanın.",
   "usage.chart.tokensDescription":
-    "Sağlayıcıya göre günlük token'lar (önbellek okumaları hariç). Kesin değerleri görmek için “Günlük verileri gör” seçeneğini kullanın.",
+    "Sağlayıcıya göre token'lar (önbellek okumaları hariç). Kesin değerleri görmek için “Günlük verileri gör” seçeneğini kullanın.",
   "usage.chart.weekOf": "{date} haftası",
   "usage.column.cost": "Maliyet",
   "usage.column.share": "Pay",
@@ -31,7 +31,6 @@ export const messages = {
   "usage.knownTokens": "Bilinen token'lar (önbellek okumaları hariç)",
   "usage.provider.shareOfCost": "Bilinen maliyetin payı: {share}",
   "usage.provider.shareOfTokens": "Bilinen token'ların payı: {share}",
-  "usage.dailyTrend": "Günlük eğilim",
   "usage.dailyCost": "Günlük maliyet",
   "usage.dailyTokens": "Günlük token'lar",
   "usage.weeklyCost": "Haftalık maliyet",

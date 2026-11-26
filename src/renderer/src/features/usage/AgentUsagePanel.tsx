@@ -274,7 +274,11 @@ export function AgentUsagePanel(props: AgentUsagePanelProps) {
         </Show>
         <Show when={state.serverId === props.serverId && state.result}>
           {(result) => (
-            <div class="agent-usage-report" data-stale={state.phase === "loading" ? "" : undefined}>
+            <div
+              class="agent-usage-report"
+              data-stale={state.phase === "loading" ? "" : undefined}
+              inert={state.phase === "loading"}
+            >
               <AgentUsageReport
                 result={result()}
                 metric={state.metric}

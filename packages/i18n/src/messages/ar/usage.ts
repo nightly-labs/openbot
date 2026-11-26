@@ -13,9 +13,9 @@ export const messages = {
   "usage.exactCost": "{amount} USD",
   "usage.tokensAmount": "{tokens} رمز",
   "usage.chart.costDescription":
-    "التكلفة اليومية التقديرية بالدولار USD حسب المزوّد. القيم الدقيقة متاحة عبر «عرض البيانات اليومية».",
+    "التكلفة التقديرية بالدولار USD حسب المزوّد. القيم الدقيقة متاحة عبر «عرض البيانات اليومية».",
   "usage.chart.tokensDescription":
-    "الرموز اليومية دون قراءات ذاكرة التخزين المؤقت حسب المزوّد. القيم الدقيقة متاحة عبر «عرض البيانات اليومية».",
+    "الرموز دون قراءات ذاكرة التخزين المؤقت حسب المزوّد. القيم الدقيقة متاحة عبر «عرض البيانات اليومية».",
   "usage.chart.weekOf": "أسبوع {date}",
   "usage.column.cost": "التكلفة",
   "usage.column.share": "الحصة",
@@ -38,7 +38,6 @@ export const messages = {
   "usage.knownTokens": "الرموز المعروفة دون قراءات ذاكرة التخزين المؤقت",
   "usage.provider.shareOfCost": "{share} من التكلفة المعروفة",
   "usage.provider.shareOfTokens": "{share} من الرموز المعروفة",
-  "usage.dailyTrend": "الاتجاه اليومي",
   "usage.dailyCost": "التكلفة اليومية",
   "usage.dailyTokens": "الرموز اليومية",
   "usage.weeklyCost": "التكلفة الأسبوعية",

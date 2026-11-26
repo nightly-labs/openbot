@@ -39,16 +39,10 @@ const TOTAL_ROWS = [
   { field: "assistantMessages", label: "usage.totals.assistantMessages" },
 ] as const satisfies ReadonlyArray<{ field: UsageTotalField; label: AppTextKey }>;
 
-const DAY_MS = 86_400_000;
-
 const TREND_TITLES = {
   cost: { day: "usage.dailyCost", week: "usage.weeklyCost", month: "usage.monthlyCost" },
   tokens: { day: "usage.dailyTokens", week: "usage.weeklyTokens", month: "usage.monthlyTokens" },
 } as const satisfies Record<UsageMetric, Record<UsageBucket, AppTextKey>>;
-
-function rangeDays(result: HostAnalytics): number {
-  return Math.round((Date.parse(result.endDate) - Date.parse(result.startDate)) / DAY_MS) + 1;
-}
 
 const UPDATED_AT_FORMAT: Intl.DateTimeFormatOptions = {
   year: "numeric",
@@ -119,8 +113,13 @@ export function AgentUsageReport(props: {
       cost() ? (b.estimatedCostUsd ?? -1) - (a.estimatedCostUsd ?? -1) : analyticsTokens(b) - analyticsTokens(a),
     ),
   );
-  const seriesColor = createMemo(() => usageSeriesColors(props.result.models.map((model) => model.provider)));
-  const bucket = createMemo(() => usageBucket(rangeDays(props.result)));
+  const seriesColor = createMemo(() =>
+    usageSeriesColors([
+      ...props.result.models.map((model) => model.provider),
+      ...props.result.providerDaily.map((cell) => cell.provider),
+    ]),
+  );
+  const bucket = createMemo(() => usageBucket(props.result.daily.length));
   const share = (amount: number | null) => {
     const total = cost() ? totals().estimatedCostUsd : analyticsTokens(totals());
     return amount === null || total === null
@@ -189,7 +188,7 @@ export function AgentUsageReport(props: {
               </For>
             </div>
           </section>
-          <section class="agent-usage-trend" aria-label={t("usage.dailyTrend")}>
+          <section class="agent-usage-trend" aria-label={t(TREND_TITLES[props.metric][bucket()])}>
             <div class="agent-usage-section-header">
               <h3>{t(TREND_TITLES[props.metric][bucket()])}</h3>
               <Button variant="ghost" size="xs" onClick={showDailyData}>
@@ -227,7 +226,7 @@ export function AgentUsageReport(props: {
           </dl>
         </section>
         <SlidingTabs.Root
-          value={state.breakdown}
+          value={state.breakdown === "skill" && !props.result.skills ? "agent" : state.breakdown}
           onChange={(value) =>
             setState((draft) => {
               draft.breakdown = value;

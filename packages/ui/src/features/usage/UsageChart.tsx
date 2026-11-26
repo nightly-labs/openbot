@@ -84,7 +84,7 @@ export function UsageChart(props: {
       when={!chart().empty}
       fallback={
         <p class="ui-chart-empty" role="status">
-          {props.metric === "cost" ? t("usage.noCostEstimate") : t("usage.empty")}
+          {props.metric === "cost" ? usageCost(props.result.totals.estimatedCostUsd, text) : chart().formatValue(0)}
         </p>
       }
     >
