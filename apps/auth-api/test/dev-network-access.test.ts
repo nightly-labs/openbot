@@ -38,6 +38,7 @@ describe("development Auth API LAN access", () => {
       "/v2/remote/owner-transfers/",
       "/v2/remote/owner-transfers/transfer-1/accept",
       "/v2/remote/owner-transfers/transfer-1/decline",
+      "/v2/remote/watch/sessions",
       "/v2/remote/watch/sessions/",
       "/v2/remote/watch/sessions/watch-session-1",
       "/v2/remote/watch/ticket",

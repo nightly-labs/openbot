@@ -19,6 +19,7 @@ const MOBILE_LAN_PATHS = new Set([
   "/v2/remote/invites/preview",
   "/v2/remote/invites/accept",
   "/v2/remote/owner-transfers/",
+  "/v2/remote/watch/sessions",
   "/v2/remote/watch/sessions/",
   "/v2/remote/watch/ticket",
   "/v2/hosting/plans",
