@@ -346,7 +346,11 @@ function quietAnswersByRun(messages: readonly ConversationMessage[]): ReadonlyMa
       const known = runByTurn.get(message.turnId);
       if (known !== undefined && known !== runId) sharedTurns.add(message.turnId);
       runByTurn.set(message.turnId, runId);
-    } else if (message.author === "user") sharedTurns.add(message.turnId);
+    } else if (
+      message.author === "user" ||
+      (message.senderAgentId !== undefined && message.exchange?.direction !== "outgoing")
+    )
+      sharedTurns.add(message.turnId);
   }
   const answers = new Map<string, RoutineQuietAnswer[]>();
   for (const message of messages) {
