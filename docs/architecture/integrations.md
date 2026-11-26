@@ -95,7 +95,7 @@ The host checks each request in [`mcp-member-access.ts`](../../src/main/team-api
 | Read and add | A member reads the whole list, with its `env` and header values, tests a server, and adds a server, a stdio command too. |
 | Change | A member changes, turns on or off, or removes only a server that the member added. Any other row gets 403 `error.team.mcpServerNotYours`. Owners and admins change every row. |
 | Owners | `McpServerOwnersStore` keeps the member ID of each row that a joined server added, in `openbot-mcp-server-owners-v1.json`. A row with no entry, such as one added on the host, counts as an admin's. A damaged file reads as empty. |
-| Sign-in | A sign-in belongs to an address (`mcpOAuthAccountKey`), not to a row. A member starts, cancels or signs out a sign-in, or changes a sign-in app, only when each row on that address is the member's. Each server keeps one sign-in, which every agent of the host uses. |
+| Sign-in | A sign-in belongs to an address with its account fragment (`mcpOAuthAccountKey`), not to a row. A member starts, cancels or signs out a sign-in, or changes a sign-in app, only when each row with that sign-in is the member's. A new member row on the address of another person gets its own account, so the member signs it in. Each server keeps one sign-in, which every agent of the host uses. |
 | Providers | Provider sign-ins, account starts and agent links on the relay stay with owners and admins. |
 
 Run `bun run test:mcp-member-access` to check these rules on a real host.
@@ -109,7 +109,7 @@ A host with `mcp-access-v1` keeps one entry for each MCP server in
 | --- | --- |
 | Agents | `agents: null` gives the server to each agent, also to a new one. A list gives it only to those agents. `AgentService` applies the list when it gives the enabled servers to a provider session. |
 | Members | `everyone` and each role have a level: `none` hides the server and refuses it, `use` gives the rights on a server of another person, `manage` gives the rights of the person who added it. A member gets the highest level. An owner, an admin and the person who added the server always manage. |
-| `none` | The host leaves the server out of the list and out of the sign-in states, and it refuses a change, a test, a sign-in and a sign-in status for the server. The sign-in belongs to the address, so the host also refuses the member each saved row (new or moved), test, sign-in status and sign-in state on that address, the member's own rows included. |
+| `none` | The host leaves the server out of the list and out of the sign-in states, and it refuses a change, a test, a sign-in and a sign-in status for the server. The host also refuses the member each saved row (new or moved), test, sign-in status and sign-in state on that address, with any account fragment, the member's own rows included. |
 | Routes | `POST /v1/mcp-access` reads and `POST /v1/mcp-access/set` replaces one entry ([`route-mcp-access.ts`](../../src/main/team-api/route-mcp-access.ts)). Only an owner or admin reads the entries and sets them; a member reads `mine`. |
 | Revision | The snapshot has a `revision`, and a replace names the one that the client read. Each replace adds 1. When another admin saved first, the host answers 409 `error.team.mcpAccessStale` and changes nothing; the client reads again. |
 | Sessions | A replace that changes the agents of a server gives each agent a new provider session. A replace of the levels only does not. |
