@@ -297,6 +297,10 @@ export function landingPageText(t: AppTranslate) {
         linux: downloadFor("linux"),
       } satisfies Record<DownloadPlatform, string>,
       phone,
+      chrome: {
+        description: t("sitePage.landing.download.chromeDescription"),
+        action: t("sitePage.landing.download.chromeAction"),
+      },
       pages: t("sitePage.landing.download.pages"),
       apk: t("sitePage.landing.download.apk"),
       intelMac: t("sitePage.marketplace.downloadFor", { platform: "Intel Mac" }),

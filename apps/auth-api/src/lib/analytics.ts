@@ -10,6 +10,7 @@ import {
 import { isBoolean, isOneOf } from "@openbot/contracts/runtime-values";
 import { OpenPanel, OpenPanelBase, type OpenPanelOptions, type TrackProperties } from "@openpanel/web";
 import { BRAND_ROUTE } from "./brand-page";
+import { CHROME_EXTENSION } from "./browser-extension";
 import { CLA_ROUTE } from "./cla";
 import { COMMERCIAL_LICENSE_ROUTE } from "./commercial-license";
 import { CONTACT_TOPICS } from "./contact";
@@ -102,7 +103,7 @@ const LANDING_PLACEMENTS = [
   "content_related",
   "other",
 ] as const satisfies readonly LandingPlacement[];
-type LandingDownloadPlatform = "linux" | "macos" | "windows" | "ios" | "android";
+type LandingDownloadPlatform = "linux" | "macos" | "windows" | "ios" | "android" | "chrome";
 type LandingDestination =
   | "download_page"
   | "download_section"
@@ -219,6 +220,7 @@ const DOWNLOAD_PLATFORMS_BY_HREF = new Map<string, LandingDownloadPlatform>([
   [MOBILE_APPS.ios.href, "ios"],
   [MOBILE_APPS.android.href, "android"],
   [OPENBOT_ANDROID_APK_LINK, "android"],
+  [CHROME_EXTENSION.href, "chrome"],
 ]);
 
 const LINK_DESTINATIONS = new Map<string, LandingDestination>([

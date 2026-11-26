@@ -4,8 +4,10 @@ import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-pro
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
+import { SidebarChromeExtensionCard } from "@openbot/ui/features/sidebar/SidebarChromeExtensionCard";
 import { SidebarCommunityCard } from "@openbot/ui/features/sidebar/SidebarCommunityCard";
 import { SidebarMobileAppCard } from "@openbot/ui/features/sidebar/SidebarMobileAppCard";
+import { type SidebarPromoCard, SidebarPromoDeck } from "@openbot/ui/features/sidebar/SidebarPromoDeck";
 import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
 import { sidebarChannelWaits } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
@@ -18,6 +20,7 @@ import { DirectConversation } from "../../lazy-views";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
 import { useTurns } from "../../turns";
+import { useAuth } from "../account/account-context";
 import { useAgentTasks } from "../agent-tasks/agent-tasks-context";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
 import type { ThreadWaits } from "../agent-threads/conversation-threads";
@@ -45,6 +48,7 @@ import { ServerUpgradeOffer } from "./server-upgrade-offer";
 import { useSidebar } from "./sidebar-context";
 
 const MOBILE_APP_DISMISSED_STORAGE_KEY = "openbot:mobile-app-card-dismissed";
+const CHROME_EXTENSION_DISMISSED_STORAGE_KEY = "openbot:chrome-extension-card-dismissed";
 
 export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   const { t } = useText();
@@ -149,6 +153,46 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
       hiddenAgentIds: userHiddenAgentIds(),
     }).filter((agent) => !userHiddenAgentIds().has(agent.id)),
   );
+  const [chromeExtensionDismissed, setChromeExtensionDismissed] = createSignal(
+    window.localStorage.getItem(CHROME_EXTENSION_DISMISSED_STORAGE_KEY) === "true",
+  );
+  const { centralAuth } = useAuth();
+  const promoCards = createMemo(() => {
+    const cards: SidebarPromoCard[] = [];
+    if (centralAuth().status === "signed_in" && !chromeExtensionDismissed()) {
+      cards.push({
+        id: "chrome-extension",
+        label: t("sidebar.chromeExtension.title"),
+        content: () => (
+          <SidebarChromeExtensionCard
+            agents={mobileAppCrew()}
+            onAdd={() => void appPort().openExternal("chrome-extension")}
+            onDismiss={() => {
+              window.localStorage.setItem(CHROME_EXTENSION_DISMISSED_STORAGE_KEY, "true");
+              setChromeExtensionDismissed(true);
+            }}
+          />
+        ),
+      });
+    }
+    if (!mobileAppDismissed()) {
+      cards.push({
+        id: "mobile-app",
+        label: t("sidebar.mobileApp.pocketTitle"),
+        content: () => (
+          <SidebarMobileAppCard
+            agents={mobileAppCrew()}
+            onInstall={(phone) => openMobileInstall(phone)}
+            onDismiss={() => {
+              window.localStorage.setItem(MOBILE_APP_DISMISSED_STORAGE_KEY, "true");
+              setMobileAppDismissed(true);
+            }}
+          />
+        ),
+      });
+    }
+    return cards;
+  });
   const communityCard = createCommunityCardVisibility();
   const alertCards = createSidebarAlertCards(activeServer);
   createEffect(serverSettingsOpen, (open, wasOpen) => {
@@ -323,19 +367,15 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
               members={teamPresence().members}
               onOpenStorage={(serverId) => openServerSettings(serverId, null, "storage")}
             />
-            <Show when={!platform.landingPreview && !alertCards.shown() && !mobileAppDismissed()}>
-              <SidebarMobileAppCard
-                agents={mobileAppCrew()}
-                onInstall={(phone) => openMobileInstall(phone)}
-                onDismiss={() => {
-                  window.localStorage.setItem(MOBILE_APP_DISMISSED_STORAGE_KEY, "true");
-                  setMobileAppDismissed(true);
-                }}
-              />
+            <Show when={!platform.landingPreview && !alertCards.shown()}>
+              <SidebarPromoDeck cards={promoCards()} />
             </Show>
             <Show
               when={
-                !platform.landingPreview && !alertCards.shown() && mobileAppDismissed() && !communityCard.dismissed()
+                !platform.landingPreview &&
+                !alertCards.shown() &&
+                promoCards().length === 0 &&
+                !communityCard.dismissed()
               }
             >
               <SidebarCommunityCard

@@ -395,6 +395,8 @@
     "./features/mobile-app/ios-app-store": "./src/features/mobile-app/ios-app-store.ts",
     "./features/sidebar/SidebarCommunityCard": "./src/features/sidebar/SidebarCommunityCard.tsx",
     "./features/sidebar/SidebarMobileAppCard": "./src/features/sidebar/SidebarMobileAppCard.tsx",
+    "./features/sidebar/SidebarChromeExtensionCard": "./src/features/sidebar/SidebarChromeExtensionCard.tsx",
+    "./features/sidebar/SidebarPromoDeck": "./src/features/sidebar/SidebarPromoDeck.tsx",
     "./features/sidebar/SidebarMachineCard": "./src/features/sidebar/SidebarMachineCard.tsx",
     "./features/sidebar/SidebarStorageCard": "./src/features/sidebar/SidebarStorageCard.tsx",
     "./features/sidebar/sidebar-mobile-app.css": "./src/features/sidebar/sidebar-mobile-app.css",

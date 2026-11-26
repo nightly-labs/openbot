@@ -1845,6 +1845,7 @@ svg[data-icon="arrow-right"]:dir(rtl) {
 .landing-page {
   --download-ios-color: #74b9ff;
   --download-android-color: #ee9a7d;
+  --download-chrome-color: #8fd4a4;
 }
 
 .landing-download-card[data-download-platform="ios"] {
@@ -1855,8 +1856,12 @@ svg[data-icon="arrow-right"]:dir(rtl) {
   background: var(--download-android-color);
 }
 
+.landing-download-card[data-download-platform="chrome"] {
+  background: var(--download-chrome-color);
+}
+
 .landing-download-grid-mobile {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 18px;
 }
 
@@ -4229,7 +4234,8 @@ svg[data-icon="arrow-right"]:dir(rtl) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .landing-download-card[data-download-platform="linux"] {
+  .landing-download-card[data-download-platform="linux"],
+  .landing-download-card[data-download-platform="chrome"] {
     min-height: 260px;
     grid-column: 1 / -1;
   }

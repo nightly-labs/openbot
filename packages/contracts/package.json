@@ -43,6 +43,7 @@
     "./hosted-sites": "./src/hosted-sites.ts",
     "./host-grant": "./src/host-grant.ts",
     "./host-key-handover": "./src/host-key-handover.ts",
+    "./browser-extension": "./src/browser-extension.ts",
     "./browser-extension-x": "./src/browser-extension-x.ts",
     "./input-limits": "./src/input-limits.ts",
     "./invite-links": "./src/invite-links.ts",
