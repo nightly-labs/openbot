@@ -1,18 +1,16 @@
-import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chmod, mkdir, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { promisify } from "node:util";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { causeHelpers } from "../backend/effect-boundary";
 import { PasswordVaultError } from "../backend/password-vault";
+import { runBitwardenCli } from "./bitwarden-connector-service";
 import { downloadArchive } from "./onepassword-cli-installer";
 import { extractZipFiles } from "./provider-runtime-archive";
 import type { RuntimeTarget } from "./provider-runtime-descriptors";
 
 const { io: vaultCall } = causeHelpers(PasswordVaultError);
-const execFileAsync = promisify(execFile);
 
 const BITWARDEN_CLI_VERSION = "2026.9.1";
 
@@ -58,15 +56,14 @@ const startsHere = Effect.fn("BitwardenCli.startsHere")(function* (
   signal: AbortSignal,
 ): Effect.fn.Return<boolean> {
   return yield* vaultCall((interrupted) =>
-    execFileAsync(path, ["--version"], {
-      encoding: "utf8",
-      env: { ...process.env, BITWARDENCLI_APPDATA_DIR: dataDirectory, BITWARDENCLI_INTERACTIVE: "false" },
-      signal: AbortSignal.any([signal, interrupted]),
-      timeout: 30_000,
-      windowsHide: true,
-    }),
+    runBitwardenCli(
+      path,
+      ["--version"],
+      { BITWARDENCLI_APPDATA_DIR: dataDirectory },
+      AbortSignal.any([signal, interrupted]),
+    ),
   ).pipe(
-    Effect.map(({ stdout }) => stdout.trim() === BITWARDEN_CLI_VERSION),
+    Effect.map((output) => output.trim() === BITWARDEN_CLI_VERSION),
     Effect.orElseSucceed(() => false),
   );
 });

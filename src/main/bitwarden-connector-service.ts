@@ -98,7 +98,7 @@ export class BitwardenKeyIdBackfillError extends Error {}
 
 const CLI_TIMEOUT_MS = 30_000;
 
-const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) => {
+export const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) => {
   const env: NodeJS.ProcessEnv = { BITWARDENCLI_INTERACTIVE: "false" };
   for (const name of [
     "HOME",
