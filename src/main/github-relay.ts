@@ -19,7 +19,6 @@ export interface GitHubRelayOptions {
   account: GitHubRelayAccount;
   githubToken(): Effect.Effect<string | null, unknown>;
   ingress(): SignalIngress;
-  now?: () => number;
 }
 
 const ROUTE_REFRESH_MS = 30 * 60_000;
@@ -71,7 +70,7 @@ export class GitHubRelay {
     ]
       .sort()
       .join("\n");
-    const now = (this.#options.now ?? Date.now)();
+    const now = Date.now();
     if (ready && stale && (stale !== this.#refreshedFor || now - this.#refreshedAt >= ROUTE_REFRESH_MS)) {
       this.#refreshedFor = stale;
       this.#refreshedAt = now;
