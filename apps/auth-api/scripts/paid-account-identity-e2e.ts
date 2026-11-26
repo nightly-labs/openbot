@@ -97,7 +97,7 @@ async function accountAnalytics() {
   }
   const server = await send(PAYER.id, { name: "hosted_server_action", action: "provisioned" });
   check("a hosted server event does not identify", server.length === 1 && server[0]?.type === "track", server);
-  const email = await send(null, { name: "email_sent", kind: "welcome", result: "accepted" });
+  const email = await send(null, { name: "email_sent", kind: "welcome", result: "accepted", mailbox: "primary" });
   check(
     "an event with no account has no profile and does not identify",
     email.length === 1 && email[0]?.type === "track" && !("profileId" in (email[0]?.payload ?? {})),
