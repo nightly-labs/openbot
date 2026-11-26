@@ -267,7 +267,7 @@ export const messages = {
   "connector.telegram.groupDescription": "As pessoas mencionam o bot ou respondem às mensagens dele.",
   "connector.telegram.directDescription": "Todas as mensagens deste chat vão para o Orquestrador do Telegram.",
   "connector.telegram.helpRemoved":
-    "O bot do OpenBot não está mais neste chat. Desconecte o chat e adicione o bot novamente.",
+    "O OpenBot não recebe mais mensagens deste chat. O bot foi removido, ou o grupo virou um supergrupo. Verifique se o bot está no chat e selecione “Vincular um chat”.",
   "connector.telegram.helpRelayUnavailable":
     "O OpenBot não consegue receber mensagens do Telegram neste computador. Entre na sua conta, dê um nome a este computador nas Configurações do servidor e mantenha o OpenBot aberto.",
   "connector.telegram.helpRelayUnavailableHost":

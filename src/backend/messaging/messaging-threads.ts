@@ -114,8 +114,11 @@ interface MessagingPostPing {
   threadKey?: string;
 }
 
+export type MessagingStopReason = "keys" | "removed" | "moved";
+
 export interface MessagingOutbound {
   keysUnreadable(connectionId: string): boolean;
+  stopped(connectionId: string): MessagingStopReason | null;
   places(connectionId: string): Effect.Effect<{ places: MessagingPlace[]; note?: string } | { error: string }>;
   history(
     connectionId: string,
@@ -240,6 +243,18 @@ function historyResult(history: MessagingHistory, scope: "channel" | "conversati
 }
 const FINISHED_TURN_LIMIT = 256;
 export const MESSAGING_NOT_RUNNING = "This connection does not run now.";
+
+function stoppedConnectionText(platform: MessagingPlatform, reason: MessagingStopReason): string {
+  const name = PLATFORM_NAMES[platform];
+  const apps = `Marketplace > Apps > ${name}`;
+  if (reason === "keys")
+    return `This connection does not run: OpenBot cannot use its saved keys. Tell the user to connect ${name} again in ${apps}.`;
+  if (platform !== "telegram")
+    return `This connection does not run: ${name} removed OpenBot from it. Tell the user to connect it again in ${apps}.`;
+  if (reason === "moved")
+    return `This Telegram group became a supergroup and got a new id, so this link does not run. The bot is still in the group. Tell the user to link the group again in ${apps} > Link a chat.`;
+  return `This Telegram chat link does not run: the bot was removed from the chat, or the group became a supergroup and got a new id. Tell the user to check that the bot is in the chat, then link the chat again in ${apps} > Link a chat.`;
+}
 export const PLATFORM_NAMES: Record<MessagingPlatform, string> = {
   slack: "Slack",
   discord: "Discord",
@@ -425,17 +440,23 @@ export class MessagingThreads {
     const enabled = this.store.connections().filter((record) => record.enabled);
     if (call.tool === "messaging_list_places" && !call.connection)
       return openBotToolResult({
-        connections: enabled.map((record) => ({
-          connection: record.connectionId,
-          platform: PLATFORM_NAMES[record.platform],
-          name: record.workspaceName,
-        })),
+        connections: enabled.map((record) => {
+          const reason = this.#outbound?.stopped(record.connectionId);
+          return {
+            connection: record.connectionId,
+            platform: PLATFORM_NAMES[record.platform],
+            name: record.workspaceName,
+            ...(reason ? { stopped: stoppedConnectionText(record.platform, reason) } : {}),
+          };
+        }),
       });
     const record = enabled.find((candidate) => candidate.connectionId === call.connection);
     if (!record)
       return openBotToolFailure("No enabled connection has that id. Call openbot.messaging_list_places for the ids.");
     const outbound = this.#outbound;
     if (!outbound) return openBotToolFailure(MESSAGING_NOT_RUNNING);
+    const reason = outbound.stopped(record.connectionId);
+    if (reason) return openBotToolFailure(stoppedConnectionText(record.platform, reason));
     if (call.tool === "messaging_history") {
       const read = yield* outbound.history(record.connectionId, call.place, call.limit, call.filter).pipe(
         Effect.timeout(HISTORY_TIMEOUT_MS),

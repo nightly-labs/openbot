@@ -838,7 +838,8 @@ export const messages = {
   "mobile.server.connectors.telegram.directTitle": "私聊",
   "mobile.server.connectors.telegram.groupDescription": "人们提及机器人或回复它的消息。",
   "mobile.server.connectors.telegram.directDescription": "该聊天中的所有消息都会交给 Telegram 调度助手。",
-  "mobile.server.connectors.telegram.helpRemoved": "OpenBot 机器人已不在该聊天中。请断开该聊天，然后重新添加机器人。",
+  "mobile.server.connectors.telegram.helpRemoved":
+    "OpenBot 不再收到该聊天的消息。机器人已被移除，或该群组已变为超级群组。请确认机器人在聊天中，然后选择「关联其他聊天」。",
   "mobile.server.connectors.telegram.helpRelay":
     "{host} 上的 OpenBot 无法接收 Telegram 消息。请在 {host} 上登录，在“服务器设置”中为服务器命名，并保持 OpenBot 打开。",
   "mobile.server.connectors.telegram.helpError": "OpenBot 无法连接到该聊天。请重新连接，或断开该聊天。",

@@ -270,7 +270,8 @@ export const messages = {
   "connector.telegram.chatsTitle": "צ'אטים",
   "connector.telegram.groupDescription": "אפשר לתייג את הבוט או להשיב להודעות שלו.",
   "connector.telegram.directDescription": "כל הודעה בצ'אט הזה עוברת למתזמר Telegram.",
-  "connector.telegram.helpRemoved": "הבוט של OpenBot כבר לא נמצא בצ'אט הזה. יש לנתק את הצ'אט ולהוסיף את הבוט שוב.",
+  "connector.telegram.helpRemoved":
+    "OpenBot כבר לא מקבל הודעות מהצ'אט הזה. הבוט הוסר, או שהקבוצה הפכה לקבוצת־על. יש לוודא שהבוט נמצא בצ'אט, ואז לבחור “קישור צ'אט”.",
   "connector.telegram.helpRelayUnavailable":
     "OpenBot לא יכול לקבל הודעות Telegram במחשב הזה. יש להתחבר, לתת למחשב הזה שם בהגדרות השרת ולהשאיר את OpenBot פתוח.",
   "connector.telegram.helpRelayUnavailableHost":

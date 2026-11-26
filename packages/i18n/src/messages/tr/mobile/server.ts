@@ -932,7 +932,7 @@ export const messages = {
   "mobile.server.connectors.telegram.groupDescription": "Kullanıcılar bottan bahseder veya mesajlarını yanıtlar.",
   "mobile.server.connectors.telegram.directDescription": "Bu sohbetteki her mesaj Telegram Düzenleyicisine gider.",
   "mobile.server.connectors.telegram.helpRemoved":
-    "OpenBot botu artık bu sohbette değil. Sohbetin bağlantısını kesin, sonra botu yeniden ekleyin.",
+    "OpenBot artık bu sohbetten mesaj almıyor. Bot kaldırıldı ya da grup bir süper gruba dönüştü. Botun sohbette olduğunu kontrol edin, sonra “Başka bir sohbet bağlayın” seçeneğini seçin.",
   "mobile.server.connectors.telegram.helpRelay":
     "{host} üzerindeki OpenBot Telegram mesajlarını alamıyor. {host} üzerinde oturum açın, Sunucu ayarlarında sunucuya bir ad verin ve OpenBot'u açık tutun.",
   "mobile.server.connectors.telegram.helpError":

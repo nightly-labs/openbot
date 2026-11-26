@@ -357,8 +357,10 @@ while this computer has no Signal connection is lost, except for a hosted server
   press, and gets it when it connects.
 - In a basic Telegram group (not a supergroup), OpenBot finds the reply chain in memory. After a
   restart, a reply to an older message starts a new conversation.
-- When a Telegram group becomes a supergroup, it gets a new ID. OpenBot shows the chat as removed:
-  disconnect it, and add the bot again.
+- When a Telegram group becomes a supergroup, it gets a new ID. OpenBot shows the chat as removed.
+  Link the group again with "Link a chat". Do not disconnect the old chat first: Disconnect deletes
+  its saved history. Agents see a removed chat in `messaging_list_places` with a `stopped` text that
+  says why it does not run and what the user must do.
 - Telegram has no history API. The agent sees as context only the messages that this computer saw
   since it started, and the message that a request answers.
 - WhatsApp is an unofficial client. WhatsApp can restrict or block a number that it sees as automated,

@@ -78,7 +78,8 @@ export class TelegramTransport implements MessagingTransport {
     if (typeof updateId === "number" && this.#remember(updateId)) return OK;
     const event = telegramUpdateEvent(update, this.#identity.botUserId, this.#chatId, this.#state);
     if (!event) return OK;
-    if (event.type === "removed") sink.state("removed");
+    if (event.type === "removed")
+      sink.state("removed", event.migratedTo ? { migratedTo: event.migratedTo } : undefined);
     else if (event.type === "renamed") sink.renamed?.(event.title);
     else if (event.type === "message") sink.message(event.message);
     else {

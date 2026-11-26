@@ -15,7 +15,7 @@ const START_COMMAND = /^\/start(?:@[A-Za-z0-9_]{1,64})?(?:\s+(\S+))?\s*$/u;
 export type TelegramUpdateEvent =
   | { type: "message"; message: InboundMessage }
   | { type: "action"; callbackQueryId: string; action: InboundAction | null }
-  | { type: "removed" }
+  | { type: "removed"; migratedTo: string | null }
   | { type: "renamed"; title: string };
 
 export interface TelegramLink {
@@ -49,7 +49,7 @@ export function telegramUpdateEvent(
   chatId: string,
   state: TelegramChatState,
 ): TelegramUpdateEvent | null {
-  if (telegramRemoval(update, botId, chatId)) return { type: "removed" };
+  if (telegramRemoval(update, botId, chatId)) return { type: "removed", migratedTo: telegramMigration(update, chatId) };
   if (isDynamicRecord(update.my_chat_member)) return null;
   const query = update.callback_query;
   if (isDynamicRecord(query)) return callbackEvent(query, chatId, state);
@@ -75,6 +75,13 @@ export function telegramRemoval(update: DynamicRecord, botId: string, chatId: st
     message.migrate_to_chat_id !== undefined ||
     (isDynamicRecord(message.left_chat_member) && String(message.left_chat_member.id) === botId)
   );
+}
+
+export function telegramMigration(update: DynamicRecord, chatId: string): string | null {
+  const message = update.message;
+  if (!isDynamicRecord(message) || !isDynamicRecord(message.chat) || String(message.chat.id) !== chatId) return null;
+  const target = message.migrate_to_chat_id;
+  return isNumber(target) || isString(target) ? String(target) : null;
 }
 
 function messageEvent(

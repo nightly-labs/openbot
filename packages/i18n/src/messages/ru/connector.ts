@@ -295,7 +295,8 @@ export const messages = {
   "connector.telegram.chatsTitle": "Чаты",
   "connector.telegram.groupDescription": "Люди упоминают бота или отвечают на его сообщения.",
   "connector.telegram.directDescription": "Каждое сообщение в этом чате получает Оркестратор Telegram.",
-  "connector.telegram.helpRemoved": "Бота OpenBot больше нет в этом чате. Отключите чат, затем снова добавьте бота.",
+  "connector.telegram.helpRemoved":
+    "OpenBot больше не получает сообщения из этого чата. Бота удалили, или группа стала супергруппой. Убедитесь, что бот есть в чате, затем выберите «Привязать чат».",
   "connector.telegram.helpRelayUnavailable":
     "OpenBot не может получать сообщения Telegram на этом компьютере. Войдите в аккаунт, задайте компьютеру имя в настройках сервера и не закрывайте OpenBot.",
   "connector.telegram.helpRelayUnavailableHost":

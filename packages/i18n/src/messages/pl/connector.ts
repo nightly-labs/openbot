@@ -299,7 +299,8 @@ export const messages = {
   "connector.telegram.chatsTitle": "Czaty",
   "connector.telegram.groupDescription": "Ludzie oznaczają bota lub odpowiadają na jego wiadomości.",
   "connector.telegram.directDescription": "Każda wiadomość w tym czacie trafia do Telegram Orchestrator.",
-  "connector.telegram.helpRemoved": "Bota OpenBot nie ma już w tym czacie. Odłącz czat, a potem dodaj bota ponownie.",
+  "connector.telegram.helpRemoved":
+    "OpenBot nie dostaje już wiadomości z tego czatu. Bot został usunięty albo grupa stała się supergrupą. Sprawdź, czy bot jest w czacie, a potem wybierz „Połącz czat”.",
   "connector.telegram.helpRelayUnavailable":
     "OpenBot nie może odbierać wiadomości z Telegram na tym komputerze. Zaloguj się, nadaj temu komputerowi nazwę w ustawieniach serwera i nie zamykaj OpenBot.",
   "connector.telegram.helpRelayUnavailableHost":
