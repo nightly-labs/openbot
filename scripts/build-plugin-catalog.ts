@@ -658,11 +658,28 @@ export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfi
   };
 }
 
+const PLUGIN_ICON_URL = "https://openbot.run/plugins/icon/";
+
+function accountServiceIconUrl(slug: string, iconUrl: string | null, appId?: string): string | null {
+  if (!iconUrl) return null;
+  const url = new URL(encodeURIComponent(slug), PLUGIN_ICON_URL);
+  if (appId) url.searchParams.set("app", appId);
+  return url.toString();
+}
+
+function withAccountServiceIcons(plugin: MarketplacePluginDetail): MarketplacePluginDetail {
+  return {
+    ...plugin,
+    iconUrl: accountServiceIconUrl(plugin.slug, plugin.iconUrl),
+    apps: plugin.apps.map((app) => ({ ...app, iconUrl: accountServiceIconUrl(plugin.slug, app.iconUrl, app.id) })),
+  };
+}
+
 ${blocks.join("\n\n")}
 
 export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   ${list},
-];
+].map(withAccountServiceIcons);
 `;
 }
 
