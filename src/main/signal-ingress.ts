@@ -33,6 +33,7 @@ import {
   DiscordApiError,
   type DiscordUploadFile,
   type IngressAnswer,
+  type IngressFailure,
   type IngressHandler,
   type IngressState,
   type LinkedRoutePlatform,
@@ -46,6 +47,19 @@ import { type RemoteWorkflowError, remoteDecode } from "./remote-service-effects
 import { downloadTelegramFile, signalHttpOrigin, uploadTelegramFile } from "./telegram-files";
 
 const logger = createOpenBotLogger("signal-ingress");
+
+const CERTIFICATE_ERROR_CODES: ReadonlySet<string> = new Set([
+  "CERT_HAS_EXPIRED",
+  "CERT_NOT_YET_VALID",
+  "CERT_SIGNATURE_FAILURE",
+  "CERT_UNTRUSTED",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "ERR_TLS_CERT_ALTNAME_INVALID",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "UNABLE_TO_GET_ISSUER_CERT",
+  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+]);
 
 function queuedRoute(message: QueuedSignalMessage): string {
   if (message.type === "slack-delivery") return `slack:${message.teamId}`;
@@ -177,6 +191,7 @@ export class SignalIngress implements MessagingIngress {
   readonly #listeners = new Set<(state: IngressState) => void>();
   readonly #holders = new Map<MessagingPlatform, number>();
   #state: IngressState = "unavailable";
+  #failure: IngressFailure | null = null;
   #handler: IngressHandler | null = null;
   #socket: WebSocket | null = null;
   #retry: ReturnType<typeof setTimeout> | null = null;
@@ -285,6 +300,10 @@ export class SignalIngress implements MessagingIngress {
 
   state(): IngressState {
     return this.#state;
+  }
+
+  failure(): IngressFailure | null {
+    return this.#failure;
   }
 
   onState(listener: (state: IngressState) => void): () => void {
@@ -501,7 +520,10 @@ export class SignalIngress implements MessagingIngress {
       { concurrency: "unbounded" },
     ).pipe(Effect.result);
     if (Result.isFailure(issued)) {
-      if (generation === this.#generation) this.#wait("unavailable");
+      logger.warn("The Signal ticket for the ingress socket is not available.", toLogValue(issued.failure.cause));
+      if (generation !== this.#generation) return;
+      this.#failure = null;
+      this.#wait("unavailable");
       return;
     }
     const [bootstrap, slackRoute, discordRoute, webhookRoute, telegramRoute, githubRoute] = issued.success;
@@ -546,8 +568,9 @@ export class SignalIngress implements MessagingIngress {
     });
     socket.on("message", (data) => this.#run(this.#receive(socket, hostId, data.toString())));
     socket.on("pong", () => pongs.set(socket, true));
-    socket.on("close", () => {
+    socket.on("close", (code) => {
       if (socket !== this.#socket) return;
+      logger.info("The Signal ingress socket closed.", { code, opened });
       this.#socket = null;
       this.#directNext = proxyUrl !== null && !opened;
       this.#discordSession = null;
@@ -560,7 +583,11 @@ export class SignalIngress implements MessagingIngress {
       this.#loseGitHub();
       if (!this.#unheld()) this.#wait("unavailable");
     });
-    socket.on("error", () => {});
+    socket.on("error", (error: NodeJS.ErrnoException) => {
+      const code = error.code ?? null;
+      logger.warn("The Signal ingress socket failed.", { code, message: error.message });
+      if (socket === this.#socket) this.#failure = code && CERTIFICATE_ERROR_CODES.has(code) ? "certificate" : null;
+    });
   });
 
   readonly #receive = Effect.fn("SignalIngress.receive")(function* (
@@ -626,6 +653,7 @@ export class SignalIngress implements MessagingIngress {
   ) {
     if (message.type === "ready") {
       this.#clearReadyDeadline();
+      this.#failure = null;
       this.#capabilities = new Set(message.capabilities ?? []);
       this.#backoffMs = BACKOFF_START_MS;
       this.#startPing(socket);
@@ -671,6 +699,7 @@ export class SignalIngress implements MessagingIngress {
     }
     if (message.type === "error") {
       logger.warn("Signal refused the ingress socket.", { code: message.code });
+      if (socket === this.#socket && this.#state !== "online") this.#failure = "refused";
       return;
     }
     if (message.type === "discord-session") {
@@ -869,6 +898,7 @@ export class SignalIngress implements MessagingIngress {
     if (this.#unheld()) for (const listener of [...this.#sessionListeners]) listener(null);
     socket?.close(1000);
     this.#backoffMs = BACKOFF_START_MS;
+    this.#failure = null;
     this.#setState("unavailable");
   }
 

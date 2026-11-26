@@ -69,6 +69,7 @@ import {
   type InboundMessage,
   type IngressAnswer,
   type IngressDelivery,
+  type IngressFailure,
   type IngressState,
   type MessageBody,
   type MessageTarget,
@@ -944,7 +945,7 @@ export class MessagingService {
     return Effect.callback<void, MessagingOperationFailed>((resume) => {
       const settled = (state: IngressState) => {
         if (ingress.telegram.available()) resume(Effect.void);
-        else if (state === "online") resume(Effect.fail(telegramNotReady(state)));
+        else if (state === "online") resume(Effect.fail(telegramNotReady(state, null)));
         else return false;
         return true;
       };
@@ -958,7 +959,9 @@ export class MessagingService {
         duration: TELEGRAM_READY_TIMEOUT_MS,
         orElse: () =>
           Effect.suspend(() =>
-            ingress.telegram.available() ? Effect.void : Effect.fail(telegramNotReady(ingress.state())),
+            ingress.telegram.available()
+              ? Effect.void
+              : Effect.fail(telegramNotReady(ingress.state(), ingress.failure?.() ?? null)),
           ),
       }),
     );
@@ -2469,13 +2472,15 @@ const TELEGRAM_RELAY_REFUSALS = new Map([
   ],
 ]);
 
-function telegramNotReady(state: IngressState): MessagingOperationFailed {
+function telegramNotReady(state: IngressState, failure: IngressFailure | null): MessagingOperationFailed {
   const text =
-    state === "online"
+    state === "online" || failure === "refused"
       ? sourceText("error.messaging.telegramServiceUnavailable")
       : state === "signed_out" || state === "no_host"
         ? sourceText("error.messaging.telegramRelayUnavailable")
-        : sourceText("error.messaging.telegramRelayUnreachable");
+        : failure === "certificate"
+          ? sourceText("error.messaging.telegramRelayCertificate")
+          : sourceText("error.messaging.telegramRelayUnreachable");
   return new MessagingOperationFailed({ cause: new Error(text) });
 }
 
