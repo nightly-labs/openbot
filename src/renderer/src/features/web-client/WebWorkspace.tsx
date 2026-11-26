@@ -297,6 +297,7 @@ import {
 } from "../conversation/message-delete-access";
 import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
 import { trackUsageLimitShown, usageLimitAskFrom } from "../conversation/usage-limit-ask";
+import { CreditModelsProvider, createCreditModels, useCreditModels } from "../credits/credits-context";
 import { createCrmEnabled } from "../crm/crm-enabled";
 import type { FilesPort } from "../files/files-port";
 import { hostSetupProviderProps } from "../onboarding/host-setup-provider-props";
@@ -483,10 +484,13 @@ type WebWorkspaceProps = {
 const WebAccountSettings = lazy(() => import("./WebAccountSettings"));
 
 export function WebWorkspace(props: WebWorkspaceProps) {
+  const creditModels = createCreditModels(() => createWebCreditsCalls(props.accountFetch).getCatalog());
   return (
     <PlatformProvider appInfo={WEB_APP_INFO}>
       <LayoutProvider>
-        <WebWorkspaceFrame {...props} />
+        <CreditModelsProvider models={creditModels}>
+          <WebWorkspaceFrame {...props} />
+        </CreditModelsProvider>
       </LayoutProvider>
     </PlatformProvider>
   );
@@ -1514,6 +1518,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const license = createLicenseStore(() => licenseCalls, billingOpen, trackLicenseEvent);
   const referralCalls = createWebReferralCalls(props.accountFetch);
   const creditsCalls = createWebCreditsCalls(props.accountFetch);
+  const creditModels = useCreditModels();
   const credits = createCreditsStore(
     () => creditsCalls,
     () => billingOpen() || creditsOpen() !== null,
@@ -3048,6 +3053,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               current={railPage()}
               pinned={layout.railPinned()}
               onPinChange={layout.setRailPinned}
+              creditModels={creditModels()}
               usageRows={usageRows()}
               onAgents={showAgentsPage}
               onTasks={
@@ -3233,6 +3239,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                               initialServerId={request.serverId}
                               headerFrame="window"
                               billingDetails={billingCalls}
+                              models={creditModels()}
                               onClose={showAgents}
                             />
                           )}

@@ -1,4 +1,14 @@
-import { creditCharge, isCreditAmount } from "./credits";
+import {
+  CREDIT_CLIP_SECONDS,
+  CREDIT_ESTIMATE_SPECS,
+  CREDIT_MODEL_COSTS,
+  type CreditEstimate,
+  type CreditModelCost,
+  creditCharge,
+  creditEstimates,
+  creditModelMakerNamed,
+  isCreditAmount,
+} from "./credits";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
 export const CREDIT_MEDIA_KINDS = ["image", "video"] as const;
@@ -153,6 +163,61 @@ export function creditMediaCost(model: CreditMediaModel, input: CreditMediaCostI
   const total = perUnit * units * Math.max(1, input.count);
   if (!Number.isFinite(total) || total <= 0) return null;
   return creditCharge(total);
+}
+
+export function creditMediaShownCredits(model: CreditMediaModel): number | null {
+  const price = creditMediaPrice(model, model.defaultResolution);
+  if (!price) return null;
+  const perUnit = model.audio && price.silentCredits !== null ? price.silentCredits : price.credits;
+  return price.unit === "second" ? creditCharge(perUnit * CREDIT_CLIP_SECONDS) : perUnit;
+}
+
+function liveModelCost(model: CreditMediaModel): CreditModelCost | null {
+  const maker = creditModelMakerNamed(model.maker);
+  const credits = creditMediaShownCredits(model);
+  if (maker === undefined || credits === null) return null;
+  const cost: CreditModelCost = {
+    modelId: model.id,
+    name: model.name,
+    maker,
+    kind: model.kind,
+    unit: model.kind === "video" ? "clip" : "image",
+    credits,
+  };
+  return model.variant === null ? cost : { ...cost, variant: model.variant };
+}
+
+export function creditModelCostsLive(models: readonly CreditMediaModel[]): CreditModelCost[] {
+  const live = new Map(models.map((model) => [model.id, model]));
+  const known = new Set(CREDIT_MODEL_COSTS.map((cost) => cost.modelId));
+  const listed = CREDIT_MODEL_COSTS.map((cost) => {
+    const model = live.get(cost.modelId);
+    const credits = model ? creditMediaShownCredits(model) : null;
+    return credits === null ? cost : { ...cost, credits };
+  });
+  const added = models.flatMap((model) => {
+    if (known.has(model.id)) return [];
+    const cost = liveModelCost(model);
+    return cost ? [cost] : [];
+  });
+  return [...listed, ...added];
+}
+
+export function creditEstimatesLive(models: readonly CreditMediaModel[]): CreditEstimate[] {
+  const live = new Map(models.map((model) => [model.id, model]));
+  return creditEstimates().flatMap((estimate) => {
+    const model = live.get(estimate.model.modelId);
+    if (!model) return [];
+    const spec = CREDIT_ESTIMATE_SPECS[estimate.model.modelId];
+    if (!spec || !model.resolutions.includes(spec.resolution)) return [estimate];
+    const charge = creditMediaCost(model, {
+      resolution: spec.resolution,
+      duration: model.kind === "video" ? CREDIT_CLIP_SECONDS : null,
+      count: 1,
+      audio: false,
+    });
+    return [charge === null ? estimate : { ...estimate, charge }];
+  });
 }
 
 export function creditMediaRequestProblem(

@@ -1,4 +1,5 @@
 import type { BillingCurrency } from "@openbot/contracts/billing";
+import { type CreditMediaModel, creditModelCostsLive } from "@openbot/contracts/credit-media";
 import {
   CREDIT_CLIP_SECONDS,
   CREDIT_MODEL_COSTS,
@@ -24,34 +25,57 @@ import {
 } from "@openbot/ui";
 import { RollingPrice } from "@openbot/ui/rolling-price";
 import { useText } from "@openbot/ui/text";
-import { createSignal, For, onSettled, Show } from "solid-js";
+import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { formatMinorMoney } from "../billing/money";
 import { CreditIcon } from "./CreditIcon";
 import { MakerLogo } from "./MakerLogo";
 import "./credits-explainer.css";
 
 const EXAMPLE_MODEL_IDS = ["gpt-image-2.6", "nano-banana-pro", "seedance-2.5", "veo-3.1"];
-const EXAMPLE_MODELS: readonly CreditModelCost[] = EXAMPLE_MODEL_IDS.flatMap((id) => {
-  const model = CREDIT_MODEL_COSTS.find((entry) => entry.modelId === id);
-  return model ? [model] : [];
-});
-const TOP_EXAMPLE_CHARGE = Math.max(...EXAMPLE_MODELS.map(creditModelCharge));
 
-function chargeRange(kind: CreditModelCost["kind"]) {
-  const charges = CREDIT_MODEL_COSTS.filter((model) => model.kind === kind).map(creditModelCharge);
+interface ChargeRange {
+  min: number;
+  max: number;
+}
+
+interface CreditPrices {
+  all: readonly CreditModelCost[];
+  examples: readonly CreditModelCost[];
+  topExample: number;
+  picture: ChargeRange;
+  video: ChargeRange;
+}
+
+function chargeRange(costs: readonly CreditModelCost[], kind: CreditModelCost["kind"]): ChargeRange {
+  const charges = costs.filter((model) => model.kind === kind).map(creditModelCharge);
   return { min: Math.min(...charges), max: Math.max(...charges) };
 }
 
-const PICTURE = chargeRange("image");
-const VIDEO = chargeRange("video");
+function creditPrices(live: readonly CreditMediaModel[] | undefined): CreditPrices {
+  const models = live && live.length > 0 ? live : undefined;
+  const all = models ? creditModelCostsLive(models) : CREDIT_MODEL_COSTS;
+  const available = models ? new Set(models.map((model) => model.id)) : undefined;
+  const ranged = available ? all.filter((model) => available.has(model.modelId)) : all;
+  const examples = EXAMPLE_MODEL_IDS.flatMap((id) => {
+    const model = ranged.find((entry) => entry.modelId === id);
+    return model ? [model] : [];
+  });
+  return {
+    all,
+    examples,
+    topExample: Math.max(...examples.map(creditModelCharge)),
+    picture: chargeRange(ranged, "image"),
+    video: chargeRange(ranged, "video"),
+  };
+}
 
 function useCredits() {
   const { format } = useText();
   return (value: number) => format.number(value, { maximumFractionDigits: 1 });
 }
 
-function barShare(model: CreditModelCost): number {
-  return Math.sqrt(creditModelCharge(model) / TOP_EXAMPLE_CHARGE);
+function barShare(model: CreditModelCost, top: number): number {
+  return Math.sqrt(creditModelCharge(model) / top);
 }
 
 const ORBIT = [
@@ -102,7 +126,7 @@ function SceneChat() {
   );
 }
 
-function SceneModels() {
+function SceneModels(props: { prices: CreditPrices }) {
   const { t } = useText();
   const credits = useCredits();
   const unit = (model: CreditModelCost) =>
@@ -111,9 +135,9 @@ function SceneModels() {
       : t("billing.credits.explainer.perPicture");
   return (
     <ul class="credits-explainer-bars">
-      <For each={EXAMPLE_MODELS}>
+      <For each={props.prices.examples}>
         {(model, index) => (
-          <li style={{ "--item": index(), "--share": barShare(model) }}>
+          <li style={{ "--item": index(), "--share": barShare(model, props.prices.topExample) }}>
             <span class="credits-explainer-bar-name">
               <MakerLogo maker={model.maker} class="credits-explainer-maker" />
               <span>{model.name}</span>
@@ -185,24 +209,24 @@ const PLAIN_TEXT = {
   get: "billing.credits.explainer.getText",
 } as const satisfies Record<Exclude<Scene, "models">, AppTextKey>;
 
-function PageText(props: { scene: Scene }) {
+function PageText(props: { scene: Scene; prices: CreditPrices }) {
   const { t } = useText();
   const credits = useCredits();
   const text = () => {
     const scene = props.scene;
     if (scene !== "models") return t(PLAIN_TEXT[scene]);
     return t("billing.credits.explainer.modelsText", {
-      pictureMin: credits(PICTURE.min),
-      pictureMax: credits(PICTURE.max),
+      pictureMin: credits(props.prices.picture.min),
+      pictureMax: credits(props.prices.picture.max),
       seconds: CREDIT_CLIP_SECONDS,
-      videoMin: credits(VIDEO.min),
-      videoMax: credits(VIDEO.max),
+      videoMin: credits(props.prices.video.min),
+      videoMax: credits(props.prices.video.max),
     });
   };
   return <>{text()}</>;
 }
 
-function SceneView(props: { scene: Scene; currency: BillingCurrency }) {
+function SceneView(props: { scene: Scene; currency: BillingCurrency; prices: CreditPrices }) {
   return (
     <>
       <Show when={props.scene === "media"}>
@@ -212,7 +236,7 @@ function SceneView(props: { scene: Scene; currency: BillingCurrency }) {
         <SceneChat />
       </Show>
       <Show when={props.scene === "models"}>
-        <SceneModels />
+        <SceneModels prices={props.prices} />
       </Show>
       <Show when={props.scene === "get"}>
         <SceneGet currency={props.currency} />
@@ -250,6 +274,7 @@ export interface CreditsExplainerDialogProps {
   onOpenChange: (open: boolean) => void;
   currency?: BillingCurrency | undefined;
   onOpenPrices?: (() => void) | undefined;
+  models?: readonly CreditMediaModel[] | undefined;
 }
 
 export function CreditsExplainerDialog(props: CreditsExplainerDialogProps) {
@@ -261,6 +286,7 @@ export function CreditsExplainerDialog(props: CreditsExplainerDialogProps) {
             currency={props.currency ?? "eur"}
             onClose={() => props.onOpenChange(false)}
             onOpenPrices={props.onOpenPrices}
+            models={props.models}
           />
         </Dialog.Overlay>
       </Dialog.Portal>
@@ -272,8 +298,10 @@ function ExplainerContent(props: {
   currency: BillingCurrency;
   onClose: () => void;
   onOpenPrices: (() => void) | undefined;
+  models: readonly CreditMediaModel[] | undefined;
 }) {
   const { t, format } = useText();
+  const prices = createMemo(() => creditPrices(props.models));
   const stepper = createStepper(PAGES.length, props.onClose);
   const current = () => PAGES[stepper.page()] ?? PAGES[0];
   let primary: HTMLButtonElement | undefined;
@@ -304,7 +332,7 @@ function ExplainerContent(props: {
           <>
             <div class="credits-explainer-scene">
               <div class="credits-explainer-scene-in" aria-hidden="true">
-                <SceneView scene={page.scene} currency={props.currency} />
+                <SceneView scene={page.scene} currency={props.currency} prices={prices()} />
               </div>
               <Show when={page.scene === "models" && props.onOpenPrices}>
                 {(openPrices) => (
@@ -316,7 +344,7 @@ function ExplainerContent(props: {
                     onClick={() => openPrices()()}
                   >
                     {t("billing.credits.explainer.allPrices", {
-                      count: format.number(CREDIT_MODEL_COSTS.length),
+                      count: format.number(prices().all.length),
                     })}
                     <ArrowRight aria-hidden="true" />
                   </Button>
@@ -335,7 +363,7 @@ function ExplainerContent(props: {
                 {t(page.title)}
               </Dialog.Title>
               <Dialog.Description class="credits-explainer-lead">
-                <PageText scene={page.scene} />
+                <PageText scene={page.scene} prices={prices()} />
               </Dialog.Description>
             </div>
           </>

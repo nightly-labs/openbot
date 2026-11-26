@@ -64,6 +64,7 @@ function fixedCalls(state: CreditsState): CreditsCalls {
   return {
     getState: async () => state,
     getActivity: async () => EMPTY_CREDIT_ACTIVITY,
+    getCatalog: async () => ({ models: [] }),
     openCheckout: async () => undefined,
     transfer: async () => state,
     redeem: () => Promise.reject(new Error(sourceText("error.billing.creditCodeInvalid"))),

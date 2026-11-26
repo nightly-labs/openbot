@@ -5,6 +5,7 @@ import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
 import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
 import type { BillingDetails, BillingDetailsRequest } from "./billing-details";
+import type { CreditMediaCatalog } from "./credit-media";
 import type {
   CreditActivity,
   CreditCheckoutRequest,
@@ -1455,6 +1456,7 @@ export const IPC_ENDPOINTS = {
   credits: {
     getState: request<undefined, CreditsState>()("credits:get-state"),
     getActivity: request<undefined, CreditActivity>()("credits:get-activity"),
+    getCatalog: request<undefined, CreditMediaCatalog>()("credits:get-catalog"),
     openCheckout: request<CreditCheckoutRequest, void>()("credits:open-checkout"),
     transfer: request<CreditTransferRequest, CreditsState>()("credits:transfer"),
     redeem: request<CreditRedeemRequest, CreditRedeemResult>()("credits:redeem"),

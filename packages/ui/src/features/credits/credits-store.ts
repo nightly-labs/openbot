@@ -1,3 +1,4 @@
+import type { CreditMediaCatalog } from "@openbot/contracts/credit-media";
 import {
   type CreditActivity,
   type CreditCheckoutRequest,
@@ -17,6 +18,7 @@ import { createStripeReturnLoad } from "../billing/billing-store";
 export interface CreditsCalls {
   getState: () => Promise<CreditsState>;
   getActivity: () => Promise<CreditActivity>;
+  getCatalog: () => Promise<CreditMediaCatalog>;
   openCheckout: (request: CreditCheckoutRequest) => Promise<void>;
   transfer: (request: CreditTransferRequest) => Promise<CreditsState>;
   redeem: (request: CreditRedeemRequest) => Promise<CreditRedeemResult>;
