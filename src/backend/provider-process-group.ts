@@ -47,14 +47,18 @@ export function readProcessGroupOutput(
   return new Promise((resolve, reject) => {
     const child = spawn(file, [...args], { env: options.env, detached: true });
     const leader = child.pid;
-    const forget = leader === undefined ? () => {} : endGroupOnQuit(leader);
+    if (leader === undefined) {
+      child.once("error", reject);
+      return;
+    }
+    const forget = endGroupOnQuit(leader);
     const chunks: Buffer[] = [];
     let size = 0;
     let failure: GroupReadFailure | null = null;
     let ending = false;
     let settled = false;
     const endGroup = () => {
-      if (ending || leader === undefined) return;
+      if (ending) return;
       ending = true;
       if (!signalProcessGroup(leader, "SIGTERM")) return forget();
       setTimeout(() => {
