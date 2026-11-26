@@ -50,6 +50,7 @@ export const NEAR_WALLET_LIMITS = {
   reason: 500,
   usd: 32,
   requestId: 128,
+  paymentDetail: 1000,
 } as const;
 
 export interface NearBalance {
@@ -102,7 +103,6 @@ export interface ConversationNearPayment {
 }
 
 const NEAR_TRANSACTION_HASH = /^[1-9A-HJ-NP-Za-km-z]{32,64}$/;
-const NEAR_PAYMENT_DETAIL = 1000;
 
 export function isNearTransactionHash(value: unknown): value is string {
   return typeof value === "string" && NEAR_TRANSACTION_HASH.test(value);
@@ -118,7 +118,7 @@ export function isConversationNearPayment(value: unknown): value is Conversation
     isOneOf(NEAR_PAYMENT_STATES, value.state) &&
     isBoolean(value.automatic) &&
     (value.transactionHash === null || isNearTransactionHash(value.transactionHash)) &&
-    isNullableBoundedString(value.detail, NEAR_PAYMENT_DETAIL)
+    isNullableBoundedString(value.detail, NEAR_WALLET_LIMITS.paymentDetail)
   );
 }
 

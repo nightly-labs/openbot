@@ -1851,7 +1851,7 @@ export class AttentionRegistry {
         state,
         automatic: plan.success.kind === "auto",
         transactionHash,
-        detail: detail === null ? null : detail.slice(0, NEAR_PAYMENT_DETAIL_LIMIT),
+        detail: detail === null ? null : detail.slice(0, NEAR_WALLET_LIMITS.paymentDetail),
       });
     if (plan.success.kind === "ask") {
       const decision = yield* this.awaitToolApproval(
@@ -3034,8 +3034,6 @@ export class AttentionRegistry {
     this.#conversation.emitConversation(snapshot);
   }
 }
-
-const NEAR_PAYMENT_DETAIL_LIMIT = 1000;
 
 const NEAR_PAYMENT_RESULT_STATE = {
   paid: "paid",
