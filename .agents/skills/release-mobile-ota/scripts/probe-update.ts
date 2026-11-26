@@ -1,4 +1,5 @@
 import { parseArgs } from "node:util";
+import { rolloutBucket, SIGNING_ALGORITHM, SIGNING_KEY_ID } from "../../../../apps/mobile-updates/src/protocol";
 
 const { values } = parseArgs({
   options: {
@@ -22,15 +23,10 @@ if ((platform !== "ios" && platform !== "android") || !runtime || !updateId || !
   process.exit(2);
 }
 
-async function rolloutBucket(clientId: string): Promise<number> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${updateId}:${clientId}`));
-  return new DataView(digest).getUint32(0) % 100;
-}
-
 async function clientWhere(inside: boolean): Promise<string> {
   for (;;) {
     const clientId = crypto.randomUUID();
-    if ((await rolloutBucket(clientId)) < rollout === inside) return clientId;
+    if ((await rolloutBucket(clientId, updateId ?? "")) < rollout === inside) return clientId;
   }
 }
 
@@ -45,7 +41,7 @@ async function askManifest(clientId: string): Promise<{ status: number; body: st
       "eas-client-id": clientId,
       "expo-current-update-id": "00000000-0000-4000-8000-000000000000",
       "expo-embedded-update-id": "00000000-0000-4000-8000-000000000001",
-      "expo-expect-signature": 'sig, keyid="main", alg="rsa-v1_5-sha256"',
+      "expo-expect-signature": `sig, keyid="${SIGNING_KEY_ID}", alg="${SIGNING_ALGORITHM}"`,
     },
   });
   return { status: response.status, body: response.status === 200 ? await response.text() : "" };
