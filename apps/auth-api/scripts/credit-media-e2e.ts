@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { CREDIT_MEDIA_REQUEST_PART } from "@openbot/contracts/credit-media";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { createAccountAnalytics } from "../src/server/account-analytics";
 import { BillingError, type BillingOperationError } from "../src/server/billing-errors";
@@ -151,6 +152,7 @@ function fakeGateway() {
   const outputs: string[] = [];
   let active = "router";
   let submitStatus = 200;
+  let submitCode = "upstream_said_no";
   let modelsStatus = 200;
   let sequence = 0;
   let gate: { arrived: () => void; released: Promise<void> } | null = null;
@@ -208,7 +210,7 @@ function fakeGateway() {
         waiting.arrived();
         await waiting.released;
       }
-      if (submitStatus !== 200) return Response.json({ error: { code: "upstream_said_no" } }, { status: submitStatus });
+      if (submitStatus !== 200) return Response.json({ error: { code: submitCode } }, { status: submitStatus });
       const upstream = isDynamicRecord(request) && typeof request.upstream === "string" ? request.upstream : "";
       const model = isDynamicRecord(request) ? request.model : null;
       if (typeof model !== "string" || !routedFor(upstream, model, request.funding))
@@ -279,8 +281,9 @@ function fakeGateway() {
     forget: (providerJobId: string) => {
       jobs.delete(find(providerJobId)[0]);
     },
-    setSubmitStatus: (status: number) => {
+    setSubmitStatus: (status: number, code = "upstream_said_no") => {
       submitStatus = status;
+      submitCode = code;
     },
     setModelsStatus: (status: number) => {
       modelsStatus = status;
@@ -316,7 +319,7 @@ async function run<T>(effect: Effect.Effect<T, BillingError | BillingOperationEr
 
 async function failure(effect: Effect.Effect<unknown, BillingError | BillingOperationError>) {
   const error = await Effect.runPromise(Effect.flip(effect));
-  if (error instanceof BillingError) return { status: error.status, code: error.code };
+  if (error instanceof BillingError) return { status: error.status, code: error.code, message: error.message };
   return { status: 500, code: error._tag };
 }
 
@@ -600,6 +603,23 @@ async function gatewayFlow() {
     );
   }
 
+  upstream.setSubmitStatus(400, "Content_Policy");
+  const unsafeSubmitRequest = submission("image-one");
+  const unsafeSubmit = await failure(service.submit(owner, OWNER, unsafeSubmitRequest));
+  upstream.setSubmitStatus(200);
+  const unsafeSubmitView = await run(service.submit(owner, OWNER, unsafeSubmitRequest));
+  check(
+    "a content policy refusal at submit says why, and the same job sent again keeps the reason",
+    unsafeSubmit.code === "media_request_refused" &&
+      unsafeSubmit.message === sourceText("error.billing.mediaContentRefused") &&
+      unsafeSubmitView.status === "failed" &&
+      unsafeSubmitView.failure === "refused" &&
+      unsafeSubmitView.reason === "content_policy" &&
+      unsafeSubmitView.credits === 0 &&
+      (await balance(owner)) === 297,
+    { unsafeSubmit, unsafeSubmitView },
+  );
+
   upstream.setSubmitStatus(500);
   const retryRequest = submission("image-one");
   const unknown = await failure(service.submit(owner, OWNER, retryRequest));
@@ -836,7 +856,7 @@ async function gatewayFlow() {
       sent(OWNER, { action: "media_released", model_id: "video-one", outcome: "failed", reason: "unknown" }).length ===
         2 &&
       sent(OWNER, { action: "media_released", wallet: "personal", outcome: "refused", reason: "content_policy" })
-        .length === 1 &&
+        .length === 2 &&
       sent(OWNER, { action: "media_released", wallet: "server", outcome: "refused", reason: "content_policy" })
         .length === 1 &&
       sent(OWNER, { action: "media_released", wallet: "server", outcome: "failed", reason: "no_output" }).length ===
@@ -891,7 +911,7 @@ async function gatewayFlow() {
     audited({ event: "hold" }).length === holds &&
       audited({ event: "charged", result: "ok", code: "completed" }).length === ledgerSpends().length &&
       audited({ event: "released", code: "refused" }).length ===
-        refusedStatuses.length + [unsafe, unsafeStudioJob].length &&
+        refusedStatuses.length + [unsafe, unsafeSubmitRequest, unsafeStudioJob].length &&
       audited({ event: "charged", server_id: SERVER_ID, model_id: "video-one", credits: 35 }).length === 1 &&
       audited({ event: "released", result: "failed", code: "failed", model_id: "video-one", credits: 155 }).length ===
         1,
@@ -910,7 +930,7 @@ async function gatewayFlow() {
             row.actor_user_id === OWNER,
         ).length === 1,
     ) &&
-      audited({ event: "media_submit", code: "media_request_refused" }).length === 1 &&
+      audited({ event: "media_submit", code: "media_request_refused" }).length === 2 &&
       audited({ event: "media_submit", code: "media_busy" }).length === 2,
     trail,
   );

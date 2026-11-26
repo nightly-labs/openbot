@@ -80,12 +80,11 @@ export interface MediaGateway {
 const SAFE_CODE = /^[a-z0-9_.-]{1,64}$/i;
 
 function safeCode(value: unknown): string {
-  return isString(value) && SAFE_CODE.test(value) ? value : "unknown";
+  return isString(value) && SAFE_CODE.test(value) ? value.toLowerCase() : "unknown";
 }
 
 function jobFailure(status: CreditMediaJobStatus, value: unknown): string | null {
-  if (status !== "failed") return null;
-  return isString(value) && SAFE_CODE.test(value) ? value.toLowerCase() : "unknown";
+  return status === "failed" ? safeCode(value) : null;
 }
 
 function retryAfter(response: Response): number | null {

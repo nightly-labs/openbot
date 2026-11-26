@@ -187,7 +187,7 @@ function failureOf(outcome: CreditHoldOutcome | null): CreditMediaFailure {
   return "failed";
 }
 
-const CONTENT_POLICY_FAILURE = "content_policy";
+const [CONTENT_POLICY_FAILURE] = CREDIT_MEDIA_FAILURE_REASONS;
 const NOT_FOUND_REASON = "not_found";
 const NO_OUTPUT_REASON = "no_output";
 
@@ -545,7 +545,13 @@ export class CreditMediaService {
       logUpstream("submit", error, trace);
       if (REFUSED_STATUSES.has(error.status)) {
         yield* this.#settle(hold, { outcome: "refused", reason: error.code });
-        return yield* new BillingError(400, "media_request_refused", sourceText("error.billing.mediaRequestRefused"));
+        return yield* new BillingError(
+          400,
+          "media_request_refused",
+          error.code === CONTENT_POLICY_FAILURE
+            ? sourceText("error.billing.mediaContentRefused")
+            : sourceText("error.billing.mediaRequestRefused"),
+        );
       }
       if (NOT_ACCEPTED_STATUSES.has(error.status)) {
         yield* this.#settle(hold, { outcome: "refused", reason: error.code });
