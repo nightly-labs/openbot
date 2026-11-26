@@ -7,7 +7,7 @@ const models = { availableModels: [{ modelId: "fast", name: "Fast" }], currentMo
 const waiting = new Map<string, { request: AcpRequest; peer: AcpPeer; timer: NodeJS.Timeout }>();
 let sessions = 0;
 
-const markersOf = (text: string) => [...text.matchAll(/HOLD-([a-z0-9-]+)/gu)].map((match) => match[1] ?? "");
+const markersOf = (text: string) => [...text.matchAll(/HOLD-([a-z0-9-]+)/gu)].map((match) => match[1] ?? "").slice(-1);
 const released = (markers: readonly string[]) => markers.every((marker) => existsSync(join(releaseDir, marker)));
 
 function finish(sessionId: string, stopReason: "end_turn" | "cancelled"): void {
@@ -40,8 +40,16 @@ serveFakeAcpAgent(
         .filter((block) => block.type === "text")
         .map((block) => block.text ?? "")
         .join("\n");
-      const markers = markersOf(text);
-      logEntry({ event: "prompt", at: Date.now(), sessionId, markers, text: text.slice(-400) });
+      const summary = text.includes("Summarize shared facts") || text.includes("Shorten this channel summary");
+      const markers = summary ? (process.env.FAKE_HOLD_SUMMARY ? ["summary"] : []) : markersOf(text);
+      logEntry({
+        event: summary ? "summary" : "prompt",
+        at: Date.now(),
+        sessionId,
+        markers,
+        leftOut: text.includes("are left out to keep this turn small"),
+        text: text.slice(-400),
+      });
       const timer = setInterval(() => {
         if (released(markers)) finish(sessionId, "end_turn");
       }, 20);

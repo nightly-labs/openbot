@@ -41,7 +41,7 @@ import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contract
 import { isFixedSourceText, matchingSourceKeys, type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import type { CauseCode } from "@openbot/telemetry";
-import { Deferred, Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
+import { Deferred, Effect, Exit, Fiber, Option, Result, Schema, Scope } from "effect";
 import { isTextAnswer } from "./agent/routine-quiet-runs";
 import { setChannelFolderSource } from "./agent/workspace-sandbox";
 import { type ChannelOperationError, channelFailure, channelResult, channelSync } from "./channel-effects";
@@ -137,6 +137,7 @@ const ROUTING_RECENT_MESSAGES = 5;
 const ROUTING_TEXT_CHARACTERS = 600;
 const ROUTING_REQUEST_BYTES = 20_000;
 const ROUTING_PROMPT_CHARACTERS = 120_000;
+const SUMMARY_WAIT_MS = 30_000;
 
 const RoutingOutcomes = [
   Schema.Struct({
@@ -1165,12 +1166,20 @@ export class ChannelService {
           (assignment.agentId === task.ownerAgentId && assignment.channelId === task.channelId),
       ) ||
       (task.ownerAgentId !== null && this.#agentAtChannelLimit(task.ownerAgentId, assignments)) ||
-      assignments.filter((assignment) => assignment.channelId === task.channelId).length >= CHANNEL_PARALLEL_LIMIT ||
+      this.#memberSlotsFull(task.channelId, task.ownerAgentId, assignments) ||
       task.dependencies.some((id) => {
         const dependency = tasks.get(id);
         return !dependency || !settled(dependency);
       })
     );
+  }
+
+  #memberSlotsFull(channelId: string, ownerAgentId: string | null, assignments: readonly ChannelAssignment[]): boolean {
+    const inChannel = assignments.filter((assignment) => assignment.channelId === channelId);
+    if (inChannel.length < CHANNEL_PARALLEL_LIMIT) return false;
+    const leadAgentId = this.store.get(channelId).leadAgentId;
+    if (ownerAgentId !== null && ownerAgentId === leadAgentId) return false;
+    return inChannel.filter((assignment) => assignment.agentId !== leadAgentId).length >= CHANNEL_PARALLEL_LIMIT;
   }
 
   #agentAtChannelLimit(agentId: string, assignments: readonly ChannelAssignment[]): boolean {
@@ -2115,7 +2124,9 @@ export class ChannelService {
             channelName: busyIn.channel.name,
           },
         ];
-      return assignments.length >= CHANNEL_PARALLEL_LIMIT ? [{ taskId: task.id, agentId, reason: "channel-full" }] : [];
+      return this.#memberSlotsFull(channelId, agentId, assignments)
+        ? [{ taskId: task.id, agentId, reason: "channel-full" }]
+        : [];
     });
   }
 
@@ -2449,7 +2460,7 @@ export class ChannelService {
     this.#preparedChanges.set(delivery.delivery.id, this.store.completedMessageChanges(channel.id));
     const delivered = this.#deliveredContext(channel.id, context, agent);
     const budget = this.hooks.contextCharacters?.(agent.id, context.threadId);
-    yield* this.#awaitSummary(channel.id, budget);
+    const caughtUp = yield* this.#awaitSummary(channel.id, budget);
     const resumed = this.#resumesAfterSubtasks(assignment);
     if (resumed) this.#resumedDeliveries.add(delivery.delivery.id);
     else this.#resumedDeliveries.delete(delivery.delivery.id);
@@ -2461,6 +2472,7 @@ export class ChannelService {
       this.#peers(tasks, task),
       budget,
       resumed,
+      caughtUp ? undefined : 0,
     );
     if (delivered && history.delta !== null)
       this.#deltas.set(delivery.delivery.id, { sessionId: delivered.sessionId, text: history.delta });
@@ -2686,11 +2698,15 @@ export class ChannelService {
     });
   }
 
-  #awaitSummary(channelId: string, budget: number | undefined): Effect.Effect<void, ChannelOperationError> {
+  #awaitSummary(channelId: string, budget: number | undefined): Effect.Effect<boolean, ChannelOperationError> {
     const fiber = this.#summaries.get(channelId);
-    if (!fiber) return Effect.void;
+    if (!fiber) return Effect.succeed(true);
     return channelSync(() => this.#history.needsSummary(channelId, budget)).pipe(
-      Effect.flatMap((needed) => (needed ? Fiber.await(fiber).pipe(Effect.asVoid) : Effect.void)),
+      Effect.flatMap((needed) =>
+        needed
+          ? Fiber.await(fiber).pipe(Effect.timeoutOption(SUMMARY_WAIT_MS), Effect.map(Option.isSome))
+          : Effect.succeed(true),
+      ),
     );
   }
 
@@ -3674,7 +3690,7 @@ export class ChannelService {
     const tasks = yield* channelSync(() => this.store.tasks(channelId));
     let history: Effect.Success<ReturnType<ChannelHistory["prepare"]>>;
     const budget = this.hooks.contextCharacters?.(agent.id, threadId);
-    yield* this.#awaitSummary(channelId, budget);
+    const caughtUp = yield* this.#awaitSummary(channelId, budget);
     try {
       history = channelResult(
         yield* Effect.result(
@@ -3685,6 +3701,8 @@ export class ChannelService {
             this.#deliveredContext(channelId, context, agent),
             this.#peers(tasks, task),
             budget,
+            false,
+            caughtUp ? undefined : 0,
           ),
         ),
       );

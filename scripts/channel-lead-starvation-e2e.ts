@@ -239,7 +239,13 @@ try {
   const lead = await create("Lead");
   const helperOne = await create("Helper one");
   const helperTwo = await create("Helper two");
-  step("agents created", { lead: lead.id, helperOne: helperOne.id, helperTwo: helperTwo.id });
+  const otherLead = await create("Other lead");
+  step("agents created", {
+    lead: lead.id,
+    helperOne: helperOne.id,
+    helperTwo: helperTwo.id,
+    otherLead: otherLead.id,
+  });
 
   const solo = await createChannel("lead-channel", [lead.id], lead.id);
   const mainTurn = await personMessage(lead.id, `Main work ${hold("main-1")}`);
@@ -289,7 +295,7 @@ try {
   );
   step("fair order", fairPrompts);
 
-  const full = await createChannel("full-channel", [lead.id, helperOne.id, helperTwo.id], lead.id);
+  const full = await createChannel("full-channel", [lead.id, helperOne.id, helperTwo.id, otherLead.id], otherLead.id);
   await mention(full, helperOne.id, `Helper one work ${hold("helper-1")}`);
   await mention(full, helperTwo.id, `Helper two work ${hold("helper-2")}`);
   await waitFor(
