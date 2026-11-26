@@ -707,6 +707,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       hooks: {
         emitError: (code, error) => this.#emitError(code, error),
         refreshAllAgentRuntimes: (timing) => this.#threads.refreshAllAgentRuntimes(timing),
+        restartRelayedMcpServer: (config) => this.#providers.restartRelayedMcpServer(config),
       },
     });
     this.#mediaCatalog = new WorkflowMediaCatalogCache({

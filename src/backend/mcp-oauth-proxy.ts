@@ -4,7 +4,7 @@ import { createServer, type Server as HttpServer, type IncomingMessage, type Ser
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
-import { Effect, Semaphore } from "effect";
+import { Effect, Exit, Semaphore } from "effect";
 import { runCauseEffect } from "./effect-boundary";
 import { McpOperationError, mcpCall, mcpSync } from "./mcp-effects";
 
@@ -71,7 +71,7 @@ export class McpOAuthProxy {
   #server: HttpServer | null = null;
   #port: number | null = null;
   #secret: string | null = null;
-  readonly #failedStarts = new Map<string, boolean>();
+  readonly #broken = new Map<string, boolean>();
   readonly #attempts = new Map<string, number>();
 
   constructor(options: McpOAuthProxyOptions) {
@@ -87,18 +87,23 @@ export class McpOAuthProxy {
     const path = agentKey ? `${route}/${agentKey}` : route;
     const bearer = routeBearer(secret, path);
     registerSecretValue(bearer);
-    let attempt = this.#attempts.get(path) ?? 0;
-    if (this.#failedStarts.delete(path)) this.#attempts.set(path, ++attempt);
+    const attempt = (this.#attempts.get(path) ?? 0) + (this.#broken.delete(path) ? 1 : 0);
+    this.#attempts.set(path, attempt);
     return { url: `http://127.0.0.1:${port}/mcp/${path}${attempt > 0 ? `?attempt=${attempt}` : ""}`, bearer };
   });
 
-  failedStart(route: string): boolean {
-    for (const [path, reported] of this.#failedStarts) if (!reported && onRoute(path, route)) return true;
+  broken(route: string): boolean {
+    for (const [path, reported] of this.#broken) if (!reported && onRoute(path, route)) return true;
     return false;
   }
 
-  reportedFailedStart(route: string): void {
-    for (const path of this.#failedStarts.keys()) if (onRoute(path, route)) this.#failedStarts.set(path, true);
+  reportedBreak(route: string): void {
+    for (const path of this.#broken.keys()) if (onRoute(path, route)) this.#broken.set(path, true);
+  }
+
+  restart(route: string): void {
+    for (const path of this.#attempts.keys())
+      if (onRoute(path, route) && !this.#broken.has(path)) this.#broken.set(path, true);
   }
 
   readonly identity = Effect.fn("McpOAuthProxy.identity")(function* (this: McpOAuthProxy) {
@@ -111,7 +116,7 @@ export class McpOAuthProxy {
     this.#server = null;
     this.#port = null;
     this.#secret = null;
-    this.#failedStarts.clear();
+    this.#broken.clear();
     this.#attempts.clear();
     if (!server) return;
     yield* Effect.callback<void>((resume) => {
@@ -208,14 +213,19 @@ export class McpOAuthProxy {
     }
     const read = method === "POST" ? yield* readBody(request) : null;
     if (read === "too-large") return refuse(response, 413);
-    const start = { answered: false };
-    const relay = this.#relay(request, response, method, read, route, agentKey ?? null, controller, start);
-    if (!read || initializeRequest(read, request) === null) return yield* relay;
-    yield* relay.pipe(
-      Effect.ensuring(
+    const exchange: ProxyExchange = { answered: false, lost: false };
+    const initialize = read !== null && initializeRequest(read, request) !== null;
+    yield* this.#relay(request, response, method, read, route, agentKey ?? null, controller, exchange).pipe(
+      Effect.onExit((exit) =>
         Effect.sync(() => {
-          if (start.answered) this.#failedStarts.delete(path);
-          else this.#failedStarts.set(path, false);
+          if (initialize) {
+            if (Exit.isSuccess(exit) && exchange.answered) this.#broken.delete(path);
+            else this.#broken.set(path, false);
+            return;
+          }
+          const clientLeft = response.destroyed && !response.writableFinished;
+          const lost = exchange.lost || (Exit.isFailure(exit) && !clientLeft);
+          if (method === "POST" && lost && !this.#broken.has(path)) this.#broken.set(path, false);
         }),
       ),
     );
@@ -230,10 +240,11 @@ export class McpOAuthProxy {
     route: string,
     agentKey: string | null,
     controller: AbortController,
-    start: { answered: boolean },
+    exchange: ProxyExchange,
   ): Effect.fn.Return<void, McpOperationError> {
     const target = yield* this.#options.target(route);
-    if (!target) return refuseRequests(response, method, read, sourceText("error.backend.mcpOAuthSignInNeeded"));
+    if (!target)
+      return refuseRequests(exchange, response, method, read, sourceText("error.backend.mcpOAuthSignInNeeded"));
     const client = this.#options.client;
     const body = read && client ? yield* mcpSync(() => withClientInfo(read, request, client, agentKey)) : read;
     const { answer: upstream, token } = yield* this.#forward(target, request, method, body, controller);
@@ -243,7 +254,7 @@ export class McpOAuthProxy {
         yield* discard(upstream);
         yield* this.#options.scopeRefused(target.url, token, scope);
         logger.warn("The MCP server asked for more access than the sign-in of this computer gives.");
-        return refuseRequests(response, method, body, sourceText("error.backend.mcpOAuthScopeNeeded"));
+        return refuseRequests(exchange, response, method, body, sourceText("error.backend.mcpOAuthScopeNeeded"));
       }
     }
     if (!(upstream instanceof Response)) {
@@ -258,7 +269,7 @@ export class McpOAuthProxy {
         : upstream.renewed
           ? sourceText("error.backend.mcpOAuthRequestRefused")
           : sourceText("error.backend.mcpOAuthRenewalFailed");
-      return refuseRequests(response, method, body, message);
+      return refuseRequests(exchange, response, method, body, message);
     }
     const refused = upstream.status === 400 && method === "POST" ? notificationMethods(body) : null;
     if (refused) {
@@ -275,7 +286,8 @@ export class McpOAuthProxy {
     }
     response.writeHead(upstream.status, headers);
     response.flushHeaders();
-    start.answered = upstream.ok;
+    exchange.answered = upstream.ok;
+    exchange.lost = upstream.status >= 500;
     if (!upstream.body) {
       response.end();
       return;
@@ -505,6 +517,11 @@ async function pipeBody(body: ReadableStream<Uint8Array>, response: ServerRespon
   }
 }
 
+interface ProxyExchange {
+  answered: boolean;
+  lost: boolean;
+}
+
 interface UpstreamRefusal {
   challengeError: string | null;
   renewed: boolean;
@@ -521,7 +538,14 @@ export function insufficientScopeChallenge(challenge: string): string | null | u
   return (scope?.[1] ?? scope?.[2])?.trim() || null;
 }
 
-function refuseRequests(response: ServerResponse, method: string, body: Buffer | null, message: string): void {
+function refuseRequests(
+  exchange: ProxyExchange,
+  response: ServerResponse,
+  method: string,
+  body: Buffer | null,
+  message: string,
+): void {
+  exchange.lost = true;
   if (method !== "POST") {
     response.writeHead(405, { allow: "POST" });
     response.end();

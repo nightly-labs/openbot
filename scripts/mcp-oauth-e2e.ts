@@ -859,6 +859,46 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
     assert.equal(textOf(await client.callTool({ name: "echo", arguments: { text: "restored" } })), "restored");
     const unusableSignInEnded = { tokenRequests: 0, signedIn: false, needsSignIn: true };
 
+    const brokenRoute = await endpointOf(gateway, direct, "agent-break");
+    const brokenClient = await connect(brokenRoute.url, brokenRoute.bearer);
+    assert.equal(textOf(await brokenClient.callTool({ name: "echo", arguments: { text: "before" } })), "before");
+    assert.deepEqual(
+      await endpointOf(gateway, direct, "agent-break"),
+      brokenRoute,
+      "A good start changed the address.",
+    );
+    servers.setEnabled(direct.id, false);
+    const offCall = await brokenClient.callTool({ name: "echo", arguments: { text: "off" } }).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    servers.setEnabled(direct.id, true);
+    assert.ok(offCall instanceof McpError, "The call to a turned-off server did not fail.");
+    const afterBreak = { ...brokenRoute, url: `${brokenRoute.url}?attempt=1` };
+    assert.deepEqual(await endpointOf(gateway, direct, "agent-break"), afterBreak);
+    assert.deepEqual(
+      await endpointOf(gateway, direct, "agent-break"),
+      afterBreak,
+      "One break moved the address twice.",
+    );
+
+    const turnedOnRoute = await endpointOf(gateway, direct, "agent-turn-on");
+    const turnedOnClient = await connect(turnedOnRoute.url, turnedOnRoute.bearer);
+    assert.equal(textOf(await turnedOnClient.callTool({ name: "echo", arguments: { text: "on" } })), "on");
+    const movedBeforeTurnOn = await endpointOf(gateway, moved);
+    await runCauseEffect(gateway.setEnabled({ mcpServerId: direct.id, enabled: false }));
+    await runCauseEffect(gateway.setEnabled({ mcpServerId: direct.id, enabled: true }));
+    assert.deepEqual(await endpointOf(gateway, direct, "agent-turn-on"), {
+      ...turnedOnRoute,
+      url: `${turnedOnRoute.url}?attempt=1`,
+    });
+    assert.deepEqual(
+      await endpointOf(gateway, moved),
+      movedBeforeTurnOn,
+      "Turning one server on moved another server.",
+    );
+    const reconnectedAfterBreak = { breakMovesAddressOnce: true, turnOnMovesAddress: true, otherServersKept: true };
+
     await runCauseEffect(gateway.signOut({ mcpServerId: direct.id }));
     const hitsAtSignOut = resource.hits.length;
     const postsBefore = resource.hits.filter((hit) => hit.method === "POST").length;
@@ -937,6 +977,7 @@ async function proxyCases(auth: Awaited<ReturnType<typeof startAuthorizationServ
       unusableSignInEnded,
       signedOut,
       expiredWithoutRefresh,
+      reconnectedAfterBreak,
       restart,
     };
   } finally {

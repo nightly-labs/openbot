@@ -197,7 +197,7 @@ const report: {
   calls: Call[];
   refreshes: number;
   failures: string[];
-  relayedStdio?: { pid: string; calls: number };
+  relayedStdio?: { pid: string; calls: number; lostAfterExit: number };
 } = {
   passed: false,
   calls,
@@ -724,6 +724,8 @@ process.stdin.on("data", (chunk) => {
 });
 `,
   );
+  let lostServers = 0;
+  const serverLost = Promise.withResolvers<void>();
   const relay = await runCauseEffect(
     startStdioMcpRelay({
       command: process.execPath,
@@ -732,6 +734,10 @@ process.stdin.on("data", (chunk) => {
         Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
       ),
       cwd: root,
+      onServerLost: () => {
+        lostServers += 1;
+        serverLost.resolve();
+      },
     }),
   );
   try {
@@ -768,7 +774,10 @@ process.stdin.on("data", (chunk) => {
       [{ type: "inputText", text: `${pid} calls=3` }],
       "the provider keeps its session",
     );
-    report.relayedStdio = { pid, calls: 3 };
+    assert.equal(lostServers, 0, "a running server counts as lost");
+    process.kill(Number(pid.slice("pid=".length)));
+    await serverLost.promise;
+    report.relayedStdio = { pid, calls: 3, lostAfterExit: lostServers };
     await provider.close();
   } finally {
     await runCauseEffect(relay.close());

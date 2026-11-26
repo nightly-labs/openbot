@@ -72,6 +72,7 @@ export interface McpServiceSignIn {
 export interface McpGatewayHooks {
   emitError(code: string, error: unknown): void;
   refreshAllAgentRuntimes(timing: RuntimeRefreshTiming): Effect.Effect<void, McpGatewayFailed>;
+  restartRelayedMcpServer?(config: McpServerConfig): void;
 }
 
 export interface GitHubConnectorSource {
@@ -269,8 +270,14 @@ export class McpGateway {
       try: () => this.#servers.setEnabled(input.mcpServerId, input.enabled),
       catch: (cause) => new McpGatewayFailed({ cause }),
     });
+    if (input.enabled && changed) this.#restartConnections(changed);
     return yield* this.changed(input.enabled ? "after-background-work" : "now", [changed?.name]);
   }, Effect.uninterruptible);
+
+  #restartConnections(config: McpServerConfig): void {
+    if (this.#proxied(config)) this.#proxy.restart(mcpOAuthProxyRoute(config.id, config.url));
+    else if (config.transport === "stdio") this.#hooks.restartRelayedMcpServer?.(config);
+  }
 
   readonly changed = Effect.fn("McpGateway.changed")(function* (
     this: McpGateway,
@@ -366,11 +373,11 @@ export class McpGateway {
     if (key === undefined || key !== mcpFingerprintValues([{ ...config, enabled: true }])[0]) return;
     const tools = [String(outcome.toolCount), ...[...outcome.tools].sort()].join("\u0000");
     const route = saved !== undefined && this.#proxied(saved) ? mcpOAuthProxyRoute(saved.id, saved.url) : null;
-    const failedStart = (route !== null && this.#proxy.failedStart(route)) || this.#providerFailedStarts.has(config.id);
+    const failedStart = (route !== null && this.#proxy.broken(route)) || this.#providerFailedStarts.has(config.id);
     if (this.#testedTools.get(key) === tools && !failedStart) return;
     yield* this.#hooks.refreshAllAgentRuntimes("after-background-work");
     if (failedStart) {
-      if (route !== null) this.#proxy.reportedFailedStart(route);
+      if (route !== null) this.#proxy.reportedBreak(route);
       this.#providerFailedStarts.delete(config.id);
     }
     this.#testedTools.set(key, tools);

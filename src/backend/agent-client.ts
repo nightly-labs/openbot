@@ -62,6 +62,7 @@ export interface AgentClient {
     args: McpToolArguments,
   ): Effect.Effect<RelayedMcpToolOutcome | null>;
   relaysMcpServer?(externalThreadId: string, config: McpServerConfig): boolean;
+  restartRelayedMcpServer?(config: McpServerConfig): void;
   holdsBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
   wakesAfterBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
   wakeAfterLostWork?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
