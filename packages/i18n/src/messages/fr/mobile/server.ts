@@ -944,7 +944,7 @@ export const messages = {
   "mobile.server.connectors.telegram.directDescription":
     "Chaque message de cette discussion va au Telegram Orchestrator.",
   "mobile.server.connectors.telegram.helpRemoved":
-    "OpenBot ne reçoit plus les messages de cette discussion. Le bot a été retiré, ou le groupe est devenu un supergroupe. Vérifiez que le bot est dans la discussion, puis sélectionnez « Associer une autre discussion ».",
+    "Le bot a été retiré, ou le groupe est devenu un supergroupe. Associez-le à nouveau avec « Associer une autre discussion ».",
   "mobile.server.connectors.telegram.helpRelay":
     "OpenBot sur {host} ne peut pas recevoir de messages Telegram. Sur {host}, connectez-vous, donnez un nom au serveur dans les Réglages du serveur et gardez OpenBot ouvert.",
   "mobile.server.connectors.telegram.helpError":

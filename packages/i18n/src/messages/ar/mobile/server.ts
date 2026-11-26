@@ -1222,7 +1222,7 @@ export const messages = {
   "mobile.server.connectors.telegram.groupDescription": "يذكر الأشخاص البوت أو يردون على رسائله.",
   "mobile.server.connectors.telegram.directDescription": "تذهب كل رسالة في هذه الدردشة إلى Telegram Orchestrator.",
   "mobile.server.connectors.telegram.helpRemoved":
-    "لم يعد OpenBot يتلقى رسائل من هذه الدردشة. أُزيل البوت، أو أصبحت المجموعة مجموعة خارقة. تأكد من وجود البوت في الدردشة، ثم اختر “ربط دردشة أخرى”.",
+    "أُزيل البوت، أو أصبحت المجموعة مجموعة خارقة. اربطها مجددًا عبر “ربط دردشة أخرى”.",
   "mobile.server.connectors.telegram.helpRelay":
     "لا يستطيع OpenBot على {host} تلقي رسائل Telegram. على {host}، سجّل الدخول، وامنح الخادم اسمًا في إعدادات الخادم، وأبقِ OpenBot مفتوحًا.",
   "mobile.server.connectors.telegram.helpError":

@@ -235,8 +235,7 @@ export const messages = {
   "connector.telegram.chatsTitle": "聊天",
   "connector.telegram.groupDescription": "人们提及机器人或回复它的消息。",
   "connector.telegram.directDescription": "该聊天中的所有消息都会交给 Telegram 调度助手。",
-  "connector.telegram.helpRemoved":
-    "OpenBot 不再收到该聊天的消息。机器人已被移除，或该群组已变为超级群组。请确认机器人在聊天中，然后选择「关联聊天」。",
+  "connector.telegram.helpRemoved": "机器人已被移除，或该群组已变为超级群组。请用「关联聊天」重新关联。",
   "connector.telegram.helpRelayUnavailable":
     "OpenBot 无法在这台电脑上接收 Telegram 消息。请先登录，在服务器设置中为这台电脑命名，并保持 OpenBot 开着。",
   "connector.telegram.helpRelayUnavailableHost":

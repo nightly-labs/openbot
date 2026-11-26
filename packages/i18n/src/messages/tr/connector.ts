@@ -271,7 +271,7 @@ export const messages = {
   "connector.telegram.groupDescription": "Kullanıcılar bottan bahseder veya mesajlarını yanıtlar.",
   "connector.telegram.directDescription": "Bu sohbetteki her mesaj Telegram Düzenleyicisine gider.",
   "connector.telegram.helpRemoved":
-    "OpenBot artık bu sohbetten mesaj almıyor. Bot kaldırıldı ya da grup bir süper gruba dönüştü. Botun sohbette olduğunu kontrol edin, sonra “Sohbet bağla” seçeneğini seçin.",
+    "Bot kaldırıldı ya da grup bir süper gruba dönüştü. “Sohbet bağla” ile yeniden bağlayın.",
   "connector.telegram.helpRelayUnavailable":
     "OpenBot bu bilgisayarda Telegram mesajlarını alamıyor. Oturum açın, Sunucu ayarlarında bu bilgisayara bir ad verin ve OpenBot'u açık tutun.",
   "connector.telegram.helpRelayUnavailableHost":

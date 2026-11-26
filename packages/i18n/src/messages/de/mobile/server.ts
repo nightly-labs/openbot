@@ -964,7 +964,7 @@ export const messages = {
   "mobile.server.connectors.telegram.directDescription":
     "Jede Nachricht in diesem Chat geht an den Telegram-Orchestrator.",
   "mobile.server.connectors.telegram.helpRemoved":
-    "OpenBot empfängt keine Nachrichten mehr aus diesem Chat. Der Bot wurde entfernt, oder die Gruppe wurde zur Supergruppe. Prüfe, ob der Bot im Chat ist, und wähle dann „Weiteren Chat verknüpfen“.",
+    "Der Bot wurde entfernt, oder die Gruppe wurde zur Supergruppe. Verknüpfe sie neu mit „Weiteren Chat verknüpfen“.",
   "mobile.server.connectors.telegram.helpRelay":
     "OpenBot auf {host} kann keine Telegram-Nachrichten empfangen. Melde dich auf {host} an, gib dem Server in den Servereinstellungen einen Namen und lass OpenBot geöffnet.",
   "mobile.server.connectors.telegram.helpError":

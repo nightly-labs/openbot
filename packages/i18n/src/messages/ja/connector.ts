@@ -265,7 +265,7 @@ export const messages = {
   "connector.telegram.groupDescription": "ボットをメンションするか、ボットのメッセージに返信します。",
   "connector.telegram.directDescription": "このチャットのすべてのメッセージが Telegram Orchestrator に届きます。",
   "connector.telegram.helpRemoved":
-    "OpenBot はこのチャットからメッセージを受け取れなくなりました。ボットが削除されたか、グループがスーパーグループになりました。ボットがチャットにいることを確認してから、「チャットをリンク」 を選んでください。",
+    "ボットが削除されたか、グループがスーパーグループになりました。「チャットをリンク」 でもう一度リンクしてください。",
   "connector.telegram.helpRelayUnavailable":
     "このコンピューターでは OpenBot が Telegram のメッセージを受信できません。サインインし、サーバー設定でこのコンピューターに名前を付けて、OpenBot を開いたままにしてください。",
   "connector.telegram.helpRelayUnavailableHost":

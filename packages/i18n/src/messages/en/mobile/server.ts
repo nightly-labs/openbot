@@ -1164,7 +1164,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.telegram.directDescription":
     "Every message in this chat goes to the Telegram Orchestrator.",
   "mobile.server.connectors.telegram.helpRemoved":
-    "OpenBot no longer gets messages from this chat. The bot was removed, or the group became a supergroup. Check that the bot is in the chat, then select Link another chat.",
+    "The bot was removed, or the group became a supergroup. Link it again with Link another chat.",
   "mobile.server.connectors.telegram.helpRelay":
     "OpenBot on {host} cannot receive Telegram messages. On {host}, sign in, give the server a name in Server settings, and keep OpenBot open.",
   "mobile.server.connectors.telegram.helpError": "OpenBot cannot reach this chat. Reconnect, or disconnect the chat.",
