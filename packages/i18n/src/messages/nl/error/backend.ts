@@ -371,6 +371,8 @@ export const messages = {
     "Deze computer heeft de verbinding met de server geblokkeerd. Controleer je firewall of beveiligingssoftware en probeer het opnieuw.",
   "error.backend.mcpServerIncompatible":
     "Er reageerde iets op dit adres, maar niet als MCP-server via Streamable HTTP. Controleer de URL en werk de app bij die de server draait.",
+  "error.backend.mcpServerKeyNotAccepted":
+    "De server heeft de API-sleutel niet geaccepteerd. Controleer de sleutel en probeer het opnieuw.",
   "error.backend.mcpRemoteBridge":
     "{reason} Deze opdracht draait de mcp-remote-brug. Kies in plaats daarvan Streamable HTTP met de URL {url}, dan logt OpenBot je in.",
   "error.backend.oauthNotHttps": "Het OAuth-endpoint {origin} is geen https, dus de inloggegevens zijn niet verstuurd.",
