@@ -1,4 +1,5 @@
 import {
+  isOpenBotCreditBalance,
   isWorkflowDetail,
   isWorkflowFields,
   isWorkflowFileHostExport,
@@ -164,9 +165,12 @@ export function decodeRemoteHiggsfieldProviders(value: unknown): { higgsfield: b
   return { higgsfield: value.higgsfield };
 }
 
-function remoteCreditBalance(value: unknown): WorkflowMediaCreditBalance | null {
+function remoteCreditBalance(
+  value: unknown,
+  isBalance: (candidate: unknown) => candidate is WorkflowMediaCreditBalance = isWorkflowMediaCreditBalance,
+): WorkflowMediaCreditBalance | null {
   if (value === null) return null;
-  if (!isWorkflowMediaCreditBalance(value)) throw new Error("Invalid remote workflow credits.");
+  if (!isBalance(value)) throw new Error("Invalid remote workflow credits.");
   return { available: value.available, quota: value.quota };
 }
 
@@ -182,7 +186,7 @@ export function decodeRemoteHiggsfieldCredits(value: unknown): { higgsfield: Wor
 
 export function decodeRemoteCreditMediaCredits(value: unknown): { openbot: WorkflowMediaCreditBalance | null } {
   if (!isDynamicRecord(value)) throw new Error("Invalid remote workflow credits.");
-  return { openbot: remoteCreditBalance(value.openbot) };
+  return { openbot: remoteCreditBalance(value.openbot, isOpenBotCreditBalance) };
 }
 
 function remoteAccountList<T>(value: unknown, item: (entry: unknown) => entry is T): T[] {
