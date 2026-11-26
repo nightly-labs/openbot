@@ -52,6 +52,7 @@ export interface BrowserFullViewProps {
   onEnterPip: () => void;
   onOpenWindow?: (() => void) | undefined;
   onSignInLocally?: ((tabId: string) => void) | undefined;
+  onHttpSignIn?: ((tabId: string, answer: { username: string; password: string } | null) => Promise<void>) | undefined;
   macWindowControls?: boolean;
   shortcuts?: BrowserShortcutPlatform | undefined;
   teach?: BrowserTeachBarProps | undefined;

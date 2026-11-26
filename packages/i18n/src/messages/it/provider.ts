@@ -64,6 +64,7 @@ export const messages = {
   "provider.aria.install": "Installa {name}",
   "provider.aria.signIn": "Accedi a {name}",
   "provider.aria.codeFallback": "Accedi a {name} con un codice",
+  "provider.aria.addressFallback": "Incolla l’indirizzo di accesso per {name}",
   "provider.aria.moreActions": "Altre azioni per {name}",
 
   "provider.aria.use": "Usa {name} in OpenBot",
@@ -92,10 +93,15 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "In attesa. Questo accesso si interrompe tra {time}.",
   "provider.codeLogin.linkTitle": "Accedi a {name} su un altro dispositivo",
   "provider.codeLogin.pageTitle": "Accedi a {name}",
+  "provider.codeLogin.addressDescription":
+    "Completa l’accesso nel browser. Questa finestra si chiude quando l’accesso è completato.",
   "provider.codeLogin.pageDescription": "Questa pagina è aperta nel browser su {host}. Accedi da qui.",
   "provider.codeLogin.relayStarting": "Avvio dell'accesso a {name} su {host}…",
   "provider.codeLogin.pageOpening": "Apertura della pagina di accesso di {name} su {host}…",
   "provider.codeLogin.linkStep": "Accedi a {name}. OpenBot continua da solo.",
+  "provider.codeLogin.thisComputerDescription":
+    "Apri questo link in un browser su questo computer. OpenBot attende qui.",
+  "provider.codeLogin.copyLink": "Copia link",
   "provider.codeLogin.chatgptDeviceSetting":
     "In ChatGPT su un computer, apri le impostazioni di sicurezza e attiva l’accesso con codice dispositivo per Codex. Per un account di lavoro, lo attiva l’amministratore del workspace.",
   "provider.useApp.title": "Connetti {name} nell'app OpenBot",
@@ -230,6 +236,7 @@ export const messages = {
   "provider.account.apiKey": "Chiave API",
   "provider.account.listLabel": "Account {name}",
   "provider.account.usedBy": "Usato da {agents}",
+  "provider.account.sameEmail": "Stessa email di {name}",
   "provider.account.failed": "Accesso non riuscito",
   "provider.account.moreActions": "Altre azioni per {name}",
   "provider.account.renameLabel": "Nome di {name}",

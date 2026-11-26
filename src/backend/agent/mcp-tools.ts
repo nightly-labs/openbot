@@ -85,7 +85,7 @@ export const MCP_SERVER_TOOL_DEFINITIONS = [
   },
   {
     name: "save_mcp_server",
-    description: `Add an MCP server, or change one by its name, only when the user asks for it. ${MCP_SCOPE} ${MCP_APPROVAL} Then OpenBot connects to the server and saves it when it answers or needs only a sign-in or a key. The result is ready with its tools, needs_sign_in (a Sign in card is in the conversation: wait for the user), needs_key (save again with the key in headers when the user gave it; else the user enters it in Marketplace, Apps; never ask for a key in the chat), or the error. Put a key that the user gave in headers, never in the address. Environment values are not set here: a stdio server that cannot start without a key in its environment is added by the user in Marketplace, Apps. A server keeps the keys it holds only on its transport, address origin, command, arguments and folder. New tools reach the agents from their next turn.`,
+    description: `Add an MCP server, or change one by its name, only when the user asks for it. ${MCP_SCOPE} ${MCP_APPROVAL} Then OpenBot connects to the server and saves it when it answers or needs only a sign-in or a key. The result is ready with its tools, needs_sign_in (a Sign in card is in the conversation: wait for the user), needs_key (save again with the key in headers when the user gave it; else the user enters it in Marketplace, Apps; never ask for a key in the chat), or the error. Keep a given address with its query; other keys go in headers. Environment values are not set here: a stdio server that cannot start without a key in its environment is added by the user in Marketplace, Apps. A server keeps the keys it holds only on its transport, address origin, command, arguments and folder. New tools reach the agents from their next turn.`,
     shape: saveMcpServerToolSchema.shape,
   },
   {
@@ -253,7 +253,7 @@ const runMarketplaceAppStatus = Effect.fn("McpServerTools.marketplaceAppStatus")
       next: "The app is installed and turned off. Tell the user to turn it on in Marketplace, Apps, or call openbot.set_mcp_server_enabled when the user asks.",
     });
   const outcome = yield* servers.inspect(config);
-  if (outcome.error === null)
+  if (outcome.error === null && !awaitsSignIn(servers, config))
     return openBotToolResult({
       status: "ready",
       server,
@@ -261,7 +261,7 @@ const runMarketplaceAppStatus = Effect.fn("McpServerTools.marketplaceAppStatus")
       tools: outcome.tools,
       next: "The app answers. Use these tools when your tool search finds them. Otherwise they reach you from your next turn: ask the user to send the request again.",
     });
-  if (outcome.needs === null && setupSteps.length > 0)
+  if (outcome.error !== null && outcome.needs === null && setupSteps.length > 0)
     return openBotToolResult({
       status: "not_running",
       server,
@@ -311,7 +311,7 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
           server: describeServer(config, servers.signIns()),
           toolCount: outcome.toolCount,
           tools: outcome.tools,
-          error: sourceText("error.backend.mcpRegistrationUnavailable"),
+          error: sourceText("error.backend.mcpSignInAppNeeded"),
           next: "The tools that need a sign-in fail until the user adds a sign-in app to this server. Tell the user what the error says, in plain words. Do not offer a Sign in card or ask the user to sign in before the sign-in app is there.",
         });
       if (offer === "offered") {
@@ -438,7 +438,7 @@ export const searchSignIns = Effect.fn("McpServerTools.searchSignIns")(function*
     (config) =>
       Effect.gen(function* () {
         const outcome = yield* servers.inspect(config);
-        if (outcome.needs !== "sign_in") return null;
+        if (outcome.needs !== "sign_in" && !(outcome.error === null && awaitsSignIn(servers, config))) return null;
         yield* requestSignIn(config);
         return {
           status: "needs_sign_in",
@@ -460,7 +460,7 @@ const report = Effect.fnUntraced(function* (
 ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
   const saved = servers.list().find((candidate) => candidate.name === config.name) ?? config;
   const server = describeServer(saved, servers.signIns());
-  if (outcome.error === null)
+  if (outcome.error === null && !awaitsSignIn(servers, saved))
     return openBotToolResult({
       status: "ready",
       server,
@@ -468,8 +468,7 @@ const report = Effect.fnUntraced(function* (
       tools: outcome.tools,
       ...(justSaved ? { appliesFrom: "the next turn of each agent" } : {}),
     });
-  const error = servers.redact(outcome.error);
-  if (outcome.needs === "sign_in") {
+  if (outcome.error === null || outcome.needs === "sign_in") {
     yield* call.requestSignIn(saved);
     return openBotToolResult({
       status: "needs_sign_in",
@@ -477,15 +476,20 @@ const report = Effect.fnUntraced(function* (
       ...signInNeeded(servers, saved),
     });
   }
+  const error = servers.redact(outcome.error);
   if (outcome.needs === "key")
     return openBotToolResult({
       status: "needs_key",
       server,
       error,
-      next: "When the user gave the key, call openbot.save_mcp_server again with it in headers, such as Authorization: Bearer <token>. Otherwise ask the user to enter the key with Edit on the server's page in Marketplace, Apps. Do not ask for the key in the chat or show it.",
+      next: "When the user gave the key, call openbot.save_mcp_server again with it in headers, such as Authorization: Bearer <token>, or with the full address when the key is in the address that the user gave. Otherwise ask the user to enter the key with Edit on the server's page in Marketplace, Apps. Do not ask for the key in the chat or show it.",
     });
   return openBotToolResult({ status: "error", server, error });
 });
+
+function awaitsSignIn(servers: AgentMcpServers, config: McpServerConfig): boolean {
+  return servers.signIns().some((state) => state.mcpServerId === config.id && state.needsSignIn === true);
+}
 
 function mergeServer(existing: McpServerConfig | undefined, input: z.infer<typeof saveMcpServerToolSchema>) {
   const base: McpServerConfig = existing ?? {

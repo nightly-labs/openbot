@@ -118,12 +118,13 @@ class SlackAdapter implements MessagingAdapter {
     target: MessageTarget,
     messageId: string,
     body: MessageBody,
-  ): Effect.fn.Return<void, MessagingAdapterError> {
+  ): Effect.fn.Return<string, MessagingAdapterError> {
     yield* this.#api.call("chat.update", {
       channel: target.platformChannelId,
       ts: messageId,
       ...this.#content(body),
     });
+    return messageId;
   });
 
   readonly remove = Effect.fnUntraced(function* (

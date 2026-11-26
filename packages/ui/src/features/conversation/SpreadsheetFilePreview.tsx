@@ -1,3 +1,4 @@
+import { OfficePreviewTooLargeError } from "@openbot/contracts/office-zip";
 import {
   parseSpreadsheet,
   SPREADSHEET_MAX_COLUMNS,
@@ -16,16 +17,20 @@ export interface SpreadsheetFilePreviewProps {
 
 export function SpreadsheetFilePreview(props: SpreadsheetFilePreviewProps) {
   const { t, format } = useText();
-  const parsed = createMemo(() => {
+  const read = createMemo(() => {
     if (props.loading || props.error || !props.bytes) return null;
     try {
-      return parseSpreadsheet(props.bytes, format);
-    } catch {
-      return null;
+      return { workbook: parseSpreadsheet(props.bytes, format), tooLarge: false };
+    } catch (error) {
+      return { workbook: null, tooLarge: error instanceof OfficePreviewTooLargeError };
     }
   });
-  const parseError = () =>
-    !props.loading && !props.error && props.bytes && !parsed() ? t("preview.spreadsheet.readFailed") : null;
+  const parsed = () => read()?.workbook ?? null;
+  const parseError = () => {
+    const result = read();
+    if (!result || result.workbook) return null;
+    return result.tooLarge ? t("preview.spreadsheet.tooLarge") : t("preview.spreadsheet.readFailed");
+  };
 
   return (
     <div class={`spreadsheet-file-preview${props.class ? ` ${props.class}` : ""}`}>

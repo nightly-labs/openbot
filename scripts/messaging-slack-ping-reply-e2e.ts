@@ -128,7 +128,11 @@ const adapter: MessagingAdapter = {
       missingScopes: [],
     }),
   post: (_target, body) => Effect.sync(() => posted("post", body.text)),
-  edit: (_target, _id, body) => Effect.sync(() => void calls.push({ method: "edit", text: body.text })),
+  edit: (_target, id, body) =>
+    Effect.sync(() => {
+      calls.push({ method: "edit", text: body.text });
+      return id;
+    }),
   remove: () => Effect.sync(() => void calls.push({ method: "remove" })),
   postPrivate: unused,
   react: () => Effect.sync(() => void calls.push({ method: "react" })),

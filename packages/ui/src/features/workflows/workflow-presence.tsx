@@ -1,18 +1,23 @@
 import type { TeamPresenceMember } from "@openbot/contracts/ipc";
 import { Button, LabelTooltipTrigger } from "@openbot/ui";
-import { For, Show } from "solid-js";
+import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { avatarHeadColor } from "../../bloub-avatar";
 import { useText } from "../../text";
 import { TeamPersonAvatar, teamMemberName, teamMemberSeed } from "../team/TeamPersonAvatar";
 import { Hint, type WfnPoint } from "./workflow-board";
 
 export interface WorkflowPeerSpot {
-  at: WfnPoint;
+  at: WfnPoint | undefined;
   selected: string | undefined;
 }
 
+export interface WorkflowOwnSpot {
+  at: WfnPoint | null;
+  selected: string | null;
+}
+
 export interface WorkflowPresence {
-  self: string;
+  self: string | null;
   members: readonly TeamPresenceMember[];
   spots: Readonly<Record<string, WorkflowPeerSpot>>;
 }
@@ -23,12 +28,34 @@ export interface WorkflowPeer {
   color: string;
 }
 
+export interface WorkflowCursorRoom {
+  right: number;
+  bottom: number;
+}
+
 export const WORKFLOW_PRESENCE_FEED_INTERVAL = 50;
 
-export function peersOf(presence: Pick<WorkflowPresence, "self" | "members">): readonly WorkflowPeer[] {
-  return presence.members
+const CURSOR_NAME_LEFT = 8;
+const CURSOR_NAME_TOP = 17;
+const CURSOR_EDGE_GAP = 4;
+
+export function peersOf(
+  presence: Pick<WorkflowPresence, "self" | "members">,
+  previous: readonly WorkflowPeer[] = [],
+): readonly WorkflowPeer[] {
+  const known = new Map(previous.map((peer) => [peer.member, peer]));
+  const next = presence.members
     .filter((member) => member.online && !member.disabled && member.id !== presence.self)
-    .map((member) => ({ member, name: teamMemberName(member), color: avatarHeadColor(teamMemberSeed(member), null) }));
+    .map(
+      (member) =>
+        known.get(member) ?? {
+          member,
+          name: teamMemberName(member),
+          color: avatarHeadColor(teamMemberSeed(member), null),
+        },
+    );
+  const unchanged = next.length === previous.length && next.every((peer, index) => peer === previous[index]);
+  return unchanged ? previous : next;
 }
 
 function Cursor(props: {
@@ -38,11 +65,27 @@ function Cursor(props: {
   glide: number;
   ease?: string | undefined;
   leaving?: boolean | undefined;
+  room: (at: WfnPoint) => WorkflowCursorRoom;
 }) {
+  let nameElement: HTMLSpanElement | undefined;
+  const [nameSize, setNameSize] = createSignal({ width: 0, height: 0 });
+  onSettled(() => {
+    if (nameElement) setNameSize({ width: nameElement.offsetWidth, height: nameElement.offsetHeight });
+  });
+  const flip = createMemo(() => {
+    const room = props.room(props.at);
+    const size = nameSize();
+    return {
+      x: room.right < CURSOR_NAME_LEFT + size.width + CURSOR_EDGE_GAP,
+      y: room.bottom < CURSOR_NAME_TOP + size.height + CURSOR_EDGE_GAP,
+    };
+  });
   return (
     <div
       class="wfn-peer-cursor"
       data-leaving={props.leaving ? "" : undefined}
+      data-flip-x={flip().x ? "" : undefined}
+      data-flip-y={flip().y ? "" : undefined}
       style={{
         "--wfn-peer": props.color,
         "--wfn-peer-feed": `${props.glide}ms`,
@@ -54,7 +97,9 @@ function Cursor(props: {
       <svg class="wfn-peer-arrow" viewBox="0 0 19 20" aria-hidden="true">
         <path d="M3.41 2.75 15.59 9.25Q17 10 15.45 10.39L9.78 11.81Q9 12 8.6 12.69L6.31 16.62Q5.5 18 5.16 16.44L2.34 3.56Q2 2 3.41 2.75Z" />
       </svg>
-      <span class="wfn-peer-name">{props.name}</span>
+      <span ref={nameElement} class="wfn-peer-name">
+        {props.name}
+      </span>
     </div>
   );
 }
@@ -62,13 +107,20 @@ function Cursor(props: {
 export function PeerCursors(props: {
   peers: readonly WorkflowPeer[];
   spots: Readonly<Record<string, WorkflowPeerSpot>>;
+  room: (at: WfnPoint) => WorkflowCursorRoom;
 }) {
   return (
     <For each={props.peers}>
       {(peer) => (
-        <Show when={props.spots[peer.member.id]}>
-          {(spot) => (
-            <Cursor name={peer.name} color={peer.color} at={spot().at} glide={WORKFLOW_PRESENCE_FEED_INTERVAL} />
+        <Show when={props.spots[peer.member.id]?.at}>
+          {(at) => (
+            <Cursor
+              name={peer.name}
+              color={peer.color}
+              at={at()}
+              glide={WORKFLOW_PRESENCE_FEED_INTERVAL}
+              room={props.room}
+            />
           )}
         </Show>
       )}
@@ -84,7 +136,11 @@ export interface WorkflowBuilderSpot {
   leaving: boolean;
 }
 
-export function BuilderCursor(props: { spot: WorkflowBuilderSpot; glide: number }) {
+export function BuilderCursor(props: {
+  spot: WorkflowBuilderSpot;
+  glide: number;
+  room: (at: WfnPoint) => WorkflowCursorRoom;
+}) {
   return (
     <Cursor
       name={props.spot.name}
@@ -93,6 +149,7 @@ export function BuilderCursor(props: { spot: WorkflowBuilderSpot; glide: number 
       glide={props.glide}
       ease="var(--openbot-ease-in-out)"
       leaving={props.spot.leaving}
+      room={props.room}
     />
   );
 }

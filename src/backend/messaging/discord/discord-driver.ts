@@ -123,7 +123,7 @@ class DiscordAdapter implements MessagingAdapter {
     target: MessageTarget,
     messageId: string,
     body: MessageBody,
-  ): Effect.fn.Return<void, MessagingAdapterError> {
+  ): Effect.fn.Return<string, MessagingAdapterError> {
     yield* this.#call(
       {
         op: "editMessage",
@@ -135,6 +135,7 @@ class DiscordAdapter implements MessagingAdapter {
       },
       ignoreAnswer,
     );
+    return messageId;
   });
 
   readonly postPrivate = Effect.fnUntraced(function* (

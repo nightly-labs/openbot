@@ -37,7 +37,7 @@ import {
   Type,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { children, createEffect, createSignal, createStore, For, onSettled, Show, untrack } from "solid-js";
+import { children, createEffect, createSignal, createStore, For, onCleanup, onSettled, Show, untrack } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
@@ -703,14 +703,53 @@ function resultFailure(board: WfnBoard, id: string): string | undefined {
 export function FailureAlert(props: { id: string; running: boolean }) {
   const board = useBoard();
   return (
-    <Show when={props.running ? undefined : resultFailure(board, props.id)}>
+    <Show when={props.running ? undefined : resultFailure(board, props.id)} keyed>
       {(failure) => (
-        <p class="wfn-alert" data-tone="danger">
-          <CircleX aria-hidden="true" />
-          <span class="wfn-alert-text">{failure()}</span>
-        </p>
+        <div class="wfn-alert" data-tone="danger">
+          <CircleX class="wfn-alert-icon-first-line" aria-hidden="true" />
+          <ClampedText class="wfn-alert-clamp" value={failure} />
+        </div>
       )}
     </Show>
+  );
+}
+
+export function ClampedText(props: { value: string; class?: string }) {
+  const { t } = useText();
+  const [open, setOpen] = createSignal(false);
+  const [overflows, setOverflows] = createSignal(false);
+  let body: HTMLDivElement | undefined;
+  const measure = () => {
+    if (body && !open()) setOverflows(body.scrollHeight > body.clientHeight + 1);
+  };
+  const resize = new ResizeObserver(measure);
+  onCleanup(() => resize.disconnect());
+  return (
+    <div class={props.class ?? "wfn-step-text"} data-clamped={overflows() && !open() ? "" : undefined}>
+      <div
+        ref={(element) => {
+          body = element;
+          resize.observe(element);
+        }}
+        class="wfn-step-text-body"
+        data-open={open() ? "" : undefined}
+      >
+        {props.value}
+      </div>
+      <Show when={overflows()}>
+        <Button
+          variant="link"
+          size="xs"
+          class="wfn-step-text-toggle"
+          aria-expanded={open() ? "true" : "false"}
+          onClick={() => {
+            setOpen((value) => !value);
+          }}
+        >
+          {open() ? t("workflow.node.settings.showLess") : t("workflow.node.settings.showMore")}
+        </Button>
+      </Show>
+    </div>
   );
 }
 

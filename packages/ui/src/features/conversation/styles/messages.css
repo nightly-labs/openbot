@@ -1110,6 +1110,13 @@
   font-size: var(--openbot-text-sm);
 }
 
+.chat-action-marker-no-answer .chat-action-marker-label {
+  min-width: 0;
+  flex: 0 1 auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .chat-action-target {
   box-sizing: border-box;
   display: inline-flex;

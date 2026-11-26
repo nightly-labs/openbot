@@ -29,6 +29,10 @@
     {
       "pattern": "api.openbot.run",
       "custom_domain": true
+    },
+    {
+      "pattern": "nearintents.openbot.run",
+      "custom_domain": true
     }
   ],
   "secrets": {
@@ -72,6 +76,10 @@
     {
       "binding": "EMAIL_RELAY",
       "service": "openbot-email-relay"
+    },
+    {
+      "binding": "MEDIA_GATEWAY",
+      "service": "openbot-media-gateway"
     }
   ],
   "send_email": [

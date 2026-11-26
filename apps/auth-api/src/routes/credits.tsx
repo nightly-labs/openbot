@@ -1,18 +1,21 @@
 import { createFileRoute } from "@tanstack/solid-router";
 import { CreditsPage } from "../components/credits/CreditsPage";
 import { creditsPageText } from "../components/credits/credits-page-text";
+import { readCreditsCatalog } from "../lib/credits-catalog";
 import { CREDITS_ROUTE } from "../lib/credits-page";
 import { loadPageText } from "../lib/page-text";
 import { loadSiteChrome, siteLocale } from "../lib/site-locale";
 
 export const Route = createFileRoute("/credits")({
   loader: async ({ context }) => {
-    const [page, site] = await Promise.all([
+    const [page, site, catalog] = await Promise.all([
       loadPageText(context.locale, creditsPageText),
       loadSiteChrome(siteLocale(context.locale)),
+      readCreditsCatalog(),
     ]);
-    return { ...page, site };
+    return { ...page, site, catalog };
   },
+  headers: ({ loaderData }) => (loaderData?.catalog.length === 0 ? { "Cache-Control": "no-store" } : undefined),
   head: ({ match, loaderData }) => {
     const url = new URL(CREDITS_ROUTE, match.context.siteUrl).toString();
     if (!loaderData) return { links: [{ rel: "canonical", href: url }] };
@@ -35,5 +38,5 @@ export const Route = createFileRoute("/credits")({
 
 function Credits() {
   const page = Route.useLoaderData();
-  return <CreditsPage text={page().text} lang={page().lang} />;
+  return <CreditsPage text={page().text} lang={page().lang} catalog={page().catalog} />;
 }

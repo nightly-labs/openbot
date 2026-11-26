@@ -34,6 +34,16 @@ import { AGENT_TASK_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/ag
 import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-update-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
+import {
+  BROWSER_HTTP_SIGN_IN_CAPABILITY,
+  BROWSER_HTTP_SIGN_IN_ROUTES,
+  decodeBrowserHttpSignInSnapshot,
+} from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
+import {
+  BROWSER_PERMISSIONS_CAPABILITY,
+  BROWSER_PERMISSIONS_ROUTES,
+  decodeBrowserPermissionsSnapshot,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSING_MEMORY_CAPABILITY } from "@openbot/contracts/team-protocol/browsing-memory-v1";
@@ -69,6 +79,7 @@ import { LOCAL_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/local
 import { MAC_APPS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/mac-apps-limit-v1";
 import { MACHINE_RESOURCES_CAPABILITY } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
+import { MEDIA_APPROVAL_CREDITS_CAPABILITY } from "@openbot/contracts/team-protocol/media-approval-credits-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
@@ -168,7 +179,7 @@ import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
-import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
+import { decodeMobileBrowserTabs, mobileHttpSignIns } from "@/features/browser/model/browser-tabs";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
 import { deleteServerDrafts } from "@/features/chat/model/composer-drafts";
 import {
@@ -639,6 +650,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         presenceSignatures.current.delete(serverId);
         for (const queryKey of [
           queryKeys.chatQueue(serverId),
+          queryKeys.agentUsageLimits(queryScope, serverId),
           queryKeys.serverMembers(queryScope, serverId),
           queryKeys.serverInvites(queryScope, serverId),
           queryKeys.agentAvatar(queryScope, serverId),
@@ -665,6 +677,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       liveState.update("approvalRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserTabs", (current) => withoutKeys(current, serverIds));
+      liveState.update("browserPermissions", (current) => withoutKeys(current, serverIds));
+      liveState.update("browserHttpSignIns", (current) => withoutKeys(current, serverIds));
       const kept = keptHosts.current;
       if (kept?.some((host) => serverIds.has(host.hostId)))
         keepHosts(kept.filter((host) => !serverIds.has(host.hostId)));
@@ -1332,6 +1346,26 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             }));
           })
           .catch(() => undefined);
+        if (compatibility.capabilities.includes(BROWSER_HTTP_SIGN_IN_CAPABILITY))
+          void client
+            .request("POST", BROWSER_HTTP_SIGN_IN_ROUTES.state, decodeBrowserHttpSignInSnapshot, {})
+            .then((snapshot) => {
+              if (!context.isCurrent()) return;
+              liveState.update("browserHttpSignIns", (current) => ({
+                ...current,
+                [serverId]: mobileHttpSignIns(snapshot.tabs),
+              }));
+            })
+            .catch(() => undefined);
+      }
+      if (compatibility.capabilities.includes(BROWSER_PERMISSIONS_CAPABILITY)) {
+        void client
+          .request("POST", BROWSER_PERMISSIONS_ROUTES.state, decodeBrowserPermissionsSnapshot, {})
+          .then(({ requests }) => {
+            if (!context.isCurrent()) return;
+            liveState.update("browserPermissions", (current) => ({ ...current, [serverId]: requests }));
+          })
+          .catch(() => undefined);
       }
       const reads =
         early && sameCapabilities(early.capabilities, compatibility.capabilities)
@@ -1942,6 +1976,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       openBrowserView: browser.openBrowserView,
       remoteDesktopConnection: (serverId) => connections.current.get(serverId)?.client ?? null,
       controlBrowserTab: browser.controlBrowserTab,
+      answerBrowserPermission: browser.answerBrowserPermission,
+      answerBrowserHttpSignIn: browser.answerBrowserHttpSignIn,
       mutateSidebarLayout: async (serverId, action) => {
         requireCapability(
           serverCapabilities.current,
@@ -2086,6 +2122,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       },
       refreshServer: async (serverId) => {
         connections.current.get(serverId)?.refresh();
+        await refreshHosts();
+      },
+      reconnectServer: async (serverId) => {
+        connections.current.get(serverId)?.reconnect();
         await refreshHosts();
       },
       hostedServerStarting,
@@ -2650,6 +2690,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         },
         canReadMachineMetrics: (serverId) => administers(serverId, MACHINE_RESOURCES_CAPABILITY),
         canManageAgentMemoryLimit: (serverId) => administers(serverId, AGENT_MEMORY_LIMIT_CAPABILITY),
+        canManageMediaApprovalCredits: (serverId) => administers(serverId, MEDIA_APPROVAL_CREDITS_CAPABILITY),
         canManageMemoryReview: (serverId) => administers(serverId, MEMORY_REVIEW_CAPABILITY),
         canManageSkillLearning: (serverId) => administers(serverId, SKILL_LEARNING_CAPABILITY),
         canManageBrowsingMemory: (serverId) => administers(serverId, BROWSING_MEMORY_CAPABILITY),

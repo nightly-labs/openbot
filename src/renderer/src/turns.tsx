@@ -4,6 +4,10 @@ import type {
   AgentEvent,
   AgentModelChoice,
   AgentWaitsSnapshot,
+  CreditsHold,
+  CreditsHoldAction,
+  MediaApprovalChoice,
+  MediaApprovalRead,
   QueueSnapshot,
   RoutineFields,
 } from "@openbot/contracts/ipc";
@@ -355,6 +359,51 @@ const Turns = createSimpleContext({
       }
     }
 
+    function readMediaApproval(approval: AgentApproval): Promise<MediaApprovalRead> {
+      return turnsPort().agent.readMediaApproval({ agentId: approval.agentId, requestId: approval.requestId });
+    }
+
+    async function respondToCreditsHold(
+      approval: AgentApproval,
+      action: CreditsHoldAction,
+    ): Promise<CreditsHold | null> {
+      const hold = await turnsPort().agent.respondToCreditsHold({
+        agentId: approval.agentId,
+        requestId: approval.requestId,
+        action,
+      });
+      if (!hold) forgetApproval(approval.agentId, approval.requestId);
+      return hold;
+    }
+
+    function setCreditsAskMuted(muted: boolean): Promise<void> {
+      return turnsPort().agent.setCreditsAskMuted({ muted });
+    }
+
+    async function respondToMediaApproval(approval: AgentApproval, choice: MediaApprovalChoice): Promise<boolean> {
+      const serverId = activeServerId();
+      const analytics = desktopAnalytics.scope();
+      try {
+        await turnsPort().agent.respondToMediaApproval({
+          agentId: approval.agentId,
+          requestId: approval.requestId,
+          choice,
+        });
+        forgetApproval(approval.agentId, approval.requestId);
+        analytics.track("agent_input_action", { kind: "approval", decision: "accept", result: "succeeded" });
+        return true;
+      } catch (error) {
+        analytics.track("agent_input_action", {
+          kind: "approval",
+          decision: "accept",
+          result: "failed",
+          failure_code: "response_failed",
+        });
+        appendUiError(approval.agentId, error, currentText().t("app.errorStatus.approval"), serverId);
+        return false;
+      }
+    }
+
     async function respondToApproval(decision: "accept" | "decline"): Promise<boolean> {
       const agent = activeAgent();
       const approval = agent ? approvalOfThread(agent.id, agent.threadId) : undefined;
@@ -612,6 +661,10 @@ const Turns = createSimpleContext({
       answerPromptRequest,
       respondToApproval,
       respondToApprovalRequest,
+      readMediaApproval,
+      respondToMediaApproval,
+      respondToCreditsHold,
+      setCreditsAskMuted,
       respondToBrowserTakeover,
       respondToBrowserTakeoverRequest,
       cancelQueuedMessage,

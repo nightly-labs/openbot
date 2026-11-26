@@ -142,6 +142,7 @@ const service = new LiveActivityPushService({
   agents: {
     on: (event, listener) => events.on(event, listener),
     off: (event, listener) => events.off(event, listener),
+    listAgents: () => [],
     getRuntimeSnapshot: snapshot,
     listConversationReads: () =>
       Object.fromEntries(

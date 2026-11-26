@@ -18,6 +18,11 @@ import {
   WORKFLOW_FOLDERS_CAPABILITY,
   WORKFLOW_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/workflow-folders-v1";
+import {
+  WORKFLOW_PRESENCE_CAPABILITY,
+  WORKFLOW_SPOT_EVENT,
+  type WorkflowSpotInput,
+} from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-agent-files-v1";
 import { WORKFLOWS_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-answers-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
@@ -133,6 +138,7 @@ export interface WebWorkflowHostOptions {
   hostName: () => string | undefined;
   onHostEvent: (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void;
   onReconnect: (listener: () => void) => () => void;
+  setSpot: (input: WorkflowSpotInput) => void;
   githubConnector: GitHubConnectorPort;
   attachmentMedia: AttachmentMediaSource | undefined;
   previewMedia: AttachmentMediaSource | undefined;
@@ -198,6 +204,10 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     return post(path, decodeWorkflowFoldersSnapshot, body);
   };
   const folders = () => postFolders(WORKFLOW_FOLDERS_ROUTES.read, {});
+  const presenceSupported = () => has(WORKFLOW_PRESENCE_CAPABILITY);
+  const setSpot = (input: WorkflowSpotInput) => {
+    if (presenceSupported()) options.setSpot(input);
+  };
   const exportFile = async (workflowId: string): Promise<WorkflowFileSaveResult> => {
     if (!has(WORKFLOWS_PORTABLE_CAPABILITY)) throw tooOld();
     const source = await post(WORKFLOWS_PORTABLE_ROUTES.export, decodeRemoteWorkflowFileExport, { workflowId });
@@ -342,6 +352,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
             : { credits: null },
       folders,
       folderAction,
+      setSpot: async (input) => setSpot(input),
     },
     onChanged(changed) {
       const events = options.onHostEvent((event) => {
@@ -360,6 +371,12 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     onFoldersChanged: (changed) =>
       options.onHostEvent((event) => {
         if (event.type === "workflow-folders-changed") changed();
+      }),
+    presenceSupported,
+    setSpot,
+    onSpot: (changed) =>
+      options.onHostEvent((event) => {
+        if (event.type === WORKFLOW_SPOT_EVENT) changed(event);
       }),
     async places() {
       if (!placesSupported()) return [];

@@ -161,6 +161,36 @@ const { rm } = fsPromisesWithoutAsarArchives;
 
 const AGENT_FILES_REMOVAL = { recursive: true, force: true, maxRetries: 10, retryDelay: 150 } as const;
 
+const OWNER_FULL_ACCESS = 0o700;
+
+async function removeAgentFiles(path: string): Promise<void> {
+  try {
+    await rm(path, AGENT_FILES_REMOVAL);
+  } catch (error) {
+    if (process.platform === "win32" || !isPermissionRefusal(error)) throw error;
+    await grantOwnerFolderAccess(path).catch(() => {
+      throw error;
+    });
+    await rm(path, AGENT_FILES_REMOVAL);
+  }
+}
+
+function isPermissionRefusal(error: unknown): boolean {
+  return error instanceof Error && "code" in error && (error.code === "EACCES" || error.code === "EPERM");
+}
+
+async function grantOwnerFolderAccess(path: string): Promise<void> {
+  const entry = await fsPromisesWithoutAsarArchives.lstat(path).catch((error: unknown) => {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return null;
+    throw error;
+  });
+  if (!entry?.isDirectory()) return;
+  if ((entry.mode & OWNER_FULL_ACCESS) !== OWNER_FULL_ACCESS)
+    await fsPromisesWithoutAsarArchives.chmod(path, entry.mode | OWNER_FULL_ACCESS);
+  for (const child of await fsPromisesWithoutAsarArchives.readdir(path, { withFileTypes: true }))
+    if (child.isDirectory()) await grantOwnerFolderAccess(join(path, child.name));
+}
+
 const HELD_COPIED_FOLDER_WAITS_MS: readonly number[] = [10, 50, 100, 250, 500, 1000, 1000, 2000, 2000, 3000];
 
 export class AgentStore {
@@ -999,7 +1029,7 @@ export class AgentStore {
         join(this.#agentsRoot, id),
         `${join(this.#agentsRoot, id)}.openbot-stage`,
       ]) {
-        yield* storedIO(() => rm(path, AGENT_FILES_REMOVAL));
+        yield* storedIO(() => removeAgentFiles(path));
       }
       yield* storedIO(() => rm(this.#duplicationMarkerPath(id), { force: true }));
       const legacyPaths = [join(this.#legacyAgentsRoot, id)];
@@ -1007,7 +1037,7 @@ export class AgentStore {
       if (legacyId !== null) {
         legacyPaths.push(join(this.#avatarsRoot, legacyId), join(this.#legacyAgentsRoot, legacyId));
       }
-      for (const path of legacyPaths) yield* storedIO(() => rm(path, AGENT_FILES_REMOVAL));
+      for (const path of legacyPaths) yield* storedIO(() => removeAgentFiles(path));
       const remaining = this.#state.agents.filter((candidate) => candidate.id !== id);
       this.#database.hardDeleteAgent(`agents:hard-delete:${randomUUID()}`, id, agent?.threadId ?? null, remaining);
       this.#state.agents = remaining;

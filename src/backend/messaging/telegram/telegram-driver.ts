@@ -115,6 +115,7 @@ class TelegramAdapter implements MessagingAdapter {
       message_id: Number(messageId),
       ...this.#content(body),
     }).pipe(Effect.catch((failure) => (notModified(failure) ? Effect.void : Effect.fail(failure))));
+    return messageId;
   });
 
   readonly remove = Effect.fnUntraced(function* (this: TelegramAdapter, target: MessageTarget, messageId: string) {

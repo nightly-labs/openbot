@@ -11,6 +11,7 @@ const PendingFinal = Schema.Struct({
   answer: Schema.Boolean,
   text: Schema.String,
   reaction: Schema.NullOr(Schema.Literals(["done", "stopped", "failed"])),
+  replacesAnswer: Schema.optional(Schema.Boolean),
 });
 export type PendingFinal = typeof PendingFinal.Type;
 
