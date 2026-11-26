@@ -637,6 +637,7 @@ function renderRendererModule(plugins: PluginDetail[]): string {
  */
 
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { OPENBOT_PLUGIN_ORIGIN, OPENBOT_PLUGIN_PATH_PREFIX } from "@openbot/contracts/plugin-links";
 import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 
 export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfig {
@@ -658,11 +659,9 @@ export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfi
   };
 }
 
-const PLUGIN_ICON_URL = "https://openbot.run/plugins/icon/";
-
 function accountServiceIconUrl(slug: string, iconUrl: string | null, appId?: string): string | null {
   if (!iconUrl) return null;
-  const url = new URL(encodeURIComponent(slug), PLUGIN_ICON_URL);
+  const url = new URL(\`\${OPENBOT_PLUGIN_PATH_PREFIX}icon/\${encodeURIComponent(slug)}\`, OPENBOT_PLUGIN_ORIGIN);
   if (appId) url.searchParams.set("app", appId);
   return url.toString();
 }
