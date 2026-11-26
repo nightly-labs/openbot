@@ -95,7 +95,8 @@ still open.
 On a Wayland session, a start that renders on the CPU opens OpenBot again on XWayland: on Wayland,
 Chromium can leave the window empty, and KDE then shows only a 1x1 taskbar entry. The log then shows
 "Software rendering is on, so OpenBot uses XWayland". Without XWayland (no `DISPLAY`), OpenBot stays
-on Wayland. To stay on Wayland, start OpenBot with `--ozone-platform=wayland`.
+on Wayland. To stay on Wayland, start OpenBot with `--ozone-platform=wayland`. The Dynamic Island and the
+agent dock above other apps can still move OpenBot to XWayland (see below).
 
 - To try the GPU again, for example after a driver update, remove the file. The log names it.
 - To always use the GPU, start OpenBot with `OPENBOT_DISABLE_GPU=0`. A server ignores this value.
@@ -111,6 +112,18 @@ when a monitor comes on, and the next start uses Wayland again.
 
 - If the session has no XWayland (no `DISPLAY`), OpenBot starts when a monitor is on.
 - To always use XWayland, start OpenBot with `--ozone-platform=x11`.
+
+## The Dynamic Island or the agent dock on Wayland
+
+On Wayland, the Dynamic Island and the agent dock "Above other apps" show only through XWayland. Settings then
+shows "Restart needed" with a Restart button. After Restart, OpenBot starts on XWayland at each start while the
+island is on or the dock is "Above other apps". This is also true when the launcher starts OpenBot with
+`--ozone-platform=wayland`, but only after you click Restart. To stay on Wayland, turn off the island and set the
+dock to "In the OpenBot window". Without XWayland (no `DISPLAY`), OpenBot stays on Wayland and Settings has no
+Restart button.
+
+On Hyprland, OpenBot pins the island and the dock, so they show on each workspace, and turns off blur and shadow
+for them. When Hyprland refuses this, the log shows "Hyprland refused", and a window rule can do the same.
 
 ## Computer Use is unavailable
 

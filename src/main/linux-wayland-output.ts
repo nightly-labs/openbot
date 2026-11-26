@@ -14,6 +14,8 @@ import { x11CompositorRunning } from "./linux-x11-activation";
 const logger = createOpenBotLogger("main");
 
 const RESTART_MARKER = "OPENBOT_XWAYLAND_RESTART";
+const LAUNCHER_PLATFORM_MARKER = "OPENBOT_XWAYLAND_LAUNCHER_PLATFORM";
+const ABOVE_APPS_OVER_LAUNCHER_FILE = "above-apps-xwayland-over-launcher";
 export type XWaylandRestartReason = "monitor" | "above-apps" | "software-rendering";
 export type AboveAppsFeature = "agent-dock" | "dynamic-island";
 const ABOVE_APPS_XWAYLAND_FILES: Record<AboveAppsFeature, string> = {
@@ -26,7 +28,8 @@ const DISPLAY_ID = 1;
 const REGISTRY_ID = 2;
 const CALLBACK_ID = 3;
 const HEADER_BYTES = 8;
-const X11_ARGUMENT = "--ozone-platform=x11";
+const PLATFORM_PREFIX = "--ozone-platform=";
+const X11_ARGUMENT = `${PLATFORM_PREFIX}x11`;
 
 const littleEndian = endianness() === "LE";
 const readUInt32 = littleEndian ? Buffer.prototype.readUInt32LE : Buffer.prototype.readUInt32BE;
@@ -50,9 +53,17 @@ function waylandSocketPath(environment: NodeJS.ProcessEnv): string | null {
   return isAbsolute(runtimeDirectory) ? join(runtimeDirectory, display) : null;
 }
 
-function chromiumChoosesWayland(): boolean {
-  if (process.argv.some((argument) => argument.startsWith("--ozone-platform="))) return false;
+function launcherPlatform(argv: readonly string[]): string | null {
+  const argument = argv.findLast((value) => value.startsWith(PLATFORM_PREFIX));
+  return argument === undefined ? null : argument.slice(PLATFORM_PREFIX.length);
+}
+
+function runsOnWayland(): boolean {
   return app.commandLine.getSwitchValue("ozone-platform") === "wayland";
+}
+
+function chromiumChoosesWayland(): boolean {
+  return launcherPlatform(process.argv) === null && runsOnWayland();
 }
 
 function message(id: number, opcode: number, newId: number): Buffer {
@@ -115,10 +126,16 @@ function startOnX11(
 ): Effect.Effect<void, WaylandProbeFailure> {
   return Effect.callback<void, WaylandProbeFailure>((resume) => {
     const executable = environment.APPIMAGE || process.execPath;
-    const child = spawn(executable, [...process.argv.slice(1), X11_ARGUMENT], {
+    const launcher = launcherPlatform(process.argv);
+    const argumentsWithoutPlatform = process.argv.slice(1).filter((argument) => !argument.startsWith(PLATFORM_PREFIX));
+    const child = spawn(executable, [...argumentsWithoutPlatform, X11_ARGUMENT], {
       detached: true,
       stdio: ["ignore", "inherit", "inherit"],
-      env: { ...environment, [RESTART_MARKER]: reason },
+      env: {
+        ...environment,
+        [RESTART_MARKER]: reason,
+        ...(launcher === null ? {} : { [LAUNCHER_PLATFORM_MARKER]: launcher }),
+      },
     });
     child.once("error", (cause) => resume(Effect.fail(new WaylandProbeFailure({ cause }))));
     child.once("spawn", () => {
@@ -133,10 +150,13 @@ export function takeXWaylandRestartMarker(
   argv: string[],
 ): XWaylandRestartReason | null {
   const marker = environment[RESTART_MARKER];
+  const launcher = environment[LAUNCHER_PLATFORM_MARKER];
   delete environment[RESTART_MARKER];
+  delete environment[LAUNCHER_PLATFORM_MARKER];
   if (marker === undefined) return null;
   const index = argv.lastIndexOf(X11_ARGUMENT);
   if (index > 0) argv.splice(index, 1);
+  if (launcher) argv.push(`${PLATFORM_PREFIX}${launcher}`);
   return marker === "above-apps" || marker === "software-rendering" ? marker : "monitor";
 }
 
@@ -160,11 +180,15 @@ export function aboveAppsWindowKind(server: boolean): "panel" | "tool" | "x11" |
 export function aboveAppsScreenSupport(): AboveAppsSupport | undefined {
   if (process.platform !== "linux") return undefined;
   if (usesX11Windows()) return onXWayland() || x11CompositorRunning() ? undefined : "no-compositor";
-  return app.isPackaged && process.env.DISPLAY && chromiumChoosesWayland() ? "restart" : "unsupported";
+  return app.isPackaged && process.env.DISPLAY && runsOnWayland() ? "restart" : "unsupported";
 }
 
 function onXWayland(): boolean {
   return usesX11Windows() && Boolean(process.env.WAYLAND_DISPLAY?.trim() || process.env.XDG_SESSION_TYPE === "wayland");
+}
+
+function aboveAppsXWaylandChosen(userDataPath: string): boolean {
+  return Object.values(ABOVE_APPS_XWAYLAND_FILES).some((file) => existsSync(join(userDataPath, file)));
 }
 
 export const keepAboveAppsXWayland = Effect.fn("keepAboveAppsXWayland")(function* (
@@ -173,7 +197,11 @@ export const keepAboveAppsXWayland = Effect.fn("keepAboveAppsXWayland")(function
 ) {
   if (process.platform !== "linux" || !onXWayland()) return;
   yield* Effect.tryPromise({
-    try: () => writeFile(join(userDataPath, ABOVE_APPS_XWAYLAND_FILES[feature]), ""),
+    try: async () => {
+      await writeFile(join(userDataPath, ABOVE_APPS_XWAYLAND_FILES[feature]), "");
+      if (launcherPlatform(process.argv) === "wayland")
+        await writeFile(join(userDataPath, ABOVE_APPS_OVER_LAUNCHER_FILE), "");
+    },
     catch: (cause) => new AboveAppsXWaylandFailure({ cause }),
   });
 });
@@ -187,14 +215,22 @@ export const setAboveAppsXWayland = Effect.fn("setAboveAppsXWayland")(function* 
   const file = join(userDataPath, ABOVE_APPS_XWAYLAND_FILES[feature]);
   if (!enabled) {
     yield* Effect.tryPromise({
-      try: () => rm(file, { force: true }),
+      try: async () => {
+        await rm(file, { force: true });
+        if (!aboveAppsXWaylandChosen(userDataPath))
+          await rm(join(userDataPath, ABOVE_APPS_OVER_LAUNCHER_FILE), { force: true });
+      },
       catch: (cause) => new AboveAppsXWaylandFailure({ cause }),
     });
     return;
   }
   if (aboveAppsScreenSupport() !== "restart") return yield* keepAboveAppsXWayland(userDataPath, feature);
   yield* Effect.tryPromise({
-    try: () => writeFile(file, ""),
+    try: async () => {
+      await writeFile(file, "");
+      if (launcherPlatform(process.argv) !== null)
+        await writeFile(join(userDataPath, ABOVE_APPS_OVER_LAUNCHER_FILE), "");
+    },
     catch: (cause) => new AboveAppsXWaylandFailure({ cause }),
   });
   logger.info(`The ${feature} shows above other apps, so OpenBot starts again on XWayland.`);
@@ -206,8 +242,10 @@ export const restartOnXWaylandForAboveApps = Effect.fn("restartOnXWaylandForAbov
   environment: NodeJS.ProcessEnv,
   userDataPath: string,
 ) {
-  if (process.platform !== "linux" || !chromiumChoosesWayland() || !environment.DISPLAY) return false;
-  if (!Object.values(ABOVE_APPS_XWAYLAND_FILES).some((file) => existsSync(join(userDataPath, file)))) return false;
+  if (process.platform !== "linux" || !runsOnWayland() || !environment.DISPLAY) return false;
+  if (!aboveAppsXWaylandChosen(userDataPath)) return false;
+  if (launcherPlatform(process.argv) !== null && !existsSync(join(userDataPath, ABOVE_APPS_OVER_LAUNCHER_FILE)))
+    return false;
   return yield* startOnX11(environment, "above-apps").pipe(
     Effect.as(true),
     Effect.catch((error) =>

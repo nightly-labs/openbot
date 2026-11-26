@@ -47,6 +47,7 @@ import { shouldShowDevelopmentWindow } from "./development-profile";
 import { dynamicIslandNotchSizeForDisplay } from "./dynamic-island-window";
 import { type InterfaceSizeService, type InterfaceSizeStep, interfaceSizeShortcut } from "./interface-size-service";
 import { withLocalHostSummary } from "./ipc/team-handlers";
+import { keepOverlayOnAllHyprlandWorkspaces } from "./linux-hyprland-overlay";
 import { desktopLayoutZoomFactor, onTilingLinuxDesktop, windowMinimumSize } from "./linux-tiling-desktop";
 import { usesX11Windows } from "./linux-wayland-output";
 import { hidePanelFromWindowSwitchers, keepPanelThroughAppHide, preventPanelActivation } from "./mac-panel-activation";
@@ -725,6 +726,7 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
   });
   preventPanelActivation(window);
   hidePanelFromWindowSwitchers(window);
+  keepOverlayOnAllHyprlandWorkspaces(window, process.env);
   window.webContents.setZoomMode("isolated");
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event, targetUrl) => {
@@ -765,6 +767,7 @@ export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
   preventPanelActivation(window);
   hidePanelFromWindowSwitchers(window);
   keepPanelThroughAppHide(window);
+  keepOverlayOnAllHyprlandWorkspaces(window, process.env);
   window.webContents.setZoomMode("isolated");
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event, targetUrl) => {
