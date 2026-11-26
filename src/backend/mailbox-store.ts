@@ -175,6 +175,20 @@ interface KeptIndex<Item, Index> {
   index: Index;
 }
 
+type AwaitedThreadRequest = AgentTaskAwaitedReply & { deliveryId: string; senderAgentId: string; taskId: string };
+
+interface AwaitedThreadCandidate {
+  request: AwaitedThreadRequest;
+  completed: boolean;
+}
+
+interface KeptAwaitedThreadCandidates {
+  state: StoredState;
+  messages: StoredMessage[];
+  deliveries: StoredDelivery[];
+  candidates: readonly AwaitedThreadCandidate[];
+}
+
 interface ConversationIndex {
   state: StoredState;
   messages: StoredMessage[];
@@ -292,6 +306,7 @@ export class MailboxStore {
   #state: StoredState = structuredClone(EMPTY_STATE);
   #taskRunsInProvider: (agentId: string, taskId: string) => boolean = () => false;
   #keptConversationIndex: ConversationIndex | undefined;
+  #keptAwaitedThreadCandidates: KeptAwaitedThreadCandidates | undefined;
   #keptConversationStructure: ConversationStructure | undefined;
   #keptRequestHolders: KeptIndex<StoredMessage, ReadonlyMap<string, ReadonlySet<string>>> | undefined;
   #keptAnsweredKeys: KeptIndex<StoredMessage, ReadonlySet<string>> | undefined;
@@ -924,13 +939,26 @@ export class MailboxStore {
     return ids;
   }
 
-  awaitedThreadRequests(): Array<
-    AgentTaskAwaitedReply & { deliveryId: string; senderAgentId: string; taskId: string }
-  > {
+  awaitedThreadRequests(): AwaitedThreadRequest[] {
+    let holders: ReadonlyMap<string, ReadonlySet<string>> | undefined;
+    return this.#awaitedThreadCandidates().flatMap(({ request, completed }) => {
+      if (completed) {
+        holders ??= this.#requestHolders();
+        if (!this.#heldByOwnWork(request.recipientAgentId, request.messageId, holders)) return [];
+      }
+      return [{ ...request }];
+    });
+  }
+
+  #awaitedThreadCandidates(): readonly AwaitedThreadCandidate[] {
+    const state = this.#state;
+    const unsaved = this.#hasUnsavedChanges();
+    const kept = this.#keptAwaitedThreadCandidates;
+    if (!unsaved && kept?.state === state && kept.messages === state.messages && kept.deliveries === state.deliveries)
+      return kept.candidates;
     let messages: ReadonlyMap<string, StoredMessage> | undefined;
     let answered: ReadonlySet<string> | undefined;
-    let holders: ReadonlyMap<string, ReadonlySet<string>> | undefined;
-    return this.#state.deliveries.flatMap((delivery) => {
+    const candidates = state.deliveries.flatMap((delivery): AwaitedThreadCandidate[] => {
       const completed = delivery.status === "completed";
       const status = completed
         ? "running"
@@ -943,21 +971,28 @@ export class MailboxStore {
       if (!message?.senderTaskId || message.sender.kind !== "agent" || message.expectsReply === false) return [];
       answered ??= this.#answeredKeys();
       if (answered.has(`${message.id}:${delivery.recipientAgentId}`)) return [];
-      if (completed) {
-        holders ??= this.#requestHolders();
-        if (!this.#heldByOwnWork(delivery.recipientAgentId, message.id, holders)) return [];
-      }
       return [
         {
-          deliveryId: delivery.id,
-          senderAgentId: message.sender.agentId,
-          taskId: message.senderTaskId,
-          messageId: message.id,
-          recipientAgentId: delivery.recipientAgentId,
-          status,
+          completed,
+          request: {
+            deliveryId: delivery.id,
+            senderAgentId: message.sender.agentId,
+            taskId: message.senderTaskId,
+            messageId: message.id,
+            recipientAgentId: delivery.recipientAgentId,
+            status,
+          },
         },
       ];
     });
+    this.#keptAwaitedThreadCandidates = unsaved
+      ? undefined
+      : { state, messages: state.messages, deliveries: state.deliveries, candidates };
+    return candidates;
+  }
+
+  #hasUnsavedChanges(): boolean {
+    return Object.values(this.#changes).some((keys) => keys.size > 0);
   }
 
   #messagesById(): ReadonlyMap<string, StoredMessage> {
@@ -1829,7 +1864,7 @@ export class MailboxStore {
 
   #conversationIndex(): ConversationIndex {
     const state = this.#state;
-    const unsaved = Object.values(this.#changes).some((keys) => keys.size > 0);
+    const unsaved = this.#hasUnsavedChanges();
     const kept = this.#keptConversationIndex;
     if (
       !unsaved &&
@@ -2875,6 +2910,7 @@ export class MailboxStore {
   restorePersistedState(): void {
     this.#state = normalizeStoredState(readStoredMailboxState(this.#database.readMailboxState()).state);
     this.#keptConversationIndex = undefined;
+    this.#keptAwaitedThreadCandidates = undefined;
     if (!this.#database.connection.isTransaction) this.#clearChanges();
   }
 
@@ -3978,6 +4014,7 @@ export class MailboxStore {
     replaceAll = false,
   ): void {
     this.#keptConversationIndex = undefined;
+    this.#keptAwaitedThreadCandidates = undefined;
     const ownsTransaction = !this.#database.connection.isTransaction;
     const idempotency = this.#idempotencyMark();
     const wrote = replaceAll
@@ -3998,6 +4035,7 @@ export class MailboxStore {
   #clearChanges(): void {
     for (const keys of Object.values(this.#changes)) keys.clear();
     this.#keptConversationIndex = undefined;
+    this.#keptAwaitedThreadCandidates = undefined;
   }
 
   #drainFileDeletionOutboxEffect = Effect.fn("MailboxStore.drainFileDeletionOutbox")(function* (this: MailboxStore) {
