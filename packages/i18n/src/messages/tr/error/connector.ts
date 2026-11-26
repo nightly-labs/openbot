@@ -87,6 +87,8 @@ export const messages = {
     "Bu sunucuda Bitwarden kilidi açılamadı. Ana parolayı kontrol edin, sonra tekrar bağlanın.",
   "error.connector.bitwardenCliInstallFailed":
     "Bu sunucuya Bitwarden CLI yüklenemedi. Ağ bağlantısını kontrol edin, sonra tekrar bağlanın.",
+  "error.connector.bitwardenCliCannotStart":
+    "Bitwarden CLI bu sunucuda başlamadı. Tekrar bağlanın. Yine başlamazsa Yardım > Sorun bildir'i seçin.",
   "error.connector.bitwardenFileUnreadable": "Bitwarden bağlantı dosyası okunamıyor.",
   "error.connector.passwordManagerUnknown": "OpenBot bu parola yöneticisini tanımıyor.",
   "error.connector.passwordManagerMethod": "Bu parola yöneticisi bu yolla bağlanamaz.",

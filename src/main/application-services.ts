@@ -1898,14 +1898,16 @@ export async function createApplicationServices({
   });
   teardown.push(TEARDOWN_ORDER.nearWallet, "the NEAR wallet", () => Effect.runPromise(nearWallet.dispose()));
   const bitwardenCliTarget = runtimeTarget(process.platform, process.arch);
+  const bitwardenDataDirectory = join(app.getPath("userData"), "provider-state", "bitwarden-host");
   const bitwardenConnector = new BitwardenConnectorService({
     host: {
       store: new BitwardenConnectorStore(join(app.getPath("userData"), BITWARDEN_CONNECTOR_FILE), secretCipher),
-      dataDirectory: join(app.getPath("userData"), "provider-state", "bitwarden-host"),
+      dataDirectory: bitwardenDataDirectory,
       installCli: bitwardenCliTarget
         ? (signal) =>
             managedBitwardenCli({
               directory: join(app.getPath("userData"), "provider-state", "bitwarden-cli"),
+              dataDirectory: bitwardenDataDirectory,
               target: bitwardenCliTarget,
               signal,
             })

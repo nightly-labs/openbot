@@ -610,6 +610,7 @@ function registerRecord(record: BitwardenConnectorRecord): void {
 function hostError(cause: unknown): string {
   const named = [
     sourceText("error.connector.bitwardenCliInstallFailed"),
+    sourceText("error.connector.bitwardenCliCannotStart"),
     sourceText("error.connector.bitwardenHostSignInFailed"),
     sourceText("error.connector.bitwardenHostUnlockFailed"),
     sourceText("error.connector.bitwardenFolderMissing"),

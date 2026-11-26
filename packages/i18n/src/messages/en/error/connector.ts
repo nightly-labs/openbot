@@ -94,6 +94,8 @@ export const messages = defineMessages("error.connector", {
     "Could not unlock Bitwarden on this server. Check the master password, then connect again.",
   "error.connector.bitwardenCliInstallFailed":
     "Could not install the Bitwarden CLI on this server. Check its network connection, then connect again.",
+  "error.connector.bitwardenCliCannotStart":
+    "The Bitwarden CLI did not start on this server. Connect again. If it still does not start, choose Help > Report a problem.",
   "error.connector.bitwardenFileUnreadable": "The Bitwarden connection file is unreadable.",
   "error.connector.passwordManagerUnknown": "OpenBot does not know this password manager.",
   "error.connector.passwordManagerMethod": "This password manager cannot connect this way.",

@@ -93,6 +93,8 @@ export const messages = {
     "לא ניתן לבטל את הנעילה של Bitwarden בשרת הזה. יש לבדוק את הסיסמה הראשית ולהתחבר שוב.",
   "error.connector.bitwardenCliInstallFailed":
     "לא ניתן להתקין את ה-CLI של Bitwarden בשרת הזה. יש לבדוק את חיבור הרשת שלו ולהתחבר שוב.",
+  "error.connector.bitwardenCliCannotStart":
+    "ה-CLI של Bitwarden לא הופעל בשרת הזה. יש להתחבר שוב. אם הוא עדיין לא מופעל, יש לבחור עזרה > דיווח על בעיה.",
   "error.connector.bitwardenFileUnreadable": "קובץ החיבור ל-Bitwarden אינו קריא.",
   "error.connector.passwordManagerUnknown": "OpenBot לא מכיר את מנהל הסיסמאות הזה.",
   "error.connector.passwordManagerMethod": "מנהל הסיסמאות הזה לא יכול להתחבר בדרך הזאת.",
