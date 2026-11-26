@@ -112,6 +112,12 @@ import {
   type ThreadMessageSearchRequest,
 } from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
+import {
+  WORKFLOW_PRESENCE_CAPABILITY,
+  WORKFLOW_SPOT_CONTROL,
+  type WorkflowSpotControl,
+  type WorkflowSpotInput,
+} from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { followHostKeyHandovers } from "@openbot/team-client/host-key-handover";
@@ -1907,6 +1913,25 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       recipientMemberId: input.memberId,
       typing: input.typing,
     });
+  }).bind(this);
+
+  readonly setWorkflowSpot = Effect.fn("RemoteManager.setWorkflowSpot")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+    input: WorkflowSpotInput,
+  ) {
+    if (!this.supportsCapability(serverId, WORKFLOW_PRESENCE_CAPABILITY)) return;
+    const control: WorkflowSpotControl = { type: WORKFLOW_SPOT_CONTROL, ...input };
+    if (this.#store.find(serverId)?.transport === "webrtc-v2") {
+      const transport = this.#webrtcTransport;
+      if (transport)
+        yield* Effect.forkIn(
+          this.#owned(transport.setWorkflowSpot(serverId, control).pipe(Effect.catch(() => Effect.void))),
+          this.#scope,
+        );
+      return;
+    }
+    this.#events.sendWorkflowSpot(serverId, control);
   }).bind(this);
 
   checkRemoteDesktopSetup(serverId: string) {

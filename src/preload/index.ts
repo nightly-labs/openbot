@@ -957,6 +957,7 @@ const openbotApi: OpenBotDesktopApi = {
     mediaPrice: decodeWorkflowMediaPrice,
     folders: decodeWorkflowFoldersSnapshotFromMain,
     folderAction: decodeWorkflowFoldersSnapshotFromMain,
+    setSpot: decodeVoid,
   }),
   crm: bridgeGroup(IPC_ENDPOINTS.crm, {
     overview: decodeCrmOverview,

@@ -243,6 +243,7 @@ import {
 import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import type { TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import type { WorkflowSpotInput } from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import {
   WORKSPACE_DIRECTORY_CAPABILITY,
   WORKSPACE_DIRECTORY_ROUTES,
@@ -428,6 +429,7 @@ export interface WebWorkspaceRuntime {
   ): Promise<string>;
   stop(agentId: string, turnId: string): Promise<void>;
   setTyping(agentId: string | null, typing: boolean): void;
+  setWorkflowSpot(input: WorkflowSpotInput): void;
   queue(agentId: string): Promise<QueueSnapshot>;
   activeQueues(agentIds: string[]): Promise<AgentActiveQueues>;
   editQueue(input: EditQueuedMessageInput): Promise<QueueSnapshot>;
@@ -1652,6 +1654,9 @@ export function createWebWorkspaceRuntime(
     },
     setTyping(agentId, typing) {
       peer.setTyping(agentId, typing);
+    },
+    setWorkflowSpot(input) {
+      peer.setWorkflowSpot(input);
     },
     async cancelUpload() {
       uploadGeneration += 1;

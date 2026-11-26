@@ -16,6 +16,12 @@ import {
   type WorkflowStep,
   type WorkflowSummary,
 } from "@openbot/contracts/ipc";
+import {
+  WORKFLOW_PRESENCE_LIMITS,
+  type WorkflowSpot,
+  type WorkflowSpotEvent,
+  type WorkflowSpotInput,
+} from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import type { AppTextKey } from "@openbot/i18n";
 import { toast } from "@openbot/ui";
 import type { WorkflowCanvasProps } from "@openbot/ui/features/workflows/WorkflowCanvas";
@@ -35,6 +41,7 @@ import type {
   WorkflowSlackWorkspace,
   WorkflowTelegramChat,
 } from "@openbot/ui/features/workflows/workflow-model";
+import type { WorkflowOwnSpot } from "@openbot/ui/features/workflows/workflow-presence";
 import { EMPTY_WORKFLOW_RUN_VIEW, sameWorkflowStep } from "@openbot/ui/features/workflows/workflow-run-view";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, untrack } from "solid-js";
@@ -649,14 +656,89 @@ export function createWorkflowsController(
     refreshTimer ??= setTimeout(flushRefresh, REFRESH_DELAY_MS);
   };
 
+  const [spots, setSpots] = createSignal<Readonly<Record<string, WorkflowSpot>>>({});
+  const openWorkflowId = () => stored()?.detail.summary.id;
+  let ownSpot: WorkflowSpotInput | null = null;
+  let spotSentAt = 0;
+  let spotTimer: ReturnType<typeof setTimeout> | undefined;
+  let keepAliveTimer: ReturnType<typeof setTimeout> | undefined;
+  let spotEntered = false;
+  const sendSpot = () => {
+    spotTimer = undefined;
+    if (!ownSpot || disposed) return;
+    spotSentAt = Date.now();
+    spotEntered = true;
+    host.setSpot(ownSpot);
+    if (keepAliveTimer !== undefined) clearTimeout(keepAliveTimer);
+    keepAliveTimer = setTimeout(keepSpotAlive, WORKFLOW_PRESENCE_LIMITS.keepAliveMs);
+  };
+  const keepSpotAlive = () => {
+    keepAliveTimer = undefined;
+    if (ownSpot) queueSpot(ownSpot);
+  };
+  const queueSpot = (input: WorkflowSpotInput) => {
+    ownSpot = input;
+    if (spotTimer !== undefined) return;
+    const wait = spotSentAt + WORKFLOW_PRESENCE_LIMITS.sendIntervalMs - Date.now();
+    if (wait <= 0) sendSpot();
+    else spotTimer = setTimeout(sendSpot, wait);
+  };
+  const leaveSpot = () => {
+    if (spotTimer !== undefined) clearTimeout(spotTimer);
+    if (keepAliveTimer !== undefined) clearTimeout(keepAliveTimer);
+    spotTimer = undefined;
+    keepAliveTimer = undefined;
+    ownSpot = null;
+    if (!spotEntered) return;
+    spotEntered = false;
+    host.setSpot({ workflowId: null, at: null, selected: null });
+  };
+  const reportSpot = (spot: WorkflowOwnSpot) => {
+    const workflowId = untrack(openWorkflowId);
+    if (!workflowId || !host.presenceSupported()) return;
+    queueSpot({ workflowId, at: spot.at, selected: spot.selected });
+  };
+  const resendSpot = () => {
+    if (!ownSpot || !host.presenceSupported()) return;
+    spotSentAt = 0;
+    queueSpot(ownSpot);
+  };
+  const receiveSpot = (event: WorkflowSpotEvent) => {
+    if (event.workflowId !== untrack(openWorkflowId)) return;
+    const spot = event.spot;
+    setSpots((current) => {
+      const { [event.memberId]: _left, ...others } = current;
+      return spot ? { ...others, [event.memberId]: spot } : others;
+    });
+  };
+  createEffect(
+    () => ({ workflowId: openWorkflowId(), supported: host.presenceSupported() }),
+    ({ workflowId, supported }) => {
+      setSpots({});
+      if (!workflowId || !supported) {
+        leaveSpot();
+        return;
+      }
+      if (ownSpot?.workflowId !== workflowId) queueSpot({ workflowId, at: null, selected: null });
+    },
+  );
+
   onSettled(() => {
-    const stop = host.onChanged(refresh);
+    const stop = host.onChanged((workflowId, agentId) => {
+      refresh(workflowId, agentId);
+      if (workflowId === null) resendSpot();
+    });
     const stopFolders = host.onFoldersChanged(readFolders);
+    const stopSpots = host.onSpot(receiveSpot);
     window.addEventListener("focus", onFocus);
+    window.addEventListener("pagehide", leaveSpot);
     return () => {
       stop();
       stopFolders();
+      stopSpots();
+      leaveSpot();
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("pagehide", leaveSpot);
       if (refreshTimer !== undefined) clearTimeout(refreshTimer);
       flush();
       disposed = true;
@@ -795,6 +877,7 @@ export function createWorkflowsController(
       return summaries();
     },
     tabs,
+    onSpot: reportSpot,
     get folders() {
       return folders();
     },
@@ -938,6 +1021,7 @@ export function createWorkflowsController(
     uploadPicture,
     downloadMedia,
     readOnly: () => lock() !== undefined,
+    spots,
     github,
     props,
   };

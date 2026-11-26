@@ -14,6 +14,7 @@ import {
   WORKFLOW_FOLDERS_CAPABILITY,
   WORKFLOW_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/workflow-folders-v1";
+import { decodeWorkflowSpotInput, type WorkflowSpotInput } from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import {
   WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY,
   WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES,
@@ -155,10 +156,16 @@ interface WorkflowRemoteServers {
     init?: RemoteRequestInit,
   ): Effect.Effect<T, RemoteWorkflowError>;
   downloadAttachment(attachmentId: string, serverId: string): Effect.Effect<{ bytes: Uint8Array }, RemoteWorkflowError>;
+  setWorkflowSpot(serverId: string, input: WorkflowSpotInput): Effect.Effect<void>;
+}
+
+interface WorkflowSpotHost {
+  setWorkflowSpot(input: WorkflowSpotInput): void;
 }
 
 interface WorkflowIpcDependencies {
   workflows: WorkflowsHandle;
+  host: WorkflowSpotHost;
   events: Pick<HostEventsService, "rotateWorkflowSecret">;
   github: WorkflowGitHubDirectory;
   workflowFolders: Pick<WorkflowFoldersService, "read" | "change">;
@@ -170,6 +177,7 @@ interface WorkflowIpcDependencies {
 
 export function workflowIpcHandlers({
   workflows,
+  host,
   events,
   github,
   workflowFolders,
@@ -422,6 +430,10 @@ export function workflowIpcHandlers({
       folderAction: scopedHandler(parseWorkflowFolderAction, {
         local: (action) => runCauseEffect(workflowFolders.change(action)),
         remote: (action, serverId) => remoteFolders(serverId, WORKFLOW_FOLDERS_ROUTES.actions, action),
+      }),
+      setSpot: scopedHandler(decodeWorkflowSpotInput, {
+        local: (input) => host.setWorkflowSpot(input),
+        remote: (input, serverId) => runCauseEffect(remoteServers.setWorkflowSpot(serverId, input)),
       }),
     },
   };

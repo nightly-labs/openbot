@@ -214,6 +214,8 @@ import {
   PresenceBar,
   peersOf,
   type WorkflowBuilderSpot,
+  type WorkflowCursorRoom,
+  type WorkflowOwnSpot,
   type WorkflowPeer,
   type WorkflowPresence,
 } from "./workflow-presence";
@@ -248,6 +250,7 @@ export interface WorkflowCanvasProps {
   opening?: boolean | undefined;
   readOnly?: boolean | undefined;
   presence?: WorkflowPresence | undefined;
+  onSpot?: ((spot: WorkflowOwnSpot) => void) | undefined;
   build?: WorkflowBuild | undefined;
   frame?: "window" | undefined;
   server?: string | undefined;
@@ -1382,6 +1385,14 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
 
   const clampScale = (scale: number) => Math.min(Math.max(scale, MIN_SCALE), MAX_SCALE);
   const view = () => ({ width: viewport?.clientWidth ?? 0, height: viewport?.clientHeight ?? 0 });
+  const [viewSize, setViewSize] = createSignal({ width: 0, height: 0 });
+  const cursorRoom = (at: WfnPoint): WorkflowCursorRoom => {
+    const size = viewSize();
+    return {
+      right: size.width - (at.x * camera.scale + camera.x),
+      bottom: size.height - (at.y * camera.scale + camera.y),
+    };
+  };
   const local = (event: { clientX: number; clientY: number }): WfnPoint => {
     const rect = viewport?.getBoundingClientRect();
     return { x: event.clientX - (rect?.left ?? 0), y: event.clientY - (rect?.top ?? 0) };
@@ -1389,6 +1400,14 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const toWorld = (point: WfnPoint): WfnPoint => ({
     x: (point.x - camera.x) / camera.scale,
     y: (point.y - camera.y) / camera.scale,
+  });
+  const ownSelection = () => canvas.selection()[0] ?? null;
+  const reportSpot = (selected: string | null) => {
+    const at = pointer;
+    props.onSpot?.({ at: at ? untrack(() => toWorld(at)) : null, selected });
+  };
+  createEffect(ownSelection, (selected) => {
+    untrack(() => reportSpot(selected));
   });
   const placeCamera = (next: Camera) => {
     setCamera((draft) => {
@@ -2221,7 +2240,9 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     });
   };
 
-  const peers = createMemo(() => (props.features.presence && props.presence ? peersOf(props.presence) : []));
+  const peers = createMemo<readonly WorkflowPeer[]>((previous) =>
+    props.features.presence && props.presence ? peersOf(props.presence, previous) : [],
+  );
   const self = () =>
     props.features.presence ? props.presence?.members.find((member) => member.id === props.presence?.self) : undefined;
   const spots = () => props.presence?.spots ?? {};
@@ -2774,6 +2795,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       | undefined;
     let space = false;
     const onResize = new ResizeObserver(() => {
+      setViewSize(view());
       if (!cameraMoved) fitView(false);
     });
     const stopClick = (event: MouseEvent) => {
@@ -3229,6 +3251,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     const onHover = (event: PointerEvent) => {
       const over = event.target instanceof Element && !event.target.closest("[data-wfn-portal]");
       pointer = over ? local(event) : undefined;
+      reportSpot(untrack(ownSelection));
       if (placing()) setGhost(over ? local(event) : null);
       const show = ui.tool === "draw" && ui.draw === "eraser" && over;
       if (!show && ink.eraser === null) return;
@@ -3239,6 +3262,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     };
     const onLeave = () => {
       pointer = undefined;
+      reportSpot(untrack(ownSelection));
       setGhost(null);
       setInk((draft) => {
         draft.eraser = null;
@@ -3705,8 +3729,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
                   </div>
                 )}
               </Show>
-              <PeerCursors peers={peers()} spots={spots()} />
-              <Show when={builder()}>{(spot) => <BuilderCursor spot={spot()} glide={BUILD_GLIDE} />}</Show>
+              <PeerCursors peers={peers()} spots={spots()} room={cursorRoom} />
+              <Show when={builder()}>
+                {(spot) => <BuilderCursor spot={spot()} glide={BUILD_GLIDE} room={cursorRoom} />}
+              </Show>
             </div>
             <Show when={marquee()}>
               {(box) => (

@@ -30,6 +30,7 @@ import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { encodeTeamProtocolV9WebRtcHttpRequest } from "@openbot/contracts/team-protocol/v9-webrtc-adapter";
 import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { decodeTeamProtocolV10WebRtcHttpResponse } from "@openbot/contracts/team-protocol/v10-webrtc-adapter";
+import { WORKFLOW_SPOT_CONTROL, type WorkflowSpotControl } from "@openbot/contracts/team-protocol/workflow-presence-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { remoteWorkspaceReadTimeout, startRemoteRequestDeadline } from "@openbot/team-client/remote-recovery";
 import { type RemoteRequestProfile, startRemoteRequest } from "@openbot/team-client/sync-profile";
@@ -417,6 +418,14 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     return yield* this.#owned(
       this.#sendEventControlEffect(hostId, { type: "team-direct-typing", recipientMemberId, typing }),
     );
+  }).bind(this);
+
+  readonly setWorkflowSpot = Effect.fn("TeamWebRtcClient.setWorkflowSpot")(function* (
+    this: TeamWebRtcClientTransport,
+    hostId: string,
+    control: WorkflowSpotControl,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
+    return yield* this.#owned(this.#sendEventControlEffect(hostId, control));
   }).bind(this);
 
   connect(hostId: string): Effect.Effect<void, RemoteWorkflowError> {
@@ -1172,7 +1181,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   readonly #sendEventControlEffect = Effect.fn("TeamWebRtcClient.sendEventControl")(function* (
     this: TeamWebRtcClientTransport,
     hostId: string,
-    control: TeamProtocolV1CurrentEventControl,
+    control: TeamProtocolV1CurrentEventControl | WorkflowSpotControl,
   ): Effect.fn.Return<void, RemoteWorkflowError, TeamClientBridge> {
     yield* this.#ensureConnected(hostId);
     yield* TeamClientBridge.use((bridge) =>
@@ -1182,7 +1191,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         encodeTeamProtocolV2Frame({
           version: 2,
           type: "event-control",
-          control: toWireTeamProtocolV1ClientEvent(control),
+          control: control.type === WORKFLOW_SPOT_CONTROL ? control : toWireTeamProtocolV1ClientEvent(control),
         }),
       ),
     );
