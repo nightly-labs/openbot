@@ -178,6 +178,7 @@ export async function routeProviderAccountPoolStrategy(
   if (!accounts || !capabilities.has(PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.providersUnsupported"));
   requireAdmin(member);
+  requireAllAccountsFit(capabilities, accounts);
   if (url.pathname === PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES.list) return json(200, accounts.poolStrategies());
   const body = await readJson(request);
   if (!isProviderAccountPoolStrategy(body.strategy)) throw new HttpError(400, "strategy is invalid.");

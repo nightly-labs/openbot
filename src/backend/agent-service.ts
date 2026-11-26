@@ -5800,7 +5800,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #providerAccountBusy(provider: AgentProvider, accountId: string): boolean {
     return this.#agentsOnProviderAccount(provider, accountId).some(
-      (agent) => this.#runsTurn(agent.id) || this.#mailbox.hasUnfinishedDelivery(agent.id),
+      (agent) =>
+        this.#runsTurn(agent.id) ||
+        (this.#usageLimits.mayDrain(agent.id)
+          ? this.#mailbox.hasUnfinishedDelivery(agent.id)
+          : this.#mailbox.hasStartedDelivery(agent.id)),
     );
   }
 
@@ -5835,8 +5839,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ) {
     const agents = this.#agentsOnProviderAccount(provider, accountId);
     yield* lifecycleStep("check provider account", () => {
-      if (agents.some((agent) => this.#runsTurn(agent.id) || this.#mailbox.hasUnfinishedDelivery(agent.id)))
-        throw new Error(sourceText("error.provider.accountInUse"));
+      if (this.#providerAccountBusy(provider, accountId)) throw new Error(sourceText("error.provider.accountInUse"));
     });
     for (const agent of agents)
       yield* this.#applyAgentUpdate({
@@ -5875,13 +5878,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
     yield* this.#moveQueuedRuntimesOffAccount(provider, accountId);
     this.#refreshPoolInUse(provider);
-    const removeWhenIdle = this.#endpoints.runExclusive(() =>
+    const removeIfIdle = this.#endpoints.runExclusive(() =>
       Effect.gen({ self: this }, function* () {
         if (!this.#providers.hasProviderAccount(provider, accountId)) return true;
         if (this.#providerAccountBusy(provider, accountId)) return false;
         yield* this.#removeIdleProviderAccount(provider, accountId);
         return true;
       }),
+    );
+    const removeWhenIdle = Effect.suspend(() =>
+      this.#providers.hasProviderAccount(provider, accountId) && this.#providerAccountBusy(provider, accountId)
+        ? Effect.succeed(false)
+        : removeIfIdle,
     );
     yield* Effect.sleep(PROVIDER_ACCOUNT_REMOVAL_POLL_MS).pipe(
       Effect.andThen(removeWhenIdle),

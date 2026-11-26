@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { AGENT_PROVIDERS, type AgentProviderId } from "@openbot/contracts/agent-providers";
 import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
+  isProviderAccountPoolStrategy,
   MAX_PROVIDER_ACCOUNTS,
   PROVIDER_ACCOUNT_LABEL_MAX_LENGTH,
-  PROVIDER_ACCOUNT_POOL_STRATEGIES,
   type ProviderAccountPoolStrategy,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -30,6 +30,7 @@ export interface StoredProviderAccount {
 
 const ACCOUNT_ID = /^a[0-9a-f]{16}$/u;
 const POOL_ACCOUNT_ID = /^(?:default|a[0-9a-f]{16})$/u;
+const POOL_STRATEGY_MAX_LENGTH = 64;
 const Provider = Schema.Literals(AGENT_PROVIDERS.filter((provider) => provider !== "acp"));
 const LabelText = Schema.String.check(Schema.isMaxLength(PROVIDER_ACCOUNT_LABEL_MAX_LENGTH));
 const Label = Schema.NullOr(LabelText);
@@ -46,7 +47,7 @@ const ProviderAccountsFile = Schema.Struct({
         leftOut: Schema.Array(Schema.String.check(Schema.isPattern(POOL_ACCOUNT_ID))).check(
           Schema.isMaxLength(MAX_PROVIDER_ACCOUNTS),
         ),
-        strategy: Schema.optionalKey(Schema.Literals(PROVIDER_ACCOUNT_POOL_STRATEGIES)),
+        strategy: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(POOL_STRATEGY_MAX_LENGTH))),
       }),
     ),
   ),
@@ -104,7 +105,11 @@ export class ProviderAccountStore {
   }
 
   pool(provider: AgentProviderId): StoredProviderAccountPool | null {
-    return this.#file.pools?.[provider] ?? null;
+    const pool = this.#file.pools?.[provider];
+    if (!pool) return null;
+    return isProviderAccountPoolStrategy(pool.strategy)
+      ? { leftOut: pool.leftOut, strategy: pool.strategy }
+      : { leftOut: pool.leftOut };
   }
 
   readonly setPool = Effect.fn("ProviderAccountStore.setPool")(function* (

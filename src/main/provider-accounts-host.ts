@@ -90,7 +90,9 @@ export class ProviderAccountsHost {
 
   pools() {
     const pools = (this.#dependencies.service.getStatus().providers ?? []).flatMap((row) =>
-      row.accounts && row.accountPool ? [{ provider: row.id, ...row.accountPool }] : [],
+      row.accounts && row.accountPool
+        ? [{ provider: row.id, leftOut: row.accountPool.leftOut, inUse: row.accountPool.inUse }]
+        : [],
     );
     return { pools };
   }
