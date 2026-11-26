@@ -7206,7 +7206,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (explain && steers) yield* this.#markSteerFallback(agent.id, deliveryId, "provider-unsupported");
       return yield* notSteered("provider-unsupported");
     }
-    if (this.#routineRunsIn(agent, task?.threadId ?? null)) {
+    if (this.#routineRunsTurn(agent, task?.threadId ?? null, steerTurnId)) {
       if (explain && steers) yield* this.#markSteerFallback(agent.id, deliveryId, "steer-failed");
       return yield* notSteered("routine-run");
     }
@@ -7587,9 +7587,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     }
   });
 
-  #routineRunsIn(agent: AgentSummary, threadId: string | null): boolean {
+  #routineRunsTurn(agent: AgentSummary, threadId: string | null, turnId: string): boolean {
     const publicThreadId = threadId ?? agent.threadId;
-    return publicThreadId !== null && this.#conversation.routineSession(agent.id, publicThreadId) !== undefined;
+    if (publicThreadId === null || this.#conversation.routineSession(agent.id, publicThreadId) === undefined)
+      return false;
+    const turnSession = this.#turn.turnSession(turnId);
+    return turnSession === undefined || this.#conversation.isRoutineSession(turnSession);
   }
 
   #runningSession(agent: AgentSummary, threadId: string | null | undefined): string | undefined {
