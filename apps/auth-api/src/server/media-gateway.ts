@@ -59,6 +59,7 @@ export interface MediaGatewayJob {
   id: string;
   status: CreditMediaJobStatus;
   pollAfterSeconds: number;
+  failure: string | null;
 }
 
 export interface MediaGatewayArtifact {
@@ -76,8 +77,15 @@ export interface MediaGateway {
   output(upstream: string, id: string, index: number): Effect.Effect<Response, MediaGatewayError>;
 }
 
+const SAFE_CODE = /^[a-z0-9_.-]{1,64}$/i;
+
 function safeCode(value: unknown): string {
-  return isString(value) && /^[a-z0-9_.-]{1,64}$/i.test(value) ? value : "unknown";
+  return isString(value) && SAFE_CODE.test(value) ? value : "unknown";
+}
+
+function jobFailure(status: CreditMediaJobStatus, value: unknown): string | null {
+  if (status !== "failed") return null;
+  return isString(value) && SAFE_CODE.test(value) ? value.toLowerCase() : "unknown";
 }
 
 function retryAfter(response: Response): number | null {
@@ -124,7 +132,13 @@ function readJob(body: DynamicRecord | null): MediaGatewayJob | null {
   const id = body.id;
   if (!upstream || !isString(id) || id.length === 0 || id.length > 200) return null;
   if (!isOneOf(JOB_STATUSES, body.status)) return null;
-  return { upstream, id, status: body.status, pollAfterSeconds: pollSeconds(body.pollAfterSeconds) };
+  return {
+    upstream,
+    id,
+    status: body.status,
+    pollAfterSeconds: pollSeconds(body.pollAfterSeconds),
+    failure: jobFailure(body.status, body.failure),
+  };
 }
 
 function readArtifacts(body: DynamicRecord | null): MediaGatewayArtifact[] | null {

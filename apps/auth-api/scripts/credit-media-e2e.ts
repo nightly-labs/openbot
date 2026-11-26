@@ -129,6 +129,7 @@ interface FakeJob {
   upstream: string;
   status: string;
   outputs: number;
+  failure?: string;
 }
 
 interface FakeSubmit {
@@ -224,7 +225,13 @@ function fakeGateway() {
     const id = decodeURIComponent(job[2] ?? "");
     if (!job[3]) {
       polls.push(key);
-      return Response.json({ upstream: stored.upstream, id, status: stored.status, pollAfterSeconds: 4 });
+      return Response.json({
+        upstream: stored.upstream,
+        id,
+        status: stored.status,
+        pollAfterSeconds: 4,
+        ...(stored.failure === undefined ? {} : { failure: stored.failure }),
+      });
     }
     if (job[3] === "result")
       return Response.json({
@@ -258,6 +265,11 @@ function fakeGateway() {
     },
     setStatus: (providerJobId: string, status: string) => {
       find(providerJobId)[1].status = status;
+    },
+    fail: (providerJobId: string, failure: string) => {
+      const [, job] = find(providerJobId);
+      job.status = "failed";
+      job.failure = failure;
     },
     complete: (providerJobId: string, count: number) => {
       const [, job] = find(providerJobId);
@@ -522,7 +534,11 @@ async function gatewayFlow() {
   const failed = await run(service.job(owner, video.jobId));
   check(
     "a failed generation frees its hold and uses no credits",
-    failed.status === "failed" && failed.failure === "failed" && failed.credits === 0 && (await balance(owner)) === 297,
+    failed.status === "failed" &&
+      failed.failure === "failed" &&
+      failed.reason === null &&
+      failed.credits === 0 &&
+      (await balance(owner)) === 297,
     failed,
   );
 
@@ -537,6 +553,27 @@ async function gatewayFlow() {
   );
   upstream.setStatus(upstream.lastJobId(), "failed");
   await run(service.job(owner, silent.jobId));
+
+  const unsafe = await run(service.submit(owner, OWNER, submission("image-one")));
+  upstream.fail(upstream.lastJobId(), "content_policy");
+  const unsafeView = await run(service.job(owner, unsafe.jobId));
+  const unsafeHold = database
+    .prepare("SELECT status, outcome, failure_reason FROM credit_holds WHERE job_id = ?")
+    .get(unsafe.jobId);
+  const unsafeLater = await run(service.job(owner, unsafe.jobId));
+  check(
+    "a generation that the upstream refuses for content policy is refused, frees its hold and uses no credits",
+    unsafeView.status === "failed" &&
+      unsafeView.failure === "refused" &&
+      unsafeView.reason === "content_policy" &&
+      unsafeLater.reason === "content_policy" &&
+      unsafeHold?.failure_reason === "content_policy" &&
+      unsafeView.credits === 0 &&
+      unsafeHold?.status === "released" &&
+      unsafeHold.outcome === "refused" &&
+      (await balance(owner)) === 297,
+    { unsafeView, unsafeLater, unsafeHold },
+  );
 
   const refusedStatuses: [number, string, string][] = [
     [422, "media_request_refused", "refused"],
@@ -724,6 +761,19 @@ async function gatewayFlow() {
     { emptyStudioHold, before: studioBeforeEmpty, after: await balance(studio) },
   );
 
+  const unsafeStudioJob = await run(service.submit(studio, null, submission("image-one")));
+  upstream.fail(upstream.lastJobId(), "content_policy");
+  clock += CREDIT_HOLD_FIRST_CHECK_MS;
+  await run(service.sweep());
+  const unsafeStudioHold = database
+    .prepare("SELECT status, outcome FROM credit_holds WHERE job_id = ?")
+    .get(unsafeStudioJob.jobId);
+  check(
+    "the sweep also settles a content policy refusal as refused",
+    unsafeStudioHold?.status === "released" && unsafeStudioHold.outcome === "refused",
+    unsafeStudioHold,
+  );
+
   database.exec("UPDATE credit_media_prices SET credits = 2.5, updated_at = 2 WHERE model_id = 'image-one'");
   const repriced = await run(service.catalog());
   const repricedJob = await run(service.submit(owner, OWNER, submission("image-one", { count: 3 })));
@@ -783,6 +833,22 @@ async function gatewayFlow() {
         kind: "image",
         outcome: "failed",
       }).length === 1 &&
+      sent(OWNER, { action: "media_released", model_id: "video-one", outcome: "failed", reason: "unknown" }).length ===
+        2 &&
+      sent(OWNER, { action: "media_released", wallet: "personal", outcome: "refused", reason: "content_policy" })
+        .length === 1 &&
+      sent(OWNER, { action: "media_released", wallet: "server", outcome: "refused", reason: "content_policy" })
+        .length === 1 &&
+      sent(OWNER, { action: "media_released", wallet: "server", outcome: "failed", reason: "no_output" }).length ===
+        1 &&
+      sent(OWNER, { action: "media_released", outcome: "refused", reason: "upstream_said_no" }).length === 4 &&
+      sent(OWNER, { action: "media_released", outcome: "failed", reason: "not_found" }).length >= 1 &&
+      tracked.every(
+        (event) =>
+          !isDynamicRecord(event.properties) ||
+          event.properties.action === "media_released" ||
+          event.properties.reason === undefined,
+      ) &&
       tracked.every(
         (event) => event.name === "credit_action" && (event.profileId === OWNER || event.profileId === OUTSIDER),
       ),
@@ -824,7 +890,8 @@ async function gatewayFlow() {
     "the credit audit has one row for each hold and start, and a charge or release for each settled generation",
     audited({ event: "hold" }).length === holds &&
       audited({ event: "charged", result: "ok", code: "completed" }).length === ledgerSpends().length &&
-      audited({ event: "released", code: "refused" }).length === refusedStatuses.length &&
+      audited({ event: "released", code: "refused" }).length ===
+        refusedStatuses.length + [unsafe, unsafeStudioJob].length &&
       audited({ event: "charged", server_id: SERVER_ID, model_id: "video-one", credits: 35 }).length === 1 &&
       audited({ event: "released", result: "failed", code: "failed", model_id: "video-one", credits: 155 }).length ===
         1,

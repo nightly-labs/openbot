@@ -1,4 +1,5 @@
 import {
+  CREDIT_MEDIA_FAILURE_REASONS,
   CREDIT_MEDIA_INPUT_LIMIT_BYTES,
   CREDIT_MEDIA_INPUT_TYPES,
   CREDIT_MEDIA_INPUTS_LIMIT_BYTES,
@@ -7,6 +8,7 @@ import {
   type CreditMediaBalance,
   type CreditMediaCatalog,
   type CreditMediaFailure,
+  type CreditMediaFailureReason,
   type CreditMediaInputRole,
   type CreditMediaJob,
   type CreditMediaJobRequest,
@@ -41,6 +43,7 @@ import {
   type CreditHoldOutcome,
   type CreditJobCheck,
   type CreditJobChecker,
+  type CreditJobRelease,
   CreditSpending,
   type CreditSubmitTarget,
   type CreditWallet,
@@ -53,6 +56,7 @@ import {
   type MediaGatewayError,
   type MediaGatewayGeneration,
   type MediaGatewayInput,
+  type MediaGatewayJob,
   type MediaGatewayModel,
 } from "./media-gateway";
 
@@ -181,6 +185,20 @@ function resumable(hold: CreditHold | null): boolean {
 function failureOf(outcome: CreditHoldOutcome | null): CreditMediaFailure {
   if (outcome === "refused" || outcome === "canceled" || outcome === "expired") return outcome;
   return "failed";
+}
+
+const CONTENT_POLICY_FAILURE = "content_policy";
+const NOT_FOUND_REASON = "not_found";
+const NO_OUTPUT_REASON = "no_output";
+
+function releasedResult(state: MediaGatewayJob): CreditJobRelease {
+  if (state.status === "canceled") return { outcome: "canceled" };
+  const reason = state.failure ?? "unknown";
+  return { outcome: reason === CONTENT_POLICY_FAILURE ? "refused" : "failed", reason };
+}
+
+function failureReasonOf(reason: string | null): CreditMediaFailureReason | null {
+  return isOneOf(CREDIT_MEDIA_FAILURE_REASONS, reason) ? reason : null;
 }
 
 function outputsOf(artifacts: readonly MediaGatewayArtifact[]): CreditMediaOutput[] {
@@ -455,6 +473,7 @@ export class CreditMediaService {
       pollAfterSeconds: finished ? 0 : pollAfterSeconds,
       outputs,
       failure: hold.status === "released" ? failureOf(hold.outcome) : null,
+      reason: hold.status === "released" ? failureReasonOf(hold.failureReason) : null,
     };
   }
 
@@ -525,11 +544,11 @@ export class CreditMediaService {
       const error = submitted.failure;
       logUpstream("submit", error, trace);
       if (REFUSED_STATUSES.has(error.status)) {
-        yield* this.#settle(hold, { outcome: "refused" });
+        yield* this.#settle(hold, { outcome: "refused", reason: error.code });
         return yield* new BillingError(400, "media_request_refused", sourceText("error.billing.mediaRequestRefused"));
       }
       if (NOT_ACCEPTED_STATUSES.has(error.status)) {
-        yield* this.#settle(hold, { outcome: "refused" });
+        yield* this.#settle(hold, { outcome: "refused", reason: error.code });
         return yield* error.status === 429 ? busy() : unavailable();
       }
       yield* this.#spending.endSubmit(hold.jobId);
@@ -623,15 +642,17 @@ export class CreditMediaService {
     const checked = yield* Effect.result(gateway.status(upstream, hold.providerJobId));
     if (Result.isFailure(checked)) {
       logUpstream("status", checked.failure, trace);
-      if (checked.failure.status === 404) return this.#releasedView(yield* this.#settle(hold, { outcome: "failed" }));
+      if (checked.failure.status === 404)
+        return this.#releasedView(yield* this.#settle(hold, { outcome: "failed", reason: NOT_FOUND_REASON }));
       return yield* busy();
     }
     const state = checked.success;
     if (state.status === "failed" || state.status === "canceled")
-      return this.#releasedView(yield* this.#settle(hold, { outcome: state.status }));
+      return this.#releasedView(yield* this.#settle(hold, releasedResult(state)));
     if (state.status !== "completed") return this.#view(hold, state.status, state.pollAfterSeconds, []);
     const artifacts = yield* this.#artifacts(gateway, upstream, hold.providerJobId, trace);
-    if (artifacts.length === 0) return this.#releasedView(yield* this.#settle(hold, { outcome: "failed" }));
+    if (artifacts.length === 0)
+      return this.#releasedView(yield* this.#settle(hold, { outcome: "failed", reason: NO_OUTPUT_REASON }));
     const charged = yield* this.#settle(hold, { outcome: "completed" });
     return this.#view(charged, "completed", 0, outputsOf(artifacts));
   }).bind(this);
@@ -686,16 +707,18 @@ export class CreditMediaService {
               .pipe(
                 Effect.map(
                   (artifacts): CreditJobCheck =>
-                    artifacts.length > 0 ? { status: "completed" } : { status: "failed" },
+                    artifacts.length > 0 ? { status: "completed" } : { status: "failed", reason: NO_OUTPUT_REASON },
                 ),
               );
-          if (state.status === "failed" || state.status === "canceled")
-            return Effect.succeed<CreditJobCheck>({ status: state.status });
+          if (state.status === "failed" || state.status === "canceled") {
+            const { outcome, ...reason } = releasedResult(state);
+            return Effect.succeed<CreditJobCheck>({ status: outcome, ...reason });
+          }
           return Effect.succeed<CreditJobCheck>({ status: "running" });
         }),
         Effect.catchIf(
           (error) => error.status === 404,
-          () => Effect.succeed<CreditJobCheck>({ status: "failed" }),
+          () => Effect.succeed<CreditJobCheck>({ status: "failed", reason: NOT_FOUND_REASON }),
         ),
         Effect.tapError((error) =>
           Effect.sync(() => logUpstream("check", error, trace)).pipe(

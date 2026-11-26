@@ -17,6 +17,8 @@ export const messages = {
   "error.billing.licensePaymentFailed":
     "추가한 사용자의 결제에 실패했어요. 결제 수단을 업데이트한 후 다시 시도해 주세요.",
   "error.billing.licenseUnavailable": "지금은 라이선스를 사용할 수 없어요.",
+  "error.billing.mediaContentRefused":
+    "모델의 안전 검사에서 프롬프트 또는 이미지를 거부했습니다. 실제 인물, 유명 캐릭터, 브랜드, 폭력, 성인 콘텐츠는 자주 거부됩니다. 내용을 바꾼 뒤 다시 시도하세요. 크레딧은 사용되지 않았습니다.",
   "error.billing.licenseOneUser": "이 라이선스는 사용자 1명용이에요. 사용자를 추가하려면 Team으로 변경해 주세요.",
   "error.billing.licensePlanChange":
     "이 라이선스는 해당 요금제로 변경할 수 없어요. 라이선스를 취소한 후 새 요금제를 구매해 주세요.",

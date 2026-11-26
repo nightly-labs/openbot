@@ -23,6 +23,8 @@ export const CREDIT_MEDIA_JOB_STATUSES = ["queued", "processing", "completed", "
 export type CreditMediaJobStatus = (typeof CREDIT_MEDIA_JOB_STATUSES)[number];
 export const CREDIT_MEDIA_FAILURES = ["refused", "failed", "canceled", "expired"] as const;
 export type CreditMediaFailure = (typeof CREDIT_MEDIA_FAILURES)[number];
+export const CREDIT_MEDIA_FAILURE_REASONS = ["content_policy"] as const;
+export type CreditMediaFailureReason = (typeof CREDIT_MEDIA_FAILURE_REASONS)[number];
 export const CREDIT_MEDIA_INPUT_ROLES = ["first", "last", "reference"] as const;
 export type CreditMediaInputRole = (typeof CREDIT_MEDIA_INPUT_ROLES)[number];
 export const CREDIT_MEDIA_WALLETS = ["personal", "server"] as const;
@@ -119,6 +121,7 @@ export interface CreditMediaJob {
   pollAfterSeconds: number;
   outputs: readonly CreditMediaOutput[];
   failure: CreditMediaFailure | null;
+  reason: CreditMediaFailureReason | null;
 }
 
 export interface CreditMediaBalance {
@@ -386,7 +389,17 @@ export function parseCreditMediaJob(value: unknown): CreditMediaJob | null {
     value.failure === null ? null : isOneOf(CREDIT_MEDIA_FAILURES, value.failure) ? value.failure : undefined;
   if (credits === null || pollAfterSeconds === null || failure === undefined) return null;
   const outputs = value.outputs.map(parseOutput).filter((output): output is CreditMediaOutput => output !== null);
-  return { jobId: value.jobId, model: value.model, status: value.status, credits, pollAfterSeconds, outputs, failure };
+  const reason = isOneOf(CREDIT_MEDIA_FAILURE_REASONS, value.reason) ? value.reason : null;
+  return {
+    jobId: value.jobId,
+    model: value.model,
+    status: value.status,
+    credits,
+    pollAfterSeconds,
+    outputs,
+    failure,
+    reason,
+  };
 }
 
 export function parseCreditMediaBalance(value: unknown): CreditMediaBalance | null {

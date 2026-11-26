@@ -16,6 +16,8 @@ export const messages = {
   "error.billing.licenseUsersInUse": "许可证的用户数不能少于当前正在使用的人数。",
   "error.billing.licensePaymentFailed": "新增用户的付款失败。请更新付款方式后重试。",
   "error.billing.licenseUnavailable": "许可证暂时不可用。",
+  "error.billing.mediaContentRefused":
+    "模型的安全检查拒绝了提示词或图片。它常常拒绝真实人物、知名角色、品牌、暴力和成人内容。请修改后重试。未使用任何积分。",
   "error.billing.licenseOneUser": "该许可证只包含 1 位用户。如需添加用户，请改为团队版。",
   "error.billing.licensePlanChange": "该许可证无法改为该套餐。请取消它，然后购买新套餐。",
   "error.billing.noLicense": "该账号没有许可证。",

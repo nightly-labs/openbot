@@ -18,6 +18,8 @@ export const messages = {
   "error.billing.licensePaymentFailed":
     "Eklenen kullanıcıların ödemesi başarısız oldu. Ödeme yöntemini güncelleyip tekrar deneyin.",
   "error.billing.licenseUnavailable": "Lisanslar şu anda kullanılamıyor.",
+  "error.billing.mediaContentRefused":
+    "Modelin güvenlik denetimi istemi veya görselleri reddetti. Gerçek kişileri, ünlü karakterleri, markaları, şiddeti ve yetişkin içeriğini sık sık reddeder. Bunları değiştirip yeniden deneyin. Hiç kredi kullanılmadı.",
   "error.billing.licenseOneUser": "Bu lisans 1 kullanıcı içindir. Kullanıcı eklemek için Team'e geçin.",
   "error.billing.licensePlanChange": "Bu lisans o plana geçemez. Lisansı iptal edip yeni planı satın alın.",
   "error.billing.noLicense": "Bu hesabın lisansı yok.",

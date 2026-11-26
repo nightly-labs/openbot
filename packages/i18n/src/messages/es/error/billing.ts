@@ -19,6 +19,8 @@ export const messages = {
   "error.billing.licensePaymentFailed":
     "El pago de los usuarios añadidos falló. Actualiza el método de pago e inténtalo de nuevo.",
   "error.billing.licenseUnavailable": "Las licencias no están disponibles ahora.",
+  "error.billing.mediaContentRefused":
+    "El control de seguridad del modelo rechazó el prompt o las imágenes. Suele rechazar personas reales, personajes famosos, marcas, violencia y contenido para adultos. Cámbialos e inténtalo de nuevo. No se usaron créditos.",
   "error.billing.licenseOneUser": "Esta licencia es para 1 usuario. Cámbiala a Team para añadir usuarios.",
   "error.billing.licensePlanChange": "Esta licencia no puede cambiar a ese plan. Cancélala y compra el plan nuevo.",
   "error.billing.noLicense": "Esta cuenta no tiene licencia.",
