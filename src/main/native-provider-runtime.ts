@@ -56,10 +56,11 @@ export function nativeProviderRuntime(
           yield* rejectNonRegularFiles(bin, { links: true });
         }
       } else if (runtime === "devin") {
+        const roots = ["bin", "libexec", "share"];
         if (spec.target === "win32-x64") {
-          yield* extractZipTree(downloadedPath, staging, ["bin", "share"], message);
+          yield* extractZipTree(downloadedPath, staging, roots, message);
         } else {
-          yield* assertSafeArchive(downloadedPath, ["bin", "share"], message);
+          yield* assertSafeArchive(downloadedPath, roots, message);
           yield* extractArchive(downloadedPath, staging);
           yield* rejectNonRegularFiles(staging);
         }
