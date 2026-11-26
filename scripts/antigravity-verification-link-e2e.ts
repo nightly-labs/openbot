@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { AGENT_PROVIDERS, type AgentEvent } from "@openbot/contracts/ipc";
@@ -16,8 +15,6 @@ const install = join(root, "antigravity");
 const fakeAgy = join(install, "1.5.14", "bin", "antigravity");
 const appData = join(home, ".gemini", "antigravity-acp");
 const ACCESS_TOKEN = "fake-verification-access-token";
-const GOOGLE_LINK =
-  "https://accounts.google.com/signin/continue?sarp=1&scc=1&continue=https://developers.google.com/gemini-code-assist/auth/auth_success_gemini&plt=from-google";
 const ANSWER_LINK = "https://accounts.google.com/signin/continue?sarp=1&scc=1&plt=from-answer";
 const LOG_LINK = "https://accounts.google.com/v3/signin/continue?sarp=1&scc=1&plt=from-log";
 const VALIDATION_LOG = `E 403 retrieveUserQuotaSummary ${JSON.stringify(
@@ -105,47 +102,25 @@ setInterval(() => {}, 1000);
 
 interface CaseReport {
   name: string;
-  googleNeedsValidation: boolean;
   status: string;
   error: { message: string; link: string | null } | null;
-  loadCodeAssistCalls: number;
+  googleRequests: number;
   passed: boolean;
 }
 
 const report: { cases: CaseReport[]; passed: boolean; error?: string } = { cases: [], passed: false };
 
-let googleNeedsValidation = true;
-let loadCodeAssistCalls = 0;
-const codeAssist = createServer((request, response) => {
-  if (request.url?.endsWith(":loadCodeAssist") && request.headers.authorization === `Bearer ${ACCESS_TOKEN}`) {
-    loadCodeAssistCalls += 1;
-    response.writeHead(200, { "Content-Type": "application/json" });
-    response.end(
-      JSON.stringify(
-        googleNeedsValidation
-          ? {
-              ineligibleTiers: [
-                { reasonCode: "INELIGIBLE_ACCOUNT", validationUrl: "https://example.com/not-google" },
-                {
-                  reasonCode: "VALIDATION_REQUIRED",
-                  reasonMessage: "Verify your account to continue.",
-                  validationUrl: GOOGLE_LINK,
-                  validationUrlLinkText: "Verify your account",
-                },
-              ],
-            }
-          : { currentTier: { id: "free-tier" } },
-      ),
-    );
-    return;
-  }
-  response.writeHead(404);
-  response.end();
-});
-await new Promise<void>((done) => codeAssist.listen(0, "127.0.0.1", done));
-const address = codeAssist.address();
-assert.ok(address && typeof address === "object");
-process.env.OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL = `http://127.0.0.1:${address.port}/v1internal`;
+const googleRequests: string[] = [];
+const sendRequest = globalThis.fetch;
+globalThis.fetch = Object.assign(
+  (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    if (!url.hostname.endsWith("googleapis.com")) return sendRequest(input, init);
+    googleRequests.push(url.origin + url.pathname);
+    return Promise.reject(new Error("This check sends nothing to Google."));
+  },
+  { preconnect: sendRequest.preconnect },
+);
 
 const { AgentService } = await import("../src/backend/agent-service");
 const { AgentStore } = await import("../src/backend/agent-store");
@@ -216,13 +191,7 @@ const idle = (agentId: string) =>
     .listQueue(agentId)
     .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
 
-async function runCase(
-  name: string,
-  text: string,
-  needsValidation: boolean,
-  expectedMessage = VERIFY_MESSAGE,
-): Promise<CaseReport> {
-  googleNeedsValidation = needsValidation;
+async function runCase(name: string, text: string, expectedMessage = VERIFY_MESSAGE): Promise<CaseReport> {
   const agent = await runCauseEffect(
     agents.createAgent({
       name,
@@ -236,7 +205,7 @@ async function runCase(
   );
   await waitFor(`${name}: the first turn`, () => idle(agent.id));
   const since = events.length;
-  const callsBefore = loadCodeAssistCalls;
+  const requestsBefore = googleRequests.length;
   const receipt = await runCauseEffect(agents.sendMessage({ agentId: agent.id, text }));
   const deliveryId = receipt.deliveries[0]?.id;
   assert.ok(deliveryId, `${name}: the message has a delivery`);
@@ -249,20 +218,19 @@ async function runCase(
   );
   const result: CaseReport = {
     name,
-    googleNeedsValidation: needsValidation,
     status,
     error: error.type === "error" ? { message: error.message, link: error.link ?? null } : null,
-    loadCodeAssistCalls: loadCodeAssistCalls - callsBefore,
+    googleRequests: googleRequests.length - requestsBefore,
     passed: false,
   };
   report.cases.push(result);
   assert.equal(status, "failed", `${name}: the message fails`);
   assert.ok(result.error?.message.includes(expectedMessage), `${name}: the error says "${expectedMessage}"`);
+  assert.equal(result.googleRequests, 0, `${name}: OpenBot sends nothing to Google`);
   return result;
 }
 
 async function runNormalAnswer(name: string): Promise<CaseReport> {
-  googleNeedsValidation = true;
   const agent = await runCauseEffect(
     agents.createAgent({
       name,
@@ -286,10 +254,9 @@ async function runNormalAnswer(name: string): Promise<CaseReport> {
   const error = events.slice(since).find((event) => event.type === "error" && event.agentId === agent.id);
   const result: CaseReport = {
     name,
-    googleNeedsValidation: true,
     status,
     error: error?.type === "error" ? { message: error.message, link: error.link ?? null } : null,
-    loadCodeAssistCalls: 0,
+    googleRequests: 0,
     passed: false,
   };
   report.cases.push(result);
@@ -301,39 +268,25 @@ async function runNormalAnswer(name: string): Promise<CaseReport> {
 try {
   await runCauseEffect(agents.initialize());
 
-  const warning = await runCase("warning answer", "WARN-VERIFY", true);
-  assert.equal(warning.error?.link, GOOGLE_LINK, "The Verify account button opens Google's verification page.");
+  const warning = await runCase("warning answer", "WARN-VERIFY");
+  assert.equal(warning.error?.link, null, "With no link in the answer or the log, the error has no link.");
   warning.passed = true;
 
-  const plain = await runCase("plain answer with a link", "PLAIN-VERIFY", false);
-  assert.equal(plain.error?.link, ANSWER_LINK, "Without a Google link, the button opens the link of the answer.");
+  const plain = await runCase("plain answer with a link", "PLAIN-VERIFY");
+  assert.equal(plain.error?.link, ANSWER_LINK, "The button opens the link of the answer.");
   plain.passed = true;
 
-  const preferred = await runCase("plain answer, Google link first", "PLAIN-VERIFY", true);
-  assert.equal(preferred.error?.link, GOOGLE_LINK, "The current link from Google comes before the link of the answer.");
-  preferred.passed = true;
-
-  const rpc = await runCase("JSON-RPC error", "RPC-VERIFY", true);
-  assert.equal(rpc.error?.link, GOOGLE_LINK, "A refused prompt also gets the Verify account button.");
+  const rpc = await runCase("JSON-RPC error", "RPC-VERIFY");
+  assert.equal(rpc.error?.link, null, "A refused prompt with no link has no link.");
   rpc.passed = true;
 
-  const stopped = await runCase("stopped turn, Google needs verification", "STOPPED-TURN", true);
-  assert.equal(stopped.error?.link, GOOGLE_LINK, "A turn that stops with no cause asks Google, then shows the link.");
-  assert.equal(stopped.loadCodeAssistCalls, 1, "A stopped turn asks Google one time.");
+  const stopped = await runCase("stopped turn", "STOPPED-TURN", STOPPED_MESSAGE);
+  assert.equal(stopped.error?.link, null, "A turn that stops with no cause keeps its message.");
   stopped.passed = true;
-
-  const denied = await runCase("refused prompt with no cause, Google needs verification", "RPC-DENIED", true);
-  assert.equal(denied.error?.link, GOOGLE_LINK, "A prompt refused with no cause also gets the Verify account button.");
-  denied.passed = true;
-
-  const verified = await runCase("stopped turn, account verified", "STOPPED-TURN", false, STOPPED_MESSAGE);
-  assert.equal(verified.error?.link, null, "When Google needs no verification, the stopped turn keeps its message.");
-  assert.equal(verified.loadCodeAssistCalls, 1, "A stopped turn with a verified account asks Google one time.");
-  verified.passed = true;
 
   await mkdir(join(appData, "log"), { recursive: true });
   await writeFile(join(appData, "log", "antigravity.log"), VALIDATION_LOG);
-  const logged = await runCase("link in the Antigravity log", "WARN-VERIFY", false);
+  const logged = await runCase("link in the Antigravity log", "WARN-VERIFY");
   assert.equal(logged.error?.link, LOG_LINK, "A /v3/signin link from the Antigravity log opens the verification page.");
   logged.passed = true;
 
@@ -347,7 +300,6 @@ try {
 } finally {
   await runCauseEffect(agents.stop()).catch(() => {});
   database.close();
-  codeAssist.close();
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   await rm(root, { recursive: true, force: true });

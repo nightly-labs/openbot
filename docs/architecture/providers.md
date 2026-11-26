@@ -1101,43 +1101,22 @@ account, and a second account with the same email is refused as already added. A
 client's browser with `provider-account-relay-v2`. A host with only `provider-account-relay-v1`, which
 names Codex and Claude only, signs the account in through the live view.
 
-Antigravity 1.5 has no `/usage` command. The driver's `readRateLimits`
-(`src/backend/antigravity-usage.ts`) reads the access token from the account's token file and calls
-Google's Code Assist service as the CLI does: `loadCodeAssist` gives the account's project, and
-`retrieveUserQuotaSummary` gives each quota group with its buckets. Google refuses these calls (403)
-unless the User-Agent names Antigravity, and it sends the "Gemini Models" group only to the desktop app's
-version, not to the CLI's, so the User-Agent names the desktop version (#7215). It is the desktop app's own
-form, `antigravity/hub/<version> (aidev_client; os_type=<os>; arch=<arch>; cl=<build>)`: with
-`antigravity/<version> <os>/<arch>`, Pro plans got no "Gemini 4 Argon" group (#10934). 
-`loadCodeAssist` goes to `cloudcode-pa`. The summary comes only from `daily-cloudcode-pa`, the host
-that meters a Google account sign-in: the other host's room for the account can be wrong, and a wrong
-"spent" reading would hold Gemini turns. OpenBot does not refresh the token: it
-does not keep the CLI's client secret. An expired token, an API key sign-in, or a failed call gives no
-reading. Only a new CLI session refreshes the token, so an idle sign-in loses it after an hour. The
-driver sets `usageLeavesSession`: an account after the first and the own sign-in keep their last
-reading when a read gives none, so the account stays in the usage popover. A sign-out, a sign-in or a
-key change clears it (`#forgetUsage`). `OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL` points the read at a loopback test server
-(`scripts/antigravity-usage-e2e.ts`); any other URL is ignored, because the token goes to it.
-Google can give a model a group of its own, such as Gemini 4
-Argon, so a read for a model takes the group whose "Models within this group" list names it (#3055),
-and a model that no group names has no reading. Google lists no models for the Argon group (its
-description is a plan note), so a group with no list takes its own name as its model while other groups
-list theirs (#9864). Google's JSON leaves a zero `remainingFraction` out: a bucket with a reset time and
-no fraction, no `remainingAmount` and no `disabled` is spent. The dock's read, with no model, takes the "Gemini
-Models" group. Each reading also carries every group by name and models (`AccountUsageLimit.groups`),
-so the usage popover shows one line per group and the composer notice uses the group of the agent's
-model (`usageGroupForModel`). The ring stays on the reading's own group. The Team API codecs do not
-send `groups`, so a remote client shows the one reading. The Claude and GPT models that Antigravity
-also runs share another limit, so `accountUsageCoversModel` keeps them out of the plan-limit hold.
+Antigravity 1.5 has no `/usage` command, and its ACP server reports no plan usage. The descriptor
+sets `reportsUsage: false`, and the driver has no `readRateLimits`, so Gemini shows no plan usage.
+OpenBot does not call Google's internal Code Assist API (`cloudcode-pa`, `daily-cloudcode-pa`,
+`v1internal`) for the quota or for an account verification link: Antigravity supports only ACP for
+other clients, and Google can flag an account that calls its internal API. The verification link comes
+only from the answer text or the CLI's own log (`antigravityAccountLink`). The token file is read only
+for the account's email (`readAntigravityEmail`). Add plan usage again only when Antigravity reports it
+over ACP.
 A saved Gemini API key comes before the Google sign-in, so the provider
 status sets `apiKeyInUse`, and the API key section of the Gemini provider page says that the key,
-not the plan, serves the turns. The dock shows no Gemini row then, because it has no reading.
+not the plan, serves the turns.
 A rate limit or quota refusal on the saved key says that the key reached it and that removing the
 key gives back the plan (`savedKeyLimitMessage`, `geminiSavedKeyLimitFailure`). A quota of 0 for the
 model, such as a free-tier key on Gemini 4 Argon (`limit: 0`), does not say to wait (#9517).
 
-A limit failure stays a turn error even though the descriptor sets `reportsUsage: true`, because
-many Gemini setups have no reading to explain it. `GEMINI_REQUEST_FAILURES` in
+A limit failure stays a turn error, because Gemini has no usage reading to explain it. `GEMINI_REQUEST_FAILURES` in
 `src/backend/acp-flavor-antigravity.ts` names a rate limit or quota, an unavailable model, and a
 service failure from Google's status text. Antigravity does not document these texts.
 

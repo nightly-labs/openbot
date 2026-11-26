@@ -42,8 +42,7 @@ import { readMuseAccount } from "./agent/muse-login";
 import { claudeModelName, modelsAfterOpenCodeDiscoveryFailure, serviceTierFields } from "./agent/provider-models";
 import type { TurnContext } from "./agent/turn-context";
 import type { AgentClient } from "./agent-client";
-import { ANTIGRAVITY_TOKEN_FILE, importAntigravityToken } from "./antigravity-token-import";
-import { readAntigravityEmail, readAntigravityQuota, readAntigravityValidationLink } from "./antigravity-usage";
+import { ANTIGRAVITY_TOKEN_FILE, importAntigravityToken, readAntigravityEmail } from "./antigravity-token-import";
 import { CodexAppServerClient } from "./app-server-client";
 import { ClaudeAgentClient } from "./claude-client";
 import {
@@ -176,7 +175,6 @@ export interface ProviderHomeAccountSupport {
   readonly codeSignIn?: { readonly flow: "device" | "paste" | "link"; readonly command: ProviderAccountCodeCommand };
   readonly signOut?: ProviderCliCommand;
   supports?(cli: AgentCliInfo): boolean;
-  readonly usageLeavesSession?: boolean;
   readonly readOwnEmail?: () => Effect.Effect<string | null>;
 }
 
@@ -471,7 +469,6 @@ export interface ProviderClientContext {
   readonly claudeCompactWindow?: () => number | null;
   readonly codexTurnContext?: TurnContext;
   readonly providerEnvironment?: (provider: ProviderEnvironmentProvider) => Readonly<Record<string, string>>;
-  readonly systemProxyFetch?: (url: string, init: RequestInit) => Promise<Response>;
   readonly fitImage?: ImageFitter | null;
 }
 
@@ -980,7 +977,6 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       signIn: ANTIGRAVITY_SIGN_IN,
       codeSignIn: { flow: "paste", command: ANTIGRAVITY_ACCOUNT_CODE_SIGN_IN },
       supports: (cli) => antigravityTakesStateFolders(cli.version),
-      usageLeavesSession: true,
       readOwnEmail: () => readAntigravityEmail(join(antigravityAppDataDir(process.env), ANTIGRAVITY_TOKEN_FILE)),
     },
     signOut: {
@@ -1015,21 +1011,6 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           antigravityUsesSavedKey(context)
             ? Effect.succeed({ email: null })
             : readAntigravityEmail(antigravityTokenFile(context)).pipe(Effect.map((email) => ({ email }))),
-        readRateLimits: (_connection, model) =>
-          antigravityUsesSavedKey(context)
-            ? Effect.succeed({ rateLimits: null, rateLimitsByLimitId: null })
-            : readAntigravityQuota({
-                tokenFile: antigravityTokenFile(context),
-                model,
-                ...(context.systemProxyFetch ? { fetch: context.systemProxyFetch } : {}),
-              }),
-        readVerificationLink: () =>
-          antigravityUsesSavedKey(context)
-            ? Effect.succeed(null)
-            : readAntigravityValidationLink({
-                tokenFile: antigravityTokenFile(context),
-                fetch: context.systemProxyFetch,
-              }),
       }),
     createProfileClient: (cli, timeout, context) =>
       new AcpAgentClient(cli, timeout, {
