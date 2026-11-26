@@ -165,7 +165,7 @@ function isUnreadableAntigravityHistory(provider: AgentProvider, message: string
 function isUnsignedAntigravityThinking(provider: AgentProvider, message: string): boolean {
   return (
     provider === "antigravity" &&
-    /\bmessages\.\d+\.content\.\d+(?:\.thinking\.signature: Field required|: Invalid `signature` in `thinking` block)/u.test(
+    /\bmessages\.\d+\.content\.\d+(?:\.thinking\.signature: Field required|: Invalid `signature` in `thinking` block|: [^\n]*\bthinking\b[^\n]*\bcannot be modified\b)/u.test(
       message,
     )
   );
