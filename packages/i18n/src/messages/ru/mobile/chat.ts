@@ -187,6 +187,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "Удерживайте кнопку, чтобы подтвердить.",
   "mobile.chat.question.preview": "Предпросмотр",
   "mobile.chat.question.showAllPreview": "Показать всё",
+  "mobile.chat.question.copyPreviewFailed": "Не удалось скопировать черновик",
   "mobile.chat.question.sendChoice": "Отправить",
   "mobile.chat.question.selectedCount": {
     one: "Выбран {count}",

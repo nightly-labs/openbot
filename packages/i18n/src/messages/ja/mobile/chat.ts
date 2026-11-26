@@ -133,6 +133,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "ボタンを長押しして確認します。",
   "mobile.chat.question.preview": "プレビュー",
   "mobile.chat.question.showAllPreview": "すべて表示",
+  "mobile.chat.question.copyPreviewFailed": "下書きをコピーできませんでした",
   "mobile.chat.question.sendChoice": "送信",
   "mobile.chat.question.selectedCount": { other: "{count} 件を選択" },
   "mobile.chat.question.noneSelected": "未選択",

@@ -133,6 +133,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "Toque e segure o botão para confirmar.",
   "mobile.chat.question.preview": "Prévia",
   "mobile.chat.question.showAllPreview": "Mostrar tudo",
+  "mobile.chat.question.copyPreviewFailed": "Não foi possível copiar o rascunho",
   "mobile.chat.question.sendChoice": "Enviar",
   "mobile.chat.question.selectedCount": { one: "{count} selecionado", other: "{count} selecionados" },
   "mobile.chat.question.noneSelected": "Nada selecionado",

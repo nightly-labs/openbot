@@ -138,6 +138,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "יש ללחוץ לחיצה ארוכה על הלחצן כדי לאשר.",
   "mobile.chat.question.preview": "תצוגה מקדימה",
   "mobile.chat.question.showAllPreview": "הצגת הכול",
+  "mobile.chat.question.copyPreviewFailed": "לא ניתן להעתיק את הטיוטה",
   "mobile.chat.question.sendChoice": "שליחה",
   "mobile.chat.question.selectedCount": { one: "נבחר אחד", two: "נבחרו שניים", other: "נבחרו {count}" },
   "mobile.chat.question.noneSelected": "לא נבחר דבר",

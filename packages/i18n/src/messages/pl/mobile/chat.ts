@@ -189,6 +189,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "Przytrzymaj przycisk, aby potwierdzić.",
   "mobile.chat.question.preview": "Podgląd",
   "mobile.chat.question.showAllPreview": "Pokaż całość",
+  "mobile.chat.question.copyPreviewFailed": "Nie można skopiować wersji roboczej",
   "mobile.chat.question.sendChoice": "Wyślij",
   "mobile.chat.question.selectedCount": {
     one: "Wybrano: {count}",
