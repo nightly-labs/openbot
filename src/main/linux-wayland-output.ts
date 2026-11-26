@@ -150,15 +150,21 @@ export function usesX11Windows(): boolean {
   return process.platform === "linux" && app.commandLine.getSwitchValue("ozone-platform") !== "wayland";
 }
 
+function onNiri(environment: NodeJS.ProcessEnv): boolean {
+  if (environment.NIRI_SOCKET?.trim()) return true;
+  return (environment.XDG_CURRENT_DESKTOP ?? "").split(":").some((desktop) => desktop.trim().toLowerCase() === "niri");
+}
+
 export function aboveAppsWindowKind(server: boolean): "panel" | "tool" | "x11" | null {
   if (server) return null;
   if (process.platform === "darwin") return "panel";
   if (process.platform === "win32") return "tool";
-  return usesX11Windows() ? "x11" : null;
+  return usesX11Windows() && !onNiri(process.env) ? "x11" : null;
 }
 
 export function aboveAppsScreenSupport(): AboveAppsSupport | undefined {
   if (process.platform !== "linux") return undefined;
+  if (onNiri(process.env)) return "unsupported";
   if (usesX11Windows()) return onXWayland() || x11CompositorRunning() ? undefined : "no-compositor";
   return app.isPackaged && process.env.DISPLAY && chromiumChoosesWayland() ? "restart" : "unsupported";
 }
@@ -206,7 +212,8 @@ export const restartOnXWaylandForAboveApps = Effect.fn("restartOnXWaylandForAbov
   environment: NodeJS.ProcessEnv,
   userDataPath: string,
 ) {
-  if (process.platform !== "linux" || !chromiumChoosesWayland() || !environment.DISPLAY) return false;
+  if (process.platform !== "linux" || !chromiumChoosesWayland() || !environment.DISPLAY || onNiri(environment))
+    return false;
   if (!Object.values(ABOVE_APPS_XWAYLAND_FILES).some((file) => existsSync(join(userDataPath, file)))) return false;
   return yield* startOnX11(environment, "above-apps").pipe(
     Effect.as(true),
