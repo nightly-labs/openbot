@@ -251,7 +251,7 @@ export const messages = {
   "settings.notch.xwayland.title": "Wymagane ponowne uruchomienie",
   "settings.notch.xwayland.description":
     "W Wayland OpenBot musi używać XWayland, aby pokazać Dynamic Island nad innymi aplikacjami. Do tego czasu wyspa się nie pokazuje.",
-  "settings.notch.xwayland.unsupported": "W Wayland bez XWayland Dynamic Island nie może być nad innymi aplikacjami.",
+  "settings.notch.xwayland.unsupported": "Na tym pulpicie Wayland Dynamic Island nie może być nad innymi aplikacjami.",
   "settings.notch.xwayland.restart": "Uruchom ponownie",
   "settings.notch.idle.title": "Pokazuj bezczynną wyspę",
   "settings.notch.idle.description": "Pokazuj logo OpenBot i powitanie, gdy żaden status nie jest aktywny.",
@@ -281,7 +281,7 @@ export const messages = {
   "settings.agentDock.xwayland.description":
     "W Wayland OpenBot musi używać XWayland, aby pokazać dok nad innymi aplikacjami. Do tego czasu dok jest w oknie OpenBot.",
   "settings.agentDock.xwayland.unsupported":
-    "W Wayland bez XWayland dok nie może być nad innymi aplikacjami. Jest w oknie OpenBot.",
+    "Na tym pulpicie Wayland dok nie może być nad innymi aplikacjami. Jest w oknie OpenBot.",
   "settings.agentDock.xwayland.restart": "Uruchom ponownie",
   "settings.agentDock.noCompositor.title": "W oknie OpenBot",
   "settings.agentDock.noCompositor.description":

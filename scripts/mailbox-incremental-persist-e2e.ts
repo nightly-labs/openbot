@@ -16,6 +16,7 @@ const OTHER_AGENT = "agent-b";
 const CHANNEL = "channel-1";
 const SEEDED_MESSAGES = 2_000;
 const TIMED_UPDATES = 50;
+const KEYED_TEXT = "x".repeat(60);
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
   "base64",
@@ -39,11 +40,18 @@ interface Report {
   steps: StepResult[];
   incrementalWrites: number;
   fullWrites: number;
+  idempotencyWritesSkipped: number;
   timing?: { seededMessages: number; updates: number; totalMs: number; perUpdateMs: number };
   passed: boolean;
 }
 
-const report: Report = { steps: [], incrementalWrites: 0, fullWrites: 0, passed: false };
+const report: Report = {
+  steps: [],
+  incrementalWrites: 0,
+  fullWrites: 0,
+  idempotencyWritesSkipped: 0,
+  passed: false,
+};
 
 class MirroredDatabase extends OpenBotDatabase {
   readonly #reference: OpenBotDatabase;
@@ -59,9 +67,11 @@ class MirroredDatabase extends OpenBotDatabase {
     changes: MailboxProjectionChanges,
     eventType: string,
     fileDeletions: string[] = [],
+    writeIdempotency = true,
   ): boolean {
-    const wrote = super.applyMailboxChanges(commandId, state, changes, eventType, fileDeletions);
+    const wrote = super.applyMailboxChanges(commandId, state, changes, eventType, fileDeletions, writeIdempotency);
     report.incrementalWrites += 1;
+    if (!writeIdempotency) report.idempotencyWritesSkipped += 1;
     this.#reference.replaceMailboxState(commandId, structuredClone(state), eventType);
     return wrote;
   }
@@ -110,7 +120,11 @@ async function openProfile(root: string, name: string, reference?: OpenBotDataba
   return { database, mailbox };
 }
 
-async function enqueue(mailbox: MailboxStore, text: string, options: { draftIds?: string[]; channelId?: string } = {}) {
+async function enqueue(
+  mailbox: MailboxStore,
+  text: string,
+  options: { draftIds?: string[]; channelId?: string; idempotencyKey?: string } = {},
+) {
   return runCauseEffect(
     mailbox.enqueue({
       sender: { kind: "user" },
@@ -118,6 +132,7 @@ async function enqueue(mailbox: MailboxStore, text: string, options: { draftIds?
       text,
       ...(options.draftIds ? { draftIds: options.draftIds } : {}),
       ...(options.channelId ? { channelId: options.channelId } : {}),
+      ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
     }),
   );
 }
@@ -273,6 +288,23 @@ async function parity(root: string): Promise<void> {
   await enqueue(mailbox, "after the nested rollback");
   check("own write after a nested rollback with a restore", database, reference);
 
+  const keyed = deliveryOf(await enqueue(mailbox, "keyed", { idempotencyKey: "routine:keyed:turn-k:1" }));
+  check("message with an idempotency key sent", database, reference);
+  await runCauseEffect(mailbox.markStarting(keyed));
+  check("keyed delivery started without a key change", database, reference);
+  assert.throws(() =>
+    withDatabaseTransaction(database, () => {
+      mailbox.forgetIdempotencyKey("routine:keyed:turn-k:1");
+      mailbox.cancelNow(AGENT, nested);
+      throw new Error("The caller's work failed after a key was forgotten.");
+    }),
+  );
+  await runCauseEffect(mailbox.markTerminal(keyed, "completed"));
+  check("own write after a rolled-back key change", database, reference);
+  mailbox.forgetIdempotencyKeys("routine:", new Date(Date.now() + 60_000));
+  await runCauseEffect(mailbox.setReaction(AGENT, first.messageId, { kind: "user" }, "👍"));
+  check("expired keys forgotten before an unrelated write", database, reference);
+
   await runCauseEffect(mailbox.deleteChannelData(CHANNEL));
   check("channel data deleted", database, reference);
   await draft(mailbox, "left on restart.txt");
@@ -298,7 +330,9 @@ async function parity(root: string): Promise<void> {
 async function timing(root: string): Promise<NonNullable<Report["timing"]>> {
   const { database, mailbox } = await openProfile(root, "timing");
   for (let index = 0; index < SEEDED_MESSAGES; index += 1) {
-    const deliveryId = deliveryOf(await enqueue(mailbox, `message ${index}`));
+    const deliveryId = deliveryOf(
+      await enqueue(mailbox, `message ${index}`, { idempotencyKey: `routine:${index}:turn-${index}:${KEYED_TEXT}` }),
+    );
     await runCauseEffect(mailbox.markStarting(deliveryId));
     await runCauseEffect(mailbox.markTerminal(deliveryId, "completed"));
   }
@@ -321,7 +355,7 @@ const root = await mkdtemp(join(tmpdir(), "openbot-mailbox-persist-"));
 try {
   await parity(root);
   report.timing = await timing(root);
-  report.passed = report.steps.every((step) => step.matched);
+  report.passed = report.steps.every((step) => step.matched) && report.idempotencyWritesSkipped > 0;
 } finally {
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);

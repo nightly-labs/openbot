@@ -44,8 +44,6 @@ export const messages = {
     "A renovação automática será retomada para este servidor. Seus agentes, conversas e arquivos são mantidos.",
   "billing.lifecycle.dataStays": "A renovação está desligada. Seus dados são mantidos quando o plano termina.",
   "billing.lifecycle.deleteServer": "Excluir servidor…",
-  "billing.lifecycle.whenDelete": "Quando este servidor deve ser excluído?",
-  "billing.lifecycle.atPeriodEnd": "No fim do período · {date}",
   "billing.lifecycle.planEndsLabel": "O plano termina",
   "billing.lifecycle.plansDescription":
     "Gerencie cada servidor separadamente. Cancelar a renovação mantém os dados dele.",
@@ -54,15 +52,12 @@ export const messages = {
   "billing.lifecycle.renewalLabel": "Próxima renovação",
   "billing.lifecycle.deletionLabel": "Data de exclusão",
   "billing.lifecycle.billingLabel": "Cobrança",
-  "billing.lifecycle.immediately": "Imediatamente",
   "billing.lifecycle.automatic": "A renovação automática é retomada",
-  "billing.lifecycle.noRefund": "Sem reembolso por tempo não usado",
   "billing.lifecycle.noRenewal": "Sem novas renovações",
   "billing.lifecycle.dateUtc": "{date} UTC",
   "billing.lifecycle.renews": "A renovação automática está ligada.",
   "billing.lifecycle.schedule": "Excluir no fim do período",
   "billing.lifecycle.keep": "Manter servidor",
-  "billing.lifecycle.deleteNow": "Excluir agora",
   "billing.lifecycle.deletesOn": "Exclusão em {date}",
   "billing.lifecycle.scheduledDescription": "A renovação está desligada. Seu servidor e seus dados serão excluídos.",
   "billing.lifecycle.scheduleDescription":
@@ -71,11 +66,8 @@ export const messages = {
   "billing.lifecycle.keepDescription":
     "Seu servidor e seus dados são mantidos. A exclusão agendada será interrompida e a renovação automática será retomada.",
   "billing.lifecycle.deleteTitle": "Excluir {name}?",
-  "billing.lifecycle.deleteDescription":
-    "Excluir permanentemente este servidor, seus agentes, conversas e arquivos. Sua assinatura termina agora. Você não pode desfazer isto.",
   "billing.lifecycle.saving": "Salvando…",
   "billing.lifecycle.failed": "A mudança não pôde ser confirmada. Atualize a Cobrança e tente de novo.",
-  "billing.lifecycle.deleted": "{name} foi excluído. Sua assinatura terminou.",
   "billing.lifecycle.label": "Prévia do design · Apenas ações simuladas",
   "billing.lifecycle.reset": "Restaurar prévia",
   "billing.license.title": "Licença",

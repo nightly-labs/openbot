@@ -335,6 +335,12 @@ export function InstallOpenBotVPS() {
         another service user, back up that user's actual home instead.
       </p>
 
+      <p>
+        OpenBot also keeps a root-only copy of the keyring at <code>/srv/openbot-keyring</code>, and restores it if
+        something on the server damages the keyring. Your backup does not need it. Before you restore a backup from
+        another server onto this VPS, delete <code>/srv/openbot-keyring</code>.
+      </p>
+
       <p>Stop OpenBot before making a consistent copy, then start it again when the copy is complete:</p>
 
       <pre>

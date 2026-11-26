@@ -345,6 +345,8 @@ export const messages = defineMessages("error.provider", {
     "Gemini could not read the saved history of this chat. OpenBot started a new Gemini session with the chat history. Send your message again.",
   "error.provider.acpTurnStuck":
     "{provider} did not end its earlier turn, so it did not accept this message. OpenBot started a new {provider} session with the chat history. Send your message again.",
+  "error.provider.antigravityLicenseRefused":
+    "Google says that your account does not have a license to use this model. Choose another model, then send your message again.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google does not let Gemini work from the network location of the computer that runs this agent. Use Gemini on another computer, or choose another provider for this agent.\n{detail}",
   "error.provider.antigravityTurnStopped":
@@ -449,6 +451,8 @@ export const messages = defineMessages("error.provider", {
     "Muse could not start an MCP server and blocked MCP in this session. OpenBot started a new Muse session with the chat history. Try again. If the error continues, turn off Computer Use or the failed MCP server for this agent.",
   "error.provider.claudeSessionMissing":
     "Claude Code could not find the saved session of this chat. OpenBot started a new Claude Code session with the chat history. Try again.",
+  "error.provider.opencodeSessionMissing":
+    "OpenCode could not find the saved session of this chat. OpenBot started a new OpenCode session with the chat history. Try again.",
   "error.provider.grokSignIn": "Run `grok login` or set XAI_API_KEY to use Grok.",
   "error.provider.acpSignInNoStart":
     "The provider did not start, so the sign-in could not begin. Try again, or restart OpenBot.",

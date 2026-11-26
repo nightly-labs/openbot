@@ -359,6 +359,7 @@ import type { BundledProviderExecutables } from "./cli";
 import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { CrmHandle } from "./crm/crm";
 import type { ProviderSession } from "./database/provider-sessions";
+import { readUsageReportInWorker } from "./database/usage-report-reader";
 import { reportOriginalFailure } from "./effect-boundary";
 import type { HostMemory } from "./host-memory";
 import type { SignInRegion } from "./kimi-region";
@@ -468,6 +469,7 @@ export interface AgentServiceOptions {
   avatarDecoder?: AvatarImageDecoder | null;
   prepareMcpTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>;
   mcpAgentAccess?: (mcpServerId: string, agentId: string | null) => boolean;
+  usageReportWorkerPath?: string | null;
   hiddenModels?: (provider: AgentProvider) => ReadonlySet<string> | undefined;
   marketplaceAppServer?: (appId: string) => MarketplaceAppServer | null;
   passwordManagerConnected?: (manager: PasswordManagerId) => boolean;
@@ -603,6 +605,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #mediaCatalog: WorkflowMediaCatalogCache;
   readonly #creditMedia: CreditMediaWorkflows | null;
   readonly #mcpAgentAccess: AgentServiceOptions["mcpAgentAccess"];
+  readonly #usageReportWorkerPath: string | null;
   readonly #hiddenModels: AgentServiceOptions["hiddenModels"];
   readonly #clearPictureBackground: AgentServiceOptions["clearPictureBackground"];
   readonly #providers: ProviderRuntime;
@@ -658,6 +661,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   constructor(options: AgentServiceOptions) {
     super();
     this.#mcpAgentAccess = options.mcpAgentAccess;
+    this.#usageReportWorkerPath = options.usageReportWorkerPath ?? null;
     this.#hiddenModels = options.hiddenModels;
     this.#clearPictureBackground = options.clearPictureBackground;
     const {
@@ -1871,8 +1875,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         mayFailOver: (agentId) => this.#mayFailOver(agentId),
         turnEnded: (turnId) => this.#turn.hasEnded(turnId),
-        staleTurnSettlement: (agentId, threadId, turnId) =>
-          this.#turnRunsNowhere(agentId, turnId) ? this.#settleStaleOwnTurn(agentId, threadId, turnId) : null,
+        staleTurnSettlement: (agentId, threadId, turnId, channelLaneId) =>
+          this.#turnRunsNowhere(agentId, turnId, channelLaneId)
+            ? this.#settleStaleTurn(agentId, threadId, turnId, channelLaneId)
+            : null,
         orphanedDeliveryRecovery: (agentId) =>
           this.#mayRecoverOrphanedDeliveries(agentId) ? this.#recoverOrphanedDeliveries(agentId) : null,
         turnRestarting: (turnId) => this.#turn.forgetEnded(turnId),
@@ -2308,15 +2314,25 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#store.database.usage.read(input);
   }
 
-  getHostAnalytics(input: HostAnalyticsInput) {
-    if (
-      input.agentId &&
-      input.agentId !== WORKFLOWS_USAGE_ID &&
-      !this.listAgents().some((agent) => agent.id === input.agentId)
-    )
-      throw new Error(sourceText("error.team.agentNotFound"));
-    return this.#store.database.usage.readHost(input);
-  }
+  readonly getHostAnalytics = Effect.fn("AgentService.getHostAnalytics")(function* (
+    this: AgentService,
+    input: HostAnalyticsInput,
+  ) {
+    yield* lifecycleStep("find usage report agent", () => {
+      if (
+        input.agentId &&
+        input.agentId !== WORKFLOWS_USAGE_ID &&
+        !this.listAgents().some((agent) => agent.id === input.agentId)
+      )
+        throw new Error(sourceText("error.team.agentNotFound"));
+    });
+    const readOnMain = lifecycleStep("read usage report", () => this.#store.database.usage.readHost(input));
+    const workerPath = this.#usageReportWorkerPath;
+    if (!workerPath) return yield* readOnMain;
+    return yield* readUsageReportInWorker({ databasePath: this.#store.database.path, workerPath }, input).pipe(
+      Effect.catch(() => readOnMain),
+    );
+  }).bind(this);
 
   getTurnUsage(agentId: string, turnId: string, since: string) {
     return this.#store.database.usage.readTurn(agentId, turnId, since);
@@ -3978,14 +3994,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
-  #turnRunsNowhere(agentId: string, turnId: string): boolean {
+  #turnRunsNowhere(agentId: string, turnId: string, channelLaneId?: string): boolean {
     return (
       !this.#stopping &&
       this.#turn.hasEnded(turnId) &&
       this.#turn.turnStartedAt(turnId) === null &&
       !this.#turn.isCompleting(turnId) &&
       this.#mailbox.findDeliveriesByTurn(agentId, turnId).length === 0 &&
-      this.#mailbox.startingDeliveriesForAgent(agentId).length === 0 &&
+      this.#mailbox.startingDeliveriesForAgent(agentId, channelLaneId).length === 0 &&
       this.#turn.workingCodexChildren(agentId, turnId).length === 0
     );
   }
@@ -4012,15 +4028,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (!this.#boot.hasOrphanedOwnChatDelivery(agentId)) this.#drain.scheduleDrain(agentId);
   });
 
-  readonly #settleStaleOwnTurn = Effect.fn("AgentService.settleStaleOwnTurn")(function* (
+  readonly #settleStaleTurn = Effect.fn("AgentService.settleStaleTurn")(function* (
     this: AgentService,
     agentId: string,
     threadId: string,
     turnId: string,
+    channelLaneId: string | undefined,
   ) {
-    if (!this.#turnRunsNowhere(agentId, turnId)) return;
+    if (!this.#turnRunsNowhere(agentId, turnId, channelLaneId)) return;
     logger.warn("A chat turn that no provider runs held the agent's queue. It ends as interrupted.", {
       agentId,
+      threadId,
       turnId,
     });
     yield* this.#turn.settleOrphanedTurn(agentId, threadId, turnId, "interrupted");
@@ -6300,13 +6318,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this: AgentService,
     agent: AgentSummary,
   ) {
-    const signIn = () => ({ cause: new Error(sourceText("error.voice.live.signIn")) });
-    yield* this.#providers.ensureProvider("codex").pipe(Effect.mapError(signIn));
+    const codexFailure = (cause: unknown) => ({
+      cause: this.#providers.signInRequired("codex") ? new Error(sourceText("error.voice.live.signIn")) : cause,
+    });
+    yield* this.#providers.ensureProvider("codex").pipe(Effect.mapError((failure) => codexFailure(failure.cause)));
     const model = this.#sideCodexModel();
     if (!model) return yield* Effect.fail({ cause: new Error(sourceText("error.provider.noModel")) });
     const client = yield* Effect.try({
       try: () => this.#providers.createProfileClient("codex", this.#liveVoiceAccountId(agent)),
-      catch: signIn,
+      catch: codexFailure,
     });
     return { client, model: model.id, effort: model.defaultReasoningEffort };
   }).bind(this);

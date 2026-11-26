@@ -1061,11 +1061,13 @@ export function ChatView({
   const outboxStatuses = useMemo(() => {
     const statuses = new Map<string, OutboxRowStatus>();
     const lastWaiting = outboxMessages.findLast((message) => message.state === "waiting");
+    const heldByFailed = outboxMessages.find((message) => message.state !== "sent")?.state === "failed";
     for (const message of outboxMessages)
       if (message.state === "waiting" || message.state === "failed")
         statuses.set(outboxRowId(message), {
           message,
           online: serverOnline,
+          heldByFailed,
           showStatus: message.state === "failed" || message === lastWaiting,
           retry: () => outbox.retry(message.clientMessageId),
           edit: () => void editOutboxMessage.current(message.clientMessageId),

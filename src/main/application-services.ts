@@ -312,7 +312,7 @@ import {
   aboveAppsWindowKind,
   ozonePlatformArguments,
   setAboveAppsXWayland,
-  usesX11Windows,
+  x11OverlaysShow,
 } from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
@@ -2069,7 +2069,7 @@ export async function createApplicationServices({
     await Effect.runPromise(computerUseReads.close());
   });
   const agentsShareDisplay = !hasSeparateAgentDisplay(process.platform);
-  const drawsComputerUseHighlight = agentsShareDisplay && (process.platform !== "linux" || usesX11Windows());
+  const drawsComputerUseHighlight = agentsShareDisplay && (process.platform !== "linux" || x11OverlaysShow());
   const computerUsePermissionHelp = new ComputerUsePermissionHelpWindowController({
     createWindow: () =>
       createComputerUsePermissionHelpWindow(language.translate, () => localeDirection(language.locale)),
@@ -2166,6 +2166,7 @@ export async function createApplicationServices({
     store,
     mailbox,
     browser,
+    usageReportWorkerPath: join(__dirname, "usage-report-worker.js"),
     finishCheck: true,
     cacheExpiryCompaction: () => cacheExpiryCompaction.get().enabled,
     mediaApprovalCredits: () => mediaApprovalCredits.get(),

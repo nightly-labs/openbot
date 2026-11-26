@@ -354,6 +354,8 @@ export const messages = defineMessages("error.backend", {
     "OpenBot could not renew the sign-in to this MCP server now. The sign-in is kept, and the next request tries again. If this error continues, the user can sign out of the server in OpenBot and sign in again.",
   "error.backend.mcpOAuthRequestRefused":
     "The MCP server refused this request, but the sign-in to it is still active. Possibly the account cannot use this tool, or the sign-in did not give all the necessary access. The user can examine the plan and the access of the account at the service, or sign in to the server again in OpenBot and allow all the access that it asks for.",
+  "error.backend.mcpOAuthScopeNeeded":
+    "The MCP server needs more access for this request than the sign-in gives. The sign-in is kept for the other tools. The user must sign in to the server again in OpenBot and allow the access that it asks for.",
   "error.backend.mcpServerUnreachable": "OpenBot could not reach the server. Check the URL and your network.",
   "error.backend.mcpLocalServerOff":
     "No server answers at {address} on this computer. Start the server, or turn it on in the app that runs it, then try again.",

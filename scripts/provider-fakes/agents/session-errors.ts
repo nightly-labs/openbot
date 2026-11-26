@@ -19,6 +19,13 @@ const LOAD_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => AcpErr
     data: { sessionId: "another-session" },
   }),
   internal: () => ({ code: -32603, message: "Internal error", data: { details: "database is locked" } }),
+  "damaged-store": () => ({
+    code: -32603,
+    message: "Internal error",
+    data: {
+      details: "create_acp_agent: Failed to load the resumed session's node headers: database disk image is malformed",
+    },
+  }),
   "invalid-id": (sessionId) => ({
     code: -32603,
     message: "Internal error",

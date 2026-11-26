@@ -138,7 +138,7 @@ function isCodexRefusedAudio(provider: AgentProvider, message: string): boolean 
 function isRejectedOpenCodeRequest(provider: AgentProvider, message: string): boolean {
   return (
     provider === "opencode" &&
-    /\bthe request contains invalid parameters\b|\bInternal error: Invalid request parameters\b|\bUpstream request failed: \[invalid_request\] the request is invalid\b/i.test(
+    /\bthe request contains invalid parameters\b|\bInternal error: Invalid request parameters\b|\bUpstream request failed: \[invalid_request\] the request is invalid\b|\bUpstream request failed: \[invalid_request_error\] messages\.\d+\.output_config\b/i.test(
       message,
     )
   );
@@ -199,6 +199,10 @@ function isMissingClaudeSession(provider: AgentProvider, message: string): boole
   return provider === "claude" && /\bNo conversation found with session ID\b/.test(message);
 }
 
+function isMissingOpenCodeSession(provider: AgentProvider, message: string): boolean {
+  return provider === "opencode" && /\bInvalid params: session not found: \S/.test(message);
+}
+
 function isClaudeContextOverflow(provider: AgentProvider, message: string): boolean {
   return provider === "claude" && /^Prompt is too long\b/.test(message);
 }
@@ -254,6 +258,7 @@ export function refusedSessionFailure(
   if (isFailedOpenCodeCompaction(provider, message)) return openCodeCompactionFailure(contextWindow);
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");
+  if (isMissingOpenCodeSession(provider, message)) return sourceText("error.provider.opencodeSessionMissing");
   if (isClaudeContextOverflow(provider, message)) return sourceText("error.provider.claudeContextFull");
   if (isPiContextOverflow(provider, message))
     return sourceText("error.provider.requestTooLarge", { provider: providerLabel(provider) });

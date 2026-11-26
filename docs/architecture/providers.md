@@ -690,6 +690,15 @@ and does not connect again while the settings stay the same (#10749). When the b
 its tools within that time after the session request, OpenBot gives the directory a new token and
 resumes the session once. The earlier tokens stay valid until the last session of the directory closes.
 
+On Windows, OpenCode picks PowerShell 7 first and accepts its Microsoft Store alias in `WindowsApps`.
+Its process service (`@opencode/pty` 0.6.0) starts that alias only some of the time: Windows refuses it
+with error 5 while another process of the Store package runs (anomalyco/opencode#64803). When `pwsh` on
+the `PATH` is only that alias and `SHELL` is not set, `opencode-windows-shell.ts` sets `SHELL` to
+Windows PowerShell in `System32`. A `shell` in the OpenCode config comes before `SHELL`, so the
+user's choice still wins. OpenCode has no variable of its own for the shell, so the commands and the
+stdio MCP servers of these agents also see this `SHELL`; GNU make on Windows reads it. Remove this
+when an OpenCode release ships anomalyco/opencode#64901.
+
 OpenCode adds its own system prompt, tools, skill listing and Code Mode catalog to each request of an
 agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does not use: the
 `question` tool (OpenBot has `ask_user`), the `opencode_list_mcp_resources` and
@@ -782,6 +791,16 @@ right after the computer wakes, also the second list lacks new models (#16212). 
 (`moveAgentsOffModelsUnlistedTwice`). The count is kept in memory, so the first start after an
 OpenBot restart never moves an agent. A model that is really gone moves at the next provider start,
 for example after the idle release.
+
+The same partial list is the session's model list right after a start. Before a turn, `applyConfig`
+fails a model that the session does not list (#11964), so a queued message failed with "does not
+offer" although OpenCode offered the model a moment later (#15963). OpenCode reloads its catalog when
+it gets a model that it does not list, and refuses a model that is still missing with -32602 and
+`data.modelId` (OpenCode 1.19 and 2). The OpenCode flavor sets `modelNotOffered` to match that
+error, so OpenBot sends the model and lets OpenCode decide. That refusal fails the turn with
+`ProviderModelNotOfferedError`, and so does a reply whose model list still does not have the model:
+OpenCode 1.15 sets any model with no check. Other ACP agents keep the check before the send, because Antigravity
+kept its own model and gave no error for a model that it did not list (#11797).
 
 The CLI reports no Go quota over ACP. `readOpenCodeGoUsage` (`src/backend/opencode-usage.ts`)
 sends `opencode.ai/zen/go/v1/usage` the key the CLI uses. A saved key is the only key: the CLI

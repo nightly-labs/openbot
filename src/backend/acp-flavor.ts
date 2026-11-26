@@ -109,6 +109,7 @@ export interface AcpFlavor {
   processWideModel?: true;
   setsConfigOnlyOnChange?: true;
   modelSetUnsaved?(error: RequestError): boolean;
+  modelNotOffered?(error: RequestError): boolean;
   modelConfigId?: string;
   configSetUnsaved?(error: RequestError): boolean;
   closeKeepsSession?: true;
