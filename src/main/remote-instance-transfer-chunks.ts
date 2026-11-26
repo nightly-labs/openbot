@@ -184,6 +184,7 @@ export const downloadTransferInParts = Effect.fn("RemoteInstanceTransfer.downloa
   input: ExportInstanceInput,
   destination: string,
   fullCopy = false,
+  onProgress?: (received: number, total: number) => void,
 ): Effect.fn.Return<{ warnings: string[] }, TransferError> {
   const begin = transferExportBegin(input, fullCopy);
   const file = yield* remote.request(serverId, begin.route, decodeExportState, {
@@ -191,6 +192,8 @@ export const downloadTransferInParts = Effect.fn("RemoteInstanceTransfer.downloa
     body: begin.body,
     timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
   });
+  const report = progressReporter(file.size, onProgress);
+  report(0, true);
   const part = `${destination}.part`;
   yield* Effect.gen(function* () {
     const handle = yield* archiveCall(() => open(part, "w"));
@@ -211,6 +214,7 @@ export const downloadTransferInParts = Effect.fn("RemoteInstanceTransfer.downloa
         );
         whole.update(bytes);
         yield* archiveCall(() => writeFully(handle, bytes, index * file.chunkBytes));
+        report(index * file.chunkBytes + bytes.length, true);
       }
       if (whole.digest("hex") !== file.sha256) return yield* invalidPart();
     }).pipe(Effect.ensuring(archiveCall(() => handle.close()).pipe(Effect.ignore)));

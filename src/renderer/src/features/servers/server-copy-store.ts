@@ -2,9 +2,9 @@ import type { InstanceTransferResult, OpenBotDesktopApi } from "@openbot/contrac
 import type {
   CopyAgentsAgent,
   CopyAgentsPhase,
+  CopyAgentsProgress,
   CopyAgentsServer,
 } from "@openbot/ui/features/transfer/CopyAgentsDialog";
-import type { TransferUploadState } from "@openbot/ui/features/transfer/InstanceTransferView";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createStore, onCleanup, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
@@ -20,7 +20,7 @@ interface ServerCopyState {
   fromError: string | null;
   toError: string | null;
   phase: CopyAgentsPhase;
-  progress: TransferUploadState | null;
+  progress: CopyAgentsProgress | null;
   result: InstanceTransferResult | null;
   error: string | null;
 }
@@ -57,10 +57,10 @@ export function createServerCopyStore(
     disposed = true;
   });
 
-  const stopProgress = calls.onUploadProgress?.(({ serverId: target, sent, total }) => {
-    if (target !== copyingTo || state.phase !== "copying") return;
+  const stopProgress = calls.onUploadProgress?.(({ serverId: target, sent, total, copyStep }) => {
+    if (!copyStep || target !== copyingTo || state.phase !== "copying") return;
     setState((draft) => {
-      draft.progress = { sent, total };
+      draft.progress = { step: copyStep, sent, total };
     });
   });
   if (stopProgress) onCleanup(stopProgress);

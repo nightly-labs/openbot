@@ -826,6 +826,13 @@ export const messages = {
     "{server} 上已有这些名称的助手：{names}。复制会为每个再添加一个助手，每份都是独立助手，拥有各自的对话、文件和记忆。",
   "settings.transfer.copy.duplicatesConfirm": "复制副本",
   "settings.transfer.copy.copying": "正在复制…",
+  "settings.transfer.copy.preparing": "正在 {server} 上准备智能体…",
+  "settings.transfer.copy.downloading": "正在从 {server} 接收智能体…",
+  "settings.transfer.copy.uploading": "正在向 {server} 发送智能体…",
+  "settings.transfer.copy.installing": "正在将智能体添加到 {server}…",
+  "settings.transfer.copy.receiveLabel": "从服务器下载",
+  "settings.transfer.copy.received": "已接收 {sent}/{total}",
+  "settings.transfer.copy.stalled": "30 秒内没有收到数据。OpenBot 正在重试。如果服务器没有响应，复制会停止并显示错误。",
   "settings.transfer.copy.done": {
     one: "已将 {count} 个助手复制到 {server}。",
     other: "已将 {count} 个助手复制到 {server}。",

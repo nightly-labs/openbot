@@ -214,13 +214,26 @@ export const CopyLoading: Story = {
 
 export const CopyCopying: Story = {
   name: "Copy: copying",
-  render: () => <CopyAgentsDialog {...copyArgs({ phase: "copying" })} />,
+  render: () => (
+    <CopyAgentsDialog {...copyArgs({ phase: "copying", progress: { step: "preparing", sent: 0, total: 0 } })} />
+  ),
+};
+
+export const CopyReceiving: Story = {
+  name: "Copy: receiving from a joined server",
+  render: () => (
+    <CopyAgentsDialog
+      {...copyArgs({ phase: "copying", progress: { step: "downloading", sent: 92_274_688, total: 314_691_120 } })}
+    />
+  ),
 };
 
 export const CopySending: Story = {
   name: "Copy: sending to a joined server",
   render: () => (
-    <CopyAgentsDialog {...copyArgs({ phase: "copying", progress: { sent: 184_549_376, total: 314_691_120 } })} />
+    <CopyAgentsDialog
+      {...copyArgs({ phase: "copying", progress: { step: "uploading", sent: 184_549_376, total: 314_691_120 } })}
+    />
   ),
 };
 

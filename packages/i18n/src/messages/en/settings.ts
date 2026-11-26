@@ -915,6 +915,14 @@ export const messages = defineMessages("settings", {
     "{server} already has agents with these names: {names}. The copy adds a second agent for each one. Each copy is a separate agent with its own chats, files, and memories.",
   "settings.transfer.copy.duplicatesConfirm": "Copy duplicates",
   "settings.transfer.copy.copying": "Copying…",
+  "settings.transfer.copy.preparing": "Preparing the agents on {server}…",
+  "settings.transfer.copy.downloading": "Receiving the agents from {server}…",
+  "settings.transfer.copy.uploading": "Sending the agents to {server}…",
+  "settings.transfer.copy.installing": "Adding the agents to {server}…",
+  "settings.transfer.copy.receiveLabel": "Download from the server",
+  "settings.transfer.copy.received": "{sent} of {total} received",
+  "settings.transfer.copy.stalled":
+    "No data came for 30 seconds. OpenBot tries again. If the server does not answer, the copy stops and shows an error.",
   "settings.transfer.copy.done": {
     one: "{count} agent copied to {server}.",
     other: "{count} agents copied to {server}.",

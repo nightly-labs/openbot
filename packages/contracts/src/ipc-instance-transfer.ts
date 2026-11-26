@@ -74,10 +74,15 @@ export interface CopyInstanceAgentsInput {
   agentIds: string[];
 }
 
+export const INSTANCE_TRANSFER_COPY_STEPS = ["preparing", "downloading", "uploading", "installing"] as const;
+
+export type InstanceTransferCopyStep = (typeof INSTANCE_TRANSFER_COPY_STEPS)[number];
+
 export interface InstanceTransferUploadProgress {
   serverId: string;
   sent: number;
   total: number;
+  copyStep?: InstanceTransferCopyStep | undefined;
 }
 
 export interface InstanceTransferResult {
@@ -240,7 +245,11 @@ export function decodeInstanceTransferUploadProgress(value: unknown): InstanceTr
   const sent = count(progress.sent, "transfer upload progress");
   const total = count(progress.total, "transfer upload progress");
   if (sent > total) invalid("transfer upload progress");
-  return { serverId: progress.serverId, sent, total };
+  const { copyStep } = progress;
+  if (copyStep === undefined) return { serverId: progress.serverId, sent, total };
+  const step = INSTANCE_TRANSFER_COPY_STEPS.find((candidate) => candidate === copyStep);
+  if (!step) invalid("transfer upload progress");
+  return { serverId: progress.serverId, sent, total, copyStep: step };
 }
 
 export function decodeRemoteInstanceTransferSummary(value: unknown): InstanceTransferSummary {

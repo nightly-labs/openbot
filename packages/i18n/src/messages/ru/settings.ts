@@ -923,6 +923,14 @@ export const messages = {
     "На {server} уже есть агенты с такими именами: {names}. Копирование добавит второго агента для каждого. Каждая копия — отдельный агент со своими чатами, файлами и записями памяти.",
   "settings.transfer.copy.duplicatesConfirm": "Копировать дубликаты",
   "settings.transfer.copy.copying": "Копирование…",
+  "settings.transfer.copy.preparing": "Подготовка агентов на {server}…",
+  "settings.transfer.copy.downloading": "Получение агентов с {server}…",
+  "settings.transfer.copy.uploading": "Отправка агентов на {server}…",
+  "settings.transfer.copy.installing": "Добавление агентов на {server}…",
+  "settings.transfer.copy.receiveLabel": "Загрузка с сервера",
+  "settings.transfer.copy.received": "Получено {sent} из {total}",
+  "settings.transfer.copy.stalled":
+    "Данные не приходят 30 секунд. OpenBot пробует снова. Если сервер не ответит, копирование остановится и покажет ошибку.",
   "settings.transfer.copy.done": {
     one: "{count} агент скопирован на {server}.",
     few: "{count} агента скопированы на {server}.",

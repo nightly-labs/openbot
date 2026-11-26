@@ -815,7 +815,7 @@ function timeLeftText(t: AppTranslate, seconds: number): string {
   return t("settings.transfer.upload.etaHours", { hours: Math.floor(minutes / 60), minutes: minutes % 60 });
 }
 
-export function TransferUploadProgress(props: { progress: TransferUploadState }) {
+export function TransferUploadProgress(props: { progress: TransferUploadState; receiving?: boolean | undefined }) {
   const { t, format } = useText();
   const secondsLeft = createSecondsLeft(() => props.progress);
   const percent = () =>
@@ -825,10 +825,10 @@ export function TransferUploadProgress(props: { progress: TransferUploadState })
       <Progress
         class="instance-transfer-upload-bar"
         value={percent()}
-        aria-label={t("settings.transfer.upload.label")}
+        aria-label={t(props.receiving ? "settings.transfer.copy.receiveLabel" : "settings.transfer.upload.label")}
       />
       <p class="instance-transfer-upload-status">
-        {t("settings.transfer.upload.sent", {
+        {t(props.receiving ? "settings.transfer.copy.received" : "settings.transfer.upload.sent", {
           sent: format.fileSizeAmount(props.progress.sent, props.progress.total),
           total: format.fileSize(props.progress.total),
         })}
