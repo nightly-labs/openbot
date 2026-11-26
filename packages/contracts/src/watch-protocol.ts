@@ -8,6 +8,7 @@ export const WATCH_REPLY_LIMIT = 1_200;
 export const WATCH_AGENT_LIMIT = 40;
 export const WATCH_CHANNEL_LIMIT = 20;
 export const WATCH_CHANNEL_MEMBERS = 4;
+export const WATCH_HIDDEN_LIMIT = 200;
 
 export type WatchAgentState = "waiting" | "working" | "idle";
 
@@ -55,6 +56,7 @@ export interface WatchChannel {
   server: string;
   color: string;
   members: string[];
+  pinned?: boolean;
   folder?: string;
   position?: number;
   unread: number;
@@ -89,6 +91,23 @@ export interface WatchServer {
   name: string;
   online: boolean;
   watchKey?: string;
+  hiddenAgents?: string[];
+  hiddenChannels?: string[];
+}
+
+export function watchChannelsWithinLimit<T extends Pick<WatchChannel, "unread" | "working">>(
+  channels: readonly T[],
+): T[] {
+  const active = (channel: T) => channel.unread > 0 || channel.working;
+  const room = Math.max(0, WATCH_CHANNEL_LIMIT - channels.filter(active).length);
+  let others = 0;
+  return channels
+    .filter((channel) => {
+      if (active(channel)) return true;
+      others += 1;
+      return others <= room;
+    })
+    .slice(0, WATCH_CHANNEL_LIMIT);
 }
 
 export interface WatchDirectServer {

@@ -23,15 +23,19 @@ enum WatchMerge {
         server.id = id
         server.online = true
         if server.watchKey == nil { server.watchKey = known?.watchKey }
+        server.hiddenAgents = known?.hiddenAgents
+        server.hiddenChannels = known?.hiddenChannels
         servers.append(server)
-        agents += part.agents.map { agent in
+        let hiddenAgents = Set(known?.hiddenAgents ?? [])
+        let hiddenChannels = Set(known?.hiddenChannels ?? [])
+        agents += part.agents.filter { !hiddenAgents.contains($0.id) }.map { agent in
           var copy = agent
           copy.serverId = id
           copy.avatar = picture(for: copy, known: [phone, previous], hasPicture: hasPicture)
           if copy.faces == nil { copy.faces = faces(for: copy, known: [phone, previous]) }
           return copy
         }
-        let partChannels = part.channels?.map { channel in
+        let partChannels = part.channels?.filter { !hiddenChannels.contains($0.id) }.map { channel in
           var copy = channel
           copy.serverId = id
           return copy

@@ -100,6 +100,7 @@ struct WatchChannel: Codable, Hashable, Identifiable {
   var server: String
   var color: String
   var members: [String]
+  var pinned: Bool?
   var folder: String?
   var position: Int?
   var unread: Int?
@@ -110,6 +111,7 @@ struct WatchChannel: Codable, Hashable, Identifiable {
 
   var key: AgentKey { AgentKey(serverId: serverId, id: id) }
   var isWorking: Bool { working ?? false }
+  var isPinned: Bool { pinned ?? false }
   var message: String? {
     guard let reply else { return nil }
     guard let author, !author.isEmpty else { return reply }
@@ -159,6 +161,8 @@ struct WatchServer: Codable, Hashable {
   var name: String
   var online: Bool
   var watchKey: String?
+  var hiddenAgents: [String]?
+  var hiddenChannels: [String]?
 }
 
 struct WatchDirectServer: Codable, Hashable {

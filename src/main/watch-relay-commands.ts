@@ -7,6 +7,7 @@ import {
   type ChannelSummary,
   canAdministerServer,
   type SidebarLayoutSnapshot,
+  type SidebarPin,
   type TeamMemberSummary,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -57,8 +58,9 @@ export interface WatchRelayTeamApi {
   >;
   layout(): SidebarLayoutSnapshot | null;
   listChannels(memberId: string): ChannelSummary[];
-  pinnedAgentIds(memberId: string, hidden: ReadonlySet<string>): readonly string[];
+  pins(memberId: string, hidden: ReadonlySet<string>): readonly SidebarPin[];
   hiddenAgentIds(member: Pick<TeamMemberSummary, "id" | "role">): ReadonlySet<string>;
+  channelHiddenAgentIds(member: Pick<TeamMemberSummary, "id" | "role">): ReadonlySet<string>;
   openSession(input: {
     sessionId: string;
     membershipId: string;
@@ -147,7 +149,7 @@ export class WatchRelayCommands {
       reads: Object.fromEntries(
         Object.entries(agents.listConversationReads(member.id, READ_OPTIONS)).filter(([agentId]) => visible(agentId)),
       ),
-      pinned: this.#api.pinnedAgentIds(member.id, hidden),
+      pins: this.#api.pins(member.id, hidden),
       layout: this.#api.layout(),
       channels: this.#visibleChannels(member),
       avatar: (agentId) => this.#avatarName(agentId),
@@ -307,7 +309,7 @@ export class WatchRelayCommands {
   #visibleChannels(member: WatchRelayMember): ChannelSummary[] {
     const hidden = canAdministerServer(member.role)
       ? new Set<string>()
-      : this.#api.hiddenAgentIds({ id: member.id, role: member.role });
+      : this.#api.channelHiddenAgentIds({ id: member.id, role: member.role });
     return this.#api
       .listChannels(member.id)
       .filter((channel) => !channel.archived && seesChannel(channel.members, hidden));

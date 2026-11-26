@@ -45,7 +45,6 @@ struct AgentGroup: Identifiable {
 
   let id: String
   let title: String
-  var pinned: [WatchAgent] = []
   var entries: [ListEntry] = []
 }
 
@@ -53,7 +52,7 @@ struct AgentListView: View {
   @EnvironmentObject private var session: WatchSession
   @Environment(\.watchText) private var text
   let snapshot: WatchReadySnapshot
-  let open: (AgentKey) -> Void
+  let open: (WatchRoute) -> Void
 
   var body: some View {
     if snapshot.isEmpty {
@@ -67,7 +66,7 @@ struct AgentListView: View {
         ForEach(groups) { group in
           if group.id == AgentGroup.pinnedId {
             Section {
-              PinnedGrid(agents: group.pinned, open: open)
+              PinnedGrid(entries: group.entries, open: open)
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
             } header: {
@@ -99,9 +98,11 @@ struct AgentListView: View {
   }
 
   private var groups: [AgentGroup] {
-    let pinned = snapshot.agents.filter(\.isPinned)
+    let pinned = byPosition(
+      snapshot.agents.filter(\.isPinned).map(ListEntry.agent)
+        + (snapshot.channels ?? []).filter(\.isPinned).map(ListEntry.channel))
     let others = snapshot.agents.filter { !$0.isPinned }
-    let channels = snapshot.channels ?? []
+    let channels = (snapshot.channels ?? []).filter { !$0.isPinned }
     let waiting = others.filter { $0.state == .waiting }
     let unreadAgents = others.filter { $0.state != .waiting && ($0.unread ?? 0) > 0 }
     let unreadChannels = channels.filter { ($0.unread ?? 0) > 0 }
@@ -111,7 +112,7 @@ struct AgentListView: View {
         + channels.filter { ($0.unread ?? 0) == 0 }.map(ListEntry.channel))
     var result: [AgentGroup] = []
     if !pinned.isEmpty {
-      result.append(AgentGroup(id: AgentGroup.pinnedId, title: text(TextKey.pinned), pinned: pinned))
+      result.append(AgentGroup(id: AgentGroup.pinnedId, title: text(TextKey.pinned), entries: pinned))
     }
     if !unread.isEmpty {
       result.append(AgentGroup(id: "unread", title: text(TextKey.unread), entries: unread))
@@ -189,38 +190,53 @@ struct AgentRow: View {
 
 struct PinnedGrid: View {
   static let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 3)
-  let agents: [WatchAgent]
-  let open: (AgentKey) -> Void
+  let entries: [ListEntry]
+  let open: (WatchRoute) -> Void
 
   var body: some View {
     LazyVGrid(columns: Self.columns, spacing: 8) {
-      ForEach(agents) { agent in
-        Button {
-          open(agent.key)
-        } label: {
-          VStack(spacing: 3) {
+      ForEach(entries) { entry in
+        switch entry {
+        case .agent(let agent):
+          cell(name: agent.name, unread: agent.unread ?? 0, route: .agent(agent.key)) {
             AgentAvatar(agent: agent, size: 40, stateIcon: true)
-              .overlay(alignment: .topTrailing) {
-                if let unread = agent.unread, unread > 0 {
-                  Text(verbatim: unread > 99 ? "99+" : String(unread))
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 4)
-                    .frame(minWidth: 16, minHeight: 16)
-                    .background(Color.blue, in: Capsule())
-                    .offset(x: 5, y: -3)
-                }
-              }
-            Text(agent.name)
-              .font(.caption2)
-              .lineLimit(1)
           }
-          .frame(maxWidth: .infinity)
-          .contentShape(Rectangle())
+        case .channel(let channel):
+          cell(name: channel.name, unread: channel.unread ?? 0, route: .channel(channel.key)) {
+            ChannelAvatar(channel: channel, size: 40)
+          }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(agent.name))
       }
     }
+  }
+
+  private func cell<Picture: View>(
+    name: String, unread: Int, route: WatchRoute, @ViewBuilder picture: () -> Picture
+  ) -> some View {
+    Button {
+      open(route)
+    } label: {
+      VStack(spacing: 3) {
+        picture()
+          .overlay(alignment: .topTrailing) {
+            if unread > 0 {
+              Text(verbatim: unread > 99 ? "99+" : String(unread))
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 4)
+                .frame(minWidth: 16, minHeight: 16)
+                .background(Color.blue, in: Capsule())
+                .offset(x: 5, y: -3)
+            }
+          }
+        Text(name)
+          .font(.caption2)
+          .lineLimit(1)
+      }
+      .frame(maxWidth: .infinity)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(Text(name))
   }
 }

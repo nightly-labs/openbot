@@ -687,15 +687,14 @@ export class TeamApiServer {
       agents,
       layout: () => this.#options.sidebarLayout.getSnapshot(),
       listChannels: (memberId) => this.#options.channels?.store.list(memberId) ?? [],
-      pinnedAgentIds: (memberId, hidden) =>
-        this.#options.sidebarPins
-          ?.snapshot(memberId, hidden)
-          .items.flatMap((pin) => (pin.kind === "agent" ? [pin.id] : [])) ?? [],
+      pins: (memberId, hidden) => this.#options.sidebarPins?.snapshot(memberId, hidden).items ?? [],
       hiddenAgentIds: (member) =>
         new Set([
           ...this.hiddenAgentIds(TEAM_PROTOCOL_V10, new Set(TEAM_CURRENT_CAPABILITIES), member),
           ...hostHidden(),
         ]),
+      channelHiddenAgentIds: (member) =>
+        this.hiddenAgentIds(TEAM_PROTOCOL_V10, new Set(TEAM_CURRENT_CAPABILITIES), member),
       openSession: (input) => store.openRemoteSession(input),
       closeSession: (sessionId) => store.closeRemoteSession(sessionId),
     };

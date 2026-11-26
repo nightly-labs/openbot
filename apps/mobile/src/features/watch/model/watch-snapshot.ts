@@ -1,12 +1,12 @@
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { coordinatorText } from "@openbot/contracts/coordinator-text";
-import type { ChannelSummary, ConversationMessage, SidebarLayoutSnapshot } from "@openbot/contracts/ipc";
+import type { ChannelSummary, ConversationMessage, SidebarLayoutSnapshot, SidebarPin } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import {
   WATCH_AGENT_LIMIT,
   WATCH_APPROVAL_LIMIT,
-  WATCH_CHANNEL_LIMIT,
   WATCH_CHANNEL_MEMBERS,
+  WATCH_HIDDEN_LIMIT,
   WATCH_PROTOCOL_VERSION,
   WATCH_REPLY_LIMIT,
   type WatchAgent,
@@ -15,6 +15,7 @@ import {
   type WatchQuestion,
   type WatchSnapshot,
   type WatchWait,
+  watchChannelsWithinLimit,
   watchText,
 } from "@openbot/contracts/watch-protocol";
 import { feedbackApproval } from "@openbot/team-client/feedback-approval";
@@ -102,7 +103,8 @@ export interface WatchSnapshotInput {
   servers: readonly MobileServer[];
   agents: readonly MobileAgent[];
   hidden: (serverId: string) => readonly string[];
-  pinned: (serverId: string) => readonly string[];
+  hiddenChannels: (serverId: string) => readonly string[];
+  pins: (serverId: string) => readonly SidebarPin[];
   layout: (serverId: string) => SidebarLayoutSnapshot | null;
   paused: boolean;
   live: LiveWorkspaceState;
@@ -224,6 +226,7 @@ interface PlacedChannel {
   channel: ChannelSummary;
   folder: string | null;
   position: number;
+  pinned: boolean;
 }
 
 function appOrder(
@@ -231,30 +234,39 @@ function appOrder(
   server: MobileServer,
 ): { agents: PlacedAgent[]; channels: PlacedChannel[] } {
   const hidden = new Set(input.hidden(server.id));
+  const hiddenChannels = new Set(input.hiddenChannels(server.id));
   const visible = input.agents.filter((agent) => agent.serverId === server.id && !hidden.has(agent.id));
-  const byId = new Map(visible.map((agent) => [agent.id, agent]));
-  const pinned = input.pinned(server.id).flatMap((id) => byId.get(id) ?? []);
-  const pinnedIds = new Set(pinned.map((agent) => agent.id));
-  let folder: string | null = null;
-  let position = pinned.length;
-  const agents: PlacedAgent[] = pinned.map((agent, index) => ({ agent, folder: null, position: index }));
+  const open = input.channels(server.id).filter((channel) => !channel.archived && !hiddenChannels.has(channel.id));
+  const agentsById = new Map(visible.map((agent) => [agent.id, agent]));
+  const channelsById = new Map(open.map((channel) => [channel.id, channel]));
+  const agents: PlacedAgent[] = [];
   const channels: PlacedChannel[] = [];
+  let position = 0;
+  for (const pin of input.pins(server.id)) {
+    const agent = pin.kind === "agent" ? agentsById.get(pin.id) : undefined;
+    const channel = pin.kind === "channel" ? channelsById.get(pin.id) : undefined;
+    if (agent) agents.push({ agent, folder: null, position: position++ });
+    if (channel) channels.push({ channel, folder: null, position: position++, pinned: true });
+  }
+  const pinnedAgents = new Set(agents.map((item) => item.agent.id));
+  const pinnedChannels = new Set(channels.map((item) => item.channel.id));
+  let folder: string | null = null;
   for (const item of mobileSidebarItems(
     input.layout(server.id),
-    visible.filter((agent) => !pinnedIds.has(agent.id)),
-    input.channels(server.id).filter((channel) => !channel.archived),
+    visible.filter((agent) => !pinnedAgents.has(agent.id)),
+    open.filter((channel) => !pinnedChannels.has(channel.id)),
     undefined,
     input.text.t,
   )) {
     if (item.kind === "section") folder = item.name;
     if (item.kind === "agent") agents.push({ agent: item.agent, folder, position: position++ });
-    if (item.kind === "channel") channels.push({ channel: item.channel, folder, position: position++ });
+    if (item.kind === "channel") channels.push({ channel: item.channel, folder, position: position++, pinned: false });
   }
   return { agents, channels };
 }
 
 function watchChannel(input: WatchSnapshotInput, server: MobileServer, placed: PlacedChannel): WatchChannel {
-  const { channel, folder, position } = placed;
+  const { channel, folder, position, pinned } = placed;
   const members = channel.members.map((member) => member.agentId);
   const lead = input.agents.find((agent) => agent.serverId === server.id && agent.id === members[0]);
   const last = channel.lastMessage;
@@ -265,6 +277,7 @@ function watchChannel(input: WatchSnapshotInput, server: MobileServer, placed: P
     server: server.name,
     color: lead ? avatarHeadColor(lead.avatarSeed, lead.avatarHue, lead.avatarColor) : input.accent,
     members: members.slice(0, WATCH_CHANNEL_MEMBERS),
+    ...(pinned ? { pinned } : {}),
     ...(folder ? { folder } : {}),
     position,
     unread: channel.unreadCount,
@@ -295,12 +308,12 @@ export function buildWatchSnapshot(input: WatchSnapshotInput): WatchSnapshot {
   const listed: WatchAgent[] = [];
   const channels: WatchChannel[] = [];
   for (const server of servers) {
-    const pinned = new Set(input.pinned(server.id));
+    const pinned = new Set(input.pins(server.id).flatMap((pin) => (pin.kind === "agent" ? [pin.id] : [])));
     const approvals = live.approvalRequests[server.id] ?? [];
     const waits = live.threadWaitsByServer[server.id] ?? [];
     const activities = live.activityByServer[server.id] ?? {};
     const placed = appOrder(input, server);
-    for (const item of placed.channels) channels.push(watchChannel(input, server, item));
+    channels.push(...watchChannelsWithinLimit(placed.channels.map((item) => watchChannel(input, server, item))));
     for (const { agent, folder, position } of placed.agents) {
       const conversation = input.conversation(agent.id);
       const activity = activities[agent.id];
@@ -343,10 +356,19 @@ export function buildWatchSnapshot(input: WatchSnapshotInput): WatchSnapshot {
     text: watchTexts(text.t, waiting),
     servers: servers.map((server) => {
       const watchKey = input.watchKey(server.id);
-      return { id: server.id, name: server.name, online: input.online(server), ...(watchKey ? { watchKey } : {}) };
+      const hiddenAgents = input.hidden(server.id).slice(0, WATCH_HIDDEN_LIMIT);
+      const hiddenChannels = input.hiddenChannels(server.id).slice(0, WATCH_HIDDEN_LIMIT);
+      return {
+        id: server.id,
+        name: server.name,
+        online: input.online(server),
+        ...(watchKey ? { watchKey } : {}),
+        ...(hiddenAgents.length > 0 ? { hiddenAgents } : {}),
+        ...(hiddenChannels.length > 0 ? { hiddenChannels } : {}),
+      };
     }),
     agents: shown,
-    channels: channels.slice(0, WATCH_CHANNEL_LIMIT),
+    channels,
   };
 }
 

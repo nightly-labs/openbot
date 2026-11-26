@@ -2390,7 +2390,8 @@ The watch shows the agents that the chat list of the iPhone app shows: their nam
 picture colours and pictures, their state, the number of unread messages, the request or question
 that an agent waits on, and the start of the last reply. It also shows the channels of that list:
 their names, member agents, the number of unread messages, if an agent works in them, and the start
-of the last message with the name of its author. It does not get hidden chats, attachments,
+of the last message with the name of its author. It does not get hidden chats, only their IDs, so
+that it does not show them when a server answers it directly. It does not get attachments,
 files or the phone's session. The watch keeps the last copy in the storage of the OpenBot watch app,
 for the watch face complication and the next time the app opens. It also keeps it when the app lock
 of the phone is on. A sign-out on the phone tells the watch to delete its copy, its pictures and its

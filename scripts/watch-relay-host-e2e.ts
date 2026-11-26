@@ -54,6 +54,7 @@ import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MailboxStore } from "../src/backend/mailbox-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { SidebarLayoutStore } from "../src/backend/sidebar-layout-store";
+import { SidebarPinStore } from "../src/main/sidebar-pin-store";
 import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/watch-relay-host-e2e");
@@ -203,6 +204,7 @@ const database = new OpenBotDatabase(userData);
 const agentStore = new AgentStore(userData, join(root, "home"), database);
 const mailbox = new MailboxStore(userData, agentStore.sharedRoot, agentStore.database);
 const sidebar = new SidebarLayoutStore(join(userData, "sidebar-layout.json"));
+const sidebarPins = new SidebarPinStore(join(userData, "sidebar-pins.json"));
 const team = new TeamStore(join(userData, "openbot-team-server-v2.json"));
 const cipher = {
   encrypt: (value: string) => Buffer.from(value, "utf8").reverse(),
@@ -413,6 +415,12 @@ try {
       const channelId = randomUUID();
       const owner = { id: ownerId, name: "Owner" };
       await runCauseEffect(
+        sidebarPins.set(watcher.member.id, [
+          { kind: "channel", id: channelId },
+          { kind: "agent", id: approver.id },
+        ]),
+      );
+      await runCauseEffect(
         channels.command(
           {
             type: "save",
@@ -543,6 +551,7 @@ try {
         appVersion: APP_VERSION,
         watchRelay: relay,
         channels,
+        sidebarPins,
       });
       const port = await Effect.runPromise(server.start());
       await Effect.runPromise(relay.start());
@@ -807,8 +816,12 @@ try {
     assert.equal(channel.unread, 1);
     assert.equal(channel.author, "Owner");
     assert.equal(channel.reply, "Check the release notes, please.");
-    assert.equal(typeof channel.position, "number");
-    return channel;
+    assert.equal(channel.pinned, true);
+    assert.equal(channel.position, 0);
+    const pinnedAgent = ready(snapshot).agents.find((item) => item.id === agents.approver);
+    assert.equal(pinnedAgent?.pinned, true);
+    assert.equal(pinnedAgent?.position, 1);
+    return { channel, pinnedAgent: { pinned: pinnedAgent?.pinned, position: pinnedAgent?.position } };
   });
 
   await step("Send to a channel posts the text as the member", async () => {

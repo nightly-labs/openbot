@@ -12,6 +12,7 @@ import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/workspace-store";
+import { phoneSidebarPins } from "@/features/workspace/model/agent-pins";
 import { InactiveRequestError } from "@/features/workspace/model/pending-approvals";
 import type { ServerCapabilities } from "@/features/workspace/model/server-capabilities";
 import { showsOnline } from "@/features/workspace/model/server-status";
@@ -94,7 +95,11 @@ function WatchLinkSync({ servers, serversReady, agents, preferences, capabilitie
         servers,
         agents,
         hidden: (serverId) => preferences[serverId]?.hidden ?? [],
-        pinned: (serverId) => preferences[serverId]?.pinned ?? [],
+        hiddenChannels: (serverId) => preferences[serverId]?.hiddenChannels ?? [],
+        pins: (serverId) => {
+          const current = preferences[serverId];
+          return current ? phoneSidebarPins(current) : [];
+        },
         layout: (serverId) => sidebarByServer[serverId]?.layout ?? null,
         paused,
         live: liveState.get(),

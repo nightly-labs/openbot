@@ -16,7 +16,7 @@ struct HomeView: View {
     TabView(selection: $page) {
       SummaryView(snapshot: shown, serverCount: snapshot.servers.count, path: $path)
         .tag(HomePage.summary)
-      AgentListView(snapshot: shown) { path.append(.agent($0)) }
+      AgentListView(snapshot: shown) { path.append($0) }
         .tag(HomePage.list)
     }
     .tabViewStyle(.page(indexDisplayMode: .always))

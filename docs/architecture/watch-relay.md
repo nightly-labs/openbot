@@ -92,10 +92,13 @@ JSON body `WatchRelayHttpRequest { v: 1, ts, sealed, proof }`, at most `WATCH_RE
   with `folder` (the folder path, such as `Parent / Child`). The order does not change with unread state
   or recent activity. The watch shows Pinned, Unread and Needs you sections, then one section per folder.
 - `channels` (optional, `WatchChannel[]`) lists the channels that the member sees on the sidebar, not
-  archived, at most `WATCH_CHANNEL_LIMIT`. Each channel has its `folder` and a `position` in the same
-  sidebar order as the agents, its first `WATCH_CHANNEL_MEMBERS` member agent IDs, `unread`, `working`,
-  and the last message (`author`, `reply`). An admin sees all channels; another member does not see a
-  channel with a hidden agent. Agents and channels share the `position` order inside a folder.
+  archived. Each channel has its `folder` and a `position` in the same sidebar order as the agents, its
+  first `WATCH_CHANNEL_MEMBERS` member agent IDs, `unread`, `working`, and the last message (`author`,
+  `reply`). The member's sidebar pins (agents and channels) come first, in pin order, with `pinned`;
+  agents and channels share the `position` order. `watchChannelsWithinLimit` keeps at most
+  `WATCH_CHANNEL_LIMIT` channels for each server: all unread or working channels first, then the others
+  in sidebar order. Channel visibility follows the Team API channel routes: an admin sees all channels;
+  another member does not see a channel with an agent that the Team API hides from that member.
 - `sendChannel { serverId, channelId, text, messageId? }` posts as the member through
   `CHANNEL_ROUTES.command` (`send`). `readChannel { serverId, channelId }` reads the channel up to its
   last message (`CHANNEL_ROUTES.read`, then the `read` command with `throughSequence`). Both fail for a
@@ -110,7 +113,10 @@ JSON body `WatchRelayHttpRequest { v: 1, ts, sealed, proof }`, at most `WATCH_RE
 - The phone creates the watch session, calls `GET /v1/watch/setup` on each server that has
   `watch-relay-v1`, and answers `WatchResult { ok: true, direct: WatchDirectCredentials }`.
   Credentials travel only in a `sendMessage` reply, never in the application context.
-- Each `WatchServer` in the phone's snapshot carries `watchKey` when the phone knows it.
+- Each `WatchServer` in the phone's snapshot carries `watchKey` when the phone knows it, and the IDs of
+  the agents and channels that the user hid on this phone (`hiddenAgents`, `hiddenChannels`, at most
+  `WATCH_HIDDEN_LIMIT` each). These lists live only on the phone, so the watch removes those chats from
+  the host's reply when it merges.
 - Each `WatchAgent` in the phone's snapshot can carry `faces` (`waiting`, `working`): the names of the
   agent's picture with that face. The phone draws them; the host does not send faces, so the watch keeps
   the faces that the phone sent.
