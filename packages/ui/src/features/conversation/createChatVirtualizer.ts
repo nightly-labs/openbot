@@ -110,6 +110,7 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     return previous ? count > STATIC_CHAT_LIMIT - STATIC_CHAT_RETURN : count > STATIC_CHAT_LIMIT;
   });
   let refreshQueued = false;
+  let disposed = false;
 
   const stopDrawingEarlierRows = (): void => {
     if (drawFrame !== undefined) cancelAnimationFrame(drawFrame);
@@ -120,13 +121,23 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
   const unmeasuredRows = new Set<TItemElement>();
   let measureQueued = false;
 
+  const pruneDisconnectedElements = (): void => {
+    if (virtualizer.elementsCache.size > 0) virtualizer.measureElement(null);
+  };
+
   const measureNewRows = (): void => {
     measureQueued = false;
+    if (disposed || unmeasuredRows.size === 0) {
+      unmeasuredRows.clear();
+      return;
+    }
+    pruneDisconnectedElements();
     for (const element of unmeasuredRows) if (element.isConnected) virtualizer.measureElement(element);
     unmeasuredRows.clear();
   };
 
   const drawRowsFrom = (index: number): void => {
+    if (disposed) return;
     const element = options.getScrollElement();
     const distanceFromEnd = element ? element.scrollHeight - element.scrollTop : undefined;
     drawFrom = index;
@@ -180,6 +191,7 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
   };
 
   const refresh = (): void => {
+    if (disposed) return;
     const measured = [...virtualizer.getVirtualItems()];
     const count = options.count();
     const isVirtualized = untrack(virtualized);
@@ -218,7 +230,7 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
   };
 
   const scheduleRefresh = (): void => {
-    if (refreshQueued) return;
+    if (disposed || refreshQueued) return;
     refreshQueued = true;
     queueMicrotask(() => {
       refreshQueued = false;
@@ -308,13 +320,22 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
             untrack(() => options.onChange?.(instance));
           },
         });
+        pruneDisconnectedElements();
         virtualizer._willUpdate();
       });
       scheduleRefresh();
     },
   );
 
-  onCleanup(stopDrawingEarlierRows);
+  createEffect(() => virtualItems(), pruneDisconnectedElements);
+
+  onCleanup(() => {
+    disposed = true;
+    stopDrawingEarlierRows();
+    unmeasuredRows.clear();
+    stableItems.clear();
+    virtualizer.elementsCache.clear();
+  });
 
   onSettled(() => {
     const cleanup = virtualizer._didMount();
@@ -335,8 +356,9 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     getTotalSize: totalSize,
     isVirtualized: virtualized,
     measureElement: (element) => {
+      if (disposed) return;
       if (!element) {
-        virtualizer.measureElement(null);
+        pruneDisconnectedElements();
         return;
       }
       unmeasuredRows.add(element);

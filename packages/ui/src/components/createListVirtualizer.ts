@@ -6,7 +6,7 @@ import {
   type VirtualItem,
   Virtualizer,
 } from "@tanstack/virtual-core";
-import { type Accessor, createEffect, createSignal, onSettled, untrack } from "solid-js";
+import { type Accessor, createEffect, createSignal, onCleanup, onSettled, untrack } from "solid-js";
 import { prefersReducedMotion } from "../utils";
 
 interface ListRow {
@@ -38,6 +38,7 @@ export function createListVirtualizer(options: ListVirtualizerOptions): ListVirt
   const [totalSize, setTotalSize] = createSignal(0);
   const [endIndex, setEndIndex] = createSignal(0);
   let refreshQueued = false;
+  let disposed = false;
   let rows: ListRow[] = [];
 
   const virtualizer = new Virtualizer<HTMLElement, HTMLElement>({
@@ -52,14 +53,33 @@ export function createListVirtualizer(options: ListVirtualizerOptions): ListVirt
     overscan: options.overscan,
   });
 
+  const unmeasuredRows = new Set<HTMLElement>();
+  let measureQueued = false;
+
+  const pruneDisconnectedElements = (): void => {
+    if (virtualizer.elementsCache.size > 0) virtualizer.measureElement(null);
+  };
+
+  const measureNewRows = (): void => {
+    measureQueued = false;
+    if (disposed || unmeasuredRows.size === 0) {
+      unmeasuredRows.clear();
+      return;
+    }
+    pruneDisconnectedElements();
+    for (const element of unmeasuredRows) if (element.isConnected) virtualizer.measureElement(element);
+    unmeasuredRows.clear();
+  };
+
   const refresh = (): void => {
+    if (disposed) return;
     setItems(() => virtualizer.getVirtualItems());
     setTotalSize(virtualizer.getTotalSize());
     setEndIndex(virtualizer.range?.endIndex ?? 0);
   };
 
   const scheduleRefresh = (): void => {
-    if (refreshQueued) return;
+    if (disposed || refreshQueued) return;
     refreshQueued = true;
     queueMicrotask(() => {
       refreshQueued = false;
@@ -84,11 +104,20 @@ export function createListVirtualizer(options: ListVirtualizerOptions): ListVirt
           },
           onChange: scheduleRefresh,
         });
+        pruneDisconnectedElements();
         virtualizer._willUpdate();
       });
       scheduleRefresh();
     },
   );
+
+  createEffect(() => items(), pruneDisconnectedElements);
+
+  onCleanup(() => {
+    disposed = true;
+    unmeasuredRows.clear();
+    virtualizer.elementsCache.clear();
+  });
 
   onSettled(() => {
     const cleanup = virtualizer._didMount();
@@ -122,9 +151,11 @@ export function createListVirtualizer(options: ListVirtualizerOptions): ListVirt
     totalSize,
     endIndex,
     measureElement: (element) => {
-      queueMicrotask(() => {
-        if (element.isConnected) virtualizer.measureElement(element);
-      });
+      if (disposed) return;
+      unmeasuredRows.add(element);
+      if (measureQueued) return;
+      measureQueued = true;
+      queueMicrotask(measureNewRows);
     },
     reveal,
   };
