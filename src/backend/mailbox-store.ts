@@ -53,7 +53,7 @@ export type { ExportedAttachmentFile, GeneratedAttachmentSource } from "./attach
 
 import { isEmptyStoredFile, parseStoredJson } from "./atomic-json-file";
 import { routineNameInLimit } from "./database/legacy-conversation-message";
-import { mailboxReactionRowKey } from "./database/mailbox-projection";
+import { type MailboxRowLookup, mailboxReactionRowKey } from "./database/mailbox-projection";
 import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
 import { runIdOrigins } from "./message-run-ids";
 import type { OpenBotDatabase } from "./openbot-database";
@@ -313,6 +313,8 @@ export class MailboxStore {
   #keptExecutionMessageIds: KeptIndex<StoredMessage, Set<string>> | undefined;
   #keptMessagesById: KeptIndex<StoredMessage, Map<string, StoredMessage>> | undefined;
   #keptDeliveriesByRecipient: KeptIndex<StoredDelivery, Map<string, StoredDelivery[]>> | undefined;
+  #keptDeliveriesById: KeptIndex<StoredDelivery, Map<string, StoredDelivery>> | undefined;
+  #keptDeliveriesByMessage: KeptIndex<StoredDelivery, Map<string, StoredDelivery[]>> | undefined;
   #idempotencyRevision = 0;
   #savedIdempotency: IdempotencyMark | undefined;
   #keptTurnIds: { mark: IdempotencyMark; turnIds: Map<string, string | undefined> } | undefined;
@@ -508,18 +510,18 @@ export class MailboxStore {
 
   taskIdForKey(key: string): string | null {
     const messageId = this.#state.idempotency[key];
-    return messageId ? (this.#state.messages.find((message) => message.id === messageId)?.taskId ?? null) : null;
+    return messageId ? (this.#messageById(messageId)?.taskId ?? null) : null;
   }
 
   deliveryForKey(key: string): DeliveryContext | null {
     const messageId = this.#state.idempotency[key];
-    const delivery = this.#state.deliveries.find((item) => item.messageId === messageId);
+    const delivery = messageId ? this.#deliveriesOfMessage(messageId)[0] : undefined;
     return delivery ? this.#context(delivery) : null;
   }
 
   messagingOrigin(deliveryId: string): MessagingOrigin | null {
-    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId);
-    const message = delivery ? this.#state.messages.find((item) => item.id === delivery.messageId) : undefined;
+    const delivery = this.#deliveryById(deliveryId);
+    const message = delivery ? this.#messageById(delivery.messageId) : undefined;
     return message?.messaging ? structuredClone(message.messaging) : null;
   }
 
@@ -531,7 +533,7 @@ export class MailboxStore {
   answerReturn(requestIds: readonly string[], recipients: readonly string[]): MessagingOrigin | undefined {
     if (recipients.length !== 1) return undefined;
     const origins = requestIds.map((requestId) => {
-      const request = this.#state.messages.find((message) => message.id === requestId);
+      const request = this.#messageById(requestId);
       return request?.sender.kind === "agent" && request.sender.agentId === recipients[0]
         ? request.messagingReturn
         : undefined;
@@ -549,17 +551,17 @@ export class MailboxStore {
 
   answerTaskId(senderAgentId: string, replyToMessageId: string, recipientAgentIds: readonly string[]): string | null {
     if (recipientAgentIds.length !== 1) return null;
-    const request = this.#state.messages.find((message) => message.id === replyToMessageId);
+    const request = this.#messageById(replyToMessageId);
     if (!request?.senderTaskId || request.sender.kind !== "agent" || request.sender.agentId !== recipientAgentIds[0])
       return null;
-    const received = this.#state.deliveries.some(
-      (delivery) => delivery.messageId === request.id && delivery.recipientAgentId === senderAgentId,
+    const received = this.#deliveriesOfMessage(request.id).some(
+      (delivery) => delivery.recipientAgentId === senderAgentId,
     );
     return received ? request.senderTaskId : null;
   }
 
   sideThreadWaitsFor(agentId: string, messageId: string): boolean {
-    const message = this.#state.messages.find((candidate) => candidate.id === messageId);
+    const message = this.#messageById(messageId);
     if (!message?.senderTaskId || message.sender.kind !== "agent") return false;
     const { senderTaskId, sender } = message;
     return this.#state.messages.some(
@@ -1010,8 +1012,39 @@ export class MailboxStore {
     return this.#keptMessagesById.index;
   }
 
+  #messageById(id: string | null | undefined): StoredMessage | undefined {
+    return id ? this.#messagesById().get(id) : undefined;
+  }
+
+  #deliveryById(id: string): StoredDelivery | undefined {
+    this.#keptDeliveriesById = extendKeptIndex(
+      this.#keptDeliveriesById,
+      this.#state.deliveries,
+      () => new Map(),
+      (index, delivery) => {
+        if (!index.has(delivery.id)) index.set(delivery.id, delivery);
+      },
+    );
+    return this.#keptDeliveriesById.index.get(id);
+  }
+
+  #agentDelivery(agentId: string, deliveryId: string): StoredDelivery | undefined {
+    const delivery = this.#deliveryById(deliveryId);
+    return delivery?.recipientAgentId === agentId ? delivery : undefined;
+  }
+
+  #deliveriesOfMessage(messageId: string): readonly StoredDelivery[] {
+    this.#keptDeliveriesByMessage = extendKeptIndex(
+      this.#keptDeliveriesByMessage,
+      this.#state.deliveries,
+      () => new Map(),
+      addDeliveryOfMessage,
+    );
+    return this.#keptDeliveriesByMessage.index.get(messageId) ?? [];
+  }
+
   taskIdForDelivery(deliveryId: string): string | null {
-    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const delivery = this.#deliveryById(deliveryId);
     return delivery ? this.#taskIdOf(delivery) : null;
   }
 
@@ -1024,21 +1057,17 @@ export class MailboxStore {
   }
 
   #messageOfDelivery(deliveryId: string): StoredMessage | undefined {
-    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
-    return delivery ? this.#state.messages.find((message) => message.id === delivery.messageId) : undefined;
+    const delivery = this.#deliveryById(deliveryId);
+    return delivery ? this.#messageById(delivery.messageId) : undefined;
   }
 
   #taskIdOf(delivery: StoredDelivery, messages?: ReadonlyMap<string, StoredMessage>): string | null {
-    const message = messages
-      ? messages.get(delivery.messageId)
-      : this.#state.messages.find((candidate) => candidate.id === delivery.messageId);
+    const message = messages ? messages.get(delivery.messageId) : this.#messageById(delivery.messageId);
     return message?.taskId ?? null;
   }
 
   #laneOf(delivery: StoredDelivery, messages?: ReadonlyMap<string, StoredMessage>): string | null {
-    const message = messages
-      ? messages.get(delivery.messageId)
-      : this.#state.messages.find((candidate) => candidate.id === delivery.messageId);
+    const message = messages ? messages.get(delivery.messageId) : this.#messageById(delivery.messageId);
     if (message?.taskId) return message.taskId;
     if (message?.channelId) return channelLane(message.channelId);
     return message?.messaging && this.#usesMessagingLane(delivery.recipientAgentId, message.messaging.linkId)
@@ -1055,7 +1084,7 @@ export class MailboxStore {
   }
 
   laneIdForDelivery(deliveryId: string): string | null {
-    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const delivery = this.#deliveryById(deliveryId);
     return delivery ? this.#laneOf(delivery) : null;
   }
 
@@ -1301,7 +1330,7 @@ export class MailboxStore {
   }
 
   requestSenderAgentId(requestId: string): string | null {
-    const request = this.#state.messages.find((message) => message.id === requestId);
+    const request = this.#messageById(requestId);
     return request?.sender.kind === "agent" ? request.sender.agentId : null;
   }
 
@@ -1623,13 +1652,11 @@ export class MailboxStore {
     taskId: string,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      const delivery = this.#state.deliveries.find(
-        (candidate) => candidate.id === deliveryId && candidate.recipientAgentId === agentId,
-      );
+      const delivery = this.#agentDelivery(agentId, deliveryId);
       if (delivery?.status !== "queued" || delivery.editId || this.#queueUpdates.has(deliveryId))
         throw new Error(sourceText("error.backend.queuedMessageUnavailable"));
       const message = this.#requireMessage(delivery.messageId);
-      const recipients = this.#state.deliveries.filter((candidate) => candidate.messageId === message.id);
+      const recipients = this.#deliveriesOfMessage(message.id);
       if (
         message.sender.kind !== "user" ||
         message.channelId ||
@@ -2055,7 +2082,7 @@ export class MailboxStore {
   }
 
   repliesToStartWith(deliveryId: string): DeliveryContext[] {
-    const next = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const next = this.#deliveryById(deliveryId);
     if (!next) return [];
     const message = this.#requireMessage(next.messageId);
     const requestId = isAnswer(message) ? message.replyToMessageId : null;
@@ -2073,7 +2100,7 @@ export class MailboxStore {
   }
 
   userMessagesToStartWith(deliveryId: string): DeliveryContext[] {
-    const next = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const next = this.#deliveryById(deliveryId);
     if (!next) return [];
     const messages = this.#messagesById();
     const first = this.#requireMessage(next.messageId, messages);
@@ -2100,7 +2127,7 @@ export class MailboxStore {
   }
 
   planContinuationsToStartWith(deliveryId: string): DeliveryContext[] {
-    const next = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const next = this.#deliveryById(deliveryId);
     if (!next || !waitsForPlanContinuation(next)) return [];
     const messages = this.#messagesById();
     const lane = this.#laneOf(next, messages);
@@ -2175,11 +2202,8 @@ export class MailboxStore {
     if (!request) return false;
     const answeredBy = reply.sender.agentId;
     return (
-      this.#state.deliveries.some(
-        (candidate) =>
-          candidate.messageId === request.id &&
-          candidate.recipientAgentId !== answeredBy &&
-          this.#stillWorksOn(candidate, request.id),
+      this.#deliveriesOfMessage(request.id).some(
+        (candidate) => candidate.recipientAgentId !== answeredBy && this.#stillWorksOn(candidate, request.id),
       ) && !this.#turnAfterRequestEnded(delivery, request, messages)
     );
   }
@@ -2221,15 +2245,12 @@ export class MailboxStore {
   }
 
   joinsRunningTurn(deliveryId: string): boolean {
-    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const delivery = this.#deliveryById(deliveryId);
     if (delivery?.status !== "queued") return false;
     const message = this.#requireMessage(delivery.messageId);
     if (message.channelId || message.messaging) return false;
     if (message.replyToMessageId !== null && message.expectsReply !== false) return false;
-    return (
-      !isAnswer(message) ||
-      this.#state.deliveries.filter((candidate) => candidate.messageId === message.replyToMessageId).length < 2
-    );
+    return !isAnswer(message) || this.#deliveriesOfMessage(message.replyToMessageId).length < 2;
   }
 
   queuedDeliveryIds(agentId: string): string[] {
@@ -2244,38 +2265,35 @@ export class MailboxStore {
   }
 
   getDelivery(deliveryId: string): DeliveryContext | null {
-    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const delivery = this.#deliveryById(deliveryId);
     return delivery ? this.#context(delivery) : null;
   }
 
   deliveryForProviderMessage(agentId: string, messageId: string): DeliveryContext | null {
-    const delivery = this.#state.deliveries.find(
+    const delivery = this.#deliveriesFor(agentId).find(
       (candidate) =>
-        candidate.recipientAgentId === agentId &&
-        (candidate.id === messageId ||
-          (candidate.resumeAfterUsageLimit !== undefined &&
-            (candidate.turnId === messageId || candidate.resumeAfterUsageLimit.previousTurnIds.includes(messageId))) ||
-          candidate.planContinuation?.turnIds.includes(messageId) === true),
+        candidate.id === messageId ||
+        (candidate.resumeAfterUsageLimit !== undefined &&
+          (candidate.turnId === messageId || candidate.resumeAfterUsageLimit.previousTurnIds.includes(messageId))) ||
+        candidate.planContinuation?.turnIds.includes(messageId) === true,
     );
     if (delivery) return this.#context(delivery);
     for (const origin of runIdOrigins(messageId).slice(1)) {
-      const run = this.#state.deliveries.find(
-        (candidate) => candidate.recipientAgentId === agentId && candidate.id === origin,
-      );
+      const run = this.#agentDelivery(agentId, origin);
       if (run) return this.#context(run);
     }
     return null;
   }
 
   deliveryForMessage(messageId: string, recipientAgentId: string): DeliveryContext | null {
-    const delivery = this.#state.deliveries.find(
-      (candidate) => candidate.messageId === messageId && candidate.recipientAgentId === recipientAgentId,
+    const delivery = this.#deliveriesOfMessage(messageId).find(
+      (candidate) => candidate.recipientAgentId === recipientAgentId,
     );
     return delivery ? this.#context(delivery) : null;
   }
 
   steeredIntoOtherWork(deliveryId: string): boolean {
-    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const delivery = this.#deliveryById(deliveryId);
     return delivery?.steeredAt !== undefined && delivery.turnId !== delivery.id;
   }
 
@@ -2297,7 +2315,7 @@ export class MailboxStore {
         (delivery.status !== "starting" && delivery.status !== "running")
       )
         continue;
-      const origin = this.#state.messages.find((message) => message.id === delivery.messageId)?.messagingReturn;
+      const origin = this.#messageById(delivery.messageId)?.messagingReturn;
       if (origin) return structuredClone(origin);
     }
     return null;
@@ -2493,12 +2511,10 @@ export class MailboxStore {
 
   chainOriginAgentId(messageId: string): string | null {
     const visited = new Set<string>();
-    let message = this.#state.messages.find((candidate) => candidate.id === messageId);
+    let message = this.#messageById(messageId);
     while (message && !visited.has(message.id)) {
       visited.add(message.id);
-      const parent = message.replyToMessageId
-        ? this.#state.messages.find((candidate) => candidate.id === message?.replyToMessageId)
-        : undefined;
+      const parent = message.replyToMessageId ? this.#messageById(message?.replyToMessageId) : undefined;
       if (!parent) return message.sender.kind === "agent" ? message.sender.agentId : null;
       message = parent;
     }
@@ -2506,38 +2522,38 @@ export class MailboxStore {
   }
 
   replyReferenceMessageId(id: string): string | null {
-    if (this.#state.messages.some((message) => message.id === id)) return id;
-    return this.#state.deliveries.find((delivery) => delivery.id === id)?.messageId ?? null;
+    if (this.#messageById(id) !== undefined) return id;
+    return this.#deliveryById(id)?.messageId ?? null;
   }
 
   #answeredRequestOf(agentId: string, reply: { replyToMessageId: string }): StoredMessage | undefined {
-    const request = this.#state.messages.find((message) => message.id === reply.replyToMessageId);
+    const request = this.#messageById(reply.replyToMessageId);
     return request?.sender.kind === "agent" && request.sender.agentId === agentId && request.expectsReply !== false
       ? request
       : undefined;
   }
 
   answersRequestOf(agentId: string, messageId: string): boolean {
-    const reply = this.#state.messages.find((message) => message.id === messageId);
+    const reply = this.#messageById(messageId);
     return reply !== undefined && isAnswer(reply) && this.#answeredRequestOf(agentId, reply) !== undefined;
   }
 
   followsUpOwnAnswer(delivery: QueueDelivery): boolean {
     if (delivery.sender.kind !== "agent" || !delivery.replyToMessageId || delivery.expectsReply !== false) return false;
-    const replied = this.#state.messages.find((message) => message.id === delivery.replyToMessageId);
+    const replied = this.#messageById(delivery.replyToMessageId);
     return replied !== undefined && isAnswer(replied) && replied.sender.agentId === delivery.recipientAgentId;
   }
 
   expectsReply(messageId: string): boolean {
-    return this.#state.messages.find((message) => message.id === messageId)?.expectsReply !== false;
+    return this.#messageById(messageId)?.expectsReply !== false;
   }
 
   senderMember(messageId: string): ConversationMessageSender | undefined {
-    return this.#state.messages.find((message) => message.id === messageId)?.senderMember;
+    return this.#messageById(messageId)?.senderMember;
   }
 
   requesterIds(messageId: string): readonly string[] {
-    return this.#state.messages.find((message) => message.id === messageId)?.requesterIds ?? [];
+    return this.#messageById(messageId)?.requesterIds ?? [];
   }
 
   hasReplyFrom(agentId: string, messageId: string): boolean {
@@ -2548,7 +2564,7 @@ export class MailboxStore {
   }
 
   hasOwnReplyFrom(deliveryId: string): boolean {
-    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const delivery = this.#deliveryById(deliveryId);
     if (!delivery?.turnId) return false;
     const replies = new Set(
       this.#state.messages
@@ -2572,7 +2588,7 @@ export class MailboxStore {
   }
 
   answersHandledRequest(deliveryId: string): boolean {
-    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const delivery = this.#deliveryById(deliveryId);
     if (!delivery) return false;
     const messages = this.#messagesById();
     const reply = messages.get(delivery.messageId);
@@ -2602,7 +2618,7 @@ export class MailboxStore {
   }
 
   hasSentResultFor(deliveryId: string): boolean {
-    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const delivery = this.#deliveryById(deliveryId);
     if (!delivery?.turnId) return false;
     return [delivery.turnId, ...(delivery.resumeAfterUsageLimit?.previousTurnIds ?? [])].some(
       (turnId) => this.#state.idempotency[`${AUTO_RESULT_KEY_PREFIX}${turnId}:${delivery.messageId}`] !== undefined,
@@ -2617,8 +2633,8 @@ export class MailboxStore {
     recovered = false,
     temporary = false,
   ): Effect.fn.Return<string | null, StoredStateFailure> {
-    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
-    const request = delivery && this.#state.messages.find((message) => message.id === delivery.messageId);
+    const delivery = this.#deliveryById(deliveryId);
+    const request = delivery && this.#messageById(delivery.messageId);
     const steered = delivery?.status === "interrupted" && this.steeredIntoOtherWork(deliveryId);
     const outcome =
       delivery?.status === "failed" || (delivery?.status === "interrupted" && (steered || recovered))
@@ -2703,9 +2719,7 @@ export class MailboxStore {
       if (message.sender.kind !== "agent" || message.sender.agentId !== agentId) return false;
       if (turnIds.get(message.id) !== turnId || !counts(message)) return false;
       if (message.replyToMessageId !== null && turnRequestIds.has(message.replyToMessageId)) return false;
-      return this.#state.deliveries.some(
-        (delivery) => delivery.messageId === message.id && delivery.recipientAgentId === recipientAgentId,
-      );
+      return this.#deliveriesOfMessage(message.id).some((delivery) => delivery.recipientAgentId === recipientAgentId);
     });
   }
 
@@ -2721,21 +2735,20 @@ export class MailboxStore {
   }
 
   routineDeliveryOfRequest(agentId: string, requestMessageId: string): DeliveryContext | null {
-    const request = this.#state.messages.find((message) => message.id === requestMessageId);
+    const request = this.#messageById(requestMessageId);
     if (request?.sender.kind !== "agent" || request.sender.agentId !== agentId) return null;
     const turnId = this.#sourceTurnIds().get(request.id);
     if (!turnId) return null;
-    const delivery = this.#state.deliveries.find(
+    const delivery = this.#deliveriesFor(agentId).find(
       (candidate) =>
-        candidate.recipientAgentId === agentId &&
         (candidate.turnId === turnId || candidate.resumeAfterUsageLimit?.previousTurnIds.includes(turnId) === true) &&
-        this.#state.messages.find((message) => message.id === candidate.messageId)?.sender.kind === "routine",
+        this.#messageById(candidate.messageId)?.sender.kind === "routine",
     );
     return delivery ? this.#context(delivery) : null;
   }
 
   routineRunTurns(deliveryId: string): { turnIds: string[]; waiting: boolean } | null {
-    const start = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const start = this.#deliveryById(deliveryId);
     if (!start?.turnId) return null;
     const agentId = start.recipientAgentId;
     const sourceTurnIds = this.#sourceTurnIds();
@@ -2803,7 +2816,7 @@ export class MailboxStore {
     deliveryId: string,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+      const delivery = this.#deliveryById(deliveryId);
       if (delivery?.status === "queued" && delivery.editId && !this.#isHeldByEdit(delivery))
         this.#finishCancellation(delivery, false);
       this.#assertQueueNotEditing(deliveryId);
@@ -2820,7 +2833,7 @@ export class MailboxStore {
     turnId: string,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      const stored = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+      const stored = this.#deliveryById(deliveryId);
       const continuation = stored?.resumeAfterUsageLimit;
       const planContinuation = stored?.planContinuation;
       yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
@@ -2876,7 +2889,7 @@ export class MailboxStore {
   }
 
   #answeredRequest(deliveryId: string): boolean {
-    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const delivery = this.#deliveryById(deliveryId);
     if (!delivery) return false;
     const request = this.#messagesById().get(delivery.messageId);
     if (request?.sender.kind !== "agent" || request.channelId) return false;
@@ -2897,9 +2910,7 @@ export class MailboxStore {
 
   cancelNow(agentId: string, deliveryId: string): void {
     this.#assertQueueNotUpdating(deliveryId);
-    const delivery = this.#state.deliveries.find(
-      (candidate) => candidate.id === deliveryId && candidate.recipientAgentId === agentId,
-    );
+    const delivery = this.#agentDelivery(agentId, deliveryId);
     if (!delivery) throw new Error(sourceText("error.backend.queuedMessageNotFound"));
     if (delivery.status !== "queued") throw new Error(sourceText("error.backend.cancelQueuedOnly"));
     this.#finishCancellation(delivery, true);
@@ -2914,13 +2925,12 @@ export class MailboxStore {
 
   #assertQueueNotEditing(deliveryId: string): void {
     this.#assertQueueNotUpdating(deliveryId);
-    if (this.#state.deliveries.find((item) => item.id === deliveryId)?.editId)
-      throw new Error(sourceText("error.backend.messageBeingEdited"));
+    if (this.#deliveryById(deliveryId)?.editId) throw new Error(sourceText("error.backend.messageBeingEdited"));
   }
 
   beginQueueEdit(agentId: string, deliveryId: string, editId: string): void {
     this.#assertQueueNotUpdating(deliveryId);
-    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
+    const delivery = this.#agentDelivery(agentId, deliveryId);
     if (delivery?.status !== "queued")
       throw new QueueEditRejectedError(sourceText("error.backend.queuedMessageUnavailable"));
     if (delivery.editId && delivery.editId !== editId)
@@ -2940,7 +2950,7 @@ export class MailboxStore {
 
   retainQueueEditAttachments(agentId: string, deliveryId: string, editId: string, draftIds: string[]): void {
     this.#assertQueueNotUpdating(deliveryId);
-    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
+    const delivery = this.#agentDelivery(agentId, deliveryId);
     if (delivery?.status !== "queued" || delivery.editId !== editId)
       throw new QueueEditRejectedError(sourceText("error.backend.editUnavailable"));
     if (draftIds.length > MAX_ATTACHMENTS || new Set(draftIds).size !== draftIds.length)
@@ -2970,7 +2980,7 @@ export class MailboxStore {
   }
 
   finishedQueueEditAction(agentId: string, deliveryId: string, editId: string): QueueEditOutcome | undefined {
-    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
+    const delivery = this.#agentDelivery(agentId, deliveryId);
     return delivery?.finishedEditOutcomes?.[editId]?.action;
   }
 
@@ -2982,7 +2992,7 @@ export class MailboxStore {
     keepAttachmentIds: string[],
     attachmentDraftIds: string[],
   ): boolean {
-    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
+    const delivery = this.#agentDelivery(agentId, deliveryId);
     const outcome = delivery?.finishedEditOutcomes?.[editId];
     return (
       outcome !== undefined &&
@@ -2993,7 +3003,7 @@ export class MailboxStore {
 
   finishQueueEdit(agentId: string, deliveryId: string, editId: string): void {
     this.#assertQueueNotUpdating(deliveryId);
-    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
+    const delivery = this.#agentDelivery(agentId, deliveryId);
     if (!delivery || delivery.editId !== editId)
       throw new QueueEditRejectedError(sourceText("error.backend.editUnavailable"));
     this.#finishCancellation(delivery, false);
@@ -3078,9 +3088,7 @@ export class MailboxStore {
     sender: ConversationMessageSender | undefined,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      const delivery = this.#state.deliveries.find(
-        (candidate) => candidate.id === deliveryId && candidate.recipientAgentId === agentId,
-      );
+      const delivery = this.#agentDelivery(agentId, deliveryId);
       if (!delivery) throw new Error(sourceText("error.backend.queuedMessageNotFound"));
       if (delivery.status !== "queued") throw new Error(sourceText("error.backend.editQueuedOnly"));
       if (delivery.editId !== editId) throw new Error(sourceText("error.backend.editedOnOtherDevice"));
@@ -3130,9 +3138,7 @@ export class MailboxStore {
                     .commitMessageTransfer(
                       `${message.id}-edit-${randomUUID()}`,
                       message.sender,
-                      this.#state.deliveries
-                        .filter((candidate) => candidate.messageId === message.id)
-                        .map((candidate) => candidate.recipientAgentId),
+                      this.#deliveriesOfMessage(message.id).map((candidate) => candidate.recipientAgentId),
                       message.id,
                       new Date().toISOString(),
                       draftAttachmentPaths,
@@ -3270,7 +3276,7 @@ export class MailboxStore {
     turnId: string,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+      const delivery = this.#deliveryById(deliveryId);
       if (!delivery || delivery.turnId !== turnId || delivery.status === "queued" || delivery.status === "cancelled") {
         return;
       }
@@ -3289,7 +3295,7 @@ export class MailboxStore {
     turnId: string,
   ): Effect.fn.Return<boolean, StoredStateFailure> {
     try {
-      const delivery = this.#state.deliveries.find((candidate) => candidate.id === turnId);
+      const delivery = this.#deliveryById(turnId);
       if (
         !delivery ||
         delivery.recipientAgentId !== agentId ||
@@ -3355,8 +3361,8 @@ export class MailboxStore {
     deliveryId: string,
     routineRetry: boolean,
   ): Effect.fn.Return<boolean, StoredStateFailure> {
-    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
-    const message = delivery && this.#state.messages.find((candidate) => candidate.id === delivery.messageId);
+    const delivery = this.#deliveryById(deliveryId);
+    const message = delivery && this.#messageById(delivery.messageId);
     const key = `${RESTARTED_RESULT_KEY_PREFIX}${deliveryId}`;
     const teammateResult =
       message?.sender.kind === "agent" &&
@@ -3384,8 +3390,7 @@ export class MailboxStore {
     turnId: string,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      const turnIds = this.#state.deliveries.find((candidate) => candidate.id === deliveryId)?.planContinuation
-        ?.turnIds;
+      const turnIds = this.#deliveryById(deliveryId)?.planContinuation?.turnIds;
       yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
         status: "queued",
         turnId: null,
@@ -3430,10 +3435,8 @@ export class MailboxStore {
   }, Effect.uninterruptible).bind(this);
 
   hasUnfinishedDelivery(agentId: string): boolean {
-    return this.#state.deliveries.some(
-      (delivery) =>
-        delivery.recipientAgentId === agentId &&
-        (delivery.status === "queued" || delivery.status === "starting" || delivery.status === "running"),
+    return this.#deliveriesFor(agentId).some(
+      (delivery) => delivery.status === "queued" || delivery.status === "starting" || delivery.status === "running",
     );
   }
 
@@ -3457,15 +3460,12 @@ export class MailboxStore {
   }
 
   hasQueuedDelivery(agentId: string): boolean {
-    return this.#state.deliveries.some(
-      (delivery) => delivery.recipientAgentId === agentId && delivery.status === "queued",
-    );
+    return this.#deliveriesFor(agentId).some((delivery) => delivery.status === "queued");
   }
 
   hasStartedDelivery(agentId: string): boolean {
-    return this.#state.deliveries.some(
-      (delivery) =>
-        delivery.recipientAgentId === agentId && (delivery.status === "starting" || delivery.status === "running"),
+    return this.#deliveriesFor(agentId).some(
+      (delivery) => delivery.status === "starting" || delivery.status === "running",
     );
   }
 
@@ -3611,7 +3611,7 @@ export class MailboxStore {
     deliveryId: string,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+      const delivery = this.#deliveryById(deliveryId);
       if (!delivery) throw new Error(`Unknown delivery: ${deliveryId}`);
       const message = this.#requireMessage(delivery.messageId);
       for (const attachment of message.attachments) {
@@ -3959,7 +3959,7 @@ export class MailboxStore {
     patch: Partial<StoredDelivery>,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      const delivery = this.#state.deliveries.find((candidate) => candidate.id === id);
+      const delivery = this.#deliveryById(id);
       if (!delivery) throw new Error(`Unknown delivery: ${id}`);
       if (!allowed.includes(delivery.status)) return;
       Object.assign(delivery, patch);
@@ -3972,14 +3972,14 @@ export class MailboxStore {
   }, Effect.uninterruptible);
 
   #clearSteerFallback(deliveryId: string): void {
-    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    const delivery = this.#deliveryById(deliveryId);
     if (delivery?.status !== "queued") return;
     delete delivery.steerFallback;
     this.#changes.deliveryIds.add(delivery.id);
   }
 
   #requireMessage(id: string, messages?: ReadonlyMap<string, StoredMessage>): StoredMessage {
-    const message = messages ? messages.get(id) : this.#state.messages.find((candidate) => candidate.id === id);
+    const message = messages ? messages.get(id) : this.#messageById(id);
     if (!message) throw new Error(`Mailbox message is missing: ${id}`);
     return message;
   }
@@ -4016,7 +4016,7 @@ export class MailboxStore {
       : this.#database.applyMailboxChanges(
           commandId,
           this.#state,
-          this.#changes,
+          { ...this.#changes, rowLookup: this.#rowLookup },
           eventType,
           fileDeletions,
           !this.#savedIdempotency || !sameIdempotencyMark(this.#savedIdempotency, idempotency),
@@ -4025,6 +4025,11 @@ export class MailboxStore {
     this.#savedIdempotency = idempotency;
     this.#clearChanges();
   }
+
+  readonly #rowLookup: MailboxRowLookup = {
+    message: (id) => this.#messageById(id),
+    delivery: (id) => this.#deliveryById(id),
+  };
 
   #clearChanges(): void {
     for (const keys of Object.values(this.#changes)) keys.clear();
