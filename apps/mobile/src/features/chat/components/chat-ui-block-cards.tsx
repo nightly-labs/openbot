@@ -27,6 +27,7 @@ import { AccessibilityInfo, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
+import { copyToClipboard } from "@/features/chat/components/use-copy-message";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { storeCodePreview } from "@/features/chat/model/code-preview-store";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
@@ -152,20 +153,43 @@ function ConfirmPreview({ markdown, title }: { markdown: string; title: string }
           />
         </View>
       </View>
-      {cutOff ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="self-start px-0"
-          onPress={() => {
-            const previewId = storeCodePreview({ kind: "markdown", source: markdown, title });
-            router.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
-          }}
-        >
-          <Button.Label>{t("mobile.chat.question.showAllPreview")}</Button.Label>
-        </Button>
-      ) : null}
+      <View className="flex-row flex-wrap items-center gap-x-4">
+        {cutOff ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-0"
+            onPress={() => {
+              const previewId = storeCodePreview({ kind: "markdown", source: markdown, title });
+              router.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
+            }}
+          >
+            <Button.Label>{t("mobile.chat.question.showAllPreview")}</Button.Label>
+          </Button>
+        ) : null}
+        <CopyPreviewButton markdown={markdown} />
+      </View>
     </View>
+  );
+}
+
+const COPIED_FEEDBACK_MS = 1_500;
+
+function CopyPreviewButton({ markdown }: { markdown: string }) {
+  const { t } = useText();
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  async function copy() {
+    if (await copyToClipboard(markdown, "mobile.chat.question.copyPreviewFailed", t)) setCopied(true);
+  }
+  return (
+    <Button variant="ghost" size="sm" className="px-0" onPress={() => void copy()}>
+      <Button.Label>{t(copied ? "common.copied" : "common.copy")}</Button.Label>
+    </Button>
   );
 }
 

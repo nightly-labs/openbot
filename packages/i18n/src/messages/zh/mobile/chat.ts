@@ -129,6 +129,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "按住按钮确认。",
   "mobile.chat.question.preview": "预览",
   "mobile.chat.question.showAllPreview": "显示全部",
+  "mobile.chat.question.copyPreviewFailed": "无法复制草稿",
   "mobile.chat.question.sendChoice": "发送",
   "mobile.chat.question.selectedCount": { one: "已选 {count} 项", other: "已选 {count} 项" },
   "mobile.chat.question.noneSelected": "未选择任何项",

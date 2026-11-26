@@ -135,6 +135,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "Maintenez le bouton enfoncé pour confirmer.",
   "mobile.chat.question.preview": "Aperçu",
   "mobile.chat.question.showAllPreview": "Tout afficher",
+  "mobile.chat.question.copyPreviewFailed": "Impossible de copier le brouillon",
   "mobile.chat.question.sendChoice": "Envoyer",
   "mobile.chat.question.selectedCount": { one: "{count} sélectionné", other: "{count} sélectionnés" },
   "mobile.chat.question.noneSelected": "Rien de sélectionné",

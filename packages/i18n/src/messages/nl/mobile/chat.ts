@@ -125,6 +125,7 @@ export const messages = {
   "mobile.chat.question.holdHint": "Houd de knop ingedrukt om te bevestigen.",
   "mobile.chat.question.preview": "Voorvertoning",
   "mobile.chat.question.showAllPreview": "Alles tonen",
+  "mobile.chat.question.copyPreviewFailed": "Kan het concept niet kopiëren",
   "mobile.chat.question.sendChoice": "Sturen",
   "mobile.chat.question.selectedCount": { one: "{count} geselecteerd", other: "{count} geselecteerd" },
   "mobile.chat.question.noneSelected": "Niets geselecteerd",
