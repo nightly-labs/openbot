@@ -105,7 +105,7 @@ import { normalizeAccountUsage, usageWindowHasReset, usageWindowResetSince } fro
 import { captureBrowser, signInPageByOpenBot } from "./browser-capture";
 import { CliCodeLoginFailed, type CliCodePrompt, PROMPT_TIMEOUT_MS, startCliCodeLogin } from "./cli-code-login";
 import { CliLoginFailed, CliLoginFlow, type CliLoginProcess, toCliLoginFailed } from "./cli-login-flow";
-import { CodexLoginFlow, toCodexLoginFailed } from "./codex-login";
+import { CodexLoginFlow, codexWorkspaceMissing, toCodexLoginFailed } from "./codex-login";
 import { readCodexRoutesToOpenai } from "./codex-model-source";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { FailureContext } from "./failure-signal";
@@ -213,15 +213,10 @@ const CODEX_SERVICE_UNREACHABLE = new Set([
 function isCodexServiceUnreachable(error: unknown): boolean {
   return error instanceof AppServerError && CODEX_SERVICE_UNREACHABLE.has(error.message);
 }
-const CODEX_WORKSPACE_MISSING = "selected workspace missing from routing discovery";
 
 function signInForMissingCodexWorkspace(failure: ProviderOperationFailed): ProviderOperationFailed {
-  if (!(failure.cause instanceof AppServerError && failure.cause.message === CODEX_WORKSPACE_MISSING)) return failure;
-  return new ProviderOperationFailed({
-    cause: new ProviderSignInError({
-      message: sourceText("error.provider.codexWorkspaceMissing", { provider: providerLabel("codex") }),
-    }),
-  });
+  const signIn = codexWorkspaceMissing(failure.cause);
+  return signIn ? new ProviderOperationFailed({ cause: signIn }) : failure;
 }
 const PROVIDER_RESTART_POLL_MS = 1_000;
 const PROVIDER_BACKGROUND_WORK_WAIT_MS = 4 * 60 * 60_000;
