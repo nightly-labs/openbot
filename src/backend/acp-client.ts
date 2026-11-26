@@ -4288,10 +4288,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     const open = thread.activeTurn?.unprompted ? thread.activeTurn : null;
-    const growing = open?.textMessageId ?? null;
+    const held = open?.leadingThought.hidden ? open.leadingThought.messageId : null;
+    const growing = held ?? open?.textMessageId ?? null;
     const grown = growing ? replayedText(updates, growing) : "";
     const shown = open
-      ? `${open.leadingThought.messageId === growing ? open.leadingThought.hidden : ""}${open.text.slice(open.textMessageStart)}`
+      ? `${held ? open.leadingThought.hidden : ""}${open.textMessageId === growing ? open.text.slice(open.textMessageStart) : ""}`
       : "";
     const added = open && grown.startsWith(shown) ? grown.slice(shown.length) : "";
     if (fresh.size === 0 && !open?.toolItems.size && !added) return;

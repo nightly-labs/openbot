@@ -17,6 +17,8 @@ interface Session {
   pending: 0 | 1 | 2 | 3 | 4;
   prompts: number;
   followsChildren: boolean;
+  tagged: boolean;
+  loaded: boolean;
 }
 
 const sessions = new Map<string, Session>();
@@ -36,6 +38,11 @@ function text(messageId: string, value: string) {
 }
 
 const ANSWER = ["", "The background task", "The background task finished: DONE."] as const;
+const TAGGED_ANSWER = [
+  "<think>The",
+  "<think>The task",
+  "<think>The task is done.</think>The background task finished: DONE.",
+] as const;
 
 function tool(toolCallId: string, status: "in_progress" | "completed", rawOutput?: unknown): SessionUpdate[] {
   return [
@@ -66,6 +73,8 @@ function send(peer: AcpPeer, session: Session, updates: SessionUpdate[]): void {
 }
 
 function advance(session: Session): void {
+  if (session.tagged && session.pending >= 3 && !session.loaded) return;
+  session.loaded = false;
   if (session.pending === 1) {
     session.history.push(
       {
@@ -84,7 +93,7 @@ function advance(session: Session): void {
   if (session.pending === 2 && RELEASE && existsSync(join(RELEASE, session.id))) {
     session.history.push(
       { sessionUpdate: "tool_call_update", toolCallId: "tool_bg_check", status: "completed" },
-      text("msg_bg_2", ANSWER[0]),
+      text("msg_bg_2", (session.tagged ? TAGGED_ANSWER : ANSWER)[0]),
     );
     session.pending = 3;
     touch(session);
@@ -95,7 +104,10 @@ function advance(session: Session): void {
       (update) => update.sessionUpdate === "agent_message_chunk" && update.messageId === "msg_bg_2",
     );
     if (answer?.sessionUpdate === "agent_message_chunk")
-      answer.content = { type: "text", text: ANSWER[session.pending === 3 ? 1 : 2] };
+      answer.content = {
+        type: "text",
+        text: (session.tagged ? TAGGED_ANSWER : ANSWER)[session.pending === 3 ? 1 : 2],
+      };
     touch(session);
     if (session.pending === 4) logEntry({ event: "background-ended", session: session.id });
     session.pending = session.pending === 3 ? 4 : 0;
@@ -123,6 +135,8 @@ serveFakeAcpAgent({
       pending: 0,
       prompts: 0,
       followsChildren: true,
+      tagged: false,
+      loaded: false,
     };
     touch(session);
     sessions.set(session.id, session);
@@ -151,6 +165,7 @@ serveFakeAcpAgent({
       return;
     }
     logEntry({ event: "load", session: session.id });
+    session.loaded = true;
     session.followsChildren = false;
     for (const update of session.history) peer.update(session.id, update);
     peer.reply(request, {});
@@ -164,6 +179,7 @@ serveFakeAcpAgent({
     session.prompts += 1;
     const turn = `msg_${session.prompts}`;
     const prompt = request.params.prompt?.map((part) => part.text ?? "").join("") ?? "";
+    session.tagged = prompt.includes("tagged");
     session.history.push({
       sessionUpdate: "user_message_chunk",
       messageId: `${turn}_user`,
