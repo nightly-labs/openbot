@@ -732,14 +732,6 @@ export class ProviderAccounts {
           ),
         );
       if (limit) limits.push(limit);
-      else if (homeSupport(provider)?.usageLeavesSession) {
-        const reading = kept();
-        limits.push(
-          reading && !usageWindowResetSince(reading, 0)
-            ? reading
-            : { id: provider, accountId: account.id, primary: null, secondary: null, readFailed: true },
-        );
-      }
     }
     return limits;
   }).bind(this);
@@ -895,7 +887,6 @@ export class ProviderAccounts {
   ) {
     const running = this.#host.agentClient(account.provider, account.id);
     if (running) return yield* this.#storeUsage(account, running, yield* this.#host.readUsage(running, model));
-    if (homeSupport(account.provider)?.usageLeavesSession) return this.#usage.get(account.id)?.limit ?? null;
     const cli = this.#host.cli(account.provider);
     if (!cli) return null;
     return yield* Effect.acquireUseRelease(

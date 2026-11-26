@@ -1,10 +1,11 @@
 import {
+  isNearBudgetText,
   NEAR_RULE_DAILY_USD,
   type NearOwnerAction,
   type NearPasskeyChoice,
   type NearWalletStatus,
 } from "@openbot/contracts/ipc";
-import { Button, Field, NativeSelect, RadioGroup, Text } from "@openbot/ui";
+import { Button, Field, Input, NativeSelect, RadioGroup, Text } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, createStore, For, Match, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
@@ -35,37 +36,81 @@ export interface NearDialogProps {
 }
 
 const BUDGET_PRESETS = ["10", "25", "100"] as const;
+const BUDGET_TEXT_LIMIT = 12;
 
 const signingFor = (status: NearWalletStatus, actions: readonly NearOwnerAction[]) =>
   status.signing !== null && actions.includes(status.signing.action);
 
-function BudgetChoice(props: { values: readonly string[]; value: string; onChange: (value: string) => void }) {
+const CUSTOM_BUDGET = "custom";
+
+const isBudgetPreset = (value: string) => BUDGET_PRESETS.some((preset) => preset === value);
+
+function BudgetChoice(props: { initial: string; onChange: (value: string | null) => void }) {
   const { t, format } = useText();
+  const [choice, setChoice] = createSignal(
+    untrack(() => (isBudgetPreset(props.initial) ? props.initial : CUSTOM_BUDGET)),
+  );
+  const [custom, setCustom] = createSignal(untrack(() => (isBudgetPreset(props.initial) ? "" : props.initial)));
+  const customValue = (text: string) => (isNearBudgetText(text.trim()) ? text.trim() : null);
+  const customInvalid = () => custom().trim() !== "" && customValue(custom()) === null;
+  const choose = (value: string) => {
+    setChoice(value);
+    props.onChange(value === CUSTOM_BUDGET ? customValue(custom()) : value);
+  };
+  const type = (text: string) => {
+    setCustom(text);
+    props.onChange(customValue(text));
+  };
   return (
-    <RadioGroup.Root
-      class="settings-mobile-route-choice"
-      aria-label={t("vault.near.budgetLabel")}
-      value={props.value}
-      onChange={(value) => {
-        if (props.values.includes(value)) props.onChange(value);
-      }}
-    >
-      <For each={props.values}>
-        {(value) => (
-          <RadioGroup.Item class="settings-mobile-route-option" value={value}>
-            <RadioGroup.ItemInput />
-            <RadioGroup.ItemControl class="settings-mobile-route-card">
-              <span class="settings-mobile-route-dot" aria-hidden="true" />
-              <span class="settings-mobile-route-text">
-                <RadioGroup.ItemLabel class="settings-mobile-route-name">
-                  {t("vault.near.perDay", { amount: format.currencyUsd(usdNumber(value)) })}
-                </RadioGroup.ItemLabel>
-              </span>
-            </RadioGroup.ItemControl>
-          </RadioGroup.Item>
-        )}
-      </For>
-    </RadioGroup.Root>
+    <>
+      <RadioGroup.Root
+        class="settings-mobile-route-choice"
+        aria-label={t("vault.near.budgetLabel")}
+        value={choice()}
+        onChange={choose}
+      >
+        <For each={BUDGET_PRESETS}>
+          {(value) => (
+            <RadioGroup.Item class="settings-mobile-route-option" value={value}>
+              <RadioGroup.ItemInput />
+              <RadioGroup.ItemControl class="settings-mobile-route-card">
+                <span class="settings-mobile-route-dot" aria-hidden="true" />
+                <span class="settings-mobile-route-text">
+                  <RadioGroup.ItemLabel class="settings-mobile-route-name">
+                    {t("vault.near.perDay", { amount: format.currencyUsd(usdNumber(value)) })}
+                  </RadioGroup.ItemLabel>
+                </span>
+              </RadioGroup.ItemControl>
+            </RadioGroup.Item>
+          )}
+        </For>
+        <RadioGroup.Item class="settings-mobile-route-option" value={CUSTOM_BUDGET}>
+          <RadioGroup.ItemInput />
+          <RadioGroup.ItemControl class="settings-mobile-route-card">
+            <span class="settings-mobile-route-dot" aria-hidden="true" />
+            <span class="settings-mobile-route-text">
+              <RadioGroup.ItemLabel class="settings-mobile-route-name">
+                {t("vault.near.budgetCustom")}
+              </RadioGroup.ItemLabel>
+            </span>
+          </RadioGroup.ItemControl>
+        </RadioGroup.Item>
+      </RadioGroup.Root>
+      <Show when={choice() === CUSTOM_BUDGET}>
+        <Field
+          label={t("vault.near.budgetCustomLabel")}
+          error={customInvalid() ? t("vault.near.budgetCustomInvalid") : undefined}
+        >
+          <Input
+            inputmode="decimal"
+            autocomplete="off"
+            maxlength={BUDGET_TEXT_LIMIT}
+            value={custom()}
+            onValueChange={type}
+          />
+        </Field>
+      </Show>
+    </>
   );
 }
 
@@ -88,6 +133,12 @@ export function NearSetupDialog(props: NearDialogProps) {
   const [index, setIndex] = createSignal(0);
   const step = () => SETUP_STEPS[index()] ?? "funds";
   const [accepted, setAccepted] = createSignal(false);
+  const [budget, setBudget] = createSignal<string | null>(SETUP_DAILY_BUDGET);
+  const [shownBudget, setShownBudget] = createSignal(SETUP_DAILY_BUDGET);
+  const chooseBudget = (value: string | null) => {
+    setBudget(value);
+    if (value !== null) setShownBudget(value);
+  };
   const [keepAccepted, setKeepAccepted] = createSignal(false);
   const [acceptedAt, setAcceptedAt] = createSignal<string | null>(null);
   const [stopped, setStopped] = createSignal(false);
@@ -146,16 +197,18 @@ export function NearSetupDialog(props: NearDialogProps) {
   });
 
   const canGo = () => {
-    if (step() === "sign") return accepted() && !waiting();
+    if (step() === "sign") return accepted() && budget() !== null && !waiting();
     if (step() === "backup") return !action.busy() && !checking() && (!deviceWarning() || keepAccepted());
     return true;
   };
 
   async function create(passkey?: NearPasskeyChoice) {
+    const dailyBudgetUsd = budget();
+    if (dailyBudgetUsd === null) return;
     setStopped(false);
     setSigned(-1);
     setStarted(true);
-    const input = { dailyBudgetUsd: SETUP_DAILY_BUDGET };
+    const input = { dailyBudgetUsd };
     const sent = await action.run(() => props.actions.create(passkey ? { ...input, passkey } : input));
     if (!sent) setStopped(true);
   }
@@ -249,11 +302,13 @@ export function NearSetupDialog(props: NearDialogProps) {
       <SetupSteps labels={stepLabels()} current={index()} />
       <Switch>
         <Match when={step() === "sign"}>
-          <SetupSignatures
-            active={activeSignature()}
-            failed={started() && stopped()}
-            dailyBudgetUsd={SETUP_DAILY_BUDGET}
-          />
+          <Show when={!started() || stopped()}>
+            <Text as="p" variant="label">
+              {t("vault.near.budgetLabel")}
+            </Text>
+            <BudgetChoice initial={shownBudget()} onChange={chooseBudget} />
+          </Show>
+          <SetupSignatures active={activeSignature()} failed={started() && stopped()} dailyBudgetUsd={shownBudget()} />
           <Show when={!started()}>
             <RiskAccept accepted={accepted()} onChange={setAccepted} />
           </Show>
@@ -380,25 +435,30 @@ function OwnerChangeDialog(props: {
 export function NearBudgetDialog(props: NearDialogProps) {
   const { t } = useText();
   const current = untrack(() => props.status.account?.dailyBudgetUsd ?? SETUP_DAILY_BUDGET);
-  const values = [...new Set([...BUDGET_PRESETS, current])].sort((a, b) => usdNumber(a) - usdNumber(b));
-  const [budget, setBudget] = createSignal(current);
+  const [budget, setBudget] = createSignal<string | null>(current);
+  const sameAsCurrent = (value: string) => Number(value) === Number(current);
+  const changed = () => {
+    const next = budget();
+    return next !== null && !sameAsCurrent(next);
+  };
   const run = createNearRun();
   async function save() {
-    if (budget() === current) return;
-    if (await run.run(() => props.actions.setBudget(budget()))) props.onClose();
+    const next = budget();
+    if (next === null || sameAsCurrent(next)) return;
+    if (await run.run(() => props.actions.setBudget(next))) props.onClose();
   }
   return (
     <OwnerChangeDialog
       title={t("vault.near.budgetTitle")}
       submitLabel={t("vault.near.signInBrowser")}
-      canSave={budget() !== current}
+      canSave={changed()}
       sign
       actions={props.actions}
       run={run}
       onClose={props.onClose}
       onSave={() => void save()}
     >
-      <BudgetChoice values={values} value={budget()} onChange={setBudget} />
+      <BudgetChoice initial={current} onChange={setBudget} />
     </OwnerChangeDialog>
   );
 }

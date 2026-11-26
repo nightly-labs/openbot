@@ -25,6 +25,7 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import { conversationContentSignature } from "./delivery-content";
 import { markIncompleteMediaGeneration } from "./image-generation";
 import type { MailboxSync } from "./mailbox-sync";
+import { nearPaymentText } from "./near-payment-message";
 import type { PlanContinuation } from "./plan-continuation";
 import type { ProviderRuntime } from "./provider-runtime";
 import { answeredRequestId } from "./routine-quiet-runs";
@@ -442,12 +443,21 @@ export class BootRecovery {
             changed.questionPrompt.resolution = { status: "expired" };
             if (changed.uiBlock?.state.status === "pending") changed.uiBlock.state = { status: "expired" };
           }
+          const paymentLost = changed.nearPayment?.state === "sending";
+          if (changed.nearPayment && paymentLost) {
+            changed.nearPayment.state = "uncertain";
+            changed.nearPayment.detail = sourceText("error.connector.nearUncertain");
+            changed.text = nearPaymentText(changed.nearPayment);
+          }
           if (turnId && changed.turnId === turnId && changed.status === "streaming") {
             changed.status = "interrupted";
             markIncompleteMediaGeneration(changed, "interrupted");
           }
           const stopped = stopRunningSubagents(changed.subagents, new Date().toISOString(), { background: true });
-          return stopped || changed.questionPrompt?.resolution?.status === "expired" || changed.status === "interrupted"
+          return stopped ||
+            paymentLost ||
+            changed.questionPrompt?.resolution?.status === "expired" ||
+            changed.status === "interrupted"
             ? [changed]
             : [];
         });

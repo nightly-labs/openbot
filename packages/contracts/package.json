@@ -324,6 +324,7 @@
     "./team-protocol/host-signal-home-v1": "./src/team-protocol/host-signal-home-v1.ts",
     "./team-protocol/host-timezone-v1": "./src/team-protocol/host-timezone-v1.ts",
     "./team-protocol/ui-block-location-v1": "./src/team-protocol/ui-block-location-v1.ts",
+    "./team-protocol/near-payment-v1": "./src/team-protocol/near-payment-v1.ts",
     "./team-protocol/host-turn-limits-events-v1": "./src/team-protocol/host-turn-limits-events-v1.ts",
     "./team-protocol/host-turn-limits-v1": "./src/team-protocol/host-turn-limits-v1.ts",
     "./team-protocol/host-appearance-v1": "./src/team-protocol/host-appearance-v1.ts",

@@ -56,7 +56,7 @@ if [ "${1:-}" = --watchdog ]; then
       armed=0 misses=0
       continue
     fi
-    echo "OpenBot did not update its heartbeat for $((interval * limit)) seconds. The watchdog stops it, and systemd starts it again." >&2
+    echo "OpenBot did not update its heartbeat for $((interval * limit)) seconds. The watchdog stops it, and the restart policy starts it again." >&2
     kill -KILL "$pid" 2>/dev/null || true
     exit 0
   done

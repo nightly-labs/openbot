@@ -707,6 +707,10 @@ function attachAppInput(
   });
 }
 
+function x11AboveAppsWindowType(): "splash" | "dock" {
+  return process.env.HYPRLAND_INSTANCE_SIGNATURE ? "splash" : "dock";
+}
+
 export function createDynamicIslandWindow(bounds: Rectangle, _display: Display): BrowserWindow {
   const x11 = process.platform === "linux";
   const window = new BrowserWindow({
@@ -725,7 +729,7 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
     enableLargerThanScreen: true,
     hasShadow: false,
     skipTaskbar: true,
-    type: process.platform === "darwin" ? "panel" : x11 ? "dock" : "toolbar",
+    type: process.platform === "darwin" ? "panel" : x11 ? x11AboveAppsWindowType() : "toolbar",
     backgroundColor: "#00000000",
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
@@ -748,7 +752,6 @@ export function createDynamicIslandWindow(bounds: Rectangle, _display: Display):
 
 export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
   const x11 = process.platform === "linux";
-  const x11Type = process.env.HYPRLAND_INSTANCE_SIGNATURE ? "splash" : "dock";
   const window = new BrowserWindow({
     ...bounds,
     show: false,
@@ -764,7 +767,7 @@ export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
     fullscreenable: false,
     hasShadow: false,
     skipTaskbar: true,
-    type: process.platform === "darwin" ? "panel" : x11 ? x11Type : "toolbar",
+    type: process.platform === "darwin" ? "panel" : x11 ? x11AboveAppsWindowType() : "toolbar",
     backgroundColor: "#00000000",
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
