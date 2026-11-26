@@ -1,5 +1,5 @@
 import { Cause, Effect, Exit, Option, Result, Schema } from "effect";
-import type { AccountAnalytics, EmailKind, EmailResult } from "./account-analytics";
+import type { AccountAnalytics, EmailKind, EmailMailbox, EmailResult } from "./account-analytics";
 import {
   AMBIGUOUS_DELIVERY_ERRORS,
   AUTOMATED_EMAIL_HEADERS,
@@ -149,12 +149,14 @@ const deliver = Effect.fn("EmailDelivery.deliver")(function* (
 ): Effect.fn.Return<void, SmtpFailure | EmailDeliveryError> {
   const prepared = yield* Effect.result(prepare);
   if (Result.isFailure(prepared)) {
-    analytics.track(null, { name: "email_sent", kind, result: "failed" });
+    analytics.track(null, { name: "email_sent", kind, result: "failed", mailbox: "primary" });
     return yield* prepared.failure;
   }
   const message = withInboxReply(senders, prepared.success);
   const startedAt = Date.now();
-  const primary = yield* Effect.result(tracked(analytics, "email_sent", kind, sendPrivateEmail(senders.smtp, message)));
+  const primary = yield* Effect.result(
+    trackedSmtp(analytics, kind, "primary", sendPrivateEmail(senders.smtp, message)),
+  );
   if (Result.isSuccess(primary)) return;
   const smtp = yield* Effect.result(sendThroughOverflow(analytics, kind, senders, message, primary.failure, startedAt));
   if (Result.isSuccess(smtp)) return;
@@ -163,9 +165,8 @@ const deliver = Effect.fn("EmailDelivery.deliver")(function* (
   if (remainingMs < MIN_SEND_MS) return yield* smtp.failure;
   console.warn("Email delivery falls back to Cloudflare:", { kind, reason: smtp.failure.message });
   const fallback = yield* Effect.result(
-    tracked(
+    trackedFallback(
       analytics,
-      "email_fallback_sent",
       kind,
       sendThroughCloudflare(
         senders.fallback,
@@ -191,17 +192,21 @@ const sendThroughOverflow = Effect.fn("EmailDelivery.overflow")(function* (
   if (!senders.overflow || primaryFailure.message !== RATE_LIMITED_DELIVERY_ERROR || remainingMs < MIN_SEND_MS) {
     return yield* primaryFailure;
   }
-  yield* tracked(
-    analytics,
-    "email_sent",
-    kind,
-    sendPrivateEmail(senders.overflow, message).pipe(
-      Effect.timeoutOrElse({
-        duration: remainingMs,
-        orElse: () => Effect.fail(new EmailDeliveryError({ message: "email_delivery_unknown" })),
-      }),
+  const overflow = yield* Effect.result(
+    trackedSmtp(
+      analytics,
+      kind,
+      "overflow",
+      sendPrivateEmail(senders.overflow, message).pipe(
+        Effect.timeoutOrElse({
+          duration: remainingMs,
+          orElse: () => Effect.fail(new EmailDeliveryError({ message: "email_delivery_unknown" })),
+        }),
+      ),
     ),
   );
+  if (Result.isSuccess(overflow)) return;
+  return yield* AMBIGUOUS_DELIVERY_ERRORS.has(overflow.failure.message) ? overflow.failure : primaryFailure;
 });
 
 function canFallBack(message: string): boolean {
@@ -252,14 +257,24 @@ function cloudflareErrorCode(error: unknown): string {
   return error instanceof Error ? error.name : typeof error;
 }
 
-function tracked<E extends { message: string }>(
+function trackedSmtp<E extends { message: string }>(
   analytics: AccountAnalytics,
-  name: "email_sent" | "email_fallback_sent",
+  kind: EmailKind,
+  mailbox: EmailMailbox,
+  send: Effect.Effect<void, E>,
+): Effect.Effect<void, E> {
+  return Effect.onExit(send, (exit) =>
+    Effect.sync(() => analytics.track(null, { name: "email_sent", kind, result: sendResult(exit), mailbox })),
+  );
+}
+
+function trackedFallback<E extends { message: string }>(
+  analytics: AccountAnalytics,
   kind: EmailKind,
   send: Effect.Effect<void, E>,
 ): Effect.Effect<void, E> {
   return Effect.onExit(send, (exit) =>
-    Effect.sync(() => analytics.track(null, { name, kind, result: sendResult(exit) })),
+    Effect.sync(() => analytics.track(null, { name: "email_fallback_sent", kind, result: sendResult(exit) })),
   );
 }
 

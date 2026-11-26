@@ -25,7 +25,7 @@ const CONFIG = {
 };
 const OVERFLOW = { username: "overflow@example.com", password: "overflow-password" };
 
-type Behavior = "normal" | "silent" | "stall_after_data" | "sender_limit";
+type Behavior = "normal" | "silent" | "stall_after_data" | "sender_limit" | "auth_refused";
 type Route = "direct" | "relay" | "relay_unreachable" | "relay_crashed";
 
 interface CaseReport {
@@ -123,7 +123,9 @@ function serveSmtp(
       const line = buffer.slice(0, lineEnd);
       buffer = buffer.slice(lineEnd + 2);
       if (line.startsWith("EHLO")) socket.write("250-relay.example.com\r\n250-PIPELINING\r\n250 AUTH PLAIN LOGIN\r\n");
-      else if (line.startsWith("AUTH PLAIN")) socket.write("235 2.7.0 ok\r\n");
+      else if (line.startsWith("AUTH PLAIN") && behavior === "auth_refused") {
+        socket.write("535 5.7.8 authentication failed\r\n");
+      } else if (line.startsWith("AUTH PLAIN")) socket.write("235 2.7.0 ok\r\n");
       else if (line.startsWith("MAIL FROM")) {
         stats.mailFrom.push(line.slice("MAIL FROM:".length));
         socket.write("250 2.1.0 ok\r\n");
@@ -203,6 +205,11 @@ function fakeCloudflare(outcome: "accept" | "daily_limit") {
   return { binding: { send }, sent };
 }
 
+function describeEvent(event: AccountAnalyticsEvent): string {
+  if (event.name === "email_sent") return `${event.name}:${event.result}:${event.mailbox}`;
+  return `${event.name}:${"result" in event ? event.result : ""}`;
+}
+
 async function runFallbackCase(
   name: string,
   behaviors: Behavior[],
@@ -250,7 +257,7 @@ async function runFallbackCase(
       elapsedMs: Date.now() - startedAt,
       fallbackSends: cloudflare.sent.length,
       mailFrom: relay.stats.mailFrom,
-      events: events.map((event) => `${event.name}:${"result" in event ? event.result : ""}`),
+      events: events.map(describeEvent),
     };
     process.stdout.write(`${JSON.stringify(report)}\n`);
     return { ...report, sent: cloudflare.sent };
@@ -316,7 +323,7 @@ try {
   assert.equal(fellBack.result, "sent");
   assert.equal(fellBack.messages, 0);
   assert.equal(fellBack.fallbackSends, 1);
-  assert.deepEqual(fellBack.events, ["email_sent:rate_limited", "email_fallback_sent:accepted"]);
+  assert.deepEqual(fellBack.events, ["email_sent:rate_limited:primary", "email_fallback_sent:accepted"]);
   const [fallbackMessage] = fallbackMessages;
   assert(fallbackMessage);
   assert.deepEqual(fallbackMessage.from, { name: "OpenBot", email: CONFIG.from });
@@ -336,34 +343,34 @@ try {
   const bothLimited = await runFallbackCase("fallback_refused", ["sender_limit"], "daily_limit");
   report.cases.push(bothLimited);
   assert.equal(bothLimited.result, RATE_LIMITED_DELIVERY_ERROR);
-  assert.deepEqual(bothLimited.events, ["email_sent:rate_limited", "email_fallback_sent:failed"]);
+  assert.deepEqual(bothLimited.events, ["email_sent:rate_limited:primary", "email_fallback_sent:failed"]);
 
   const noFallbackUnknown = await runFallbackCase("no_fallback_after_unknown", ["stall_after_data"], "accept");
   report.cases.push(noFallbackUnknown);
   assert.equal(noFallbackUnknown.result, "smtp_delivery_unknown");
   assert.equal(noFallbackUnknown.fallbackSends, 0);
-  assert.deepEqual(noFallbackUnknown.events, ["email_sent:unknown"]);
+  assert.deepEqual(noFallbackUnknown.events, ["email_sent:unknown:primary"]);
 
   const noFallbackSent = await runFallbackCase("no_fallback_when_sent", ["normal"], "accept");
   report.cases.push(noFallbackSent);
   assert.equal(noFallbackSent.result, "sent");
   assert.equal(noFallbackSent.messages, 1);
   assert.equal(noFallbackSent.fallbackSends, 0);
-  assert.deepEqual(noFallbackSent.events, ["email_sent:accepted"]);
+  assert.deepEqual(noFallbackSent.events, ["email_sent:accepted:primary"]);
 
   const noFallbackInvalid = await runFallbackCase("no_fallback_for_invalid_code", ["normal"], "accept", "not-a-code");
   report.cases.push(noFallbackInvalid);
   assert.equal(noFallbackInvalid.result, "smtp_invalid_code");
   assert.equal(noFallbackInvalid.connections, 0);
   assert.equal(noFallbackInvalid.fallbackSends, 0);
-  assert.deepEqual(noFallbackInvalid.events, ["email_sent:failed"]);
+  assert.deepEqual(noFallbackInvalid.events, ["email_sent:failed:primary"]);
 
   const noFallbackAfterBudget = await runFallbackCase("no_fallback_after_budget", ["silent"], "accept");
   report.cases.push(noFallbackAfterBudget);
   assert.equal(noFallbackAfterBudget.result, "smtp_timeout");
   assert.equal(noFallbackAfterBudget.connections, 3);
   assert.equal(noFallbackAfterBudget.fallbackSends, 0);
-  assert.deepEqual(noFallbackAfterBudget.events, ["email_sent:failed"]);
+  assert.deepEqual(noFallbackAfterBudget.events, ["email_sent:failed:primary"]);
 
   const overflowSent = await runFallbackCase(
     "overflow_after_sender_limit",
@@ -378,7 +385,7 @@ try {
   assert.equal(overflowSent.messages, 1);
   assert.equal(overflowSent.fallbackSends, 0);
   assert.deepEqual(overflowSent.mailFrom, [`<${CONFIG.from}>`, `<${OVERFLOW.username}>`]);
-  assert.deepEqual(overflowSent.events, ["email_sent:rate_limited", "email_sent:accepted"]);
+  assert.deepEqual(overflowSent.events, ["email_sent:rate_limited:primary", "email_sent:accepted:overflow"]);
 
   const overflowLimited = await runFallbackCase(
     "fallback_after_overflow_limit",
@@ -395,8 +402,8 @@ try {
   assert.equal(overflowLimited.fallbackSends, 1);
   assert.deepEqual(overflowFallbackMessages[0]?.from, { name: "OpenBot", email: CONFIG.from });
   assert.deepEqual(overflowLimited.events, [
-    "email_sent:rate_limited",
-    "email_sent:rate_limited",
+    "email_sent:rate_limited:primary",
+    "email_sent:rate_limited:overflow",
     "email_fallback_sent:accepted",
   ]);
 
@@ -411,7 +418,24 @@ try {
   report.cases.push(noOverflowAfterUnknown);
   assert.equal(noOverflowAfterUnknown.result, "smtp_delivery_unknown");
   assert.equal(noOverflowAfterUnknown.connections, 1);
-  assert.deepEqual(noOverflowAfterUnknown.events, ["email_sent:unknown"]);
+  assert.deepEqual(noOverflowAfterUnknown.events, ["email_sent:unknown:primary"]);
+
+  const overflowRefused = await runFallbackCase(
+    "overflow_auth_refused",
+    ["sender_limit", "auth_refused"],
+    "daily_limit",
+    "ABCD-EFGH",
+    undefined,
+    true,
+  );
+  report.cases.push(overflowRefused);
+  assert.equal(overflowRefused.result, RATE_LIMITED_DELIVERY_ERROR);
+  assert.equal(overflowRefused.fallbackSends, 0);
+  assert.deepEqual(overflowRefused.events, [
+    "email_sent:rate_limited:primary",
+    "email_sent:failed:overflow",
+    "email_fallback_sent:failed",
+  ]);
 
   report.passed = true;
 } catch (error) {
