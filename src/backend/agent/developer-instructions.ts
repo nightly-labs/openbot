@@ -21,7 +21,7 @@ import {
   type ResponseStyle,
   workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
-import { redactSecrets, redactText } from "@openbot/logging";
+import { redactPostText, redactSecrets, redactText } from "@openbot/logging";
 import { automationRunCommand } from "../automation-command";
 import type { HomeSkill } from "../home-skills";
 import { PASSWORD_MANAGER_BRAND_NAMES } from "../password-vault";
@@ -147,7 +147,7 @@ function instructionsFileLines(file: InstructionsFileText, lead: string): string
   return [
     lead,
     "<agent_instructions>",
-    redactText(file.text).replace(/<(\/?(?:openbot_)?agent_instructions)/giu, "&lt;$1"),
+    redactPostText(file.text).replace(/<(\/?(?:openbot_)?agent_instructions)/giu, "&lt;$1"),
     "</agent_instructions>",
     ...(file.truncated ? [`This is the start of the file only; read the rest in ${file.fileName}.`] : []),
   ];

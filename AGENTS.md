@@ -38,7 +38,8 @@ and state which default you set aside. Do not argue by citing this file.
 - **Redact secrets** on every log, export, and send path, including diagnostics and analytics.
   Exception: an agent's chat-app post (`redactPostText`) masks known key formats and a saved secret
   only as a whole token, not inside a word, an email address or a domain, and not labeled passwords
-  that are not saved. Decided by the developer on 2026-11-22.
+  that are not saved. Decided by the developer on 2026-11-22. The agent's instruction file, when
+  OpenBot sends it to the model, uses the same rule. Decided by the developer on 2026-11-26.
 - **Keep PolyForm Noncommercial 1.0.0.** Do not add incompatible dependencies or relicense files.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md#security-sensitive-changes) when a change touches the trust
