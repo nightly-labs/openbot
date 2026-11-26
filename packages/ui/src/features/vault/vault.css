@@ -526,12 +526,90 @@
   border: 0;
 }
 
-.near-chat-card .ui-block-title {
-  font-variant-numeric: tabular-nums;
-}
-
 .near-chat-card[data-inline-actions] > .ui-block-content > .ui-block-header:has(> .ui-block-status) {
   flex-basis: 100%;
+}
+
+.ui-block-card.near-payment-record > .ui-block-content {
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+}
+
+.near-chat-card.near-payment-record > .ui-block-content > .ui-block-header:has(> .ui-block-status) {
+  row-gap: 0;
+}
+
+@container ui-block (width >= 360px) {
+  .near-payment-record .ui-block-header:has(> .ui-block-status) > :is(.ui-block-icon, .ui-block-status) {
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+
+  .near-payment-record .ui-block-header:has(> .ui-block-status) .ui-block-subtitle {
+    grid-row: 2;
+    grid-column: -3 / -2;
+  }
+
+  .near-payment-record:has(.ui-block-icon) .near-payment-note {
+    padding-inline-start: calc(var(--integration-tile, 36px) + var(--openbot-space-3));
+  }
+}
+
+.near-payment-record .ui-block-title {
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-medium);
+  line-height: var(--openbot-leading-sm);
+}
+
+.near-payment-record .ui-block-subtitle {
+  min-width: 0;
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+.near-payment-subtitle {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.near-chat-card.ui-block-card.near-payment-record[data-status="answered"]
+  > .ui-block-content
+  > .ui-block-header
+  > .ui-block-status {
+  border-color: var(--openbot-border-strong);
+  background: transparent;
+  color: var(--openbot-text-secondary);
+}
+
+.near-payment-record[data-status="answered"] .ui-block-status > svg {
+  color: var(--openbot-success-text);
+}
+
+.near-payment-alert {
+  color: var(--openbot-warning-text);
+  translate: 0 -1px;
+}
+
+.near-payment-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.near-payment-link {
+  height: auto;
+  padding: 0;
+  color: var(--openbot-text-muted);
+  translate: 0 -1px;
+}
+
+.near-payment-note {
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
 }
 
 .near-wallet-steps {

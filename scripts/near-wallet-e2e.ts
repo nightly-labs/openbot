@@ -19,6 +19,7 @@ import { NearOwnerSigning } from "../src/main/near-wallet-signing";
 import { NearWalletStore } from "../src/main/near-wallet-store";
 import {
   FakeAgentApi,
+  fakeTransactionHash,
   type Json,
   KeyedNearGateway,
   PAGE_ORIGIN,
@@ -402,8 +403,14 @@ async function main(): Promise<void> {
         assert.equal(update?.expected_revision, 1);
 
         const auto = await wallet.prepare(payment("pay-auto-1", { amount: "2" }));
-        assert.deepEqual(auto, { kind: "auto" });
-        assert.equal((await wallet.pay("pay-auto-1")).status, "paid");
+        assert.deepEqual(auto, { kind: "auto", amount: "2", symbol: "USDC" });
+        const paidAuto = await wallet.pay("pay-auto-1");
+        assert.equal(paidAuto.status, "paid");
+        assert.equal(
+          paidAuto.transactionHash,
+          paidAuto.correlationId ? fakeTransactionHash(paidAuto.correlationId) : null,
+          "a paid transfer gives its transaction hash",
+        );
         const after = wallet.status();
         details.set("rules", after.rules);
         assert.equal(after.rules[0]?.spentTodayUsd, 2);
@@ -436,7 +443,7 @@ async function main(): Promise<void> {
       assert.equal(wallet.status().rules[0]?.spentTodayUsd, 3, "the approved payment counts under the rule");
 
       const auto = await wallet.prepare(payment("pay-shop-2", { recipient: SHOP, amount: "1" }));
-      assert.deepEqual(auto, { kind: "auto" });
+      assert.deepEqual(auto, { kind: "auto", amount: "1", symbol: "USDC" });
       assert.equal((await wallet.pay("pay-shop-2")).status, "paid");
       const over = await wallet.prepare(payment("pay-shop-3", { recipient: SHOP, amount: "7" }));
       details.set("over", over);
@@ -449,7 +456,7 @@ async function main(): Promise<void> {
       const mark = api.requests.length;
       const balanceBefore = api.balanceRaw;
       const auto = await wallet.prepare(payment("pay-lost", { amount: "1" }));
-      assert.deepEqual(auto, { kind: "auto" });
+      assert.deepEqual(auto, { kind: "auto", amount: "1", symbol: "USDC" });
       api.dropNextExecution = true;
       const result = await wallet.pay("pay-lost");
       details.set("result", result);
@@ -495,8 +502,16 @@ async function main(): Promise<void> {
     await scenario("two auto payments at the same time stay inside the rule limit", async (details) => {
       const mark = api.requests.length;
       assert.equal(wallet.status().rules[0]?.spentTodayUsd, 5);
-      assert.deepEqual(await wallet.prepare(payment("pay-race-1", { amount: "3" })), { kind: "auto" });
-      assert.deepEqual(await wallet.prepare(payment("pay-race-2", { amount: "3" })), { kind: "auto" });
+      assert.deepEqual(await wallet.prepare(payment("pay-race-1", { amount: "3" })), {
+        kind: "auto",
+        amount: "3",
+        symbol: "USDC",
+      });
+      assert.deepEqual(await wallet.prepare(payment("pay-race-2", { amount: "3" })), {
+        kind: "auto",
+        amount: "3",
+        symbol: "USDC",
+      });
       const results = await Promise.all([wallet.pay("pay-race-1"), wallet.pay("pay-race-2")]);
       details.set("results", results);
       details.set(
@@ -516,7 +531,11 @@ async function main(): Promise<void> {
       "a proxy error with no error document is uncertain; after a new grant a restart does not send it again",
       async (details) => {
         const mark = api.requests.length;
-        assert.deepEqual(await wallet.prepare(payment("pay-proxy", { amount: "1" })), { kind: "auto" });
+        assert.deepEqual(await wallet.prepare(payment("pay-proxy", { amount: "1" })), {
+          kind: "auto",
+          amount: "1",
+          symbol: "USDC",
+        });
         api.proxyFailures = SEND_ATTEMPTS;
         const result = await wallet.pay("pay-proxy");
         details.set("result", result);

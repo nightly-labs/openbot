@@ -27,6 +27,7 @@ export interface UiBlockCardProps {
   waiting?: boolean | undefined;
   waitingLabel?: string | undefined;
   outcomeBadge?: boolean | undefined;
+  outcomeIcon?: JSX.Element | undefined;
   answerInBody?: boolean | undefined;
   error?: string | undefined;
   onSkip?: (() => void) | undefined;
@@ -79,6 +80,7 @@ export function UiBlockCard(props: UiBlockCardProps) {
   const title = children(() => props.title);
   const subtitle = children(() => props.subtitle);
   const icon = children(() => props.icon);
+  const outcomeIcon = children(() => props.outcomeIcon);
   const actions = children(() => props.actions);
   const hasTitle = () => filled(title.toArray());
   const pending = () => props.status === "pending";
@@ -128,6 +130,7 @@ export function UiBlockCard(props: UiBlockCardProps) {
                 role="status"
               >
                 <Switch fallback={<X data-icon="inline-start" aria-hidden="true" />}>
+                  <Match when={filled(outcomeIcon.toArray())}>{outcomeIcon()}</Match>
                   <Match when={props.status === "answered"}>
                     <Check data-icon="inline-start" aria-hidden="true" />
                   </Match>

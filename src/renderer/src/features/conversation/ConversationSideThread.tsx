@@ -27,6 +27,7 @@ import type { SideThread } from "./conversation-types";
 import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
+import { useThreadNearPaymentCard } from "./NearPaymentThreadCard";
 import { naturalThreadRows } from "./narration-rows";
 import { useNearPaymentApproval } from "./near-payment-approval";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
@@ -179,6 +180,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
   const mcpSignInCard = useThreadMcpSignInCard((body) => thread()?.onSend(body, [], null) ?? Promise.resolve(false));
   const marketplaceCard = useThreadMarketplaceSuggestionCard();
   const settingLinkCard = useThreadSettingLinkCard();
+  const paymentRecordCard = useThreadNearPaymentCard();
   const visualReplyCard = useThreadVisualReplyCard(draftKey, undefined, props.threadId);
   const branch = () => {
     if (!view.threads?.onBranch) return undefined;
@@ -306,7 +308,8 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
               visualReplyCard(message, quote) ??
               mcpSignInCard(message) ??
               marketplaceCard(message) ??
-              settingLinkCard(message)
+              settingLinkCard(message) ??
+              paymentRecordCard(message)
             }
             olderMessages={current().thread.olderMessages}
             newerMessages={current().thread.newerMessages}
