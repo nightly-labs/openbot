@@ -183,7 +183,7 @@ export class ProviderAccounts {
             label: account.label,
             email: state?.email ?? null,
             state: state?.state ?? "checking",
-            message: this.#removing.has(account.id)
+            message: this.#removing.has(removalKey(provider, account.id))
               ? sourceText("status.provider.accountRemovesAfterTurn")
               : (state?.message ?? null),
             ...(models ? { models: structuredClone(models) } : {}),
@@ -517,14 +517,15 @@ export class ProviderAccounts {
     this.#host.changed();
   }).bind(this);
 
-  removing(accountId: string): boolean {
-    return this.#removing.has(accountId);
+  removing(provider: AgentProviderId, accountId: string): boolean {
+    return this.#removing.has(removalKey(provider, accountId));
   }
 
-  setRemoving(accountId: string, removing: boolean): void {
-    if (this.#removing.has(accountId) === removing) return;
-    if (removing) this.#removing.add(accountId);
-    else this.#removing.delete(accountId);
+  setRemoving(provider: AgentProviderId, accountId: string, removing: boolean): void {
+    const key = removalKey(provider, accountId);
+    if (this.#removing.has(key) === removing) return;
+    if (removing) this.#removing.add(key);
+    else this.#removing.delete(key);
     this.#host.changed();
   }
 
@@ -1089,4 +1090,8 @@ function signInCause(error: unknown): ProviderSignInError | null {
 
 export function defaultUsageModel(provider: AgentProviderId): string | undefined {
   return provider === "codex" ? undefined : agentProviderDescriptor(provider).defaultModel || undefined;
+}
+
+function removalKey(provider: AgentProviderId, accountId: string): string {
+  return `${provider}\n${accountId}`;
 }

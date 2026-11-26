@@ -5779,7 +5779,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#endpoints
       .runExclusive(() =>
         Effect.gen({ self: this }, function* () {
-          if (accountId === CLAUDE_API_KEY_ACCOUNT_ID || !this.#providerAccountBusy(provider, accountId))
+          if (!this.#removalMayWait(provider, accountId))
             return yield* this.#removeIdleProviderAccount(provider, accountId);
           yield* this.#removeProviderAccountAfterTurns(provider, accountId);
           return this.getStatus();
@@ -5790,6 +5790,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "removeProviderAccount", cause: failure.cause }),
         ),
       );
+  }
+
+  #removalMayWait(provider: AgentProvider, accountId: string): boolean {
+    return (
+      accountId !== DEFAULT_PROVIDER_ACCOUNT_ID &&
+      accountId !== CLAUDE_API_KEY_ACCOUNT_ID &&
+      this.#providers.hasProviderAccount(provider, accountId) &&
+      this.#providerAccountBusy(provider, accountId)
+    );
   }
 
   #agentsOnProviderAccount(provider: AgentProvider, accountId: string): AgentSummary[] {
@@ -5859,7 +5868,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const key = `${provider}\n${accountId}`;
     if (this.#accountRemovals.has(key)) return;
     this.#accountRemovals.add(key);
-    this.#providers.setAccountRemoving(accountId, true);
+    this.#providers.setAccountRemoving(provider, accountId, true);
     for (const agent of this.#agentsOnProviderAccount(provider, accountId))
       yield* this.#applyAgentUpdate(
         { agentId: agent.id, providerAccountId: null, ...this.#modelForAccount({ ...agent, provider }, undefined) },
@@ -5905,7 +5914,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       Effect.ensuring(
         Effect.sync(() => {
           this.#accountRemovals.delete(key);
-          this.#providers.setAccountRemoving(accountId, false);
+          this.#providers.setAccountRemoving(provider, accountId, false);
           this.#refreshPoolInUse(provider);
         }),
       ),

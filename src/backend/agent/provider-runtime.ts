@@ -1921,7 +1921,8 @@ export class ProviderRuntime implements ProviderPort {
     const named = members.some((member) => member.namesModels && member.windows !== undefined);
     return members
       .filter(
-        (member) => !pool.leftOut.includes(member.accountId) && !this.#providerAccounts?.removing(member.accountId),
+        (member) =>
+          !pool.leftOut.includes(member.accountId) && !this.#providerAccounts?.removing(provider, member.accountId),
       )
       .filter((member) => !(named && member.namesModels && member.windows === undefined))
       .map(({ accountId, windows }) => ({
@@ -1936,8 +1937,8 @@ export class ProviderRuntime implements ProviderPort {
     this.#setStatus({});
   }
 
-  setAccountRemoving(accountId: string, removing: boolean): void {
-    this.#providerAccounts?.setRemoving(accountId, removing);
+  setAccountRemoving(provider: AgentProvider, accountId: string, removing: boolean): void {
+    this.#providerAccounts?.setRemoving(provider, accountId, removing);
   }
 
   readPoolUsage(provider: AgentProvider): Effect.Effect<void> {
