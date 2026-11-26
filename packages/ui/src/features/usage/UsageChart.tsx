@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "@openbot/ui/chart";
-import { createMemo, For } from "solid-js";
+import { createMemo, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { UsageProviderMark } from "./UsageProviderMark";
 import {
@@ -51,6 +51,7 @@ export function UsageChart(props: {
     const daily = usageSeries(props.result.providerDaily, props.result.daily, metric);
     const named = daily.series[0] !== usageTotalSeries;
     return {
+      empty: daily.rows.every((row) => daily.series.every((key) => !(Number(row[key]) > 0))),
       series: daily.series,
       rows: usageBucketRows(daily.rows, daily.series, bucket),
       named,
@@ -79,56 +80,65 @@ export function UsageChart(props: {
     };
   });
   return (
-    <ChartContainer
-      label={props.metric === "cost" ? t("usage.chart.costDescription") : t("usage.chart.tokensDescription")}
+    <Show
+      when={!chart().empty}
+      fallback={
+        <p class="ui-chart-empty" role="status">
+          {props.metric === "cost" ? t("usage.noCostEstimate") : t("usage.empty")}
+        </p>
+      }
     >
-      <BarChart
-        data={chart().rows}
-        margin={{ top: 8, right: 0, bottom: 0, left: 0 }}
-        barCategoryGap="24%"
-        accessibilityLayer
-        role="img"
-        tabIndex={0}
-        aria-label={props.label}
+      <ChartContainer
+        label={props.metric === "cost" ? t("usage.chart.costDescription") : t("usage.chart.tokensDescription")}
       >
-        <CartesianGrid vertical={false} stroke="var(--openbot-border)" />
-        <XAxis
-          dataKey="date"
-          tickLine={false}
-          axisLine={false}
-          minTickGap={24}
-          tickMargin={10}
-          stroke="var(--openbot-text-muted)"
-          tickFormatter={chart().formatTick}
-        />
-        <YAxis
-          tickLine={false}
-          axisLine={false}
-          width="auto"
-          tickCount={5}
-          stroke="var(--openbot-text-muted)"
-          tickFormatter={chart().formatAxis}
-        />
-        <ChartTooltip
-          cursor={CURSOR}
-          content={(contentProps: TooltipContentProps) => (
-            <ChartTooltipContent
-              {...contentProps}
-              formatValue={chart().formatValue}
-              formatLabel={chart().formatLabel}
-              series={chart().seriesInfo}
-              total={chart().named}
-            />
-          )}
-        />
-        <BarStack stackId="usage" radius={BAR_RADIUS}>
-          <For each={chart().series}>
-            {(provider) => (
-              <Bar dataKey={provider} fill={chart().fill(provider)} maxBarSize={28} isAnimationActive={false} />
+        <BarChart
+          data={chart().rows}
+          margin={{ top: 8, right: 0, bottom: 0, left: 0 }}
+          barCategoryGap="24%"
+          accessibilityLayer
+          role="img"
+          tabIndex={0}
+          aria-label={props.label}
+        >
+          <CartesianGrid vertical={false} stroke="var(--openbot-border)" />
+          <XAxis
+            dataKey="date"
+            tickLine={false}
+            axisLine={false}
+            minTickGap={24}
+            tickMargin={10}
+            stroke="var(--openbot-text-muted)"
+            tickFormatter={chart().formatTick}
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            width="auto"
+            tickCount={5}
+            stroke="var(--openbot-text-muted)"
+            tickFormatter={chart().formatAxis}
+          />
+          <ChartTooltip
+            cursor={CURSOR}
+            content={(contentProps: TooltipContentProps) => (
+              <ChartTooltipContent
+                {...contentProps}
+                formatValue={chart().formatValue}
+                formatLabel={chart().formatLabel}
+                series={chart().seriesInfo}
+                total={chart().named}
+              />
             )}
-          </For>
-        </BarStack>
-      </BarChart>
-    </ChartContainer>
+          />
+          <BarStack stackId="usage" radius={BAR_RADIUS}>
+            <For each={chart().series}>
+              {(provider) => (
+                <Bar dataKey={provider} fill={chart().fill(provider)} maxBarSize={28} isAnimationActive={false} />
+              )}
+            </For>
+          </BarStack>
+        </BarChart>
+      </ChartContainer>
+    </Show>
   );
 }
