@@ -214,7 +214,7 @@ export class UsageLimitGate {
       spent: spent || previous?.spent === true,
       refused: refused || previous?.refused === true,
       notOffered: notOffered || previous?.notOffered === true,
-      reason: reason ?? previous?.reason ?? null,
+      reason,
       timer: this.#armFailure(key, endsAt),
     });
     if (dropped) this.#wakeReturning(provider, turnModel);
