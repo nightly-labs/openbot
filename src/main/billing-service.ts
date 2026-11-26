@@ -72,6 +72,8 @@ const buyBillingStorage = Effect.fn("BillingDesktop.buyStorage")(function* (requ
   );
 });
 
+const BILLING_DETAILS_SAVE_TIMEOUT_MS = 30_000;
+
 const readBillingDetails = Effect.fn("BillingDesktop.getDetails")(function* () {
   const platform = yield* AccountServicePlatform;
   return yield* platform.request("/v1/me/billing/details", { method: "GET" }, decodeBillingDetails);
@@ -83,6 +85,7 @@ const saveBillingDetails = Effect.fn("BillingDesktop.setDetails")(function* (req
     "/v1/me/billing/details",
     { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) },
     decodeBillingDetails,
+    BILLING_DETAILS_SAVE_TIMEOUT_MS,
   );
 });
 
