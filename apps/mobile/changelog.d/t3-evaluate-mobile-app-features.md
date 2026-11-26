@@ -1,8 +1,11 @@
 ### Added
 
-- An Apple Watch app. It opens on your agents in the order of the iPhone app: pinned agents, then the
-  agents that need you, then the other agents of each server. Each agent shows its picture, its number
-  of unread messages, and if it works, waits for you, or is idle. Tap an agent to open its page.
+- An Apple Watch app. It opens on a summary of one server: how many agents need you, have unread
+  messages or work, with their pictures. Swipe left for the agent list of that server: pinned agents as
+  pictures with names, then the agents that need you, the unread agents and each folder in the order of
+  the iPhone app. Each agent shows its number of unread messages and if it works, waits for you, or is
+  idle; an agent that waits or works shows that face. With more than one server, tap the server name on
+  the summary to choose another server. Tap an agent to open its page.
 - Allow or deny an approval from the watch. The watch offers Allow only when it shows all of the
   request. For a longer request, it offers Deny and Open on iPhone.
 - Answer an agent's question from the watch with one of its choices or by dictation, and send a new

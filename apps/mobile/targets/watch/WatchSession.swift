@@ -15,6 +15,7 @@ struct WatchFeedback: Equatable, Identifiable {
   let id = UUID()
   var text: String
   var success: Bool
+  var color: String?
 }
 
 @MainActor
@@ -31,6 +32,7 @@ final class WatchSession: NSObject, ObservableObject {
   static let pairRetry: TimeInterval = 60 * 60
   static let pairFailureRetry: TimeInterval = 30
   static let urlScheme = "openbot-watch"
+  static let serverKey = "openbot.watch.server"
   static let shared = WatchSession()
 
   private static let snapshotKey = "openbot.watch.snapshot"
@@ -153,7 +155,7 @@ final class WatchSession: NSObject, ObservableObject {
 
   private var missingAvatars: [String] {
     guard case .ready(let ready) = snapshot else { return [] }
-    let names = Set(ready.agents.compactMap(\.avatar))
+    let names = Set(ready.agents.flatMap(\.pictureNames))
     return names.filter { Self.avatarURL($0) != nil && !Self.hasPicture($0) }.sorted()
   }
 
@@ -163,8 +165,13 @@ final class WatchSession: NSObject, ObservableObject {
   }
 
   func picture(_ agent: WatchAgent) -> UIImage? {
+    if let face = agent.face, let image = picture(named: face) { return image }
+    return agent.avatar.flatMap(picture(named:))
+  }
+
+  private func picture(named name: String) -> UIImage? {
     _ = avatarRevision
-    guard let name = agent.avatar, let url = Self.avatarURL(name) else { return nil }
+    guard let url = Self.avatarURL(name) else { return nil }
     if let image = pictures[name] { return image }
     guard let image = UIImage(contentsOfFile: url.path) else { return nil }
     pictures[name] = image
@@ -406,9 +413,9 @@ final class WatchSession: NSObject, ObservableObject {
     guard !names.isEmpty, let ready = readySnapshot else { return }
     var byServer: [String: [String]] = [:]
     for agent in ready.agents {
-      guard let name = agent.avatar, names.contains(name), !(byServer[agent.serverId]?.contains(name) ?? false)
-      else { continue }
-      byServer[agent.serverId, default: []].append(name)
+      for name in agent.pictureNames where names.contains(name) && !(byServer[agent.serverId]?.contains(name) ?? false) {
+        byServer[agent.serverId, default: []].append(name)
+      }
     }
     var received: [String: String] = [:]
     var remaining = Set(names)
@@ -448,7 +455,7 @@ final class WatchSession: NSObject, ObservableObject {
     if result.ok {
       markFresh()
       WKInterfaceDevice.current().play(.success)
-      show(WatchFeedback(text: done, success: true))
+      show(WatchFeedback(text: done, success: true, color: command.agentKey.flatMap(agent)?.color))
     } else {
       WKInterfaceDevice.current().play(.failure)
       let message = result.message.flatMap { $0.isEmpty ? nil : $0 } ?? text(TextKey.error(result.error ?? .failed))
@@ -542,8 +549,9 @@ final class WatchSession: NSObject, ObservableObject {
         forgetCredentials(ifAccountIsNot: ready.account)
         learnDirectServers(from: ready)
       }
-      Self.removeAvatars(keeping: Set(ready.agents.compactMap(\.avatar)))
-      pictures = pictures.filter { name, _ in ready.agents.contains { $0.avatar == name } }
+      let kept = Set(ready.agents.flatMap(\.pictureNames))
+      Self.removeAvatars(keeping: kept)
+      pictures = pictures.filter { name, _ in kept.contains(name) }
       ComplicationData.write(.ready(ready))
     }
     defaults.set(json, forKey: Self.snapshotKey)
@@ -567,6 +575,7 @@ final class WatchSession: NSObject, ObservableObject {
     nextPairAttempt = .distantPast
     Task { await direct.reset() }
     defaults.removeObject(forKey: Self.snapshotKey)
+    UserDefaults.standard.removeObject(forKey: Self.serverKey)
     if let folder = Self.avatarFolder { try? FileManager.default.removeItem(at: folder) }
     pictures = [:]
     avatarRevision += 1

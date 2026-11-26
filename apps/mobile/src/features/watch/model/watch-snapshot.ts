@@ -6,6 +6,7 @@ import {
   WATCH_PROTOCOL_VERSION,
   WATCH_REPLY_LIMIT,
   type WatchAgent,
+  type WatchFaces,
   type WatchQuestion,
   type WatchSnapshot,
   type WatchWait,
@@ -58,6 +59,7 @@ const WATCH_TEXT_KEYS = [
   "mobile.watch.question.private",
   "mobile.agent.list.waiting.title",
   "mobile.agent.list.unreadGroup.title",
+  "mobile.server.drawer.title",
   "mobile.chat.question.next",
   "mobile.watch.disconnected.title",
   "mobile.watch.disconnected.detail",
@@ -100,6 +102,7 @@ export interface WatchSnapshotInput {
   live: LiveWorkspaceState;
   conversation: (agentId: string) => MobileConversation | undefined;
   avatar: (agent: MobileAgent) => string | undefined;
+  faces: (agent: MobileAgent) => WatchFaces | undefined;
   online: (server: MobileServer) => boolean;
   watchKey: (serverId: string) => string | undefined;
   account: string | undefined;
@@ -253,6 +256,7 @@ export function buildWatchSnapshot(input: WatchSnapshotInput): WatchSnapshot {
       const wait = agentWait(agent, approvals, waits, conversation, text) ?? waitingActivity(activity);
       const state = stateOf(wait, activity);
       const avatar = input.avatar(agent);
+      const faces = input.faces(agent);
       listed.push({
         serverId: server.id,
         id: agent.id,
@@ -260,6 +264,7 @@ export function buildWatchSnapshot(input: WatchSnapshotInput): WatchSnapshot {
         server: server.name,
         color: avatarHeadColor(agent.avatarSeed, agent.avatarHue, agent.avatarColor),
         ...(avatar ? { avatar } : {}),
+        ...(faces ? { faces } : {}),
         pinned: pinned.has(agent.id),
         ...(folder ? { folder } : {}),
         unread: live.unreadAgentIds.includes(agent.id) ? Math.max(1, live.unreadCounts[agent.id] ?? 1) : 0,

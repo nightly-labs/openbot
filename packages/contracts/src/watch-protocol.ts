@@ -41,6 +41,11 @@ export interface WatchPhoneWait {
 
 export type WatchWait = WatchApprovalWait | WatchQuestionWait | WatchPhoneWait;
 
+export interface WatchFaces {
+  waiting?: string;
+  working?: string;
+}
+
 export interface WatchAgent {
   serverId: string;
   id: string;
@@ -48,6 +53,7 @@ export interface WatchAgent {
   server: string;
   color: string;
   avatar?: string;
+  faces?: WatchFaces;
   pinned: boolean;
   folder?: string;
   unread: number;

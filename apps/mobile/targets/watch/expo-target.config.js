@@ -10,6 +10,6 @@ module.exports = () => ({
     "com.apple.security.application-groups": ["group.run.openbot.mobile"],
   },
   colors: {
-    $accent: "#007CF7",
+    $accent: "#FFFFFF",
   },
 });

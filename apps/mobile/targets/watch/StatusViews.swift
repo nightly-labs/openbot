@@ -132,7 +132,7 @@ struct FeedbackView: View {
   var body: some View {
     Label(feedback.text, systemImage: feedback.success ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
       .font(.footnote.weight(.semibold))
-      .foregroundStyle(feedback.success ? .green : .orange)
+      .foregroundStyle(feedback.success ? (feedback.color.flatMap(Color.init(hex:)) ?? .green) : .orange)
       .padding(.horizontal, 12)
       .padding(.vertical, 8)
       .frame(maxWidth: .infinity)
@@ -143,16 +143,37 @@ struct FeedbackView: View {
 }
 
 struct AgentAvatar: View {
+  static let pictureScale: CGFloat = 1.25
+
   @EnvironmentObject private var session: WatchSession
+  @Environment(\.watchText) private var text
   let agent: WatchAgent
   var size: CGFloat = 44
+  var stateIcon = false
 
   var body: some View {
+    picture
+      .overlay(alignment: .bottomTrailing) {
+        if stateIcon && agent.isBusy {
+          let style = AgentStateStyle(agent: agent, text: text)
+          Image(systemName: style.symbol)
+            .font(.system(size: size * 0.2, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: size * 0.42, height: size * 0.42)
+            .background(agent.wait != nil || agent.state == .waiting ? Color.orange : Color.blue, in: Circle())
+            .overlay(Circle().stroke(.black, lineWidth: 2))
+            .offset(x: 3, y: 3)
+        }
+      }
+  }
+
+  private var picture: some View {
     Group {
       if let image = session.picture(agent) {
         Image(uiImage: image)
           .resizable()
           .scaledToFill()
+          .scaleEffect(Self.pictureScale)
       } else {
         ZStack {
           Circle().fill(Color(hex: agent.color) ?? .accentColor)

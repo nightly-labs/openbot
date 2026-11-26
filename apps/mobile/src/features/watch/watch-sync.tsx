@@ -6,7 +6,6 @@ import * as Notifications from "expo-notifications";
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
 import { useCSSVariable } from "uniwind";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
-import { shareAvatarFile, shareAvatarName } from "@/features/share/model/share-extension";
 import { useWatchAwake } from "@/features/watch/model/watch-awake";
 import {
   useMobileWorkspaceActions,
@@ -26,6 +25,7 @@ import {
   supportsWatchRelay,
   watchDirectCredentials,
 } from "./model/watch-pairing";
+import { syncWatchPictures, watchAvatar, watchFaces, watchPictureFile } from "./model/watch-pictures";
 import { buildWatchSnapshot, questionsToLoad } from "./model/watch-snapshot";
 import {
   knownWatchKey,
@@ -54,16 +54,11 @@ const SEND_DELAY_MS = 400;
 const AVATAR_REPLY_LIMIT = 48_000;
 const WATCH_KEY_RETRY_MS = 5 * 60_000;
 
-function watchAvatar(agent: MobileAgent): string | undefined {
-  const name = shareAvatarName(agent);
-  return shareAvatarFile(name) ? name : undefined;
-}
-
 async function watchAvatarData(names: readonly string[]): Promise<Record<string, string>> {
   const avatars: Record<string, string> = {};
   let size = 0;
   for (const name of names) {
-    const file = shareAvatarFile(name);
+    const file = watchPictureFile(name);
     if (!file) continue;
     const data = await file.base64();
     if (size + data.length > AVATAR_REPLY_LIMIT) break;
@@ -105,6 +100,7 @@ function WatchLinkSync({ servers, serversReady, agents, preferences, capabilitie
         live: liveState.get(),
         conversation: (agentId) => actions.conversationStore.get(agentId),
         avatar: watchAvatar,
+        faces: watchFaces,
         online: showsOnline,
         watchKey: knownWatchKey,
         account: session ? accountScope(session.apiUrl, session.user.id) : undefined,
@@ -118,6 +114,10 @@ function WatchLinkSync({ servers, serversReady, agents, preferences, capabilitie
 
   const requested = useRef(new Set<string>());
   const keyRequests = useRef(new Map<string, number>());
+
+  useEffect(() => {
+    if (watchInstalled) syncWatchPictures(agents);
+  }, [watchInstalled, agents]);
 
   useEffect(() => {
     if (!watchInstalled || !serversReady) return;

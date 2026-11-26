@@ -131,7 +131,7 @@ struct QuestionFlowView: View {
               Spacer(minLength: 4)
               if question.multiSelect {
                 Image(systemName: checked.contains(option) ? "checkmark.circle.fill" : "circle")
-                  .foregroundStyle(checked.contains(option) ? Color.accentColor : .secondary)
+                  .foregroundStyle(checked.contains(option) ? Color.blue : .secondary)
               }
             }
           }
@@ -184,7 +184,7 @@ struct QuestionFlowView: View {
       } label: {
         ActionLabel(title: text(TextKey.send), symbol: "paperplane.fill")
       }
-      .tint(.accentColor)
+      .tint(Color(hex: agent.color) ?? .blue)
       .disabled(!session.canAct)
       .primaryActionShortcut()
       Button {

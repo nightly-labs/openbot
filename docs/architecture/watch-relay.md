@@ -100,6 +100,9 @@ JSON body `WatchRelayHttpRequest { v: 1, ts, sealed, proof }`, at most `WATCH_RE
   `watch-relay-v1`, and answers `WatchResult { ok: true, direct: WatchDirectCredentials }`.
   Credentials travel only in a `sendMessage` reply, never in the application context.
 - Each `WatchServer` in the phone's snapshot carries `watchKey` when the phone knows it.
+- Each `WatchAgent` in the phone's snapshot can carry `faces` (`waiting`, `working`): the names of the
+  agent's picture with that face. The phone draws them; the host does not send faces, so the watch keeps
+  the faces that the phone sent.
 - The phone's ready snapshot and the credentials carry `account`, the account scope of the phone's
   session (`apps/mobile/src/shared/lib/account-scope.ts`). When a snapshot from the phone has another
   `account` than the credentials, the watch deletes the credentials and pairs again.

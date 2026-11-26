@@ -69,6 +69,7 @@ const WATCH_TEXT_KEYS = [
   "mobile.watch.question.private",
   "mobile.agent.list.waiting.title",
   "mobile.agent.list.unreadGroup.title",
+  "mobile.server.drawer.title",
   "mobile.chat.question.next",
   "mobile.watch.disconnected.title",
   "mobile.watch.disconnected.detail",

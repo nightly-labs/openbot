@@ -58,7 +58,7 @@ struct ReviewView: View {
           Label(text(TextKey.send), systemImage: "checkmark")
             .frame(maxWidth: .infinity)
         }
-        .tint(.accentColor)
+        .tint(Color(hex: agent.color) ?? .blue)
         .disabled(!session.canAct)
         .primaryActionShortcut()
         TextFieldLink {

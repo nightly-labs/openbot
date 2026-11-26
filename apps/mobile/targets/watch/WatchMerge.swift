@@ -27,6 +27,7 @@ enum WatchMerge {
           var copy = agent
           copy.serverId = id
           copy.avatar = picture(for: copy, known: [phone, previous], hasPicture: hasPicture)
+          if copy.faces == nil { copy.faces = faces(for: copy, known: [phone, previous]) }
           return copy
         }
       } else if let listed, let known {
@@ -65,6 +66,12 @@ enum WatchMerge {
       snapshot?.agents.first { $0.serverId == agent.serverId && $0.id == agent.id }?.avatar
     }
     return names.first(where: hasPicture) ?? agent.avatar ?? names.first
+  }
+
+  static func faces(for agent: WatchAgent, known snapshots: [WatchReadySnapshot?]) -> WatchFaces? {
+    snapshots.lazy.compactMap { snapshot in
+      snapshot?.agents.first { $0.serverId == agent.serverId && $0.id == agent.id }?.faces
+    }.first
   }
 
   static func withinLimit(_ agents: [WatchAgent]) -> [WatchAgent] {

@@ -93,6 +93,11 @@ struct AgentKey: Hashable {
   var id: String
 }
 
+struct WatchFaces: Codable, Hashable {
+  var waiting: String?
+  var working: String?
+}
+
 struct WatchAgent: Codable, Hashable, Identifiable {
   var serverId: String
   var id: String
@@ -100,6 +105,7 @@ struct WatchAgent: Codable, Hashable, Identifiable {
   var server: String
   var color: String
   var avatar: String?
+  var faces: WatchFaces?
   var pinned: Bool?
   var folder: String?
   var unread: Int?
@@ -112,6 +118,15 @@ struct WatchAgent: Codable, Hashable, Identifiable {
 
   var key: AgentKey { AgentKey(serverId: serverId, id: id) }
   var isPinned: Bool { pinned ?? false }
+  var isBusy: Bool { state != .idle || wait != nil }
+  var face: String? {
+    switch state {
+    case .waiting: return faces?.waiting
+    case .working: return faces?.working
+    case .idle: return nil
+    }
+  }
+  var pictureNames: [String] { [avatar, faces?.waiting, faces?.working].compactMap { $0 } }
 }
 
 struct WatchServer: Codable, Hashable {
@@ -293,6 +308,16 @@ enum WatchCommand: Encodable, Hashable {
     case .approve(let serverId, _, _), .deny(let serverId, _, _), .answer(let serverId, _, _, _),
       .send(let serverId, _, _, _), .stop(let serverId, _, _), .open(let serverId, _), .read(let serverId, _):
       return serverId
+    }
+  }
+
+  var agentKey: AgentKey? {
+    switch self {
+    case .refresh, .pair, .avatars: return nil
+    case .approve(let serverId, let agentId, _), .deny(let serverId, let agentId, _),
+      .answer(let serverId, let agentId, _, _), .send(let serverId, let agentId, _, _),
+      .stop(let serverId, let agentId, _), .open(let serverId, let agentId), .read(let serverId, let agentId):
+      return AgentKey(serverId: serverId, id: agentId)
     }
   }
 }

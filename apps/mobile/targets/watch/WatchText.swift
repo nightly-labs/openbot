@@ -24,6 +24,7 @@ enum TextKey {
   static let newMessage = "mobile.watch.compose.newMessage"
   static let pinned = "mobile.watch.list.pinned"
   static let needsYou = "mobile.agent.list.waiting.title"
+  static let servers = "mobile.server.drawer.title"
   static let unread = "mobile.agent.list.unreadGroup.title"
   static let questionPrivate = "mobile.watch.question.private"
   static let position = "mobile.chat.question.position"

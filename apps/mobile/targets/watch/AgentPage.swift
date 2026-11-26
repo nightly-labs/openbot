@@ -22,7 +22,6 @@ struct AgentPage: View {
       .frame(maxWidth: .infinity)
     }
     .agentBackground(agent)
-    .navigationTitle(agent.server)
     .task(id: agent.unread ?? 0) {
       if agent.message == nil { await session.markRead(agent) }
     }
@@ -264,6 +263,7 @@ struct MessageButton: View {
     DictateLink(target: .message(agent.key), path: $path) {
       ActionLabel(title: text(TextKey.message), symbol: "mic.fill")
     }
+    .tint(Color(hex: agent.color) ?? .blue)
   }
 }
 

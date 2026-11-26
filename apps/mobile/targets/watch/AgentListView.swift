@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct AgentGroup: Identifiable {
+  static let pinnedId = "pinned"
+
   let id: String
   let title: String
   var agents: [WatchAgent]
@@ -10,40 +12,43 @@ struct AgentListView: View {
   @EnvironmentObject private var session: WatchSession
   @Environment(\.watchText) private var text
   let snapshot: WatchReadySnapshot
+  let open: (AgentKey) -> Void
 
   var body: some View {
     if snapshot.agents.isEmpty {
       EmptyAgentsView(live: snapshot.live)
     } else {
       List {
-        if let title {
-          Text(title)
-            .font(.title3.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .lineLimit(2)
-            .minimumScaleFactor(0.8)
-            .listRowBackground(Color.clear)
-        }
         if session.showsConnectionNote {
           ConnectionNote()
             .listRowBackground(Color.clear)
         }
         ForEach(groups) { group in
-          Section {
-            ForEach(group.agents) { agent in
-              AgentRow(agent: agent)
+          if group.id == AgentGroup.pinnedId {
+            Section {
+              PinnedGrid(agents: group.agents, open: open)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+            } header: {
+              Text(group.title)
+                .textCase(nil)
+                .padding(.bottom, 6)
             }
-          } header: {
-            Text(group.title)
-              .textCase(nil)
+          } else {
+            Section {
+              ForEach(Array(group.agents.enumerated()), id: \.element.id) { index, agent in
+                AgentRow(agent: agent, divided: index > 0)
+                  .listRowBackground(Color.clear)
+              }
+            } header: {
+              Text(group.title)
+                .textCase(nil)
+                .padding(.bottom, 6)
+            }
           }
         }
       }
     }
-  }
-
-  private var title: String? {
-    snapshot.servers.count == 1 ? snapshot.servers.first?.name : nil
   }
 
   private var groups: [AgentGroup] {
@@ -54,7 +59,7 @@ struct AgentListView: View {
     let rest = others.filter { $0.state != .waiting && ($0.unread ?? 0) == 0 }
     var result: [AgentGroup] = []
     if !pinned.isEmpty {
-      result.append(AgentGroup(id: "pinned", title: text(TextKey.pinned), agents: pinned))
+      result.append(AgentGroup(id: AgentGroup.pinnedId, title: text(TextKey.pinned), agents: pinned))
     }
     if !unread.isEmpty {
       result.append(AgentGroup(id: "unread", title: text(TextKey.unread), agents: unread))
@@ -82,8 +87,11 @@ private func folderTitle(_ agent: WatchAgent, manyServers: Bool) -> String {
 }
 
 struct AgentRow: View {
+  static let dividerInset: CGFloat = 40
+
   @Environment(\.watchText) private var text
   let agent: WatchAgent
+  var divided = false
 
   var body: some View {
     let style = AgentStateStyle(agent: agent, text: text)
@@ -110,6 +118,51 @@ struct AgentRow: View {
         }
       }
       .padding(.vertical, 2)
+    }
+    .overlay(alignment: .top) {
+      if divided {
+        Divider()
+          .padding(.leading, Self.dividerInset)
+          .offset(y: -4)
+      }
+    }
+  }
+}
+
+struct PinnedGrid: View {
+  static let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 3)
+  let agents: [WatchAgent]
+  let open: (AgentKey) -> Void
+
+  var body: some View {
+    LazyVGrid(columns: Self.columns, spacing: 8) {
+      ForEach(agents) { agent in
+        Button {
+          open(agent.key)
+        } label: {
+          VStack(spacing: 3) {
+            AgentAvatar(agent: agent, size: 40, stateIcon: true)
+              .overlay(alignment: .topTrailing) {
+                if let unread = agent.unread, unread > 0 {
+                  Text(verbatim: unread > 99 ? "99+" : String(unread))
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 4)
+                    .frame(minWidth: 16, minHeight: 16)
+                    .background(Color.blue, in: Capsule())
+                    .offset(x: 5, y: -3)
+                }
+              }
+            Text(agent.name)
+              .font(.caption2)
+              .lineLimit(1)
+          }
+          .frame(maxWidth: .infinity)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(agent.name))
+      }
     }
   }
 }

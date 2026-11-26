@@ -26,6 +26,7 @@ struct OpenBotWatchApp: App {
 }
 
 enum WatchRoute: Hashable {
+  case servers
   case agent(AgentKey)
   case detail(AgentKey)
   case questions(AgentKey)
@@ -97,13 +98,17 @@ struct RootView: View {
     case .locked:
       LockedView()
     case .ready(let snapshot):
-      AgentListView(snapshot: snapshot)
+      HomeView(snapshot: snapshot, path: $path)
     }
   }
 
   @ViewBuilder
   private func destination(_ route: WatchRoute) -> some View {
     switch route {
+    case .servers:
+      if case .ready(let snapshot) = session.phase {
+        ServerPickerView(snapshot: snapshot, path: $path)
+      }
     case .agent(let key):
       AgentScreen(key: key) { agent in AgentPage(agent: agent, path: $path) }
     case .detail(let key):
