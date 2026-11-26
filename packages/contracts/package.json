@@ -113,6 +113,7 @@
     "./team-protocol/provider-account-code-v1": "./src/team-protocol/provider-account-code-v1.ts",
     "./team-protocol/provider-account-keys-v1": "./src/team-protocol/provider-account-keys-v1.ts",
     "./team-protocol/provider-account-pool-v1": "./src/team-protocol/provider-account-pool-v1.ts",
+    "./team-protocol/provider-account-pool-strategy-v1": "./src/team-protocol/provider-account-pool-strategy-v1.ts",
     "./team-protocol/provider-many-accounts-v1": "./src/team-protocol/provider-many-accounts-v1.ts",
     "./team-protocol/provider-accounts-v1": "./src/team-protocol/provider-accounts-v1.ts",
     "./team-protocol/provider-sign-in-relay-v2": "./src/team-protocol/provider-sign-in-relay-v2.ts",

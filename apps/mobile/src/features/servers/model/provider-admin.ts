@@ -32,6 +32,7 @@ import {
   type PromptCacheTtlSetting,
   type ProviderAccountCodeLoginStart,
   type ProviderAccountCodeLoginStatus,
+  type ProviderAccountPoolStrategy,
   type ProviderApiKeyStatus,
   type ProviderCodeLoginStart,
   type ProviderEnvironment,
@@ -73,6 +74,7 @@ import {
 } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
+import { PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-strategy-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -443,12 +445,25 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
                 false,
                 has(PROVIDER_ACCOUNT_POOL_CAPABILITY),
                 has(LIVE_VOICE_ACCOUNT_CAPABILITY),
+                has(PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY),
               ),
             ),
           setPool: has(PROVIDER_ACCOUNT_POOL_CAPABILITY)
-            ? (provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]): Promise<void> =>
-                runTeamRequest(setProviderAccountPool(request, { provider, enabled, leftOut: [...leftOut] }))
+            ? (
+                provider: AgentProviderId,
+                enabled: boolean,
+                leftOut: readonly string[],
+                strategy?: ProviderAccountPoolStrategy,
+              ): Promise<void> =>
+                runTeamRequest(
+                  setProviderAccountPool(
+                    request,
+                    { provider, enabled, leftOut: [...leftOut], ...(strategy ? { strategy } : {}) },
+                    has(PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY),
+                  ),
+                )
             : null,
+          poolStrategy: has(PROVIDER_ACCOUNT_POOL_CAPABILITY) && has(PROVIDER_ACCOUNT_POOL_STRATEGY_CAPABILITY),
           setLiveVoiceAccount: has(LIVE_VOICE_ACCOUNT_CAPABILITY)
             ? (accountId: string | null): Promise<void> => runTeamRequest(setLiveVoiceAccount(request, { accountId }))
             : null,

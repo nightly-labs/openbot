@@ -3,6 +3,7 @@ import {
   type AgentProviderId,
   type ClientAgentModelOption,
   DEFAULT_PROVIDER_ACCOUNT_ID,
+  type ProviderAccountPoolStrategy,
   type ProviderAccountStatus,
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
@@ -26,7 +27,15 @@ export interface ProviderAccountActions {
   usageResets?: ((provider: AgentProviderId) => Promise<readonly ProviderUsageResets[]>) | undefined;
   resetUsage?: ((provider: AgentProviderId, accountId: string) => Promise<ProviderUsageResetOutcome>) | undefined;
   signOut?: ((provider: AgentProviderId) => Promise<void>) | undefined;
-  setPool?: ((provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) => Promise<void>) | undefined;
+  setPool?:
+    | ((
+        provider: AgentProviderId,
+        enabled: boolean,
+        leftOut: readonly string[],
+        strategy?: ProviderAccountPoolStrategy,
+      ) => Promise<void>)
+    | undefined;
+  poolStrategy?: boolean | undefined;
   setLiveVoiceAccount?: ((accountId: string | null) => Promise<void>) | undefined;
   maxAccounts?: number | undefined;
   local?: boolean | undefined;
