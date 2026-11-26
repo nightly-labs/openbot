@@ -119,6 +119,7 @@ import { PROMPT_CACHE_TTL_CODECS } from "./prompt-cache-ttl-v1";
 import { PROVIDER_ACCOUNT_CODE_CODECS } from "./provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CODECS } from "./provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CODECS } from "./provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_STRATEGY_CODECS } from "./provider-account-pool-strategy-v1";
 import { PROVIDER_ACCOUNT_POOL_CODECS } from "./provider-account-pool-v1";
 import { PROVIDER_ACCOUNT_RELAY_CODECS } from "./provider-account-relay-v1";
 import { PROVIDER_ACCOUNT_RELAY_V2_CODECS } from "./provider-account-relay-v2";
@@ -286,6 +287,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_ENVIRONMENT_CODECS,
   ...PROVIDER_ACCOUNT_MODELS_CODECS,
   ...PROVIDER_ACCOUNT_POOL_CODECS,
+  ...PROVIDER_ACCOUNT_POOL_STRATEGY_CODECS,
   ...PROVIDER_ACCOUNT_KEYS_CODECS,
   ...PROVIDER_ACCOUNT_CODE_CODECS,
   ...GITHUB_SKILLS_CODECS,

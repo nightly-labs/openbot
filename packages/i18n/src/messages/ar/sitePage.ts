@@ -403,6 +403,8 @@ export const messages = {
   "sitePage.landing.download.googlePlay": "احصل عليه من Google Play",
   "sitePage.landing.download.pages": "متطلبات النظام وخطوات التثبيت:",
   "sitePage.landing.download.apk": "احصل على ملف APK",
+  "sitePage.landing.download.chromeDescription": "سوق Chrome الإلكتروني · وكلاؤك بجانب أي صفحة",
+  "sitePage.landing.download.chromeAction": "إضافة إلى Chrome",
   "sitePage.referral.invitedBy": "{name} دعاك إلى OpenBot",
   "sitePage.referral.invited": "لديك دعوة إلى OpenBot",
   "sitePage.referral.offer": "خصم {percent}",

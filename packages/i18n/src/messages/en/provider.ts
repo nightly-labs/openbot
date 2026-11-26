@@ -265,6 +265,11 @@ export const messages = defineMessages("provider", {
   "provider.account.pool": "Pool accounts",
   "provider.account.poolDescription":
     "Agents use one account until it nears a usage limit, then the account whose limit resets first.",
+  "provider.account.poolStrategy": "Use accounts",
+  "provider.account.poolFillFirst": "Fill first",
+  "provider.account.poolSpread": "Spread",
+  "provider.account.poolSpreadDescription":
+    "Agents spread over the accounts with the most usage left. An agent changes accounts only when another account has much more room.",
   "provider.account.inUse": "In use",
   "provider.account.notInPool": "Not in pool",
   "provider.account.leaveOutOfPool": "Leave out of pool",

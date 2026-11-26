@@ -397,6 +397,8 @@ export const messages = {
   "sitePage.landing.download.googlePlay": "在 Google Play 获取",
   "sitePage.landing.download.pages": "系统要求和安装步骤：",
   "sitePage.landing.download.apk": "获取 APK",
+  "sitePage.landing.download.chromeDescription": "Chrome 应用商店 · 在任意网页旁使用你的智能体",
+  "sitePage.landing.download.chromeAction": "添加到 Chrome",
   "sitePage.referral.invitedBy": "{name} 邀请你加入 OpenBot",
   "sitePage.referral.invited": "你收到了 OpenBot 邀请",
   "sitePage.referral.offer": "立减 {percent}",

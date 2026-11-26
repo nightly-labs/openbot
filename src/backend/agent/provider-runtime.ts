@@ -19,6 +19,7 @@ import type {
   McpServerConfig,
   ProviderAccountCodeLoginStatus,
   ProviderAccountPool,
+  ProviderAccountPoolStrategy,
   ProviderAccountStatus,
   ProviderCodeLoginStart,
   ProviderUsageResetOutcome,
@@ -1060,7 +1061,6 @@ export class ProviderRuntime implements ProviderPort {
             const codexType = provider === "codex" ? this.#accounts.get(provider)?.type : undefined;
             if (codexType === "apiKey" || codexType === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE) return null;
             const released = this.#released.has(provider) && !this.#clients.has(provider);
-            const accounts = ProviderAccounts.support(provider);
             const releasedCli = this.#releasedUsageCli(provider);
             if (releasedCli) {
               usage = yield* this.#readReleasedUsage(provider, releasedCli, defaultUsageModel(provider)).pipe(deadline);
@@ -1075,9 +1075,7 @@ export class ProviderRuntime implements ProviderPort {
               usage = yield* this.#refreshUsage(client, defaultUsageModel(provider), false).pipe(deadline);
               const first = usage.limits[0];
               const last = this.#lastUsage.get(provider);
-              const leavesSession = Boolean(accounts && !isKeyAccountSupport(accounts) && accounts.usageLeavesSession);
-              if (last && !first?.primary && !first?.secondary && (leavesSession || !usageWindowHasReset(last)))
-                return last;
+              if (last && !first?.primary && !first?.secondary && !usageWindowHasReset(last)) return last;
             }
           }
           const limit = usage.limits[0];
@@ -1179,8 +1177,7 @@ export class ProviderRuntime implements ProviderPort {
       codexType !== "apiKey" &&
       codexType !== CODEX_MODEL_PROVIDER_ACCOUNT_TYPE &&
       accounts &&
-      !isKeyAccountSupport(accounts) &&
-      !accounts.usageLeavesSession
+      !isKeyAccountSupport(accounts)
       ? cli
       : undefined;
   }
@@ -1845,9 +1842,10 @@ export class ProviderRuntime implements ProviderPort {
     provider: AgentProvider,
     enabled: boolean,
     leftOut: readonly string[],
+    strategy?: ProviderAccountPoolStrategy,
   ) {
     const accounts = yield* this.#requireAccounts(provider);
-    yield* accounts.setPool(provider, enabled, leftOut).pipe(toProviderOperationFailed);
+    yield* accounts.setPool(provider, enabled, leftOut, strategy).pipe(toProviderOperationFailed);
     if (!enabled) this.#poolInUse.delete(provider);
     return this.status();
   }).bind(this);
@@ -1884,7 +1882,15 @@ export class ProviderRuntime implements ProviderPort {
   accountPool(provider: AgentProvider): ProviderAccountPool | null {
     const pool = this.#providerAccounts?.pool(provider);
     if (!pool) return null;
-    return { leftOut: [...pool.leftOut], inUse: this.#poolInUse.get(provider) ?? null };
+    return {
+      leftOut: [...pool.leftOut],
+      inUse: this.#poolInUse.get(provider) ?? null,
+      ...(pool.strategy ? { strategy: pool.strategy } : {}),
+    };
+  }
+
+  poolStrategy(provider: AgentProvider): ProviderAccountPoolStrategy {
+    return this.#providerAccounts?.pool(provider)?.strategy ?? "fillFirst";
   }
 
   poolMembers(provider: AgentProvider, model: string): PoolCandidate[] {
@@ -1914,7 +1920,10 @@ export class ProviderRuntime implements ProviderPort {
     }));
     const named = members.some((member) => member.namesModels && member.windows !== undefined);
     return members
-      .filter((member) => !pool.leftOut.includes(member.accountId))
+      .filter(
+        (member) =>
+          !pool.leftOut.includes(member.accountId) && !this.#providerAccounts?.removing(provider, member.accountId),
+      )
       .filter((member) => !(named && member.namesModels && member.windows === undefined))
       .map(({ accountId, windows }) => ({
         accountId,
@@ -1926,6 +1935,14 @@ export class ProviderRuntime implements ProviderPort {
     if ((this.#poolInUse.get(provider) ?? null) === accountId) return;
     this.#poolInUse.set(provider, accountId);
     this.#setStatus({});
+  }
+
+  accountRemoving(provider: AgentProvider, accountId: string): boolean {
+    return this.#providerAccounts?.removing(provider, accountId) ?? false;
+  }
+
+  setAccountRemoving(provider: AgentProvider, accountId: string, removing: boolean): void {
+    this.#providerAccounts?.setRemoving(provider, accountId, removing);
   }
 
   readPoolUsage(provider: AgentProvider): Effect.Effect<void> {

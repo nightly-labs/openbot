@@ -700,6 +700,7 @@ async function main(): Promise<void> {
         : new Promise<void>((resolve) => contents.once("destroyed", () => resolve()));
     const loaded: Electron.WebContents[] = [];
     let firstTabId: string | undefined;
+    await runCauseEffect(sleepy.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
     for (const index of [1, 2, 3, 4, 5]) {
       const url = `${origin}/form?tab=${index}`;
       const tab = await runCauseEffect(sleepy.open(url, "fixture-thread", "fixture-agent"));
@@ -708,7 +709,6 @@ async function main(): Promise<void> {
       assert(contents, `Missing contents of sleep tab ${index}.`);
       loaded.push(contents);
     }
-    await runCauseEffect(sleepy.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
     const [first, second, ...newest] = loaded;
     assert(first && second, "Missing sleep tabs.");
     await unloaded(first);
@@ -753,6 +753,7 @@ async function main(): Promise<void> {
     await mkdir(dirname(reportPath), { recursive: true });
     await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   } catch (error) {
+    process.stderr.write(`Browser steps fixture failed in ${currentPhase}: ${redactText(String(error))}\n`);
     await mkdir(dirname(reportPath), { recursive: true });
     await writeFile(
       reportPath,

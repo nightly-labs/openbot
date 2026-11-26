@@ -262,6 +262,11 @@ export const messages = {
   "provider.account.pool": "Raggruppa account",
   "provider.account.poolDescription":
     "Gli agenti usano un account finché non si avvicina a un limite di utilizzo, poi l'account il cui limite si azzera per primo.",
+  "provider.account.poolStrategy": "Usa gli account",
+  "provider.account.poolFillFirst": "Riempi prima",
+  "provider.account.poolSpread": "Distribuisci",
+  "provider.account.poolSpreadDescription":
+    "Gli agenti si distribuiscono sugli account con più utilizzo rimasto. Un agente cambia account solo quando un altro account ha molto più margine.",
   "provider.account.inUse": "In uso",
   "provider.account.notInPool": "Fuori dal pool",
   "provider.account.leaveOutOfPool": "Escludi dal pool",

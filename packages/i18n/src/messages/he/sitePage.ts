@@ -407,6 +407,8 @@ export const messages = {
   "sitePage.landing.download.googlePlay": "זמין ב-Google Play",
   "sitePage.landing.download.pages": "דרישות מערכת ושלבי התקנה:",
   "sitePage.landing.download.apk": "הורדת APK",
+  "sitePage.landing.download.chromeDescription": "Chrome Web Store · הסוכנים שלך לצד כל דף",
+  "sitePage.landing.download.chromeAction": "הוספה ל-Chrome",
   "sitePage.referral.invitedBy": "קיבלת מ-{name} הזמנה ל-OpenBot",
   "sitePage.referral.invited": "יש לך הזמנה ל-OpenBot",
   "sitePage.referral.offer": "{percent} הנחה",

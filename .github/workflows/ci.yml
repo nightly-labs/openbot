@@ -740,10 +740,6 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:agent-update-agents
 
-      - name: Run the Gemini usage E2E test
-        if: ${{ !cancelled() }}
-        run: bun run test:antigravity-usage
-
       - name: Run the Gemini accounts E2E test
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-accounts
@@ -1006,7 +1002,6 @@ jobs:
             .openbot-build/agent-mcp-tools-e2e/
             .openbot-build/mcp-server-unreadable-row-e2e/
             .openbot-build/agent-update-agents-e2e/
-            .openbot-build/antigravity-usage-e2e/
             .openbot-build/antigravity-accounts-e2e/
             .openbot-build/antigravity-usage-metering-e2e/
             .openbot-build/antigravity-quota-failover-e2e/

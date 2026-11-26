@@ -80,6 +80,7 @@ import { PENDING_APPROVAL_ROUTES } from "@openbot/contracts/team-protocol/pendin
 import { PENDING_PROMPTS_ROUTES } from "@openbot/contracts/team-protocol/pending-prompts-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { PROVIDER_ACCOUNT_MODELS_ROUTES } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES } from "@openbot/contracts/team-protocol/provider-account-pool-strategy-v1";
 import { PROVIDER_ACCOUNT_POOL_ROUTES } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { PROVIDER_ACCOUNTS_ROUTES } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provider-default-v1";
@@ -170,6 +171,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   PROVIDER_MODEL_SOURCE_ROUTES.list,
   PROVIDER_ACCOUNT_MODELS_ROUTES.list,
   PROVIDER_ACCOUNT_POOL_ROUTES.list,
+  PROVIDER_ACCOUNT_POOL_STRATEGY_ROUTES.list,
   LIVE_VOICE_ACCOUNT_ROUTES.settings,
   PROVIDER_DEFAULT_ROUTES.settings,
   PROVIDER_USE_ROUTES.list,

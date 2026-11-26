@@ -505,7 +505,6 @@ export interface AcpProviderOptions {
   ): Effect.Effect<void, ProviderClientOperationError>;
   savedKeyRefusedMessage?: () => string | null;
   savedKeyLimitMessage?: (detail: string, error?: unknown) => string | null;
-  readVerificationLink?: () => Effect.Effect<string | null>;
   authBlockedMessage?: () => string | null;
   savedSignInCheck?: AcpSavedSignInCheck;
   readAccount?(
@@ -817,10 +816,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   get #label(): string {
     return this.options.label ?? agentProviderName(this.provider);
-  }
-
-  #readVerificationLink(): Effect.Effect<string | null> {
-    return this.options.readVerificationLink?.() ?? Effect.succeed(null);
   }
 
   #redact(text: string): string {
@@ -4457,11 +4452,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const detail = this.#redact(failureText(error));
       const verification =
         turn.accountVerification || this.#flavor.sdkHarness?.accountVerification?.test(detail) === true;
-      if (verification) {
-        turn.accountLink = (yield* this.#readVerificationLink()) ?? turn.accountLink;
-        turn.failureCause ??= "authentication";
-      }
-      const shown =
+      if (verification) turn.failureCause ??= "authentication";
+      const message =
         this.options.savedKeyLimitMessage?.(detail, error) ??
         this.#flavor.turnFailure?.(
           error,
@@ -4477,15 +4469,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           () => this.options.savedKeyShadowed?.() ?? false,
         ) ??
         detail;
-      const verificationMessage = verification
-        ? null
-        : (this.#flavor.unexplainedFailureVerification?.(error, detail, shown) ?? null);
-      const verifiedLink = verificationMessage ? yield* this.#readVerificationLink() : null;
-      if (verifiedLink) {
-        turn.accountLink = verifiedLink;
-        turn.failureCause = "authentication";
-      }
-      const message = verifiedLink && verificationMessage ? verificationMessage : shown;
       const causeCode = turn.failureCause ?? acpFailureCause(error, this.#flavor, message, answer);
       this.emit("notification", {
         method: "error",

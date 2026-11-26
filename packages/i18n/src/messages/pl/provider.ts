@@ -284,6 +284,11 @@ export const messages = {
   "provider.account.pool": "Łącz konta w pulę",
   "provider.account.poolDescription":
     "Agenci używają jednego konta, aż zbliży się do limitu użycia, a potem konta, którego limit odnowi się najwcześniej.",
+  "provider.account.poolStrategy": "Używanie kont",
+  "provider.account.poolFillFirst": "Najpierw zapełniaj",
+  "provider.account.poolSpread": "Rozkładaj",
+  "provider.account.poolSpreadDescription":
+    "Agenci rozkładają się na konta z największym pozostałym użyciem. Agent zmienia konto tylko wtedy, gdy inne konto ma dużo więcej zapasu.",
   "provider.account.inUse": "W użyciu",
   "provider.account.notInPool": "Poza pulą",
   "provider.account.leaveOutOfPool": "Wyłącz z puli",

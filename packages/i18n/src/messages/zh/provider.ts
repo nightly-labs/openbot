@@ -249,6 +249,11 @@ export const messages = {
   "provider.account.resetUsageFailed": "无法重置 {name} 的用量。",
   "provider.account.pool": "账号池",
   "provider.account.poolDescription": "助手先用一个账号，直到接近用量限额，再换到限额最先重置的账号。",
+  "provider.account.poolStrategy": "账号用法",
+  "provider.account.poolFillFirst": "先用满",
+  "provider.account.poolSpread": "分散",
+  "provider.account.poolSpreadDescription":
+    "助手分散到剩余用量最多的账号。只有当另一个账号的余量多很多时，助手才会换账号。",
   "provider.account.inUse": "使用中",
   "provider.account.notInPool": "不在池中",
   "provider.account.leaveOutOfPool": "移出账号池",

@@ -283,6 +283,8 @@ export type TeamApiProviderAccounts = Pick<
   | "models"
   | "pools"
   | "setPool"
+  | "poolStrategies"
+  | "setPoolStrategy"
   | "liveVoiceAccount"
   | "setLiveVoiceAccount"
   | "usage"

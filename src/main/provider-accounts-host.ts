@@ -1,4 +1,8 @@
-import { type AgentProviderId, DEFAULT_PROVIDER_ACCOUNT_ID } from "@openbot/contracts/ipc";
+import {
+  type AgentProviderId,
+  DEFAULT_PROVIDER_ACCOUNT_ID,
+  type ProviderAccountPoolStrategy,
+} from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { PROVIDER_ACCOUNT_MODELS_LIMIT } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { PROVIDER_ACCOUNTS_MESSAGE_LIMIT } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -86,13 +90,30 @@ export class ProviderAccountsHost {
 
   pools() {
     const pools = (this.#dependencies.service.getStatus().providers ?? []).flatMap((row) =>
-      row.accounts && row.accountPool ? [{ provider: row.id, ...row.accountPool }] : [],
+      row.accounts && row.accountPool
+        ? [{ provider: row.id, leftOut: row.accountPool.leftOut, inUse: row.accountPool.inUse }]
+        : [],
     );
     return { pools };
   }
 
   setPool(provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) {
     return this.#dependencies.service.setProviderAccountPool(provider, enabled, leftOut).pipe(Effect.asVoid);
+  }
+
+  poolStrategies() {
+    const strategies = (this.#dependencies.service.getStatus().providers ?? []).flatMap((row) =>
+      row.accounts && row.accountPool ? [{ provider: row.id, strategy: row.accountPool.strategy ?? "fillFirst" }] : [],
+    );
+    return { strategies };
+  }
+
+  setPoolStrategy(provider: AgentProviderId, strategy: ProviderAccountPoolStrategy) {
+    const pool = this.#dependencies.service.getStatus().providers?.find((row) => row.id === provider)?.accountPool;
+    if (!pool) return Effect.void;
+    return this.#dependencies.service
+      .setProviderAccountPool(provider, true, pool.leftOut, strategy)
+      .pipe(Effect.asVoid);
   }
 
   liveVoiceAccount() {

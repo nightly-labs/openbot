@@ -237,6 +237,22 @@ function chatAtPoint(world: SidebarDragWorld, point: SidebarDragPoint, sectionId
   );
 }
 
+function ownSectionTopTarget(
+  world: SidebarDragWorld,
+  point: SidebarDragPoint,
+  sourceChatId: string,
+  sectionId: string,
+): SidebarDropTarget | null | undefined {
+  if (world.chatSlots.get(sourceChatId)?.sectionId !== sectionId) return undefined;
+  let first: ChatDragSlot | null = null;
+  for (const slot of world.chatSlots.values()) {
+    if (slot.sectionId === sectionId && (!first || slot.top < first.top)) first = slot;
+  }
+  if (!first || point.clientY >= first.top - world.chatScrollDelta) return undefined;
+  if (first.chatId === sourceChatId) return null;
+  return { kind: "chat", target: { chatId: first.chatId, placement: "before", sectionId } };
+}
+
 function personAtPoint(world: SidebarDragWorld, point: SidebarDragPoint): PersonDragSlot | null {
   return closestVerticalSlot(world.personSlots.values(), point.clientY, world.sessionScrollDelta);
 }
@@ -306,6 +322,10 @@ export function sidebarDropTargetAt(world: SidebarDragWorld, point: SidebarDragP
   if (chat && chat.chatId !== session.source.id) {
     const target = targetChatAt(world, session.source.id, chat.chatId, point.clientY);
     if (target) return { kind: "chat", target };
+  }
+  if (!chat) {
+    const top = ownSectionTopTarget(world, point, session.source.id, section.sectionId);
+    if (top !== undefined) return top;
   }
   return { kind: "section", sectionId: section.sectionId };
 }

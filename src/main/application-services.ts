@@ -2312,7 +2312,6 @@ export async function createApplicationServices({
       mcpToolRuntimes: () => providerRuntimes.mcpToolRuntimes(),
       mcpOAuth,
       mcpOAuthProxySettings,
-      systemProxyFetch: (url, init) => net.fetch(url, { ...init, credentials: "omit", cache: "no-store" }),
       appVersion: app.getVersion(),
       providerStateDirectory: join(app.getPath("userData"), "provider-state"),
       ...(process.platform === "win32" ? { providerTempDirectory } : {}),

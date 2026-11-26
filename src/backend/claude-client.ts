@@ -87,6 +87,7 @@ import {
   claudeHistoryFromMessages,
   claudeHistoryReader,
   claudeTaskTurnId,
+  claudeWakeTurnId,
   isClaudeNoResponsePlaceholder,
 } from "./claude-history";
 import { readClaudeStoredSignIn } from "./claude-stored-sign-in";
@@ -2269,6 +2270,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       !message.resume_reason
     )
       runtime.nextTurnId = message.user_message_uuid;
+    else if (
+      !runtime.activeTurn &&
+      runtime.nextTurnId === null &&
+      message.parent_tool_use_id === null &&
+      !message.resume_reason &&
+      isString(message.session_id)
+    ) {
+      const apiMessageId = claudeReplyMessageId(message);
+      if (apiMessageId) runtime.nextTurnId = claudeWakeTurnId(message.session_id, apiMessageId);
+    }
     if (message.type === "stream_event" && message.parent_tool_use_id === null) {
       const event = message.event;
       const delta = isRecord(event) ? event.delta : null;
@@ -3773,6 +3784,14 @@ function takePrompt(runtime: ThreadRuntime, uuid: string): void {
     if (runtime.promptIds.size <= TAKEN_PROMPT_LIMIT) break;
     runtime.promptIds.delete(old);
   }
+}
+
+function claudeReplyMessageId(message: ClaudeStreamMessage): string | null {
+  if (message.type === "assistant")
+    return isClaudeNoResponsePlaceholder(message.message) ? null : getString(message.message, "id");
+  if (message.type === "stream_event" && isRecord(message.event) && message.event.type === "message_start")
+    return getString(message.event.message, "id");
+  return null;
 }
 
 function takenMessageIds(message: ClaudeStreamMessage): string[] {

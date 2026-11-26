@@ -78,7 +78,8 @@ safe to replay. Keep domain retry and recovery rules at their existing owners.
     structured param. Patterns cannot find a secret with no label, such as a token in an error
     text, so a store that loads a secret passes the value to `registerSecretValue`, and every later
     line masks that exact value. The provider credential store and the MCP store (for header and
-    environment names that look secret) do this. `info` and above is written by default; `OPENBOT_LOG_LEVEL` changes the
+    environment names that look secret) do this. The Vault uses `replaceSecretValueGroup` instead: each
+    change replaces its set of values, so a deleted item is no longer masked. `info` and above is written by default; `OPENBOT_LOG_LEVEL` changes the
     threshold. Machine-readable stdout (piped JSON, tags, harness URLs) uses
     `process.stdout.write` instead. Dev automation
     (`scripts/dev-automation`, `bun run dev:automation`) drives the already-running dev app over its
