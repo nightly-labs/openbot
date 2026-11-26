@@ -4,7 +4,8 @@ const MODELS = [{ modelId: "fake-alpha", name: "Fake Alpha" }];
 const closes = process.env.FAKE_CLOSE === "1";
 const resumes = process.env.FAKE_RESUME === "1";
 const hangMs = Number(process.env.FAKE_HANG_MS ?? 0);
-const refusesWithReason = process.env.FAKE_REFUSAL === "reason";
+const refusal = process.env.FAKE_REFUSAL;
+const refusesWithReason = refusal === "reason" || refusal === "busy";
 const active = new Set<string>();
 const open = new Map<string, { request: AcpRequest; peer: AcpPeer }>();
 let count = 0;
@@ -42,7 +43,11 @@ function restore(request: AcpRequest, peer: AcpPeer): void {
     peer.fail(
       request,
       refusesWithReason
-        ? { code: -32901, message: "The session is busy.", data: { reason: "session_already_open" } }
+        ? {
+            code: -32901,
+            message: "The session is busy.",
+            data: { reason: refusal === "busy" && open.has(sessionId) ? "session_busy" : "session_already_open" },
+          }
         : { code: -32602, message: "Invalid params", data: `session is already active: ${sessionId}` },
     );
     return;

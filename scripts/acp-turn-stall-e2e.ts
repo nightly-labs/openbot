@@ -64,7 +64,7 @@ interface Report {
   noLoad?: { stopStatus: string | null; next: string | null; sessionsOpened: number; loads: number };
   silentNew?: { error: string; elapsedMs: number };
   heldSession?: ActiveSessionReport;
-  reasonHeldSession?: ActiveSessionReport;
+  reasonHeldSession?: Record<string, ActiveSessionReport>;
   closedHeldSession?: ActiveSessionReport;
   failure?: string;
 }
@@ -592,26 +592,30 @@ try {
   assert.equal(report.heldSession.sameSession, true, "No new session replaces the chat.");
   assert.ok(report.heldSession.refusedRestores >= 2, "The agent refused to open the held session again.");
 
-  const reasonLog = join(root, "reason-held-session.jsonl");
-  const reasonHeld = await openStrict("reason-held-session", {
-    FAKE_HANG_MS: String(STALL_MS * 4),
-    FAKE_REFUSAL: "reason",
-  });
-  const reasonThread = await startThread(reasonHeld, { cwd: workspace });
-  const reasonStall = await runTurn(reasonHeld, reasonThread, { text: "hang", timeoutMs: STALL_MS * 10 });
-  const reasonBusy = await runTurn(reasonHeld, reasonThread, { timeoutMs: 10_000 }).then(
-    () => false,
-    (error: unknown) => error instanceof ProviderSessionBusyError,
-  );
-  await waitForEntry(reasonLog, (entry) => entry.event === "prompt-ended", 15_000);
-  const reasonNext = await runTurn(reasonHeld, reasonThread, { timeoutMs: 10_000 });
-  report.reasonHeldSession = await activeSessionReport(reasonLog, reasonStall, reasonNext, reasonBusy);
-  assert.equal(reasonStall.status, "failed", "A silent turn fails at the stall limit.");
-  assert.equal(reasonBusy, true, "A -32901 session_already_open refusal makes the message wait, not fail.");
-  assert.equal(reasonNext.status, "completed", "The next message uses the session that the agent still holds.");
-  assert.equal(reasonNext.reply, "ok", "The agent answers in the held session.");
-  assert.equal(report.reasonHeldSession.sameSession, true, "No new session replaces the chat.");
-  assert.ok(report.reasonHeldSession.refusedRestores >= 2, "The agent refused to open the held session again.");
+  report.reasonHeldSession = {};
+  for (const refusal of ["reason", "busy"]) {
+    const reasonLog = join(root, `${refusal}-held-session.jsonl`);
+    const reasonHeld = await openStrict(`${refusal}-held-session`, {
+      FAKE_HANG_MS: String(STALL_MS * 4),
+      FAKE_REFUSAL: refusal,
+    });
+    const reasonThread = await startThread(reasonHeld, { cwd: workspace });
+    const reasonStall = await runTurn(reasonHeld, reasonThread, { text: "hang", timeoutMs: STALL_MS * 10 });
+    const reasonBusy = await runTurn(reasonHeld, reasonThread, { timeoutMs: 10_000 }).then(
+      () => false,
+      (error: unknown) => error instanceof ProviderSessionBusyError,
+    );
+    await waitForEntry(reasonLog, (entry) => entry.event === "prompt-ended", 15_000);
+    const reasonNext = await runTurn(reasonHeld, reasonThread, { timeoutMs: 10_000 });
+    const held = await activeSessionReport(reasonLog, reasonStall, reasonNext, reasonBusy);
+    report.reasonHeldSession[refusal] = held;
+    assert.equal(reasonStall.status, "failed", "A silent turn fails at the stall limit.");
+    assert.equal(reasonBusy, true, `A -32901 refusal (${refusal}) makes the message wait, not fail.`);
+    assert.equal(reasonNext.status, "completed", "The next message uses the session that the agent still holds.");
+    assert.equal(reasonNext.reply, "ok", "The agent answers in the held session.");
+    assert.equal(held.sameSession, true, "No new session replaces the chat.");
+    assert.ok(held.refusedRestores >= 2, "The agent refused to open the held session again.");
+  }
 
   const closedLog = join(root, "closed-held-session.jsonl");
   const closed = await openStrict("closed-held-session", { FAKE_CLOSE: "1", FAKE_RESUME: "1" });
