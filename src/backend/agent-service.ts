@@ -2214,6 +2214,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       githubConnected: () => Boolean(githubConnector?.mcpServer()),
+      providerUsage: () => this.getProviderAccountUsage().pipe(toToolOperationFailed),
       ...(options.passwordManagerConnected === undefined
         ? {}
         : { passwordManagerConnected: options.passwordManagerConnected }),

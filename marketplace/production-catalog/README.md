@@ -77,6 +77,7 @@ Do not use the separate `skills:seed`, `agents:seed`, or `dev:seed` demo scripts
 | Spend Auditor | `spend-auditor` | data-analytics | Unused seats, duplicates and near renewals in your software spend, each with evidence and the saving | `spend-audit`, `data-quality-review` | day 1 of each month 09:00 |
 | Request Triage Desk | `request-triage-desk` | automation | Yes, maybe or no for each event, sponsorship or speaking request, with scores and a reply draft | `request-scoring` | — |
 | Ops Digest | `ops-digest` | automation | A Friday digest of overdue, due, done and new operations items | `workflow-playbook` | Fridays 15:00 |
+| Quota Looper | `quota-looper` | automation | Weekly provider quota pacing for approved project work, with separate account resets | `quota-loop` | every 15 minutes (paused) |
 | Home Care Log | `home-care-log` | other | A private care log for plants, pets and filters, with a weekend due list | `care-log` | Saturdays 09:00 |
 | Bill Tracker | `bill-tracker` | other | Recurring charges, price changes and renewals from your statements, with the statement lines | `recurring-charges` | Mondays 09:15 |
 | Dr. Eggbot | `dr-eggbot` | automation | Designs focused agents, skills and routines | `agent-designer`, `eggbot-getting-started`, `routine-healthcheck`, `agent-chat-healthcheck`, `working-with-teammate-agents`, `pstack` | weekdays 08:44 (paused); Mondays 08:49 (paused) |
@@ -124,6 +125,7 @@ Do not use the separate `skills:seed`, `agents:seed`, or `dev:seed` demo scripts
 | [agent-designer](skills/agent-designer/SKILL.md) | automation | openbot |
 | [eggbot-getting-started](skills/eggbot-getting-started/SKILL.md) | automation | openbot |
 | [routine-healthcheck](skills/routine-healthcheck/SKILL.md) | automation | openbot |
+| [quota-loop](skills/quota-loop/SKILL.md) | automation | openbot |
 | [agent-chat-healthcheck](skills/agent-chat-healthcheck/SKILL.md) | automation | openbot |
 | [working-with-teammate-agents](skills/working-with-teammate-agents/SKILL.md) | automation | openbot |
 | `pstack`, with the 58 skills `pstack-<name>` of [bundles/pstack/skills](bundles/pstack/skills) | coding | cursor |
@@ -132,6 +134,6 @@ Do not use the separate `skills:seed`, `agents:seed`, or `dev:seed` demo scripts
 
 ## Attribution
 
-The 35 original OpenBot team Skills use the repository PolyForm Noncommercial 1.0.0 license. The five existing adapted Skills retain their pinned OpenAI or Anthropic source attribution and Apache-2.0 license. Each generated bundle contains the applicable LICENSE.txt and NOTICE.txt; the build also produces UPSTREAM_NOTICES.md.
+The 36 original OpenBot team Skills use the repository PolyForm Noncommercial 1.0.0 license. The five existing adapted Skills retain their pinned OpenAI or Anthropic source attribution and Apache-2.0 license. Each generated bundle contains the applicable LICENSE.txt and NOTICE.txt; the build also produces UPSTREAM_NOTICES.md.
 
 `bundles/pstack/` is an unchanged copy of the `skills/` and `agents/` of the pstack plugin by Lauren Tan from the pinned `cursor/plugins` commit, under the MIT License, without `skills/statechart/scripts/test/`. The app and the account service refuse a skill archive with more than 200 files, and that test suite alone has 377. It is a pack in `catalog.json`: the build publishes it as the one Skill `pstack`. Its archive holds an index `SKILL.md`, the `LICENSE`, a `NOTICE.md`, and each folder of `skills/` as `skills/pstack-<folder>/`. The app installs each of those as a skill folder of its own, beside `pstack`, under one lock entry: one download and one install receipt. In Markdown, the build renames links, `/<name>` commands and `<name>` mentions of other pstack skills to `pstack-<name>`, removes `disable-model-invocation` so `$pstack-<name>` works with every provider, copies `agents/` into each skill that names a subagent, and adds a closing `pstack in OpenBot` section. Links to files that no skill installs go to the pinned commit. To update it, copy the new upstream `skills/` and `agents/`, remove `skills/statechart/scripts/test/`, update the pinned commit in `catalog.json` and `NOTICE.md`, and increase `catalogVersion`.

@@ -40,6 +40,7 @@ import {
 } from "@openbot/contracts/hosted-servers";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
+  AccountUsage,
   AgentApproval,
   AgentModelChoice,
   AgentModelOption,
@@ -236,6 +237,7 @@ import {
   widensAgentSettings,
 } from "./profile-tools";
 import { apiKeyFormSpec, browserUserControlResult, locationFormSpec } from "./prompts";
+import { summarizeProviderUsage } from "./provider-usage-summary";
 import { ROUTINE_NO_UPDATE_MARKER, ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
@@ -523,6 +525,7 @@ export interface OpenBotToolRouterOptions {
   mcpServers?: AgentMcpServers | null | undefined;
   marketplaceAppServer?: ((appId: string) => MarketplaceAppServer | null) | undefined;
   githubConnected?: (() => boolean) | undefined;
+  providerUsage?: (() => Effect.Effect<AccountUsage, ToolOperationFailed>) | undefined;
   passwordManagerConnected?: ((manager: PasswordManagerId) => boolean) | undefined;
   feedbackFacts?: FeedbackFacts | null | undefined;
   feedback?: AgentFeedback | null | undefined;
@@ -581,6 +584,7 @@ export class OpenBotToolRouter {
   readonly #mcpServers: AgentMcpServers | null;
   readonly #marketplaceAppServer: (appId: string) => MarketplaceAppServer | null;
   readonly #githubConnected: () => boolean;
+  readonly #providerUsage: (() => Effect.Effect<AccountUsage, ToolOperationFailed>) | undefined;
   readonly #passwordManagerConnected: (manager: PasswordManagerId) => boolean;
   readonly #feedbackFacts: FeedbackFacts | null;
   readonly #feedback: AgentFeedback | null;
@@ -653,6 +657,7 @@ export class OpenBotToolRouter {
     this.#mcpServers = options.mcpServers ?? null;
     this.#marketplaceAppServer = options.marketplaceAppServer ?? (() => null);
     this.#githubConnected = options.githubConnected ?? (() => false);
+    this.#providerUsage = options.providerUsage;
     this.#passwordManagerConnected = options.passwordManagerConnected ?? (() => false);
     this.#feedbackFacts = options.feedbackFacts ?? null;
     this.#feedback = options.feedback ?? null;
@@ -2166,6 +2171,17 @@ export class OpenBotToolRouter {
       return openBotToolResult(
         yield* organizeLibrary(libraryFolders, senderAgentId, args, this.#mailbox.listStoredFiles()),
       );
+    }
+
+    if (params.tool === "get_provider_usage") {
+      if (
+        this.#fromRemoteMember(senderAgentId, params.turnId) ||
+        this.#messaging.store.linkForThread(executionThreadId) ||
+        this.#channels.store.channelForThread(executionThreadId)
+      )
+        return openBotToolFailure("Provider usage is private. Use this tool only in your own OpenBot chat.");
+      if (!this.#providerUsage) return openBotToolFailure("Provider usage is unavailable on this OpenBot.");
+      return openBotToolResult(summarizeProviderUsage(yield* this.#providerUsage()));
     }
 
     if (params.tool === "list_agents") {

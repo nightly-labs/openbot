@@ -26,6 +26,7 @@ const DIRECT_NAMES = new Set([
   "ask_ui",
   "attach_files_to_response",
   "list_agents",
+  "get_provider_usage",
   "send_message",
   "start_task",
   "message_task",

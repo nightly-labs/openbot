@@ -457,6 +457,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     shape: {},
   },
   {
+    name: "get_provider_usage",
+    description:
+      "Read provider usage windows for connected accounts, with independent reset times and daily pacing estimates for weekly limits. Returns percentages, not exact token counts. Use only in a private OpenBot chat.",
+    shape: {},
+  },
+  {
     name: "list_models",
     description:
       "List the models each provider offers: id, name, reasoning efforts, and the default model that create_agent uses for a provider only. With no query, each provider lists its default, the models in use and its first models; omittedModels counts the rest. A provider with more than one account lists them: id, label and state, its own sign-in (id default) first. Read-only.",
