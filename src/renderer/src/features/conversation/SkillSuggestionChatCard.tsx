@@ -67,7 +67,7 @@ export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
     setSkillSuggestionPress(key, "pending");
     const reply =
       props.suggestion.action === "create" ? t("chat.suggestion.saveReply") : t("chat.suggestion.updateReply");
-    const result = await props.onSave?.(reply);
+    const result = await props.onSave?.(reply).catch(() => null);
     if (result === "saved" || result === "sent") setSkillSuggestionPress(key, result);
     else {
       setSkillSuggestionPress(key, null);
